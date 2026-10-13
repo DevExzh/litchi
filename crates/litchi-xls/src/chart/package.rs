@@ -1081,9 +1081,7 @@ pub(crate) fn write_rr_tab_ids(
     Ok(output)
 }
 pub(crate) fn names_equal(left: &str, right: &str) -> bool {
-    left.chars()
-        .flat_map(char::to_lowercase)
-        .eq(right.chars().flat_map(char::to_lowercase))
+    crate::sheet_name::equivalent(left, right)
 }
 #[cfg(test)]
 pub(crate) fn validate_sheet_name(name: &str) -> Result<()> {

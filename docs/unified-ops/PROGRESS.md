@@ -318,6 +318,16 @@ Cut from `e467bcf4e8`:
   - DOC and PPT `add` arms were unioned in the ops dispatch.
   - `test_threads.test_long_writes_release_the_gil` flaked once under load (3/3 reruns pass).
 
+- Merged `p16-schema` (0263, `3973a88a7e`):
+  - `litchi_ops::schema(format)` with registry goldens;
+  - the delta table now reads the registry and covers DOC, PPT and RTF;
+  - exposed through the CLI and Python.
+- Merged `p12-xls` (0259):
+  - XLS sheet lifecycle, formula writes, row/column layout, XF formatting writes, read-only named ranges;
+  - writes cost 1.00–1.07× (file-backed layout ~1.10×).
+  - Read overhead of 1.6–7× is traced to the shared resolver and walker and handed to the p8 perf stream.
+  - Feature-subset build fixes made at the merge: signature-test imports, an encryption-gated test, and the `round_trip` dead code in pptx-less builds.
+
 Still running from R1: `p7a-docx` (0251), `p7c-pptx` (0252), `p6-ooxml-meta` (0253).
 
 Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-pptx-w4` 9474e2b6ce, `uo/m2-l-xlsb-w1` 876588a23c, `uo/m1-r4-perf` 012fd509ff.

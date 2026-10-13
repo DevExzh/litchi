@@ -7,7 +7,7 @@
 
 use std::collections::HashSet;
 
-use litchi_core::FileFormat;
+use litchi_core::{FileFormat, Position};
 use litchi_xls::cell_values::{Reference, Selector, Value as NativeValue};
 
 use super::node::{CellState, Item, Node};
@@ -37,6 +37,10 @@ pub(crate) struct WriteCommit {
 enum CellAssignment {
     Value(NativeValue),
     Clear,
+    /// A formula expression without its leading `=`.
+    Formula(String),
+    /// Alignment, border-style and fill changes to the cell XF.
+    Format(litchi_xls::cell_values::FormatChange),
     Noop,
 }
 
@@ -78,6 +82,8 @@ pub(crate) fn set_with_limits<'p, 'v>(
         file.set_metadata(&props, limits)
     } else if is_sheet_property(&props) {
         set_sheet_with_limits(file, target, &props, limits)
+    } else if let Some(commit) = super::layout::set_layout(file, &target, &props, limits)? {
+        Ok(commit)
     } else {
         set_cells_with_limits(file, target, &props, limits)
     };
@@ -94,6 +100,12 @@ pub(crate) fn remove_with_limits(
     limits: &SemanticLimits,
 ) -> Result<WriteCommit> {
     file.admit_edit()?;
+    if let Some(commit) = super::structure::remove_sheet(file, &target, limits)? {
+        return Ok(commit);
+    }
+    if let Some(commit) = super::layout::remove_axis(file, &target, limits)? {
+        return Ok(commit);
+    }
     let targets = resolve_removal_targets(file, &target, limits)?;
     let staged = targets
         .len()
@@ -122,8 +134,11 @@ pub(crate) fn remove_with_limits(
     let mut edit = file.editable_package()?.edit().map_err(native_edit_error)?;
     for target in targets {
         if target.present {
-            edit.remove_cell(Selector::Position(target.sheet), target.reference)
-                .map_err(native_edit_error)?;
+            edit.remove_cell(
+                Selector::Position(Position::new(target.sheet)),
+                target.reference,
+            )
+            .map_err(native_edit_error)?;
         }
     }
     let native = edit.commit().map_err(native_edit_error)?;
@@ -167,8 +182,9 @@ fn set_sheet_with_limits(
     }
 
     let SheetAssignment::Name(name) = assignment;
+    super::structure::validate_sheet_name(file, Some(position), &name)?;
     let mut edit = file.editable_package()?.edit().map_err(native_edit_error)?;
-    edit.rename_sheet(Selector::Position(position), &name)
+    edit.rename_sheet(Selector::Position(Position::new(position)), &name)
         .map_err(native_edit_error)?;
     let native = edit.commit().map_err(native_edit_error)?;
     finish_commit(file, native, 1, limits)
@@ -198,14 +214,29 @@ fn set_cells_with_limits(
     if limits.max_operations() < 1 {
         return Err(operation_limit(1, limits.max_operations()));
     }
+    if let CellAssignment::Format(change) = &plan.assignment {
+        // Formatting rewrites only the cell's XF reference, so formula cells
+        // and absent coordinates are admitted alike.
+        let mut edit = file.editable_package()?.edit().map_err(native_edit_error)?;
+        for target in targets {
+            edit.set_cell_format(
+                Selector::Position(Position::new(target.sheet)),
+                target.reference,
+                change,
+            )
+            .map_err(format_error)?;
+        }
+        let native = edit.commit().map_err(native_edit_error)?;
+        return finish_commit(file, native, 1, limits);
+    }
     if targets
         .iter()
         .any(|target| target.present && target.formula)
     {
-        let property = if matches!(&plan.assignment, CellAssignment::Clear) {
-            "clear"
-        } else {
-            "value"
+        let property = match &plan.assignment {
+            CellAssignment::Clear => "clear",
+            CellAssignment::Formula(_) => "formula",
+            CellAssignment::Value(_) | CellAssignment::Format(_) | CellAssignment::Noop => "value",
         };
         return Err(Error::new(
             Code::UnsupportedCapability,
@@ -216,8 +247,22 @@ fn set_cells_with_limits(
     }
 
     let mut edit = file.editable_package()?.edit().map_err(native_edit_error)?;
+    if let CellAssignment::Formula(expression) = &plan.assignment {
+        // Each coordinate is written once: an absent cell gains a Formula,
+        // and a scalar cell is replaced with one keeping its XF.
+        for target in targets {
+            edit.set_formula(
+                Selector::Position(Position::new(target.sheet)),
+                target.reference,
+                expression,
+            )
+            .map_err(formula_error)?;
+        }
+        let native = edit.commit().map_err(native_edit_error)?;
+        return finish_commit(file, native, 1, limits);
+    }
     for target in targets {
-        let selector = Selector::Position(target.sheet);
+        let selector = Selector::Position(Position::new(target.sheet));
         if matches!(&plan.assignment, CellAssignment::Clear) {
             // Keep an explicit BIFF8 blank record so the existing cell's
             // style survives and the read projection retains its `empty`
@@ -231,6 +276,8 @@ fn set_cells_with_limits(
         let value = match &plan.assignment {
             CellAssignment::Value(value) => value.clone(),
             CellAssignment::Clear => unreachable!("clear handled above"),
+            CellAssignment::Formula(_) => unreachable!("formula handled above"),
+            CellAssignment::Format(_) => unreachable!("format handled above"),
             CellAssignment::Noop => unreachable!("no-op handled above"),
         };
         if target.present {
@@ -350,6 +397,70 @@ fn admit_cell_property(props: &Props<'_>, limits: &SemanticLimits) -> Result<Cel
                     assignment = CellAssignment::Clear;
                     Ok(())
                 },
+                CellSetter::Horizontal
+                | CellSetter::Vertical
+                | CellSetter::WrapText
+                | CellSetter::Indent
+                | CellSetter::ShrinkToFit
+                | CellSetter::BorderLeft
+                | CellSetter::BorderRight
+                | CellSetter::BorderTop
+                | CellSetter::BorderBottom
+                | CellSetter::FillPattern
+                | CellSetter::Fill
+                | CellSetter::FillBg => {
+                    let change = match &mut assignment {
+                        CellAssignment::Noop => {
+                            assignment = CellAssignment::Format(Default::default());
+                            let CellAssignment::Format(change) = &mut assignment else {
+                                unreachable!("the format assignment was just installed")
+                            };
+                            change
+                        },
+                        CellAssignment::Format(change) => change,
+                        CellAssignment::Value(_)
+                        | CellAssignment::Clear
+                        | CellAssignment::Formula(_) => {
+                            return Err(Error::new(
+                                Code::InvalidArgument,
+                                "XLS cell formatting is set separately from value, clear and formula",
+                            )
+                            .with_format(FileFormat::Xls)
+                            .with_suggestion("apply the formatting in its own set call"));
+                        },
+                    };
+                    stage_format(change, setter, value)?;
+                    staged_bytes = staged_bytes
+                        .checked_add(8)
+                        .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
+                    Ok(())
+                },
+                CellSetter::Formula => {
+                    if !matches!(assignment, CellAssignment::Noop) {
+                        return Err(Error::new(
+                            Code::InvalidArgument,
+                            "cell properties value, clear and formula are mutually exclusive",
+                        )
+                        .with_format(FileFormat::Xls)
+                        .with_property("formula"));
+                    }
+                    let Some(Scalar::Text(expression)) = value else {
+                        return Err(invalid_formula());
+                    };
+                    // OfficeCLI and the XLSX adapter spell formulas without
+                    // the leading `=`; the readback omits it as well.
+                    if expression.is_empty()
+                        || expression.starts_with('=')
+                        || expression.encode_utf16().count() > MAX_FORMULA_UNITS
+                    {
+                        return Err(invalid_formula());
+                    }
+                    staged_bytes = staged_bytes
+                        .checked_add(expression.len())
+                        .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
+                    assignment = CellAssignment::Formula(expression.to_owned());
+                    Ok(())
+                },
             })
             .map_err(|error| error.with_format(FileFormat::Xls))?;
     }
@@ -357,6 +468,104 @@ fn admit_cell_property(props: &Props<'_>, limits: &SemanticLimits) -> Result<Cel
         assignment,
         staged_bytes,
     })
+}
+
+/// Record one formatting assignment; each field may be named once.
+fn stage_format(
+    change: &mut litchi_xls::cell_values::FormatChange,
+    setter: CellSetter,
+    value: Option<Scalar<'_>>,
+) -> Result<()> {
+    use super::style;
+    let invalid = |property: &'static str| {
+        Error::new(
+            Code::InvalidValue,
+            "the XLS cell format value is not supported",
+        )
+        .with_format(FileFormat::Xls)
+        .with_property(property)
+    };
+    let duplicate = |property: &'static str| {
+        Error::new(
+            Code::InvalidArgument,
+            "the same XLS cell property was supplied more than once",
+        )
+        .with_format(FileFormat::Xls)
+        .with_property(property)
+    };
+    let token = |value: &Option<Scalar<'_>>| match value {
+        Some(Scalar::Token(token)) => Some(*token),
+        _ => None,
+    };
+    macro_rules! assign {
+        ($field:ident, $property:literal, $value:expr) => {{
+            let value = $value.ok_or_else(|| invalid($property))?;
+            if change.$field.replace(value).is_some() {
+                return Err(duplicate($property));
+            }
+        }};
+    }
+    match setter {
+        CellSetter::Horizontal => assign!(
+            horizontal,
+            "alignment.horizontal",
+            token(&value).and_then(style::horizontal)
+        ),
+        CellSetter::Vertical => assign!(
+            vertical,
+            "alignment.vertical",
+            token(&value).and_then(style::vertical)
+        ),
+        CellSetter::WrapText => assign!(
+            wrap_text,
+            "alignment.wrapText",
+            match value {
+                Some(Scalar::Bool(value)) => Some(value),
+                _ => None,
+            }
+        ),
+        CellSetter::Indent => assign!(
+            indent,
+            "alignment.indent",
+            match value {
+                Some(Scalar::Int(value)) => u8::try_from(value).ok().filter(|value| *value <= 15),
+                _ => None,
+            }
+        ),
+        CellSetter::ShrinkToFit => assign!(
+            shrink_to_fit,
+            "alignment.shrinkToFit",
+            match value {
+                Some(Scalar::Bool(value)) => Some(value),
+                _ => None,
+            }
+        ),
+        CellSetter::BorderLeft => {
+            assign!(border_left, "border.left", style::border(token(&value)))
+        },
+        CellSetter::BorderRight => {
+            assign!(border_right, "border.right", style::border(token(&value)))
+        },
+        CellSetter::BorderTop => assign!(border_top, "border.top", style::border(token(&value))),
+        CellSetter::BorderBottom => {
+            assign!(border_bottom, "border.bottom", style::border(token(&value)))
+        },
+        CellSetter::FillPattern => assign!(
+            fill_pattern,
+            "fillPattern",
+            token(&value).and_then(style::fill_pattern)
+        ),
+        CellSetter::Fill => {
+            assign!(fill_foreground, "fill", style::rgb(value));
+            // A bare fill color is a solid fill, as in the XLSX adapter.
+            if change.fill_pattern.is_none() {
+                change.fill_pattern = Some(litchi_xls::FillPattern::Solid);
+            }
+        },
+        CellSetter::FillBg => assign!(fill_background, "fillBg", style::rgb(value)),
+        CellSetter::Value | CellSetter::Clear | CellSetter::Formula => {},
+    }
+    Ok(())
 }
 
 fn native_scalar(value: Scalar<'_>) -> Result<NativeValue> {
@@ -526,7 +735,7 @@ fn resolve_removal_targets(
         if error.code() == Code::UnsupportedElement {
             Error::new(
                 Code::UnsupportedCapability,
-                "XLS removal supports stored cells and ranges; worksheet, row, and column removal are not integrated",
+                "XLS removal supports worksheet tabs, empty rows and columns, stored cells and ranges",
             )
             .with_format(FileFormat::Xls)
         } else {
@@ -650,7 +859,7 @@ fn cell_state_facts(state: CellState<'_>) -> (bool, bool) {
     }
 }
 
-fn finish_commit(
+pub(super) fn finish_commit(
     file: &Xls,
     native: litchi_xls::Commit,
     fallback_operations: usize,
@@ -719,6 +928,57 @@ fn duplicate_sheet_property() -> Error {
     .with_property("name")
 }
 
+/// Excel's formula-text bound (8,192 characters); the BIFF8 token bound is
+/// checked by the native tokenizer.
+const MAX_FORMULA_UNITS: usize = 8_192;
+
+fn invalid_formula() -> Error {
+    Error::new(
+        Code::InvalidValue,
+        "an XLS formula requires nonempty expression text without a leading '='",
+    )
+    .with_format(FileFormat::Xls)
+    .with_property("formula")
+}
+
+/// Map a native format refusal: a color outside the workbook palette is an
+/// invalid value for this workbook.
+fn format_error(error: litchi_xls::package::edit::Error) -> Error {
+    use litchi_xls::package::edit::Error as Native;
+    match &error {
+        Native::CellValues(litchi_xls::Error::UnsupportedFeature(_)) => Error::new(
+            Code::InvalidValue,
+            "the XLS fill color is not an entry of the workbook palette",
+        )
+        .with_format(FileFormat::Xls)
+        .with_property("fill")
+        .with_suggestion("use one of the workbook's 56 palette colors"),
+        _ => native_edit_error(error),
+    }
+}
+
+/// Map a native formula refusal: an expression the BIFF8 tokenizer cannot
+/// encode is an invalid value, not a corrupt workbook.
+fn formula_error(error: litchi_xls::package::edit::Error) -> Error {
+    use litchi_xls::package::edit::Error as Native;
+    match &error {
+        Native::CellValues(
+            litchi_xls::Error::InvalidFormula(_)
+            | litchi_xls::Error::InvalidCellReference(_)
+            | litchi_xls::Error::InvalidData(_),
+        ) => Error::new(
+            Code::InvalidValue,
+            "the XLS formula expression cannot be encoded as BIFF8 tokens",
+        )
+        .with_format(FileFormat::Xls)
+        .with_property("formula")
+        .with_suggestion(
+            "use same-sheet references, numbers, text, operators and built-in functions",
+        ),
+        _ => native_edit_error(error),
+    }
+}
+
 fn invalid_scalar() -> Error {
     Error::new(
         Code::InvalidValue,
@@ -781,7 +1041,7 @@ fn native_error(error: litchi_xls::package::edit::Error) -> Error {
     Error::from(error).with_format(FileFormat::Xls)
 }
 
-fn native_edit_error(error: litchi_xls::package::edit::Error) -> Error {
+pub(super) fn native_edit_error(error: litchi_xls::package::edit::Error) -> Error {
     native_error(error)
 }
 
@@ -814,6 +1074,7 @@ pub(crate) mod coalesce {
     use crate::error::{Code, Error};
     use crate::props::Props;
     use crate::transaction::{Error as TransactionError, SemanticLimits};
+    use litchi_core::Position;
     use litchi_core::sheet::CellValue;
     use litchi_xls::Package;
     use litchi_xls::cell_values::{Reference, Selector};
@@ -901,7 +1162,12 @@ pub(crate) mod coalesce {
                     return Ok(None);
                 }
                 let admitted = admit_cell_property(props, limits)?;
-                if matches!(admitted.assignment, CellAssignment::Noop) {
+                // Formula writes keep the ordinary handler: each one is a
+                // removal and an authored Formula, not a scalar staging.
+                if matches!(
+                    admitted.assignment,
+                    CellAssignment::Noop | CellAssignment::Formula(_) | CellAssignment::Format(_)
+                ) {
                     return Ok(None);
                 }
                 let Some((target, current)) = direct_target(self, target, limits, source)? else {
@@ -928,12 +1194,16 @@ pub(crate) mod coalesce {
                     CellAssignment::Clear => {
                         target.present && current.as_ref() != Some(&NativeValue::Blank)
                     },
-                    CellAssignment::Noop => false,
+                    CellAssignment::Formula(_)
+                    | CellAssignment::Format(_)
+                    | CellAssignment::Noop => false,
                 };
                 let action = match admitted.assignment {
                     CellAssignment::Value(value) => Action::Set(value),
                     CellAssignment::Clear => Action::Clear,
-                    CellAssignment::Noop => return Ok(None),
+                    CellAssignment::Formula(_)
+                    | CellAssignment::Format(_)
+                    | CellAssignment::Noop => return Ok(None),
                 };
                 Ok(Some(Plan {
                     target,
@@ -1074,7 +1344,7 @@ pub(crate) mod coalesce {
                 .map_err(|source| TransactionError::Allocation { source })?;
             match &plan.action {
                 Action::Set(value) => {
-                    let selector = Selector::Position(plan.target.sheet);
+                    let selector = Selector::Position(Position::new(plan.target.sheet));
                     if plan.target.present {
                         self.edit
                             .set_value(selector, plan.target.reference, value.clone())
@@ -1089,7 +1359,7 @@ pub(crate) mod coalesce {
                     if plan.target.present {
                         self.edit
                             .set_value(
-                                Selector::Position(plan.target.sheet),
+                                Selector::Position(Position::new(plan.target.sheet)),
                                 plan.target.reference,
                                 NativeValue::Blank,
                             )
@@ -1098,7 +1368,10 @@ pub(crate) mod coalesce {
                 },
                 Action::Remove => {
                     self.edit
-                        .remove_cell(Selector::Position(plan.target.sheet), plan.target.reference)
+                        .remove_cell(
+                            Selector::Position(Position::new(plan.target.sheet)),
+                            plan.target.reference,
+                        )
                         .map_err(native_edit_error)?;
                 },
                 Action::Noop => {},
@@ -1136,7 +1409,7 @@ pub(crate) mod coalesce {
     fn apply_item(edit: &mut litchi_xls::package::edit::Edit, item: &Item) -> Result<()> {
         match &item.plan.action {
             Action::Set(value) => {
-                let selector = Selector::Position(item.plan.target.sheet);
+                let selector = Selector::Position(Position::new(item.plan.target.sheet));
                 if item.plan.target.present {
                     edit.set_value(selector, item.plan.target.reference, value.clone())
                         .map_err(native_edit_error)?;
@@ -1147,14 +1420,14 @@ pub(crate) mod coalesce {
             },
             Action::Clear if item.plan.target.present => edit
                 .set_value(
-                    Selector::Position(item.plan.target.sheet),
+                    Selector::Position(Position::new(item.plan.target.sheet)),
                     item.plan.target.reference,
                     NativeValue::Blank,
                 )
                 .map_err(native_edit_error)?,
             Action::Remove if item.plan.target.present => edit
                 .remove_cell(
-                    Selector::Position(item.plan.target.sheet),
+                    Selector::Position(Position::new(item.plan.target.sheet)),
                     item.plan.target.reference,
                 )
                 .map_err(native_edit_error)?,
@@ -1246,7 +1519,10 @@ pub(crate) mod coalesce {
         let reference = Reference::new(row, column).map_err(native_value_error)?;
         let (present, formula, current) = if let Some(source) = source {
             let cell = source
-                .source_cell(Selector::Position(node.sheet_position()), reference)
+                .source_cell(
+                    Selector::Position(Position::new(node.sheet_position())),
+                    reference,
+                )
                 .map_err(native_edit_error)?;
             (
                 cell.is_some(),

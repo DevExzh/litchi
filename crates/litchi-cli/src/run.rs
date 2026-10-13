@@ -23,6 +23,7 @@ pub(crate) fn run(cli: Cli, out: &mut impl Write) -> Result<u8> {
         Command::Query(args) => query(&args, json, out),
         Command::View(args) => view(&args, json, out),
         Command::Capabilities(args) => capabilities(&args, json, out),
+        Command::Schema(args) => schema(&args, json, out),
         Command::Set(args) => {
             let mut item = BatchItem::new("set");
             item.path = Some(args.path.as_str().into());
@@ -200,6 +201,51 @@ fn capabilities(args: &cli::Capabilities, json: bool, out: &mut impl Write) -> R
         text.push_str(element.name());
     }
     text.push('\n');
+    out.write_all(text.as_bytes())
+        .map_err(|error| render::io(&error))?;
+    Ok(exit::OK)
+}
+
+fn schema(args: &cli::Schema, json: bool, out: &mut impl Write) -> Result<u8> {
+    let schema = litchi_ops::schema(formats::parse(&args.format)?);
+    if json {
+        render::json(out, &schema)?;
+        return Ok(exit::OK);
+    }
+    let mut text = format!("format: {}\n", formats::name(schema.format()));
+    if !schema.registered() {
+        text.push_str("registered: no\n");
+    }
+    for element in schema.elements() {
+        text.push_str(element.name());
+        if let Some(gap) = element.gap() {
+            text.push_str(&format!(" (gap: {})", gap.follow_up()));
+        }
+        text.push('\n');
+        for property in element.properties() {
+            let flags: String = [
+                ('a', property.add()),
+                ('s', property.set()),
+                ('g', property.get()),
+            ]
+            .iter()
+            .map(|&(letter, on)| if on { letter } else { '-' })
+            .collect();
+            text.push_str(&format!(
+                "  {} {} {flags}",
+                property.name(),
+                property.value_type().schema_type()
+            ));
+            let aliases: Vec<_> = property.aliases().collect();
+            if !aliases.is_empty() {
+                text.push_str(&format!(" aliases={}", aliases.join(",")));
+            }
+            if let Some(gap) = property.write_gap() {
+                text.push_str(&format!(" write-gap={}", gap.follow_up()));
+            }
+            text.push('\n');
+        }
+    }
     out.write_all(text.as_bytes())
         .map_err(|error| render::io(&error))?;
     Ok(exit::OK)

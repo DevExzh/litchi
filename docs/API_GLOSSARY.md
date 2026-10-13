@@ -49,6 +49,8 @@ transaction is the bare `Package::edit()`.
 | PPTX chunked shape publication | `Edit::{set_shape_text_chunks, set_shape_property_chunks}` | — | Eager/source primary and focused source edits admit bounded, globally disjoint chunks together for one same-slide publication (0158); single-chunk setter limits are retained |
 | PPT chunked text publication | `Edit::set_shape_text_chunks` | — | At most 4096 globally distinct targets across at most 4096 chunks, each bounded at 256; one native publication and complete readback per call (0220); ordinary `set_shape_texts` remains bounded at 256 |
 | Transaction type | `Edit` | `Transaction` (pptx), `WorkbookEdit` (xlsb) | ✅ pptx primary `opened::Edit` (0116), XLSB structural and cell-value `Edit/Commit/Patch` families, diagnostics and Package commit triads (0165–0171); 🔴 remaining XLSB mutators/error families (W2); ✅ scoped PPTX families renamed `Edit` (0252) |
+
+| Transaction type | `Edit` | `Transaction` (pptx), `WorkbookEdit` (xlsb) | ✅ pptx primary `opened::Edit` (0116), XLSB structural and cell-value `Edit/Commit/Patch` families, diagnostics and Package commit triads (0165–0171); ✅ XLS scoped families (`sheet_visibility`, `ole_object`, `real_time_data`, `revision_records`, `user_names`, `picture_compression`, `chart_area`, `web_pub`, `external_link`) (0259); 🔴 remaining XLSB mutators/error families and scoped PPTX families (W2) |
 | Commit | `Edit::commit() -> Result<Commit>` | — | ✅ everywhere; shape fixed by the rows below |
 | New snapshot accessor | `Commit::package()` / `Commit::into_package()` | `Commit::snapshot()` (docx/pptx), `Commit::{workbook, into_workbook}` (xlsx) | ✅ iWork/docx eager (0022) and source (0031), PPTX eager (0118), XLSX primary (0250) · 🔴 other W2 |
 | Diagnostics on every commit | `Commit::diagnostics()` | commits without diagnostics (xlsx, pptx) | ✅ docx/iWork/PPTX eager (0118), XLSX primary `workbook::edit::Diagnostics` (0250) · 🔴 remaining owners (W2) |
@@ -61,6 +63,10 @@ transaction is the bare `Package::edit()`.
 | Rollback | *dropping the `Edit`* | `Transaction::rollback()` (pptx) | ✅ primary PPTX edit (0116); ✅ every DOC transaction, `rollback` banned crate-wide (0258); 🔴 scoped PPTX families (W2) |
 
 | Rollback | *dropping the `Edit`* | `Transaction::rollback()` (pptx) | ✅ primary PPTX edit (0116); ✅ PPT root `slide_order::Transaction` and `text_edit::{Transaction, SourceTransaction}` (0260); 🔴 scoped PPTX families (W2); 🔴 scoped PPT families (W4 residue, 0260) |
+
+| No-op introspection | `commit.diagnostics().changed()`; `patch.is_noop()` | `Transaction::is_changed()`, `Commit::is_changed()` (pptx), `Patch::is_empty()` (xlsx) | ✅ iWork/docx/PPTX primary (0118), XLSX primary (0250), XLS scoped families (0259) · 🔴 remaining W2 |
+| Inverse patch | `Patch::inverse()` | — | ✅ everywhere |
+| Rollback | *dropping the `Edit`* | `Transaction::rollback()` (pptx) | ✅ primary PPTX edit (0116), XLS scoped families (0259); 🔴 scoped PPTX families (W2) |
 | Mutable writer on a package | *none — `edit()` is the only write path* | `document_mut()` (docx), `presentation_mut()` (pptx) | PPTX `presentation_mut` removed (0127); 🔴 remaining W2 authoring verbs move into `Edit`, direct mutators and `UnsafeEdit` vocabulary still require migration |
 
 Deferred (own tracks, not this glossary): `History`/undo-redo, patch
@@ -264,14 +270,16 @@ semantic-limit migrations.
 
 | Concept | Canonical | Banned | Notes / status |
 |---|---|---|---|
-| Catalog selector | `Selector<'a> = Name(Cow<'a, str>) \| Position(Position)` | the `Id` variant (raw IDs live in raw modules); `Index(usize)` (numbers); `At`/`Index` selector forms (pages footnotes) | ✅ core/pages/keynote shape · 🔴 numbers (W1) |
+| Catalog selector | `Selector<'a> = Name(Cow<'a, str>) \| Position(Position)` | the `Id` variant (raw IDs live in raw modules); `Index(usize)` (numbers); `At`/`Index` selector forms (pages footnotes) | ✅ core/pages/keynote shape · ✅ XLS `cell_values`/`sheet_visibility` `Position(Position)` (0259) · 🔴 numbers (W1) |
 | Positional selection word | `Position` — checked, zero-based value type | `Index` as a selector variant; raw `usize` in public signatures (facade `slide(usize)`, `paragraph(usize)`) | 🔴 facade fold into M0a |
 | Selector-taking methods | `impl Into<Selector>` parameter, `Result<Option<_>>` return; missing → `Ok(None)`, ambiguous/invalid → typed error, never panics, no `Index` trait | method-level splits that bypass the selector channel | pptx `scene::get/at` converge (W2) |
 | Grid coordinates (not selectors) | `At` / `Area` with A1 parsing at the edge | treating coordinates as catalog selectors | ✅ xlsx; rule recorded |
 | Name identity policy | follows the producing application; fresh authoring defaults to Unicode caseless | silently mixing case policies | ✅ behavior unchanged; per-format registration below |
 
 Registered name-identity policies: xlsx sheet names — Unicode caseless
-(Excel semantics); docx glossary entries — NFD/case-fold/NFD (Word
+(Excel semantics); xls sheet names — the same Unicode caseless key (NFD,
+default case fold, NFD) for the reader's duplicate check, selector lookup,
+rename and tab insertion (`litchi_xls::sheet_name`, record 0259); docx glossary entries — NFD/case-fold/NFD (Word
 semantics); pages section names — case-sensitive (Pages semantics); keynote
 slide names — exact (Keynote semantics).
 
@@ -1397,6 +1405,26 @@ replacement and unrepresented dependency/inverse closures remain explicit
 element-level gaps. No parallel mutable workbook model or transaction family
 is introduced.
 
+## XLS unified P0 and W4 residue (record 0259)
+
+Unified XLS adds sheet add/remove/move/swap, row and column height, width,
+hidden state and empty insertion/removal, formula writes with `formula` and
+`cachedValue` reads, cell alignment/border/fill writes through `XF` records,
+and read-only `namedrange` nodes. Every write is a native `Package::edit`
+operation: `Edit::{reorder_sheets, insert_sheet, remove_sheet, set_formula,
+set_row_height, set_row_hidden, set_column_width, set_column_hidden,
+set_cell_format}` with `cell_values::FormatChange`. Sheet-name identity uses
+the registered caseless key.
+
+W4 residue: the scoped XLS families name their transaction `Edit`; the
+`Transaction` names, `UserNamesTransaction`/`UserNamesPackageTransaction`,
+`rollback`, `is_changed`, `Patch::is_empty` and
+`sheet_visibility::Snapshot::transaction` are removed and banned in the
+`xls-minimal` profile. The `cell_values` and `sheet_visibility` selectors
+carry a checked `litchi_core::Position`. `property_set::Transaction` remains
+because the record 0254 metadata owner uses it. See
+[0259](unified-ops/0259-xls-unified-p0.md).
+
 ## Unified PPT navigation (0215)
 
 The PPT adapter now supports unified `get`, `find`, `query` and semantic views
@@ -1728,3 +1756,17 @@ bounded `Snapshot::parse_with_options_and_policy` result through
 and every `rollback` are removed and banned in both DOC profiles (dropping a
 transaction is the rollback). See
 [0258](unified-ops/0258-doc-p0-surface.md).
+
+## Registry schema export (record 0263)
+
+`litchi_ops::schema(format) -> schema::Schema` is the one export of the
+property registry (`litchi::schema` in the facade, `litchi schema <type>` in
+the CLI, `litchi_py.schema(format)` in Python). `Schema::{format,
+registered, elements, element, gaps}` reuses the capability report's
+`Element`/`Property`/`Gap` types; it is not a second element model.
+`capabilities::Property` gains `aliases()`, `constraint()`, `clearable()`
+and `write_gap()`, and `capabilities::Constraint` (`None`, `Int`, `Number`,
+`Length`, `Chars`, `NotEmpty`) names the registry's value domain. The
+format-level report stays `Capabilities::of`; the file-level one stays
+`File::capabilities`. No alias names are added. See
+[0263](unified-ops/0263-registry-schema-export.md).

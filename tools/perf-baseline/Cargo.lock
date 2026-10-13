@@ -1217,6 +1217,7 @@ dependencies = [
 name = "litchi-ops"
 version = "0.0.1"
 dependencies = [
+ "base64",
  "caseless",
  "chrono",
  "litchi-cfb",
@@ -1397,6 +1398,7 @@ name = "litchi-xls"
 version = "0.0.1"
 dependencies = [
  "bitflags",
+ "caseless",
  "chrono",
  "litchi-biff",
  "litchi-cfb",
@@ -1410,6 +1412,7 @@ dependencies = [
  "litchi-vba",
  "rand 0.10.2",
  "serde_json",
+ "unicode-normalization",
  "zerocopy",
  "zeroize",
 ]

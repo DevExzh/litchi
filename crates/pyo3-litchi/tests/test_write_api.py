@@ -398,8 +398,8 @@ class CapabilityAgreementTests(WriteAssertions):
                     error = raised(lambda: call(file))
                     self.assertIsInstance(error, L.UnsupportedError)
                     self.assertEqual(error.code, verbs[verb]["code"])
-        # DOC (record 0258) and PPT (record 0260) support every write verb.
-        self.assertTrue({"Odt", "Ods", "Odp", "xls"} <= seen, seen)
+        # DOC (0258), PPT (0260) and XLS (0259) support every write verb.
+        self.assertTrue({"Odt", "Ods", "Odp"} <= seen, seen)
 
     def test_read_only_formats_refuse_every_write(self):
         for relative, name in READ_ONLY:

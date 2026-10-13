@@ -139,6 +139,7 @@ pub(crate) const PARAGRAPH_PROPS: &[PropSpec] = &[
             add: true,
         },
         raw: false,
+        admission: crate::registry::Admission::NONE,
     },
     PropSpec {
         name: "align",
@@ -149,6 +150,7 @@ pub(crate) const PARAGRAPH_PROPS: &[PropSpec] = &[
             add: false,
         },
         raw: false,
+        admission: crate::registry::Admission::NONE,
     },
     PropSpec {
         name: "spaceBefore",
@@ -159,6 +161,7 @@ pub(crate) const PARAGRAPH_PROPS: &[PropSpec] = &[
             add: false,
         },
         raw: false,
+        admission: crate::registry::Admission::NONE,
     },
     PropSpec {
         name: "spaceAfter",
@@ -169,6 +172,7 @@ pub(crate) const PARAGRAPH_PROPS: &[PropSpec] = &[
             add: false,
         },
         raw: false,
+        admission: crate::registry::Admission::NONE,
     },
     PropSpec {
         name: "indent",
@@ -179,6 +183,7 @@ pub(crate) const PARAGRAPH_PROPS: &[PropSpec] = &[
             add: false,
         },
         raw: false,
+        admission: crate::registry::Admission::NONE,
     },
     PropSpec {
         name: "rightIndent",
@@ -189,6 +194,7 @@ pub(crate) const PARAGRAPH_PROPS: &[PropSpec] = &[
             add: false,
         },
         raw: false,
+        admission: crate::registry::Admission::NONE,
     },
     PropSpec {
         name: "firstLineIndent",
@@ -199,6 +205,7 @@ pub(crate) const PARAGRAPH_PROPS: &[PropSpec] = &[
             add: false,
         },
         raw: false,
+        admission: crate::registry::Admission::NONE,
     },
     PropSpec {
         name: "keepNext",
@@ -209,6 +216,7 @@ pub(crate) const PARAGRAPH_PROPS: &[PropSpec] = &[
             add: false,
         },
         raw: false,
+        admission: crate::registry::Admission::NONE,
     },
     PropSpec {
         name: "keepLines",
@@ -219,6 +227,7 @@ pub(crate) const PARAGRAPH_PROPS: &[PropSpec] = &[
             add: false,
         },
         raw: false,
+        admission: crate::registry::Admission::NONE,
     },
     PropSpec {
         name: "pageBreakBefore",
@@ -229,6 +238,7 @@ pub(crate) const PARAGRAPH_PROPS: &[PropSpec] = &[
             add: false,
         },
         raw: false,
+        admission: crate::registry::Admission::NONE,
     },
 ];
 
@@ -248,12 +258,14 @@ pub(crate) const RUN_PROPS: &[PropSpec] = &[
             add: true,
         },
         raw: false,
+        admission: crate::registry::Admission::NONE,
     },
     PropSpec {
         name: "font",
         ty: ValueType::Text,
         access: Access::READ,
         raw: false,
+        admission: crate::registry::Admission::NONE,
     },
     PropSpec {
         name: "size",
@@ -264,6 +276,7 @@ pub(crate) const RUN_PROPS: &[PropSpec] = &[
             add: true,
         },
         raw: false,
+        admission: crate::registry::Admission::NONE,
     },
     PropSpec {
         name: "bold",
@@ -274,6 +287,7 @@ pub(crate) const RUN_PROPS: &[PropSpec] = &[
             add: true,
         },
         raw: false,
+        admission: crate::registry::Admission::NONE,
     },
     PropSpec {
         name: "italic",
@@ -284,12 +298,14 @@ pub(crate) const RUN_PROPS: &[PropSpec] = &[
             add: true,
         },
         raw: false,
+        admission: crate::registry::Admission::NONE,
     },
     PropSpec {
         name: "color",
         ty: ValueType::Color(ColorContext::Word),
         access: Access::READ,
         raw: false,
+        admission: crate::registry::Admission::NONE,
     },
     PropSpec {
         name: "underline",
@@ -300,6 +316,7 @@ pub(crate) const RUN_PROPS: &[PropSpec] = &[
             add: true,
         },
         raw: false,
+        admission: crate::registry::Admission::NONE,
     },
     PropSpec {
         name: "strike",
@@ -310,6 +327,7 @@ pub(crate) const RUN_PROPS: &[PropSpec] = &[
             add: true,
         },
         raw: false,
+        admission: crate::registry::Admission::NONE,
     },
     PropSpec {
         name: "dstrike",
@@ -320,6 +338,7 @@ pub(crate) const RUN_PROPS: &[PropSpec] = &[
             add: true,
         },
         raw: false,
+        admission: crate::registry::Admission::NONE,
     },
     PropSpec {
         name: "vanish",
@@ -330,6 +349,7 @@ pub(crate) const RUN_PROPS: &[PropSpec] = &[
             add: true,
         },
         raw: false,
+        admission: crate::registry::Admission::NONE,
     },
     PropSpec {
         name: "caps",
@@ -340,6 +360,7 @@ pub(crate) const RUN_PROPS: &[PropSpec] = &[
             add: true,
         },
         raw: false,
+        admission: crate::registry::Admission::NONE,
     },
     PropSpec {
         name: "smallcaps",
@@ -350,6 +371,7 @@ pub(crate) const RUN_PROPS: &[PropSpec] = &[
             add: true,
         },
         raw: false,
+        admission: crate::registry::Admission::NONE,
     },
     PropSpec {
         name: "outline",
@@ -360,6 +382,7 @@ pub(crate) const RUN_PROPS: &[PropSpec] = &[
             add: true,
         },
         raw: false,
+        admission: crate::registry::Admission::NONE,
     },
 ];
 

@@ -27,7 +27,7 @@ use litchi_cfb::{
     SameLengthStreamSplice, StreamSpliceLimits, ValidatedOverlayPlan,
 };
 use litchi_core::binary;
-use litchi_core::{ReadAt, SourceVersion};
+use litchi_core::{Position, ReadAt, SourceVersion};
 use litchi_ole_common::object::{Editor as PackageEditor, Limits, Targets};
 use litchi_ole_common::source_backed_overlay::SourceBackedOverlayPublisher;
 use std::fmt;
@@ -165,26 +165,22 @@ impl Snapshot {
         }))
     }
 
-    /// Starts a detached bounded visibility transaction.
+    /// Starts a detached bounded visibility edit.
     #[must_use]
-    pub fn transaction(&self) -> Transaction {
-        Transaction {
+    pub fn edit(&self) -> Edit {
+        Edit {
             source: self.clone(),
             changes: Vec::new(),
         }
     }
 
-    /// Alias for [`Self::transaction`].
-    #[must_use]
-    pub fn edit(&self) -> Transaction {
-        self.transaction()
-    }
-
     fn resolve(&self, selector: Selector<'_>) -> Result<Option<usize>> {
         match selector {
-            Selector::Position(position) => Ok(self.inner.sheets.get(position).and_then(|sheet| {
-                (sheet.kind == SheetKind::WorksheetOrDialog).then_some(position)
-            })),
+            Selector::Position(position) => {
+                Ok(self.inner.sheets.get(position.get()).and_then(|sheet| {
+                    (sheet.kind == SheetKind::WorksheetOrDialog).then_some(position.get())
+                }))
+            },
             Selector::Name(name) => {
                 let mut matches = self.inner.sheets.iter().enumerate().filter(|(_, sheet)| {
                     sheet.kind == SheetKind::WorksheetOrDialog && caseless_eq(&sheet.name, name)
@@ -258,7 +254,7 @@ pub enum Selector<'a> {
     /// Case-folded developer-visible tab name.
     Name(&'a str),
     /// Exact zero-based workbook tab position.
-    Position(usize),
+    Position(Position),
 }
 
 impl<'a> From<&'a str> for Selector<'a> {
@@ -267,9 +263,15 @@ impl<'a> From<&'a str> for Selector<'a> {
     }
 }
 
+impl From<Position> for Selector<'_> {
+    fn from(value: Position) -> Self {
+        Self::Position(value)
+    }
+}
+
 impl From<usize> for Selector<'_> {
     fn from(value: usize) -> Self {
-        Self::Position(value)
+        Self::Position(Position::new(value))
     }
 }
 
@@ -282,12 +284,12 @@ struct Change {
 
 /// Detached, bounded and failure-atomic worksheet visibility transaction.
 #[derive(Clone)]
-pub struct Transaction {
+pub struct Edit {
     source: Snapshot,
     changes: Vec<Change>,
 }
 
-impl Transaction {
+impl Edit {
     /// Stages one exact visible, hidden, or very-hidden outcome.
     ///
     /// # Errors
@@ -549,10 +551,10 @@ impl Transaction {
     }
 }
 
-impl fmt::Debug for Transaction {
+impl fmt::Debug for Edit {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("Transaction")
+            .debug_struct("Edit")
             .field("source", &self.source)
             .field("staged_changes", &self.changes.len())
             .finish()
@@ -880,7 +882,7 @@ impl Patch {
 
     /// Whether the exact artifact transition is empty.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before == self.after
     }
 
@@ -895,7 +897,7 @@ impl Patch {
                 "worksheet visibility patch source does not match its base snapshot".into(),
             ));
         }
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(source.clone());
         }
         let target = Snapshot::from_bytes(self.after.to_vec())?;
@@ -919,7 +921,7 @@ impl fmt::Debug for Patch {
             .debug_struct("Patch")
             .field("before_bytes", &self.before.len())
             .field("after_bytes", &self.after.len())
-            .field("is_empty", &self.is_empty())
+            .field("is_noop", &self.is_noop())
             .finish()
     }
 }
@@ -1432,9 +1434,7 @@ fn decode_visibility(visibility: SheetVisible) -> SheetVisibility {
 }
 
 fn caseless_eq(left: &str, right: &str) -> bool {
-    left.chars()
-        .flat_map(char::to_lowercase)
-        .eq(right.chars().flat_map(char::to_lowercase))
+    crate::sheet_name::equivalent(left, right)
 }
 
 fn read_patch_len(bytes: &[u8], offset: usize) -> Result<usize> {
@@ -1483,7 +1483,7 @@ mod tests {
         ] {
             let source = Snapshot::from_bytes(package(sheets)).unwrap();
             let mut edit = source.edit();
-            edit.set_visibility(Selector::Position(target), visibility)
+            edit.set_visibility(Selector::Position(Position::new(target)), visibility)
                 .unwrap();
             let commit = edit.commit().unwrap();
             let mut rerendered = PackageEditor::open(
@@ -1549,7 +1549,7 @@ mod tests {
     fn hides_unhides_and_very_hides_exact_fixed_width_owners() {
         let source = Snapshot::from_bytes(package(3)).unwrap();
         let before = source.workbook_stream().to_vec();
-        let mut transaction = source.transaction();
+        let mut transaction = source.edit();
         transaction.hide("sHeEt1".into()).unwrap();
         transaction.very_hide(2usize.into()).unwrap();
         let commit = transaction.commit().unwrap();
@@ -1585,7 +1585,7 @@ mod tests {
         assert_eq!(stream(source.bytes(), &["Opaque"]), b"untouched");
         assert_eq!(stream(commit.snapshot().bytes(), &["Opaque"]), b"untouched");
 
-        let mut unhide = commit.snapshot().transaction();
+        let mut unhide = commit.snapshot().edit();
         unhide.unhide("SHEET1".into()).unwrap();
         let unhidden = unhide.commit().unwrap();
         assert_eq!(
@@ -1606,7 +1606,7 @@ mod tests {
             let ole = OleFile::open(Cursor::new(source.bytes())).unwrap();
             directory_catalog(&ole).unwrap()
         };
-        let mut edit = source.transaction();
+        let mut edit = source.edit();
         edit.hide(1usize.into()).unwrap();
         let commit = edit.commit_source_backed().unwrap();
         assert_eq!(commit.diagnostics().changed_worksheets(), 1);
@@ -1651,12 +1651,14 @@ mod tests {
         );
 
         let source = Snapshot::from_bytes(package(MAX_VISIBILITY_CHANGES + 2)).unwrap();
-        let mut bounded = source.transaction();
+        let mut bounded = source.edit();
         bounded
-            .set_visibility_batch(
-                (1..=MAX_VISIBILITY_CHANGES)
-                    .map(|position| (Selector::Position(position), SheetVisibility::Hidden)),
-            )
+            .set_visibility_batch((1..=MAX_VISIBILITY_CHANGES).map(|position| {
+                (
+                    Selector::Position(Position::new(position)),
+                    SheetVisibility::Hidden,
+                )
+            }))
             .unwrap();
         let bounded = bounded.commit_source_backed().unwrap();
         assert_eq!(
@@ -1683,7 +1685,7 @@ mod tests {
     #[test]
     fn source_backed_visibility_noop_and_cap_plus_one_are_atomic() {
         let source = Snapshot::from_bytes(package(2)).unwrap();
-        let noop = source.transaction().commit_source_backed().unwrap();
+        let noop = source.edit().commit_source_backed().unwrap();
         assert!(noop.is_noop());
         assert_eq!(noop.diagnostics().changed_worksheets(), 0);
         assert_eq!(noop.diagnostics().touched_streams(), 0);
@@ -1698,14 +1700,15 @@ mod tests {
         assert_eq!(output, source.bytes());
 
         let source = Snapshot::from_bytes(package(MAX_VISIBILITY_CHANGES + 2)).unwrap();
-        let mut refused = source.transaction();
+        let mut refused = source.edit();
         assert!(
             refused
-                .set_visibility_batch(
-                    (0..=MAX_VISIBILITY_CHANGES).map(|position| {
-                        (Selector::Position(position), SheetVisibility::Hidden)
-                    })
-                )
+                .set_visibility_batch((0..=MAX_VISIBILITY_CHANGES).map(|position| {
+                    (
+                        Selector::Position(Position::new(position)),
+                        SheetVisibility::Hidden,
+                    )
+                }))
                 .is_err()
         );
         let noop = refused.commit_source_backed().unwrap();
@@ -1739,7 +1742,7 @@ mod tests {
     #[test]
     fn source_backed_visibility_reports_partial_sink_and_save_failures() {
         let source = Snapshot::from_bytes(package(2)).unwrap();
-        let mut edit = source.transaction();
+        let mut edit = source.edit();
         edit.hide(1usize.into()).unwrap();
         let commit = edit.commit_source_backed().unwrap();
         let mut sink = PartialSink {
@@ -1772,7 +1775,7 @@ mod tests {
     #[test]
     fn refuses_hiding_every_worksheet_atomically() {
         let source = Snapshot::from_bytes(package(2)).unwrap();
-        let mut transaction = source.transaction();
+        let mut transaction = source.edit();
         transaction.hide(0usize.into()).unwrap();
         transaction.hide(1usize.into()).unwrap();
         assert!(transaction.commit().is_err());
@@ -1788,12 +1791,14 @@ mod tests {
     #[test]
     fn batch_accepts_cap_and_refuses_cap_plus_one_without_staging_prefix() {
         let source = Snapshot::from_bytes(package(MAX_VISIBILITY_CHANGES + 2)).unwrap();
-        let mut transaction = source.transaction();
+        let mut transaction = source.edit();
         transaction
-            .set_visibility_batch(
-                (1..=MAX_VISIBILITY_CHANGES)
-                    .map(|position| (Selector::Position(position), SheetVisibility::Hidden)),
-            )
+            .set_visibility_batch((1..=MAX_VISIBILITY_CHANGES).map(|position| {
+                (
+                    Selector::Position(Position::new(position)),
+                    SheetVisibility::Hidden,
+                )
+            }))
             .unwrap();
         let commit = transaction.commit().unwrap();
         assert_eq!(
@@ -1801,25 +1806,26 @@ mod tests {
             MAX_VISIBILITY_CHANGES
         );
 
-        let mut refused = source.transaction();
+        let mut refused = source.edit();
         assert!(
             refused
-                .set_visibility_batch(
-                    (0..=MAX_VISIBILITY_CHANGES).map(|position| {
-                        (Selector::Position(position), SheetVisibility::Hidden)
-                    })
-                )
+                .set_visibility_batch((0..=MAX_VISIBILITY_CHANGES).map(|position| {
+                    (
+                        Selector::Position(Position::new(position)),
+                        SheetVisibility::Hidden,
+                    )
+                }))
                 .is_err()
         );
         let noop = refused.commit().unwrap();
-        assert!(noop.patch().is_empty());
+        assert!(noop.patch().is_noop());
         assert_eq!(noop.snapshot().bytes(), source.bytes());
     }
 
     #[test]
     fn exact_patch_rejects_stale_and_durable_inverse_restores_source() {
         let source = Snapshot::from_bytes(package(3)).unwrap();
-        let mut transaction = source.transaction();
+        let mut transaction = source.edit();
         transaction.hide(2usize.into()).unwrap();
         let commit = transaction.commit().unwrap();
         let wire = commit.patch().to_bytes().unwrap();
@@ -1862,7 +1868,7 @@ mod tests {
         });
         let chart_typed = Snapshot::from_bytes(chart_typed).unwrap();
         assert!(chart_typed.worksheet(1usize.into()).unwrap().is_none());
-        assert!(chart_typed.transaction().hide(1usize.into()).is_err());
+        assert!(chart_typed.edit().hide(1usize.into()).is_err());
     }
 
     #[test]

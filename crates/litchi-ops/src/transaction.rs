@@ -530,7 +530,8 @@ impl Edit {
             feature = "pptx",
             feature = "xlsb",
             feature = "rtf",
-            feature = "ppt"
+            feature = "ppt",
+            feature = "xls"
         ))]
         let limits = self.limits;
         self.execute(|file| match file {
@@ -538,6 +539,12 @@ impl Edit {
             File::Docx(handle) => {
                 let (commit, path) = handle.add(_parent.into_path()?, _node.into_node()?)?;
                 wrap(handle, commit, path)
+            },
+            #[cfg(feature = "xls")]
+            File::Xls(handle) => {
+                let (commit, path) =
+                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                wrap_xls(handle, commit, path)
             },
             #[cfg(feature = "xlsx")]
             File::Xlsx(handle) => {
@@ -588,7 +595,8 @@ impl Edit {
             feature = "pptx",
             feature = "xlsb",
             feature = "rtf",
-            feature = "ppt"
+            feature = "ppt",
+            feature = "xls"
         ))]
         let limits = self.limits;
         self.execute(|file| match file {
@@ -597,6 +605,12 @@ impl Edit {
                 let (commit, path) =
                     handle.add_command(_parent.into_path()?, _node.into_node()?)?;
                 wrap(handle, commit, path)
+            },
+            #[cfg(feature = "xls")]
+            File::Xls(handle) => {
+                let (commit, path) =
+                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                wrap_xls(handle, commit, path)
             },
             #[cfg(feature = "xlsx")]
             File::Xlsx(handle) => {
@@ -883,6 +897,7 @@ impl Edit {
             feature = "doc",
             feature = "pptx",
             feature = "xlsb",
+            feature = "xls",
             feature = "ppt",
             feature = "rtf"
         ))]
@@ -892,6 +907,12 @@ impl Edit {
             File::Docx(handle) => wrap(
                 handle,
                 handle.move_to(_path.into_path()?, _to.into_placement()?)?,
+                (),
+            ),
+            #[cfg(feature = "xls")]
+            File::Xls(handle) => wrap_xls(
+                handle,
+                handle.move_to_with_limits(_path.into_path()?, _to.into_placement()?, &limits)?,
                 (),
             ),
             #[cfg(feature = "xlsx")]
@@ -943,6 +964,7 @@ impl Edit {
             feature = "doc",
             feature = "pptx",
             feature = "xlsb",
+            feature = "xls",
             feature = "ppt",
             feature = "rtf"
         ))]
@@ -950,6 +972,12 @@ impl Edit {
         self.execute(|file| match file {
             #[cfg(feature = "docx")]
             File::Docx(handle) => wrap(handle, handle.swap(_a.into_path()?, _b.into_path()?)?, ()),
+            #[cfg(feature = "xls")]
+            File::Xls(handle) => wrap_xls(
+                handle,
+                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &limits)?,
+                (),
+            ),
             #[cfg(feature = "xlsx")]
             File::Xlsx(handle) => {
                 wrap_xlsx(handle, handle.swap(_a.into_path()?, _b.into_path()?)?, ())

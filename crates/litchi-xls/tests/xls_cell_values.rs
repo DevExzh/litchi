@@ -6,6 +6,7 @@
 )]
 
 use litchi_cfb::OleFile;
+use litchi_core::Position;
 use litchi_core::sheet::{Cell as _, CellValue};
 use litchi_xls::cell_values::{Reference, Selector, Snapshot, Storage};
 use litchi_xls::raw::Reader;
@@ -26,7 +27,7 @@ fn real_excel_formula_references_shift_reopen_and_invert() {
         .expect("open Microsoft Excel formula fixture");
     let mut transaction = source.edit();
     transaction
-        .insert_rows(Selector::Position(0), 0, 1)
+        .insert_rows(Selector::Position(Position::new(0)), 0, 1)
         .expect("stage reference-bearing Formula shift");
     let commit = transaction
         .commit()
@@ -91,7 +92,7 @@ fn real_mulrk_field_edit_remains_packed() {
         .expect("fixture contains MulRk");
     let mut edit = source.edit();
     edit.set_value(
-        Selector::Position(sheet_position),
+        Selector::Position(Position::new(sheet_position)),
         reference,
         litchi_xls::cell_values::Value::Number(123.0),
     )
@@ -99,7 +100,7 @@ fn real_mulrk_field_edit_remains_packed() {
     let commit = edit.commit().expect("commit MulRk field");
     let cell = commit
         .snapshot()
-        .worksheet(Selector::Position(sheet_position))
+        .worksheet(Selector::Position(Position::new(sheet_position)))
         .expect("resolve sheet")
         .expect("sheet exists")
         .cell(reference)
@@ -135,13 +136,13 @@ fn real_mulrk_edge_deletion_rebuilds_and_semantically_repacks() {
         .expect("fixture contains a MulRk edge");
     let mut transaction = source.edit();
     transaction
-        .remove_cell(Selector::Position(sheet_position), reference)
+        .remove_cell(Selector::Position(Position::new(sheet_position)), reference)
         .expect("stage packed edge removal");
     let commit = transaction.commit().expect("remove and reopen packed edge");
     assert!(
         commit
             .snapshot()
-            .worksheet(Selector::Position(sheet_position))
+            .worksheet(Selector::Position(Position::new(sheet_position)))
             .expect("resolve edited sheet")
             .expect("edited sheet exists")
             .cell(reference)
@@ -157,7 +158,7 @@ fn real_mulrk_edge_deletion_rebuilds_and_semantically_repacks() {
     assert_eq!(
         restored
             .snapshot()
-            .worksheet(Selector::Position(sheet_position))
+            .worksheet(Selector::Position(Position::new(sheet_position)))
             .expect("resolve restored sheet")
             .expect("restored sheet exists")
             .cell(reference)
@@ -195,8 +196,12 @@ fn real_fixture_number_commit_reopens_and_preserves_other_streams() {
     };
 
     let mut edit = source.edit();
-    edit.set_number(Selector::Position(sheet_position), reference, replacement)
-        .expect("stage Number replacement");
+    edit.set_number(
+        Selector::Position(Position::new(sheet_position)),
+        reference,
+        replacement,
+    )
+    .expect("stage Number replacement");
     let commit = edit.commit().expect("publish Number replacement");
     assert_eq!(commit.diagnostics().changed_number_fields(), 1);
     assert_eq!(commit.diagnostics().touched_streams(), 1);
@@ -268,7 +273,7 @@ fn multiple_real_fixtures_rename_and_fully_reopen() {
             .position();
         let mut transaction = source.edit();
         transaction
-            .rename_sheet(Selector::Position(position), replacement)
+            .rename_sheet(Selector::Position(Position::new(position)), replacement)
             .expect("stage real-fixture rename");
         let commit = transaction
             .commit()
@@ -276,7 +281,7 @@ fn multiple_real_fixtures_rename_and_fully_reopen() {
         assert_eq!(
             commit
                 .snapshot()
-                .worksheet(Selector::Position(position))
+                .worksheet(Selector::Position(Position::new(position)))
                 .expect("resolve reopened worksheet")
                 .expect("reopened worksheet exists")
                 .name(),

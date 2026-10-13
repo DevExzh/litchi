@@ -14,6 +14,9 @@ use litchi_core::sheet::Cell as _;
 pub(crate) struct Children<'f> {
     file: &'f Xls,
     state: State<'f>,
+    /// View children fence each step; query-walk children run inside the
+    /// walker's own per-advance fence.
+    fenced: bool,
 }
 
 enum State<'f> {
@@ -23,6 +26,12 @@ enum State<'f> {
     },
     Done,
     Sheets {
+        next: usize,
+        count: usize,
+        /// Continue with the defined names once the tabs are exhausted.
+        names: bool,
+    },
+    Names {
         next: usize,
         count: usize,
     },
@@ -176,7 +185,11 @@ impl SheetItems {
 
 impl<'f> Children<'f> {
     fn new(file: &'f Xls, state: State<'f>) -> Self {
-        Self { file, state }
+        Self {
+            file,
+            state,
+            fenced: true,
+        }
     }
 
     pub(super) fn view(node: &Node<'f>, options: &ViewOptions) -> Result<Self> {
@@ -185,6 +198,7 @@ impl<'f> Children<'f> {
             Item::Workbook => State::Sheets {
                 next: 0,
                 count: super::nav::tab_count(file)?,
+                names: false,
             },
             Item::Sheet(sheet) => {
                 if !sheet.handle.is_grid() {
@@ -226,17 +240,30 @@ impl<'f> Children<'f> {
                     }
                 }
             },
-            Item::Cell(_) => State::Done,
+            Item::Cell(_) | Item::NamedRange(_) => State::Done,
         };
         Ok(Self::new(file, state))
     }
 
+    /// The query walker's children of `node`; the walker fences each advance,
+    /// so these steps add no source probe of their own.
     pub(super) fn walk(node: &Node<'f>, kinds: KindSet<Kind>) -> Result<Self> {
+        let mut children = Self::walk_children(node, kinds)?;
+        children.fenced = false;
+        Ok(children)
+    }
+
+    fn walk_children(node: &Node<'f>, kinds: KindSet<Kind>) -> Result<Self> {
         let file = node.file();
         let state = match node.item() {
             Item::Workbook if kinds.contains(Kind::Sheet) => State::Sheets {
                 next: 0,
                 count: super::nav::tab_count(file)?,
+                names: kinds.contains(Kind::NamedRange),
+            },
+            Item::Workbook if kinds.contains(Kind::NamedRange) => State::Names {
+                next: 0,
+                count: super::node::defined_names(file)?.len(),
             },
             Item::Sheet(sheet) => {
                 let want = SheetWant {
@@ -297,10 +324,7 @@ impl<'f> Children<'f> {
                     return Ok(None);
                 };
                 let at = (cell.row(), cell.column());
-                let data = CellData {
-                    value: cell.value().clone(),
-                    formula: cell.is_formula(),
-                };
+                let data = CellData::from_eager(cell);
                 Ok(Some(Node::new_cell(
                     self.file,
                     *sheet,
@@ -309,10 +333,17 @@ impl<'f> Children<'f> {
                 )))
             },
             State::Done => Ok(None),
-            State::Sheets { next, count } => {
+            State::Sheets { next, count, names } => {
                 if *next >= *count {
-                    self.state = State::Done;
-                    return Ok(None);
+                    self.state = if *names {
+                        State::Names {
+                            next: 0,
+                            count: super::node::defined_names(self.file)?.len(),
+                        }
+                    } else {
+                        State::Done
+                    };
+                    return self.step();
                 }
                 let position = *next;
                 *next += 1;
@@ -323,6 +354,15 @@ impl<'f> Children<'f> {
                     self.file,
                     Sheet::new(position, handle),
                 )))
+            },
+            State::Names { next, count } => {
+                if *next >= *count {
+                    self.state = State::Done;
+                    return Ok(None);
+                }
+                let index = *next;
+                *next += 1;
+                Ok(Some(Node::new_named_range(self.file, index)))
             },
             State::Rows { sheet, grid, rows } => {
                 let Some(index) = rows.next() else {
@@ -359,7 +399,12 @@ impl<'f> Iterator for Children<'f> {
         if matches!(self.state, State::Done) {
             return None;
         }
-        match self.file.finish(|| self.step()) {
+        let step = if self.fenced {
+            self.file.finish(|| self.step())
+        } else {
+            self.step()
+        };
+        match step {
             Ok(Some(node)) => Some(Ok(node)),
             Ok(None) => {
                 self.state = State::Done;

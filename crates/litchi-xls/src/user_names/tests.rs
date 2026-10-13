@@ -96,17 +96,16 @@ fn semantic_revert_is_an_exact_noop_and_invalid_edit_is_atomic() {
     let source = Snapshot::parse_with_revision_guids(&bytes, &[guid]).unwrap();
     let mut edit = source.edit();
     edit.set_user_name(0, "Bob").unwrap();
-    assert!(edit.is_changed());
+    assert!(edit.clone().commit().unwrap().changed());
     edit.set_user_name(0, "Alice").unwrap();
-    assert!(!edit.is_changed());
     let noop = edit.commit().unwrap();
     assert!(!noop.changed());
     assert_eq!(noop.snapshot(), &source);
 
     let mut rejected = source.edit();
     assert!(rejected.set_user_name(0, "").is_err());
-    assert!(!rejected.is_changed());
     assert_eq!(rejected.users()[0].user_name(), "Alice");
+    assert!(!rejected.commit().unwrap().changed());
 }
 
 #[test]
