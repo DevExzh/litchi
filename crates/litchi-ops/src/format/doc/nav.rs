@@ -171,15 +171,16 @@ impl<'f> Navigate<'f> for Nav<'f> {
             },
             (Kind::Body, _, Kind::Paragraph) => {
                 let position = match select {
-                    Select::None => doc.body_paragraph_at(Position::new(0))?.map(|_| 0),
-                    Select::Ordinal(position) => {
-                        doc.body_paragraph_at(*position)?.map(|_| position.get())
+                    Select::None => Position::new(0),
+                    Select::Ordinal(position) => *position,
+                    Select::Last => match doc.body_paragraph_count()?.checked_sub(1) {
+                        Some(last) => Position::new(last),
+                        None => return Ok(Lookup::Missing),
                     },
-                    Select::Last => doc.body_paragraph_count()?.checked_sub(1),
                     _ => return Ok(Lookup::NotApplicable),
                 };
-                Ok(found(position.map(|position| {
-                    Node::paragraph(doc, Position::new(position))
+                Ok(found(doc.body_paragraph_at(position)?.map(|text| {
+                    Node::paragraph_with_text(doc, position, text)
                 })))
             },
             (Kind::Body, _, Kind::Table) => {

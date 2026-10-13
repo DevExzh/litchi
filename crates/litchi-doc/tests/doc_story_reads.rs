@@ -532,3 +532,32 @@ fn story_reads_are_shared_across_threads() {
         "every miss built once"
     );
 }
+
+/// Over the corpus: the story index's borrowed paragraph text, where it
+/// vouches for a paragraph, is the body traversal's text at the same
+/// position, so the constant-time lookup and the scan address one paragraph.
+#[test]
+fn indexed_body_paragraph_text_matches_the_body_scan_over_the_corpus() {
+    let mut compared = 0usize;
+    for (name, document) in corpus() {
+        let Ok(blocks) = document.body_blocks() else {
+            continue;
+        };
+        let scanned = document.body_paragraphs().collect::<Result<Vec<_>, _>>();
+        let Ok(scanned) = scanned else { continue };
+        for (position, text) in scanned.iter().enumerate() {
+            if let Some(indexed) = blocks.paragraph_text(Position::new(position)) {
+                assert_eq!(indexed, *text, "{name} paragraph {position}");
+                compared += 1;
+            }
+        }
+        // The index never vouches for a paragraph the scan does not emit.
+        assert!(
+            blocks
+                .paragraph_text(Position::new(scanned.len()))
+                .is_none(),
+            "{name}"
+        );
+    }
+    assert!(compared > 400, "too few paragraphs compared: {compared}");
+}

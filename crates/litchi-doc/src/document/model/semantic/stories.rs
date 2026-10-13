@@ -364,6 +364,21 @@ impl<'d> StoryBlocks<'d> {
         self.index.block(usize::try_from(position).ok()?)
     }
 
+    /// The text of the paragraph block at `ordinal`, its paragraph mark
+    /// excluded, borrowed from the document: an index lookup that builds
+    /// nothing. `None` when there is no such block or the block is a trailing
+    /// fragment without a paragraph mark.
+    #[must_use]
+    pub fn paragraph_text(&self, ordinal: Position) -> Option<&'d str> {
+        let block = self.get_kind(StoryBlockKind::Paragraph, ordinal)?;
+        let (start, end) = self.index.paragraph_span(block.paragraphs.start)?;
+        self.document
+            .0
+            .text_extractor
+            .text_at_range(start, end)
+            .strip_suffix('\r')
+    }
+
     /// The paragraph block at `ordinal`: `/body/p[ordinal + 1]` of the main
     /// story, which counts only paragraphs outside tables.
     ///

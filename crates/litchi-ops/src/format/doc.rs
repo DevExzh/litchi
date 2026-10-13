@@ -258,8 +258,16 @@ impl Doc {
     /// Read one ordinary main-story paragraph without crossing into any DOC
     /// subdocument.  This is the identity boundary shared by read and write.
     pub(crate) fn body_paragraph_at(&self, position: Position) -> Result<Option<&str>> {
-        let result =
-            (|| -> Result<Option<&str>> { Ok(self.reader()?.body_paragraph_text(position)?) })();
+        let result = (|| -> Result<Option<&str>> {
+            let reader = self.reader()?;
+            // The memoized story index answers in constant time; a paragraph
+            // it cannot vouch for (a trailing fragment, an empty story) falls
+            // back to the borrowed body scan.
+            if let Some(text) = reader.body_blocks()?.paragraph_text(position) {
+                return Ok(Some(text));
+            }
+            Ok(reader.body_paragraph_text(position)?)
+        })();
         self.check_source()?;
         result
     }
