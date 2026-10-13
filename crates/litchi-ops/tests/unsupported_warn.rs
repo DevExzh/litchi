@@ -3,6 +3,16 @@
 //! atomically, and reports each refused one; `Refuse`, the default, refuses
 //! the whole command. Invalid values and every other failure still fail.
 
+#![cfg(any(feature = "xlsx", feature = "docx"))]
+#![cfg_attr(
+    not(feature = "xlsx"),
+    allow(
+        dead_code,
+        unused_imports,
+        reason = "the batch helpers serve the XLSX tests"
+    )
+)]
+
 use litchi_core::FileFormat;
 use litchi_ops::batch::{self, Options, Unsupported};
 use litchi_ops::{BatchItem, BatchMode, Code, ItemResult, Props, create};

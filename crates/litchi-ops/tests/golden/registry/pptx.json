@@ -2174,6 +2174,546 @@
           "add": true,
           "set": false,
           "get": false
+        },
+        "series1.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series1.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series1.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series2.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series2.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series2.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series3.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series3.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series3.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series4.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series4.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series4.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series5.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series5.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series5.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series6.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series6.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series6.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series7.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series7.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series7.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series8.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series8.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series8.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series9.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series9.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series9.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series10.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series10.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series10.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series11.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series11.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series11.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series12.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series12.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series12.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series13.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series13.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series13.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series14.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series14.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series14.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series15.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series15.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series15.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series16.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series16.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series16.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series17.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series17.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series17.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series18.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series18.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series18.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series19.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series19.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series19.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series20.name": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series20.values": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series20.color": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": false,
+          "get": false
         }
       },
       "predicates": {

@@ -9,6 +9,12 @@
 //! charts. Corpus generation, opening, warm-up, serialization and the
 //! equivalence check are outside the timed interval; each timed sample is one
 //! chart add. Samples alternate ABBA; medians are the upper middle.
+//!
+//! `--compare dotted` (record 0271) pairs two unified legs instead: the
+//! chart given as `data=` plus the `colors` palette, versus the same chart
+//! given as OfficeCLI's dotted per-series keys (`series1.name`,
+//! `series1.values`, `series1.color`, ...). Both legs publish identical
+//! bytes. Routes `pptx_chart_add_dotted_v1`, `xlsx_chart_add_dotted_v1`.
 
 use litchi_core::FileFormat;
 use litchi_drawingml::chart::authoring::{Kind, Series, Spec, Variant};
@@ -42,6 +48,38 @@ fn node(format: FileFormat) -> NewNode<'static> {
         .prop("legend", "bottom")
         .prop("categories", CATEGORIES)
         .prop("data", DATA);
+    placed(node, format)
+}
+
+/// Which keys a unified leg names its series with.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Keys {
+    /// `data=` and the `colors` palette.
+    Data,
+    /// `series{N}.name`, `.values` and `.color`.
+    Dotted,
+}
+
+fn colored_node(format: FileFormat, keys: Keys) -> NewNode<'static> {
+    let node = NewNode::new("chart")
+        .prop("chartType", "column")
+        .prop("title", "Sales")
+        .prop("legend", "bottom")
+        .prop("categories", CATEGORIES);
+    let node = match keys {
+        Keys::Data => node.prop("data", DATA).prop("colors", "4472C4,ED7D31"),
+        Keys::Dotted => node
+            .prop("series1.name", "East")
+            .prop("series1.values", "120,135,148,162")
+            .prop("series1.color", "4472C4")
+            .prop("series2.name", "West")
+            .prop("series2.values", "95,108,115,128")
+            .prop("series2.color", "ED7D31"),
+    };
+    placed(node, format)
+}
+
+fn placed(node: NewNode<'static>, format: FileFormat) -> NewNode<'static> {
     match format {
         FileFormat::Pptx => node
             .prop("x", "1in")
@@ -125,16 +163,70 @@ fn native_bytes(owner: &mut Native) -> Result<Vec<u8>> {
 }
 
 fn unified_once(file: &File, format: FileFormat, count: usize) -> Result<File> {
+    unified_with(file, format, count, node(format))
+}
+
+fn unified_with(file: &File, format: FileFormat, count: usize, node: NewNode<'_>) -> Result<File> {
     let parent = if format == FileFormat::Pptx {
         "/slide[1]"
     } else {
         "/Sheet1"
     };
     let node = match format {
-        FileFormat::Pptx => node(format),
-        _ => node(format).prop("y", i64::try_from(count * 16)?),
+        FileFormat::Pptx => node,
+        _ => node.prop("y", i64::try_from(count * 16)?),
     };
     Ok(file.add(parent, node)?.file)
+}
+
+/// `--compare dotted`: `data=` (A) versus dotted series keys (B), both
+/// unified, on the same eager owner.
+fn case_dotted(format: FileFormat, count: usize, rounds: usize) -> Result<Value> {
+    let bytes = corpus(format, count)?;
+    let file = litchi_ops::open_bytes_with(
+        bytes.clone(),
+        &OpenOptions::new().source_mode(SourceMode::Eager),
+    )?;
+    let leg = |keys: Keys| unified_with(&file, format, count, colored_node(format, keys));
+    if leg(Keys::Data)?.to_bytes()? != leg(Keys::Dotted)?.to_bytes()? {
+        return Err(format!("{format:?} with {count} charts: the legs differ").into());
+    }
+    let mut data_samples = Vec::with_capacity(rounds * 2);
+    let mut dotted_samples = Vec::with_capacity(rounds * 2);
+    for round in 0..rounds * 2 {
+        let data_first = (round / 2) % 2 == 0;
+        for step in 0..2 {
+            let keys = if (step == 0) == data_first {
+                Keys::Data
+            } else {
+                Keys::Dotted
+            };
+            let start = Instant::now();
+            black_box(leg(keys)?);
+            let elapsed = start.elapsed().as_nanos();
+            match keys {
+                Keys::Data => data_samples.push(elapsed),
+                Keys::Dotted => dotted_samples.push(elapsed),
+            }
+        }
+    }
+    let data_median = median(&mut data_samples.clone());
+    let dotted_median = median(&mut dotted_samples.clone());
+    Ok(json!({
+        "route": format!("{}_chart_add_dotted_v1", if format == FileFormat::Pptx { "pptx" } else { "xlsx" }),
+        "owner": "eager",
+        "existing_charts": count,
+        "corpus_bytes": bytes.len(),
+        "corpus_sha256": sha256(&bytes),
+        "equivalence": "exact_bytes",
+        "data_median_ns": data_median,
+        "dotted_median_ns": dotted_median,
+        "dotted_over_data": dotted_median as f64 / data_median as f64,
+        "data_min_ns": data_samples.iter().min(),
+        "dotted_min_ns": dotted_samples.iter().min(),
+        "data_samples_ns": data_samples,
+        "dotted_samples_ns": dotted_samples,
+    }))
 }
 
 /// Every archive member, decoded, by name.
@@ -173,14 +265,19 @@ fn case(format: FileFormat, count: usize, rounds: usize) -> Result<Value> {
     let unified_out = unified_after.to_bytes()?;
     if let Ok(dir) = std::env::var("CHART_ADD_DUMP") {
         std::fs::write(format!("{dir}/native-{format:?}-{count}.bin"), &native_out)?;
-        std::fs::write(format!("{dir}/unified-{format:?}-{count}.bin"), &unified_out)?;
+        std::fs::write(
+            format!("{dir}/unified-{format:?}-{count}.bin"),
+            &unified_out,
+        )?;
     }
     let equivalence = if native_out == unified_out {
         "exact_bytes"
     } else if members(&native_out)? == members(&unified_out)? {
         "decoded_members"
     } else {
-        return Err(format!("{format:?} with {count} charts: the legs publish different packages").into());
+        return Err(
+            format!("{format:?} with {count} charts: the legs publish different packages").into(),
+        );
     };
     let mut native_samples = Vec::with_capacity(rounds * 2);
     let mut unified_samples = Vec::with_capacity(rounds * 2);
@@ -219,6 +316,7 @@ fn case(format: FileFormat, count: usize, rounds: usize) -> Result<Value> {
 fn main() -> Result<()> {
     let mut counts = DEFAULT_COUNTS.to_vec();
     let mut rounds = DEFAULT_ROUNDS;
+    let mut dotted = false;
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         match arg.as_str() {
@@ -231,6 +329,11 @@ fn main() -> Result<()> {
                     .collect::<std::result::Result<_, _>>()?;
             },
             "--rounds" => rounds = args.next().ok_or("--rounds needs a value")?.parse()?,
+            "--compare" => match args.next().as_deref() {
+                Some("native") => dotted = false,
+                Some("dotted") => dotted = true,
+                _ => return Err("--compare takes native or dotted".into()),
+            },
             other => return Err(format!("unknown argument {other}").into()),
         }
     }
@@ -240,12 +343,17 @@ fn main() -> Result<()> {
     let mut results = Vec::new();
     for format in [FileFormat::Pptx, FileFormat::Xlsx] {
         for &count in &counts {
-            results.push(case(format, count, rounds)?);
+            results.push(if dotted {
+                case_dotted(format, count, rounds)?
+            } else {
+                case(format, count, rounds)?
+            });
         }
     }
     let report = json!({
         "schema": 1,
         "harness": "unified-chart-add-baseline",
+        "compare": if dotted { "dotted" } else { "native" },
         "rounds": rounds,
         "provenance": {
             "commit": std::env::var("LITCHI_SOURCE_COMMIT").ok(),

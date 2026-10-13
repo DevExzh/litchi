@@ -109,6 +109,40 @@ class ClassifyTests(unittest.TestCase):
         (bug,) = corpus.skipped_verdicts([call(result="warned", detail="align")], regs)
         self.assertEqual(bug[1].kind, "bug")
 
+    def test_failure_after_skipping_is_a_gap_not_a_bug(self):
+        # Record 0271: a warn-mode add whose data came only from skipped keys
+        # fails with `missing_property`; the skipped keys are the gap.
+        (row,) = corpus.parse(
+            "@ word/x.sh\n3\tadd\tdocx\tchart\tmissing_property\t"
+            "data;skipped:style,colour,+2\t-\n")
+        self.assertEqual((row.detail, row.after_skip), ("data", "style,colour,+2"))
+        self.assertTrue(row.refused and row.failed_after_skipping)
+        self.assertEqual(row.skipped(), ["style", "colour", "+2"])
+        regs = {"docx": registry([PARAGRAPH, CHART])}
+        (verdict,) = corpus.classify([row], regs)
+        self.assertEqual((verdict.kind, verdict.rule), ("gap", "F3b"))
+        skipped = corpus.skipped_verdicts(
+            [call(result="missing_property", detail="data", after_skip="style")], regs)
+        self.assertEqual([v.rule for _, v in skipped], ["docx|add|paragraph|skipped|style"])
+        # Skipping a property the registry claims is still a bug ...
+        (bug,) = corpus.skipped_verdicts(
+            [call(result="missing_property", detail="data", after_skip="align")], regs)
+        self.assertEqual(bug[1].kind, "bug")
+        # ... the same failure without skipped properties stays untriaged ...
+        (plain,) = self.classify([call(kind="chart", result="missing_property", detail="data")])
+        self.assertEqual(plain.kind, "bug")
+        # ... and so does another failure after skipping: only a missing
+        # property is explained by the skip.
+        (other,) = self.classify([call(result="invalid_value", detail="size", after_skip="x")])
+        self.assertEqual(other.kind, "bug")
+        # The call's own failure is classified first (here a recorded delta).
+        (delta,) = self.classify([call(verb="batch", fmt="pptx", kind="", result="missing_property",
+                                       detail="layout", after_skip="transition")])
+        self.assertEqual((delta.kind, delta.rule), ("delta", "D4b"))
+        # A later path into the failed add is a cascade.
+        after = self.classify([row, call(verb="set", result="path_not_found", target="p")])
+        self.assertEqual(after[1].kind, "cascade")
+
     def test_batch_slide_without_layout_is_delta_d4b(self):
         (verdict,) = self.classify([
             call(verb="batch", fmt="pptx", kind="", result="missing_property", detail="layout"),

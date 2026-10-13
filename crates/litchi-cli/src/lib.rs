@@ -40,7 +40,11 @@
 //! as `warning[unsupported_property]: ...` with its `property` line (and in
 //! the item's `warnings` with `--json`), and the run exits 9. Invalid values
 //! and every other failure still refuse the command (`batch::Unsupported`,
-//! record 0269).
+//! record 0269). A command that still fails after skipping prints the
+//! skipped properties as `warning[...]` blocks before its `error[...]`
+//! (with `--json`, the error's `warnings`), and exits with the failure's own
+//! status: the failure is that of the command without them
+//! (`litchi_ops::Error::warnings`, record 0271).
 //!
 //! # Output
 //!
@@ -59,8 +63,8 @@
 //!   "summary": {...}}`. Each result has `index` and `success`; a success
 //!   adds `changed` and, for `add`, the created `path`; a failure adds
 //!   `code`, `error` (the message), `suggestion`, `property` and the failed
-//!   input `item`; a success under `--unsupported warn` adds `warnings`, one
-//!   `ErrorResult` per skipped property. The summary counts `total`, `executed`, `succeeded`,
+//!   input `item`; under `--unsupported warn` a success, or a failure after
+//!   skipping, adds `warnings`, one `ErrorResult` per skipped property. The summary counts `total`, `executed`, `succeeded`,
 //!   `failed` and `skipped`, and adds `changed`, `saved` (the destination)
 //!   and `atomicRolledBack`.
 //!

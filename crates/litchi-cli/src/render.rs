@@ -196,15 +196,20 @@ pub(crate) fn node_text(out: &mut impl Write, view: &View<'_, '_>, indent: usize
     Ok(())
 }
 
-/// Writes an error on stderr: text or OfficeCLI's `ErrorResult` JSON.
+/// Writes an error on stderr: text or OfficeCLI's `ErrorResult` JSON. A
+/// `--unsupported warn` command that failed after skipping properties
+/// prints each skipped property as a `warning[...]` first (JSON: the
+/// error's `warnings`), so the failure is never shown without its cause.
 pub(crate) fn error(error: &Error, json: bool) {
-    let mut stderr = std::io::stderr().lock();
     if json {
+        let mut stderr = std::io::stderr().lock();
         let value = ErrorJson::of(error);
         let _ = serde_json::to_writer_pretty(&mut stderr, &value);
         let _ = writeln!(stderr);
         return;
     }
+    warnings(error.warnings());
+    let mut stderr = std::io::stderr().lock();
     let _ = writeln!(stderr, "error[{}]: {}", error.code(), error.message());
     if let Some(item) = error.item() {
         let _ = writeln!(stderr, "  item: {item}");
@@ -250,6 +255,10 @@ struct ErrorJson<'a> {
     item: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     property: Option<&'a str>,
+    /// The properties a `--unsupported warn` command skipped before it
+    /// failed (`litchi_ops::Error::warnings`).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    warnings: Vec<ErrorJson<'a>>,
 }
 
 impl<'a> ErrorJson<'a> {
@@ -260,6 +269,7 @@ impl<'a> ErrorJson<'a> {
             suggestion: error.suggestion(),
             item: error.item(),
             property: error.property(),
+            warnings: error.warnings().iter().map(ErrorJson::of).collect(),
         }
     }
 }
@@ -326,7 +336,7 @@ impl<'a> ItemJson<'a> {
             suggestion: error.suggestion(),
             property: error.property(),
             item,
-            warnings: Vec::new(),
+            warnings: error.warnings().iter().map(ErrorJson::of).collect(),
         }
     }
 
@@ -413,12 +423,21 @@ impl Report<'_> {
                     format!("#{}: ok{target}{effect}", item.index)
                 }
             } else {
-                format!(
+                let mut line = format!(
                     "#{}: error[{}]: {}",
                     item.index,
                     item.code.unwrap_or("internal_error"),
                     item.error.unwrap_or_default()
-                )
+                );
+                if !item.warnings.is_empty() {
+                    let skipped: Vec<&str> = item
+                        .warnings
+                        .iter()
+                        .map(|warning| warning.property.unwrap_or("?"))
+                        .collect();
+                    line.push_str(&format!(" (after skipping: {})", skipped.join(", ")));
+                }
+                line
             };
             writeln!(out, "{line}").map_err(|error| io(&error))?;
         }

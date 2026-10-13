@@ -25,11 +25,11 @@ differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `3a1cc3f959c8f9e4f42414bed26990ce7b8392ca9678ce0d79a39f8256218140` |
 | golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `058012097bee2177a9b74042591068db0216f738ba762b0747ffdf5d99915764` |
 | golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `b80c09f5723f4a3da889e473913cb9abfb9bf4cf31aecd4e2deafb79859b9b7f` |
-| golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `9d1f190710517b4b8a5915b6629946f6e70dacf746ee7e87c917bc010249ed80` |
-| golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `f81240b1cb42f91365e8cbb259cc42f6a0b172a5d0911dc864cb50342a58a73d` |
+| golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `aecaf9f83fb9a289d0eb3741f849947ca500f867605953c48bc6ffaab0f59dee` |
+| golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `0160cdb4a607e6fbe773387c14cc398f7553d1119fd386db70e54b80311f1464` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsb.json` | `12690d951e7900bead6edaedb44e44154a94f73bfc3fee9a3f7f4e2d797bdfa3` |
 | golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `b79c62d11b084a6d64eab2536ad000a17ebb8bedf67380dbf46557265eb55b5e` |
-| golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `5a18a065f62c8e115f2991c0a0f61d3d96aa6ec8f21b53412b1294e97cb37a93` |
+| golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `2326a7db7ac883ceb3b53fc9bfddfd88f2462408886140b195be269f04477baa` |
 | golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `e5ce90bdf0f83b73b5d7a306bee39269cc4f07f3896861578948eebfc37b9cde` |
 | officecli | `schemas/help` (152 files, OfficeCLI commit `dced0d74`) | `0bcd8cae45fabc0c5e45ff99d1994465fb213ac1b8db3f7eadd87339fb40ced4` |
 
@@ -84,10 +84,10 @@ Property reads:
 | docx | 138 | 3 | 391 | 0 | 113 | 2 | 314 | 28 |
 | doc | 39 | 0 | 231 | 0 | 205 | 1 | 485 | 38 |
 | rtf | 25 | 0 | 225 | 0 | 196 | 1 | 514 | 39 |
-| xlsx | 101 | 16 | 328 | 0 | 100 | 1 | 145 | 85 |
+| xlsx | 101 | 16 | 328 | 0 | 100 | 1 | 145 | 145 |
 | xlsb | 78 | 29 | 489 | 0 | 24 | 1 | 70 | 30 |
 | xls | 56 | 4 | 504 | 0 | 24 | 1 | 102 | 0 |
-| pptx | 167 | 22 | 70 | 0 | 144 | 0 | 284 | 189 |
+| pptx | 167 | 22 | 70 | 0 | 144 | 0 | 284 | 249 |
 | ppt | 41 | 3 | 318 | 0 | 48 | 0 | 277 | 47 |
 
 Property writes:
@@ -97,10 +97,10 @@ Property writes:
 | docx | 92 | 30 | 674 | 0 | 12 | 181 |
 | doc | 1 | 13 | 782 | 0 | 21 | 182 |
 | rtf | 12 | 9 | 775 | 0 | 33 | 171 |
-| xlsx | 21 | 69 | 454 | 0 | 89 | 143 |
+| xlsx | 21 | 69 | 454 | 0 | 149 | 143 |
 | xlsb | 8 | 26 | 510 | 0 | 31 | 146 |
 | xls | 1 | 19 | 524 | 0 | 0 | 147 |
-| pptx | 53 | 55 | 453 | 0 | 73 | 242 |
+| pptx | 53 | 55 | 453 | 0 | 133 | 242 |
 | ppt | 0 | 14 | 547 | 0 | 16 | 157 |
 
 ## docx
@@ -3687,6 +3687,66 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | chart | `series18` | string |  | a-- | litchi-only | litchi-only |  |
 | chart | `series19` | string |  | a-- | litchi-only | litchi-only |  |
 | chart | `series20` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series1.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series1.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series1.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series2.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series2.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series2.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series3.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series3.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series3.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series4.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series4.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series4.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series5.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series5.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series5.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series6.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series6.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series6.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series7.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series7.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series7.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series8.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series8.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series8.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series9.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series9.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series9.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series10.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series10.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series10.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series11.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series11.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series11.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series12.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series12.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series12.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series13.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series13.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series13.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series14.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series14.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series14.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series15.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series15.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series15.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series16.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series16.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series16.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series17.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series17.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series17.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series18.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series18.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series18.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series19.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series19.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series19.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series20.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series20.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series20.color` | string |  | a-- | litchi-only | litchi-only |  |
 | colbreak | `col` | string | as- |  | element gap | gap | M1-extended (R4x) |
 | colbreak | `manual` | bool | -s- |  | element gap | gap | M1-extended (R4x) |
 | colbreak | `min` | int | -s- |  | element gap | gap | M1-extended (R4x) |
@@ -6040,6 +6100,66 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | chart | `series18` | string |  | a-- | litchi-only | litchi-only |  |
 | chart | `series19` | string |  | a-- | litchi-only | litchi-only |  |
 | chart | `series20` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series1.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series1.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series1.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series2.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series2.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series2.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series3.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series3.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series3.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series4.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series4.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series4.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series5.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series5.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series5.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series6.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series6.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series6.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series7.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series7.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series7.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series8.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series8.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series8.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series9.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series9.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series9.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series10.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series10.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series10.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series11.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series11.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series11.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series12.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series12.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series12.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series13.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series13.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series13.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series14.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series14.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series14.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series15.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series15.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series15.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series16.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series16.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series16.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series17.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series17.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series17.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series18.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series18.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series18.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series19.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series19.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series19.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series20.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series20.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series20.color` | string |  | a-- | litchi-only | litchi-only |  |
 | comment | `index` | int | --g | --g | supported | — |  |
 | comment | `x` | length | asg | asg | supported | supported |  |
 | comment | `y` | length | asg | asg | supported | supported |  |

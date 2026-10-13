@@ -126,6 +126,9 @@ pub(crate) enum ChartSetter {
     Format(shared::FormatKey),
     /// `series{N}`, by its zero-based number.
     Numbered(u8),
+    /// `series{N}.name`, `.values` or `.color`, by the zero-based number
+    /// (record 0271).
+    Dotted(u8, shared::SeriesField),
 }
 
 const CELL_SPAN: Constraint = Constraint::Int {
@@ -154,10 +157,11 @@ const fn entry(
 const CHART_BASE_COUNT: usize = 14;
 const CHART_FORMAT_START: usize = CHART_BASE_COUNT;
 const CHART_NUMBERED_START: usize = CHART_FORMAT_START + shared::FORMAT_PROPS.len();
-const CHART_WRITE_COUNT: usize = CHART_NUMBERED_START + shared::NUMBERED_SERIES_PROPS.len();
+const CHART_DOTTED_START: usize = CHART_NUMBERED_START + shared::NUMBERED_SERIES_PROPS.len();
+const CHART_WRITE_COUNT: usize = CHART_DOTTED_START + shared::DOTTED_SERIES_PROPS.len();
 const _: () = assert!(
-    CHART_WRITE_COUNT <= 64,
-    "chart adds track assignments in a u64"
+    CHART_WRITE_COUNT <= 128,
+    "chart adds track assignments in a u128"
 );
 
 const fn chart_entries() -> [Entry<ChartSetter>; CHART_WRITE_COUNT] {
@@ -271,6 +275,23 @@ const fn chart_entries() -> [Entry<ChartSetter>; CHART_WRITE_COUNT] {
             false,
         );
         number += 1;
+    }
+    let mut dotted = 0;
+    while dotted < shared::DOTTED_SERIES_PROPS.len() {
+        let field = shared::SERIES_FIELDS[dotted % 3];
+        let setter = ChartSetter::Dotted((dotted / 3) as u8, field);
+        entries[CHART_DOTTED_START + dotted] = entry(
+            shared::DOTTED_SERIES_PROPS[dotted],
+            // A series' name and values are also settable on the chart
+            // (OfficeCLI's chart-level `set`); its color only on add.
+            match field {
+                shared::SeriesField::Color => Access::Add(setter),
+                _ => Access::SetAndAdd(setter),
+            },
+            Constraint::NotEmpty,
+            false,
+        );
+        dotted += 1;
     }
     entries
 }
@@ -472,12 +493,12 @@ impl Xlsx {
         let mut name = None;
         let mut origin = [0_u32; 2];
         let mut span = [8_u32, 15];
-        let mut assigned = 0_u64;
+        let mut assigned = 0_u128;
         for (key, value) in node.props().iter() {
             let (index, entry) = CHART_WRITE_TABLE
                 .resolve(key.as_str())
                 .map_err(|e| e.with_property(key.as_str().to_owned()))?;
-            let bit = 1_u64 << index;
+            let bit = 1_u128 << index;
             if assigned & bit != 0 {
                 return Err(error(
                     Code::InvalidArgument,
@@ -524,6 +545,11 @@ impl Xlsx {
                     ChartSetter::Format(key) => props.format(key, scalar)?,
                     ChartSetter::Numbered(number) => props.numbered_series(
                         usize::from(number) + 1,
+                        &text(scalar).unwrap_or_default(),
+                    )?,
+                    ChartSetter::Dotted(number, field) => props.dotted_series(
+                        usize::from(number) + 1,
+                        field,
                         &text(scalar).unwrap_or_default(),
                     )?,
                 }
@@ -706,6 +732,12 @@ impl Xlsx {
                                 })?;
                                 edit.axis_titles.push((axis.id, text(scalar)));
                             },
+                            ChartSetter::Dotted(number, field) => edit.dotted_series(
+                                &item.summary,
+                                usize::from(number) + 1,
+                                field,
+                                text(scalar),
+                            )?,
                             _ => unreachable!("chart set admission"),
                         }
                         Ok(())

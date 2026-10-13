@@ -34,6 +34,17 @@ fn invalid(message: &'static str, property: &'static str) -> Error {
     Error::new(Code::InvalidValue, message).with_property(property)
 }
 
+/// A series value given as a cell range: the key is supported, the
+/// reference form is not authored yet.
+fn range_refused(property: &'static str) -> Error {
+    Error::new(
+        Code::UnsupportedCapability,
+        "a series bound to a cell range is not authored yet",
+    )
+    .with_property(property)
+    .with_suggestion("give the values inline (1,2,3), or bind a worksheet range with dataRange")
+}
+
 /// The OfficeCLI `chartType` name of a variant: the family, prefixed by
 /// `stacked`/`percentStacked` and suffixed by `3d` (`stackedColumn3d`).
 pub(crate) fn variant_name(variant: Variant) -> String {
@@ -370,6 +381,141 @@ pub(crate) const NUMBERED_SERIES_PROPS: [PropSpec; 20] = {
     props
 };
 
+/// The part of one numbered series a dotted key (`series{N}.name`)
+/// assigns, OfficeCLI's per-series add keys.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SeriesField {
+    /// `series{N}.name`: the series name.
+    Name,
+    /// `series{N}.values`: the comma list of values.
+    Values,
+    /// `series{N}.color`: the series fill, `RRGGBB` or `AARRGGBB`.
+    Color,
+}
+
+/// The fields in the order [`DOTTED_SERIES`] lists them for each number.
+pub(crate) const SERIES_FIELDS: [SeriesField; 3] =
+    [SeriesField::Name, SeriesField::Values, SeriesField::Color];
+
+macro_rules! dotted_series {
+    ($($number:literal),*) => {
+        [$(
+            concat!("series", $number, ".name"),
+            concat!("series", $number, ".values"),
+            concat!("series", $number, ".color"),
+        )*]
+    };
+}
+
+/// The dotted numbered series keys, `series1.name`, `series1.values`,
+/// `series1.color`, `series2.name`, ... `series20.color`: entry
+/// `(N - 1) * 3 + field`, fields in [`SERIES_FIELDS`] order.
+pub(crate) const DOTTED_SERIES: [&str; 60] = dotted_series!(
+    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20
+);
+
+/// The dotted numbered series keys as write-only properties.
+pub(crate) const DOTTED_SERIES_PROPS: [PropSpec; 60] = {
+    let mut props = [PropSpec::new("series1.name", ValueType::Text); 60];
+    let mut index = 0;
+    while index < 60 {
+        props[index] = write_only(DOTTED_SERIES[index], ValueType::Text);
+        index += 1;
+    }
+    props
+};
+
+/// The dotted key of a series number (one-based) and field.
+fn dotted_key(number: usize, field: SeriesField) -> &'static str {
+    let offset = match field {
+        SeriesField::Name => 0,
+        SeriesField::Values => 1,
+        SeriesField::Color => 2,
+    };
+    DOTTED_SERIES[(number - 1) * 3 + offset]
+}
+
+/// Whether a series value is a cell range (`Sheet1!B2:B13`, `B2:B13`),
+/// OfficeCLI's reference form, rather than a comma list of numbers.
+fn is_range_reference(text: &str) -> bool {
+    let text = text.trim();
+    if text.contains('!') {
+        return true;
+    }
+    let mut cells = text.split(':');
+    let cell = |part: Option<&str>| {
+        part.is_some_and(|part| {
+            let part = part.trim().replace('$', "");
+            let letters = part.bytes().take_while(u8::is_ascii_alphabetic).count();
+            letters > 0
+                && part.len() > letters
+                && part.bytes().skip(letters).all(|byte| byte.is_ascii_digit())
+        })
+    };
+    cell(cells.next()) && cell(cells.next()) && cells.next().is_none()
+}
+
+/// What the keys of one series number assigned on a chart `add`.
+#[derive(Debug, Default)]
+pub(crate) struct Numbered {
+    /// The one-based series number.
+    number: usize,
+    /// `series{N}=[Name:]1,2,3`: the name, when the value has one, and
+    /// the values.
+    legacy: Option<(Option<String>, Vec<f64>)>,
+    name: Option<String>,
+    values: Option<Vec<f64>>,
+    color: Option<String>,
+}
+
+impl Numbered {
+    /// Whether the keys define the series itself (not only its color).
+    fn defines(&self) -> bool {
+        self.legacy.is_some() || self.name.is_some() || self.values.is_some()
+    }
+
+    /// The series the keys define, OfficeCLI's merge: the dotted name, else
+    /// the legacy one, else `Series N`; the dotted values, else the legacy
+    /// ones. A key that assigns what another already did is refused.
+    fn into_series(self) -> Result<Series> {
+        let number = self.number;
+        let (legacy_name, legacy_values) = match self.legacy {
+            Some((name, values)) => (name, Some(values)),
+            None => (None, None),
+        };
+        if self.name.is_some() && legacy_name.is_some() {
+            return Err(Error::new(
+                Code::InvalidArgument,
+                "the series is named by both series{N}=Name:... and series{N}.name",
+            )
+            .with_property(dotted_key(number, SeriesField::Name))
+            .with_suggestion("name it once: drop the name from series{N}= or the .name key"));
+        }
+        if self.values.is_some() && legacy_values.is_some() {
+            return Err(Error::new(
+                Code::InvalidArgument,
+                "the series values are given by both series{N}= and series{N}.values",
+            )
+            .with_property(dotted_key(number, SeriesField::Values))
+            .with_suggestion("give the values once"));
+        }
+        let values = self.values.or(legacy_values).ok_or_else(|| {
+            Error::new(Code::MissingProperty, "a numbered series has no values")
+                .with_property(dotted_key(number, SeriesField::Values))
+                .with_suggestion("add series{N}.values=1,2,3")
+        })?;
+        let name = self
+            .name
+            .or(legacy_name)
+            .unwrap_or_else(|| format!("Series {number}"));
+        let series = Series::new(name, values);
+        Ok(match self.color {
+            Some(color) => series.with_color(color),
+            None => series,
+        })
+    }
+}
+
 fn label_position(text: &str) -> Option<DataLabelPosition> {
     Some(match text {
         "outsideend" | "outend" | "outside" => DataLabelPosition::OutsideEnd,
@@ -474,8 +620,9 @@ pub(crate) struct AddProps {
     pub(crate) category_axis_title: Option<String>,
     pub(crate) value_axis_title: Option<String>,
     pub(crate) appearance: Appearance,
-    /// `series{N}` values by their number.
-    pub(crate) numbered: Vec<(usize, Series)>,
+    /// The `series{N}` and `series{N}.*` keys, one entry per number in
+    /// first-assignment order.
+    pub(crate) numbered: Vec<Numbered>,
     /// A combo chart's series families (`comboTypes`).
     pub(crate) combo_types: Option<Vec<Kind>>,
     /// How many leading series of a combo chart are columns (`comboSplit`).
@@ -483,17 +630,66 @@ pub(crate) struct AddProps {
 }
 
 impl AddProps {
-    /// Admit a `series{N}` value (`Name:1,2,3`).
+    /// The entry of a series number, created on its first key.
+    fn numbered_entry(&mut self, number: usize) -> &mut Numbered {
+        let position = match self
+            .numbered
+            .iter()
+            .position(|entry| entry.number == number)
+        {
+            Some(position) => position,
+            None => {
+                self.numbered.push(Numbered {
+                    number,
+                    ..Numbered::default()
+                });
+                self.numbered.len() - 1
+            },
+        };
+        &mut self.numbered[position]
+    }
+
+    /// Admit a `series{N}` value: `Name:1,2,3` (the last `:` splits the
+    /// name), or bare values named `Series N` (OfficeCLI).
     pub(crate) fn numbered_series(&mut self, number: usize, text: &str) -> Result<()> {
         let property = NUMBERED_SERIES[number - 1];
-        let (name, values) = text.rsplit_once(':').ok_or_else(|| {
-            invalid("a numbered series is Name:1,2,3", property)
-                .with_suggestion("write series1=Name:1,2,3")
-        })?;
-        self.numbered.push((
-            number,
-            Series::new(name.trim().to_owned(), parse_values(values, property)?),
-        ));
+        if is_range_reference(text) {
+            return Err(range_refused(property));
+        }
+        let (name, values) = match text.rsplit_once(':') {
+            Some((name, values)) => (Some(name.trim().to_owned()), values),
+            None => (None, text),
+        };
+        let values = parse_values(values, property)?;
+        self.numbered_entry(number).legacy = Some((name, values));
+        Ok(())
+    }
+
+    /// Admit a dotted `series{N}.name`, `.values` or `.color` value.
+    pub(crate) fn dotted_series(
+        &mut self,
+        number: usize,
+        field: SeriesField,
+        text: &str,
+    ) -> Result<()> {
+        let property = dotted_key(number, field);
+        match field {
+            SeriesField::Name => {
+                let name = bounded(text, property)?.to_owned();
+                self.numbered_entry(number).name = Some(name);
+            },
+            SeriesField::Values => {
+                if is_range_reference(text) {
+                    return Err(range_refused(property));
+                }
+                let values = parse_values(text, property)?;
+                self.numbered_entry(number).values = Some(values);
+            },
+            SeriesField::Color => {
+                let color = argb(text, property)?;
+                self.numbered_entry(number).color = Some(color);
+            },
+        }
         Ok(())
     }
 
@@ -678,7 +874,9 @@ impl AddProps {
     /// Build the chart spec; the chart type defaults to `column` (OfficeCLI)
     /// and the legend to `bottom`.
     pub(crate) fn into_spec(mut self) -> Result<Spec> {
-        if !self.numbered.is_empty() {
+        self.numbered.sort_by_key(|entry| entry.number);
+        let defined = self.numbered.iter().any(Numbered::defines);
+        if defined {
             if self.data.is_some() {
                 return Err(Error::new(
                     Code::InvalidArgument,
@@ -686,8 +884,28 @@ impl AddProps {
                 )
                 .with_property("data"));
             }
-            self.numbered.sort_by_key(|(number, _)| *number);
-            self.data = Some(self.numbered.drain(..).map(|(_, series)| series).collect());
+            let mut series = Vec::with_capacity(self.numbered.len());
+            for entry in self.numbered.drain(..) {
+                if !entry.defines() {
+                    // A color for a number no other key defines.
+                    return Err(invalid(
+                        "the color names a series that no series{N} key defines",
+                        dotted_key(entry.number, SeriesField::Color),
+                    ));
+                }
+                series.push(entry.into_series()?);
+            }
+            self.data = Some(series);
+        } else if let Some(data) = &mut self.data {
+            // `series{N}.color` alone colors the Nth series of `data`
+            // (OfficeCLI merges it over the `colors` palette).
+            for entry in self.numbered.drain(..) {
+                let property = dotted_key(entry.number, SeriesField::Color);
+                let series = data.get_mut(entry.number - 1).ok_or_else(|| {
+                    invalid("the color names a series beyond the chart's data", property)
+                })?;
+                series.color = entry.color;
+            }
         }
         let data = self.data.ok_or_else(|| {
             Error::new(Code::MissingProperty, "a chart needs data")
@@ -955,6 +1173,45 @@ fn native(error: litchi_drawingml::Error, property: &'static str) -> Error {
 }
 
 impl ChartEdit {
+    /// Admit a chart-level `series{N}.name` or `series{N}.values` set: the
+    /// `N`th series of the chart in reading order (the `series[N]` node).
+    pub(crate) fn dotted_series(
+        &mut self,
+        summary: &Summary,
+        number: usize,
+        field: SeriesField,
+        text: Option<String>,
+    ) -> Result<()> {
+        let property = dotted_key(number, field);
+        let index = summary
+            .series
+            .get(number - 1)
+            .map(|series| series.index)
+            .ok_or_else(|| {
+                Error::new(Code::OutOfRange, "the chart has no series with this number")
+                    .with_property(property)
+            })?;
+        match field {
+            SeriesField::Name => self.series_names.push((index, text)),
+            SeriesField::Values => {
+                let text = text.unwrap_or_default();
+                if is_range_reference(&text) {
+                    return Err(range_refused(property));
+                }
+                self.series_values
+                    .push((index, parse_values(&text, property)?));
+            },
+            SeriesField::Color => {
+                return Err(Error::new(
+                    Code::UnsupportedProperty,
+                    "a series color can be given on add only",
+                )
+                .with_property(property));
+            },
+        }
+        Ok(())
+    }
+
     /// Apply the edit to a chart part; `None` when nothing changes.
     pub(crate) fn apply(self, xml: Vec<u8>) -> Result<Option<Edited>> {
         let snapshot = litchi_drawingml::chart::edit::Snapshot::from_xml(xml)
@@ -1138,6 +1395,188 @@ mod tests {
             parse_list("Q1, Q2 ,Q3", "categories").unwrap(),
             ["Q1", "Q2", "Q3"]
         );
+    }
+
+    fn spec_of(keys: &[(&str, &str)]) -> Result<Spec> {
+        let mut props = AddProps::default();
+        for (key, value) in keys {
+            if *key == "data" {
+                props.data = Some(parse_data(value)?);
+            } else if let Some(number) = NUMBERED_SERIES.iter().position(|name| name == key) {
+                props.numbered_series(number + 1, value)?;
+            } else {
+                let index = DOTTED_SERIES
+                    .iter()
+                    .position(|name| name == key)
+                    .expect("a series key");
+                props.dotted_series(index / 3 + 1, SERIES_FIELDS[index % 3], value)?;
+            }
+        }
+        props.into_spec()
+    }
+
+    fn named(spec: &Spec) -> Vec<(&str, &[f64], Option<&str>)> {
+        spec.series()
+            .iter()
+            .map(|series| {
+                (
+                    series.name.as_str(),
+                    series.values.as_slice(),
+                    series.color.as_deref(),
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn dotted_series_keys_follow_officecli() {
+        assert_eq!(DOTTED_SERIES[0], "series1.name");
+        assert_eq!(DOTTED_SERIES[59], "series20.color");
+        assert_eq!(dotted_key(7, SeriesField::Values), "series7.values");
+        // The corpus form: names, values and colors, in number order
+        // whatever the key order.
+        let spec = spec_of(&[
+            ("series2.name", "Mobile"),
+            ("series1.name", "Web"),
+            ("series1.values", "50,60"),
+            ("series1.color", "#4472c4"),
+            ("series2.values", "30, 35"),
+            ("series2.color", "80ED7D31"),
+        ])
+        .unwrap();
+        assert_eq!(
+            named(&spec),
+            [
+                ("Web", &[50.0, 60.0][..], Some("4472C4")),
+                ("Mobile", &[30.0, 35.0][..], Some("80ED7D31")),
+            ]
+        );
+        // Values without a name are `Series N`; numbers may skip.
+        let spec = spec_of(&[("series3.values", "1,2"), ("series1.values", "3")]).unwrap();
+        assert_eq!(
+            named(&spec),
+            [
+                ("Series 1", &[3.0][..], None),
+                ("Series 3", &[1.0, 2.0][..], None)
+            ]
+        );
+        // Legacy keys: `Name:values`, or bare values named `Series N`; a
+        // dotted name names bare legacy values (OfficeCLI's mixed form).
+        let spec = spec_of(&[
+            ("series1", "Sales:1,2"),
+            ("series2", "3,4"),
+            ("series2.name", "Cost"),
+            ("series2.color", "C00000"),
+        ])
+        .unwrap();
+        assert_eq!(
+            named(&spec),
+            [
+                ("Sales", &[1.0, 2.0][..], None),
+                ("Cost", &[3.0, 4.0][..], Some("C00000"))
+            ]
+        );
+        // A color alone colors the Nth series of `data`.
+        let spec = spec_of(&[("data", "A:1;B:2"), ("series2.color", "00FF00")]).unwrap();
+        assert_eq!(named(&spec)[1].2, Some("00FF00"));
+        assert_eq!(named(&spec)[0].2, None);
+    }
+
+    #[test]
+    fn dotted_series_refusals_name_their_key() {
+        let refused = |keys: &[(&str, &str)]| {
+            let error = spec_of(keys).unwrap_err();
+            (error.code(), error.property().map(str::to_owned))
+        };
+        // A name without values.
+        assert_eq!(
+            refused(&[("series1.name", "Web")]),
+            (Code::MissingProperty, Some("series1.values".into()))
+        );
+        // Mixing data with series definitions stays refused.
+        assert_eq!(
+            refused(&[
+                ("data", "A:1"),
+                ("series1.name", "Web"),
+                ("series1.values", "1")
+            ]),
+            (Code::InvalidArgument, Some("data".into()))
+        );
+        // Two assignments of one part of a series.
+        assert_eq!(
+            refused(&[("series1", "A:1"), ("series1.values", "2")]),
+            (Code::InvalidArgument, Some("series1.values".into()))
+        );
+        assert_eq!(
+            refused(&[("series1", "A:1"), ("series1.name", "B")]),
+            (Code::InvalidArgument, Some("series1.name".into()))
+        );
+        // A color for a series nothing defines.
+        assert_eq!(
+            refused(&[("series1.values", "1"), ("series2.color", "FF0000")]),
+            (Code::InvalidValue, Some("series2.color".into()))
+        );
+        assert_eq!(
+            refused(&[("data", "A:1"), ("series2.color", "FF0000")]),
+            (Code::InvalidValue, Some("series2.color".into()))
+        );
+        // Only colors: the chart still has no data.
+        assert_eq!(
+            refused(&[("series1.color", "FF0000")]),
+            (Code::MissingProperty, Some("data".into()))
+        );
+        // Bad values and colors.
+        assert_eq!(
+            refused(&[("series1.values", "1,x")]),
+            (Code::InvalidValue, Some("series1.values".into()))
+        );
+        assert_eq!(
+            refused(&[("series1.values", "1"), ("series1.color", "red")]),
+            (Code::InvalidValue, Some("series1.color".into()))
+        );
+        // A cell range is OfficeCLI's reference form, not authored yet.
+        for range in ["Sheet1!B2:B13", "B2:B13", "$B$2:$B$13"] {
+            assert_eq!(
+                refused(&[("series1.values", range)]),
+                (Code::UnsupportedCapability, Some("series1.values".into()))
+            );
+        }
+        assert_eq!(
+            refused(&[("series4", "Sheet1!B2:B13")]),
+            (Code::UnsupportedCapability, Some("series4".into()))
+        );
+        // `Q1:40` is a name and a value, not a range.
+        assert!(!is_range_reference("Q1:40"));
+        assert!(!is_range_reference("1,2,3"));
+    }
+
+    #[test]
+    fn dotted_series_sets_select_series_by_number() {
+        let xml = AddProps {
+            data: Some(parse_data("East:1,2;West:3,4").unwrap()),
+            ..AddProps::default()
+        }
+        .into_spec()
+        .unwrap()
+        .to_xml(None)
+        .unwrap();
+        let summary = Summary::read(&xml).unwrap();
+        let mut edit = ChartEdit::default();
+        edit.dotted_series(&summary, 2, SeriesField::Name, Some("North".into()))
+            .unwrap();
+        edit.dotted_series(&summary, 1, SeriesField::Values, Some("7,8".into()))
+            .unwrap();
+        let error = edit
+            .dotted_series(&summary, 3, SeriesField::Name, Some("x".into()))
+            .unwrap_err();
+        assert_eq!(
+            (error.code(), error.property()),
+            (Code::OutOfRange, Some("series3.name"))
+        );
+        let edited = edit.apply(xml).unwrap().unwrap();
+        let after = Summary::read(&edited.xml).unwrap();
+        assert_eq!(after.series[1].name.as_deref(), Some("North"));
+        assert_eq!(after.series[0].values, [7.0, 8.0]);
     }
 
     #[test]

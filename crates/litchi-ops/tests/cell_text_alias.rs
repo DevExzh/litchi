@@ -6,6 +6,8 @@
 //! read-back behaviour; these tests prove the two spellings write the same
 //! bytes and read back the same text.
 
+#![cfg(any(feature = "xlsx", feature = "xlsb", feature = "xls"))]
+
 use litchi_core::FileFormat;
 use litchi_ops::{File, create, props};
 

@@ -537,8 +537,9 @@ impl Source {
 /// Its [`Display`](fmt::Display) form is facade-level: the code and its
 /// summary for an error converted from a leaf error, or the code and the
 /// message for an error the unified layer raised itself, followed by the
-/// format, the failing property and batch item, and the suggestion when there
-/// are any. The leaf error's own text is
+/// format, the failing property and batch item, the suggestion, and the
+/// properties a warn-policy command skipped before it failed
+/// ([`Error::warnings`]), when there are any. The leaf error's own text is
 /// [`Error::message`], and the leaf error is [`std::error::Error::source`], so
 /// an error-chain printer shows it once, as the cause.
 #[derive(Clone)]
@@ -557,6 +558,9 @@ struct Inner {
     property: Option<Cow<'static, str>>,
     /// Shared so that cloning an error never copies or loses its leaf error.
     source: Arc<Source>,
+    /// The properties a `batch::Unsupported::Warn` command skipped before
+    /// it failed; empty (and unallocated) otherwise.
+    warnings: Box<[Error]>,
 }
 
 const _: () = assert!(size_of::<Error>() == size_of::<usize>());
@@ -575,6 +579,7 @@ impl Error {
             item: None,
             property: None,
             source: Arc::new(Source::None),
+            warnings: Box::default(),
         }))
     }
 
@@ -746,6 +751,52 @@ impl Error {
         self.0.property.as_deref()
     }
 
+    /// The properties a command run under
+    /// [`Unsupported::Warn`](crate::batch::Unsupported::Warn) skipped before
+    /// it failed, in the order they were refused: each the
+    /// `unsupported_property` refusal that dropped it, exactly as a
+    /// successful command reports them in
+    /// [`Applied::warnings`](crate::batch::Applied::warnings).
+    ///
+    /// When this is not empty, this error is the failure of the command
+    /// *without* those properties, and the command as written was refused
+    /// first for the first of them. A failure that only the skipping caused
+    /// (a chart `add` whose series all came from unsupported keys fails
+    /// with `missing_property`) is told apart from a failure of the
+    /// caller's own input by this list. Empty for every other error.
+    ///
+    /// ```
+    /// # #[cfg(feature = "xlsx")]
+    /// # {
+    /// use litchi_core::FileFormat;
+    /// use litchi_ops::batch::{Options, Unsupported};
+    /// use litchi_ops::{BatchItem, Code, Props, create};
+    ///
+    /// let file = create(FileFormat::Xlsx)?;
+    /// let mut item = BatchItem::new("set");
+    /// item.path = Some("/Sheet1/A1".into());
+    /// item.props = Some(Props::new().with("sparkle", true).with("font.size", -3));
+    /// let options = Options::new().unsupported(Unsupported::Warn);
+    /// let error = file.apply_with(&item, &options).unwrap_err();
+    /// // The rest of the command failed on its own value ...
+    /// assert_eq!(error.code(), Code::InvalidValue);
+    /// // ... after `sparkle` was skipped.
+    /// assert_eq!(error.warnings()[0].property(), Some("sparkle"));
+    /// # }
+    /// # Ok::<(), litchi_ops::Error>(())
+    /// ```
+    #[must_use]
+    pub fn warnings(&self) -> &[Error] {
+        &self.0.warnings
+    }
+
+    /// Attaches the properties a warn-policy command skipped before it
+    /// failed.
+    pub(crate) fn with_warnings(mut self, warnings: Box<[Error]>) -> Self {
+        self.0.warnings = warnings;
+        self
+    }
+
     /// The typed leaf error this error was converted from. Clones of an error
     /// share it.
     #[must_use]
@@ -768,6 +819,7 @@ impl Error {
             item: None,
             property: None,
             source: Arc::new(source),
+            warnings: Box::default(),
         }))
     }
 }
@@ -807,6 +859,16 @@ impl fmt::Display for Error {
         }
         if let Some(suggestion) = &self.0.suggestion {
             write!(formatter, " (suggestion: {suggestion})")?;
+        }
+        if !self.0.warnings.is_empty() {
+            formatter.write_str(" (after skipping unsupported properties: ")?;
+            for (index, warning) in self.0.warnings.iter().enumerate() {
+                if index > 0 {
+                    formatter.write_str(", ")?;
+                }
+                formatter.write_str(warning.property().unwrap_or("?"))?;
+            }
+            formatter.write_str(")")?;
         }
         Ok(())
     }

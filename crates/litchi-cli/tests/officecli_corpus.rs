@@ -17,7 +17,9 @@
 //!   reads stdin, a bare slide gets a layout; record 0265 §3), passes
 //!   `--unsupported warn` to `set`, `add` and `batch` as OfficeCLI applies
 //!   the supported properties by default (record 0269), runs `litchi` and
-//!   records the call; a call that skipped properties is `warned`;
+//!   records the call; a call that skipped properties is `warned`, and one
+//!   that still failed after skipping records its code with detail
+//!   `<property>;skipped:<properties>` (record 0271);
 //! - `python3` and `python` run the real interpreter with `-I -S`, so the
 //!   scripts' helper snippets see only the standard library and every
 //!   machine replays them the same way (no Pillow, no numpy);
@@ -401,9 +403,16 @@ fn error_field(stderr: &str, key: &str) -> Option<String> {
         let value: serde_json::Value = serde_json::from_str(stderr.trim()).ok()?;
         return value.get(key)?.as_str().map(str::to_owned);
     }
+    // The error's own lines follow its `error[...]` line; `warning[...]`
+    // blocks of skipped properties may precede it (record 0271).
     let prefix = format!("  {key}: ");
-    stderr
+    let error = stderr
+        .find("error[")
+        .map_or(stderr, |start| &stderr[start..]);
+    error
         .lines()
+        .skip(1)
+        .take_while(|line| line.starts_with("  "))
         .find_map(|line| line.strip_prefix(&prefix))
         .map(str::to_owned)
 }
@@ -436,14 +445,26 @@ fn skipped(stderr: &str) -> Vec<String> {
 /// The skipped properties, comma-separated, within the 48-character detail
 /// bound: names that do not fit are counted as a final `+N`.
 fn skipped_detail(properties: &[String]) -> String {
-    let mut detail = String::new();
+    skipped_within(properties, 48, String::new())
+}
+
+/// The detail of a call that failed after skipping properties: the error's
+/// own property, `;skipped:` and the skipped properties, within the same
+/// bound.
+fn failed_after_skipping_detail(property: &str, properties: &[String]) -> String {
+    skipped_within(properties, 48, format!("{property};skipped:"))
+}
+
+fn skipped_within(properties: &[String], bound: usize, prefix: String) -> String {
+    let start = prefix.len();
+    let mut detail = prefix;
     for (index, property) in properties.iter().enumerate() {
         let rest = properties.len() - index;
-        let separator = usize::from(!detail.is_empty());
+        let separator = usize::from(detail.len() > start);
         // Leave room for `,+N` unless this is the last name.
         let reserve = if rest > 1 { 4 } else { 0 };
-        if detail.len() + separator + property.len() + reserve > 48 {
-            if !detail.is_empty() {
+        if detail.len() + separator + property.len() + reserve > bound {
+            if detail.len() > start {
                 detail.push(',');
             }
             detail.push_str(&format!("+{rest}"));
@@ -539,7 +560,14 @@ impl Record {
             ("warned".to_owned(), skipped_detail(&skipped(&self.stderr)))
         } else if let Some(code) = error_code(&self.stderr) {
             let property = error_field(&self.stderr, "property").unwrap_or_default();
-            (code, property)
+            let skipped = skipped(&self.stderr);
+            if skipped.is_empty() {
+                (code, property)
+            } else {
+                // `--unsupported warn` skipped properties, then the rest of
+                // the call failed (record 0271).
+                (code, failed_after_skipping_detail(&property, &skipped))
+            }
         } else if status == "2" {
             let token = quoted_after(&self.stderr, "unexpected argument '")
                 .or_else(|| quoted_after(&self.stderr, "unrecognized subcommand '"))
@@ -578,8 +606,9 @@ const HEADER: &str = "\
 # `@ <script>` starts a script; each row is one `officecli` call in replay order:
 # line (0 = harness read-back), verb, format (the document's extension), --type,
 # result (ok, skip, usage, warned, error code),
-# detail (property, the skipped properties of a warned call, offending argument
-# or translated:<delta>), last path step.
+# detail (property, the skipped properties of a warned call,
+# `<property>;skipped:<properties>` for a call that failed after skipping,
+# offending argument or translated:<delta>), last path step.
 ";
 
 fn render(outcomes: &BTreeMap<String, Vec<Call>>) -> String {
@@ -805,6 +834,32 @@ fn warned_calls_list_their_skipped_properties() {
     assert!(detail.len() <= 48, "{detail}");
     assert!(detail.starts_with("property0,property1,"));
     assert!(detail.ends_with(",+16"), "{detail}");
+}
+
+#[test]
+fn calls_that_failed_after_skipping_name_the_skipped_properties() {
+    let stderr = "warning[unsupported_property]: the element has no such property\n  \
+                  item: 0\n  property: series1.name\n\
+                  warning[unsupported_property]: m\n  property: series1.values\n\
+                  error[missing_property]: a chart needs data\n  item: 0\n  \
+                  property: data\n  suggestion: pass data=Name:1,2,3\n";
+    assert!(!warned(stderr));
+    assert_eq!(error_code(stderr).as_deref(), Some("missing_property"));
+    // The error's own property, not the first warning's.
+    assert_eq!(error_field(stderr, "property").as_deref(), Some("data"));
+    assert_eq!(skipped(stderr), ["series1.name", "series1.values"]);
+    assert_eq!(
+        failed_after_skipping_detail("data", &skipped(stderr)),
+        "data;skipped:series1.name,series1.values"
+    );
+    let long: Vec<String> = (0..20).map(|n| format!("series{n}.color")).collect();
+    let detail = failed_after_skipping_detail("data", &long);
+    assert!(detail.len() <= 48, "{detail}");
+    assert!(
+        detail.starts_with("data;skipped:series0.color,"),
+        "{detail}"
+    );
+    assert!(detail.contains(",+"), "{detail}");
 }
 
 #[test]

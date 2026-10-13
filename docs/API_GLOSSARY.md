@@ -1920,6 +1920,23 @@ on the existing `chart::edit::Transaction` (a pre-W2 name, unchanged here).
 | `litchi_xlsx::Package::{edit_charts, apply_charts, chart_count, chart_xml}` | adopted (0270) |
 | `litchi_xlsx::SourceWorksheet::{chart_count, chart_xml}` | adopted (0270) |
 
+## Per-series chart keys and warn-mode failures (record 0271)
+
+`litchi_drawingml::chart::authoring::Series` gains `color` (an `RRGGBB` or
+`AARRGGBB` fill that takes precedence over the series' `Appearance::colors`
+entry) and the consuming setter `with_color`, the same `with_*` shape as
+`Spec`. No new type: OfficeCLI's dotted add keys `series{N}.name`,
+`series{N}.values` and `series{N}.color` are registry properties of the
+chart element, not API names. `litchi_ops::Error::warnings` returns the
+properties an `Unsupported::Warn` command skipped before it failed, reusing
+the name and element type of `Applied::warnings`; it is empty for every
+other error.
+
+| Name | Status |
+|---|---|
+| `litchi_drawingml::chart::authoring::Series::{color, with_color}` | adopted (0271) |
+| `litchi_ops::Error::warnings` | adopted (0271) |
+
 ## Unified CSV/TSV import and formula evaluation (record 0266)
 
 `File::import(target, source, &import::Options)` and

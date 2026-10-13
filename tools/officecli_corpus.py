@@ -20,6 +20,13 @@ those rows and classifies every call that did not pass:
 - **warned**: the call applied with ``--unsupported warn`` and skipped the
   properties it lists (record 0269); each skipped property is cross-checked
   like a refused one;
+- a call that still failed after ``--unsupported warn`` skipped properties
+  (detail ``<property>;skipped:<properties>``, record 0271) is classified
+  by its own failure first (deltas, cascades, element refusals); a
+  ``missing_property`` that no rule explains is the named gap F3b, because
+  the skipped properties are what it lacked; each skipped property is
+  cross-checked like a refused one, so skipping a property the registry
+  claims is still a bug, and any other unexplained failure stays a bug;
 - **bug**: anything else.
 
 It writes ``docs/unified-ops/officecli-corpus-deltas.md``: the summary per
@@ -62,6 +69,8 @@ LITCHI_VERBS = {
     "create", "get", "query", "view", "set", "add", "remove", "move", "swap",
     "batch", "capabilities", "schema",
 }
+# Separates a failed call's own property from the properties it skipped.
+SKIPPED_SEPARATOR = ";skipped:"
 CASCADE_CODES = {"path_not_found", "missing_argument", "unsupported_path", "out_of_range"}
 FATAL = {"panic", "internal_error", "timeout", "lost"}
 
@@ -94,6 +103,9 @@ class Call:
     result: str
     detail: str
     target: str
+    # The properties a call that failed after skipping skipped (the part of
+    # the recorded detail after `;skipped:`, record 0271).
+    after_skip: str = ""
 
     @property
     def cite(self) -> str:
@@ -115,10 +127,23 @@ class Call:
     def refused(self) -> bool:
         return self.result not in ("ok", "skip", "warned")
 
+    @property
+    def failed_after_skipping(self) -> bool:
+        """A refused call whose ``--unsupported warn`` run skipped properties
+        before the rest failed (record 0271)."""
+        return self.refused and bool(self.after_skip)
+
     def skipped(self) -> list[str]:
-        """The properties a warned call skipped; `+N` counts names the
-        48-character detail bound left out."""
-        return [name for name in self.detail.split(",") if name] if self.warned else []
+        """The properties a warned call, or a call that failed after
+        skipping, skipped; `+N` counts names the 48-character detail bound
+        left out."""
+        if self.warned:
+            detail = self.detail
+        elif self.failed_after_skipping:
+            detail = self.after_skip
+        else:
+            return []
+        return [name for name in detail.split(",") if name]
 
 
 def parse(text: str) -> list[Call]:
@@ -136,7 +161,8 @@ def parse(text: str) -> list[Call]:
         line, verb, fmt, kind, result, detail, target = (
             "" if value == "-" else value for value in fields
         )
-        calls.append(Call(script, int(line), verb, fmt, kind, result, detail, target))
+        detail, _, after_skip = detail.partition(SKIPPED_SEPARATOR)
+        calls.append(Call(script, int(line), verb, fmt, kind, result, detail, target, after_skip))
     return calls
 
 
@@ -412,6 +438,17 @@ RULES: list[Rule] = [
         "numbering is a registry gap, so the later `numId` is `invalid_value`",
         lambda c, e: c.detail == "numId" and failed_add(e, {"num", "abstractnum"}),
     ),
+    When(
+        "F3b", "gap", "Failed after skipping unsupported properties",
+        "applies the supported properties and warns about the rest; a command whose "
+        "remaining properties are not enough fails",
+        "`--unsupported warn` skipped properties, then the rest of the call failed with "
+        "`missing_property`, which no other rule explains; the error carries the skipped "
+        "properties "
+        "(`Error::warnings`, record 0271), which are the gap (each is listed in the "
+        "property gaps with refusal `skipped`)",
+        lambda c, e: False,  # a fallback in `classify`, after the other rules
+    ),
 ]
 
 
@@ -482,6 +519,9 @@ def classify(calls: list[Call], registries: dict[str, Registry]) -> list[Verdict
             call.result.startswith("unsupported_") or call.result == "unsupported_property"
         ):
             verdict = cross_check(call, registries.get(call.fmt))
+        if verdict is None and call.failed_after_skipping and call.result == "missing_property":
+            # Record 0271: the skipped properties carried what is missing.
+            verdict = Verdict("gap", "F3b")
         if verdict is None:
             verdict = Verdict("bug", "untriaged", f"{call.result} {call.detail}".strip())
         verdicts.append(verdict)
@@ -574,6 +614,9 @@ FOLLOW_UPS = [
     ("F3", "calls still refused for an unsupported property (a property the warn policy "
      "cannot drop: an alias of a refused canonical name, or a verb without props)",
      lambda c, v: c.result == "unsupported_property"),
+    ("F3", "calls that failed after skipping unsupported properties (named gap F3b; the "
+     "error carries the skipped properties, record 0271)",
+     lambda c, v: c.failed_after_skipping),
     ("F4", "view options (`--start`, `--end`, `--max-lines`, ...)",
      lambda c, v: c.verb == "view" and c.result == "usage"),
     ("F6", "`add --from`, find/replace on `set`, `remove --shift`, `get --save`",
@@ -609,10 +652,12 @@ def unclaimed(calls: list[Call], registries: dict[str, Registry]) -> list[tuple[
 
 def skipped_verdicts(calls: list[Call],
                      loaded: dict[str, Registry] | None) -> list[tuple[Call, Verdict]]:
-    """One verdict per property a warned call skipped, cross-checked as if
-    the call had been refused for it; the group key's refusal is `warned`."""
+    """One verdict per property a warned call (or a call that failed after
+    skipping) skipped, cross-checked as if the call had been refused for it;
+    the group key's refusal is `warned` (or `skipped`)."""
     found = []
     for call in calls:
+        refusal = "|skipped|" if call.failed_after_skipping else "|warned|"
         for name in call.skipped():
             if name.startswith("+"):
                 name = "(more)"
@@ -623,7 +668,7 @@ def skipped_verdicts(calls: list[Call],
                 verdict = Verdict("bug", verdict.rule, f"skipped {name}: {verdict.note}")
                 found.append((refused, verdict))
                 continue
-            key = verdict.rule.replace("|unsupported_property|", "|warned|", 1)
+            key = verdict.rule.replace("|unsupported_property|", refusal, 1)
             found.append((call, Verdict(verdict.kind, key, verdict.note)))
     return found
 
@@ -665,7 +710,8 @@ def render(calls: list[Call], verdicts: list[Verdict], commit: str,
         "because OfficeCLI applies the supported properties of a command and warns about "
         "the rest by default (record 0269). A warned call applied without the properties "
         "it lists (exit 9); each skipped property is listed in the gap tables below with "
-        "refusal `warned`.",
+        "refusal `warned`. A call that still failed after skipping is the named gap F3b; "
+        "its skipped properties are listed with refusal `skipped` (record 0271).",
         "- **bug**: a refusal of something the registry claims, or an unexplained failure; "
         "none may be a panic or `internal_error` (the test refuses those).",
         "- **resident**: `open`/`close`, not run (delta D5).",
@@ -745,8 +791,11 @@ def render(calls: list[Call], verdicts: list[Verdict], commit: str,
         out += ["| Script line | Verb | Format | Element | Refusal | Detail | Note |",
                 "|---|---|---|---|---|---|---|"]
         for call, verdict in bugs:
+            detail = call.detail or "-"
+            if call.after_skip:
+                detail += f" (after skipping {call.after_skip})"
             out.append(f"| `{call.cite}` | {call.verb} | {call.fmt} | {call.kind or call.target} "
-                       f"| `{call.result}` | {call.detail or '-'} | {verdict.note} |")
+                       f"| `{call.result}` | {detail} | {verdict.note} |")
 
     out += ["", "## Passed calls the registry does not claim", "",
             "A passed call on an element whose registry entry lacks the verb means "

@@ -208,6 +208,11 @@ pub struct Series {
     /// The values, one per category (the Y values of a scatter or bubble
     /// chart).
     pub values: Vec<f64>,
+    /// The series' own `RRGGBB` (or `AARRGGBB`) fill color; it takes
+    /// precedence over this series' entry of [`Appearance::colors`]. On a
+    /// single-series pie or doughnut it colors the whole series, while
+    /// [`Appearance::colors`] still colors its points.
+    pub color: Option<String>,
 }
 
 impl Series {
@@ -217,7 +222,25 @@ impl Series {
         Self {
             name: name.into(),
             values,
+            color: None,
         }
+    }
+
+    /// The series with its own fill color, `RRGGBB` or `AARRGGBB`.
+    ///
+    /// ```
+    /// use litchi_drawingml::chart::authoring::{Kind, Series, Spec, Variant};
+    ///
+    /// let spec = Spec::new(Variant::new(Kind::Column))
+    ///     .with_series(Series::new("Web", vec![1.0, 2.0]).with_color("4472C4"));
+    /// let xml = String::from_utf8(spec.to_xml(None)?).expect("UTF-8");
+    /// assert!(xml.contains(r#"<a:srgbClr val="4472C4"/>"#));
+    /// # Ok::<(), litchi_drawingml::Error>(())
+    /// ```
+    #[must_use]
+    pub fn with_color(mut self, color: impl Into<String>) -> Self {
+        self.color = Some(color.into());
+        self
     }
 }
 
@@ -661,6 +684,12 @@ impl Spec {
                     series.name
                 )));
             }
+            if series.color.as_deref().is_some_and(|color| !is_argb(color)) {
+                return Err(Error::Invalid(format!(
+                    "series '{}' has a color that is not RRGGBB or AARRGGBB",
+                    series.name
+                )));
+            }
             if series.values.len() > MAX_POINTS {
                 return Err(Error::Limit {
                     resource: "authored chart series points",
@@ -968,6 +997,13 @@ impl Spec {
                                 .ok();
                         built.data_points.push(data_point);
                     }
+                    // The series' own color fills the whole series; the
+                    // point colors above override it point by point.
+                    if let Some(color) = &series.color {
+                        built.shape_properties =
+                            shape_properties(&format!("<a:solidFill>{}</a:solidFill>", srgb(color)))
+                                .ok();
+                    }
                 } else {
                     let family = if self.variant.kind == Kind::Combo {
                         self.series_kind(index)
@@ -977,7 +1013,11 @@ impl Spec {
                     let lined = matches!(family, Kind::Line | Kind::Scatter)
                         || (family == Kind::Radar
                             && appearance.radar_style != Some(RadarStyle::Filled));
-                    let color = appearance.colors.get(index).map(|color| srgb(color));
+                    let color = series
+                        .color
+                        .as_ref()
+                        .or_else(|| appearance.colors.get(index))
+                        .map(|color| srgb(color));
                     let width = appearance
                         .line_width
                         .map_or(28_575, |points| (points * 12_700.0).round() as i64);

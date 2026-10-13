@@ -1061,6 +1061,139 @@ fn unsupported_warn_applies_the_rest_and_exits_partial() {
     assert_eq!(text_of(&path, "/Sheet1/B2"), json!("z"));
 }
 
+/// A `--unsupported warn` command that still fails after skipping prints the
+/// skipped properties with its error, never the bare reduced failure
+/// (record 0271).
+#[test]
+fn unsupported_warn_failures_name_the_skipped_properties() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = scratch(dir.path(), "w.pptx", None);
+    expect(
+        0,
+        [
+            "add",
+            arg(&path),
+            "/",
+            "--type",
+            "slide",
+            "--prop",
+            "layout=Blank",
+        ],
+    );
+    let before = std::fs::read(&path).expect("read");
+    let base = vec![
+        "add",
+        arg(&path),
+        "/slide[1]",
+        "--type",
+        "chart",
+        "--prop",
+        "chartType=line",
+        "--prop",
+        "series1.trendline=linear",
+        "--prop",
+        "series1.categories=Sheet1!A2:A3",
+        "--unsupported",
+        "warn",
+    ];
+    let add = |extra: &[&'static str]| {
+        let mut args = base.clone();
+        args.extend_from_slice(extra);
+        args
+    };
+    // Text: each skipped property as a warning, then the error with its own
+    // property; the exit status is the failure's (4, property family).
+    let run = expect(4, add(&[]));
+    let error = run.stderr.find("error[missing_property]").expect("error");
+    let warnings = &run.stderr[..error];
+    assert!(
+        warnings.starts_with("warning[unsupported_property]:"),
+        "{}",
+        run.stderr
+    );
+    assert!(warnings.contains("  property: series1.trendline"));
+    assert!(warnings.contains("  property: series1.categories"));
+    assert!(
+        run.stderr[error..].contains("  property: data"),
+        "{}",
+        run.stderr
+    );
+    assert_eq!(std::fs::read(&path).expect("read"), before);
+
+    // JSON: OfficeCLI's ErrorResult with the skipped properties as warnings.
+    let run = expect(4, add(&["--json"]));
+    let error: Value = serde_json::from_str(run.stderr.trim()).expect("ErrorResult");
+    assert_eq!(error["code"], "missing_property");
+    assert_eq!(error["property"], "data");
+    let warnings = error["warnings"].as_array().expect("warnings");
+    assert_eq!(warnings.len(), 2);
+    assert_eq!(warnings[0]["code"], "unsupported_property");
+    assert_eq!(warnings[0]["property"], "series1.trendline");
+    assert_eq!(warnings[1]["property"], "series1.categories");
+
+    // A failure with nothing skipped carries no warnings.
+    let run = expect(
+        4,
+        [
+            "add",
+            arg(&path),
+            "/slide[1]",
+            "--type",
+            "chart",
+            "--prop",
+            "chartType=line",
+            "--unsupported",
+            "warn",
+            "--json",
+        ],
+    );
+    let error: Value = serde_json::from_str(run.stderr.trim()).expect("ErrorResult");
+    assert!(error.get("warnings").is_none(), "{error}");
+
+    // The corpus form of the call now applies (exit 0, no warnings).
+    expect(
+        0,
+        [
+            "add",
+            arg(&path),
+            "/slide[1]",
+            "--type",
+            "chart",
+            "--prop",
+            "chartType=area",
+            "--prop",
+            "series1.name=Web",
+            "--prop",
+            "series1.values=50,60,70",
+            "--prop",
+            "series1.color=4472C4",
+            "--unsupported",
+            "warn",
+        ],
+    );
+
+    // An atomic batch item that fails after skipping reports them too.
+    let run = expect(
+        4,
+        [
+            "batch",
+            arg(&path),
+            "--unsupported",
+            "warn",
+            "--json",
+            "--commands",
+            r#"[{"command":"add","parent":"/slide[1]","type":"chart",
+                 "props":{"chartType":"line","series1.trendline":"linear"}}]"#,
+        ],
+    );
+    let report = run.json();
+    assert_eq!(report["results"][0]["code"], "missing_property");
+    assert_eq!(
+        report["results"][0]["warnings"][0]["property"],
+        "series1.trendline"
+    );
+}
+
 /// `import`, `evaluate` and `recalculate` (record 0266).
 #[test]
 fn import_evaluate_and_recalculate() {

@@ -104,13 +104,13 @@ impl Pptx {
         let mut props = AddProps::default();
         let mut name = None;
         let mut geometry = [None; 4];
-        let mut assigned = 0_u64;
+        let mut assigned = 0_u128;
         let mut staged_bytes = 0_usize;
         for (key, value) in node.props().iter() {
             let (index, entry) = CHART_WRITE_TABLE
                 .resolve(key.as_str())
                 .map_err(|e| e.with_property(key.as_str().to_owned()))?;
-            let bit = 1_u64 << index;
+            let bit = 1_u128 << index;
             if assigned & bit != 0 {
                 return Err(error(
                     Code::InvalidArgument,
@@ -169,6 +169,11 @@ impl Pptx {
                     ChartSetter::Format(key) => props.format(key, scalar)?,
                     ChartSetter::Numbered(number) => props.numbered_series(
                         usize::from(number) + 1,
+                        &text(scalar).unwrap_or_default(),
+                    )?,
+                    ChartSetter::Dotted(number, field) => props.dotted_series(
+                        usize::from(number) + 1,
+                        field,
                         &text(scalar).unwrap_or_default(),
                     )?,
                 }
@@ -381,6 +386,15 @@ fn admit_set(
                                 .with_property("catTitle")
                             })?;
                             edit.axis_titles.push((axis.id, text(scalar)));
+                        },
+                        ChartSetter::Dotted(number, field) => {
+                            let summary = chart_summary(file, tree)?;
+                            edit.dotted_series(
+                                &summary,
+                                usize::from(number) + 1,
+                                field,
+                                text(scalar),
+                            )?;
                         },
                         _ => unreachable!("chart set admission"),
                     }

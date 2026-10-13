@@ -345,3 +345,53 @@ fn combo_charts_group_series_by_family() {
             .is_err()
     );
 }
+
+#[test]
+fn series_colors_override_the_palette_and_tint_whole_pies() {
+    // A series color wins over its palette entry; the other series keep
+    // theirs, and a series with neither keeps the application default.
+    let spec = Spec::new(Variant::new(Kind::Line))
+        .with_series(Series::new("A", vec![1.0, 2.0]).with_color("c00000"))
+        .with_series(Series::new("B", vec![3.0, 4.0]))
+        .with_series(Series::new("C", vec![5.0, 6.0]).with_color("8000FF00"))
+        .with_appearance(Appearance {
+            colors: vec!["111111".into(), "222222".into()],
+            ..Appearance::default()
+        });
+    let xml = String::from_utf8(spec.to_xml(None).unwrap()).unwrap();
+    assert!(xml.contains(r#"<a:srgbClr val="C00000"/>"#), "{xml}");
+    assert!(!xml.contains(r#"val="111111""#));
+    assert!(xml.contains(r#"<a:srgbClr val="222222"/>"#));
+    assert!(xml.contains(r#"<a:srgbClr val="00FF00"><a:alpha val="50196"/></a:srgbClr>"#));
+    assert_eq!(xml, String::from_utf8(spec.to_xml(None).unwrap()).unwrap());
+    let chart = reader::read(xml.as_bytes()).unwrap();
+    let series = &chart.plot_area.type_groups[0].common().series;
+    assert!(
+        series
+            .iter()
+            .all(|series| series.shape_properties.is_some())
+    );
+
+    // A single-series pie: the series color fills the series, the palette
+    // still colors its points.
+    let pie = Spec::new(Variant::new(Kind::Pie))
+        .with_series(Series::new("Share", vec![1.0, 2.0]).with_color("4472C4"))
+        .with_appearance(Appearance {
+            colors: vec!["FF0000".into(), "00FF00".into()],
+            ..Appearance::default()
+        });
+    let xml = String::from_utf8(pie.to_xml(None).unwrap()).unwrap();
+    assert_eq!(xml.matches("<c:dPt>").count(), 2, "{xml}");
+    assert!(xml.contains(r#"<a:srgbClr val="4472C4"/>"#));
+    let chart = reader::read(xml.as_bytes()).unwrap();
+    assert!(
+        chart.plot_area.type_groups[0].common().series[0]
+            .shape_properties
+            .is_some()
+    );
+
+    let bad = Spec::new(Variant::new(Kind::Column))
+        .with_series(Series::new("A", vec![1.0]).with_color("blue"));
+    assert!(matches!(bad.validate(), Err(Error::Invalid(_))));
+    assert!(bad.to_xml(None).is_err());
+}

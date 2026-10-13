@@ -26,3 +26,14 @@ taskset -c 7 "$BUILD/release/unified-chart-add-baseline" --rounds 9 > chart-add.
 ```
 
 Route names: `pptx_chart_add_v1`, `xlsx_chart_add_v1`.
+
+`--compare dotted` (record 0271) pairs two unified legs on the same owner
+instead: the chart given as `data=` with the `colors` palette (A) versus the
+same chart given as OfficeCLI's dotted per-series keys `series{N}.name`,
+`.values` and `.color` (B). Both legs publish identical bytes (checked
+before timing). Route names: `pptx_chart_add_dotted_v1`,
+`xlsx_chart_add_dotted_v1`.
+
+```sh
+taskset -c 7 "$BUILD/release/unified-chart-add-baseline" --compare dotted --rounds 15 > dotted.json
+```
