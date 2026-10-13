@@ -392,6 +392,9 @@ pub(crate) enum Source<'a> {
     /// A DOC node's leaf values.
     #[cfg(feature = "doc")]
     Doc(crate::format::doc::NodeProps<'a>),
+    /// An ODS node's leaf values.
+    #[cfg(feature = "ods")]
+    Ods(crate::format::ods::Props<'a>),
 }
 
 impl<'a> Source<'a> {
@@ -480,6 +483,8 @@ impl<'a> Source<'a> {
             Self::Xls(ref props) => props.get(index),
             #[cfg(feature = "doc")]
             Self::Doc(ref props) => props.get(index),
+            #[cfg(feature = "ods")]
+            Self::Ods(ref props) => props.get(index),
         }
     }
 }
@@ -676,6 +681,9 @@ enum Inner<'n, 'f> {
     /// The RTF iterator carries the native RTF handle through its nodes.
     #[cfg(feature = "rtf")]
     Rtf(crate::format::rtf::children::Children<'f>),
+    /// The ODS iterator borrows the handle's cached content index.
+    #[cfg(feature = "ods")]
+    Ods(crate::format::ods::Children<'f>),
 }
 
 impl<'n, 'f> Children<'n, 'f> {
@@ -760,6 +768,14 @@ impl<'n, 'f> Children<'n, 'f> {
             inner: Inner::Rtf(children),
         }
     }
+
+    /// An ODS node's children.
+    #[cfg(feature = "ods")]
+    pub(crate) const fn ods(children: crate::format::ods::Children<'f>) -> Self {
+        Self {
+            inner: Inner::Ods(children),
+        }
+    }
 }
 
 impl<'f> Iterator for Children<'_, 'f> {
@@ -787,6 +803,8 @@ impl<'f> Iterator for Children<'_, 'f> {
             Inner::Xls(children) => children.next().map(|child| child.map(Node::Xls)),
             #[cfg(feature = "rtf")]
             Inner::Rtf(children) => children.next().map(|child| child.map(Node::Rtf)),
+            #[cfg(feature = "ods")]
+            Inner::Ods(children) => children.next().map(|child| child.map(Node::Ods)),
         };
         if matches!(item, Some(Err(_)) | None) {
             self.inner = Inner::Empty(PhantomData);

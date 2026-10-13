@@ -87,7 +87,8 @@
         feature = "pptx",
         feature = "xlsb",
         feature = "xls",
-        feature = "rtf"
+        feature = "rtf",
+        feature = "ods"
     )),
     allow(dead_code, unused_variables, unreachable_code)
 )]
@@ -192,6 +193,14 @@ pub(crate) fn prop_aliases(adapter: Adapter, canonical: &str) -> &'static [PropA
             _ => &[],
         };
     }
+    #[cfg(feature = "ods")]
+    if adapter == Adapter::Ods {
+        return match canonical {
+            "cell" | "range" => ODS_CELL_ALIASES,
+            _ => &[],
+        };
+    }
+
     let _ = (adapter, canonical);
     &[]
 }
@@ -200,6 +209,8 @@ pub(crate) fn prop_aliases(adapter: Adapter, canonical: &str) -> &'static [PropA
 const XLSB_CELL_ALIASES: &[PropAlias] = &crate::format::xlsb::CELL_WRITE_TABLE.prop_aliases();
 #[cfg(feature = "xls")]
 const XLS_CELL_ALIASES: &[PropAlias] = &crate::format::xls::CELL_WRITE_TABLE.prop_aliases();
+#[cfg(feature = "ods")]
+const ODS_CELL_ALIASES: &[PropAlias] = &crate::format::ods::CELL_WRITE_TABLE.prop_aliases();
 
 #[cfg(feature = "xlsx")]
 const XLSX_CELL_ALIASES: &[PropAlias] = &crate::format::xlsx::CELL_WRITE_TABLE.prop_aliases();

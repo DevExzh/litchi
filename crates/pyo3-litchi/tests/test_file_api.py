@@ -154,7 +154,7 @@ class OpenTests(ErrorAssertions):
                 self.assertEqual(error.message, "not a recognized Office file")
             self.assertError(raised(lambda: L.open(truncated)), L.CorruptFileError, "corrupt_file")
         self.assertError(
-            raised(lambda: L.open(fixture("odf/ods/grid-padding.fods"))),
+            raised(lambda: L.open(fixture("odf/odt/form-controls.fodt"))),
             L.UnsupportedError,
             "unsupported_capability",
         )

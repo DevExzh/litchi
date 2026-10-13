@@ -101,6 +101,11 @@ const READS: &[(&str, &[&str], &str)] = &[
         "slide",
     ),
     ("rtf/column-break.rtf", &["/", "/body/p[1]"], "p"),
+    (
+        "odf/corpus/calc-two-sheets.ods",
+        &["/", "/sheet1", "/sheet[1]/row[1]", "/sheet1/A1"],
+        "cell",
+    ),
 ];
 
 #[test]
@@ -424,7 +429,9 @@ fn applied(run: &Run) -> Value {
 #[test]
 fn create_writes_every_creatable_format_and_refuses_overwrite() {
     let dir = tempfile::tempdir().expect("tempdir");
-    for format in ["docx", "xlsx", "pptx", "xlsb", "doc", "xls", "ppt", "rtf"] {
+    for format in [
+        "docx", "xlsx", "pptx", "xlsb", "doc", "xls", "ppt", "rtf", "ods",
+    ] {
         let path = scratch(dir.path(), &format!("blank.{format}"), None);
         let file = litchi_ops::open(&path).expect("reopen in process");
         assert_eq!(
@@ -584,6 +591,40 @@ fn spreadsheet_writes_save_in_place() {
     expect(0, ["set", file, "/Sheet1/A1", "--prop", "value=3"]);
     assert_eq!(text_of(&path, "/Sheet1/A1"), "3");
     expect(0, ["remove", file, "/Sheet1/A1"]);
+
+    // ODS (record 0277): a created workbook, and a LibreOffice one edited in
+    // place.
+    let path = scratch(dir.path(), "w.ods", None);
+    let file = arg(&path);
+    expect(0, ["set", file, "/Sheet1/A1", "--prop", "value=42"]);
+    assert_eq!(text_of(&path, "/Sheet1/A1"), "42");
+    let run = expect(
+        0,
+        [
+            "add",
+            file,
+            "/",
+            "--type",
+            "sheet",
+            "--prop",
+            "name=Data",
+            "--json",
+        ],
+    );
+    assert_eq!(applied(&run)["results"][0]["path"], "/sheet[2]");
+    expect(0, ["swap", file, "/sheet[1]", "/sheet[2]"]);
+    expect(0, ["move", file, "/Sheet1", "--index", "0"]);
+    assert_eq!(text_of(&path, "/sheet[1]"), "Sheet1");
+    expect(0, ["remove", file, "/Data"]);
+    expect(3, ["get", file, "/Data"]);
+    let path = scratch(
+        dir.path(),
+        "producer.ods",
+        Some("odf/corpus/calc-two-sheets.ods"),
+    );
+    expect(0, ["set", arg(&path), "/sheet1/B2", "--prop", "value=7"]);
+    assert_eq!(text_of(&path, "/sheet1/B2"), "7");
+    assert_eq!(text_of(&path, "/sheet2/D4"), "another");
 }
 
 #[test]

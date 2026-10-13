@@ -84,6 +84,7 @@ fn handle_is_one_pointer_and_shares_its_state() {
     let ods = open_prepared(std::fs::read(fixture(FIXTURES[0])).expect("read"));
     let clone = ods.clone();
     assert!(Arc::ptr_eq(&ods.0, &clone.0));
+    assert!(Arc::ptr_eq(&ods.0.inner, &clone.0.inner));
     assert_eq!(format!("{ods:?}"), r#"Ods { owner: "eager", .. }"#);
 }
 
@@ -91,13 +92,13 @@ fn handle_is_one_pointer_and_shares_its_state() {
 fn byte_routes_match_the_leaf_reader() {
     for name in FIXTURES {
         let bytes = std::fs::read(fixture(name)).expect("read ODS fixture");
-        let leaf = litchi_ods::Package::from_bytes(&bytes)
+        let leaf = Package::from_bytes(&bytes)
             .expect("leaf ODS")
             .workbook()
             .expect("leaf ODS");
         assert!(leaf.sheet_count() > 0, "{name}");
         for ods in [open_prepared(bytes.clone()), open_detected(bytes)] {
-            assert!(matches!(ods.0.owner, OdsOwner::Eager(_)));
+            assert!(matches!(ods.owner(), OdsOwner::Eager { .. }));
             assert_matches_leaf(&ods, &leaf, name);
         }
     }
@@ -108,12 +109,12 @@ fn byte_routes_match_the_leaf_reader() {
 fn source_route_matches_the_leaf_reader() {
     for name in FIXTURES {
         let path = fixture(name);
-        let leaf = litchi_ods::Package::from_bytes(&std::fs::read(&path).expect("read"))
+        let leaf = Package::from_bytes(&std::fs::read(&path).expect("read"))
             .expect("leaf ODS")
             .workbook()
             .expect("leaf ODS");
         let ods = open_source(&path);
-        assert!(matches!(ods.0.owner, OdsOwner::Source(_)));
+        assert!(matches!(ods.owner(), OdsOwner::Source { .. }));
         assert_eq!(format!("{ods:?}"), r#"Ods { owner: "source", .. }"#);
         assert_matches_leaf(&ods, &leaf, name);
     }
@@ -150,7 +151,7 @@ fn source_route_reports_a_changed_source_as_io_error() {
 #[test]
 fn malformed_body_is_a_typed_core_error() {
     let bytes = broken_package(litchi_odf_common::constants::ODF_SPREADSHEET);
-    let Err(leaf_error) = litchi_ods::Package::from_bytes(&bytes)
+    let Err(leaf_error) = Package::from_bytes(&bytes)
         .map_err(litchi_core::Error::from)
         .and_then(|package| package.workbook())
     else {

@@ -848,6 +848,20 @@ impl Capabilities {
             {
                 return Support::Supported;
             }
+            #[cfg(feature = "ods")]
+            if matches!(
+                verb,
+                Verb::Set
+                    | Verb::Add
+                    | Verb::Remove
+                    | Verb::Move
+                    | Verb::Swap
+                    | Verb::Edit
+                    | Verb::Batch
+            ) && self.adapter() == Some(Adapter::Ods)
+            {
+                return Support::Supported;
+            }
             return EDITS.support();
         }
         match verb {
@@ -878,6 +892,9 @@ impl Capabilities {
     /// Whether this report's format has an integrated publisher.
     fn publication_support(&self) -> Support {
         if self.format == Some(FileFormat::Rtf) && cfg!(feature = "rtf") {
+            return Support::Supported;
+        }
+        if self.format == Some(FileFormat::Ods) && cfg!(feature = "ods") {
             return Support::Supported;
         }
         #[cfg(feature = "ppt")]
@@ -913,6 +930,9 @@ impl Capabilities {
     /// Whether this report's format has an integrated creator.
     fn creation_support(&self) -> Support {
         if self.format == Some(FileFormat::Rtf) && cfg!(feature = "rtf") {
+            return Support::Supported;
+        }
+        if self.format == Some(FileFormat::Ods) && cfg!(feature = "ods") {
             return Support::Supported;
         }
 
@@ -1051,10 +1071,6 @@ fn refused(format: FileFormat) -> Refusal {
         FileFormat::Odt if cfg!(feature = "odt") => pending(
             "M1 R7",
             "the ODT adapter of record 0010 §4.9 has not landed",
-        ),
-        FileFormat::Ods if cfg!(feature = "ods") => pending(
-            "M1 R7",
-            "the ODS adapter of record 0010 §4.9 has not landed",
         ),
         FileFormat::Odp if cfg!(feature = "odp") => pending(
             "M1 R7",
@@ -2278,6 +2294,8 @@ const fn view_gap(adapter: Adapter, mode: Mode) -> Option<&'static GapSpec> {
         Adapter::Ppt => m1_view_gap(mode),
         #[cfg(feature = "rtf")]
         Adapter::Rtf => m1_view_gap(mode),
+        #[cfg(feature = "ods")]
+        Adapter::Ods => m1_view_gap(mode),
     }
 }
 
@@ -2413,6 +2431,9 @@ check_capabilities!(crate::format::ppt::SPEC);
 
 #[cfg(feature = "rtf")]
 check_capabilities!(crate::format::rtf::SPEC);
+
+#[cfg(feature = "ods")]
+check_capabilities!(crate::format::ods::SPEC);
 
 /// Byte equality usable in constant evaluation.
 const fn same(a: &str, b: &str) -> bool {
@@ -2692,6 +2713,11 @@ impl Element {
             || (self.adapter == Adapter::Rtf
                 && matches!(self.data().canonical, "p" | "r")
                 && readable);
+        #[cfg(feature = "ods")]
+        let settable = settable
+            || (self.adapter == Adapter::Ods
+                && crate::format::ods::SETTABLE.contains(&self.data().canonical)
+                && readable);
         let structural = {
             #[cfg(feature = "docx")]
             {
@@ -2762,6 +2788,11 @@ impl Element {
             || (self.adapter == Adapter::Rtf
                 && matches!(self.data().canonical, "body" | "p" | "r")
                 && readable);
+        #[cfg(feature = "ods")]
+        let add = add
+            || (self.adapter == Adapter::Ods
+                && crate::format::ods::ADDABLE.contains(&self.data().canonical)
+                && readable);
         #[cfg(feature = "pptx")]
         let remove = structural
             || (self.adapter == Adapter::Pptx
@@ -2819,6 +2850,11 @@ impl Element {
             || (self.adapter == Adapter::Rtf
                 && matches!(self.data().canonical, "p" | "r")
                 && readable);
+        #[cfg(feature = "ods")]
+        let remove = remove
+            || (self.adapter == Adapter::Ods
+                && crate::format::ods::REMOVABLE.contains(&self.data().canonical)
+                && readable);
         Operations {
             add,
             set: settable,
@@ -2849,6 +2885,10 @@ impl Element {
     pub(crate) fn header_columns(&self) -> bool {
         #[cfg(feature = "xls")]
         if self.adapter == Adapter::Xls {
+            return false;
+        }
+        #[cfg(feature = "ods")]
+        if self.adapter == Adapter::Ods {
             return false;
         }
         self.adapter.family() == Family::Workbook && self.data().canonical == "row"
@@ -2935,6 +2975,16 @@ fn element_data(adapter: Adapter, index: u16) -> Data {
         } else {
             props
         };
+        #[cfg(feature = "ods")]
+        let props = if adapter == Adapter::Ods {
+            crate::format::ods::capability_props(crate::path::navigate::ElementKind::name(
+                element.kind,
+            ))
+            .unwrap_or(props)
+        } else {
+            props
+        };
+
         let canonical = crate::path::navigate::ElementKind::name(element.kind);
         Data {
             name: element.name,
@@ -3272,6 +3322,10 @@ fn option_gap(adapter: Adapter, index: usize) -> Option<Option<&'static GapSpec>
     #[cfg(feature = "rtf")]
     if adapter == Adapter::Rtf {
         return RTF_WRITE_GAPS.get(index).map(Some);
+    }
+    #[cfg(feature = "ods")]
+    if adapter == Adapter::Ods {
+        return crate::format::ods::WRITE_GAPS.get(index).map(Some);
     }
     let _ = (adapter, index);
     None

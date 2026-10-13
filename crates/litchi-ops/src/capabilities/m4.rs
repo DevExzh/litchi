@@ -5,7 +5,7 @@
 use super::RETAINED_SOURCE;
 use super::{Capabilities, Refusal, Support, Verb};
 use crate::Code;
-#[cfg(any(feature = "xlsx", feature = "xlsb", feature = "xls"))]
+#[cfg(any(feature = "xlsx", feature = "xlsb", feature = "xls", feature = "ods"))]
 use crate::read::Adapter;
 
 /// Import or evaluation on a format without worksheets.
@@ -13,6 +13,14 @@ const NOT_A_WORKBOOK: Refusal = Refusal {
     code: Code::UnsupportedCapability,
     follow_up: "none: import and evaluation are worksheet operations",
     reason: "this format has no worksheets",
+};
+
+/// Import or evaluation on an OpenDocument spreadsheet (record 0277).
+#[cfg(feature = "ods")]
+const ODS_PENDING: Refusal = Refusal {
+    code: Code::UnsupportedCapability,
+    follow_up: "ODS adapter follow-up (record 0277): CSV import and OpenFormula evaluation",
+    reason: "ODS worksheets are written cell by cell; CSV import and OpenFormula evaluation are not integrated",
 };
 
 /// Evaluation in a build without the formula engine.
@@ -28,6 +36,10 @@ impl Capabilities {
     pub(super) fn m4_support(&self, verb: Verb) -> Support {
         if let Some(refusal) = self.read_refusal() {
             return refusal.support();
+        }
+        #[cfg(feature = "ods")]
+        if self.adapter() == Some(Adapter::Ods) {
+            return ODS_PENDING.support();
         }
         let workbook = match self.adapter() {
             #[cfg(feature = "xlsx")]

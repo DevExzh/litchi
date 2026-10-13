@@ -8,7 +8,8 @@
     feature = "pptx",
     feature = "xlsb",
     feature = "xls",
-    feature = "rtf"
+    feature = "rtf",
+    feature = "ods"
 ))]
 use std::io;
 use std::io::Write;
@@ -120,6 +121,14 @@ impl File {
                     path,
                 })
             },
+            #[cfg(feature = "ods")]
+            Self::Ods(handle) => {
+                let (commit, path) = handle.add(_parent.into_path()?, _node.into_node()?)?;
+                Ok(Added {
+                    file: Self::Ods(commit.after),
+                    path,
+                })
+            },
             Self::Signed(_) => Err(protected(self)),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -130,7 +139,8 @@ impl File {
     /// Move an element to a sibling position or another supported parent.
     ///
     /// Legacy PPT supports slide ordering and XLS complete-catalog tab
-    /// ordering through their native package edits.
+    /// ordering through their native package edits. ODS moves
+    /// dependency-free sheets and rows through its leaf splices.
     /// Positional destinations are measured after detaching the element.
     /// The original snapshot stays unchanged on success and failure.
     ///
@@ -188,6 +198,10 @@ impl File {
             Self::Doc(handle) => handle
                 .move_to(_path.into_path()?, _to.into_placement()?)
                 .map(|commit| Self::Doc(commit.after)),
+            #[cfg(feature = "ods")]
+            Self::Ods(handle) => handle
+                .move_to(_path.into_path()?, _to.into_placement()?)
+                .map(|commit| Self::Ods(commit.after)),
             Self::Signed(_) => Err(protected(self)),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -256,6 +270,10 @@ impl File {
             Self::Doc(handle) => handle
                 .remove(_target.into_target()?)
                 .map(|commit| Self::Doc(commit.after)),
+            #[cfg(feature = "ods")]
+            Self::Ods(handle) => handle
+                .remove(_target.into_target()?)
+                .map(|commit| Self::Ods(commit.after)),
             Self::Signed(_) => Err(protected(self)),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -324,6 +342,10 @@ impl File {
             Self::Doc(handle) => handle
                 .swap(_a.into_path()?, _b.into_path()?)
                 .map(|commit| Self::Doc(commit.after)),
+            #[cfg(feature = "ods")]
+            Self::Ods(handle) => handle
+                .swap(_a.into_path()?, _b.into_path()?)
+                .map(|commit| Self::Ods(commit.after)),
             Self::Signed(_) => Err(protected(self)),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -403,6 +425,10 @@ impl File {
             Self::Rtf(handle) => handle
                 .set(_target.into_target()?, _props)
                 .map(|commit| Self::Rtf(commit.after)),
+            #[cfg(feature = "ods")]
+            Self::Ods(handle) => handle
+                .set(_target.into_target()?, _props)
+                .map(|commit| Self::Ods(commit.after)),
             Self::Signed(_) => Err(protected(self)),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -439,7 +465,8 @@ impl File {
             feature = "pptx",
             feature = "xlsb",
             feature = "xls",
-            feature = "rtf"
+            feature = "rtf",
+            feature = "ods"
         )),
         allow(
             clippy::only_used_in_recursion,
@@ -496,6 +523,12 @@ impl File {
                 handle.write_to(&mut counted)?;
                 Ok(counted.bytes)
             },
+            #[cfg(feature = "ods")]
+            Self::Ods(handle) => {
+                let mut counted = Counted { sink, bytes: 0 };
+                handle.write_to(&mut counted)?;
+                Ok(counted.bytes)
+            },
             Self::Signed(signed) => signed.file().write_to(sink),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -534,7 +567,8 @@ fn pending(file: &File, operation: &str) -> Error {
     feature = "pptx",
     feature = "xlsb",
     feature = "xls",
-    feature = "rtf"
+    feature = "rtf",
+    feature = "ods"
 ))]
 pub(crate) struct Counted<W> {
     pub(crate) sink: W,
@@ -549,7 +583,8 @@ pub(crate) struct Counted<W> {
     feature = "pptx",
     feature = "xlsb",
     feature = "xls",
-    feature = "rtf"
+    feature = "rtf",
+    feature = "ods"
 ))]
 impl<W: Write> Write for Counted<W> {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {

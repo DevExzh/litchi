@@ -159,7 +159,8 @@ pub fn create(format: FileFormat) -> Result<File> {
 /// supports ordinary documents, templates, Transitional conformance, and
 /// the core metadata fields its leaf stores. DOC, XLS and PPT support
 /// ordinary Transitional documents with initial metadata written to their
-/// OLE property sets (fields without a property-set slot are refused). RTF,
+/// OLE property sets (fields without a property-set slot are refused). ODS
+/// creates one empty `Sheet1` with optional initial `meta.xml` metadata. RTF,
 /// XLSX, XLSB and PPTX support ordinary Transitional documents; template,
 /// Strict and initial metadata requests are refused explicitly by those
 /// creators.
@@ -206,6 +207,11 @@ pub fn create_with(format: FileFormat, options: &CreateOptions) -> Result<File> 
     #[cfg(feature = "rtf")]
     if format == FileFormat::Rtf {
         return crate::format::rtf::Rtf::create(options).map(File::Rtf);
+    }
+
+    #[cfg(feature = "ods")]
+    if format == FileFormat::Ods {
+        return crate::format::ods::Ods::create(options).map(File::Ods);
     }
 
     let _ = options;

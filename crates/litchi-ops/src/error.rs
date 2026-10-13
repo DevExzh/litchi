@@ -677,14 +677,20 @@ impl Error {
     /// input that does not parse, [`Code::InvalidValue`] for an authored property,
     /// [`Code::DuplicateName`] for a conflicting authored name, and
     /// [`Code::OutOfRange`] for a position outside
-    /// its collection. A leaf crate reports such input with the same error it
+    /// its collection, and [`Code::UnsupportedCapability`] for a write the
+    /// leaf refuses on a document it already parsed (ODS, record 0277). A
+    /// leaf crate reports such input with the same error it
     /// reports for malformed file content, so only the call site that
     /// received the argument can tell the two apart.
-    #[cfg(any(feature = "xlsx", feature = "xlsb"))]
+    #[cfg(any(feature = "xlsx", feature = "xlsb", feature = "ods"))]
     pub(crate) fn caused_by_argument(mut self, code: Code) -> Self {
         debug_assert!(matches!(
             code,
-            Code::InvalidArgument | Code::InvalidValue | Code::OutOfRange | Code::DuplicateName
+            Code::InvalidArgument
+                | Code::InvalidValue
+                | Code::OutOfRange
+                | Code::DuplicateName
+                | Code::UnsupportedCapability
         ));
         self.0.code = code;
         self.0.suggestion = None;

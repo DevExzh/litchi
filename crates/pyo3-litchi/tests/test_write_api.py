@@ -17,7 +17,7 @@ Oracles, strongest first:
   unsupported raises ``UnsupportedError`` with the report's code.
 
 Formats: every verb is exercised on every format whose capability report
-supports it (DOCX, XLSX, PPTX, XLSB, DOC, XLS, PPT, RTF); ODT, ODS and ODP
+supports it (DOCX, XLSX, PPTX, XLSB, DOC, XLS, PPT, RTF, ODS); ODT and ODP
 refuse every write verb. The cross-thread and GIL tests of the write verbs
 are in test_threads.py.
 """
@@ -44,11 +44,10 @@ NOTES_PPT = "poi/test-data/slideshow/basic_test_ppt_file.ppt"
 RTF_INPUT = rb"{\rtf1\ansi First\par Second\par Third\par Fourth}"
 
 #: The formats ``create`` builds.
-CREATABLE = ("docx", "xlsx", "pptx", "xlsb", "doc", "xls", "ppt", "rtf")
+CREATABLE = ("docx", "xlsx", "pptx", "xlsb", "doc", "xls", "ppt", "rtf", "ods")
 #: The formats File holds read-only, and a fixture of each.
 READ_ONLY = (
     ("odf/corpus/writer-table.odt", "Odt"),
-    ("odf/corpus/calc-two-sheets.ods", "Ods"),
     ("odf/odp/tdf169979.odp", "Odp"),
 )
 #: Python suggestion of a document_protected error on a locked file.
@@ -143,7 +142,7 @@ class CreateTests(WriteAssertions):
         self.assertError(raised(lambda: L.create(5)), L.PropertyError, "invalid_argument")
 
     def test_formats_without_a_builder_are_unsupported(self):
-        for name in ("odt", "ods", "odp", "pages", "odg"):
+        for name in ("odt", "odp", "pages", "odg"):
             with self.subTest(format=name):
                 error = raised(lambda: L.create(name))
                 self.assertIsInstance(error, L.UnsupportedError)
@@ -399,7 +398,7 @@ class CapabilityAgreementTests(WriteAssertions):
                     self.assertIsInstance(error, L.UnsupportedError)
                     self.assertEqual(error.code, verbs[verb]["code"])
         # DOC (0258), PPT (0260) and XLS (0259) support every write verb.
-        self.assertTrue({"Odt", "Ods", "Odp"} <= seen, seen)
+        self.assertTrue({"Odt", "Odp"} <= seen, seen)
 
     def test_read_only_formats_refuse_every_write(self):
         for relative, name in READ_ONLY:
@@ -409,6 +408,33 @@ class CapabilityAgreementTests(WriteAssertions):
                     self.assertIsInstance(raised(lambda: call(file)), L.UnsupportedError)
             with self.subTest(format=name, verb="edit"):
                 self.assertIsInstance(raised(lambda: file.edit(lambda tx: None)), L.UnsupportedError)
+
+
+class OdsRoundTripTests(WriteAssertions):
+    """ODS writes through the unified layer (record 0277)."""
+
+    def test_cells_sheets_and_metadata_round_trip(self):
+        source = L.open(fixture("odf/corpus/calc-two-sheets.ods"))
+        before = source.to_bytes()
+        file = source.set("/sheet1/B2", {"value": 42})
+        file = file.set("/sheet1/E5", {"text": "new"})
+        file, path = file.add("/", "sheet", {"name": "Extra"})
+        self.assertEqual(path, "/sheet[3]")
+        file = file.set("/metadata", {"title": "Budget"})
+        self.assertUnchanged(source, before)
+        reopened = self.assertReopens(file)
+        self.assertEqual(cell_text(reopened, "/sheet1/B2"), "42")
+        self.assertEqual(cell_text(reopened, "/sheet1/E5"), "new")
+        self.assertEqual(reopened.metadata()["title"], "Budget")
+        with tempfile.TemporaryDirectory() as directory:
+            target = os.path.join(directory, "out.ods")
+            file.save_as(target)
+            self.assertEqual(cell_text(L.open(target), "/Extra/A1"), "")
+        self.assertError(
+            raised(lambda: source.set("/sheet1/A1", {"font.bold": True})),
+            L.PropertyError,
+            "unsupported_property",
+        )
 
 
 # ---------------------------------------------------------------------------
