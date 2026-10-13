@@ -140,7 +140,16 @@ fn every_format_has_one_answer_for_its_reads() {
                 );
             let doc_edit = format == FileFormat::Doc
                 && cfg!(feature = "doc")
-                && matches!(verb, Verb::Set | Verb::Edit | Verb::Batch);
+                && matches!(
+                    verb,
+                    Verb::Set
+                        | Verb::Add
+                        | Verb::Remove
+                        | Verb::Move
+                        | Verb::Swap
+                        | Verb::Edit
+                        | Verb::Batch
+                );
             let xlsx_edit = format == FileFormat::Xlsx
                 && cfg!(feature = "xlsx")
                 && matches!(
@@ -563,7 +572,7 @@ fn gap_subjects_are_unique() {
 #[test]
 fn doc_enumerates_its_unprojected_element_gaps() {
     let capabilities = Capabilities::of(FileFormat::Doc);
-    for element in ["run", "table", "header", "footnote", "comment", "picture"] {
+    for element in ["hyperlink", "section", "style", "field", "picture", "shape"] {
         assert!(
             capabilities
                 .gaps()

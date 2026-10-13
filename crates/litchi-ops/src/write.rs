@@ -88,6 +88,14 @@ impl File {
                     path,
                 })
             },
+            #[cfg(feature = "doc")]
+            Self::Doc(handle) => {
+                let (commit, path) = handle.add(_parent.into_path()?, _node.into_node()?)?;
+                Ok(Added {
+                    file: Self::Doc(commit.after),
+                    path,
+                })
+            },
             Self::Signed(_) => Err(protected(self)),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -143,6 +151,10 @@ impl File {
             Self::Rtf(handle) => handle
                 .move_to(_path.into_path()?, _to.into_placement()?)
                 .map(|commit| Self::Rtf(commit.after)),
+            #[cfg(feature = "doc")]
+            Self::Doc(handle) => handle
+                .move_to(_path.into_path()?, _to.into_placement()?)
+                .map(|commit| Self::Doc(commit.after)),
             Self::Signed(_) => Err(protected(self)),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -205,6 +217,10 @@ impl File {
             Self::Rtf(handle) => handle
                 .remove(_target.into_target()?)
                 .map(|commit| Self::Rtf(commit.after)),
+            #[cfg(feature = "doc")]
+            Self::Doc(handle) => handle
+                .remove(_target.into_target()?)
+                .map(|commit| Self::Doc(commit.after)),
             Self::Signed(_) => Err(protected(self)),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -261,6 +277,10 @@ impl File {
             Self::Rtf(handle) => handle
                 .swap(_a.into_path()?, _b.into_path()?)
                 .map(|commit| Self::Rtf(commit.after)),
+            #[cfg(feature = "doc")]
+            Self::Doc(handle) => handle
+                .swap(_a.into_path()?, _b.into_path()?)
+                .map(|commit| Self::Doc(commit.after)),
             Self::Signed(_) => Err(protected(self)),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]

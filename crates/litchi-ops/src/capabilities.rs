@@ -671,8 +671,16 @@ impl Capabilities {
         }
         if verb.is_edit() {
             #[cfg(feature = "doc")]
-            if matches!(verb, Verb::Set | Verb::Edit | Verb::Batch)
-                && self.adapter() == Some(Adapter::Doc)
+            if matches!(
+                verb,
+                Verb::Set
+                    | Verb::Add
+                    | Verb::Remove
+                    | Verb::Move
+                    | Verb::Swap
+                    | Verb::Edit
+                    | Verb::Batch
+            ) && self.adapter() == Some(Adapter::Doc)
             {
                 if self.retains_source == Some(false) {
                     return RETAINED_SOURCE.support();
@@ -2707,7 +2715,7 @@ impl Element {
         let settable = settable
             || (self.adapter == Adapter::Doc
                 && self.retains_source != Some(false)
-                && self.data().canonical == "p"
+                && matches!(self.data().canonical, "p" | "r")
                 && readable);
         #[cfg(feature = "xlsx")]
         let settable = settable
@@ -2784,6 +2792,12 @@ impl Element {
                 && self.retains_source != Some(false)
                 && self.data().canonical == "sheet"
                 && readable);
+        #[cfg(feature = "doc")]
+        let add = add
+            || (self.adapter == Adapter::Doc
+                && self.retains_source != Some(false)
+                && self.data().canonical == "p"
+                && readable);
         #[cfg(feature = "rtf")]
         let add = add
             || (self.adapter == Adapter::Rtf
@@ -2826,6 +2840,12 @@ impl Element {
             || (self.adapter == Adapter::Ppt
                 && self.retains_source != Some(false)
                 && self.data().canonical == "slide"
+                && readable);
+        #[cfg(feature = "doc")]
+        let remove = remove
+            || (self.adapter == Adapter::Doc
+                && self.retains_source != Some(false)
+                && matches!(self.data().canonical, "p" | "r")
                 && readable);
         #[cfg(feature = "rtf")]
         let remove = remove

@@ -1342,7 +1342,15 @@ impl Classify for litchi_doc::body_text::Error {
                 Class::of(Code::OutOfRange)
             },
             Self::Refused(Refusal::ResourceCollision { .. }) => Class::of(Code::DuplicateName),
-            Self::Refused(Refusal::ResourceNotFound { .. }) => Class::of(Code::NotFound),
+            Self::Refused(Refusal::ResourceNotFound { .. } | Refusal::FontNotFound) => {
+                Class::of(Code::NotFound)
+            },
+            Self::Refused(Refusal::InvalidFontSize) => Class::of(Code::InvalidValue),
+            Self::Refused(Refusal::SoleParagraph) => Class::of(Code::InvalidArgument),
+            Self::Refused(Refusal::Encrypted) => Class::suggest(
+                Code::DocumentProtected,
+                "native encrypted DOC edits are not supported; edit a decrypted copy",
+            ),
             Self::Refused(Refusal::OperationLimit { .. } | Refusal::ReplacementLimit { .. }) => {
                 Class::of(Code::LimitExceeded)
             },

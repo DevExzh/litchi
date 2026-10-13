@@ -578,6 +578,9 @@ pub enum Refusal {
     /// proofing anchor, or a section boundary, that the structural edit
     /// would collapse.
     AnchoredContent,
+    /// The package is encrypted or obfuscated; the body editor never
+    /// rewrites protected streams.
+    Encrypted,
 }
 
 impl std::fmt::Display for Refusal {
@@ -686,6 +689,9 @@ impl std::fmt::Display for Refusal {
             Self::AnchoredContent => formatter.write_str(
                 "the paragraph carries an anchored range or section boundary that the edit would collapse",
             ),
+            Self::Encrypted => {
+                formatter.write_str("encrypted or obfuscated DOC packages cannot be edited")
+            },
         }
     }
 }

@@ -197,11 +197,11 @@ office-interop/litchi-changed/document-properties-litchi.docx	35:03e5b3f62a9abab
 office-interop/litchi-changed/noheadfoot-litchi.doc	153:df28368ddec51d0f	=	149:b64e9185512d8e9b	=	482:d5c392cef8cd68c0	=
 office-interop/litchi-changed/relsize-litchi.rtf	59:4c445d466211ecd1	=	=	=	=	=
 office-interop/litchi-changed/shapes-litchi.pptx	454:c9a0295ae9cd744f	=	=	=	615:a5189c07806b14c6	=
-ole/doc/3endnotes.doc	8837:3dac476ba3b97acc	=	8740:1a57cbfb311a273f	=	9193:a2e9e4e1a06fd75a	=
+ole/doc/3endnotes.doc	8865:bdecc0a9803cc007	=	8768:b5c62df23e4f8dc0	=	9221:8f4c42c83e94bee5	=
 ole/doc/DiffFirstPageHeadFoot.doc	486:f6778906a4aa243b	=	482:9f87a8fb1e9fdb8f	=	815:421e6cd354ec9288	=
 ole/doc/FancyFoot.doc	352:78df83d4efe76464	=	348:329872ceea5ccc50	=	681:55ecd8e4e99e9a7d	=
 ole/doc/FloatingPictures.doc	!Unsupported	=	=	=	=	=
-ole/doc/HeaderFooterProblematic.doc	6:359f604bc5f8ec35	=	=	=	375:461569c4cde2e4c6	=
+ole/doc/HeaderFooterProblematic.doc	16068:fd3e67be13b71c43	=	=	=	20479:84d1081aaf31f3ca	=
 ole/doc/HeaderFooterUnicode.doc	587:56f2cd5319945e4c	=	581:337b055448dacf22	=	916:bcd9908c7f43a0c0	=
 ole/doc/Lists.doc	!Unsupported	=	=	=	=	=
 ole/doc/NoHeadFoot.doc	196:11cb299db325f89c	=	192:6ae5457ea9b8d648	=	525:da03ef370ae48149	=
@@ -332,7 +332,7 @@ poi/test-data/document/heading123.docx	!Unsupported	=	=	=	=	=
 poi/test-data/document/password_password_cryptoapi.doc	!InvalidFormat	=	=	=	=	=
 poi/test-data/document/password_tika_binaryrc4.doc	!InvalidFormat	=	=	=	=	=
 poi/test-data/document/saut_page.docx	!Unsupported	=	=	=	=	=
-poi/test-data/document/saved-by-table.doc	28422:2567f51517b70ce2	=	28030:9d5bfa50b82cadf0	=	28855:78f2f311d0793583	=
+poi/test-data/document/saved-by-table.doc	28434:f080393c2d478c19	=	28042:0e278b6915c6416f	=	28867:d39eb9fdd8650694	=
 poi/test-data/document/test.doc	564:5e883ba0dd103b94	=	521:3e537dee9e1f5913	=	564:5e883ba0dd103b94	=
 poi/test-data/document/testComment.docx	!Unsupported	=	=	=	=	=
 poi/test-data/document/word_with_embeded.doc	!Unsupported	=	=	=	=	=

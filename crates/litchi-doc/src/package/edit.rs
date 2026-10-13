@@ -459,6 +459,11 @@ impl Edit {
         package: Package,
         options: EditOptions,
     ) -> Result<Self> {
+        if package.document().fib().is_encrypted() {
+            return Err(Error::Body(body_text::Error::Refused(
+                body_text::Refusal::Encrypted,
+            )));
+        }
         let bytes = package.to_bytes().map_err(Error::Package)?;
         let source = body_text::Snapshot::from_bytes_with_options(
             bytes,
