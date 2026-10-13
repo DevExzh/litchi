@@ -39,8 +39,10 @@ const OTHER_MEDIA: &str = "/xl/media/other.bin";
 const NEW_SVG: &[u8] = br#"<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0 L4 4"/></svg>"#;
 const PNG: &[u8] = b"synthetic-png-payload";
 
+// LibreOffice `sc/qa/unit/data/xlsx/tdf169496_hidden_graphic.xlsx`, vendored
+// byte-for-byte; see `test-data/libreoffice-core/PROVENANCE.md`.
 const NATIVE_XLSX: &[u8] = include_bytes!(
-    "../../../3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf169496_hidden_graphic.xlsx"
+    "../../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf169496_hidden_graphic.xlsx"
 );
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

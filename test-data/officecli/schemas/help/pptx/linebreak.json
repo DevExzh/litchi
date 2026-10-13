@@ -1,0 +1,22 @@
+{
+  "$schema": "../_schema.json",
+  "format": "pptx",
+  "element": "linebreak",
+  "elementAliases": ["br", "line-break"],
+  "parent": "paragraph",
+  "operations": {
+    "add": true,
+    "set": false,
+    "get": true,
+    "query": false,
+    "remove": true
+  },
+  "paths": {
+    "positional": [
+      "/slide[N]/shape[M]/paragraph[K]/br[B]",
+      "/slide[N]/placeholder[X]/paragraph[K]/br[B]"
+    ]
+  },
+  "note": "Soft line break (<a:br/>) inside a paragraph's text body — a new line within the same paragraph, not a new paragraph. Add to a shape/placeholder or a specific paragraph: `add /slide[1]/shape[2] --type br` (appends to the last paragraph) or target `/slide[1]/shape[2]/paragraph[1]`. The break inherits the run formatting at its position; there are no properties to set. Aliases: br, line-break.",
+  "properties": {}
+}

@@ -1,14 +1,17 @@
 //! Native Office and LibreOffice OOXML encryption corpus checks.
 //!
-//! The corpus is kept in the repository's LibreOffice and Apache POI checkouts
-//! because these files are producer evidence rather than synthetic litchi
-//! fixtures. Run explicitly with `cargo test ... -- --ignored`.
+//! The fixtures are producer evidence rather than synthetic litchi fixtures:
+//! byte-for-byte copies of LibreOffice and Apache POI test files, vendored
+//! under `test-data/` with their provenance in
+//! `test-data/libreoffice-core/PROVENANCE.md` and `test-data/poi/PROVENANCE.md`.
+//! `LITCHI_LIBREOFFICE_CORE` and `LITCHI_POI60320_FIXTURE` point the tests at
+//! another copy.
 
 #![cfg(feature = "ooxml")]
 #![allow(
     clippy::expect_used,
     clippy::panic,
-    reason = "ignored corpus tests report the exact missing or incompatible fixture"
+    reason = "corpus tests report the exact missing or incompatible fixture"
 )]
 
 use std::io::{Cursor, Read};
@@ -26,7 +29,7 @@ fn libreoffice_fixture_root() -> PathBuf {
     let source_root = std::env::var_os(LIBREOFFICE_ROOT_ENV)
         .map(PathBuf::from)
         .unwrap_or_else(|| {
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../3rdparty/libreoffice-core")
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/libreoffice-core")
         });
     source_root.join("sw/qa/extras/ooxmlexport/data")
 }
@@ -40,7 +43,7 @@ fn poi_fixture() -> PathBuf {
         .map(PathBuf::from)
         .unwrap_or_else(|| {
             Path::new(env!("CARGO_MANIFEST_DIR"))
-                .join("../../3rdparty/poi/test-data/poifs/60320-protected.xlsx")
+                .join("../../test-data/poi/test-data/poifs/60320-protected.xlsx")
         })
 }
 
@@ -115,7 +118,6 @@ fn assert_native_fixture(
 }
 
 #[test]
-#[ignore = "requires the native Office/LibreOffice corpus checkout"]
 fn native_office_profiles_open_with_default_graph_validation() {
     let limits = Limits::default();
     assert_native_fixture(
@@ -145,7 +147,6 @@ fn native_office_profiles_open_with_default_graph_validation() {
 }
 
 #[test]
-#[ignore = "requires the native Office/LibreOffice corpus checkout"]
 fn libreoffice_standard_without_dataspaces_requires_explicit_compatibility() {
     let path = libreoffice_fixture("Encrypted_LO_Standard_abc.docx");
     let bytes = std::fs::read(&path).expect("read native LibreOffice fixture");
@@ -179,7 +180,6 @@ fn libreoffice_standard_without_dataspaces_requires_explicit_compatibility() {
 }
 
 #[test]
-#[ignore = "requires the Apache POI 60320 fixture checkout"]
 fn apache_poi_60320_mixed_wrapper_profile_opens() {
     let path = poi_fixture();
     let bytes = std::fs::read(&path).expect("read Apache POI 60320 fixture");

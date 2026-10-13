@@ -82,6 +82,22 @@ class SchemaLoading(unittest.TestCase):
         write(self.help / "xlsx" / "a.json", {"element": "b"})
         self.assertNotEqual(delta.schema_tree_hash(self.help)[0], first)
 
+    def test_a_vendored_tree_reports_its_pinned_commit(self) -> None:
+        root = Path(self.tempdir.name)
+        self.assertEqual(delta.officecli_commit(root), "unknown")
+        (root / delta.UPSTREAM_COMMIT).write_text("0123456789abcdef\n", encoding="utf-8")
+        self.assertEqual(delta.officecli_commit(root), "01234567")
+
+    def test_the_vendored_schemas_match_the_committed_table(self) -> None:
+        vendored = delta.REPO / delta.VENDORED_OFFICECLI
+        tree, count = delta.schema_tree_hash(vendored / "schemas" / "help")
+        commit = delta.officecli_commit(vendored)
+        table = (delta.REPO / delta.OUTPUT).read_text(encoding="utf-8")
+        self.assertIn(
+            f"| officecli | `schemas/help` ({count} files, OfficeCLI commit `{commit}`) | `{tree}` |",
+            table,
+        )
+
 
 class Comparison(unittest.TestCase):
     def schemas(self, *elements: delta.OcElement) -> list[delta.OcElement]:

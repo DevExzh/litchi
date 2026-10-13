@@ -12,7 +12,7 @@
 //!
 //! # References
 //!
-//! - `odfpy`: `3rdparty/odfpy/odf/namespaces.py` (lines 24–111)
+//! - `odfpy`: `odf/namespaces.py` (lines 24–111)
 
 use litchi_core::{Error, Result};
 use phf::{Map, phf_map};

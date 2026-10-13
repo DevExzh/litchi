@@ -14,8 +14,8 @@
 //!
 //! # References
 //!
-//! - `odfdo`: `3rdparty/odfdo/src/odfdo/const.py`
-//! - `odfpy`: `3rdparty/odfpy/odf/namespaces.py`
+//! - `odfdo`: `src/odfdo/const.py`
+//! - `odfpy`: `odf/namespaces.py`
 
 use phf::{Map, phf_map};
 

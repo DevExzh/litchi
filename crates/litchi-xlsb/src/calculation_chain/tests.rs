@@ -740,27 +740,25 @@ fn malformed_or_non_biff_opaque_payload_removes_and_restores_exactly() {
 }
 
 #[test]
-#[ignore = "requires the vendored native XLSB corpus and exercises producer-specific streams"]
 fn native_calculation_chain_fixtures_are_opaque_inventory_cases() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../3rdparty");
+    // Byte-for-byte Apache POI and LibreOffice fixtures vendored under
+    // `test-data/`; see `test-data/poi/PROVENANCE.md` and
+    // `test-data/libreoffice-core/PROVENANCE.md`.
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data");
     let fixtures = [
-        "poi/test-data/spreadsheet/sample.xlsb",
+        "ooxml/xlsb/sample.xlsb",
         "poi/test-data/spreadsheet/testVarious.xlsb",
-        "poi/test-data/spreadsheet/bug66682.xlsb",
+        "ooxml/xlsb/bug66682.xlsb",
         "poi/test-data/spreadsheet/62815.xlsb",
         "libreoffice-core/sc/qa/unit/data/xlsb/tdf94627.xlsb",
         "libreoffice-core/sc/qa/unit/data/xlsb/pivottable_error_item_filter.xlsb",
-        "libreoffice-core/sc/qa/unit/data/xlsb/universal-content.xlsb",
+        "ooxml/xlsb/universal-content.xlsb",
         "libreoffice-core/sc/qa/unit/data/xlsb/shared_formula.xlsb",
     ];
-    let mut found = 0usize;
     for fixture in fixtures {
         let path = root.join(fixture);
-        if !path.is_file() {
-            continue;
-        }
-        found += 1;
-        let package = Package::open(&path).expect("native XLSB package");
+        let package = Package::open(&path)
+            .unwrap_or_else(|error| panic!("native XLSB package {fixture}: {error}"));
         let snapshot = package.calculation_chain().expect("Calculation Chain");
         assert!(snapshot.is_present());
         assert!(!snapshot.part().expect("part").bytes().is_empty());
@@ -769,5 +767,4 @@ fn native_calculation_chain_fixtures_are_opaque_inventory_cases() {
         // parser recognizes them.
         let _ = snapshot.part().expect("part").record_count();
     }
-    assert!(found > 0, "native fixture corpus is unavailable");
 }

@@ -1,7 +1,7 @@
 //! The command-line grammar.
 //!
 //! Verbs, argument order and option names follow OfficeCLI
-//! (`3rdparty/OfficeCLI/src/officecli/CommandBuilder*.cs`): the file comes
+//! (OfficeCLI `src/officecli/CommandBuilder*.cs`): the file comes
 //! first, then the path, then options. Litchi-specific spellings are noted on
 //! each option.
 
