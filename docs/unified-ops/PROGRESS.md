@@ -464,6 +464,21 @@ Cut from `395d0ffa9f`:
 
 Queued next: field/TOC `refresh` (engine 3), DOCX charts (0270a), the other ODF leaves (0268 G1), the performance misses (full queries, DOCX set and cell writes, PPTX add, `Warn` batches) and iWork M6.
 
+## Wave R5 (2026-10-14)
+Cut from `80e24f8745`:
+- `s20-refresh` (0279): field/TOC `refresh` (M4 engine 3).
+- `perf-query` (0280): shared query and transaction misses (full queries, RTF fan-out and edit-closure singles, source freshness check).
+- `perf-writes` (0281): per-format write misses:
+  - DOCX set, cells and find;
+  - PPTX add and metadata;
+  - `Warn` batch coalescing;
+  - XLSB metadata and XLS.
+- `odf-leaves` (0282): the remaining ODF crates (OTH, ODM, ODG, ODC, ODF-formula, ODI, ODB) into `File`.
+- `charts-docx` (0283): DOCX charts, chartex types and chart set coverage.
+- `smartart` (0284): typed SmartArt CRUD (v1 scope).
+
+Not dispatched: iWork M6. It waits for owner decisions D1/D2, and the iWork crates belong to their owners.
+
 Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-pptx-w4` 9474e2b6ce, `uo/m2-l-xlsb-w1` 876588a23c, `uo/m1-r4-perf` 012fd509ff.
 
 - M0a S10 (`docs/unified-ops/s10-measurement.md` §9). M0a landed on the strength of two explanations. If either is rejected, the chosen alternative becomes a harness follow-up; M0a is not reverted.
