@@ -93,6 +93,8 @@ pub struct NewPage {
     /// The page whose drawing-page style, master page and layout the new
     /// page copies; the preceding page (or the first) when absent.
     pub like: Option<usize>,
+    /// The master page for a presentation without pages to copy from.
+    pub master: Option<String>,
 }
 
 /// One edit of a scene, resolved against the scene it is planned on.
@@ -883,13 +885,19 @@ impl<'a> Planner<'a> {
         let like = page
             .like
             .unwrap_or_else(|| index.saturating_sub(1).min(count.saturating_sub(1)));
-        let model = self.scene.pages.get(like).ok_or_else(|| {
-            unsupported("a new ODP page needs an existing page to copy its master page from")
-        })?;
-        let master = model
-            .master_page
-            .as_deref()
-            .ok_or_else(|| unsupported("the model ODP page names no master page"))?;
+        let model = self.scene.pages.get(like);
+        let master = match (page.master.as_deref(), model) {
+            (Some(master), _) => master,
+            (None, Some(model)) => model
+                .master_page
+                .as_deref()
+                .ok_or_else(|| unsupported("the model ODP page names no master page"))?,
+            (None, None) => {
+                return Err(unsupported(
+                    "a new ODP page needs a master page or an existing page to copy from",
+                ));
+            },
+        };
         let draw = self.prefix(self.scene.prefixes.draw.as_ref(), "drawing")?;
         let name = match &page.name {
             Some(name) => {
@@ -907,7 +915,7 @@ impl<'a> Planner<'a> {
             None => self.unique_page_name(),
         };
         let mut markup = format!("<{draw}:page {draw}:name=\"{}\"", escape_attribute(&name));
-        if let Some(style) = &model.style_name {
+        if let Some(style) = model.and_then(|model| model.style_name.as_ref()) {
             markup.push_str(&format!(
                 " {draw}:style-name=\"{}\"",
                 escape_attribute(style)
@@ -917,9 +925,10 @@ impl<'a> Planner<'a> {
             " {draw}:master-page-name=\"{}\"",
             escape_attribute(master)
         ));
-        if let (Some(layout), Some(presentation)) =
-            (&model.layout, self.scene.prefixes.presentation.as_ref())
-        {
+        if let (Some(layout), Some(presentation)) = (
+            model.and_then(|model| model.layout.as_ref()),
+            self.scene.prefixes.presentation.as_ref(),
+        ) {
             markup.push_str(&format!(
                 " {presentation}:presentation-page-layout-name=\"{}\"",
                 escape_attribute(layout)

@@ -874,6 +874,17 @@ fn rewrite_attr(
     apply(xml, edits)
 }
 
+/// Parse the master pages of a `styles.xml` part (or a flat presentation
+/// document) in document order, without opening a package.
+///
+/// # Errors
+///
+/// Returns an error when the XML is malformed or exceeds the definition
+/// limits.
+pub fn parse_masters(styles_xml: &str) -> Result<Vec<MasterPage>> {
+    masters_from_xml(styles_xml)
+}
+
 fn masters_from_xml(xml: &str) -> Result<Vec<MasterPage>> {
     let parsed = parse_master_pages(xml)?;
     if parsed.len() > MAX_DEFINITIONS {
@@ -1219,4 +1230,78 @@ fn error(message: impl Into<String>) -> Error {
 }
 fn invalid<T>(message: impl Into<String>) -> Result<T> {
     Err(error(message))
+}
+
+/// The identity of one master page, read without classifying its children.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct MasterSummary {
+    /// `style:name`.
+    pub name: String,
+    /// `style:display-name`.
+    pub display_name: Option<String>,
+    /// `style:page-layout-name`.
+    pub page_layout_name: Option<String>,
+    /// `draw:style-name`, the master's drawing-page style.
+    pub drawing_style_name: Option<String>,
+}
+
+/// List the master pages of a `styles.xml` part (or a flat presentation
+/// document) by their identity attributes only.
+///
+/// Unlike [`parse_masters`], this tolerates master-page children the shared
+/// semantic reader does not classify (such as LibreOffice's `loext:theme`),
+/// because it reads no child.
+///
+/// # Errors
+///
+/// Returns an error when the XML is malformed or holds more than 65,536
+/// master pages.
+pub fn list_masters(styles_xml: &str) -> Result<Vec<MasterSummary>> {
+    const STYLE_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:style:1.0";
+    const DRAW_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
+    let mut reader = NsReader::from_str(styles_xml);
+    reader.config_mut().check_end_names = true;
+    let mut masters = Vec::new();
+    loop {
+        let (resolved, event) = reader
+            .read_resolved_event()
+            .map_err(|source| error(format!("invalid ODP styles XML: {source}")))?;
+        let is_style =
+            matches!(resolved, ResolveResult::Bound(Namespace(namespace)) if namespace == STYLE_NS);
+        match event {
+            Event::Start(element) | Event::Empty(element)
+                if is_style && element.local_name().as_ref() == b"master-page" =>
+            {
+                if masters.len() >= MAX_DEFINITIONS {
+                    return invalid("ODP styles exceed 65536 master pages");
+                }
+                let mut summary = MasterSummary::default();
+                for attribute in element.attributes() {
+                    let attribute = attribute
+                        .map_err(|source| error(format!("invalid ODP attribute: {source}")))?;
+                    let (namespace, local) = reader.resolver().resolve_attribute(attribute.key);
+                    let namespace = match namespace {
+                        ResolveResult::Bound(Namespace(namespace)) => namespace,
+                        _ => continue,
+                    };
+                    let value = attribute
+                        .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                        .map_err(|source| error(format!("invalid ODP attribute: {source}")))?
+                        .into_owned();
+                    match (namespace, local.as_ref()) {
+                        (STYLE_NS, b"name") => summary.name = value,
+                        (STYLE_NS, b"display-name") => summary.display_name = Some(value),
+                        (STYLE_NS, b"page-layout-name") => summary.page_layout_name = Some(value),
+                        (DRAW_NS, b"style-name") => summary.drawing_style_name = Some(value),
+                        _ => {},
+                    }
+                }
+                masters.push(summary);
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    Ok(masters)
 }
