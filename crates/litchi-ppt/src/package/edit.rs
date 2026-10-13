@@ -562,6 +562,7 @@ impl Edit {
     /// Publish this edit as a new immutable package.
     pub fn commit(self) -> Result<Commit> {
         ensure_source_version(&self.package, self.expected_source)?;
+        let verified = self.inner.verified_shapes();
         let native_commit = self.inner.commit();
         ensure_source_version(&self.package, self.expected_source)?;
         let native_commit = native_commit?;
@@ -572,7 +573,9 @@ impl Edit {
         let package = if patch.is_noop() {
             Ok(source.clone())
         } else {
-            package_from_bytes(&source, snapshot.bytes())
+            package_from_bytes(&source, snapshot.bytes()).inspect(|package| {
+                seed_verified_shapes(&source, package, snapshot.bytes(), verified);
+            })
         };
         // This is the final source fence, after the target has been fully
         // parsed.  The source owner remains borrowed through `source` until
@@ -700,6 +703,32 @@ fn open_options(source: &Package) -> OpenOptions<'static> {
     OpenOptions::new()
         .source_limits(source.source_limits())
         .leniency(source.leniency())
+}
+
+/// Hand the shapes a batch text publication proved for its output to the
+/// published package's slide memo, so the next chunked edit resolves its
+/// targets without parsing the slide again (record 0264).
+///
+/// The proof was made against a default-policy reopen of exactly the
+/// published bytes, from a source parse made by the source package. It
+/// transfers only when the published package was opened from the same
+/// allocation under the same (default) policies.
+fn seed_verified_shapes(
+    source: &Package,
+    published: &Package,
+    bytes: &[u8],
+    verified: Option<slide_order::VerifiedSlideShapes>,
+) {
+    let Some(verified) = verified else {
+        return;
+    };
+    if !std::ptr::eq(verified.bytes.as_ref(), bytes)
+        || source.source_limits() != crate::SourceLimits::default()
+        || source.leniency() != crate::leniency::Leniency::default()
+    {
+        return;
+    }
+    published.seed_slide_shapes(verified.persist_id, verified.shapes);
 }
 
 fn package_from_bytes(source: &Package, bytes: &[u8]) -> Result<Package> {

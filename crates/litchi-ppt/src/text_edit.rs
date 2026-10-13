@@ -40,6 +40,9 @@ use litchi_cfb::{
 use litchi_core::{ReadAt, SourceVersion};
 use litchi_ole_common::source_backed_overlay::SourceBackedOverlayPublisher;
 
+mod readback;
+#[cfg(test)]
+mod readback_tests;
 mod source_range;
 
 const PPT_HEADER_LEN: usize = 8;
@@ -274,15 +277,21 @@ impl Snapshot {
         // editor preflight below remains the first observable failure, while
         // keeping the two allocation-heavy owners sequential.
         let shape_target = match presentation {
-            Some(presentation) => resolve_shape_target_at(presentation, target),
-            None => resolve_shape_target(&self.bytes, target),
+            Some(presentation) => resolve_shape_target_at_with_view(presentation, target),
+            None => presentation_shared(self.bytes.clone())
+                .map_err(Error::from)
+                .and_then(|presentation| {
+                    resolve_shape_target_in_presentation_with_view(&presentation, target)
+                }),
         };
         // The shared incremental owner rejects signed and encrypted CFB
         // envelopes before any candidate is staged. Surface that capability
         // boundary as a typed refusal instead of trying to normalize it.
         let editor = crate::embedded::object::Editor::open_records(self.bytes.to_vec())
             .map_err(|_error| Error::Refused(Refusal::UnsupportedSource))?;
-        let resolved = resolve_with_shape_target(target, shape_target?, &editor)?;
+        let (shape_target, source_view) = shape_target?;
+        let mut resolved = resolve_with_shape_target(target, shape_target, &editor)?;
+        resolved.source_view = source_view.map(Arc::new);
         Ok(Transaction {
             source: self.clone(),
             resolved,
@@ -1920,16 +1929,28 @@ impl Transaction {
     /// Returns an error if package publication or source-checked readback
     /// fails, or a typed refusal for an unsafe replacement.
     pub fn commit(self) -> Result<Commit> {
+        self.commit_verified().map(|(commit, _)| commit)
+    }
+
+    /// [`Self::commit`], also returning the shapes a parse of the published
+    /// slide returns when the readback proved them incrementally (record
+    /// 0264).
+    pub(crate) fn commit_verified(
+        self,
+    ) -> Result<(Commit, Option<(u32, crate::slide::PatchedShapes)>)> {
         let replacement = self
             .replacement
             .unwrap_or_else(|| self.resolved.text.clone());
         if replacement == self.resolved.text {
             let patch = Patch::new(self.source.clone(), self.source.clone(), None);
-            return Ok(Commit {
-                snapshot: self.source,
-                patch,
-                replaced_slide_persist_id: None,
-            });
+            return Ok((
+                Commit {
+                    snapshot: self.source,
+                    patch,
+                    replaced_slide_persist_id: None,
+                },
+                None,
+            ));
         }
 
         let encoded = encode_replacement(&replacement, self.resolved.kind)?;
@@ -1954,8 +1975,14 @@ impl Transaction {
         }
         editor.replace_persisted_record(self.resolved.slide_persist_id, target_slide)?;
         let bytes = editor.finish()?;
-        let snapshot = Snapshot::from_bytes(bytes)?;
-        let readback = resolve(&snapshot.bytes, self.resolved.target)?;
+        // `Snapshot::from_bytes` validates that the candidate opens; that
+        // open also serves the incremental readback (record 0264).
+        let bytes: Arc<[u8]> = Arc::from(bytes.into_boxed_slice());
+        let opened = presentation_shared(bytes.clone())?;
+        let snapshot = Snapshot { bytes };
+        let (readback, verified) =
+            resolve_published(&snapshot.bytes, &self.resolved, &replacement, &opened)?;
+        drop(opened);
         if readback.text != replacement {
             return Err(PackageError::Corrupted(
                 "published PPT shape text did not round-trip through the selected source shape"
@@ -1969,11 +1996,14 @@ impl Transaction {
             after_text: replacement,
         };
         let patch = Patch::new(self.source, snapshot.clone(), Some(change));
-        Ok(Commit {
-            snapshot,
-            patch,
-            replaced_slide_persist_id: Some(self.resolved.slide_persist_id),
-        })
+        Ok((
+            Commit {
+                snapshot,
+                patch,
+                replaced_slide_persist_id: Some(self.resolved.slide_persist_id),
+            },
+            verified,
+        ))
     }
 }
 
@@ -2059,9 +2089,18 @@ pub(crate) struct RootBatchPublication {
     /// Whether the publication replaced the live `DocumentContainer`, which
     /// owns slide-list (outline) text bodies.
     document_changed: bool,
+    /// Shapes that parsing each edited slide of `output` returns, proven by
+    /// the incremental readback (record 0264); empty when not proven or not
+    /// requested.
+    verified: readback::VerifiedSlides,
 }
 
 impl RootBatchPublication {
+    /// Take the proven shapes of the edited slides of the output.
+    pub(crate) fn take_verified_shapes(&mut self) -> readback::VerifiedSlides {
+        std::mem::take(&mut self.verified)
+    }
+
     pub(crate) fn source(&self) -> &[u8] {
         &self.source
     }
@@ -2274,6 +2313,9 @@ struct Resolved {
     payload: Vec<u8>,
     text: String,
     can_resize: bool,
+    /// The source parse of the target's slide, which the commit readback
+    /// verifies the publication against incrementally (record 0264).
+    source_view: Option<Arc<readback::SourceSlideView>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -2340,6 +2382,7 @@ fn resolved_from_shared_location(
         payload: text.payload,
         text: text.text,
         can_resize: text.can_resize,
+        source_view: None,
     })
 }
 
@@ -2426,10 +2469,64 @@ fn resolve_shape_target(bytes: &[u8], target: Target) -> Result<(u32, u32)> {
     resolve_shape_target_in_presentation(&presentation, target)
 }
 
+/// Resolve `target` in a published candidate, as [`resolve`] does, proving
+/// its slide's parse incrementally from the source parse when possible
+/// (record 0264). [`resolve`] parses the whole slide to find the target's
+/// persist and shape identifiers; when [`readback::readback_incremental`]
+/// accepts, those identifiers are proven to be the ones that parse yields,
+/// and every later step is the same.
+fn resolve_published(
+    bytes: &[u8],
+    resolved: &Resolved,
+    replacement: &str,
+    opened: &Presentation,
+) -> Result<(Resolved, Option<(u32, crate::slide::PatchedShapes)>)> {
+    if let Some(view) = &resolved.source_view
+        && let Some((shape_target, patched)) =
+            incremental_published_target(opened, resolved, view, replacement)
+    {
+        let editor = crate::embedded::object::Editor::open_records(bytes.to_vec())?;
+        let location = resolve_shape_record(shape_target.0, shape_target.1, &editor)?;
+        return Ok((
+            resolved_from_location(resolved.target, location)?,
+            Some(patched),
+        ));
+    }
+    Ok((resolve(bytes, resolved.target)?, None))
+}
+
+/// `opened` is a default-policy open of exactly the candidate, the same open
+/// `resolve_shape_target` makes.
+fn incremental_published_target(
+    opened: &Presentation,
+    resolved: &Resolved,
+    view: &Arc<readback::SourceSlideView>,
+    replacement: &str,
+) -> Option<((u32, u32), (u32, crate::slide::PatchedShapes))> {
+    let slides = opened.slides().ok()?;
+    let targets = [readback::ReadbackTarget {
+        target: resolved.target,
+        slide_persist_id: resolved.slide_persist_id,
+        native_shape_id: resolved.native_shape_id,
+        replacement,
+    }];
+    let sources = BTreeMap::from([(resolved.slide_persist_id, Arc::clone(view))]);
+    let (persist_id, patched) =
+        readback::readback_incremental(&slides, &targets, &sources)?.pop()?;
+    Some((
+        (persist_id, resolved.native_shape_id),
+        (persist_id, patched),
+    ))
+}
+
 /// Resolves one target through a single selected slide of an opened
 /// projection, with the same refusals as
-/// [`resolve_shape_target_in_presentation`].
-fn resolve_shape_target_at(presentation: &Presentation, target: Target) -> Result<(u32, u32)> {
+/// [`resolve_shape_target_in_presentation`], also capturing the slide's
+/// parse (record 0264).
+fn resolve_shape_target_at_with_view(
+    presentation: &Presentation,
+    target: Target,
+) -> Result<((u32, u32), Option<readback::SourceSlideView>)> {
     let slide = presentation
         .slide_at(target.slide.get())?
         .ok_or(Error::Refused(Refusal::SlideNotFound {
@@ -2439,7 +2536,31 @@ fn resolve_shape_target_at(presentation: &Presentation, target: Target) -> Resul
         .shapes()?
         .get(target.shape.get())
         .ok_or(Error::Refused(Refusal::ShapeNotFound))?;
-    Ok((slide.persist_id(), native_shape_id(shape)))
+    let shape_target = (slide.persist_id(), native_shape_id(shape));
+    Ok((
+        shape_target,
+        readback::SourceSlideView::capture(&slide).ok(),
+    ))
+}
+
+/// [`resolve_shape_target_in_presentation`], also capturing the selected
+/// slide's parse.
+fn resolve_shape_target_in_presentation_with_view(
+    presentation: &Presentation,
+    target: Target,
+) -> Result<((u32, u32), Option<readback::SourceSlideView>)> {
+    let slides = presentation.slides()?;
+    let slide = slides
+        .get(target.slide.get())
+        .ok_or(Error::Refused(Refusal::SlideNotFound {
+            position: target.slide,
+        }))?;
+    let shape = slide
+        .shapes()?
+        .get(target.shape.get())
+        .ok_or(Error::Refused(Refusal::ShapeNotFound))?;
+    let shape_target = (slide.persist_id(), native_shape_id(shape));
+    Ok((shape_target, readback::SourceSlideView::capture(slide).ok()))
 }
 
 fn resolve_shape_target_in_presentation(
@@ -2519,6 +2640,7 @@ pub(crate) fn replace_shape_texts_batch(
     let mut targets = Vec::with_capacity(replacements.len());
     let mut original_slides = BTreeMap::<u32, Arc<[u8]>>::new();
     let mut requested_shapes = BTreeMap::<u32, BTreeSet<u32>>::new();
+    let mut source_views = BTreeMap::<u32, Arc<readback::SourceSlideView>>::new();
     let mut deferred_resolution_error = None;
     // Resolve the semantic slide and shape positions once per request, but
     // defer text inspection until each persisted slide's drawing has been
@@ -2544,6 +2666,12 @@ pub(crate) fn replace_shape_texts_batch(
         };
         let slide_persist_id = slide.persist_id();
         let native_shape_id = native_shape_id(shape);
+        if let Entry::Vacant(entry) = source_views.entry(slide_persist_id)
+            && let Ok(view) = readback::SourceSlideView::capture(slide)
+        {
+            // The incremental readback starts from this parse (record 0264).
+            entry.insert(Arc::new(view));
+        }
         let slide_record = match original_slides.get(&slide_persist_id) {
             Some(record) => record.clone(),
             None => {
@@ -2675,6 +2803,7 @@ pub(crate) fn replace_shape_texts_batch(
             payload: text.payload,
             text: text.text,
             can_resize: text.can_resize,
+            source_view: None,
         };
         let encoded_len = encoded_replacement_len(&target.replacement, resolved.kind)?;
         encoded_bytes = encoded_bytes.checked_add(encoded_len).ok_or_else(|| {
@@ -2790,48 +2919,252 @@ pub(crate) fn replace_shape_texts_batch(
     let output: Arc<[u8]> = Arc::from(candidate.into_boxed_slice());
 
     // One complete reopen validates the publication and supplies all semantic
-    // readbacks without reopening the package once per shape.
+    // readbacks without reopening the package once per shape. The edited
+    // slides are verified incrementally against their source parse when that
+    // is provably equivalent to parsing them again (record 0264).
     let reopened = presentation_shared(output.clone())?;
     let reopened_slides = reopened.slides()?;
-    let mut changes = Vec::with_capacity(prepared.len());
-    for prepared in prepared {
-        let resolved = prepared.resolved;
-        let replacement = prepared.replacement;
-        let slide = reopened_slides
-            .get(resolved.target.slide.get())
-            .ok_or(Error::Refused(Refusal::SlideNotFound {
-                position: resolved.target.slide,
-            }))?;
-        if slide.persist_id() != resolved.slide_persist_id {
-            return Err(PackageError::Corrupted(
-                "published PPT batch shape text resolved a different slide".into(),
-            )
-            .into());
-        }
-        let shape = slide
-            .shapes()?
-            .get(resolved.target.shape.get())
-            .ok_or(Error::Refused(Refusal::ShapeNotFound))?;
-        if shape.text()? != replacement {
-            return Err(PackageError::Corrupted(
-                "published PPT batch shape text did not round-trip through its source shape".into(),
-            )
-            .into());
-        }
-        changes.push(RootShapeTextChange {
-            target: resolved.target,
-            before: resolved.text,
-            after: replacement,
-            slide_persist_id: resolved.slide_persist_id,
-        });
-    }
+    let targets = prepared
+        .iter()
+        .map(|prepared| readback::ReadbackTarget {
+            target: prepared.resolved.target,
+            slide_persist_id: prepared.resolved.slide_persist_id,
+            native_shape_id: prepared.resolved.native_shape_id,
+            replacement: &prepared.replacement,
+        })
+        .collect::<Vec<_>>();
+    let verified = if document_changed {
+        // Outline bodies live in the republished document; parse in full.
+        readback::readback_full(&reopened_slides, &targets)?;
+        Vec::new()
+    } else {
+        readback::readback(&reopened_slides, &targets, &source_views)?
+    };
+    drop(targets);
+    let changes = prepared
+        .into_iter()
+        .map(|prepared| RootShapeTextChange {
+            target: prepared.resolved.target,
+            before: prepared.resolved.text,
+            after: prepared.replacement,
+            slide_persist_id: prepared.resolved.slide_persist_id,
+        })
+        .collect();
 
     Ok(Some(RootBatchPublication {
         source,
         output,
         changes,
         document_changed,
+        verified,
     }))
+}
+
+/// Publishes a batch through a test hook that may corrupt each staged slide
+/// record, then returns both verifiers' verdicts on the published bytes
+/// (record 0264 differential tests).
+#[cfg(test)]
+pub(crate) fn differential_readback_for_test(
+    source: &[u8],
+    replacements: &[(Target, &str)],
+    corrupt: &dyn Fn(u32, &mut Vec<u8>),
+) -> Result<DifferentialVerdicts> {
+    let source: Arc<[u8]> = Arc::from(source);
+    let presentation = presentation_shared(source.clone())?;
+    let slides = presentation.slides()?;
+    let mut editor =
+        crate::embedded::object::Editor::open_records_arc_with_limit(source.clone(), usize::MAX)?;
+    let mut views = BTreeMap::new();
+    let mut grouped = BTreeMap::<u32, Vec<ShapeTextRewrite<'_>>>::new();
+    let mut originals = BTreeMap::new();
+    let mut prepared = Vec::new();
+    for (target, replacement) in replacements {
+        let slide =
+            slides
+                .get(target.slide.get())
+                .ok_or(Error::Refused(Refusal::SlideNotFound {
+                    position: target.slide,
+                }))?;
+        let shape = slide
+            .shapes()?
+            .get(target.shape.get())
+            .ok_or(Error::Refused(Refusal::ShapeNotFound))?;
+        let persist_id = slide.persist_id();
+        let shape_id = native_shape_id(shape);
+        if let Entry::Vacant(entry) = views.entry(persist_id) {
+            entry.insert(Arc::new(readback::SourceSlideView::capture(slide)?));
+        }
+        if let Entry::Vacant(entry) = originals.entry(persist_id) {
+            entry.insert(editor.persisted_record(persist_id)?);
+        }
+        let record = originals
+            .get(&persist_id)
+            .ok_or(Error::Refused(Refusal::ShapeNotFound))?;
+        let text = inspect_slide(record, shape_id)?;
+        prepared.push((
+            *target,
+            persist_id,
+            shape_id,
+            text,
+            encode_replacement_owned(replacement)?,
+        ));
+    }
+    for (_, persist_id, shape_id, text, encoded) in &prepared {
+        let encoded = match text.kind {
+            TextKind::Chars => &encoded.0,
+            TextKind::Bytes => encoded
+                .1
+                .as_ref()
+                .ok_or(Error::Refused(Refusal::DependencyClosure))?,
+        };
+        grouped
+            .entry(*persist_id)
+            .or_default()
+            .push(ShapeTextRewrite {
+                shape_id: *shape_id,
+                kind: text.kind,
+                before: &text.payload,
+                after: encoded,
+            });
+    }
+    for (persist_id, rewrites) in grouped {
+        let original = originals
+            .get(&persist_id)
+            .ok_or(Error::Refused(Refusal::ShapeNotFound))?;
+        let mut staged = rewrite_slide_grouped(original, &rewrites)?;
+        corrupt(persist_id, &mut staged);
+        editor.replace_persisted_record(persist_id, staged)?;
+    }
+    let output: Arc<[u8]> = Arc::from(editor.finish()?.into_boxed_slice());
+    // A candidate that does not reopen is refused by both verifiers, which
+    // share the reopen.
+    let reopened = presentation_shared(output.clone());
+    let reopened_slides = reopened.as_ref().map(Presentation::slides);
+    let Ok(Ok(reopened_slides)) = reopened_slides else {
+        return Ok(DifferentialVerdicts {
+            incremental: None,
+            full_accepted: false,
+            reopened: false,
+            single: None,
+            persist_ids: Vec::new(),
+            parsed: Vec::new(),
+        });
+    };
+    let targets = prepared
+        .iter()
+        .zip(replacements)
+        .map(
+            |((target, persist_id, shape_id, _, _), (_, replacement))| readback::ReadbackTarget {
+                target: *target,
+                slide_persist_id: *persist_id,
+                native_shape_id: *shape_id,
+                replacement,
+            },
+        )
+        .collect::<Vec<_>>();
+    let incremental = readback::readback_incremental(&reopened_slides, &targets, &views);
+    // The single-target commit readback on the same candidate: the proven
+    // resolution against the reference `resolve`.
+    let single = match replacements {
+        [(target, replacement)] => {
+            let transaction = Snapshot::from_shared_bytes(source.clone())?.edit_text(*target)?;
+            let opened = presentation_shared(output.clone())?;
+            let proven = resolve_published(&output, &transaction.resolved, replacement, &opened);
+            let reference = resolve(&output, *target);
+            let summary = |resolved: &Resolved| {
+                (
+                    resolved.slide_persist_id,
+                    resolved.native_shape_id,
+                    resolved.payload.clone(),
+                    resolved.text.clone(),
+                )
+            };
+            Some(SingleVerdicts {
+                proven: proven
+                    .as_ref()
+                    .map(|(resolved, _)| summary(resolved))
+                    .map_err(|error| format!("{error:?}")),
+                used_proof: proven
+                    .as_ref()
+                    .is_ok_and(|(_, verified)| verified.is_some()),
+                reference: reference
+                    .as_ref()
+                    .map(summary)
+                    .map_err(|error| format!("{error:?}")),
+            })
+        },
+        _ => None,
+    };
+    let full = readback::readback_full(&reopened_slides, &targets);
+    let parsed = reopened_slides
+        .iter()
+        .map(|slide| {
+            slide
+                .shapes()
+                .map(|shapes| format!("{shapes:?}"))
+                .map_err(|_| ())
+        })
+        .collect();
+    Ok(DifferentialVerdicts {
+        incremental: incremental.map(|verified| {
+            verified
+                .into_iter()
+                .map(|(persist_id, shapes)| (persist_id, format!("{:?}", &*shapes.materialize())))
+                .collect()
+        }),
+        full_accepted: full.is_ok(),
+        reopened: true,
+        single,
+        persist_ids: reopened_slides
+            .iter()
+            .map(|slide| slide.persist_id())
+            .collect(),
+        parsed,
+    })
+}
+
+/// Both verifiers' verdicts on one published candidate.
+#[cfg(test)]
+#[derive(Debug)]
+pub(crate) struct DifferentialVerdicts {
+    /// The incremental verifier's proven shapes (debug form) per edited
+    /// slide, or `None` when it could not prove acceptance.
+    pub(crate) incremental: Option<Vec<(u32, String)>>,
+    /// Whether the reference verifier accepted.
+    pub(crate) full_accepted: bool,
+    /// Whether the candidate reopened and listed its slides (the step both
+    /// verifiers share).
+    pub(crate) reopened: bool,
+    /// For a one-target batch, the single-commit readback on the candidate.
+    pub(crate) single: Option<SingleVerdicts>,
+    /// Persist identifiers of the reopened slides, in order.
+    pub(crate) persist_ids: Vec<u32>,
+    /// A full parse of every reopened slide's shapes (debug form).
+    pub(crate) parsed: Vec<std::result::Result<String, ()>>,
+}
+
+/// A resolved readback: persist id, shape id, text payload, text.
+#[cfg(test)]
+pub(crate) type ResolvedSummary = (u32, u32, Vec<u8>, String);
+
+/// The single-target commit readback, proven and reference.
+#[cfg(test)]
+#[derive(Debug)]
+pub(crate) struct SingleVerdicts {
+    /// `resolve_published` (incremental when provable).
+    pub(crate) proven: std::result::Result<ResolvedSummary, String>,
+    /// Whether `resolve_published` used the incremental proof.
+    pub(crate) used_proof: bool,
+    /// The reference `resolve` (full parse).
+    pub(crate) reference: std::result::Result<ResolvedSummary, String>,
+}
+
+#[cfg(test)]
+fn encode_replacement_owned(value: &str) -> Result<(Vec<u8>, Option<Vec<u8>>)> {
+    Ok((
+        encode_replacement(value, TextKind::Chars)?,
+        encode_replacement(value, TextKind::Bytes).ok(),
+    ))
 }
 
 /// One published speaker-notes text replacement.
@@ -3604,6 +3937,23 @@ fn rewrite_officeart_grouped(
     match_counts: &mut BTreeMap<u32, usize>,
     depth: usize,
 ) -> Result<Vec<u8>> {
+    let mut output = Vec::with_capacity(record.len());
+    rewrite_officeart_grouped_into(record, replacements, match_counts, depth, &mut output)?;
+    Ok(output)
+}
+
+/// Appends the rewritten record to `output`. Every container is framed again
+/// in place (its length patched after its children), so one drawing pass
+/// writes one buffer instead of allocating a copy per record (record 0264);
+/// the visited records, checks, errors and bytes are those of the
+/// per-record rebuild.
+fn rewrite_officeart_grouped_into(
+    record: &[u8],
+    replacements: &BTreeMap<u32, Vec<ShapeTextRewrite<'_>>>,
+    match_counts: &mut BTreeMap<u32, usize>,
+    depth: usize,
+    output: &mut Vec<u8>,
+) -> Result<()> {
     if depth >= 128 {
         return Err(
             PackageError::Corrupted("OfficeArt nesting exceeds text-edit limit".into()).into(),
@@ -3617,22 +3967,35 @@ fn rewrite_officeart_grouped(
                 PackageError::Corrupted("PPT grouped rewrite lost shape identity".into())
             })?;
             *count = count.saturating_add(1);
-            return rewrite_shape_container_grouped(record, shape_replacements);
+            output.extend_from_slice(&rewrite_shape_container_grouped(
+                record,
+                shape_replacements,
+            )?);
+            return Ok(());
         }
     }
     if record_version(record)? != 0xF {
-        return Ok(record.to_vec());
+        output.extend_from_slice(record);
+        return Ok(());
     }
-    let mut data = Vec::with_capacity(drawing_payload(record)?.len());
+    // `drawing_payload` proves the 8-byte header and the payload extent.
+    let payload = drawing_payload(record)?;
+    let start = output.len();
+    output.extend_from_slice(&record[..PPT_HEADER_LEN]);
+    output.reserve(payload.len());
     for child_result in children(record)? {
-        data.extend_from_slice(&rewrite_officeart_grouped(
+        rewrite_officeart_grouped_into(
             child_result?,
             replacements,
             match_counts,
             depth + 1,
-        )?);
+            output,
+        )?;
     }
-    rebuild(record, &data).map_err(Into::into)
+    let data_length = u32::try_from(output.len() - start - PPT_HEADER_LEN)
+        .map_err(|_err| PackageError::ResourceLimit("PPT text-edit record exceeds u32".into()))?;
+    output[start + 4..start + PPT_HEADER_LEN].copy_from_slice(&data_length.to_le_bytes());
+    Ok(())
 }
 
 fn rewrite_shape_container_grouped(
@@ -3827,32 +4190,67 @@ fn rewrite_officeart(
     depth: usize,
     matches: &mut usize,
 ) -> Result<Vec<u8>> {
+    let mut output = Vec::with_capacity(record.len());
+    let target = SingleRewrite {
+        shape_id,
+        kind,
+        before,
+        after,
+    };
+    rewrite_officeart_into(record, &target, depth, matches, &mut output)?;
+    Ok(output)
+}
+
+struct SingleRewrite<'a> {
+    shape_id: u32,
+    kind: TextKind,
+    before: &'a [u8],
+    after: &'a [u8],
+}
+
+/// Appends the rewritten record to `output`, framing each container in
+/// place; the same visits, checks, errors and bytes as a per-record rebuild
+/// (record 0264, as [`rewrite_officeart_grouped_into`]).
+fn rewrite_officeart_into(
+    record: &[u8],
+    target: &SingleRewrite<'_>,
+    depth: usize,
+    matches: &mut usize,
+    output: &mut Vec<u8>,
+) -> Result<()> {
     if depth >= 128 {
         return Err(
             PackageError::Corrupted("OfficeArt nesting exceeds text-edit limit".into()).into(),
         );
     }
-    if record_type(record)? == OFFICEART_SP_CONTAINER && shape_id_of(record)? == Some(shape_id) {
+    if record_type(record)? == OFFICEART_SP_CONTAINER
+        && shape_id_of(record)? == Some(target.shape_id)
+    {
         *matches = matches.saturating_add(1);
-        return rewrite_shape_container(record, kind, before, after);
+        output.extend_from_slice(&rewrite_shape_container(
+            record,
+            target.kind,
+            target.before,
+            target.after,
+        )?);
+        return Ok(());
     }
     if record_version(record)? != 0xF {
-        return Ok(record.to_vec());
+        output.extend_from_slice(record);
+        return Ok(());
     }
-    let mut data = Vec::with_capacity(drawing_payload(record)?.len());
+    // `drawing_payload` proves the 8-byte header and the payload extent.
+    let payload = drawing_payload(record)?;
+    let start = output.len();
+    output.extend_from_slice(&record[..PPT_HEADER_LEN]);
+    output.reserve(payload.len());
     for child_result in children(record)? {
-        let child = child_result?;
-        data.extend_from_slice(&rewrite_officeart(
-            child,
-            shape_id,
-            kind,
-            before,
-            after,
-            depth + 1,
-            matches,
-        )?);
+        rewrite_officeart_into(child_result?, target, depth + 1, matches, output)?;
     }
-    rebuild(record, &data).map_err(Into::into)
+    let data_length = u32::try_from(output.len() - start - PPT_HEADER_LEN)
+        .map_err(|_err| PackageError::ResourceLimit("PPT text-edit record exceeds u32".into()))?;
+    output[start + 4..start + PPT_HEADER_LEN].copy_from_slice(&data_length.to_le_bytes());
+    Ok(())
 }
 
 fn rewrite_shape_container(

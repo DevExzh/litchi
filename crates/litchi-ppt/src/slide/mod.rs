@@ -17,5 +17,5 @@ pub use directory::{SlideDirectory, SlideDirectoryEntry};
 )]
 pub use factory::{SlideData, SlideFactory};
 pub use notes::SpeakerNotes;
-pub(crate) use types::ShapeMemo;
 pub use types::{ParsedComment, ParsedSlideTiming, Slide};
+pub(crate) use types::{PatchedShapes, ShapeMemo};

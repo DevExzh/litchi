@@ -1017,6 +1017,7 @@ impl Snapshot {
             inserted_pictures: BTreeMap::new(),
             live_document_changed: false,
             opened: None,
+            verified_shapes: None,
         })
     }
 
@@ -1791,6 +1792,37 @@ pub struct Transaction {
     /// The opened projection of exactly the source bytes, when the root
     /// edit was started from an immutable package (record 0260).
     opened: Option<OpenedProjection>,
+    /// Shapes of one slide of the working artifact, proven equal to a parse
+    /// by the last batch text publication's incremental readback (record
+    /// 0264).
+    verified_shapes: Option<VerifiedShapes>,
+}
+
+/// Shapes a parse of slide `persist_id` of exactly `bytes` returns.
+pub(crate) struct VerifiedSlideShapes {
+    /// The exact artifact the shapes describe.
+    pub(crate) bytes: Arc<[u8]>,
+    /// The slide's persist identifier in that artifact.
+    pub(crate) persist_id: u32,
+    /// What parsing that slide returns.
+    pub(crate) shapes: Arc<crate::slide::PatchedShapes>,
+}
+
+/// Shapes a parse of slide `persist_id` of exactly `bytes` returns.
+#[derive(Clone)]
+struct VerifiedShapes {
+    bytes: Arc<[u8]>,
+    persist_id: u32,
+    shapes: Arc<crate::slide::PatchedShapes>,
+}
+
+impl fmt::Debug for VerifiedShapes {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("VerifiedShapes")
+            .field("persist_id", &self.persist_id)
+            .finish_non_exhaustive()
+    }
 }
 
 /// An opened projection of a transaction's exact source bytes. It is used
@@ -1820,6 +1852,20 @@ impl Transaction {
             .as_ref()
             .filter(|_| Arc::ptr_eq(&self.working.shared_bytes(), &self.source.shared_bytes()))
             .map(|opened| &opened.0)
+    }
+
+    /// The working artifact and the proven shapes of one of its slides, when
+    /// the last batch text publication verified exactly this working
+    /// artifact (record 0264).
+    pub(crate) fn verified_shapes(&self) -> Option<VerifiedSlideShapes> {
+        self.verified_shapes
+            .as_ref()
+            .filter(|verified| Arc::ptr_eq(&verified.bytes, &self.working.shared_bytes()))
+            .map(|verified| VerifiedSlideShapes {
+                bytes: Arc::clone(&verified.bytes),
+                persist_id: verified.persist_id,
+                shapes: Arc::clone(&verified.shapes),
+            })
     }
 
     /// Immutable source snapshot.
@@ -2092,7 +2138,7 @@ impl Transaction {
         };
         let before = text_edit.text().to_string();
         text_edit.set_text(after.clone())?;
-        let commit = text_edit.commit()?;
+        let (commit, verified) = text_edit.commit_verified()?;
         if commit.patch().is_empty() {
             return Ok(());
         }
@@ -2102,6 +2148,12 @@ impl Transaction {
         self.working = self
             .working
             .adopt_text_edit_publication(publication, persist_id)?;
+        // As for batches: proven shapes describe exactly the adopted bytes.
+        self.verified_shapes = verified.map(|(persist_id, shapes)| VerifiedShapes {
+            bytes: self.working.shared_bytes(),
+            persist_id,
+            shapes: Arc::new(shapes),
+        });
         let change = ShapeTextChange {
             target: source_target,
             before,
@@ -2259,7 +2311,7 @@ impl Transaction {
             return Ok(0);
         }
 
-        let Some(publication) = crate::text_edit::replace_shape_texts_batch(
+        let Some(mut publication) = crate::text_edit::replace_shape_texts_batch(
             self.working.shared_bytes(),
             &mapped,
             self.source.limits.max_package_bytes,
@@ -2282,9 +2334,20 @@ impl Transaction {
         }
 
         let document_changed = publication.document_changed();
+        let verified = publication.take_verified_shapes();
         let (working, published_changes) = self
             .working
             .adopt_text_edit_batch_publication(publication)?;
+        // Proven shapes describe exactly the adopted bytes when adoption kept
+        // the publication's allocation; a reopened adoption drops them.
+        self.verified_shapes = verified
+            .into_iter()
+            .next_back()
+            .map(|(persist_id, shapes)| VerifiedShapes {
+                bytes: working.shared_bytes(),
+                persist_id,
+                shapes: Arc::new(shapes),
+            });
         self.live_document_changed |= document_changed;
         let changes = published_changes
             .into_iter()
