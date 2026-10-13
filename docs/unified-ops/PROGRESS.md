@@ -415,6 +415,15 @@ Added later in R3: `corpus-parity` (0269) and `s19-charts` (0270), then follow-u
   - PPT aggregate routes renamed `_v2` → `_v3`;
   - the CI smoke job now lints the harness, and its path filters are pinned by policy tests.
 
+## Wave R4 (2026-10-14)
+Cut from `395d0ffa9f`:
+- `s20-find` (0273): formatting-aware find/replace as `find=`/`replace=` on `set` (M4 engine 1).
+- `s20-merge` (0274): template `merge` (M4 engine 2).
+- `s21-rtf` (0275): RTF to parity (plan step 21).
+- `s23-odt`, `s23-ods`, `s23-odp` (0276–0278): unified ODF adapters, read and write (plan step 23).
+
+Queued next: field/TOC `refresh` (engine 3), DOCX charts (0270a), the other ODF leaves (0268 G1), the performance misses (full queries, DOCX set and cell writes, PPTX add, `Warn` batches) and iWork M6.
+
 Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-pptx-w4` 9474e2b6ce, `uo/m2-l-xlsb-w1` 876588a23c, `uo/m1-r4-perf` 012fd509ff.
 
 - M0a S10 (`docs/unified-ops/s10-measurement.md` §9). M0a landed on the strength of two explanations. If either is rejected, the chosen alternative becomes a harness follow-up; M0a is not reverted.
