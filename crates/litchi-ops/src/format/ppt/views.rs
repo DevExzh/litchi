@@ -4,8 +4,8 @@
 //! than a PresentationML scene.  These views therefore walk that projection
 //! directly.  They preserve the four semantic modes shared by the OOXML
 //! presentation adapter, while reporting facts only where the PPT leaf has a
-//! typed value: native pictures have no alternate-text field, and the legacy
-//! leaf has no chart model.
+//! typed value: pictures report their `wzDescription` alternative text, and
+//! the legacy leaf has no chart model.
 
 use std::fmt;
 
@@ -391,17 +391,23 @@ fn annotate_shape<W: fmt::Write>(
             .map_err(sink)?;
         },
         ShapeEnum::Picture(picture) => {
+            let named = super::node::shape_name(shape);
             let (kind, name) = match picture.frame_kind() {
-                PictureFrameKind::Picture => ("Picture", picture.name().unwrap_or("Picture")),
-                PictureFrameKind::OleObject => ("OLE", picture.name().unwrap_or("OLE")),
-                PictureFrameKind::Media => ("Media", picture.name().unwrap_or("Media")),
+                PictureFrameKind::Picture => ("Picture", named.unwrap_or("Picture")),
+                PictureFrameKind::OleObject => ("OLE", named.unwrap_or("OLE")),
+                PictureFrameKind::Media => ("Media", named.unwrap_or("Media")),
             };
-            let suffix = if picture.frame_kind() == PictureFrameKind::Picture {
-                "⚠ no alt text"
-            } else {
-                "⚠ preview metadata only"
-            };
-            writeln!(out, "{pad}[{kind}] \"{name}\" ← {suffix}").map_err(sink)?;
+            let alt = shape.description().filter(|alt| !alt.is_empty());
+            match (picture.frame_kind(), alt) {
+                (PictureFrameKind::Picture, Some(alt)) => {
+                    writeln!(out, "{pad}[{kind}] \"{name}\" ← alt=\"{alt}\"")
+                },
+                (PictureFrameKind::Picture, None) => {
+                    writeln!(out, "{pad}[{kind}] \"{name}\" ← ⚠ no alt text")
+                },
+                _ => writeln!(out, "{pad}[{kind}] \"{name}\" ← ⚠ preview metadata only"),
+            }
+            .map_err(sink)?;
         },
         ShapeEnum::Group(group) => {
             let items = group.children().len();
@@ -559,10 +565,11 @@ fn outline_json(file: &Ppt) -> Result<OutlineJson> {
 // stats
 // ---------------------------------------------------------------------------
 
-/// Counts exposed by the stats view. Chart and alternate-text counts are
-/// omitted because the PPT adapter has no typed chart or picture-description
-/// projection; those gaps are advertised by its format specification rather
-/// than inferred from a generic frame.
+/// Counts exposed by the stats view. The chart count is omitted because the
+/// PPT adapter has no typed chart projection; that gap is advertised by its
+/// format specification rather than inferred from a generic frame. Pictures
+/// without alternate text count media frames too, as in the PPTX adapter's
+/// picture count.
 #[derive(Debug, Clone, Default)]
 struct Stats {
     slides: usize,
@@ -572,6 +579,7 @@ struct Stats {
     ole_objects: usize,
     words: usize,
     slides_without_title: usize,
+    pictures_without_alt: usize,
     fonts: Vec<(String, usize)>,
 }
 
@@ -618,7 +626,12 @@ fn walk_shape(
             }
         },
         ShapeEnum::Picture(picture) => match picture.frame_kind() {
-            PictureFrameKind::Picture | PictureFrameKind::Media => stats.pictures += 1,
+            PictureFrameKind::Picture | PictureFrameKind::Media => {
+                stats.pictures += 1;
+                if shape.description().is_none_or(str::is_empty) {
+                    stats.pictures_without_alt += 1;
+                }
+            },
             PictureFrameKind::OleObject => stats.ole_objects += 1,
         },
         ShapeEnum::Group(group) => {
@@ -669,6 +682,11 @@ impl Stats {
         }
         writeln!(out, "Words: {}", self.words)?;
         writeln!(out, "Slides without title: {}", self.slides_without_title)?;
+        writeln!(
+            out,
+            "Pictures without alt text: {}",
+            self.pictures_without_alt
+        )?;
         if !self.fonts.is_empty() {
             writeln!(out)?;
             writeln!(out, "Font usage:")?;
@@ -688,12 +706,13 @@ impl Stats {
             ole_objects: self.ole_objects,
             words: self.words,
             slides_without_title: self.slides_without_title,
+            pictures_without_alt: self.pictures_without_alt,
             font_usage: (!self.fonts.is_empty()).then_some(FontUsage(self.fonts)),
         }
     }
 }
 
-/// `{"slides","totalShapes","textBoxes","pictures","oleObjects","words","slidesWithoutTitle","fontUsage"}`.
+/// `{"slides","totalShapes","textBoxes","pictures","oleObjects","words","slidesWithoutTitle","picturesWithoutAlt","fontUsage"}`.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct StatsJson {
@@ -704,6 +723,7 @@ pub(crate) struct StatsJson {
     ole_objects: usize,
     words: usize,
     slides_without_title: usize,
+    pictures_without_alt: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     font_usage: Option<FontUsage>,
 }

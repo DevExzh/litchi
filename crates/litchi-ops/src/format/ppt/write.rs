@@ -17,7 +17,8 @@ use litchi_ppt::text_edit::Target as NativeTarget;
 
 use super::node::Node;
 use super::spec::{
-    Kind, PLACEHOLDER_WRITE_TABLE, SHAPE_WRITE_TABLE, SLIDE_WRITE_TABLE, ShapeSetter, SlideSetter,
+    Kind, NOTES_WRITE_TABLE, PARAGRAPH_WRITE_TABLE, PLACEHOLDER_WRITE_TABLE, SHAPE_WRITE_TABLE,
+    SLIDE_WRITE_TABLE, ShapeSetter, SlideSetter, TextSetter,
 };
 use super::{Nav, Ppt};
 use crate::error::{Code, Error, Result};
@@ -85,15 +86,51 @@ struct SlidePlan {
 }
 
 #[derive(Debug, Clone)]
+struct NotesPlan {
+    position: Position,
+    text: String,
+}
+
+#[derive(Debug, Clone)]
 enum Plan {
     Shape(ShapePlan),
     Slide(SlidePlan),
+    Notes(NotesPlan),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum TargetIdentity {
     Slide(usize),
-    Shape { slide: usize, shape: usize },
+    Shape {
+        slide: usize,
+        shape: usize,
+    },
+    Notes(usize),
+    Paragraph {
+        slide: usize,
+        shape: usize,
+        paragraph: usize,
+    },
+}
+
+/// The kind of element one PPT write targets; a write's targets share one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TargetClass {
+    Slide,
+    Shape,
+    Notes,
+    Paragraph,
+}
+
+impl TargetClass {
+    fn of(node: &Node<'_>) -> Self {
+        match node.element() {
+            Kind::Slide => Self::Slide,
+            Kind::Notes => Self::Notes,
+            Kind::Paragraph => Self::Paragraph,
+            _ => Self::Shape,
+        }
+    }
 }
 
 /// The bounded staging charge for one selected slide position.  The native
@@ -409,6 +446,24 @@ fn append_node<'f>(
             node.slide_position()
                 .ok_or_else(|| unsupported_target("slide target has no position"))?,
         ),
+        Kind::Notes => TargetIdentity::Notes(
+            node.slide_position()
+                .ok_or_else(|| unsupported_target("notes target has no slide"))?,
+        ),
+        Kind::Paragraph => {
+            let (Some(target), Some(paragraph)) =
+                (node.native_shape_target(), node.paragraph_index())
+            else {
+                return Err(unsupported_target(
+                    "nested PPT group shape writes are not integrated",
+                ));
+            };
+            TargetIdentity::Paragraph {
+                slide: target.slide().get(),
+                shape: target.shape().get(),
+                paragraph,
+            }
+        },
         _ => {
             let Some(target) = node.native_shape_target() else {
                 return Err(unsupported_target(
@@ -446,9 +501,18 @@ fn build_plans(
     props: &Props<'_>,
     limits: &SemanticLimits,
 ) -> Result<Vec<Plan>> {
-    let shape = nodes
-        .iter()
-        .all(|node| !matches!(node.element(), Kind::Slide));
+    let class = nodes.first().map_or(TargetClass::Shape, TargetClass::of);
+    if nodes.iter().any(|node| TargetClass::of(node) != class) {
+        return Err(unsupported_target(
+            "one PPT write cannot mix slide, shape, notes and paragraph targets",
+        ));
+    }
+    match class {
+        TargetClass::Notes => return build_notes_plans(&nodes, props, limits),
+        TargetClass::Paragraph => return build_paragraph_plans(&nodes, props, limits),
+        TargetClass::Slide | TargetClass::Shape => {},
+    }
+    let shape = class == TargetClass::Shape;
     if shape {
         let mut kinds = Vec::new();
         for node in &nodes {
@@ -502,7 +566,7 @@ fn build_plans(
         }
         plans.sort_by_key(|plan| match plan {
             Plan::Shape(plan) => (plan.target.slide().get(), plan.target.shape().get()),
-            Plan::Slide(_) => (usize::MAX, usize::MAX),
+            Plan::Slide(_) | Plan::Notes(_) => (usize::MAX, usize::MAX),
         });
         Ok(plans)
     } else {
@@ -541,10 +605,164 @@ fn build_plans(
         }
         plans.sort_by_key(|plan| match plan {
             Plan::Slide(plan) => plan.position.get(),
-            Plan::Shape(_) => usize::MAX,
+            Plan::Shape(_) | Plan::Notes(_) => usize::MAX,
         });
         Ok(plans)
     }
+}
+
+/// Admit the one `text` property of a notes or paragraph write.
+fn admit_text_prop<const N: usize, const A: usize>(
+    props: &Props<'_>,
+    table: &crate::registry::Table<TextSetter, N, A>,
+    limits: &SemanticLimits,
+) -> Result<String> {
+    let mut text = None;
+    for (key, value) in props.iter() {
+        let (_, entry) = table.resolve(key.as_str()).map_err(|error| {
+            error
+                .with_format(FileFormat::Ppt)
+                .with_property(key.as_str().to_owned())
+        })?;
+        if text.is_some() {
+            return Err(Error::new(
+                Code::InvalidArgument,
+                "a PPT text property was assigned more than once",
+            )
+            .with_format(FileFormat::Ppt)
+            .with_property(entry.spec.name));
+        }
+        entry
+            .prepare(Operation::Set, value, |setter, value| match setter {
+                TextSetter::Text => {
+                    let value = match value {
+                        Some(Scalar::Text(value)) => value,
+                        None => "",
+                        _ => unreachable!("PPT text coercion returned a non-text scalar"),
+                    };
+                    bound(
+                        LimitKind::StagedBytes,
+                        value.len(),
+                        limits.max_staged_bytes(),
+                    )?;
+                    let mut owned = String::new();
+                    owned
+                        .try_reserve_exact(value.len())
+                        .map_err(|source| allocation(source, "PPT text"))?;
+                    owned.push_str(value);
+                    text = Some(owned);
+                    Ok(())
+                },
+            })
+            .map_err(|error| error.with_format(FileFormat::Ppt))?;
+    }
+    text.ok_or_else(|| {
+        Error::new(
+            Code::InvalidArgument,
+            "the PPT text write requires the `text` property",
+        )
+        .with_format(FileFormat::Ppt)
+    })
+}
+
+/// One native notes replacement per selected slide.
+fn build_notes_plans(
+    nodes: &[Node<'_>],
+    props: &Props<'_>,
+    limits: &SemanticLimits,
+) -> Result<Vec<Plan>> {
+    if props.is_empty() {
+        return Ok(Vec::new());
+    }
+    let text = admit_text_prop(props, &NOTES_WRITE_TABLE, limits)?;
+    let staged = nodes
+        .len()
+        .checked_mul(text.len().saturating_add(2 * size_of::<usize>()))
+        .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
+    bound(LimitKind::StagedBytes, staged, limits.max_staged_bytes())?;
+    let mut plans = Vec::new();
+    plans
+        .try_reserve_exact(nodes.len())
+        .map_err(|source| allocation(source, "PPT notes plans"))?;
+    for node in nodes {
+        let position = node
+            .slide_position()
+            .ok_or_else(|| unsupported_target("notes target has no slide"))?;
+        plans.push(Plan::Notes(NotesPlan {
+            position: Position::new(position),
+            text: text.clone(),
+        }));
+    }
+    plans.sort_by_key(|plan| match plan {
+        Plan::Notes(plan) => plan.position.get(),
+        Plan::Shape(_) | Plan::Slide(_) => usize::MAX,
+    });
+    Ok(plans)
+}
+
+/// One native shape-text replacement per shape that holds selected
+/// paragraphs: the shape's text with each selected paragraph replaced.
+///
+/// Paragraphs are the text between the binary format's paragraph marks
+/// (`\r`). Replacing one therefore rewrites its shape's whole text body under
+/// the native closure rules, which keep the formatting of a single-run body
+/// and refuse a changed length where per-character ranges would shift.
+fn build_paragraph_plans(
+    nodes: &[Node<'_>],
+    props: &Props<'_>,
+    limits: &SemanticLimits,
+) -> Result<Vec<Plan>> {
+    if props.is_empty() {
+        return Ok(Vec::new());
+    }
+    let text = admit_text_prop(props, &PARAGRAPH_WRITE_TABLE, limits)?;
+    let mut by_shape =
+        std::collections::BTreeMap::<(usize, usize), (NativeTarget, Vec<String>)>::new();
+    let mut staged = 0usize;
+    for node in nodes {
+        let (Some(target), Some(index), Some(shape)) = (
+            node.native_shape_target(),
+            node.paragraph_index(),
+            node.shape(),
+        ) else {
+            return Err(unsupported_target(
+                "nested PPT group shape writes are not integrated",
+            ));
+        };
+        let key = (target.slide().get(), target.shape().get());
+        let entry = match by_shape.entry(key) {
+            std::collections::btree_map::Entry::Occupied(entry) => entry.into_mut(),
+            std::collections::btree_map::Entry::Vacant(entry) => {
+                let current = shape.text().map_err(Error::from)?;
+                staged = staged
+                    .saturating_add(current.len())
+                    .saturating_add(text.len());
+                bound(LimitKind::StagedBytes, staged, limits.max_staged_bytes())?;
+                let paragraphs = super::node::paragraphs(&current)
+                    .map(str::to_owned)
+                    .collect::<Vec<_>>();
+                entry.insert((target, paragraphs))
+            },
+        };
+        let paragraph = entry.1.get_mut(index).ok_or_else(|| {
+            Error::new(Code::InternalError, "PPT paragraph vanished from its shape")
+                .with_format(FileFormat::Ppt)
+        })?;
+        paragraph.clear();
+        paragraph.push_str(&text);
+    }
+    let mut plans = Vec::new();
+    plans
+        .try_reserve_exact(by_shape.len())
+        .map_err(|source| allocation(source, "PPT paragraph plans"))?;
+    for (target, paragraphs) in by_shape.into_values() {
+        plans.push(Plan::Shape(ShapePlan {
+            target,
+            text: Some(paragraphs.join("\r")),
+            anchor: None,
+        }));
+    }
+    Ok(plans)
 }
 
 fn admit_shape_props(
@@ -814,7 +1032,7 @@ fn stage_plans(
             Plan::Shape(plan) => {
                 usize::from(plan.text.is_some()) + usize::from(plan.anchor.is_some())
             },
-            Plan::Slide(_) => 1,
+            Plan::Slide(_) | Plan::Notes(_) => 1,
         })
         .sum::<usize>();
     let maximum = litchi_ppt::package::edit::MAX_OPERATIONS;
@@ -883,6 +1101,9 @@ fn stage_plans(
             },
             Plan::Slide(plan) => edit
                 .set_slide_hidden(plan.position, plan.hidden)
+                .map_err(native_edit_error)?,
+            Plan::Notes(plan) => edit
+                .set_notes_text(plan.position, plan.text)
                 .map_err(native_edit_error)?,
         }
     }

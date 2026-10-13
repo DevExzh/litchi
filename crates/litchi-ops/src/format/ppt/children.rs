@@ -10,7 +10,7 @@ use std::sync::Arc;
 use litchi_ppt::shapes::{ShapeEnum, ShapeType};
 
 use super::Ppt;
-use super::node::{Item, Node};
+use super::node::{Item, Node, ShapeItem, paragraph_count};
 use super::spec::Kind;
 use crate::error::{Error, Result};
 use crate::path::navigate::KindSet;
@@ -20,6 +20,9 @@ pub(crate) struct Children<'f> {
     file: &'f Ppt,
     kinds: KindSet<Kind>,
     state: State,
+    /// A query walk also visits a slide's notes after its shape tree; a view
+    /// listing does not, as in the PPTX adapter.
+    notes: Option<usize>,
 }
 
 // Only physical kinds through Connector are emitted by this iterator.
@@ -38,6 +41,13 @@ enum State {
         source: ShapeSource,
         next: usize,
         counters: [usize; COUNTER_COUNT],
+    },
+    /// The paragraphs of one text shape.
+    Paragraphs {
+        parent: Arc<[crate::node::PathStep<'static>]>,
+        shape: ShapeItem,
+        next: usize,
+        end: usize,
     },
 }
 
@@ -108,6 +118,18 @@ pub(crate) fn source_for(parent: &Node<'_>) -> Result<Option<ShapeSource>> {
 }
 
 impl<'f> Children<'f> {
+    /// Construct the lazy child iterator a query walk uses: a view listing's
+    /// children, then a slide's notes.
+    pub(crate) fn walk(parent: &Node<'f>, kinds: KindSet<Kind>) -> Self {
+        let mut children = Self::of(parent, kinds);
+        if let Item::Slide(slide) = parent.item()
+            && kinds.contains(Kind::Notes)
+        {
+            children.notes = Some(slide.position);
+        }
+        children
+    }
+
     /// Construct a lazy child iterator for `parent`.
     pub(crate) fn of(parent: &Node<'f>, kinds: KindSet<Kind>) -> Self {
         let file = parent.file();
@@ -131,6 +153,7 @@ impl<'f> Children<'f> {
                         file,
                         kinds,
                         state: State::Done,
+                        notes: None,
                     };
                 }
                 let source = ShapeSource::tree(Arc::clone(&shape.source), Arc::clone(&shape.path));
@@ -146,9 +169,25 @@ impl<'f> Children<'f> {
                     State::Done
                 }
             },
-            Item::Shape(_) => State::Done,
+            Item::Shape(shape) if kinds.contains(Kind::Paragraph) => {
+                match parent.shape().map(paragraph_count) {
+                    Some(Ok(end)) if end > 0 => State::Paragraphs {
+                        parent: Arc::from(parent.steps().to_vec().into_boxed_slice()),
+                        shape: shape.clone(),
+                        next: 0,
+                        end,
+                    },
+                    _ => State::Done,
+                }
+            },
+            Item::Shape(_) | Item::Notes(_) | Item::Paragraph(_) => State::Done,
         };
-        Self { file, kinds, state }
+        Self {
+            file,
+            kinds,
+            state,
+            notes: None,
+        }
     }
 
     fn step(&mut self) -> Result<Option<Node<'f>>> {
@@ -156,7 +195,7 @@ impl<'f> Children<'f> {
         // In particular, do not perform another source check on a later pull:
         // a source that changes after EOF/error must not make this iterator
         // yield a second result.
-        if matches!(self.state, State::Done) {
+        if matches!(self.state, State::Done) && self.notes.is_none() {
             return Ok(None);
         }
         self.file.check_source()?;
@@ -166,8 +205,39 @@ impl<'f> Children<'f> {
 
     fn step_unfenced(&mut self) -> Result<Option<Node<'f>>> {
         let state = std::mem::replace(&mut self.state, State::Done);
+        let next = self.step_state(state)?;
+        if next.is_some() {
+            return Ok(next);
+        }
+        // The shape tree is done: a query walk then visits the slide's notes.
+        let Some(slide) = self.notes.take() else {
+            return Ok(None);
+        };
+        Ok(super::nav::slide_notes(self.file, slide)?
+            .map(|text| Node::notes_node(self.file, slide, text)))
+    }
+
+    fn step_state(&mut self, state: State) -> Result<Option<Node<'f>>> {
         match state {
             State::Done => Ok(None),
+            State::Paragraphs {
+                parent,
+                shape,
+                next,
+                end,
+            } => {
+                if next >= end {
+                    return Ok(None);
+                }
+                let node = Node::paragraph_at(self.file, &parent, shape.clone(), next);
+                self.state = State::Paragraphs {
+                    parent,
+                    shape,
+                    next: next + 1,
+                    end,
+                };
+                Ok(Some(node))
+            },
             State::Slides { next, end } => {
                 if next >= end {
                     return Ok(None);
@@ -269,6 +339,7 @@ impl<'f> Iterator for Children<'f> {
             Ok(None) => None,
             Err(error) => {
                 self.state = State::Done;
+                self.notes = None;
                 Some(Err(error))
             },
         }
