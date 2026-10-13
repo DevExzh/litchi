@@ -82,6 +82,14 @@ pub(crate) trait Navigate<'f> {
         Ok(())
     }
 
+    /// The handle's key for [`super::fence::Scope`]: while a bracket of
+    /// [`Self::check_source`] calls holds a scope with this key, the
+    /// adapter's nested reads skip their own checks. 0 (the default) for an
+    /// adapter whose reads do not check.
+    fn fence_key(&self) -> usize {
+        0
+    }
+
     /// The document root (`/`).
     fn root(&self) -> Result<Self::Node>;
 
@@ -126,6 +134,10 @@ impl<'f, N: Navigate<'f>> Navigate<'f> for &N {
 
     fn check_source(&self) -> Result<()> {
         (**self).check_source()
+    }
+
+    fn fence_key(&self) -> usize {
+        (**self).fence_key()
     }
 
     fn root(&self) -> Result<Self::Node> {

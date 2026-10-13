@@ -341,23 +341,46 @@ impl Decimal {
             return None;
         }
         let negative = numerator != 0 && (numerator < 0) != (denominator < 0);
-        let numerator = u128::from(numerator.unsigned_abs());
-        let denominator = u128::from(denominator.unsigned_abs());
-        let scaled = numerator * 10_u128.pow(u32::from(max_decimals));
-        let (quotient, remainder) = (scaled / denominator, scaled % denominator);
-        let magnitude = if remainder * 2 >= denominator {
-            quotient + 1
-        } else {
-            quotient
+        // In 64 bits when the scaled numerator fits, as for every length a
+        // workbook or deck holds; the same rounding in 128 bits otherwise.
+        // `remainder >= denominator - remainder` is `2 * remainder >=
+        // denominator` without overflow.
+        let power = 10_u64.pow(u32::from(max_decimals));
+        let (numerator, denominator) = (numerator.unsigned_abs(), denominator.unsigned_abs());
+        let magnitude = match numerator.checked_mul(power) {
+            Some(scaled) => {
+                let (quotient, remainder) = (scaled / denominator, scaled % denominator);
+                u128::from(quotient + u64::from(remainder >= denominator - remainder))
+            },
+            None => {
+                let scaled = u128::from(numerator) * u128::from(power);
+                let denominator = u128::from(denominator);
+                let (quotient, remainder) = (scaled / denominator, scaled % denominator);
+                quotient + u128::from(remainder >= denominator - remainder)
+            },
         };
         Some(Self::normalized(negative, magnitude, max_decimals))
     }
 
     /// Builds `±magnitude × 10^-scale` with trailing zeros removed.
     pub(super) const fn normalized(negative: bool, mut magnitude: u128, mut scale: u8) -> Self {
-        while scale > 0 && magnitude % 10 == 0 {
-            magnitude /= 10;
-            scale -= 1;
+        if magnitude <= u64::MAX as u128 {
+            // 64-bit division where the magnitude allows it.
+            #[allow(
+                clippy::cast_possible_truncation,
+                reason = "the magnitude was just checked to fit 64 bits"
+            )]
+            let mut small = magnitude as u64;
+            while scale > 0 && small % 10 == 0 {
+                small /= 10;
+                scale -= 1;
+            }
+            magnitude = small as u128;
+        } else {
+            while scale > 0 && magnitude % 10 == 0 {
+                magnitude /= 10;
+                scale -= 1;
+            }
         }
         Self {
             negative,
@@ -370,6 +393,27 @@ impl Decimal {
     #[must_use]
     pub const fn is_zero(self) -> bool {
         self.magnitude == 0
+    }
+
+    /// The value as the double a correctly rounded parse of its text reads,
+    /// computed without the text: a magnitude of at most 2^53 and a power of
+    /// ten of at most 10^22 are exact doubles, so one division rounds
+    /// correctly (Clinger's fast path). `None` beyond that range.
+    pub(super) fn to_f64_exact(self) -> Option<f64> {
+        const POWERS: [f64; 23] = [
+            1e0, 1e1, 1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, 1e10, 1e11, 1e12, 1e13, 1e14, 1e15,
+            1e16, 1e17, 1e18, 1e19, 1e20, 1e21, 1e22,
+        ];
+        let magnitude = u64::try_from(self.magnitude)
+            .ok()
+            .filter(|magnitude| *magnitude <= 1 << 53)?;
+        let power = POWERS.get(usize::from(self.scale))?;
+        #[allow(
+            clippy::cast_precision_loss,
+            reason = "the magnitude is at most 2^53, exact as a double"
+        )]
+        let value = magnitude as f64 / power;
+        Some(if self.negative { -value } else { value })
     }
 
     /// `true` for a negative value, including a negative value that rounded
@@ -386,12 +430,16 @@ impl fmt::Display for Decimal {
             formatter.write_char('-')?;
         }
         let unit = 10_u128.pow(u32::from(self.scale));
-        write!(formatter, "{}", self.magnitude / unit)?;
+        match u64::try_from(self.magnitude / unit) {
+            Ok(whole) => write!(formatter, "{whole}")?,
+            Err(_) => write!(formatter, "{}", self.magnitude / unit)?,
+        }
         if self.scale > 0 {
+            // Below `unit`, at most 10^18: always 64 bits.
+            let fraction = u64::try_from(self.magnitude % unit).map_err(|_| fmt::Error)?;
             write!(
                 formatter,
-                ".{:0width$}",
-                self.magnitude % unit,
+                ".{fraction:0width$}",
                 width = usize::from(self.scale)
             )?;
         }

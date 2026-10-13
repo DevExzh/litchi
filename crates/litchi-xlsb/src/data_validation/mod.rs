@@ -46,7 +46,7 @@ pub enum Error {
     /// Formula token parsing or rendering failed.
     #[error(transparent)]
     Formula(#[from] crate::formula::Error),
-    /// Writer I/O failed.
+    /// Encoder I/O failed.
     #[error("I/O error: {0}")]
     Io(#[from] io::Error),
 }

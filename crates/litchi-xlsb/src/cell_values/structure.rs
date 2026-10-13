@@ -45,13 +45,15 @@
     reason = "new workbook transaction code uses checked wire conversions and explicit validation"
 )]
 
+pub use super::LimitKind;
 use super::{CellFormula, Reference, TransferLimits, Value};
 use crate::Workbook;
 use crate::external_link::ExternalLinkLimits;
 use crate::formula::{Parser, Token};
-use crate::package::error::{Error, Result};
+pub use crate::package::error::Error;
+use crate::package::error::Result;
 use crate::package::formula::excel_name_eq;
-use crate::raw::{Header, Limits as RawLimits, Records, Writer, kind};
+use crate::raw::{Encoder, Header, Limits as RawLimits, Records, kind};
 use crate::sheet::{Kind, Selector, State};
 use crate::workbook::DrawingLoadPolicy;
 use litchi_core::sheet::traits::WorkbookTrait;
@@ -62,6 +64,34 @@ use std::sync::Arc;
 
 const MAGIC: &[u8; 8] = b"LCXBWRP1";
 const WORKSHEET_CONTENT_TYPE: &str = "application/vnd.ms-excel.worksheet";
+
+/// Finite policies for the primary workbook transaction
+/// ([`crate::Package::edit_with_options`]).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct EditOptions {
+    transfer_limits: TransferLimits,
+}
+
+impl EditOptions {
+    /// The default transfer and patch policy.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            transfer_limits: TransferLimits::DEFAULT,
+        }
+    }
+
+    /// Select the transfer, patch and history policy.
+    #[must_use]
+    pub const fn transfer_limits(mut self, limits: TransferLimits) -> Self {
+        self.transfer_limits = limits;
+        self
+    }
+
+    pub(crate) const fn get_transfer_limits(self) -> TransferLimits {
+        self.transfer_limits
+    }
+}
 
 /// Typed resources for one newly authored cell XF.
 #[derive(Debug, Clone)]
@@ -155,6 +185,20 @@ enum Operation {
         source_anchor: usize,
         target_sheet: usize,
     },
+    /// Replace every merged range of one worksheet, selected by its
+    /// complete-catalog position. Ranges are canonical: sorted and pairwise
+    /// disjoint. Durable tag 11.
+    SetMergedRanges {
+        catalog_position: usize,
+        ranges: Arc<[crate::merged_cells::MergedCell]>,
+    },
+    /// Set (`target` present) or remove a defined name of one scope (a
+    /// complete-catalog position, or the workbook). Durable tag 12.
+    SetDefinedName {
+        name: String,
+        scope: Option<usize>,
+        target: Option<(usize, crate::formula::Range)>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -226,10 +270,14 @@ enum Selection {
     SheetState(usize),
     Cell(usize, Reference),
     Drawing(usize),
+    Merges(usize),
+    /// A defined name: its case-folded spelling's hash and its scope
+    /// (`usize::MAX` for the workbook).
+    DefinedName(u64, usize),
 }
 
 impl Operation {
-    const fn selection(&self) -> Selection {
+    fn selection(&self) -> Selection {
         match self {
             Self::RenameSheet { sheet, .. } => Selection::LegacyWorksheetRename(*sheet),
             Self::SetSheetName {
@@ -250,6 +298,12 @@ impl Operation {
             } => Selection::Cell(*target_sheet, *target_reference),
             Self::AddImage { sheet, .. } => Selection::Drawing(*sheet),
             Self::TransferDrawing { target_sheet, .. } => Selection::Drawing(*target_sheet),
+            Self::SetMergedRanges {
+                catalog_position, ..
+            } => Selection::Merges(*catalog_position),
+            Self::SetDefinedName { name, scope, .. } => {
+                Selection::DefinedName(name_key(name), scope.unwrap_or(usize::MAX))
+            },
         }
     }
 
@@ -356,7 +410,9 @@ impl Edit {
                 | Operation::RemoveSheets { .. }
                 | Operation::TransferCell { .. }
                 | Operation::AddImage { .. }
-                | Operation::TransferDrawing { .. } => {
+                | Operation::TransferDrawing { .. }
+                | Operation::SetMergedRanges { .. }
+                | Operation::SetDefinedName { .. } => {
                     self.sheet_catalog[catalog_position].name.as_str()
                 },
             },
@@ -488,7 +544,9 @@ impl Edit {
                         | Operation::SetSheetState { .. }
                         | Operation::TransferCell { .. }
                         | Operation::AddImage { .. }
-                        | Operation::TransferDrawing { .. } => None,
+                        | Operation::TransferDrawing { .. }
+                        | Operation::SetMergedRanges { .. }
+                        | Operation::SetDefinedName { .. } => None,
                     })
             });
         let identity = order
@@ -571,9 +629,9 @@ impl Edit {
             ));
         }
         if self.operations.len() >= self.limits.changes() {
-            return Err(Error::LimitExceeded {
-                resource: "workbook structural operations",
-                actual: self.operations.len().saturating_add(1),
+            return Err(Error::Limit {
+                kind: LimitKind::Changes,
+                observed: self.operations.len().saturating_add(1),
                 maximum: self.limits.changes(),
             });
         }
@@ -624,9 +682,9 @@ impl Edit {
                 resource: "durable workbook patch bytes",
             })?;
         if minimum_patch_bytes > self.limits.bytes() {
-            return Err(Error::LimitExceeded {
-                resource: "durable workbook patch bytes",
-                actual: minimum_patch_bytes,
+            return Err(Error::Limit {
+                kind: LimitKind::PatchBytes,
+                observed: minimum_patch_bytes,
                 maximum: self.limits.bytes(),
             });
         }
@@ -714,7 +772,9 @@ impl Edit {
             | Operation::SetSheetState { .. }
             | Operation::TransferCell { .. }
             | Operation::AddImage { .. }
-            | Operation::TransferDrawing { .. } => None,
+            | Operation::TransferDrawing { .. }
+            | Operation::SetMergedRanges { .. }
+            | Operation::SetDefinedName { .. } => None,
         });
         let positions_len = existing_positions.map_or(Ok(1usize), |positions| {
             positions
@@ -742,9 +802,9 @@ impl Edit {
         let positions: Arc<[usize]> = positions.into();
         let operation = Operation::RemoveSheets { positions };
         if existing_index.is_none() && self.operations.len() >= self.limits.changes() {
-            return Err(Error::LimitExceeded {
-                resource: "workbook structural operations",
-                actual: self.operations.len().saturating_add(1),
+            return Err(Error::Limit {
+                kind: LimitKind::Changes,
+                observed: self.operations.len().saturating_add(1),
                 maximum: self.limits.changes(),
             });
         }
@@ -777,9 +837,9 @@ impl Edit {
                 resource: "durable workbook patch bytes",
             })?;
         if minimum_patch_bytes > self.limits.bytes() {
-            return Err(Error::LimitExceeded {
-                resource: "durable workbook patch bytes",
-                actual: minimum_patch_bytes,
+            return Err(Error::Limit {
+                kind: LimitKind::PatchBytes,
+                observed: minimum_patch_bytes,
                 maximum: self.limits.bytes(),
             });
         }
@@ -876,7 +936,9 @@ impl Edit {
             | Operation::RemoveSheets { .. }
             | Operation::TransferCell { .. }
             | Operation::AddImage { .. }
-            | Operation::TransferDrawing { .. } => tab.state,
+            | Operation::TransferDrawing { .. }
+            | Operation::SetMergedRanges { .. }
+            | Operation::SetDefinedName { .. } => tab.state,
         });
         let changed = current != state;
         if let Some(index) = state_index {
@@ -891,6 +953,249 @@ impl Edit {
             })?;
         }
         Ok(Some(changed))
+    }
+
+    /// Merge exactly `range` on the selected worksheet.
+    ///
+    /// The selector resolves the complete tab catalog; a missing selector is
+    /// `Ok(None)`. `Some(false)` reports that the range is already merged.
+    /// Cell records are not changed: the covered cells keep their values, as
+    /// the binary format stores them, and Excel displays the top-left one.
+    /// Repeated merge edits of one worksheet replace each other's staged
+    /// range set; publication rewrites only the worksheet's `BrtMergeCell`
+    /// block (durable tag 11).
+    ///
+    /// ```
+    /// use litchi_xlsb::merged_cells::MergedCell;
+    /// let source = litchi_xlsb::Package::new()?;
+    /// let mut edit = source.edit()?;
+    /// assert_eq!(edit.merge_cells(0, MergedCell::new(0, 1, 0, 2))?, Some(true));
+    /// assert_eq!(edit.merge_cells(0, MergedCell::new(0, 1, 0, 2))?, Some(false));
+    /// let package = edit.commit()?.into_package();
+    /// assert_eq!(
+    ///     package.workbook()?.merged_cell_ranges(0)?,
+    ///     vec![MergedCell::new(0, 1, 0, 2)]
+    /// );
+    /// # Ok::<(), litchi_xlsb::package::PackageError>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a non-worksheet tab, an invalid or single-cell
+    /// range, a range overlapping another merge, and the topology and limit
+    /// refusals of [`Self::commit`].
+    pub fn merge_cells<'a>(
+        &mut self,
+        selector: impl Into<Selector<'a>>,
+        range: crate::merged_cells::MergedCell,
+    ) -> Result<Option<bool>> {
+        self.change_merges(selector.into(), range, true)
+    }
+
+    /// Remove exactly the merge `range` from the selected worksheet.
+    ///
+    /// `Some(false)` reports that no merge covers the range. A range that
+    /// partially overlaps a different merge is refused, so a caller cannot
+    /// remove a merge it did not name.
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`Self::merge_cells`].
+    pub fn unmerge_cells<'a>(
+        &mut self,
+        selector: impl Into<Selector<'a>>,
+        range: crate::merged_cells::MergedCell,
+    ) -> Result<Option<bool>> {
+        self.change_merges(selector.into(), range, false)
+    }
+
+    fn change_merges(
+        &mut self,
+        selector: Selector<'_>,
+        range: crate::merged_cells::MergedCell,
+        merge: bool,
+    ) -> Result<Option<bool>> {
+        let Some(catalog_position) = resolve_catalog_position(&self.sheet_catalog, &selector)?
+        else {
+            return Ok(None);
+        };
+        if self.sheet_catalog[catalog_position].kind != Kind::Worksheet {
+            return Err(Error::UnsupportedFeature(
+                "merged ranges belong to worksheets".to_string(),
+            ));
+        }
+        range.validate()?;
+        let staged = self
+            .operation_indexes
+            .get(&Selection::Merges(catalog_position))
+            .and_then(|indexes| indexes.first().copied());
+        let current: Vec<crate::merged_cells::MergedCell> = match staged {
+            Some(index) => {
+                let Operation::SetMergedRanges { ranges, .. } = &self.operations[index] else {
+                    return Err(Error::InvalidFormat(
+                        "merge selection names another operation".to_string(),
+                    ));
+                };
+                ranges.to_vec()
+            },
+            None => {
+                let workbook = self.base.workbook()?;
+                let worksheet = workbook
+                    .worksheet_for_catalog_position(catalog_position)
+                    .ok_or_else(|| {
+                        Error::UnsupportedFeature(
+                            "the selected tab has no worksheet part".to_string(),
+                        )
+                    })?;
+                workbook.merged_cell_ranges(worksheet)?
+            },
+        };
+        let exact = current.iter().position(|existing| *existing == range);
+        let mut next = current.clone();
+        match (merge, exact) {
+            (true, Some(_)) | (false, None) => {
+                if !merge && current.iter().any(|existing| existing.overlaps(&range)) {
+                    return Err(Error::UnsupportedFeature(
+                        "the range overlaps a different merge; name that merge exactly".to_string(),
+                    ));
+                }
+                return Ok(Some(false));
+            },
+            (true, None) => {
+                if current.iter().any(|existing| existing.overlaps(&range)) {
+                    return Err(Error::UnsupportedFeature(
+                        "the range overlaps an existing merge".to_string(),
+                    ));
+                }
+                next.push(range);
+            },
+            (false, Some(index)) => {
+                next.remove(index);
+            },
+        }
+        let ranges: Arc<[crate::merged_cells::MergedCell]> = canonical_merge_ranges(next)?.into();
+        let operation = Operation::SetMergedRanges {
+            catalog_position,
+            ranges,
+        };
+        match staged {
+            Some(index) => self.operations[index] = operation,
+            None => self.stage(operation)?,
+        }
+        Ok(Some(true))
+    }
+
+    /// Set a defined name that refers to a range of one worksheet.
+    ///
+    /// `scope` selects the sheet a local name belongs to; `None` is workbook
+    /// scope. An existing name of the same scope (compared as Excel compares
+    /// names) keeps its flags and comment and receives the new reference; a
+    /// new name is appended after the workbook's existing names, so no name
+    /// reference in a formula is renumbered. Returns `Ok(None)` when a
+    /// selector does not resolve. Repeated edits of one name replace each
+    /// other's staged reference (durable tag 12).
+    ///
+    /// ```
+    /// use litchi_xlsb::formula::Range;
+    /// let source = litchi_xlsb::Package::new()?;
+    /// let mut edit = source.edit()?;
+    /// edit.set_defined_name("Totals", None, 0, Range::new(0, 4, 1, 1)?)?;
+    /// let package = edit.commit()?.into_package();
+    /// let names = package.workbook()?.defined_name_entries()?;
+    /// assert_eq!(names[0].name, "Totals");
+    /// assert_eq!(names[0].formula.as_deref(), Some("Sheet1!$B$1:$B$5"));
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid name, a non-worksheet target, an
+    /// extern-sheet table that cannot take another entry, and the topology
+    /// and limit refusals of [`Self::commit`].
+    pub fn set_defined_name<'a, 'b>(
+        &mut self,
+        name: &str,
+        scope: Option<Selector<'a>>,
+        sheet: impl Into<Selector<'b>>,
+        range: crate::formula::Range,
+    ) -> Result<Option<()>> {
+        crate::named_ranges::validate_name(name)
+            .map_err(|error| Error::InvalidFormula(error.to_string()))?;
+        let scope = match scope {
+            Some(selector) => match resolve_catalog_position(&self.sheet_catalog, &selector)? {
+                Some(position) => Some(position),
+                None => return Ok(None),
+            },
+            None => None,
+        };
+        let Some(sheet) = resolve_catalog_position(&self.sheet_catalog, &sheet.into())? else {
+            return Ok(None);
+        };
+        if self.sheet_catalog[sheet].kind != Kind::Worksheet {
+            return Err(Error::UnsupportedFeature(
+                "a defined name refers to a worksheet range".to_string(),
+            ));
+        }
+        self.stage_defined_name(Operation::SetDefinedName {
+            name: name.to_owned(),
+            scope,
+            target: Some((sheet, range)),
+        })?;
+        Ok(Some(()))
+    }
+
+    /// Remove a defined name of one scope (`None` is workbook scope).
+    ///
+    /// Only the workbook's last defined name can be removed: removing an
+    /// earlier one would renumber the name references of every formula.
+    /// Removing a name that does not exist is an exact no-op.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid name, a name that is not the last
+    /// one, and the refusals of [`Self::commit`], which include a formula
+    /// that still refers to the removed name.
+    pub fn remove_defined_name<'a>(
+        &mut self,
+        name: &str,
+        scope: Option<Selector<'a>>,
+    ) -> Result<Option<()>> {
+        crate::named_ranges::validate_name(name)
+            .map_err(|error| Error::InvalidFormula(error.to_string()))?;
+        let scope = match scope {
+            Some(selector) => match resolve_catalog_position(&self.sheet_catalog, &selector)? {
+                Some(position) => Some(position),
+                None => return Ok(None),
+            },
+            None => None,
+        };
+        self.stage_defined_name(Operation::SetDefinedName {
+            name: name.to_owned(),
+            scope,
+            target: None,
+        })?;
+        Ok(Some(()))
+    }
+
+    fn stage_defined_name(&mut self, operation: Operation) -> Result<()> {
+        let selection = operation.selection();
+        let staged = self
+            .operation_indexes
+            .get(&selection)
+            .and_then(|indexes| indexes.first().copied());
+        let mut candidate = self.operations.clone();
+        match staged {
+            Some(index) => candidate[index] = operation.clone(),
+            None => candidate.push(operation.clone()),
+        }
+        let _validated_candidate = replay_package(&self.base, &self.before, &candidate)?;
+        match staged {
+            Some(index) => {
+                self.operations[index] = operation;
+                Ok(())
+            },
+            None => self.stage(operation),
+        }
     }
 
     /// Plan dependency-complete transfer of one stored cell from another XLSB.
@@ -1176,9 +1481,9 @@ impl Edit {
             ));
         }
         if self.operations.len() >= self.limits.changes() {
-            return Err(Error::LimitExceeded {
-                resource: "workbook structural operations",
-                actual: self.operations.len().saturating_add(1),
+            return Err(Error::Limit {
+                kind: LimitKind::Changes,
+                observed: self.operations.len().saturating_add(1),
                 maximum: self.limits.changes(),
             });
         }
@@ -1284,7 +1589,9 @@ impl Patch {
     fn changed_candidate(&self, package: &crate::Package) -> Result<Workbook> {
         crate::signature_policy::ensure_unsigned(package.opc_package())?;
         let limits = package.opc_package().read_limits();
-        let candidate = litchi_opc::OpcPackage::from_bytes_with_limits(&self.after, limits)?;
+        // An owned image publishes its exact bytes, so an applied (or
+        // inverted) patch reproduces its after image byte for byte.
+        let candidate = litchi_opc::OpcPackage::from_vec_with_limits(self.after.to_vec(), limits)?;
         let workbook = package.project_candidate(candidate)?;
         validate_all_worksheets(&workbook)?;
         Ok(workbook)
@@ -1433,9 +1740,9 @@ impl Patch {
     pub fn to_bytes(&self, limits: TransferLimits) -> Result<Vec<u8>> {
         validate_limits(limits)?;
         if self.operations.len() > limits.changes() {
-            return Err(Error::LimitExceeded {
-                resource: "workbook structural operations",
-                actual: self.operations.len(),
+            return Err(Error::Limit {
+                kind: LimitKind::Changes,
+                observed: self.operations.len(),
                 maximum: limits.changes(),
             });
         }
@@ -1457,9 +1764,9 @@ impl Patch {
                 resource: "durable workbook patch bytes",
             })?;
         if total > limits.bytes() {
-            return Err(Error::LimitExceeded {
-                resource: "durable workbook patch bytes",
-                actual: total,
+            return Err(Error::Limit {
+                kind: LimitKind::PatchBytes,
+                observed: total,
                 maximum: limits.bytes(),
             });
         }
@@ -1556,9 +1863,9 @@ impl Patch {
     ) -> Result<Self> {
         validate_limits(limits)?;
         if data.len() > limits.bytes() {
-            return Err(Error::LimitExceeded {
-                resource: "durable workbook patch bytes",
-                actual: data.len(),
+            return Err(Error::Limit {
+                kind: LimitKind::PatchBytes,
+                observed: data.len(),
                 maximum: limits.bytes(),
             });
         }
@@ -1572,9 +1879,9 @@ impl Patch {
         let after_len = read_usize(data, 16)?;
         let operation_count = read_usize(data, 24)?;
         if operation_count > limits.changes() {
-            return Err(Error::LimitExceeded {
-                resource: "workbook structural operations",
-                actual: operation_count,
+            return Err(Error::Limit {
+                kind: LimitKind::Changes,
+                observed: operation_count,
                 maximum: limits.changes(),
             });
         }
@@ -1698,6 +2005,8 @@ impl Patch {
                     })
                 },
                 Operation::TransferDrawing { source, .. } => 33usize.checked_add(source.len()),
+                Operation::SetMergedRanges { ranges, .. } => merge_ranges_bytes(ranges.len()),
+                Operation::SetDefinedName { name, .. } => defined_name_bytes(name),
             }
             .ok_or(Error::CapacityOverflow {
                 resource: "workbook history operation bytes",
@@ -1728,7 +2037,9 @@ impl MergeConflict {
             | Selection::SheetInsert(sheet)
             | Selection::SheetState(sheet)
             | Selection::Cell(sheet, _)
-            | Selection::Drawing(sheet) => sheet,
+            | Selection::Drawing(sheet)
+            | Selection::Merges(sheet) => sheet,
+            Selection::DefinedName(_, scope) => scope,
             Selection::SheetOrder | Selection::SheetRemoval => usize::MAX,
         }
     }
@@ -1743,7 +2054,9 @@ impl MergeConflict {
             | Selection::SheetState(_)
             | Selection::SheetOrder
             | Selection::SheetRemoval
-            | Selection::Drawing(_) => None,
+            | Selection::Drawing(_)
+            | Selection::Merges(_)
+            | Selection::DefinedName(..) => None,
             Selection::Cell(_, reference) => Some(reference),
         }
     }
@@ -1807,9 +2120,9 @@ impl History {
     pub fn push(&mut self, patch: Patch) -> Result<()> {
         let bytes = patch.retained_bytes()?;
         if bytes > self.limits.history_bytes() {
-            return Err(Error::LimitExceeded {
-                resource: "workbook patch history bytes",
-                actual: bytes,
+            return Err(Error::Limit {
+                kind: LimitKind::HistoryBytes,
+                observed: bytes,
                 maximum: self.limits.history_bytes(),
             });
         }
@@ -1906,7 +2219,7 @@ fn replay_package(
         // before publication. This also establishes the precise archive
         // lineage used by later edits/applications. The semantic workbook is
         // already validated by replay; do not parse that projection again.
-        workbook.package = litchi_opc::OpcPackage::from_bytes_with_limits(&bytes, limits)?;
+        workbook.package = litchi_opc::OpcPackage::from_vec_with_limits(bytes.clone(), limits)?;
         workbook.into_package()
     };
     Ok((bytes, package))
@@ -1940,7 +2253,9 @@ fn canonicalize_legacy_operations(
             | Operation::SetSheetState { .. }
             | Operation::TransferCell { .. }
             | Operation::AddImage { .. }
-            | Operation::TransferDrawing { .. }) => operation,
+            | Operation::TransferDrawing { .. }
+            | Operation::SetMergedRanges { .. }
+            | Operation::SetDefinedName { .. }) => operation,
         };
         canonical.push(operation);
     }
@@ -2085,6 +2400,30 @@ fn replay_workbook(
             Operation::AddImage { sheet, image } => {
                 add_image(&mut workbook, *sheet, image)?;
                 changed = true;
+            },
+            Operation::SetDefinedName {
+                name,
+                scope,
+                target,
+            } => {
+                changed |= super::names::apply(&mut workbook, name, *scope, *target)?;
+            },
+            Operation::SetMergedRanges {
+                catalog_position,
+                ranges,
+            } => {
+                let worksheet = workbook
+                    .worksheet_for_catalog_position(*catalog_position)
+                    .ok_or_else(|| {
+                        Error::UnsupportedFeature(format!(
+                            "catalog position {catalog_position} is not a worksheet"
+                        ))
+                    })?;
+                let before = workbook.merged_cell_ranges(worksheet)?;
+                if before[..] != ranges[..] {
+                    workbook.set_merged_cell_ranges(worksheet, ranges)?;
+                    changed = true;
+                }
             },
             Operation::TransferDrawing {
                 source,
@@ -2282,13 +2621,13 @@ fn add_image(workbook: &mut Workbook, sheet: usize, plan: &ImagePlan) -> Result<
         },
     );
     let mut drawing_payload = Vec::new();
-    Writer::new(&mut drawing_payload).write_wide_string(&drawing_rel_id)?;
+    Encoder::new(&mut drawing_payload).write_wide_string(&drawing_rel_id)?;
     let mut worksheet_output = Vec::new();
     let mut inserted = false;
     for item in Records::new(&worksheet_source) {
         let record = item?;
         if !inserted && matches!(record.kind(), kind::BEGIN_LIST_PARTS | kind::END_SHEET) {
-            Writer::new(&mut worksheet_output).write_record(kind::DRAWING, &drawing_payload)?;
+            Encoder::new(&mut worksheet_output).write_record(kind::DRAWING, &drawing_payload)?;
             inserted = true;
         }
         copy_record(&worksheet_source, &record, &mut worksheet_output)?;
@@ -2666,7 +3005,7 @@ fn authored_blank_worksheet(name: &str) -> Result<(Vec<u8>, Vec<u8>)> {
     });
     let mut source = Vec::new();
     worksheet.write_with_sparkline_block(
-        &mut Writer::new(&mut source),
+        &mut Encoder::new(&mut source),
         &mut crate::writer::MutableSharedStringsWriter::new(),
         None,
     )?;
@@ -2844,7 +3183,7 @@ fn bundle_sheet_payload(state: State, tab_id: u32, rel_id: &str, name: &str) -> 
         ));
     }
     let mut payload = Vec::new();
-    let mut writer = Writer::new(&mut payload);
+    let mut writer = Encoder::new(&mut payload);
     writer.write_u32(u32::from(state_to_wire(state)))?;
     writer.write_u32(tab_id)?;
     writer.write_wide_string(rel_id)?;
@@ -2985,7 +3324,7 @@ fn rewrite_workbook_insert(
 
 fn make_record(record_kind: crate::raw::Kind, payload: &[u8]) -> Result<Vec<u8>> {
     let mut output = Vec::new();
-    Writer::new(&mut output).write_record(record_kind, payload)?;
+    Encoder::new(&mut output).write_record(record_kind, payload)?;
     Ok(output)
 }
 
@@ -5434,7 +5773,9 @@ fn apply_sheet_metadata(workbook: &mut Workbook, operations: &[Operation]) -> Re
             | Operation::InsertSheet { .. }
             | Operation::RemoveSheets { .. }
             | Operation::AddImage { .. }
-            | Operation::TransferDrawing { .. } => {
+            | Operation::TransferDrawing { .. }
+            | Operation::SetMergedRanges { .. }
+            | Operation::SetDefinedName { .. } => {
                 return Err(Error::InvalidFormat(
                     "workbook metadata operation grouping is internally inconsistent".to_string(),
                 ));
@@ -5542,7 +5883,7 @@ fn apply_sheet_metadata(workbook: &mut Workbook, operations: &[Operation]) -> Re
                     })?;
                     state_bytes.copy_from_slice(&u32::from(state_to_wire(state)).to_le_bytes());
                 }
-                Writer::new(&mut output).write_record(kind::BUNDLE_SH, &payload)?;
+                Encoder::new(&mut output).write_record(kind::BUNDLE_SH, &payload)?;
                 replaced = true;
             } else {
                 copy_record(&source, &record, &mut output)?;
@@ -6045,7 +6386,7 @@ fn renamed_bundle_payload(source: &[u8], name: &str) -> Result<Vec<u8>> {
             found: source.len(),
         })?
         .to_vec();
-    Writer::new(&mut payload).write_wide_string(name)?;
+    Encoder::new(&mut payload).write_wide_string(name)?;
     payload.extend_from_slice(suffix);
     let mut tolerance_report = crate::leniency::ToleranceReport::default();
     let _validated_record = crate::package::records::BundleSheetRecord::parse_with(
@@ -6271,6 +6612,8 @@ fn encoded_operation_length(operation: &Operation) -> Result<usize> {
             .checked_add(image.data.len())
             .and_then(|size| size.checked_add(image.description.as_ref().map_or(0, String::len))),
         Operation::TransferDrawing { source, .. } => 33usize.checked_add(source.len()),
+        Operation::SetMergedRanges { ranges, .. } => merge_ranges_bytes(ranges.len()),
+        Operation::SetDefinedName { name, .. } => defined_name_bytes(name),
     };
     length.ok_or(Error::CapacityOverflow {
         resource: "durable workbook patch operation bytes",
@@ -6385,6 +6728,42 @@ fn encode_operation(operation: &Operation, output: &mut Vec<u8>) -> Result<()> {
             push_usize(output, *source_anchor)?;
             push_usize(output, *target_sheet)?;
             output.extend_from_slice(source);
+        },
+        Operation::SetDefinedName {
+            name,
+            scope,
+            target,
+        } => {
+            output.push(12);
+            push_usize(output, name.len())?;
+            output.extend_from_slice(name.as_bytes());
+            output.extend_from_slice(&scope.map_or(u64::MAX, |scope| scope as u64).to_le_bytes());
+            match target {
+                Some((sheet, range)) => {
+                    output.push(1);
+                    push_usize(output, *sheet)?;
+                    for value in [
+                        range.row_first,
+                        range.row_last,
+                        range.col_first,
+                        range.col_last,
+                    ] {
+                        output.extend_from_slice(&value.to_le_bytes());
+                    }
+                },
+                None => output.push(0),
+            }
+        },
+        Operation::SetMergedRanges {
+            catalog_position,
+            ranges,
+        } => {
+            output.push(11);
+            push_usize(output, *catalog_position)?;
+            push_usize(output, ranges.len())?;
+            for range in ranges.iter() {
+                output.extend_from_slice(&range.serialize());
+            }
         },
     }
     Ok(())
@@ -6594,10 +6973,152 @@ fn decode_operation(data: &[u8], offset: &mut usize) -> Result<Operation> {
                 target_sheet,
             })
         },
+        12 => {
+            let length = read_next_usize(data, offset)?;
+            let name = std::str::from_utf8(read_slice(data, offset, length)?)
+                .map_err(|error| {
+                    Error::InvalidFormat(format!("defined name is not UTF-8: {error}"))
+                })?
+                .to_string();
+            let scope = match read_next_u64(data, offset)? {
+                u64::MAX => None,
+                value => Some(usize::try_from(value).map_err(|error| {
+                    Error::InvalidFormat(format!("defined-name scope overflow: {error}"))
+                })?),
+            };
+            let target = match read_slice(data, offset, 1)?[0] {
+                0 => None,
+                1 => {
+                    let sheet = read_next_usize(data, offset)?;
+                    let row_first = read_next_u32(data, offset)?;
+                    let row_last = read_next_u32(data, offset)?;
+                    let col_first = read_next_u32(data, offset)?;
+                    let col_last = read_next_u32(data, offset)?;
+                    Some((
+                        sheet,
+                        crate::formula::Range::new(row_first, row_last, col_first, col_last)?,
+                    ))
+                },
+                flag => {
+                    return Err(Error::InvalidFormat(format!(
+                        "defined-name target flag {flag} is invalid"
+                    )));
+                },
+            };
+            crate::named_ranges::validate_name(&name)
+                .map_err(|error| Error::InvalidFormula(error.to_string()))?;
+            Ok(Operation::SetDefinedName {
+                name,
+                scope,
+                target,
+            })
+        },
+        11 => {
+            let catalog_position = read_next_usize(data, offset)?;
+            let count = read_next_usize(data, offset)?;
+            let available = data
+                .len()
+                .checked_sub(*offset)
+                .ok_or(Error::InvalidLength {
+                    expected: *offset,
+                    found: data.len(),
+                })?;
+            let required =
+                count
+                    .checked_mul(crate::merged_cells::LEN)
+                    .ok_or(Error::CapacityOverflow {
+                        resource: "workbook patch merged ranges",
+                    })?;
+            if required > available {
+                return Err(Error::InvalidLength {
+                    expected: offset.saturating_add(required),
+                    found: data.len(),
+                });
+            }
+            let mut ranges = Vec::new();
+            ranges
+                .try_reserve_exact(count)
+                .map_err(|source| Error::Allocation {
+                    resource: "workbook patch merged ranges",
+                    source,
+                })?;
+            for _ in 0..count {
+                ranges.push(crate::merged_cells::MergedCell::parse(read_slice(
+                    data,
+                    offset,
+                    crate::merged_cells::LEN,
+                )?)?);
+            }
+            Ok(Operation::SetMergedRanges {
+                catalog_position,
+                ranges: canonical_merge_ranges(ranges)?.into(),
+            })
+        },
         _ => Err(Error::InvalidFormat(format!(
             "unknown workbook patch operation {tag}"
         ))),
     }
+}
+
+/// Encoded length of a tag-12 defined-name operation.
+fn defined_name_bytes(name: &str) -> Option<usize> {
+    name.len().checked_add(1 + 8 + 8 + 1 + 8 + 16)
+}
+
+/// A stable hash of a defined name's case-folded spelling, for selection.
+fn name_key(name: &str) -> u64 {
+    name.to_uppercase()
+        .bytes()
+        .fold(0xcbf2_9ce4_8422_2325_u64, |hash, byte| {
+            (hash ^ u64::from(byte)).wrapping_mul(0x0100_0000_01b3)
+        })
+}
+
+/// Encoded length of a tag-11 merged-range replacement.
+fn merge_ranges_bytes(count: usize) -> Option<usize> {
+    count
+        .checked_mul(crate::merged_cells::LEN)
+        .and_then(|bytes| bytes.checked_add(17))
+}
+
+/// Sort `ranges` and refuse an invalid or overlapping set.
+fn canonical_merge_ranges(
+    mut ranges: Vec<crate::merged_cells::MergedCell>,
+) -> Result<Vec<crate::merged_cells::MergedCell>> {
+    if ranges.len() > crate::merged_cells::MAX_MERGED_CELL_RANGES {
+        return Err(Error::InvalidLength {
+            expected: crate::merged_cells::MAX_MERGED_CELL_RANGES,
+            found: ranges.len(),
+        });
+    }
+    for range in &ranges {
+        range.validate()?;
+        if range.row_first == range.row_last && range.col_first == range.col_last {
+            return Err(Error::InvalidFormat(
+                "a merged range must span more than one cell".to_string(),
+            ));
+        }
+    }
+    ranges.sort_unstable_by_key(|range| {
+        (
+            range.row_first,
+            range.col_first,
+            range.row_last,
+            range.col_last,
+        )
+    });
+    for (index, range) in ranges.iter().enumerate() {
+        if ranges[index + 1..]
+            .iter()
+            .take_while(|next| next.row_first <= range.row_last)
+            .any(|next| next.overlaps(range))
+        {
+            return Err(Error::UnsupportedFeature(
+                "merged ranges must not overlap".to_string(),
+            ));
+        }
+    }
+    Ok(ranges)
 }
 
 const fn image_format_bits(format: crate::package::drawing_image::ImageFormat) -> u8 {

@@ -59,6 +59,7 @@ mod owner;
 mod picture;
 mod publish;
 mod remove;
+mod scenes;
 mod shape_add;
 mod spec;
 mod steps;
@@ -109,6 +110,17 @@ struct PptxState {
     /// borrowed leaf slide directly from the OPC graph without reparsing the
     /// presentation root for every node read.
     eager_catalog: OnceLock<Box<[EagerSlide]>>,
+    /// The number of slide masters, read once: every query from the root
+    /// asks for it, and reading it parses the presentation part, whose cost
+    /// grows with the deck (record 0262).
+    masters: OnceLock<usize>,
+    /// Eager slide scenes, shared with every handle a write derives from
+    /// this one (see [`scenes`]).
+    scenes: Arc<scenes::Scenes>,
+    /// The eager package a source-backed handle commits metadata on,
+    /// materialized by the first metadata set (record 0262; see
+    /// `metadata::Pptx::metadata_owner`).
+    metadata_package: OnceLock<Arc<pptx::Package>>,
     /// Successful native source promotion, shared by readers and editors.
     promotion: OnceLock<Mutex<Option<pptx::source::Package>>>,
     /// Current native revision, including slide topology, order and text overlays.
@@ -234,7 +246,23 @@ impl Pptx {
         Arc::ptr_eq(&self.0, &other.0)
     }
 
+    /// This handle's key for [`crate::path::fence::Scope`].
+    pub(crate) fn fence_key(&self) -> usize {
+        Arc::as_ptr(&self.0).addr()
+    }
+
+    /// The source-freshness check of a nested read: skipped inside a
+    /// resolver or query step, whose bracket ([`Self::check_source_now`])
+    /// already checks around the whole step.
     fn check_owner(&self) -> Result<()> {
+        if crate::path::fence::is_active(self.fence_key()) {
+            return Ok(());
+        }
+        self.check_source_now()
+    }
+
+    /// The source-freshness check itself.
+    pub(crate) fn check_source_now(&self) -> Result<()> {
         if let Some(source) = &self.0.source_guard {
             source.check_source()?;
         }
@@ -253,6 +281,9 @@ impl Pptx {
             retain_source: self.0.retain_source,
             ooxml_limits: self.0.ooxml_limits,
             eager_catalog: OnceLock::new(),
+            masters: OnceLock::new(),
+            scenes: Arc::clone(&self.0.scenes),
+            metadata_package: OnceLock::new(),
             promotion: OnceLock::new(),
             revision: None,
             unsigned_promotion: OnceLock::new(),
@@ -291,6 +322,9 @@ impl Pptx {
             retain_source: options.retain_source,
             ooxml_limits: options.ooxml_limits.unwrap_or_default(),
             eager_catalog: OnceLock::new(),
+            masters: OnceLock::new(),
+            scenes: Arc::default(),
+            metadata_package: OnceLock::new(),
             promotion: OnceLock::new(),
             revision: None,
             unsigned_promotion: OnceLock::new(),
@@ -329,6 +363,9 @@ impl Pptx {
             retain_source: self.0.retain_source,
             ooxml_limits: self.0.ooxml_limits,
             eager_catalog: OnceLock::new(),
+            masters: OnceLock::new(),
+            scenes: Arc::clone(&self.0.scenes),
+            metadata_package: OnceLock::new(),
             promotion: OnceLock::new(),
             revision: Some(revision),
             unsigned_promotion: OnceLock::new(),
@@ -873,6 +910,17 @@ fn eager_slide<'a>(
     package: &'a pptx::Package,
     position: usize,
 ) -> Result<Option<pptx::slide::Slide<'a>>> {
+    Ok(eager_slide_with_payload(owner, package, position)?.map(|(slide, _)| slide))
+}
+
+/// [`eager_slide`] with the slide part's decoded payload, whose identity
+/// keys the eager scene cache; `None` for a payload that is not decoded and
+/// shared (the slide is then read as before, without the cache).
+fn eager_slide_with_payload<'a>(
+    owner: &Pptx,
+    package: &'a pptx::Package,
+    position: usize,
+) -> Result<Option<(pptx::slide::Slide<'a>, Option<Arc<Vec<u8>>>)>> {
     let Some(target) = owner
         .eager_catalog(package)?
         .get(position)
@@ -882,8 +930,12 @@ fn eager_slide<'a>(
     };
     let opc = package.opc()?;
     let part = opc.get_part(target).map_err(pptx::Error::from)?;
+    let payload = part.ensure_payload().ok().and_then(|()| {
+        let payload = part.blob_arc();
+        std::ptr::eq(payload.as_slice(), part.blob()).then_some(payload)
+    });
     let part = pptx::parts::SlidePart::from_part(part)?;
-    Ok(Some(pptx::slide::Slide::new(opc, part)))
+    Ok(Some((pptx::slide::Slide::new(opc, part), payload)))
 }
 
 fn reserve_slide_catalog(capacity: usize) -> Result<Vec<SlideDescriptor>> {

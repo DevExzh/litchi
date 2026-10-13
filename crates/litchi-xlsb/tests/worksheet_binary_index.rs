@@ -28,7 +28,7 @@ use litchi_opc::{OpcError, OpcPackage, PackURI};
 use litchi_xlsb::binary_index::Limits as BinaryIndexLimits;
 use litchi_xlsb::cell_values::{Reference, StyleIndex, Value};
 use litchi_xlsb::package::PackageError;
-use litchi_xlsb::raw::{Header, Kind, Limits as RawLimits, Records, Writer, kind};
+use litchi_xlsb::raw::{Encoder, Header, Kind, Limits as RawLimits, Records, kind};
 use litchi_xlsb::writer::{Builder, MutableWorksheet};
 use litchi_xlsb::{Package, SourceBackedWorkbook, SourceLimits, Workbook};
 
@@ -148,7 +148,7 @@ fn remove_index_relationship(package_bytes: &[u8]) -> Vec<u8> {
 fn insert_opaque_index_record(index: &[u8]) -> Vec<u8> {
     let insertion = {
         let mut bytes = Vec::new();
-        Writer::new(&mut bytes)
+        Encoder::new(&mut bytes)
             .write_record(
                 Kind::new(OPAQUE_KIND).expect("opaque kind"),
                 b"extension bytes",
@@ -179,7 +179,7 @@ fn truncate_first_row_block(index: &[u8]) -> Vec<u8> {
     let new_payload_len = first_row_block.payload.len() - 4;
     let mut rebuilt = Vec::with_capacity(index.len() - 4);
     rebuilt.extend_from_slice(&index[..first_row_block.start]);
-    let mut writer = Writer::new(&mut rebuilt);
+    let mut writer = Encoder::new(&mut rebuilt);
     writer
         .write_record(
             kind::INDEX_ROW_BLOCK,
@@ -192,7 +192,7 @@ fn truncate_first_row_block(index: &[u8]) -> Vec<u8> {
 
 fn append_index_part_end(index: &[u8]) -> Vec<u8> {
     let mut output = index.to_vec();
-    Writer::new(&mut output)
+    Encoder::new(&mut output)
         .write_record(kind::INDEX_PART_END, &[])
         .expect("second end marker");
     output
@@ -210,7 +210,7 @@ fn append_empty_index_block(index: &[u8]) -> Vec<u8> {
     block.extend_from_slice(&[0; 8]);
     block.extend_from_slice(&[0; 8]);
     let mut encoded = Vec::new();
-    Writer::new(&mut encoded)
+    Encoder::new(&mut encoded)
         .write_record(kind::INDEX_BLOCK, &block)
         .expect("empty index block");
     let mut output = Vec::with_capacity(index.len() + encoded.len());
@@ -220,7 +220,7 @@ fn append_empty_index_block(index: &[u8]) -> Vec<u8> {
     output
 }
 
-fn write_empty_index_block(writer: &mut Writer<&mut Vec<u8>>, row_start: u32) {
+fn write_empty_index_block(writer: &mut Encoder<&mut Vec<u8>>, row_start: u32) {
     let mut block = Vec::new();
     block.extend_from_slice(&row_start.to_le_bytes());
     block.extend_from_slice(&(row_start + 32).to_le_bytes());
@@ -233,7 +233,7 @@ fn write_empty_index_block(writer: &mut Writer<&mut Vec<u8>>, row_start: u32) {
 
 fn two_empty_index_blocks(_index: &[u8]) -> Vec<u8> {
     let mut output = Vec::new();
-    let mut writer = Writer::new(&mut output);
+    let mut writer = Encoder::new(&mut output);
     write_empty_index_block(&mut writer, 0);
     write_empty_index_block(&mut writer, 32);
     writer
@@ -244,7 +244,7 @@ fn two_empty_index_blocks(_index: &[u8]) -> Vec<u8> {
 
 fn empty_index_with_end(_index: &[u8]) -> Vec<u8> {
     let mut output = Vec::new();
-    Writer::new(&mut output)
+    Encoder::new(&mut output)
         .write_record(kind::INDEX_PART_END, &[])
         .expect("empty index end marker");
     output
@@ -935,12 +935,13 @@ fn indexed_handle_refuses_stale_source_and_cancellation() {
     ));
 
     let (cancellation_source, context) = managed_context();
-    let managed = SourceBackedWorkbook::from_read_at_with_execution_context(
+    let managed = SourceBackedWorkbook::from_read_at_with_options(
         Arc::new(OwnedSource::new(fixture(
             "test-data/ooxml/xlsb/sample.xlsb",
         ))),
-        SourceLimits::default(),
-        context,
+        litchi_xlsb::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .expect("managed source workbook");
     let managed_index = managed
@@ -1004,10 +1005,11 @@ fn managed_index_handle_keeps_worksheet_part_data_alive() {
         "test-data/ooxml/xlsb/62815.xlsb",
     )));
     let (_cancellation_source, context) = managed_context();
-    let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
         source.clone(),
-        SourceLimits::default(),
-        context,
+        litchi_xlsb::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .expect("managed source workbook");
     let indexed = workbook

@@ -21,7 +21,10 @@ const MAX_PAYLOAD_BYTES: usize = 512 * 1024 * 1024;
 /// and relationship fields while borrowing the caller's graph. Source-provenance
 /// maps and other OPC-owned state have separate limits and are not a measured
 /// part of this estimate.
-pub(crate) fn preflight_metadata(package: &OpcPackage, limits: super::ReadLimits) -> Result<()> {
+pub(crate) fn preflight_metadata(
+    package: &OpcPackage,
+    limits: super::SemanticLimits,
+) -> Result<()> {
     if package.part_count() > limits.max_graph_parts {
         return Err(limit(
             "Data Model graph parts",
@@ -93,7 +96,9 @@ pub(crate) fn preflight_metadata(package: &OpcPackage, limits: super::ReadLimits
     Ok(())
 }
 
-pub(crate) fn opc_capture_limits(limits: super::ReadLimits) -> Result<litchi_opc::SourceLimits> {
+pub(crate) fn opc_capture_limits(
+    limits: super::SemanticLimits,
+) -> Result<litchi_opc::SourceLimits> {
     if limits.max_part_bytes == 0 || limits.max_metadata_bytes == 0 {
         return Err(limit(
             "Data Model source capture bytes",
@@ -148,7 +153,7 @@ fn preflight_relationships(
     opc_limits: &litchi_opc::SourceLimits,
     relationship_count: &mut usize,
     metadata_bytes: &mut usize,
-    limits: super::ReadLimits,
+    limits: super::SemanticLimits,
 ) -> Result<()> {
     *metadata_bytes = checked_metadata_add(
         *metadata_bytes,
@@ -226,7 +231,7 @@ fn metadata_cost(lengths: impl IntoIterator<Item = usize>) -> Result<usize> {
 fn checked_metadata_add(
     current: usize,
     addition: usize,
-    limits: super::ReadLimits,
+    limits: super::SemanticLimits,
     resource: &'static str,
 ) -> Result<usize> {
     let total = current
@@ -356,7 +361,7 @@ pub(crate) fn validate_payload(part: &ModelPart) -> Result<()> {
 /// are separate owners; validating only the former lets a caller publish
 /// stale groupings after replacing the opaque bytes.
 pub(crate) fn validate_model_payload_and_groupings(model: &Model) -> Result<()> {
-    super::codec::validate_definition(&model.definition, super::ReadLimits::DEFAULT)?;
+    super::codec::validate_definition(&model.definition, super::SemanticLimits::DEFAULT)?;
     validate_payload(&model.part)?;
     for grouping in &model.definition.time_groupings {
         super::proof::prove_time_grouping(model.part.bytes(), grouping)?;

@@ -56,7 +56,7 @@ fn conformant_workbooks_report_clean_on_the_eager_open_path() {
 #[test]
 fn conformant_workbooks_report_clean_on_the_package_open_path() {
     for name in CONFORMANT_FIXTURES {
-        let package = Package::from_bytes(fixture(name)).unwrap();
+        let package = Package::from_bytes(&fixture(name)).unwrap();
         assert_clean(package.tolerance_report(), name);
         let workbook = package.into_workbook().unwrap();
         assert_clean(workbook.tolerance_report(), name);

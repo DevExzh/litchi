@@ -81,10 +81,19 @@ impl Pptx {
                     strict_scene(slide.scene()?).map(Some)
                 },
                 PptxOwner::Eager(package) => {
-                    let Some(slide) = super::eager_slide(self, package, position)? else {
+                    let Some((slide, payload)) =
+                        super::eager_slide_with_payload(self, package, position)?
+                    else {
                         return Ok(None);
                     };
-                    strict_scene(slide.scene()?).map(Some)
+                    if let Some(scene) = payload.as_ref().and_then(|key| self.0.scenes.get(key)) {
+                        return Ok(Some(scene));
+                    }
+                    let scene = strict_scene(slide.scene()?)?;
+                    if let Some(payload) = payload {
+                        self.0.scenes.insert(payload, scene.clone());
+                    }
+                    Ok(Some(scene))
                 },
             }
         })
@@ -97,12 +106,18 @@ impl Pptx {
 
     /// The number of slide masters in the owner catalog.
     pub(super) fn masters_in_catalog(&self) -> Result<usize> {
-        self.finish(|| match &self.0.owner {
-            PptxOwner::Source(presentation) => {
-                self.check_owner()?;
-                Ok(presentation.masters()?.len())
-            },
-            PptxOwner::Eager(package) => Ok(package.presentation()?.slide_masters()?.len()),
+        self.finish(|| {
+            if let Some(&count) = self.0.masters.get() {
+                return Ok(count);
+            }
+            let count = match &self.0.owner {
+                PptxOwner::Source(presentation) => {
+                    self.check_owner()?;
+                    presentation.masters()?.len()
+                },
+                PptxOwner::Eager(package) => package.presentation()?.slide_masters()?.len(),
+            };
+            Ok(*self.0.masters.get_or_init(|| count))
         })
     }
 

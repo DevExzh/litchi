@@ -144,7 +144,7 @@ fn rewrite_active_book_view(bytes: &[u8], active_catalog_position: u32) -> Vec<u
     let mut rewritten = Vec::new();
     let mut book_view_count = 0;
     {
-        let mut writer = xlsb::raw::Writer::new(&mut rewritten);
+        let mut writer = xlsb::raw::Encoder::new(&mut rewritten);
         for record in xlsb::raw::Records::new(&original) {
             let record = record.unwrap();
             let mut payload = record.payload().to_vec();
@@ -528,7 +528,7 @@ fn dynamic_xlsb_byte_entrypoint_rejects_xlsx() {
         litchi::open_bytes(bytes.as_slice()).unwrap_err().detected(),
         Some(FileFormat::Xlsx)
     );
-    assert!(xlsb::Package::from_slice(bytes).is_err());
+    assert!(xlsb::Package::from_bytes(bytes).is_err());
 }
 
 #[test]
@@ -679,7 +679,7 @@ fn source_backed_facade_strictly_refuses_sparkline_materialization() {
             .value(),
         &CellValue::String("TAIL".to_string())
     );
-    let eager = xlsb::Package::from_slice(&bytes)
+    let eager = xlsb::Package::from_bytes(&bytes)
         .and_then(xlsb::Package::into_workbook)
         .expect("explicit eager XLSB API should support sparkline-bearing sheets");
     assert_eq!(eager_text(&eager), "DATA\nTAIL\n");

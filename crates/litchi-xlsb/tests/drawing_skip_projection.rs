@@ -35,8 +35,11 @@ fn fixture_bytes() -> Vec<u8> {
 }
 
 fn skipped(bytes: &[u8]) -> Workbook {
-    Workbook::new_without_drawing_parse(Cursor::new(bytes.to_vec()))
-        .expect("drawing-skipped workbook")
+    Workbook::new_with_options(
+        Cursor::new(bytes.to_vec()),
+        litchi_xlsb::OpenOptions::new().parse_drawings(false),
+    )
+    .expect("drawing-skipped workbook")
 }
 
 fn saved(workbook: &Workbook) -> Vec<u8> {

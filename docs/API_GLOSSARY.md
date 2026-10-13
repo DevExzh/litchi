@@ -48,9 +48,7 @@ transaction is the bare `Package::edit()`.
 | PPTX combined shape properties | `Edit::set_shape_properties`, `ShapePropertiesReplacement` | — | Eager/source primary edits share checked `Position` targets and optional text/bounds in one atomic operation (0153); broader shape properties remain pending |
 | PPTX chunked shape publication | `Edit::{set_shape_text_chunks, set_shape_property_chunks}` | — | Eager/source primary and focused source edits admit bounded, globally disjoint chunks together for one same-slide publication (0158); single-chunk setter limits are retained |
 | PPT chunked text publication | `Edit::set_shape_text_chunks` | — | At most 4096 globally distinct targets across at most 4096 chunks, each bounded at 256; one native publication and complete readback per call (0220); ordinary `set_shape_texts` remains bounded at 256 |
-| Transaction type | `Edit` | `Transaction` (pptx), `WorkbookEdit` (xlsb) | ✅ pptx primary `opened::Edit` (0116), XLSB structural and cell-value `Edit/Commit/Patch` families, diagnostics and Package commit triads (0165–0171); 🔴 remaining XLSB mutators/error families (W2); ✅ scoped PPTX families renamed `Edit` (0252) |
-
-| Transaction type | `Edit` | `Transaction` (pptx), `WorkbookEdit` (xlsb) | ✅ pptx primary `opened::Edit` (0116), XLSB structural and cell-value `Edit/Commit/Patch` families, diagnostics and Package commit triads (0165–0171); ✅ XLS scoped families (`sheet_visibility`, `ole_object`, `real_time_data`, `revision_records`, `user_names`, `picture_compression`, `chart_area`, `web_pub`, `external_link`) (0259); 🔴 remaining XLSB mutators/error families and scoped PPTX families (W2) |
+| Transaction type | `Edit` | `Transaction` (pptx), `WorkbookEdit` (xlsb) | ✅ pptx primary `opened::Edit` (0116), XLSB structural and cell-value `Edit/Commit/Patch` families, diagnostics and Package commit triads (0165–0171); ✅ XLSB `cell_values`, `cell_values::structure` and `cell_values::worksheet` complete with `Error` and `LimitKind` and registered (0261); ✅ XLS scoped families (`sheet_visibility`, `ole_object`, `real_time_data`, `revision_records`, `user_names`, `picture_compression`, `chart_area`, `web_pub`, `external_link`) (0259); ✅ scoped PPTX families renamed `Edit` (0252); 🔴 remaining XLSB scoped mutators and scoped PPTX families (W2) |
 | Commit | `Edit::commit() -> Result<Commit>` | — | ✅ everywhere; shape fixed by the rows below |
 | New snapshot accessor | `Commit::package()` / `Commit::into_package()` | `Commit::snapshot()` (docx/pptx), `Commit::{workbook, into_workbook}` (xlsx) | ✅ iWork/docx eager (0022) and source (0031), PPTX eager (0118), XLSX primary (0250) · 🔴 other W2 |
 | Diagnostics on every commit | `Commit::diagnostics()` | commits without diagnostics (xlsx, pptx) | ✅ docx/iWork/PPTX eager (0118), XLSX primary `workbook::edit::Diagnostics` (0250) · 🔴 remaining owners (W2) |
@@ -98,14 +96,10 @@ and redaction vocabulary remain pending.
 | Concept | Canonical | Banned | Notes / status |
 |---|---|---|---|
 | Open from path | `open(path)` | — | ✅ everywhere |
-| Open from bytes (copy allowed) | `from_bytes(&[u8])` | `from_bytes(Vec<u8>)` signatures (xlsx/odt/odp), `from_slice` (xlsx), `from_vec` (pptx, removed 0252) | ✅ DOCX owning/lazy Package (0038/0040); ✅ XLSX `Package` (0250; copies into the owned source archive); ✅ PPTX (0252) · 🔴 W2/W3 |
+| Open from bytes (copy allowed) | `from_bytes(&[u8])` | `from_bytes(Vec<u8>)` signatures (xlsx/odt/odp), `from_slice` (xlsx), `from_vec` (pptx, removed 0252) | ✅ DOCX owning/lazy Package (0038/0040); ✅ XLSX `Package` (0250; copies into the owned source archive); ✅ PPTX (0252); ✅ XLSB `Package` (0261; copies into the owned source archive; `from_slice*` deleted) · 🔴 W3 |
 | Open from shared bytes (zero-copy) | `from_shared_bytes(Arc<[u8]>)` | — | ✅ numbers; offered only where zero-copy is real |
-| Open from reader | `from_reader(R)` | — | ✅ docx/xlsx; extended per wave |
-| Configured open | `open_with_options(path, OpenOptions)`, `from_bytes_with_options(bytes, OpenOptions)` | `open_with_limits`, `open_with` (doc), `open_with_options` under other type names | envelope decided in §5 · ✅ DOCX (0038) · ✅ XLSX `OpenOptions` (source limits, leniency, encryption limits; 0250) · ✅ PPTX owning `Package` and positional-source presentation owners (0252) |
-
-| Configured open | `open_with_options(path, OpenOptions)`, `from_bytes_with_options(bytes, OpenOptions)` | `open_with_limits`, `open_with` (doc), `open_with_options` under other type names | envelope decided in §5 · ✅ XLSX `OpenOptions` (source limits, leniency, encryption limits; 0250) · ✅ DOC raw owner and part editors, `open_with_limits*` banned crate-wide (0258) |
-
-| Configured open | `open_with_options(path, OpenOptions)`, `from_bytes_with_options(bytes, OpenOptions)` | `open_with_limits`, `open_with` (doc), `open_with_options` under other type names | envelope decided in §5 · ✅ XLSX `OpenOptions` (source limits, leniency, encryption limits; 0250) · ✅ PPT `text_edit::SourceSnapshot::open_with_options` and `slide_order::Snapshot::from_bytes_with_options` only (0260); 🔴 PPT `raw::Reader` limits-only ingress and scoped-family `*_with_limits` (W4 residue) |
+| Open from reader | `from_reader(R)` | — | ✅ docx/xlsx; ✅ XLSB `Package`/`SourceBackedWorkbook` (0261); extended per wave |
+| Configured open | `open_with_options(path, OpenOptions)`, `from_bytes_with_options(bytes, OpenOptions)` | `open_with_limits`, `open_with` (doc), `open_with_options` under other type names | envelope decided in §5 · ✅ DOCX (0038) · ✅ XLSX `OpenOptions` (source limits, leniency, encryption limits; 0250) · ✅ PPTX owning `Package` and positional-source presentation owners (0252) · ✅ XLSB `OpenOptions` (source, external-link and cache limits, leniency, drawing decoding, execution context) on `Package`, the `Workbook` projection constructors and `SourceBackedWorkbook` (0261) · ✅ DOC raw owner and part editors, `open_with_limits*` banned crate-wide (0258) · ✅ PPT `text_edit::SourceSnapshot::open_with_options` and `slide_order::Snapshot::from_bytes_with_options` only (0260); 🔴 PPT `raw::Reader` limits-only ingress and scoped-family `*_with_limits` (W4 residue) |
 | Minimal fresh artifact | `Package::new()` | `Workbook::create()` duplicate (xlsx) | ✅ docx; ✅ canonical PPTX constructor (0127); ✅ XLSB (0175); ✅ XLS (0199); ✅ RTF (0225); ✅ XLSX (0250) · all formats gain it |
 | Save to path | `save(path)` — **always atomic** (sibling temp + rename) | non-atomic `Builder::save` (odt/odp) | ✅ OOXML, including lazy DOCX (0041), and RTF (0226) · 🔴 ODF (W3, behavior change with CRUD evidence) |
 | Save with explicit durability | `save_with_durability(path, Durability)` | — | ✅ OOXML and RTF (0226); extended everywhere |
@@ -121,12 +115,12 @@ and redaction vocabulary remain pending.
 | Concept | Canonical | Banned | Notes / status |
 |---|---|---|---|
 | Physical ingress limits | `SourceLimits` | `ReadLimits` (OPC re-exports in docx/pptx/xlsx/xlsb), `SourcePackageLimits` (odt), `package::Limits` (doc), `RecordLimits` (ppt), `DocumentSourceLimits` (iWork) | ✅ OPC `SourceLimits`/`SourceLimitsBuilder` and OOXML `SourceLimits` re-exports, record 0035 · ✅ DOC (0192); ✅ XLS eager/retained policies (0196–0198); ✅ PPT (0210); 🔴 ODF/iWork |
-| Semantic limits | `SemanticLimits` | `DocumentLimits` (numbers), `DocumentSemanticLimits` (keynote) | ✅ pages; ✅ RTF primary operation count and replacement bytes (0227–0228) · 🔴 remaining dimensions and W1 |
-| Open configuration envelope | `OpenOptions` (per format, extensible fields) | `PackageOpenOptions` (doc — merges), `ReadOptions` (numbers), `iwork::Options` (facade) | ✅ DOCX ingress envelope (0038–0040); owning lazy-policy support and W1–W4 pending |
+| Semantic limits | `SemanticLimits` | `DocumentLimits` (numbers), `DocumentSemanticLimits` (keynote) | ✅ pages; ✅ RTF primary operation count and replacement bytes (0227–0228); ✅ XLSB nested `data_model`, `calculation_chain`, `volatile_dependencies` and `xml_maps` `ReadLimits` and their `Limits` aliases renamed `SemanticLimits` (0261) · 🔴 remaining dimensions and W1 |
+| Open configuration envelope | `OpenOptions` (per format, extensible fields) | `PackageOpenOptions` (doc — merges), `ReadOptions` (numbers), `iwork::Options` (facade) | ✅ DOCX ingress envelope (0038–0040); ✅ XLSB (0261, `OpenPolicy` refusals for owner-specific policies); owning lazy-policy support and W1–W4 pending |
 | Construction idiom | consuming builder, fallible `max_<dimension>` setters, fallible `build()` | positional `new(...)` constructors (iWork) | ✅ OPC, DOC (0192), XLS (0196) and PPT (0210) · 🔴 other W1 |
 | Build-time invalid limit | `Error::InvalidLimit { kind, value, maximum }` | standalone `*LimitsError` types (doc, iWork) | ✅ OPC `InvalidLimit` with contextual maximum (0036); DOC (0192), XLS (0196), PPT (0210); other owners pending |
-| Ingress limit exceeded | `Error::Limit { kind, observed, maximum }` | `OpcError::ReadLimit`, facade `ResourceLimit` mapping drift | ✅ OPC (0036), DOC (0192), XLS (0196), PPT (0210) kind/observed/maximum; broader taxonomy pending |
-| Limit kind enums | `SourceLimitKind` / `SemanticLimitKind` | `ReadResource`, per-crate one-off kinds | ✅ OPC/OOXML (0036), DOC (0192), XLS (0196), PPT (0210) `SourceLimitKind`; semantic kinds pending |
+| Ingress limit exceeded | `Error::Limit { kind, observed, maximum }` | `OpcError::ReadLimit`, facade `ResourceLimit` mapping drift | ✅ OPC (0036), DOC (0192), XLS (0196), PPT (0210) kind/observed/maximum; ✅ XLSB cell-values transaction bounds (`PackageError::Limit`, 0261); broader taxonomy pending |
+| Limit kind enums | `SourceLimitKind` / `SemanticLimitKind` | `ReadResource`, per-crate one-off kinds | ✅ OPC/OOXML (0036), DOC (0192), XLS (0196), PPT (0210) `SourceLimitKind`; ✅ XLSB `cell_values::LimitKind` (0261); other semantic kinds pending |
 | Dimension naming | nouns (`input_bytes`, `members`, `entry_bytes`, `aggregate_bytes`, `depth`, `events`, …); setters `max_<noun>` | a second name for an existing dimension | ✅ OPC common nouns (0037); shared defaults remain 512 MiB input and XML depth 256; other families pending |
 | Coverage policy | caller-selected limits on **every** public ingress path | — | ✅ PPT package/record ingress (0210), XLS eager ingress (0196); 🔴 remaining specialized ingress and ODF (W3) |
 
@@ -264,6 +258,9 @@ semantic-limit migrations.
 | Unstorable metadata field | typed `metadata::Error::Unsupported { field }` naming a `metadata::Field` | silently dropping a field | ✅ OOXML transaction (0253): `content_type`, `last_backup`, `codepage` |
 | Metadata read | `Package::metadata()` | `Package::props()` (docx) | ✅ facade/ODF/iWork reads · ✅ pptx/xlsx/xlsb `Package::metadata()` (0253) · ✅ docx `Package::metadata() -> Option<&Metadata>` (0251) |
 | Metadata mutation | `Package::{edit_metadata, apply_metadata}` + `metadata::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` | `put_props()`, `props_mut()`, `clear_props()` | ✅ pptx/xlsx/xlsb `Package` and the shared `litchi_ooxml_common::properties` engine; families registered in the gate (0253) · ✅ doc/xls/ppt `package::metadata` (0254) · ✅ docx `metadata` family over the shared core codec, registered in `docx-minimal`/`docx-full` (0251); 🔴 docx app/custom staging through the shared engine |
+
+| Metadata read | `Package::metadata()` | `Package::props()` (docx) | ✅ facade/ODF/iWork reads · ✅ pptx/xlsx/xlsb `Package::metadata()` (0253) · 🔴 docx rename (W2, uo2/p7a) |
+| Metadata mutation | `Package::{edit_metadata, apply_metadata}` + `metadata::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` | `put_props()`, `props_mut()`, `clear_props()` | ✅ pptx/xlsx/xlsb `Package` and the shared `litchi_ooxml_common::properties` engine; families registered in the gate (0253) · ✅ XLSB source owner: `SourceBackedWorkbook::edit_metadata` with `metadata::source::{Edit, Commit}`, published over the retained source through `properties::Patch::{compose, check_source_backed, prepare_source_backed}` (0261) · ✅ doc/xls/ppt `package::metadata` (0254) · 🔴 docx (uo2/p7a) |
 | Custom properties | `custom_props()` / `edit_custom_props()` | — | ✅ name (docx/pptx/xlsx); OOXML custom properties are also staged through `metadata::Edit::set_custom_props` (0253) |
 | Application properties (OOXML-only) | `app_props()` | — | ✅ `litchi_ooxml_common::properties::app` (splice writer), pptx/xlsx/xlsb `Package::app_props()` (0253) |
 | Fresh-authoring metadata | `Builder::set_metadata(Metadata)` | `Builder::set_property` (doc/xls/ppt) | ✅ ODF · ✅ doc/xls/ppt (0254); not an opened-document mutation · OOXML creation commits a metadata `Edit` on the fresh package (0253) |
@@ -1571,8 +1568,7 @@ exist are listed below as wave residue, not as failing rules.
 - **Families.** `litchi_docx::document` is registered in `docx-minimal` and
   `docx-full`; it is the only OOXML module exporting all six family types.
   **Pending, not registered:** pptx `opened`, `source` and `change_tracking`
-  (no `Error`, `LimitKind`); xlsb `cell_values` (no `LimitKind`) and its
-  structure/worksheet families; the scoped xlsx families
+  (no `Error`, `LimitKind`); the scoped xlsx families
   (`workbook::edit` is registered by record 0250) (no `Diagnostics`, `Error`, `LimitKind`, or no `Edit`); docx
   `content_control`, `ink`, `section::layout`, `revision::conflict` and the
   `source_backed::*` edit modules. Each registers in the change that completes it.
@@ -1605,7 +1601,32 @@ Wave residue that still exposes a glossary-banned name (owner: record 0248):
 | ooxml-common | `custom_xml::Transaction`, `Transaction::is_changed`, `Commit::snapshot` | `Edit`, `diagnostics().changed()`, `Commit::package()` | follow-up of record 0253 (not cheap: the in-place `&mut OpcPackage` owner needs a family reshape and docx call sites) |
 | ooxml-common | `custom_data::Limits` | `SemanticLimits` | follow-up of record 0253 (re-exported by xlsx/xlsb, which uo2/p4 and step 7d own) |
 | core | `Limits`, `Error::ResourceLimit` (execution budgets) | not banned by §4; rename only on an owner decision | owner decision |
-| pptx, xlsb, xlsx, opc, ops | names listed in record 0248 §2 | §2–§4 | Phase B steps 4–5, ops follow-ups |
+| pptx, xlsx, opc, ops | names listed in record 0248 §2 | §2–§4 | Phase B steps 4–5, ops follow-ups |
+| xlsb | `Package::into_workbook`; mutating `Workbook` verbs (`edit_opc`, `put_*`, `set_*`, `sign`); scoped `x_with_limits`/`edit_x_with_limits` read and edit entries | `Package::workbook()` projection; `edit_x()`/`apply_x()` families | record 0261 §8 |
+
+## XLSB W2 residue and P0 writes (record 0261)
+
+- Ingress: `litchi_xlsb::OpenOptions` (`source_limits`, `external_link_limits`,
+  `leniency`, `parse_drawings`, `cache_limits`, `execution_context`) on
+  `Package::{open, from_bytes, from_reader, from_opc}_with_options`,
+  `Workbook::{new, from_opc_package}_with_options` and
+  `SourceBackedWorkbook::{from_reader, from_read_at}_with_options`. A policy
+  an owner cannot honour is `PackageError::UnsupportedOpenPolicy { policy:
+  OpenPolicy }`. `Package::from_bytes` borrows `&[u8]`.
+- Edits: `Package::edit_with_options(structure::EditOptions)` and
+  `Package::edit_cell_values_with_options(selector, cell_values::EditOptions)`.
+- Renames: `raw::Writer` → `raw::Encoder`; nested `ReadLimits`/`Limits` →
+  `SemanticLimits` (data_model, calculation_chain, volatile_dependencies,
+  xml_maps). `cell_values::LimitKind` with `PackageError::Limit`.
+- Writes: `cell_values::Edit::{set_format(reference, &Format),
+  set_formula_text}` (`Format`, `BorderLine` are partial changes; unnamed
+  attributes keep their records); `structure::Edit::{merge_cells,
+  unmerge_cells, set_defined_name, remove_defined_name}` (durable tags 11 and
+  12). Reads: `named_ranges::Entry` via `{Workbook,
+  SourceBackedWorkbook}::defined_name_entries`.
+- Source-owner metadata: `SourceBackedWorkbook::{metadata, app_props,
+  edit_metadata, write_to, has_metadata_edits}` with
+  `metadata::source::{Edit, Commit}`.
 
 ## Legacy OLE metadata (record 0254)
 

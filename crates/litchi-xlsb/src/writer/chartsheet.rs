@@ -10,7 +10,7 @@ use crate::package::chartsheet::{
     ChartSheet, Color, ColorType, PageSetup, Protection, State, View,
 };
 use crate::package::error::{Error, Result};
-use crate::raw::Writer;
+use crate::raw::Encoder;
 use crate::raw::kind as rt;
 use crate::sheet::StrongProtection;
 use std::io::Write;
@@ -188,7 +188,7 @@ pub(crate) fn write_chart_sheet(
 ) -> Result<Vec<u8>> {
     sheet.validate()?;
     let mut output = Vec::new();
-    let mut writer = Writer::new(&mut output);
+    let mut writer = Encoder::new(&mut output);
     writer.write_record(rt::BEGIN_SHEET, &[])?;
     write_properties(&mut writer, &sheet.metadata)?;
     write_views(&mut writer, &sheet.metadata.views)?;
@@ -288,7 +288,7 @@ fn validate_page_setup(value: &PageSetup) -> Result<()> {
     Ok(())
 }
 
-fn write_properties<W: Write>(writer: &mut Writer<W>, value: &ChartSheet) -> Result<()> {
+fn write_properties<W: Write>(writer: &mut Encoder<W>, value: &ChartSheet) -> Result<()> {
     let mut data = Vec::new();
     data.extend_from_slice(&(u16::from(value.published)).to_le_bytes());
     let color_type = match value.tab_color.color_type {
@@ -301,11 +301,11 @@ fn write_properties<W: Write>(writer: &mut Writer<W>, value: &ChartSheet) -> Res
     data.push(value.tab_color.index);
     data.extend_from_slice(&value.tab_color.tint.to_le_bytes());
     data.extend_from_slice(&value.tab_color.rgba);
-    Writer::new(&mut data).write_wide_string(&value.code_name)?;
+    Encoder::new(&mut data).write_wide_string(&value.code_name)?;
     Ok(writer.write_record(rt::CS_PROP, &data)?)
 }
 
-fn write_views<W: Write>(writer: &mut Writer<W>, views: &[View]) -> Result<()> {
+fn write_views<W: Write>(writer: &mut Encoder<W>, views: &[View]) -> Result<()> {
     writer.write_record(rt::BEGIN_CS_VIEWS, &[])?;
     for view in views {
         let mut data = Vec::with_capacity(10);
@@ -319,7 +319,7 @@ fn write_views<W: Write>(writer: &mut Writer<W>, views: &[View]) -> Result<()> {
 }
 
 fn write_protection<W: Write>(
-    writer: &mut Writer<W>,
+    writer: &mut Encoder<W>,
     classic: Option<Protection>,
     strong: Option<&StrongProtection>,
 ) -> Result<()> {
@@ -333,7 +333,7 @@ fn write_protection<W: Write>(
         data.extend_from_slice(&u32::from(classic.objects).to_le_bytes());
         write_blob(&mut data, &strong.hash)?;
         write_blob(&mut data, &strong.salt)?;
-        Writer::new(&mut data).write_wide_string(&strong.algorithm)?;
+        Encoder::new(&mut data).write_wide_string(&strong.algorithm)?;
         writer.write_record(rt::CS_PROTECTION_ISO, &data)?;
     }
     let mut data = Vec::with_capacity(10);
@@ -351,7 +351,7 @@ fn write_protection<W: Write>(
 }
 
 fn write_page_setup<W: Write>(
-    writer: &mut Writer<W>,
+    writer: &mut Encoder<W>,
     setup: &PageSetup,
     printer_rel_id: &str,
 ) -> Result<()> {
@@ -367,17 +367,17 @@ fn write_page_setup<W: Write>(
         | (u16::from(setup.use_page_start) << 4)
         | (u16::from(setup.draft) << 5);
     data.extend_from_slice(&flags.to_le_bytes());
-    Writer::new(&mut data).write_wide_string(printer_rel_id)?;
+    Encoder::new(&mut data).write_wide_string(printer_rel_id)?;
     Ok(writer.write_record(rt::CS_PAGE_SETUP, &data)?)
 }
 
 fn write_rel_id<W: Write>(
-    writer: &mut Writer<W>,
+    writer: &mut Encoder<W>,
     record_type: crate::raw::Kind,
     rel_id: &str,
 ) -> Result<()> {
     let mut data = Vec::new();
-    Writer::new(&mut data).write_wide_string(rel_id)?;
+    Encoder::new(&mut data).write_wide_string(rel_id)?;
     Ok(writer.write_record(record_type, &data)?)
 }
 

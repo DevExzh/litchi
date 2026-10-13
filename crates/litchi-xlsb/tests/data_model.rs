@@ -63,7 +63,7 @@ fn package() -> Package {
         .expect("build package")
         .write_to(&mut output)
         .expect("save");
-    Package::from_bytes(output.into_inner()).expect("package")
+    Package::from_bytes(&output.into_inner()).expect("package")
 }
 
 fn empty_package() -> Package {
@@ -76,7 +76,7 @@ fn empty_package() -> Package {
         .expect("build package")
         .write_to(&mut output)
         .expect("save");
-    Package::from_bytes(output.into_inner()).expect("package")
+    Package::from_bytes(&output.into_inner()).expect("package")
 }
 
 fn package_with_case_variant_model_part() -> Package {
@@ -347,7 +347,7 @@ fn table_connection_binding_is_case_insensitive() {
         .expect("build package")
         .write_to(&mut output)
         .expect("save");
-    let reopened = Package::from_bytes(output.into_inner()).expect("package");
+    let reopened = Package::from_bytes(&output.into_inner()).expect("package");
     assert_eq!(
         reopened
             .data_model()
@@ -449,7 +449,7 @@ fn connection_source_change_is_stale_even_when_model_and_workbook_bytes_are_unch
         .to_package()
         .write_to(&mut output)
         .expect("save changed source");
-    let changed_package = Package::from_bytes(output.into_inner()).expect("reopen");
+    let changed_package = Package::from_bytes(&output.into_inner()).expect("reopen");
 
     assert_eq!(
         changed_package
@@ -628,7 +628,7 @@ fn source_tokens_restore_explicit_empty_model_relationships_after_reopened_zip_i
     let commit = transaction.commit().expect("remove commit");
     let removed = package.apply_data_model(&commit).expect("remove model");
     let removed_zip = removed.to_bytes().expect("removed ZIP bytes");
-    let reopened_removed = Package::from_bytes(removed_zip).expect("reopen removed ZIP");
+    let reopened_removed = Package::from_bytes(&removed_zip).expect("reopen removed ZIP");
     let restored = reopened_removed
         .apply_data_model_patch(&commit.patch().inverse())
         .expect("inverse model");
@@ -647,7 +647,7 @@ fn source_tokens_restore_explicit_empty_model_relationships_after_reopened_zip_i
             .expect("restored model relationships member"),
         EMPTY_RELATIONSHIPS
     );
-    let reopened = Package::from_bytes(restored_zip).expect("reopen restored ZIP");
+    let reopened = Package::from_bytes(&restored_zip).expect("reopen restored ZIP");
     assert_eq!(reopened.data_model().expect("reopened snapshot"), before);
 }
 
@@ -677,7 +677,7 @@ fn elevated_source_tokens_survive_reopened_inverse_with_large_content_types() {
         EMPTY_RELATIONSHIPS
     );
 
-    let mut limits = litchi_xlsb::data_model::ReadLimits::DEFAULT;
+    let mut limits = litchi_xlsb::data_model::SemanticLimits::DEFAULT;
     limits.max_part_bytes = 16 * 1024 * 1024;
     limits.max_metadata_bytes = 16 * 1024 * 1024;
     let before = package
@@ -729,7 +729,7 @@ fn elevated_source_tokens_survive_reopened_inverse_with_large_content_types() {
 #[test]
 fn data_model_limits_bound_borrowed_graph_metadata_before_snapshot_ownership() {
     let package = package();
-    let mut limits = litchi_xlsb::data_model::ReadLimits::DEFAULT;
+    let mut limits = litchi_xlsb::data_model::SemanticLimits::DEFAULT;
     limits.max_metadata_bytes = 1;
     let error = package
         .data_model_with_limits(limits)
@@ -740,7 +740,7 @@ fn data_model_limits_bound_borrowed_graph_metadata_before_snapshot_ownership() {
 #[test]
 fn data_model_limits_bound_connection_count_before_typed_load() {
     let package = package();
-    let mut limits = litchi_xlsb::data_model::ReadLimits::DEFAULT;
+    let mut limits = litchi_xlsb::data_model::SemanticLimits::DEFAULT;
     limits.max_connections = 0;
     let error = package
         .data_model_with_limits(limits)

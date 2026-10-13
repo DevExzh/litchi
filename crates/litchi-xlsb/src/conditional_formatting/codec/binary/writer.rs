@@ -9,7 +9,7 @@
 
 use crate::conditional_formatting::model::*;
 use crate::formula::ParsedFormula;
-use crate::raw::{Writer, kind};
+use crate::raw::{Encoder, kind};
 use std::collections::HashSet;
 use std::io::Write;
 
@@ -24,7 +24,7 @@ use super::wire::{parse_range_list, serialize_rule_extension_guid, write_bin_ran
 
 /// Write all classic and Office 2013 conditional-formatting collections for a worksheet.
 pub fn write_conditional_formattings<W: Write>(
-    writer: &mut Writer<W>,
+    writer: &mut Encoder<W>,
     cond_fmts: &[Formatting],
 ) -> Result<()> {
     validate_extension_links(cond_fmts)?;
@@ -52,7 +52,7 @@ pub fn write_conditional_formattings<W: Write>(
 }
 
 fn write_single_cond_formatting<W: Write>(
-    writer: &mut Writer<W>,
+    writer: &mut Encoder<W>,
     formatting: &Formatting,
 ) -> Result<()> {
     writer.write_record(
@@ -72,7 +72,7 @@ fn write_single_cond_formatting<W: Write>(
 }
 
 fn write_single_cond_formatting14<W: Write>(
-    writer: &mut Writer<W>,
+    writer: &mut Encoder<W>,
     formatting: &Formatting,
 ) -> Result<()> {
     writer.write_record(
@@ -162,7 +162,7 @@ pub(crate) fn serialize_cf_rule(rule: &Rule) -> Result<Vec<u8>> {
     Ok(payload)
 }
 
-fn write_rule_visualization<W: Write>(writer: &mut Writer<W>, rule: &Rule) -> Result<()> {
+fn write_rule_visualization<W: Write>(writer: &mut Encoder<W>, rule: &Rule) -> Result<()> {
     match rule.rule_type {
         RuleType::ColorScale => {
             let scale = rule.color_scale.as_ref().expect("validated color scale");
@@ -231,7 +231,7 @@ fn write_rule_visualization<W: Write>(writer: &mut Writer<W>, rule: &Rule) -> Re
     Ok(())
 }
 
-fn write_rule_visualization14<W: Write>(writer: &mut Writer<W>, rule: &Rule) -> Result<()> {
+fn write_rule_visualization14<W: Write>(writer: &mut Encoder<W>, rule: &Rule) -> Result<()> {
     if rule.color_scale.is_some() || rule.data_bar.is_some() || rule.icon_set.is_some() {
         return Err(invalid(
             "BrtBeginCFRule14",
@@ -335,7 +335,7 @@ fn write_rule_visualization14<W: Write>(writer: &mut Writer<W>, rule: &Rule) -> 
     Ok(())
 }
 
-fn write_cfvo14<W: Write>(writer: &mut Writer<W>, cfvo: &Value, icon_set: bool) -> Result<()> {
+fn write_cfvo14<W: Write>(writer: &mut Encoder<W>, cfvo: &Value, icon_set: bool) -> Result<()> {
     let formula = effective_cfvo_formula(cfvo)?;
     let numeric_value = if formula.is_none() && matches!(cfvo.cfvo_type, 1 | 4 | 5) {
         cfvo.value
@@ -356,7 +356,7 @@ fn write_cfvo14<W: Write>(writer: &mut Writer<W>, cfvo: &Value, icon_set: bool) 
     Ok(())
 }
 
-fn write_color14<W: Write>(writer: &mut Writer<W>, record: Color, legacy_argb: u32) -> Result<()> {
+fn write_color14<W: Write>(writer: &mut Encoder<W>, record: Color, legacy_argb: u32) -> Result<()> {
     let record = if record.argb == Some(legacy_argb) || (record.argb.is_none() && legacy_argb == 0)
     {
         record
@@ -367,7 +367,7 @@ fn write_color14<W: Write>(writer: &mut Writer<W>, record: Color, legacy_argb: u
     Ok(())
 }
 
-fn write_cfvo<W: Write>(writer: &mut Writer<W>, cfvo: &Value, icon_set: bool) -> Result<()> {
+fn write_cfvo<W: Write>(writer: &mut Encoder<W>, cfvo: &Value, icon_set: bool) -> Result<()> {
     if !matches!(cfvo.cfvo_type, 1 | 2 | 3 | 4 | 5 | 7) {
         return Err(invalid(
             "BrtCFVO",
@@ -415,7 +415,7 @@ fn write_cfvo<W: Write>(writer: &mut Writer<W>, cfvo: &Value, icon_set: bool) ->
     Ok(())
 }
 
-fn write_color<W: Write>(writer: &mut Writer<W>, record: Color, legacy_argb: u32) -> Result<()> {
+fn write_color<W: Write>(writer: &mut Encoder<W>, record: Color, legacy_argb: u32) -> Result<()> {
     let record = if record.argb == Some(legacy_argb) || (record.argb.is_none() && legacy_argb == 0)
     {
         record

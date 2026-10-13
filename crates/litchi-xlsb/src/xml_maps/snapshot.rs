@@ -22,7 +22,7 @@ use crate::package::error::Result;
 
 /// Finite package and codec ceilings for one XLSB XML Maps snapshot.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ReadLimits {
+pub struct SemanticLimits {
     /// Limits for the shared SpreadsheetML MapInfo XML codec.
     pub xml_maps: XmlMapLimits,
     /// Limits for BIFF12 table and single-cell binding streams.
@@ -41,7 +41,7 @@ pub struct ReadLimits {
     pub max_total_xpath_units: usize,
 }
 
-impl ReadLimits {
+impl SemanticLimits {
     /// Conservative finite XML Maps package limits.
     pub const DEFAULT: Self = Self {
         xml_maps: XmlMapLimits::DEFAULT,
@@ -55,7 +55,7 @@ impl ReadLimits {
     };
 }
 
-impl Default for ReadLimits {
+impl Default for SemanticLimits {
     fn default() -> Self {
         Self::DEFAULT
     }
@@ -69,18 +69,18 @@ pub struct Snapshot {
     mapped_tables: Vec<MappedTable>,
     single_cell_tables: Vec<SingleCellTable>,
     single_cell_ranges: Vec<Option<Range<usize>>>,
-    limits: ReadLimits,
+    limits: SemanticLimits,
     source: SourceState,
 }
 
 impl Snapshot {
     /// Read an XLSB XML Maps snapshot using conservative finite defaults.
     pub fn read(package: &OpcPackage) -> Result<Self> {
-        Self::read_with_limits(package, ReadLimits::DEFAULT)
+        Self::read_with_limits(package, SemanticLimits::DEFAULT)
     }
 
     /// Read an XLSB XML Maps snapshot with explicit finite limits.
-    pub fn read_with_limits(package: &OpcPackage, limits: ReadLimits) -> Result<Self> {
+    pub fn read_with_limits(package: &OpcPackage, limits: SemanticLimits) -> Result<Self> {
         Self::read_with_limits_and_external_link_limits(
             package,
             limits,
@@ -92,7 +92,7 @@ impl Snapshot {
     /// external-link resource policies.
     pub fn read_with_limits_and_external_link_limits(
         package: &OpcPackage,
-        limits: ReadLimits,
+        limits: SemanticLimits,
         external_link_limits: ExternalLinkLimits,
     ) -> Result<Self> {
         super::package::preflight(package, limits)?;
@@ -107,7 +107,7 @@ impl Snapshot {
     pub(crate) fn read_for_worksheets(
         package: &OpcPackage,
         worksheets: Vec<PackURI>,
-        limits: ReadLimits,
+        limits: SemanticLimits,
     ) -> Result<Self> {
         let loaded = super::package::read_with_limits(package, worksheets, limits)?;
         let workbook = package.main_document_part()?;
@@ -174,7 +174,7 @@ impl Snapshot {
     }
 
     /// Return the exact limits used to parse this snapshot.
-    pub const fn limits(&self) -> ReadLimits {
+    pub const fn limits(&self) -> SemanticLimits {
         self.limits
     }
 
@@ -265,7 +265,7 @@ impl Snapshot {
             mapped_tables: Vec::new(),
             single_cell_tables: Vec::new(),
             single_cell_ranges: Vec::new(),
-            limits: ReadLimits::DEFAULT,
+            limits: SemanticLimits::DEFAULT,
             source: SourceState {
                 root_relationships,
                 workbook: SourcePart {

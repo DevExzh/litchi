@@ -375,3 +375,323 @@ fn typed_values_compare_as_their_canonical_text() {
         }
     }
 }
+
+/// Values whose canonical text exercises every way the evaluation reads a
+/// value without writing it (record 0262): integers, finite numbers around
+/// .NET's positional/scientific switch and the 2^53 and EMU ranges,
+/// lengths in every unit form and beyond 2^53 hundredths, and the values
+/// that are still written (text, tokens, booleans, colours, non-finite
+/// numbers).
+fn differential_values() -> Vec<Scalar<'static>> {
+    let mut values = vec![
+        Scalar::Bool(true),
+        Scalar::Bool(false),
+        Scalar::Token("single"),
+        Scalar::Token(""),
+        Scalar::Token("12"),
+        Scalar::Token("1in"),
+        Scalar::Color(Color::rgb(255, 0, 0)),
+        Scalar::Color(Color::rgba(0x12, 0x34, 0x56, 0x78)),
+        Scalar::Color(Color::parse("accent1+lumMod75", ColorContext::Drawing).expect("parses")),
+        Scalar::Number(f64::NAN),
+        Scalar::Number(f64::INFINITY),
+        Scalar::Number(f64::NEG_INFINITY),
+    ];
+    for int in [
+        0,
+        1,
+        -1,
+        7,
+        12,
+        500,
+        999,
+        1_000,
+        1_001,
+        1_200,
+        12_700,
+        360_000,
+        914_400,
+        3_600_000,
+        (1 << 53) + 1,
+        i64::MAX,
+        i64::MIN,
+        -914_400,
+    ] {
+        values.push(Scalar::Int(int));
+    }
+    for number in [
+        0.0,
+        -0.0,
+        0.5,
+        -0.5,
+        1.0,
+        2.54,
+        12.5,
+        450.5,
+        999.999_999_999_9,
+        1_000.0,
+        1_000.000_000_000_1,
+        1_200.0,
+        2_000.0,
+        914_400.0,
+        914_400.5,
+        1e-4,
+        9.999_999_999_999_999e-5,
+        1.5e-7,
+        -1.5e-7,
+        5e-324,
+        1e15,
+        999_999_999_999_999.9,
+        1e15 + 0.5,
+        123_456_789_012_345.6,
+        1e20,
+        -1e20,
+        9.3e18,
+        1e300,
+        f64::MAX,
+        f64::MIN,
+    ] {
+        values.push(Scalar::Number(number));
+    }
+    let mut state = 11_u64;
+    for emu in [
+        0,
+        1,
+        -1,
+        63,
+        127,
+        635,
+        1_800,
+        3_600,
+        6_350,
+        12_700,
+        180_000,
+        360_000,
+        3_599_999,
+        3_600_000,
+        3_600_001,
+        3_960_000,
+        914_400,
+        12_192_000,
+        -914_400,
+        i64::from(i32::MAX),
+        // 2^53 hundredths of a point and past them; the largest whole
+        // hundredths of a centimetre and of an inch.
+        (1_i64 << 53) * 127,
+        (1_i64 << 53) * 127 + 127,
+        i64::MAX / 3_600 * 3_600,
+        i64::MAX / 9_144 * 9_144,
+        i64::MAX,
+        i64::MIN,
+        i64::MAX - 126,
+    ] {
+        values.push(Scalar::Length(Length::from_emu(emu)));
+    }
+    for _ in 0..60 {
+        let emu = (pseudo_random(&mut state) % 40_000_000) as i64 - 20_000_000;
+        values.push(Scalar::Length(Length::from_emu(emu)));
+        values.push(Scalar::Length(Length::from_emu(emu / 127 * 127)));
+    }
+    for text in [
+        "",
+        "1200",
+        "800",
+        "450.5",
+        "2000",
+        "-.5",
+        "1.",
+        ".",
+        "-",
+        "-5",
+        "+5",
+        "1,000",
+        "1,5",
+        "(5)",
+        "50%",
+        "2.54cm",
+        "2.54CM",
+        "1800emu",
+        "abc",
+        "West",
+        " 12 ",
+        "12 ",
+        "1e5",
+        "1E+20",
+        "\u{a4}5",
+        "12pt ",
+        "\u{661}\u{662}",
+        "1\u{131}n",
+        "#FF0000",
+        "ff0000",
+        "--5",
+        "1-2",
+        "0.0001",
+        "1.5E-07",
+        "9223372036854775808",
+        "true",
+        "TRUE",
+        "single",
+    ] {
+        values.push(Scalar::Text(text));
+    }
+    values
+}
+
+const DIFFERENTIAL_LITERALS: &[&str] = &[
+    "0",
+    "1",
+    "-1",
+    "7",
+    "12",
+    "100",
+    "1000",
+    "1000.0",
+    "1,000",
+    "1200",
+    "2000",
+    "450.5",
+    "914400",
+    "2.54",
+    "2.54cm",
+    "2.54CM",
+    "1in",
+    "1IN",
+    "72pt",
+    "72PT",
+    "1cm",
+    "10cm",
+    "11cm",
+    "960pt",
+    "11pt",
+    "14.17pt",
+    "10.5",
+    "50%",
+    "1800emu",
+    "1800EMU",
+    "3600",
+    "abc",
+    "true",
+    "TRUE",
+    "false",
+    "#FF0000",
+    "ff0000",
+    "#5",
+    "#1200",
+    "##7",
+    "accent1",
+    "1e20",
+    "1E+20",
+    "1e15",
+    "1E+15",
+    "1000000000000000",
+    "1.5E-07",
+    "1.5e-7",
+    "0.00000015",
+    "0.0001",
+    "1E-04",
+    "0.5",
+    "12700",
+    "-2.54cm",
+    "-0",
+    "0.0",
+    "pt",
+    "cm",
+    "",
+    " ",
+    "2em",
+    "(5)",
+    "+5",
+    ".5",
+    "-.5",
+    "5.",
+    " 5",
+    "5 ",
+    "1\u{131}n",
+    "1\u{130}N",
+    "\u{17f}",
+    "\u{ff11}\u{ff12}",
+    "12\u{a4}",
+    "9223372036854775807",
+    "-9223372036854775808",
+    "single",
+    "SINGLE",
+    "NaN",
+    "Infinity",
+    "1mm",
+    "20mm",
+    "720400emu",
+    "720500",
+    "1q",
+    "5px",
+    "1pc",
+    "1rem",
+    "Revenue",
+    "West",
+    "\u{dc}",
+];
+
+/// The evaluation reads values without writing their text where it can; it
+/// gives exactly what writing the canonical text and reading it gives (the
+/// evaluation before record 0262, kept as `reference_eval`), for every
+/// operator, key type and value.
+#[test]
+fn evaluation_agrees_with_writing_and_reading_the_text() {
+    static UNDERLINE: Tokens = Tokens::new("underline", &["single", "double"], &[("sgl", 0)]);
+    let mut types = vec![
+        None,
+        Some(ValueType::Bool),
+        Some(ValueType::Int),
+        Some(ValueType::Number),
+        Some(ValueType::Text),
+        Some(ValueType::Token(&UNDERLINE)),
+        Some(ValueType::Color(ColorContext::Drawing)),
+        Some(ValueType::Color(ColorContext::Spreadsheet)),
+    ];
+    for context in [
+        LengthContext::Emu,
+        LengthContext::Extent,
+        LengthContext::LineWidth,
+        LengthContext::FontSize,
+    ] {
+        for style in [
+            LengthStyle::Auto,
+            LengthStyle::PointsFirst,
+            LengthStyle::Lossy,
+            LengthStyle::LineWidth,
+            LengthStyle::Points,
+        ] {
+            types.push(Some(ValueType::Length(LengthSpec::new(context, style))));
+        }
+    }
+    let values = differential_values();
+    let mut checked = 0_usize;
+    for ty in &types {
+        for op in OPS {
+            for literal in DIFFERENTIAL_LITERALS {
+                let compiled = crate::value::compare::Compiled::new(op, literal, *ty);
+                assert_eq!(
+                    compiled.eval(literal, None),
+                    compiled.reference_eval(literal, None),
+                    "absent {op} {literal:?} {ty:?}"
+                );
+                for value in &values {
+                    assert_eq!(
+                        compiled.eval(literal, Some(*value)),
+                        compiled.reference_eval(literal, Some(*value)),
+                        "{value:?} {op} {literal:?} as {ty:?}"
+                    );
+                    checked += 1;
+                }
+            }
+        }
+        let exists = crate::value::compare::Compiled::EXISTS;
+        for value in &values {
+            assert_eq!(
+                exists.eval("", Some(*value)),
+                exists.reference_eval("", Some(*value)),
+                "{value:?} exists as {ty:?}"
+            );
+        }
+    }
+    assert!(checked > 1_000_000, "{checked} comparisons");
+}

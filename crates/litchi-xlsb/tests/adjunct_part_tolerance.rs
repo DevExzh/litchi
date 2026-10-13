@@ -17,7 +17,7 @@ use litchi_xlsb::package::connections::{
     CommandType, Connection, Connections, DbProperties, Properties, SourceType,
 };
 use litchi_xlsb::package::table::{Column, Range as TableRange, Table, Type as TableType};
-use litchi_xlsb::raw::{Kind, Records, Writer, kind};
+use litchi_xlsb::raw::{Encoder, Kind, Records, kind};
 use litchi_xlsb::writer::{Builder, MutableWorksheet};
 use litchi_xlsb::{
     Defect, LayoutDefect, Package, ReservedFieldDefect, SourceBackedWorkbook, ToleranceReport,
@@ -61,7 +61,7 @@ fn rewrite(package_bytes: &[u8], part: &str, transform: impl FnOnce(&mut Stream)
         .collect();
     transform(&mut stream);
     let mut blob = Vec::new();
-    let mut writer = Writer::new(&mut blob);
+    let mut writer = Encoder::new(&mut blob);
     for (record_type, payload) in &stream {
         writer.write_record(*record_type, payload).unwrap();
     }
@@ -189,7 +189,7 @@ fn conformant_adjunct_parts_repair_nothing() {
             );
         }
         assert!(
-            Package::from_bytes(bytes)
+            Package::from_bytes(&bytes)
                 .unwrap()
                 .tolerance_report()
                 .is_clean()
@@ -220,9 +220,7 @@ fn trailing_table_record_bytes_are_ignored_and_recorded_once() {
         Some("SalesTable")
     );
     assert_eq!(
-        Package::from_bytes(bytes.clone())
-            .unwrap()
-            .tolerance_report(),
+        Package::from_bytes(&bytes).unwrap().tolerance_report(),
         workbook.tolerance_report()
     );
 
@@ -286,7 +284,7 @@ fn trailing_pivot_cache_definition_bytes_are_ignored_and_recorded() {
         format!("{:?}", control.pivot_cache_definitions())
     );
     assert_eq!(
-        Package::from_bytes(bytes).unwrap().tolerance_report(),
+        Package::from_bytes(&bytes).unwrap().tolerance_report(),
         workbook.tolerance_report()
     );
 }

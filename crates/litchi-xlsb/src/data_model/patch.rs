@@ -44,7 +44,7 @@ impl Patch {
         }
     }
 
-    pub(crate) fn limits(&self) -> super::ReadLimits {
+    pub(crate) fn limits(&self) -> super::SemanticLimits {
         self.before.limits()
     }
 
@@ -173,7 +173,7 @@ pub(crate) fn materialize_models(
 fn restore_source_tokens(
     package: &mut OpcPackage,
     source: &super::snapshot::SourceState,
-    limits: super::ReadLimits,
+    limits: super::SemanticLimits,
 ) -> Result<()> {
     let opc_limits = super::package::opc_capture_limits(limits)?;
     let root = PackURI::new("/").map_err(|error| Error::InvalidUri(error.to_string()))?;

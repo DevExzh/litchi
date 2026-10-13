@@ -12,7 +12,7 @@
 
 use crate::package::connections::model::*;
 use crate::package::error::{Error, Result};
-use crate::raw::Writer;
+use crate::raw::Encoder;
 use crate::raw::kind as rt;
 use std::collections::HashSet;
 
@@ -520,7 +520,7 @@ pub(crate) fn write_connections_part_with_unknown(
         ));
     }
     let mut data = Vec::with_capacity(512);
-    let mut writer = Writer::new(&mut data);
+    let mut writer = Encoder::new(&mut data);
     writer.write_record(rt::BEGIN_EXT_CONNECTIONS, &[])?;
     for connection in &connections.connections {
         if connection.name.is_empty() {

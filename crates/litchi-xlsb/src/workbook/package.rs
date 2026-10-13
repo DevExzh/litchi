@@ -1032,130 +1032,68 @@ impl Workbook {
 
     /// Read and validate an XLSB workbook with the default bounded OPC limits.
     pub fn new<R: Read + Seek>(reader: R) -> Result<Self> {
-        Self::new_with_limits_and_external_link_limits(
-            reader,
-            litchi_opc::SourceLimits::default(),
-            ExternalLinkLimits::default(),
-        )
+        Self::new_with_options(reader, crate::OpenOptions::default())
     }
 
-    /// Read an XLSB workbook for cell/catalog CRUD without decoding standard
-    /// SpreadsheetDrawing parts during open.
+    /// Read and validate an XLSB workbook under explicit ingress policies.
     ///
-    /// This explicit projection retains every drawing, chart, image, and
-    /// relationship part in the underlying OPC package for lossless save, but
-    /// does not populate the typed [`Workbook::sheet_drawings`] inventory.
-    /// Callers that need typed drawing access must use [`Self::new`] instead.
-    /// The source-backed workbook remains the preferred selector-first path
-    /// when positional input and deferred worksheet payloads are available.
-    pub fn new_without_drawing_parse<R: Read + Seek>(reader: R) -> Result<Self> {
-        Self::new_without_drawing_parse_with_limits_and_external_link_limits(
-            reader,
-            litchi_opc::SourceLimits::default(),
-            ExternalLinkLimits::default(),
-        )
-    }
-
-    /// Read a cell/catalog CRUD projection with explicit OPC resource limits.
-    pub fn new_without_drawing_parse_with_limits<R: Read + Seek>(
+    /// With [`crate::OpenOptions::parse_drawings`] `false` the projection
+    /// retains every drawing, chart, image and relationship part for lossless
+    /// save but does not populate the typed [`Workbook::sheet_drawings`]
+    /// inventory.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::package::PackageError::UnsupportedOpenPolicy`] for a
+    /// cache or execution policy (positional-source only), the OPC limit and
+    /// archive errors, and the workbook validation errors.
+    pub fn new_with_options<R: Read + Seek>(
         reader: R,
-        limits: litchi_opc::SourceLimits,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
-        Self::new_without_drawing_parse_with_limits_and_external_link_limits(
-            reader,
-            limits,
-            ExternalLinkLimits::default(),
-        )
-    }
-
-    /// Read a cell/catalog CRUD projection with explicit OPC and external-link
-    /// resource limits.
-    pub fn new_without_drawing_parse_with_limits_and_external_link_limits<R: Read + Seek>(
-        reader: R,
-        limits: litchi_opc::SourceLimits,
-        external_link_limits: ExternalLinkLimits,
-    ) -> Result<Self> {
-        let package = OpcPackage::from_reader_with_limits(reader, limits)?;
-        Self::from_opc_package_with_external_link_limits_and_drawing_policy(
-            package,
-            external_link_limits,
-            DrawingLoadPolicy::Skipped,
-        )
-    }
-
-    /// Read and validate an XLSB workbook with explicit OPC resource limits.
-    pub fn new_with_limits<R: Read + Seek>(
-        reader: R,
-        limits: litchi_opc::SourceLimits,
-    ) -> Result<Self> {
-        Self::new_with_limits_and_external_link_limits(
-            reader,
-            limits,
-            ExternalLinkLimits::default(),
-        )
-    }
-
-    /// Read and validate an XLSB workbook with explicit external-link
-    /// resource limits and default OPC limits.
-    pub fn new_with_external_link_limits<R: Read + Seek>(
-        reader: R,
-        external_link_limits: ExternalLinkLimits,
-    ) -> Result<Self> {
-        Self::new_with_limits_and_external_link_limits(
-            reader,
-            litchi_opc::SourceLimits::default(),
-            external_link_limits,
-        )
-    }
-
-    /// Read and validate an XLSB workbook with independent OPC and
-    /// external-link resource limits.
-    pub fn new_with_limits_and_external_link_limits<R: Read + Seek>(
-        reader: R,
-        limits: litchi_opc::SourceLimits,
-        external_link_limits: ExternalLinkLimits,
-    ) -> Result<Self> {
-        let package = OpcPackage::from_reader_with_limits(reader, limits)?;
-        Self::from_opc_package_with_external_link_limits(package, external_link_limits)
+        options.check_owning()?;
+        let package = OpcPackage::from_reader_with_limits(reader, options.source_limits)?;
+        Self::from_opc_package_with_options(package, options)
     }
 
     /// Create an XLSB workbook from an already-parsed OPC package.
     ///
     /// This is used for single-pass parsing where the OPC package has already
     /// been parsed during format detection. It avoids double-parsing.
-    ///
-    /// # Arguments
-    ///
-    /// * `package` - An already-parsed OPC package
     pub fn from_opc_package(package: OpcPackage) -> Result<Self> {
-        Self::from_opc_package_with_external_link_limits(package, ExternalLinkLimits::default())
+        Self::from_opc_package_with_options(package, crate::OpenOptions::default())
     }
 
-    /// Read an XLSB workbook with the default bounded OPC limits under an
-    /// explicit [`Leniency`].
+    /// Create an XLSB workbook from an already-parsed OPC package under
+    /// explicit semantic policies: external-link limits, leniency and the
+    /// drawing policy. The package's own source limits already applied when
+    /// it was read.
     ///
-    /// The Excel-compatible repairs are applied under every variant; see
+    /// The Excel-compatible repairs are applied under every leniency; see
     /// [`crate::leniency`]. [`Leniency::TolerateCachedNumbers`] additionally
     /// repairs non-normal cached numbers in materialized worksheets and
     /// cell-value snapshots, recording each repair in the report of the
     /// object that read the cell.
-    pub fn new_with_leniency<R: Read + Seek>(reader: R, leniency: Leniency) -> Result<Self> {
-        let mut workbook = Self::new(reader)?;
-        workbook.leniency = leniency;
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::package::PackageError::UnsupportedOpenPolicy`] for a
+    /// cache or execution policy, and the workbook validation errors.
+    pub fn from_opc_package_with_options(
+        package: OpcPackage,
+        options: crate::OpenOptions,
+    ) -> Result<Self> {
+        options.check_owning()?;
+        let mut workbook = Self::from_opc_package_with_external_link_limits_and_drawing_policy(
+            package,
+            options.external_link_limits,
+            options.drawing_load_policy(),
+        )?;
+        workbook.leniency = options.leniency;
         Ok(workbook)
     }
 
-    /// Create an XLSB workbook from an already-parsed OPC package under an
-    /// explicit [`Leniency`]; see [`Self::new_with_leniency`].
-    pub fn from_opc_package_with_leniency(package: OpcPackage, leniency: Leniency) -> Result<Self> {
-        let mut workbook = Self::from_opc_package(package)?;
-        workbook.leniency = leniency;
-        Ok(workbook)
-    }
-
-    /// Create an XLSB workbook from an already-parsed OPC package using
-    /// explicit external-link resource limits.
-    pub fn from_opc_package_with_external_link_limits(
+    pub(crate) fn from_opc_package_with_external_link_limits(
         package: OpcPackage,
         external_link_limits: ExternalLinkLimits,
     ) -> Result<Self> {

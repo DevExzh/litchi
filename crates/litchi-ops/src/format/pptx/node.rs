@@ -48,7 +48,7 @@ use super::spec::{
     RootKey, RunKey, SHAPE_PROPS, SLIDE_PROPS, SLIDE_SIZE, SMARTART_PROPS, ShapeKey, SlideKey,
     SmartArtKey, TABLE_PROPS, TableKey,
 };
-use super::steps::{self, Builder, Steps};
+use super::steps::{self, Builder};
 use super::text;
 use crate::error::{Error, Result};
 use crate::node::{
@@ -79,7 +79,15 @@ const UNTITLED: &str = "(untitled)";
 pub struct Node<'f> {
     file: &'f Pptx,
     item: Item,
-    path: OnceLock<Steps>,
+    /// The paths of an address of more than four steps, written on first
+    /// use; shorter paths are written on each request (record 0262).
+    deep: OnceLock<Box<DeepPaths>>,
+}
+
+/// The paths of a deep address, each written on first use.
+#[derive(Clone, Default)]
+struct DeepPaths {
+    canonical: OnceLock<Box<[PathStep<'static>]>>,
     positional: OnceLock<Box<[PathStep<'static>]>>,
 }
 
@@ -525,8 +533,7 @@ impl<'f> Node<'f> {
         Self {
             file,
             item,
-            path: OnceLock::new(),
-            positional: OnceLock::new(),
+            deep: OnceLock::new(),
         }
     }
 
@@ -841,6 +848,54 @@ impl<'f> Node<'f> {
         Ok(Some(u32::try_from(count).unwrap_or(u32::MAX)))
     }
 
+    /// The value at `index` of the node's property table: what
+    /// [`Self::format_member`] gives there. A shape-tree element other than
+    /// a table reads only that key's inputs (its transform, alternative
+    /// text or text body, each when the key needs it), so a geometry filter
+    /// does not decode the text body (record 0262); a read error of an input
+    /// the key does not use is not reported here, but by `format`.
+    pub(super) fn prop_member(&self, index: usize) -> Result<Option<Value<'_>>> {
+        let Item::Tree(tree) = &self.item else {
+            return Ok(self.format_member()?.get(index));
+        };
+        Ok(match tree.kind {
+            Kind::Shape => match ShapeKey::at(index) {
+                Some(key) => TreeProps::read_for(tree, Needs::shape(tree, key))?.shape(key),
+                None => None,
+            },
+            Kind::Table => self.format_member()?.get(index),
+            Kind::SmartArt => match SmartArtKey::at(index) {
+                Some(key) => TreeProps::read_for(tree, Needs::smartart(tree, key))?.smartart(key),
+                None => None,
+            },
+            _ => match FrameKey::at(index) {
+                Some(key) => TreeProps::read_for(tree, Needs::frame(tree, key))?.frame(key),
+                None => None,
+            },
+        })
+    }
+
+    /// The canonical or positional path: written now and carried by value
+    /// when it has at most four steps, else written once and kept.
+    fn address(&self, canonical: bool) -> NodePath<'_> {
+        fn kept(deep: &DeepPaths, canonical: bool) -> &OnceLock<Box<[PathStep<'static>]>> {
+            if canonical {
+                &deep.canonical
+            } else {
+                &deep.positional
+            }
+        }
+        if let Some(steps) = self.deep.get().and_then(|deep| kept(deep, canonical).get()) {
+            return NodePath::new(steps);
+        }
+        let steps = self.steps(canonical).finish();
+        if let Some(path) = NodePath::inline(steps.as_slice()) {
+            return path;
+        }
+        let deep = self.deep.get_or_init(Box::default);
+        NodePath::new(kept(deep, canonical).get_or_init(|| steps.into_boxed()))
+    }
+
     /// The `format` member's values.
     pub(super) fn format_member(&self) -> Result<Format<'_>> {
         let (table, kind) = match &self.item {
@@ -1000,18 +1055,11 @@ impl<'f> Project<'f> for Node<'f> {
     }
 
     fn path(&self) -> NodePath<'_> {
-        NodePath::new(
-            self.path
-                .get_or_init(|| self.steps(true).finish())
-                .as_slice(),
-        )
+        self.address(true)
     }
 
     fn positional_path(&self) -> NodePath<'_> {
-        NodePath::new(
-            self.positional
-                .get_or_init(|| self.steps(false).finish().into_boxed()),
-        )
+        self.address(false)
     }
 
     fn text(&self) -> Result<Option<Cow<'_, str>>> {
@@ -1097,12 +1145,129 @@ struct TreeProps<'a> {
     text: Option<text::Facts<'a>>,
 }
 
+/// The inputs a [`TreeProps`] reads.
+#[derive(Debug, Clone, Copy)]
+struct Needs {
+    transform: bool,
+    description: bool,
+    text: bool,
+}
+
+impl Needs {
+    /// What `format` reads: everything (the text body for shapes only).
+    const fn all(text: bool) -> Self {
+        Self {
+            transform: true,
+            description: true,
+            text,
+        }
+    }
+
+    /// The inputs of a geometry key: the transform when the scene has no
+    /// bounds for the element.
+    fn geometry(tree: &TreeItem) -> Self {
+        Self {
+            transform: tree.handle.view().bounds().is_none(),
+            description: false,
+            text: false,
+        }
+    }
+
+    const NONE: Self = Self {
+        transform: false,
+        description: false,
+        text: false,
+    };
+
+    const TRANSFORM: Self = Self {
+        transform: true,
+        description: false,
+        text: false,
+    };
+
+    const DESCRIPTION: Self = Self {
+        transform: false,
+        description: true,
+        text: false,
+    };
+
+    fn shape(tree: &TreeItem, key: ShapeKey) -> Self {
+        match key {
+            ShapeKey::Name
+            | ShapeKey::PhType
+            | ShapeKey::PhIndex
+            | ShapeKey::Id
+            | ShapeKey::IsTitle
+            | ShapeKey::Zorder => Self::NONE,
+            ShapeKey::Alt => Self::DESCRIPTION,
+            ShapeKey::X | ShapeKey::Y | ShapeKey::Width | ShapeKey::Height => Self::geometry(tree),
+            ShapeKey::FlipH | ShapeKey::FlipV | ShapeKey::Rotation => Self::TRANSFORM,
+            ShapeKey::Font
+            | ShapeKey::FontLatin
+            | ShapeKey::FontEa
+            | ShapeKey::FontCs
+            | ShapeKey::Size
+            | ShapeKey::Bold
+            | ShapeKey::Italic
+            | ShapeKey::Cap
+            | ShapeKey::Underline
+            | ShapeKey::Strike
+            | ShapeKey::Highlight
+            | ShapeKey::Spacing
+            | ShapeKey::Color
+            | ShapeKey::Align
+            | ShapeKey::LineSpacing
+            | ShapeKey::SpaceBefore
+            | ShapeKey::SpaceAfter
+            | ShapeKey::Indent
+            | ShapeKey::MarginLeft
+            | ShapeKey::MarginRight
+            | ShapeKey::Direction => Self {
+                transform: false,
+                description: false,
+                text: true,
+            },
+        }
+    }
+
+    fn frame(tree: &TreeItem, key: FrameKey) -> Self {
+        match key {
+            FrameKey::Name | FrameKey::Id | FrameKey::Zorder => Self::NONE,
+            FrameKey::Alt => Self::DESCRIPTION,
+            FrameKey::X | FrameKey::Y | FrameKey::Width | FrameKey::Height => Self::geometry(tree),
+            FrameKey::Rotation | FrameKey::FlipH | FrameKey::FlipV => Self::TRANSFORM,
+        }
+    }
+
+    fn smartart(tree: &TreeItem, key: SmartArtKey) -> Self {
+        match key {
+            SmartArtKey::Name | SmartArtKey::Id | SmartArtKey::Zorder => Self::NONE,
+            SmartArtKey::X | SmartArtKey::Y | SmartArtKey::Width | SmartArtKey::Height => {
+                Self::geometry(tree)
+            },
+        }
+    }
+}
+
 impl<'a> TreeProps<'a> {
     fn read(tree: &'a TreeItem, include_text: bool) -> Result<Self> {
+        Self::read_for(tree, Needs::all(include_text))
+    }
+
+    /// The values whose inputs `needs` names; the others read as absent.
+    fn read_for(tree: &'a TreeItem, needs: Needs) -> Result<Self> {
         let shape = tree.handle.view();
-        let transform = shape.transform().map_err(Error::from)?;
-        let description = shape.description().map_err(Error::from)?;
-        let text = if include_text {
+        let transform = if needs.transform {
+            shape.transform().map_err(Error::from)?
+        } else {
+            None
+        };
+        let description = if needs.description {
+            shape.description().map_err(Error::from)?
+        } else {
+            None
+        };
+        let text = if needs.text {
             tree.body()?.map(|body| text::Facts::of(body.as_ref()))
         } else {
             None

@@ -26,7 +26,7 @@ use litchi_xlsb::data_model::{Definition, Model};
 use litchi_xlsb::named_ranges::Definition as NamedRange;
 use litchi_xlsb::package::PackageError;
 use litchi_xlsb::package::connections::{Connection, Connections, SourceType};
-use litchi_xlsb::raw::{Kind, Records, Writer, kind};
+use litchi_xlsb::raw::{Encoder, Kind, Records, kind};
 use litchi_xlsb::shared_workbook::{
     Catalog, Guid, Header, Info, RawRecord, RevisionHeaders, RevisionLog, ShortDateTime, User,
     UserNames,
@@ -237,10 +237,10 @@ where
 
 fn rewrite_records<F>(source: &[u8], mut rewrite: F) -> Vec<u8>
 where
-    F: FnMut(Kind, &[u8], &mut Writer<&mut Vec<u8>>),
+    F: FnMut(Kind, &[u8], &mut Encoder<&mut Vec<u8>>),
 {
     let mut output = Vec::new();
-    let mut writer = Writer::new(&mut output);
+    let mut writer = Encoder::new(&mut output);
     for item in Records::new(source) {
         let record = item.expect("workbook record");
         rewrite(record.kind(), record.payload(), &mut writer);
@@ -284,7 +284,7 @@ fn with_opaque_sheet_record(package: &Package, name: &str) -> Package {
     let original = opc.get_part(&part).expect("sheet part").blob().to_vec();
     let opaque_kind = Kind::new(0x0ffe).expect("opaque worksheet record kind");
     let mut opaque = Vec::new();
-    Writer::new(&mut opaque)
+    Encoder::new(&mut opaque)
         .write_record(opaque_kind, b"opaque-insert-preservation")
         .expect("opaque record");
     let end_sheet = Records::new(&original)
@@ -389,7 +389,7 @@ fn extern_sheet_record_count(package: &Package) -> usize {
 fn with_unknown_workbook_record(package: &Package) -> Package {
     replace_workbook(package, |source, output| {
         let unknown = Kind::new(0x3ffe).expect("unknown workbook record kind");
-        let mut writer = Writer::new(output);
+        let mut writer = Encoder::new(output);
         let mut inserted = false;
         for item in Records::new(source) {
             let record = item.expect("workbook record");

@@ -14,7 +14,7 @@ use litchi_ops::transaction::SemanticLimits;
 use litchi_ops::{
     BatchItem, BatchMode, Code, File, ItemResult, OpenOptions, Props, SourceMode, props,
 };
-use litchi_xlsb::raw::{Records, Writer, kind};
+use litchi_xlsb::raw::{Encoder, Records, kind};
 use litchi_xlsb::sheet::{Kind, State};
 
 const FIRST: &str = "/sheet[1]";
@@ -57,7 +57,7 @@ fn with_states(bytes: &[u8], states: &[u32]) -> Vec<u8> {
     let mut rewritten = Vec::new();
     let mut position = 0;
     {
-        let mut writer = Writer::new(&mut rewritten);
+        let mut writer = Encoder::new(&mut rewritten);
         for record in Records::new(&original) {
             let record = record.expect("valid workbook record");
             let mut payload = record.payload().to_vec();
@@ -131,7 +131,7 @@ fn with_null_relationship(bytes: &[u8], target_position: usize) -> Vec<u8> {
     let mut rewritten = Vec::new();
     let mut position = 0;
     {
-        let mut writer = Writer::new(&mut rewritten);
+        let mut writer = Encoder::new(&mut rewritten);
         for record in Records::new(&original) {
             let record = record.expect("valid workbook record");
             let mut payload = record.payload().to_vec();
@@ -763,7 +763,7 @@ fn multi_window_active_relocation_is_an_explicit_capability_refusal() {
     let mut output = Vec::new();
     let mut inserted = false;
     {
-        let mut writer = Writer::new(&mut output);
+        let mut writer = Encoder::new(&mut output);
         for record in Records::new(&source) {
             let record = record.unwrap();
             writer

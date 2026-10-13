@@ -51,7 +51,9 @@ use crate::options::{OpenOptions, SourceMode};
 mod children;
 pub(crate) mod create;
 mod header;
+mod merge_write;
 mod metadata;
+mod name_write;
 mod nav;
 mod node;
 mod owner;
@@ -620,8 +622,11 @@ impl Xlsb {
         let mut workbook = match &self.0.owner {
             XlsbOwner::Source(workbook) => {
                 let bytes = signature::exact_source(workbook.workbook().source_backed_package())?;
-                xlsb::Package::from_bytes_with_limits(bytes, self.0.ooxml_limits)?
-                    .into_workbook()?
+                xlsb::Package::from_bytes_with_options(
+                    &bytes,
+                    litchi_xlsb::OpenOptions::new().source_limits(self.0.ooxml_limits),
+                )?
+                .into_workbook()?
             },
             XlsbOwner::Eager(workbook) => {
                 xlsb::Workbook::from_opc_package(workbook.opc_package().clone())?

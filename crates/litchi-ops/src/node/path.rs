@@ -21,9 +21,12 @@ use litchi_core::selector::{
 /// Explicit raw construction can also represent `/body/p[@paraId=1A2B3C4D]`,
 /// `/Sheet1/A1`, `/slide[1]/shape[@id=5]`.
 ///
-/// A `NodePath` borrows the steps its node stores. `Display` writes the
-/// grammar's canonical text without allocating; [`NodePath::to_path`] builds
-/// the equal [`Path`] value.
+/// A `NodePath` borrows the steps its node stores, or carries up to four
+/// steps by value: a node whose address is short and cheap to spell out (a
+/// worksheet cell, a slide's shape) writes its steps on demand instead of
+/// storing them, which keeps it small to move (record 0262). `Display`
+/// writes the grammar's canonical text without allocating;
+/// [`NodePath::to_path`] builds the equal [`Path`] value.
 ///
 /// A path deeper than the grammar's step limit (64,
 /// `litchi_core::selector::limits::MAX_STEPS`) still renders, but does not
@@ -46,31 +49,100 @@ use litchi_core::selector::{
 /// assert_eq!(NodePath::ROOT.to_string(), "/");
 /// # Ok::<(), litchi_core::selector::ParseError>(())
 /// ```
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy)]
 pub struct NodePath<'a> {
-    steps: &'a [PathStep<'a>],
+    repr: Repr<'a>,
 }
+
+/// The most steps a [`NodePath`] carries by value.
+const INLINE_STEPS: usize = 4;
+
+#[derive(Clone, Copy)]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "a path is a short-lived value; carrying a few steps inline is what spares a node \
+              from storing them"
+)]
+enum Repr<'a> {
+    /// Steps the node stores.
+    Borrowed(&'a [PathStep<'a>]),
+    /// Steps written for this path, the first `len` of `steps`.
+    Inline {
+        steps: [PathStep<'a>; INLINE_STEPS],
+        len: u8,
+    },
+}
+
+/// The step that fills an unused inline slot.
+const EMPTY_STEP: PathStep<'static> = PathStep::new("");
 
 impl<'a> NodePath<'a> {
     /// The document root, `/`.
-    pub const ROOT: NodePath<'static> = NodePath { steps: &[] };
+    pub const ROOT: NodePath<'static> = NodePath {
+        repr: Repr::Borrowed(&[]),
+    };
 
     /// The path through `steps`, from the root.
     #[must_use]
     pub const fn new(steps: &'a [PathStep<'a>]) -> Self {
-        Self { steps }
+        Self {
+            repr: Repr::Borrowed(steps),
+        }
+    }
+
+    /// The path through `steps`, from the root, carried by value; `None`
+    /// for more than four steps.
+    #[cfg_attr(
+        not(feature = "pptx"),
+        allow(dead_code, reason = "the PPTX adapter writes its short paths this way")
+    )]
+    pub(crate) fn inline(steps: &[PathStep<'a>]) -> Option<Self> {
+        let len = u8::try_from(steps.len())
+            .ok()
+            .filter(|&len| usize::from(len) <= INLINE_STEPS)?;
+        let mut inline = [EMPTY_STEP; INLINE_STEPS];
+        inline[..steps.len()].copy_from_slice(steps);
+        Some(Self {
+            repr: Repr::Inline { steps: inline, len },
+        })
+    }
+
+    /// The path of `first` and, when given, `second`, carried by value.
+    #[cfg_attr(
+        not(any(feature = "xlsx", feature = "xls")),
+        allow(
+            dead_code,
+            reason = "the XLSX and XLS adapters write their paths this way"
+        )
+    )]
+    pub(crate) fn short(first: PathStep<'a>, second: Option<PathStep<'a>>) -> Self {
+        let mut steps = [EMPTY_STEP; INLINE_STEPS];
+        steps[0] = first;
+        let len = match second {
+            Some(second) => {
+                steps[1] = second;
+                2
+            },
+            None => 1,
+        };
+        Self {
+            repr: Repr::Inline { steps, len },
+        }
     }
 
     /// The steps, from the root.
     #[must_use]
-    pub const fn steps(self) -> &'a [PathStep<'a>] {
-        self.steps
+    pub fn steps(&self) -> &[PathStep<'a>] {
+        match &self.repr {
+            Repr::Borrowed(steps) => steps,
+            Repr::Inline { steps, len } => &steps[..usize::from(*len)],
+        }
     }
 
     /// Whether this is the root path `/`.
     #[must_use]
-    pub const fn is_root(self) -> bool {
-        self.steps.is_empty()
+    pub fn is_root(&self) -> bool {
+        self.steps().is_empty()
     }
 
     /// The equal grammar value. It allocates where a [`Path`] does: past six
@@ -91,16 +163,32 @@ impl<'a> NodePath<'a> {
     /// Native identity steps require `path::raw::path` before resolution;
     /// ordinary format adapters must produce semantic names or positions.
     pub fn to_path(self) -> Path<'a> {
-        Path::from_steps(self.steps.iter().map(|step| step.to_step()))
+        Path::from_steps(self.steps().iter().map(|step| step.to_step()))
+    }
+}
+
+/// Paths are equal when their steps are, however they are carried.
+impl PartialEq for NodePath<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.steps() == other.steps()
+    }
+}
+
+impl Eq for NodePath<'_> {}
+
+impl std::hash::Hash for NodePath<'_> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.steps().hash(state);
     }
 }
 
 impl fmt::Display for NodePath<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.steps.is_empty() {
+        let steps = self.steps();
+        if steps.is_empty() {
             return f.write_char('/');
         }
-        for step in self.steps {
+        for step in steps {
             f.write_char('/')?;
             fmt::Display::fmt(step, f)?;
         }

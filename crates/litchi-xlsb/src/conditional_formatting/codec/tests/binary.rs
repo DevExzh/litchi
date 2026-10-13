@@ -9,7 +9,7 @@
 use super::super::super::model::*;
 use super::super::{binary::*, semantic::*};
 use crate::formula::ParsedFormula;
-use crate::raw::{Writer, kind};
+use crate::raw::{Encoder, kind};
 
 #[cfg(test)]
 mod model_tests {
@@ -678,7 +678,7 @@ mod tests {
         formatting.add_rule(icons);
 
         let mut bytes = Vec::new();
-        write_conditional_formattings(&mut Writer::new(&mut bytes), &[formatting]).unwrap();
+        write_conditional_formattings(&mut Encoder::new(&mut bytes), &[formatting]).unwrap();
         let records = Records::new(&bytes);
         let mut found = Vec::new();
         for record in records {
@@ -705,7 +705,7 @@ mod tests {
         let mut second = Formatting::new(vec!["B1".into()]);
         second.add_rule(rule);
         assert!(
-            write_conditional_formattings(&mut Writer::new(Vec::new()), &[first, second]).is_err()
+            write_conditional_formattings(&mut Encoder::new(Vec::new()), &[first, second]).is_err()
         );
     }
 
@@ -729,7 +729,7 @@ mod tests {
         formatting.add_rule(rule);
 
         let mut bytes = Vec::new();
-        write_conditional_formattings(&mut Writer::new(&mut bytes), &[formatting]).unwrap();
+        write_conditional_formattings(&mut Encoder::new(&mut bytes), &[formatting]).unwrap();
         let found = Records::new(&bytes)
             .map(|record| record.unwrap().kind())
             .collect::<Vec<_>>();
@@ -768,7 +768,9 @@ mod tests {
             0xff00_ff00,
         ));
         extension.add_rule(rule);
-        assert!(write_conditional_formattings(&mut Writer::new(Vec::new()), &[extension]).is_err());
+        assert!(
+            write_conditional_formattings(&mut Encoder::new(Vec::new()), &[extension]).is_err()
+        );
 
         let mut classic = Formatting::new(vec!["A1".into()]);
         let mut bar = Rule::new(RuleType::DataBar, 1);
@@ -779,6 +781,6 @@ mod tests {
             0xff44_72c4,
         ));
         classic.add_rule(bar);
-        assert!(write_conditional_formattings(&mut Writer::new(Vec::new()), &[classic]).is_err());
+        assert!(write_conditional_formattings(&mut Encoder::new(Vec::new()), &[classic]).is_err());
     }
 }

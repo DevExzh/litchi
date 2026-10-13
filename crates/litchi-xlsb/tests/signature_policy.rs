@@ -110,7 +110,7 @@ fn signed(plain: &[u8]) -> Vec<u8> {
 
 fn signed_workbook() -> (Vec<u8>, Workbook) {
     let bytes = signed(&fixture("Simple.xlsb"));
-    let workbook = Package::from_bytes(bytes.clone())
+    let workbook = Package::from_bytes(&bytes)
         .unwrap()
         .into_workbook()
         .unwrap();
@@ -201,7 +201,7 @@ fn explicit_unsign_authorizes_a_changed_edit() {
     workbook = commit.into_package().into_workbook().unwrap();
     let output = save(&workbook);
     assert!(!carries_signature(&output));
-    let reopened = Package::from_bytes(output)
+    let reopened = Package::from_bytes(&output)
         .unwrap()
         .into_workbook()
         .unwrap();
@@ -370,13 +370,13 @@ mod task_panes_and_ribbon {
 
     /// `Simple.xlsb` edited by `edit` while unsigned, then signed.
     fn signed_workbook_with(edit: impl FnOnce(&mut Workbook)) -> (Vec<u8>, Workbook) {
-        let mut plain = Package::from_bytes(fixture("Simple.xlsb"))
+        let mut plain = Package::from_bytes(&fixture("Simple.xlsb"))
             .unwrap()
             .into_workbook()
             .unwrap();
         edit(&mut plain);
         let bytes = signed(&save(&plain));
-        let workbook = Package::from_bytes(bytes.clone())
+        let workbook = Package::from_bytes(&bytes)
             .unwrap()
             .into_workbook()
             .unwrap();
@@ -416,7 +416,7 @@ mod task_panes_and_ribbon {
         assert!(workbook.remove_task_panes().unwrap());
         let output = save(&workbook);
         assert!(!carries_signature(&output));
-        let reopened = Package::from_bytes(output)
+        let reopened = Package::from_bytes(&output)
             .unwrap()
             .into_workbook()
             .unwrap();
@@ -451,7 +451,7 @@ mod task_panes_and_ribbon {
             .unwrap();
         let output = save(&workbook);
         assert!(!carries_signature(&output));
-        let reopened = Package::from_bytes(output)
+        let reopened = Package::from_bytes(&output)
             .unwrap()
             .into_workbook()
             .unwrap();
@@ -487,7 +487,7 @@ fn package_cell_removal_preserves_signed_noops_and_refuses_changed_publication()
             .to_bytes()
             .expect("bytes"),
     );
-    let source = Package::from_bytes(bytes.clone()).expect("signed source");
+    let source = Package::from_bytes(&bytes).expect("signed source");
     let mut noop = source.edit_cell_values(0).expect("edit").expect("sheet");
     assert!(!noop.remove(b1).expect("missing"));
     let commit = noop.commit().expect("signed noop");

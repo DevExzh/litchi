@@ -12,4 +12,4 @@ mod writer;
 pub use cursor::Cursor;
 pub use error::{Error, LimitResource, Result, Stage};
 pub use record::{Header, Kind, Limits, MAX_WIRE_PAYLOAD, MAX_WIRE_STRING_UNITS, Record, Records};
-pub use writer::Writer;
+pub use writer::Encoder;

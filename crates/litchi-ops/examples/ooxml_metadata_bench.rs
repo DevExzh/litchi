@@ -60,7 +60,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 })
             },
             _ => {
-                let package = litchi_xlsb::Package::from_bytes(bytes.clone())?;
+                let package = litchi_xlsb::Package::from_bytes(&bytes)?;
                 Box::new(move || {
                     let mut edit = package.edit_metadata()?;
                     edit.update(|m| m.title = Some(title.to_owned()))?;
@@ -107,6 +107,43 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 unified_ns,
             );
         }
+    }
+
+    // First set on a fresh source-backed PPTX handle (record 0262): the
+    // handle builds the eager package it commits metadata on once, so this
+    // pairs open + first set against the leaf's open + edit.
+    {
+        let bytes = create(FileFormat::Pptx)?.to_bytes()?;
+        let title = "Quarterly review";
+        let mut native_ns = Vec::new();
+        let mut unified_ns = Vec::new();
+        for round in 0..ROUNDS + WARMUP {
+            for route in [false, true, true, false] {
+                let start = Instant::now();
+                if route {
+                    let file = open_bytes(bytes.as_slice())?;
+                    black_box(file.set("/metadata", Props::new().with("title", title))?);
+                } else {
+                    let package = litchi_pptx::Package::from_bytes(&bytes)?;
+                    let mut edit = package.edit_metadata()?;
+                    edit.update(|m| m.title = Some(title.to_owned()))?;
+                    black_box(edit.commit()?.into_package());
+                }
+                let elapsed = start.elapsed().as_nanos();
+                if round >= WARMUP {
+                    if route {
+                        unified_ns.push(elapsed);
+                    } else {
+                        native_ns.push(elapsed);
+                    }
+                }
+            }
+        }
+        report(
+            "Pptx open + first set /title (source open vs leaf eager open)",
+            native_ns,
+            unified_ns,
+        );
     }
 
     // Open: what the application-properties read adds to a source-backed

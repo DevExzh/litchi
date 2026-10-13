@@ -8,7 +8,7 @@
 
 use super::super::model::{CellRange, ChangedCell};
 use crate::package::error::{Error, Result};
-use crate::raw::{Cursor, Kind, Writer};
+use crate::raw::{Cursor, Encoder, Kind};
 use std::io::Write;
 
 const BEGIN_MANAGER: u16 = 500;
@@ -137,7 +137,7 @@ pub(crate) fn write_manager_header(
     result_ranges: &[CellRange],
 ) -> Result<Vec<u8>> {
     let mut payload = Vec::new();
-    let mut writer = Writer::new(&mut payload);
+    let mut writer = Encoder::new(&mut payload);
     writer.write_u16(match current {
         Some(index) => u16::try_from(index).map_err(|_| Error::Unrecognized {
             typ: "BrtBeginScenMan isctCur".to_string(),
@@ -180,7 +180,7 @@ pub(crate) fn write_scenario_header(
     user_name: &str,
 ) -> Result<Vec<u8>> {
     let mut payload = Vec::new();
-    let mut writer = Writer::new(&mut payload);
+    let mut writer = Encoder::new(&mut payload);
     writer.write_u16(u16::try_from(count).map_err(|_| Error::Unrecognized {
         typ: "BrtBeginSct cref".to_string(),
         val: "changed-cell count exceeds u16".to_string(),
@@ -195,7 +195,7 @@ pub(crate) fn write_scenario_header(
 
 pub(crate) fn write_changed_cell(cell: &ChangedCell) -> Result<Vec<u8>> {
     let mut payload = Vec::new();
-    let mut writer = Writer::new(&mut payload);
+    let mut writer = Encoder::new(&mut payload);
     writer.write_u32(cell.row())?;
     writer.write_u32(cell.column())?;
     writer.write_u32(0)?;
@@ -206,7 +206,7 @@ pub(crate) fn write_changed_cell(cell: &ChangedCell) -> Result<Vec<u8>> {
 }
 
 pub(crate) fn write_record<W: Write>(
-    writer: &mut Writer<W>,
+    writer: &mut Encoder<W>,
     kind: Kind,
     payload: &[u8],
 ) -> Result<()> {

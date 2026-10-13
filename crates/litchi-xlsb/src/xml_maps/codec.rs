@@ -13,7 +13,7 @@ use super::model::{
 };
 use super::validation;
 use crate::package::error::{Error, Result};
-use crate::raw::{Cursor, Kind, Limits as RawLimits, Records, Writer, kind as rt};
+use crate::raw::{Cursor, Encoder, Kind, Limits as RawLimits, Records, kind as rt};
 
 const LIST_SINGLE_CELL: u32 = 1 << 1;
 const XML_CAN_BE_SINGLE: u32 = 1 << 1;
@@ -431,7 +431,7 @@ fn serialize_column_binding_with_flags(
             source,
         })?;
     {
-        let mut writer = Writer::with_limits(
+        let mut writer = Encoder::with_limits(
             &mut payload,
             RawLimits::new(limits.max_part_bytes, limits.max_xpath_units),
         );
@@ -454,7 +454,7 @@ fn serialize_column_binding_with_flags(
             resource: "XML column binding records",
             source,
         })?;
-    let mut writer = Writer::with_limits(
+    let mut writer = Encoder::with_limits(
         &mut output,
         RawLimits::new(limits.max_part_bytes, limits.max_xpath_units),
     );
@@ -848,7 +848,7 @@ pub fn serialize_single_cells(values: &[SingleCellBinding], limits: Limits) -> R
             source,
         })?;
     let raw_limits = RawLimits::new(limits.max_part_bytes, limits.max_xpath_units);
-    let mut writer = Writer::with_limits(&mut output, raw_limits);
+    let mut writer = Encoder::with_limits(&mut output, raw_limits);
     writer.write_record(rt::BEGIN_SINGLE_CELLS, &[])?;
     for value in values {
         let list = single_list_payload(value, limits)?;
@@ -870,7 +870,7 @@ pub fn serialize_single_cells(values: &[SingleCellBinding], limits: Limits) -> R
 
 fn single_list_payload(value: &SingleCellBinding, limits: Limits) -> Result<Vec<u8>> {
     let mut payload = checked_vec(92, "single-cell BrtBeginList")?;
-    let mut writer = Writer::with_limits(
+    let mut writer = Encoder::with_limits(
         &mut payload,
         RawLimits::new(limits.max_part_bytes, limits.max_xpath_units),
     );
@@ -895,7 +895,7 @@ fn single_list_payload(value: &SingleCellBinding, limits: Limits) -> Result<Vec<
 
 fn single_column_payload(value: &SingleCellBinding, limits: Limits) -> Result<Vec<u8>> {
     let mut payload = checked_vec(48, "single-cell BrtBeginListCol")?;
-    let mut writer = Writer::with_limits(
+    let mut writer = Encoder::with_limits(
         &mut payload,
         RawLimits::new(limits.max_part_bytes, limits.max_xpath_units),
     );

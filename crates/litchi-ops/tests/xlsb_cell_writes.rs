@@ -320,7 +320,7 @@ fn xlsb_cell_capabilities_advertise_scalar_and_clear_writes() {
     );
     let formula = cell.property("formula").expect("formula capability");
     assert!(formula.get());
-    assert!(!formula.set(), "formula authoring remains an explicit gap");
+    assert!(formula.set(), "formula text is authored (record 0261)");
 }
 
 #[test]
@@ -442,16 +442,16 @@ fn exact_cell_noops_reuse_input_bytes_and_keep_the_base_immutable() {
 }
 
 #[test]
-fn formula_authoring_is_a_typed_capability_gap() {
+fn formulas_needing_workbook_context_are_a_typed_capability_gap() {
     let bytes = fixture();
 
     for eager in [false, true] {
         let original = open_owner(&bytes, eager);
         let original_bytes = original.to_bytes().expect("publish original owner");
         let error = original
-            .set(A1, props! { "formula" => "1+1" })
-            .expect_err("XLSB formula authoring is unsupported");
-        assert_eq!(error.code(), Code::UnsupportedProperty);
+            .set(A1, props! { "formula" => "1+Archive!A1" })
+            .expect_err("XLSB contextual formula authoring is unsupported");
+        assert_eq!(error.code(), Code::UnsupportedCapability);
         assert_eq!(error.property(), Some("formula"));
         assert_eq!(
             original.to_bytes().expect("publish after formula refusal"),
@@ -756,14 +756,14 @@ fn atomic_and_best_effort_batches_handle_mixed_cell_operations() {
             .batch(
                 [
                     batch_set(A1, Props::new().with("value", "atomic")),
-                    batch_set(A2, Props::new().with("formula", "1+1")),
+                    batch_set(A2, Props::new().with("formula", "1+Archive!A1")),
                     batch_set(SECOND_A1, Props::new().with("value", "suffix")),
                 ],
                 BatchMode::Atomic,
             )
             .expect_err("atomic batch must reject unsupported formula");
         assert_eq!(atomic_error.item(), Some(1));
-        assert_eq!(atomic_error.code(), Code::UnsupportedProperty);
+        assert_eq!(atomic_error.code(), Code::UnsupportedCapability);
         assert_eq!(
             original.to_bytes().expect("publish atomic base"),
             original_bytes,
@@ -774,7 +774,7 @@ fn atomic_and_best_effort_batches_handle_mixed_cell_operations() {
             .batch(
                 [
                     batch_set(A1, Props::new().with("value", "best")),
-                    batch_set(A2, Props::new().with("formula", "1+1")),
+                    batch_set(A2, Props::new().with("formula", "1+Archive!A1")),
                     batch_set(SECOND_A1, Props::new().with("value", "suffix")),
                 ],
                 BatchMode::BestEffort,

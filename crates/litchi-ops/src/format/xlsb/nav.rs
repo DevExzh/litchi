@@ -258,6 +258,11 @@ pub(super) fn tab_count(file: &Xlsb) -> Result<usize> {
 
 /// Fence a public operation around both its source read and result creation.
 pub(super) fn finish<T>(file: &Xlsb, operation: impl FnOnce() -> Result<T>) -> Result<T> {
+    // Inside a resolver or query step, whose check after the step covers
+    // this read, the read runs alone (record 0262).
+    if crate::path::fence::is_active(fence_key(file)) {
+        return operation();
+    }
     file.0.owner.ensure_current()?;
     let value = operation();
     let freshness = file.0.owner.ensure_current();
@@ -265,6 +270,11 @@ pub(super) fn finish<T>(file: &Xlsb, operation: impl FnOnce() -> Result<T>) -> R
         Err(error) => Err(error),
         Ok(()) => value,
     }
+}
+
+/// The handle's key for [`crate::path::fence::Scope`].
+fn fence_key(file: &Xlsb) -> usize {
+    std::ptr::from_ref(&file.0.owner).addr()
 }
 
 fn table_position<'t>(
@@ -401,6 +411,10 @@ impl<'f> Navigate<'f> for Nav<'f> {
 
     fn check_source(&self) -> Result<()> {
         self.file.0.owner.ensure_current()
+    }
+
+    fn fence_key(&self) -> usize {
+        fence_key(self.file)
     }
 
     fn root(&self) -> Result<Node<'f>> {

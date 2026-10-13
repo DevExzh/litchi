@@ -9,7 +9,7 @@
 use super::model::*;
 use super::parse::parse_connections_part;
 use crate::package::Workbook;
-use crate::raw::{Kind, Writer, kind as rt};
+use crate::raw::{Encoder, Kind, kind as rt};
 use crate::writer::{Builder, MutableWorksheet};
 use litchi_opc::PackURI;
 use std::io::Cursor;
@@ -29,7 +29,7 @@ fn record(record_type: Kind, payload: &[u8]) -> (Kind, Vec<u8>) {
 
 fn build(records: &[(Kind, Vec<u8>)]) -> Vec<u8> {
     let mut data = Vec::new();
-    let mut writer = Writer::new(&mut data);
+    let mut writer = Encoder::new(&mut data);
     for (record_type, payload) in records {
         writer.write_record(*record_type, payload).unwrap();
     }

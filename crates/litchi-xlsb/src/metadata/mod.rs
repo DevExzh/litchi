@@ -5,7 +5,9 @@
 //! [`Package::edit_metadata`] starts an [`Edit`] whose [`Edit::commit`]
 //! returns a [`Commit`] holding the new snapshot, the [`Patch`] and the
 //! [`Diagnostics`]. [`Package::apply_metadata`] replays a patch onto an
-//! equal snapshot. The source snapshot never changes.
+//! equal snapshot. The source snapshot never changes. [`source`] edits the
+//! same families of a [`crate::SourceBackedWorkbook`] without materializing
+//! it.
 //!
 //! The shared OOXML engine ([`litchi_ooxml_common::properties`]) routes each
 //! field to the part that stores it and keeps the lexical form of every
@@ -34,6 +36,8 @@ use litchi_ooxml_common::properties::{self, Snapshot, app};
 pub use litchi_ooxml_common::properties::{Diagnostics, Error, LimitKind, Patch};
 
 use crate::package::Package;
+
+pub mod source;
 
 type Result<T> = std::result::Result<T, Error>;
 

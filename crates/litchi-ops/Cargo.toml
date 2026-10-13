@@ -116,5 +116,16 @@ required-features = ["test-support"]
 name = "query_walk_bench"
 required-features = ["test-support"]
 
+# Representative queries over the OOXML corpora return what they returned
+# before the query-walker optimizations (record 0262).
+[[test]]
+name              = "query_corpus_differential"
+required-features = ["xlsx", "docx", "pptx"]
+
+# Prints the corpus query digests, to compare two builds (record 0262).
+[[example]]
+name              = "query_corpus_digest"
+required-features = ["xlsx", "docx", "pptx"]
+
 [lints]
 workspace = true

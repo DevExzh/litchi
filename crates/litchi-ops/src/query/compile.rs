@@ -32,7 +32,7 @@ use litchi_core::selector::{
 use super::inspect::Inspect;
 use super::plan::{
     Chain, CompoundPlan, CondPlan, Diagnostic, DiagnosticKind, ExprNode, HeaderPlan, Link, Plan,
-    Positional, ScopePlan, Structural, Target,
+    Positional, ScopePlan, Shortcut, Structural, Target,
 };
 use crate::Family;
 use crate::error::{Code, Error, Result};
@@ -377,11 +377,17 @@ impl<'q, 'f, N: Inspect<'f>> Compiler<'q, 'f, N> {
         let len = to_u32(links.len())?;
         self.plan.links.extend(links);
         let id = to_u32(self.plan.chains.len())?;
+        let shortcut = if len == 1 {
+            self.plan.compounds[subject as usize].shortcut(subject)
+        } else {
+            Shortcut::None
+        };
         self.plan.chains.push(Chain {
             first,
             len,
             kinds,
             position,
+            shortcut,
         });
         Ok(id)
     }
@@ -511,9 +517,44 @@ impl<'q, 'f, N: Inspect<'f>> Compiler<'q, 'f, N> {
             }
         }
         plan.expr = self.and(conds)?;
+        if plan.no_alt.is_none() {
+            if let Some(expr) = plan.expr {
+                self.mark_direct(expr);
+            }
+        }
         let id = to_u32(self.plan.compounds.len())?;
         self.plan.compounds.push(plan);
         Ok((id, position))
+    }
+
+    /// Marks the one condition of the expression `expr` that reads
+    /// properties, when only one does, to read its value alone.
+    fn mark_direct(&mut self, expr: u32) {
+        let (mut readers, mut last) = (0_usize, None);
+        self.property_readers(expr, &mut readers, &mut last);
+        if let (1, Some(only)) = (readers, last) {
+            self.plan.conds[only as usize].direct = true;
+        }
+    }
+
+    /// Counts the conditions of `expr` that read properties, keeping the
+    /// last one. Recurses as deep as the expression, which the grammar
+    /// bounds.
+    fn property_readers(&self, expr: u32, readers: &mut usize, last: &mut Option<u32>) {
+        match self.plan.exprs[expr as usize] {
+            ExprNode::Cond(cond) => {
+                if self.plan.conds[cond as usize].reads_properties() {
+                    *readers += 1;
+                    *last = Some(cond);
+                }
+            },
+            ExprNode::And(start, len) | ExprNode::Or(start, len) => {
+                for &arg in &self.plan.expr_args[start as usize..(start + len) as usize] {
+                    self.property_readers(arg, readers, last);
+                }
+            },
+            ExprNode::Not(inner) => self.property_readers(inner, readers, last),
+        }
     }
 
     /// The kind set, structural test and refinement of a named element.
@@ -878,6 +919,7 @@ impl<'q, 'f, N: Inspect<'f>> Compiler<'q, 'f, N> {
             literal,
             by_kind,
             targets,
+            direct: false,
         });
         Ok(id)
     }

@@ -30,7 +30,9 @@
 //! ```
 
 mod drawing_transfer;
+mod format;
 mod formula_transfer;
+mod names;
 mod package;
 mod resources;
 mod scalar_sst;
@@ -39,10 +41,11 @@ pub mod workbook;
 pub mod worksheet;
 
 pub use drawing_transfer::DrawingTransferRefusal;
-pub use package::{Commit, Diagnostics, Edit, Patch, Scalar};
+pub use format::{BorderLine, Format};
+pub use package::{Commit, Diagnostics, Edit, EditOptions, Patch, Scalar};
 pub use worksheet::{
-    CellError, CellFormula, Change, Limits, Number, Reference, Snapshot, StoredCell, StyleIndex,
-    TransferLimits, Value,
+    CellError, CellFormula, Change, LimitKind, Limits, Number, Reference, Snapshot, StoredCell,
+    StyleIndex, TransferLimits, Value,
 };
 
 pub use crate::package::error::{Error, Result};

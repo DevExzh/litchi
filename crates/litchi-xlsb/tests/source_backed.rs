@@ -20,7 +20,7 @@ use litchi_opc::{
 use litchi_xlsb::cell_values::{Reference, StyleIndex, Value};
 use litchi_xlsb::external_link::ExternalLinkLimits;
 use litchi_xlsb::package::PackageError;
-use litchi_xlsb::raw::{Header, Limits as RawLimits, Records, Writer, kind};
+use litchi_xlsb::raw::{Encoder, Header, Limits as RawLimits, Records, kind};
 use litchi_xlsb::sheet::{Kind, State};
 use litchi_xlsb::{Leniency, SourceBackedWorkbook, SourceLimits, Workbook};
 
@@ -108,7 +108,7 @@ fn two_external_link_fixture() -> (Vec<u8>, usize) {
         })
         .unwrap();
     let mut second_reference = Vec::new();
-    Writer::new(&mut second_reference)
+    Encoder::new(&mut second_reference)
         .write_record(kind::SUP_BOOK_SRC, &external_wide_string("rIdExternalCopy"))
         .unwrap();
     workbook_blob.splice(end..end, second_reference);
@@ -160,7 +160,7 @@ fn reserved_cell_flag_fixture() -> Vec<u8> {
     let uri = PackURI::new("/xl/worksheets/sheet1.bin").unwrap();
     let source = package.get_part(&uri).unwrap().blob().to_vec();
     let mut rewritten = Vec::new();
-    let mut writer = Writer::new(&mut rewritten);
+    let mut writer = Encoder::new(&mut rewritten);
     let mut changed = false;
     for record in Records::new(&source) {
         let record = record.unwrap();
@@ -184,7 +184,7 @@ fn reserved_indexed_fixture() -> Vec<u8> {
     let uri = PackURI::new("/xl/worksheets/sheet1.bin").unwrap();
     let source = package.get_part(&uri).unwrap().blob().to_vec();
     let mut rewritten = Vec::new();
-    let mut writer = Writer::new(&mut rewritten);
+    let mut writer = Encoder::new(&mut rewritten);
     let mut changed = false;
     for record in Records::new(&source) {
         let record = record.unwrap();
@@ -240,7 +240,7 @@ fn rewrite_null_relationship(position: usize, state: u32) -> Vec<u8> {
     let mut workbook_blob = Vec::new();
     let mut current_position = 0;
     {
-        let mut writer = Writer::new(&mut workbook_blob);
+        let mut writer = Encoder::new(&mut workbook_blob);
         for record in Records::new(&original) {
             let record = record.unwrap();
             let mut payload = record.payload().to_vec();
@@ -298,7 +298,7 @@ fn add_comments_part(content_type: &str) -> Vec<u8> {
     let sheet_uri = PackURI::new("/xl/worksheets/sheet1.bin").unwrap();
     let comments_uri = PackURI::new("/xl/comments1.bin").unwrap();
     let mut comments = Vec::new();
-    litchi_xlsb::comments::write(&mut Writer::new(&mut comments), &[]).unwrap();
+    litchi_xlsb::comments::write(&mut Encoder::new(&mut comments), &[]).unwrap();
     package.add_part(Box::new(BlobPart::new(
         comments_uri,
         content_type.to_owned(),
@@ -683,10 +683,11 @@ fn selectors_remain_metadata_only_and_source_checked() {
 fn managed_cancellation_is_checked_for_catalog_selectors_state_and_handles() {
     let source = Arc::new(VersionedSource::new(fixture()));
     let (cancellation_source, context) = managed_context();
-    let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
         source,
-        SourceLimits::default(),
-        context,
+        litchi_xlsb::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let sheet_name = workbook.sheet_names().unwrap().remove(0);
@@ -732,10 +733,11 @@ fn managed_cancellation_is_checked_before_catalog_construction() {
     let (cancellation_source, context) = managed_context();
     cancellation_source.cancel();
     assert!(matches!(
-        SourceBackedWorkbook::from_read_at_with_execution_context(
+        SourceBackedWorkbook::from_read_at_with_options(
             Arc::new(OwnedSource::new(fixture())),
-            SourceLimits::default(),
-            context,
+            litchi_xlsb::OpenOptions::new()
+                .source_limits(SourceLimits::default())
+                .execution_context(context)
         ),
         Err(PackageError::Opc(OpcError::Cancelled))
     ));
@@ -745,10 +747,11 @@ fn managed_cancellation_is_checked_before_catalog_construction() {
 fn managed_cancellation_precedes_stale_source_preflight() {
     let source = Arc::new(VersionedSource::new(fixture()));
     let (cancellation_source, context) = managed_context();
-    let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
         source.clone(),
-        SourceLimits::default(),
-        context,
+        litchi_xlsb::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     source.change();
@@ -761,10 +764,11 @@ fn managed_cancellation_precedes_stale_source_preflight() {
 fn stale_source_preflight_remains_source_changed_without_cancellation() {
     let source = Arc::new(VersionedSource::new(fixture()));
     let (_cancellation_source, context) = managed_context();
-    let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
         source.clone(),
-        SourceLimits::default(),
-        context,
+        litchi_xlsb::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let selected = workbook.sheet(0_usize).unwrap().unwrap();
@@ -792,10 +796,11 @@ fn stale_source_preflight_remains_source_changed_without_cancellation() {
 fn cancellation_during_selected_materialization_is_typed_and_not_cached() {
     let (cancellation_source, context) = managed_context();
     let source = Arc::new(CancelOnArmedRead::new(fixture(), cancellation_source));
-    let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
         source.clone(),
-        SourceLimits::default(),
-        context,
+        litchi_xlsb::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let selected = workbook.worksheet_by_index(0).unwrap().unwrap();
@@ -839,10 +844,11 @@ fn source_fences_run_before_a_semantic_cache_hit() {
 
     let source = Arc::new(VersionedSource::new(fixture()));
     let (cancellation_source, context) = managed_context();
-    let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
         source,
-        SourceLimits::default(),
-        context,
+        litchi_xlsb::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let selected = workbook.worksheet_by_index(0).unwrap().unwrap();
@@ -894,9 +900,11 @@ fn late_source_fence_rolls_back_candidate_and_report_publication() {
 #[test]
 fn cached_grid_trim_and_reparse_keeps_one_fallback_tolerance_report() {
     let source = add_pivot_relationship(reserved_indexed_fixture());
-    let workbook =
-        SourceBackedWorkbook::from_reader_with_leniency(Cursor::new(source), Leniency::Strict)
-            .unwrap();
+    let workbook = SourceBackedWorkbook::from_reader_with_options(
+        Cursor::new(source),
+        litchi_xlsb::OpenOptions::new().leniency(Leniency::Strict),
+    )
+    .unwrap();
     let selected = workbook.worksheet_by_index(0).unwrap().unwrap();
     assert!(matches!(
         selected.grid(),
@@ -920,9 +928,11 @@ fn late_source_fence_rolls_back_cached_grid_and_fallback_report() {
     let source_bytes = add_pivot_relationship(reserved_indexed_fixture());
     for skip_versions in 0..128 {
         let source = Arc::new(LateFenceSource::new(source_bytes.clone()));
-        let workbook =
-            SourceBackedWorkbook::from_read_at_with_leniency(source.clone(), Leniency::Strict)
-                .unwrap();
+        let workbook = SourceBackedWorkbook::from_read_at_with_options(
+            source.clone(),
+            litchi_xlsb::OpenOptions::new().leniency(Leniency::Strict),
+        )
+        .unwrap();
         let selected = workbook.worksheet_by_index(0).unwrap().unwrap();
         source.arm_after_versions(skip_versions);
 
@@ -947,9 +957,11 @@ fn late_source_fence_rolls_back_cached_grid_and_fallback_report() {
 #[test]
 fn source_trim_and_reparse_keeps_one_worksheet_tolerance_report() {
     let source = reserved_cell_flag_fixture();
-    let workbook =
-        SourceBackedWorkbook::from_reader_with_leniency(Cursor::new(source), Leniency::Strict)
-            .unwrap();
+    let workbook = SourceBackedWorkbook::from_reader_with_options(
+        Cursor::new(source),
+        litchi_xlsb::OpenOptions::new().leniency(Leniency::Strict),
+    )
+    .unwrap();
     let selected = workbook.worksheet_by_index(0).unwrap().unwrap();
 
     let first = selected.grid().unwrap();
@@ -1112,8 +1124,11 @@ fn declared_part_read_limit_is_forwarded_at_catalog_open() {
         .build()
         .unwrap();
     assert!(
-        SourceBackedWorkbook::from_read_at_with_limits(Arc::new(OwnedSource::new(source)), limits,)
-            .is_err()
+        SourceBackedWorkbook::from_read_at_with_options(
+            Arc::new(OwnedSource::new(source)),
+            litchi_xlsb::OpenOptions::new().source_limits(limits)
+        )
+        .is_err()
     );
 }
 
@@ -1552,9 +1567,9 @@ fn unknown_sheet_relationship_suffix_is_rejected() {
 #[test]
 fn finite_cache_policy_is_forwarded_to_deferred_parts() {
     let cache_limits = SourceCacheLimits::new(1, 1).unwrap();
-    let workbook = SourceBackedWorkbook::from_read_at_with_cache_limits(
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
         Arc::new(OwnedSource::new(fixture())),
-        cache_limits,
+        litchi_xlsb::OpenOptions::new().cache_limits(cache_limits),
     )
     .unwrap();
     let selected = workbook.worksheet_by_index(0).unwrap().unwrap();
@@ -1617,7 +1632,7 @@ fn table_column_payload(caption: &str) -> Vec<u8> {
 
 fn table_part_payload(id: u32, display_name: &str) -> Vec<u8> {
     let mut data = Vec::new();
-    let mut writer = Writer::new(&mut data);
+    let mut writer = Encoder::new(&mut data);
     writer
         .write_record(kind::BEGIN_LIST, &table_header_payload(id, display_name))
         .unwrap();
@@ -1635,7 +1650,7 @@ fn table_part_payload(id: u32, display_name: &str) -> Vec<u8> {
 
 fn malformed_table_part_payload() -> Vec<u8> {
     let mut data = Vec::new();
-    let mut writer = Writer::new(&mut data);
+    let mut writer = Encoder::new(&mut data);
     writer.write_record(kind::BEGIN_LIST, &[0; 8]).unwrap();
     data
 }
@@ -1653,7 +1668,7 @@ fn resident_table_formula(table_id: u32) -> (Vec<u8>, Vec<u8>) {
 
 fn worksheet_with_table(table_relationship_id: Option<&str>, formula: Option<&[u8]>) -> Vec<u8> {
     let mut data = Vec::new();
-    let mut writer = Writer::new(&mut data);
+    let mut writer = Encoder::new(&mut data);
     let mut dimensions = Vec::new();
     for value in [0_u32, 1, 0, 0] {
         dimensions.extend_from_slice(&value.to_le_bytes());
@@ -1699,7 +1714,7 @@ fn bundle_sheet_payload(id: u32, relationship_id: &str, name: &str) -> Vec<u8> {
 
 fn two_sheet_workbook_payload() -> Vec<u8> {
     let mut data = Vec::new();
-    let mut writer = Writer::new(&mut data);
+    let mut writer = Encoder::new(&mut data);
     writer
         .write_record(kind::BUNDLE_SH, &bundle_sheet_payload(1, "rId1", "Sheet1"))
         .unwrap();
@@ -2011,8 +2026,11 @@ fn source_catalog_defers_table_payload_and_materializes_cross_sheet_reference() 
         None,
     ));
     let cache_limits = SourceCacheLimits::new(1, 1).unwrap();
-    let workbook =
-        SourceBackedWorkbook::from_read_at_with_cache_limits(source.clone(), cache_limits).unwrap();
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
+        source.clone(),
+        litchi_xlsb::OpenOptions::new().cache_limits(cache_limits),
+    )
+    .unwrap();
     assert_eq!(source.table_payload_reads(), 0);
     let catalog = workbook.cache_diagnostics();
     assert_eq!(catalog.cold_loads, 1);
@@ -2155,10 +2173,11 @@ fn source_table_cancellation_does_not_publish_partial_cache() {
         &["xl/tables/table1.bin", "xl/tables/table2.bin"],
         Some(cancellation_source),
     ));
-    let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
         source.clone(),
-        SourceLimits::default(),
-        context,
+        litchi_xlsb::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let selected = workbook.worksheet_by_index(0).unwrap().unwrap();
@@ -2282,9 +2301,9 @@ fn source_external_link_declared_size_is_lazily_bounded() {
         .max_total_part_bytes(0)
         .build()
         .unwrap();
-    let workbook = SourceBackedWorkbook::from_read_at_with_external_link_limits(
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
         Arc::new(OwnedSource::new(external_link_fixture())),
-        limits,
+        litchi_xlsb::OpenOptions::new().external_link_limits(limits),
     )
     .unwrap();
 
@@ -2304,9 +2323,9 @@ fn source_external_link_parts_share_one_aggregate_budget() {
         .max_total_part_bytes(part_bytes)
         .build()
         .unwrap();
-    let rejecting = SourceBackedWorkbook::from_read_at_with_external_link_limits(
+    let rejecting = SourceBackedWorkbook::from_read_at_with_options(
         Arc::new(OwnedSource::new(bytes.clone())),
-        rejecting_limits,
+        litchi_xlsb::OpenOptions::new().external_link_limits(rejecting_limits),
     )
     .unwrap();
     assert_eq!(rejecting.external_link_count().unwrap(), 2);
@@ -2320,9 +2339,9 @@ fn source_external_link_parts_share_one_aggregate_budget() {
         .max_total_part_bytes(part_bytes.checked_mul(2).unwrap())
         .build()
         .unwrap();
-    let exact = SourceBackedWorkbook::from_read_at_with_external_link_limits(
+    let exact = SourceBackedWorkbook::from_read_at_with_options(
         Arc::new(OwnedSource::new(bytes)),
-        exact_limits,
+        litchi_xlsb::OpenOptions::new().external_link_limits(exact_limits),
     )
     .unwrap();
     let links = exact.external_links().unwrap();
@@ -2371,10 +2390,11 @@ fn source_external_link_second_part_cancellation_is_typed() {
         ],
         Some(cancellation_source),
     ));
-    let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
         source.clone(),
-        SourceLimits::default(),
-        context,
+        litchi_xlsb::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     source.arm_cancel_on_table(1);

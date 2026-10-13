@@ -5,7 +5,7 @@
 
 //! Bounded BIFF12 codecs for the shared-workbook owner.
 
-use crate::raw::{Cursor, Kind, Limits, Records, Writer};
+use crate::raw::{Cursor, Encoder, Kind, Limits, Records};
 
 use super::model::{
     Guid, Header, Info, MAX_HEADERS, MAX_NAME_UNITS, MAX_PART_BYTES, MAX_RECORDS, MAX_STRING_UNITS,
@@ -299,7 +299,7 @@ fn write_records(records: &[RawRecord]) -> Result<Vec<u8>> {
     }
     let mut output = Vec::new();
     {
-        let mut writer = Writer::new(&mut output);
+        let mut writer = Encoder::new(&mut output);
         for record in records {
             let projected = writer
                 .get_ref()

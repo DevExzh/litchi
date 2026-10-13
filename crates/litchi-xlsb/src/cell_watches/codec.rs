@@ -4,7 +4,7 @@ use super::model::{Item, UnknownRecord, Watch};
 use super::phonetic::{Alignment, Info, Type};
 use super::validation;
 use crate::package::error::{Error, Result};
-use crate::raw::{Cursor, Kind, Limits, Records, Writer, kind};
+use crate::raw::{Cursor, Encoder, Kind, Limits, Records, kind};
 use std::sync::Arc;
 
 /// One source record span. The source allocation is shared by snapshots and
@@ -55,7 +55,7 @@ pub(crate) fn parse_watch(payload: &[u8]) -> Result<Watch> {
 
 pub(crate) fn write_watch(watch: Watch) -> Result<Vec<u8>> {
     let mut payload = Vec::with_capacity(8);
-    let mut writer = Writer::new(&mut payload);
+    let mut writer = Encoder::new(&mut payload);
     writer.write_u32(watch.row())?;
     writer.write_u32(watch.column())?;
     Ok(payload)
@@ -78,7 +78,7 @@ pub(crate) fn parse_phonetic(payload: &[u8]) -> Result<Info> {
 
 pub(crate) fn write_phonetic(info: Info) -> Result<Vec<u8>> {
     let mut payload = Vec::with_capacity(10);
-    let mut writer = Writer::new(&mut payload);
+    let mut writer = Encoder::new(&mut payload);
     writer.write_u16(info.font_index())?;
     writer.write_u32(info.phonetic_type().wire())?;
     writer.write_u32(info.alignment().wire())?;
@@ -87,7 +87,7 @@ pub(crate) fn write_phonetic(info: Info) -> Result<Vec<u8>> {
 
 pub(crate) fn encode_record(record_kind: Kind, payload: &[u8]) -> Result<Vec<u8>> {
     let mut output = Vec::with_capacity(payload.len().saturating_add(5));
-    Writer::new(&mut output).write_record(record_kind, payload)?;
+    Encoder::new(&mut output).write_record(record_kind, payload)?;
     Ok(output)
 }
 

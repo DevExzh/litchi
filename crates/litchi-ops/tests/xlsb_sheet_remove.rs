@@ -12,7 +12,7 @@ use litchi_ops::transaction::SemanticLimits;
 use litchi_ops::{
     BatchItem, BatchMode, Code, File, NewNode, OpenOptions, Props, SourceMode, create,
 };
-use litchi_xlsb::raw::{Records, Writer, kind};
+use litchi_xlsb::raw::{Encoder, Records, kind};
 
 const FIRST: &str = "/sheet[1]";
 const SECOND: &str = "/sheet[2]";
@@ -208,7 +208,7 @@ fn dependency_free_chart_fixture() -> Vec<u8> {
     };
     let mut rewritten_blob = Vec::new();
     {
-        let mut writer = Writer::new(&mut rewritten_blob);
+        let mut writer = Encoder::new(&mut rewritten_blob);
         for record in Records::new(&original_blob) {
             let record = record.expect("read chart sheet record");
             if record.kind() != kind::DRAWING {

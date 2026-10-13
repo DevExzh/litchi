@@ -1050,6 +1050,13 @@ impl Store {
         }
     }
 
+    /// The stored record at `index` of the row-major record order, in O(1).
+    pub(crate) fn record(&self, index: RecordIndex) -> Option<(Address, &Cell)> {
+        self.cells
+            .get(index.0)
+            .map(|entry| (entry.address, &entry.cell))
+    }
+
     /// Stored records inside `range`, in row-major order, with their
     /// record-level metadata.
     pub(crate) fn entries_in(&self, range: Rect) -> Entries<'_> {
@@ -1060,6 +1067,7 @@ impl Store {
             cells: &self.cells,
             rows: &self.cell_rows[start..],
             current: &[],
+            position: 0,
             range,
         }
     }
@@ -1228,6 +1236,27 @@ pub struct Cells<'a> {
     entries: Entries<'a>,
 }
 
+impl<'a> Cells<'a> {
+    /// The same traversal, with each record's position in its grid's
+    /// row-major record order, which reads the record again in O(1)
+    /// ([`crate::workbook::source::Grid::record`], [`crate::Worksheet::record`]).
+    ///
+    /// ```
+    /// # fn demo(grid: &litchi_xlsx::workbook::source::Grid) -> litchi_xlsx::Result<()> {
+    /// for (index, at, cell) in grid.cells("A1:C10")?.indexed() {
+    ///     assert_eq!(grid.record(index), Some((at, cell)));
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn indexed(self) -> IndexedCells<'a> {
+        IndexedCells {
+            entries: self.entries,
+        }
+    }
+}
+
 impl<'a> Iterator for Cells<'a> {
     type Item = (Address, &'a Cell);
 
@@ -1239,23 +1268,74 @@ impl<'a> Iterator for Cells<'a> {
     }
 }
 
+/// The position of a stored record in its grid's row-major record order.
+///
+/// It reads the record again in O(1) from the grid that produced it
+/// ([`Cells::indexed`]); a position from another grid reads another record
+/// or none.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct RecordIndex(usize);
+
+impl RecordIndex {
+    /// The zero-based position.
+    #[must_use]
+    pub const fn get(self) -> usize {
+        self.0
+    }
+
+    /// The record position `index`.
+    #[must_use]
+    pub const fn new(index: usize) -> Self {
+        Self(index)
+    }
+}
+
+/// Borrowed sparse cells inside a half-open range, each with its
+/// [`RecordIndex`] ([`Cells::indexed`]).
+#[derive(Debug)]
+pub struct IndexedCells<'a> {
+    entries: Entries<'a>,
+}
+
+impl<'a> Iterator for IndexedCells<'a> {
+    type Item = (RecordIndex, Address, &'a Cell);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let (index, entry) = self.entries.next_indexed()?;
+        Some((RecordIndex(index), entry.address, &entry.cell))
+    }
+}
+
 /// Borrowed stored records inside a half-open range, in row-major order.
 #[derive(Debug)]
 pub(crate) struct Entries<'a> {
     cells: &'a [Stored],
     rows: &'a [CellRowStart],
     current: &'a [Stored],
+    /// The record position of `current`'s first entry.
+    position: usize,
     range: Rect,
 }
 
 impl<'a> Iterator for Entries<'a> {
     type Item = &'a Stored;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
+        self.next_indexed().map(|(_, entry)| entry)
+    }
+}
+
+impl<'a> Entries<'a> {
+    /// The next record with its position in the record order.
+    fn next_indexed(&mut self) -> Option<(usize, &'a Stored)> {
         loop {
             if let Some((entry, remaining)) = self.current.split_first() {
                 self.current = remaining;
-                return Some(entry);
+                let index = self.position;
+                self.position += 1;
+                return Some((index, entry));
             }
 
             let (row, remaining_rows) = self.rows.split_first()?;
@@ -1288,6 +1368,7 @@ impl<'a> Iterator for Entries<'a> {
                 selected.partition_point(|entry| entry.address.column().get() < self.range.end().1)
             };
             self.current = &selected[..selected_len];
+            self.position = row.start + start;
         }
     }
 }
@@ -1295,6 +1376,37 @@ impl<'a> Iterator for Entries<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn indexed_cells_read_their_records_again() {
+        let addresses = [(0, 0), (0, 3), (0, 7), (2, 1), (2, 2), (5, 0), (5, 9)];
+        let store = empty_store(&addresses);
+        let whole = Rect::new(Address::at(0, 0).expect("start"), 10, 10).expect("range");
+        let indexed: Vec<_> = store.cells(whole).indexed().collect();
+        assert_eq!(indexed.len(), addresses.len());
+        for (position, (index, at, cell)) in indexed.iter().enumerate() {
+            assert_eq!(index.get(), position, "the whole grid lists every record");
+            assert_eq!(store.record(*index), Some((*at, *cell)));
+        }
+        // A range that starts and ends mid-row lists the records it covers,
+        // each at its position in the whole order.
+        let inner = Rect::new(Address::at(0, 1).expect("start"), 6, 8).expect("range");
+        let plain: Vec<_> = store.cells(inner).collect();
+        let indexed: Vec<_> = store.cells(inner).indexed().collect();
+        assert_eq!(plain.len(), indexed.len());
+        for ((at, cell), (index, indexed_at, indexed_cell)) in plain.iter().zip(&indexed) {
+            assert_eq!((at, cell), (indexed_at, indexed_cell));
+            assert_eq!(store.record(*index), Some((*at, *cell)));
+        }
+        assert_eq!(
+            indexed
+                .iter()
+                .map(|(index, ..)| index.get())
+                .collect::<Vec<_>>(),
+            [1, 2, 3, 4]
+        );
+        assert_eq!(store.record(RecordIndex::new(addresses.len())), None);
+    }
 
     fn empty_store(addresses: &[(u32, u32)]) -> Store {
         let cells = addresses

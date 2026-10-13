@@ -11,7 +11,7 @@
 )]
 
 use litchi_core::sheet::{CellValue, traits::WorkbookTrait};
-use litchi_xlsb::cell_values::structure::{AuthoredStyle, History, Patch};
+use litchi_xlsb::cell_values::structure::{AuthoredStyle, History, LimitKind, Patch};
 use litchi_xlsb::cell_values::{
     CellFormula, DrawingTransferRefusal, Reference, TransferLimits, Value,
 };
@@ -19,7 +19,7 @@ use litchi_xlsb::chart::{Chart, ExternalDataPart};
 use litchi_xlsb::named_ranges::Definition as NamedRange;
 use litchi_xlsb::package::table::{Column, Range as TableRange, Table, Type as TableType};
 use litchi_xlsb::package::{PackageError, SharedString, SharedStringRun};
-use litchi_xlsb::raw::{Records, Writer, kind};
+use litchi_xlsb::raw::{Encoder, Records, kind};
 use litchi_xlsb::shapes::{
     Anchor as ShapeAnchor, CellMarker, EditAs, Emu, EmuExtent, EmuOffset, Object as ShapeObject,
     Preset,
@@ -83,7 +83,7 @@ fn workbook_with_bundle_suffix(workbook: &Workbook, suffix: &[u8]) -> Workbook {
         .to_vec();
     let mut rewritten = Vec::new();
     {
-        let mut writer = Writer::new(&mut rewritten);
+        let mut writer = Encoder::new(&mut rewritten);
         for record in Records::new(&original) {
             let record = record.expect("workbook record");
             let mut payload = record.payload().to_vec();
@@ -115,7 +115,7 @@ fn workbook_with_unpaired_bundle_name(workbook: &Workbook) -> Workbook {
         .to_vec();
     let mut rewritten = Vec::new();
     {
-        let mut writer = Writer::new(&mut rewritten);
+        let mut writer = Encoder::new(&mut rewritten);
         for record in Records::new(&original) {
             let record = record.expect("workbook record");
             let mut payload = record.payload().to_vec();
@@ -165,14 +165,11 @@ fn workbook_with_unpaired_bundle_name(workbook: &Workbook) -> Workbook {
         .expect("unpaired-name workbook")
 }
 
-fn assert_limit(error: PackageError, resource: &str) {
-    let PackageError::LimitExceeded {
-        resource: observed, ..
-    } = error
-    else {
+fn assert_limit(error: PackageError, expected: LimitKind) {
+    let PackageError::Limit { kind, .. } = error else {
         panic!("expected typed limit error, got {error:?}");
     };
-    assert_eq!(observed, resource);
+    assert_eq!(kind, expected);
 }
 
 fn publish_structure_patch(workbook: &mut Workbook, patch: &Patch) {
@@ -293,7 +290,7 @@ fn standard_drawing_xml(workbook: &Workbook) -> Vec<u8> {
         .to_package()
         .write_to(&mut bytes)
         .expect("workbook package save");
-    let package = Package::from_slice(bytes.get_ref()).expect("package reopen");
+    let package = Package::from_bytes(bytes.get_ref()).expect("package reopen");
     package
         .opc_package()
         .try_iter_parts()
@@ -313,7 +310,7 @@ fn standard_drawing_external_hyperlinks(workbook: &Workbook) -> Vec<(String, Str
         .to_package()
         .write_to(&mut bytes)
         .expect("workbook package save");
-    let package = Package::from_slice(bytes.get_ref()).expect("package reopen");
+    let package = Package::from_bytes(bytes.get_ref()).expect("package reopen");
     let drawing = package
         .opc_package()
         .iter_parts()
@@ -1485,7 +1482,9 @@ fn structural_quotas_return_typed_limit_errors() {
     );
     let mut edit = target
         .to_package()
-        .edit_with_limits(limits)
+        .edit_with_options(
+            litchi_xlsb::cell_values::structure::EditOptions::new().transfer_limits(limits),
+        )
         .expect("limited edit");
     edit.set_sheet_name(0, "Renamed".to_owned())
         .expect("first operation")
@@ -1499,7 +1498,7 @@ fn structural_quotas_return_typed_limit_errors() {
             Reference::new(1, 0).expect("target reference"),
         )
         .expect_err("second operation quota");
-    assert_limit(error, "workbook structural operations");
+    assert_limit(error, LimitKind::Changes);
 
     let patch = two_operation_patch();
     let wire = patch
@@ -1516,11 +1515,11 @@ fn structural_quotas_return_typed_limit_errors() {
         patch
             .to_bytes(operation_limits)
             .expect_err("patch operation quota"),
-        "workbook structural operations",
+        LimitKind::Changes,
     );
     assert_limit(
         Patch::from_bytes(&wire, operation_limits).expect_err("decoded operation quota"),
-        "workbook structural operations",
+        LimitKind::Changes,
     );
 
     let byte_limits = TransferLimits::new(
@@ -1531,11 +1530,11 @@ fn structural_quotas_return_typed_limit_errors() {
     );
     assert_limit(
         patch.to_bytes(byte_limits).expect_err("patch byte quota"),
-        "durable workbook patch bytes",
+        LimitKind::PatchBytes,
     );
     assert_limit(
         Patch::from_bytes(&wire, byte_limits).expect_err("decoded byte quota"),
-        "durable workbook patch bytes",
+        LimitKind::PatchBytes,
     );
 
     let history_limits = TransferLimits::new(
@@ -1547,6 +1546,6 @@ fn structural_quotas_return_typed_limit_errors() {
     let mut history = History::new(history_limits).expect("limited history");
     assert_limit(
         history.push(patch).expect_err("history byte quota"),
-        "workbook patch history bytes",
+        LimitKind::HistoryBytes,
     );
 }

@@ -1252,41 +1252,82 @@ fn xlsb_reports_keep_selection_semantic_and_declare_sheet_and_cell_writes() {
             .properties()
             .map(|property| property.name())
             .collect::<Vec<_>>(),
-        vec!["name"]
+        vec!["name", "ref", "scope"]
     );
     let cell = caps.element("cell").unwrap();
-    for unsupported in [
-        "font.bold",
-        "fill",
-        "border.left",
-        "protection.locked",
-        "numFmtId",
-        "numberformat",
-    ] {
+    for unsupported in ["protection.locked", "numFmtId", "font.scheme"] {
         assert!(
             cell.property(unsupported).is_none(),
             "XLSB must not advertise {unsupported}"
         );
     }
+    // Record 0261: formatting reads and writes.
+    for supported in ["font.bold", "fill", "border.left", "numberformat"] {
+        let property = cell.property(supported).expect("advertised");
+        assert!(property.get() && property.set(), "{supported}");
+    }
     for element in caps.elements() {
         assert!(element.paths().all(|(path, _)| {
             !path.contains("<id>") && !path.contains("[@id=") && !path.contains("[@rId=")
         }));
+        // Record 0261: the cell setters (also accepted by ranges) and `merge`.
+        const CELL_WRITES: &[&str] = &[
+            "value",
+            "formula",
+            "clear",
+            "font.bold",
+            "font.italic",
+            "strike",
+            "underline",
+            "font.name",
+            "font.size",
+            "font.color",
+            "fill",
+            "border.all",
+            "border.all.color",
+            "border.left",
+            "border.left.color",
+            "border.right",
+            "border.right.color",
+            "border.top",
+            "border.top.color",
+            "border.bottom",
+            "border.bottom.color",
+            "numberformat",
+            "alignment.horizontal",
+            "alignment.vertical",
+            "alignment.wrapText",
+            "alignment.textRotation",
+            "alignment.indent",
+            "alignment.shrinkToFit",
+            "alignment.readingOrder",
+        ];
         for property in element.properties() {
+            let name = property.name();
             let payload = matches!(element.name(), "cell" | "range")
-                && matches!(property.name(), "value" | "clear");
-            assert_eq!(property.get(), !payload, "{}", property.name());
+                && matches!(name, "value" | "clear" | "border.all" | "border.all.color");
+            let range_write_only = element.name() == "range" && name != "merge";
+            assert_eq!(
+                property.get(),
+                !(payload || range_write_only),
+                "{}.{name}",
+                element.name()
+            );
             assert_eq!(
                 property.set(),
-                (element.name() == "sheet"
-                    && matches!(property.name(), "name" | "hidden" | "visibility"))
-                    || payload,
+                (element.name() == "sheet" && matches!(name, "name" | "hidden" | "visibility"))
+                    || (element.name() == "namedrange" && name == "ref")
+                    || (element.name() == "cell" && CELL_WRITES.contains(&name))
+                    || (element.name() == "range"
+                        && (CELL_WRITES.contains(&name) || name == "merge")),
                 "{}.{}",
                 element.name(),
                 property.name()
             );
-            let sheet_add = element.name() == "sheet"
-                && matches!(property.name(), "name" | "hidden" | "visibility");
+            let sheet_add = (element.name() == "sheet"
+                && matches!(property.name(), "name" | "hidden" | "visibility"))
+                || (element.name() == "namedrange"
+                    && matches!(property.name(), "name" | "ref" | "scope"));
             assert_eq!(
                 property.add(),
                 sheet_add,

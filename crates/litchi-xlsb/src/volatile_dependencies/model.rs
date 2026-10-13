@@ -32,7 +32,7 @@ pub const HARD_MAX_RELATIONSHIPS: usize = 1_000_000;
 /// ownership check. Values are checked against hard safety ceilings before
 /// parsing or reserving semantic collections.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ReadLimits {
+pub struct SemanticLimits {
     /// Maximum encoded bytes in each inspected Workbook or owner stream and
     /// each captured relationship/content-types source token.
     pub max_part_bytes: usize,
@@ -56,7 +56,7 @@ pub struct ReadLimits {
     pub max_relationships: usize,
 }
 
-impl ReadLimits {
+impl SemanticLimits {
     /// Conservative finite defaults for ordinary workbook inspection.
     pub const DEFAULT: Self = Self {
         max_part_bytes: 16 * 1024 * 1024,
@@ -147,7 +147,7 @@ impl ReadLimits {
     }
 }
 
-impl Default for ReadLimits {
+impl Default for SemanticLimits {
     fn default() -> Self {
         Self::DEFAULT
     }
@@ -330,7 +330,7 @@ impl Dependencies {
     }
 
     /// Validate model cardinalities, scalar domains, and caller quotas.
-    pub fn validate(&self, limits: ReadLimits) -> Result<()> {
+    pub fn validate(&self, limits: SemanticLimits) -> Result<()> {
         let limits = limits.validate()?;
         if self.types.len() > limits.max_types {
             return Err(limit(
@@ -453,7 +453,7 @@ impl Dependencies {
 fn validate_cached_value(
     value: &CachedValue,
     strings: &mut usize,
-    limits: ReadLimits,
+    limits: SemanticLimits,
 ) -> Result<()> {
     match value {
         CachedValue::Number(value) => validate_xnum(*value),
@@ -479,7 +479,7 @@ pub(crate) fn validate_xnum(value: f64) -> Result<()> {
 fn add_string(
     value: &mut usize,
     string: &str,
-    limits: ReadLimits,
+    limits: SemanticLimits,
     what: &'static str,
 ) -> Result<()> {
     let units = string.encode_utf16().count();

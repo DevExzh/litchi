@@ -18,7 +18,7 @@
 
 use crate::Workbook;
 use crate::package::error::{Error, Result};
-use crate::raw::{Header, Limits as RawLimits, Records, Writer as BinaryWriter, kind};
+use crate::raw::{Encoder as BinaryEncoder, Header, Limits as RawLimits, Records, kind};
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -1753,13 +1753,13 @@ fn attach_drawing_to_worksheet(
         },
     );
     let mut payload = Vec::new();
-    BinaryWriter::new(&mut payload).write_wide_string(&relationship_id)?;
+    BinaryEncoder::new(&mut payload).write_wide_string(&relationship_id)?;
     let mut output = Vec::new();
     let mut inserted = false;
     for item in Records::new(&worksheet_source) {
         let record = item?;
         if !inserted && matches!(record.kind(), kind::BEGIN_LIST_PARTS | kind::END_SHEET) {
-            BinaryWriter::new(&mut output).write_record(kind::DRAWING, &payload)?;
+            BinaryEncoder::new(&mut output).write_record(kind::DRAWING, &payload)?;
             inserted = true;
         }
         copy_record(&worksheet_source, &record, &mut output)?;

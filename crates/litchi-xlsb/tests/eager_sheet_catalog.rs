@@ -13,7 +13,7 @@ use litchi_opc::{OpcPackage, PackURI};
 use litchi_xlsb::Workbook;
 use litchi_xlsb::chart::{Anchor, Chart};
 use litchi_xlsb::package::PackageError;
-use litchi_xlsb::raw::{Records, Writer, kind};
+use litchi_xlsb::raw::{Encoder, Records, kind};
 use litchi_xlsb::sheet::{Kind, State};
 use litchi_xlsb::writer::{Builder, MutableChartSheet, MutableWorksheet};
 
@@ -164,7 +164,7 @@ fn with_states(bytes: &[u8], states: &[(usize, u32)]) -> Vec<u8> {
     let original = package.get_part(&workbook_uri).unwrap().blob().to_vec();
     let mut rewritten = Vec::new();
     {
-        let mut writer = Writer::new(&mut rewritten);
+        let mut writer = Encoder::new(&mut rewritten);
         let mut position = 0;
         for record in Records::new(&original) {
             let record = record.unwrap();
@@ -194,7 +194,7 @@ fn with_null_relationship(bytes: &[u8], position: usize, state: u32) -> Vec<u8> 
     let mut rewritten = Vec::new();
     let mut current_position = 0;
     {
-        let mut writer = Writer::new(&mut rewritten);
+        let mut writer = Encoder::new(&mut rewritten);
         for record in Records::new(&original) {
             let record = record.unwrap();
             let mut payload = record.payload().to_vec();

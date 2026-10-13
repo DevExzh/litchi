@@ -3,7 +3,7 @@
 use litchi_opc::{BlobPart, OpcPackage, Part, TargetMode};
 
 use super::snapshot::{SourcePart, SourceRelationship};
-use super::{ReadLimits, Snapshot};
+use super::{SemanticLimits, Snapshot};
 use crate::package::error::{Error, Result};
 
 /// A reversible replacement of the exact XML Maps-owned package graph.
@@ -41,7 +41,7 @@ impl Patch {
         }
     }
 
-    pub(crate) fn limits(&self) -> ReadLimits {
+    pub(crate) fn limits(&self) -> SemanticLimits {
         self.before.limits()
     }
 

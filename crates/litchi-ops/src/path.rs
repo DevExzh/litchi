@@ -58,6 +58,7 @@
 pub(crate) mod arg;
 #[cfg(any(test, feature = "test-support"))]
 mod fake;
+pub(crate) mod fence;
 pub(crate) mod navigate;
 pub(crate) mod report;
 pub(crate) mod resolve;

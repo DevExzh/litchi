@@ -34,10 +34,11 @@ use std::ops::Deref;
 use litchi_core::selector::{Combinator, Path, Position, Step};
 
 use super::inspect::{HeaderBinding, HeaderKey, Inspect};
-use super::plan::{Chain, ExprNode, Plan, Positional, ScopePlan, Structural, Target};
+use super::plan::{Chain, ExprNode, Plan, Positional, ScopePlan, Shortcut, Structural, Target};
 use crate::error::{Code, Error, Result};
 use crate::node::{Format, Value};
 use crate::path::PathArg;
+use crate::path::fence::Scope;
 use crate::path::navigate::{ElementKind, KindSet, Lookup, Navigate, Resolved, Select};
 use crate::path::resolve;
 use crate::value::Scalar;
@@ -346,10 +347,15 @@ where
             self.finish();
             return Ok(None);
         }
-        let result = self
-            .nav
-            .check_source()
-            .and_then(|()| self.advance_checked());
+        // One check after the step fences every read of it: the adapter's
+        // nested reads skip their own checks while the scope is active, and a
+        // source that changed before or during the step fails this check, so
+        // its error wins over whatever the step read, as it would if checked
+        // before as well (record 0262).
+        let result = {
+            let _scope = Scope::enter(self.nav.fence_key());
+            self.advance_checked()
+        };
         let result = self.nav.check_source().and(result);
         if result.is_err() {
             self.finish();
@@ -783,7 +789,7 @@ where
             {
                 continue;
             }
-            if !self.chain_matches(chain_id, &candidate, &mut probe, 0)? {
+            if !self.shortcut_matches(chain, chain_id, &candidate, &mut probe, 0)? {
                 continue;
             }
             match chain.position {
@@ -828,6 +834,30 @@ where
             state
                 .pending_path
                 .push((frame.node.clone(), frame.kind, frame.ordinal));
+        }
+    }
+
+    /// Whether a candidate of one of `chain`'s kinds matches it: through its
+    /// shortcut when it has one (a kind-only compound matches; a compound
+    /// with only a filter is its filter; a compound that tests nothing
+    /// about the node's place is its content tests), else in full.
+    #[inline]
+    fn shortcut_matches<'c>(
+        &mut self,
+        chain: Chain,
+        chain_id: u32,
+        candidate: &Candidate<'c, 'f, N>,
+        probe: &mut Probe<'c>,
+        floor: usize,
+    ) -> Result<bool>
+    where
+        'e: 'c,
+    {
+        match chain.shortcut {
+            Shortcut::KindOnly => Ok(true),
+            Shortcut::Expr(expr) => self.expr(expr, candidate, probe),
+            Shortcut::Content(compound) => self.content_matches(compound, candidate, probe),
+            Shortcut::None => self.chain_matches(chain_id, candidate, probe, floor),
         }
     }
 
@@ -1007,8 +1037,9 @@ where
         }
         for &(start, len) in &compound.not {
             for &chain in &plan.lists[start as usize..(start + len) as usize] {
-                if plan.chains[chain as usize].kinds & bit(candidate.kind) != 0
-                    && self.chain_matches(chain, candidate, probe, 0)?
+                let plan_chain = plan.chains[chain as usize];
+                if plan_chain.kinds & bit(candidate.kind) != 0
+                    && self.shortcut_matches(plan_chain, chain, candidate, probe, 0)?
                 {
                     return Ok(false);
                 }
@@ -1050,13 +1081,14 @@ where
             Structural::Number(number) => self.nav.number(candidate.node) == Some(number),
             Structural::Column(column) => self
                 .nav
-                .cell(candidate.node)
-                .is_some_and(|cell| cell.column() == column),
+                .cell_at(candidate.node)
+                .is_some_and(|(cell_column, _)| cell_column == column),
             Structural::Range { first, last } => {
-                self.nav.cell(candidate.node).is_some_and(|cell| {
-                    (first.0..=last.0).contains(&cell.column())
-                        && (first.1..=last.1).contains(&cell.row())
-                })
+                self.nav
+                    .cell_at(candidate.node)
+                    .is_some_and(|(column, row)| {
+                        (first.0..=last.0).contains(&column) && (first.1..=last.1).contains(&row)
+                    })
             },
         })
     }
@@ -1167,7 +1199,11 @@ where
         Ok(match target {
             Target::Absent(test) => test.eval(literal, None),
             Target::Prop { index, test } => {
-                let value = probe.format(nav, candidate.node)?.get(usize::from(index));
+                let value = if cond.direct {
+                    nav.prop(candidate.node, usize::from(index))?
+                } else {
+                    probe.format(nav, candidate.node)?.get(usize::from(index))
+                };
                 test.eval(literal, value.as_ref().map(Value::as_scalar))
             },
             Target::Text(test) => {
@@ -1262,8 +1298,15 @@ where
             };
             let mut probe = Probe::new();
             for &chain in chains {
-                if plan.chains[chain as usize].kinds & bit(kind) != 0
-                    && self.chain_matches(chain, &candidate, &mut probe, barrier + 1)?
+                let plan_chain = plan.chains[chain as usize];
+                if plan_chain.kinds & bit(kind) != 0
+                    && self.shortcut_matches(
+                        plan_chain,
+                        chain,
+                        &candidate,
+                        &mut probe,
+                        barrier + 1,
+                    )?
                 {
                     return Ok(true);
                 }
