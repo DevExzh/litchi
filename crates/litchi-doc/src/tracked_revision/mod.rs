@@ -13,6 +13,6 @@ mod tests;
 
 pub use litchi_ole_common::object::Limits;
 pub use model::{Revision, RevisionKind, RevisionMetadata};
-pub(crate) use package::PictureGraph;
 pub use package::RevisionEditor;
+pub(crate) use package::{ParagraphCopy, PictureGraph};
 pub use transaction::{Commit, Error, Patch, Snapshot, Transaction};

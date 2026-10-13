@@ -888,6 +888,37 @@ fn containing_piece(pieces: &[RawPiece], cp: u32) -> Option<&RawPiece> {
     pieces.get(index).filter(|piece| cp < piece.end)
 }
 
+/// PlcfSed: section descriptors by main-story CP.
+const PLCFSED: usize = 6;
+
+/// One main-story paragraph's exact text (its mark included), character
+/// runs and paragraph formatting, captured for re-insertion.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ParagraphCopy {
+    units: Vec<u16>,
+    runs: Vec<(u32, Vec<u8>)>,
+    papx: Vec<u8>,
+    phe: crate::parts::fkp::ParagraphHeight,
+}
+
+impl ParagraphCopy {
+    /// The paragraph's UTF-16 length, its mark included.
+    pub(crate) fn len(&self) -> usize {
+        self.units.len()
+    }
+}
+
+/// The SPRMs of `grpprl` whose opcode is one of `opcodes`, in stored order.
+fn select_sprms(grpprl: &[u8], opcodes: &[u16]) -> Result<Vec<u8>> {
+    let mut output = Vec::new();
+    for sprm in strict_sprms(grpprl)? {
+        if opcodes.contains(&sprm.opcode) {
+            output.extend_from_slice(&grpprl[sprm.offset..sprm.offset + sprm.size]);
+        }
+    }
+    Ok(output)
+}
+
 fn containing_papx(runs: &[PapxRun], fc: u32) -> Option<&PapxRun> {
     let index = runs.partition_point(|run| run.start <= fc).checked_sub(1)?;
     runs.get(index).filter(|run| fc < run.end)
@@ -1653,6 +1684,327 @@ impl RevisionEditor {
             Ok(output)
         })?;
         candidate.rewrite_chpx()?;
+        candidate.commit()?;
+        *self = candidate;
+        Ok(())
+    }
+
+    /// The direct SPRMs with one of `opcodes`, concatenated in stored order,
+    /// when every character group of the range carries the same ones; `None`
+    /// when the groups disagree.
+    pub(crate) fn uniform_character_sprms(
+        &self,
+        start: u32,
+        end: u32,
+        opcodes: &[u16],
+    ) -> Result<Option<Vec<u8>>> {
+        let groups = self.character_groups(start, end)?;
+        let mut uniform: Option<Vec<u8>> = None;
+        for group in groups {
+            let selected = select_sprms(group, opcodes)?;
+            match &uniform {
+                Some(previous) if *previous != selected => return Ok(None),
+                Some(_) => {},
+                None => uniform = Some(selected),
+            }
+        }
+        Ok(uniform)
+    }
+
+    /// Replaces every direct SPRM with one of `opcodes` by `fragment` on a
+    /// range, retaining every other character SPRM and rebuilding the
+    /// affected CHPX FKPs.
+    pub(crate) fn set_character_sprms(
+        &mut self,
+        start: u32,
+        end: u32,
+        opcodes: &[u16],
+        fragment: &[u8],
+    ) -> Result<()> {
+        validate_range(
+            start,
+            end,
+            self.pieces.last().map_or(self.main_ccp, |piece| piece.end),
+        )?;
+        if strict_sprms(fragment)?
+            .iter()
+            .any(|sprm| !opcodes.contains(&sprm.opcode))
+        {
+            return Err(corrupted("character SPRM fragment names another property"));
+        }
+        let intervals = self.fc_intervals(start, end)?;
+        let mut candidate = self.clone();
+        split_transform_chpx(&mut candidate.chpx, &intervals, |group| {
+            let mut output = retain_sprms(group, opcodes)?;
+            output.extend_from_slice(fragment);
+            if output.len() > 255 {
+                return Err(corrupted("edited CHPX exceeds one-byte FKP limit"));
+            }
+            Ok(output)
+        })?;
+        candidate.rewrite_chpx()?;
+        candidate.commit()?;
+        *self = candidate;
+        Ok(())
+    }
+
+    /// The bytes of one FIB-pointed table-stream structure, `None` when the
+    /// FIB gives it no length.
+    pub(crate) fn table_slice(&self, index: usize) -> Result<Option<&[u8]>> {
+        let (offset, length) = fib_pair(&self.word, index)?;
+        if length == 0 {
+            return Ok(None);
+        }
+        slice(&self.table, offset, length, "FIB table structure").map(Some)
+    }
+
+    /// The physical FC of one main-story character.
+    fn fc_at_cp(&self, cp: u32) -> Result<u32> {
+        let piece = containing_piece(&self.pieces, cp)
+            .ok_or_else(|| corrupted("character has no text piece"))?;
+        let width = if piece.unicode { 2 } else { 1 };
+        cp.checked_sub(piece.start)
+            .and_then(|offset| offset.checked_mul(width))
+            .and_then(|offset| piece.fc.checked_add(offset))
+            .ok_or_else(|| corrupted("character FC overflow"))
+    }
+
+    /// The direct character formatting of one main-story character.
+    pub(crate) fn character_grpprl_at(&self, cp: u32) -> Result<Vec<u8>> {
+        let end = cp
+            .checked_add(1)
+            .ok_or_else(|| corrupted("character CP overflow"))?;
+        let groups = self.character_groups(cp, end)?;
+        groups
+            .first()
+            .map(|group| group.to_vec())
+            .ok_or_else(|| corrupted("character has no CHPX formatting"))
+    }
+
+    /// The paragraph formatting of the paragraph whose mark is at `mark`.
+    fn paragraph_papx_at(&self, mark: u32) -> Result<&PapxRun> {
+        let fc = self.fc_at_cp(mark)?;
+        containing_papx(&self.papx, fc).ok_or_else(|| corrupted("paragraph mark has no PAPX run"))
+    }
+
+    /// Whether any modeled CP-indexed table has a position strictly inside
+    /// `start..end`: a field, bookmark, note, comment, drawing or proofing
+    /// anchor that a deletion would collapse.
+    pub(crate) fn has_cp_dependency_inside(&self, start: u32, end: u32) -> bool {
+        self.cp_tables
+            .iter()
+            .any(|table| table.cps.iter().any(|cp| *cp > start && *cp < end))
+    }
+
+    /// Captures one ordinary main-story paragraph (`start..end`, its mark
+    /// included) with its exact character runs and paragraph formatting.
+    pub(crate) fn capture_paragraph(&self, start: u32, end: u32) -> Result<ParagraphCopy> {
+        if start >= end || end > self.main_ccp {
+            return Err(corrupted(
+                "captured paragraph range is outside the main story",
+            ));
+        }
+        let units = read_units(&self.word, &self.pieces, start, end)?;
+        if units.last() != Some(&0x000D) {
+            return Err(corrupted(
+                "captured range does not end with a paragraph mark",
+            ));
+        }
+        let mut chpx = self.chpx.iter().collect::<Vec<_>>();
+        chpx.sort_by_key(|run| run.start);
+        let mut runs: Vec<(u32, Vec<u8>)> = Vec::new();
+        for piece in &self.pieces {
+            let left = start.max(piece.start);
+            let right = end.min(piece.end);
+            if left >= right {
+                continue;
+            }
+            if piece.prm != [0, 0] {
+                return Err(corrupted(
+                    "captured paragraph uses a piece property modifier",
+                ));
+            }
+            let width = if piece.unicode { 2 } else { 1 };
+            let fc_start = piece
+                .fc
+                .checked_add((left - piece.start) * width)
+                .ok_or_else(|| corrupted("captured FC overflow"))?;
+            let fc_end = piece
+                .fc
+                .checked_add((right - piece.start) * width)
+                .ok_or_else(|| corrupted("captured FC overflow"))?;
+            let mut cursor = fc_start;
+            for run in &chpx {
+                let a = fc_start.max(run.start);
+                let b = fc_end.min(run.end);
+                if a >= b {
+                    continue;
+                }
+                if a > cursor || (b - a) % width != 0 || (a - fc_start) % width != 0 {
+                    return Err(corrupted("captured CHPX coverage is not character aligned"));
+                }
+                let length = (b - a) / width;
+                match runs.last_mut() {
+                    Some((count, grpprl)) if *grpprl == run.grpprl => *count += length,
+                    _ => runs.push((length, run.grpprl.clone())),
+                }
+                cursor = b;
+            }
+            if cursor < fc_end {
+                return Err(corrupted("captured paragraph is outside CHPX coverage"));
+            }
+        }
+        let mark = end - 1;
+        let papx = self.paragraph_papx_at(mark)?;
+        if papx.in_table() {
+            return Err(corrupted("captured paragraph belongs to a table"));
+        }
+        Ok(ParagraphCopy {
+            units,
+            runs,
+            papx: papx.grpprl.clone(),
+            phe: papx.phe,
+        })
+    }
+
+    /// A new paragraph holding `units` (its mark included) with the
+    /// paragraph formatting of the paragraph marked at `template_mark` and
+    /// that mark's character formatting.
+    pub(crate) fn template_paragraph(
+        &self,
+        template_mark: u32,
+        units: Vec<u16>,
+    ) -> Result<ParagraphCopy> {
+        if units.last() != Some(&0x000D) {
+            return Err(corrupted(
+                "new paragraph does not end with a paragraph mark",
+            ));
+        }
+        let papx = self.paragraph_papx_at(template_mark)?;
+        if papx.in_table() {
+            return Err(corrupted("template paragraph belongs to a table"));
+        }
+        let length = u32::try_from(units.len())
+            .map_err(|_error| corrupted("new paragraph length exceeds u32"))?;
+        Ok(ParagraphCopy {
+            runs: vec![(length, self.character_grpprl_at(template_mark)?)],
+            units,
+            papx: papx.grpprl.clone(),
+            phe: papx.phe,
+        })
+    }
+
+    /// Inserts a captured or templated paragraph at a main-story paragraph
+    /// boundary, appending its text as one Unicode piece, shifting modeled
+    /// CP tables, and rebuilding the CHPX/PAPX FKPs and the CLX.
+    pub(crate) fn insert_paragraph_copy(&mut self, at: u32, copy: &ParagraphCopy) -> Result<()> {
+        if at > self.main_ccp {
+            return Err(corrupted("paragraph insertion is outside the main story"));
+        }
+        if at != 0 {
+            let previous = read_units(&self.word, &self.pieces, at - 1, at)?;
+            if !matches!(previous.as_slice(), [0x000D | 0x0007]) {
+                return Err(corrupted(
+                    "paragraph insertion is not at a paragraph boundary",
+                ));
+            }
+        }
+        if !self.unmodeled_cp_tables.is_empty() {
+            return Err(corrupted(
+                "paragraph insertion has unmodeled CP-indexed dependencies",
+            ));
+        }
+        if copy.units.len() > MAX_TEXT_UNITS || copy.units.last() != Some(&0x000D) {
+            return Err(corrupted(
+                "inserted paragraph is empty or exceeds the text limit",
+            ));
+        }
+        let added = u32::try_from(copy.units.len())
+            .map_err(|_error| corrupted("inserted paragraph length exceeds u32"))?;
+        if copy.runs.iter().map(|(count, _)| *count).sum::<u32>() != added {
+            return Err(corrupted("inserted paragraph runs do not cover its text"));
+        }
+        let saved_selection = self.prepared_saved_selection_splice(at, at, added)?;
+        let mut candidate = self.clone();
+        let fc = align2(candidate.word.len())?;
+        candidate.word.resize(fc, 0);
+        for unit in &copy.units {
+            candidate.word.extend_from_slice(&unit.to_le_bytes());
+        }
+        let fc =
+            u32::try_from(fc).map_err(|_error| corrupted("inserted paragraph FC exceeds u32"))?;
+        insert_piece(&mut candidate.pieces, at, added, fc)?;
+        let mut cursor = fc;
+        for (count, grpprl) in &copy.runs {
+            let end = count
+                .checked_mul(2)
+                .and_then(|bytes| cursor.checked_add(bytes))
+                .ok_or_else(|| corrupted("inserted paragraph FC overflow"))?;
+            candidate.chpx.push(FcRun {
+                start: cursor,
+                end,
+                grpprl: grpprl.clone(),
+            });
+            cursor = end;
+        }
+        candidate
+            .papx
+            .push(PapxRun::new(fc, cursor, copy.papx.clone(), false, copy.phe));
+        candidate.shift_cp_tables(at, 0, added)?;
+        candidate.main_ccp = candidate
+            .main_ccp
+            .checked_add(added)
+            .ok_or_else(|| corrupted("main story CP insertion overflow"))?;
+        candidate.rewrite_chpx()?;
+        candidate.rewrite_papx()?;
+        candidate.append_clx_and_cp_tables()?;
+        candidate.patch_sizes()?;
+        if let Some(replacement) = saved_selection {
+            candidate.apply_saved_selection_splice(replacement)?;
+        }
+        candidate.commit()?;
+        *self = candidate;
+        Ok(())
+    }
+
+    /// Deletes one main-story range of whole paragraphs, shifting modeled CP
+    /// tables. Orphaned text and formatting bytes stay unreferenced.
+    pub(crate) fn delete_paragraph_range(&mut self, start: u32, end: u32) -> Result<()> {
+        if start >= end || end > self.main_ccp {
+            return Err(corrupted("paragraph deletion is outside the main story"));
+        }
+        if !self.unmodeled_cp_tables.is_empty() {
+            return Err(corrupted(
+                "paragraph deletion has unmodeled CP-indexed dependencies",
+            ));
+        }
+        if self.has_cp_dependency_inside(start, end) {
+            return Err(corrupted(
+                "paragraph deletion would collapse an anchored range",
+            ));
+        }
+        let saved_selection = self.prepared_saved_selection_splice(start, end, 0)?;
+        let removed = end - start;
+        let mut candidate = self.clone();
+        delete_piece_range(&mut candidate.pieces, start, end)?;
+        candidate.shift_cp_tables(start, removed, 0)?;
+        if candidate
+            .cp_tables
+            .iter()
+            .filter(|table| table.index == PLCFSED)
+            .any(|table| table.cps.windows(2).any(|pair| pair[0] >= pair[1]))
+        {
+            return Err(corrupted("paragraph deletion would empty a section"));
+        }
+        candidate.main_ccp = candidate
+            .main_ccp
+            .checked_sub(removed)
+            .ok_or_else(|| corrupted("main story CP deletion underflow"))?;
+        candidate.append_clx_and_cp_tables()?;
+        candidate.patch_sizes()?;
+        if let Some(replacement) = saved_selection {
+            candidate.apply_saved_selection_splice(replacement)?;
+        }
         candidate.commit()?;
         *self = candidate;
         Ok(())
