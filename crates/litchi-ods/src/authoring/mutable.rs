@@ -1,7 +1,7 @@
 //! Transactional editing of an existing spreadsheet package.
 
 use crate::{
-    Spreadsheet,
+    Workbook,
     model::names::{Definition, Expression, Range, Scope},
     worksheet::{Cell, CellView, Sheet},
 };
@@ -13,77 +13,27 @@ use std::path::Path;
 ///
 /// Every package-level edit is validated and atomically replaces the owned
 /// immutable snapshot. Failed edits leave the document unchanged. New code
-/// should prefer the source-checked `Snapshot`/`Transaction`/`Commit`/`Patch`
-/// APIs of individual feature owners, or `FlatSpreadsheet` for flat-ODS cell
-/// edits; this attached compatibility facade cannot safely edit every
-/// source-level worksheet extension.
+/// should prefer [`crate::Package::edit`] and the source-checked
+/// `Edit`/`Commit`/`Patch` families of individual feature owners, or
+/// `FlatSpreadsheet` for flat-ODS cell edits; this attached compatibility
+/// facade cannot safely edit every source-level worksheet extension.
 pub struct MutableSpreadsheet {
-    spreadsheet: Spreadsheet,
+    spreadsheet: Workbook,
 }
 
 impl MutableSpreadsheet {
-    ///
-    /// # Errors
-    /// Returns an error when the operation cannot be completed.
-    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Spreadsheet::open(path).map(Self::from_spreadsheet)
-    }
-
-    ///
-    /// # Errors
-    /// Returns an error when the operation cannot be completed.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Spreadsheet::from_bytes(bytes).map(Self::from_spreadsheet)
-    }
-
+    /// Start the legacy mutable writer from a read-only projection.
     #[must_use]
-    pub fn from_spreadsheet(spreadsheet: Spreadsheet) -> Self {
-        Self { spreadsheet }
-    }
-
-    #[must_use]
-    pub fn spreadsheet(&self) -> &Spreadsheet {
-        &self.spreadsheet
-    }
-
-    /// Capture the exact package as the unified immutable transaction owner.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when package bounds or complete facade readback fail.
-    pub fn document_snapshot(&self) -> Result<crate::document::Snapshot> {
-        self.spreadsheet.document_snapshot()
-    }
-
-    /// Apply one durable exact-source unified package patch.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for stale lineage, security refusal, package bounds, or candidate
-    /// readback failure.
-    pub fn apply_document_patch(&mut self, patch: &crate::document::Patch) -> Result<()> {
-        self.spreadsheet.apply_document_patch(patch)
-    }
-
-    /// Clone-stage all supported ODS owners and publish them as one immutable package commit.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the closure, security checks, durable patch, package rebuild, or
-    /// complete typed readback fails. The attached facade remains unchanged on failure.
-    pub fn edit_document<F>(&mut self, update: F) -> Result<crate::document::Patch>
-    where
-        F: FnOnce(&mut crate::document::Edit) -> Result<()>,
-    {
-        let snapshot = self.document_snapshot()?;
-        let mut edit = snapshot.edit();
-        update(&mut edit)?;
-        let commit = edit.commit()?;
-        let patch = commit.patch().clone();
-        if commit.changed() {
-            self.spreadsheet = Spreadsheet::from_bytes(commit.snapshot().as_bytes().to_vec())?;
+    pub fn from_workbook(workbook: Workbook) -> Self {
+        Self {
+            spreadsheet: workbook,
         }
-        Ok(patch)
+    }
+
+    /// Borrow the current read-only projection.
+    #[must_use]
+    pub fn workbook(&self) -> &Workbook {
+        &self.spreadsheet
     }
 
     /// Borrow the compact cross-format metadata projection.
@@ -367,7 +317,7 @@ impl MutableSpreadsheet {
         edit(&mut transaction)?;
         let commit = transaction.commit()?;
         if commit.changed() {
-            self.spreadsheet = Spreadsheet::from_bytes(commit.snapshot().as_bytes().to_vec())?;
+            self.spreadsheet = Workbook::from_bytes(commit.snapshot().as_bytes().to_vec())?;
         }
         Ok(())
     }
@@ -395,7 +345,7 @@ impl MutableSpreadsheet {
     pub fn apply_chart_patch(&mut self, patch: &crate::charts::Patch) -> Result<()> {
         let commit = patch.apply(&self.chart_snapshot()?)?;
         if commit.changed() {
-            self.spreadsheet = Spreadsheet::from_bytes(commit.snapshot().as_bytes().to_vec())?;
+            self.spreadsheet = Workbook::from_bytes(commit.snapshot().as_bytes().to_vec())?;
         }
         Ok(())
     }
@@ -416,7 +366,7 @@ impl MutableSpreadsheet {
         edit(&mut transaction)?;
         let commit = transaction.commit()?;
         if commit.changed() {
-            self.spreadsheet = Spreadsheet::from_bytes(commit.into_owned_bytes())?;
+            self.spreadsheet = Workbook::from_bytes(commit.into_owned_bytes())?;
         }
         Ok(())
     }
@@ -445,7 +395,7 @@ impl MutableSpreadsheet {
     pub fn apply_data_pilot_patch(&mut self, patch: &crate::data_pilot::Patch) -> Result<()> {
         let commit = patch.apply(&self.data_pilot_snapshot()?)?;
         if commit.changed() {
-            self.spreadsheet = Spreadsheet::from_bytes(commit.snapshot().as_bytes().to_vec())?;
+            self.spreadsheet = Workbook::from_bytes(commit.snapshot().as_bytes().to_vec())?;
         }
         Ok(())
     }
@@ -468,7 +418,7 @@ impl MutableSpreadsheet {
             transaction.commit()?
         };
         if commit.changed() {
-            self.spreadsheet = Spreadsheet::from_bytes(commit.into_owned_bytes())?;
+            self.spreadsheet = Workbook::from_bytes(commit.into_owned_bytes())?;
         }
         Ok(())
     }
@@ -690,7 +640,7 @@ impl MutableSpreadsheet {
         edit(&mut transaction)?;
         let commit = transaction.commit()?;
         if commit.changed() {
-            self.spreadsheet = Spreadsheet::from_bytes(commit.snapshot().as_bytes().to_vec())?;
+            self.spreadsheet = Workbook::from_bytes(commit.snapshot().as_bytes().to_vec())?;
         }
         Ok(())
     }
@@ -800,16 +750,116 @@ impl MutableSpreadsheet {
         self.spreadsheet.remove_rdf_graph(path)
     }
 
+    /// Append one RDF triple and return its position in the graph.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the graph is missing or package rebuilding fails.
+    pub fn add_rdf_triple(&mut self, path: &str, triple: &Triple) -> Result<usize> {
+        self.spreadsheet.add_rdf_triple(path, triple)
+    }
+
+    /// Replace one RDF triple while preserving its description subject.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the triple is missing or package rebuilding fails.
+    pub fn replace_rdf_triple(&mut self, path: &str, index: usize, triple: &Triple) -> Result<()> {
+        self.spreadsheet.replace_rdf_triple(path, index, triple)
+    }
+
+    /// Remove one RDF triple.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the triple is missing or package rebuilding fails.
+    pub fn remove_rdf_triple(&mut self, path: &str, index: usize) -> Result<()> {
+        self.spreadsheet.remove_rdf_triple(path, index)
+    }
+
+    /// Move one RDF triple within its description.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a position is invalid or package rebuilding fails.
+    pub fn move_rdf_triple(&mut self, path: &str, from: usize, to: usize) -> Result<()> {
+        self.spreadsheet.move_rdf_triple(path, from, to)
+    }
+
+    /// Apply one source-checked protection patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a stale patch or package rebuilding failure.
+    pub fn apply_protection_patch(&mut self, patch: &crate::protection::Patch) -> Result<()> {
+        self.spreadsheet.apply_protection_patch(patch)
+    }
+
+    /// Apply a short-lived protection transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the closure or package rebuilding fails.
+    pub fn update_protection<F>(&mut self, edit: F) -> Result<()>
+    where
+        F: FnOnce(&mut crate::protection::Transaction) -> Result<()>,
+    {
+        self.spreadsheet.update_protection(edit)
+    }
+
+    /// Apply a short-lived tracked-change transaction.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the closure or package rebuilding fails.
+    pub fn update_tracked_changes<F>(&mut self, edit: F) -> Result<()>
+    where
+        F: FnOnce(&mut crate::tracked_changes::Transaction) -> Result<()>,
+    {
+        self.spreadsheet.update_tracked_changes(edit)
+    }
+
+    /// Apply one source-checked tracked-change patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a stale patch or package rebuilding failure.
+    pub fn apply_tracked_changes_patch(
+        &mut self,
+        patch: &crate::tracked_changes::Patch,
+    ) -> Result<()> {
+        self.spreadsheet.apply_tracked_changes_patch(patch)
+    }
+
+    /// Consume the writer and return the exact package bytes.
     #[must_use]
     pub fn to_bytes(self) -> Vec<u8> {
         self.spreadsheet.into_bytes()
     }
 
+    /// Consume the writer into an immutable [`crate::Package`].
     ///
     /// # Errors
-    /// Returns an error when the operation cannot be completed.
-    pub fn save(self, path: impl AsRef<Path>) -> Result<()> {
-        std::fs::write(path, self.to_bytes()).map_err(Into::into)
+    ///
+    /// Returns an archive-validation failure.
+    pub fn into_package(self) -> std::result::Result<crate::Package, litchi_odf_common::Error> {
+        Ok(crate::Package::from_authored(self.to_bytes())?)
+    }
+
+    /// Atomically replace `path` with the current package bytes.
+    ///
+    /// The bytes are staged in a sibling temporary file and published with
+    /// one rename, so a failed save leaves an existing destination unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns the publication I/O failure.
+    pub fn save(self, path: impl AsRef<Path>) -> std::result::Result<(), litchi_odf_common::Error> {
+        litchi_odf_common::publish::save_bytes(
+            path.as_ref(),
+            &self.to_bytes(),
+            litchi_core::Durability::Full,
+        )
     }
 }
 
@@ -822,10 +872,13 @@ mod tests {
     fn preserves_owned_package_without_edits() {
         let bytes = Builder::new()
             .build()
+            .expect("test fixture or operation should succeed")
+            .to_bytes()
             .expect("test fixture or operation should succeed");
-        let mutable = MutableSpreadsheet::from_bytes(bytes)
+        let mutable = Workbook::from_bytes(bytes)
+            .map(MutableSpreadsheet::from_workbook)
             .expect("test fixture or operation should succeed");
-        let reopened = Spreadsheet::from_bytes(mutable.to_bytes())
+        let reopened = Workbook::from_bytes(mutable.to_bytes())
             .expect("test fixture or operation should succeed");
         assert!(reopened.content_xml().contains("office:spreadsheet"));
     }

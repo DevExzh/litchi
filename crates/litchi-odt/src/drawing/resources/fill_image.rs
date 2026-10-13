@@ -290,7 +290,7 @@ impl Collection {
     }
 }
 
-impl crate::Package {
+impl crate::GenericPackage {
     pub fn drawing_fill_images(&self) -> Result<Collection> {
         let styles = self.styles_xml()?;
         parse_drawing_fill_images(styles.as_deref().unwrap_or_default())

@@ -421,17 +421,17 @@ fn readback_xls(input: &Path) -> Result<()> {
 #[cfg(feature = "odt")]
 fn generate_odt(output: &Path) -> Result<()> {
     let source = fixture("test-data/odf/corpus/writer-header-footer.odt");
-    let document = litchi_odt::Document::open(source)?;
-    let mut edit = document.edit()?;
+    let package = litchi_odt::Package::open(source)?;
+    let mut edit = package.edit();
     edit.replace_paragraph(litchi_core::Position::new(0), SENTINEL)?;
     let commit = edit.commit()?;
-    fs::write(output, commit.snapshot().as_bytes())?;
+    commit.package().save(output)?;
     readback_odt(output)
 }
 
 #[cfg(feature = "odt")]
 fn readback_odt(input: &Path) -> Result<()> {
-    let document = litchi_odt::Document::open(input)?;
+    let document = litchi_odt::Package::open(input)?.document()?;
     let text = document.text()?;
     if !text.contains(SENTINEL) {
         return Err("ODT sentinel text is absent after reopen".into());
@@ -444,24 +444,24 @@ fn readback_odt(input: &Path) -> Result<()> {
 fn generate_ods(output: &Path) -> Result<()> {
     let source = fixture("test-data/odf/corpus/calc-two-sheets.ods");
     let bytes = fs::read(source)?;
-    let spreadsheet = litchi_ods::Spreadsheet::from_bytes(bytes.clone())?;
-    let sheet = spreadsheet
+    let package = litchi_ods::Package::from_bytes(&bytes)?;
+    let sheet = package
+        .workbook()?
         .sheets()
         .first()
         .ok_or_else(|| missing("ODS has no sheet"))?
         .name
         .to_string();
-    let snapshot = litchi_ods::document::Snapshot::from_bytes(bytes)?;
-    let mut edit = snapshot.edit();
+    let mut edit = package.edit()?;
     edit.set_cell_formula(&sheet, 0, 0, "of:=40+2")?;
     let commit = edit.commit()?;
-    fs::write(output, commit.snapshot().as_bytes())?;
+    commit.package().save(output)?;
     readback_ods(output)
 }
 
 #[cfg(feature = "ods")]
 fn readback_ods(input: &Path) -> Result<()> {
-    let spreadsheet = litchi_ods::Spreadsheet::from_bytes(fs::read(input)?)?;
+    let spreadsheet = litchi_ods::Package::from_bytes(&fs::read(input)?)?.workbook()?;
     if !spreadsheet
         .content_xml()
         .contains("table:formula=\"of:=40+2\"")
@@ -475,19 +475,19 @@ fn readback_ods(input: &Path) -> Result<()> {
 #[cfg(feature = "odp")]
 fn generate_odp(output: &Path) -> Result<()> {
     let source = fixture("test-data/odf/odp/tdf169979.odp");
-    let snapshot = litchi_odp::edit::Snapshot::open(source)?;
-    let mut edit = snapshot.transaction()?;
+    let snapshot = litchi_odp::Package::open(source)?;
+    let mut edit = snapshot.edit()?;
     let rich = litchi_odp::content::RichText::plain(SENTINEL)?;
     let text_box = litchi_odp::content::TextBox::new("Litchi Interop Box", rich)?;
     edit.add_text_box(0_usize, &text_box)?;
     let commit = edit.commit()?;
-    fs::write(output, commit.snapshot().bytes())?;
+    commit.package().save(output)?;
     readback_odp(output)
 }
 
 #[cfg(feature = "odp")]
 fn readback_odp(input: &Path) -> Result<()> {
-    let presentation = litchi_odp::Presentation::from_bytes(fs::read(input)?)?;
+    let presentation = litchi_odp::Package::from_bytes(&fs::read(input)?)?.presentation()?;
     let xml = presentation.content_xml();
     if !xml.contains("Litchi Interop Box") || !xml.contains(SENTINEL) {
         return Err("ODP text box is absent after reopen".into());

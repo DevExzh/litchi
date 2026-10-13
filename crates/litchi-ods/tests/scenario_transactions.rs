@@ -1,7 +1,9 @@
 use std::sync::Arc;
 
 use litchi_core::OwnedSource;
-use litchi_ods::{Builder, SourceBackedSpreadsheet, Spreadsheet, scenario};
+use litchi_ods::{
+    Builder, MutableSpreadsheet, Package, SourceBackedSpreadsheet, Workbook, scenario,
+};
 
 const CONTENT: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.4"><office:body><office:spreadsheet><table:table table:name="One"><table:title>Keep title</table:title><table:scenario table:scenario-ranges=".A1:.B2" table:is-active="true" table:comment="Original"/><table:table-row/></table:table><table:table table:name="Two"><table:desc>Keep description</table:desc><table:table-row/></table:table></office:spreadsheet></office:body></office:document-content>"#;
 
@@ -9,13 +11,17 @@ fn range(value: &str) -> scenario::RangeAddress {
     scenario::RangeAddress::new(value).expect("valid range")
 }
 
-fn spreadsheet() -> Spreadsheet {
-    Spreadsheet::from_bytes(
-        Builder::new()
+fn spreadsheet() -> Workbook {
+    Package::from_bytes(
+        &Builder::new()
             .content_xml(CONTENT)
             .build()
+            .expect("build content")
+            .to_bytes()
             .expect("build content"),
     )
+    .expect("open content")
+    .workbook()
     .expect("open content")
 }
 
@@ -52,8 +58,8 @@ fn scenario_noop_inverse_and_stale_source_are_exact() {
 
 #[test]
 fn owned_facade_scenario_edit_is_atomic_and_reopenable() {
-    let mut spreadsheet = spreadsheet();
-    let original = spreadsheet.content_xml().to_owned();
+    let mut spreadsheet = MutableSpreadsheet::from_workbook(spreadsheet());
+    let original = spreadsheet.workbook().content_xml().to_owned();
     spreadsheet
         .edit_scenarios(|edit| {
             edit.replace_sheet(
@@ -71,7 +77,7 @@ fn owned_facade_scenario_edit_is_atomic_and_reopenable() {
         })
         .expect("edit scenarios");
 
-    let target = spreadsheet.content_xml().to_owned();
+    let target = spreadsheet.workbook().content_xml().to_owned();
     assert!(target.contains("Keep title"));
     assert!(target.contains("Keep description"));
     assert!(target.contains("Edited &amp; retained"));
@@ -80,14 +86,17 @@ fn owned_facade_scenario_edit_is_atomic_and_reopenable() {
         2
     );
 
-    let bytes = spreadsheet.into_bytes();
-    let reopened = Spreadsheet::from_bytes(bytes.clone()).expect("reopen");
+    let bytes = spreadsheet.to_bytes();
+    let reopened = Package::from_bytes(&bytes)
+        .expect("reopen")
+        .workbook()
+        .expect("reopen");
     assert_eq!(
         reopened.scenarios().expect("scenarios").scenarios().len(),
         2
     );
 
-    let mut failed = reopened;
+    let mut failed = MutableSpreadsheet::from_workbook(reopened);
     assert!(
         failed
             .edit_scenarios(|edit| {
@@ -100,7 +109,7 @@ fn owned_facade_scenario_edit_is_atomic_and_reopenable() {
             })
             .is_err()
     );
-    assert_eq!(failed.content_xml(), target);
+    assert_eq!(failed.workbook().content_xml(), target);
     assert_ne!(original, target);
 }
 
@@ -109,6 +118,8 @@ fn source_backed_scenarios_check_source_identity() {
     let bytes = Builder::new()
         .content_xml(CONTENT)
         .build()
+        .expect("build content")
+        .to_bytes()
         .expect("build content");
     let source = SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(bytes)))
         .expect("source open");
@@ -123,8 +134,15 @@ fn builder_scenario_lifecycle_reopens_typed_metadata() {
     builder
         .edit_scenarios(|edit| edit.remove_named("One").map(|_| ()))
         .expect("builder edit");
-    let bytes = builder.build().expect("build edited package");
-    let spreadsheet = Spreadsheet::from_bytes(bytes).expect("reopen edited package");
+    let bytes = builder
+        .build()
+        .expect("build edited package")
+        .to_bytes()
+        .expect("build edited package");
+    let spreadsheet = Package::from_bytes(&bytes)
+        .expect("reopen edited package")
+        .workbook()
+        .expect("reopen edited package");
     assert!(
         spreadsheet
             .scenarios()

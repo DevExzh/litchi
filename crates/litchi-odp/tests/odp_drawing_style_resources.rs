@@ -4,7 +4,7 @@
 )]
 
 use litchi_odp::{
-    Presentation, constants,
+    Package, Presentation, constants,
     drawing::resources::{fill_image, gradient, hatch, marker, opacity, stroke_dash},
 };
 use soapberry_zip::office::StreamingArchiveWriter;
@@ -28,7 +28,10 @@ fn presentation() -> Presentation {
     archive
         .write_deflated("META-INF/manifest.xml", MANIFEST)
         .unwrap();
-    Presentation::from_bytes(archive.finish_to_bytes().unwrap()).unwrap()
+    Package::from_bytes(&archive.finish_to_bytes().unwrap())
+        .unwrap()
+        .presentation()
+        .unwrap()
 }
 
 #[test]

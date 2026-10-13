@@ -29,15 +29,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             builder.add_bulleted_list(vec!["First bullet", "Second bullet", "Third bullet"])?;
             builder.add_heading("Conclusion", 2)?;
             builder.add_paragraph("Reading round-trips text content successfully.")?;
-            // `save` consumes the builder, so use the tempfile path explicitly.
+            // `build` returns the immutable package; `save` publishes it
+            // atomically to the tempfile path.
             let path = tmp.path().to_path_buf();
-            builder.save(&path)?;
+            builder.build()?.save(&path)?;
             (path, Some(tmp))
         },
     };
 
     println!("Opening: {}", path.display());
-    let doc = odt::Document::open(&path)?;
+    let doc = odt::Package::open(&path)?.document()?;
 
     // Full text extraction.
     let text = doc.text()?;

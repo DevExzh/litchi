@@ -13,7 +13,7 @@ use litchi_odt::form::{
     ListboxControl, Node, RadioControl, SelectionForm, TextControl, TypedValueControl,
     TypedValueControlKind, TypedValueForm, VisualForm,
 };
-use litchi_odt::{Builder, Document};
+use litchi_odt::{Builder, Package};
 
 /// Flat text document holding one form with every common control kind.
 const FIXTURE: &str = "../../test-data/odf/odt/form-controls.fodt";
@@ -214,7 +214,10 @@ fn builder_authored_forms_round_trip_the_package() {
     // Duplicate form names are rejected atomically.
     assert!(builder.add_control_form(&text_form()).is_err());
 
-    let document = Document::from_bytes(builder.build().unwrap()).unwrap();
+    let document = Package::from_bytes(&builder.build().unwrap().to_bytes().unwrap())
+        .unwrap()
+        .document()
+        .unwrap();
     let forms = document.forms().unwrap();
     assert_eq!(forms.groups.len(), 1);
     let names: Vec<Option<String>> = forms.groups[0]
@@ -262,7 +265,10 @@ fn mutable_inserts_replaces_and_removes_controls() {
     builder.add_typed_value_form(&typed_value_form()).unwrap();
     builder.add_generic_form(&generic_form()).unwrap();
     builder.add_visual_form(&visual_form()).unwrap();
-    let document = Document::from_bytes(builder.build().unwrap()).unwrap();
+    let document = Package::from_bytes(&builder.build().unwrap().to_bytes().unwrap())
+        .unwrap()
+        .document()
+        .unwrap();
     let mut mutable = litchi_odt::mutable::MutableDocument::from_document(document).unwrap();
 
     // Insert a new textarea into the first form (document order).
@@ -294,7 +300,10 @@ fn mutable_inserts_replaces_and_removes_controls() {
     assert!(mutable.remove_text_control(42).is_err());
     assert!(mutable.insert_text_control(42, &extra).is_err());
 
-    let reopened = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+    let reopened = Package::from_bytes(&mutable.to_bytes().unwrap())
+        .unwrap()
+        .document()
+        .unwrap();
     let reopened = litchi_odt::mutable::MutableDocument::from_document(reopened).unwrap();
 
     let texts = reopened.text_controls().unwrap();

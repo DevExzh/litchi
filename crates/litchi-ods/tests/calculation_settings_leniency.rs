@@ -18,7 +18,7 @@ use std::sync::Arc;
 
 use litchi_core::OwnedSource;
 use litchi_odf_common::{ContentDefect, Defect, ToleranceReport};
-use litchi_ods::{SourceBackedSpreadsheet, Spreadsheet};
+use litchi_ods::{Package, SourceBackedSpreadsheet};
 
 const SETTINGS: &str = r#"<table:calculation-settings table:automatic-find-labels="false" table:use-regular-expressions="false" table:use-wildcards="true"/>"#;
 
@@ -52,7 +52,7 @@ fn with_settings_children(children: &str) -> Vec<u8> {
 }
 
 fn assert_every_open_path(bytes: &[u8], defects: &[(Defect, u16)], label: &str) {
-    let owned = Spreadsheet::from_bytes(bytes.to_vec()).unwrap();
+    let owned = Package::from_bytes(bytes).unwrap().workbook().unwrap();
     assert_eq!(
         recorded(owned.tolerance_report()),
         defects,
@@ -69,7 +69,10 @@ fn assert_every_open_path(bytes: &[u8], defects: &[(Defect, u16)], label: &str) 
 
     let prepared = litchi_odf_common::detect::prepared(bytes.to_vec())
         .unwrap_or_else(|| panic!("{label}: package must prepare"));
-    let adopted = Spreadsheet::from_prepared_package(prepared).unwrap();
+    let adopted = Package::from_prepared_package(prepared)
+        .unwrap()
+        .workbook()
+        .unwrap();
     assert_eq!(
         recorded(adopted.tolerance_report()),
         defects,
@@ -112,7 +115,7 @@ fn foreign_and_unknown_children_are_skipped_and_recorded() {
         "unknown children",
     );
 
-    let owned = Spreadsheet::from_bytes(bytes).unwrap();
+    let owned = Package::from_bytes(&bytes).unwrap().workbook().unwrap();
     let settings = owned.calculation_settings().unwrap();
     assert_eq!(
         settings
@@ -138,7 +141,7 @@ fn null_date_after_iteration_is_accepted_and_recorded() {
         r#"<table:null-date table:date-value="1904-01-01"/>"#,
     ));
     assert_every_open_path(&bytes, &[REORDERED], "reordered");
-    let owned = Spreadsheet::from_bytes(bytes).unwrap();
+    let owned = Package::from_bytes(&bytes).unwrap().workbook().unwrap();
     assert!(owned.calculation_settings().unwrap().null_date.is_some());
 }
 
@@ -158,11 +161,21 @@ fn duplicates_and_undeclared_entities_stay_hard_errors() {
         r#"<table:iteration table:steps="7"/>"#,
         r#"<table:iteration table:steps="8"/>"#,
     ));
-    assert!(Spreadsheet::from_bytes(duplicate).is_err());
+    assert!(
+        Package::from_bytes(&duplicate)
+            .map_err(litchi_core::Error::from)
+            .and_then(|package| package.workbook())
+            .is_err()
+    );
 
     let entity =
         with_settings_children(r#"<loext:vendor-setting>&undeclared;</loext:vendor-setting>"#);
-    assert!(Spreadsheet::from_bytes(entity.clone()).is_err());
+    assert!(
+        Package::from_bytes(&entity)
+            .map_err(litchi_core::Error::from)
+            .and_then(|package| package.workbook())
+            .is_err()
+    );
     assert!(SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(entity))).is_err());
 }
 
@@ -179,7 +192,7 @@ fn the_standalone_parser_reports_the_same_repairs() {
 #[test]
 fn a_skipped_child_is_never_silently_dropped_by_an_edit() {
     let bytes = with_settings_children(r#"<loext:vendor-setting loext:mode="fast"/>"#);
-    let owned = Spreadsheet::from_bytes(bytes).unwrap();
+    let owned = Package::from_bytes(&bytes).unwrap().workbook().unwrap();
     let snapshot = litchi_ods::settings::Snapshot::from_content_xml(owned.content_xml()).unwrap();
 
     // An unchanged commit borrows the source and keeps the vendor child.

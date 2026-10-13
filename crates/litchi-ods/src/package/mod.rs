@@ -2,4 +2,4 @@
 
 mod document;
 
-pub use document::Package;
+pub(crate) use document::Archive;

@@ -401,6 +401,9 @@ pub enum Source {
     /// An OOXML package-encryption error.
     #[cfg(feature = "encryption")]
     Crypto(litchi_crypto::ooxml::Error),
+    /// An ODF package ingress, egress or transaction error (typed limits).
+    #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
+    Odf(litchi_odf_common::Error),
     /// A formula conversion error: Markdown output renders OMML formulas as
     /// LaTeX.
     #[cfg(feature = "formula")]
@@ -490,6 +493,8 @@ impl Source {
             Self::RtfEdit(error) => Some(error),
             #[cfg(feature = "encryption")]
             Self::Crypto(error) => Some(error),
+            #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
+            Self::Odf(error) => Some(error),
             #[cfg(feature = "formula")]
             Self::Formula(error) => Some(error),
         }
@@ -1640,6 +1645,18 @@ impl Classify for litchi_ppt::Error {
     }
 }
 
+#[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
+impl Classify for litchi_odf_common::Error {
+    fn classify(&self) -> Class {
+        match self {
+            Self::Limit { .. } => Class::of(Code::LimitExceeded),
+            Self::InvalidLimit { .. } => Class::of(Code::InvalidArgument),
+            Self::Core(error) => error.classify(),
+            _ => Class::of(Code::InternalError),
+        }
+    }
+}
+
 #[cfg(feature = "rtf")]
 impl Classify for litchi_rtf::builder::Error {
     fn classify(&self) -> Class {
@@ -2032,6 +2049,10 @@ from_leaf!(
     litchi_sign::Error => Sign, None
 );
 from_leaf!(#[cfg(feature = "rtf")] litchi_rtf::Error => Rtf, Some(FileFormat::Rtf));
+from_leaf!(
+    #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
+    litchi_odf_common::Error => Odf, None
+);
 from_leaf!(#[cfg(feature = "rtf")] litchi_rtf::builder::Error => RtfBuild, Some(FileFormat::Rtf));
 from_leaf!(#[cfg(feature = "rtf")] litchi_rtf::edit::Error => RtfEdit, Some(FileFormat::Rtf));
 from_leaf!(

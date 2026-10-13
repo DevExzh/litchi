@@ -48,7 +48,7 @@ fn source_document() -> Document {
         .unwrap();
     builder.add_paragraph("Document end").unwrap();
 
-    Document::from_bytes(builder.build().unwrap()).unwrap()
+    builder.build().unwrap().document().unwrap()
 }
 
 #[test]
@@ -400,7 +400,7 @@ fn read_modify_write_preserves_auxiliary_package_parts_and_media_types() {
         b"stale signature",
     );
     let source = Document::from_bytes(source_bytes.clone()).unwrap();
-    assert_eq!(source.to_bytes().unwrap(), source_bytes);
+    assert_eq!(source.original_bytes(), source_bytes.as_slice());
     let mut mutable = MutableDocument::from_document(source).unwrap();
     mutable.add_paragraph("Modified").unwrap();
     let output = OwnedPackage::from_bytes(mutable.to_bytes().unwrap()).unwrap();

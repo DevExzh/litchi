@@ -39,7 +39,7 @@ pub(crate) struct Location {
 enum Kind {
     Document,
     Body,
-    Spreadsheet,
+    Workbook,
     Calculation,
     Other,
 }
@@ -416,7 +416,7 @@ impl LocateHandler {
 /// is unreachable for non-recorded kinds — removing it there changes no
 /// observable error behavior.
 fn qualified_name(element: &quick_xml::events::BytesStart<'_>, kind: Kind) -> Result<String> {
-    if matches!(kind, Kind::Spreadsheet | Kind::Calculation) {
+    if matches!(kind, Kind::Workbook | Kind::Calculation) {
         String::from_utf8(element.name().as_ref().to_vec()).map_err(|_error| {
             Error::InvalidFormat("ODS XML element name is not valid UTF-8".to_string())
         })
@@ -470,8 +470,8 @@ fn classify(parent: Option<Kind>, namespace: NamespaceKind, local: &[u8]) -> Kin
     } else if parent == Some(Kind::Body)
         && is_element(namespace, NamespaceKind::Office, local, b"spreadsheet")
     {
-        Kind::Spreadsheet
-    } else if parent == Some(Kind::Spreadsheet)
+        Kind::Workbook
+    } else if parent == Some(Kind::Workbook)
         && is_element(
             namespace,
             NamespaceKind::Table,
@@ -492,7 +492,7 @@ fn record(
     calculation: &mut Option<Span>,
 ) -> Result<()> {
     match kind {
-        Kind::Spreadsheet => {
+        Kind::Workbook => {
             if spreadsheet.is_some() {
                 return Err(Error::InvalidFormat(
                     "ODS content.xml has more than one office:spreadsheet host".to_string(),

@@ -358,10 +358,23 @@ impl Builder {
         Ok(self)
     }
 
+    /// Build the spreadsheet into an immutable [`crate::Package`].
+    ///
+    /// Output (`save`, `save_with_durability`, `to_bytes`, `write_to`) lives
+    /// on the returned package. Building never consults the clock or any
+    /// other ambient state: two builders with equal inputs produce
+    /// byte-identical packages.
     ///
     /// # Errors
-    /// Returns an error when the operation cannot be completed.
-    pub fn build(self) -> Result<Vec<u8>> {
+    ///
+    /// Returns an error when an authored part fails validation or cannot be
+    /// serialized.
+    pub fn build(self) -> std::result::Result<crate::Package, crate::Error> {
+        Ok(crate::Package::from_authored(self.build_bytes()?)?)
+    }
+
+    /// Build the complete package bytes (crate-internal authoring helper).
+    pub(crate) fn build_bytes(self) -> Result<Vec<u8>> {
         let mut content_xml = if self.definitions.is_empty() {
             self.content_xml
         } else {

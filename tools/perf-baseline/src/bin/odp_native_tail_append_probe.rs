@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .create_new(true)
         .open(&args[1])?;
     let report = plan.write_to(output, options)?;
-    let reopened = SourceBackedPresentation::from_path(&args[1])?;
+    let reopened = SourceBackedPresentation::open(&args[1])?;
     let expected_count = plan.proof().slide_count() + 1;
     if reopened.slide_count()? != expected_count {
         return Err("published slide count differs from source plus one".into());

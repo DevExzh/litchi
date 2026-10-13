@@ -896,7 +896,10 @@ mod standalone_odf_facade_tests {
     #[test]
     fn exposes_each_standalone_owner_without_an_outer_namespace() {
         let _: Option<super::odp::Presentation> = None;
-        let _: Option<super::ods::Spreadsheet> = None;
+        let _: Option<super::ods::Workbook> = None;
+        let _: Option<super::odt::Package> = None;
+        let _: Option<super::ods::Package> = None;
+        let _: Option<super::odp::Package> = None;
         let _: Option<super::odt::Document> = None;
         let _: Option<super::odf_common::detect::Format> = None;
     }

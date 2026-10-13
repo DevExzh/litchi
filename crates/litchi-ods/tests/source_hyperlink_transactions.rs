@@ -3,8 +3,7 @@ use std::sync::Arc;
 use litchi_core::OwnedSource;
 use litchi_odf_common::{constants, core::PackageWriter};
 use litchi_ods::{
-    Cell, CellValue, HyperlinkChange, HyperlinkOperation, Link, SourceBackedSpreadsheet,
-    Spreadsheet,
+    Cell, CellValue, HyperlinkChange, HyperlinkOperation, Link, Package, SourceBackedSpreadsheet,
 };
 
 const CONTENT: &str = concat!(
@@ -32,7 +31,7 @@ fn text(value: &str) -> Cell {
 }
 
 fn first_link(bytes: Vec<u8>) -> litchi_core::Result<Link> {
-    let spreadsheet = Spreadsheet::from_bytes(bytes)?;
+    let spreadsheet = Package::from_bytes(&bytes)?.workbook()?;
     let Some(litchi_ods::CellView::Stored(cell)) = spreadsheet.cell("Data", 0, 0) else {
         return Err(litchi_core::Error::InvalidFormat(
             "source hyperlink fixture cell is missing".to_string(),
@@ -89,7 +88,7 @@ fn source_hyperlink_batch_rewrites_direct_links_and_supports_exact_no_op() -> li
     let commit = edit.commit()?;
     let mut output = Vec::new();
     commit.write_to(&mut output).unwrap();
-    let reopened = Spreadsheet::from_bytes(output.clone())?;
+    let reopened = Package::from_bytes(&output)?.workbook()?;
     let Some(litchi_ods::CellView::Stored(cell)) = reopened.cell("Data", 0, 0) else {
         return Err(litchi_core::Error::InvalidFormat(
             "source hyperlink cell is missing after publication".to_string(),
@@ -112,7 +111,7 @@ fn source_hyperlink_batch_rewrites_direct_links_and_supports_exact_no_op() -> li
     let chained_commit = chained.commit()?;
     let mut chained_output = Vec::new();
     chained_commit.write_to(&mut chained_output).unwrap();
-    let chained_reopen = Spreadsheet::from_bytes(chained_output)?;
+    let chained_reopen = Package::from_bytes(&chained_output)?.workbook()?;
     let Some(litchi_ods::CellView::Stored(cell)) = chained_reopen.cell("Data", 0, 0) else {
         return Err(litchi_core::Error::InvalidFormat(
             "chained source hyperlink cell is missing after publication".to_string(),
@@ -150,7 +149,7 @@ fn source_hyperlink_operations_are_ordered_and_failure_atomic() -> litchi_core::
     let commit = edit.commit()?;
     let mut output = Vec::new();
     commit.write_to(&mut output).unwrap();
-    let reopened = Spreadsheet::from_bytes(output)?;
+    let reopened = Package::from_bytes(&output)?.workbook()?;
     let Some(litchi_ods::CellView::Stored(cell)) = reopened.cell("Data", 0, 0) else {
         return Err(litchi_core::Error::InvalidFormat(
             "ordered source hyperlink cell is missing after publication".to_string(),
@@ -209,7 +208,7 @@ fn source_hyperlink_preserves_unchanged_legacy_unsafe_links() -> litchi_core::Re
     let commit = edit.commit()?;
     let mut output = Vec::new();
     commit.write_to(&mut output).unwrap();
-    let reopened = Spreadsheet::from_bytes(output)?;
+    let reopened = Package::from_bytes(&output)?.workbook()?;
     let Some(litchi_ods::CellView::Stored(cell)) = reopened.cell("Data", 0, 0) else {
         return Err(litchi_core::Error::InvalidFormat(
             "legacy source hyperlink cell is missing after publication".to_string(),

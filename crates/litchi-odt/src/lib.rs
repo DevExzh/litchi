@@ -7,8 +7,8 @@
 //! # Implementation Progress
 //!
 //! ## ✅ Reading (`document.rs`, `parser.rs`) - COMPLETE
-//! - ✅ `Document::open()` - Load from file path
-//! - ✅ `Document::from_bytes()` - Load from memory
+//! - ✅ `Package::open().map_err(litchi_core::Error::from).and_then(|package| package.document())` - Load from file path
+//! - ✅ `Package::from_bytes(&).map_err(litchi_core::Error::from).and_then(|package| package.document())` - Load from memory
 //! - ✅ `text()` - Extract all text content
 //! - ✅ `paragraphs()` - Parse all paragraphs with formatting
 //! - ✅ `tables()` - Parse tables with nested structure support
@@ -215,7 +215,7 @@ pub(crate) use embedded::Object;
     unused_imports,
     reason = "ODT facade exposes the canonical document package types"
 )]
-pub(crate) use generic::{Family, FlatDocument, Package};
+pub(crate) use generic::{Family, FlatDocument, Package as GenericPackage};
 #[allow(unused_imports, reason = "ODT facade exposes graphic style semantics")]
 pub(crate) use graphic_properties::{
     Child, ChildKind, Kind, Namespace, Properties, Property, Value, parse_graphic_style_properties,
@@ -329,7 +329,7 @@ pub use content_metadata::{
     TextMeta,
 };
 pub use document::{
-    Document, ReadLimits, SourceBackedDocument, SourceBackedDocumentCatalog, TextBlockCatalogEntry,
+    Document, SourceBackedDocument, SourceBackedDocumentCatalog, TextBlockCatalogEntry,
 };
 #[allow(unused_imports)]
 pub use dynamic_text::{
@@ -343,6 +343,10 @@ pub(crate) use index::{
 pub(crate) use index_mark::{
     TextIndexMark, insert_text_index_mark_xml, remove_text_index_mark_xml,
     replace_text_index_mark_xml,
+};
+pub use litchi_odf_common::{
+    Error, LimitKind, OpenOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsBuilder,
+    SourceLimitKind, SourceLimits, SourceLimitsBuilder,
 };
 pub(crate) use note::{Note, NoteClass, insert_note_xml, remove_note_xml, replace_note_xml};
 pub(crate) use page_layout::PageLayout;
@@ -359,6 +363,7 @@ pub(crate) use tracked_changes::{
     Position, mark_tracked_change_range_xml, mark_tracked_deletion_xml, set_tracked_changes_xml,
     unmark_tracked_change_xml,
 };
+pub use transaction::Package;
 pub use xforms::{
     Attribute as XFormsAttribute, Bind, Extension as XFormsExtension, Instance,
     Model as XFormsModel, ModelChild as XFormsModelChild,

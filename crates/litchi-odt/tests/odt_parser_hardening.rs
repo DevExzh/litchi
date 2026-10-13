@@ -1,7 +1,7 @@
 //! Compact corpus and malformed-input hardening for the ODT parser facade.
 
 use litchi_core::Error;
-use litchi_odt::{Document, core::PackageWriter};
+use litchi_odt::{Package, core::PackageWriter};
 mod support;
 
 const CONTENT_HEAD: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" office:version="1.3"><office:body><office:text>"#;
@@ -36,7 +36,10 @@ fn exercise_odt(content_xml: &[u8]) -> Option<Error> {
         Ok(bytes) => bytes,
         Err(error) => return Some(error),
     };
-    let document = match Document::from_bytes(bytes) {
+    let document = match Package::from_bytes(&bytes)
+        .map_err(Error::from)
+        .and_then(|package| package.document())
+    {
         Ok(document) => document,
         Err(error) => return Some(error),
     };
@@ -71,7 +74,7 @@ fn assert_typed_error(content_xml: &[u8], case: &str) {
 #[test]
 fn corpus_text_documents_parse_and_extract() -> Result<(), Error> {
     let bytes = package(&content(FEATURE_BODY), Some(STYLES), Some(META))?;
-    let document = Document::from_bytes(bytes)?;
+    let document = Package::from_bytes(&bytes)?.document()?;
     assert!(!document.text()?.trim().is_empty());
     assert!(document.paragraphs()?.len() >= 5);
     assert_eq!(document.tables()?.len(), 1);
@@ -98,7 +101,10 @@ fn corpus_xxe_probe_is_rejected_without_resolution() -> Result<(), Error> {
             ("meta.xml", META.as_bytes()),
         ],
     );
-    let document = match Document::from_bytes(raw) {
+    let document = match Package::from_bytes(&raw)
+        .map_err(Error::from)
+        .and_then(|package| package.document())
+    {
         Ok(document) => document,
         Err(Error::InvalidFormat(_)) => return Ok(()),
         Err(error) => panic!("open produced a non-format error: {error:?}"),

@@ -46,6 +46,15 @@ const _: () = {
     assert!(size_of::<Odp>() == size_of::<usize>());
 };
 
+/// Typed ODF limit failures stay `Source::Odf`; every other failure keeps
+/// its common-core payload as `Source::Core`, exactly as before W3.
+fn odf_error(error: litchi_odf_common::Error) -> Error {
+    match error {
+        litchi_odf_common::Error::Core(error) => core_error(error),
+        other => Error::from(other).with_format(FileFormat::Odp),
+    }
+}
+
 fn core_error(error: litchi_core::Error) -> Error {
     Error::from(error).with_format(FileFormat::Odp)
 }
@@ -56,8 +65,10 @@ impl Odp {
     /// by turning a prepared package back into bytes and parsing them again
     /// (`DetectedFormat::Odp`).
     pub(crate) fn from_prepared(prepared: PreparedPackage, _options: &OpenOptions) -> Result<Self> {
-        let presentation =
-            litchi_odp::Presentation::from_prepared_package(prepared).map_err(core_error)?;
+        let presentation = litchi_odp::Package::from_prepared_package(prepared)
+            .map_err(odf_error)?
+            .presentation()
+            .map_err(core_error)?;
         Ok(Self::from_owner(OdpOwner::Eager(presentation)))
     }
 

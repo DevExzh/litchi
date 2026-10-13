@@ -6,8 +6,8 @@ use litchi_odf_common::core::{
 use litchi_odf_common::package::{
     replace_content_xml as replace_package_content_xml, replace_content_xml_spliced,
 };
+use std::fmt;
 use std::sync::Arc;
-use std::{fmt, path::Path};
 
 use crate::model::names::Definition;
 
@@ -21,14 +21,14 @@ const BODY_MARKER: &str = "<office:spreadsheet";
 /// archive/index handoff without reparsing the ZIP central directory.  The
 /// wrapper remains crate-private in ordinary signatures; callers still see
 /// semantic snapshots and byte slices.
-pub struct Package {
+pub(crate) struct Archive {
     inner: Arc<family::Package>,
 }
 
-impl fmt::Debug for Package {
+impl fmt::Debug for Archive {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("Package")
+            .debug_struct("Archive")
             .field("bytes", &self.inner.as_bytes().len())
             .field(
                 "prepared_index",
@@ -38,33 +38,11 @@ impl fmt::Debug for Package {
     }
 }
 
-impl Package {
+impl Archive {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_bytes(std::fs::read(path.as_ref())?)
-    }
-
-    /// Open a password-encrypted ODS package and validate its decrypted semantic owners.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for file I/O, an incorrect password, malformed encryption metadata,
-    /// MIME/body mismatch, invalid XML, or worksheet validation failure.
-    pub fn open_with_password(path: impl AsRef<Path>, password: impl Into<String>) -> Result<Self> {
-        let package =
-            family::Package::open_with_password(path, password, MIMETYPE, BODY_MARKER, "ODS")?;
-        crate::authoring::validate_content_xml(package.content_xml())?;
-        Ok(Self {
-            inner: Arc::new(package),
-        })
-    }
-
-    ///
-    /// # Errors
-    /// Returns an error when the operation cannot be completed.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
+    pub(crate) fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         let package = family::Package::from_bytes(bytes, MIMETYPE, BODY_MARKER, "ODS")?;
         crate::authoring::validate_content_xml(package.content_xml())?;
         Ok(Self {
@@ -77,7 +55,7 @@ impl Package {
     /// The prepared value is consumed only after the ODS MIME contract is
     /// checked, so a mismatched family is reported without exposing or
     /// rebuilding the underlying archive index.
-    pub fn from_prepared_package(prepared: PreparedPackage) -> Result<Self> {
+    pub(crate) fn from_prepared_package(prepared: PreparedPackage) -> Result<Self> {
         if prepared.format() != litchi_core::detection::FileFormat::Ods {
             return Err(Error::InvalidFormat(
                 "prepared ODF package is not an ODS family document".to_string(),
@@ -95,12 +73,6 @@ impl Package {
         })
     }
 
-    /// Alias for [`Self::from_prepared_package`].
-    #[inline]
-    pub fn from_prepared(prepared: PreparedPackage) -> Result<Self> {
-        Self::from_prepared_package(prepared)
-    }
-
     /// Adopt an already materialized, validated archive without copying its
     /// bytes.  This is the explicit handoff from the positional source owner
     /// to the established mutable package facade.
@@ -115,26 +87,6 @@ impl Package {
     /// Adopt shared ODS bytes for an internal source-bound transaction.
     pub(crate) fn from_shared_bytes(bytes: Arc<Vec<u8>>) -> Result<Self> {
         let package = family::Package::from_shared_bytes(bytes, MIMETYPE, BODY_MARKER, "ODS")?;
-        crate::authoring::validate_content_xml(package.content_xml())?;
-        Ok(Self {
-            inner: Arc::new(package),
-        })
-    }
-
-    /// Decode a password-encrypted ODS package and validate its decrypted semantic owners.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for an incorrect password, malformed encryption metadata, MIME/body
-    /// mismatch, invalid XML, or worksheet validation failure.
-    pub fn from_bytes_with_password(bytes: Vec<u8>, password: impl Into<String>) -> Result<Self> {
-        let package = family::Package::from_bytes_with_password(
-            bytes,
-            password,
-            MIMETYPE,
-            BODY_MARKER,
-            "ODS",
-        )?;
         crate::authoring::validate_content_xml(package.content_xml())?;
         Ok(Self {
             inner: Arc::new(package),
@@ -159,17 +111,17 @@ impl Package {
     }
 
     #[must_use]
-    pub fn content_xml(&self) -> &str {
+    pub(crate) fn content_xml(&self) -> &str {
         self.inner.content_xml()
     }
 
     #[must_use]
-    pub fn styles_xml(&self) -> Option<&str> {
+    pub(crate) fn styles_xml(&self) -> Option<&str> {
         self.inner.styles_xml()
     }
 
     #[must_use]
-    pub fn package(&self) -> &OwnedPackage {
+    pub(crate) fn package(&self) -> &OwnedPackage {
         self.inner.package()
     }
 
@@ -179,14 +131,14 @@ impl Package {
     /// [`litchi_odf_common::leniency::ToleranceReport`].
     #[inline]
     #[must_use]
-    pub fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
+    pub(crate) fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
         self.inner.tolerance_report()
     }
 
     /// Return the identity of the archive index retained by smart detection.
     #[doc(hidden)]
     #[must_use]
-    pub fn prepared_index_identity(&self) -> usize {
+    pub(crate) fn prepared_index_identity(&self) -> usize {
         self.inner.package().prepared_index_identity()
     }
 
@@ -208,7 +160,7 @@ impl Package {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn definitions(&self) -> Result<Vec<Definition>> {
+    pub(crate) fn definitions(&self) -> Result<Vec<Definition>> {
         crate::codec::names::parse(self.content_xml())
     }
 
@@ -332,7 +284,7 @@ impl Package {
     }
 
     #[must_use]
-    pub fn into_bytes(self) -> Vec<u8> {
+    pub(crate) fn into_bytes(self) -> Vec<u8> {
         match Arc::try_unwrap(self.inner) {
             Ok(package) => package.into_bytes(),
             Err(package) => package.as_bytes().to_vec(),

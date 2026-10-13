@@ -27,7 +27,7 @@ impl MutableDocument {
     /// use litchi_odt::mutable::MutableDocument;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let doc = Document::open("document.odt")?;
+    /// let doc = litchi_odt::Package::open("document.odt")?.document()?;
     /// let mut mutable_doc = MutableDocument::from_document(doc)?;
     /// # Ok(())
     /// # }
@@ -60,7 +60,7 @@ impl MutableDocument {
                 OrderElement::List(list) => DocumentElement::List(list),
             })
             .collect();
-        let source_package = Some(doc.into_package());
+        let source_package = Some(doc.transaction_package().clone());
 
         Ok(Self {
             elements,
@@ -374,17 +374,35 @@ impl MutableDocument {
     /// ```no_run
     /// use litchi_odt::mutable::MutableDocument;
     ///
-    /// # fn main() -> litchi_core::Result<()> {
+    /// # fn main() -> Result<(), litchi_odt::Error> {
     /// let mut doc = MutableDocument::new();
     /// doc.add_paragraph("Hello!")?;
     /// doc.save("output.odt")?;
     /// # Ok(())
     /// # }
     /// ```
-    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+    ///
+    /// The bytes are staged in a sibling temporary file and published with
+    /// one rename, so a failed save leaves an existing destination unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns serialization or publication failures.
+    pub fn save<P: AsRef<Path>>(
+        &self,
+        path: P,
+    ) -> std::result::Result<(), litchi_odf_common::Error> {
         let bytes = self.to_bytes()?;
-        std::fs::write(path, bytes)?;
-        Ok(())
+        litchi_odf_common::publish::save_bytes(path.as_ref(), &bytes, litchi_core::Durability::Full)
+    }
+
+    /// Serialize the current state into an immutable [`crate::Package`].
+    ///
+    /// # Errors
+    ///
+    /// Returns serialization or archive-validation failures.
+    pub fn to_package(&self) -> std::result::Result<crate::Package, litchi_odf_common::Error> {
+        Ok(crate::Package::from_authored(self.to_bytes()?)?)
     }
 
     /// Publish a content-only edit against the retained package.

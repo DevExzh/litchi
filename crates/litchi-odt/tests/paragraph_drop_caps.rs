@@ -1,6 +1,6 @@
 use litchi_odt::style::paragraph::drop_cap::{Distance, DropCap, Length, Style, parse};
 use litchi_odt::style::paragraph::tab_stop::{Position, Stop, Stops, Style as TabStyle};
-use litchi_odt::{Builder, Document};
+use litchi_odt::{Builder, Package};
 use std::io::Cursor;
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const STYLE: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
@@ -103,8 +103,8 @@ fn builder_package_composition_and_mutation_round_trip() {
         .add_paragraph_drop_cap_style(drop_style.clone())
         .unwrap();
     builder.add_paragraph("Opening text").unwrap();
-    let bytes = builder.build().unwrap();
-    let package = litchi_odt::generic::Package::from_bytes(bytes.clone()).unwrap();
+    let bytes = builder.build().unwrap().to_bytes().unwrap();
+    let package = litchi_odt::generic::Package::from_bytes(&bytes).unwrap();
     assert_eq!(
         package.paragraph_style_drop_caps().unwrap().get("Opening"),
         Some(&drop_style)
@@ -116,9 +116,10 @@ fn builder_package_composition_and_mutation_round_trip() {
             .get("Opening")
             .is_some()
     );
-    let mut mutable =
-        litchi_odt::mutable::MutableDocument::from_document(Document::from_bytes(bytes).unwrap())
-            .unwrap();
+    let mut mutable = litchi_odt::mutable::MutableDocument::from_document(
+        Package::from_bytes(&bytes).unwrap().document().unwrap(),
+    )
+    .unwrap();
     let replacement = DropCap {
         length: Some(Length::Word),
         lines: Some(4),
@@ -127,7 +128,7 @@ fn builder_package_composition_and_mutation_round_trip() {
     };
     drop_style.drop_cap = Some(replacement.clone());
     mutable.set_paragraph_style_drop_cap(&drop_style).unwrap();
-    let package = litchi_odt::generic::Package::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+    let package = litchi_odt::generic::Package::from_bytes(&mutable.to_bytes().unwrap()).unwrap();
     assert_eq!(
         package
             .paragraph_style_drop_caps()

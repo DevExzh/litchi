@@ -34,7 +34,7 @@ enum NamespaceKind {
 enum Kind {
     Root,
     Body,
-    Spreadsheet,
+    Workbook,
     Table,
     Row,
     Cell,
@@ -202,7 +202,7 @@ pub(crate) fn parse(xml: &str) -> Result<Parsed> {
                             span.clone(),
                         )?;
                     },
-                    Kind::Root | Kind::Body | Kind::Spreadsheet | Kind::Other => {},
+                    Kind::Root | Kind::Body | Kind::Workbook | Kind::Other => {},
                 }
                 stack.push(Open {
                     kind,
@@ -263,7 +263,7 @@ pub(crate) fn parse(xml: &str) -> Result<Parsed> {
                             annotation: Some(builder.finish()?),
                         });
                     },
-                    Kind::Root | Kind::Body | Kind::Spreadsheet | Kind::Other => {},
+                    Kind::Root | Kind::Body | Kind::Workbook | Kind::Other => {},
                 }
                 restore_namespace_declarations(&mut namespaces, changes);
             },
@@ -319,11 +319,7 @@ pub(crate) fn parse(xml: &str) -> Result<Parsed> {
                         }
                         current_table = None;
                     },
-                    Kind::Root
-                    | Kind::Body
-                    | Kind::Spreadsheet
-                    | Kind::Annotation
-                    | Kind::Other => {},
+                    Kind::Root | Kind::Body | Kind::Workbook | Kind::Annotation | Kind::Other => {},
                 }
             },
             Event::Eof => break,
@@ -371,10 +367,10 @@ fn classify(namespace: NamespaceKind, local: &[u8], parent: Option<Kind>) -> Res
         return Ok(Kind::Body);
     }
     if namespace == NamespaceKind::Office && local == b"spreadsheet" {
-        return Ok(Kind::Spreadsheet);
+        return Ok(Kind::Workbook);
     }
     if namespace == NamespaceKind::Table && local == b"table" {
-        return direct(Kind::Table, parent, Kind::Spreadsheet, "table:table");
+        return direct(Kind::Table, parent, Kind::Workbook, "table:table");
     }
     if namespace == NamespaceKind::Table && local == b"table-row" {
         return direct(Kind::Row, parent, Kind::Table, "table:table-row");

@@ -21,9 +21,9 @@ use crate::{
     mutable::MutableDocument,
 };
 use litchi_core::{
-    BlobBundle, BlobId, BlobLimits, Error, ForwardOnly, History as CoreHistory, JoinedSubEdits,
-    Patch as CorePatch, PatchLimits, PatchOperation, Result, Reversible, ReversibleOperation,
-    SubEdit, ThreeWayMergePlan,
+    BlobBundle, BlobId, BlobLimits, Error as CoreError, ForwardOnly, History as CoreHistory,
+    JoinedSubEdits, Patch as CorePatch, PatchLimits, PatchOperation, Result, Reversible,
+    ReversibleOperation, SubEdit, ThreeWayMergePlan,
 };
 use serde_json::Value;
 use std::{
@@ -37,6 +37,13 @@ pub use litchi_core::Position;
 pub use litchi_core::{
     CompositionLimits, ConflictSet, HistoryLimits, MergeChoice, SubEditConflict, SubEditJoinFailure,
 };
+/// The family error of package-level verbs, [`Edit::commit`] and
+/// [`Package::apply`]: typed limits plus the common-core payload.
+pub use litchi_odf_common::Error;
+use litchi_odf_common::Error as PackageError;
+/// The dimension named by [`Error::Limit`] and [`Error::InvalidLimit`].
+pub use litchi_odf_common::LimitKind;
+pub use litchi_odf_common::OpenOptions;
 
 const MAX_PACKAGE_BYTES: usize = 64 * 1024 * 1024;
 const MAX_DURABLE_TRANSFER_EXPANSION_BYTES: usize = MAX_PACKAGE_BYTES;
@@ -52,11 +59,18 @@ const TARGET_PRECONDITION: &str = "target_sha256";
 const DEFAULT_COMPOSITION_LIMITS: CompositionLimits =
     CompositionLimits::new(1_024, 64, 4_096, 1_024);
 
-/// Immutable, validated ODT package snapshot.
+/// The immutable owner of one packaged ODT artifact.
+///
+/// `Package` owns every state verb: ingress (`open*`, `from_bytes*`,
+/// `from_reader*`), the primary [`Edit`] transaction, patch application and
+/// output (`save`, `save_with_durability`, `to_bytes`, `write_to`). It is
+/// cheap to clone; clones share the exact bytes, the validated archive index
+/// and the parsed [`Document`] projection. A commit publishes a new package
+/// and never mutates its source.
 #[derive(Clone)]
-pub struct Snapshot {
+pub struct Package {
     bytes: Arc<Vec<u8>>,
-    /// The validated physical package is retained alongside its byte owner.
+    /// The validated physical package retained alongside its byte owner.
     ///
     /// `OwnedPackage` keeps the immutable ZIP index in an `Arc`, so reopening
     /// a snapshot for semantic validation can reuse the already-built
@@ -64,43 +78,322 @@ pub struct Snapshot {
     /// bytes. The byte handle remains separate because lineage and exact
     /// source authorization intentionally compare the immutable artifact.
     package: crate::core::OwnedPackage,
+    /// The parsed read-only projection of exactly these bytes. Opened and
+    /// committed packages hold it from construction; freshly built packages
+    /// parse it on first use.
+    document: Arc<std::sync::OnceLock<Document>>,
 }
 
-impl Snapshot {
-    /// Opens and retains an ODT package as an immutable snapshot.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        ensure_package_size(bytes.len(), "ODT transaction input")?;
+impl std::fmt::Debug for Package {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Package")
+            .field("bytes", &self.bytes.len())
+            .finish_non_exhaustive()
+    }
+}
+
+impl Package {
+    /// Create the minimal valid text document.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error only when the fixed minimal package cannot be built.
+    pub fn new() -> std::result::Result<Self, PackageError> {
+        crate::Builder::new().build()
+    }
+
+    /// Open an ODT package from a path with the default [`OpenOptions`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PackageError::Limit`] when a source dimension is exceeded and
+    /// [`PackageError::Core`] for I/O, archive or family-validation failures.
+    pub fn open(path: impl AsRef<std::path::Path>) -> std::result::Result<Self, PackageError> {
+        Self::open_with_options(path, OpenOptions::new())
+    }
+
+    /// Open an ODT package from a path under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn open_with_options(
+        path: impl AsRef<std::path::Path>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        let file = std::fs::File::open(path)?;
+        Self::from_reader_with_options(file, options)
+    }
+
+    /// Open a password-encrypted ODT package from a path.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`]; a wrong password fails while the projection reads
+    /// the encrypted parts.
+    pub fn open_with_password(
+        path: impl AsRef<std::path::Path>,
+        password: impl Into<String>,
+    ) -> std::result::Result<Self, PackageError> {
+        Self::open_with_password_and_options(path, password, OpenOptions::new())
+    }
+
+    /// Open a password-encrypted ODT package under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open_with_password`].
+    pub fn open_with_password_and_options(
+        path: impl AsRef<std::path::Path>,
+        password: impl Into<String>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        let password = zeroize::Zeroizing::new(password.into());
+        let file = std::fs::File::open(path)?;
+        let package = crate::core::OwnedPackage::from_reader_with_limits_and_password(
+            file,
+            options.source_limits_value(),
+            password.as_str(),
+        )?;
+        Self::from_owned_package_with_options(package, options)
+    }
+
+    /// Open an ODT package from bytes (the bytes are copied).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_bytes(bytes: &[u8]) -> std::result::Result<Self, PackageError> {
+        Self::from_bytes_with_options(bytes, OpenOptions::new())
+    }
+
+    /// Open an ODT package from bytes under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_bytes_with_options(
+        bytes: &[u8],
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        let limits = options.source_limits_value();
+        check_input_bytes(bytes.len(), limits)?;
+        Self::from_vec_with_options(copy_input(bytes)?, options)
+    }
+
+    /// Open a password-encrypted ODT package from bytes.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open_with_password`].
+    pub fn from_bytes_with_password(
+        bytes: &[u8],
+        password: impl Into<String>,
+    ) -> std::result::Result<Self, PackageError> {
+        Self::from_bytes_with_password_and_options(bytes, password, OpenOptions::new())
+    }
+
+    /// Open a password-encrypted ODT package from bytes under caller-selected
+    /// limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open_with_password`].
+    pub fn from_bytes_with_password_and_options(
+        bytes: &[u8],
+        password: impl Into<String>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        let password = zeroize::Zeroizing::new(password.into());
+        let limits = options.source_limits_value();
+        check_input_bytes(bytes.len(), limits)?;
+        let package = crate::core::OwnedPackage::from_bytes_with_limits_and_password(
+            copy_input(bytes)?,
+            limits,
+            password.as_str(),
+        )?;
+        Self::from_owned_package_with_options(package, options)
+    }
+
+    /// Open an ODT package from a reader with the default [`OpenOptions`].
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_reader(reader: impl std::io::Read) -> std::result::Result<Self, PackageError> {
+        Self::from_reader_with_options(reader, OpenOptions::new())
+    }
+
+    /// Open an ODT package from a reader under caller-selected limits. The
+    /// reader is consumed through an input-limit guard before indexing.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_reader_with_options(
+        reader: impl std::io::Read,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        let package = crate::core::OwnedPackage::from_reader_with_limits(
+            reader,
+            options.source_limits_value(),
+        )?;
+        Self::from_owned_package_with_options(package, options)
+    }
+
+    /// Adopt a packaged ODF result prepared by smart detection, reusing its
+    /// validated archive index.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`litchi_core::Error::UnexpectedFormat`] (as
+    /// [`PackageError::Core`]) when the prepared package is another family.
+    pub fn from_prepared_package(
+        prepared: crate::core::PreparedPackage,
+    ) -> std::result::Result<Self, PackageError> {
+        let document = Document::from_prepared_package(prepared)?;
+        Ok(Self::from_parsed(document))
+    }
+
+    fn from_vec_with_options(
+        bytes: Vec<u8>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        let package = crate::core::OwnedPackage::from_bytes_with_limits(
+            bytes,
+            options.source_limits_value(),
+        )?;
+        Self::from_owned_package_with_options(package, options)
+    }
+
+    fn from_owned_package_with_options(
+        package: crate::core::OwnedPackage,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        let document =
+            Document::from_owned_package_with_limits(package, options.semantic_limits_value())?;
+        Ok(Self::from_parsed(document))
+    }
+
+    /// Adopt a parsed projection; the package shares its exact bytes.
+    pub(crate) fn from_parsed(document: Document) -> Self {
+        let package = document.transaction_package().clone_without_password();
+        Self {
+            bytes: package.shared_bytes(),
+            package,
+            document: Arc::new(std::sync::OnceLock::from(document)),
+        }
+    }
+
+    /// Adopt complete bytes written by the crate's own authoring codecs. The
+    /// archive is indexed and validated now; the projection is parsed on the
+    /// first [`Self::document`] call.
+    pub(crate) fn from_authored(bytes: Vec<u8>) -> Result<Self> {
         let package = crate::core::OwnedPackage::from_bytes(bytes)?;
-        // Constructing the semantic document performs family validation,
-        // while the retained package is moved into the immutable snapshot so
-        // its validated ZIP index can be shared by subsequent reopenings.
-        Document::from_owned_package(package.clone())?;
-        Self::from_owned_package(package)
-    }
-
-    /// Captures the exact bytes backing an already validated document.
-    pub fn from_document(document: &Document) -> Result<Self> {
-        ensure_package_size(document.original_bytes().len(), "ODT transaction package")?;
-        Self::from_owned_package(document.transaction_package().clone_without_password())
-    }
-
-    fn from_owned_package(package: crate::core::OwnedPackage) -> Result<Self> {
-        ensure_package_size(package.as_bytes().len(), "ODT transaction package")?;
         Ok(Self {
             bytes: package.shared_bytes(),
             package,
+            document: Arc::new(std::sync::OnceLock::new()),
         })
+    }
+
+    /// Reopen complete bytes produced inside the crate.
+    pub(crate) fn from_vec(bytes: Vec<u8>) -> Result<Self> {
+        Ok(Self::from_parsed(Document::from_bytes(bytes)?))
+    }
+
+    /// Captures the exact bytes backing an already validated document.
+    pub(crate) fn from_document(document: &Document) -> Result<Self> {
+        Ok(Self::from_parsed(document.clone()))
+    }
+
+    /// The owned read-only projection of this package (one reference-count
+    /// increment once parsed).
+    ///
+    /// # Errors
+    ///
+    /// Returns the parse failure of a freshly built package whose projection
+    /// has not been parsed yet; opened and committed packages never fail.
+    pub fn document(&self) -> Result<Document> {
+        if let Some(document) = self.document.get() {
+            return Ok(document.clone());
+        }
+        let document = Document::from_owned_package(self.package.clone())?;
+        Ok(self.document.get_or_init(|| document).clone())
+    }
+
+    /// Repairs tolerated while this package was opened.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
+        match self.document.get() {
+            Some(document) => document.tolerance_report(),
+            None => self.package.tolerance_report(),
+        }
+    }
+
+    /// Apply a primary-transaction patch to this exact package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when this package is not byte-identical to the patch
+    /// source.
+    pub fn apply(&self, patch: &Patch) -> std::result::Result<Self, PackageError> {
+        Ok(patch.apply(self)?)
+    }
+
+    /// Atomically replace `path` with this package (full durability).
+    ///
+    /// The artifact is staged in a sibling temporary file and published with
+    /// one rename; a failure before publication leaves the destination
+    /// unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PackageError::Core`] carrying the I/O failure.
+    pub fn save(&self, path: impl AsRef<std::path::Path>) -> std::result::Result<(), PackageError> {
+        self.save_with_durability(path, litchi_core::Durability::Full)
+    }
+
+    /// Atomically replace `path` with this package under explicit durability.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::save`].
+    pub fn save_with_durability(
+        &self,
+        path: impl AsRef<std::path::Path>,
+        durability: litchi_core::Durability,
+    ) -> std::result::Result<(), PackageError> {
+        litchi_odf_common::publish::save_bytes(path.as_ref(), self.as_bytes(), durability)
+    }
+
+    /// Copy the exact package bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an allocation failure.
+    pub fn to_bytes(&self) -> std::result::Result<Vec<u8>, PackageError> {
+        Ok(copy_input(self.as_bytes())?)
+    }
+
+    /// Write the exact package bytes to a stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns the stream's I/O failure.
+    pub fn write_to(
+        &self,
+        mut writer: impl std::io::Write,
+    ) -> std::result::Result<(), PackageError> {
+        writer.write_all(self.as_bytes())?;
+        Ok(())
     }
 
     /// Returns the exact package bytes represented by this snapshot.
     #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         self.bytes.as_slice()
-    }
-
-    /// Reopens this immutable snapshot for semantic inspection.
-    pub fn document(&self) -> Result<Document> {
-        Document::from_owned_package(self.package.clone())
     }
 
     /// Return the identity of the validated physical package index retained
@@ -145,7 +438,7 @@ impl Snapshot {
     /// any bytes are retained by the plan.
     pub fn plan_plain_paragraph_transfer_from(
         &self,
-        donor: &Snapshot,
+        donor: &Package,
         source: Position,
         target: Position,
     ) -> Result<ParagraphTransferPlan> {
@@ -156,7 +449,7 @@ impl Snapshot {
     /// plain paragraphs from an immutable donor snapshot.
     pub fn plan_plain_paragraphs_transfer_from(
         &self,
-        donor: &Snapshot,
+        donor: &Package,
         sources: &[Position],
         target: Position,
     ) -> Result<ParagraphTransferPlan> {
@@ -167,7 +460,7 @@ impl Snapshot {
     /// slice of length one or more.
     pub fn plan_plain_paragraph_transfer_batch_from(
         &self,
-        donor: &Snapshot,
+        donor: &Package,
         sources: &[Position],
         target: Position,
     ) -> Result<ParagraphTransferPlan> {
@@ -175,12 +468,96 @@ impl Snapshot {
     }
 }
 
-fn snapshot_from_final_document(source: &Snapshot, document: &Document) -> Result<Snapshot> {
+fn apply_annotation_operation(
+    document: &mut Document,
+    operation: &AnnotationOperation,
+) -> Result<OperationResult> {
+    use crate::package::annotation::AnnotationHost;
+    let package = document.transaction_package();
+    let content = document.transaction_content_xml();
+    let (bytes, result) = match operation {
+        AnnotationOperation::Add { anchor, annotation } => {
+            let (bytes, index) = crate::package::annotation::add(
+                package,
+                content,
+                AnnotationHost::Text,
+                anchor,
+                annotation,
+            )?;
+            (bytes, OperationResult::Index(index))
+        },
+        AnnotationOperation::Replace { index, annotation } => (
+            crate::package::annotation::replace(
+                package,
+                content,
+                AnnotationHost::Text,
+                *index,
+                annotation,
+            )?,
+            OperationResult::Unit,
+        ),
+        AnnotationOperation::Update { index, update } => (
+            crate::package::annotation::update(
+                package,
+                content,
+                AnnotationHost::Text,
+                *index,
+                update,
+            )?,
+            OperationResult::Unit,
+        ),
+        AnnotationOperation::Remove { index } => (
+            crate::package::annotation::remove(package, content, AnnotationHost::Text, *index)?,
+            OperationResult::Unit,
+        ),
+        AnnotationOperation::Reorder { from, to } => (
+            crate::package::annotation::reorder(
+                package,
+                content,
+                AnnotationHost::Text,
+                *from,
+                *to,
+            )?,
+            OperationResult::Unit,
+        ),
+    };
+    document.replace_transaction_bytes(bytes)?;
+    Ok(result)
+}
+
+fn snapshot_from_final_document(source: &Package, document: &Document) -> Result<Package> {
     if document.original_bytes() == source.as_bytes() {
         Ok(source.clone())
     } else {
-        Snapshot::from_document(document)
+        Package::from_document(document)
     }
+}
+
+fn check_input_bytes(
+    length: usize,
+    limits: litchi_odf_common::SourceLimits,
+) -> std::result::Result<(), PackageError> {
+    let observed = u64::try_from(length).unwrap_or(u64::MAX);
+    if observed > limits.max_input_bytes() {
+        return Err(PackageError::Limit {
+            kind: LimitKind::Source(litchi_odf_common::SourceLimitKind::InputBytes),
+            observed,
+            maximum: limits.max_input_bytes(),
+        });
+    }
+    Ok(())
+}
+
+fn copy_input(source: &[u8]) -> Result<Vec<u8>> {
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(source.len())
+        .map_err(|allocation_error| CoreError::Allocation {
+            resource: "ODT package bytes",
+            source: allocation_error,
+        })?;
+    bytes.extend_from_slice(source);
+    Ok(bytes)
 }
 
 /// Security envelope classification relevant to package mutation.
@@ -231,7 +608,7 @@ impl ParagraphSelector {
 
 /// Detached, lossless packaged-ODT edit.
 pub struct Edit {
-    source: Snapshot,
+    source: Package,
     operations: Vec<Operation>,
 }
 
@@ -280,7 +657,7 @@ impl Edit {
         if from.get() >= MAX_PLAIN_PARAGRAPH_MOVE_POSITIONS
             || to.get() >= MAX_PLAIN_PARAGRAPH_MOVE_POSITIONS
         {
-            return Err(Error::InvalidFormat(format!(
+            return Err(CoreError::InvalidFormat(format!(
                 "ODT plain paragraph move position exceeds {MAX_PLAIN_PARAGRAPH_MOVE_POSITIONS}"
             )));
         }
@@ -296,7 +673,7 @@ impl Edit {
     /// Stages one checked dependency-free direct plain paragraph transfer.
     pub fn copy_plain_paragraph_from(
         &mut self,
-        donor: &Snapshot,
+        donor: &Package,
         source: Position,
         target: Position,
     ) -> Result<&mut Self> {
@@ -309,7 +686,7 @@ impl Edit {
     /// Alias for [`Edit::copy_plain_paragraph_from`].
     pub fn copy_plain_paragraph_transfer_from(
         &mut self,
-        donor: &Snapshot,
+        donor: &Package,
         source: Position,
         target: Position,
     ) -> Result<&mut Self> {
@@ -320,7 +697,7 @@ impl Edit {
     /// paragraph transfers.
     pub fn copy_plain_paragraphs_from(
         &mut self,
-        donor: &Snapshot,
+        donor: &Package,
         sources: &[Position],
         target: Position,
     ) -> Result<&mut Self> {
@@ -333,7 +710,7 @@ impl Edit {
     /// Alias for [`Edit::copy_plain_paragraphs_from`].
     pub fn copy_plain_paragraphs_transfer_from(
         &mut self,
-        donor: &Snapshot,
+        donor: &Package,
         sources: &[Position],
         target: Position,
     ) -> Result<&mut Self> {
@@ -1018,15 +1395,68 @@ impl Edit {
         })
     }
 
+    /// Stages a point or named-range body annotation; the commit result is
+    /// its allocated [`OperationResult::Index`].
+    pub fn add_annotation(
+        &mut self,
+        anchor: &crate::AnnotationAnchor,
+        annotation: &crate::Annotation,
+    ) -> Result<&mut Self> {
+        self.push(Operation::Annotation(AnnotationOperation::Add {
+            anchor: anchor.clone(),
+            annotation: annotation.clone(),
+        }))
+    }
+
+    /// Stages replacement of an annotation body and metadata, retaining its
+    /// anchor.
+    pub fn replace_annotation(
+        &mut self,
+        annotation_index: Position,
+        annotation: &crate::Annotation,
+    ) -> Result<&mut Self> {
+        self.push(Operation::Annotation(AnnotationOperation::Replace {
+            index: annotation_index.get(),
+            annotation: annotation.clone(),
+        }))
+    }
+
+    /// Stages a partial typed annotation metadata update.
+    pub fn update_annotation(
+        &mut self,
+        annotation_index: Position,
+        update: &crate::AnnotationUpdate,
+    ) -> Result<&mut Self> {
+        self.push(Operation::Annotation(AnnotationOperation::Update {
+            index: annotation_index.get(),
+            update: update.clone(),
+        }))
+    }
+
+    /// Stages removal of an annotation and its paired end marker, if any.
+    pub fn remove_annotation(&mut self, annotation_index: Position) -> Result<&mut Self> {
+        self.push(Operation::Annotation(AnnotationOperation::Remove {
+            index: annotation_index.get(),
+        }))
+    }
+
+    /// Stages a reorder of point annotations that are direct XML siblings.
+    pub fn reorder_annotation(&mut self, from: Position, to: Position) -> Result<&mut Self> {
+        self.push(Operation::Annotation(AnnotationOperation::Reorder {
+            from: from.get(),
+            to: to.get(),
+        }))
+    }
+
     fn push(&mut self, operation: Operation) -> Result<&mut Self> {
         if self.operations.len() >= MAX_OPERATIONS {
-            return Err(Error::InvalidFormat(format!(
+            return Err(CoreError::InvalidFormat(format!(
                 "ODT transaction exceeds {MAX_OPERATIONS} staged operations"
             )));
         }
         self.operations
             .try_reserve(1)
-            .map_err(|source| Error::Allocation {
+            .map_err(|source| CoreError::Allocation {
                 resource: "ODT transaction operations",
                 source,
             })?;
@@ -1034,10 +1464,22 @@ impl Edit {
         Ok(self)
     }
 
-    /// Validates every staged operation and publishes one immutable snapshot.
-    pub fn commit(self) -> Result<Commit> {
+    /// Validates every staged operation and publishes one immutable package.
+    ///
+    /// An edit with no staged operation commits the source package itself:
+    /// `diagnostics().changed()` is false and `patch().is_noop()` holds.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Core`] for refused or invalid operations, including a
+    /// changed write on a signed or encrypted source.
+    pub fn commit(self) -> std::result::Result<Commit, PackageError> {
+        Ok(self.commit_core()?)
+    }
+
+    pub(crate) fn commit_core(self) -> Result<Commit> {
         if !transfer_operations_are_isolated(&self.operations) {
-            return Err(Error::InvalidFormat(
+            return Err(CoreError::InvalidFormat(
                 "ODT paragraph transfer cannot be composed with another staged mutation"
                     .to_string(),
             ));
@@ -1061,7 +1503,7 @@ impl Edit {
         let mut results = Vec::new();
         results
             .try_reserve_exact(self.operations.len())
-            .map_err(|source| Error::Allocation {
+            .map_err(|source| CoreError::Allocation {
                 resource: "ODT transaction results",
                 source,
             })?;
@@ -1095,7 +1537,7 @@ impl Edit {
             let result = match operation {
                 Operation::Noop => OperationResult::Unit,
                 Operation::RestoreSnapshot => {
-                    return Err(Error::Unsupported(
+                    return Err(CoreError::Unsupported(
                         "snapshot restoration is available only through patch application"
                             .to_string(),
                     ));
@@ -1119,7 +1561,7 @@ impl Edit {
                     OperationResult::Unit
                 },
                 Operation::MovePlainParagraph { from, to } => {
-                    let snapshot = Snapshot::from_document(&document)?;
+                    let snapshot = Package::from_document(&document)?;
                     let moved = crate::package::paragraph_move::move_plain_paragraph(
                         &snapshot, *from, *to,
                     )?;
@@ -1127,14 +1569,14 @@ impl Edit {
                     OperationResult::Unit
                 },
                 Operation::TransferPlainParagraphs(transfer) => {
-                    let snapshot = Snapshot::from_document(&document)?;
+                    let snapshot = Package::from_document(&document)?;
                     let transferred =
                         crate::package::paragraph_transfer::apply_operation(&snapshot, transfer)?;
                     document = transferred.document()?;
                     let mut indexes = Vec::new();
                     indexes
                         .try_reserve_exact(transfer.fragments.len())
-                        .map_err(|source| Error::Allocation {
+                        .map_err(|source| CoreError::Allocation {
                             resource: "ODT paragraph transfer result indexes",
                             source,
                         })?;
@@ -1323,7 +1765,7 @@ impl Edit {
                         .into_iter()
                         .find(|graph| graph.path == *path)
                         .ok_or_else(|| {
-                            Error::InvalidFormat(format!("RDF graph '{path}' was not found"))
+                            CoreError::InvalidFormat(format!("RDF graph '{path}' was not found"))
                         })?
                         .triples
                         .len();
@@ -1608,10 +2050,10 @@ impl Edit {
                     OperationResult::Indices(indices)
                 },
                 Operation::GarbageCollectEmbeddedResources { candidates } => {
-                    let current = Snapshot::from_document(&document)?;
+                    let current = Package::from_document(&document)?;
                     let plan = crate::package::resource_gc::plan(current, candidates)?;
                     if !plan.is_applicable() {
-                        return Err(Error::Unsupported(
+                        return Err(CoreError::Unsupported(
                             "ODT embedded-resource GC replay contains a typed refusal".to_string(),
                         ));
                     }
@@ -1717,6 +2159,9 @@ impl Edit {
                     document.replace_transaction_bytes(bytes)?;
                     OperationResult::Unit
                 },
+                Operation::Annotation(operation) => {
+                    apply_annotation_operation(&mut document, operation)?
+                },
             };
             // The paragraph mover publishes several individually audited,
             // source-provenance XML splices. A reordered producer document can
@@ -1732,9 +2177,8 @@ impl Edit {
             operation_index += 1;
         }
         let after = snapshot_from_final_document(&self.source, &document)?;
-        // Reparse after the compact audit so commit never returns an invalid
-        // candidate even when a writer implementation changes independently.
-        after.document()?;
+        // `document` is the parse of the final candidate bytes and is retained
+        // by `after`, so the commit never returns an unparsed candidate.
         Ok(Commit::new(self.source, after, results, self.operations))
     }
 }
@@ -1817,7 +2261,7 @@ fn apply_model_content_operation(
             mutable.append_semantic_hyperlink(*paragraph, href, text)?;
             Ok(OperationResult::Unit)
         },
-        _ => Err(Error::InvalidFormat(
+        _ => Err(CoreError::InvalidFormat(
             "ODT model-content batch received a non-content operation".to_string(),
         )),
     }
@@ -1851,7 +2295,7 @@ impl JoinConflict {
 
 /// Bounded collection of disjoint edits against one exact immutable snapshot.
 pub struct JoinedEdit {
-    source: Snapshot,
+    source: Package,
     limits: CompositionLimits,
     inner: JoinedSubEdits<Lineage, Vec<Operation>>,
 }
@@ -1859,7 +2303,7 @@ pub struct JoinedEdit {
 impl JoinedEdit {
     /// Creates an empty composition under caller-selected finite bounds.
     #[must_use]
-    pub fn new(source: Snapshot, limits: CompositionLimits) -> Self {
+    pub fn new(source: Package, limits: CompositionLimits) -> Self {
         let lineage = Lineage(source.bytes.clone());
         Self {
             source,
@@ -1920,7 +2364,7 @@ impl JoinedEdit {
         for edit in self.inner.into_sub_edits() {
             let payload = edit.into_payload();
             if !transfer_operations_are_isolated(&payload) {
-                return Err(Error::InvalidFormat(
+                return Err(CoreError::InvalidFormat(
                     "ODT paragraph transfer cannot be composed within one sub-edit".to_string(),
                 ));
             }
@@ -1930,13 +2374,13 @@ impl JoinedEdit {
             source: self.source,
             operations,
         }
-        .commit()
+        .commit_core()
     }
 }
 
 /// Non-applying three-way plan for two branches from one exact ODT snapshot.
 pub struct MergePlan {
-    source: Snapshot,
+    source: Package,
     limits: CompositionLimits,
     inner: ThreeWayMergePlan<Lineage, Vec<Operation>>,
 }
@@ -1945,14 +2389,14 @@ impl MergePlan {
     /// Plans a merge without mutating or reopening the base snapshot.
     pub fn new(left: JoinedEdit, right: JoinedEdit) -> Result<Self> {
         if left.source.as_bytes() != right.source.as_bytes() {
-            return Err(Error::InvalidFormat(
+            return Err(CoreError::InvalidFormat(
                 "ODT merge branches do not share an exact base snapshot".to_string(),
             ));
         }
         let source = left.source.clone();
         let limits = left.limits;
         let inner = ThreeWayMergePlan::new(left.inner, right.inner).map_err(|error| {
-            Error::InvalidFormat(format!(
+            CoreError::InvalidFormat(format!(
                 "ODT three-way planning failed: {:?}",
                 error.failure()
             ))
@@ -2001,13 +2445,13 @@ impl MergePlan {
 
 /// Commit-coupled bounded undo/redo over exact immutable ODT snapshots.
 pub struct History {
-    inner: CoreHistory<Snapshot>,
+    inner: CoreHistory<Package>,
 }
 
 impl History {
     /// Starts history at one immutable snapshot.
     #[must_use]
-    pub fn new(current: Snapshot, limits: HistoryLimits) -> Self {
+    pub fn new(current: Package, limits: HistoryLimits) -> Self {
         Self {
             inner: CoreHistory::new(current, limits),
         }
@@ -2015,7 +2459,7 @@ impl History {
 
     /// Current exact immutable snapshot.
     #[must_use]
-    pub const fn current(&self) -> &Snapshot {
+    pub const fn current(&self) -> &Package {
         self.inner.current()
     }
 
@@ -2036,12 +2480,12 @@ impl History {
             return Err(stale_history_error());
         }
         let commit = edit.commit()?;
-        self.record(commit.snapshot().clone())?;
+        self.record(commit.package().clone())?;
         Ok(commit)
     }
 
     /// Applies and records a durable patch only at the current exact head.
-    pub fn apply(&mut self, patch: &DurablePatch) -> Result<Snapshot> {
+    pub fn apply(&mut self, patch: &DurablePatch) -> Result<Package> {
         let snapshot = patch.apply(self.current())?;
         self.record(snapshot.clone())?;
         Ok(snapshot)
@@ -2069,9 +2513,9 @@ impl History {
         self.inner.can_redo()
     }
 
-    fn record(&mut self, snapshot: Snapshot) -> Result<()> {
+    fn record(&mut self, snapshot: Package) -> Result<()> {
         let weight = u64::try_from(self.current().as_bytes().len()).map_err(|_error| {
-            Error::InvalidFormat("ODT history snapshot weight exceeds u64".to_string())
+            CoreError::InvalidFormat("ODT history snapshot weight exceeds u64".to_string())
         })?;
         self.inner
             .record(snapshot, weight)
@@ -2308,37 +2752,84 @@ enum Operation {
     RemoveScriptResource {
         path: String,
     },
+    /// A body annotation edit. Annotation operations are source-local: they
+    /// are not encoded into durable patches and are refused by transfers.
+    Annotation(AnnotationOperation),
+}
+
+#[derive(Clone, Debug)]
+enum AnnotationOperation {
+    Add {
+        anchor: crate::AnnotationAnchor,
+        annotation: crate::Annotation,
+    },
+    Replace {
+        index: usize,
+        annotation: crate::Annotation,
+    },
+    Update {
+        index: usize,
+        update: crate::AnnotationUpdate,
+    },
+    Remove {
+        index: usize,
+    },
+    Reorder {
+        from: usize,
+        to: usize,
+    },
 }
 
 /// A validated packaged-ODT transaction result.
 pub struct Commit {
-    snapshot: Snapshot,
+    package: Package,
     patch: Patch,
     results: Vec<OperationResult>,
 }
 
+/// Content-free facts about one [`Commit`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Diagnostics {
+    changed: bool,
+    operation_count: usize,
+}
+
+impl Diagnostics {
+    /// Whether the committed package differs from its source bytes.
+    #[must_use]
+    pub const fn changed(&self) -> bool {
+        self.changed
+    }
+
+    /// The number of staged operations the commit applied.
+    #[must_use]
+    pub const fn operation_count(&self) -> usize {
+        self.operation_count
+    }
+}
+
 impl Commit {
     fn new(
-        before: Snapshot,
-        snapshot: Snapshot,
+        before: Package,
+        package: Package,
         results: Vec<OperationResult>,
         operations: Vec<Operation>,
     ) -> Self {
         Self {
             patch: Patch {
                 before,
-                after: snapshot.clone(),
+                after: package.clone(),
                 operations,
             },
-            snapshot,
+            package,
             results,
         }
     }
 
-    /// Returns the committed immutable snapshot.
+    /// Returns the committed immutable package.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
+    pub const fn package(&self) -> &Package {
+        &self.package
     }
 
     /// Returns the exact source-checked reversible patch.
@@ -2347,22 +2838,37 @@ impl Commit {
         &self.patch
     }
 
+    /// Returns content-free facts about this commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> Diagnostics {
+        Diagnostics {
+            changed: !self.patch.is_noop(),
+            operation_count: self.patch.operations.len(),
+        }
+    }
+
     /// Returns one deterministic result for each staged operation.
     #[must_use]
     pub fn results(&self) -> &[OperationResult] {
         &self.results
     }
 
-    /// Consumes the commit and returns its immutable snapshot.
+    /// Consumes the commit and returns its immutable package.
     #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
+    pub fn into_package(self) -> Package {
+        self.package
+    }
+
+    /// Consumes the commit into its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
     }
 }
 
 pub(crate) fn embedded_resource_gc_commit(
-    before: Snapshot,
-    snapshot: Snapshot,
+    before: Package,
+    snapshot: Package,
     candidates: Vec<crate::package::resource_gc::EmbeddedResourceGcCandidate>,
 ) -> Commit {
     let operations = if candidates.is_empty() {
@@ -2390,16 +2896,23 @@ pub enum OperationResult {
 /// Exact-byte, source-checked package patch.
 #[derive(Clone)]
 pub struct Patch {
-    before: Snapshot,
-    after: Snapshot,
+    before: Package,
+    after: Package,
     operations: Vec<Operation>,
 }
 
 impl Patch {
+    /// Whether applying this patch preserves the exact source bytes.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        Arc::ptr_eq(&self.before.bytes, &self.after.bytes)
+            || self.before.as_bytes() == self.after.as_bytes()
+    }
+
     /// Applies this patch only to the exact snapshot from which it was made.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn apply(&self, source: &Package) -> Result<Package> {
         if source.as_bytes() != self.before.as_bytes() {
-            return Err(Error::InvalidFormat(
+            return Err(CoreError::InvalidFormat(
                 "ODT patch source does not match its expected snapshot".to_string(),
             ));
         }
@@ -2436,7 +2949,7 @@ impl Patch {
     /// Form, chart, and embedded-resource positions are checked against the
     /// destination before their replacements, removals, or moves may commit.
     /// Other source-local selectors and snapshot restores remain refused.
-    pub fn plan_transfer(&self, destination: &Snapshot) -> Result<TransferPlan> {
+    pub fn plan_transfer(&self, destination: &Package) -> Result<TransferPlan> {
         TransferPlan::new(destination.clone(), &self.operations)
     }
 }
@@ -2499,13 +3012,13 @@ impl TransferDependency {
 
 /// Non-mutating, bounded plan for dependency-aware cross-document replay.
 pub struct TransferPlan {
-    destination: Snapshot,
+    destination: Package,
     operations: Vec<Operation>,
     dependencies: Vec<TransferDependency>,
 }
 
 impl TransferPlan {
-    fn new(destination: Snapshot, operations: &[Operation]) -> Result<Self> {
+    fn new(destination: Package, operations: &[Operation]) -> Result<Self> {
         if operations.len() > MAX_OPERATIONS {
             return Err(invalid_durable_patch());
         }
@@ -2865,7 +3378,7 @@ impl TransferPlan {
                     );
                 },
                 _ => {
-                    return Err(Error::Unsupported(
+                    return Err(CoreError::Unsupported(
                         "ODT cross-document transfer refuses this source-local operation"
                             .to_string(),
                     ));
@@ -2906,7 +3419,7 @@ impl TransferPlan {
             .iter()
             .any(|dependency| !dependency.satisfied)
         {
-            return Err(Error::InvalidFormat(
+            return Err(CoreError::InvalidFormat(
                 "ODT transfer plan has unresolved dependencies".to_string(),
             ));
         }
@@ -2914,7 +3427,7 @@ impl TransferPlan {
             source: self.destination,
             operations: self.operations,
         }
-        .commit()
+        .commit_core()
     }
 }
 
@@ -3114,8 +3627,8 @@ impl DurablePatch {
     fn from_semantic_patch(patch: &Patch) -> Result<Self> {
         // Durable patches intentionally do not retain credentials. This
         // credential-free reopen makes the encrypted-package refusal explicit.
-        Snapshot::from_bytes(copy_bytes(patch.before.as_bytes())?)?;
-        Snapshot::from_bytes(copy_bytes(patch.after.as_bytes())?)?;
+        Package::from_vec(copy_bytes(patch.before.as_bytes())?)?;
+        Package::from_vec(copy_bytes(patch.after.as_bytes())?)?;
         let limits = durable_patch_limits();
         let blob_limits = limits.blobs();
         let mut forward_blobs = BlobBundle::new(blob_limits);
@@ -3153,7 +3666,7 @@ impl DurablePatch {
         let mut pairs = Vec::new();
         pairs
             .try_reserve_exact(operations.len())
-            .map_err(|allocation_error| Error::Allocation {
+            .map_err(|allocation_error| CoreError::Allocation {
                 resource: "ODT durable semantic operations",
                 source: allocation_error,
             })?;
@@ -3212,7 +3725,7 @@ impl DurablePatch {
     ///
     /// Returns an error if `source` is not byte-identical to the retained
     /// source artifact or the target package no longer validates as ODT.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+    pub fn apply(&self, source: &Package) -> Result<Package> {
         let inverse = self.inner.inverse();
         if let Some(expected_source) = restore_target_bytes(&inverse)?
             && source.as_bytes() != expected_source
@@ -3280,7 +3793,7 @@ impl SealedPatch {
     ///
     /// Returns an error if the source digest differs or the target package no
     /// longer validates as ODT.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+    pub fn apply(&self, source: &Package) -> Result<Package> {
         apply_durable_patch(&self.inner, source)
     }
 }
@@ -3708,8 +4221,8 @@ fn semantic_patch_operation(
             format!("/package/scripts/{path}"),
             Value::Null,
         ),
-        Operation::RestoreSnapshot => {
-            return Err(Error::Unsupported(
+        Operation::RestoreSnapshot | Operation::Annotation(_) => {
+            return Err(CoreError::Unsupported(
                 "this ODT operation has not migrated to the semantic durable vocabulary"
                     .to_string(),
             ));
@@ -3960,23 +4473,23 @@ fn restore_target_bytes<Mode>(patch: &CorePatch<Mode>) -> Result<Option<&[u8]>> 
     if BlobId::of(bytes).as_hex() != lineage.target_id {
         return Err(invalid_durable_patch());
     }
-    Snapshot::from_bytes(copy_bytes(bytes)?)?;
+    Package::from_vec(copy_bytes(bytes)?)?;
     Ok(Some(bytes))
 }
 
-fn apply_durable_patch<Mode>(patch: &CorePatch<Mode>, source: &Snapshot) -> Result<Snapshot> {
+fn apply_durable_patch<Mode>(patch: &CorePatch<Mode>, source: &Package) -> Result<Package> {
     let lineage = durable_lineage(patch)?;
     if BlobId::of(source.as_bytes()).as_hex() != lineage.source_id {
         return Err(durable_source_mismatch());
     }
     validate_patch_direction(patch)?;
     if let Some(bytes) = restore_target_bytes(patch)? {
-        return Snapshot::from_bytes(copy_bytes(bytes)?);
+        return Package::from_vec(copy_bytes(bytes)?);
     }
     let mut operations = Vec::new();
     operations
         .try_reserve_exact(patch.operations().len())
-        .map_err(|allocation_error| Error::Allocation {
+        .map_err(|allocation_error| CoreError::Allocation {
             resource: "ODT durable semantic replay",
             source: allocation_error,
         })?;
@@ -3991,12 +4504,12 @@ fn apply_durable_patch<Mode>(patch: &CorePatch<Mode>, source: &Snapshot) -> Resu
         operations,
     }
     .commit()?;
-    if BlobId::of(committed.snapshot().as_bytes()).as_hex() != lineage.target_id {
-        return Err(Error::InvalidFormat(
+    if BlobId::of(committed.package().as_bytes()).as_hex() != lineage.target_id {
+        return Err(CoreError::InvalidFormat(
             "ODT semantic patch replay produced an unexpected target".to_string(),
         ));
     }
-    Ok(committed.into_snapshot())
+    Ok(committed.into_package())
 }
 
 fn decode_semantic_operation(operation: &PatchOperation, blobs: &BlobBundle) -> Result<Operation> {
@@ -4413,7 +4926,7 @@ fn plain_paragraph_transfer_value(
     let mut source_positions = Vec::new();
     source_positions
         .try_reserve_exact(transfer.source_positions.len())
-        .map_err(|source| Error::Allocation {
+        .map_err(|source| CoreError::Allocation {
             resource: "ODT paragraph transfer durable positions",
             source,
         })?;
@@ -4423,7 +4936,7 @@ fn plain_paragraph_transfer_value(
     let mut fragments = Vec::new();
     fragments
         .try_reserve_exact(transfer.fragments.len())
-        .map_err(|source| Error::Allocation {
+        .map_err(|source| CoreError::Allocation {
             resource: "ODT paragraph transfer durable fragments",
             source,
         })?;
@@ -4508,7 +5021,7 @@ fn plain_paragraph_transfer_from_value(
     let mut fragments = Vec::new();
     fragments
         .try_reserve_exact(fragments_value.len())
-        .map_err(|source| Error::Allocation {
+        .map_err(|source| CoreError::Allocation {
             resource: "ODT paragraph transfer durable fragment decode",
             source,
         })?;
@@ -4519,7 +5032,7 @@ fn plain_paragraph_transfer_from_value(
         let mut owned = Vec::new();
         owned
             .try_reserve_exact(bytes.len())
-            .map_err(|source| Error::Allocation {
+            .map_err(|source| CoreError::Allocation {
                 resource: "ODT paragraph transfer durable fragment",
                 source,
             })?;
@@ -4554,7 +5067,7 @@ fn transfer_positions_from_value(value: &Value) -> Result<Vec<usize>> {
     let mut output = Vec::new();
     output
         .try_reserve_exact(positions.len())
-        .map_err(|source| Error::Allocation {
+        .map_err(|source| CoreError::Allocation {
             resource: "ODT paragraph transfer durable source positions",
             source,
         })?;
@@ -4601,7 +5114,7 @@ fn rdf_triple_value(triple: &crate::rdf::Triple) -> Result<Value> {
         crate::rdf::Subject::Iri(value) => ("iri", value),
         crate::rdf::Subject::BlankNode(value) => ("blank", value),
         _ => {
-            return Err(Error::Unsupported(
+            return Err(CoreError::Unsupported(
                 "unsupported RDF subject variant".to_string(),
             ));
         },
@@ -4622,7 +5135,7 @@ fn rdf_triple_value(triple: &crate::rdf::Triple) -> Result<Value> {
             "value": value,
         }),
         _ => {
-            return Err(Error::Unsupported(
+            return Err(CoreError::Unsupported(
                 "unsupported RDF object variant".to_string(),
             ));
         },
@@ -4759,7 +5272,7 @@ fn embedded_resource_batch_value(
     let mut values = Vec::new();
     values
         .try_reserve_exact(changes.len())
-        .map_err(|source| Error::Allocation {
+        .map_err(|source| CoreError::Allocation {
             resource: "embedded-resource durable batch",
             source,
         })?;
@@ -4809,7 +5322,7 @@ fn embedded_resource_batch_from_value(
     let mut changes = Vec::new();
     changes
         .try_reserve_exact(values.len())
-        .map_err(|source| Error::Allocation {
+        .map_err(|source| CoreError::Allocation {
             resource: "embedded-resource durable batch",
             source,
         })?;
@@ -4885,7 +5398,7 @@ fn embedded_resource_gc_from_value(
     let mut candidates = Vec::new();
     candidates
         .try_reserve_exact(values.len())
-        .map_err(|source| Error::Allocation {
+        .map_err(|source| CoreError::Allocation {
             resource: "embedded-resource GC durable candidates",
             source,
         })?;
@@ -4938,20 +5451,20 @@ fn embedded_resource_value(
             preferred_root,
         } => {
             if files.len() > 16_384 {
-                return Err(Error::InvalidFormat(
+                return Err(CoreError::InvalidFormat(
                     "embedded resource has too many durable files".to_string(),
                 ));
             }
             let total = files.iter().try_fold(0usize, |total, file| {
                 total.checked_add(file.bytes.len()).ok_or_else(|| {
-                    Error::InvalidFormat("embedded resource byte count overflow".to_string())
+                    CoreError::InvalidFormat("embedded resource byte count overflow".to_string())
                 })
             })?;
             ensure_package_size(total, "embedded resource durable payload")?;
             let mut payload = Vec::new();
             payload
                 .try_reserve_exact(total)
-                .map_err(|source| Error::Allocation {
+                .map_err(|source| CoreError::Allocation {
                     resource: "embedded resource durable payload",
                     source,
                 })?;
@@ -4959,7 +5472,7 @@ fn embedded_resource_value(
             let mut entries = Vec::new();
             entries
                 .try_reserve_exact(files.len())
-                .map_err(|source| Error::Allocation {
+                .map_err(|source| CoreError::Allocation {
                     resource: "embedded resource durable file table",
                     source,
                 })?;
@@ -4988,7 +5501,7 @@ fn embedded_resource_value(
                 litchi_odf_common::embedded::Root::OpenDocument => "open-document",
                 litchi_odf_common::embedded::Root::MathMl => "mathml",
                 _ => {
-                    return Err(Error::Unsupported(
+                    return Err(CoreError::Unsupported(
                         "unsupported embedded XML root".to_string(),
                     ));
                 },
@@ -5064,7 +5577,7 @@ fn embedded_resource_from_value(
             let mut files = Vec::new();
             files
                 .try_reserve_exact(entries.len())
-                .map_err(|source| Error::Allocation {
+                .map_err(|source| CoreError::Allocation {
                     resource: "embedded resource durable file table",
                     source,
                 })?;
@@ -5354,27 +5867,27 @@ fn is_canonical_digest(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
 }
 
-fn durable_wire_error(source: litchi_core::PatchError) -> Error {
+fn durable_wire_error(source: litchi_core::PatchError) -> CoreError {
     let message = format!("invalid ODT durable patch: {source}");
     drop(source);
-    Error::InvalidFormat(message)
+    CoreError::InvalidFormat(message)
 }
 
-fn invalid_durable_patch() -> Error {
-    Error::InvalidFormat("invalid ODT durable patch vocabulary".to_string())
+fn invalid_durable_patch() -> CoreError {
+    CoreError::InvalidFormat("invalid ODT durable patch vocabulary".to_string())
 }
 
-fn durable_source_mismatch() -> Error {
-    Error::InvalidFormat("ODT durable patch source does not match".to_string())
+fn durable_source_mismatch() -> CoreError {
+    CoreError::InvalidFormat("ODT durable patch source does not match".to_string())
 }
 
-fn stale_history_error() -> Error {
-    Error::InvalidFormat("ODT history edit is stale relative to the current head".to_string())
+fn stale_history_error() -> CoreError {
+    CoreError::InvalidFormat("ODT history edit is stale relative to the current head".to_string())
 }
 
 fn bounded_semantic_text(value: String, field: &str) -> Result<String> {
     if value.len() > MAX_SEMANTIC_TEXT_BYTES || value.chars().any(|character| character == '\0') {
-        return Err(Error::InvalidFormat(format!(
+        return Err(CoreError::InvalidFormat(format!(
             "ODT {field} exceeds semantic patch bounds"
         )));
     }
@@ -5432,6 +5945,7 @@ fn operation_effects(operations: &[Operation]) -> (Vec<String>, Vec<String>) {
         }
         match operation {
             Operation::Noop => {},
+            Operation::Annotation(_) => writes.push("/body/annotations".to_string()),
             Operation::InsertParagraph { index, .. } | Operation::RemoveParagraph { index } => {
                 writes.push("/body/paragraphs/order".to_string());
                 writes.push(format!("/body/paragraphs/{index}/content"));
@@ -5655,7 +6169,7 @@ fn append_paragraph_index_point_effects(reads: &mut Vec<String>, index: usize) {
     }
 }
 
-fn envelope_kind(snapshot: &Snapshot) -> Result<EnvelopeKind> {
+fn envelope_kind(snapshot: &Package) -> Result<EnvelopeKind> {
     let package = envelope_package(snapshot)?;
     let archive = package.package()?;
     if archive
@@ -5674,7 +6188,7 @@ fn envelope_kind(snapshot: &Snapshot) -> Result<EnvelopeKind> {
     Ok(EnvelopeKind::Plain)
 }
 
-fn envelope_package(snapshot: &Snapshot) -> Result<crate::core::OwnedPackage> {
+fn envelope_package(snapshot: &Package) -> Result<crate::core::OwnedPackage> {
     ensure_package_size(snapshot.as_bytes().len(), "ODT transaction package")?;
     Ok(snapshot.package.clone())
 }
@@ -5684,7 +6198,7 @@ fn copy_bytes(source: &[u8]) -> Result<Vec<u8>> {
     let mut bytes = Vec::new();
     bytes
         .try_reserve_exact(source.len())
-        .map_err(|allocation_error| Error::Allocation {
+        .map_err(|allocation_error| CoreError::Allocation {
             resource: "ODT transaction package",
             source: allocation_error,
         })?;
@@ -5694,7 +6208,7 @@ fn copy_bytes(source: &[u8]) -> Result<Vec<u8>> {
 
 fn ensure_package_size(size: usize, scope: &str) -> Result<()> {
     if size > MAX_PACKAGE_BYTES {
-        return Err(Error::InvalidFormat(format!(
+        return Err(CoreError::InvalidFormat(format!(
             "{scope} exceeds the {MAX_PACKAGE_BYTES}-byte package limit"
         )));
     }
@@ -5707,13 +6221,13 @@ fn resolve_paragraph(document: &Document, selector: &ParagraphSelector) -> Resul
         ParagraphSelector::Position(position) if position.get() < paragraphs.len() => {
             Ok(position.get())
         },
-        ParagraphSelector::Position(position) => Err(Error::InvalidFormat(format!(
+        ParagraphSelector::Position(position) => Err(CoreError::InvalidFormat(format!(
             "paragraph selector position {} is out of bounds (found {})",
             position.get(),
             paragraphs.len()
         ))),
         ParagraphSelector::Index(index) if *index < paragraphs.len() => Ok(*index),
-        ParagraphSelector::Index(index) => Err(Error::InvalidFormat(format!(
+        ParagraphSelector::Index(index) => Err(CoreError::InvalidFormat(format!(
             "paragraph selector index {index} is out of bounds (found {})",
             paragraphs.len()
         ))),
@@ -5722,14 +6236,14 @@ fn resolve_paragraph(document: &Document, selector: &ParagraphSelector) -> Resul
             for (index, paragraph) in paragraphs.into_iter().enumerate() {
                 if paragraph.text()? == *text {
                     if selected.replace(index).is_some() {
-                        return Err(Error::InvalidFormat(
+                        return Err(CoreError::InvalidFormat(
                             "paragraph text selector is ambiguous".to_string(),
                         ));
                     }
                 }
             }
             selected.ok_or_else(|| {
-                Error::InvalidFormat("paragraph text selector did not match".to_string())
+                CoreError::InvalidFormat("paragraph text selector did not match".to_string())
             })
         },
     }
@@ -5754,7 +6268,9 @@ fn audit_changed_xml_is_compact(
             }
             if path == crate::constants::ODF_CONTENT {
                 let candidate_content = std::str::from_utf8(&xml).map_err(|error| {
-                    Error::InvalidFormat(format!("changed content.xml is not valid UTF-8: {error}"))
+                    CoreError::InvalidFormat(format!(
+                        "changed content.xml is not valid UTF-8: {error}"
+                    ))
                 })?;
                 if litchi_odf_common::package::content_splice_publication(
                     &source,
@@ -5766,11 +6282,13 @@ fn audit_changed_xml_is_compact(
                 }
             }
             let limits = litchi_odf_common::compact_xml::Limits::new(MAX_PACKAGE_BYTES, 4_096)
-                .map_err(Error::from)?;
+                .map_err(CoreError::from)?;
             let validation_xml = numeric_reference_projection(&xml)?;
             litchi_odf_common::compact_xml::validate_with_limits(&validation_xml, limits).map_err(
                 |source| {
-                    Error::InvalidFormat(format!("XML publication rejected for '{path}': {source}"))
+                    CoreError::InvalidFormat(format!(
+                        "XML publication rejected for '{path}': {source}"
+                    ))
                 },
             )?;
         }
@@ -5782,7 +6300,7 @@ fn numeric_reference_projection(xml: &[u8]) -> Result<Vec<u8>> {
     let mut output = Vec::new();
     output
         .try_reserve_exact(xml.len())
-        .map_err(|source| Error::Allocation {
+        .map_err(|source| CoreError::Allocation {
             resource: "ODT compact XML numeric-reference audit",
             source,
         })?;
@@ -5793,7 +6311,7 @@ fn numeric_reference_projection(xml: &[u8]) -> Result<Vec<u8>> {
                 .iter()
                 .position(|byte| *byte == b';')
                 .ok_or_else(|| {
-                    Error::InvalidFormat(
+                    CoreError::InvalidFormat(
                         "ODT authored XML contains an unterminated numeric reference".to_string(),
                     )
                 })?;
@@ -5843,17 +6361,17 @@ fn is_xml_scalar(value: u32) -> bool {
     )
 }
 
-fn invalid_numeric_reference() -> Error {
-    Error::InvalidFormat("ODT authored XML contains an invalid numeric reference".to_string())
+fn invalid_numeric_reference() -> CoreError {
+    CoreError::InvalidFormat("ODT authored XML contains an invalid numeric reference".to_string())
 }
 
-fn ensure_editable_envelope(snapshot: &Snapshot) -> Result<()> {
+fn ensure_editable_envelope(snapshot: &Package) -> Result<()> {
     match envelope_kind(snapshot)? {
-        EnvelopeKind::Encrypted => Err(Error::Unsupported(
+        EnvelopeKind::Encrypted => Err(CoreError::Unsupported(
             "packaged ODT transactions preserve encrypted snapshots only as exact no-ops"
                 .to_string(),
         )),
-        EnvelopeKind::Signed => Err(Error::Unsupported(
+        EnvelopeKind::Signed => Err(CoreError::Unsupported(
             "packaged ODT transactions preserve signed snapshots only as exact no-ops".to_string(),
         )),
         EnvelopeKind::Plain => Ok(()),
@@ -5871,7 +6389,7 @@ mod tests {
         let document = Document::from_bytes(mutable.to_bytes()?)?;
         let package_bytes = document.transaction_package().shared_bytes();
 
-        let snapshot = Snapshot::from_document(&document)?;
+        let snapshot = Package::from_document(&document)?;
 
         assert!(Arc::ptr_eq(&snapshot.bytes, &package_bytes));
         assert_eq!(
@@ -5886,14 +6404,14 @@ mod tests {
     fn changed_final_document_handoff_shares_bytes_and_reopens_independently() -> Result<()> {
         let mut source_document = MutableDocument::new();
         source_document.add_paragraph("before")?;
-        let source = Snapshot::from_bytes(source_document.to_bytes()?)?;
+        let source = Package::from_vec(source_document.to_bytes()?)?;
 
         let mut changed_document = MutableDocument::new();
         changed_document.add_paragraph("after")?;
         let changed_document = Document::from_bytes(changed_document.to_bytes()?)?;
         let changed_bytes = changed_document.transaction_package().shared_bytes();
         let copied_and_reparsed =
-            Snapshot::from_bytes(copy_bytes(changed_document.original_bytes())?)?;
+            Package::from_vec(copy_bytes(changed_document.original_bytes())?)?;
 
         let snapshot = snapshot_from_final_document(&source, &changed_document)?;
 
@@ -5915,7 +6433,7 @@ mod tests {
         let bytes = mutable.to_bytes()?;
         let source_pointer = bytes.as_ptr();
 
-        let snapshot = Snapshot::from_bytes(bytes)?;
+        let snapshot = Package::from_vec(bytes)?;
         let document = snapshot.document()?;
         let document_bytes = document.transaction_package().shared_bytes();
 
@@ -5933,7 +6451,7 @@ mod tests {
     fn repeated_snapshot_reopens_reuse_the_validated_package_index() -> Result<()> {
         let mut mutable = MutableDocument::new();
         mutable.add_paragraph("reused package index")?;
-        let snapshot = Snapshot::from_bytes(mutable.to_bytes()?)?;
+        let snapshot = Package::from_vec(mutable.to_bytes()?)?;
 
         let first = snapshot.document()?;
         let second = snapshot.document()?;
@@ -5957,7 +6475,7 @@ mod tests {
     fn envelope_classification_shares_the_snapshot_package_allocation() -> Result<()> {
         let mut mutable = MutableDocument::new();
         mutable.add_paragraph("shared envelope classification")?;
-        let snapshot = Snapshot::from_bytes(mutable.to_bytes()?)?;
+        let snapshot = Package::from_vec(mutable.to_bytes()?)?;
 
         let package = envelope_package(&snapshot)?;
 
@@ -5974,13 +6492,13 @@ mod tests {
     fn exact_noop_commit_shares_bytes_and_package_index() -> Result<()> {
         let mut mutable = MutableDocument::new();
         mutable.add_paragraph("exact no-op")?;
-        let snapshot = Snapshot::from_bytes(mutable.to_bytes()?)?;
+        let snapshot = Package::from_vec(mutable.to_bytes()?)?;
         let commit = snapshot.edit().commit()?;
 
-        assert!(Arc::ptr_eq(&snapshot.bytes, &commit.snapshot().bytes));
+        assert!(Arc::ptr_eq(&snapshot.bytes, &commit.package().bytes));
         assert_eq!(
             snapshot.prepared_index_identity(),
-            commit.snapshot().prepared_index_identity()
+            commit.package().prepared_index_identity()
         );
         Ok(())
     }

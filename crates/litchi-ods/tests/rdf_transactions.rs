@@ -1,6 +1,6 @@
 use litchi_core::Position;
 use litchi_ods::{
-    Builder, MutableSpreadsheet,
+    Builder, MutableSpreadsheet, Package,
     metadata_graphs::Snapshot,
     rdf::{Object, Subject, Triple},
 };
@@ -21,7 +21,7 @@ fn triple(predicate: &str, value: &str) -> Triple {
 
 #[test]
 fn rdf_transaction_batches_graph_and_triple_crud_with_inverse() -> litchi_core::Result<()> {
-    let source = Builder::new().content_xml(CONTENT).build()?;
+    let source = Builder::new().content_xml(CONTENT).build()?.to_bytes()?;
     let snapshot = Snapshot::from_bytes(source.clone())?;
     let mut edit = snapshot.edit();
     let first = triple("https://example.invalid/schema#label", "Sheet");
@@ -41,7 +41,8 @@ fn rdf_transaction_batches_graph_and_triple_crud_with_inverse() -> litchi_core::
     let unrelated = Snapshot::from_bytes(
         Builder::new()
             .content_xml(CONTENT.replace("Sheet1", "Other"))
-            .build()?,
+            .build()?
+            .to_bytes()?,
     )?;
     assert!(commit.patch().apply(&unrelated).is_err());
     Ok(())
@@ -49,7 +50,7 @@ fn rdf_transaction_batches_graph_and_triple_crud_with_inverse() -> litchi_core::
 
 #[test]
 fn rdf_no_ops_preserve_exact_bytes_and_failed_staging_is_atomic() -> litchi_core::Result<()> {
-    let source = Builder::new().content_xml(CONTENT).build()?;
+    let source = Builder::new().content_xml(CONTENT).build()?.to_bytes()?;
     let snapshot = Snapshot::from_bytes(source.clone())?;
     let empty = snapshot.edit().commit();
     assert!(!empty.changed());
@@ -64,8 +65,8 @@ fn rdf_no_ops_preserve_exact_bytes_and_failed_staging_is_atomic() -> litchi_core
 
 #[test]
 fn mutable_facade_publishes_a_batched_rdf_transaction() -> litchi_core::Result<()> {
-    let source = Builder::new().content_xml(CONTENT).build()?;
-    let mut mutable = MutableSpreadsheet::from_bytes(source)?;
+    let source = Builder::new().content_xml(CONTENT).build()?.to_bytes()?;
+    let mut mutable = MutableSpreadsheet::from_workbook(Package::from_bytes(&source)?.workbook()?);
     let value = triple("https://example.invalid/schema#label", "Sheet");
     mutable.edit_rdf(|edit| {
         edit.add_graph(Some("Metadata/sheet.rdf"), std::slice::from_ref(&value))?;

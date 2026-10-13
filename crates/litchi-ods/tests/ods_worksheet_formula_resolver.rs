@@ -552,9 +552,14 @@ fn from_snapshot_reuses_the_parsed_worksheet_graph() {
     builder
         .add_sheet(sheet)
         .expect("worksheet fixture should be authorable");
-    let snapshot =
-        Snapshot::from_bytes(builder.build().expect("worksheet fixture should serialize"))
-            .expect("worksheet fixture should parse");
+    let snapshot = Snapshot::from_bytes(
+        builder
+            .build()
+            .expect("worksheet fixture should serialize")
+            .to_bytes()
+            .expect("worksheet fixture should serialize"),
+    )
+    .expect("worksheet fixture should parse");
     let (_budget, _cancellation, execution) = make_execution("worksheet-formula-snapshot");
     let resolver = Resolver::from_snapshot(&snapshot, SheetExtent::new(4, 5), &execution)
         .expect("snapshot worksheet index should build");

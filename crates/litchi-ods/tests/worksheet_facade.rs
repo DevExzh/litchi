@@ -1,4 +1,4 @@
-use litchi_ods::{Builder, Cell, CellValue, CellView, MutableSpreadsheet, Row, Sheet, Spreadsheet};
+use litchi_ods::{Builder, Cell, CellValue, CellView, MutableSpreadsheet, Package, Row, Sheet};
 
 #[test]
 fn worksheet_graph_round_trips_repeats_formula_and_style() {
@@ -31,11 +31,15 @@ fn worksheet_graph_round_trips_repeats_formula_and_style() {
     builder
         .add_sheet(sheet)
         .expect("test fixture or operation should succeed");
-    let spreadsheet = Spreadsheet::from_bytes(
-        builder
+    let spreadsheet = Package::from_bytes(
+        &builder
             .build()
+            .expect("test fixture or operation should succeed")
+            .to_bytes()
             .expect("test fixture or operation should succeed"),
     )
+    .expect("test fixture or operation should succeed")
+    .workbook()
     .expect("test fixture or operation should succeed");
 
     let data = spreadsheet
@@ -108,10 +112,16 @@ fn mutable_worksheet_edits_are_atomic_on_validation_failure() {
         .expect("test fixture or operation should succeed");
     let bytes = builder
         .build()
+        .expect("test fixture or operation should succeed")
+        .to_bytes()
         .expect("test fixture or operation should succeed");
 
-    let mut mutable =
-        MutableSpreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed");
+    let mut mutable = MutableSpreadsheet::from_workbook(
+        Package::from_bytes(&bytes)
+            .expect("test fixture or operation should succeed")
+            .workbook()
+            .expect("test fixture or operation should succeed"),
+    );
     let before = mutable.sheets().to_vec();
     assert!(
         mutable
@@ -149,12 +159,18 @@ fn mutable_worksheet_remove_is_transactional() {
         .add_sheet(second)
         .expect("test fixture or operation should succeed");
 
-    let mut mutable = MutableSpreadsheet::from_bytes(
-        builder
-            .build()
-            .expect("test fixture or operation should succeed"),
-    )
-    .expect("test fixture or operation should succeed");
+    let mut mutable = MutableSpreadsheet::from_workbook(
+        Package::from_bytes(
+            &builder
+                .build()
+                .expect("test fixture or operation should succeed")
+                .to_bytes()
+                .expect("test fixture or operation should succeed"),
+        )
+        .expect("test fixture or operation should succeed")
+        .workbook()
+        .expect("test fixture or operation should succeed"),
+    );
     let removed = mutable
         .remove_sheet("First")
         .expect("test fixture or operation should succeed");

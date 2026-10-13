@@ -3,7 +3,7 @@
 //! The public owner is kept ergonomic at the module boundary while semantic
 //! models, XML codecs, and regression tests live in dedicated layers.
 
-use crate::{FlatDocument, Package};
+use crate::{FlatDocument, GenericPackage as Package};
 pub(super) use litchi_core::{Result, xml::escape_xml};
 pub(super) use quick_xml::{
     XmlVersion,

@@ -10,7 +10,6 @@ use litchi_core::{
 };
 use std::{
     io::Write,
-    path::Path,
     sync::{
         Arc, OnceLock,
         atomic::{AtomicUsize, Ordering},
@@ -21,7 +20,7 @@ pub use crate::authoring::{Builder, MutableSpreadsheet};
 use crate::model::names::{Definition, Expression, Range, Scope};
 pub use litchi_odf_common::rdf::{Graph, Object, Subject, Triple};
 pub use selective::{SheetCatalogEntry, SourceBackedSpreadsheetCatalog, SourceReadMetrics};
-pub use source::{ReadLimits, SourceBackedSpreadsheet};
+pub use source::SourceBackedSpreadsheet;
 pub use source_edit::{
     FormulaChange, HyperlinkChange, HyperlinkOperation, SourceCellCommit, SourceCellEdit,
     SourceCellPatch, SourceCellPublicationReport, SourceCellSnapshot,
@@ -107,42 +106,39 @@ fn map_sheet_metadata_execution(error: litchi_core::ExecutionError) -> litchi_co
 }
 
 /// Immutable ODS document facade.
-pub struct Spreadsheet {
-    package: Arc<crate::package::Package>,
+/// The read-only semantic projection of an `OpenDocument` spreadsheet.
+///
+/// A `Workbook` is obtained from [`crate::Package::workbook`]; it is owned,
+/// immutable and cheap to clone (one reference-count increment). Every state
+/// verb (open, edit, apply, save) lives on [`crate::Package`].
+#[derive(Clone)]
+pub struct Workbook {
+    inner: Arc<State>,
+}
+
+struct State {
+    package: Arc<crate::package::Archive>,
     definitions: Vec<Definition>,
     sheets: Vec<crate::worksheet::Sheet>,
     metadata: crate::metadata::Snapshot,
     settings: Option<crate::settings::Settings>,
     cell_queries: AtomicUsize,
     cell_locator: OnceLock<Option<cell_locator::CellLocator>>,
-    /// Package repairs followed by the content repairs of the open parse.
     tolerance: litchi_odf_common::leniency::ToleranceReport,
 }
 
-impl Spreadsheet {
-    ///
-    /// # Errors
-    /// Returns an error when the operation cannot be completed.
-    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        let package = crate::package::Package::open(path)?;
-        Self::from_package(package)
+impl std::fmt::Debug for Workbook {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Workbook")
+            .field("sheets", &self.inner.sheets.len())
+            .finish_non_exhaustive()
     }
+}
 
-    /// Open a password-encrypted ODS path and fully decode the public semantic owners.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for file I/O, an incorrect password, malformed encryption metadata,
-    /// invalid XML, or typed owner readback failure.
-    pub fn open_with_password(path: impl AsRef<Path>, password: impl Into<String>) -> Result<Self> {
-        let package = crate::package::Package::open_with_password(path, password)?;
-        Self::from_package(package)
-    }
-
-    ///
-    /// # Errors
-    /// Returns an error when the operation cannot be completed.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
+impl Workbook {
+    /// Reparse complete ODS bytes produced inside the crate.
+    pub(crate) fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         // Let the prepared detector perform the local MIME probe exactly
         // once.  A matching ODS result transfers its indexed archive; a
         // different ODF family still follows the historical package owner so
@@ -150,65 +146,31 @@ impl Spreadsheet {
         // recover the original allocation for the ordinary parser.
         match litchi_odf_common::detect::prepared_or_original(bytes) {
             Ok(prepared) if prepared.format() == litchi_core::detection::FileFormat::Ods => {
-                Self::from_prepared_package(prepared)
+                Self::from_package(crate::package::Archive::from_prepared_package(prepared)?)
             },
             Ok(prepared) => {
-                let package = crate::package::Package::from_owned_package(prepared.into_package())?;
+                let package = crate::package::Archive::from_owned_package(prepared.into_package())?;
                 Self::from_package(package)
             },
             Err(bytes) => {
-                let package = crate::package::Package::from_bytes(bytes)?;
+                let package = crate::package::Archive::from_bytes(bytes)?;
                 Self::from_package(package)
             },
         }
-    }
-
-    /// Adopt the indexed package retained by smart ODF detection.
-    ///
-    /// This transfers the detector-owned archive index into the immutable
-    /// spreadsheet package without a second ZIP central-directory scan.
-    pub fn from_prepared_package(
-        prepared: litchi_odf_common::core::PreparedPackage,
-    ) -> Result<Self> {
-        let package = crate::package::Package::from_prepared_package(prepared)?;
-        Self::from_package(package)
-    }
-
-    /// Alias for [`Self::from_prepared_package`].
-    #[inline]
-    pub fn from_prepared(prepared: litchi_odf_common::core::PreparedPackage) -> Result<Self> {
-        Self::from_prepared_package(prepared)
     }
 
     /// Return the identity of the archive index retained by smart detection.
     #[doc(hidden)]
     #[must_use]
     pub fn prepared_index_identity(&self) -> usize {
-        self.package.prepared_index_identity()
+        self.inner.package.prepared_index_identity()
     }
 
-    /// Open password-encrypted ODS bytes and fully decode the public semantic owners.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for an incorrect password, malformed encryption metadata, invalid XML,
-    /// or typed owner readback failure.
-    pub fn from_bytes_with_password(bytes: Vec<u8>, password: impl Into<String>) -> Result<Self> {
-        let package = crate::package::Package::from_bytes_with_password(bytes, password)?;
-        Self::from_package(package)
-    }
-
-    pub(crate) fn from_package(package: crate::package::Package) -> Result<Self> {
+    pub(crate) fn from_package(package: crate::package::Archive) -> Result<Self> {
         Self::from_shared_package(Arc::new(package))
     }
 
-    pub(crate) fn from_owned_package(
-        package: litchi_odf_common::core::OwnedPackage,
-    ) -> Result<Self> {
-        Self::from_package(crate::package::Package::from_owned_package(package)?)
-    }
-
-    pub(crate) fn from_shared_package(package: Arc<crate::package::Package>) -> Result<Self> {
+    pub(crate) fn from_shared_package(package: Arc<crate::package::Archive>) -> Result<Self> {
         // Keep ordinary and source-backed opening on the same namespace-aware
         // content reader.  Besides avoiding five independent tokenizations,
         // this admits semantically normalized namespace declarations (for
@@ -227,59 +189,22 @@ impl Spreadsheet {
         crate::worksheet::codec::apply_table_metadata(package.content_xml(), &mut sheets)?;
         let metadata = package.metadata_snapshot()?;
         Ok(Self {
-            package,
-            definitions,
-            sheets,
-            metadata,
-            settings,
-            cell_queries: AtomicUsize::new(0),
-            cell_locator: OnceLock::new(),
-            tolerance,
+            inner: Arc::new(State {
+                package,
+                definitions,
+                sheets,
+                metadata,
+                settings,
+                cell_queries: AtomicUsize::new(0),
+                cell_locator: OnceLock::new(),
+                tolerance,
+            }),
         })
-    }
-
-    /// Capture the exact package as the unified immutable transaction owner.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when package bounds or complete facade readback fail.
-    pub fn document_snapshot(&self) -> Result<crate::document::Snapshot> {
-        if self
-            .package
-            .package()
-            .package()?
-            .manifest()
-            .has_encrypted_entries()
-        {
-            return crate::document::Snapshot::from_shared_package(
-                Arc::clone(&self.package),
-                crate::document::Limits::default(),
-            );
-        }
-        let package = self.package.clone_without_password()?;
-        crate::document::Snapshot::from_shared_package(
-            Arc::new(package),
-            crate::document::Limits::default(),
-        )
-    }
-
-    /// Apply one durable exact-source unified package patch.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for stale lineage, security refusal, package bounds, or candidate
-    /// readback failure. This facade changes only after the target fully reopens.
-    pub fn apply_document_patch(&mut self, patch: &crate::document::Patch) -> Result<()> {
-        let commit = patch.apply(&self.document_snapshot()?)?;
-        if commit.changed() {
-            *self = Self::from_bytes(commit.snapshot().as_bytes().to_vec())?;
-        }
-        Ok(())
     }
 
     #[must_use]
     pub fn content_xml(&self) -> &str {
-        self.package.content_xml()
+        self.inner.package.content_xml()
     }
 
     /// Everything a tolerant read repaired while this spreadsheet was opened.
@@ -289,19 +214,23 @@ impl Spreadsheet {
     #[inline]
     #[must_use]
     pub fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
-        &self.tolerance
+        &self.inner.tolerance
     }
 
     /// Return worksheet names in document order.
     #[must_use]
     pub fn sheet_names(&self) -> Vec<String> {
-        self.sheets.iter().map(|sheet| sheet.name.clone()).collect()
+        self.inner
+            .sheets
+            .iter()
+            .map(|sheet| sheet.name.clone())
+            .collect()
     }
 
     /// Return the number of worksheets.
     #[must_use]
     pub fn sheet_count(&self) -> usize {
-        self.sheets.len()
+        self.inner.sheets.len()
     }
 
     /// Extract displayed worksheet text using tab-separated cells and
@@ -310,7 +239,7 @@ impl Spreadsheet {
     /// # Errors
     /// Returns an error when the bounded projection cannot reserve its output.
     pub fn text(&self) -> Result<String> {
-        source::project_text(&self.sheets)
+        source::project_text(&self.inner.sheets)
     }
 
     /// Write displayed worksheet text to a caller-owned sequential sink.
@@ -334,13 +263,13 @@ impl Spreadsheet {
         options: TextOutputOptions<'_>,
     ) -> std::result::Result<TextOutputReport, TextOutputError<litchi_core::Error>> {
         let mut writer = SequentialTextWriter::new(output, options);
-        source::write_text_to_sheets(&self.sheets, &mut writer, options)?;
+        source::write_text_to_sheets(&self.inner.sheets, &mut writer, options)?;
         Ok(writer.finish())
     }
 
     #[must_use]
     pub fn styles_xml(&self) -> Option<&str> {
-        self.package.styles_xml()
+        self.inner.package.styles_xml()
     }
 
     /// Capture the standalone table-template catalog from styles.xml.
@@ -348,11 +277,11 @@ impl Spreadsheet {
     /// The snapshot retains the exact styles source for no-op, stale-source,
     /// and inverse transaction checks.
     pub fn table_templates(&self) -> Result<crate::styles::table_template::Snapshot> {
-        crate::styles::table_template::Snapshot::from_source(self.package.styles_xml())
+        crate::styles::table_template::Snapshot::from_source(self.inner.package.styles_xml())
     }
 
     /// Apply an exact-source table-template patch and rehydrate the facade.
-    pub fn apply_table_template_patch(
+    pub(crate) fn apply_table_template_patch(
         &mut self,
         patch: &crate::styles::table_template::Patch,
     ) -> Result<()> {
@@ -360,6 +289,7 @@ impl Spreadsheet {
         let commit = patch.apply(&snapshot)?;
         if commit.changed() {
             let package = self
+                .inner
                 .package
                 .replace_styles_xml(commit.snapshot().source_xml())?;
             *self = Self::from_package(package)?;
@@ -368,7 +298,7 @@ impl Spreadsheet {
     }
 
     /// Stage a source-checked table-template edit and publish it atomically.
-    pub fn edit_table_templates<F>(&mut self, update: F) -> Result<()>
+    pub(crate) fn edit_table_templates<F>(&mut self, update: F) -> Result<()>
     where
         F: FnOnce(&mut crate::styles::table_template::Edit) -> Result<()>,
     {
@@ -378,6 +308,7 @@ impl Spreadsheet {
         let commit = edit.commit()?;
         if commit.changed() {
             let package = self
+                .inner
                 .package
                 .replace_styles_xml(commit.snapshot().source_xml())?;
             *self = Self::from_package(package)?;
@@ -391,7 +322,10 @@ impl Spreadsheet {
     /// # Errors
     /// Returns an error when the operation cannot be completed.
     pub fn protection(&self) -> Result<crate::protection::Snapshot> {
-        crate::protection::Snapshot::parse(self.package.content_xml(), self.package.styles_xml())
+        crate::protection::Snapshot::parse(
+            self.inner.package.content_xml(),
+            self.inner.package.styles_xml(),
+        )
     }
 
     /// Apply an exact-source reversible protection patch and fully rehydrate
@@ -399,10 +333,16 @@ impl Spreadsheet {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn apply_protection_patch(&mut self, patch: &crate::protection::Patch) -> Result<()> {
+    pub(crate) fn apply_protection_patch(
+        &mut self,
+        patch: &crate::protection::Patch,
+    ) -> Result<()> {
         let commit = patch.apply(&self.protection()?)?;
         if commit.changed() {
-            let package = self.package.replace_content_xml(commit.content_xml())?;
+            let package = self
+                .inner
+                .package
+                .replace_content_xml(commit.content_xml())?;
             *self = Self::from_package(package)?;
         }
         Ok(())
@@ -414,7 +354,7 @@ impl Spreadsheet {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn update_protection<F>(&mut self, edit: F) -> Result<()>
+    pub(crate) fn update_protection<F>(&mut self, edit: F) -> Result<()>
     where
         F: FnOnce(&mut crate::protection::Transaction) -> Result<()>,
     {
@@ -423,7 +363,10 @@ impl Spreadsheet {
         if !commit.changed() {
             return Ok(());
         }
-        let package = self.package.replace_content_xml(commit.content_xml())?;
+        let package = self
+            .inner
+            .package
+            .replace_content_xml(commit.content_xml())?;
         *self = Self::from_package(package)?;
         Ok(())
     }
@@ -437,7 +380,7 @@ impl Spreadsheet {
     /// # Errors
     /// Returns an error when the operation cannot be completed.
     pub fn annotations(&self) -> Result<crate::annotations::Snapshot> {
-        crate::annotations::Snapshot::parse(self.package.content_xml())
+        crate::annotations::Snapshot::parse(self.inner.package.content_xml())
     }
 
     /// Capture the presence-aware, exact-source tracked-change owner.
@@ -445,7 +388,7 @@ impl Spreadsheet {
     /// # Errors
     /// Returns an error when the operation cannot be completed.
     pub fn tracked_changes(&self) -> Result<crate::tracked_changes::Snapshot> {
-        crate::tracked_changes::Snapshot::parse(self.package.content_xml())
+        crate::tracked_changes::Snapshot::parse(self.inner.package.content_xml())
     }
 
     /// Capture tracked changes under an explicit resource budget.
@@ -456,7 +399,10 @@ impl Spreadsheet {
         &self,
         limits: crate::tracked_changes::Limits,
     ) -> Result<crate::tracked_changes::Snapshot> {
-        crate::tracked_changes::Snapshot::parse_with_limits(self.package.content_xml(), limits)
+        crate::tracked_changes::Snapshot::parse_with_limits(
+            self.inner.package.content_xml(),
+            limits,
+        )
     }
 
     /// Inspect all DDE declarations and cached tables as inert, source-bound data.
@@ -469,7 +415,7 @@ impl Spreadsheet {
     /// Returns an error when the content XML has invalid or over-budget DDE
     /// metadata.
     pub fn dde(&self) -> Result<crate::dde::Snapshot> {
-        crate::dde::Snapshot::parse(self.package.content_xml()).map_err(Into::into)
+        crate::dde::Snapshot::parse(self.inner.package.content_xml()).map_err(Into::into)
     }
 
     /// Capture inert DDE declarations and cached tables under explicit limits.
@@ -478,14 +424,14 @@ impl Spreadsheet {
         limits: crate::dde::Limits,
         context: &litchi_core::ExecutionContext,
     ) -> Result<crate::dde::Snapshot> {
-        crate::dde::Snapshot::parse_with_context(self.package.content_xml(), limits, context)
+        crate::dde::Snapshot::parse_with_context(self.inner.package.content_xml(), limits, context)
             .map_err(Into::into)
     }
 
     /// Stage and publish a failure-atomic DDE metadata transaction.
     ///
     /// Sources remain inert; publication never refreshes cached data.
-    pub fn edit_dde<F>(&mut self, update: F) -> Result<()>
+    pub(crate) fn edit_dde<F>(&mut self, update: F) -> Result<()>
     where
         F: FnOnce(&mut crate::dde::Edit) -> Result<()>,
     {
@@ -498,9 +444,9 @@ impl Spreadsheet {
 
     /// Edit DDE metadata with explicit parsing, staging, and readback budgets.
     ///
-    /// Package replacement and facade rehydration use the package policy. The
+    /// Archive replacement and facade rehydration use the package policy. The
     /// supplied context is checked after rehydration and before publication.
-    pub fn edit_dde_with_context<F>(
+    pub(crate) fn edit_dde_with_context<F>(
         &mut self,
         limits: crate::dde::Limits,
         context: &litchi_core::ExecutionContext,
@@ -516,6 +462,7 @@ impl Spreadsheet {
         if commit.changed() {
             self.ensure_dde_publication_allowed()?;
             let package = self
+                .inner
                 .package
                 .replace_content_xml(commit.snapshot().source_xml())?;
             let candidate = Self::from_package(package)?;
@@ -526,13 +473,14 @@ impl Spreadsheet {
     }
 
     /// Apply an exact-source DDE patch and rehydrate the accepted package.
-    pub fn apply_dde_patch(&mut self, patch: &crate::dde::Patch) -> Result<()> {
+    pub(crate) fn apply_dde_patch(&mut self, patch: &crate::dde::Patch) -> Result<()> {
         let context = crate::dde::default_context();
         let snapshot = self.dde_with(crate::dde::Limits::default(), &context)?;
         let commit = patch.apply(&snapshot)?;
         if commit.changed() {
             self.ensure_dde_publication_allowed()?;
             let package = self
+                .inner
                 .package
                 .replace_content_xml(commit.snapshot().source_xml())?;
             let candidate = Self::from_package(package)?;
@@ -544,6 +492,7 @@ impl Spreadsheet {
 
     fn ensure_dde_publication_allowed(&self) -> Result<()> {
         if self
+            .inner
             .package
             .package()
             .files()?
@@ -565,7 +514,7 @@ impl Spreadsheet {
     /// Returns an error when the content XML has invalid or over-budget
     /// scenario metadata.
     pub fn scenarios(&self) -> Result<crate::scenario::Snapshot> {
-        crate::scenario::Snapshot::parse(self.package.content_xml()).map_err(|error| {
+        crate::scenario::Snapshot::parse(self.inner.package.content_xml()).map_err(|error| {
             litchi_core::Error::InvalidFormat(format!(
                 "ODS scenario metadata inspection failed: {error}"
             ))
@@ -577,11 +526,12 @@ impl Spreadsheet {
     ///
     /// Scenario declarations are metadata only.  This method never applies a
     /// what-if scenario, evaluates a formula, or refreshes external data.
-    pub fn apply_scenario_patch(&mut self, patch: &crate::scenario::Patch) -> Result<()> {
+    pub(crate) fn apply_scenario_patch(&mut self, patch: &crate::scenario::Patch) -> Result<()> {
         let snapshot = self.scenarios()?;
         let commit = patch.apply(&snapshot)?;
         if commit.changed() {
             let package = self
+                .inner
                 .package
                 .replace_content_xml(commit.snapshot().source_xml())?;
             *self = Self::from_package(package)?;
@@ -594,7 +544,7 @@ impl Spreadsheet {
     /// The closure edits typed declarations selected by exact worksheet name
     /// or source order.  A failed closure, stale source, invalid XML, or typed
     /// readback leaves this spreadsheet unchanged.
-    pub fn edit_scenarios<F>(&mut self, update: F) -> Result<()>
+    pub(crate) fn edit_scenarios<F>(&mut self, update: F) -> Result<()>
     where
         F: FnOnce(&mut crate::scenario::Edit) -> Result<()>,
     {
@@ -604,6 +554,7 @@ impl Spreadsheet {
         let commit = edit.commit()?;
         if commit.changed() {
             let package = self
+                .inner
                 .package
                 .replace_content_xml(commit.snapshot().source_xml())?;
             *self = Self::from_package(package)?;
@@ -614,7 +565,7 @@ impl Spreadsheet {
     /// Capture the source-backed consolidation, label-range, cell-source, and
     /// detective metadata catalog for this owned spreadsheet.
     pub fn sheet_metadata(&self) -> Result<crate::sheet_metadata::Snapshot> {
-        crate::sheet_metadata::Snapshot::parse(self.package.content_xml())
+        crate::sheet_metadata::Snapshot::parse(self.inner.package.content_xml())
     }
 
     /// Capture sheet metadata under explicit finite limits and execution context.
@@ -624,14 +575,14 @@ impl Spreadsheet {
         context: &litchi_core::ExecutionContext,
     ) -> Result<crate::sheet_metadata::Snapshot> {
         crate::sheet_metadata::Snapshot::parse_with_context(
-            self.package.content_xml(),
+            self.inner.package.content_xml(),
             limits,
             context,
         )
     }
 
     /// Stage and publish one failure-atomic sheet metadata edit.
-    pub fn edit_sheet_metadata<F>(&mut self, update: F) -> Result<()>
+    pub(crate) fn edit_sheet_metadata<F>(&mut self, update: F) -> Result<()>
     where
         F: FnOnce(&mut crate::sheet_metadata::Edit) -> Result<()>,
     {
@@ -648,7 +599,7 @@ impl Spreadsheet {
     /// rendering, and target readback. Owned package replacement and facade
     /// rehydration use the package's own bounded policy; the context is
     /// checked again after rehydration and before this spreadsheet is replaced.
-    pub fn edit_sheet_metadata_with_context<F>(
+    pub(crate) fn edit_sheet_metadata_with_context<F>(
         &mut self,
         limits: crate::sheet_metadata::Limits,
         context: &litchi_core::ExecutionContext,
@@ -664,6 +615,7 @@ impl Spreadsheet {
         if commit.changed() {
             self.ensure_sheet_metadata_publication_allowed()?;
             let package = self
+                .inner
                 .package
                 .replace_content_xml(commit.snapshot().source_xml())?;
             let candidate = Self::from_package(package)?;
@@ -675,7 +627,7 @@ impl Spreadsheet {
 
     /// Apply an exact source patch and rehydrate the owned spreadsheet only
     /// after the candidate passes complete metadata readback.
-    pub fn apply_sheet_metadata_patch(
+    pub(crate) fn apply_sheet_metadata_patch(
         &mut self,
         patch: &crate::sheet_metadata::Patch,
     ) -> Result<()> {
@@ -684,6 +636,7 @@ impl Spreadsheet {
         if commit.changed() {
             self.ensure_sheet_metadata_publication_allowed()?;
             let package = self
+                .inner
                 .package
                 .replace_content_xml(commit.snapshot().source_xml())?;
             *self = Self::from_package(package)?;
@@ -693,6 +646,7 @@ impl Spreadsheet {
 
     fn ensure_sheet_metadata_publication_allowed(&self) -> Result<()> {
         let signed = self
+            .inner
             .package
             .package()
             .files()?
@@ -711,7 +665,7 @@ impl Spreadsheet {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn update_tracked_changes<F>(&mut self, edit: F) -> Result<()>
+    pub(crate) fn update_tracked_changes<F>(&mut self, edit: F) -> Result<()>
     where
         F: FnOnce(&mut crate::tracked_changes::Transaction) -> Result<()>,
     {
@@ -720,7 +674,7 @@ impl Spreadsheet {
         if !commit.changed() {
             return Ok(());
         }
-        let package = self.package.replace_tracked_changes(&commit)?;
+        let package = self.inner.package.replace_tracked_changes(&commit)?;
         let candidate = Self::from_package(package)?;
         *self = candidate;
         Ok(())
@@ -730,7 +684,7 @@ impl Spreadsheet {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn apply_tracked_changes_patch(
+    pub(crate) fn apply_tracked_changes_patch(
         &mut self,
         patch: &crate::tracked_changes::Patch,
     ) -> Result<()> {
@@ -739,7 +693,7 @@ impl Spreadsheet {
         if !commit.changed() {
             return Ok(());
         }
-        let package = self.package.replace_tracked_changes(&commit)?;
+        let package = self.inner.package.replace_tracked_changes(&commit)?;
         let candidate = Self::from_package(package)?;
         *self = candidate;
         Ok(())
@@ -748,7 +702,7 @@ impl Spreadsheet {
     /// Publish a validated annotation transaction without rebuilding an
     /// unchanged package.
     pub(crate) fn publish_annotations(&mut self, content_xml: &str) -> Result<()> {
-        let package = crate::annotations::replace_content(&self.package, content_xml)?;
+        let package = crate::annotations::replace_content(&self.inner.package, content_xml)?;
         *self = Self::from_package(package)?;
         Ok(())
     }
@@ -756,25 +710,25 @@ impl Spreadsheet {
     /// Borrow the compact cross-format metadata projection.
     #[must_use]
     pub fn metadata(&self) -> &litchi_core::Metadata {
-        self.metadata.value()
+        self.inner.metadata.value()
     }
 
     /// Borrow the complete typed ODF metadata model.
     #[must_use]
     pub fn odf_metadata(&self) -> &crate::metadata::Metadata {
-        self.metadata.odf()
+        self.inner.metadata.odf()
     }
 
     /// Borrow the retained metadata snapshot, including bounded source XML.
     #[must_use]
     pub fn metadata_snapshot(&self) -> &crate::metadata::Snapshot {
-        &self.metadata
+        &self.inner.metadata
     }
 
     /// Borrow spreadsheet calculation settings, if the document declares them.
     #[must_use]
     pub fn settings(&self) -> Option<&crate::settings::Settings> {
-        self.settings.as_ref()
+        self.inner.settings.as_ref()
     }
 
     /// Alias whose name makes the content-level ODF owner explicit.
@@ -788,7 +742,7 @@ impl Spreadsheet {
     /// # Errors
     /// Returns an error when the operation cannot be completed.
     pub fn data_pilots(&self) -> Result<crate::data_pilot::Catalog<'_>> {
-        crate::data_pilot::Catalog::load(&self.package)
+        crate::data_pilot::Catalog::load(&self.inner.package)
     }
 
     /// Capture the `DataPilot` owner as an immutable, exact-package snapshot.
@@ -796,7 +750,7 @@ impl Spreadsheet {
     /// # Errors
     /// Returns an error when the operation cannot be completed.
     pub fn data_pilot_snapshot(&self) -> Result<crate::data_pilot::Snapshot> {
-        crate::data_pilot::Snapshot::from_bytes(self.package.package().as_bytes().to_vec())
+        crate::data_pilot::Snapshot::from_bytes(self.inner.package.package().as_bytes().to_vec())
     }
 
     /// Discover inert database-range declarations owned by this spreadsheet.
@@ -808,7 +762,7 @@ impl Spreadsheet {
     /// # Errors
     /// Returns an error when the content owner is malformed or over budget.
     pub fn database_ranges(&self) -> Result<crate::database_range::Catalog<'_>> {
-        crate::database_range::Catalog::load(&self.package)
+        crate::database_range::Catalog::load(&self.inner.package)
     }
 
     /// Capture database-range metadata as an immutable, exact-package
@@ -818,7 +772,7 @@ impl Spreadsheet {
     /// Returns an error when the package or typed owner exceeds its finite
     /// admission limits.
     pub fn database_range_snapshot(&self) -> Result<crate::database_range::Snapshot> {
-        crate::database_range::Snapshot::from_package(&self.package)
+        crate::database_range::Snapshot::from_package(&self.inner.package)
     }
 
     /// Alias with a plural noun for callers that use the owner name.
@@ -832,7 +786,7 @@ impl Spreadsheet {
     /// # Errors
     /// Returns an error for stale lineage, invalid metadata, or failed
     /// candidate readback.
-    pub fn apply_database_range_patch(
+    pub(crate) fn apply_database_range_patch(
         &mut self,
         patch: &crate::database_range::Patch,
     ) -> Result<()> {
@@ -852,7 +806,7 @@ impl Spreadsheet {
     /// # Errors
     /// Returns an error when the closure, source checks, package rebuild, or
     /// typed readback fails.
-    pub fn edit_database_ranges<F>(&mut self, edit: F) -> Result<()>
+    pub(crate) fn edit_database_ranges<F>(&mut self, edit: F) -> Result<()>
     where
         F: for<'source> FnOnce(&mut crate::database_range::Editor<'_, 'source>) -> Result<()>,
     {
@@ -871,7 +825,7 @@ impl Spreadsheet {
     /// Return the typed worksheet graph in document order.
     #[must_use]
     pub fn sheets(&self) -> &[crate::worksheet::Sheet] {
-        &self.sheets
+        &self.inner.sheets
     }
 
     /// Capture worksheets as an immutable, exact-package snapshot.
@@ -880,7 +834,7 @@ impl Spreadsheet {
     ///
     /// Returns an error when the retained package or worksheet graph is invalid.
     pub fn worksheet_snapshot(&self) -> Result<crate::worksheet::Snapshot> {
-        let package = self.package.clone_without_password()?;
+        let package = self.inner.package.clone_without_password()?;
         crate::worksheet::Snapshot::from_shared_package(Arc::new(package))
     }
 
@@ -889,7 +843,7 @@ impl Spreadsheet {
     /// # Errors
     ///
     /// Returns an error for a stale patch or invalid candidate package.
-    pub fn apply_worksheet_patch(&mut self, patch: &crate::worksheet::Patch) -> Result<()> {
+    pub(crate) fn apply_worksheet_patch(&mut self, patch: &crate::worksheet::Patch) -> Result<()> {
         let commit = patch.apply(&self.worksheet_snapshot()?)?;
         if commit.changed() {
             *self = Self::from_bytes(commit.snapshot().as_bytes().to_vec())?;
@@ -913,7 +867,7 @@ impl Spreadsheet {
         &self,
         limits: crate::charts::Limits,
     ) -> Result<crate::charts::Inventory<'_>> {
-        crate::charts::inventory(&self.package, limits)
+        crate::charts::inventory(&self.inner.package, limits)
     }
 
     /// Capture embedded charts as an immutable, exact-package snapshot.
@@ -932,7 +886,10 @@ impl Spreadsheet {
         &self,
         limits: crate::charts::Limits,
     ) -> Result<crate::charts::Snapshot> {
-        crate::charts::Snapshot::from_bytes_with(self.package.package().as_bytes().to_vec(), limits)
+        crate::charts::Snapshot::from_bytes_with(
+            self.inner.package.package().as_bytes().to_vec(),
+            limits,
+        )
     }
 
     /// Select one embedded chart by exact drawing name or checked position.
@@ -949,7 +906,7 @@ impl Spreadsheet {
     /// Find a worksheet by its exact ODF name.
     #[must_use]
     pub fn sheet(&self, name: &str) -> Option<&crate::worksheet::Sheet> {
-        self.sheets.iter().find(|sheet| sheet.name == name)
+        self.inner.sheets.iter().find(|sheet| sheet.name == name)
     }
 
     /// Look up a logical cell while retaining the distinction between a
@@ -966,18 +923,25 @@ impl Spreadsheet {
 
     fn cell_unchecked(&self, selector: CellSelector<'_>) -> Option<crate::worksheet::CellView<'_>> {
         let sheet_index = self
+            .inner
             .sheets
             .iter()
             .position(|sheet| sheet.name == selector.sheet_name)?;
-        let direct = || self.sheets[sheet_index].cell_view(selector.row, selector.column);
+        let direct = || self.inner.sheets[sheet_index].cell_view(selector.row, selector.column);
 
-        if let Some(locator) = self.cell_locator.get() {
+        if let Some(locator) = self.inner.cell_locator.get() {
             return Some(locator.as_ref().map_or_else(direct, |locator| {
-                locator.cell_view(&self.sheets, sheet_index, selector.row, selector.column)
+                locator.cell_view(
+                    &self.inner.sheets,
+                    sheet_index,
+                    selector.row,
+                    selector.column,
+                )
             }));
         }
 
         let previous = self
+            .inner
             .cell_queries
             .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |count| {
                 Some(count.saturating_add(1))
@@ -985,10 +949,16 @@ impl Spreadsheet {
             .unwrap_or(usize::MAX);
         if previous.saturating_add(1) >= cell_locator::BUILD_QUERY_THRESHOLD {
             let locator = self
+                .inner
                 .cell_locator
-                .get_or_init(|| cell_locator::CellLocator::try_build(&self.sheets));
+                .get_or_init(|| cell_locator::CellLocator::try_build(&self.inner.sheets));
             return Some(locator.as_ref().map_or_else(direct, |locator| {
-                locator.cell_view(&self.sheets, sheet_index, selector.row, selector.column)
+                locator.cell_view(
+                    &self.inner.sheets,
+                    sheet_index,
+                    selector.row,
+                    selector.column,
+                )
             }));
         }
 
@@ -1039,10 +1009,10 @@ impl Spreadsheet {
     /// # Errors
     /// Returns an error when the operation cannot be completed.
     pub fn images(&self) -> Result<Vec<crate::media::Image>> {
-        let package = self.package.package().package()?;
+        let package = self.inner.package.package().package()?;
         crate::media::scan_package(
-            self.package.content_xml(),
-            self.package.styles_xml(),
+            self.inner.package.content_xml(),
+            self.inner.package.styles_xml(),
             &package,
         )
     }
@@ -1053,7 +1023,7 @@ impl Spreadsheet {
     /// # Errors
     /// Returns an error when the operation cannot be completed.
     pub fn source_features(&self) -> Result<crate::source_features::Snapshot> {
-        crate::source_features::Snapshot::parse(self.package.content_xml())
+        crate::source_features::Snapshot::parse(self.inner.package.content_xml())
     }
 
     /// Inspect the source-backed content-validation catalog and compact cell bindings.
@@ -1067,7 +1037,7 @@ impl Spreadsheet {
     pub fn content_validations(
         &self,
     ) -> crate::content_validation::Result<crate::content_validation::Snapshot<'_>> {
-        crate::content_validation::Snapshot::parse(self.package.content_xml())
+        crate::content_validation::Snapshot::parse(self.inner.package.content_xml())
     }
 
     /// Discover package, inline, missing, and inert linked embedded objects.
@@ -1075,10 +1045,10 @@ impl Spreadsheet {
     /// # Errors
     /// Returns an error when the operation cannot be completed.
     pub fn embedded_objects(&self) -> Result<Vec<crate::embedded::Object>> {
-        let package = self.package.package().package()?;
+        let package = self.inner.package.package().package()?;
         crate::embedded::scan_package(
-            self.package.content_xml(),
-            self.package.styles_xml(),
+            self.inner.package.content_xml(),
+            self.inner.package.styles_xml(),
             &package,
         )
     }
@@ -1092,7 +1062,7 @@ impl Spreadsheet {
         match &image.source {
             crate::media::Source::Inline { bytes, .. } => Ok(Some(bytes.clone())),
             crate::media::Source::PackagePart { path, .. } => {
-                self.package.package().get_file(path).map(Some)
+                self.inner.package.package().get_file(path).map(Some)
             },
             crate::media::Source::MissingPackagePart { .. }
             | crate::media::Source::Linked { .. }
@@ -1102,17 +1072,14 @@ impl Spreadsheet {
     }
 
     #[must_use]
-    pub fn into_bytes(self) -> Vec<u8> {
-        match Arc::try_unwrap(self.package) {
-            Ok(package) => package.into_bytes(),
-            Err(package) => package.package().as_bytes().to_vec(),
-        }
+    pub(crate) fn into_bytes(self) -> Vec<u8> {
+        self.inner.package.package().as_bytes().to_vec()
     }
 
     /// Return all global and sheet-local named definitions in document order.
     #[must_use]
     pub fn definitions(&self) -> &[Definition] {
-        &self.definitions
+        &self.inner.definitions
     }
 
     /// Capture named definitions as an immutable, exact-package snapshot.
@@ -1121,7 +1088,7 @@ impl Spreadsheet {
     ///
     /// Returns an error when the retained package cannot be reparsed.
     pub fn definitions_snapshot(&self) -> Result<crate::definitions::Snapshot> {
-        crate::definitions::Snapshot::from_bytes(self.package.package().as_bytes().to_vec())
+        crate::definitions::Snapshot::from_bytes(self.inner.package.package().as_bytes().to_vec())
     }
 
     /// Apply an exact-source reversible named-definition patch.
@@ -1130,7 +1097,10 @@ impl Spreadsheet {
     ///
     /// Returns an error for a stale patch or invalid candidate package. This facade changes only
     /// after the complete target has been reparsed.
-    pub fn apply_definitions_patch(&mut self, patch: &crate::definitions::Patch) -> Result<()> {
+    pub(crate) fn apply_definitions_patch(
+        &mut self,
+        patch: &crate::definitions::Patch,
+    ) -> Result<()> {
         let commit = patch.apply(&self.definitions_snapshot()?)?;
         if commit.changed() {
             *self = Self::from_bytes(commit.snapshot().as_bytes().to_vec())?;
@@ -1140,7 +1110,8 @@ impl Spreadsheet {
 
     /// Return named ranges in their document order.
     pub fn ranges(&self) -> impl Iterator<Item = &Range> {
-        self.definitions
+        self.inner
+            .definitions
             .iter()
             .filter_map(|definition| match definition {
                 Definition::Range(range) => Some(range),
@@ -1150,7 +1121,8 @@ impl Spreadsheet {
 
     /// Return named expressions in their document order.
     pub fn expressions(&self) -> impl Iterator<Item = &Expression> {
-        self.definitions
+        self.inner
+            .definitions
             .iter()
             .filter_map(|definition| match definition {
                 Definition::Range(_) => None,
@@ -1176,7 +1148,7 @@ impl Spreadsheet {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn add_range(&mut self, range: Range) -> Result<()> {
+    pub(crate) fn add_range(&mut self, range: Range) -> Result<()> {
         self.add_definition(range.into())
     }
 
@@ -1184,7 +1156,7 @@ impl Spreadsheet {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn add_expression(&mut self, expression: Expression) -> Result<()> {
+    pub(crate) fn add_expression(&mut self, expression: Expression) -> Result<()> {
         self.add_definition(expression.into())
     }
 
@@ -1192,8 +1164,8 @@ impl Spreadsheet {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn add_definition(&mut self, definition: Definition) -> Result<()> {
-        let mut candidate = self.definitions.clone();
+    pub(crate) fn add_definition(&mut self, definition: Definition) -> Result<()> {
+        let mut candidate = self.inner.definitions.clone();
         candidate.push(definition);
         self.set_definitions(candidate)
     }
@@ -1202,25 +1174,23 @@ impl Spreadsheet {
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn set_definitions(&mut self, definitions: Vec<Definition>) -> Result<()> {
-        let updated = crate::codec::names::replace(self.package.content_xml(), &definitions)?;
-        let package = self.package.replace_content_xml(&updated)?;
-        self.package = Arc::new(package);
-        self.definitions = definitions;
+    pub(crate) fn set_definitions(&mut self, definitions: Vec<Definition>) -> Result<()> {
+        let updated = crate::codec::names::replace(self.inner.package.content_xml(), &definitions)?;
+        let package = self.inner.package.replace_content_xml(&updated)?;
+        *self = Self::from_package(package)?;
         Ok(())
     }
 
     /// Publish a validated worksheet snapshot as one package transaction.
     pub(crate) fn publish_sheets(&mut self, sheets: Vec<crate::worksheet::Sheet>) -> Result<()> {
-        crate::worksheet::package::validate_owned_link_delta(&self.sheets, &sheets)?;
-        let package = self.package.replace_sheets(&sheets)?;
-        self.package = Arc::new(package);
-        self.sheets = sheets;
+        crate::worksheet::package::validate_owned_link_delta(&self.inner.sheets, &sheets)?;
+        let package = self.inner.package.replace_sheets(&sheets)?;
+        *self = Self::from_package(package)?;
         Ok(())
     }
 
     pub(crate) fn publish_metadata(&mut self, metadata: litchi_core::Metadata) -> Result<()> {
-        let package = self.package.metadata_snapshot()?;
+        let package = self.inner.package.metadata_snapshot()?;
         let mut transaction = package.transaction();
         transaction.replace(metadata)?;
         let commit = transaction.commit()?;
@@ -1232,20 +1202,23 @@ impl Spreadsheet {
                 "changed ODS metadata transaction produced no XML".to_string(),
             )
         })?;
-        let package = self.package.replace_metadata_xml(Some(&metadata_xml))?;
+        let package = self
+            .inner
+            .package
+            .replace_metadata_xml(Some(&metadata_xml))?;
         *self = Self::from_package(package)?;
         Ok(())
     }
 
     pub(crate) fn remove_metadata(&mut self) -> Result<()> {
-        let snapshot = self.package.metadata_snapshot()?;
+        let snapshot = self.inner.package.metadata_snapshot()?;
         let mut transaction = snapshot.transaction();
         transaction.remove();
         let commit = transaction.commit()?;
         if !commit.changed() {
             return Ok(());
         }
-        let package = self.package.replace_metadata_xml(None)?;
+        let package = self.inner.package.replace_metadata_xml(None)?;
         *self = Self::from_package(package)?;
         Ok(())
     }
@@ -1254,10 +1227,11 @@ impl Spreadsheet {
         &mut self,
         settings: Option<crate::settings::Settings>,
     ) -> Result<()> {
-        if self.settings == settings {
+        if self.inner.settings == settings {
             return Ok(());
         }
         let package = self
+            .inner
             .package
             .replace_calculation_settings(settings.as_ref())?;
         *self = Self::from_package(package)?;
@@ -1270,7 +1244,7 @@ impl Spreadsheet {
     ///
     /// Returns an error when the manifest or a declared graph is invalid.
     pub fn rdf_graphs(&self) -> Result<Vec<Graph>> {
-        litchi_odf_common::rdf::graphs(self.package.package())
+        litchi_odf_common::rdf::graphs(self.inner.package.package())
     }
 
     /// Capture RDF graphs as an immutable, exact-package snapshot.
@@ -1279,7 +1253,9 @@ impl Spreadsheet {
     ///
     /// Returns an error when the package, manifest, or a declared graph is invalid.
     pub fn rdf_snapshot(&self) -> Result<crate::metadata_graphs::Snapshot> {
-        crate::metadata_graphs::Snapshot::from_bytes(self.package.package().as_bytes().to_vec())
+        crate::metadata_graphs::Snapshot::from_bytes(
+            self.inner.package.package().as_bytes().to_vec(),
+        )
     }
 
     /// Apply an exact-source reversible RDF graph patch.
@@ -1287,7 +1263,7 @@ impl Spreadsheet {
     /// # Errors
     ///
     /// Returns an error for a stale patch or invalid candidate package.
-    pub fn apply_rdf_patch(&mut self, patch: &crate::metadata_graphs::Patch) -> Result<()> {
+    pub(crate) fn apply_rdf_patch(&mut self, patch: &crate::metadata_graphs::Patch) -> Result<()> {
         let commit = patch.apply(&self.rdf_snapshot()?)?;
         self.publish_rdf_commit(commit)
     }
@@ -1297,7 +1273,7 @@ impl Spreadsheet {
     /// # Errors
     ///
     /// Returns an error when the path, triples, compact XML, or rebuilt package is invalid.
-    pub fn add_rdf_graph(
+    pub(crate) fn add_rdf_graph(
         &mut self,
         preferred_path: Option<&str>,
         triples: &[Triple],
@@ -1314,7 +1290,7 @@ impl Spreadsheet {
     /// # Errors
     ///
     /// Returns an error when the graph, triples, compact XML, or rebuilt package is invalid.
-    pub fn replace_rdf_graph(&mut self, path: &str, triples: &[Triple]) -> Result<()> {
+    pub(crate) fn replace_rdf_graph(&mut self, path: &str, triples: &[Triple]) -> Result<()> {
         let snapshot = self.rdf_snapshot()?;
         let mut edit = snapshot.edit();
         edit.replace_graph(path, triples)?;
@@ -1326,7 +1302,7 @@ impl Spreadsheet {
     /// # Errors
     ///
     /// Returns an error when the graph is missing, referenced, or package rebuilding fails.
-    pub fn remove_rdf_graph(&mut self, path: &str) -> Result<()> {
+    pub(crate) fn remove_rdf_graph(&mut self, path: &str) -> Result<()> {
         let snapshot = self.rdf_snapshot()?;
         let mut edit = snapshot.edit();
         edit.remove_graph(path)?;
@@ -1338,7 +1314,7 @@ impl Spreadsheet {
     /// # Errors
     ///
     /// Returns an error when the graph, triple, compact XML, or rebuilt package is invalid.
-    pub fn add_rdf_triple(&mut self, path: &str, triple: &Triple) -> Result<usize> {
+    pub(crate) fn add_rdf_triple(&mut self, path: &str, triple: &Triple) -> Result<usize> {
         let snapshot = self.rdf_snapshot()?;
         let mut edit = snapshot.edit();
         let position = edit.add_triple(path, triple)?;
@@ -1351,7 +1327,12 @@ impl Spreadsheet {
     /// # Errors
     ///
     /// Returns an error when the graph, position, triple, or rebuilt package is invalid.
-    pub fn replace_rdf_triple(&mut self, path: &str, index: usize, triple: &Triple) -> Result<()> {
+    pub(crate) fn replace_rdf_triple(
+        &mut self,
+        path: &str,
+        index: usize,
+        triple: &Triple,
+    ) -> Result<()> {
         let snapshot = self.rdf_snapshot()?;
         let mut edit = snapshot.edit();
         edit.replace_triple(path, litchi_core::Position::new(index), triple)?;
@@ -1363,7 +1344,7 @@ impl Spreadsheet {
     /// # Errors
     ///
     /// Returns an error when the graph, position, compact XML, or rebuilt package is invalid.
-    pub fn remove_rdf_triple(&mut self, path: &str, index: usize) -> Result<()> {
+    pub(crate) fn remove_rdf_triple(&mut self, path: &str, index: usize) -> Result<()> {
         let snapshot = self.rdf_snapshot()?;
         let mut edit = snapshot.edit();
         edit.remove_triple(path, litchi_core::Position::new(index))?;
@@ -1375,7 +1356,7 @@ impl Spreadsheet {
     /// # Errors
     ///
     /// Returns an error when either position, the graph, or rebuilt package is invalid.
-    pub fn move_rdf_triple(&mut self, path: &str, from: usize, to: usize) -> Result<()> {
+    pub(crate) fn move_rdf_triple(&mut self, path: &str, from: usize, to: usize) -> Result<()> {
         let snapshot = self.rdf_snapshot()?;
         let mut edit = snapshot.edit();
         edit.move_triple(
@@ -1398,6 +1379,7 @@ impl Spreadsheet {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
     use std::sync::Arc;
 
     const ANNOTATED_CONTENT: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" xmlns:vendor="urn:example:vendor" office:version="1.3"><office:body><office:spreadsheet><vendor:keep/><table:table table:name="Data"><table:table-row><table:table-cell><office:annotation><text:p>existing</text:p></office:annotation></table:table-cell><table:table-cell/></table:table-row></table:table></office:spreadsheet></office:body></office:document-content>"#;
@@ -1406,9 +1388,11 @@ mod tests {
     fn builder_round_trips_through_facade() {
         let bytes = Builder::new()
             .build()
+            .expect("test fixture or operation should succeed")
+            .to_bytes()
             .expect("test fixture or operation should succeed");
         let spreadsheet =
-            Spreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed");
+            Workbook::from_bytes(bytes).expect("test fixture or operation should succeed");
         assert!(spreadsheet.content_xml().contains("office:spreadsheet"));
     }
 
@@ -1416,9 +1400,11 @@ mod tests {
     fn worksheet_snapshot_reuses_the_facade_package_index() {
         let bytes = Builder::new()
             .build()
+            .expect("test fixture or operation should succeed")
+            .to_bytes()
             .expect("test fixture or operation should succeed");
         let spreadsheet =
-            Spreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed");
+            Workbook::from_bytes(bytes).expect("test fixture or operation should succeed");
         let snapshot = spreadsheet
             .worksheet_snapshot()
             .expect("test fixture or operation should succeed");
@@ -1438,19 +1424,23 @@ mod tests {
         let bytes = std::fs::read(&path).expect("test fixture or operation should succeed");
 
         // Owned open and the prepared-detection handoff.
-        let spreadsheet = Spreadsheet::from_bytes(bytes.clone())
-            .expect("test fixture or operation should succeed");
+        let spreadsheet =
+            Workbook::from_bytes(bytes.clone()).expect("test fixture or operation should succeed");
         assert!(spreadsheet.tolerance_report().is_clean());
         assert_eq!(spreadsheet.tolerance_report().total(), 0);
         let prepared = litchi_odf_common::detect::prepared(bytes)
             .expect("test fixture or operation should succeed");
-        let spreadsheet = Spreadsheet::from_prepared_package(prepared)
+        let spreadsheet = crate::Package::from_prepared_package(prepared)
+            .map_err(litchi_core::Error::from)
+            .and_then(|package| package.workbook())
             .expect("test fixture or operation should succeed");
         assert!(spreadsheet.tolerance_report().is_clean());
 
         // Path-based open and the positional source-backed facade.
-        let spreadsheet =
-            Spreadsheet::open(&path).expect("test fixture or operation should succeed");
+        let spreadsheet = crate::Package::open(&path)
+            .map_err(litchi_core::Error::from)
+            .and_then(|package| package.workbook())
+            .expect("test fixture or operation should succeed");
         assert!(spreadsheet.tolerance_report().is_clean());
         let source = Arc::new(litchi_core::OwnedSource::new(
             std::fs::read(&path).expect("test fixture or operation should succeed"),
@@ -1463,14 +1453,16 @@ mod tests {
     #[test]
     fn cell_locator_builds_at_the_threshold_and_preserves_snapshot_traits() {
         fn assert_send_sync<T: Send + Sync>() {}
-        assert_send_sync::<Spreadsheet>();
+        assert_send_sync::<Workbook>();
 
         let bytes = Builder::new()
             .content_xml(ANNOTATED_CONTENT)
             .build()
+            .expect("test fixture or operation should succeed")
+            .to_bytes()
             .expect("test fixture or operation should succeed");
         let spreadsheet =
-            Spreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed");
+            Workbook::from_bytes(bytes).expect("test fixture or operation should succeed");
 
         for _ in 1..cell_locator::BUILD_QUERY_THRESHOLD {
             assert!(matches!(
@@ -1478,12 +1470,15 @@ mod tests {
                 Some(crate::worksheet::CellView::Stored(_))
             ));
         }
-        assert!(spreadsheet.cell_locator.get().is_none());
+        assert!(spreadsheet.inner.cell_locator.get().is_none());
         assert!(matches!(
             spreadsheet.cell("Data", 0, 0),
             Some(crate::worksheet::CellView::Stored(_))
         ));
-        assert!(matches!(spreadsheet.cell_locator.get(), Some(Some(_))));
+        assert!(matches!(
+            spreadsheet.inner.cell_locator.get(),
+            Some(Some(_))
+        ));
     }
 
     #[test]
@@ -1491,9 +1486,11 @@ mod tests {
         let bytes = Builder::new()
             .content_xml(ANNOTATED_CONTENT)
             .build()
+            .expect("test fixture or operation should succeed")
+            .to_bytes()
             .expect("test fixture or operation should succeed");
         let spreadsheet =
-            Spreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed");
+            Workbook::from_bytes(bytes).expect("test fixture or operation should succeed");
         let selectors = [
             CellSelector::new("Data", 0, 1),
             CellSelector::new("Data", 0, 0),
@@ -1536,9 +1533,11 @@ mod tests {
         let bytes = Builder::new()
             .content_xml(ANNOTATED_CONTENT)
             .build()
+            .expect("test fixture or operation should succeed")
+            .to_bytes()
             .expect("test fixture or operation should succeed");
         let spreadsheet =
-            Spreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed");
+            Workbook::from_bytes(bytes).expect("test fixture or operation should succeed");
         assert!(
             spreadsheet
                 .cell_batch(&[])
@@ -1569,10 +1568,12 @@ mod tests {
             }
         }
 
-        let bounded = Spreadsheet::from_bytes(
+        let bounded = Workbook::from_bytes(
             Builder::new()
                 .content_xml(ANNOTATED_CONTENT)
                 .build()
+                .expect("test fixture or operation should succeed")
+                .to_bytes()
                 .expect("test fixture or operation should succeed"),
         )
         .expect("test fixture or operation should succeed");
@@ -1583,8 +1584,8 @@ mod tests {
             litchi_core::Error::InvalidFormat(message)
                 if message.contains("selector safety limit")
         ));
-        assert!(bounded.cell_locator.get().is_none());
-        assert_eq!(bounded.cell_queries.load(Ordering::Relaxed), 0);
+        assert!(bounded.inner.cell_locator.get().is_none());
+        assert_eq!(bounded.inner.cell_queries.load(Ordering::Relaxed), 0);
     }
 
     #[test]
@@ -1595,9 +1596,11 @@ mod tests {
         let bytes = Builder::new()
             .content_xml(ANNOTATED_CONTENT)
             .build()
+            .expect("test fixture or operation should succeed")
+            .to_bytes()
             .expect("test fixture or operation should succeed");
         let spreadsheet = Arc::new(
-            Spreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed"),
+            Workbook::from_bytes(bytes).expect("test fixture or operation should succeed"),
         );
         let expected = match spreadsheet.sheet("Data").and_then(|sheet| sheet.cell(0, 0)) {
             Some(cell) => std::ptr::from_ref(cell) as usize,
@@ -1623,7 +1626,10 @@ mod tests {
         for thread in threads {
             thread.join().expect("cell batch thread");
         }
-        assert!(matches!(spreadsheet.cell_locator.get(), Some(Some(_))));
+        assert!(matches!(
+            spreadsheet.inner.cell_locator.get(),
+            Some(Some(_))
+        ));
     }
 
     #[test]
@@ -1631,9 +1637,11 @@ mod tests {
         let bytes = Builder::new()
             .content_xml(ANNOTATED_CONTENT)
             .build()
+            .expect("test fixture or operation should succeed")
+            .to_bytes()
             .expect("test fixture or operation should succeed");
         let spreadsheet = Arc::new(
-            Spreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed"),
+            Workbook::from_bytes(bytes).expect("test fixture or operation should succeed"),
         );
         let expected = std::ptr::from_ref(
             spreadsheet
@@ -1662,7 +1670,10 @@ mod tests {
                 .join()
                 .expect("test fixture or operation should succeed");
         }
-        assert!(matches!(spreadsheet.cell_locator.get(), Some(Some(_))));
+        assert!(matches!(
+            spreadsheet.inner.cell_locator.get(),
+            Some(Some(_))
+        ));
     }
 
     #[test]
@@ -1670,20 +1681,25 @@ mod tests {
         let bytes = Builder::new()
             .content_xml(ANNOTATED_CONTENT)
             .build()
+            .expect("test fixture or operation should succeed")
+            .to_bytes()
             .expect("test fixture or operation should succeed");
         let mut spreadsheet =
-            Spreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed");
+            Workbook::from_bytes(bytes).expect("test fixture or operation should succeed");
         for _ in 0..cell_locator::BUILD_QUERY_THRESHOLD {
             assert!(spreadsheet.cell("Data", 0, 0).is_some());
         }
-        assert!(matches!(spreadsheet.cell_locator.get(), Some(Some(_))));
+        assert!(matches!(
+            spreadsheet.inner.cell_locator.get(),
+            Some(Some(_))
+        ));
 
         let updated = ANNOTATED_CONTENT.replace("existing", "replacement");
         spreadsheet
             .publish_annotations(&updated)
             .expect("test fixture or operation should succeed");
-        assert!(spreadsheet.cell_locator.get().is_none());
-        assert_eq!(spreadsheet.cell_queries.load(Ordering::Relaxed), 0);
+        assert!(spreadsheet.inner.cell_locator.get().is_none());
+        assert_eq!(spreadsheet.inner.cell_queries.load(Ordering::Relaxed), 0);
         assert_eq!(
             spreadsheet
                 .annotations()
@@ -1704,9 +1720,9 @@ mod tests {
                 r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.3"><office:body><office:spreadsheet><draw:frame draw:name="Photo"><draw:image><office:binary-data>AQID</office:binary-data></draw:image></draw:frame><draw:object xlink:href="https://example.invalid/object" xlink:type="simple"/></office:spreadsheet></office:body></office:document-content>"#,
             )
             .build()
-            .expect("test fixture or operation should succeed");
+            .expect("test fixture or operation should succeed").to_bytes().expect("test fixture or operation should succeed");
         let spreadsheet =
-            Spreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed");
+            Workbook::from_bytes(bytes).expect("test fixture or operation should succeed");
 
         let images = spreadsheet
             .images()
@@ -1736,9 +1752,11 @@ mod tests {
         let bytes = Builder::new()
             .content_xml(ANNOTATED_CONTENT)
             .build()
+            .expect("test fixture or operation should succeed")
+            .to_bytes()
             .expect("test fixture or operation should succeed");
-        let spreadsheet = Spreadsheet::from_bytes(bytes.clone())
-            .expect("test fixture or operation should succeed");
+        let spreadsheet =
+            Workbook::from_bytes(bytes.clone()).expect("test fixture or operation should succeed");
         let annotations = spreadsheet
             .annotations()
             .expect("test fixture or operation should succeed");
@@ -1752,14 +1770,15 @@ mod tests {
             "existing"
         );
 
-        let mut mutable = MutableSpreadsheet::from_bytes(bytes.clone())
+        let mut mutable = Workbook::from_bytes(bytes.clone())
+            .map(MutableSpreadsheet::from_workbook)
             .expect("test fixture or operation should succeed");
         mutable
             .edit_annotations(|transaction| {
                 transaction.set("Data", 0, 1, crate::annotations::Annotation::new("added"))
             })
             .expect("test fixture or operation should succeed");
-        let edited = Spreadsheet::from_bytes(mutable.to_bytes())
+        let edited = Workbook::from_bytes(mutable.to_bytes())
             .expect("test fixture or operation should succeed");
         assert_eq!(
             edited
@@ -1774,7 +1793,8 @@ mod tests {
         );
         assert!(edited.content_xml().contains("vendor:keep"));
 
-        let mut no_op = MutableSpreadsheet::from_bytes(bytes.clone())
+        let mut no_op = Workbook::from_bytes(bytes.clone())
+            .map(MutableSpreadsheet::from_workbook)
             .expect("test fixture or operation should succeed");
         no_op
             .edit_annotations(|_| Ok(()))

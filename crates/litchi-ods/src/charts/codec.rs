@@ -1,7 +1,7 @@
 //! ODS chart discovery, inline-root adaptation, and bounded XML spans.
 
 use super::model::{Chart, Limits, Location, Part, Storage};
-use crate::package::Package;
+use crate::package::Archive;
 use litchi_core::{Error, Result};
 use litchi_odf_common::chart::authoring::{Definition, serialize_content};
 use litchi_odf_common::chart::read;
@@ -18,7 +18,7 @@ const OFFICE_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const DRAW_NS: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
 
 /// Read all content-level embedded chart occurrences from an ODS package.
-pub(crate) fn inventory(package: &Package, limits: Limits) -> Result<Vec<Chart>> {
+pub(crate) fn inventory(package: &Archive, limits: Limits) -> Result<Vec<Chart>> {
     let owned = package.package();
     let borrowed = owned.package()?;
     let objects = scan_package(package.content_xml(), None, &borrowed)?;

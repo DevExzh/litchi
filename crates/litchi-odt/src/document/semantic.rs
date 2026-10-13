@@ -25,7 +25,7 @@ impl Document {
     #[inline]
     #[must_use]
     pub fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
-        &self.tolerance
+        &self.state.tolerance
     }
 
     /// Extract all text content from the document.
@@ -42,17 +42,17 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odt::Document;
+    /// use litchi_odt::Package;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let doc = Document::open("document.odt")?;
+    /// let doc = Package::open("document.odt")?.document()?;
     /// let text = doc.text()?;
     /// println!("Text content:\n{}", text);
     /// # Ok(())
     /// # }
     /// ```
     pub fn text(&self) -> Result<String> {
-        TextElements::extract_text(self.content.xml_content())
+        TextElements::extract_text(self.state.content.xml_content())
     }
 
     /// Write visible paragraphs and headings as bounded UTF-8 text to a
@@ -76,7 +76,7 @@ impl Document {
         litchi_core::TextOutputReport,
         litchi_core::TextOutputError<litchi_core::Error>,
     > {
-        TextElements::write_text_to(self.content.xml_content(), output, options)
+        TextElements::write_text_to(self.state.content.xml_content(), output, options)
     }
 
     /// Get the number of paragraphs in the document.
@@ -84,10 +84,10 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odt::Document;
+    /// use litchi_odt::Package;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let doc = Document::open("document.odt")?;
+    /// let doc = Package::open("document.odt")?.document()?;
     /// let count = doc.paragraph_count()?;
     /// println!("Paragraph count: {}", count);
     /// # Ok(())
@@ -105,10 +105,10 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odt::Document;
+    /// use litchi_odt::Package;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let doc = Document::open("document.odt")?;
+    /// let doc = Package::open("document.odt")?.document()?;
     /// let paragraphs = doc.paragraphs()?;
     ///
     /// for para in paragraphs {
@@ -118,7 +118,7 @@ impl Document {
     /// # }
     /// ```
     pub fn paragraphs(&self) -> Result<Vec<ElementParagraph>> {
-        TextElements::parse_paragraphs(self.content.xml_content())
+        TextElements::parse_paragraphs(self.state.content.xml_content())
     }
 
     /// Get one paragraph by its zero-based paragraph index.
@@ -126,7 +126,7 @@ impl Document {
     /// Headings do not contribute to the index. The complete document XML is
     /// still validated, but only the requested paragraph is retained.
     pub fn paragraph(&self, index: usize) -> Result<Option<ElementParagraph>> {
-        TextElements::parse_paragraph_at(self.content.xml_content(), index)
+        TextElements::parse_paragraph_at(self.state.content.xml_content(), index)
     }
 
     /// Get all tables in the document.
@@ -137,10 +137,10 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odt::Document;
+    /// use litchi_odt::Package;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let doc = Document::open("document.odt")?;
+    /// let doc = Package::open("document.odt")?.document()?;
     /// let tables = doc.tables()?;
     ///
     /// println!("Found {} tables", tables.len());
@@ -149,7 +149,7 @@ impl Document {
     /// ```
     pub fn tables(&self) -> Result<Vec<ElementTable>> {
         use crate::elements::table::TableElements;
-        TableElements::parse_tables_from_content(self.content.xml_content())
+        TableElements::parse_tables_from_content(self.state.content.xml_content())
     }
 
     /// Get all document elements (paragraphs, headings, and tables) in document order.
@@ -167,11 +167,11 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odt::Document;
+    /// use litchi_odt::Package;
     /// use litchi_odt::elements::parser::OrderElement;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let doc = Document::open("document.odt")?;
+    /// let doc = Package::open("document.odt")?.document()?;
     /// let elements = doc.elements()?;
     ///
     /// for element in elements {
@@ -200,7 +200,7 @@ impl Document {
         use crate::elements::parser::Parser;
 
         // Parse all elements in document order using the generic ODF parser
-        Parser::parse_elements_in_order(self.content.xml_content())
+        Parser::parse_elements_in_order(self.state.content.xml_content())
     }
 
     /// Get document metadata.
@@ -216,10 +216,10 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odt::Document;
+    /// use litchi_odt::Package;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let doc = Document::open("document.odt")?;
+    /// let doc = Package::open("document.odt")?.document()?;
     /// let metadata = doc.metadata()?;
     ///
     /// if let Some(title) = &metadata.title {
@@ -235,7 +235,7 @@ impl Document {
     /// # }
     /// ```
     pub fn metadata(&self) -> Result<Metadata> {
-        if let Some(meta) = &self.meta {
+        if let Some(meta) = &self.state.meta {
             meta.try_extract_metadata()
         } else {
             Ok(Metadata::default())
@@ -244,7 +244,7 @@ impl Document {
 
     /// Get the complete format-specific `OpenDocument` metadata model.
     pub fn odf_metadata(&self) -> Result<Option<crate::Metadata>> {
-        self.meta.as_ref().map(Meta::odf_metadata).transpose()
+        self.state.meta.as_ref().map(Meta::odf_metadata).transpose()
     }
 
     /// Return document interaction and protection policy metadata.
@@ -252,7 +252,7 @@ impl Document {
     /// The policy is inert: reading it never enforces protection or unlocks
     /// tracked changes.
     pub fn protection(&self) -> Result<crate::protection::Policy> {
-        let package = self.package.package()?;
+        let package = self.state.package.package()?;
         if !package.has_file(crate::constants::ODF_SETTINGS) {
             return Ok(crate::protection::Policy::default());
         }
@@ -267,22 +267,22 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odt::Document;
+    /// use litchi_odt::Package;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let doc = Document::open("document.odt")?;
+    /// let doc = Package::open("document.odt")?.document()?;
     /// let styles = doc.styles();
     /// // Use the style registry to query styles...
     /// # Ok(())
     /// # }
     /// ```
     pub fn styles(&self) -> &StyleRegistry {
-        &self.style_registry
+        &self.state.style_registry
     }
 
     /// Get typed named ruby style definitions from `styles.xml`.
     pub fn ruby_styles(&self) -> Result<crate::ruby_family::Styles> {
-        self.styles.as_ref().map_or_else(
+        self.state.styles.as_ref().map_or_else(
             || Ok(Default::default()),
             |styles| crate::parse_ruby_styles(styles.xml_content()),
         )
@@ -293,7 +293,7 @@ impl Document {
     /// This preserves stored metadata only. It does not fetch linked font
     /// resources, load fonts, or inspect embedded font data.
     pub fn content_font_face_declarations(&self) -> Result<Option<crate::font_face::Declarations>> {
-        crate::font_face::parse_content_font_face_declarations(self.content.xml_content())
+        crate::font_face::parse_content_font_face_declarations(self.state.content.xml_content())
     }
 
     /// Return font-face declarations stored in `styles.xml`.
@@ -301,7 +301,7 @@ impl Document {
     /// This preserves stored metadata only. It does not fetch linked font
     /// resources, load fonts, or inspect embedded font data.
     pub fn styles_font_face_declarations(&self) -> Result<Option<crate::font_face::Declarations>> {
-        self.styles.as_ref().map_or_else(
+        self.state.styles.as_ref().map_or_else(
             || Ok(None),
             |styles| crate::font_face::parse_styles_font_face_declarations(styles.xml_content()),
         )
@@ -312,7 +312,7 @@ impl Document {
     /// This exposes stored common-style resources only. It does not resolve
     /// style use sites, load external data, or render gradients.
     pub fn drawing_gradients(&self) -> Result<crate::drawing::resources::gradient::Collection> {
-        self.styles.as_ref().map_or_else(
+        self.state.styles.as_ref().map_or_else(
             || Ok(Default::default()),
             |styles| {
                 crate::drawing::resources::gradient::parse_drawing_gradients(styles.xml_content())
@@ -325,7 +325,7 @@ impl Document {
     /// This exposes stored common-style resources only. It does not resolve
     /// style use sites or render hatches.
     pub fn drawing_hatches(&self) -> Result<crate::drawing::resources::hatch::Collection> {
-        self.styles.as_ref().map_or_else(
+        self.state.styles.as_ref().map_or_else(
             || Ok(Default::default()),
             |styles| crate::drawing::resources::hatch::parse_drawing_hatches(styles.xml_content()),
         )
@@ -338,7 +338,7 @@ impl Document {
     pub fn drawing_stroke_dashes(
         &self,
     ) -> Result<crate::drawing::resources::stroke_dash::Collection> {
-        self.styles.as_ref().map_or_else(
+        self.state.styles.as_ref().map_or_else(
             || Ok(Default::default()),
             |styles| {
                 crate::drawing::resources::stroke_dash::parse_drawing_stroke_dashes(
@@ -353,7 +353,7 @@ impl Document {
     /// This exposes stored common-style metadata only. It does not resolve
     /// style use sites, follow links, load linked resources, or render images.
     pub fn drawing_fill_images(&self) -> Result<crate::drawing::resources::fill_image::Collection> {
-        self.styles.as_ref().map_or_else(
+        self.state.styles.as_ref().map_or_else(
             || Ok(Default::default()),
             |styles| {
                 crate::drawing::resources::fill_image::parse_drawing_fill_images(
@@ -368,7 +368,7 @@ impl Document {
     /// This exposes stored common-style metadata only. It does not resolve
     /// style use sites or render marker paths.
     pub fn drawing_markers(&self) -> Result<crate::drawing::resources::marker::Collection> {
-        self.styles.as_ref().map_or_else(
+        self.state.styles.as_ref().map_or_else(
             || Ok(Default::default()),
             |styles| crate::drawing::resources::marker::parse_drawing_markers(styles.xml_content()),
         )
@@ -379,7 +379,7 @@ impl Document {
     /// This exposes stored common-style metadata only. It does not resolve
     /// style use sites or render opacity gradients.
     pub fn drawing_opacities(&self) -> Result<crate::drawing::resources::opacity::Collection> {
-        self.styles.as_ref().map_or_else(
+        self.state.styles.as_ref().map_or_else(
             || Ok(Default::default()),
             |styles| {
                 crate::drawing::resources::opacity::parse_drawing_opacities(styles.xml_content())
@@ -389,14 +389,15 @@ impl Document {
 
     /// Parse master pages and their losslessly retained headers and footers.
     pub fn master_pages(&self) -> Result<Vec<Master>> {
-        self.styles
+        self.state
+            .styles
             .as_ref()
             .map_or_else(|| Ok(Vec::new()), |styles| read(styles.xml_content()))
     }
 
     /// Parse automatic page layouts, their properties, and header/footer styles.
     pub fn page_layouts(&self) -> Result<Vec<PageLayout>> {
-        self.styles.as_ref().map_or_else(
+        self.state.styles.as_ref().map_or_else(
             || Ok(Vec::new()),
             |styles| parse_page_layouts(styles.xml_content()),
         )
@@ -405,7 +406,7 @@ impl Document {
     /// The unnamed fallback page layout (`style:default-page-layout`), when
     /// the document declares one.
     pub fn default_page_layout(&self) -> Result<Option<PageLayout>> {
-        self.styles.as_ref().map_or_else(
+        self.state.styles.as_ref().map_or_else(
             || Ok(None),
             |styles| crate::page_layout::parse_default_page_layout(styles.xml_content()),
         )
@@ -417,7 +418,7 @@ impl Document {
     /// not renumber notes, resolve style references, or render continuation
     /// notices.
     pub fn notes_configurations(&self) -> Result<crate::notes_configuration::Configurations> {
-        self.styles.as_ref().map_or_else(
+        self.state.styles.as_ref().map_or_else(
             || Ok(Default::default()),
             |styles| crate::notes_configuration::parse(styles.xml_content()),
         )
@@ -428,7 +429,7 @@ impl Document {
     /// These are styles metadata only. This API does not apply styles to
     /// headings, generate labels, or update tables of contents.
     pub fn outline_styles(&self) -> Result<crate::outline_style::Styles> {
-        self.styles.as_ref().map_or_else(
+        self.state.styles.as_ref().map_or_else(
             || Ok(Default::default()),
             |styles| crate::outline_style::parse_outline_styles(styles.xml_content()),
         )
@@ -441,7 +442,7 @@ impl Document {
     pub fn bibliography_configuration(
         &self,
     ) -> Result<Option<crate::bibliography_configuration::Configuration>> {
-        self.styles.as_ref().map_or_else(
+        self.state.styles.as_ref().map_or_else(
             || Ok(None),
             |styles| {
                 crate::bibliography_configuration::parse_bibliography_configuration(
@@ -456,7 +457,7 @@ impl Document {
     /// This exposes stored page metadata only. It does not resolve master-page
     /// styles, calculate page breaks, or paginate the document.
     pub fn page_sequence(&self) -> Result<Option<Sequence>> {
-        parse_page_sequence(self.content.xml_content())
+        parse_page_sequence(self.state.content.xml_content())
     }
 
     /// Return the stored document line-numbering configuration.
@@ -466,7 +467,7 @@ impl Document {
     pub fn line_numbering_configuration(
         &self,
     ) -> Result<Option<crate::line_numbering::Configuration>> {
-        self.styles.as_ref().map_or_else(
+        self.state.styles.as_ref().map_or_else(
             || Ok(None),
             |styles| crate::line_numbering::parse(styles.xml_content()),
         )
@@ -488,10 +489,10 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odt::Document;
+    /// use litchi_odt::Package;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let doc = Document::open("document.odt")?;
+    /// let doc = Package::open("document.odt")?.document()?;
     /// let props = doc.get_style_properties("Heading1");
     ///
     /// if let Some(font_size) = &props.text.font_size {
@@ -504,7 +505,9 @@ impl Document {
         &self,
         style_name: &str,
     ) -> crate::elements::style::StyleProperties<'_> {
-        self.style_registry.get_resolved_properties(style_name)
+        self.state
+            .style_registry
+            .get_resolved_properties(style_name)
     }
 
     /// Get all tracked changes in the document.
@@ -515,10 +518,10 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odt::Document;
+    /// use litchi_odt::Package;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let doc = Document::open("document.odt")?;
+    /// let doc = Package::open("document.odt")?.document()?;
     /// let changes = doc.track_changes()?;
     ///
     /// for change in changes {
@@ -528,7 +531,7 @@ impl Document {
     /// # }
     /// ```
     pub fn track_changes(&self) -> Result<Vec<crate::parser::TrackChange>> {
-        crate::parser::Parser::parse_track_changes(self.content.xml_content())
+        crate::parser::Parser::parse_track_changes(self.state.content.xml_content())
     }
 
     /// Get tracked changes together with their inert container policy metadata.
@@ -536,7 +539,7 @@ impl Document {
     /// Protection-key material and digest identifiers are retained for round-trip and
     /// inspection only; this method never unlocks, accepts, rejects, or evaluates changes.
     pub fn tracked_changes(&self) -> Result<crate::parser::TrackedChanges> {
-        crate::parser::Parser::parse_tracked_changes(self.content.xml_content())
+        crate::parser::Parser::parse_tracked_changes(self.state.content.xml_content())
     }
 
     /// Get all comments/annotations in the document.
@@ -544,10 +547,10 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odt::Document;
+    /// use litchi_odt::Package;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let doc = Document::open("document.odt")?;
+    /// let doc = Package::open("document.odt")?.document()?;
     /// let comments = doc.comments()?;
     ///
     /// for comment in comments {
@@ -557,7 +560,7 @@ impl Document {
     /// # }
     /// ```
     pub fn comments(&self) -> Result<Vec<crate::parser::Comment>> {
-        crate::parser::Parser::parse_comments(self.content.xml_content())
+        crate::parser::Parser::parse_comments(self.state.content.xml_content())
     }
 
     /// Get all sections in the document.
@@ -568,10 +571,10 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odt::Document;
+    /// use litchi_odt::Package;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let doc = Document::open("document.odt")?;
+    /// let doc = Package::open("document.odt")?.document()?;
     /// let sections = doc.sections()?;
     ///
     /// for section in sections {
@@ -581,7 +584,7 @@ impl Document {
     /// # }
     /// ```
     pub fn sections(&self) -> Result<Vec<crate::parser::Section>> {
-        crate::parser::Parser::parse_sections(self.content.xml_content())
+        crate::parser::Parser::parse_sections(self.state.content.xml_content())
     }
 
     /// Get all generated text indexes, including their inert source definitions and cached bodies.
@@ -590,22 +593,22 @@ impl Document {
     /// and bibliography indexes. Stored source declarations are never evaluated, and external
     /// alphabetical auto-mark files are never fetched.
     pub fn text_indexes(&self) -> Result<Vec<crate::TextIndex>> {
-        crate::index::parse_text_indexes(self.content.xml_content())
+        crate::index::parse_text_indexes(self.state.content.xml_content())
     }
 
     /// Get point and resolved range marks that contribute entries to generated text indexes.
     pub fn text_index_marks(&self) -> Result<Vec<crate::TextIndexMark>> {
-        crate::index_mark::parse_text_index_marks(self.content.xml_content())
+        crate::index_mark::parse_text_index_marks(self.state.content.xml_content())
     }
 
     /// Get point and range targets used by `text:reference-ref` fields.
     pub fn reference_marks(&self) -> Result<Vec<crate::ReferenceMark>> {
-        crate::reference_mark::parse_reference_marks(self.content.xml_content())
+        crate::reference_mark::parse_reference_marks(self.state.content.xml_content())
     }
 
     /// Get all semantic footnotes and endnotes in document order.
     pub fn notes(&self) -> Result<Vec<crate::Note>> {
-        crate::note::parse_notes(self.content.xml_content())
+        crate::note::parse_notes(self.state.content.xml_content())
     }
 
     pub fn footnotes(&self) -> Result<Vec<crate::Note>> {
@@ -626,12 +629,12 @@ impl Document {
 
     /// Get structure-preserving ruby annotations in document order.
     pub fn ruby_annotations(&self) -> Result<crate::ruby_family::Annotations> {
-        crate::parse_ruby_annotations(self.content.xml_content())
+        crate::parse_ruby_annotations(self.state.content.xml_content())
     }
 
     /// Get simplified ruby base/pronunciation pairs in document order.
     pub fn rubies(&self) -> Result<Vec<crate::ruby::Annotation>> {
-        crate::ruby::parse_rubies(self.content.xml_content())
+        crate::ruby::parse_rubies(self.state.content.xml_content())
     }
 
     /// Get all bookmarks in the document.
@@ -639,10 +642,10 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odt::Document;
+    /// use litchi_odt::Package;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let doc = Document::open("document.odt")?;
+    /// let doc = Package::open("document.odt")?.document()?;
     /// let bookmarks = doc.bookmarks()?;
     ///
     /// for bookmark in bookmarks {
@@ -655,7 +658,7 @@ impl Document {
     /// ```
     pub fn bookmarks(&self) -> Result<Vec<crate::elements::bookmark::Bookmark>> {
         use crate::elements::bookmark::BookmarkParser;
-        BookmarkParser::parse_bookmarks(self.content.xml_content())
+        BookmarkParser::parse_bookmarks(self.state.content.xml_content())
     }
 
     /// Get all bookmark ranges in the document.
@@ -665,10 +668,10 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odt::Document;
+    /// use litchi_odt::Package;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let doc = Document::open("document.odt")?;
+    /// let doc = Package::open("document.odt")?.document()?;
     /// let ranges = doc.bookmark_ranges()?;
     ///
     /// for range in ranges {
@@ -681,7 +684,7 @@ impl Document {
     /// ```
     pub fn bookmark_ranges(&self) -> Result<Vec<crate::elements::bookmark::BookmarkRange>> {
         use crate::elements::bookmark::BookmarkParser;
-        BookmarkParser::parse_bookmark_ranges(self.content.xml_content())
+        BookmarkParser::parse_bookmark_ranges(self.state.content.xml_content())
     }
 
     /// Get all fields in the document.
@@ -693,10 +696,10 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odt::Document;
+    /// use litchi_odt::Package;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let doc = Document::open("document.odt")?;
+    /// let doc = Package::open("document.odt")?.document()?;
     /// let fields = doc.fields()?;
     ///
     /// for field in fields {
@@ -707,7 +710,7 @@ impl Document {
     /// ```
     pub fn fields(&self) -> Result<Vec<crate::elements::field::Field>> {
         use crate::elements::field::FieldParser;
-        FieldParser::parse_fields(self.content.xml_content())
+        FieldParser::parse_fields(self.state.content.xml_content())
     }
 
     /// Get conditional, hidden, and placeholder text fields in document order.
@@ -716,7 +719,7 @@ impl Document {
     /// evaluates them and returns only the cached display text stored in the file.
     pub fn dynamic_text_fields(&self) -> Result<Vec<crate::elements::field::DynamicTextField>> {
         use crate::elements::field::FieldParser;
-        FieldParser::parse_dynamic_text_fields(self.content.xml_content())
+        FieldParser::parse_dynamic_text_fields(self.state.content.xml_content())
     }
 
     /// Get all tables with repeated cells and rows expanded.
@@ -727,10 +730,10 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odt::Document;
+    /// use litchi_odt::Package;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let doc = Document::open("document.odt")?;
+    /// let doc = Package::open("document.odt")?.document()?;
     /// let expanded_tables = doc.tables_expanded()?;
     ///
     /// for table in expanded_tables {
@@ -752,10 +755,10 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odt::Document;
+    /// use litchi_odt::Package;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let doc = Document::open("document.odt")?;
+    /// let doc = Package::open("document.odt")?.document()?;
     /// let hyperlinks = doc.hyperlinks()?;
     /// for (text, url) in hyperlinks {
     ///     println!("{}: {}", text, url);
@@ -764,7 +767,7 @@ impl Document {
     /// # }
     /// ```
     pub fn hyperlinks(&self) -> Result<Vec<(String, String)>> {
-        parse_hyperlinks(self.content.xml_content())
+        parse_hyperlinks(self.state.content.xml_content())
     }
 
     /// Extract all bookmark names from the document
@@ -774,10 +777,10 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odt::Document;
+    /// use litchi_odt::Package;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let doc = Document::open("document.odt")?;
+    /// let doc = Package::open("document.odt")?.document()?;
     /// let bookmark_names = doc.bookmark_names()?;
     /// for bookmark in bookmark_names {
     ///     println!("Bookmark: {}", bookmark);
@@ -786,7 +789,7 @@ impl Document {
     /// # }
     /// ```
     pub fn bookmark_names(&self) -> Result<Vec<String>> {
-        parse_bookmark_names(self.content.xml_content())
+        parse_bookmark_names(self.state.content.xml_content())
     }
 
     /// Extract all linked image references from the document
@@ -797,10 +800,10 @@ impl Document {
     /// # Examples
     ///
     /// ```no_run
-    /// use litchi_odt::Document;
+    /// use litchi_odt::Package;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let doc = Document::open("document.odt")?;
+    /// let doc = Package::open("document.odt")?.document()?;
     /// let images = doc.image_paths()?;
     /// for img_path in images {
     ///     println!("Image: {}", img_path);
@@ -811,23 +814,23 @@ impl Document {
     /// # }
     /// ```
     pub fn image_paths(&self) -> Result<Vec<String>> {
-        parse_image_references(self.content.xml_content())
+        parse_image_references(self.state.content.xml_content())
     }
 
     /// Discover referenced, inline, missing, and inert linked images.
     pub fn images(&self) -> Result<Vec<crate::Image>> {
-        let package = self.package.package()?;
+        let package = self.state.package.package()?;
         crate::media::scan_package(
-            self.content.xml_content(),
-            self.styles.as_ref().map(Styles::xml_content),
+            self.state.content.xml_content(),
+            self.state.styles.as_ref().map(Styles::xml_content),
             &package,
         )
     }
 
     /// Inspect classic forms without executing bindings, events, or external resources.
     pub fn forms(&self) -> Result<crate::form::Forms> {
-        let mut parts = vec![(self.content.xml_content(), crate::form::Part::Content)];
-        if let Some(styles) = self.styles.as_ref().map(Styles::xml_content) {
+        let mut parts = vec![(self.state.content.xml_content(), crate::form::Part::Content)];
+        if let Some(styles) = self.state.styles.as_ref().map(Styles::xml_content) {
             parts.push((styles, crate::form::Part::Styles));
         }
         crate::form::parse_form_parts(&parts)
@@ -840,8 +843,11 @@ impl Document {
     /// parsed. RDFa values and inline metadata remain inert strings/content;
     /// no CURIE, datatype, link, or external resource is resolved.
     pub fn in_content_metadata(&self) -> Result<crate::ContentMetadata> {
-        let mut parts = vec![(self.content.xml_content(), crate::MetadataPart::Content)];
-        if let Some(styles) = self.styles.as_ref().map(Styles::xml_content) {
+        let mut parts = vec![(
+            self.state.content.xml_content(),
+            crate::MetadataPart::Content,
+        )];
+        if let Some(styles) = self.state.styles.as_ref().map(Styles::xml_content) {
             parts.push((styles, crate::MetadataPart::Styles));
         }
         crate::content_metadata::parse_parts(&parts)
@@ -849,20 +855,20 @@ impl Document {
 
     /// Inspect inert XForms model declarations in `office:forms`.
     pub fn xforms_models(&self) -> Result<Vec<crate::xforms::Model>> {
-        crate::xforms::parse_models(self.content.xml_content())
+        crate::xforms::parse_models(self.state.content.xml_content())
     }
 
     pub fn rdf_graphs(&self) -> Result<Vec<crate::rdf::Graph>> {
-        crate::rdf::graphs(&self.package)
+        crate::rdf::graphs(&self.state.package)
     }
 
     /// Inspect ordered ODF variable declarations without evaluating fields or formulas.
     pub fn variable_declarations(&self) -> Result<crate::variable_declaration::Declarations> {
         let mut parts = vec![(
-            self.content.xml_content(),
+            self.state.content.xml_content(),
             crate::variable_declaration::Part::Content,
         )];
-        if let Some(styles) = self.styles.as_ref().map(Styles::xml_content) {
+        if let Some(styles) = self.state.styles.as_ref().map(Styles::xml_content) {
             parts.push((styles, crate::variable_declaration::Part::Styles));
         }
         crate::variable_declaration::parse_parts(&parts)
@@ -870,10 +876,10 @@ impl Document {
 
     /// Discover package, inline, missing, and inert linked embedded objects.
     pub fn embedded_objects(&self) -> Result<Vec<crate::Object>> {
-        let package = self.package.package()?;
+        let package = self.state.package.package()?;
         crate::embedded::scan_package(
-            self.content.xml_content(),
-            self.styles.as_ref().map(Styles::xml_content),
+            self.state.content.xml_content(),
+            self.state.styles.as_ref().map(Styles::xml_content),
             &package,
         )
     }
@@ -881,9 +887,9 @@ impl Document {
     /// Open one inert embedded chart as a standalone chart document.
     pub fn embedded_chart(&self, index: usize) -> Result<crate::odc::Document> {
         crate::package::charts::open_embedded_chart(
-            &self.package,
-            self.content.xml_content(),
-            self.styles.as_ref().map(Styles::xml_content),
+            &self.state.package,
+            self.state.content.xml_content(),
+            self.state.styles.as_ref().map(Styles::xml_content),
             index,
         )
     }

@@ -356,7 +356,7 @@ impl Styles {
     }
 }
 
-impl crate::Package {
+impl crate::GenericPackage {
     pub fn paragraph_style_tab_stops(&self) -> Result<Styles> {
         parse(self.styles_xml()?.as_deref().unwrap_or_default())
     }

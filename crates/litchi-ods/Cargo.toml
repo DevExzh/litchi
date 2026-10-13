@@ -19,6 +19,7 @@ smallvec = { workspace = true }
 zeroize = { workspace = true }
 
 [dev-dependencies]
+tempfile = { workspace = true }
 zip = { version = "8", default-features = false, features = ["deflate"] }
 
 [lints]

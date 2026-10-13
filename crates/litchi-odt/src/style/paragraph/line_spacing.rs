@@ -6,7 +6,7 @@
 //! `style:justify-single-word`, `style:auto-text-indent`,
 //! `style:snap-to-layout-grid`, `style:tab-stop-distance`, `fo:text-align-last`).
 
-use crate::{FlatDocument, Package, line_numbering::NonNegativeLength};
+use crate::{FlatDocument, GenericPackage as Package, line_numbering::NonNegativeLength};
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,

@@ -1026,9 +1026,9 @@ fn try_clone_patch(source: &Patch) -> Result<Patch> {
 }
 
 pub(crate) fn publish_package_commit(
-    package: &crate::package::Package,
+    package: &crate::package::Archive,
     commit: &Commit,
-) -> litchi_core::Result<crate::package::Package> {
+) -> litchi_core::Result<crate::package::Archive> {
     if !commit.changed {
         return Err(litchi_core::Error::InvalidFormat(
             "unchanged content-validation commit must not rebuild the package".to_string(),
@@ -1664,7 +1664,7 @@ enum NamespaceKind {
 enum Element {
     Root,
     Body,
-    Spreadsheet,
+    Workbook,
     Catalog(usize),
     Definition,
     Sheet(usize),
@@ -1873,7 +1873,7 @@ impl<'xml> Parser<'xml> {
             return direct(
                 &self.stack,
                 |parent| matches!(parent, Element::Body),
-                Element::Spreadsheet,
+                Element::Workbook,
                 "office:spreadsheet must be the direct child of office:body",
             );
         }
@@ -1881,7 +1881,7 @@ impl<'xml> Parser<'xml> {
             return invalid("content occurs outside the canonical document root");
         }
         if namespace == NamespaceKind::Table && local == b"content-validations" {
-            if !matches!(self.stack.last(), Some(Element::Spreadsheet))
+            if !matches!(self.stack.last(), Some(Element::Workbook))
                 || self.seen_catalog
                 || self.seen_table
                 || self.spreadsheet_prelude_complete
@@ -1897,7 +1897,7 @@ impl<'xml> Parser<'xml> {
             }
             return Ok(Element::Catalog(self.definitions.len()));
         }
-        if matches!(self.stack.last(), Some(Element::Spreadsheet))
+        if matches!(self.stack.last(), Some(Element::Workbook))
             && namespace == NamespaceKind::Table
             && local != b"content-validations"
             && !matches!(local, b"tracked-changes" | b"calculation-settings")
@@ -1961,7 +1961,7 @@ impl<'xml> Parser<'xml> {
             self.definitions[index].opaque_content = true;
         }
         if namespace == NamespaceKind::Table && local == b"table" {
-            if !matches!(self.stack.last(), Some(Element::Spreadsheet)) {
+            if !matches!(self.stack.last(), Some(Element::Workbook)) {
                 return Ok(Element::Other);
             }
             self.seen_table = true;
@@ -2127,7 +2127,7 @@ impl<'xml> Parser<'xml> {
                 self.sheets[sheet].logical_rows = checked_add(start, count, "row extent")?;
             },
             Element::Body
-            | Element::Spreadsheet
+            | Element::Workbook
             | Element::Sheet(_)
             | Element::RowContainer(_)
             | Element::Cell(_)
@@ -2394,7 +2394,7 @@ impl<'xml> Parser<'xml> {
 
 #[derive(Debug)]
 enum LayoutElement {
-    Spreadsheet {
+    Workbook {
         start: usize,
         tag_end: usize,
         qname: String,
@@ -2523,13 +2523,13 @@ fn classify_layout_start(
     if namespace == NamespaceKind::Office && local == b"spreadsheet" {
         let qname = copy_utf8(start.name().as_ref(), "spreadsheet qualified name")?;
         layout.catalog_insertion = tag_end;
-        return Ok(LayoutElement::Spreadsheet {
+        return Ok(LayoutElement::Workbook {
             start: source_start,
             tag_end,
             qname,
         });
     }
-    if matches!(stack.last(), Some(LayoutElement::Spreadsheet { .. })) {
+    if matches!(stack.last(), Some(LayoutElement::Workbook { .. })) {
         if namespace == NamespaceKind::Table && local == b"content-validations" {
             return Ok(LayoutElement::Catalog {
                 start: source_start,
@@ -2567,7 +2567,7 @@ fn finish_layout_element(
     first_non_prelude: &mut Option<usize>,
 ) -> Result<()> {
     match element {
-        LayoutElement::Spreadsheet {
+        LayoutElement::Workbook {
             start,
             tag_end,
             qname,

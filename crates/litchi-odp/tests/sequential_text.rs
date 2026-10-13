@@ -12,7 +12,7 @@ use std::sync::{
 use litchi_core::{
     Error, ReadAt, SourceVersion, TextOutputError, TextOutputLimitKind, TextOutputOptions,
 };
-use litchi_odp::{Presentation, SourceBackedPresentation};
+use litchi_odp::{Package, Presentation, SourceBackedPresentation};
 
 const MIME: &str = "application/vnd.oasis.opendocument.presentation";
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -48,7 +48,10 @@ fn write_owned(presentation: &Presentation, options: TextOutputOptions<'_>) -> (
 
 #[test]
 fn semantic_slide_text_matches_all_text_and_preserves_empty_slide_objects() {
-    let presentation = Presentation::from_bytes(representative_package()).unwrap();
+    let presentation = Package::from_bytes(&representative_package())
+        .unwrap()
+        .presentation()
+        .unwrap();
     let slides = presentation.slides().unwrap();
     let expected = slides
         .iter()
@@ -81,14 +84,13 @@ fn semantic_slide_text_matches_all_text_and_preserves_empty_slide_objects() {
 
 #[test]
 fn controls_entities_cdata_utf8_and_custom_separators_match_semantics() {
-    let presentation = Presentation::from_bytes(package(
+    let presentation = Package::from_bytes(&package(
         concat!(
             r#"<draw:page><draw:frame><draw:text-box><text:p> lead &amp; &#x1f600; <![CDATA[<cdata>a"#,
             "\r\n",
             r#"b]]><text:s text:c="2"/><text:tab/>尾<text:line-break/>end</text:p></draw:text-box></draw:frame></draw:page>"#,
         ),
-    ))
-    .unwrap();
+    )).unwrap().presentation().unwrap();
     let expected = presentation.slides().unwrap()[0].all_text();
     assert_eq!(expected, "lead & 😀 <cdata>a b  \t尾\nend");
 
@@ -101,10 +103,9 @@ fn controls_entities_cdata_utf8_and_custom_separators_match_semantics() {
 
 #[test]
 fn paired_text_controls_are_applied_on_start_events() {
-    let presentation = Presentation::from_bytes(package(
+    let presentation = Package::from_bytes(&package(
         r#"<draw:page><draw:frame><draw:text-box><text:p>A<text:s text:c="2"></text:s><text:tab></text:tab>B<text:line-break></text:line-break>C</text:p></draw:text-box></draw:frame></draw:page>"#,
-    ))
-    .unwrap();
+    )).unwrap().presentation().unwrap();
     let mut output = Vec::new();
     let report = presentation
         .write_text_to(&mut output, TextOutputOptions::default())
@@ -117,7 +118,10 @@ fn paired_text_controls_are_applied_on_start_events() {
 
 #[test]
 fn paragraph_and_slide_separators_are_applied_without_joining_the_document() {
-    let presentation = Presentation::from_bytes(representative_package()).unwrap();
+    let presentation = Package::from_bytes(&representative_package())
+        .unwrap()
+        .presentation()
+        .unwrap();
     let options = TextOutputOptions::new("::", "||", 1024, 4);
     let (output, bytes_written, objects_written) = write_owned(&presentation, options);
 
@@ -131,7 +135,10 @@ fn paragraph_and_slide_separators_are_applied_without_joining_the_document() {
 
 #[test]
 fn object_limit_reports_rejected_slide_with_exact_progress() {
-    let presentation = Presentation::from_bytes(representative_package()).unwrap();
+    let presentation = Package::from_bytes(&representative_package())
+        .unwrap()
+        .presentation()
+        .unwrap();
     let mut output = Vec::new();
     let error = presentation
         .write_text_to(&mut output, TextOutputOptions::new("\n", "\n\n", 1024, 1))
@@ -151,7 +158,10 @@ fn object_limit_reports_rejected_slide_with_exact_progress() {
 
 #[test]
 fn output_limit_accounts_for_slide_separator_and_next_slide() {
-    let presentation = Presentation::from_bytes(representative_package()).unwrap();
+    let presentation = Package::from_bytes(&representative_package())
+        .unwrap()
+        .presentation()
+        .unwrap();
     let first = presentation.slides().unwrap()[0].all_text();
     let mut output = Vec::new();
     let error = presentation
@@ -197,10 +207,9 @@ impl Write for PrefixThenFail {
 
 #[test]
 fn sink_failures_preserve_utf8_prefix_progress_and_write_zero() {
-    let presentation = Presentation::from_bytes(package(
+    let presentation = Package::from_bytes(&package(
         r#"<draw:page><draw:frame><draw:text-box><text:p>αβγ</text:p></draw:text-box></draw:frame></draw:page>"#,
-    ))
-    .unwrap();
+    )).unwrap().presentation().unwrap();
     let mut sink = PrefixThenFail {
         accepted: Vec::new(),
         prefix_limit: 2,
@@ -252,7 +261,10 @@ impl Write for ShortWriter {
 
 #[test]
 fn eventually_successful_short_writes_preserve_complete_progress() {
-    let presentation = Presentation::from_bytes(representative_package()).unwrap();
+    let presentation = Package::from_bytes(&representative_package())
+        .unwrap()
+        .presentation()
+        .unwrap();
     let mut sink = ShortWriter {
         output: Vec::new(),
         max_write: 1,
@@ -274,7 +286,7 @@ fn malformed_later_slide_returns_document_error_after_prior_progress() {
     let bytes = package(
         r#"<draw:page><draw:frame><draw:text-box><text:p>first</text:p></draw:text-box></draw:frame></draw:page><draw:page><draw:frame><draw:text-box><text:p><text:p>broken</text:p></text:p></draw:text-box></draw:frame></draw:page>"#,
     );
-    let presentation = Presentation::from_bytes(bytes).unwrap();
+    let presentation = Package::from_bytes(&bytes).unwrap().presentation().unwrap();
     let mut output = Vec::new();
     let error = presentation
         .write_text_to(&mut output, TextOutputOptions::default())
@@ -335,7 +347,7 @@ impl ReadAt for CountingSource {
 #[test]
 fn source_backed_sink_matches_owned_and_does_not_use_text_cache() {
     let bytes = representative_package();
-    let owned = Presentation::from_bytes(bytes.clone()).unwrap();
+    let owned = Package::from_bytes(&bytes).unwrap().presentation().unwrap();
     let source = Arc::new(CountingSource::new(bytes));
     let presentation = SourceBackedPresentation::from_read_at(source.clone()).unwrap();
     let reads_before = source.reads.load(Ordering::Relaxed);

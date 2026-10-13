@@ -4,7 +4,7 @@ use super::{
     Class, Configuration, MAX_VALUE_BYTES, NumberingScope, Position, parse, remove_xml, set_xml,
 };
 use crate::line_numbering::Format;
-use crate::{FlatDocument, Package};
+use crate::{FlatDocument, GenericPackage as Package};
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TEXT: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
@@ -184,7 +184,7 @@ fn lossless_mutation_and_builder_package_access() {
 
     let mut builder = Builder::new();
     builder.set_notes_configuration(value.clone()).unwrap();
-    let package = Package::from_bytes(builder.build().unwrap()).unwrap();
+    let package = Package::from_bytes(&builder.build().unwrap().to_bytes().unwrap()).unwrap();
     assert_eq!(
         package.notes_configurations().unwrap().footnote,
         Some(value)

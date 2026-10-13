@@ -3,7 +3,7 @@
 use litchi_core::Result;
 
 use super::{Configuration, parse};
-use crate::{FlatDocument, Package};
+use crate::{FlatDocument, GenericPackage as Package};
 
 impl Package {
     /// Return stored document line-numbering configuration from styles XML.

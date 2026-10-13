@@ -41,7 +41,7 @@ pub(crate) struct Location {
 enum Kind {
     Document,
     Body,
-    Spreadsheet,
+    Workbook,
     Container,
     Other,
 }
@@ -172,7 +172,7 @@ pub(crate) fn locate(xml: &str) -> Result<Location> {
                 let parent = stack.last().map(|open| open.kind);
                 let kind = classify(parent, namespace, element.local_name().as_ref());
                 let known = known_element(namespace, element.local_name().as_ref());
-                if parent == Some(Kind::Spreadsheet)
+                if parent == Some(Kind::Workbook)
                     && is_insertion_anchor(namespace, element.local_name().as_ref())
                     && insertion.is_none()
                 {
@@ -202,7 +202,7 @@ pub(crate) fn locate(xml: &str) -> Result<Location> {
                 }
                 let parent = stack.last().map(|open| open.kind);
                 let kind = classify(parent, namespace, element.local_name().as_ref());
-                if parent == Some(Kind::Spreadsheet)
+                if parent == Some(Kind::Workbook)
                     && is_insertion_anchor(namespace, element.local_name().as_ref())
                     && insertion.is_none()
                 {
@@ -293,8 +293,8 @@ fn classify(parent: Option<Kind>, namespace: NamespaceKind, local: &[u8]) -> Kin
     } else if parent == Some(Kind::Body)
         && is_element(namespace, NamespaceKind::Office, local, b"spreadsheet")
     {
-        Kind::Spreadsheet
-    } else if parent == Some(Kind::Spreadsheet)
+        Kind::Workbook
+    } else if parent == Some(Kind::Workbook)
         && is_element(namespace, NamespaceKind::Table, local, b"database-ranges")
     {
         Kind::Container
@@ -310,7 +310,7 @@ fn record(
     container: &mut Option<Span>,
 ) -> Result<()> {
     match kind {
-        Kind::Spreadsheet => {
+        Kind::Workbook => {
             if spreadsheet.replace(span).is_some() {
                 return Err(invalid(
                     "ODS content.xml has more than one office:spreadsheet host",
@@ -662,7 +662,7 @@ fn allowed_child(parent: Option<&OpenElement>, child: KnownElement) -> bool {
     let parent_kind = parent.map(|open| open.kind);
     let parent_known = parent.and_then(|open| open.known);
     match child {
-        KnownElement::DatabaseRanges => parent_kind == Some(Kind::Spreadsheet),
+        KnownElement::DatabaseRanges => parent_kind == Some(Kind::Workbook),
         KnownElement::DatabaseRange => parent_known == Some(KnownElement::DatabaseRanges),
         KnownElement::SourceSql
         | KnownElement::SourceTable

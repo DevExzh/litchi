@@ -1,0 +1,18 @@
+[package]
+name = "odf-w3-bench-before"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+litchi-core = { path = "<trunk-4d1afe92bc-export>/crates/litchi-core" }
+litchi-odt = { path = "<trunk-4d1afe92bc-export>/crates/litchi-odt" }
+litchi-ods = { path = "<trunk-4d1afe92bc-export>/crates/litchi-ods" }
+litchi-odp = { path = "<trunk-4d1afe92bc-export>/crates/litchi-odp" }
+
+[profile.release]
+debug = false
+lto = true
+panic = "abort"

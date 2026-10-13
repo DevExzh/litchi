@@ -1457,7 +1457,7 @@ mod odt {
     pub(super) fn minimal_odt() -> Vec<u8> {
         let mut builder = litchi_odt::Builder::new();
         builder.add_paragraph("Source-backed ODT").unwrap();
-        builder.build().unwrap()
+        builder.build().unwrap().to_bytes().unwrap()
     }
 
     fn malformed_odt() -> Vec<u8> {

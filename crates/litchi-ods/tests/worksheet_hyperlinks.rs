@@ -1,8 +1,8 @@
 use litchi_core::OwnedSource;
 use litchi_odf_common::{constants, core::PackageWriter, package::raw_identical_members};
 use litchi_ods::{
-    Actuate, Builder, Cell, CellValue, CellView, FlatSnapshot, Link, Show, SourceBackedSpreadsheet,
-    Spreadsheet,
+    Actuate, Builder, Cell, CellValue, CellView, FlatSnapshot, Link, Package, Show,
+    SourceBackedSpreadsheet,
     worksheet::{CellChange, Snapshot},
 };
 use std::sync::Arc;
@@ -86,8 +86,11 @@ fn assert_unchanged_after(
 
 #[test]
 fn parses_unicode_multiple_direct_links_and_all_link_metadata() -> litchi_core::Result<()> {
-    let source = Builder::new().content_xml(LINK_CONTENT).build()?;
-    let spreadsheet = Spreadsheet::from_bytes(source)?;
+    let source = Builder::new()
+        .content_xml(LINK_CONTENT)
+        .build()?
+        .to_bytes()?;
+    let spreadsheet = Package::from_bytes(&source)?.workbook()?;
     let Some(CellView::Stored(cell)) = spreadsheet.cell("Data", 0, 0) else {
         return Err(litchi_core::Error::InvalidFormat(
             "link fixture cell is missing".to_string(),
@@ -243,7 +246,7 @@ fn owned_and_unified_link_commits_reopen_preserve_opaque_members_and_inverse()
     assert_eq!(edit.set_cell("Data", 0, 0, changed.clone())?, Some(()));
     let commit = edit.commit()?;
     assert!(commit.changed());
-    let reopened = Spreadsheet::from_bytes(commit.snapshot().as_bytes().to_vec())?;
+    let reopened = Package::from_bytes(commit.snapshot().as_bytes())?.workbook()?;
     let Some(CellView::Stored(cell)) = reopened.cell("Data", 0, 0) else {
         return Err(litchi_core::Error::InvalidFormat(
             "reopened link cell is missing".to_string(),
@@ -267,8 +270,8 @@ fn owned_and_unified_link_commits_reopen_preserve_opaque_members_and_inverse()
     assert!(identical.contains("Pictures/opaque.bin"));
     assert!(!identical.contains("content.xml"));
 
-    let unified_source = litchi_ods::document::Snapshot::from_bytes(source.clone())?;
-    let mut unified_noop_edit = unified_source.edit();
+    let unified_source = Package::from_bytes(&source)?;
+    let mut unified_noop_edit = unified_source.edit()?;
     unified_noop_edit.worksheets(|worksheets| {
         assert_eq!(
             worksheets.set_cell("Data", 0, 0, original.clone())?,
@@ -277,10 +280,10 @@ fn owned_and_unified_link_commits_reopen_preserve_opaque_members_and_inverse()
         Ok(())
     })?;
     let unified_noop_commit = unified_noop_edit.commit()?;
-    assert!(!unified_noop_commit.changed());
-    assert_eq!(unified_noop_commit.snapshot().as_bytes(), source);
+    assert!(!unified_noop_commit.diagnostics().changed());
+    assert_eq!(unified_noop_commit.package().as_bytes(), source);
 
-    let mut unified_edit = unified_source.edit();
+    let mut unified_edit = unified_source.edit()?;
     unified_edit.worksheets(|worksheets| {
         worksheets
             .set_cell("Data", 0, 0, changed.clone())?
@@ -290,7 +293,7 @@ fn owned_and_unified_link_commits_reopen_preserve_opaque_members_and_inverse()
         Ok(())
     })?;
     let unified_commit = unified_edit.commit()?;
-    let unified_reopened = Spreadsheet::from_bytes(unified_commit.snapshot().as_bytes().to_vec())?;
+    let unified_reopened = Package::from_bytes(unified_commit.package().as_bytes())?.workbook()?;
     let Some(CellView::Stored(cell)) = unified_reopened.cell("Data", 0, 0) else {
         return Err(litchi_core::Error::InvalidFormat(
             "unified reopened link cell is missing".to_string(),
@@ -298,16 +301,18 @@ fn owned_and_unified_link_commits_reopen_preserve_opaque_members_and_inverse()
     };
     assert_eq!(cell.hyperlinks()[0].href(), "https://example.test/edited");
     let unified_restored = unified_commit
-        .patch()
-        .inverse()
-        .apply(unified_commit.snapshot())?;
-    assert_eq!(unified_restored.snapshot().as_bytes(), source);
+        .package()
+        .apply(&unified_commit.patch().inverse())?;
+    assert_eq!(unified_restored.as_bytes(), source);
     Ok(())
 }
 
 #[test]
 fn invalid_owned_link_batch_does_not_mutate_the_draft() -> litchi_core::Result<()> {
-    let source = Builder::new().content_xml(LINK_CONTENT).build()?;
+    let source = Builder::new()
+        .content_xml(LINK_CONTENT)
+        .build()?
+        .to_bytes()?;
     let snapshot = Snapshot::from_bytes(source)?;
     let mut edit = snapshot.edit();
     let before = edit.sheets().to_vec();
@@ -327,7 +332,7 @@ fn invalid_owned_link_batch_does_not_mutate_the_draft() -> litchi_core::Result<(
 #[test]
 fn nested_and_foreign_inline_markup_respects_lossless_read_boundary() -> litchi_core::Result<()> {
     let nested_source = package(NESTED_LINK_CONTENT)?;
-    let nested = Spreadsheet::from_bytes(nested_source.clone())?;
+    let nested = Package::from_bytes(&nested_source)?.workbook()?;
     let Some(CellView::Stored(cell)) = nested.cell("Data", 0, 0) else {
         return Err(litchi_core::Error::InvalidFormat(
             "nested link cell is missing".to_string(),
@@ -350,7 +355,12 @@ fn nested_and_foreign_inline_markup_respects_lossless_read_boundary() -> litchi_
     assert_eq!(nested_snapshot.as_bytes(), nested_source);
 
     let foreign_source = package(FOREIGN_INLINE_CONTENT)?;
-    assert!(Spreadsheet::from_bytes(foreign_source).is_err());
+    assert!(
+        Package::from_bytes(&foreign_source)
+            .map_err(litchi_core::Error::from)
+            .and_then(|package| package.workbook())
+            .is_err()
+    );
     Ok(())
 }
 
@@ -388,7 +398,7 @@ fn owned_publication_rejects_new_unsafe_links_but_preserves_legacy_ones() -> lit
         Some(())
     );
     let legacy_commit = legacy_edit.commit()?;
-    let reopened = Spreadsheet::from_bytes(legacy_commit.snapshot().as_bytes().to_vec())?;
+    let reopened = Package::from_bytes(legacy_commit.snapshot().as_bytes())?.workbook()?;
     let Some(CellView::Stored(link_cell)) = reopened.cell("Data", 0, 0) else {
         return Err(litchi_core::Error::InvalidFormat(
             "legacy link cell is missing".to_string(),

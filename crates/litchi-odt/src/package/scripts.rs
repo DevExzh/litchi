@@ -697,7 +697,7 @@ fn invalid<T>(message: impl Into<String>) -> Result<T> {
 macro_rules! script_facade_methods {
     () => {
         pub fn document_scripts(&self) -> litchi_core::Result<Option<crate::Scripts>> {
-            crate::package::scripts::document_scripts(self.content.xml_content())
+            crate::package::scripts::document_scripts(self.state.content.xml_content())
         }
         #[deprecated(
             since = "0.0.1",
@@ -709,8 +709,8 @@ macro_rules! script_facade_methods {
             scripts: Option<&crate::Scripts>,
         ) -> litchi_core::Result<()> {
             let bytes = crate::package::scripts::set_document_scripts(
-                &self.package,
-                self.content.xml_content(),
+                &self.state.package,
+                self.state.content.xml_content(),
                 scripts,
             )?;
             *self = Self::from_bytes(bytes)?;
@@ -726,8 +726,8 @@ macro_rules! script_facade_methods {
             script: &crate::EmbeddedScript,
         ) -> litchi_core::Result<usize> {
             let (bytes, index) = crate::package::scripts::add_embedded_script(
-                &self.package,
-                self.content.xml_content(),
+                &self.state.package,
+                self.state.content.xml_content(),
                 script,
             )?;
             *self = Self::from_bytes(bytes)?;
@@ -744,8 +744,8 @@ macro_rules! script_facade_methods {
             script: &crate::EmbeddedScript,
         ) -> litchi_core::Result<()> {
             let bytes = crate::package::scripts::replace_embedded_script(
-                &self.package,
-                self.content.xml_content(),
+                &self.state.package,
+                self.state.content.xml_content(),
                 index,
                 script,
             )?;
@@ -759,8 +759,8 @@ macro_rules! script_facade_methods {
         #[allow(dead_code, reason = "legacy direct script mutation is crate-private")]
         pub(crate) fn remove_document_script(&mut self, index: usize) -> litchi_core::Result<()> {
             let bytes = crate::package::scripts::remove_embedded_script(
-                &self.package,
-                self.content.xml_content(),
+                &self.state.package,
+                self.state.content.xml_content(),
                 index,
             )?;
             *self = Self::from_bytes(bytes)?;
@@ -777,8 +777,8 @@ macro_rules! script_facade_methods {
             to: usize,
         ) -> litchi_core::Result<()> {
             let bytes = crate::package::scripts::move_embedded_script(
-                &self.package,
-                self.content.xml_content(),
+                &self.state.package,
+                self.state.content.xml_content(),
                 from,
                 to,
             )?;
@@ -795,8 +795,8 @@ macro_rules! script_facade_methods {
             listener: &crate::EventListener,
         ) -> litchi_core::Result<usize> {
             let (bytes, index) = crate::package::scripts::add_event_listener(
-                &self.package,
-                self.content.xml_content(),
+                &self.state.package,
+                self.state.content.xml_content(),
                 listener,
             )?;
             *self = Self::from_bytes(bytes)?;
@@ -813,8 +813,8 @@ macro_rules! script_facade_methods {
             listener: &crate::EventListener,
         ) -> litchi_core::Result<()> {
             let bytes = crate::package::scripts::replace_event_listener(
-                &self.package,
-                self.content.xml_content(),
+                &self.state.package,
+                self.state.content.xml_content(),
                 index,
                 listener,
             )?;
@@ -831,8 +831,8 @@ macro_rules! script_facade_methods {
             index: usize,
         ) -> litchi_core::Result<()> {
             let bytes = crate::package::scripts::remove_event_listener(
-                &self.package,
-                self.content.xml_content(),
+                &self.state.package,
+                self.state.content.xml_content(),
                 index,
             )?;
             *self = Self::from_bytes(bytes)?;
@@ -849,8 +849,8 @@ macro_rules! script_facade_methods {
             to: usize,
         ) -> litchi_core::Result<()> {
             let bytes = crate::package::scripts::move_event_listener(
-                &self.package,
-                self.content.xml_content(),
+                &self.state.package,
+                self.state.content.xml_content(),
                 from,
                 to,
             )?;
@@ -858,62 +858,13 @@ macro_rules! script_facade_methods {
             Ok(())
         }
         pub fn script_resources(&self) -> litchi_core::Result<Vec<crate::ScriptResource>> {
-            crate::package::scripts::resources(&self.package)
+            crate::package::scripts::resources(&self.state.package)
         }
         pub fn find_script_resource(
             &self,
             path: &str,
         ) -> litchi_core::Result<Option<crate::ScriptResource>> {
-            crate::package::scripts::find_resource(&self.package, path)
-        }
-        #[deprecated(
-            since = "0.0.1",
-            note = "use Document::edit().add_script_resource() and Commit::results()"
-        )]
-        pub fn add_script_resource(
-            &mut self,
-            resource: &crate::ScriptResourceSpec,
-        ) -> litchi_core::Result<String> {
-            let mut edit = self.edit()?;
-            edit.add_script_resource(resource)?;
-            self.publish_transaction_path(edit.commit()?)
-        }
-        #[deprecated(
-            since = "0.0.1",
-            note = "use Document::edit().replace_script_resource() and commit"
-        )]
-        pub fn replace_script_resource(
-            &mut self,
-            path: &str,
-            resource: &crate::ScriptResourceSpec,
-        ) -> litchi_core::Result<()> {
-            let mut edit = self.edit()?;
-            edit.replace_script_resource(path, resource)?;
-            self.publish_transaction(edit.commit()?)
-        }
-        #[deprecated(
-            since = "0.0.1",
-            note = "use Document::edit().replace_script_resource() and commit"
-        )]
-        #[allow(
-            deprecated,
-            reason = "compatibility alias delegates to the deprecated direct wrapper"
-        )]
-        pub fn update_script_resource(
-            &mut self,
-            path: &str,
-            resource: &crate::ScriptResourceSpec,
-        ) -> litchi_core::Result<()> {
-            self.replace_script_resource(path, resource)
-        }
-        #[deprecated(
-            since = "0.0.1",
-            note = "use Document::edit().remove_script_resource() and commit"
-        )]
-        pub fn remove_script_resource(&mut self, path: &str) -> litchi_core::Result<()> {
-            let mut edit = self.edit()?;
-            edit.remove_script_resource(path)?;
-            self.publish_transaction(edit.commit()?)
+            crate::package::scripts::find_resource(&self.state.package, path)
         }
     };
 }

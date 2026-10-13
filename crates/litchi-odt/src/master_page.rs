@@ -5,7 +5,7 @@ pub use litchi_odf_common::style::master::{Child, ChildKind, Master};
 
 use litchi_core::Result;
 
-impl crate::Package {
+impl crate::GenericPackage {
     /// Parse inert master-page metadata from packaged `styles.xml`.
     pub fn master_pages(&self) -> Result<Vec<Master>> {
         self.styles_xml()?.map_or_else(

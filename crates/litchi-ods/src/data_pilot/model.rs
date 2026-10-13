@@ -1,7 +1,7 @@
 //! Immutable `DataPilot` catalogs and semantic selectors.
 
 use crate::model::data_pilot::{self as vocabulary, Table};
-use crate::package::Package;
+use crate::package::Archive;
 use litchi_core::Result;
 
 use super::codec::{Location, locate};
@@ -10,7 +10,7 @@ use super::validation;
 
 /// Immutable `DataPilot` declarations bound to one ODS package snapshot.
 pub struct Catalog<'source> {
-    pub(crate) source: &'source Package,
+    pub(crate) source: &'source Archive,
     pub(crate) source_xml: &'source str,
     pub(crate) location: Location,
     pub(crate) tables: Vec<Table>,
@@ -18,7 +18,7 @@ pub struct Catalog<'source> {
 }
 
 impl<'source> Catalog<'source> {
-    pub(crate) fn load(source: &'source Package) -> Result<Self> {
+    pub(crate) fn load(source: &'source Archive) -> Result<Self> {
         let source_xml = source.content_xml();
         let location = locate(source_xml)?;
         let tables = vocabulary::parse_data_pilot_tables(source_xml)?;

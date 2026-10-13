@@ -561,10 +561,15 @@ impl OdtSourcePathCandidate {
 
     /// Open the source-backed ODT owner, refusing a source that changed since
     /// it was classified.
-    pub(crate) fn into_document(self) -> litchi_core::Result<litchi_odt::SourceBackedDocument> {
+    pub(crate) fn into_document(
+        self,
+        options: litchi_odf_common::OpenOptions,
+    ) -> litchi_core::Result<litchi_odt::SourceBackedDocument> {
         let source = std::sync::Arc::clone(&self.source);
         ensure_odt_source_current(source.as_ref(), self.source_version)?;
-        let result = litchi_odt::SourceBackedDocument::from_read_at(self.source);
+        let result =
+            litchi_odt::SourceBackedDocument::from_read_at_with_options(self.source, options)
+                .map_err(litchi_core::Error::from);
         match ensure_odt_source_current(source.as_ref(), self.source_version) {
             Err(error) => Err(error),
             Ok(()) => result,
@@ -845,7 +850,10 @@ mod short_signature_tests {
             panic!("smart ODT detection did not retain a prepared package");
         };
         let index_identity = prepared.prepared_index_identity();
-        let document = litchi_odt::Document::from_prepared_package(prepared).unwrap();
+        let document = litchi_odt::Package::from_prepared_package(prepared)
+            .unwrap()
+            .document()
+            .unwrap();
         assert_eq!(document.prepared_index_identity(), index_identity);
         assert_eq!(document.text().unwrap(), "smart");
     }

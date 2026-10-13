@@ -1,7 +1,7 @@
 //! Owned `database-ranges` snapshots, edits, commits, and reversible patches.
 
 use super::{Catalog, Selector, validation};
-use crate::{model::database_range::Range, package::Package};
+use crate::{model::database_range::Range, package::Archive};
 use litchi_core::{Error, Result};
 
 /// Immutable `database-ranges` owner bound to one complete ODS package source.
@@ -18,11 +18,11 @@ impl Snapshot {
     /// # Errors
     /// Returns an error when the operation cannot be completed.
     pub fn from_bytes(source: Vec<u8>) -> Result<Self> {
-        let package = Package::from_bytes(source)?;
+        let package = Archive::from_bytes(source)?;
         Self::from_package(&package)
     }
 
-    pub(crate) fn from_package(package: &Package) -> Result<Self> {
+    pub(crate) fn from_package(package: &Archive) -> Result<Self> {
         let catalog = Catalog::load(package)?;
         Ok(Self {
             source: package.package().as_bytes().to_vec(),
@@ -131,7 +131,7 @@ impl Edit {
         let target = if unchanged {
             self.before.clone()
         } else {
-            let package = Package::from_bytes(self.before.source.clone())?;
+            let package = Archive::from_bytes(self.before.source.clone())?;
             let catalog = Catalog::load(&package)?;
             let bytes = super::package::replace(
                 &package,
@@ -164,7 +164,7 @@ impl Edit {
     }
 
     fn before_location(&self) -> Result<super::codec::Location> {
-        let package = Package::from_bytes(self.before.source.clone())?;
+        let package = Archive::from_bytes(self.before.source.clone())?;
         Ok(Catalog::load(&package)?.location)
     }
 

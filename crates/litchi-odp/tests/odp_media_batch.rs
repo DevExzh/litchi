@@ -4,7 +4,7 @@
 )]
 
 use litchi_odf_common::core::{OwnedPackage, PackageWriter};
-use litchi_odp::{Presentation, edit};
+use litchi_odp::{Package, edit};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const MIME: &str = "application/vnd.oasis.opendocument.presentation";
@@ -82,9 +82,9 @@ fn source_bytes() -> Vec<u8> {
 fn media_batch_replaces_adds_and_removes_with_untouched_member_preservation() {
     let source_bytes = source_bytes();
     let source_package = OwnedPackage::from_bytes(source_bytes.clone()).unwrap();
-    let source = edit::Snapshot::from_bytes(source_bytes.clone()).unwrap();
+    let source = Package::from_bytes(&source_bytes).unwrap();
 
-    let mut transaction = source.transaction().unwrap();
+    let mut transaction = source.edit().unwrap();
     assert_eq!(
         transaction
             .apply_media_changes(&[
@@ -96,10 +96,10 @@ fn media_batch_replaces_adds_and_removes_with_untouched_member_preservation() {
         3
     );
     let commit = transaction.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert_eq!(commit.patch().domains(), &[edit::Domain::Slides]);
 
-    let output_package = OwnedPackage::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    let output_package = OwnedPackage::from_bytes(commit.package().as_bytes().to_vec()).unwrap();
     assert_eq!(
         output_package.get_file("Pictures/referenced.png").unwrap(),
         b"new-image"
@@ -135,7 +135,10 @@ fn media_batch_replaces_adds_and_removes_with_untouched_member_preservation() {
             .any(|(path, _)| path == "Pictures/orphan.png")
     );
 
-    let reopened = Presentation::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    let reopened = Package::from_bytes(commit.package().as_bytes())
+        .unwrap()
+        .presentation()
+        .unwrap();
     assert_eq!(
         reopened
             .media_data(
@@ -148,20 +151,24 @@ fn media_batch_replaces_adds_and_removes_with_untouched_member_preservation() {
     let durable =
         edit::Patch::from_durable_bytes(&commit.patch().to_durable_bytes().unwrap()).unwrap();
     assert_eq!(
-        durable.apply(&source).unwrap().bytes(),
-        commit.snapshot().bytes()
+        source.apply(&durable).unwrap().as_bytes(),
+        commit.package().as_bytes()
     );
     assert_eq!(
-        durable.inverse().apply(commit.snapshot()).unwrap().bytes(),
-        source.bytes()
+        commit
+            .package()
+            .apply(&durable.inverse())
+            .unwrap()
+            .as_bytes(),
+        source.as_bytes()
     );
 }
 
 #[test]
 fn referenced_removal_and_late_failure_are_failure_atomic() {
     let source_bytes = source_bytes();
-    let source = edit::Snapshot::from_bytes(source_bytes.clone()).unwrap();
-    let mut transaction = source.transaction().unwrap();
+    let source = Package::from_bytes(&source_bytes).unwrap();
+    let mut transaction = source.edit().unwrap();
     let error = transaction
         .apply_media_changes(&[
             edit::MediaChange::replace("Pictures/referenced.png", b"would-change", "image/png"),
@@ -170,24 +177,24 @@ fn referenced_removal_and_late_failure_are_failure_atomic() {
         .unwrap_err();
     assert!(error.to_string().contains("more than once"));
     let commit = transaction.commit().unwrap();
-    assert!(!commit.changed());
-    assert_eq!(commit.snapshot().bytes(), source_bytes);
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().as_bytes(), source_bytes);
 
-    let mut transaction = source.transaction().unwrap();
+    let mut transaction = source.edit().unwrap();
     let error = transaction
         .apply_media_changes(&[edit::MediaChange::remove("Pictures/referenced.png")])
         .unwrap_err();
     assert!(error.to_string().contains("referenced member"));
     let commit = transaction.commit().unwrap();
-    assert!(!commit.changed());
-    assert_eq!(commit.snapshot().bytes(), source_bytes);
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().as_bytes(), source_bytes);
 }
 
 #[test]
 fn exact_replacement_noop_and_batch_limits_preserve_source() {
     let source_bytes = source_bytes();
-    let source = edit::Snapshot::from_bytes(source_bytes.clone()).unwrap();
-    let mut transaction = source.transaction().unwrap();
+    let source = Package::from_bytes(&source_bytes).unwrap();
+    let mut transaction = source.edit().unwrap();
     assert_eq!(
         transaction
             .apply_media_changes(&[edit::MediaChange::replace(
@@ -199,17 +206,17 @@ fn exact_replacement_noop_and_batch_limits_preserve_source() {
         0
     );
     let commit = transaction.commit().unwrap();
-    assert!(!commit.changed());
-    assert_eq!(commit.snapshot().bytes(), source_bytes);
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().as_bytes(), source_bytes);
 
     let too_many = (0..=edit::MAX_MEDIA_CHANGES)
         .map(|index| edit::MediaChange::remove(format!("Pictures/missing-{index}.png")))
         .collect::<Vec<_>>();
-    let mut transaction = source.transaction().unwrap();
+    let mut transaction = source.edit().unwrap();
     assert!(transaction.apply_media_changes(&too_many).is_err());
     let commit = transaction.commit().unwrap();
-    assert!(!commit.changed());
-    assert_eq!(commit.snapshot().bytes(), source_bytes);
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().as_bytes(), source_bytes);
 }
 
 #[test]
@@ -223,12 +230,12 @@ fn signed_sources_are_read_only_for_media_batches() {
             br#"<dsig:document-signatures xmlns:dsig="urn:oasis:names:tc:opendocument:xmlns:digitalsignature:1.0"/>"#,
         )
         .unwrap();
-    let source = edit::Snapshot::from_bytes(writer.finish_to_bytes().unwrap()).unwrap();
+    let source = Package::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap();
     assert_eq!(
         source.security_policy().unwrap(),
         edit::SecurityPolicy::SignedReadOnly
     );
-    assert!(source.transaction().is_err());
+    assert!(source.edit().is_err());
 }
 
 #[test]
@@ -239,12 +246,12 @@ fn every_signature_owner_name_is_read_only() {
     writer
         .add_file("META-INF/vendor-signatures.xml", br#"<signatures/>"#)
         .unwrap();
-    let source = edit::Snapshot::from_bytes(writer.finish_to_bytes().unwrap()).unwrap();
+    let source = Package::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap();
     assert_eq!(
         source.security_policy().unwrap(),
         edit::SecurityPolicy::SignedReadOnly
     );
-    assert!(source.transaction().is_err());
+    assert!(source.edit().is_err());
 }
 
 #[test]
@@ -262,19 +269,19 @@ fn zip_encryption_is_classified_by_the_owned_package() {
     let bytes = mark_zip_encrypted(archive.finish_to_bytes().unwrap(), "Vendor/opaque.bin");
     let package = OwnedPackage::from_bytes(bytes.clone()).unwrap();
     assert!(package.has_zip_encrypted_entries());
-    let source = edit::Snapshot::from_bytes(bytes).unwrap();
+    let source = Package::from_bytes(&bytes).unwrap();
     assert_eq!(
         source.security_policy().unwrap(),
         edit::SecurityPolicy::EncryptedReadOnly
     );
-    assert!(source.transaction().is_err());
+    assert!(source.edit().is_err());
 }
 
 #[test]
 fn replace_then_remove_across_calls_removes_the_source_member() {
     let source_bytes = source_bytes();
-    let source = edit::Snapshot::from_bytes(source_bytes.clone()).unwrap();
-    let mut transaction = source.transaction().unwrap();
+    let source = Package::from_bytes(&source_bytes).unwrap();
+    let mut transaction = source.edit().unwrap();
 
     assert_eq!(
         transaction
@@ -294,16 +301,16 @@ fn replace_then_remove_across_calls_removes_the_source_member() {
     );
 
     let commit = transaction.commit().unwrap();
-    assert!(commit.changed());
-    let package = OwnedPackage::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    assert!(commit.diagnostics().changed());
+    let package = OwnedPackage::from_bytes(commit.package().as_bytes().to_vec()).unwrap();
     assert!(!package.has_file("Pictures/orphan.png").unwrap());
 }
 
 #[test]
 fn restoring_an_exact_source_payload_across_calls_is_a_noop() {
     let source_bytes = source_bytes();
-    let source = edit::Snapshot::from_bytes(source_bytes.clone()).unwrap();
-    let mut transaction = source.transaction().unwrap();
+    let source = Package::from_bytes(&source_bytes).unwrap();
+    let mut transaction = source.edit().unwrap();
 
     assert_eq!(
         transaction
@@ -323,8 +330,8 @@ fn restoring_an_exact_source_payload_across_calls_is_a_noop() {
     );
 
     let commit = transaction.commit().unwrap();
-    assert!(!commit.changed());
-    assert_eq!(commit.snapshot().bytes(), source_bytes);
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().as_bytes(), source_bytes);
 }
 
 #[test]
@@ -356,14 +363,14 @@ fn reference_index_decodes_entities_percent_escapes_and_relationship_targets() {
             "application/vnd.openxmlformats-package.relationships+xml",
         )
         .unwrap();
-    let source = edit::Snapshot::from_bytes(writer.finish_to_bytes().unwrap()).unwrap();
+    let source = Package::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap();
 
     for path in [
         "Pictures/entity&name.png",
         "Pictures/relative.png",
         "Pictures/rels.png",
     ] {
-        let mut transaction = source.transaction().unwrap();
+        let mut transaction = source.edit().unwrap();
         let error = transaction
             .apply_media_changes(&[edit::MediaChange::remove(path)])
             .unwrap_err();
@@ -377,8 +384,8 @@ fn reference_index_decodes_entities_percent_escapes_and_relationship_targets() {
 #[test]
 fn invalid_path_in_a_later_change_is_rejected_before_staging() {
     let source_bytes = source_bytes();
-    let source = edit::Snapshot::from_bytes(source_bytes.clone()).unwrap();
-    let mut transaction = source.transaction().unwrap();
+    let source = Package::from_bytes(&source_bytes).unwrap();
+    let mut transaction = source.edit().unwrap();
     let error = transaction
         .apply_media_changes(&[
             edit::MediaChange::add("Pictures/new.gif", b"new-gif", "image/gif"),
@@ -387,15 +394,15 @@ fn invalid_path_in_a_later_change_is_rejected_before_staging() {
         .unwrap_err();
     assert!(error.to_string().contains("path"));
     let commit = transaction.commit().unwrap();
-    assert!(!commit.changed());
-    assert_eq!(commit.snapshot().bytes(), source_bytes);
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().as_bytes(), source_bytes);
 }
 
 #[test]
 fn repeated_replacements_account_only_the_current_staged_payload() {
-    let source = edit::Snapshot::from_bytes(source_bytes()).unwrap();
+    let source = Package::from_bytes(&source_bytes()).unwrap();
     let payload = vec![0xAB; 32 * 1024 * 1024];
-    let mut transaction = source.transaction().unwrap();
+    let mut transaction = source.edit().unwrap();
     for index in 0..4 {
         let mut replacement = payload.clone();
         replacement[0] = index;
@@ -411,8 +418,8 @@ fn repeated_replacements_account_only_the_current_staged_payload() {
         );
     }
     let commit = transaction.commit().unwrap();
-    assert!(commit.changed());
-    let package = OwnedPackage::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    assert!(commit.diagnostics().changed());
+    let package = OwnedPackage::from_bytes(commit.package().as_bytes().to_vec()).unwrap();
     assert_eq!(
         package.get_file("Pictures/orphan.png").unwrap().len(),
         32 * 1024 * 1024
@@ -437,8 +444,8 @@ fn dtd_in_an_xml_owner_fails_media_removal_closed() {
     archive
         .write_deflated("META-INF/manifest.xml", MANIFEST)
         .unwrap();
-    let source = edit::Snapshot::from_bytes(archive.finish_to_bytes().unwrap()).unwrap();
-    let mut transaction = source.transaction().unwrap();
+    let source = Package::from_bytes(&archive.finish_to_bytes().unwrap()).unwrap();
+    let mut transaction = source.edit().unwrap();
     let error = transaction
         .apply_media_changes(&[edit::MediaChange::remove("Pictures/orphan.png")])
         .unwrap_err();

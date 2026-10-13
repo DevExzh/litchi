@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use litchi_core::OwnedSource;
 use litchi_ods::{
-    Builder, CellView, MutableSpreadsheet, SourceBackedSpreadsheet, Spreadsheet,
+    Builder, CellView, MutableSpreadsheet, Package, SourceBackedSpreadsheet,
     model::source::CellRange,
     model::structure::StyleUsage,
     styles::table_template::{Region, Style, Template},
@@ -12,8 +12,16 @@ const CONTENT: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-
 
 #[test]
 fn table_metadata_and_cell_range_source_round_trip_through_owned_and_source_open() {
-    let bytes = Builder::new().content_xml(CONTENT).build().expect("build");
-    let spreadsheet = Spreadsheet::from_bytes(bytes.clone()).expect("open");
+    let bytes = Builder::new()
+        .content_xml(CONTENT)
+        .build()
+        .expect("build")
+        .to_bytes()
+        .expect("build");
+    let spreadsheet = Package::from_bytes(&bytes)
+        .expect("open")
+        .workbook()
+        .expect("open");
     let sheet = &spreadsheet.sheets()[0];
     assert_eq!(sheet.title(), Some("Revenue & Plan"));
     assert_eq!(sheet.description(), Some("Imported source"));
@@ -52,15 +60,25 @@ fn table_metadata_and_cell_range_source_round_trip_through_owned_and_source_open
 
 #[test]
 fn worksheet_metadata_edit_is_failure_atomic_and_reopenable() {
-    let bytes = Builder::new().content_xml(CONTENT).build().expect("build");
-    let mut mutable = MutableSpreadsheet::from_bytes(bytes).expect("open");
+    let bytes = Builder::new()
+        .content_xml(CONTENT)
+        .build()
+        .expect("build")
+        .to_bytes()
+        .expect("build");
+    let mut mutable = MutableSpreadsheet::from_workbook(
+        Package::from_bytes(&bytes)
+            .expect("open")
+            .workbook()
+            .expect("open"),
+    );
     let mut sheet = mutable.sheets()[0].clone();
     sheet.set_title(Some("Edited".to_string())).expect("title");
     sheet
         .set_description(Some("Edited description".to_string()))
         .expect("description");
     mutable.set_sheets(vec![sheet]).expect("publish");
-    let reopened = mutable.spreadsheet();
+    let reopened = mutable.workbook();
     assert_eq!(reopened.sheets()[0].title(), Some("Edited"));
     assert_eq!(
         reopened.sheets()[0].description(),
@@ -83,8 +101,17 @@ fn table_template_builder_and_package_lifecycle_reopen() {
     builder
         .edit_table_templates(|edit| edit.add(template.clone()))
         .expect("builder template");
-    let bytes = builder.build().expect("build with styles");
-    let mut spreadsheet = Spreadsheet::from_bytes(bytes).expect("open styles");
+    let bytes = builder
+        .build()
+        .expect("build with styles")
+        .to_bytes()
+        .expect("build with styles");
+    let mut spreadsheet = MutableSpreadsheet::from_workbook(
+        Package::from_bytes(&bytes)
+            .expect("open styles")
+            .workbook()
+            .expect("open styles"),
+    );
     assert_eq!(
         spreadsheet
             .table_templates()
@@ -114,8 +141,17 @@ fn table_template_builder_and_package_lifecycle_reopen() {
 
 #[test]
 fn table_template_edit_creates_missing_styles_owner() {
-    let bytes = Builder::new().build().expect("minimal package");
-    let mut spreadsheet = Spreadsheet::from_bytes(bytes).expect("open");
+    let bytes = Builder::new()
+        .build()
+        .expect("minimal package")
+        .to_bytes()
+        .expect("minimal package");
+    let mut spreadsheet = MutableSpreadsheet::from_workbook(
+        Package::from_bytes(&bytes)
+            .expect("open")
+            .workbook()
+            .expect("open"),
+    );
     let template = Template::new("Created").with_region(Region::Body, Style::new("Body"));
     spreadsheet
         .edit_table_templates(|edit| edit.add(template.clone()))
@@ -151,7 +187,11 @@ fn fresh_table_template_builder_writes_normative_owner_and_axes() {
     builder
         .edit_table_templates(|edit| edit.add(template))
         .expect("template");
-    let spreadsheet = Spreadsheet::from_bytes(builder.build().expect("build")).expect("open");
+    let spreadsheet =
+        Package::from_bytes(&builder.build().expect("build").to_bytes().expect("build"))
+            .expect("open")
+            .workbook()
+            .expect("open");
     let styles = spreadsheet.styles_xml().expect("styles owner");
     assert!(styles.contains("<table:table-template"));
     for attribute in [
@@ -175,8 +215,15 @@ fn metadata_rewrite_refuses_comment_or_pi_loss() {
     let bytes = Builder::new()
         .content_xml(source)
         .build()
+        .expect("build source")
+        .to_bytes()
         .expect("build source");
-    let mut mutable = MutableSpreadsheet::from_bytes(bytes).expect("open");
+    let mut mutable = MutableSpreadsheet::from_workbook(
+        Package::from_bytes(&bytes)
+            .expect("open")
+            .workbook()
+            .expect("open"),
+    );
     assert!(
         mutable
             .set_sheet_title("Data", Some("Edited".to_string()))
@@ -186,8 +233,18 @@ fn metadata_rewrite_refuses_comment_or_pi_loss() {
 
 #[test]
 fn row_and_table_metadata_changes_use_the_full_table_fallback() {
-    let bytes = Builder::new().content_xml(CONTENT).build().expect("build");
-    let mut mutable = MutableSpreadsheet::from_bytes(bytes).expect("open");
+    let bytes = Builder::new()
+        .content_xml(CONTENT)
+        .build()
+        .expect("build")
+        .to_bytes()
+        .expect("build");
+    let mut mutable = MutableSpreadsheet::from_workbook(
+        Package::from_bytes(&bytes)
+            .expect("open")
+            .workbook()
+            .expect("open"),
+    );
     let mut sheet = mutable.sheets()[0].clone();
     sheet.set_title(Some("Edited".to_string())).expect("title");
     sheet
@@ -201,7 +258,10 @@ fn row_and_table_metadata_changes_use_the_full_table_fallback() {
         )
         .expect("cell");
     mutable.set_sheets(vec![sheet]).expect("combined edit");
-    let reopened = Spreadsheet::from_bytes(mutable.to_bytes()).expect("reopen");
+    let reopened = Package::from_bytes(&mutable.to_bytes())
+        .expect("reopen")
+        .workbook()
+        .expect("reopen");
     assert_eq!(reopened.sheets()[0].title(), Some("Edited"));
     let CellView::Stored(cell) = reopened.cell("Data", 0, 0).expect("cell") else {
         panic!("stored cell");
@@ -237,8 +297,16 @@ fn cell_range_source_rejects_duplicate_actuate_attributes() {
 #[test]
 fn normative_table_template_usage_round_trips_through_sheet_edit() {
     let content = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.4"><office:body><office:spreadsheet><table:table table:name="Data" table:template-name="Bands" table:use-first-row-styles="true" table:use-last-row-styles="false" table:use-first-column-styles="1" table:use-last-column-styles="0" table:use-banding-rows-styles="true" table:use-banding-columns-styles="false"><table:table-row/></table:table></office:spreadsheet></office:body></office:document-content>"#;
-    let bytes = Builder::new().content_xml(content).build().expect("build");
-    let spreadsheet = Spreadsheet::from_bytes(bytes.clone()).expect("open");
+    let bytes = Builder::new()
+        .content_xml(content)
+        .build()
+        .expect("build")
+        .to_bytes()
+        .expect("build");
+    let spreadsheet = Package::from_bytes(&bytes)
+        .expect("open")
+        .workbook()
+        .expect("open");
     let sheet = &spreadsheet.sheets()[0];
     assert_eq!(sheet.template_name.as_deref(), Some("Bands"));
     assert_eq!(
@@ -253,7 +321,12 @@ fn normative_table_template_usage_round_trips_through_sheet_edit() {
         }
     );
 
-    let mut metadata_only = MutableSpreadsheet::from_bytes(bytes.clone()).expect("metadata open");
+    let mut metadata_only = MutableSpreadsheet::from_workbook(
+        Package::from_bytes(&bytes)
+            .expect("metadata open")
+            .workbook()
+            .expect("metadata open"),
+    );
     let mut metadata_sheet = metadata_only.sheets()[0].clone();
     metadata_sheet
         .set_title(Some("Accessible data".to_string()))
@@ -261,7 +334,7 @@ fn normative_table_template_usage_round_trips_through_sheet_edit() {
     metadata_only
         .set_sheets(vec![metadata_sheet])
         .expect("metadata edit");
-    let metadata_xml = metadata_only.spreadsheet().content_xml();
+    let metadata_xml = metadata_only.workbook().content_xml();
     assert!(metadata_xml.contains(
         r#"<table:table table:name="Data" table:template-name="Bands" table:use-first-row-styles="true" table:use-last-row-styles="false" table:use-first-column-styles="1" table:use-last-column-styles="0" table:use-banding-rows-styles="true" table:use-banding-columns-styles="false">"#
     ));
@@ -272,13 +345,21 @@ fn normative_table_template_usage_round_trips_through_sheet_edit() {
         .set_template_name(Some("Other Bands".to_string()))
         .expect("template name");
     edited.style_usage.use_last_column_styles = Some(true);
-    let mut mutable = MutableSpreadsheet::from_bytes(bytes).expect("mutable open");
+    let mut mutable = MutableSpreadsheet::from_workbook(
+        Package::from_bytes(&bytes)
+            .expect("mutable open")
+            .workbook()
+            .expect("mutable open"),
+    );
     mutable.set_sheets(vec![edited]).expect("sheet edit");
-    let xml = mutable.spreadsheet().content_xml();
+    let xml = mutable.workbook().content_xml();
     assert!(xml.contains(r#"table:template-name="Other Bands""#));
     assert!(xml.contains(r#"table:use-last-column-styles="true""#));
 
-    let reopened = Spreadsheet::from_bytes(mutable.to_bytes()).expect("reopen");
+    let reopened = Package::from_bytes(&mutable.to_bytes())
+        .expect("reopen")
+        .workbook()
+        .expect("reopen");
     let sheet = &reopened.sheets()[0];
     assert_eq!(sheet.template_name.as_deref(), Some("Other Bands"));
     assert_eq!(sheet.style_usage.use_last_column_styles, Some(true));

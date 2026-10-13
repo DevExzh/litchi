@@ -34,7 +34,7 @@ impl Package {
             return Ok(before);
         }
         let bytes = rewrite_owned_package(self.owned_package(), self.mimetype(), policy)?;
-        *self = Self::from_bytes(bytes)?;
+        *self = Self::from_vec(bytes)?;
         Ok(before)
     }
 }

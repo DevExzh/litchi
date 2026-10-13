@@ -1616,7 +1616,7 @@ enum FrameKind {
     DocumentContent,
     Body,
     Mce,
-    Spreadsheet,
+    Workbook,
     Table(usize),
     Links,
     Link(usize),
@@ -3015,9 +3015,9 @@ fn classify_start(
             range: start..start,
             opaque: false,
         });
-        return Ok(FrameKind::Spreadsheet);
+        return Ok(FrameKind::Workbook);
     }
-    if matches!(parent, Some(FrameKind::Spreadsheet)) && namespace == NamespaceTag::Table {
+    if matches!(parent, Some(FrameKind::Workbook)) && namespace == NamespaceTag::Table {
         if local.as_ref() == b"table" {
             let name = source_table_name(element, reader, limits, context)?;
             scan.reserve_vec_slot::<TableSite>(scan.tables.len(), scan.tables.capacity(), context)?;
@@ -3212,7 +3212,7 @@ fn classify_empty(
         mark_unknown_child(scan, parent);
         return Ok(());
     }
-    if matches!(parent, Some(FrameKind::Spreadsheet)) && namespace == NamespaceTag::Table {
+    if matches!(parent, Some(FrameKind::Workbook)) && namespace == NamespaceTag::Table {
         if local.as_ref() == b"table" {
             let name = source_table_name(element, reader, limits, context)?;
             scan.reserve_vec_slot::<TableSite>(scan.tables.len(), scan.tables.capacity(), context)?;
@@ -3348,7 +3348,7 @@ fn finish_frame(scan: &mut Scan, frame: Frame, closing_start: usize, end: usize)
         | FrameKind::Mce
         | FrameKind::Other
         | FrameKind::CacheContent(_) => {},
-        FrameKind::Spreadsheet => {
+        FrameKind::Workbook => {
             let site = scan
                 .spreadsheet
                 .as_mut()

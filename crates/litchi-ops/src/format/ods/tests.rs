@@ -45,7 +45,7 @@ fn open_source(path: &Path) -> Ods {
     }
 }
 
-fn assert_matches_leaf(ods: &Ods, leaf: &litchi_ods::Spreadsheet, name: &str) {
+fn assert_matches_leaf(ods: &Ods, leaf: &litchi_ods::Workbook, name: &str) {
     assert_eq!(
         ods.worksheet_names().expect("names"),
         leaf.sheet_names(),
@@ -91,7 +91,10 @@ fn handle_is_one_pointer_and_shares_its_state() {
 fn byte_routes_match_the_leaf_reader() {
     for name in FIXTURES {
         let bytes = std::fs::read(fixture(name)).expect("read ODS fixture");
-        let leaf = litchi_ods::Spreadsheet::from_bytes(bytes.clone()).expect("leaf ODS");
+        let leaf = litchi_ods::Package::from_bytes(&bytes)
+            .expect("leaf ODS")
+            .workbook()
+            .expect("leaf ODS");
         assert!(leaf.sheet_count() > 0, "{name}");
         for ods in [open_prepared(bytes.clone()), open_detected(bytes)] {
             assert!(matches!(ods.0.owner, OdsOwner::Eager(_)));
@@ -105,7 +108,9 @@ fn byte_routes_match_the_leaf_reader() {
 fn source_route_matches_the_leaf_reader() {
     for name in FIXTURES {
         let path = fixture(name);
-        let leaf = litchi_ods::Spreadsheet::from_bytes(std::fs::read(&path).expect("read"))
+        let leaf = litchi_ods::Package::from_bytes(&std::fs::read(&path).expect("read"))
+            .expect("leaf ODS")
+            .workbook()
             .expect("leaf ODS");
         let ods = open_source(&path);
         assert!(matches!(ods.0.owner, OdsOwner::Source(_)));
@@ -145,7 +150,10 @@ fn source_route_reports_a_changed_source_as_io_error() {
 #[test]
 fn malformed_body_is_a_typed_core_error() {
     let bytes = broken_package(litchi_odf_common::constants::ODF_SPREADSHEET);
-    let Err(leaf_error) = litchi_ods::Spreadsheet::from_bytes(bytes.clone()) else {
+    let Err(leaf_error) = litchi_ods::Package::from_bytes(&bytes)
+        .map_err(litchi_core::Error::from)
+        .and_then(|package| package.workbook())
+    else {
         panic!("a broken body must not open in the leaf");
     };
     let error = crate::open_bytes(bytes).expect_err("a broken body must not open");

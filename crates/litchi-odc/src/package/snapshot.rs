@@ -5,7 +5,7 @@ use litchi_core::{Error, Metadata, Result};
 use litchi_odf_common::{
     compact_xml,
     core::{
-        AuthoredXmlFragment, OwnedPackage, PackageWriter, SourcePackageLimits, XmlSourcePart,
+        AuthoredXmlFragment, OwnedPackage, PackageWriter, SourceLimits, XmlSourcePart,
         XmlSplicePublication, family::Package,
     },
 };
@@ -100,7 +100,7 @@ impl Snapshot {
                 "ODC package exceeds the caller-selected byte limit".into(),
             ));
         }
-        let archive = OwnedPackage::from_bytes_with_limits(bytes, SourcePackageLimits::default())?;
+        let archive = OwnedPackage::from_bytes_with_limits(bytes, SourceLimits::default())?;
         let mimetype = archive.mimetype()?.to_owned();
         let kind = ChartPackageKind::from_mime(&mimetype)?;
         let owned_manifest = archive.package()?;

@@ -9,7 +9,7 @@ use litchi_odf_common::chart::authoring::{
 };
 use litchi_odp::core::{OwnedPackage, PackageWriter};
 use litchi_odp::rdf::{Object, Subject, Triple};
-use litchi_odp::{Builder, MasterPage, edit};
+use litchi_odp::{Builder, MasterPage, Package, edit};
 use soapberry_zip::office::StreamingArchiveWriter;
 use std::path::Path;
 
@@ -63,7 +63,7 @@ fn slide_and_rdf_edits_publish_as_one_reversible_package_commit() {
         .unwrap();
     writer.add_file("content.xml", CONTENT).unwrap();
     writer.add_file("styles.xml", STYLES).unwrap();
-    let source = edit::Snapshot::from_bytes(writer.finish_to_bytes().unwrap()).unwrap();
+    let source = Package::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap();
     assert_eq!(
         source.security_policy().unwrap(),
         edit::SecurityPolicy::Editable
@@ -87,9 +87,9 @@ fn slide_and_rdf_edits_publish_as_one_reversible_package_commit() {
             .refusal(),
         Some(edit::CryptoRefusal::SignatureAuthoringUnavailable)
     );
-    let source_bytes = source.bytes().to_vec();
+    let source_bytes = source.as_bytes().to_vec();
 
-    let mut transaction = source.transaction().unwrap();
+    let mut transaction = source.edit().unwrap();
     transaction
         .add("Second", "Slide and graph are atomic")
         .unwrap();
@@ -133,11 +133,11 @@ fn slide_and_rdf_edits_publish_as_one_reversible_package_commit() {
         .unwrap();
 
     let commit = transaction.commit().unwrap();
-    assert!(commit.changed());
-    assert_eq!(source.bytes(), source_bytes);
-    assert_eq!(commit.snapshot().slides().len(), 2);
+    assert!(commit.diagnostics().changed());
+    assert_eq!(source.as_bytes(), source_bytes);
+    assert_eq!(commit.package().slides().unwrap().len(), 2);
 
-    let presentation = commit.snapshot().to_presentation().unwrap();
+    let presentation = commit.package().presentation().unwrap();
     let graphs = presentation.rdf_graphs().unwrap();
     assert_eq!(graphs.len(), 1);
     assert_eq!(graphs[0].path, graph_path);
@@ -168,15 +168,15 @@ fn slide_and_rdf_edits_publish_as_one_reversible_package_commit() {
         litchi_odp::charts::Storage::InlineXml
     );
 
-    let package = OwnedPackage::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    let package = OwnedPackage::from_bytes(commit.package().as_bytes().to_vec()).unwrap();
     let rdf = String::from_utf8(package.get_file(&graph_path).unwrap()).unwrap();
     assert!(!rdf.contains('\n'));
     assert!(!rdf.contains("> <"));
 
-    let applied = commit.patch().apply(&source).unwrap();
-    assert_eq!(applied.bytes(), commit.snapshot().bytes());
-    let restored = commit.patch().inverse().apply(&applied).unwrap();
-    assert_eq!(restored.bytes(), source.bytes());
+    let applied = source.apply(commit.patch()).unwrap();
+    assert_eq!(applied.as_bytes(), commit.package().as_bytes());
+    let restored = applied.apply(&commit.patch().inverse()).unwrap();
+    assert_eq!(restored.as_bytes(), source.as_bytes());
 
     assert_eq!(
         commit.patch().domains(),
@@ -192,33 +192,39 @@ fn slide_and_rdf_edits_publish_as_one_reversible_package_commit() {
     let durable_patch = edit::Patch::from_durable_bytes(&durable).unwrap();
     assert_eq!(durable_patch.domains(), commit.patch().domains());
     assert_eq!(
-        durable_patch.apply(&source).unwrap().bytes(),
-        commit.snapshot().bytes()
+        source.apply(&durable_patch).unwrap().as_bytes(),
+        commit.package().as_bytes()
     );
     let mut malformed = durable;
     malformed.push(0);
     assert!(edit::Patch::from_durable_bytes(&malformed).is_err());
 
     let history_budget = source
-        .bytes()
+        .as_bytes()
         .len()
-        .checked_add(commit.snapshot().bytes().len())
+        .checked_add(commit.package().as_bytes().len())
         .unwrap();
     let mut history = edit::History::new(source.clone(), 2, history_budget).unwrap();
     history.record(&commit).unwrap();
-    assert_eq!(history.current().bytes(), commit.snapshot().bytes());
-    assert_eq!(history.undo().unwrap().bytes(), source.bytes());
-    assert_eq!(history.redo().unwrap().bytes(), commit.snapshot().bytes());
+    assert_eq!(history.current().as_bytes(), commit.package().as_bytes());
+    assert_eq!(history.undo().unwrap().as_bytes(), source.as_bytes());
+    assert_eq!(
+        history.redo().unwrap().as_bytes(),
+        commit.package().as_bytes()
+    );
     let durable_history = history.to_durable_bytes().unwrap();
     let mut reopened_history = edit::History::from_durable_bytes(&durable_history).unwrap();
     assert_eq!(
-        reopened_history.current().bytes(),
-        commit.snapshot().bytes()
+        reopened_history.current().as_bytes(),
+        commit.package().as_bytes()
     );
-    assert_eq!(reopened_history.undo().unwrap().bytes(), source.bytes());
     assert_eq!(
-        reopened_history.redo().unwrap().bytes(),
-        commit.snapshot().bytes()
+        reopened_history.undo().unwrap().as_bytes(),
+        source.as_bytes()
+    );
+    assert_eq!(
+        reopened_history.redo().unwrap().as_bytes(),
+        commit.package().as_bytes()
     );
     let mut malformed_history = durable_history;
     malformed_history.push(0);
@@ -227,12 +233,12 @@ fn slide_and_rdf_edits_publish_as_one_reversible_package_commit() {
 
 #[test]
 fn merge_planning_is_independent_only_for_disjoint_rdf_work() {
-    let source = edit::Snapshot::from_bytes(Builder::new().build().unwrap()).unwrap();
-    let mut slide_edit = source.transaction().unwrap();
+    let source = Package::from_bytes(&Builder::new().build().unwrap().to_bytes().unwrap()).unwrap();
+    let mut slide_edit = source.edit().unwrap();
     slide_edit.add("Slide", "content").unwrap();
     let slide_commit = slide_edit.commit().unwrap();
 
-    let mut rdf_edit = source.transaction().unwrap();
+    let mut rdf_edit = source.edit().unwrap();
     rdf_edit
         .add_rdf_graph(Some("Metadata/merge.rdf"), &[literal("metadata")])
         .unwrap();
@@ -251,20 +257,15 @@ fn merge_planning_is_independent_only_for_disjoint_rdf_work() {
     let durable_rdf =
         edit::Patch::from_durable_bytes(&rdf_commit.patch().to_durable_bytes().unwrap()).unwrap();
     let joined = durable_slide.join_snapshot(&durable_rdf).unwrap();
-    assert_eq!(joined.slides().len(), 1);
+    assert_eq!(joined.slides().unwrap().len(), 1);
     assert_eq!(
-        joined
-            .to_presentation()
-            .unwrap()
-            .rdf_graphs()
-            .unwrap()
-            .len(),
+        joined.presentation().unwrap().rdf_graphs().unwrap().len(),
         1
     );
     let three_way = edit::Patch::three_way_snapshot(&source, &durable_slide, &durable_rdf).unwrap();
-    assert_eq!(three_way.bytes(), joined.bytes());
+    assert_eq!(three_way.as_bytes(), joined.as_bytes());
 
-    let mut other_slide = source.transaction().unwrap();
+    let mut other_slide = source.edit().unwrap();
     other_slide.add("Other", "content").unwrap();
     let other_commit = other_slide.commit().unwrap();
     let conflict = slide_commit
@@ -282,8 +283,9 @@ fn merge_planning_is_independent_only_for_disjoint_rdf_work() {
 
 #[test]
 fn typed_chart_data_transfers_and_a_real_impress_deck_fully_reopens() {
-    let chart_base = edit::Snapshot::from_bytes(Builder::new().build().unwrap()).unwrap();
-    let mut source_transaction = chart_base.transaction().unwrap();
+    let chart_base =
+        Package::from_bytes(&Builder::new().build().unwrap().to_bytes().unwrap()).unwrap();
+    let mut source_transaction = chart_base.edit().unwrap();
     source_transaction
         .add("Chart source", "typed cached data")
         .unwrap();
@@ -295,20 +297,20 @@ fn typed_chart_data_transfers_and_a_real_impress_deck_fully_reopens() {
             &typed_chart(),
         )
         .unwrap();
-    let chart_source = source_transaction.commit().unwrap().snapshot().clone();
+    let chart_source = source_transaction.commit().unwrap().package().clone();
 
     let real_path =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/odf/odp/tdf169979.odp");
-    let real = edit::Snapshot::open(real_path).unwrap();
-    let reopened_real = edit::Snapshot::from_bytes(real.bytes().to_vec()).unwrap();
-    assert_eq!(reopened_real.slides(), real.slides());
-    assert!(!real.slides().is_empty());
+    let real = Package::open(real_path).unwrap();
+    let reopened_real = Package::from_bytes(real.as_bytes()).unwrap();
+    assert_eq!(reopened_real.slides().unwrap(), real.slides().unwrap());
+    assert!(!real.slides().unwrap().is_empty());
 
     let mut destination_builder = Builder::new();
     destination_builder.add_slide("Chart destination").unwrap();
     let destination_source =
-        edit::Snapshot::from_bytes(destination_builder.build().unwrap()).unwrap();
-    let mut destination = destination_source.transaction().unwrap();
+        Package::from_bytes(&destination_builder.build().unwrap().to_bytes().unwrap()).unwrap();
+    let mut destination = destination_source.edit().unwrap();
     destination
         .transfer_chart_from(
             &chart_source,
@@ -319,11 +321,11 @@ fn typed_chart_data_transfers_and_a_real_impress_deck_fully_reopens() {
         )
         .unwrap();
     let commit = destination.commit().unwrap();
-    assert_eq!(commit.snapshot().slides().len(), 1);
+    assert_eq!(commit.package().slides().unwrap().len(), 1);
 
-    let reopened = edit::Snapshot::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    let reopened = Package::from_bytes(commit.package().as_bytes()).unwrap();
     let chart = reopened
-        .to_presentation()
+        .presentation()
         .unwrap()
         .chart("Transferred typed chart")
         .unwrap()
@@ -334,8 +336,9 @@ fn typed_chart_data_transfers_and_a_real_impress_deck_fully_reopens() {
     assert!(!chart.content_xml().contains("> <"));
     assert!(!chart.content_xml().contains('\n'));
 
-    let dependent_base = edit::Snapshot::from_bytes(Builder::new().build().unwrap()).unwrap();
-    let mut dependent = dependent_base.transaction().unwrap();
+    let dependent_base =
+        Package::from_bytes(&Builder::new().build().unwrap().to_bytes().unwrap()).unwrap();
+    let mut dependent = dependent_base.edit().unwrap();
     dependent.add("Dependent", "chart").unwrap();
     dependent
         .embed_media("Pictures/chart.png", b"chart-pixels", "image/png")
@@ -348,8 +351,8 @@ fn typed_chart_data_transfers_and_a_real_impress_deck_fully_reopens() {
             litchi_odp::charts::Part::from_xml(DEPENDENT_CHART).unwrap(),
         )
         .unwrap();
-    let dependent_source = dependent.commit().unwrap().snapshot().clone();
-    let mut dependent_transfer = reopened.transaction().unwrap();
+    let dependent_source = dependent.commit().unwrap().package().clone();
+    let mut dependent_transfer = reopened.edit().unwrap();
     dependent_transfer
         .embed_media("Pictures/chart.png", b"destination-pixels", "image/png")
         .unwrap();
@@ -364,7 +367,7 @@ fn typed_chart_data_transfers_and_a_real_impress_deck_fully_reopens() {
         .unwrap();
     let dependent_commit = dependent_transfer.commit().unwrap();
     let dependent_package =
-        OwnedPackage::from_bytes(dependent_commit.snapshot().bytes().to_vec()).unwrap();
+        OwnedPackage::from_bytes(dependent_commit.package().as_bytes().to_vec()).unwrap();
     assert_eq!(
         dependent_package.get_file("Pictures/chart.png").unwrap(),
         b"destination-pixels"
@@ -377,8 +380,8 @@ fn typed_chart_data_transfers_and_a_real_impress_deck_fully_reopens() {
     );
     assert!(
         dependent_commit
-            .snapshot()
-            .to_presentation()
+            .package()
+            .presentation()
             .unwrap()
             .chart("Transferred dependent chart")
             .unwrap()
@@ -390,8 +393,8 @@ fn typed_chart_data_transfers_and_a_real_impress_deck_fully_reopens() {
 
 #[test]
 fn failed_checked_rdf_selector_leaves_an_exact_noop() {
-    let source = edit::Snapshot::from_bytes(Builder::new().build().unwrap()).unwrap();
-    let mut transaction = source.transaction().unwrap();
+    let source = Package::from_bytes(&Builder::new().build().unwrap().to_bytes().unwrap()).unwrap();
+    let mut transaction = source.edit().unwrap();
     let graph_path = transaction
         .add_rdf_graph(Some("Metadata/deck.rdf"), &[literal("Kept")])
         .unwrap();
@@ -406,9 +409,9 @@ fn failed_checked_rdf_selector_leaves_an_exact_noop() {
 
     transaction.remove_rdf_graph(&graph_path).unwrap();
     let commit = transaction.commit().unwrap();
-    assert!(!commit.changed());
+    assert!(!commit.diagnostics().changed());
     assert!(commit.patch().is_noop());
-    assert_eq!(commit.snapshot().bytes(), source.bytes());
+    assert_eq!(commit.package().as_bytes(), source.as_bytes());
 }
 
 #[test]
@@ -425,7 +428,7 @@ fn signed_packages_are_refused_before_a_transaction_can_stage_changes() {
             br#"<dsig:document-signatures xmlns:dsig="urn:oasis:names:tc:opendocument:xmlns:digitalsignature:1.0"/>"#,
         )
         .unwrap();
-    let source = edit::Snapshot::from_bytes(writer.finish_to_bytes().unwrap()).unwrap();
+    let source = Package::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap();
     assert_eq!(
         source.security_policy().unwrap(),
         edit::SecurityPolicy::SignedReadOnly
@@ -443,7 +446,7 @@ fn signed_packages_are_refused_before_a_transaction_can_stage_changes() {
         edit::CryptoCapability::Refused(edit::CryptoRefusal::SignatureRemovalUnavailable)
     );
 
-    let Err(error) = source.transaction() else {
+    let Err(error) = source.edit() else {
         panic!("signed package unexpectedly admitted an editing transaction");
     };
     assert!(error.to_string().contains("signed packages"));
@@ -461,7 +464,7 @@ fn encrypted_package_entries_are_refused_before_staging() {
     archive
         .write_deflated("META-INF/manifest.xml", MANIFEST)
         .unwrap();
-    let source = edit::Snapshot::from_bytes(archive.finish_to_bytes().unwrap()).unwrap();
+    let source = Package::from_bytes(&archive.finish_to_bytes().unwrap()).unwrap();
     assert_eq!(
         source.security_policy().unwrap(),
         edit::SecurityPolicy::EncryptedReadOnly
@@ -479,7 +482,7 @@ fn encrypted_package_entries_are_refused_before_staging() {
         edit::CryptoCapability::Refused(edit::CryptoRefusal::EncryptionAuthoringUnavailable)
     );
 
-    let Err(error) = source.transaction() else {
+    let Err(error) = source.edit() else {
         panic!("encrypted package unexpectedly admitted an editing transaction");
     };
     assert!(error.to_string().contains("encrypted package entries"));

@@ -101,6 +101,7 @@ pub mod private {
     pub use super::stream_xml::{XmlStreamEvent, XmlStreamLimits, XmlStreamReport, scan_xml};
 }
 
+pub use crate::limits::SourceLimits;
 pub use encryption::{Cipher, Kdf, Profile, StartKey};
 pub use family::{Package, PreparedPackage, validate_content_document_part, validate_content_part};
 pub use generated_xml::{
@@ -121,8 +122,7 @@ pub use metadata::{
 };
 pub use metadata::{MetaXmlPatch, patch_meta_xml};
 pub use package::{
-    OwnedPackage, SourceBackedPackage, SourceMemberReaderError, SourcePackageLimits,
-    is_signature_owner_path,
+    OwnedPackage, SourceBackedPackage, SourceMemberReaderError, is_signature_owner_path,
 };
 pub use resolved_reader::ResolvedReader;
 pub use source_publication::{

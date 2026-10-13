@@ -5,7 +5,7 @@
 //! existing-cell and direct-hyperlink edits publish through the source-backed
 //! `content.xml` path;
 //! callers explicitly call [`SourceBackedSpreadsheet::materialize`] before
-//! entering the complete owned/mutable [`super::Spreadsheet`] boundary.
+//! entering the complete immutable [`crate::Package`] boundary.
 
 use std::{
     fmt,
@@ -22,11 +22,11 @@ use litchi_core::{
     Error, Metadata, ReadAt, Result, SequentialTextWriter, SourceVersion, TextObjectKind,
     TextOutputError, TextOutputOptions, TextOutputReport,
 };
+use litchi_odf_common::{Error as OdfError, OpenOptions};
 use litchi_odf_common::{
     core::{
         SourceBackedPackage, SourceContentPublicationError, SourceContentPublicationOptions,
-        SourceContentPublicationReport, SourcePackageLimits, private::ContentDocumentValidator,
-        validate_content_part,
+        SourceContentPublicationReport, private::ContentDocumentValidator, validate_content_part,
     },
     package::{is_media_path, resolve_package_path},
 };
@@ -44,9 +44,6 @@ use crate::{
 const ODF_SPREADSHEET: &str = "application/vnd.oasis.opendocument.spreadsheet";
 const BODY_MARKER: &str = "<office:spreadsheet";
 const FAMILY_NAME: &str = "ODS";
-
-/// The bounded ZIP-index policy used by positional ODF facades.
-pub type ReadLimits = SourcePackageLimits;
 
 /// ODS access over an immutable positional source.
 ///
@@ -88,122 +85,132 @@ impl fmt::Debug for SourceBackedSpreadsheet {
 }
 
 impl SourceBackedSpreadsheet {
-    /// Open an ODS from a regular filesystem file without slurping it.
+    /// Open an ODS spreadsheet from a regular filesystem file without slurping it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`litchi_odf_common::Error::Limit`] for an exceeded dimension
+    /// and [`litchi_odf_common::Error::Core`] for I/O or validation failures.
     #[cfg(any(unix, windows))]
-    pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_read_at(file_source(path)?)
+    pub fn open(path: impl AsRef<Path>) -> std::result::Result<Self, OdfError> {
+        Self::open_with_options(path, OpenOptions::new())
     }
 
-    /// Open an ODS from a regular filesystem file with explicit ZIP limits.
+    /// Open an ODS spreadsheet from a filesystem file under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
     #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
-        Self::from_read_at_with_limits(file_source(path)?, limits)
+    pub fn open_with_options(
+        path: impl AsRef<Path>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, OdfError> {
+        Self::from_read_at_with_options(file_source(path)?, options)
     }
 
-    /// Open a password-protected ODS from a regular filesystem file.
+    /// Open password-protected an ODS spreadsheet from a filesystem file.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
     #[cfg(any(unix, windows))]
-    pub fn from_path_with_password(
+    pub fn open_with_password(
         path: impl AsRef<Path>,
         password: impl Into<String>,
-    ) -> Result<Self> {
-        // Enter the zeroizing owner before any fallible source-backed work.
+    ) -> std::result::Result<Self, OdfError> {
+        Self::open_with_password_and_options(path, password, OpenOptions::new())
+    }
+
+    /// Open password-protected an ODS spreadsheet from a filesystem file under
+    /// caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    #[cfg(any(unix, windows))]
+    pub fn open_with_password_and_options(
+        path: impl AsRef<Path>,
+        password: impl Into<String>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, OdfError> {
         let mut password = Zeroizing::new(password.into());
         let source = file_source(path)?;
-        Self::from_read_at_with_password(source, std::mem::take(&mut *password))
-    }
-
-    /// Open a password-protected ODS from a regular filesystem file with
-    /// explicit ZIP limits.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits_and_password(
-        path: impl AsRef<Path>,
-        limits: ReadLimits,
-        password: impl Into<String>,
-    ) -> Result<Self> {
-        let mut password = Zeroizing::new(password.into());
-        let source = file_source(path)?;
-        Self::from_read_at_with_limits_and_password(source, limits, std::mem::take(&mut *password))
-    }
-
-    /// Alias for [`Self::from_path`].
-    #[cfg(any(unix, windows))]
-    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_path(path)
-    }
-
-    /// Alias for [`Self::from_path_with_limits`].
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
-        Self::from_path_with_limits(path, limits)
-    }
-
-    /// Alias for [`Self::from_path_with_password`].
-    #[cfg(any(unix, windows))]
-    pub fn open_with_password(path: impl AsRef<Path>, password: impl Into<String>) -> Result<Self> {
-        Self::from_path_with_password(path, password)
-    }
-
-    /// Alias for [`Self::from_path_with_limits_and_password`].
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits_and_password(
-        path: impl AsRef<Path>,
-        limits: ReadLimits,
-        password: impl Into<String>,
-    ) -> Result<Self> {
-        Self::from_path_with_limits_and_password(path, limits, password)
-    }
-
-    /// Open an ODS from a caller-provided positional source.
-    pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::from_read_at_with_limits(source, ReadLimits::default())
-    }
-
-    /// Open a password-protected ODS from a caller-provided positional source.
-    pub fn from_read_at_with_password(
-        source: Arc<dyn ReadAt>,
-        password: impl Into<String>,
-    ) -> Result<Self> {
-        let mut password = Zeroizing::new(password.into());
-        Self::from_read_at_inner_with_password(
+        Self::from_read_at_with_password_and_options(
             source,
-            ReadLimits::default(),
             std::mem::take(&mut *password),
+            options,
         )
     }
 
-    /// Open an ODS from a positional source with explicit finite limits.
-    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: ReadLimits) -> Result<Self> {
-        Self::from_read_at_inner(source, limits)
+    /// Open an ODS spreadsheet from a caller-provided positional source.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_read_at(source: Arc<dyn ReadAt>) -> std::result::Result<Self, OdfError> {
+        Self::from_read_at_with_options(source, OpenOptions::new())
     }
 
-    /// Open a password-protected ODS from a positional source with explicit
-    /// finite limits.
-    pub fn from_read_at_with_limits_and_password(
+    /// Open an ODS spreadsheet from a positional source under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_read_at_with_options(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, OdfError> {
+        Self::from_read_at_inner(source, options, None)
+    }
+
+    /// Open password-protected an ODS spreadsheet from a caller-provided positional
+    /// source.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_read_at_with_password(
+        source: Arc<dyn ReadAt>,
         password: impl Into<String>,
-    ) -> Result<Self> {
+    ) -> std::result::Result<Self, OdfError> {
+        Self::from_read_at_with_password_and_options(source, password, OpenOptions::new())
+    }
+
+    /// Open password-protected an ODS spreadsheet from a positional source under
+    /// caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_read_at_with_password_and_options(
+        source: Arc<dyn ReadAt>,
+        password: impl Into<String>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, OdfError> {
         let mut password = Zeroizing::new(password.into());
-        Self::from_read_at_inner_with_password(source, limits, std::mem::take(&mut *password))
+        Self::from_read_at_inner(source, options, Some(std::mem::take(&mut *password)))
     }
 
-    fn from_read_at_inner(source: Arc<dyn ReadAt>, limits: ReadLimits) -> Result<Self> {
-        let package = SourceBackedPackage::from_read_at_with_limits(Arc::clone(&source), limits)?;
-        Self::from_package(source, package)
-    }
-
-    fn from_read_at_inner_with_password(
+    fn from_read_at_inner(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
-        password: impl Into<String>,
-    ) -> Result<Self> {
-        // The common owner immediately wraps the credential in Zeroizing.
-        let package = SourceBackedPackage::from_read_at_with_limits_and_password(
-            Arc::clone(&source),
-            limits,
-            password,
-        )?;
-        Self::from_package(source, package)
+        options: OpenOptions,
+        password: Option<String>,
+    ) -> std::result::Result<Self, OdfError> {
+        let limits = options.source_limits_value();
+        let package = match password {
+            Some(password) => {
+                let mut password = Zeroizing::new(password);
+                SourceBackedPackage::from_read_at_with_limits_and_password(
+                    Arc::clone(&source),
+                    limits,
+                    std::mem::take(&mut *password),
+                )?
+            },
+            None => SourceBackedPackage::from_read_at_with_limits(Arc::clone(&source), limits)?,
+        };
+        check_semantic_part_sizes(&package, options.semantic_limits_value())?;
+        Ok(Self::from_package(source, package)?)
     }
 
     fn from_package(source: Arc<dyn ReadAt>, package: SourceBackedPackage) -> Result<Self> {
@@ -779,14 +786,18 @@ impl SourceBackedSpreadsheet {
         self.member_data(path)
     }
 
-    /// Explicitly materialize this source into the existing mutable ODS
-    /// spreadsheet owner.
-    pub fn materialize(self) -> Result<super::Spreadsheet> {
+    /// Explicitly materialize this source into an immutable
+    /// [`crate::Package`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a source-changed, archive or family-validation failure.
+    pub fn materialize(self) -> Result<crate::Package> {
         self.check_source()?;
         let source = Arc::clone(&self.source);
         let source_version = self.source_version;
         let package = prefer_current(source.as_ref(), source_version, self.package.materialize())?;
-        let result = super::Spreadsheet::from_owned_package(package);
+        let result = crate::Package::from_materialized(package);
         prefer_current(source.as_ref(), source_version, result)
     }
 }
@@ -1086,9 +1097,27 @@ fn text_capacity(sheets: &[Sheet]) -> Result<usize> {
     Ok(total)
 }
 
+/// Check the caller's semantic part-size limits against the declared member
+/// sizes before any part is inflated.
+fn check_semantic_part_sizes(
+    package: &SourceBackedPackage,
+    limits: litchi_odf_common::SemanticLimits,
+) -> std::result::Result<(), OdfError> {
+    if limits.is_default() {
+        return Ok(());
+    }
+    if let Some(size) = package.member_materialized_size("content.xml")? {
+        limits.check(litchi_odf_common::SemanticLimitKind::ContentBytes, size)?;
+    }
+    if let Some(size) = package.member_materialized_size("styles.xml")? {
+        limits.check(litchi_odf_common::SemanticLimitKind::StylesBytes, size)?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{ReadLimits, SourceBackedSpreadsheet, project_text};
+    use super::{SourceBackedSpreadsheet, project_text};
     use crate::worksheet::{Cell, CellValue, Row, Sheet};
     use crate::{CellSelector, MAX_CELL_SELECTORS};
     use litchi_core::{OwnedSource, ReadAt, SourceVersion, TextOutputOptions};
@@ -1146,10 +1175,10 @@ mod tests {
                 .contains("package href escapes the package root")
         );
 
-        let owned = crate::Spreadsheet::from_bytes(bytes).expect("owned ODS");
+        let owned = crate::Workbook::from_bytes(bytes).expect("owned ODS");
         assert_eq!(owned.sheets().len(), source.sheet_count().unwrap());
         let materialized = source.materialize().expect("materialize ODS");
-        assert_eq!(materialized.sheets(), owned.sheets());
+        assert_eq!(materialized.workbook().unwrap().sheets(), owned.sheets());
     }
 
     #[test]
@@ -1397,7 +1426,7 @@ mod tests {
         let source = Arc::new(CountingSource::new(package()));
         let spreadsheet =
             SourceBackedSpreadsheet::from_read_at(source.clone()).expect("source ODS");
-        let owned = crate::Spreadsheet::from_bytes(package()).expect("owned ODS");
+        let owned = crate::Workbook::from_bytes(package()).expect("owned ODS");
         let after_open_reads = source.reads();
         let after_open_versions = source.versions();
         let selectors = [
@@ -1677,13 +1706,17 @@ mod tests {
     #[test]
     fn source_limits_and_passwords_fail_closed() {
         let bytes = package();
-        let limits = ReadLimits::default().with_max_source_bytes(1);
+        let limits = litchi_odf_common::SourceLimits::builder()
+            .max_input_bytes(1)
+            .unwrap()
+            .build()
+            .unwrap();
         assert!(matches!(
-            SourceBackedSpreadsheet::from_read_at_with_limits(
+            SourceBackedSpreadsheet::from_read_at_with_options(
                 Arc::new(OwnedSource::new(bytes.clone())),
-                limits,
+                litchi_odf_common::OpenOptions::new().source_limits(limits),
             ),
-            Err(litchi_core::Error::ResourceLimit(_))
+            Err(litchi_odf_common::Error::Limit { .. })
         ));
 
         let mut writer = litchi_odf_common::core::PackageWriter::new();
@@ -1764,11 +1797,11 @@ mod tests {
                 "source wrong-password open must reject manifest alias {alias}"
             );
             assert!(
-                crate::Spreadsheet::from_bytes(aliased.clone()).is_err(),
+                crate::Workbook::from_bytes(aliased.clone()).is_err(),
                 "owned open must reject manifest alias {alias}"
             );
             assert!(
-                crate::Spreadsheet::from_bytes_with_password(aliased, "wrong").is_err(),
+                crate::Package::from_bytes_with_password(&aliased, "wrong").is_err(),
                 "owned wrong-password open must reject manifest alias {alias}"
             );
         }
@@ -1780,9 +1813,7 @@ mod tests {
             )
             .is_ok()
         );
-        assert!(
-            crate::Spreadsheet::from_bytes_with_password(canonical, "manifest-password").is_ok()
-        );
+        assert!(crate::Package::from_bytes_with_password(&canonical, "manifest-password").is_ok());
     }
 
     fn rewrite_manifest_content_path(bytes: &[u8], path: &str) -> Vec<u8> {

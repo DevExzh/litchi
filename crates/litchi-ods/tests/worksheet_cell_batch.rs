@@ -1,6 +1,6 @@
 use litchi_odf_common::{constants, core::PackageWriter, package::raw_identical_members};
 use litchi_ods::{
-    Builder, Cell, CellValue, Row, Sheet, Spreadsheet,
+    Builder, Cell, CellValue, Package, Row, Sheet,
     worksheet::{CellChange, MAX_CELL_CHANGES, Snapshot},
 };
 
@@ -19,7 +19,7 @@ fn repeated_source() -> litchi_core::Result<Vec<u8>> {
     sheet.push_row(row)?;
     let mut builder = Builder::new();
     builder.add_sheet(sheet)?;
-    builder.build()
+    Ok(builder.build()?.to_bytes()?)
 }
 
 const OPAQUE_ROW: &str = concat!(
@@ -107,7 +107,7 @@ fn batch_matches_scalar_edits_across_sparse_and_last_grid_coordinates() -> litch
     sheet.push_row(first_row)?;
     let mut builder = Builder::new();
     builder.add_sheet(sheet)?;
-    let source = builder.build()?;
+    let source = builder.build()?.to_bytes()?;
     let changes = vec![
         CellChange::new(0, 1, text("near")),
         CellChange::new(3, 7, text("sparse")),
@@ -254,7 +254,7 @@ fn batch_commit_preserves_opaque_rows_and_members_and_has_exact_inverse() -> lit
         Some(2)
     );
     let commit = edit.commit()?;
-    let reopened = Spreadsheet::from_bytes(commit.snapshot().as_bytes().to_vec())?;
+    let reopened = Package::from_bytes(commit.snapshot().as_bytes())?.workbook()?;
     assert!(reopened.content_xml().contains(OPAQUE_ROW));
     assert_eq!(
         reopened.cell("Data", 1, 0).and_then(|view| match view {
@@ -290,7 +290,7 @@ fn batch_commit_preserves_opaque_rows_and_members_and_has_exact_inverse() -> lit
         source
     );
 
-    let stale = Snapshot::from_bytes(Builder::new().build()?)?;
+    let stale = Snapshot::from_bytes(Builder::new().build()?.to_bytes()?)?;
     assert!(commit.patch().apply(&stale).is_err());
     Ok(())
 }

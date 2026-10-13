@@ -176,7 +176,7 @@ fn parses_all_bundled_fixtures_without_rewriting_packages() {
         "test-data/libreoffice-core/xmloff/qa/unit/data/tdf167358_label_form_control_borders.odt",
     ] {
         let bytes = std::fs::read(fixture(relative)).unwrap();
-        let package = litchi_odt::generic::Package::from_bytes(bytes.clone()).unwrap();
+        let package = litchi_odt::generic::Package::from_bytes(&bytes).unwrap();
         let forms = package.forms().unwrap();
         assert!(!forms.groups.is_empty(), "{relative}");
         assert!(!forms.control_shapes.is_empty(), "{relative}");

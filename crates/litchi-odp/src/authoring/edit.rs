@@ -4,10 +4,14 @@ use super::mutable::MutablePresentation;
 use crate::core::OwnedPackage;
 use crate::{Presentation, Reference, Shape, Slide};
 use litchi_core::{Error, Result};
+/// The family error of package-level verbs, [`Edit::commit`] and
+/// [`Package::apply`]: typed limits plus the common-core payload.
+pub use litchi_odf_common::Error as PackageError;
+pub use litchi_odf_common::{LimitKind, OpenOptions};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use xml_minifier::audit;
 
 const MAX_PACKAGE_BYTES: usize = 128 * 1024 * 1024;
@@ -216,9 +220,16 @@ impl CryptoCapability {
     }
 }
 
-/// An immutable presentation package and its parsed slide projection.
+/// The immutable owner of one packaged ODP artifact.
+///
+/// `Package` owns every state verb: ingress (`open*`, `from_bytes*`,
+/// `from_reader*`), the primary [`Edit`] transaction, patch application and
+/// output (`save`, `save_with_durability`, `to_bytes`, `write_to`). It is
+/// cheap to clone; clones share the exact bytes, the validated archive index
+/// and the [`Presentation`] projection. A commit publishes a new package and
+/// never mutates its source.
 #[derive(Clone)]
-pub struct Snapshot {
+pub struct Package {
     bytes: Arc<Vec<u8>>,
     /// The validated physical package retained with this immutable snapshot.
     ///
@@ -228,32 +239,246 @@ pub struct Snapshot {
     /// same bytes. The separate byte owner remains authoritative for exact
     /// lineage and patch source checks.
     package: OwnedPackage,
+    /// The read-only projection of exactly these bytes, parsed at open or,
+    /// for a freshly built package, on first use. For a password-opened
+    /// package it retains the credential needed to read encrypted parts;
+    /// `package` never does.
+    presentation: Arc<OnceLock<Presentation>>,
+    /// The bounded slide projection used by edits, parsed on first use.
+    editing: Arc<OnceLock<Editing>>,
+}
+
+struct Editing {
     resource_bytes: usize,
     slides: Arc<[Slide]>,
 }
 
-impl Snapshot {
-    /// Open an ODP editing snapshot from a path.
+impl std::fmt::Debug for Package {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Package")
+            .field("bytes", &self.bytes.len())
+            .finish_non_exhaustive()
+    }
+}
+
+impl Package {
+    /// Create the minimal valid presentation (no slides).
     ///
     /// # Errors
     ///
-    /// Returns an error when the file cannot be read or is not a bounded valid ODP package.
-    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_bytes(read_bounded(path.as_ref(), MAX_PACKAGE_BYTES)?)
+    /// Returns an error only when the fixed minimal package cannot be built.
+    pub fn new() -> std::result::Result<Self, PackageError> {
+        crate::Builder::new().build()
     }
 
-    /// Parse owned ODP package bytes into a source-bound snapshot.
+    /// Open an ODP package from a path with the default [`OpenOptions`].
     ///
     /// # Errors
     ///
-    /// Returns an error for an oversized, malformed, or non-ODP package.
-    /// Signed and encrypted packages can be inspected but have a read-only
-    /// [`SecurityPolicy`] and cannot start a transaction.
-    pub fn from_bytes(source_bytes: Vec<u8>) -> Result<Self> {
-        if source_bytes.len() > MAX_PACKAGE_BYTES {
-            return invalid("ODP editing package exceeds the 128 MiB limit");
+    /// Returns [`PackageError::Limit`] when a source dimension is exceeded and
+    /// [`PackageError::Core`] for I/O, archive or family-validation failures.
+    pub fn open(path: impl AsRef<Path>) -> std::result::Result<Self, PackageError> {
+        Self::open_with_options(path, OpenOptions::new())
+    }
+
+    /// Open an ODP package from a path under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn open_with_options(
+        path: impl AsRef<Path>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        Self::from_reader_with_options(File::open(path)?, options)
+    }
+
+    /// Open a password-encrypted ODP package from a path.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn open_with_password(
+        path: impl AsRef<Path>,
+        password: impl Into<String>,
+    ) -> std::result::Result<Self, PackageError> {
+        Self::open_with_password_and_options(path, password, OpenOptions::new())
+    }
+
+    /// Open a password-encrypted ODP package under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn open_with_password_and_options(
+        path: impl AsRef<Path>,
+        password: impl Into<String>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        let password = zeroize::Zeroizing::new(password.into());
+        let package = OwnedPackage::from_reader_with_limits_and_password(
+            File::open(path)?,
+            options.source_limits_value(),
+            password.as_str(),
+        )?;
+        Self::from_opened(package, options)
+    }
+
+    /// Open an ODP package from bytes (the bytes are copied).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_bytes(bytes: &[u8]) -> std::result::Result<Self, PackageError> {
+        Self::from_bytes_with_options(bytes, OpenOptions::new())
+    }
+
+    /// Open an ODP package from bytes under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_bytes_with_options(
+        bytes: &[u8],
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        let limits = options.source_limits_value();
+        check_input_bytes(bytes.len(), limits)?;
+        let package = OwnedPackage::from_bytes_with_limits(copy_input(bytes)?, limits)?;
+        Self::from_opened(package, options)
+    }
+
+    /// Open a password-encrypted ODP package from bytes.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_bytes_with_password(
+        bytes: &[u8],
+        password: impl Into<String>,
+    ) -> std::result::Result<Self, PackageError> {
+        Self::from_bytes_with_password_and_options(bytes, password, OpenOptions::new())
+    }
+
+    /// Open a password-encrypted ODP package from bytes under
+    /// caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_bytes_with_password_and_options(
+        bytes: &[u8],
+        password: impl Into<String>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        let password = zeroize::Zeroizing::new(password.into());
+        let limits = options.source_limits_value();
+        check_input_bytes(bytes.len(), limits)?;
+        let package = OwnedPackage::from_bytes_with_limits_and_password(
+            copy_input(bytes)?,
+            limits,
+            password.as_str(),
+        )?;
+        Self::from_opened(package, options)
+    }
+
+    /// Open an ODP package from a reader with the default [`OpenOptions`].
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_reader(reader: impl Read) -> std::result::Result<Self, PackageError> {
+        Self::from_reader_with_options(reader, OpenOptions::new())
+    }
+
+    /// Open an ODP package from a reader under caller-selected limits. The
+    /// reader is consumed through an input-limit guard before indexing.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_reader_with_options(
+        reader: impl Read,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        let package = OwnedPackage::from_reader_with_limits(reader, options.source_limits_value())?;
+        Self::from_opened(package, options)
+    }
+
+    /// Adopt a packaged ODF result prepared by smart detection, reusing its
+    /// validated archive index.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::UnexpectedFormat`] (as [`PackageError::Core`]) when
+    /// the prepared package is another family.
+    pub fn from_prepared_package(
+        prepared: litchi_odf_common::PreparedPackage,
+    ) -> std::result::Result<Self, PackageError> {
+        Ok(Self::from_presentation(
+            Presentation::from_prepared_package(prepared)?,
+        ))
+    }
+
+    fn from_opened(
+        package: OwnedPackage,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        let semantic = options.semantic_limits_value();
+        if !semantic.is_default() {
+            if let Some(size) = package.package()?.member_materialized_size("content.xml")? {
+                semantic.check(litchi_odf_common::SemanticLimitKind::ContentBytes, size)?;
+            }
+            if let Some(size) = package.package()?.member_materialized_size("styles.xml")? {
+                semantic.check(litchi_odf_common::SemanticLimitKind::StylesBytes, size)?;
+            }
         }
-        Self::from_shared_bytes(Arc::new(source_bytes))
+        let presentation = Presentation::from_owned_package(package)?;
+        if !semantic.is_default() {
+            let slides = u64::try_from(presentation.slide_count()?).unwrap_or(u64::MAX);
+            semantic.check(litchi_odf_common::SemanticLimitKind::Units, slides)?;
+        }
+        Ok(Self::from_presentation(presentation))
+    }
+
+    /// Adopt a parsed projection; the package shares its exact bytes.
+    pub(crate) fn from_presentation(presentation: Presentation) -> Self {
+        let package = presentation.owned_package().clone_without_password();
+        Self {
+            bytes: package.shared_bytes(),
+            package,
+            presentation: Arc::new(OnceLock::from(presentation)),
+            editing: Arc::new(OnceLock::new()),
+        }
+    }
+
+    /// Adopt complete bytes written by the crate's own authoring codecs. The
+    /// archive is indexed and validated now; the projection is decoded on
+    /// the first [`Self::presentation`] call and the bounded slide
+    /// projection on the first edit.
+    pub(crate) fn from_authored(bytes: Vec<u8>) -> Result<Self> {
+        let package = OwnedPackage::from_bytes(bytes)?;
+        Ok(Self {
+            bytes: package.shared_bytes(),
+            package,
+            presentation: Arc::new(OnceLock::new()),
+            editing: Arc::new(OnceLock::new()),
+        })
+    }
+
+    /// The parsed projection, decoded on first use.
+    fn projection(&self) -> Result<&Presentation> {
+        if let Some(presentation) = self.presentation.get() {
+            return Ok(presentation);
+        }
+        let presentation = Presentation::from_owned_package(self.package.clone())?;
+        Ok(self.presentation.get_or_init(|| presentation))
+    }
+
+    /// Reopen complete bytes produced inside the crate.
+    pub(crate) fn from_vec(bytes: Vec<u8>) -> Result<Self> {
+        Self::from_shared_bytes(Arc::new(bytes))
     }
 
     pub(crate) fn from_shared_bytes(bytes: Arc<Vec<u8>>) -> Result<Self> {
@@ -264,37 +489,119 @@ impl Snapshot {
         Self::from_owned_package(package)
     }
 
+    /// Validate a candidate package and its bounded slide projection, as
+    /// commit and patch decoding require.
     pub(crate) fn from_owned_package(package: OwnedPackage) -> Result<Self> {
         validate_package_size(package.as_bytes().len())?;
         let presentation = Presentation::from_owned_package(package)?;
-        let slides = presentation.slides()?;
-        if slides.len() > MAX_SLIDES {
-            return invalid("ODP editing snapshot exceeds the slide-count limit");
+        let editing = editing_projection(&presentation)?;
+        let owner = Self::from_presentation(presentation);
+        let _ = owner.editing.set(editing);
+        Ok(owner)
+    }
+
+    /// The bounded slide projection, parsed and checked on first use.
+    fn editing(&self) -> Result<&Editing> {
+        if let Some(editing) = self.editing.get() {
+            return Ok(editing);
         }
-        let resource_bytes = slides_resource(&slides)?;
-        if resource_bytes > MAX_DRAFT_BYTES {
-            return invalid("ODP editing snapshot exceeds the aggregate draft limit");
+        validate_package_size(self.bytes.len())?;
+        let editing = editing_projection(self.projection()?)?;
+        Ok(self.editing.get_or_init(|| editing))
+    }
+
+    /// The owned read-only projection of this package (one reference-count
+    /// increment).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a freshly built package's projection cannot be
+    /// decoded; an opened package was decoded at open.
+    pub fn presentation(&self) -> Result<Presentation> {
+        Ok(self.projection()?.clone())
+    }
+
+    /// Repairs tolerated while this package was opened.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
+        match self.presentation.get() {
+            Some(presentation) => presentation.tolerance_report(),
+            None => self.package.tolerance_report(),
         }
-        let package = presentation.owned_package().clone_without_password();
-        let bytes = package.shared_bytes();
-        Ok(Self {
-            bytes,
-            package,
-            resource_bytes,
-            slides: Arc::from(slides),
-        })
     }
 
     /// Borrow the exact source package bytes.
     #[must_use]
-    pub fn bytes(&self) -> &[u8] {
+    pub fn as_bytes(&self) -> &[u8] {
         self.bytes.as_slice()
     }
 
-    /// Borrow the immutable parsed slide projection.
-    #[must_use]
-    pub fn slides(&self) -> &[Slide] {
-        &self.slides
+    /// The bounded slide projection used by edits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package exceeds the editing slide-count or
+    /// aggregate draft limits.
+    pub fn slides(&self) -> Result<&[Slide]> {
+        Ok(&self.editing()?.slides)
+    }
+
+    /// Apply a primary-transaction patch to this exact package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when this package is not byte-identical to the patch
+    /// source or its signature/encryption policy makes it read-only.
+    pub fn apply(&self, patch: &Patch) -> std::result::Result<Self, PackageError> {
+        Ok(patch.apply(self)?)
+    }
+
+    /// Atomically replace `path` with this package (full durability).
+    ///
+    /// The artifact is staged in a sibling temporary file and published with
+    /// one rename; a failure before publication leaves the destination
+    /// unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PackageError::Core`] carrying the I/O failure.
+    pub fn save(&self, path: impl AsRef<Path>) -> std::result::Result<(), PackageError> {
+        self.save_with_durability(path, litchi_core::Durability::Full)
+    }
+
+    /// Atomically replace `path` with this package under explicit durability.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::save`].
+    pub fn save_with_durability(
+        &self,
+        path: impl AsRef<Path>,
+        durability: litchi_core::Durability,
+    ) -> std::result::Result<(), PackageError> {
+        litchi_odf_common::publish::save_bytes(path.as_ref(), self.as_bytes(), durability)
+    }
+
+    /// Copy the exact package bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an allocation failure.
+    pub fn to_bytes(&self) -> std::result::Result<Vec<u8>, PackageError> {
+        Ok(copy_input(self.as_bytes())?)
+    }
+
+    /// Write the exact package bytes to a stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns the stream's I/O failure.
+    pub fn write_to(
+        &self,
+        mut writer: impl std::io::Write,
+    ) -> std::result::Result<(), PackageError> {
+        writer.write_all(self.as_bytes())?;
+        Ok(())
     }
 
     /// Inspect the package mutation policy without staging an edit.
@@ -384,8 +691,8 @@ impl Snapshot {
     where
         S: Into<Selector<'a>>,
     {
-        select(&self.slides, selector.into())
-            .map(|selected| selected.map(|position| &self.slides[position]))
+        let slides = &self.editing()?.slides;
+        select(slides, selector.into()).map(|selected| selected.map(|position| &slides[position]))
     }
 
     /// Start an isolated transaction over a detached staging engine.
@@ -394,14 +701,19 @@ impl Snapshot {
     ///
     /// Returns an error when the exact source package cannot be reparsed for staging or
     /// its signature/encryption policy makes it read-only.
-    pub fn transaction(&self) -> Result<Transaction> {
+    pub fn edit(&self) -> std::result::Result<Edit, PackageError> {
+        Ok(self.edit_core()?)
+    }
+
+    pub(crate) fn edit_core(&self) -> Result<Edit> {
+        let editing = self.editing()?;
         let presentation = Presentation::from_owned_package(self.package.clone())?;
         ensure_editable_source(presentation.owned_package())?;
-        Ok(Transaction {
+        Ok(Edit {
             source: self.clone(),
             draft: MutablePresentation::from_presentation_with_validated_slides(
                 &presentation,
-                &self.slides,
+                &editing.slides,
             )?,
             changed: false,
             rdf: None,
@@ -411,23 +723,14 @@ impl Snapshot {
             content: None,
             layer_operations: Vec::new(),
             media_bytes: 0,
-            resource_bytes: self.resource_bytes,
-            source_resource_bytes: self.resource_bytes,
+            resource_bytes: editing.resource_bytes,
+            source_resource_bytes: editing.resource_bytes,
             non_media_changed: false,
             media_changed: false,
             slide_order_changed: false,
             dependency_free_slide_copy_changed: false,
             dependency_free_slide_removal_changed: false,
         })
-    }
-
-    /// Materialize this snapshot as the ordinary read facade.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the retained package can no longer be parsed.
-    pub fn to_presentation(&self) -> Result<Presentation> {
-        Presentation::from_owned_package(self.package.clone())
     }
 
     /// Return the identity of the validated archive index retained by this
@@ -473,8 +776,8 @@ impl<'a> From<&'a str> for Selector<'a> {
 }
 
 /// An isolated mutable draft that cannot alter its source snapshot.
-pub struct Transaction {
-    source: Snapshot,
+pub struct Edit {
+    source: Package,
     draft: MutablePresentation,
     changed: bool,
     rdf: Option<RdfDraft>,
@@ -626,6 +929,8 @@ enum DesignOperation {
         slide_index: usize,
         name: Option<String>,
     },
+    SetHandout(crate::handout_master::Master),
+    RemoveHandout,
 }
 
 struct DesignDraft {
@@ -636,6 +941,8 @@ struct DesignDraft {
     masters: Vec<crate::MasterPage>,
     original_pages: crate::page::Collection,
     pages: crate::page::Collection,
+    original_handout: Option<crate::handout_master::Master>,
+    handout: Option<crate::handout_master::Master>,
     operations: Vec<DesignOperation>,
 }
 
@@ -667,7 +974,7 @@ struct ContentDraft {
     operations: Vec<crate::content::Operation>,
 }
 
-impl Transaction {
+impl Edit {
     /// Borrow the current staged slide projection.
     #[must_use]
     pub fn slides(&self) -> &[Slide] {
@@ -1038,7 +1345,7 @@ impl Transaction {
     /// read-only source. Refusal leaves the transaction unchanged.
     pub fn transfer_dependency_free_blank_slide_from<'a, S>(
         &mut self,
-        source: &Snapshot,
+        source: &Package,
         selector: S,
     ) -> Result<Option<usize>>
     where
@@ -1054,7 +1361,7 @@ impl Transaction {
                 "ODP foreign blank-slide transfer cannot be staged after a slide move",
             );
         }
-        let Some(source_index) = select(source.slides(), selector.into())? else {
+        let Some(source_index) = select(source.slides()?, selector.into())? else {
             return Ok(None);
         };
         if self.dependency_free_slide_removal_changed {
@@ -1116,7 +1423,7 @@ impl Transaction {
             .draft
             .prepare_foreign_dependency_free_blank_slide_copy(
                 donor_page,
-                &source.slides()[source_index],
+                &source.slides()?[source_index],
                 source_name,
             )?;
         let candidate = self.resource_candidate(0, copy.resource_bytes())?;
@@ -1588,7 +1895,7 @@ impl Transaction {
     /// Returns an error for a missing object/page, dangling dependency, unsafe resource, or limit.
     pub fn transfer_text_box_from<'a, P>(
         &mut self,
-        source: &Snapshot,
+        source: &Package,
         source_name: &str,
         destination_page: P,
         destination_name: impl Into<String>,
@@ -1612,7 +1919,7 @@ impl Transaction {
     /// Returns an error for a missing object/page, dangling dependency, unsafe resource, or limit.
     pub fn transfer_table_from<'a, P>(
         &mut self,
-        source: &Snapshot,
+        source: &Package,
         source_name: &str,
         destination_page: P,
         destination_name: impl Into<String>,
@@ -1636,7 +1943,7 @@ impl Transaction {
     /// Returns an error for a missing owner/page, dangling dependency, collision, or limit.
     pub fn transfer_form_control_from<'a, P>(
         &mut self,
-        source: &Snapshot,
+        source: &Package,
         source_name: &str,
         destination_page: P,
         destination_name: impl Into<String>,
@@ -1645,7 +1952,7 @@ impl Transaction {
         P: Into<crate::charts::Page<'a>>,
     {
         let page_index = self.content_page_index(destination_page.into())?;
-        let source_presentation = source.to_presentation()?;
+        let source_presentation = source.presentation()?;
         let operation = crate::content::prepare_control_transfer(
             source_presentation.owned_package(),
             page_index,
@@ -2054,7 +2361,7 @@ impl Transaction {
     /// dependency, invalid destination selector, identity collision, or resource limit.
     pub fn transfer_chart_from<'a, 'b, S, P>(
         &mut self,
-        source: &Snapshot,
+        source: &Package,
         source_chart: S,
         destination_page: P,
         destination_name: impl Into<String>,
@@ -2229,6 +2536,61 @@ impl Transaction {
         })
     }
 
+    /// Inspect the singleton handout master in the current package draft.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `styles.xml` is missing, malformed, or over budget.
+    pub fn handout_master(&mut self) -> Result<Option<&crate::handout_master::Master>> {
+        self.ensure_design()?;
+        self.design
+            .as_ref()
+            .map(|draft| draft.handout.as_ref())
+            .ok_or_else(|| invalid_error("ODP design draft initialization failed"))
+    }
+
+    /// Insert or replace the singleton handout master.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid master or dangling layout references.
+    pub fn set_handout_master(&mut self, master: &crate::handout_master::Master) -> Result<()> {
+        self.stage_design_operation(DesignOperation::SetHandout(master.clone()))
+    }
+
+    /// Insert a handout master, failing if the draft already has one.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a handout master exists or the master is invalid.
+    pub fn add_handout_master(&mut self, master: &crate::handout_master::Master) -> Result<()> {
+        if self.handout_master()?.is_some() {
+            return invalid("ODP package already has a handout master");
+        }
+        self.set_handout_master(master)
+    }
+
+    /// Replace the handout master, failing if the draft has none.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when no handout master exists or the master is invalid.
+    pub fn replace_handout_master(&mut self, master: &crate::handout_master::Master) -> Result<()> {
+        if self.handout_master()?.is_none() {
+            return invalid("ODP package has no handout master");
+        }
+        self.set_handout_master(master)
+    }
+
+    /// Remove the optional handout master.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `styles.xml` is missing or malformed.
+    pub fn remove_handout_master(&mut self) -> Result<()> {
+        self.stage_design_operation(DesignOperation::RemoveHandout)
+    }
+
     /// Inspect slide- and shape-anchored annotations in the current package draft.
     ///
     /// # Errors
@@ -2310,8 +2672,13 @@ impl Transaction {
     /// # Errors
     ///
     /// Returns an error if validation, bounded serialization, package parsing, or semantic
-    /// readback fails. The source snapshot is never changed.
-    pub fn commit(self) -> Result<Commit> {
+    /// readback fails. The source package is never changed. A changed write
+    /// on a signed or encrypted source is refused when the edit starts.
+    pub fn commit(self) -> std::result::Result<Commit, PackageError> {
+        Ok(self.commit_core()?)
+    }
+
+    pub(crate) fn commit_core(self) -> Result<Commit> {
         let rdf_changed = self
             .rdf
             .as_ref()
@@ -2377,8 +2744,8 @@ impl Transaction {
         let (mut bytes, mut package, slide_candidate, mut audit_proof) = if self.changed {
             let (package, audit_proof) = self.draft.to_owned_package_bounded(MAX_PACKAGE_BYTES)?;
             let bytes = package.shared_bytes();
-            let candidate = Snapshot::from_owned_package(package.clone())?;
-            if candidate.slides() != self.draft.slides() {
+            let candidate = Package::from_owned_package(package.clone())?;
+            if candidate.slides()? != self.draft.slides() {
                 return invalid("ODP transaction readback differs from the staged slide model");
             }
             (bytes, package, Some(candidate), audit_proof)
@@ -2589,7 +2956,7 @@ impl Transaction {
                 candidate
             },
             (true, None) => unreachable!("a slide-only ODP commit always has a slide candidate"),
-            (false, _) => Snapshot::from_owned_package(reopened)?,
+            (false, _) => Package::from_owned_package(reopened)?,
         };
         let patch = Patch {
             before: self.source,
@@ -2768,6 +3135,7 @@ impl Transaction {
             let layouts = presentation.layouts()?;
             let masters = presentation.master_pages()?;
             let pages = presentation.pages()?;
+            let handout = presentation.handout_master()?;
             self.design = Some(DesignDraft {
                 package,
                 original_layouts: layouts.clone(),
@@ -2776,6 +3144,8 @@ impl Transaction {
                 masters,
                 original_pages: pages.clone(),
                 pages,
+                original_handout: handout.clone(),
+                handout,
                 operations: Vec::new(),
             });
         }
@@ -2798,6 +3168,7 @@ impl Transaction {
         let layouts = presentation.layouts()?;
         let masters = presentation.master_pages()?;
         let pages = presentation.pages()?;
+        let handout = presentation.handout_master()?;
         let draft = self
             .design
             .as_mut()
@@ -2805,17 +3176,20 @@ impl Transaction {
         if layouts == draft.layouts
             && root_masters_equal(&masters, &draft.masters)
             && pages == draft.pages
+            && handout == draft.handout
         {
             return Ok(());
         }
         if layouts == draft.original_layouts
             && root_masters_equal(&masters, &draft.original_masters)
             && pages == draft.original_pages
+            && handout == draft.original_handout
         {
             draft.package = self.source.package.clone();
             draft.layouts = layouts;
             draft.masters = masters;
             draft.pages = pages;
+            draft.handout = handout;
             draft.operations.clear();
             return Ok(());
         }
@@ -2823,6 +3197,7 @@ impl Transaction {
         draft.layouts = layouts;
         draft.masters = masters;
         draft.pages = pages;
+        draft.handout = handout;
         draft.operations.push(operation);
         Ok(())
     }
@@ -2851,14 +3226,14 @@ impl Transaction {
 
     fn transfer_content_object_from(
         &mut self,
-        source: &Snapshot,
+        source: &Package,
         source_name: &str,
         destination_page: crate::charts::Page<'_>,
         destination_name: String,
         kind: crate::content::ObjectKind,
     ) -> Result<()> {
         let page_index = self.content_page_index(destination_page)?;
-        let source_presentation = source.to_presentation()?;
+        let source_presentation = source.presentation()?;
         let operation = crate::content::prepare_object_transfer(
             source_presentation.owned_package(),
             page_index,
@@ -3083,7 +3458,7 @@ impl Transaction {
 
     fn check_projected(&self, resource_bytes: usize, media_bytes: usize) -> Result<()> {
         let _projected = projected_size(
-            self.source.bytes().len(),
+            self.source.as_bytes().len(),
             self.source_resource_bytes,
             resource_bytes,
             media_bytes,
@@ -3110,7 +3485,7 @@ impl Transaction {
 
 /// A validated publication result containing a snapshot and reversible patch.
 pub struct Commit {
-    snapshot: Snapshot,
+    snapshot: Package,
     patch: Patch,
     changed: bool,
     #[cfg(test)]
@@ -3118,7 +3493,7 @@ pub struct Commit {
 }
 
 impl Commit {
-    fn unchanged(snapshot: Snapshot) -> Self {
+    fn unchanged(snapshot: Package) -> Self {
         let patch = Patch {
             before: snapshot.clone(),
             after: snapshot.clone(),
@@ -3133,15 +3508,9 @@ impl Commit {
         }
     }
 
-    /// Return whether publication rebuilt the package.
+    /// Borrow the published immutable package.
     #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-
-    /// Borrow the published immutable snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub const fn package(&self) -> &Package {
         &self.snapshot
     }
 
@@ -3151,10 +3520,25 @@ impl Commit {
         &self.patch
     }
 
-    /// Consume the commit into its published snapshot.
+    /// Content-free facts about this commit.
     #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
+    pub fn diagnostics(&self) -> Diagnostics {
+        Diagnostics {
+            changed: self.changed,
+            domains: Arc::clone(&self.patch.domains),
+        }
+    }
+
+    /// Consume the commit into its published package.
+    #[must_use]
+    pub fn into_package(self) -> Package {
         self.snapshot
+    }
+
+    /// Consume the commit into its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.snapshot, self.patch)
     }
 
     #[cfg(test)]
@@ -3163,11 +3547,32 @@ impl Commit {
     }
 }
 
+/// Content-free facts about one [`Commit`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Diagnostics {
+    changed: bool,
+    domains: Arc<[Domain]>,
+}
+
+impl Diagnostics {
+    /// Whether publication rebuilt the package.
+    #[must_use]
+    pub const fn changed(&self) -> bool {
+        self.changed
+    }
+
+    /// The sorted semantic dependency domains the commit changed.
+    #[must_use]
+    pub fn domains(&self) -> &[Domain] {
+        &self.domains
+    }
+}
+
 /// An exact-byte-source-checked reversible ODP package patch.
 #[derive(Clone)]
 pub struct Patch {
-    before: Snapshot,
-    after: Snapshot,
+    before: Package,
+    after: Package,
     domains: Arc<[Domain]>,
 }
 
@@ -3178,7 +3583,7 @@ impl Patch {
     ///
     /// Returns an error when `source` is not byte-for-byte identical to the patch source or
     /// its signature/encryption policy makes it read-only.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+    pub(crate) fn apply(&self, source: &Package) -> Result<Package> {
         if !same_source(&self.before, source) {
             return invalid("stale ODP presentation patch source");
         }
@@ -3262,7 +3667,7 @@ impl Patch {
     ///
     /// Returns an error for different sources, a reported conflict, or an RDF delta that cannot
     /// be replayed and verified over the other target.
-    pub fn join_snapshot(&self, other: &Self) -> Result<Snapshot> {
+    pub fn join_snapshot(&self, other: &Self) -> Result<Package> {
         let plan = self.plan_join(other)?;
         if !plan.is_independent() {
             return unsupported("ODP patch join requires resolution of semantic conflicts");
@@ -3290,7 +3695,7 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error when either side was not authored against `base`.
-    pub fn plan_three_way(base: &Snapshot, left: &Self, right: &Self) -> Result<MergePlan> {
+    pub fn plan_three_way(base: &Package, left: &Self, right: &Self) -> Result<MergePlan> {
         if !same_source(base, &left.before) || !same_source(base, &right.before) {
             return invalid("ODP three-way merge patches do not share the supplied base");
         }
@@ -3302,7 +3707,7 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error when either side was not authored against `base`.
-    pub fn three_way(base: &Snapshot, left: &Self, right: &Self) -> Result<MergePlan> {
+    pub fn three_way(base: &Package, left: &Self, right: &Self) -> Result<MergePlan> {
         Self::plan_three_way(base, left, right)
     }
 
@@ -3313,7 +3718,7 @@ impl Patch {
     ///
     /// Returns an error when either patch is not rooted at `base`, the planner reports a
     /// conflict, or the bounded semantic compositor cannot verify the merged package.
-    pub fn three_way_snapshot(base: &Snapshot, left: &Self, right: &Self) -> Result<Snapshot> {
+    pub fn three_way_snapshot(base: &Package, left: &Self, right: &Self) -> Result<Package> {
         Self::plan_three_way(base, left, right)?;
         left.join_snapshot(right)
     }
@@ -3327,8 +3732,8 @@ impl Patch {
     ///
     /// Returns an allocation or size error when the bounded envelope cannot be materialized.
     pub fn to_durable_bytes(&self) -> Result<Vec<u8>> {
-        let before_len = self.before.bytes().len();
-        let after_len = self.after.bytes().len();
+        let before_len = self.before.as_bytes().len();
+        let after_len = self.after.as_bytes().len();
         let capacity = DURABLE_PATCH_MAGIC
             .len()
             .checked_add(2 + 1 + 8 + 8)
@@ -3354,8 +3759,8 @@ impl Patch {
         output.push(domain_bits(&self.domains));
         output.extend_from_slice(&u64::try_from(before_len).unwrap_or(u64::MAX).to_le_bytes());
         output.extend_from_slice(&u64::try_from(after_len).unwrap_or(u64::MAX).to_le_bytes());
-        output.extend_from_slice(self.before.bytes());
-        output.extend_from_slice(self.after.bytes());
+        output.extend_from_slice(self.before.as_bytes());
+        output.extend_from_slice(self.after.as_bytes());
         Ok(output)
     }
 
@@ -3393,8 +3798,8 @@ impl Patch {
             return invalid("ODP durable patch length does not match its envelope");
         }
         let before_end = offset + before_len;
-        let before = Snapshot::from_bytes(bytes[offset..before_end].to_vec())?;
-        let after = Snapshot::from_bytes(bytes[before_end..].to_vec())?;
+        let before = Package::from_vec(bytes[offset..before_end].to_vec())?;
+        let after = Package::from_vec(bytes[before_end..].to_vec())?;
         Ok(Self {
             before,
             after,
@@ -3405,7 +3810,7 @@ impl Patch {
 
 /// Entry- and byte-bounded undo/redo history for immutable ODP snapshots.
 pub struct History {
-    entries: Vec<Snapshot>,
+    entries: Vec<Package>,
     cursor: usize,
     max_entries: usize,
     max_bytes: usize,
@@ -3418,14 +3823,14 @@ impl History {
     /// # Errors
     ///
     /// Returns an error for zero limits or a byte budget smaller than the root package.
-    pub fn new(initial: Snapshot, max_entries: usize, max_bytes: usize) -> Result<Self> {
+    pub fn new(initial: Package, max_entries: usize, max_bytes: usize) -> Result<Self> {
         if max_entries == 0 || max_bytes == 0 {
             return invalid("ODP history limits must be positive");
         }
-        if initial.bytes().len() > max_bytes {
+        if initial.as_bytes().len() > max_bytes {
             return invalid("ODP history byte budget cannot retain its initial snapshot");
         }
-        let retained_bytes = initial.bytes().len();
+        let retained_bytes = initial.as_bytes().len();
         Ok(Self {
             entries: vec![initial],
             cursor: 0,
@@ -3437,7 +3842,7 @@ impl History {
 
     /// Borrow the current immutable snapshot.
     #[must_use]
-    pub fn current(&self) -> &Snapshot {
+    pub fn current(&self) -> &Package {
         &self.entries[self.cursor]
     }
 
@@ -3456,13 +3861,13 @@ impl History {
         if !commit.changed {
             return Ok(());
         }
-        let target_bytes = commit.snapshot.bytes().len();
+        let target_bytes = commit.snapshot.as_bytes().len();
         if target_bytes > self.max_bytes {
             return invalid("ODP history target exceeds the byte budget");
         }
         if self.cursor + 1 < self.entries.len() {
             for removed in self.entries.drain(self.cursor + 1..) {
-                self.retained_bytes = self.retained_bytes.saturating_sub(removed.bytes().len());
+                self.retained_bytes = self.retained_bytes.saturating_sub(removed.as_bytes().len());
             }
         }
         self.entries.push(commit.snapshot.clone());
@@ -3473,7 +3878,7 @@ impl History {
         self.cursor = self.entries.len() - 1;
         while self.entries.len() > self.max_entries || self.retained_bytes > self.max_bytes {
             let removed = self.entries.remove(0);
-            self.retained_bytes = self.retained_bytes.saturating_sub(removed.bytes().len());
+            self.retained_bytes = self.retained_bytes.saturating_sub(removed.as_bytes().len());
             self.cursor = self.cursor.saturating_sub(1);
         }
         Ok(())
@@ -3481,7 +3886,7 @@ impl History {
 
     /// Move to the previous retained snapshot.
     #[must_use]
-    pub fn undo(&mut self) -> Option<&Snapshot> {
+    pub fn undo(&mut self) -> Option<&Package> {
         if self.cursor == 0 {
             return None;
         }
@@ -3491,7 +3896,7 @@ impl History {
 
     /// Move to the next retained snapshot.
     #[must_use]
-    pub fn redo(&mut self) -> Option<&Snapshot> {
+    pub fn redo(&mut self) -> Option<&Package> {
         if self.cursor + 1 >= self.entries.len() {
             return None;
         }
@@ -3530,7 +3935,7 @@ impl History {
         let header_len = DURABLE_HISTORY_MAGIC.len() + 2 + (8 * 4);
         let capacity = self.entries.iter().try_fold(header_len, |size, snapshot| {
             size.checked_add(8)
-                .and_then(|value| value.checked_add(snapshot.bytes().len()))
+                .and_then(|value| value.checked_add(snapshot.as_bytes().len()))
                 .ok_or_else(|| invalid_error("ODP durable history size overflow"))
         })?;
         if capacity > MAX_DURABLE_HISTORY_BYTES {
@@ -3550,8 +3955,8 @@ impl History {
         write_len(&mut output, self.cursor)?;
         write_len(&mut output, self.entries.len())?;
         for snapshot in &self.entries {
-            write_len(&mut output, snapshot.bytes().len())?;
-            output.extend_from_slice(snapshot.bytes());
+            write_len(&mut output, snapshot.as_bytes().len())?;
+            output.extend_from_slice(snapshot.as_bytes());
         }
         Ok(output)
     }
@@ -3606,7 +4011,7 @@ impl History {
             let package = bytes
                 .get(offset..end)
                 .ok_or_else(|| invalid_error("truncated ODP durable history package"))?;
-            entries.push(Snapshot::from_bytes(package.to_vec())?);
+            entries.push(Package::from_vec(package.to_vec())?);
             retained_bytes = retained_bytes
                 .checked_add(length)
                 .ok_or_else(|| invalid_error("ODP durable history byte count overflow"))?;
@@ -3646,7 +4051,7 @@ fn select(slides: &[Slide], selector: Selector<'_>) -> Result<Option<usize>> {
     }
 }
 
-fn same_source(left: &Snapshot, right: &Snapshot) -> bool {
+fn same_source(left: &Package, right: &Package) -> bool {
     Arc::ptr_eq(&left.bytes, &right.bytes) || left.bytes == right.bytes
 }
 
@@ -3750,7 +4155,7 @@ fn package_security_policy(package: &OwnedPackage) -> Result<SecurityPolicy> {
     })
 }
 
-fn materialize_rdf_join(rdf_patch: &Patch, target_patch: &Patch) -> Result<Snapshot> {
+fn materialize_rdf_join(rdf_patch: &Patch, target_patch: &Patch) -> Result<Package> {
     let base_package = rdf_patch.before.package.clone();
     let rdf_target_package = rdf_patch.after.package.clone();
     let base_graphs = crate::rdf::graphs(&base_package)?;
@@ -3812,7 +4217,7 @@ fn materialize_rdf_join(rdf_patch: &Patch, target_patch: &Patch) -> Result<Snaps
     if package.as_bytes().len() > MAX_PACKAGE_BYTES {
         return invalid("ODP joined package exceeds the 128 MiB package limit");
     }
-    let joined = Snapshot::from_owned_package(package)?;
+    let joined = Package::from_owned_package(package)?;
     if crate::rdf::graphs(&joined.package)? != expected_graphs {
         return invalid("ODP joined package RDF readback differs from the expected graph model");
     }
@@ -3906,6 +4311,8 @@ fn apply_design_operation(package: &OwnedPackage, operation: &DesignOperation) -
         DesignOperation::AssignSlideLayout { slide_index, name } => {
             presentation.assign_slide_page_layout(*slide_index, name.as_deref())?;
         },
+        DesignOperation::SetHandout(master) => presentation.set_handout_master(master)?,
+        DesignOperation::RemoveHandout => presentation.clear_handout_master()?,
     }
     presentation.to_bytes()
 }
@@ -4009,50 +4416,45 @@ fn try_owned_str(value: &str, resource: &'static str) -> Result<String> {
     Ok(owned)
 }
 
-fn read_bounded(path: &Path, limit: usize) -> Result<Vec<u8>> {
-    let mut file = File::open(path)?;
-    let declared = file.metadata()?.len();
-    let limit_u64 = u64::try_from(limit).unwrap_or(u64::MAX);
-    if declared > limit_u64 {
-        return invalid(format!(
-            "ODP editing package exceeds the {limit}-byte limit"
-        ));
+fn editing_projection(presentation: &Presentation) -> Result<Editing> {
+    let slides = presentation.slides()?;
+    if slides.len() > MAX_SLIDES {
+        return invalid("ODP editing snapshot exceeds the slide-count limit");
     }
-    let capacity = usize::try_from(declared).map_err(|error| {
-        invalid_error(format!(
-            "ODP package length does not fit this platform: {error}"
-        ))
-    })?;
+    let resource_bytes = slides_resource(&slides)?;
+    if resource_bytes > MAX_DRAFT_BYTES {
+        return invalid("ODP editing snapshot exceeds the aggregate draft limit");
+    }
+    Ok(Editing {
+        resource_bytes,
+        slides: Arc::from(slides),
+    })
+}
+
+fn check_input_bytes(
+    length: usize,
+    limits: litchi_odf_common::SourceLimits,
+) -> std::result::Result<(), PackageError> {
+    let observed = u64::try_from(length).unwrap_or(u64::MAX);
+    if observed > limits.max_input_bytes() {
+        return Err(PackageError::Limit {
+            kind: LimitKind::Source(litchi_odf_common::SourceLimitKind::InputBytes),
+            observed,
+            maximum: limits.max_input_bytes(),
+        });
+    }
+    Ok(())
+}
+
+fn copy_input(source: &[u8]) -> Result<Vec<u8>> {
     let mut bytes = Vec::new();
     bytes
-        .try_reserve_exact(capacity)
+        .try_reserve_exact(source.len())
         .map_err(|source| Error::Allocation {
-            resource: "ODP bounded package input",
+            resource: "ODP package bytes",
             source,
         })?;
-    let mut buffer = [0u8; 8 * 1024];
-    loop {
-        let read = file.read(&mut buffer)?;
-        if read == 0 {
-            break;
-        }
-        let candidate = bytes
-            .len()
-            .checked_add(read)
-            .ok_or_else(|| invalid_error("ODP bounded package input size overflow"))?;
-        if candidate > limit {
-            return invalid(format!(
-                "ODP editing package exceeds the {limit}-byte limit"
-            ));
-        }
-        bytes
-            .try_reserve_exact(read)
-            .map_err(|source| Error::Allocation {
-                resource: "ODP bounded package input",
-                source,
-            })?;
-        bytes.extend_from_slice(&buffer[..read]);
-    }
+    bytes.extend_from_slice(source);
     Ok(bytes)
 }
 
@@ -4239,19 +4641,42 @@ fn unsupported<T>(message: impl Into<String>) -> Result<T> {
 #[cfg(test)]
 mod tests {
     use super::{
-        MAX_PACKAGE_BYTES, Snapshot, bounded_candidate, projected_size, read_bounded,
-        validate_package_size,
+        MAX_PACKAGE_BYTES, Package, bounded_candidate, projected_size, validate_package_size,
     };
     use crate::Builder;
     use litchi_core::Result;
 
     #[test]
-    fn bounded_file_reader_accepts_n_and_rejects_n_plus_one() -> Result<()> {
+    fn path_ingress_input_limit_rejects_n_plus_one_before_indexing() -> Result<()> {
+        let package = Builder::new().build()?;
         let file = tempfile::NamedTempFile::new()?;
-        std::fs::write(file.path(), b"1234")?;
-        assert_eq!(read_bounded(file.path(), 4)?, b"1234");
-        std::fs::write(file.path(), b"12345")?;
-        assert!(read_bounded(file.path(), 4).is_err());
+        package.save(file.path())?;
+        let length = u64::try_from(package.as_bytes().len()).unwrap_or(u64::MAX);
+        let exact = litchi_odf_common::SourceLimits::builder()
+            .max_input_bytes(length)?
+            .build()?;
+        let reopened = Package::open_with_options(
+            file.path(),
+            litchi_odf_common::OpenOptions::new().source_limits(exact),
+        )?;
+        assert_eq!(reopened.as_bytes(), package.as_bytes());
+        let below = litchi_odf_common::SourceLimits::builder()
+            .max_input_bytes(length - 1)?
+            .build()?;
+        let error = Package::open_with_options(
+            file.path(),
+            litchi_odf_common::OpenOptions::new().source_limits(below),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            litchi_odf_common::Error::Limit {
+                kind: litchi_odf_common::LimitKind::Source(
+                    litchi_odf_common::SourceLimitKind::InputBytes
+                ),
+                ..
+            }
+        ));
         Ok(())
     }
 
@@ -4275,8 +4700,8 @@ mod tests {
     fn changed_slide_commit_reports_the_authored_audit_fast_path() -> Result<()> {
         let mut builder = Builder::new();
         builder.add_slide_with_title("Original", "Body")?;
-        let source = Snapshot::from_bytes(builder.build()?)?;
-        let mut transaction = source.transaction()?;
+        let source = builder.build()?;
+        let mut transaction = source.edit()?;
         transaction.add("Added", "Body")?;
         let commit = transaction.commit()?;
         assert!(commit.publication_audit_hit());
@@ -4287,8 +4712,8 @@ mod tests {
     fn later_rdf_rewrite_clears_the_serialization_audit_proof() -> Result<()> {
         let mut builder = Builder::new();
         builder.add_slide_with_title("Original", "Body")?;
-        let source = Snapshot::from_bytes(builder.build()?)?;
-        let mut transaction = source.transaction()?;
+        let source = builder.build()?;
+        let mut transaction = source.edit()?;
         transaction.add("Added", "Body")?;
         let triple = crate::rdf::Triple {
             subject: crate::rdf::Subject::Iri("urn:litchi:test-subject".to_string()),

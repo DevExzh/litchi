@@ -74,7 +74,7 @@ fn opens_every_document_family_and_template_losslessly() {
         (constants::ODF_DATABASE, Family::Database, false),
     ] {
         let bytes = package(mimetype);
-        let document = Package::from_bytes(bytes.clone()).unwrap();
+        let document = Package::from_bytes(&bytes).unwrap();
         assert_eq!(document.family(), family);
         assert_eq!(document.is_template(), template);
         assert_eq!(document.mimetype(), mimetype);
@@ -91,18 +91,18 @@ fn rejects_non_odf_missing_content_and_invalid_xml_bytes() {
     let mut writer = PackageWriter::new();
     writer.set_mimetype("application/zip").unwrap();
     writer.add_file(constants::ODF_CONTENT, b"<x/>").unwrap();
-    assert!(Package::from_bytes(writer.finish_to_bytes().unwrap()).is_err());
+    assert!(Package::from_bytes(&writer.finish_to_bytes().unwrap()).is_err());
 
     let mut writer = PackageWriter::new();
     writer.set_mimetype(constants::ODF_DRAWING).unwrap();
-    assert!(Package::from_bytes(writer.finish_to_bytes().unwrap()).is_err());
+    assert!(Package::from_bytes(&writer.finish_to_bytes().unwrap()).is_err());
 
     let mut writer = PackageWriter::new();
     writer.set_mimetype(constants::ODF_CHART).unwrap();
     writer.add_file(constants::ODF_CONTENT, b"<x/>").unwrap();
     let package = writer.finish_to_bytes().unwrap();
     let invalid_xml = replace_zip_member_raw(&package, constants::ODF_CONTENT, &[0xff]);
-    assert!(Package::from_bytes(invalid_xml).is_err());
+    assert!(Package::from_bytes(&invalid_xml).is_err());
 }
 
 #[test]

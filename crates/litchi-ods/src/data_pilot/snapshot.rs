@@ -1,7 +1,7 @@
 //! Owned `DataPilot` snapshots, edits, commits, and reversible patches.
 
 use super::{Catalog, Selector, validation};
-use crate::{model::data_pilot::Table, package::Package};
+use crate::{model::data_pilot::Table, package::Archive};
 use litchi_core::{Error, Result};
 
 /// Immutable `DataPilot` owner bound to one complete ODS package source.
@@ -18,7 +18,7 @@ impl Snapshot {
     /// # Errors
     /// Returns an error when the operation cannot be completed.
     pub fn from_bytes(source: Vec<u8>) -> Result<Self> {
-        let package = Package::from_bytes(source.clone())?;
+        let package = Archive::from_bytes(source.clone())?;
         let catalog = Catalog::load(&package)?;
         Ok(Self {
             source,
@@ -127,7 +127,7 @@ impl Edit {
         let target = if unchanged {
             self.before.clone()
         } else {
-            let package = Package::from_bytes(self.before.source.clone())?;
+            let package = Archive::from_bytes(self.before.source.clone())?;
             let catalog = Catalog::load(&package)?;
             let bytes = super::package::replace(
                 &package,
@@ -160,7 +160,7 @@ impl Edit {
     }
 
     fn before_location(&self) -> Result<super::codec::Location> {
-        let package = Package::from_bytes(self.before.source.clone())?;
+        let package = Archive::from_bytes(self.before.source.clone())?;
         Ok(Catalog::load(&package)?.location)
     }
 

@@ -1,6 +1,6 @@
 //! Package and flat-document access to named drawing style resources.
 
-use crate::{FlatDocument, Package};
+use crate::{FlatDocument, GenericPackage as Package};
 use litchi_core::Result;
 use litchi_odf_common::drawing::resources::{
     fill_image::{Collection as FillImageCollection, Image, Source, parse_drawing_fill_images},

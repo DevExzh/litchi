@@ -149,6 +149,9 @@ pub(crate) fn run_catalog(content_xml: &str) -> Result<Vec<Kind>> {
 pub(crate) struct OpenParse {
     registry: StyleRegistry,
     style_error: Option<Error>,
+    /// Child elements of the `office:text` body (the projection's top-level
+    /// semantic units), counted for the caller's semantic limits.
+    units: u64,
 }
 
 impl OpenParse {
@@ -171,6 +174,13 @@ impl OpenParse {
         let mut tracker = BindingTracker::new()
             .map_err(|error| error.into_litchi_error("invalid ODT content.xml"))?;
         let mut pending_pop = false;
+        // Element depth after the current start tag: the root is 1,
+        // `office:body` 2, `office:text` 3, so a body unit opens at 4.
+        // `body_depth` records how far down the `body`/`text` chain the
+        // current element path follows; only children of that chain count.
+        let mut depth = 0_usize;
+        let mut body_depth = 0_usize;
+        let mut units = 0_u64;
         loop {
             // Borrowing read: events borrow `content_xml` directly, avoiding
             // the per-event buffer copy of the `_into` API. The tokenization
@@ -197,6 +207,33 @@ impl OpenParse {
                     )));
                 },
             };
+            match &event {
+                Event::Start(element) => {
+                    depth += 1;
+                    // Only the root/body/text chain needs a name; deeper
+                    // elements cost one comparison.
+                    if depth == 4 {
+                        if body_depth == 3 {
+                            units += 1;
+                        }
+                    } else if depth == 2 && element.local_name().as_ref() == b"body" {
+                        body_depth = 2;
+                    } else if depth == 3
+                        && body_depth == 2
+                        && element.local_name().as_ref() == b"text"
+                    {
+                        body_depth = 3;
+                    }
+                },
+                Event::Empty(_) if depth == 3 && body_depth == 3 => units += 1,
+                Event::End(_) => {
+                    if depth == body_depth {
+                        body_depth -= 1;
+                    }
+                    depth = depth.saturating_sub(1);
+                },
+                _ => {},
+            }
             match &event {
                 Event::Start(element) => {
                     // `NamespaceError`'s `Display` is what
@@ -264,7 +301,13 @@ impl OpenParse {
         Ok(Self {
             registry: styles.registry,
             style_error,
+            units,
         })
+    }
+
+    /// Child elements of the `office:text` body.
+    pub(crate) const fn units(&self) -> u64 {
+        self.units
     }
 
     /// Surface the recorded content-styles error or return the registry the
@@ -419,6 +462,7 @@ mod tests {
         validate.finish()?;
 
         Ok(OpenParse {
+            units: 0,
             registry: styles.registry,
             style_error,
         })

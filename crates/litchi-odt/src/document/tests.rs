@@ -203,7 +203,7 @@ fn conformant_fixture_opens_with_an_empty_tolerance_report() {
     assert!(document.tolerance_report().is_clean());
 
     // Path-based open and the positional source-backed facade.
-    let document = Document::open(&path).unwrap();
+    let document = crate::Package::open(&path).unwrap().document().unwrap();
     assert!(document.tolerance_report().is_clean());
     let source = std::sync::Arc::new(litchi_core::OwnedSource::new(std::fs::read(&path).unwrap()));
     let source_document = super::SourceBackedDocument::from_read_at(source).unwrap();

@@ -25,7 +25,7 @@ const MAX_XML_DEPTH: usize = 1_024;
 enum Kind {
     Root,
     Body,
-    Spreadsheet,
+    Workbook,
     DdeLink,
     DdeCache,
     Table,
@@ -608,7 +608,7 @@ fn parse_impl(
                 }
                 match kind {
                     Kind::Root => {},
-                    Kind::Body | Kind::Spreadsheet | Kind::DdeLink | Kind::DdeCache => {},
+                    Kind::Body | Kind::Workbook | Kind::DdeLink | Kind::DdeCache => {},
                     Kind::Other => {
                         if current_cell
                             .as_ref()
@@ -631,7 +631,7 @@ fn parse_impl(
                         }
                     },
                     Kind::Table => {
-                        if stack.last() != Some(&Kind::Spreadsheet) {
+                        if stack.last() != Some(&Kind::Workbook) {
                             return Err(Error::InvalidFormat(
                                 "table:table must be a direct child of office:spreadsheet"
                                     .to_string(),
@@ -738,7 +738,7 @@ fn parse_impl(
                 }
                 match kind {
                     Kind::Table => {
-                        if stack.last() != Some(&Kind::Spreadsheet) {
+                        if stack.last() != Some(&Kind::Workbook) {
                             return Err(Error::InvalidFormat(
                                 "table:table must be a direct child of office:spreadsheet"
                                     .to_string(),
@@ -854,7 +854,7 @@ fn parse_impl(
                     },
                     Kind::Root
                     | Kind::Body
-                    | Kind::Spreadsheet
+                    | Kind::Workbook
                     | Kind::DdeLink
                     | Kind::DdeCache
                     | Kind::Text => {},
@@ -966,7 +966,7 @@ fn parse_impl(
                     },
                     Kind::Root
                     | Kind::Body
-                    | Kind::Spreadsheet
+                    | Kind::Workbook
                     | Kind::DdeLink
                     | Kind::DdeCache
                     | Kind::Text
@@ -1384,7 +1384,7 @@ impl WorksheetHandler {
                 }
                 match kind {
                     Kind::Root => {},
-                    Kind::Body | Kind::Spreadsheet | Kind::DdeLink | Kind::DdeCache => {},
+                    Kind::Body | Kind::Workbook | Kind::DdeLink | Kind::DdeCache => {},
                     Kind::Other => {
                         if self
                             .current_cell
@@ -1408,7 +1408,7 @@ impl WorksheetHandler {
                         }
                     },
                     Kind::Table => {
-                        if self.stack.last() != Some(&Kind::Spreadsheet) {
+                        if self.stack.last() != Some(&Kind::Workbook) {
                             return Err(Error::InvalidFormat(
                                 "table:table must be a direct child of office:spreadsheet"
                                     .to_string(),
@@ -1516,7 +1516,7 @@ impl WorksheetHandler {
                 }
                 match kind {
                     Kind::Table => {
-                        if self.stack.last() != Some(&Kind::Spreadsheet) {
+                        if self.stack.last() != Some(&Kind::Workbook) {
                             return Err(Error::InvalidFormat(
                                 "table:table must be a direct child of office:spreadsheet"
                                     .to_string(),
@@ -1636,7 +1636,7 @@ impl WorksheetHandler {
                     },
                     Kind::Root
                     | Kind::Body
-                    | Kind::Spreadsheet
+                    | Kind::Workbook
                     | Kind::DdeLink
                     | Kind::DdeCache
                     | Kind::Text => {},
@@ -1748,7 +1748,7 @@ impl WorksheetHandler {
                     },
                     Kind::Root
                     | Kind::Body
-                    | Kind::Spreadsheet
+                    | Kind::Workbook
                     | Kind::DdeLink
                     | Kind::DdeCache
                     | Kind::Text
@@ -1942,7 +1942,7 @@ fn classify(namespace: NamespaceKind, local: &[u8]) -> Kind {
     } else if namespace == NamespaceKind::Office && local == b"body" {
         Kind::Body
     } else if namespace == NamespaceKind::Office && local == b"spreadsheet" {
-        Kind::Spreadsheet
+        Kind::Workbook
     } else if namespace == NamespaceKind::Table && local == b"dde-link" {
         Kind::DdeLink
     } else if namespace == NamespaceKind::Table && local == b"table" {

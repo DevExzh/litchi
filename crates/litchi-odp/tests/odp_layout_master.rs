@@ -4,7 +4,7 @@
 )]
 
 use litchi_odp::{
-    MasterPage, Presentation, constants,
+    MasterPage, Package, constants,
     core::{OwnedPackage, PackageWriter},
     layout::{Layout, Measure, Placeholder, Role},
 };
@@ -20,9 +20,20 @@ fn package() -> Vec<u8> {
     writer.finish().unwrap()
 }
 
+/// Apply one staged operation through the primary edit and adopt the commit.
+fn edit_with<T>(
+    package: &mut Package,
+    operation: impl FnOnce(&mut litchi_odp::edit::Edit) -> litchi_core::Result<T>,
+) -> litchi_core::Result<T> {
+    let mut edit = package.edit()?;
+    let value = operation(&mut edit)?;
+    *package = edit.commit()?.into_package();
+    Ok(value)
+}
+
 #[test]
 fn master_pages_are_exported_and_commit_lossless_snapshot_edits() {
-    let mut presentation = Presentation::from_bytes(package()).unwrap();
+    let mut presentation = Package::from_bytes(&package()).unwrap();
     let mut layout = Layout::new("layout-a").unwrap();
     layout.placeholders.push(Placeholder::new(
         Role::Title,
@@ -31,7 +42,7 @@ fn master_pages_are_exported_and_commit_lossless_snapshot_edits() {
         "10cm".parse().unwrap(),
         "2cm".parse().unwrap(),
     ));
-    presentation.add_layout(&layout).unwrap();
+    edit_with(&mut presentation, |edit| edit.add_layout(&layout)).unwrap();
 
     let mut master = MasterPage::new("master-a", "physical").unwrap();
     master.master_page.drawing_style_name = Some("page-style".to_string());
@@ -40,19 +51,27 @@ fn master_pages_are_exported_and_commit_lossless_snapshot_edits() {
         "/>",
         "><draw:rect xmlns:draw=\"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0\"/></style:master-page>",
     );
-    presentation.add_master_page(&master).unwrap();
-    presentation
-        .assign_slide_master_page(0, Some("master-a"))
-        .unwrap();
-    presentation
-        .assign_slide_page_layout(0, Some("layout-a"))
-        .unwrap();
+    edit_with(&mut presentation, |edit| edit.add_master_page(&master)).unwrap();
+    edit_with(&mut presentation, |edit| {
+        edit.assign_slide_master_page(0, Some("master-a"))
+    })
+    .unwrap();
+    edit_with(&mut presentation, |edit| {
+        edit.assign_slide_page_layout(0, Some("layout-a"))
+    })
+    .unwrap();
 
-    let pages = presentation.master_pages().unwrap();
+    let pages = presentation.presentation().unwrap().master_pages().unwrap();
     assert_eq!(pages.len(), 1);
     assert_eq!(pages[0].name(), "master-a");
     assert_eq!(pages[0].page_layout_name.as_deref(), Some("layout-a"));
-    assert!(presentation.content_xml().contains("master-a"));
+    assert!(
+        presentation
+            .presentation()
+            .unwrap()
+            .content_xml()
+            .contains("master-a")
+    );
 }
 
 fn layout(name: &str, width: &str) -> Layout {
@@ -80,13 +99,15 @@ fn host_package() -> Vec<u8> {
 
 #[test]
 fn reorder_remove_reassign_and_unknown_xml_round_trip() {
-    let mut presentation = Presentation::from_bytes(host_package()).unwrap();
-    presentation
-        .add_layout(&layout("layout-a", "20cm"))
-        .unwrap();
-    presentation
-        .add_layout(&layout("layout-b", "18cm"))
-        .unwrap();
+    let mut presentation = Package::from_bytes(&host_package()).unwrap();
+    edit_with(&mut presentation, |edit| {
+        edit.add_layout(&layout("layout-a", "20cm"))
+    })
+    .unwrap();
+    edit_with(&mut presentation, |edit| {
+        edit.add_layout(&layout("layout-b", "18cm"))
+    })
+    .unwrap();
     let mut first = MasterPage::new("master-a", "physical").unwrap();
     first.master_page.drawing_style_name = Some("page-style".to_string());
     first.page_layout_name = Some("layout-a".to_string());
@@ -94,28 +115,35 @@ fn reorder_remove_reassign_and_unknown_xml_round_trip() {
         "/>",
         "><draw:rect xmlns:draw=\"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0\" draw:name=\"kept-master-shape\"/></style:master-page>",
     );
-    presentation.add_master_page(&first).unwrap();
-    presentation
-        .add_master_page(&MasterPage::new("master-b", "physical").unwrap())
-        .unwrap();
-    presentation
-        .assign_slide_master_page(0, Some("master-a"))
-        .unwrap();
-    presentation
-        .assign_slide_page_layout(0, Some("layout-a"))
-        .unwrap();
-    presentation
-        .reorder_layouts(&["layout-b".to_string(), "layout-a".to_string()])
-        .unwrap();
-    presentation
-        .reorder_master_pages(&["master-b".to_string(), "master-a".to_string()])
-        .unwrap();
-    presentation
-        .remove_page_layout("layout-a", Some("layout-b"))
-        .unwrap();
-    presentation
-        .remove_master_page("master-a", Some("master-b"))
-        .unwrap();
+    edit_with(&mut presentation, |edit| edit.add_master_page(&first)).unwrap();
+    edit_with(&mut presentation, |edit| {
+        edit.add_master_page(&MasterPage::new("master-b", "physical").unwrap())
+    })
+    .unwrap();
+    edit_with(&mut presentation, |edit| {
+        edit.assign_slide_master_page(0, Some("master-a"))
+    })
+    .unwrap();
+    edit_with(&mut presentation, |edit| {
+        edit.assign_slide_page_layout(0, Some("layout-a"))
+    })
+    .unwrap();
+    edit_with(&mut presentation, |edit| {
+        edit.reorder_layouts(&["layout-b".to_string(), "layout-a".to_string()])
+    })
+    .unwrap();
+    edit_with(&mut presentation, |edit| {
+        edit.reorder_master_pages(&["master-b".to_string(), "master-a".to_string()])
+    })
+    .unwrap();
+    edit_with(&mut presentation, |edit| {
+        edit.remove_page_layout("layout-a", Some("layout-b"))
+    })
+    .unwrap();
+    edit_with(&mut presentation, |edit| {
+        edit.remove_master_page("master-a", Some("master-b"))
+    })
+    .unwrap();
 
     let bytes = presentation.to_bytes().unwrap();
     let package = OwnedPackage::from_bytes(bytes.clone()).unwrap();
@@ -134,7 +162,9 @@ fn reorder_remove_reassign_and_unknown_xml_round_trip() {
         assert!(!xml.contains("> <"));
     }
     assert_eq!(
-        Presentation::from_bytes(bytes)
+        Package::from_bytes(&bytes)
+            .unwrap()
+            .presentation()
             .unwrap()
             .master_pages()
             .unwrap()
@@ -145,8 +175,11 @@ fn reorder_remove_reassign_and_unknown_xml_round_trip() {
 
 #[test]
 fn invalid_layout_master_edits_are_atomic() {
-    let mut presentation = Presentation::from_bytes(host_package()).unwrap();
-    presentation.add_layout(&layout("signed", "-1cm")).unwrap();
+    let mut presentation = Package::from_bytes(&host_package()).unwrap();
+    edit_with(&mut presentation, |edit| {
+        edit.add_layout(&layout("signed", "-1cm"))
+    })
+    .unwrap();
     let before = presentation.to_bytes().unwrap();
     assert!("NaNcm".parse::<Measure>().is_err());
     assert!("infinity%".parse::<Measure>().is_err());
@@ -158,12 +191,12 @@ fn invalid_layout_master_edits_are_atomic() {
 
     let mut oversized = layout("valid", "1cm");
     oversized.name = "x".repeat(4_097);
-    assert!(presentation.add_layout(&oversized).is_err());
+    assert!(edit_with(&mut presentation, |edit| edit.add_layout(&oversized)).is_err());
     assert_eq!(presentation.to_bytes().unwrap(), before);
     assert!(
-        presentation
-            .assign_slide_master_page(0, Some("missing"))
-            .is_err()
+        edit_with(&mut presentation, |edit| edit
+            .assign_slide_master_page(0, Some("missing")))
+        .is_err()
     );
     assert_eq!(presentation.to_bytes().unwrap(), before);
 
@@ -172,12 +205,12 @@ fn invalid_layout_master_edits_are_atomic() {
         "/>",
         "><script:event-listener xmlns:script=\"urn:oasis:names:tc:opendocument:xmlns:script:1.0\"/></style:master-page>",
     );
-    assert!(presentation.add_master_page(&scripted).is_err());
+    assert!(edit_with(&mut presentation, |edit| edit.add_master_page(&scripted)).is_err());
     assert_eq!(presentation.to_bytes().unwrap(), before);
     assert!(
-        presentation
-            .reorder_layouts(&["unknown".to_string()])
-            .is_err()
+        edit_with(&mut presentation, |edit| edit
+            .reorder_layouts(&["unknown".to_string()]))
+        .is_err()
     );
     assert_eq!(presentation.to_bytes().unwrap(), before);
 }

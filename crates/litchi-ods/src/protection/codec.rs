@@ -117,7 +117,7 @@ impl Location {
                         collect_prefixes(&reader, &element, &mut table_prefix, &mut loext_prefix)?;
                     }
                     let sheet_index = match kind {
-                        ElementKind::Spreadsheet => {
+                        ElementKind::Workbook => {
                             if spreadsheet.is_some() {
                                 return Err(Error::InvalidFormat(
                                     "duplicate office:spreadsheet element".to_string(),
@@ -187,7 +187,7 @@ impl Location {
                         collect_prefixes(&reader, &element, &mut table_prefix, &mut loext_prefix)?;
                     }
                     match kind {
-                        ElementKind::Spreadsheet => {
+                        ElementKind::Workbook => {
                             if spreadsheet.replace(info).is_some() {
                                 return Err(Error::InvalidFormat(
                                     "duplicate office:spreadsheet element".to_string(),
@@ -267,7 +267,7 @@ impl Location {
                         ElementKind::Other
                         | ElementKind::DocumentContent
                         | ElementKind::Body
-                        | ElementKind::Spreadsheet => {},
+                        | ElementKind::Workbook => {},
                     }
                 },
                 Event::Eof => break,
@@ -495,7 +495,7 @@ impl<'a> LocationHandler<'a> {
                     )?;
                 }
                 let sheet_index = match kind {
-                    ElementKind::Spreadsheet => {
+                    ElementKind::Workbook => {
                         if self.spreadsheet.is_some() {
                             return Err(Error::InvalidFormat(
                                 "duplicate office:spreadsheet element".to_string(),
@@ -581,7 +581,7 @@ impl<'a> LocationHandler<'a> {
                     )?;
                 }
                 match kind {
-                    ElementKind::Spreadsheet => {
+                    ElementKind::Workbook => {
                         if self.spreadsheet.replace(info).is_some() {
                             return Err(Error::InvalidFormat(
                                 "duplicate office:spreadsheet element".to_string(),
@@ -665,7 +665,7 @@ impl<'a> LocationHandler<'a> {
                     ElementKind::Other
                     | ElementKind::DocumentContent
                     | ElementKind::Body
-                    | ElementKind::Spreadsheet => {},
+                    | ElementKind::Workbook => {},
                 }
             },
             Event::Eof => {},
@@ -724,7 +724,7 @@ enum ElementKind {
     Other,
     DocumentContent,
     Body,
-    Spreadsheet,
+    Workbook,
     Sheet,
     Protection,
     Automatic,
@@ -745,10 +745,10 @@ fn classify(namespace: &[u8], local: &[u8], parent: Option<ElementKind>) -> Elem
     } else if office && local == b"body" {
         ElementKind::Body
     } else if office && local == b"spreadsheet" {
-        ElementKind::Spreadsheet
+        ElementKind::Workbook
     } else if office && local == b"automatic-styles" {
         ElementKind::Automatic
-    } else if table && local == b"table" && parent == Some(ElementKind::Spreadsheet) {
+    } else if table && local == b"table" && parent == Some(ElementKind::Workbook) {
         ElementKind::Sheet
     } else if local == b"table-protection"
         && (namespace == TABLE_NAMESPACE

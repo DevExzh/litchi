@@ -2,7 +2,7 @@
 
 use super::codec::parse_page_layout_header_footer_properties;
 use super::model::Properties;
-use crate::{FlatDocument, Package};
+use crate::{FlatDocument, GenericPackage as Package};
 use litchi_core::Result;
 
 impl Package {

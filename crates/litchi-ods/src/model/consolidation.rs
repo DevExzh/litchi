@@ -1,4 +1,4 @@
-//! Spreadsheet consolidation declarations.
+//! Workbook consolidation declarations.
 
 use super::structure::{
     split_cell_range_addresses, validate_cell_address, validate_cell_range_addresses,
@@ -389,7 +389,7 @@ fn xml_error(error: quick_xml::Error) -> Error {
 #[cfg(any())]
 mod tests {
     use super::*;
-    use crate::{Builder, MutableSpreadsheet, Spreadsheet};
+    use crate::{Builder, MutableSpreadsheet, Workbook};
 
     const PREFIX: &str = concat!(
         "<office:document-content ",
@@ -484,7 +484,7 @@ mod tests {
         let mut builder = Builder::new();
         builder.add_sheet("Sheet1").unwrap();
         builder.set_consolidation(Some(original.clone())).unwrap();
-        let spreadsheet = Spreadsheet::from_bytes(builder.build().unwrap()).unwrap();
+        let spreadsheet = Workbook::from_bytes(builder.build().unwrap()).unwrap();
         let xml = spreadsheet.content_xml();
         assert!(
             xml.find("</table:table>").unwrap() < xml.find("<table:consolidation ").unwrap(),
@@ -496,7 +496,7 @@ mod tests {
         mutable
             .set_consolidation(Some(replacement.clone()))
             .unwrap();
-        let reopened = Spreadsheet::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+        let reopened = Workbook::from_bytes(mutable.to_bytes().unwrap()).unwrap();
         assert_eq!(reopened.consolidation(), Some(&replacement));
     }
 }

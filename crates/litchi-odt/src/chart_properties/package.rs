@@ -2,7 +2,7 @@
 
 use super::codec::parse_chart_style_properties;
 use super::model::StylePropertiesSet;
-use crate::{FlatDocument, Package};
+use crate::{FlatDocument, GenericPackage as Package};
 use litchi_core::Result;
 
 impl Package {

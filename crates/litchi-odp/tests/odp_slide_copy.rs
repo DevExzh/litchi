@@ -4,7 +4,7 @@
 )]
 
 use litchi_odp::core::{OwnedPackage, PackageWriter};
-use litchi_odp::edit;
+use litchi_odp::{Package, edit};
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const DRAW: &str = "urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
@@ -72,21 +72,21 @@ fn dependency_free_blank_copy_is_exact_named_reversible_and_source_checked() {
         r#"<draw:page draw:name="Untouched"/>"#,
     );
     let source_bytes = package(&content(pages));
-    let source = edit::Snapshot::from_bytes(source_bytes.clone()).unwrap();
-    let mut transaction = source.transaction().unwrap();
+    let source = Package::from_bytes(&source_bytes).unwrap();
+    let mut transaction = source.edit().unwrap();
     assert_eq!(
         transaction.copy_dependency_free_blank_slide(0).unwrap(),
         Some(4)
     );
     let commit = transaction.commit().unwrap();
-    assert!(commit.changed());
-    assert_eq!(source.bytes(), source_bytes);
-    assert_eq!(commit.snapshot().slides().len(), 5);
+    assert!(commit.diagnostics().changed());
+    assert_eq!(source.as_bytes(), source_bytes);
+    assert_eq!(commit.package().slides().unwrap().len(), 5);
 
     let expected_pages = format!("{pages}{}", r#"<draw:page draw:name="Blank Copy 3"/>"#);
-    let published_content = package_content(commit.snapshot().bytes());
+    let published_content = package_content(commit.package().as_bytes());
     assert!(published_content.contains(&expected_pages));
-    let published = OwnedPackage::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    let published = OwnedPackage::from_bytes(commit.package().as_bytes().to_vec()).unwrap();
     assert_eq!(
         published.get_file("Producer/opaque.bin").unwrap(),
         AUXILIARY
@@ -95,8 +95,8 @@ fn dependency_free_blank_copy_is_exact_named_reversible_and_source_checked() {
     assert_eq!(published.get_file("meta.xml").unwrap(), META);
     assert_eq!(
         commit
-            .snapshot()
-            .to_presentation()
+            .package()
+            .presentation()
             .unwrap()
             .pages()
             .unwrap()
@@ -116,24 +116,27 @@ fn dependency_free_blank_copy_is_exact_named_reversible_and_source_checked() {
     let durable =
         edit::Patch::from_durable_bytes(&commit.patch().to_durable_bytes().unwrap()).unwrap();
     assert_eq!(
-        durable.apply(&source).unwrap().bytes(),
-        commit.snapshot().bytes()
+        source.apply(&durable).unwrap().as_bytes(),
+        commit.package().as_bytes()
     );
     assert_eq!(
-        durable.inverse().apply(commit.snapshot()).unwrap().bytes(),
-        source.bytes()
+        commit
+            .package()
+            .apply(&durable.inverse())
+            .unwrap()
+            .as_bytes(),
+        source.as_bytes()
     );
     let stale =
-        edit::Snapshot::from_bytes(package(&content(r#"<draw:page draw:name="Different"/>"#)))
-            .unwrap();
-    assert!(durable.apply(&stale).is_err());
+        Package::from_bytes(&package(&content(r#"<draw:page draw:name="Different"/>"#))).unwrap();
+    assert!(stale.apply(&durable).is_err());
 }
 
 #[test]
 fn missing_copy_selector_is_an_exact_noop() {
     let source_bytes = package(&content(r#"<draw:page draw:name="Blank"/>"#));
-    let source = edit::Snapshot::from_bytes(source_bytes.clone()).unwrap();
-    let mut transaction = source.transaction().unwrap();
+    let source = Package::from_bytes(&source_bytes).unwrap();
+    let mut transaction = source.edit().unwrap();
     assert_eq!(
         transaction
             .copy_dependency_free_blank_slide("Missing")
@@ -141,9 +144,9 @@ fn missing_copy_selector_is_an_exact_noop() {
         None
     );
     let commit = transaction.commit().unwrap();
-    assert!(!commit.changed());
+    assert!(!commit.diagnostics().changed());
     assert!(commit.patch().is_noop());
-    assert_eq!(commit.snapshot().bytes(), source_bytes);
+    assert_eq!(commit.package().as_bytes(), source_bytes);
 }
 
 #[test]
@@ -205,8 +208,8 @@ fn dependency_bearing_pages_are_refused_without_staging() {
     ];
     for (description, page) in cases {
         let source_bytes = package(&content(page));
-        let source = edit::Snapshot::from_bytes(source_bytes.clone()).unwrap();
-        let mut transaction = source.transaction().unwrap();
+        let source = Package::from_bytes(&source_bytes).unwrap();
+        let mut transaction = source.edit().unwrap();
         let error = transaction
             .copy_dependency_free_blank_slide(0)
             .expect_err(description);
@@ -216,8 +219,8 @@ fn dependency_bearing_pages_are_refused_without_staging() {
             "unexpected {description} error: {error}"
         );
         let commit = transaction.commit().unwrap();
-        assert!(!commit.changed(), "{description}");
-        assert_eq!(commit.snapshot().bytes(), source_bytes, "{description}");
+        assert!(!commit.diagnostics().changed(), "{description}");
+        assert_eq!(commit.package().as_bytes(), source_bytes, "{description}");
     }
 }
 
@@ -225,8 +228,8 @@ fn dependency_bearing_pages_are_refused_without_staging() {
 fn noncompact_source_and_name_bound_are_refused_before_copy_allocation() {
     let noncompact =
         content("\n<draw:page draw:name=\"Blank\"/>\n<draw:page draw:name=\"Other\"/>\n");
-    let source = edit::Snapshot::from_bytes(raw_package(&noncompact)).unwrap();
-    let mut transaction = source.transaction().unwrap();
+    let source = Package::from_bytes(&raw_package(&noncompact)).unwrap();
+    let mut transaction = source.edit().unwrap();
     assert!(
         transaction
             .copy_dependency_free_blank_slide(0)
@@ -239,8 +242,8 @@ fn noncompact_source_and_name_bound_are_refused_before_copy_allocation() {
     let source_bytes = package(&content(&format!(
         r#"<draw:page draw:name="{oversized_name}"/>"#
     )));
-    let source = edit::Snapshot::from_bytes(source_bytes.clone()).unwrap();
-    let mut transaction = source.transaction().unwrap();
+    let source = Package::from_bytes(&source_bytes).unwrap();
+    let mut transaction = source.edit().unwrap();
     assert!(
         transaction
             .copy_dependency_free_blank_slide(0)
@@ -249,6 +252,6 @@ fn noncompact_source_and_name_bound_are_refused_before_copy_allocation() {
             .contains("name exceeds")
     );
     let commit = transaction.commit().unwrap();
-    assert!(!commit.changed());
-    assert_eq!(commit.snapshot().bytes(), source_bytes);
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().as_bytes(), source_bytes);
 }

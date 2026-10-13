@@ -3,7 +3,7 @@
 use std::borrow::Cow;
 
 use crate::model::data_pilot::Table;
-use crate::package::Package;
+use crate::package::Archive;
 use litchi_core::{Error, Result};
 
 use super::model::{Catalog, Selector, select};
@@ -11,7 +11,7 @@ use super::{codec::Location, package, validation};
 
 /// An isolated mutable draft derived from an immutable `DataPilot` catalog.
 pub struct Transaction<'source> {
-    pub(crate) source: &'source Package,
+    pub(crate) source: &'source Archive,
     pub(crate) source_xml: &'source str,
     pub(crate) location: Location,
     pub(crate) original: Option<Vec<Table>>,

@@ -1188,7 +1188,7 @@ mod tests {
 
     #[test]
     fn builder_and_mutable_document_round_trip() {
-        use crate::{Builder, Document, mutable::MutableDocument};
+        use crate::{Builder, mutable::MutableDocument};
         let mut initial = FileControl::new("File", "file");
         initial.current_value = Some("/host/path/is/not/read".into());
         let mut form = PasswordFileForm::new("Main");
@@ -1196,7 +1196,7 @@ mod tests {
         let mut builder = Builder::new();
         builder.add_password_file_form(&form).unwrap();
         builder.add_paragraph("body").unwrap();
-        let document = Document::from_bytes(builder.build().unwrap()).unwrap();
+        let document = builder.build().unwrap().document().unwrap();
         let mut mutable = MutableDocument::from_document(document).unwrap();
         assert!(
             matches!(&mutable.password_file_controls().unwrap()[0], PasswordFileControl::File(value) if value.current_value.as_deref() == Some("/host/path/is/not/read"))

@@ -71,7 +71,10 @@ fn handle_is_one_pointer_and_shares_its_state() {
 fn prepared_route_matches_the_leaf_reader() {
     for name in FIXTURES {
         let bytes = std::fs::read(fixture(name)).expect("read ODT fixture");
-        let leaf = litchi_odt::Document::from_bytes(bytes.clone()).expect("leaf ODT");
+        let leaf = litchi_odt::Package::from_bytes(&bytes)
+            .expect("leaf ODT")
+            .document()
+            .expect("leaf ODT");
         let odt = open_prepared(bytes);
         assert!(matches!(odt.owner(), OdtOwner::Eager(_)));
         assert_matches_leaf(&odt, &leaf, name);
@@ -83,8 +86,10 @@ fn prepared_route_matches_the_leaf_reader() {
 fn source_route_matches_the_leaf_reader() {
     for name in FIXTURES {
         let path = fixture(name);
-        let leaf =
-            litchi_odt::Document::from_bytes(std::fs::read(&path).expect("read")).expect("leaf");
+        let leaf = litchi_odt::Package::from_bytes(&std::fs::read(&path).expect("read"))
+            .expect("leaf")
+            .document()
+            .expect("leaf");
         let odt = open_source(&path);
         assert!(matches!(odt.owner(), OdtOwner::Source(_)));
         assert_eq!(format!("{odt:?}"), r#"Odt { owner: "source", .. }"#);

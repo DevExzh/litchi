@@ -12,7 +12,7 @@ use litchi_odf_common::package::raw_identical_members;
 use litchi_odp::content::{
     Cell, ControlKind, ElementSelector, FormControl, Paragraph, RichText, Run, Table, TextBox,
 };
-use litchi_odp::{Builder, Presentation, edit};
+use litchi_odp::{Builder, Package, edit};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 fn chart() -> Definition {
@@ -36,8 +36,8 @@ fn chart() -> Definition {
 
 #[test]
 fn rich_text_table_form_and_fine_chart_data_share_one_durable_root() {
-    let source = edit::Snapshot::from_bytes(Builder::new().build().unwrap()).unwrap();
-    let mut transaction = source.transaction().unwrap();
+    let source = Package::from_bytes(&Builder::new().build().unwrap().to_bytes().unwrap()).unwrap();
+    let mut transaction = source.edit().unwrap();
     transaction.add("Rich objects", "Atomic content").unwrap();
 
     let rich = RichText::new(vec![
@@ -121,7 +121,7 @@ fn rich_text_table_form_and_fine_chart_data_share_one_durable_root() {
             edit::Domain::Content
         ]
     );
-    let content = commit.snapshot().to_presentation().unwrap();
+    let content = commit.package().presentation().unwrap();
     assert_eq!(content.slides().unwrap().len(), 1);
     assert!(content.content_xml().contains("Rich Box"));
     assert!(content.content_xml().contains("Summary Table"));
@@ -131,19 +131,25 @@ fn rich_text_table_form_and_fine_chart_data_share_one_durable_root() {
 
     let durable =
         edit::Patch::from_durable_bytes(&commit.patch().to_durable_bytes().unwrap()).unwrap();
-    let applied = durable.apply(&source).unwrap();
-    let reopened = Presentation::from_bytes(applied.bytes().to_vec()).unwrap();
+    let applied = source.apply(&durable).unwrap();
+    let reopened = Package::from_bytes(applied.as_bytes())
+        .unwrap()
+        .presentation()
+        .unwrap();
     assert!(reopened.content_xml().contains("Rich Box"));
     assert_eq!(
-        durable.inverse().apply(&applied).unwrap().bytes(),
-        source.bytes()
+        applied.apply(&durable.inverse()).unwrap().as_bytes(),
+        source.as_bytes()
     );
 
-    let budget = source.bytes().len() + commit.snapshot().bytes().len();
+    let budget = source.as_bytes().len() + commit.package().as_bytes().len();
     let mut history = edit::History::new(source.clone(), 2, budget).unwrap();
     history.record(&commit).unwrap();
-    assert_eq!(history.undo().unwrap().bytes(), source.bytes());
-    assert_eq!(history.redo().unwrap().bytes(), commit.snapshot().bytes());
+    assert_eq!(history.undo().unwrap().as_bytes(), source.as_bytes());
+    assert_eq!(
+        history.redo().unwrap().as_bytes(),
+        commit.package().as_bytes()
+    );
 }
 
 #[test]
@@ -153,16 +159,16 @@ fn rich_content_selectors_and_values_fail_without_partial_publication() {
 
     let mut builder = Builder::new();
     builder.add_slide_with_title("One", "body").unwrap();
-    let source = edit::Snapshot::from_bytes(builder.build().unwrap()).unwrap();
-    let mut transaction = source.transaction().unwrap();
+    let source = Package::from_bytes(&builder.build().unwrap().to_bytes().unwrap()).unwrap();
+    let mut transaction = source.edit().unwrap();
     let box_one = TextBox::new("duplicate", RichText::plain("one").unwrap()).unwrap();
     transaction.add_text_box(0usize, &box_one).unwrap();
     assert!(transaction.add_text_box(0usize, &box_one).is_err());
     let commit = transaction.commit().unwrap();
     assert_eq!(
         commit
-            .snapshot()
-            .to_presentation()
+            .package()
+            .presentation()
             .unwrap()
             .slides()
             .unwrap()
@@ -173,8 +179,9 @@ fn rich_content_selectors_and_values_fail_without_partial_publication() {
 
 #[test]
 fn rich_content_objects_transfer_through_durable_history() {
-    let source_base = edit::Snapshot::from_bytes(Builder::new().build().unwrap()).unwrap();
-    let mut source_transaction = source_base.transaction().unwrap();
+    let source_base =
+        Package::from_bytes(&Builder::new().build().unwrap().to_bytes().unwrap()).unwrap();
+    let mut source_transaction = source_base.edit().unwrap();
     source_transaction.add("Source", "transfer owners").unwrap();
     source_transaction
         .add_text_box(
@@ -201,10 +208,11 @@ fn rich_content_objects_transfer_through_durable_history() {
                 .unwrap(),
         )
         .unwrap();
-    let source = source_transaction.commit().unwrap().snapshot().clone();
+    let source = source_transaction.commit().unwrap().package().clone();
 
-    let destination_base = edit::Snapshot::from_bytes(Builder::new().build().unwrap()).unwrap();
-    let mut destination_transaction = destination_base.transaction().unwrap();
+    let destination_base =
+        Package::from_bytes(&Builder::new().build().unwrap().to_bytes().unwrap()).unwrap();
+    let mut destination_transaction = destination_base.edit().unwrap();
     destination_transaction
         .add("Destination", "transfer target")
         .unwrap();
@@ -218,7 +226,7 @@ fn rich_content_objects_transfer_through_durable_history() {
         .transfer_form_control_from(&source, "Source Control", 0usize, "Copied Control")
         .unwrap();
     let commit = destination_transaction.commit().unwrap();
-    let content = commit.snapshot().to_presentation().unwrap();
+    let content = commit.package().presentation().unwrap();
     assert!(content.content_xml().contains("Copied Box"));
     assert!(content.content_xml().contains("copied text"));
     assert!(content.content_xml().contains("Copied Table"));
@@ -229,27 +237,34 @@ fn rich_content_objects_transfer_through_durable_history() {
 
     let durable =
         edit::Patch::from_durable_bytes(&commit.patch().to_durable_bytes().unwrap()).unwrap();
-    let applied = durable.apply(&destination_base).unwrap();
-    assert_eq!(applied.bytes(), commit.snapshot().bytes());
+    let applied = destination_base.apply(&durable).unwrap();
+    assert_eq!(applied.as_bytes(), commit.package().as_bytes());
     assert_eq!(
-        durable.inverse().apply(&applied).unwrap().bytes(),
-        destination_base.bytes()
+        applied.apply(&durable.inverse()).unwrap().as_bytes(),
+        destination_base.as_bytes()
     );
 
-    let budget = destination_base.bytes().len() + commit.snapshot().bytes().len();
+    let budget = destination_base.as_bytes().len() + commit.package().as_bytes().len();
     let mut history = edit::History::new(destination_base.clone(), 2, budget).unwrap();
     history.record(&commit).unwrap();
     let mut history =
         edit::History::from_durable_bytes(&history.to_durable_bytes().unwrap()).unwrap();
-    assert_eq!(history.current().bytes(), commit.snapshot().bytes());
-    assert_eq!(history.undo().unwrap().bytes(), destination_base.bytes());
-    assert_eq!(history.redo().unwrap().bytes(), commit.snapshot().bytes());
+    assert_eq!(history.current().as_bytes(), commit.package().as_bytes());
+    assert_eq!(
+        history.undo().unwrap().as_bytes(),
+        destination_base.as_bytes()
+    );
+    assert_eq!(
+        history.redo().unwrap().as_bytes(),
+        commit.package().as_bytes()
+    );
 }
 
 #[test]
 fn source_backed_story_table_and_form_models_edit_without_flattening() {
-    let source_base = edit::Snapshot::from_bytes(Builder::new().build().unwrap()).unwrap();
-    let mut authored = source_base.transaction().unwrap();
+    let source_base =
+        Package::from_bytes(&Builder::new().build().unwrap().to_bytes().unwrap()).unwrap();
+    let mut authored = source_base.edit().unwrap();
     authored.add("Models", "source backed").unwrap();
     authored
         .add_text_box(
@@ -276,10 +291,10 @@ fn source_backed_story_table_and_form_models_edit_without_flattening() {
                 .unwrap(),
         )
         .unwrap();
-    let source = authored.commit().unwrap().snapshot().clone();
+    let source = authored.commit().unwrap().package().clone();
 
     let inventory = source.rich_content().unwrap();
-    let mut transaction = source.transaction().unwrap();
+    let mut transaction = source.edit().unwrap();
     let mut story = inventory
         .text_boxes()
         .iter()
@@ -368,13 +383,13 @@ fn source_backed_story_table_and_form_models_edit_without_flattening() {
     let commit = transaction.commit().unwrap();
     let durable =
         edit::Patch::from_durable_bytes(&commit.patch().to_durable_bytes().unwrap()).unwrap();
-    let replayed = durable.apply(&source).unwrap();
-    assert_eq!(replayed.bytes(), commit.snapshot().bytes());
+    let replayed = source.apply(&durable).unwrap();
+    assert_eq!(replayed.as_bytes(), commit.package().as_bytes());
     assert_eq!(
-        durable.inverse().apply(&replayed).unwrap().bytes(),
-        source.bytes()
+        replayed.apply(&durable.inverse()).unwrap().as_bytes(),
+        source.as_bytes()
     );
-    let inventory = commit.snapshot().rich_content().unwrap();
+    let inventory = commit.package().rich_content().unwrap();
     let story = inventory
         .text_boxes()
         .iter()
@@ -417,22 +432,23 @@ fn producer_named_drawing_resources_transfer_with_their_payload() {
     writer
         .add_file_with_media_type("Pictures/producer.png", b"producer-pixels", "image/png")
         .unwrap();
-    let source = edit::Snapshot::from_bytes(writer.finish_to_bytes().unwrap()).unwrap();
+    let source = Package::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap();
 
     let mut destination_builder = Builder::new();
     destination_builder.add_slide("Destination").unwrap();
-    let destination = edit::Snapshot::from_bytes(destination_builder.build().unwrap()).unwrap();
-    let mut transaction = destination.transaction().unwrap();
+    let destination =
+        Package::from_bytes(&destination_builder.build().unwrap().to_bytes().unwrap()).unwrap();
+    let mut transaction = destination.edit().unwrap();
     transaction
         .transfer_text_box_from(&source, "Producer Box", 0usize, "Copied Producer Box")
         .unwrap();
     let commit = transaction.commit().unwrap();
-    let package = OwnedPackage::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    let package = OwnedPackage::from_bytes(commit.package().as_bytes().to_vec()).unwrap();
     assert_eq!(
         package.get_file("Pictures/producer.png").unwrap(),
         b"producer-pixels"
     );
-    let content = commit.snapshot().to_presentation().unwrap();
+    let content = commit.package().presentation().unwrap();
     assert!(content.content_xml().contains("ProducerStyle"));
     assert!(content.content_xml().contains("ProducerImage"));
     assert!(content.content_xml().contains("producer closure"));
@@ -452,9 +468,9 @@ fn producer_bom_remains_source_provenance_during_rich_content_edit() {
     archive
         .write_deflated("META-INF/manifest.xml", MANIFEST)
         .unwrap();
-    let source = edit::Snapshot::from_bytes(archive.finish_to_bytes().unwrap()).unwrap();
+    let source = Package::from_bytes(&archive.finish_to_bytes().unwrap()).unwrap();
 
-    let mut transaction = source.transaction().unwrap();
+    let mut transaction = source.edit().unwrap();
     transaction
         .add_text_box(
             0usize,
@@ -462,7 +478,7 @@ fn producer_bom_remains_source_provenance_during_rich_content_edit() {
         )
         .unwrap();
     let commit = transaction.commit().unwrap();
-    let changed = OwnedPackage::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    let changed = OwnedPackage::from_bytes(commit.package().as_bytes().to_vec()).unwrap();
     let changed_content = changed.get_file("content.xml").unwrap();
     assert!(changed_content.starts_with(b"\xef\xbb\xbf"));
     assert!(
@@ -480,9 +496,9 @@ fn real_producer_manifest_config_and_ole_are_exactly_preserved_during_text_box_e
     ))
     .to_vec();
     let source_package = OwnedPackage::from_bytes(source_bytes.clone()).unwrap();
-    let source = edit::Snapshot::from_bytes(source_bytes.clone()).unwrap();
+    let source = Package::from_bytes(&source_bytes).unwrap();
 
-    let mut transaction = source.transaction().unwrap();
+    let mut transaction = source.edit().unwrap();
     transaction
         .add_text_box(
             0usize,
@@ -494,9 +510,9 @@ fn real_producer_manifest_config_and_ole_are_exactly_preserved_during_text_box_e
         )
         .unwrap();
     let commit = transaction.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
 
-    let changed_package = OwnedPackage::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    let changed_package = OwnedPackage::from_bytes(commit.package().as_bytes().to_vec()).unwrap();
     for path in source_package.files().unwrap() {
         if path != "content.xml" {
             assert_eq!(
@@ -517,7 +533,7 @@ fn real_producer_manifest_config_and_ole_are_exactly_preserved_during_text_box_e
             "untouched source member changed: {path}"
         );
     }
-    let identical = raw_identical_members(source.bytes(), commit.snapshot().bytes()).unwrap();
+    let identical = raw_identical_members(source.as_bytes(), commit.package().as_bytes()).unwrap();
     for path in [
         "META-INF/manifest.xml",
         "Configurations2/accelerator/current.xml",
@@ -526,17 +542,20 @@ fn real_producer_manifest_config_and_ole_are_exactly_preserved_during_text_box_e
         assert!(identical.contains(path), "{path}");
     }
 
-    let reopened = Presentation::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    let reopened = Package::from_bytes(commit.package().as_bytes())
+        .unwrap()
+        .presentation()
+        .unwrap();
     assert!(reopened.content_xml().contains("Litchi source sentinel"));
     assert!(
         reopened
             .content_xml()
             .contains("Litchi source sentinel text")
     );
-    let applied = commit.patch().apply(&source).unwrap();
-    assert_eq!(applied.bytes(), commit.snapshot().bytes());
-    let restored = commit.patch().inverse().apply(&applied).unwrap();
-    assert_eq!(restored.bytes(), source.bytes());
+    let applied = source.apply(commit.patch()).unwrap();
+    assert_eq!(applied.as_bytes(), commit.package().as_bytes());
+    let restored = applied.apply(&commit.patch().inverse()).unwrap();
+    assert_eq!(restored.as_bytes(), source.as_bytes());
 }
 
 #[test]
@@ -558,9 +577,9 @@ fn noncompact_content_whole_rewrite_is_refused_atomically() {
         .write_deflated("META-INF/manifest.xml", MANIFEST)
         .unwrap();
     let source_bytes = archive.finish_to_bytes().unwrap();
-    let source = edit::Snapshot::from_bytes(source_bytes.clone()).unwrap();
+    let source = Package::from_bytes(&source_bytes).unwrap();
 
-    let mut transaction = source.transaction().unwrap();
+    let mut transaction = source.edit().unwrap();
     transaction
         .add("Rejected formatted slide", "must not publish")
         .unwrap();
@@ -569,7 +588,7 @@ fn noncompact_content_whole_rewrite_is_refused_atomically() {
         Ok(_) => panic!("formatted content.xml unexpectedly published"),
     };
     assert!(error.to_string().contains("content.xml"));
-    assert_eq!(source.bytes(), source_bytes);
+    assert_eq!(source.as_bytes(), source_bytes);
 }
 
 #[test]
@@ -578,7 +597,7 @@ fn content_only_text_box_edit_raw_preserves_unchanged_media_and_metadata() {
     const MEDIA_PATH: &str = "Pictures/opaque.bin";
     let mut builder = Builder::new();
     builder.add_slide_with_title("Source", "Body").unwrap();
-    let base = OwnedPackage::from_bytes(builder.build().unwrap()).unwrap();
+    let base = OwnedPackage::from_bytes(builder.build().unwrap().to_bytes().unwrap()).unwrap();
     let package = base.package().unwrap();
     let mut writer = PackageWriter::new();
     writer.set_mimetype(MIME).unwrap();
@@ -603,9 +622,9 @@ fn content_only_text_box_edit_raw_preserves_unchanged_media_and_metadata() {
         )
         .unwrap();
     let source_bytes = writer.finish_to_bytes().unwrap();
-    let source = edit::Snapshot::from_bytes(source_bytes.clone()).unwrap();
+    let source = Package::from_bytes(&source_bytes).unwrap();
 
-    let mut transaction = source.transaction().unwrap();
+    let mut transaction = source.edit().unwrap();
     transaction
         .add_text_box(
             0usize,
@@ -613,7 +632,7 @@ fn content_only_text_box_edit_raw_preserves_unchanged_media_and_metadata() {
         )
         .unwrap();
     let commit = transaction.commit().unwrap();
-    let identical = raw_identical_members(&source_bytes, commit.snapshot().bytes()).unwrap();
+    let identical = raw_identical_members(&source_bytes, commit.package().as_bytes()).unwrap();
 
     assert!(!identical.contains("content.xml"));
     for path in [
@@ -625,7 +644,7 @@ fn content_only_text_box_edit_raw_preserves_unchanged_media_and_metadata() {
     ] {
         assert!(identical.contains(path), "{path}");
     }
-    let reopened = OwnedPackage::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    let reopened = OwnedPackage::from_bytes(commit.package().as_bytes().to_vec()).unwrap();
     assert_eq!(
         reopened.get_file(MEDIA_PATH).unwrap(),
         vec![0x5a; 1024 * 1024]
@@ -639,16 +658,15 @@ fn content_only_text_box_edit_raw_preserves_unchanged_media_and_metadata() {
         Some("application/octet-stream")
     );
     assert_eq!(
-        commit.patch().apply(&source).unwrap().bytes(),
-        commit.snapshot().bytes()
+        source.apply(commit.patch()).unwrap().as_bytes(),
+        commit.package().as_bytes()
     );
     assert_eq!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.snapshot())
+            .package()
+            .apply(&commit.patch().inverse())
             .unwrap()
-            .bytes(),
+            .as_bytes(),
         source_bytes
     );
 }
@@ -669,9 +687,9 @@ fn content_only_raw_publication_preserves_noncompact_referenced_xml() {
         .unwrap();
     let source_bytes = archive.finish_to_bytes().unwrap();
     let source_package = OwnedPackage::from_bytes(source_bytes.clone()).unwrap();
-    let source = edit::Snapshot::from_bytes(source_bytes.clone()).unwrap();
+    let source = Package::from_bytes(&source_bytes).unwrap();
 
-    let mut transaction = source.transaction().unwrap();
+    let mut transaction = source.edit().unwrap();
     transaction
         .add_text_box(
             0usize,
@@ -679,13 +697,13 @@ fn content_only_raw_publication_preserves_noncompact_referenced_xml() {
         )
         .unwrap();
     let commit = transaction.commit().unwrap();
-    assert!(commit.changed());
-    let changed_package = OwnedPackage::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    assert!(commit.diagnostics().changed());
+    let changed_package = OwnedPackage::from_bytes(commit.package().as_bytes().to_vec()).unwrap();
     assert_eq!(
         changed_package.get_file("Object 1/content.xml").unwrap(),
         source_package.get_file("Object 1/content.xml").unwrap()
     );
-    assert_eq!(source.bytes(), source_bytes);
+    assert_eq!(source.as_bytes(), source_bytes);
 }
 
 fn custom_manifest_source() -> (Vec<u8>, Vec<u8>) {
@@ -693,7 +711,7 @@ fn custom_manifest_source() -> (Vec<u8>, Vec<u8>) {
     const OPAQUE_PATH: &str = "Opaque/foreign.bin";
     let mut builder = Builder::new();
     builder.add_slide_with_title("Source", "Body").unwrap();
-    let base = OwnedPackage::from_bytes(builder.build().unwrap()).unwrap();
+    let base = OwnedPackage::from_bytes(builder.build().unwrap().to_bytes().unwrap()).unwrap();
     let package = base.package().unwrap();
 
     let mut manifest = b"\xef\xbb\xbf".to_vec();
@@ -745,8 +763,8 @@ fn custom_manifest_source() -> (Vec<u8>, Vec<u8>) {
 #[test]
 fn content_only_edit_preserves_bom_multiline_custom_manifest_and_opaque_member() {
     let (source_bytes, source_manifest) = custom_manifest_source();
-    let source = edit::Snapshot::from_bytes(source_bytes.clone()).unwrap();
-    let mut transaction = source.transaction().unwrap();
+    let source = Package::from_bytes(&source_bytes).unwrap();
+    let mut transaction = source.edit().unwrap();
     transaction
         .add_text_box(
             0usize,
@@ -758,7 +776,7 @@ fn content_only_edit_preserves_bom_multiline_custom_manifest_and_opaque_member()
         )
         .unwrap();
     let commit = transaction.commit().unwrap();
-    let changed = OwnedPackage::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    let changed = OwnedPackage::from_bytes(commit.package().as_bytes().to_vec()).unwrap();
 
     assert_eq!(
         changed.get_file("META-INF/manifest.xml").unwrap(),
@@ -768,24 +786,27 @@ fn content_only_edit_preserves_bom_multiline_custom_manifest_and_opaque_member()
         changed.get_file("Opaque/foreign.bin").unwrap(),
         b"opaque producer payload"
     );
-    let identical = raw_identical_members(&source_bytes, commit.snapshot().bytes()).unwrap();
+    let identical = raw_identical_members(&source_bytes, commit.package().as_bytes()).unwrap();
     assert!(identical.contains("META-INF/manifest.xml"));
     assert!(identical.contains("Opaque/foreign.bin"));
-    let reopened = Presentation::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    let reopened = Package::from_bytes(commit.package().as_bytes())
+        .unwrap()
+        .presentation()
+        .unwrap();
     assert!(reopened.content_xml().contains("Manifest-preserving box"));
-    assert_eq!(source.bytes(), source_bytes);
+    assert_eq!(source.as_bytes(), source_bytes);
 }
 
 #[test]
 fn media_topology_change_regenerates_custom_source_manifest() {
     let (source_bytes, source_manifest) = custom_manifest_source();
-    let source = edit::Snapshot::from_bytes(source_bytes.clone()).unwrap();
-    let mut transaction = source.transaction().unwrap();
+    let source = Package::from_bytes(&source_bytes).unwrap();
+    let mut transaction = source.edit().unwrap();
     transaction
         .embed_media("Pictures/new.png", b"new image", "image/png")
         .unwrap();
     let commit = transaction.commit().unwrap();
-    let changed = OwnedPackage::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    let changed = OwnedPackage::from_bytes(commit.package().as_bytes().to_vec()).unwrap();
     let changed_manifest = changed.get_file("META-INF/manifest.xml").unwrap();
 
     assert_ne!(changed_manifest, source_manifest);
@@ -801,8 +822,11 @@ fn media_topology_change_regenerates_custom_source_manifest() {
         changed.get_file("Opaque/foreign.bin").unwrap(),
         b"opaque producer payload"
     );
-    let identical = raw_identical_members(&source_bytes, commit.snapshot().bytes()).unwrap();
+    let identical = raw_identical_members(&source_bytes, commit.package().as_bytes()).unwrap();
     assert!(!identical.contains("META-INF/manifest.xml"));
-    Presentation::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
-    assert_eq!(source.bytes(), source_bytes);
+    Package::from_bytes(commit.package().as_bytes())
+        .unwrap()
+        .presentation()
+        .unwrap();
+    assert_eq!(source.as_bytes(), source_bytes);
 }

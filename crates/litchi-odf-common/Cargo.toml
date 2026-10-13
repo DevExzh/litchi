@@ -32,11 +32,13 @@ serde_json = { workspace = true }
 signature = { workspace = true }
 soapberry-zip = { workspace = true }
 subtle = { workspace = true }
+thiserror = { workspace = true }
 x509-cert = { workspace = true }
 zeroize = { workspace = true }
 xml-minifier = { workspace = true }
 
 [dev-dependencies]
+tempfile = { workspace = true }
 zip = { version = "8", default-features = false, features = ["deflate"] }
 
 [lints]

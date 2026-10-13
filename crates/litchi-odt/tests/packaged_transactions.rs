@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use litchi_odf_common::package::raw_identical_members;
 use litchi_odt::form::TextControl;
 use litchi_odt::{
-    Document, ScriptResourceKind, ScriptResourceSpec,
+    Package, ScriptResourceKind, ScriptResourceSpec,
     core::{OwnedPackage as CoreOwnedPackage, PackageWriter, Profile},
     elements::field::DynamicTextField,
     mutable::MutableDocument,
@@ -26,10 +26,10 @@ use litchi_odt::{
 };
 mod support;
 
-fn source() -> Document {
+fn source() -> Package {
     let mut document = MutableDocument::new();
     document.add_paragraph("Unique paragraph").unwrap();
-    Document::from_bytes(document.to_bytes().unwrap()).unwrap()
+    Package::from_bytes(&document.to_bytes().unwrap()).unwrap()
 }
 
 #[test]
@@ -64,8 +64,8 @@ fn content_only_edits_raw_preserve_unchanged_media_and_metadata() {
         )
         .unwrap();
     let source_bytes = writer.finish_to_bytes().unwrap();
-    let source = Document::from_bytes(source_bytes.clone()).unwrap();
-    let snapshot = litchi_odt::transaction::Snapshot::from_document(&source).unwrap();
+    let source = Package::from_bytes(&source_bytes).unwrap();
+    let snapshot = source.clone();
 
     let mut edit = snapshot.edit();
     edit.replace_paragraph(Position::new(0), "Interim")
@@ -73,7 +73,7 @@ fn content_only_edits_raw_preserve_unchanged_media_and_metadata() {
         .replace_paragraph(Position::new(0), "After")
         .unwrap();
     let commit = edit.commit().unwrap();
-    let identical = raw_identical_members(&source_bytes, commit.snapshot().as_bytes()).unwrap();
+    let identical = raw_identical_members(&source_bytes, commit.package().as_bytes()).unwrap();
 
     assert!(!identical.contains("content.xml"));
     for path in [
@@ -85,21 +85,20 @@ fn content_only_edits_raw_preserve_unchanged_media_and_metadata() {
     ] {
         assert!(identical.contains(path), "{path}");
     }
-    let reopened = commit.snapshot().document().unwrap();
+    let reopened = commit.package().document().unwrap();
     assert_eq!(reopened.paragraphs().unwrap()[0].text().unwrap(), "After");
     assert_eq!(
         reopened.get_file(MEDIA_PATH).unwrap(),
         vec![0x5a; 1024 * 1024]
     );
     assert_eq!(
-        commit.patch().apply(&snapshot).unwrap().as_bytes(),
-        commit.snapshot().as_bytes()
+        snapshot.apply(commit.patch()).unwrap().as_bytes(),
+        commit.package().as_bytes()
     );
     assert_eq!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.snapshot())
+            .package()
+            .apply(&commit.patch().inverse())
             .unwrap()
             .as_bytes(),
         source_bytes
@@ -109,7 +108,7 @@ fn content_only_edits_raw_preserve_unchanged_media_and_metadata() {
     edit.append_line_break(ParagraphSelector::position(Position::new(0)))
         .unwrap();
     let commit = edit.commit().unwrap();
-    let identical = raw_identical_members(&source_bytes, commit.snapshot().as_bytes()).unwrap();
+    let identical = raw_identical_members(&source_bytes, commit.package().as_bytes()).unwrap();
     assert!(!identical.contains("content.xml"));
     for path in [
         "mimetype",
@@ -120,20 +119,19 @@ fn content_only_edits_raw_preserve_unchanged_media_and_metadata() {
     ] {
         assert!(identical.contains(path), "{path}");
     }
-    let reopened = commit.snapshot().document().unwrap();
+    let reopened = commit.package().document().unwrap();
     assert_eq!(
         reopened.paragraphs().unwrap()[0].text().unwrap(),
         "Before\n"
     );
     assert_eq!(
-        commit.patch().apply(&snapshot).unwrap().as_bytes(),
-        commit.snapshot().as_bytes()
+        snapshot.apply(commit.patch()).unwrap().as_bytes(),
+        commit.package().as_bytes()
     );
     assert_eq!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.snapshot())
+            .package()
+            .apply(&commit.patch().inverse())
             .unwrap()
             .as_bytes(),
         source_bytes
@@ -144,7 +142,7 @@ fn content_only_edits_raw_preserve_unchanged_media_and_metadata() {
         edit.append_run(Position::new(0), " appended", style_name)
             .unwrap();
         let commit = edit.commit().unwrap();
-        let identical = raw_identical_members(&source_bytes, commit.snapshot().as_bytes()).unwrap();
+        let identical = raw_identical_members(&source_bytes, commit.package().as_bytes()).unwrap();
         assert!(!identical.contains("content.xml"));
         for path in [
             "mimetype",
@@ -155,7 +153,7 @@ fn content_only_edits_raw_preserve_unchanged_media_and_metadata() {
         ] {
             assert!(identical.contains(path), "{path}");
         }
-        let reopened = commit.snapshot().document().unwrap();
+        let reopened = commit.package().document().unwrap();
         assert_eq!(
             reopened.paragraphs().unwrap()[0].text().unwrap(),
             "Before appended"
@@ -168,19 +166,18 @@ fn content_only_edits_raw_preserve_unchanged_media_and_metadata() {
             style_name.is_some()
         );
         assert_eq!(
-            commit.patch().apply(&snapshot).unwrap().as_bytes(),
-            commit.snapshot().as_bytes()
+            snapshot.apply(commit.patch()).unwrap().as_bytes(),
+            commit.package().as_bytes()
         );
         assert_eq!(
             commit
-                .patch()
-                .inverse()
-                .apply(commit.snapshot())
+                .package()
+                .apply(&commit.patch().inverse())
                 .unwrap()
                 .as_bytes(),
             source_bytes
         );
-        assert!(commit.patch().apply(commit.snapshot()).is_err());
+        assert!(commit.package().apply(commit.patch()).is_err());
     }
 
     let mut edit = snapshot.edit();
@@ -191,7 +188,7 @@ fn content_only_edits_raw_preserve_unchanged_media_and_metadata() {
     )
     .unwrap();
     let commit = edit.commit().unwrap();
-    let identical = raw_identical_members(&source_bytes, commit.snapshot().as_bytes()).unwrap();
+    let identical = raw_identical_members(&source_bytes, commit.package().as_bytes()).unwrap();
     assert!(!identical.contains("content.xml"));
     for path in [
         "mimetype",
@@ -202,7 +199,7 @@ fn content_only_edits_raw_preserve_unchanged_media_and_metadata() {
     ] {
         assert!(identical.contains(path), "{path}");
     }
-    let reopened = commit.snapshot().document().unwrap();
+    let reopened = commit.package().document().unwrap();
     assert_eq!(
         reopened.paragraphs().unwrap()[0].text().unwrap(),
         "Before linked"
@@ -215,19 +212,18 @@ fn content_only_edits_raw_preserve_unchanged_media_and_metadata() {
         )]
     );
     assert_eq!(
-        commit.patch().apply(&snapshot).unwrap().as_bytes(),
-        commit.snapshot().as_bytes()
+        snapshot.apply(commit.patch()).unwrap().as_bytes(),
+        commit.package().as_bytes()
     );
     assert_eq!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.snapshot())
+            .package()
+            .apply(&commit.patch().inverse())
             .unwrap()
             .as_bytes(),
         source_bytes
     );
-    assert!(commit.patch().apply(commit.snapshot()).is_err());
+    assert!(commit.package().apply(commit.patch()).is_err());
 
     for inserted in [true, false] {
         let mut edit = snapshot.edit();
@@ -237,7 +233,7 @@ fn content_only_edits_raw_preserve_unchanged_media_and_metadata() {
             edit.remove_paragraph(Position::new(0)).unwrap();
         }
         let commit = edit.commit().unwrap();
-        let identical = raw_identical_members(&source_bytes, commit.snapshot().as_bytes()).unwrap();
+        let identical = raw_identical_members(&source_bytes, commit.package().as_bytes()).unwrap();
         assert!(!identical.contains("content.xml"));
         for path in [
             "mimetype",
@@ -248,7 +244,7 @@ fn content_only_edits_raw_preserve_unchanged_media_and_metadata() {
         ] {
             assert!(identical.contains(path), "{path}");
         }
-        let reopened = commit.snapshot().document().unwrap();
+        let reopened = commit.package().document().unwrap();
         let text = reopened
             .paragraphs()
             .unwrap()
@@ -264,19 +260,18 @@ fn content_only_edits_raw_preserve_unchanged_media_and_metadata() {
             }
         );
         assert_eq!(
-            commit.patch().apply(&snapshot).unwrap().as_bytes(),
-            commit.snapshot().as_bytes()
+            snapshot.apply(commit.patch()).unwrap().as_bytes(),
+            commit.package().as_bytes()
         );
         assert_eq!(
             commit
-                .patch()
-                .inverse()
-                .apply(commit.snapshot())
+                .package()
+                .apply(&commit.patch().inverse())
                 .unwrap()
                 .as_bytes(),
             source_bytes
         );
-        assert!(commit.patch().apply(commit.snapshot()).is_err());
+        assert!(commit.package().apply(commit.patch()).is_err());
     }
 }
 
@@ -286,10 +281,7 @@ fn consecutive_paragraph_replacements_match_scalar_semantics_and_durable_replay(
     for text in ["zero", "one", "two", "three"] {
         document.add_paragraph(text).unwrap();
     }
-    let snapshot = Document::from_bytes(document.to_bytes().unwrap())
-        .unwrap()
-        .snapshot()
-        .unwrap();
+    let snapshot = Package::from_bytes(&document.to_bytes().unwrap()).unwrap();
 
     let mut edit = snapshot.edit();
     edit.replace_paragraph(Position::new(0), "ZERO")
@@ -307,9 +299,9 @@ fn consecutive_paragraph_replacements_match_scalar_semantics_and_durable_replay(
     for (index, text) in [(0, "ZERO"), (2, "TWO"), (2, "two-final"), (3, "THREE")] {
         let mut edit = scalar.edit();
         edit.replace_paragraph(Position::new(index), text).unwrap();
-        scalar = edit.commit().unwrap().into_snapshot();
+        scalar = edit.commit().unwrap().into_package();
     }
-    let coalesced_document = committed.snapshot().document().unwrap();
+    let coalesced_document = committed.package().document().unwrap();
     let scalar_document = scalar.document().unwrap();
     let coalesced_paragraphs = coalesced_document
         .paragraphs()
@@ -331,7 +323,7 @@ fn consecutive_paragraph_replacements_match_scalar_semantics_and_durable_replay(
     );
 
     let coalesced_package =
-        CoreOwnedPackage::from_bytes(committed.snapshot().as_bytes().to_vec()).unwrap();
+        CoreOwnedPackage::from_bytes(committed.package().as_bytes().to_vec()).unwrap();
     let scalar_package = CoreOwnedPackage::from_bytes(scalar.as_bytes().to_vec()).unwrap();
     let coalesced_archive = coalesced_package.package().unwrap();
     let scalar_archive = scalar_package.package().unwrap();
@@ -362,7 +354,7 @@ fn consecutive_paragraph_replacements_match_scalar_semantics_and_durable_replay(
     .into_iter()
     .collect::<BTreeSet<_>>();
     let coalesced_raw_identical =
-        raw_identical_members(snapshot.as_bytes(), committed.snapshot().as_bytes()).unwrap();
+        raw_identical_members(snapshot.as_bytes(), committed.package().as_bytes()).unwrap();
     let scalar_raw_identical =
         raw_identical_members(snapshot.as_bytes(), scalar.as_bytes()).unwrap();
     assert_eq!(coalesced_raw_identical, expected_untouched);
@@ -378,7 +370,7 @@ fn consecutive_paragraph_replacements_match_scalar_semantics_and_durable_replay(
     );
     let decoded = litchi_odt::transaction::DurablePatch::from_deterministic_json(&wire).unwrap();
     let replayed = decoded.apply(&snapshot).unwrap();
-    assert_eq!(replayed.as_bytes(), committed.snapshot().as_bytes());
+    assert_eq!(replayed.as_bytes(), committed.package().as_bytes());
     assert_eq!(
         decoded.inverse().apply(&replayed).unwrap().as_bytes(),
         snapshot.as_bytes()
@@ -387,7 +379,7 @@ fn consecutive_paragraph_replacements_match_scalar_semantics_and_durable_replay(
 
 #[test]
 fn consecutive_paragraph_replacements_refuse_late_invalid_position_atomically() {
-    let source = source().snapshot().unwrap();
+    let source = source().clone();
     let source_bytes = source.as_bytes().to_vec();
     let mut edit = source.edit();
     edit.replace_paragraph(Position::new(0), "changed")
@@ -409,10 +401,7 @@ fn mixed_model_content_run_matches_scalar_semantics_and_patch_replay() {
     for text in ["zero", "one", "two"] {
         document.add_paragraph(text).unwrap();
     }
-    let snapshot = Document::from_bytes(document.to_bytes().unwrap())
-        .unwrap()
-        .snapshot()
-        .unwrap();
+    let snapshot = Package::from_bytes(&document.to_bytes().unwrap()).unwrap();
 
     let mut coalesced = snapshot.edit();
     coalesced
@@ -463,7 +452,7 @@ fn mixed_model_content_run_matches_scalar_semantics_and_patch_replay() {
             },
             _ => unreachable!(),
         }
-        scalar = edit.commit().unwrap().into_snapshot();
+        scalar = edit.commit().unwrap().into_package();
     }
 
     assert_eq!(coalesced.results().len(), 5);
@@ -478,7 +467,7 @@ fn mixed_model_content_run_matches_scalar_semantics_and_patch_replay() {
     // A repeated scalar publication is not a whole-archive byte oracle for
     // this rich mixed run: each reopen may canonicalize the content model.
     // Compare the semantic projection and untouched package members instead.
-    let reopened = coalesced.snapshot().document().unwrap();
+    let reopened = coalesced.package().document().unwrap();
     let scalar_reopened = scalar.document().unwrap();
     assert_eq!(reopened.text().unwrap(), "one\ninserted run\nTWO linked");
     assert_eq!(reopened.text().unwrap(), scalar_reopened.text().unwrap());
@@ -494,7 +483,7 @@ fn mixed_model_content_run_matches_scalar_semantics_and_patch_replay() {
     assert!(content.contains("<text:a xlink:href=\"https://example.invalid/mixed\""));
 
     let coalesced_package =
-        CoreOwnedPackage::from_bytes(coalesced.snapshot().as_bytes().to_vec()).unwrap();
+        CoreOwnedPackage::from_bytes(coalesced.package().as_bytes().to_vec()).unwrap();
     let scalar_package = CoreOwnedPackage::from_bytes(scalar.as_bytes().to_vec()).unwrap();
     let coalesced_archive = coalesced_package.package().unwrap();
     let scalar_archive = scalar_package.package().unwrap();
@@ -513,7 +502,7 @@ fn mixed_model_content_run_matches_scalar_semantics_and_patch_replay() {
         }
     }
     let raw_identical =
-        raw_identical_members(snapshot.as_bytes(), coalesced.snapshot().as_bytes()).unwrap();
+        raw_identical_members(snapshot.as_bytes(), coalesced.package().as_bytes()).unwrap();
     for path in [
         "mimetype",
         "styles.xml",
@@ -529,12 +518,12 @@ fn mixed_model_content_run_matches_scalar_semantics_and_patch_replay() {
     let decoded = litchi_odt::transaction::DurablePatch::from_deterministic_json(&wire).unwrap();
     assert_eq!(
         decoded.apply(&snapshot).unwrap().as_bytes(),
-        coalesced.snapshot().as_bytes()
+        coalesced.package().as_bytes()
     );
     assert_eq!(
         decoded
             .inverse()
-            .apply(coalesced.snapshot())
+            .apply(coalesced.package())
             .unwrap()
             .as_bytes(),
         snapshot.as_bytes()
@@ -544,17 +533,14 @@ fn mixed_model_content_run_matches_scalar_semantics_and_patch_replay() {
     for text in ["zero", "one", "foreign"] {
         foreign_document.add_paragraph(text).unwrap();
     }
-    let foreign = Document::from_bytes(foreign_document.to_bytes().unwrap())
-        .unwrap()
-        .snapshot()
-        .unwrap();
-    assert!(coalesced.patch().apply(&foreign).is_err());
-    assert!(coalesced.patch().apply(coalesced.snapshot()).is_err());
+    let foreign = Package::from_bytes(&foreign_document.to_bytes().unwrap()).unwrap();
+    assert!(foreign.apply(coalesced.patch()).is_err());
+    assert!(coalesced.package().apply(coalesced.patch()).is_err());
 }
 
 #[test]
 fn inline_append_then_plain_replace_starts_a_fresh_batch() {
-    let snapshot = source().snapshot().unwrap();
+    let snapshot = source().clone();
     let mut edit = snapshot.edit();
     edit.append_run(Position::new(0), " run", Some("Emphasis"))
         .unwrap()
@@ -567,7 +553,7 @@ fn inline_append_then_plain_replace_starts_a_fresh_batch() {
         .replace_paragraph(Position::new(0), "replacement")
         .unwrap();
     let committed = edit.commit().unwrap();
-    let reopened = committed.snapshot().document().unwrap();
+    let reopened = committed.package().document().unwrap();
 
     assert_eq!(committed.results().len(), 3);
     assert_eq!(reopened.text().unwrap(), "replacement");
@@ -579,7 +565,7 @@ fn inline_append_then_plain_replace_starts_a_fresh_batch() {
 
 #[test]
 fn plain_replace_then_inline_append_stays_in_one_batch() {
-    let snapshot = source().snapshot().unwrap();
+    let snapshot = source().clone();
     let mut edit = snapshot.edit();
     edit.replace_paragraph(Position::new(0), "replacement")
         .unwrap()
@@ -592,7 +578,7 @@ fn plain_replace_then_inline_append_stays_in_one_batch() {
         )
         .unwrap();
     let committed = edit.commit().unwrap();
-    let reopened = committed.snapshot().document().unwrap();
+    let reopened = committed.package().document().unwrap();
 
     assert_eq!(committed.results().len(), 3);
     assert_eq!(reopened.text().unwrap(), "replacement run linked");
@@ -610,7 +596,7 @@ fn plain_replace_then_inline_append_stays_in_one_batch() {
 
 #[test]
 fn mixed_model_content_run_refuses_late_invalid_operation_atomically() {
-    let source = source().snapshot().unwrap();
+    let source = source().clone();
     let source_bytes = source.as_bytes().to_vec();
     let mut edit = source.edit();
     edit.replace_paragraph(Position::new(0), "changed")
@@ -628,7 +614,7 @@ fn mixed_model_content_run_refuses_late_invalid_operation_atomically() {
 
 #[test]
 fn xml_only_line_break_remains_a_model_content_batch_barrier() {
-    let source = source().snapshot().unwrap();
+    let source = source().clone();
 
     let mut edit = source.edit();
     edit.replace_paragraph(Position::new(0), "before break")
@@ -643,20 +629,20 @@ fn xml_only_line_break_remains_a_model_content_batch_barrier() {
     let mut edit = scalar.edit();
     edit.replace_paragraph(Position::new(0), "before break")
         .unwrap();
-    scalar = edit.commit().unwrap().into_snapshot();
+    scalar = edit.commit().unwrap().into_package();
     let mut edit = scalar.edit();
     edit.append_line_break(ParagraphSelector::position(Position::new(0)))
         .unwrap();
-    scalar = edit.commit().unwrap().into_snapshot();
+    scalar = edit.commit().unwrap().into_package();
     let mut edit = scalar.edit();
     edit.replace_paragraph(Position::new(0), "after break")
         .unwrap();
-    scalar = edit.commit().unwrap().into_snapshot();
+    scalar = edit.commit().unwrap().into_package();
 
     assert_eq!(committed.results().len(), 3);
-    assert_eq!(committed.snapshot().as_bytes(), scalar.as_bytes());
+    assert_eq!(committed.package().as_bytes(), scalar.as_bytes());
     assert_eq!(
-        committed.snapshot().document().unwrap().text().unwrap(),
+        committed.package().document().unwrap().text().unwrap(),
         "after break"
     );
 }
@@ -667,10 +653,7 @@ fn non_replacement_operation_ends_paragraph_replacement_run() {
     document.add_paragraph("zero").unwrap();
     document.add_paragraph("one").unwrap();
     document.add_paragraph("two").unwrap();
-    let snapshot = Document::from_bytes(document.to_bytes().unwrap())
-        .unwrap()
-        .snapshot()
-        .unwrap();
+    let snapshot = Package::from_bytes(&document.to_bytes().unwrap()).unwrap();
     let mut edit = snapshot.edit();
     edit.replace_paragraph(Position::new(0), "ZERO")
         .unwrap()
@@ -682,7 +665,7 @@ fn non_replacement_operation_ends_paragraph_replacement_run() {
     let commit = edit.commit().unwrap();
     assert_eq!(commit.results().len(), 3);
     assert_eq!(
-        commit.snapshot().document().unwrap().text().unwrap(),
+        commit.package().document().unwrap().text().unwrap(),
         "ZERO\nONE!\ntwo"
     );
 }
@@ -696,12 +679,17 @@ fn paragraph_replacement_above_common_raw_limit_uses_existing_rebuild_path() {
     for _ in 0..PARAGRAPH_COUNT {
         document.add_paragraph(&text).unwrap();
     }
-    let source = Document::from_bytes(document.to_bytes().unwrap()).unwrap();
+    let source = Package::from_bytes(&document.to_bytes().unwrap()).unwrap();
     assert!(
-        source.get_file("content.xml").unwrap().len()
+        source
+            .document()
+            .unwrap()
+            .get_file("content.xml")
+            .unwrap()
+            .len()
             > litchi_odf_common::package::MAX_CONTENT_REPLACEMENT_BYTES
     );
-    let snapshot = litchi_odt::transaction::Snapshot::from_document(&source).unwrap();
+    let snapshot = source.clone();
 
     let mut edit = snapshot.edit();
     edit.replace_paragraph(Position::new(TARGET), "fallback replacement")
@@ -709,7 +697,7 @@ fn paragraph_replacement_above_common_raw_limit_uses_existing_rebuild_path() {
         .replace_paragraph(Position::new(TARGET + 1), "second fallback replacement")
         .unwrap();
     let commit = edit.commit().unwrap();
-    let reopened = commit.snapshot().document().unwrap();
+    let reopened = commit.package().document().unwrap();
     let paragraphs = reopened.paragraphs().unwrap();
 
     assert_eq!(paragraphs.len(), PARAGRAPH_COUNT);
@@ -722,7 +710,7 @@ fn paragraph_replacement_above_common_raw_limit_uses_existing_rebuild_path() {
     assert_eq!(paragraphs[TARGET + 2].text().unwrap(), text);
 }
 
-fn real_producer_source() -> Document {
+fn real_producer_source() -> Package {
     let mut writer = PackageWriter::new();
     writer
         .set_mimetype("application/vnd.oasis.opendocument.text")
@@ -745,7 +733,7 @@ fn real_producer_source() -> Document {
             br#"<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" office:version="1.3"><office:meta/></office:document-meta>"#,
         )
         .unwrap();
-    Document::from_bytes(writer.finish_to_bytes().unwrap()).unwrap()
+    Package::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap()
 }
 
 fn assert_all_package_xml_is_compact(bytes: &[u8]) {
@@ -761,31 +749,30 @@ fn assert_all_package_xml_is_compact(bytes: &[u8]) {
 #[test]
 fn packaged_transaction_is_source_checked_reversible_and_exact_for_noop() {
     let source = source();
-    let snapshot = litchi_odt::transaction::Snapshot::from_document(&source).unwrap();
+    let snapshot = source.clone();
 
     let no_op = snapshot.edit().commit().unwrap();
-    assert_eq!(no_op.snapshot().as_bytes(), snapshot.as_bytes());
+    assert_eq!(no_op.package().as_bytes(), snapshot.as_bytes());
 
     let mut edit = snapshot.edit();
     edit.append_line_break(ParagraphSelector::exact_text("Unique paragraph"))
         .unwrap();
     let commit = edit.commit().unwrap();
     assert!(
-        commit.snapshot().document().unwrap().paragraphs().unwrap()[0]
+        commit.package().document().unwrap().paragraphs().unwrap()[0]
             .text()
             .unwrap()
             .contains('\n')
     );
     assert_eq!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.snapshot())
+            .package()
+            .apply(&commit.patch().inverse())
             .unwrap()
             .as_bytes(),
         snapshot.as_bytes()
     );
-    assert!(commit.patch().apply(commit.snapshot()).is_err());
+    assert!(commit.package().apply(commit.patch()).is_err());
 }
 
 #[test]
@@ -793,8 +780,8 @@ fn packaged_transaction_rejects_ambiguous_text_selectors() {
     let mut document = MutableDocument::new();
     document.add_paragraph("duplicate").unwrap();
     document.add_paragraph("duplicate").unwrap();
-    let source = Document::from_bytes(document.to_bytes().unwrap()).unwrap();
-    let snapshot = litchi_odt::transaction::Snapshot::from_document(&source).unwrap();
+    let source = Package::from_bytes(&document.to_bytes().unwrap()).unwrap();
+    let snapshot = source.clone();
 
     assert!(
         snapshot
@@ -807,7 +794,7 @@ fn packaged_transaction_rejects_ambiguous_text_selectors() {
 #[test]
 fn checked_positions_are_resolved_against_the_source_snapshot() {
     let source = source();
-    let snapshot = litchi_odt::transaction::Snapshot::from_document(&source).unwrap();
+    let snapshot = source.clone();
     let position = Position::new(0);
 
     let mut edit = snapshot.edit();
@@ -826,7 +813,7 @@ fn checked_positions_are_resolved_against_the_source_snapshot() {
 #[test]
 fn rdf_transaction_preserves_a_real_producer_package_and_is_reversible() {
     let source = real_producer_source();
-    let before = source.snapshot().unwrap();
+    let before = source.clone();
     let triple = Triple {
         subject: Subject::Iri("urn:litchi:document".to_string()),
         predicate: "urn:litchi:review#reviewed".to_string(),
@@ -837,20 +824,19 @@ fn rdf_transaction_preserves_a_real_producer_package_and_is_reversible() {
         },
     };
 
-    let mut edit = source.edit().unwrap();
+    let mut edit = source.edit();
     edit.add_rdf_graph(Some("metadata/litchi.rdf"), std::slice::from_ref(&triple))
         .unwrap();
     let commit = edit.commit().unwrap();
-    let after = commit.snapshot().document().unwrap();
+    let after = commit.package().document().unwrap();
     let graphs = after.rdf_graphs().unwrap();
     assert_eq!(graphs.len(), 1);
     assert_eq!(graphs[0].path, "metadata/litchi.rdf");
     assert_eq!(graphs[0].triples, vec![triple]);
     assert_eq!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.snapshot())
+            .package()
+            .apply(&commit.patch().inverse())
             .unwrap()
             .as_bytes(),
         before.as_bytes()
@@ -872,8 +858,8 @@ fn changed_transactions_refuse_signed_and_encrypted_envelopes() {
     signed_writer
         .add_file("META-INF/documentsignatures.xml", b"<signatures/>")
         .unwrap();
-    let signed = Document::from_bytes(signed_writer.finish_to_bytes().unwrap()).unwrap();
-    let signed_snapshot = signed.snapshot().unwrap();
+    let signed = Package::from_bytes(&signed_writer.finish_to_bytes().unwrap()).unwrap();
+    let signed_snapshot = signed.clone();
     assert_eq!(
         signed_snapshot.envelope_kind().unwrap(),
         EnvelopeKind::Signed
@@ -883,11 +869,11 @@ fn changed_transactions_refuse_signed_and_encrypted_envelopes() {
             .edit()
             .commit()
             .unwrap()
-            .snapshot()
+            .package()
             .as_bytes(),
         signed_snapshot.as_bytes()
     );
-    let mut signed_edit = signed.edit().unwrap();
+    let mut signed_edit = signed.edit();
     signed_edit
         .append_line_break(ParagraphSelector::at(0))
         .unwrap();
@@ -907,19 +893,19 @@ fn changed_transactions_refuse_signed_and_encrypted_envelopes() {
         )
         .unwrap();
     let encrypted_bytes = encrypted_writer.finish_to_bytes().unwrap();
-    let encrypted = Document::from_bytes_with_password(encrypted_bytes, "secret").unwrap();
-    let encrypted_snapshot = encrypted.snapshot().unwrap();
+    let encrypted = Package::from_bytes_with_password(&encrypted_bytes, "secret").unwrap();
+    let encrypted_snapshot = encrypted.clone();
     assert_eq!(
         encrypted_snapshot.envelope_kind().unwrap(),
         EnvelopeKind::Encrypted
     );
     let encrypted_noop = encrypted_snapshot.edit().commit().unwrap();
     assert_eq!(
-        encrypted_noop.snapshot().as_bytes(),
+        encrypted_noop.package().as_bytes(),
         encrypted_snapshot.as_bytes()
     );
     assert!(encrypted_noop.patch().durable().is_err());
-    let mut encrypted_edit = encrypted.edit().unwrap();
+    let mut encrypted_edit = encrypted.edit();
     encrypted_edit
         .append_line_break(ParagraphSelector::at(0))
         .unwrap();
@@ -929,7 +915,7 @@ fn changed_transactions_refuse_signed_and_encrypted_envelopes() {
 #[test]
 fn form_and_linked_resource_operations_commit_as_one_atomic_package() {
     let source = source();
-    let before = source.snapshot().unwrap();
+    let before = source.clone();
     let form = AuthoredForm::new("ReviewForm");
     let resource = EmbeddedResource {
         kind: EmbeddedResourceKind::Object,
@@ -941,20 +927,19 @@ fn form_and_linked_resource_operations_commit_as_one_atomic_package() {
         class_id: None,
     };
 
-    let mut edit = source.edit().unwrap();
+    let mut edit = source.edit();
     edit.add_form(0, &form)
         .unwrap()
         .add_embedded_resource(&resource)
         .unwrap();
     let commit = edit.commit().unwrap();
-    let document = commit.snapshot().document().unwrap();
+    let document = commit.package().document().unwrap();
     assert_eq!(document.forms().unwrap().groups.len(), 1);
     assert_eq!(document.embedded_objects().unwrap().len(), 1);
     assert_eq!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.snapshot())
+            .package()
+            .apply(&commit.patch().inverse())
             .unwrap()
             .as_bytes(),
         before.as_bytes()
@@ -983,7 +968,7 @@ fn residual_semantic_families_share_one_reversible_transaction() {
         bytes: b"inert-not-executed".to_vec(),
     };
 
-    let mut edit = source.edit().unwrap();
+    let mut edit = source.edit();
     edit.add_rdf_graph(Some("metadata/review.rdf"), std::slice::from_ref(&triple))
         .unwrap()
         .add_rdf_triple("metadata/review.rdf", &triple)
@@ -1012,7 +997,7 @@ fn residual_semantic_families_share_one_reversible_transaction() {
             OperationResult::Path("Scripts/review.bin".to_string()),
         ]
     );
-    let document = commit.snapshot().document().unwrap();
+    let document = commit.package().document().unwrap();
     assert_eq!(document.rdf_graphs().unwrap()[0].triples.len(), 2);
     assert_eq!(document.protection().unwrap().read_only, Some(true));
     assert_eq!(document.forms().unwrap().groups[0].forms.len(), 1);
@@ -1024,27 +1009,23 @@ fn residual_semantic_families_share_one_reversible_transaction() {
         assert!(wire_text.contains(operation), "missing {operation}");
     }
     assert_eq!(
-        durable
-            .apply(&source.snapshot().unwrap())
-            .unwrap()
-            .as_bytes(),
-        commit.snapshot().as_bytes()
+        durable.apply(&source.clone()).unwrap().as_bytes(),
+        commit.package().as_bytes()
     );
-    assert_all_package_xml_is_compact(commit.snapshot().as_bytes());
+    assert_all_package_xml_is_compact(commit.package().as_bytes());
     assert_eq!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.snapshot())
+            .package()
+            .apply(&commit.patch().inverse())
             .unwrap()
             .as_bytes(),
-        source.original_bytes()
+        source.as_bytes()
     );
 }
 
 #[test]
 fn form_replacement_reorder_and_removal_are_durable_and_transferable() {
-    let source = source().snapshot().unwrap();
+    let source = source().clone();
     let first = AuthoredForm::new("First");
     let second = AuthoredForm::new("Second");
     let first_control = AuthoredFormControl::from(TextControl::text("One", "one"));
@@ -1059,7 +1040,7 @@ fn form_replacement_reorder_and_removal_are_durable_and_transferable() {
         .unwrap()
         .add_form_control(0, &second_control)
         .unwrap();
-    let setup = setup.commit().unwrap().into_snapshot();
+    let setup = setup.commit().unwrap().into_package();
 
     let replacement_form = AuthoredForm::new("Replacement");
     let replacement_control =
@@ -1093,7 +1074,7 @@ fn form_replacement_reorder_and_removal_are_durable_and_transferable() {
     }
     assert_eq!(
         durable.apply(&setup).unwrap().as_bytes(),
-        committed.snapshot().as_bytes()
+        committed.package().as_bytes()
     );
     assert_eq!(
         committed
@@ -1102,16 +1083,16 @@ fn form_replacement_reorder_and_removal_are_durable_and_transferable() {
             .unwrap()
             .commit()
             .unwrap()
-            .snapshot()
+            .package()
             .as_bytes(),
-        committed.snapshot().as_bytes()
+        committed.package().as_bytes()
     );
 }
 
 #[test]
 fn durable_patch_round_trips_deterministically_and_remains_exactly_reversible() {
     let source = source();
-    let snapshot = source.snapshot().unwrap();
+    let snapshot = source.clone();
     let mut edit = snapshot.edit();
     edit.append_line_break(ParagraphSelector::position(Position::new(0)))
         .unwrap();
@@ -1125,7 +1106,7 @@ fn durable_patch_round_trips_deterministically_and_remains_exactly_reversible() 
     let decoded =
         litchi_odt::transaction::DurablePatch::from_deterministic_json(&first_json).unwrap();
     let applied = decoded.apply(&snapshot).unwrap();
-    assert_eq!(applied.as_bytes(), commit.snapshot().as_bytes());
+    assert_eq!(applied.as_bytes(), commit.package().as_bytes());
     assert_all_package_xml_is_compact(applied.as_bytes());
     let restored = decoded.inverse().apply(&applied).unwrap();
     assert_eq!(restored.as_bytes(), snapshot.as_bytes());
@@ -1135,7 +1116,7 @@ fn durable_patch_round_trips_deterministically_and_remains_exactly_reversible() 
 #[test]
 fn semantic_durable_patch_covers_styles_fields_revisions_rdf_protection_and_script_blobs() {
     let source = source();
-    let snapshot = source.snapshot().unwrap();
+    let snapshot = source.clone();
     let ruby = RubyStyle::new(
         "RubyReview",
         Some(RubyProperties {
@@ -1199,7 +1180,7 @@ fn semantic_durable_patch_covers_styles_fields_revisions_rdf_protection_and_scri
 
     let decoded = litchi_odt::transaction::DurablePatch::from_deterministic_json(&wire).unwrap();
     let applied = decoded.apply(&snapshot).unwrap();
-    assert_eq!(applied.as_bytes(), commit.snapshot().as_bytes());
+    assert_eq!(applied.as_bytes(), commit.package().as_bytes());
     let reopened = applied.document().unwrap();
     assert_eq!(reopened.ruby_styles().unwrap().styles, vec![ruby]);
     assert_eq!(reopened.dynamic_text_fields().unwrap(), vec![field]);
@@ -1219,7 +1200,7 @@ fn semantic_durable_patch_covers_styles_fields_revisions_rdf_protection_and_scri
 
 #[test]
 fn rich_note_and_ruby_edits_use_typed_durable_fragments() {
-    let snapshot = source().snapshot().unwrap();
+    let snapshot = source().clone();
     let note = Note::new(NoteClass::Footnote, "1", "Durable footnote").unwrap();
     let ruby = RubyAnnotation::new(None, RubyBase::from_text("漢").unwrap(), "kan", None).unwrap();
     let mut edit = snapshot.edit();
@@ -1237,7 +1218,7 @@ fn rich_note_and_ruby_edits_use_typed_durable_fragments() {
 
     let decoded = litchi_odt::transaction::DurablePatch::from_deterministic_json(&wire).unwrap();
     let inserted = decoded.apply(&snapshot).unwrap();
-    assert_eq!(inserted.as_bytes(), committed.snapshot().as_bytes());
+    assert_eq!(inserted.as_bytes(), committed.package().as_bytes());
     let reopened = inserted.document().unwrap();
     assert_eq!(reopened.notes().unwrap(), vec![note]);
     assert_eq!(reopened.ruby_annotations().unwrap().annotations, vec![ruby]);
@@ -1258,7 +1239,7 @@ fn rich_note_and_ruby_edits_use_typed_durable_fragments() {
         .unwrap()
         .apply(&inserted)
         .unwrap();
-    assert_eq!(replayed.as_bytes(), replacement.snapshot().as_bytes());
+    assert_eq!(replayed.as_bytes(), replacement.package().as_bytes());
 
     let mut removal = replayed.edit();
     removal
@@ -1281,7 +1262,7 @@ fn rich_note_and_ruby_edits_use_typed_durable_fragments() {
 
 #[test]
 fn chart_and_resource_payloads_replay_and_transfer_with_explicit_dependencies() {
-    let snapshot = source().snapshot().unwrap();
+    let snapshot = source().clone();
     let chart = Definition::new(ChartClass::line());
     let resource = EmbeddedResource {
         kind: EmbeddedResourceKind::Image,
@@ -1308,17 +1289,17 @@ fn chart_and_resource_payloads_replay_and_transfer_with_explicit_dependencies() 
 
     let decoded = litchi_odt::transaction::DurablePatch::from_deterministic_json(&wire).unwrap();
     let applied = decoded.apply(&snapshot).unwrap();
-    assert_eq!(applied.as_bytes(), committed.snapshot().as_bytes());
+    assert_eq!(applied.as_bytes(), committed.package().as_bytes());
     applied.document().unwrap().embedded_chart(0).unwrap();
 
-    let destination = source().snapshot().unwrap();
+    let destination = source().clone();
     let transfer = committed.patch().plan_transfer(&destination).unwrap();
     assert!(transfer.dependencies().iter().any(|dependency| {
         dependency.kind() == TransferDependencyKind::ResourcePayload && dependency.is_satisfied()
     }));
     let transferred = transfer.commit().unwrap();
     transferred
-        .snapshot()
+        .package()
         .document()
         .unwrap()
         .embedded_chart(0)
@@ -1340,7 +1321,7 @@ fn chart_and_resource_payloads_replay_and_transfer_with_explicit_dependencies() 
 
 #[test]
 fn chart_and_resource_replacement_removal_and_moves_use_semantic_wire() {
-    let source = source().snapshot().unwrap();
+    let source = source().clone();
     let linked = |name: &str| EmbeddedResource {
         kind: EmbeddedResourceKind::Object,
         source: EmbeddedResourceSource::Linked {
@@ -1374,7 +1355,7 @@ fn chart_and_resource_replacement_removal_and_moves_use_semantic_wire() {
         .unwrap()
         .add_embedded_resource(&image("image-two", b"two"))
         .unwrap();
-    let setup = setup.commit().unwrap().into_snapshot();
+    let setup = setup.commit().unwrap().into_package();
 
     let mut edit = setup.edit();
     edit.replace_embedded_chart(2, &Definition::new(ChartClass::ring()))
@@ -1411,7 +1392,7 @@ fn chart_and_resource_replacement_removal_and_moves_use_semantic_wire() {
     }
     assert_eq!(
         durable.apply(&setup).unwrap().as_bytes(),
-        committed.snapshot().as_bytes()
+        committed.package().as_bytes()
     );
     assert_eq!(
         committed
@@ -1420,15 +1401,15 @@ fn chart_and_resource_replacement_removal_and_moves_use_semantic_wire() {
             .unwrap()
             .commit()
             .unwrap()
-            .snapshot()
+            .package()
             .as_bytes(),
-        committed.snapshot().as_bytes()
+        committed.package().as_bytes()
     );
 }
 
 #[test]
 fn cross_document_transfer_is_dependency_checked_and_refuses_source_local_edits() {
-    let source_snapshot = source().snapshot().unwrap();
+    let source_snapshot = source().clone();
     let mut portable = source_snapshot.edit();
     portable
         .insert_paragraph(Position::new(1), "portable")
@@ -1437,7 +1418,7 @@ fn cross_document_transfer_is_dependency_checked_and_refuses_source_local_edits(
         .unwrap();
     let portable = portable.commit().unwrap();
 
-    let destination = source().snapshot().unwrap();
+    let destination = source().clone();
     let plan = portable.patch().plan_transfer(&destination).unwrap();
     assert_eq!(plan.operation_count(), 2);
     assert_eq!(plan.dependencies().len(), 1);
@@ -1449,7 +1430,7 @@ fn cross_document_transfer_is_dependency_checked_and_refuses_source_local_edits(
     assert_eq!(
         plan.commit()
             .unwrap()
-            .snapshot()
+            .package()
             .document()
             .unwrap()
             .text()
@@ -1466,10 +1447,7 @@ fn cross_document_transfer_is_dependency_checked_and_refuses_source_local_edits(
 
     let empty = {
         let document = MutableDocument::new();
-        Document::from_bytes(document.to_bytes().unwrap())
-            .unwrap()
-            .snapshot()
-            .unwrap()
+        Package::from_bytes(&document.to_bytes().unwrap()).unwrap()
     };
     let unresolved = portable.patch().plan_transfer(&empty).unwrap();
     assert!(
@@ -1483,14 +1461,10 @@ fn cross_document_transfer_is_dependency_checked_and_refuses_source_local_edits(
 
 #[test]
 fn genuine_libreoffice_package_survives_transaction_reopen_and_full_resave() {
-    let producer = Document::from_bytes(
-        include_bytes!(
+    let producer = Package::from_bytes(include_bytes!(
             "../../../test-data/libreoffice-core/sw/qa/extras/odfexport/data/Formcontrol needs high z-index.odt"
-        )
-        .to_vec(),
-    )
-    .unwrap();
-    let snapshot = producer.snapshot().unwrap();
+        ).as_ref()).unwrap();
+    let snapshot = producer.clone();
     let triple = Triple {
         subject: Subject::Iri("urn:litchi:libreoffice".to_string()),
         predicate: "urn:litchi:review#reopened".to_string(),
@@ -1526,9 +1500,9 @@ fn genuine_libreoffice_package_survives_transaction_reopen_and_full_resave() {
         other => panic!("unexpected embedded chart result: {other:?}"),
     };
 
-    let first_reopen = Document::from_bytes(committed.snapshot().as_bytes().to_vec()).unwrap();
+    let first_reopen = Package::from_bytes(committed.package().as_bytes()).unwrap();
     let resaved = first_reopen.to_bytes().unwrap();
-    let second_reopen = Document::from_bytes(resaved).unwrap();
+    let second_reopen = Package::from_bytes(&resaved).unwrap().document().unwrap();
     let graph = second_reopen
         .rdf_graphs()
         .unwrap()
@@ -1554,7 +1528,7 @@ fn raw_zip_signature_marker_is_classified_and_never_mutated() {
             ),
         ],
     );
-    let snapshot = Document::from_bytes(bytes).unwrap().snapshot().unwrap();
+    let snapshot = Package::from_bytes(&bytes).unwrap();
     assert_eq!(snapshot.envelope_kind().unwrap(), EnvelopeKind::Signed);
     let mut edit = snapshot.edit();
     edit.append_line_break(ParagraphSelector::position(Position::new(0)))
@@ -1565,7 +1539,7 @@ fn raw_zip_signature_marker_is_classified_and_never_mutated() {
 #[test]
 fn sealed_durable_patch_discards_reverse_artifact_and_checks_source_digest() {
     let source = source();
-    let snapshot = source.snapshot().unwrap();
+    let snapshot = source.clone();
     let mut edit = snapshot.edit();
     edit.append_line_break(ParagraphSelector::position(Position::new(0)))
         .unwrap();
@@ -1589,15 +1563,15 @@ fn sealed_durable_patch_discards_reverse_artifact_and_checks_source_digest() {
         litchi_odt::transaction::SealedPatch::from_deterministic_json(&sealed_json).unwrap();
     assert_eq!(
         sealed.apply(&snapshot).unwrap().as_bytes(),
-        commit.snapshot().as_bytes()
+        commit.package().as_bytes()
     );
-    assert!(sealed.apply(commit.snapshot()).is_err());
+    assert!(sealed.apply(commit.package()).is_err());
 }
 
 #[test]
 fn durable_patch_parser_rejects_noncanonical_json() {
     let source = source();
-    let snapshot = source.snapshot().unwrap();
+    let snapshot = source.clone();
     let json = snapshot
         .edit()
         .commit()
@@ -1626,7 +1600,7 @@ fn durable_patch_parser_rejects_noncanonical_json() {
 #[test]
 fn semantic_durable_patch_replays_paragraph_runs_and_hyperlinks() {
     let source = source();
-    let snapshot = source.snapshot().unwrap();
+    let snapshot = source.clone();
     let mut edit = snapshot.edit();
     edit.insert_paragraph(Position::new(1), "second")
         .unwrap()
@@ -1648,8 +1622,8 @@ fn semantic_durable_patch_replays_paragraph_runs_and_hyperlinks() {
         .append_hyperlink(Position::new(1), "https://example.invalid/review", "review")
         .unwrap();
     assert_eq!(
-        repeated.commit().unwrap().snapshot().as_bytes(),
-        commit.snapshot().as_bytes()
+        repeated.commit().unwrap().package().as_bytes(),
+        commit.package().as_bytes()
     );
     let durable = commit.patch().durable().unwrap();
     let wire = durable.to_deterministic_json().unwrap();
@@ -1671,7 +1645,7 @@ fn semantic_durable_patch_replays_paragraph_runs_and_hyperlinks() {
     assert_eq!(
         durable
             .inverse()
-            .apply(commit.snapshot())
+            .apply(commit.package())
             .unwrap()
             .as_bytes(),
         snapshot.as_bytes()
@@ -1683,10 +1657,7 @@ fn deterministic_join_reports_exact_conflicts_and_commits_in_identifier_order() 
     let mut document = MutableDocument::new();
     document.add_paragraph("zero").unwrap();
     document.add_paragraph("one").unwrap();
-    let snapshot = Document::from_bytes(document.to_bytes().unwrap())
-        .unwrap()
-        .snapshot()
-        .unwrap();
+    let snapshot = Package::from_bytes(&document.to_bytes().unwrap()).unwrap();
 
     let mut joined = snapshot.joined_edit();
     let mut second = snapshot.edit();
@@ -1709,7 +1680,7 @@ fn deterministic_join_reports_exact_conflicts_and_commits_in_identifier_order() 
 
     let committed = joined.commit().unwrap();
     let paragraphs = committed
-        .snapshot()
+        .package()
         .document()
         .unwrap()
         .paragraphs()
@@ -1720,7 +1691,7 @@ fn deterministic_join_reports_exact_conflicts_and_commits_in_identifier_order() 
 
 #[test]
 fn three_way_plan_is_non_applying_and_requires_explicit_conflict_resolution() {
-    let snapshot = source().snapshot().unwrap();
+    let snapshot = source().clone();
     let mut left = snapshot.joined_edit();
     let mut left_edit = snapshot.edit();
     left_edit
@@ -1747,15 +1718,12 @@ fn three_way_plan_is_non_applying_and_requires_explicit_conflict_resolution() {
         Err(_) => panic!("resolved ODT merge plan must finish"),
     };
     let merged = joined.commit().unwrap();
-    assert_eq!(
-        merged.snapshot().document().unwrap().text().unwrap(),
-        "left"
-    );
+    assert_eq!(merged.package().document().unwrap().text().unwrap(), "left");
 }
 
 #[test]
 fn bounded_history_rejects_stale_edits_and_fully_reopens_undo_redo() {
-    let snapshot = source().snapshot().unwrap();
+    let snapshot = source().clone();
     let mut history = snapshot.history(HistoryLimits::new(4, 64 * 1024 * 1024));
     let stale = history.edit();
     let mut current = history.edit();

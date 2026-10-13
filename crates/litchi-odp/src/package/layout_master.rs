@@ -190,7 +190,7 @@ impl Presentation {
 
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn add_layout(&mut self, layout: &Layout) -> Result<()> {
+    pub(crate) fn add_layout(&mut self, layout: &Layout) -> Result<()> {
         layout.validate()?;
         let styles = required_styles(self)?.to_string();
         if definitions(&styles, STYLE, "presentation-page-layout", STYLE, "name")?
@@ -208,7 +208,7 @@ impl Presentation {
 
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn replace_page_layout(&mut self, layout: &Layout) -> Result<()> {
+    pub(crate) fn replace_page_layout(&mut self, layout: &Layout) -> Result<()> {
         layout.validate()?;
         let styles = required_styles(self)?.to_string();
         if !definitions(&styles, STYLE, "presentation-page-layout", STYLE, "name")?
@@ -226,7 +226,11 @@ impl Presentation {
 
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn remove_page_layout(&mut self, name: &str, replacement: Option<&str>) -> Result<()> {
+    pub(crate) fn remove_page_layout(
+        &mut self,
+        name: &str,
+        replacement: Option<&str>,
+    ) -> Result<()> {
         validate_name(name, "presentation page layout name")?;
         if replacement == Some(name) {
             return invalid("layout replacement must differ from removed layout");
@@ -264,7 +268,7 @@ impl Presentation {
 
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn reorder_layouts(&mut self, names: &[String]) -> Result<()> {
+    pub(crate) fn reorder_layouts(&mut self, names: &[String]) -> Result<()> {
         let styles = reorder(
             required_styles(self)?,
             STYLE,
@@ -279,7 +283,7 @@ impl Presentation {
 
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn add_master_page(&mut self, master: &MasterPage) -> Result<()> {
+    pub(crate) fn add_master_page(&mut self, master: &MasterPage) -> Result<()> {
         let fragment = master.fragment()?;
         let styles = required_styles(self)?.to_string();
         if definitions(&styles, STYLE, "master-page", STYLE, "name")?.contains_key(master.name()) {
@@ -292,7 +296,7 @@ impl Presentation {
 
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn replace_master_page(&mut self, master: &MasterPage) -> Result<()> {
+    pub(crate) fn replace_master_page(&mut self, master: &MasterPage) -> Result<()> {
         let fragment = master.fragment()?;
         let styles = required_styles(self)?.to_string();
         let masters = definitions(&styles, STYLE, "master-page", STYLE, "name")?;
@@ -306,7 +310,11 @@ impl Presentation {
 
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn remove_master_page(&mut self, name: &str, replacement: Option<&str>) -> Result<()> {
+    pub(crate) fn remove_master_page(
+        &mut self,
+        name: &str,
+        replacement: Option<&str>,
+    ) -> Result<()> {
         validate_name(name, "master page name")?;
         if replacement == Some(name) {
             return invalid("master replacement must differ from removed master");
@@ -348,7 +356,7 @@ impl Presentation {
 
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn reorder_master_pages(&mut self, names: &[String]) -> Result<()> {
+    pub(crate) fn reorder_master_pages(&mut self, names: &[String]) -> Result<()> {
         let styles = reorder(
             required_styles(self)?,
             STYLE,
@@ -363,7 +371,7 @@ impl Presentation {
 
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn assign_slide_master_page(
+    pub(crate) fn assign_slide_master_page(
         &mut self,
         slide_index: usize,
         master_name: Option<&str>,
@@ -389,7 +397,7 @@ impl Presentation {
 
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn assign_slide_page_layout(
+    pub(crate) fn assign_slide_page_layout(
         &mut self,
         slide_index: usize,
         layout_name: Option<&str>,

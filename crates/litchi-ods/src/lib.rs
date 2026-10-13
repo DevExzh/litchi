@@ -1,8 +1,22 @@
 //! `OpenDocument` Spreadsheet (`.ods`) support.
 //!
 //! The crate is organized by responsibility: immutable spreadsheet vocabulary
-//! in [`model`], XML codecs in [`codec`], package access in [`package`],
-//! construction in [`authoring`], and the concise entry points in [`facade`].
+//! in [`model`], XML codecs in [`codec`], the immutable [`Package`] owner and
+//! its primary transaction in [`document`], construction in [`authoring`],
+//! and the read-only [`Workbook`] projection in [`facade`].
+//!
+//! ```
+//! use litchi_ods::{Builder, Package, Sheet};
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let mut builder = Builder::new();
+//! builder.add_sheet(Sheet::new("Data")?)?;
+//! let package: Package = builder.build()?;
+//! let workbook = package.workbook()?;
+//! assert_eq!(workbook.sheet_count(), 1);
+//! # Ok(())
+//! # }
+//! ```
 
 #![forbid(unsafe_code)]
 // ODF element models and the established spreadsheet facade deliberately use
@@ -69,7 +83,7 @@ pub mod metadata;
 pub mod metadata_graphs;
 pub mod model;
 mod open_parse;
-pub mod package;
+pub(crate) mod package;
 pub mod protection;
 pub mod settings;
 pub mod sheet_metadata;
@@ -80,13 +94,14 @@ pub mod worksheet;
 mod xml_reference;
 
 pub use charts::Chart;
+pub use document::{EditOptions, Package};
 pub use drawing::{Frame, Part};
 pub use embedded::{Kind, Object, Parameter, Root};
 pub use facade::{
     Builder, CellSelector, FormulaChange, HyperlinkChange, HyperlinkOperation, MAX_CELL_SELECTORS,
-    MutableSpreadsheet, ReadLimits, SheetCatalogEntry, SourceBackedSpreadsheet,
-    SourceBackedSpreadsheetCatalog, SourceCellCommit, SourceCellEdit, SourceCellPatch,
-    SourceCellPublicationReport, SourceCellSnapshot, SourceReadMetrics, Spreadsheet,
+    MutableSpreadsheet, SheetCatalogEntry, SourceBackedSpreadsheet, SourceBackedSpreadsheetCatalog,
+    SourceCellCommit, SourceCellEdit, SourceCellPatch, SourceCellPublicationReport,
+    SourceCellSnapshot, SourceReadMetrics, Workbook,
 };
 pub use flat::{
     FlatCommit, FlatEdit, FlatSpreadsheet, Limits as FlatLimits, Patch as FlatPatch,
@@ -94,6 +109,10 @@ pub use flat::{
 };
 pub use litchi_core::Metadata;
 pub use litchi_odf_common::rdf;
+pub use litchi_odf_common::{
+    Error, LimitKind, OpenOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsBuilder,
+    SourceLimitKind, SourceLimits, SourceLimitsBuilder,
+};
 pub use media::Image;
 pub use model::hyperlink::{Actuate, Link, Show};
 pub use model::names;

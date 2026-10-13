@@ -5,7 +5,7 @@ use std::{fmt, sync::Arc};
 use litchi_core::{Error, Position, Result};
 use litchi_odf_common::rdf::{Graph, Triple};
 
-use crate::package::Package;
+use crate::package::Archive;
 
 /// An immutable RDF graph owner bound to exact ODS package bytes.
 #[derive(Clone)]
@@ -35,7 +35,7 @@ impl Snapshot {
     }
 
     fn from_arc(source: Arc<[u8]>) -> Result<Self> {
-        let package = Package::from_bytes(source.as_ref().to_vec())?;
+        let package = Archive::from_bytes(source.as_ref().to_vec())?;
         let graphs = Arc::from(litchi_odf_common::rdf::graphs(package.package())?);
         Ok(Self { source, graphs })
     }
@@ -228,8 +228,8 @@ impl Edit {
         }
     }
 
-    fn package(&self) -> Result<Package> {
-        Package::from_bytes(self.candidate.source.as_ref().to_vec())
+    fn package(&self) -> Result<Archive> {
+        Archive::from_bytes(self.candidate.source.as_ref().to_vec())
     }
 
     fn graph_or_error(&self, path: &str) -> Result<&Graph> {
@@ -348,7 +348,7 @@ fn check_position(position: Position, length: usize) -> Result<()> {
 }
 
 fn validate_authored_xml(bytes: &[u8], graph_path: Option<&str>) -> Result<()> {
-    let package = Package::from_bytes(bytes.to_vec())?;
+    let package = Archive::from_bytes(bytes.to_vec())?;
     let manifest = package.package().get_file("META-INF/manifest.xml")?;
     litchi_odf_common::compact_xml::validate(&manifest).map_err(Error::from)?;
     if let Some(path) = graph_path {

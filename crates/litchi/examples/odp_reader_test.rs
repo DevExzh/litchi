@@ -11,7 +11,7 @@
 #[cfg(feature = "odf")]
 use litchi::Result;
 #[cfg(feature = "odf")]
-use litchi::odp::Presentation;
+use litchi::odp::Package;
 
 #[cfg(feature = "odf")]
 fn main() -> Result<()> {
@@ -20,7 +20,7 @@ fn main() -> Result<()> {
     // Open the test ODP file
     let test_file = "test.odp";
     println!("📖 Opening file: {}", test_file);
-    let presentation = Presentation::open(test_file)?;
+    let presentation = Package::open(test_file)?.presentation()?;
     println!("✅ File opened successfully\n");
 
     // Test 1: Slide count

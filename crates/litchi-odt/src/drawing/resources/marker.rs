@@ -186,7 +186,7 @@ impl Collection {
     }
 }
 
-impl crate::Package {
+impl crate::GenericPackage {
     /// Parse named marker resources from the package `styles.xml` part.
     pub fn drawing_markers(&self) -> Result<Collection> {
         let styles = self.styles_xml()?;

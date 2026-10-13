@@ -479,14 +479,34 @@ impl Formula {
         self.package.into_bytes()
     }
 
-    /// Save the exact package bytes without rebuilding the archive.
+    /// Atomically replace `path` with the exact package bytes (full
+    /// durability) without rebuilding the archive.
+    ///
+    /// The bytes are staged in a sibling temporary file and published with
+    /// one rename, so a failed save leaves an existing destination unchanged.
     ///
     /// # Errors
     ///
-    /// Returns an error when the file cannot be written.
-    pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
-        std::fs::write(path, self.as_bytes())?;
-        Ok(())
+    /// Returns the publication I/O failure.
+    pub fn save(
+        &self,
+        path: impl AsRef<Path>,
+    ) -> std::result::Result<(), litchi_odf_common::Error> {
+        self.save_with_durability(path, litchi_core::Durability::Full)
+    }
+
+    /// Atomically replace `path` with the exact package bytes under explicit
+    /// durability.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::save`].
+    pub fn save_with_durability(
+        &self,
+        path: impl AsRef<Path>,
+        durability: litchi_core::Durability,
+    ) -> std::result::Result<(), litchi_odf_common::Error> {
+        litchi_odf_common::publish::save_bytes(path.as_ref(), self.as_bytes(), durability)
     }
 }
 

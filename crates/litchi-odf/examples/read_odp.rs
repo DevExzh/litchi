@@ -34,13 +34,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             )?;
             builder.add_slide_with_title("Final Slide", "Thanks for trying litchi-odf!")?;
             let path = tmp.path().to_path_buf();
-            builder.save(&path)?;
+            builder.build()?.save(&path)?;
             (path, Some(tmp))
         },
     };
 
     println!("Opening: {}", path.display());
-    let pres = odp::Presentation::open(&path)?;
+    let pres = odp::Package::open(&path)?.presentation()?;
 
     let slide_count = pres.slide_count()?;
     println!("Slide count: {}", slide_count);

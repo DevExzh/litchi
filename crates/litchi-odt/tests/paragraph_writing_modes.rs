@@ -222,7 +222,9 @@ fn builder_package_round_trip() {
             .is_err()
     );
     builder.add_paragraph("x").unwrap();
-    let package = litchi_odt::generic::Package::from_bytes(builder.build().unwrap()).unwrap();
+    let package =
+        litchi_odt::generic::Package::from_bytes(&builder.build().unwrap().to_bytes().unwrap())
+            .unwrap();
     assert_eq!(
         package.paragraph_style_writing_modes().unwrap().get("Body"),
         Some(&style)

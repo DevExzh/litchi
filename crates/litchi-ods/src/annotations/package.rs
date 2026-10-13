@@ -5,8 +5,8 @@ use litchi_core::Result;
 /// Replace only the owned `content.xml` member after a validated annotation
 /// transaction.  The package layer retains every other member unchanged.
 pub(crate) fn replace_content(
-    package: &crate::package::Package,
+    package: &crate::package::Archive,
     content_xml: &str,
-) -> Result<crate::package::Package> {
+) -> Result<crate::package::Archive> {
     package.replace_content_xml(content_xml)
 }

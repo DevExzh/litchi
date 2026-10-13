@@ -1,5 +1,5 @@
 use litchi_odt::list_label_alignment::{Alignment, FollowedBy, Kind, Length, Style, parse};
-use litchi_odt::{Builder, Document};
+use litchi_odt::{Builder, Package};
 use std::io::Cursor;
 const O: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const S: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
@@ -47,16 +47,17 @@ fn builder_package_and_mutable_round_trip() {
     b.set_numbered_list_level_label_alignment(1, a.clone())
         .unwrap();
     b.add_paragraph("x").unwrap();
-    let bytes = b.build().unwrap();
-    let p = litchi_odt::generic::Package::from_bytes(bytes.clone()).unwrap();
+    let bytes = b.build().unwrap().to_bytes().unwrap();
+    let p = litchi_odt::generic::Package::from_bytes(&bytes).unwrap();
     assert_eq!(&p.alignments().unwrap().get("L1", 1).unwrap().alignment, &a);
-    let mut m =
-        litchi_odt::mutable::MutableDocument::from_document(Document::from_bytes(bytes).unwrap())
-            .unwrap();
+    let mut m = litchi_odt::mutable::MutableDocument::from_document(
+        Package::from_bytes(&bytes).unwrap().document().unwrap(),
+    )
+    .unwrap();
     let replacement = Alignment::new(FollowedBy::Nothing);
     m.set_list_level_label_alignment(&Style::new("L1", 1, replacement.clone()).unwrap())
         .unwrap();
-    let p = litchi_odt::generic::Package::from_bytes(m.to_bytes().unwrap()).unwrap();
+    let p = litchi_odt::generic::Package::from_bytes(&m.to_bytes().unwrap()).unwrap();
     assert_eq!(
         &p.alignments().unwrap().get("L1", 1).unwrap().alignment,
         &replacement

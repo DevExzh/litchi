@@ -1,7 +1,7 @@
 //! Private staging engine for source-checked presentation transactions.
 //!
 //! The attached mutable root is intentionally not exported. Public mutation is
-//! available only through [`super::edit::Transaction`].
+//! available only through [`super::edit::Edit`].
 
 use crate::codec::content_source::ContentSource;
 use crate::core::{OwnedPackage, PackageWriter, Structure};
@@ -229,22 +229,22 @@ impl DependencyFreeBlankSlideCopy {
 /// # Examples
 ///
 /// ```
-/// use litchi_odp::{Builder, edit};
+/// use litchi_odp::Builder;
 ///
 /// # fn main() -> litchi_core::Result<()> {
 /// // Build a presentation and take an immutable editing snapshot
 /// let mut builder = Builder::new();
 /// builder.add_slide_with_title("Welcome", "First draft")?;
-/// let source = edit::Snapshot::from_bytes(builder.build()?)?;
+/// let source = builder.build()?;
 ///
 /// // Stage edits in an isolated transaction
-/// let mut transaction = source.transaction()?;
+/// let mut transaction = source.edit()?;
 /// transaction.add("New Slide", "Slide content")?;
 /// transaction.remove(0)?;
 ///
 /// // Publish atomically; the source snapshot is never mutated
 /// let commit = transaction.commit()?;
-/// assert_eq!(commit.snapshot().slides().len(), 1);
+/// assert_eq!(commit.package().slides()?.len(), 1);
 /// # Ok(())
 /// # }
 /// ```
@@ -310,12 +310,11 @@ impl MutablePresentation {
     /// # Examples
     ///
     /// ```
-    /// use litchi_odp::{Builder, Presentation};
+    /// use litchi_odp::Builder;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let presentation = Presentation::from_bytes(Builder::new().build()?)?;
-    /// let snapshot = presentation.snapshot()?;
-    /// let transaction = snapshot.transaction()?;
+    /// let snapshot = Builder::new().build()?;
+    /// let transaction = snapshot.edit()?;
     /// assert!(transaction.slides().is_empty());
     /// # Ok(())
     /// # }
@@ -1180,14 +1179,14 @@ impl MutablePresentation {
     ///
     /// # Examples
     ///
-    /// The public equivalent starts from [`crate::edit::Snapshot::transaction`].
+    /// The public equivalent starts from [`crate::Package::edit`].
     ///
     /// ```
-    /// use litchi_odp::{Builder, edit};
+    /// use litchi_odp::Builder;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let source = edit::Snapshot::from_bytes(Builder::new().build()?)?;
-    /// let mut transaction = source.transaction()?;
+    /// let source = Builder::new().build()?;
+    /// let mut transaction = source.edit()?;
     /// transaction.add("First", "Content 1")?;
     /// transaction.add("Third", "Content 3")?;
     /// transaction.add_before(1, "Second", "Content 2")?;
@@ -1249,14 +1248,14 @@ impl MutablePresentation {
     ///
     /// # Examples
     ///
-    /// The public equivalent starts from [`crate::edit::Snapshot::transaction`].
+    /// The public equivalent starts from [`crate::Package::edit`].
     ///
     /// ```
-    /// use litchi_odp::{Builder, edit};
+    /// use litchi_odp::Builder;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let source = edit::Snapshot::from_bytes(Builder::new().build()?)?;
-    /// let mut transaction = source.transaction()?;
+    /// let source = Builder::new().build()?;
+    /// let mut transaction = source.edit()?;
     /// transaction.add("Slide 1", "Content 1")?;
     /// transaction.add("Slide 2", "Content 2")?;
     /// let removed = transaction.remove(0)?; // Remove first slide
@@ -1365,14 +1364,14 @@ impl MutablePresentation {
     ///
     /// # Examples
     ///
-    /// The public equivalent starts from [`crate::edit::Snapshot::transaction`].
+    /// The public equivalent starts from [`crate::Package::edit`].
     ///
     /// ```
-    /// use litchi_odp::{Builder, edit};
+    /// use litchi_odp::Builder;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let source = edit::Snapshot::from_bytes(Builder::new().build()?)?;
-    /// let mut transaction = source.transaction()?;
+    /// let source = Builder::new().build()?;
+    /// let mut transaction = source.edit()?;
     /// transaction.add("Old Title", "Old content")?;
     /// transaction.replace(0, "New Title", "New content")?;
     /// assert_eq!(transaction.slides()[0].title.as_deref(), Some("New Title"));
@@ -1407,8 +1406,8 @@ impl MutablePresentation {
     /// use litchi_odp::{Builder, Shape, edit};
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let source = edit::Snapshot::from_bytes(Builder::new().build()?)?;
-    /// let mut transaction = source.transaction()?;
+    /// let source = Builder::new().build()?;
+    /// let mut transaction = source.edit()?;
     /// transaction.add("Slide 1", "Content")?;
     /// let mut shape = Shape::new();
     /// shape.text = "Shape text".to_string();
@@ -1437,14 +1436,14 @@ impl MutablePresentation {
     ///
     /// # Examples
     ///
-    /// The public equivalent starts from [`crate::edit::Snapshot::transaction`].
+    /// The public equivalent starts from [`crate::Package::edit`].
     ///
     /// ```
     /// use litchi_odp::{Builder, Shape, edit};
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let source = edit::Snapshot::from_bytes(Builder::new().build()?)?;
-    /// let mut transaction = source.transaction()?;
+    /// let source = Builder::new().build()?;
+    /// let mut transaction = source.edit()?;
     /// transaction.add("Slide 1", "Content")?;
     /// // Add shape first, then remove it
     /// transaction.add_shape(0, Shape::new())?;
@@ -1475,14 +1474,14 @@ impl MutablePresentation {
     ///
     /// # Examples
     ///
-    /// The public equivalent starts from [`crate::edit::Snapshot::transaction`].
+    /// The public equivalent starts from [`crate::Package::edit`].
     ///
     /// ```
-    /// use litchi_odp::{Builder, edit};
+    /// use litchi_odp::Builder;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let source = edit::Snapshot::from_bytes(Builder::new().build()?)?;
-    /// let mut transaction = source.transaction()?;
+    /// let source = Builder::new().build()?;
+    /// let mut transaction = source.edit()?;
     /// transaction.add("Slide 1", "Content")?;
     /// transaction.clear(0)?;
     /// assert!(transaction.slides()[0].title.is_none());
@@ -1758,17 +1757,17 @@ impl MutablePresentation {
     ///
     /// # Examples
     ///
-    /// The public equivalent starts from [`crate::edit::Snapshot::transaction`].
+    /// The public equivalent starts from [`crate::Package::edit`].
     ///
     /// ```
-    /// use litchi_odp::{Builder, edit};
+    /// use litchi_odp::Builder;
     ///
     /// # fn main() -> litchi_core::Result<()> {
-    /// let source = edit::Snapshot::from_bytes(Builder::new().build()?)?;
-    /// let mut transaction = source.transaction()?;
+    /// let source = Builder::new().build()?;
+    /// let mut transaction = source.edit()?;
     /// transaction.add("Slide 1", "Content")?;
     /// let commit = transaction.commit()?;
-    /// let bytes = commit.snapshot().bytes();
+    /// let bytes = commit.package().as_bytes();
     /// assert!(!bytes.is_empty());
     /// # Ok(())
     /// # }
@@ -2888,7 +2887,7 @@ mod tests {
         let mut builder = Builder::new();
         builder.add_slide_with_title("First", "First body")?;
         builder.add_slide_with_title("Second", "Second body")?;
-        Presentation::from_bytes(builder.build()?)
+        builder.build()?.presentation()
     }
 
     #[test]
@@ -3199,7 +3198,7 @@ mod tests {
     fn presentation_with_auxiliary_member() -> Result<Presentation> {
         let mut builder = Builder::new();
         builder.add_slide_with_title("First", "First body")?;
-        let base = Presentation::from_bytes(builder.build()?)?;
+        let base = builder.build()?.presentation()?;
         let base_package = base.owned_package();
         let package = base_package.package()?;
         let mut manifest = b"\xef\xbb\xbf<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!-- retained noncompact manifest -->\n<m:manifest xmlns:m=\"urn:oasis:names:tc:opendocument:xmlns:manifest:1.0\" m:version=\"1.3\">\n".to_vec();

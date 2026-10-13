@@ -4,7 +4,7 @@ use litchi_odt::elements::field::{
     SequenceNumberFormat, SequenceReferenceFormat, StatisticKind, UserFieldDisplay,
     VariableSetDisplay,
 };
-use litchi_odt::{Builder, Document};
+use litchi_odt::{Builder, Document, Package};
 mod support;
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -15,10 +15,12 @@ fn document(inner: &str) -> Document {
     let content = format!(
         r#"<o:document-content xmlns:o="{OFFICE}" xmlns:t="{TEXT}" o:version="1.2"><o:body><o:text><t:p>{inner}</t:p></o:text></o:body></o:document-content>"#
     );
-    Document::from_bytes(support::package(
+    Package::from_bytes(&support::package(
         MIMETYPE,
         &[("content.xml", content.as_bytes())],
     ))
+    .unwrap()
+    .document()
     .unwrap()
 }
 
@@ -189,7 +191,10 @@ fn mutable_document_inserts_replaces_and_removes_fields_without_rewriting_neighb
     let removed = mutable.remove_dynamic_text_field(1).unwrap();
     assert_eq!(removed, conditional);
 
-    let round_trip = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+    let round_trip = Package::from_bytes(&mutable.to_bytes().unwrap())
+        .unwrap()
+        .document()
+        .unwrap();
     assert_eq!(round_trip.dynamic_text_fields().unwrap(), vec![hidden]);
     let content = String::from_utf8(round_trip.get_file("content.xml").unwrap()).unwrap();
     assert!(
@@ -207,7 +212,10 @@ fn insertion_supports_empty_prefixed_paragraphs_and_builder_round_trips() {
     };
     let mut mutable = litchi_odt::mutable::MutableDocument::from_document(document("")).unwrap();
     mutable.insert_dynamic_text_field(0, &field).unwrap();
-    let round_trip = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+    let round_trip = Package::from_bytes(&mutable.to_bytes().unwrap())
+        .unwrap()
+        .document()
+        .unwrap();
     assert_eq!(
         round_trip.dynamic_text_fields().unwrap(),
         vec![field.clone()]
@@ -215,7 +223,10 @@ fn insertion_supports_empty_prefixed_paragraphs_and_builder_round_trips() {
 
     let mut builder = Builder::new();
     builder.add_dynamic_text_field(&field).unwrap();
-    let built = Document::from_bytes(builder.build().unwrap()).unwrap();
+    let built = Package::from_bytes(&builder.build().unwrap().to_bytes().unwrap())
+        .unwrap()
+        .document()
+        .unwrap();
     assert_eq!(built.dynamic_text_fields().unwrap(), vec![field]);
 }
 
@@ -223,7 +234,9 @@ fn insertion_supports_empty_prefixed_paragraphs_and_builder_round_trips() {
 fn mutation_rejects_out_of_bounds_targets_without_changing_content() {
     let mut mutable =
         litchi_odt::mutable::MutableDocument::from_document(document("plain")).unwrap();
-    let before = Document::from_bytes(mutable.to_bytes().unwrap())
+    let before = Package::from_bytes(&mutable.to_bytes().unwrap())
+        .unwrap()
+        .document()
         .unwrap()
         .get_file("content.xml")
         .unwrap();
@@ -235,7 +248,9 @@ fn mutation_rejects_out_of_bounds_targets_without_changing_content() {
     assert!(mutable.insert_dynamic_text_field(1, &field).is_err());
     assert!(mutable.replace_dynamic_text_field(0, &field).is_err());
     assert!(mutable.remove_dynamic_text_field(0).is_err());
-    let after = Document::from_bytes(mutable.to_bytes().unwrap())
+    let after = Package::from_bytes(&mutable.to_bytes().unwrap())
+        .unwrap()
+        .document()
         .unwrap()
         .get_file("content.xml")
         .unwrap();
@@ -285,7 +300,10 @@ fn sequence_fields_support_document_mutation_and_namespace_aliases() {
         mutable.replace_dynamic_text_field(0, &replacement).unwrap(),
         old
     );
-    let round_trip = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+    let round_trip = Package::from_bytes(&mutable.to_bytes().unwrap())
+        .unwrap()
+        .document()
+        .unwrap();
     assert_eq!(
         round_trip.dynamic_text_fields().unwrap(),
         vec![replacement.clone()]
@@ -294,7 +312,9 @@ fn sequence_fields_support_document_mutation_and_namespace_aliases() {
     let mut mutable = litchi_odt::mutable::MutableDocument::from_document(round_trip).unwrap();
     assert_eq!(mutable.remove_dynamic_text_field(0).unwrap(), replacement);
     assert!(
-        Document::from_bytes(mutable.to_bytes().unwrap())
+        Package::from_bytes(&mutable.to_bytes().unwrap())
+            .unwrap()
+            .document()
             .unwrap()
             .dynamic_text_fields()
             .unwrap()
@@ -363,7 +383,10 @@ fn sequence_references_support_namespace_aware_document_mutation() {
         mutable.replace_dynamic_text_field(0, &replacement).unwrap(),
         old
     );
-    let round_trip = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+    let round_trip = Package::from_bytes(&mutable.to_bytes().unwrap())
+        .unwrap()
+        .document()
+        .unwrap();
     assert_eq!(
         round_trip.dynamic_text_fields().unwrap(),
         vec![replacement.clone()]
@@ -377,7 +400,10 @@ fn sequence_references_support_namespace_aware_document_mutation() {
     let mut mutable = litchi_odt::mutable::MutableDocument::from_document(round_trip).unwrap();
     mutable.insert_dynamic_text_field(0, &inserted).unwrap();
     assert_eq!(mutable.remove_dynamic_text_field(0).unwrap(), replacement);
-    let final_document = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+    let final_document = Package::from_bytes(&mutable.to_bytes().unwrap())
+        .unwrap()
+        .document()
+        .unwrap();
     assert_eq!(
         final_document.dynamic_text_fields().unwrap(),
         vec![inserted]
@@ -498,7 +524,10 @@ fn calculated_variables_support_namespace_aware_document_mutation() {
         mutable.replace_dynamic_text_field(0, &replacement).unwrap(),
         DynamicTextField::Expression { .. }
     ));
-    let round_trip = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+    let round_trip = Package::from_bytes(&mutable.to_bytes().unwrap())
+        .unwrap()
+        .document()
+        .unwrap();
     assert_eq!(
         round_trip.dynamic_text_fields().unwrap(),
         vec![replacement.clone()]
@@ -506,7 +535,9 @@ fn calculated_variables_support_namespace_aware_document_mutation() {
     let mut mutable = litchi_odt::mutable::MutableDocument::from_document(round_trip).unwrap();
     assert_eq!(mutable.remove_dynamic_text_field(0).unwrap(), replacement);
     assert!(
-        Document::from_bytes(mutable.to_bytes().unwrap())
+        Package::from_bytes(&mutable.to_bytes().unwrap())
+            .unwrap()
+            .document()
             .unwrap()
             .dynamic_text_fields()
             .unwrap()
@@ -602,7 +633,10 @@ fn drop_down_fields_round_trip_and_support_namespace_aware_mutation() {
         mutable.replace_dynamic_text_field(0, &replacement).unwrap(),
         old
     );
-    let round_trip = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+    let round_trip = Package::from_bytes(&mutable.to_bytes().unwrap())
+        .unwrap()
+        .document()
+        .unwrap();
     assert_eq!(
         round_trip.dynamic_text_fields().unwrap(),
         vec![replacement.clone()]
@@ -618,7 +652,10 @@ fn drop_down_fields_round_trip_and_support_namespace_aware_mutation() {
     };
     let mut mutable = litchi_odt::mutable::MutableDocument::from_document(round_trip).unwrap();
     mutable.insert_dynamic_text_field(0, &inserted).unwrap();
-    let round_trip = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+    let round_trip = Package::from_bytes(&mutable.to_bytes().unwrap())
+        .unwrap()
+        .document()
+        .unwrap();
     assert_eq!(
         round_trip.dynamic_text_fields().unwrap(),
         vec![replacement.clone(), inserted.clone()]
@@ -626,7 +663,9 @@ fn drop_down_fields_round_trip_and_support_namespace_aware_mutation() {
     let mut mutable = litchi_odt::mutable::MutableDocument::from_document(round_trip).unwrap();
     assert_eq!(mutable.remove_dynamic_text_field(0).unwrap(), replacement);
     assert_eq!(
-        Document::from_bytes(mutable.to_bytes().unwrap())
+        Package::from_bytes(&mutable.to_bytes().unwrap())
+            .unwrap()
+            .document()
             .unwrap()
             .dynamic_text_fields()
             .unwrap(),
@@ -656,7 +695,10 @@ fn inline_script_metadata_round_trips_and_supports_namespace_aware_mutation() {
         mutable.replace_dynamic_text_field(0, &replacement).unwrap(),
         old
     );
-    let round_trip = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+    let round_trip = Package::from_bytes(&mutable.to_bytes().unwrap())
+        .unwrap()
+        .document()
+        .unwrap();
     assert_eq!(
         round_trip.dynamic_text_fields().unwrap(),
         vec![replacement.clone()]
@@ -669,14 +711,19 @@ fn inline_script_metadata_round_trips_and_supports_namespace_aware_mutation() {
     };
     let mut mutable = litchi_odt::mutable::MutableDocument::from_document(round_trip).unwrap();
     mutable.insert_dynamic_text_field(0, &inserted).unwrap();
-    let round_trip = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+    let round_trip = Package::from_bytes(&mutable.to_bytes().unwrap())
+        .unwrap()
+        .document()
+        .unwrap();
     assert_eq!(
         round_trip.dynamic_text_fields().unwrap(),
         vec![replacement.clone(), inserted.clone()]
     );
     assert_eq!(mutable.remove_dynamic_text_field(0).unwrap(), replacement);
     assert_eq!(
-        Document::from_bytes(mutable.to_bytes().unwrap())
+        Package::from_bytes(&mutable.to_bytes().unwrap())
+            .unwrap()
+            .document()
             .unwrap()
             .dynamic_text_fields()
             .unwrap(),
@@ -733,7 +780,10 @@ fn interactive_fields_support_namespace_aware_mutation() {
         display_text: "Prompt".to_string(),
     };
     mutable.insert_dynamic_text_field(0, &input).unwrap();
-    let round_trip = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+    let round_trip = Package::from_bytes(&mutable.to_bytes().unwrap())
+        .unwrap()
+        .document()
+        .unwrap();
     assert_eq!(
         round_trip.dynamic_text_fields().unwrap(),
         vec![replacement.clone(), input]
@@ -807,7 +857,10 @@ fn table_formula_supports_namespace_aware_insert_replace_and_remove() {
         display_text: "cached".to_string(),
     };
     mutable.insert_dynamic_text_field(0, &inserted).unwrap();
-    let round_trip = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+    let round_trip = Package::from_bytes(&mutable.to_bytes().unwrap())
+        .unwrap()
+        .document()
+        .unwrap();
     assert_eq!(
         round_trip.dynamic_text_fields().unwrap(),
         vec![replacement.clone(), inserted]
@@ -880,7 +933,10 @@ fn measure_fields_support_namespace_aware_insert_replace_and_remove() {
         display_text: " ".to_string(),
     };
     mutable.insert_dynamic_text_field(0, &inserted).unwrap();
-    let round_trip = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+    let round_trip = Package::from_bytes(&mutable.to_bytes().unwrap())
+        .unwrap()
+        .document()
+        .unwrap();
     assert_eq!(
         round_trip.dynamic_text_fields().unwrap(),
         vec![replacement.clone(), inserted]
@@ -995,7 +1051,10 @@ fn cross_references_support_namespace_aware_insert_replace_and_remove() {
         display_text: "footnote".to_string(),
     };
     mutable.insert_dynamic_text_field(0, &inserted).unwrap();
-    let round_trip = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+    let round_trip = Package::from_bytes(&mutable.to_bytes().unwrap())
+        .unwrap()
+        .document()
+        .unwrap();
     assert_eq!(
         round_trip.dynamic_text_fields().unwrap(),
         vec![replacement.clone(), inserted]
@@ -1088,7 +1147,10 @@ fn document_statistics_parse_style_aliases_and_support_mutation() {
         display_text: "3".to_string(),
     };
     mutable.insert_dynamic_text_field(0, &inserted).unwrap();
-    let round_trip = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+    let round_trip = Package::from_bytes(&mutable.to_bytes().unwrap())
+        .unwrap()
+        .document()
+        .unwrap();
     assert_eq!(
         round_trip.dynamic_text_fields().unwrap(),
         vec![replacement.clone(), inserted]

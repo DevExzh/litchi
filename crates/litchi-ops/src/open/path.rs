@@ -463,9 +463,12 @@ mod zip {
             },
             #[cfg(feature = "ods")]
             FileFormat::Ods => {
-                let spreadsheet =
-                    litchi_ods::SourceBackedSpreadsheet::from_read_at(Arc::clone(&source))
-                        .map_err(error)?;
+                let spreadsheet = litchi_ods::SourceBackedSpreadsheet::from_read_at_with_options(
+                    Arc::clone(&source),
+                    options.odf_open_options(),
+                )
+                .map_err(litchi_core::Error::from)
+                .map_err(error)?;
                 let observed = spreadsheet.source_version().map_err(error)?;
                 if observed != version {
                     return Err(error(litchi_core::Error::SourceChanged {
@@ -480,8 +483,11 @@ mod zip {
             },
             #[cfg(feature = "odp")]
             FileFormat::Odp => {
-                let presentation =
-                    litchi_odp::SourceBackedPresentation::from_read_at(Arc::clone(&source));
+                let presentation = litchi_odp::SourceBackedPresentation::from_read_at_with_options(
+                    Arc::clone(&source),
+                    options.odf_open_options(),
+                )
+                .map_err(litchi_core::Error::from);
                 ensure_path_source_current(source.as_ref(), version)?;
                 Ok(File::Odp(crate::format::odp::Odp::from_source(
                     presentation.map_err(error)?,

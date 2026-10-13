@@ -668,7 +668,7 @@ mod tests {
         builder
             .add_bookmark_target(0, &BookmarkTarget::range("built"))
             .unwrap();
-        let document = crate::Document::from_bytes(builder.build().unwrap()).unwrap();
+        let document = builder.build().unwrap().document().unwrap();
         let targets = document.bookmark_ranges().unwrap();
         assert_eq!(targets.len(), 1);
         assert_eq!(targets[0].name, "built");
