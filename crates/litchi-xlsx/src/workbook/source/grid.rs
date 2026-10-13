@@ -14,7 +14,7 @@ use std::sync::Arc;
 use litchi_sheet::{Area, At, Cell as Address, ColumnAt, RowAt};
 
 use super::{Selection, SourceWorksheet, resolve_selected_record};
-use crate::cell::{Cell, Cells, Extents, Store, View};
+use crate::cell::{Cell, Cells, Extents, RecordIndex, Store, View};
 use crate::error::{Result, invalid};
 use crate::layout::Defaults;
 use crate::leniency::ToleranceReport;
@@ -70,6 +70,13 @@ impl Grid {
     pub fn cells<'a>(&self, area: impl Into<Area<'a>>) -> Result<Cells<'_>> {
         let range = area.into().resolve()?;
         Ok(self.store.cells(range))
+    }
+
+    /// The stored record at a position [`Cells::indexed`] reported for this
+    /// grid, with its coordinate, in O(1); `None` past the last record.
+    #[must_use]
+    pub fn record(&self, index: RecordIndex) -> Option<(Address, &Cell)> {
+        self.store.record(index)
     }
 
     /// Number of stored cell records.

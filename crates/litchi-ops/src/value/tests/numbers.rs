@@ -213,3 +213,87 @@ fn printed_doubles_parse_back_exactly() {
         assert_eq!(parse_numeric_text(&text), Some(value), "{text}");
     }
 }
+
+/// `Decimal::from_ratio` rounds in 64 bits when the scaled numerator fits
+/// (record 0262): the result and its text are those of the 128-bit
+/// computation, kept here as the reference.
+#[test]
+fn decimals_from_ratios_match_the_128_bit_reference() {
+    fn reference(numerator: i64, denominator: i64, decimals: u8) -> String {
+        let negative = numerator != 0 && (numerator < 0) != (denominator < 0);
+        let scaled = u128::from(numerator.unsigned_abs()) * 10_u128.pow(u32::from(decimals));
+        let denominator = u128::from(denominator.unsigned_abs());
+        let (quotient, remainder) = (scaled / denominator, scaled % denominator);
+        let mut magnitude = if remainder * 2 >= denominator {
+            quotient + 1
+        } else {
+            quotient
+        };
+        let mut scale = decimals;
+        while scale > 0 && magnitude % 10 == 0 {
+            magnitude /= 10;
+            scale -= 1;
+        }
+        let unit = 10_u128.pow(u32::from(scale));
+        let mut text = String::new();
+        if negative {
+            text.push('-');
+        }
+        text.push_str(&(magnitude / unit).to_string());
+        if scale > 0 {
+            text.push_str(&format!(
+                ".{:0width$}",
+                magnitude % unit,
+                width = usize::from(scale)
+            ));
+        }
+        text
+    }
+    let mut state = 3_u64;
+    let mut next = || {
+        state = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+        let mut z = state;
+        z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+        z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+        z ^ (z >> 31)
+    };
+    let mut numerators = vec![
+        0,
+        1,
+        -1,
+        5,
+        -5,
+        127,
+        3_599,
+        3_600,
+        914_400,
+        i64::MAX,
+        i64::MIN,
+        i64::MAX / 100,
+        i64::MAX / 100 + 1,
+        -(i64::MAX / 100) - 1,
+    ];
+    let mut denominators = vec![1, -1, 2, 3, 7, 127, 240, 3_600, 12_700, 360_000, 914_400];
+    denominators.extend([i64::MAX, i64::MIN, 1 << 62, (1 << 62) + 1]);
+    for _ in 0..400 {
+        numerators.push(next() as i64);
+        numerators.push((next() % 100_000_000) as i64 - 50_000_000);
+    }
+    for _ in 0..40 {
+        denominators.push((next() as i64) | 1);
+        denominators.push((next() % 1_000_000) as i64 + 1);
+    }
+    for &numerator in &numerators {
+        for &denominator in &denominators {
+            for decimals in [0_u8, 1, 2, 4, 18] {
+                let decimal =
+                    Decimal::from_ratio(numerator, denominator, decimals).expect("a denominator");
+                assert_eq!(
+                    decimal.to_string(),
+                    reference(numerator, denominator, decimals),
+                    "{numerator} / {denominator} to {decimals} decimals"
+                );
+            }
+        }
+    }
+}

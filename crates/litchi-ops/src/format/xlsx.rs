@@ -157,9 +157,18 @@ impl XlsxOwner {
         }
     }
 
+    /// This owner's key for [`crate::path::fence::Scope`].
+    pub(crate) fn fence_key(&self) -> usize {
+        std::ptr::from_ref(self).addr()
+    }
+
     /// Bracket `read` with freshness checks; a changed source wins over the
-    /// read's own result.
+    /// read's own result. Inside a resolver or query step, whose bracket
+    /// already checks around the whole step, `read` runs alone.
     pub(crate) fn finish<T>(&self, read: impl FnOnce() -> Result<T>) -> Result<T> {
+        if crate::path::fence::is_active(self.fence_key()) {
+            return read();
+        }
         self.ensure_current()?;
         let result = read();
         self.ensure_current()?;

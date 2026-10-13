@@ -18,6 +18,10 @@
 //! grid or parsed value for the unified layer, so the leaf's weighted
 //! caches stay the only retention policy (record 0010 §3.3).
 //!
+//! A node is small, so a walk moves it cheaply (record 0262): its path is
+//! written from its coordinates when asked for, its A1 label the first time
+//! a preview needs it, and a cell read by `get` keeps the leaf's view boxed.
+//!
 //! The view's `format` member reads typed values straight from those leaf
 //! values with OfficeCLI's keys (`spec`), local formatting only. A cell's
 //! formatting is resolved once per node, through the workbook's format table
@@ -80,12 +84,14 @@ pub(super) const MISSING_TEXT: &str = "(empty)";
 pub struct Node<'f> {
     file: &'f Xlsx,
     item: Item,
-    steps: [PathStep<'f>; 2],
-    depth: u8,
     /// The position of the node's worksheet (0 for the workbook and a
     /// defined name).
-    sheet: usize,
+    sheet: u32,
 }
+
+// A walk moves every node it visits: keep it small (record 0262; 248 bytes
+// before, with its path steps and label kept inline).
+const _: () = assert!(size_of::<Node<'static>>() <= 96);
 
 /// The element a node is, with the leaf values it reads.
 #[derive(Clone)]
@@ -139,14 +145,14 @@ impl Sheet {
     }
 }
 
-/// A cell: its coordinate, where its state is read from, its A1 label, and
-/// its formatting once read.
+/// A cell: its coordinate, where its state is read from, its A1 label once
+/// a preview needed it, and its formatting once read.
 #[derive(Clone)]
 pub(super) struct CellItem {
     pub(super) at: Address,
     pub(super) source: CellSource,
-    label: Label,
-    format: OnceLock<Option<CellFormat>>,
+    label: OnceLock<Label>,
+    format: OnceLock<Option<Box<CellFormat>>>,
 }
 
 /// Where a cell node reads its state.
@@ -154,15 +160,21 @@ pub(super) struct CellItem {
 pub(super) enum CellSource {
     /// The leaf's owned view of the coordinate, read by `get` through the
     /// leaf's cell route, with the sheet for formatting reads.
-    View {
-        handle: SheetHandle,
-        view: Box<xlsx::SourceCellView>,
-    },
+    View(Box<ViewSource>),
     /// A record of a pinned grid, listed under a sheet, row, column or
-    /// range.
+    /// range, at its position in the grid's record order: read in O(1).
+    Record { grid: Grid, index: u32 },
+    /// A record of a pinned grid, read by its coordinate.
     Grid(Grid),
     /// A coordinate with no record, listed by a dense range view.
     Stub,
+}
+
+/// What `get` read for a cell through the leaf's cell route.
+#[derive(Clone)]
+pub(super) struct ViewSource {
+    pub(super) handle: SheetHandle,
+    pub(super) view: xlsx::SourceCellView,
 }
 
 /// A range: its worksheet's grid and its normalized rectangle.
@@ -170,7 +182,7 @@ pub(super) enum CellSource {
 pub(super) struct RangeItem {
     pub(super) grid: Grid,
     pub(super) rect: Rect,
-    label: Label,
+    label: OnceLock<Label>,
 }
 
 /// A row: its worksheet's grid and its zero-based index.
@@ -183,7 +195,7 @@ pub(super) struct RowItem {
     /// resolved by `get` or matched by a query lists every record, as
     /// OfficeCLI's row path does.
     pub(super) bulk: bool,
-    label: Label,
+    label: OnceLock<Label>,
 }
 
 /// A column: its worksheet's grid and its zero-based index.
@@ -191,14 +203,14 @@ pub(super) struct RowItem {
 pub(super) struct ColumnItem {
     pub(super) grid: Grid,
     pub(super) index: u32,
-    label: Label,
+    label: OnceLock<Label>,
 }
 
-/// A table: its parsed part. Its worksheet and its position among the
-/// worksheet's tables are in the node's path.
+/// A table: its parsed part and its position among its worksheet's tables.
 #[derive(Clone)]
 pub(super) struct TableItem {
     pub(super) part: Box<TablePart>,
+    pub(super) index: usize,
 }
 
 /// One sheet of either owner.
@@ -365,6 +377,18 @@ impl Grid {
         Ok(self.cells(Rect::single(at))?.next().map(|(_, cell)| cell))
     }
 
+    /// The record at `index` of the grid's record order, with its
+    /// coordinate, in O(1).
+    pub(super) fn record_at(
+        &self,
+        index: xlsx::RecordIndex,
+    ) -> Result<Option<(Address, &xlsx::Cell)>> {
+        Ok(match &*self.0 {
+            GridInner::Eager(sheet) => sheet.record(index)?,
+            GridInner::Source { grid, .. } => grid.record(index),
+        })
+    }
+
     /// The state of one coordinate: missing, covered by a merge, or stored.
     pub(super) fn view(&self, at: Address) -> Result<xlsx::cell::View<'_>> {
         Ok(match &*self.0 {
@@ -477,8 +501,21 @@ fn base_format(file: &Xlsx) -> Result<Option<CellFormat>> {
     }
 }
 
-/// The empty step that fills an unused path slot.
-const NO_STEP: PathStep<'static> = PathStep::new("");
+/// A position as stored in a node: worksheet positions are below the
+/// catalog's length, which no workbook brings near `u32::MAX`.
+fn position_u32(position: usize) -> u32 {
+    u32::try_from(position).unwrap_or(u32::MAX)
+}
+
+/// The first and last cells of `rect`, each a zero-based `(column, row)`.
+fn corners(rect: Rect) -> ((u32, u32), (u32, u32)) {
+    let first = (rect.start().column().get(), rect.start().row().get());
+    let last = (
+        rect.end().1.saturating_sub(1),
+        rect.end().0.saturating_sub(1),
+    );
+    (first, last)
+}
 
 impl<'f> Node<'f> {
     /// The workbook root, `/`.
@@ -486,60 +523,48 @@ impl<'f> Node<'f> {
         Self {
             file,
             item: Item::Workbook,
-            steps: [NO_STEP; 2],
-            depth: 0,
             sheet: 0,
         }
     }
 
     /// A sheet, `/sheet[N]`.
     pub(super) fn new_sheet(file: &'f Xlsx, sheet: Sheet) -> Self {
-        let position = sheet.position;
+        let position = position_u32(sheet.position);
         Self {
             file,
             item: Item::Sheet(sheet),
-            steps: [PathStep::at("sheet", Position::new(position)), NO_STEP],
-            depth: 1,
             sheet: position,
         }
     }
 
     /// An element of the worksheet at `sheet`, `/sheet[N]/<tail>`.
-    fn in_sheet(file: &'f Xlsx, sheet: usize, item: Item, tail: PathStep<'f>) -> Self {
+    fn in_sheet(file: &'f Xlsx, sheet: usize, item: Item) -> Self {
         Self {
             file,
             item,
-            steps: [PathStep::at("sheet", Position::new(sheet)), tail],
-            depth: 2,
-            sheet,
+            sheet: position_u32(sheet),
         }
     }
 
     /// A cell of the worksheet at `sheet`.
     pub(super) fn new_cell(file: &'f Xlsx, sheet: usize, at: Address, source: CellSource) -> Self {
-        let (row, column) = (at.row().get(), at.column().get());
         let item = Item::Cell(CellItem {
             at,
             source,
-            label: Label::cell(column, row),
+            label: OnceLock::new(),
             format: OnceLock::new(),
         });
-        Self::in_sheet(file, sheet, item, PathStep::cell(column, row))
+        Self::in_sheet(file, sheet, item)
     }
 
     /// The range `rect` of the worksheet at `sheet`.
     pub(super) fn new_range(file: &'f Xlsx, sheet: usize, grid: Grid, rect: Rect) -> Self {
-        let first = (rect.start().column().get(), rect.start().row().get());
-        let last = (
-            rect.end().1.saturating_sub(1),
-            rect.end().0.saturating_sub(1),
-        );
         let item = Item::Range(RangeItem {
             grid,
             rect,
-            label: Label::range(first, last),
+            label: OnceLock::new(),
         });
-        Self::in_sheet(file, sheet, item, PathStep::range(first, last))
+        Self::in_sheet(file, sheet, item)
     }
 
     /// The row with zero-based `index` of the worksheet at `sheet`.
@@ -557,10 +582,9 @@ impl<'f> Node<'f> {
             grid,
             index,
             bulk,
-            label: Label::row(index),
+            label: OnceLock::new(),
         });
-        let tail = PathStep::at("row", Position::new(index as usize));
-        Self::in_sheet(file, sheet, item, tail)
+        Self::in_sheet(file, sheet, item)
     }
 
     /// The column with zero-based `index` of the worksheet at `sheet`.
@@ -568,22 +592,18 @@ impl<'f> Node<'f> {
         let item = Item::Column(ColumnItem {
             grid,
             index,
-            label: Label::column(index),
+            label: OnceLock::new(),
         });
-        Self::in_sheet(file, sheet, item, PathStep::column("col", index))
+        Self::in_sheet(file, sheet, item)
     }
 
     /// The table at `index` among the tables of the worksheet at `sheet`.
     pub(super) fn new_table(file: &'f Xlsx, sheet: usize, index: usize, part: TablePart) -> Self {
         let item = Item::Table(TableItem {
             part: Box::new(part),
+            index,
         });
-        Self::in_sheet(
-            file,
-            sheet,
-            item,
-            PathStep::at("table", Position::new(index)),
-        )
+        Self::in_sheet(file, sheet, item)
     }
 
     /// The defined name at `index`, `/namedrange[N]`.
@@ -591,8 +611,6 @@ impl<'f> Node<'f> {
         Self {
             file,
             item: Item::NamedRange(index),
-            steps: [PathStep::at("namedrange", Position::new(index)), NO_STEP],
-            depth: 1,
             sheet: 0,
         }
     }
@@ -607,7 +625,7 @@ impl<'f> Node<'f> {
 
     /// The position of the node's worksheet.
     pub(super) fn sheet_position(&self) -> usize {
-        self.sheet
+        self.sheet as usize
     }
 
     /// The native worksheet position and address used by the cell write
@@ -616,7 +634,7 @@ impl<'f> Node<'f> {
     /// target accessors.
     pub(super) fn write_cell_target(&self) -> Option<(usize, Address)> {
         match &self.item {
-            Item::Cell(cell) => Some((self.sheet, cell.at)),
+            Item::Cell(cell) => Some((self.sheet_position(), cell.at)),
             _ => None,
         }
     }
@@ -628,16 +646,44 @@ impl<'f> Node<'f> {
     /// cell record (the same dense range semantics as reads).
     pub(super) fn write_range_target(&self) -> Option<(usize, Rect)> {
         match &self.item {
-            Item::Range(range) => Some((self.sheet, range.rect)),
+            Item::Range(range) => Some((self.sheet_position(), range.rect)),
             _ => None,
         }
     }
 
-    /// The node's last path step: its own step under its parent.
-    pub(super) fn last_step(&self) -> Option<&PathStep<'f>> {
-        usize::from(self.depth)
-            .checked_sub(1)
-            .and_then(|index| self.steps.get(index))
+    /// The node's last path step: its own step under its parent, written
+    /// from its coordinates.
+    pub(super) fn last_step(&self) -> Option<PathStep<'static>> {
+        Some(match &self.item {
+            Item::Workbook => return None,
+            Item::Sheet(_) => PathStep::at("sheet", Position::new(self.sheet_position())),
+            Item::Cell(cell) => PathStep::cell(cell.at.column().get(), cell.at.row().get()),
+            Item::Range(range) => {
+                let (first, last) = corners(range.rect);
+                PathStep::range(first, last)
+            },
+            Item::Row(row) => PathStep::at("row", Position::new(row.index as usize)),
+            Item::Column(column) => PathStep::column("col", column.index),
+            Item::Table(table) => PathStep::at("table", Position::new(table.index)),
+            Item::NamedRange(index) => PathStep::at("namedrange", Position::new(*index)),
+        })
+    }
+
+    /// The A1 label of a cell, range, row or column node, written on first
+    /// use.
+    fn label(&self) -> Option<&Label> {
+        Some(match &self.item {
+            Item::Cell(cell) => cell
+                .label
+                .get_or_init(|| Label::cell(cell.at.column().get(), cell.at.row().get())),
+            Item::Range(range) => range.label.get_or_init(|| {
+                let (first, last) = corners(range.rect);
+                Label::range(first, last)
+            }),
+            Item::Row(row) => row.label.get_or_init(|| Label::row(row.index)),
+            Item::Column(column) => column.label.get_or_init(|| Label::column(column.index)),
+            _ => return None,
+        })
     }
 
     /// The element kind.
@@ -689,7 +735,7 @@ impl<'f> Node<'f> {
         self.file.0.owner.finish(|| {
             Ok(match self.item {
                 Item::Workbook | Item::NamedRange(_) => None,
-                _ => Some(sheet_name(self.file, self.sheet)),
+                _ => Some(sheet_name(self.file, self.sheet_position())),
             })
         })
     }
@@ -767,7 +813,9 @@ impl<'f> Node<'f> {
     /// The selector grammar's form of a cell node's coordinate.
     pub(super) fn cell_ref(&self) -> Option<CellRef> {
         match &self.item {
-            Item::Cell(cell) => CellRef::parse(cell.label.as_str()),
+            Item::Cell(_) => self
+                .label()
+                .and_then(|label| CellRef::parse(label.as_str())),
             _ => None,
         }
     }
@@ -873,7 +921,7 @@ pub(super) enum CellState<'a> {
 impl CellItem {
     pub(super) fn state(&self) -> Result<CellState<'_>> {
         Ok(match &self.source {
-            CellSource::View { view, .. } => match view.as_ref() {
+            CellSource::View(source) => match &source.view {
                 xlsx::SourceCellView::Stored(cell) => CellState::Stored(cell),
                 xlsx::SourceCellView::Covered(range) => CellState::Covered(*range),
                 _ => CellState::Missing,
@@ -888,6 +936,20 @@ impl CellItem {
                 },
                 _ => CellState::Missing,
             },
+            // A listed record is stored: the coordinate's view would read
+            // it, directly or as a merged follower's own record.
+            CellSource::Record { grid, index } => {
+                match grid.record_at(xlsx::RecordIndex::new(*index as usize))? {
+                    Some((_, cell)) => CellState::Stored(cell),
+                    None => {
+                        return Err(Error::new(
+                            Code::InternalError,
+                            "a listed cell record vanished from its grid",
+                        )
+                        .with_format(FileFormat::Xlsx));
+                    },
+                }
+            },
             CellSource::Stub => CellState::Stub,
         })
     }
@@ -895,17 +957,17 @@ impl CellItem {
     /// The cell's local formatting, resolved once per node.
     fn format(&self) -> Result<Option<&CellFormat>> {
         if let Some(format) = self.format.get() {
-            return Ok(format.as_ref());
+            return Ok(format.as_deref());
         }
         let format = match &self.source {
-            CellSource::View { handle, view } => match view.as_ref() {
-                xlsx::SourceCellView::Stored(_) => handle.grid()?.format(self.at)?,
+            CellSource::View(source) => match &source.view {
+                xlsx::SourceCellView::Stored(_) => source.handle.grid()?.format(self.at)?,
                 _ => None,
             },
-            CellSource::Grid(grid) => grid.format(self.at)?,
+            CellSource::Grid(grid) | CellSource::Record { grid, .. } => grid.format(self.at)?,
             CellSource::Stub => None,
         };
-        Ok(self.format.get_or_init(|| format).as_ref())
+        Ok(self.format.get_or_init(|| format.map(Box::new)).as_deref())
     }
 
     /// The merge the cell belongs to, and whether it is its anchor.
@@ -916,11 +978,11 @@ impl CellItem {
             // A blank anchor has no cell record but still owns merge geometry.
             // Only a synthetic stub lacks a native grid to inspect.
             (_, CellState::Stub) => return Ok(None),
-            (CellSource::View { handle, .. }, _) => {
-                grid = handle.grid()?;
+            (CellSource::View(source), _) => {
+                grid = source.handle.grid()?;
                 grid.merges()?
             },
-            (CellSource::Grid(grid), _) => grid.merges()?,
+            (CellSource::Grid(grid) | CellSource::Record { grid, .. }, _) => grid.merges()?,
             (CellSource::Stub, _) => return Ok(None),
         };
         for range in merges {
@@ -956,7 +1018,14 @@ impl<'f> Project<'f> for Node<'f> {
     }
 
     fn path(&self) -> NodePath<'_> {
-        NodePath::new(&self.steps[..usize::from(self.depth)])
+        match (&self.item, self.last_step()) {
+            (_, None) => NodePath::ROOT,
+            (Item::Sheet(_) | Item::NamedRange(_), Some(step)) => NodePath::short(step, None),
+            (_, Some(step)) => NodePath::short(
+                PathStep::at("sheet", Position::new(self.sheet_position())),
+                Some(step),
+            ),
+        }
     }
 
     fn text(&self) -> Result<Option<Cow<'_, str>>> {
@@ -984,13 +1053,18 @@ impl<'f> Project<'f> for Node<'f> {
             Ok(match &self.item {
                 Item::Workbook => None,
                 Item::Sheet(_) => Some(Preview::Text(Cow::Borrowed(sheet_name(
-                    self.file, self.sheet,
+                    self.file,
+                    self.sheet_position(),
                 )))),
-                Item::Cell(cell) => Some(Preview::Text(Cow::Borrowed(cell.label.as_str()))),
-                Item::Range(range) => Some(Preview::Text(Cow::Borrowed(range.label.as_str()))),
-                Item::Row(row) => (!row.grid.row(row.index)?.stored())
-                    .then(|| Preview::Text(Cow::Borrowed(row.label.as_str()))),
-                Item::Column(column) => Some(Preview::Text(Cow::Borrowed(column.label.as_str()))),
+                Item::Cell(_) | Item::Range(_) | Item::Column(_) => self
+                    .label()
+                    .map(|label| Preview::Text(Cow::Borrowed(label.as_str()))),
+                Item::Row(row) => match row.grid.row(row.index)?.stored() {
+                    true => None,
+                    false => self
+                        .label()
+                        .map(|label| Preview::Text(Cow::Borrowed(label.as_str()))),
+                },
                 Item::Table(table) => {
                     let table = table.part.table();
                     Some(Preview::Text(Cow::Owned(format!(

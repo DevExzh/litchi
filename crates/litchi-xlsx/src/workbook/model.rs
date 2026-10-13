@@ -1447,6 +1447,19 @@ impl Worksheet {
         Ok(self.store()?.cells(range))
     }
 
+    /// The stored record at a position [`Cells::indexed`] reported for this
+    /// worksheet, with its coordinate, in O(1); `None` past the last record.
+    ///
+    /// # Errors
+    ///
+    /// The errors of reading the worksheet's cell store.
+    pub fn record(
+        &self,
+        index: crate::RecordIndex,
+    ) -> Result<Option<(litchi_sheet::Cell, &crate::Cell)>> {
+        Ok(self.store()?.record(index))
+    }
+
     /// Lazily traverse validated, non-overlapping merged ranges.
     pub fn merges(&self) -> Result<crate::merge::Merges<'_>> {
         Ok(self.store()?.merges())

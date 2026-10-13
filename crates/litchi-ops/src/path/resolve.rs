@@ -20,16 +20,16 @@ use crate::{Family, Result};
 /// Resolves an absolute path from the document root; a miss is
 /// `path_not_found`.
 pub(crate) fn get<'f, N: Navigate<'f>>(nav: &N, path: &PathArg<'_>) -> Result<N::Node> {
-    nav.check_source()?;
-    let result = walk(nav, path, None).and_then(|outcome| found(nav, path, outcome));
+    let result = fenced(nav, || {
+        walk(nav, path, None).and_then(|outcome| found(nav, path, outcome))
+    });
     nav.check_source()?;
     result
 }
 
 /// Resolves an absolute path from the document root; a miss is `Ok(None)`.
 pub(crate) fn find<'f, N: Navigate<'f>>(nav: &N, path: &PathArg<'_>) -> Result<Option<N::Node>> {
-    nav.check_source()?;
-    let result = walk(nav, path, None).map(Outcome::into_found);
+    let result = fenced(nav, || walk(nav, path, None).map(Outcome::into_found));
     nav.check_source()?;
     result
 }
@@ -42,8 +42,9 @@ pub(crate) fn get_from<'f, N: Navigate<'f>>(
     kind: N::Kind,
     path: &PathArg<'_>,
 ) -> Result<N::Node> {
-    nav.check_source()?;
-    let result = walk(nav, path, Some((start, kind))).and_then(|outcome| found(nav, path, outcome));
+    let result = fenced(nav, || {
+        walk(nav, path, Some((start, kind))).and_then(|outcome| found(nav, path, outcome))
+    });
     nav.check_source()?;
     result
 }
@@ -55,10 +56,21 @@ pub(crate) fn find_from<'f, N: Navigate<'f>>(
     kind: N::Kind,
     path: &PathArg<'_>,
 ) -> Result<Option<N::Node>> {
-    nav.check_source()?;
-    let result = walk(nav, path, Some((start, kind))).map(Outcome::into_found);
+    let result = fenced(nav, || {
+        walk(nav, path, Some((start, kind))).map(Outcome::into_found)
+    });
     nav.check_source()?;
     result
+}
+
+/// Runs `read` with the adapter's nested source checks covered by the
+/// caller's [`Navigate::check_source`] after it: a source that changed
+/// before or during `read` fails that check, whose error wins over what
+/// `read` returned, so one check after the whole resolution gives what a
+/// check around each nested read gave (record 0262).
+fn fenced<'f, N: Navigate<'f>, T>(nav: &N, read: impl FnOnce() -> T) -> T {
+    let _scope = super::fence::Scope::enter(nav.fence_key());
+    read()
 }
 
 /// Where a walk ended.
