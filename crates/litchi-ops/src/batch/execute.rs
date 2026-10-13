@@ -113,9 +113,17 @@ impl File {
     /// # Ok::<(), litchi_ops::Error>(())
     /// ```
     ///
+    /// When the command still fails after skipping, the error is the
+    /// failure of the command without the skipped properties, and
+    /// [`Error::warnings`] lists them, so a failure the skipping caused (an
+    /// `add` that lost every key naming its data reports
+    /// `missing_property`) is never reported as if the caller had omitted
+    /// the data.
+    ///
     /// # Errors
     /// As [`Self::apply`]; under [`Unsupported::Warn`] only for failures
-    /// other than an unsupported property.
+    /// other than an unsupported property, with the properties skipped
+    /// before the failure in [`Error::warnings`].
     pub fn apply_with<'i>(
         &self,
         item: impl Into<BatchItem<'i>>,
@@ -377,7 +385,9 @@ fn apply_item(
 /// properties with `unsupported_property`, drop that property (every
 /// assignment of it) and run again. Each attempt is isolated, so only the
 /// final, successful attempt leaves changes. The loop ends because every
-/// retry removes at least one assignment.
+/// retry removes at least one assignment. When the reduced command fails
+/// for another reason, its error carries the skipped properties
+/// ([`Error::warnings`]).
 fn apply_skipping(edit: &mut Edit, item: &BatchItem<'_>, index: usize) -> Result<Applied> {
     let mut warnings = Vec::new();
     let mut current: Option<BatchItem<'_>> = None;
@@ -403,7 +413,14 @@ fn apply_skipping(edit: &mut Edit, item: &BatchItem<'_>, index: usize) -> Result
             Err(error) => error,
         };
         let Some(rest) = props.and_then(|props| without_refused(props, &error)) else {
-            return Err(error);
+            // The command failed for another reason after skipping: the
+            // error is that of the reduced command, so it carries what was
+            // skipped (`Error::warnings`) rather than hiding the cause.
+            return Err(if warnings.is_empty() {
+                error
+            } else {
+                error.with_warnings(warnings.into_boxed_slice())
+            });
         };
         warnings.try_reserve(1).map_err(|source| {
             Error::from(TransactionError::Allocation { source }).with_item(index)

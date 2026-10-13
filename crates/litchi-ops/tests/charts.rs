@@ -502,3 +502,290 @@ fn chart_capabilities_report_the_registry() {
         assert!(axis.property("title").expect("title").set());
     }
 }
+
+/// OfficeCLI's per-series add keys (record 0271), as the corpus writes them.
+fn dotted_chart(kind: &'static str) -> NewNode<'static> {
+    NewNode::new("chart")
+        .prop("chartType", kind)
+        .prop("title", "Traffic")
+        .prop("categories", "Mon,Tue,Wed")
+        .prop("series1.name", "Web")
+        .prop("series1.values", "50,60,70")
+        .prop("series1.color", "4472C4")
+        .prop("series2.name", "Mobile")
+        .prop("series2.values", "30,35,42")
+        .prop("series2.color", "ED7D31")
+}
+
+/// The same chart through `data` and the `colors` palette.
+fn data_chart(kind: &'static str) -> NewNode<'static> {
+    NewNode::new("chart")
+        .prop("chartType", kind)
+        .prop("title", "Traffic")
+        .prop("categories", "Mon,Tue,Wed")
+        .prop("data", "Web:50,60,70;Mobile:30,35,42")
+        .prop("colors", "4472C4,ED7D31")
+}
+
+#[test]
+fn dotted_series_keys_add_the_same_chart_as_data_in_both_formats() {
+    for (source, parent, chart) in [
+        (deck(), "/slide[1]", "/slide[1]/chart[1]"),
+        (workbook(), "/Sheet1", "/Sheet1/chart[1]"),
+    ] {
+        for kind in ["area", "column", "scatter"] {
+            let dotted = source.add(parent, dotted_chart(kind)).unwrap().file;
+            let data = source.add(parent, data_chart(kind)).unwrap().file;
+            // Byte-identical packages: a series color is the palette entry.
+            assert_eq!(
+                dotted.to_bytes().unwrap(),
+                data.to_bytes().unwrap(),
+                "{kind}"
+            );
+            for eager in [false, true] {
+                let file = reopen(&dotted, eager);
+                assert_eq!(
+                    prop(&file, &format!("{chart}/series[1]"), "name").as_deref(),
+                    Some("Web")
+                );
+                assert_eq!(
+                    prop(&file, &format!("{chart}/series[2]"), "values").as_deref(),
+                    Some("30,35,42")
+                );
+            }
+        }
+        // Bare legacy values take a dotted name; a lone color tints a `data`
+        // series.
+        let mixed = source
+            .add(
+                parent,
+                NewNode::new("chart")
+                    .prop("series1", "1,2")
+                    .prop("series1.name", "Named")
+                    .prop("series2", "Other:3,4"),
+            )
+            .unwrap()
+            .file;
+        assert_eq!(
+            prop(&mixed, &format!("{chart}/series[1]"), "name").as_deref(),
+            Some("Named")
+        );
+        assert_eq!(
+            prop(&mixed, &format!("{chart}/series[2]"), "name").as_deref(),
+            Some("Other")
+        );
+        let tinted = source
+            .add(
+                parent,
+                NewNode::new("chart")
+                    .prop("data", "Web:50,60,70;Mobile:30,35,42")
+                    .prop("series2.color", "ED7D31")
+                    .prop("series1.color", "4472C4")
+                    .prop("categories", "Mon,Tue,Wed")
+                    .prop("title", "Traffic")
+                    .prop("chartType", "column"),
+            )
+            .unwrap()
+            .file;
+        assert_eq!(
+            tinted.to_bytes().unwrap(),
+            source
+                .add(parent, data_chart("column"))
+                .unwrap()
+                .file
+                .to_bytes()
+                .unwrap()
+        );
+    }
+}
+
+#[test]
+fn dotted_series_refusals_leave_the_input_unchanged() {
+    for (source, parent) in [(deck(), "/slide[1]"), (workbook(), "/Sheet1")] {
+        let before = source.to_bytes().unwrap();
+        for (node, code, property) in [
+            (
+                NewNode::new("chart").prop("series1.name", "Web"),
+                Code::MissingProperty,
+                "series1.values",
+            ),
+            (
+                NewNode::new("chart")
+                    .prop("data", "A:1,2")
+                    .prop("series1.name", "Web")
+                    .prop("series1.values", "1,2"),
+                Code::InvalidArgument,
+                "data",
+            ),
+            (
+                NewNode::new("chart")
+                    .prop("series1", "A:1,2")
+                    .prop("series1.values", "3,4"),
+                Code::InvalidArgument,
+                "series1.values",
+            ),
+            (
+                NewNode::new("chart")
+                    .prop("series1.values", "1,2")
+                    .prop("series3.color", "FF0000"),
+                Code::InvalidValue,
+                "series3.color",
+            ),
+            (
+                NewNode::new("chart").prop("series1.values", "1,two"),
+                Code::InvalidValue,
+                "series1.values",
+            ),
+            (
+                NewNode::new("chart")
+                    .prop("series1.values", "1")
+                    .prop("series1.color", "blue"),
+                Code::InvalidValue,
+                "series1.color",
+            ),
+            (
+                NewNode::new("chart").prop("series1.values", "Sheet1!B2:B3"),
+                Code::UnsupportedCapability,
+                "series1.values",
+            ),
+            (
+                NewNode::new("chart").prop("series21.values", "1"),
+                Code::UnsupportedProperty,
+                "series21.values",
+            ),
+        ] {
+            let error = source.add(parent, node).unwrap_err();
+            assert_eq!(
+                (error.code(), error.property()),
+                (code, Some(property)),
+                "{error}"
+            );
+            assert_eq!(source.to_bytes().unwrap(), before);
+        }
+    }
+}
+
+#[test]
+fn dotted_series_keys_set_series_names_and_values_on_the_chart() {
+    for (source, parent, chart) in [
+        (deck(), "/slide[1]", "/slide[1]/chart[1]"),
+        (workbook(), "/Sheet1", "/Sheet1/chart[1]"),
+    ] {
+        let added = source.add(parent, dotted_chart("line")).unwrap().file;
+        let edited = added
+            .set(
+                chart,
+                props! { "series2.name" => "Phone", "series1.values" => "1,2,3" },
+            )
+            .unwrap();
+        // The same edit through the series paths gives the same package.
+        let by_path = added
+            .set(&*format!("{chart}/series[2]"), props! { "name" => "Phone" })
+            .unwrap()
+            .set(
+                &*format!("{chart}/series[1]"),
+                props! { "values" => "1,2,3" },
+            )
+            .unwrap();
+        assert_eq!(edited.to_bytes().unwrap(), by_path.to_bytes().unwrap());
+        for eager in [false, true] {
+            let file = reopen(&edited, eager);
+            assert_eq!(
+                prop(&file, &format!("{chart}/series[2]"), "name").as_deref(),
+                Some("Phone")
+            );
+            assert_eq!(
+                prop(&file, &format!("{chart}/series[1]"), "values").as_deref(),
+                Some("1,2,3")
+            );
+        }
+        let before = added.to_bytes().unwrap();
+        for (props, code, property) in [
+            (
+                props! { "series3.name" => "None" },
+                Code::OutOfRange,
+                "series3.name",
+            ),
+            (
+                props! { "series1.color" => "C00000" },
+                Code::UnsupportedProperty,
+                "series1.color",
+            ),
+        ] {
+            let error = added.set(chart, props).unwrap_err();
+            assert_eq!((error.code(), error.property()), (code, Some(property)));
+            assert_eq!(added.to_bytes().unwrap(), before);
+        }
+    }
+}
+
+#[test]
+fn warn_mode_failures_carry_the_skipped_properties() {
+    use litchi_ops::BatchItem;
+    use litchi_ops::batch::{Options, Unsupported};
+    let warn = Options::new().unsupported(Unsupported::Warn);
+    for (source, parent) in [(deck(), "/slide[1]"), (workbook(), "/Sheet1")] {
+        let before = source.to_bytes().unwrap();
+        // Every key naming the data is unsupported: the rest of the add
+        // lacks data, and the error says which keys it lost.
+        let mut item = BatchItem::new("add");
+        item.parent = Some(parent.into());
+        item.kind = Some("chart".into());
+        item.props = Some(
+            litchi_ops::Props::new()
+                .with("chartType", "column")
+                .with("series1.trendline", "linear")
+                .with("series1.categories", "Sheet1!A2:A3"),
+        );
+        let error = source.apply_with(&item, &warn).unwrap_err();
+        assert_eq!(error.code(), Code::MissingProperty);
+        assert_eq!(error.property(), Some("data"));
+        let skipped: Vec<_> = error
+            .warnings()
+            .iter()
+            .map(|warning| (warning.code(), warning.property(), warning.item()))
+            .collect();
+        assert_eq!(
+            skipped,
+            [
+                (
+                    Code::UnsupportedProperty,
+                    Some("series1.trendline"),
+                    Some(0)
+                ),
+                (
+                    Code::UnsupportedProperty,
+                    Some("series1.categories"),
+                    Some(0)
+                ),
+            ]
+        );
+        assert!(error.to_string().contains(
+            "(after skipping unsupported properties: series1.trendline, series1.categories)"
+        ));
+        assert_eq!(source.to_bytes().unwrap(), before);
+        // Refuse reports the first unsupported key; with nothing skipped the
+        // failure carries no warnings.
+        let error = source.apply(&item).unwrap_err();
+        assert_eq!(error.code(), Code::UnsupportedProperty);
+        assert!(error.warnings().is_empty());
+        let mut plain = BatchItem::new("add");
+        plain.parent = Some(parent.into());
+        plain.kind = Some("chart".into());
+        plain.props = Some(litchi_ops::Props::new().with("chartType", "column"));
+        let error = source.apply_with(&plain, &warn).unwrap_err();
+        assert_eq!(error.code(), Code::MissingProperty);
+        assert!(error.warnings().is_empty());
+        // The corpus line now applies.
+        let mut corpus = item.clone();
+        corpus.props = Some(
+            litchi_ops::Props::new()
+                .with("chartType", "area")
+                .with("series1.name", "Web")
+                .with("series1.values", "50,60")
+                .with("series1.color", "4472C4"),
+        );
+        let applied = source.apply_with(&corpus, &warn).unwrap();
+        assert!(applied.value.warnings.is_empty());
+    }
+}

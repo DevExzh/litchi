@@ -63,6 +63,15 @@ pub enum Unsupported {
     /// apply the remaining properties atomically, and report every skipped
     /// property in [`Applied::warnings`]. Any other failure (an invalid
     /// value, a missing path, a resource limit) still fails the command.
+    ///
+    /// A command that fails after skipping reports the failure of the
+    /// reduced command with the skipped properties attached
+    /// ([`OpsError::warnings`]; record 0271). The code stays the reduced
+    /// command's own, because that failure is real (the command, as it can
+    /// be applied, is incomplete or invalid), and the list says which
+    /// skipped keys it lost: an `add` whose data came only from skipped
+    /// keys fails with `missing_property` *and* names those keys, so the
+    /// caller is never told it omitted something it did supply.
     Warn,
 }
 

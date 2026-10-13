@@ -2004,11 +2004,16 @@ pub(super) enum ChartSetter {
     Format(crate::format::chart::FormatKey),
     /// `series{N}`, by its zero-based number.
     Numbered(u8),
+    /// `series{N}.name`, `.values` or `.color`, by the zero-based number
+    /// (record 0271).
+    Dotted(u8, crate::format::chart::SeriesField),
 }
 const CHART_FORMAT_START: usize = CHART_PROPS.len() + 2;
 const CHART_NUMBERED_START: usize = CHART_FORMAT_START + crate::format::chart::FORMAT_PROPS.len();
-const CHART_WRITE_COUNT: usize =
+const CHART_DOTTED_START: usize =
     CHART_NUMBERED_START + crate::format::chart::NUMBERED_SERIES_PROPS.len();
+const CHART_WRITE_COUNT: usize =
+    CHART_DOTTED_START + crate::format::chart::DOTTED_SERIES_PROPS.len();
 const fn chart_write_entries() -> [crate::registry::Entry<ChartSetter>; CHART_WRITE_COUNT] {
     use crate::registry::{Access, Constraint, Entry};
     let mut entries = [Entry::read(CHART_PROPS[0]); CHART_WRITE_COUNT];
@@ -2091,11 +2096,28 @@ const fn chart_write_entries() -> [crate::registry::Entry<ChartSetter>; CHART_WR
         };
         number += 1;
     }
+    let mut dotted = 0;
+    while dotted < crate::format::chart::DOTTED_SERIES_PROPS.len() {
+        let field = crate::format::chart::SERIES_FIELDS[dotted % 3];
+        let setter = ChartSetter::Dotted((dotted / 3) as u8, field);
+        entries[CHART_DOTTED_START + dotted] = Entry {
+            spec: crate::format::chart::DOTTED_SERIES_PROPS[dotted],
+            // A series' name and values are also settable on the chart
+            // (OfficeCLI's chart-level `set`); its color only on add.
+            access: match field {
+                crate::format::chart::SeriesField::Color => Access::Add(setter),
+                _ => Access::SetAndAdd(setter),
+            },
+            constraint: Constraint::NotEmpty,
+            clear: false,
+        };
+        dotted += 1;
+    }
     entries
 }
 const _: () = assert!(
-    CHART_WRITE_COUNT <= 64,
-    "chart adds track assignments in a u64"
+    CHART_WRITE_COUNT <= 128,
+    "chart adds track assignments in a u128"
 );
 pub(super) const CHART_WRITE_TABLE: crate::registry::Table<ChartSetter, CHART_WRITE_COUNT, 3> =
     crate::registry::Table::new(

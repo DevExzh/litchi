@@ -49,9 +49,9 @@ impl Xlsx {
         // The element kind first (record 0269, finding X1): a kind the
         // workbook cannot add is `unsupported_element` whatever its parent;
         // an addable kind under the wrong parent is `unsupported_type`.
-        new_kind(node.kind())?;
+        let kind = new_kind(node.kind())?;
         let parent = resolve_path(self, &parent)?;
-        if node.kind().eq_ignore_ascii_case("chart") {
+        if matches!(kind, NewKind::Chart) {
             drop(source);
             return self.add_chart(&parent, node);
         }
@@ -206,15 +206,19 @@ impl Xlsx {
 #[derive(Clone, Copy)]
 enum NewKind {
     Sheet,
+    /// A worksheet chart (record 0270), added under its sheet.
+    Chart,
 }
 
 fn new_kind(name: &str) -> Result<NewKind> {
     if name.eq_ignore_ascii_case("sheet") {
         Ok(NewKind::Sheet)
+    } else if name.eq_ignore_ascii_case("chart") {
+        Ok(NewKind::Chart)
     } else {
         Err(Error::new(
             Code::UnsupportedElement,
-            "this element kind cannot be added to an XLSX workbook yet; only sheets can",
+            "this element kind cannot be added to an XLSX workbook yet; only sheets and charts can",
         )
         .with_format(FileFormat::Xlsx)
         .with_suggestion("capabilities() lists the addable elements and the gaps"))
