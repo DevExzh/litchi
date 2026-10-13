@@ -1,0 +1,2996 @@
+{
+  "format": "docx",
+  "elements": [
+    {
+      "format": "docx",
+      "element": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/"
+        ]
+      },
+      "children": [
+        {
+          "element": "body",
+          "pathSegment": "body"
+        }
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "author": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "subject": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "keywords": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "description": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "category": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "lastModifiedBy": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "revisionNumber": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "created": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "modified": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      }
+    },
+    {
+      "format": "docx",
+      "element": "body",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/body"
+        ]
+      },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "p"
+        },
+        {
+          "element": "table",
+          "pathSegment": "tbl"
+        },
+        {
+          "element": "sdt",
+          "pathSegment": "sdt"
+        },
+        {
+          "element": "equation",
+          "pathSegment": "oMathPara"
+        },
+        {
+          "element": "section",
+          "pathSegment": "section"
+        }
+      ],
+      "properties": {},
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "paragraph",
+      "parent": [
+        "body",
+        "cell",
+        "sdt"
+      ],
+      "elementAliases": [
+        "p"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]",
+          "/body/tbl[N]/tr[M]/tc[K]/p[J]",
+          "/body/sdt[N]/p[M]"
+        ]
+      },
+      "children": [
+        {
+          "element": "run",
+          "pathSegment": "r"
+        },
+        {
+          "element": "hyperlink",
+          "pathSegment": "hyperlink"
+        }
+      ],
+      "properties": {
+        "style": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "styleId": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "align": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "justify",
+            "start",
+            "end",
+            "distribute",
+            "mediumKashida",
+            "highKashida",
+            "lowKashida",
+            "thaiDistribute",
+            "numTab"
+          ],
+          "valueAliases": {
+            "both": "justify"
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "spaceBefore": {
+          "type": "length",
+          "unit": "emu",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "spaceAfter": {
+          "type": "length",
+          "unit": "emu",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "lineSpacing": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "lineRule": {
+          "type": "enum",
+          "values": [
+            "auto",
+            "exact",
+            "atLeast"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "spaceBeforeLines": {
+          "type": "int",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "spaceAfterLines": {
+          "type": "int",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "spaceBeforeAuto": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "spaceAfterAuto": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "firstLineIndent": {
+          "type": "length",
+          "unit": "emu",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "hangingIndent": {
+          "type": "length",
+          "unit": "emu",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "indent": {
+          "type": "length",
+          "unit": "emu",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "rightIndent": {
+          "type": "length",
+          "unit": "emu",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "firstLineChars": {
+          "type": "int",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "hangingChars": {
+          "type": "int",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "leftChars": {
+          "type": "int",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "rightChars": {
+          "type": "int",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "keepNext": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "keepLines": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "pageBreakBefore": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "widowControl": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "direction": {
+          "type": "enum",
+          "values": [
+            "ltr",
+            "rtl"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "contextualSpacing": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "numId": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "numLevel": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "outlineLvl": {
+          "type": "int",
+          "constraint": {
+            "min": 0,
+            "max": 9
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "font.latin": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "font.ascii": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "font.hAnsi": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "font.ea": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "font.asciiTheme": {
+          "type": "enum",
+          "values": [
+            "majorEastAsia",
+            "majorBidi",
+            "majorAscii",
+            "majorHAnsi",
+            "minorEastAsia",
+            "minorBidi",
+            "minorAscii",
+            "minorHAnsi"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "font.hAnsiTheme": {
+          "type": "enum",
+          "values": [
+            "majorEastAsia",
+            "majorBidi",
+            "majorAscii",
+            "majorHAnsi",
+            "minorEastAsia",
+            "minorBidi",
+            "minorAscii",
+            "minorHAnsi"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "font.eaTheme": {
+          "type": "enum",
+          "values": [
+            "majorEastAsia",
+            "majorBidi",
+            "majorAscii",
+            "majorHAnsi",
+            "minorEastAsia",
+            "minorBidi",
+            "minorAscii",
+            "minorHAnsi"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "font.csTheme": {
+          "type": "enum",
+          "values": [
+            "majorEastAsia",
+            "majorBidi",
+            "majorAscii",
+            "majorHAnsi",
+            "minorEastAsia",
+            "minorBidi",
+            "minorAscii",
+            "minorHAnsi"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "font.hint": {
+          "type": "enum",
+          "values": [
+            "default",
+            "eastAsia",
+            "cs"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "lang.latin": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "lang.ea": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "lang.cs": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "size": {
+          "type": "font-size",
+          "unit": "pt",
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "bold": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "italic": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "font.cs": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "size.cs": {
+          "type": "font-size",
+          "unit": "pt",
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "bold.cs": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "italic.cs": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "color": {
+          "type": "color",
+          "colorContext": "word",
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "underline": {
+          "type": "enum",
+          "values": [
+            "none",
+            "single",
+            "words",
+            "double",
+            "thick",
+            "dotted",
+            "dottedHeavy",
+            "dash",
+            "dashedHeavy",
+            "dashLong",
+            "dashLongHeavy",
+            "dotDash",
+            "dashDotHeavy",
+            "dotDotDash",
+            "dashDotDotHeavy",
+            "wave",
+            "wavyHeavy",
+            "wavyDouble"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "underline.color": {
+          "type": "color",
+          "colorContext": "word",
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "strike": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "highlight": {
+          "type": "enum",
+          "values": [
+            "black",
+            "blue",
+            "cyan",
+            "green",
+            "magenta",
+            "red",
+            "yellow",
+            "white",
+            "darkBlue",
+            "darkCyan",
+            "darkGreen",
+            "darkMagenta",
+            "darkRed",
+            "darkYellow",
+            "darkGray",
+            "lightGray",
+            "none"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "caps": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "smallcaps": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "dstrike": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "vanish": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "outline": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "shadow": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "emboss": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "imprint": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "noproof": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "superscript": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "subscript": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "position": {
+          "type": "length",
+          "unit": "emu",
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "charSpacing": {
+          "type": "length",
+          "unit": "emu",
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "rStyle": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "clearable": true,
+          "add": true,
+          "set": false,
+          "get": false
+        }
+      },
+      "propertyGaps": {
+        "styleName": {
+          "code": "unsupported_capability",
+          "followUp": "L-DOCX-R6 (R4x)",
+          "reason": "a style's display name needs the styles part, which the node view does not read yet; `style` is the style id (M1-Δ4)"
+        },
+        "numFmt": {
+          "code": "unsupported_capability",
+          "followUp": "L-DOCX-R6 (R4x)",
+          "reason": "list formats need the numbering part, which the node view does not read yet"
+        },
+        "listStyle": {
+          "code": "unsupported_capability",
+          "followUp": "L-DOCX-R6 (R4x)",
+          "reason": "list kinds need the numbering part, which the node view does not read yet"
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "run",
+      "parent": "paragraph",
+      "elementAliases": [
+        "r"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]/r[M]"
+        ]
+      },
+      "properties": {
+        "font.latin": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.ascii": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.hAnsi": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.ea": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.asciiTheme": {
+          "type": "enum",
+          "values": [
+            "majorEastAsia",
+            "majorBidi",
+            "majorAscii",
+            "majorHAnsi",
+            "minorEastAsia",
+            "minorBidi",
+            "minorAscii",
+            "minorHAnsi"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.hAnsiTheme": {
+          "type": "enum",
+          "values": [
+            "majorEastAsia",
+            "majorBidi",
+            "majorAscii",
+            "majorHAnsi",
+            "minorEastAsia",
+            "minorBidi",
+            "minorAscii",
+            "minorHAnsi"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.eaTheme": {
+          "type": "enum",
+          "values": [
+            "majorEastAsia",
+            "majorBidi",
+            "majorAscii",
+            "majorHAnsi",
+            "minorEastAsia",
+            "minorBidi",
+            "minorAscii",
+            "minorHAnsi"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.csTheme": {
+          "type": "enum",
+          "values": [
+            "majorEastAsia",
+            "majorBidi",
+            "majorAscii",
+            "majorHAnsi",
+            "minorEastAsia",
+            "minorBidi",
+            "minorAscii",
+            "minorHAnsi"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.hint": {
+          "type": "enum",
+          "values": [
+            "default",
+            "eastAsia",
+            "cs"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "lang.latin": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "lang.ea": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "lang.cs": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "unit": "pt",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "bold": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font.cs": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "size.cs": {
+          "type": "font-size",
+          "unit": "pt",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "bold.cs": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "italic.cs": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "colorContext": "word",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "underline": {
+          "type": "enum",
+          "values": [
+            "none",
+            "single",
+            "words",
+            "double",
+            "thick",
+            "dotted",
+            "dottedHeavy",
+            "dash",
+            "dashedHeavy",
+            "dashLong",
+            "dashLongHeavy",
+            "dotDash",
+            "dashDotHeavy",
+            "dotDotDash",
+            "dashDotDotHeavy",
+            "wave",
+            "wavyHeavy",
+            "wavyDouble"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "underline.color": {
+          "type": "color",
+          "colorContext": "word",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "strike": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "highlight": {
+          "type": "enum",
+          "values": [
+            "black",
+            "blue",
+            "cyan",
+            "green",
+            "magenta",
+            "red",
+            "yellow",
+            "white",
+            "darkBlue",
+            "darkCyan",
+            "darkGreen",
+            "darkMagenta",
+            "darkRed",
+            "darkYellow",
+            "darkGray",
+            "lightGray",
+            "none"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "caps": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "smallcaps": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "dstrike": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "vanish": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "outline": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "shadow": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "emboss": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "imprint": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "noproof": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "direction": {
+          "type": "enum",
+          "values": [
+            "ltr",
+            "rtl"
+          ],
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "superscript": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "subscript": {
+          "type": "bool",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "position": {
+          "type": "length",
+          "unit": "emu",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "charSpacing": {
+          "type": "length",
+          "unit": "emu",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "rStyle": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "hyperlink",
+      "parent": "paragraph",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]/hyperlink[M]"
+        ]
+      },
+      "properties": {
+        "url": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "anchor": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "docLocation": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "tooltip": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "tgtFrame": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "font.cs": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "unit": "pt",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "bold": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "colorContext": "word",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "underline": {
+          "type": "enum",
+          "values": [
+            "none",
+            "single",
+            "words",
+            "double",
+            "thick",
+            "dotted",
+            "dottedHeavy",
+            "dash",
+            "dashedHeavy",
+            "dashLong",
+            "dashLongHeavy",
+            "dotDash",
+            "dashDotHeavy",
+            "dotDotDash",
+            "dashDotDotHeavy",
+            "wave",
+            "wavyHeavy",
+            "wavyDouble"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "underline.color": {
+          "type": "color",
+          "colorContext": "word",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "strike": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "highlight": {
+          "type": "enum",
+          "values": [
+            "black",
+            "blue",
+            "cyan",
+            "green",
+            "magenta",
+            "red",
+            "yellow",
+            "white",
+            "darkBlue",
+            "darkCyan",
+            "darkGreen",
+            "darkMagenta",
+            "darkRed",
+            "darkYellow",
+            "darkGray",
+            "lightGray",
+            "none"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "rStyle": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "table",
+      "parent": [
+        "body",
+        "cell",
+        "sdt"
+      ],
+      "elementAliases": [
+        "tbl"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/tbl[N]",
+          "/body/tbl[N]/tr[M]/tc[K]/tbl[J]"
+        ]
+      },
+      "children": [
+        {
+          "element": "row",
+          "pathSegment": "tr"
+        }
+      ],
+      "properties": {
+        "cols": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "rows": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "style": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "rowBandSize": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "colBandSize": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "width": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "align": {
+          "type": "enum",
+          "values": [
+            "center",
+            "end",
+            "left",
+            "right",
+            "start"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "indent": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "cellSpacing": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "layout": {
+          "type": "enum",
+          "values": [
+            "fixed",
+            "autofit"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "tblLook": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "direction": {
+          "type": "enum",
+          "values": [
+            "ltr",
+            "rtl"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "padding.top": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "padding.bottom": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "padding.left": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "padding.right": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "firstRow": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "lastRow": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "firstCol": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "lastCol": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "bandedRows": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "bandedCols": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "caption": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "description": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "colWidths": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "row",
+      "parent": "table",
+      "elementAliases": [
+        "tr"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/tbl[N]/tr[M]"
+        ]
+      },
+      "children": [
+        {
+          "element": "cell",
+          "pathSegment": "tc"
+        }
+      ],
+      "properties": {
+        "height": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "height.rule": {
+          "type": "enum",
+          "values": [
+            "auto",
+            "exact",
+            "atLeast"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "header": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "cantSplit": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "hidden": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "rowAlign": {
+          "type": "enum",
+          "values": [
+            "center",
+            "end",
+            "left",
+            "right",
+            "start"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "gridBefore": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "wBefore": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "gridAfter": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "wAfter": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "cellSpacing": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "cell",
+      "parent": "row",
+      "elementAliases": [
+        "tc"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/tbl[N]/tr[M]/tc[K]"
+        ]
+      },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "p"
+        },
+        {
+          "element": "table",
+          "pathSegment": "tbl"
+        },
+        {
+          "element": "sdt",
+          "pathSegment": "sdt"
+        },
+        {
+          "element": "equation",
+          "pathSegment": "oMathPara"
+        }
+      ],
+      "properties": {
+        "width": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "valign": {
+          "type": "enum",
+          "values": [
+            "top",
+            "center",
+            "both",
+            "bottom"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "vmerge": {
+          "type": "enum",
+          "values": [
+            "restart",
+            "continue"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "hmerge": {
+          "type": "enum",
+          "values": [
+            "restart",
+            "continue"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "colspan": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "padding.top": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "padding.bottom": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "padding.left": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "padding.right": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "textDirection": {
+          "type": "enum",
+          "values": [
+            "tb",
+            "rl",
+            "lr",
+            "tbV",
+            "rlV",
+            "lrV",
+            "btLr",
+            "lrTb",
+            "lrTbV",
+            "tbLrV",
+            "tbRl",
+            "tbRlV"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "nowrap": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "hideMark": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "tcFitText": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "sdt",
+      "parent": [
+        "body",
+        "cell",
+        "sdt"
+      ],
+      "elementAliases": [
+        "contentcontrol"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/sdt[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "p"
+        },
+        {
+          "element": "table",
+          "pathSegment": "tbl"
+        },
+        {
+          "element": "sdt",
+          "pathSegment": "sdt"
+        },
+        {
+          "element": "equation",
+          "pathSegment": "oMathPara"
+        }
+      ],
+      "properties": {
+        "alias": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "tag": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "propertyGaps": {
+        "type": {
+          "code": "unsupported_capability",
+          "followUp": "R4x",
+          "reason": "the leaf reads a content control's id, tag and alias only"
+        },
+        "lock": {
+          "code": "unsupported_capability",
+          "followUp": "R4x",
+          "reason": "the leaf reads a content control's id, tag and alias only"
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "equation",
+      "parent": [
+        "body",
+        "cell",
+        "sdt"
+      ],
+      "elementAliases": [
+        "formula",
+        "math",
+        "omath",
+        "omathpara"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/oMathPara[N]"
+        ]
+      },
+      "properties": {
+        "mode": {
+          "type": "enum",
+          "values": [
+            "display",
+            "inline"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "section",
+      "parent": "body",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/section[N]"
+        ]
+      },
+      "properties": {},
+      "propertyGaps": {
+        "pageWidth": {
+          "code": "unsupported_capability",
+          "followUp": "R4x",
+          "reason": "section properties are read through the section inventory, which the node view does not wire yet"
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "docx",
+      "element": "header",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/header[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "L-DOCX-R5",
+        "reason": "header stories are read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet"
+      }
+    },
+    {
+      "format": "docx",
+      "element": "footer",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/footer[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "L-DOCX-R5",
+        "reason": "footer stories are read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet"
+      }
+    },
+    {
+      "format": "docx",
+      "element": "footnotes",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/footnotes"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "L-DOCX-R5",
+        "reason": "the footnotes part is read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet"
+      }
+    },
+    {
+      "format": "docx",
+      "element": "footnote",
+      "parent": [
+        "document",
+        "footnotes"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/footnote[N]",
+          "/footnotes/footnote[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "L-DOCX-R5",
+        "reason": "footnote stories are read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet"
+      }
+    },
+    {
+      "format": "docx",
+      "element": "endnotes",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/endnotes"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "L-DOCX-R5",
+        "reason": "the endnotes part is read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet"
+      }
+    },
+    {
+      "format": "docx",
+      "element": "endnote",
+      "parent": [
+        "document",
+        "endnotes"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/endnote[N]",
+          "/endnotes/endnote[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "L-DOCX-R5",
+        "reason": "endnote stories are read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet"
+      }
+    },
+    {
+      "format": "docx",
+      "element": "comments",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/comments"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "L-DOCX-R5",
+        "reason": "the comments part is read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet"
+      }
+    },
+    {
+      "format": "docx",
+      "element": "comment",
+      "parent": "comments",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/comments/comment[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "L-DOCX-R5",
+        "reason": "comment stories are read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet"
+      }
+    },
+    {
+      "format": "docx",
+      "element": "styles",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/styles"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "L-DOCX-R6 (R4x)",
+        "reason": "the styles part has no node adapter yet"
+      }
+    },
+    {
+      "format": "docx",
+      "element": "style",
+      "parent": "styles",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {},
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "L-DOCX-R6 (R4x)",
+        "reason": "styles have no node adapter yet"
+      }
+    },
+    {
+      "format": "docx",
+      "element": "numbering",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/numbering"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "L-DOCX-R6 (R4x)",
+        "reason": "the numbering part has no node adapter yet"
+      }
+    },
+    {
+      "format": "docx",
+      "element": "abstractNum",
+      "parent": "numbering",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {},
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "L-DOCX-R6 (R4x)",
+        "reason": "numbering definitions have no node adapter yet"
+      }
+    },
+    {
+      "format": "docx",
+      "element": "num",
+      "parent": "numbering",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {},
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "L-DOCX-R6 (R4x)",
+        "reason": "numbering instances have no node adapter yet"
+      }
+    },
+    {
+      "format": "docx",
+      "element": "level",
+      "parent": "abstractNum",
+      "elementAliases": [
+        "lvl"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {},
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "L-DOCX-R6 (R4x)",
+        "reason": "numbering levels have no node adapter yet"
+      }
+    },
+    {
+      "format": "docx",
+      "element": "settings",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/settings"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "L-DOCX-R6 (R4x)",
+        "reason": "the settings part has no node adapter yet"
+      }
+    },
+    {
+      "format": "docx",
+      "element": "theme",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/theme"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "L-DOCX-R6 (R4x)",
+        "reason": "the theme part has no node adapter yet"
+      }
+    },
+    {
+      "format": "docx",
+      "element": "bookmark",
+      "parent": "paragraph",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/bookmark[@name=X]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "R4x",
+        "reason": "bookmarks have no located reader yet"
+      }
+    },
+    {
+      "format": "docx",
+      "element": "field",
+      "parent": "paragraph",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/field[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "R4x",
+        "reason": "fields have no located reader yet"
+      }
+    },
+    {
+      "format": "docx",
+      "element": "formfield",
+      "parent": "paragraph",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/formfield[NAME]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "R4x",
+        "reason": "legacy form fields have no located reader yet"
+      }
+    },
+    {
+      "format": "docx",
+      "element": "picture",
+      "parent": "paragraph",
+      "elementAliases": [
+        "image",
+        "img"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]/picture[M]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "R4x",
+        "reason": "pictures have no located reader yet"
+      }
+    },
+    {
+      "format": "docx",
+      "element": "chart",
+      "parent": "paragraph",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/chart[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "R4x",
+        "reason": "charts have no located reader yet"
+      }
+    },
+    {
+      "format": "docx",
+      "element": "ole",
+      "parent": "paragraph",
+      "elementAliases": [
+        "embed",
+        "object",
+        "oleobject"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]/ole[M]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "R4x",
+        "reason": "embedded objects have no located reader yet"
+      }
+    },
+    {
+      "format": "docx",
+      "element": "toc",
+      "parent": "body",
+      "elementAliases": [
+        "tableofcontents"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/toc[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "R4x",
+        "reason": "tables of contents have no located reader yet"
+      }
+    },
+    {
+      "format": "docx",
+      "element": "revision",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/revision[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "R4x",
+        "reason": "tracked revisions have no located reader yet"
+      }
+    },
+    {
+      "format": "docx",
+      "element": "watermark",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/watermark"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "R4x",
+        "reason": "watermarks live in header stories, which have no node adapter yet"
+      }
+    },
+    {
+      "format": "docx",
+      "element": "textbox",
+      "parent": "paragraph",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]/textbox[M]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "R4x",
+        "reason": "text boxes have no located reader yet"
+      }
+    },
+    {
+      "format": "docx",
+      "element": "shape",
+      "parent": "paragraph",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]/shape[M]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "R4x",
+        "reason": "drawing shapes have no located reader yet"
+      }
+    },
+    {
+      "format": "docx",
+      "element": "break",
+      "parent": "paragraph",
+      "elementAliases": [
+        "br",
+        "pagebreak"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]/break[M]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "R4x",
+        "reason": "breaks are read as run content, not addressed yet"
+      }
+    },
+    {
+      "format": "docx",
+      "element": "tab",
+      "parent": "paragraph",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]/tab[M]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "R4x",
+        "reason": "tab characters are read as run content, not addressed yet"
+      }
+    }
+  ],
+  "gaps": [
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "paragraph",
+      "context": "nested-or-unproven-selection",
+      "code": "unsupported_capability",
+      "followUp": "L-DOCX-W3",
+      "reason": "paragraphs in cells, content controls or wrappers are readable, but their raw transaction position is not proven for editing"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "run",
+      "context": "nested-or-unproven-selection",
+      "code": "unsupported_capability",
+      "followUp": "L-DOCX-W2",
+      "reason": "the editor addresses only direct runs whose raw ordinal is proven against the paragraph; nested and wrapped run selections are refused"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "paragraph/run",
+      "context": "mixed-paragraph-run-fanout",
+      "code": "unsupported_capability",
+      "followUp": "M2 (homogeneous mutation fanout)",
+      "reason": "one DOCX mutation admits one target kind, so a paragraph/run union is refused before staging rather than applying a descendant ordinal to the wrong leaf"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "paragraph/run",
+      "context": "managed-transaction",
+      "code": "unsupported_capability",
+      "followUp": "L-DOCX-W5",
+      "reason": "the formatting transaction has not proven edit admission and publication for execution-context-managed DOCX owners; the read projection remains available"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "paragraph/run",
+      "context": "complex-leaf-content",
+      "code": "unsupported_capability",
+      "followUp": "L-DOCX-W2 / record 0011",
+      "reason": "fields, hyperlinks, markup-compatibility branches and other nested or unmodeled run content lack a proven raw ownership and address mapping for leaf edits"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "paragraph/run",
+      "context": "managed-transaction",
+      "code": "unsupported_capability",
+      "followUp": "L-DOCX-W5",
+      "reason": "structural insertion uses the unmanaged DOCX transaction path; execution-context-managed owners refuse the leaf splice until managed admission is proven"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "paragraph",
+      "context": "nested-or-unproven-parent",
+      "code": "unsupported_capability",
+      "followUp": "L-DOCX-W3",
+      "reason": "paragraph creation is admitted only under the direct main body, so cells, content controls and other nested parents are refused"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "run",
+      "context": "nested-or-unproven-parent",
+      "code": "unsupported_capability",
+      "followUp": "L-DOCX-W2",
+      "reason": "run creation is admitted only under a proven direct body paragraph and refuses wrapped or nested paragraph parents"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "paragraph/run",
+      "context": "managed-transaction",
+      "code": "unsupported_capability",
+      "followUp": "L-DOCX-W5",
+      "reason": "structural removal uses the unmanaged DOCX transaction path; execution-context-managed owners refuse the leaf splice until managed admission is proven"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "paragraph/run",
+      "context": "nested-or-unproven-selection",
+      "code": "unsupported_capability",
+      "followUp": "L-DOCX-W2 / L-DOCX-W3",
+      "reason": "only direct body paragraphs and their direct runs have transaction positions proven for removal; nested selections are refused"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "paragraph/run",
+      "context": "complex-leaf-content",
+      "code": "unsupported_capability",
+      "followUp": "L-DOCX-W2 / record 0011",
+      "reason": "paragraph and run dependency scans refuse open ranges, field interiors, tracked changes and story references rather than dropping their relationships"
+    },
+    {
+      "subject": "operation",
+      "verb": "move",
+      "element": "paragraph/run",
+      "context": "managed-transaction",
+      "code": "unsupported_capability",
+      "followUp": "L-DOCX-W5",
+      "reason": "paragraph and direct-run movement use the unmanaged DOCX transaction path; execution-context-managed owners refuse the leaf splice until managed admission is proven"
+    },
+    {
+      "subject": "operation",
+      "verb": "move",
+      "element": "paragraph/run",
+      "context": "nested-or-unproven-selection",
+      "code": "unsupported_capability",
+      "followUp": "L-DOCX-W3",
+      "reason": "only direct main-body paragraphs and their direct runs can be moved; nested and wrapped selections have no proven body or run anchor"
+    },
+    {
+      "subject": "operation",
+      "verb": "move",
+      "element": "paragraph/run",
+      "context": "complex-leaf-content",
+      "code": "unsupported_capability",
+      "followUp": "L-DOCX-W2 / record 0011",
+      "reason": "paragraph and direct-run movement preserves exact source fragments but refuses open ranges, field interiors, namespace changes, tracked changes and unmodeled dependencies"
+    },
+    {
+      "subject": "operation",
+      "verb": "swap",
+      "element": "paragraph/run",
+      "context": "managed-transaction",
+      "code": "unsupported_capability",
+      "followUp": "L-DOCX-W5",
+      "reason": "paragraph and direct-run swapping compose unmanaged fragment moves; execution-context-managed owners refuse the leaf splice until managed admission is proven"
+    },
+    {
+      "subject": "operation",
+      "verb": "swap",
+      "element": "paragraph/run",
+      "context": "nested-or-unproven-selection",
+      "code": "unsupported_capability",
+      "followUp": "L-DOCX-W3",
+      "reason": "only direct main-body paragraphs or direct runs can be swapped; nested and wrapped selections have no proven anchors"
+    },
+    {
+      "subject": "operation",
+      "verb": "swap",
+      "element": "paragraph/run",
+      "context": "complex-leaf-content",
+      "code": "unsupported_capability",
+      "followUp": "L-DOCX-W2 / record 0011",
+      "reason": "paragraph and direct-run swapping preserves exact source fragments but refuses field interiors, namespace changes, tracked changes and unmodeled dependencies"
+    },
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "document",
+      "context": "strict-conformance",
+      "code": "unsupported_capability",
+      "followUp": "CreateOptions::conformance(Conformance::Transitional)",
+      "reason": "the DOCX creator emits Transitional packages and refuses a Strict conformance request rather than silently downgrading it"
+    },
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "document",
+      "context": "noncore-initial-metadata",
+      "code": "unsupported_capability",
+      "followUp": "CreateOptions::metadata (DOCX core properties)",
+      "reason": "initial metadata outside the DOCX core-properties part is not representable by the creator and is refused rather than dropped"
+    },
+    {
+      "subject": "operation",
+      "verb": "batch",
+      "element": "document",
+      "context": "text-paragraph-and-soft-breaks",
+      "code": "unsupported_capability",
+      "followUp": "M2 (batch command and transfer families)",
+      "reason": "full text-output parity remains incomplete; paragraph addition splits normalized LF into paragraphs with VT inline breaks; run setters update the first literal text node and mark the owning same-paragraph cached field dirty; run addition and paragraph setters normalize controls to inline breaks"
+    },
+    {
+      "subject": "operation",
+      "verb": "batch",
+      "element": "document",
+      "context": "read-and-extended-commands",
+      "code": "unsupported_capability",
+      "followUp": "M2 (batch command and transfer families)",
+      "reason": "get, query, view, raw, raw-set, add-part, validate and import are not integrated into batch item results"
+    },
+    {
+      "subject": "operation",
+      "verb": "batch",
+      "element": "document",
+      "context": "non-v2-dump-metadata",
+      "code": "unsupported_capability",
+      "followUp": "M2 (batch command and transfer families)",
+      "reason": "dumpVersion other than explicit v2 is refused for the whole batch; absent metadata uses current semantics"
+    },
+    {
+      "subject": "operation",
+      "verb": "batch",
+      "element": "document",
+      "context": "add-from",
+      "code": "unsupported_capability",
+      "followUp": "M2 (batch command and transfer families)",
+      "reason": "copying an add source requires typed transfer families not yet integrated into the command channel"
+    },
+    {
+      "subject": "operation",
+      "verb": "batch",
+      "element": "document",
+      "context": "move-properties",
+      "code": "unsupported_capability",
+      "followUp": "M2 (batch command and transfer families)",
+      "reason": "move-time property assignments are not integrated and are never silently dropped"
+    },
+    {
+      "subject": "operation",
+      "verb": "batch",
+      "element": "document",
+      "context": "move-parent-and-relative-anchor",
+      "code": "unsupported_capability",
+      "followUp": "M2 (batch command and transfer families)",
+      "reason": "move to a parent combined with before or after is not represented by the current placement model"
+    },
+    {
+      "subject": "view",
+      "mode": "issues",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "forms",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "html",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "svg",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "screenshot",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "pdf",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    }
+  ]
+}

@@ -599,6 +599,30 @@ class ViewTests(ErrorAssertions):
 # ---------------------------------------------------------------------------
 
 
+class SchemaTests(unittest.TestCase):
+    """``litchi_py.schema(format)`` is the Rust registry export
+    (``crates/litchi-ops/tests/golden/registry/<format>.json``)."""
+
+    def test_schema_equals_the_rust_registry_golden(self):
+        for name in ("doc", "docx", "ppt", "pptx", "rtf", "xls", "xlsb", "xlsx"):
+            with self.subTest(format=name):
+                exported = L.schema(name)
+                expected = golden(f"registry/{name}.json")
+                self.assertEqual(exported, expected)
+                self.assertEqual(json.dumps(exported), json.dumps(expected))
+        self.assertEqual(L.schema(L.FileFormat.Docx), L.schema("docx"))
+
+    def test_stub_typed_dict_matches_the_export(self):
+        fields = typed_dict_fields(STUB_PATH)["_Schema"]
+        self.assertEqual(list(L.schema("xlsx")), [key for key in fields if key != "pending"])
+        self.assertEqual(list(L.schema("pages")), list(fields))
+        self.assertEqual(L.schema("pages")["elements"], [])
+
+    def test_unknown_format_names_raise(self):
+        with self.assertRaises(L.PropertyError):
+            L.schema("txt")
+
+
 class CapabilitiesTests(unittest.TestCase):
     def test_reports_equal_the_rust_goldens(self):
         for relative, name in ((DRAWING, "docx"), (TABLES, "xlsx"), (PPTX, "pptx")):

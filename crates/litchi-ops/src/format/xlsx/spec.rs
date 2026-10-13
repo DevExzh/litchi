@@ -776,12 +776,41 @@ pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 51, 38> = Table::new(
 pub(crate) const CELL_WRITE_PROPS: &[PropSpec] = &CELL_WRITE_TABLE.readable();
 
 /// Cell capability projection: all shared read properties in their existing
-/// order, with matching registry properties upgraded to writable and `value` and
-/// `clear` entries appended.  The XLSB adapter continues to consume only the
+/// order, with matching registry properties upgraded to writable and every
+/// other registry entry (`value`, `clear`, the border shorthands) appended
+/// write-only.  The XLSB adapter continues to consume only the
 /// shared `CELL_PROPS` slice, so this write metadata cannot alter its read
 /// semantics.
-const fn cell_capability_array() -> [PropSpec; CELL_PROPS.len() + 2] {
-    let mut props = [PropSpec::new("", ValueType::Text); CELL_PROPS.len() + 2];
+/// Whether `name` is a shared readable cell property.
+const fn cell_reads(name: &str) -> bool {
+    let mut index = 0;
+    while index < CELL_PROPS.len() {
+        if same_name(CELL_PROPS[index].name, name) {
+            return true;
+        }
+        index += 1;
+    }
+    false
+}
+
+/// The cell write registry entries that are not readable cell properties
+/// (`value`, `clear` and the border shorthands): appended write-only.
+const fn cell_write_only_count() -> usize {
+    let mut count = 0;
+    let mut index = 0;
+    while index < CELL_WRITE_PROPS.len() {
+        if !cell_reads(CELL_WRITE_PROPS[index].name) {
+            count += 1;
+        }
+        index += 1;
+    }
+    count
+}
+
+const CELL_CAPABILITY_LEN: usize = CELL_PROPS.len() + cell_write_only_count();
+
+const fn cell_capability_array() -> [PropSpec; CELL_CAPABILITY_LEN] {
+    let mut props = [PropSpec::new("", ValueType::Text); CELL_CAPABILITY_LEN];
     let mut index = 0;
     while index < CELL_PROPS.len() {
         let mut prop = CELL_PROPS[index];
@@ -791,6 +820,7 @@ const fn cell_capability_array() -> [PropSpec; CELL_PROPS.len() + 2] {
             if same_name(prop.name, write.name) {
                 prop.access.set = write.access.set;
                 prop.access.add = write.access.add;
+                prop.admission = write.admission;
             }
             write_index += 1;
         }
@@ -808,13 +838,23 @@ const fn cell_capability_array() -> [PropSpec; CELL_PROPS.len() + 2] {
             if same_name(props[prop_index].name, write.name) {
                 props[prop_index].access.set = write.access.set;
                 props[prop_index].access.add = write.access.add;
+                props[prop_index].admission = write.admission;
             }
             prop_index += 1;
         }
         merge_index += 1;
     }
-    props[CELL_PROPS.len()] = CELL_WRITE_PROPS[0];
-    props[CELL_PROPS.len() + 1] = CELL_WRITE_PROPS[2];
+    let mut next = CELL_PROPS.len();
+    let mut write_index = 0;
+    while write_index < CELL_WRITE_PROPS.len() {
+        let mut write = CELL_WRITE_PROPS[write_index];
+        if !cell_reads(write.name) {
+            write.access.get = false;
+            props[next] = write;
+            next += 1;
+        }
+        write_index += 1;
+    }
     props
 }
 
@@ -845,6 +885,7 @@ const fn range_capability_array() -> [PropSpec; RANGE_PROPS.len() + CELL_WRITE_P
         if same_name(prop.name, MERGE_WRITE_PROPS[0].name) {
             prop.access.set = MERGE_WRITE_PROPS[0].access.set;
             prop.access.add = MERGE_WRITE_PROPS[0].access.add;
+            prop.admission = MERGE_WRITE_PROPS[0].admission;
         }
         props[index] = prop;
         index += 1;
@@ -881,6 +922,7 @@ const fn sheet_capability_array() -> [PropSpec; SHEET_PROPS.len() + 1] {
             if same_name(prop.name, write.name) {
                 prop.access.set = write.access.set;
                 prop.access.add = write.access.add;
+                prop.admission = write.admission;
             }
             write_index += 1;
         }
@@ -1030,6 +1072,7 @@ const fn row_capability_array() -> [PropSpec; ROW_PROPS.len() + 1] {
             {
                 prop.access.set = write.access.set;
                 prop.access.add = write.access.add;
+                prop.admission = write.admission;
             }
             write_index += 1;
         }
@@ -1056,6 +1099,7 @@ const fn column_capability_array() -> [PropSpec; COLUMN_PROPS.len() + 1] {
             {
                 prop.access.set = write.access.set;
                 prop.access.add = write.access.add;
+                prop.admission = write.admission;
             }
             write_index += 1;
         }

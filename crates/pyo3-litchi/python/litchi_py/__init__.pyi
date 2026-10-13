@@ -630,6 +630,25 @@ class _Capabilities(TypedDict):
     """Each element, path or property Litchi cannot read yet, with its code
     and follow-up."""
 
+class _Schema(TypedDict):
+    """``schema(format)``: the format's property registry (stub-only type).
+
+    Each element is in OfficeCLI's help-schema shape; each of its
+    ``properties`` has ``type``, ``add``, ``set`` and ``get``, and, where
+    they apply, ``aliases``, ``values``, ``valueAliases``, ``unit``,
+    ``colorContext``, ``constraint``, ``clearable`` and ``writeGap``.
+    """
+
+    format: str
+    """The format, such as "docx"."""
+    pending: NotRequired[_Support]
+    """Present when this build has no reader for the format: why, and the
+    follow-up."""
+    elements: List[Dict[str, Any]]
+    """Each element kind with its properties, ``propertyGaps`` and ``gap``."""
+    gaps: List[Dict[str, Any]]
+    """The format's axis, operation, view and undeclared element gaps."""
+
 class _Metadata(TypedDict, total=False):
     """``File.metadata()``: the document properties that are set
     (stub-only type). Dates are ISO 8601 text; ``*_local`` dates carry no
@@ -755,6 +774,32 @@ def create(format: Union[FileFormat, str]) -> File:
         PropertyError: (a ValueError) If format names no format
             ("invalid_argument")
         UnsupportedError: (a ValueError) If Litchi cannot create the format
+    """
+    ...
+
+def schema(format: Union[FileFormat, str]) -> _Schema:
+    """The property registry of ``format``: what ``set``, ``add`` and ``get``
+    accept for each element, as data.
+
+    Each element is in OfficeCLI's help-schema shape. Each property has its
+    ``type``, the enumeration ``values`` and ``valueAliases``, the ``unit``
+    a bare length number is read in, its ``aliases``, ``constraint`` and
+    ``clearable`` flag, the ``add``/``set``/``get`` flags, and a ``writeGap``
+    with its follow-up when it cannot be written yet. ``propertyGaps`` lists
+    an element's keys Litchi does not answer yet; ``gaps`` the format's other
+    gaps. A format without a reader in this build has no elements and a
+    ``pending`` entry. The result equals the Rust ``litchi_ops::schema``
+    JSON.
+
+    Args:
+        format: A FileFormat, or its name ("docx", "Xlsx", ".pptx")
+
+    Returns:
+        A dict
+
+    Raises:
+        PropertyError: (a ValueError) If format names no format
+            ("invalid_argument")
     """
     ...
 
@@ -1370,6 +1415,7 @@ __all__ = [
     "open",
     "open_bytes",
     "create",
+    "schema",
     "File",
     "Commit",
     "Edit",

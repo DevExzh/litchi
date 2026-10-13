@@ -3,16 +3,17 @@
 
 The table compares OfficeCLI's help schemas (``schemas/help/<format>/*.json``,
 with their ``extends`` bases merged the way OfficeCLI's ``SchemaHelpLoader``
-merges them) with Litchi's golden capability reports
-(``crates/litchi-ops/tests/golden/capabilities/<format>.json``, the JSON of
-``Capabilities::of(format)``) for the three formats OfficeCLI describes:
-DOCX, XLSX and PPTX, plus XLS and XLSB against the XLSX vocabulary as a parity
-target (not a claim of OfficeCLI XLS/XLSB file support). DOCX's optional
-``docx-encryption.json`` baseline contributes feature-gated operation gaps
-that are absent from the default report. Each property row carries a read
-status (Litchi's ``get`` against OfficeCLI's) and a write status (Litchi's
-``add``/``set`` against OfficeCLI's). It writes
-``docs/unified-ops/officecli-capability-delta.md``.
+merges them) with Litchi's property registry export
+(``crates/litchi-ops/tests/golden/registry/<format>.json``, the golden JSON
+of ``litchi_ops::schema(format)``; record 0263) for every format the
+registry covers. OfficeCLI describes DOCX, XLSX and PPTX; the other formats
+are compared against the vocabulary of their family as a parity target (not
+a claim of OfficeCLI support for them): DOC and RTF against DOCX, XLS and
+XLSB against XLSX, PPT against PPTX. An optional ``<format>-encryption.json``
+snapshot contributes feature-gated operation gaps that are absent from the
+default export. Each property row carries a read status (Litchi's ``get``
+against OfficeCLI's) and a write status (Litchi's ``add``/``set`` against
+OfficeCLI's). It writes ``docs/unified-ops/officecli-capability-delta.md``.
 
 The OfficeCLI help schemas it reads are vendored, unchanged, under
 ``test-data/officecli/`` (record 0257; provenance, license and the pinned
@@ -22,12 +23,13 @@ upstream commit sit next to them), so the script runs anywhere::
 
 ``--officecli`` (default ``$LITCHI_OFFICECLI``, then ``test-data/officecli``)
 names another OfficeCLI tree, such as a newer upstream checkout; refresh the
-vendored copy from it before regenerating the committed table. The table records the SHA-256 of every golden report it
-read and of the schema tree, and ``tools/test_officecli_capability_delta.py``
-fails when a golden report no longer matches the hash recorded here. Rerun
-the script whenever the goldens change: after an adapter lands (R4a, R4c,
-...) and its goldens are blessed with ``LITCHI_BLESS=1``. ``--check``
-regenerates the table in memory and fails if the committed one differs.
+vendored copy from it before regenerating the committed table. The table
+records the SHA-256 of every registry snapshot it read and of the schema
+tree, and ``tools/test_officecli_capability_delta.py`` fails when a snapshot
+no longer matches the hash recorded here. Rerun the script whenever the
+registry changes and its snapshots are blessed with ``LITCHI_BLESS=1``
+(``cargo test -p litchi-ops --test registry``). ``--check`` regenerates the
+table in memory and fails if the committed one differs.
 
 The output is deterministic: no timestamps, sorted where OfficeCLI's order is
 not meaningful, so rerunning on the same inputs reproduces it byte for byte.
@@ -48,14 +50,40 @@ REPO = Path(__file__).resolve().parent.parent
 VENDORED_OFFICECLI = Path("test-data/officecli")
 # The vendored tree has no git metadata; this file pins its upstream commit.
 UPSTREAM_COMMIT = "UPSTREAM_COMMIT"
-GOLDEN_DIR = Path("crates/litchi-ops/tests/golden/capabilities")
+GOLDEN_DIR = Path("crates/litchi-ops/tests/golden/registry")
 OUTPUT = Path("docs/unified-ops/officecli-capability-delta.md")
-FORMATS = ("docx", "xlsx", "xlsb", "xls", "pptx")
+# Table order: each OfficeCLI format, then the formats compared against its
+# vocabulary. A registry snapshot of another format is appended, sorted.
+FORMATS = ("docx", "doc", "rtf", "xlsx", "xlsb", "xls", "pptx", "ppt")
+OPTIONAL_SUFFIX = "-encryption"
+
+REFERENCE = {
+    "doc": "docx",
+    "rtf": "docx",
+    "odt": "docx",
+    "xls": "xlsx",
+    "xlsb": "xlsx",
+    "ods": "xlsx",
+    "ppt": "pptx",
+    "odp": "pptx",
+}
 
 
 def reference_format(fmt: str) -> str:
-    """Binary Excel formats use SpreadsheetML vocabulary as a comparison target."""
-    return "xlsx" if fmt in ("xls", "xlsb") else fmt
+    """The OfficeCLI format whose vocabulary ``fmt`` is compared against:
+    its own for DOCX, XLSX and PPTX, its family's otherwise."""
+    return REFERENCE.get(fmt, fmt)
+
+
+def formats(repo: Path) -> list[str]:
+    """Every format with a registry snapshot, in table order."""
+    present = sorted(
+        path.stem
+        for path in (repo / GOLDEN_DIR).glob("*.json")
+        if not path.stem.endswith(OPTIONAL_SUFFIX)
+    )
+    known = [fmt for fmt in FORMATS if fmt in present]
+    return known + [fmt for fmt in present if fmt not in FORMATS]
 
 
 # OfficeCLI elements Litchi models inside another element: their properties
@@ -307,6 +335,16 @@ def officecli_elements(help_dir: Path, fmt: str) -> list[OcElement]:
     return schemas
 
 
+def element_gaps(report: dict) -> dict[str, dict]:
+    """Gaps for elements the format has but its table does not declare
+    (subject ``element`` in the export's top-level ``gaps``), by name."""
+    return {
+        normalize(gap["element"]): gap
+        for gap in report.get("gaps", [])
+        if gap.get("subject") == "element"
+    }
+
+
 def litchi_elements(report: dict) -> list[LitchiElement]:
     return [
         LitchiElement(
@@ -408,9 +446,8 @@ def merge_optional_operation_gaps(report: dict, optional_reports: list[dict]) ->
 
 def compare(fmt: str, officecli: list[OcElement], report: dict) -> FormatDelta:
     delta = FormatDelta(fmt, operation_gaps=operation_gap_rows(report))
-    verbs = report.get("verbs", {})
-    if not verbs.get("get", {}).get("supported", False):
-        delta.pending = verbs.get("get", {})
+    if "pending" in report:
+        delta.pending = report["pending"]
         for schema in officecli:
             reason = OUT_OF_SCOPE.get(schema.stem) or OUT_OF_SCOPE.get(schema.name)
             if reason:
@@ -432,9 +469,10 @@ def compare(fmt: str, officecli: list[OcElement], report: dict) -> FormatDelta:
         for name in element.names():
             index.setdefault(name, element)
     property_gaps: dict[tuple[str, str], dict] = {}
-    for gap in report.get("gaps", []):
-        if gap.get("subject") == "property":
-            property_gaps[(normalize(gap["element"]), normalize(gap["key"]))] = gap
+    for element in report.get("elements", []):
+        for key, gap in element.get("propertyGaps", {}).items():
+            property_gaps[(normalize(element["element"]), normalize(key))] = gap
+    undeclared = element_gaps(report)
 
     matched: set[str] = set()
     folded = FOLDED.get(reference_format(fmt), {})
@@ -445,7 +483,7 @@ def compare(fmt: str, officecli: list[OcElement], report: dict) -> FormatDelta:
             reason = OUT_OF_SCOPE.get(schema.stem) or OUT_OF_SCOPE[schema.name]
             delta.elements.append((schema.name, "", "out of scope", reason))
             continue
-        if fmt == "docx" and schema.name in {"fieldChar", "instrText", "ptab"}:
+        if reference_format(fmt) == "docx" and schema.name in {"fieldChar", "instrText", "ptab"}:
             target = None
         if target is None and schema.stem in folded:
             into, why = folded[schema.stem]
@@ -455,6 +493,17 @@ def compare(fmt: str, officecli: list[OcElement], report: dict) -> FormatDelta:
                 raise SystemExit(f"{fmt}: {schema.stem} is folded into {into}, which the report lacks")
             status = "folded"
         elif target is None:
+            gap = next((undeclared[name] for name in sorted(schema.names()) if name in undeclared), None)
+            if gap is not None:
+                # Listed in `capabilities()` as an element gap without a table entry.
+                delta.elements.append((schema.name, "", "gap", gap["followUp"]))
+                for key, spec in schema.properties.items():
+                    write = "gap" if spec.get("add") or spec.get("set") else "—"
+                    delta.properties.append(
+                        (schema.name, key, spec.get("type", ""), ops_letters(spec), "element gap",
+                         gap["followUp"], "", write)
+                    )
+                continue
             delta.elements.append((schema.name, "", "missing", ""))
             for key, spec in schema.properties.items():
                 status = "missing" if spec.get("get") else "write-only"
@@ -534,19 +583,21 @@ def render(
         "# OfficeCLI capability delta (generated)",
         "",
         "Generated by `tools/officecli_capability_delta.py`; do not edit by hand.",
-        "It compares OfficeCLI's help schemas with Litchi's golden capability",
-        "reports (`Capabilities::of(format)`, record 0010 §7), for the formats",
-        "OfficeCLI describes. Each property has a read status (Litchi's `get`",
-        "against OfficeCLI's) and a write status (Litchi's `add`/`set` against",
-        "OfficeCLI's); both sides' add/set/get flags are shown as `asg`.",
-        "XLS and XLSB are compared against the XLSX help vocabulary as Litchi's parity",
-        "target; this does not claim OfficeCLI itself supports XLS or XLSB files.",
-        "DOCX operation gaps also include the feature-specific encryption baseline",
-        "when that golden is present.",
+        "It compares OfficeCLI's help schemas with Litchi's property registry",
+        "export (`litchi_ops::schema(format)`, golden snapshots under",
+        "`crates/litchi-ops/tests/golden/registry/`, record 0263), for every",
+        "format the registry covers. Each property has a read status (Litchi's",
+        "`get` against OfficeCLI's) and a write status (Litchi's `add`/`set`",
+        "against OfficeCLI's); both sides' add/set/get flags are shown as `asg`.",
+        "DOC and RTF are compared against the DOCX help vocabulary, XLS and XLSB",
+        "against XLSX, and PPT against PPTX, as Litchi's parity target; this does",
+        "not claim OfficeCLI itself supports those files.",
+        "Operation gaps also include a format's feature-specific encryption",
+        "snapshot when it is present.",
         "",
-        "Rerun the script after blessing the goldens (`LITCHI_BLESS=1`), for",
-        "example when an adapter lands; `tools/test_officecli_capability_delta.py`",
-        "fails while a golden differs from the hash recorded below.",
+        "Rerun the script after blessing the registry snapshots (`LITCHI_BLESS=1`);",
+        "`tools/test_officecli_capability_delta.py` fails while a snapshot",
+        "differs from the hash recorded below.",
         "",
         "## Inputs",
         "",
@@ -567,7 +618,7 @@ def render(
         "| Status | Meaning |",
         "|---|---|",
         "| supported | Litchi reads it (a property, or the node's text for a predicate key such as a cell's `value`) |",
-        "| gap | Litchi lists it in `capabilities()` as a gap, with the follow-up shown |",
+        "| gap | Litchi lists it in `capabilities()` as a gap (an element gap may have no table entry), with the follow-up shown |",
         "| element gap | a property of an element Litchi lists as a gap |",
         "| folded | an OfficeCLI element Litchi models inside another element (named in the follow-up) |",
         "| pending | the format's adapter has not landed (the follow-up names the step that lands it) |",
@@ -678,24 +729,16 @@ def generate(officecli: Path, repo: Path) -> str:
         raise SystemExit(f"no OfficeCLI help schemas at {help_dir}; pass --officecli")
     deltas = []
     goldens = []
-    for fmt in FORMATS:
+    for fmt in formats(repo):
         golden = repo / GOLDEN_DIR / f"{fmt}.json"
         data = golden.read_bytes()
         goldens.append(((GOLDEN_DIR / f"{fmt}.json").as_posix(), sha256(data)))
         report = json.loads(data)
-        if fmt == "docx":
-            encrypted_golden = repo / GOLDEN_DIR / "docx-encryption.json"
-            if encrypted_golden.is_file():
-                encrypted_data = encrypted_golden.read_bytes()
-                goldens.append(
-                    (
-                        (GOLDEN_DIR / "docx-encryption.json").as_posix(),
-                        sha256(encrypted_data),
-                    )
-                )
-                report = merge_optional_operation_gaps(
-                    report, [json.loads(encrypted_data)]
-                )
+        optional = GOLDEN_DIR / f"{fmt}{OPTIONAL_SUFFIX}.json"
+        if (repo / optional).is_file():
+            optional_data = (repo / optional).read_bytes()
+            goldens.append((optional.as_posix(), sha256(optional_data)))
+            report = merge_optional_operation_gaps(report, [json.loads(optional_data)])
         deltas.append(compare(fmt, officecli_elements(help_dir, fmt), report))
     return render(deltas, goldens, schema_tree_hash(help_dir), officecli_commit(officecli))
 
