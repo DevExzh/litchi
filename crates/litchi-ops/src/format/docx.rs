@@ -78,8 +78,12 @@ use crate::options::{OpenOptions, SourceMode};
 pub mod __unified;
 mod children;
 pub(crate) mod create;
+mod element;
+mod lists;
 mod nav;
+mod nested;
 mod node;
+mod picture;
 mod props;
 mod publish;
 pub(crate) mod setters;
@@ -454,7 +458,7 @@ impl Docx {
             return self.0.owner.finish(Ok(metadata.clone()));
         }
         let metadata = match &self.0.owner {
-            DocxOwner::Eager(package) => package.props().cloned().unwrap_or_default(),
+            DocxOwner::Eager(package) => package.metadata().cloned().unwrap_or_default(),
             DocxOwner::Source(package) => {
                 let result = package.metadata().map_err(Error::from);
                 self.0.owner.finish(result)?

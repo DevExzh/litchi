@@ -2936,7 +2936,10 @@ mod tests {
 
     fn make_patch() -> (Patch, CorePatch<Reversible>) {
         let mut package = Package::new().expect("new DOCX");
-        package.document_mut().expect("document").add_paragraph();
+        package
+            .authoring_document()
+            .expect("document")
+            .add_paragraph();
         let mut bytes = std::io::Cursor::new(Vec::new());
         package
             .to_plain_stream(&mut bytes)

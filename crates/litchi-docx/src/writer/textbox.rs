@@ -47,17 +47,17 @@ pub(crate) const MAX_TEXT_BYTES: usize = 1024 * 1024;
 /// # Examples
 ///
 /// ```rust,no_run
-/// use litchi_docx::Package;
+/// use litchi_docx::Builder;
 /// use litchi_docx::textbox::TextBoxAutofit;
 /// use litchi_docx::writer::MutableTextBox;
 ///
-/// let mut package = Package::new()?;
+/// let mut builder = Builder::new()?;
 /// let mut text_box = MutableTextBox::new("Greeting", 1828800, 914_400)?;
 /// text_box.add_run("Hello ")?.bold = Some(true);
 /// text_box.add_run("world")?;
 /// text_box.body_properties_mut().autofit = TextBoxAutofit::Shape;
-/// package.document_mut()?.add_text_box(text_box);
-/// package.save("out.docx")?;
+/// builder.document()?.add_text_box(text_box);
+/// builder.build()?.save("out.docx")?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 #[derive(Debug, Clone)]
@@ -513,7 +513,7 @@ mod tests {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut package = Package::new().unwrap();
         {
-            let document = package.document_mut().unwrap();
+            let document = package.authoring_document().unwrap();
             document.add_paragraph_with_text("before the box");
             let mut text_box = MutableTextBox::new("Round Trip Box", 1828800, 914_400).unwrap();
             text_box.set_id(11);
@@ -569,7 +569,7 @@ mod tests {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut package = Package::new().unwrap();
         {
-            let document = package.document_mut().unwrap();
+            let document = package.authoring_document().unwrap();
             let mut first = MutableTextBox::new("First Box", 914_400, 457200).unwrap();
             first.set_id(21);
             first.add_run("first story").unwrap();

@@ -2725,7 +2725,7 @@ fn build_fixture(
         &authored_record,
     );
     let mut output = Vec::new();
-    let publication = plan.write_to_stream(&mut output)?;
+    let publication = plan.write_to(&mut output)?;
     let candidate_archive = output;
     let candidate_bytes: Arc<[u8]> = Arc::from(candidate_archive.clone());
     let candidate_source = Arc::new(MeasureSource::new(
@@ -2999,7 +2999,7 @@ where
             &fixture.authored_record,
         );
         let mut output = Vec::new();
-        let publication = plan.write_to_stream(&mut output)?;
+        let publication = plan.write_to(&mut output)?;
         let candidate_bytes: Arc<[u8]> = Arc::from(output.clone());
         let candidate_source = Arc::new(MeasureSource::new(
             Arc::clone(&candidate_bytes),
@@ -3066,7 +3066,7 @@ fn publish_alternative_plan(
     match publication {
         PublicationMode::CountingSink => {
             let mut output = CountingSink::new(sink_write_bytes)?;
-            let publication = plan.write_to_stream(&mut output)?;
+            let publication = plan.write_to(&mut output)?;
             let proof = TimedArtifactProof::from_publication(&publication);
             drop(publication);
             Ok((output.finish(), proof))
@@ -3145,7 +3145,7 @@ fn run_iteration(
                 let plan = edit.prepare()?;
                 if config.publication.is_default() {
                     let mut output = HashingSink::new(sink_write_bytes)?;
-                    let _publication = plan.write_to_stream(&mut output)?;
+                    let _publication = plan.write_to(&mut output)?;
                     (None, output.finish(), None)
                 } else {
                     let (output, proof) = publish_alternative_plan(
@@ -3204,7 +3204,7 @@ fn run_iteration(
                 let plan = edit.prepare()?;
                 if config.publication.is_default() {
                     let mut output = HashingSink::new(sink_write_bytes)?;
-                    let _publication = plan.write_to_stream(&mut output)?;
+                    let _publication = plan.write_to(&mut output)?;
                     (Some(replay_counters.snapshot()), output.finish(), None)
                 } else {
                     let (output, proof) = publish_alternative_plan(

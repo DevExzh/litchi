@@ -436,17 +436,18 @@ fn signed_noop_is_preserved_but_changed_publication_requires_explicit_unsign() {
 #[test]
 fn dirty_document_facade_refuses_task_pane_planning_without_publication() {
     let (panes, _) = authored_panes();
-    let mut package = Package::new().unwrap();
-    package
-        .document_mut()
+    let mut builder = litchi_docx::Builder::new().unwrap();
+    builder
+        .document()
         .unwrap()
         .add_paragraph_with_text("unmaterialized document edit");
-    let before = members(&package_bytes(&package));
+    let package = builder.package();
+    let before = members(&package_bytes(package));
     let error = package
         .plan_task_panes(panes, web::Conformance::Transitional)
         .unwrap_err();
     assert!(error.to_string().contains("unmaterialized changes"));
-    assert_eq!(members(&package_bytes(&package)), before);
+    assert_eq!(members(&package_bytes(package)), before);
 }
 
 #[test]

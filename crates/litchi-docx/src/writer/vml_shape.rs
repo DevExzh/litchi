@@ -89,14 +89,14 @@ pub enum VmlShapePosition {
 /// # Examples
 ///
 /// ```rust,no_run
-/// use litchi_docx::{MutableVmlShape, Package, VmlShapeKind};
+/// use litchi_docx::{Builder, MutableVmlShape, VmlShapeKind};
 ///
-/// let mut package = Package::new()?;
+/// let mut builder = Builder::new()?;
 /// let mut shape = MutableVmlShape::new(VmlShapeKind::RoundRectangle, 1828800, 914_400)?;
 /// shape.set_fill_color("#E5F1F8")?;
 /// shape.add_run("legacy box").bold = Some(true);
-/// package.document_mut()?.add_vml_shape(shape)?;
-/// package.save("out.docx")?;
+/// builder.document()?.add_vml_shape(shape)?;
+/// builder.build()?.save("out.docx")?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 #[derive(Debug, Clone)]
@@ -494,7 +494,7 @@ mod tests {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut package = Package::new().unwrap();
         {
-            let document = package.document_mut().unwrap();
+            let document = package.authoring_document().unwrap();
             document.add_paragraph_with_text("before the shape");
             let mut shape =
                 MutableVmlShape::new(VmlShapeKind::RoundRectangle, 1828800, 914_400).unwrap();
@@ -533,7 +533,7 @@ mod tests {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut package = Package::new().unwrap();
         {
-            let document = package.document_mut().unwrap();
+            let document = package.authoring_document().unwrap();
             let mut first = MutableVmlShape::new(VmlShapeKind::Rectangle, 914_400, 457200).unwrap();
             first.add_run("first");
             let first = document.add_vml_shape(first).unwrap();
@@ -579,7 +579,7 @@ mod tests {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut package = Package::new().unwrap();
         {
-            let document = package.document_mut().unwrap();
+            let document = package.authoring_document().unwrap();
 
             let mut text_box = MutableTextBox::new("DrawingML Box", 914_400, 457200).unwrap();
             text_box.add_run("drawingml story").unwrap();

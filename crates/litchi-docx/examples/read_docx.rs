@@ -53,7 +53,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // ----- Document properties (core.xml metadata) -----
-    let props = pkg.props();
+    let props = pkg.metadata();
     println!("\n--- Core document properties ---");
     println!(
         "Title           : {:?}",

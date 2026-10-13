@@ -502,6 +502,112 @@ pub(super) fn apply_transfer_graph(
     Ok(())
 }
 
+/// Apply (`forward`) or undo one staged package-graph change, checking every
+/// precondition exactly before mutating.
+pub(super) fn apply_graph_change(
+    package: &mut OpcPackage,
+    change: &crate::document::GraphChange,
+    forward: bool,
+) -> Result<(), TransactionError> {
+    let main_name = package
+        .main_document_part()
+        .map_err(crate::Error::from)?
+        .partname()
+        .clone();
+    let names = change
+        .parts
+        .iter()
+        .map(|part| PackURI::new(part.name.clone()).map_err(crate::Error::Invalid))
+        .collect::<Result<Vec<_>, _>>()?;
+    let replaced = change
+        .replaced
+        .iter()
+        .map(|part| PackURI::new(part.name.clone()).map_err(crate::Error::Invalid))
+        .collect::<Result<Vec<_>, _>>()?;
+    // Preconditions, before any mutation.
+    {
+        let main = package.get_part(&main_name).map_err(crate::Error::from)?;
+        for relationship in change.relationships.iter() {
+            let present = main.rels().get(&relationship.id);
+            let matches = present.is_some_and(|actual| {
+                actual.reltype() == relationship.relationship_type
+                    && actual.target_ref() == relationship.target
+                    && actual.is_external() == relationship.external
+            });
+            if (forward && present.is_some()) || (!forward && !matches) {
+                return Err(TransactionError::SemanticPrecondition);
+            }
+        }
+        for (name, planned) in names.iter().zip(change.parts.iter()) {
+            match package.get_part(name) {
+                Ok(part) if !forward => {
+                    if part.content_type() != planned.content_type
+                        || part.blob() != planned.blob.as_slice()
+                        || !relationships_match(part.rels(), &planned.relationships)
+                    {
+                        return Err(TransactionError::SemanticPrecondition);
+                    }
+                },
+                Ok(_) => return Err(TransactionError::SemanticPrecondition),
+                Err(_) if forward => {},
+                Err(_) => return Err(TransactionError::SemanticPrecondition),
+            }
+        }
+        for (name, planned) in replaced.iter().zip(change.replaced.iter()) {
+            let expected = if forward {
+                &planned.before
+            } else {
+                &planned.after
+            };
+            let part = package.get_part(name).map_err(crate::Error::from)?;
+            if part.blob() != expected.as_slice() {
+                return Err(TransactionError::SemanticPrecondition);
+            }
+        }
+    }
+    for (name, planned) in replaced.iter().zip(change.replaced.iter()) {
+        let bytes = if forward {
+            &planned.after
+        } else {
+            &planned.before
+        };
+        package
+            .get_part_mut(name)
+            .map_err(crate::Error::from)?
+            .set_blob_shared(Arc::clone(bytes));
+    }
+    if forward {
+        for (name, planned) in names.into_iter().zip(change.parts.iter()) {
+            let mut part = BlobPart::new_shared(
+                name,
+                planned.content_type.clone(),
+                Arc::clone(&planned.blob),
+            );
+            add_relationships(part.rels_mut(), &planned.relationships)?;
+            package
+                .try_add_part(Box::new(part))
+                .map_err(crate::Error::from)?;
+        }
+        let main = package
+            .get_part_mut(&main_name)
+            .map_err(crate::Error::from)?;
+        add_relationships(main.rels_mut(), &change.relationships)?;
+    } else {
+        let main = package
+            .get_part_mut(&main_name)
+            .map_err(crate::Error::from)?;
+        for relationship in change.relationships.iter() {
+            main.rels_mut().remove(&relationship.id);
+        }
+        for name in names.iter().rev() {
+            if !package.remove_part(name) {
+                return Err(TransactionError::SemanticPrecondition);
+            }
+        }
+    }
+    Ok(())
+}
+
 fn add_relationships(
     relationships: &mut litchi_opc::Relationships,
     planned: &[TransferRelationship],

@@ -202,7 +202,7 @@ fn file_replay_mutation_after_publication_prefix_is_incomplete_and_typed() {
 
     let mut sink = MutatingPrefixSink::new(temporary.path());
     let error = plan
-        .write_to_stream(&mut sink)
+        .write_to(&mut sink)
         .expect_err("mutation during DOCX publication must fail");
     assert!(sink.mutated, "sink must mutate after accepting its prefix");
     assert!(!sink.bytes.is_empty(), "publication must accept a prefix");

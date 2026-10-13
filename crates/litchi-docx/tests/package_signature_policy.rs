@@ -20,6 +20,7 @@
 use std::io::Cursor;
 use std::path::PathBuf;
 
+use litchi_docx::metadata::Error as MetadataError;
 use litchi_docx::{Error, Package};
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, Part as _, TargetMode};
@@ -466,10 +467,11 @@ mod ribbon_family {
 }
 
 /// The shared core- and custom-properties owners of `litchi-ooxml-common`
-/// refuse a change to a signed document at a managed save, keeping this
-/// crate's typed signed error, instead of removing the signature (unified-ops
-/// record 0014a, F1b). The edit stays pending, so the save succeeds once the
-/// signature is removed explicitly.
+/// refuse a change to a signed document instead of removing the signature
+/// (unified-ops record 0014a, F1b): the core-properties transaction refuses
+/// at commit with `metadata::Error::Signed`, and a custom-property edit is
+/// refused at a managed save with this crate's typed signed error, staying
+/// pending so the save succeeds once the signature is removed explicitly.
 mod shared_properties {
     use super::*;
 
@@ -488,21 +490,35 @@ mod shared_properties {
             let original = fixture(name);
 
             // Values equal to the stored ones publish nothing.
-            let mut package = open(&original);
-            let props = package.props().cloned().expect("core properties");
-            package.put_props(props);
+            let package = open(&original);
+            let props = package.metadata().cloned().expect("core properties");
+            let mut edit = package.edit_metadata();
+            edit.set(props);
+            let commit = edit.commit().expect("exact no-op");
+            assert!(!commit.diagnostics().changed());
+            let mut package = commit.into_package();
             let _ = package.custom_props_mut();
             assert_eq!(bytes(&mut package), original, "{name}: exact no-ops");
 
-            // A changed title and a new custom property are refused at save.
+            // A changed title is refused at commit; a new custom property
+            // is refused at save.
             let mut package = open(&original);
-            package.props_mut().expect("core properties").title = Some("Signed".into());
-            assert_save_refused(&mut package);
+            let mut edit = package.edit_metadata();
+            edit.update(|props| props.title = Some("Signed".into()));
+            assert!(
+                matches!(edit.commit(), Err(MetadataError::Signed)),
+                "{name}"
+            );
+            assert_eq!(bytes(&mut package), original, "{name}: refusal");
             package.unsign();
-            let output = bytes(&mut package);
+            let mut edit = package.edit_metadata();
+            edit.update(|props| props.title = Some("Signed".into()));
+            let output = bytes(&mut edit.commit().expect("unsigned").into_package());
             assert!(!carries_signature(&output), "{name}");
             assert_eq!(
-                open(&output).props().and_then(|props| props.title.clone()),
+                open(&output)
+                    .metadata()
+                    .and_then(|props| props.title.clone()),
                 Some("Signed".into())
             );
 
@@ -535,12 +551,16 @@ mod shared_properties {
         assert!(package.custom_props_mut().remove("Project").is_some());
         assert_save_refused(&mut package);
         let mut package = open(&signed);
-        assert!(package.clear_props().is_some());
-        assert_save_refused(&mut package);
+        let mut edit = package.edit_metadata();
+        edit.clear();
+        assert!(matches!(edit.commit(), Err(MetadataError::Signed)));
+        assert_eq!(bytes(&mut package), signed, "refusal");
 
         package.unsign();
-        let output = bytes(&mut package);
+        let mut edit = package.edit_metadata();
+        edit.clear();
+        let output = bytes(&mut edit.commit().expect("unsigned").into_package());
         assert!(!carries_signature(&output));
-        assert!(open(&output).props().is_none());
+        assert!(open(&output).metadata().is_none());
     }
 }

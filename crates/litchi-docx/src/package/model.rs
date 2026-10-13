@@ -120,18 +120,22 @@ pub(crate) fn validate_document_main_content_type(content_type: &str) -> Result<
 ///
 /// ## Creating a new document
 ///
-/// ```rust,no_run
-/// use litchi_docx::Package;
+/// Fresh content is authored with [`crate::Builder`]; an opened package
+/// changes only through [`Package::edit`] and its scoped `edit_*` families.
 ///
-/// // Create a new document
-/// let mut pkg = Package::new()?;
-/// let mut doc = pkg.document_mut()?;
+/// ```rust,no_run
+/// use litchi_docx::Builder;
+///
+/// // Author a new document
+/// let mut builder = Builder::new()?;
+/// let doc = builder.document()?;
 ///
 /// // Add content
 /// doc.add_paragraph_with_text("Hello, World!");
 /// doc.add_heading("Chapter 1", 1)?;
 ///
-/// // Save the document
+/// // Finalize and save the document
+/// let mut pkg = builder.build()?;
 /// pkg.save("output.docx")?;
 /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
 /// ```
@@ -923,71 +927,6 @@ impl Package {
 }
 
 impl Package {
-    /// Borrows the document core properties, retaining package absence.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// use litchi_docx::Package;
-    ///
-    /// let pkg = Package::open("document.docx")?;
-    /// let props = pkg.props();
-    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
-    /// ```
-    #[must_use]
-    pub fn props(&self) -> Option<&Props> {
-        self.properties.get()
-    }
-
-    /// Mutably borrows existing core properties.
-    ///
-    /// A managed save of a signed package whose core properties were edited
-    /// is refused with
-    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
-    /// (ADR 0006) and leaves the package and the edit as they were: call
-    /// [`Self::unsign`] first. An edit that writes the stored bytes publishes
-    /// nothing.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// use litchi_docx::Package;
-    ///
-    /// let mut pkg = Package::new()?;
-    /// if let Some(props) = pkg.props_mut() {
-    ///     props.title = Some("My Document".to_string());
-    /// }
-    /// pkg.save("document.docx")?;
-    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
-    /// ```
-    pub fn props_mut(&mut self) -> Option<&mut Props> {
-        self.properties.get_mut()
-    }
-
-    /// Moves a present core-properties value into the package facade.
-    ///
-    /// A managed save of a signed package whose core properties were edited
-    /// is refused with
-    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
-    /// (ADR 0006) and leaves the package and the edit as they were: call
-    /// [`Self::unsign`] first. An edit that writes the stored bytes publishes
-    /// nothing.
-    pub fn put_props(&mut self, props: Props) -> Option<Props> {
-        self.properties.put(props)
-    }
-
-    /// Marks core properties absent and moves out the previous value.
-    ///
-    /// A managed save of a signed package whose core properties were edited
-    /// is refused with
-    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
-    /// (ADR 0006) and leaves the package and the edit as they were: call
-    /// [`Self::unsign`] first. An edit that writes the stored bytes publishes
-    /// nothing.
-    pub fn clear_props(&mut self) -> Option<Props> {
-        self.properties.clear()
-    }
-
     /// Get a reference to the custom document properties.
     ///
     /// Custom properties allow you to attach arbitrary typed metadata to documents.

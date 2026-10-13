@@ -20,7 +20,7 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn add_alt(&mut self, import: Import, match_source: Option<bool>) -> Result<Chunk> {
-        let index = self.document_mut()?.alts().len();
+        let index = self.authoring_document()?.alts().len();
         self.insert_alt(index, import, match_source)
     }
 
@@ -37,7 +37,7 @@ impl Package {
         import: Import,
         match_source: Option<bool>,
     ) -> Result<Chunk> {
-        let count = self.document_mut()?.alts().len();
+        let count = self.authoring_document()?.alts().len();
         if index > count {
             return Err(Error::InvalidFormat(format!(
                 "altChunk index {index} is out of range"
@@ -52,7 +52,7 @@ impl Package {
         let (chunk, installed_part) =
             self.install_alt_chunk_target(import, match_source, namespace)?;
         if let Err(error) = self
-            .document_mut()?
+            .authoring_document()?
             .insert_alt(index, chunk.clone(), namespace)
         {
             self.rollback_alt_chunk_target(chunk.relationship().as_str(), installed_part.as_ref())?;
@@ -73,7 +73,7 @@ impl Package {
         match_source: Option<bool>,
     ) -> Result<Chunk> {
         let old = self
-            .document_mut()?
+            .authoring_document()?
             .alts()
             .get(index)
             .cloned()
@@ -85,7 +85,7 @@ impl Package {
         let (new, installed_part) =
             self.install_alt_chunk_target(import, match_source, namespace)?;
         if let Err(error) = self
-            .document_mut()?
+            .authoring_document()?
             .replace_alt(index, new.clone(), namespace)
         {
             self.rollback_alt_chunk_target(new.relationship().as_str(), installed_part.as_ref())?;
@@ -102,7 +102,7 @@ impl Package {
     /// Returns an error if the operation cannot be completed.
     pub fn remove_alt(&mut self, index: usize) -> Result<Chunk> {
         let old = self
-            .document_mut()?
+            .authoring_document()?
             .alts()
             .get(index)
             .cloned()
@@ -110,7 +110,7 @@ impl Package {
                 Error::InvalidFormat(format!("altChunk index {index} is out of range"))
             })?;
         let old_target = self.validate_alt_chunk_relationship(&old)?;
-        self.document_mut()?.remove_alt(index)?;
+        self.authoring_document()?.remove_alt(index)?;
         self.remove_alt_relationship(&old, old_target.as_ref())?;
         Ok(old)
     }
@@ -121,7 +121,7 @@ impl Package {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn move_alt(&mut self, from: usize, to: usize) -> Result<()> {
-        self.document_mut()?.move_alt(from, to)
+        self.authoring_document()?.move_alt(from, to)
     }
 
     fn alt_chunk_namespace(&self) -> Result<Conformance> {

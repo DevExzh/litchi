@@ -893,7 +893,7 @@ fn appends_before_exact_opaque_section_and_preserves_untouched_store_and_deflate
         );
         let mut output = Vec::new();
         let publication = plan
-            .write_to_stream(&mut output)
+            .write_to(&mut output)
             .expect("bounded tail append must publish");
         assert_ne!(output, source_archive);
         assert_eq!(semantic_texts(&output), ["seed", "tail & < > \" '"]);
@@ -968,7 +968,7 @@ fn default_word_namespace_and_shadowed_local_prefix_are_bound_at_insertion() {
         let package = bounded_package(source_archive);
         let plan = append_plan(&package, "tail", xml.len());
         let mut output = Vec::new();
-        plan.write_to_stream(&mut output)
+        plan.write_to(&mut output)
             .expect("namespace-bound tail append must publish");
         assert_eq!(semantic_texts(&output), ["seed", "tail"]);
     }
@@ -981,7 +981,7 @@ fn append_without_a_section_properties_element_targets_the_body_close() {
     let package = bounded_package(source_archive);
     let plan = append_plan(&package, "tail", source_xml.len());
     let mut output = Vec::new();
-    plan.write_to_stream(&mut output)
+    plan.write_to(&mut output)
         .expect("tail append without sectPr must publish");
     assert_eq!(semantic_texts(&output), ["tail"]);
 }
@@ -996,7 +996,7 @@ fn insertion_survives_distinct_body_prefix_and_word_prefix_shadowing_in_section(
     let package = bounded_package(source_archive);
     let plan = append_plan(&package, "tail", xml.len());
     let mut output = Vec::new();
-    plan.write_to_stream(&mut output)
+    plan.write_to(&mut output)
         .expect("shadowed namespace append must publish");
     assert_eq!(semantic_texts(&output), ["seed", "tail"]);
 
@@ -1024,7 +1024,7 @@ fn empty_text_is_a_real_empty_paragraph_and_is_not_the_exact_noop_branch() {
     let plan = append_plan(&package, "", source_xml.len());
     let mut output = Vec::new();
     let publication = plan
-        .write_to_stream(&mut output)
+        .write_to(&mut output)
         .expect("empty authored text still publishes one paragraph");
     assert_ne!(output, source_archive);
     assert_eq!(semantic_texts(&output), ["seed", ""]);
@@ -1044,7 +1044,7 @@ fn explicit_noop_is_exact_and_reversible_without_a_generated_paragraph() {
     assert!(plan.is_noop());
     let mut output = Vec::new();
     let publication = plan
-        .write_to_stream(&mut output)
+        .write_to(&mut output)
         .expect("explicit no-op must publish");
     assert!(publication.is_noop());
     assert_eq!(output, source_archive);
@@ -1070,7 +1070,7 @@ fn cancellation_is_checked_before_preparation_and_before_publication_output() {
         .with_limits(limits(source_xml.len()))
         .with_options(TailAppendOptions::default().with_cancellation_token(&cancellation))
         .prepare()
-        .and_then(|plan| plan.write_to_stream(&mut output));
+        .and_then(|plan| plan.write_to(&mut output));
     assert!(result.is_err());
     assert!(
         output.is_empty(),
@@ -1087,7 +1087,7 @@ fn cancellation_is_checked_before_preparation_and_before_publication_output() {
         .expect("uncancelled plan must prepare");
     cancel_source.cancel();
     let mut output = Vec::new();
-    assert!(plan.write_to_stream(&mut output).is_err());
+    assert!(plan.write_to(&mut output).is_err());
     assert!(
         output.is_empty(),
         "cancelled publication must emit no archive"
@@ -1102,7 +1102,7 @@ fn authored_text_uses_xml_space_and_rejects_streaming_writer_control_rules() {
     let package = bounded_package(source_archive);
     let plan = append_plan(&package, " leading & <tail> ", source_xml.len());
     let mut output = Vec::new();
-    plan.write_to_stream(&mut output)
+    plan.write_to(&mut output)
         .expect("escaped text publication must succeed");
     assert_eq!(semantic_texts(&output), [" seed ", " leading & <tail> "]);
     let output_main = main_bytes(&output);
@@ -1132,7 +1132,7 @@ fn authored_text_uses_xml_space_and_rejects_streaming_writer_control_rules() {
             .tail_append_plain_paragraph(invalid)
             .with_limits(limits(source_xml.len()))
             .prepare()
-            .and_then(|plan| plan.write_to_stream(&mut output));
+            .and_then(|plan| plan.write_to(&mut output));
         assert!(
             result.is_err(),
             "invalid authored text must refuse: {invalid:?}"
@@ -1189,7 +1189,7 @@ fn many_xml_space_paragraphs_use_the_aggregate_attribute_budget() {
     );
 
     let mut output = Vec::new();
-    plan.write_to_stream(&mut output)
+    plan.write_to(&mut output)
         .expect("aggregate XML attributes must not be confused with token scratch");
     let texts = semantic_texts(&output);
     assert_eq!(texts.len(), PARAGRAPHS + 1);
@@ -1208,7 +1208,7 @@ fn strict_tail_append_preserves_opaque_section_with_vendor_word_like_descendants
     let package = bounded_package(source_archive.clone());
     let plan = append_plan(&package, "strict-tail", xml.len());
     let mut output = Vec::new();
-    plan.write_to_stream(&mut output)
+    plan.write_to(&mut output)
         .expect("strict source with opaque section must publish");
     assert_eq!(semantic_texts(&output), ["seed", "strict-tail"]);
     let output_main = main_bytes(&output);
@@ -1241,7 +1241,7 @@ fn opaque_section_allows_an_explicit_empty_default_namespace_and_preserves_it() 
     let package = bounded_package(source_archive);
     let plan = append_plan(&package, "tail", xml.len());
     let mut output = Vec::new();
-    plan.write_to_stream(&mut output)
+    plan.write_to(&mut output)
         .expect("an explicitly empty default namespace is valid opaque XML");
     assert_eq!(semantic_texts(&output), ["seed", "tail"]);
     let output_main = main_bytes(&output);
@@ -1335,7 +1335,7 @@ fn opaque_section_namespace_attribute_and_event_policy_refuses_before_output() {
             .tail_append_plain_paragraph("tail")
             .with_limits(limits(xml.len()))
             .prepare()
-            .and_then(|plan| plan.write_to_stream(&mut output));
+            .and_then(|plan| plan.write_to(&mut output));
         assert!(result.is_err(), "opaque {label} must be refused");
         assert!(
             output.is_empty(),
@@ -1355,7 +1355,7 @@ fn opaque_section_preserves_unicode_qnames() {
     let package = bounded_package(archive(&xml, Compression::Store, false, Topology::Plain));
     let plan = append_plan(&package, "tail", xml.len());
     let mut output = Vec::new();
-    plan.write_to_stream(&mut output)
+    plan.write_to(&mut output)
         .expect("Unicode XML NCNames are valid opaque section names");
     assert_eq!(semantic_texts(&output), ["seed", "tail"]);
     let output_main = main_bytes(&output);
@@ -1379,7 +1379,7 @@ fn assert_refused_with_text(xml: Vec<u8>, topology: Topology, text: &str) {
         .tail_append_plain_paragraph(text)
         .with_limits(limits(xml.len()))
         .prepare()
-        .and_then(|plan| plan.write_to_stream(&mut output));
+        .and_then(|plan| plan.write_to(&mut output));
     assert!(result.is_err(), "fixture must be refused: {topology:?}");
     assert!(output.is_empty(), "refusal must happen before ZIP output");
 }
@@ -1452,7 +1452,7 @@ fn xml_declaration_and_encoding_grammar_refuse_before_publication() {
             .tail_append_plain_paragraph("tail")
             .with_limits(limits(xml.len()))
             .prepare()
-            .and_then(|plan| plan.write_to_stream(&mut output))
+            .and_then(|plan| plan.write_to(&mut output))
             .expect("XML 1.0 standalone yes/no declarations are admitted");
         assert_eq!(semantic_texts(&output), ["seed", "tail"]);
     }
@@ -1490,7 +1490,7 @@ fn topology_refusals_keep_their_public_reason_and_emit_no_prefix() {
             .tail_append_plain_paragraph("tail")
             .with_limits(limits(xml.len()))
             .prepare()
-            .and_then(|plan| plan.write_to_stream(&mut output));
+            .and_then(|plan| plan.write_to(&mut output));
         match result {
             Err(TailAppendError::Refused(actual)) => assert_eq!(actual, expected),
             Err(error) => panic!("unexpected topology error: {error}"),
@@ -1552,7 +1552,7 @@ fn settings_protection_flags_honor_explicit_on_and_off_values() {
                 .tail_append_plain_paragraph("tail")
                 .with_limits(limits(source_xml.len()))
                 .prepare()
-                .and_then(|plan| plan.write_to_stream(&mut output));
+                .and_then(|plan| plan.write_to(&mut output));
             if refused {
                 match result {
                     Err(TailAppendError::Refused(Refusal::Protection)) => {},
@@ -1591,7 +1591,7 @@ fn supported_settings_mce_fallback_is_admitted_at_exact_source_limit() {
             .tail_append_plain_paragraph("tail")
             .with_limits(limits(source_xml.len()))
             .prepare()
-            .and_then(|plan| plan.write_to_stream(&mut output))
+            .and_then(|plan| plan.write_to(&mut output))
             .expect("unsupported Choice must select the valid MCE fallback");
         assert_eq!(semantic_texts(&output), ["seed", "tail"]);
         assert_eq!(
@@ -1610,7 +1610,7 @@ fn supported_settings_mce_fallback_is_admitted_at_exact_source_limit() {
             .tail_append_plain_paragraph("tail")
             .with_limits(exact_limits)
             .prepare()
-            .and_then(|plan| plan.write_to_stream(&mut exact_output))
+            .and_then(|plan| plan.write_to(&mut exact_output))
             .expect("scoped namespace output fits the exact source-size ceiling");
         assert_eq!(semantic_texts(&exact_output), ["seed", "tail"]);
         assert_eq!(
@@ -1624,7 +1624,7 @@ fn supported_settings_mce_fallback_is_admitted_at_exact_source_limit() {
             .tail_append_plain_paragraph("tail")
             .with_limits(exact_limits)
             .prepare()
-            .and_then(|plan| plan.write_to_stream(&mut output_limited));
+            .and_then(|plan| plan.write_to(&mut output_limited));
         assert!(
             matches!(
                 &result,
@@ -1666,7 +1666,7 @@ fn settings_mce_must_understand_unknown_namespace_refuses_before_publication() {
             .tail_append_plain_paragraph("tail")
             .with_limits(limits(source_xml.len()))
             .prepare()
-            .and_then(|plan| plan.write_to_stream(&mut output));
+            .and_then(|plan| plan.write_to(&mut output));
         assert!(
             matches!(
                 &result,
@@ -1724,7 +1724,7 @@ fn settings_relationship_closure_is_checked_without_staging_relationships() {
             .tail_append_plain_paragraph("tail")
             .with_limits(limits(source_xml.len()))
             .prepare()
-            .and_then(|plan| plan.write_to_stream(&mut output))
+            .and_then(|plan| plan.write_to(&mut output))
             .expect("valid mail-merge relationship closure must be admitted");
         assert_eq!(semantic_texts(&output), ["seed", "tail"]);
 
@@ -1798,7 +1798,7 @@ fn settings_relationship_closure_is_checked_without_staging_relationships() {
                 .tail_append_plain_paragraph("tail")
                 .with_limits(limits(source_xml.len()))
                 .prepare()
-                .and_then(|plan| plan.write_to_stream(&mut output));
+                .and_then(|plan| plan.write_to(&mut output));
             assert!(
                 matches!(&result, Err(TailAppendError::Document(_))),
                 "{label} must fail through settings relationship validation: {:?}",
@@ -1829,7 +1829,7 @@ fn empty_settings_root_is_admitted_in_both_word_dialects() {
             .tail_append_plain_paragraph("tail")
             .with_limits(limits(source_xml.len()))
             .prepare()
-            .and_then(|plan| plan.write_to_stream(&mut output))
+            .and_then(|plan| plan.write_to(&mut output))
             .expect("a self-closing settings root must be a valid empty settings part");
         assert_eq!(semantic_texts(&output), ["seed", "tail"]);
     }
@@ -1858,7 +1858,7 @@ fn settings_xml_declaration_inside_root_refuses_before_publication() {
             .tail_append_plain_paragraph("tail")
             .with_limits(limits(source_xml.len()))
             .prepare()
-            .and_then(|plan| plan.write_to_stream(&mut output));
+            .and_then(|plan| plan.write_to(&mut output));
         assert!(
             result.is_err(),
             "settings declaration inside root must refuse"
@@ -1889,7 +1889,7 @@ fn inherited_settings_namespace_copies_hit_the_workspace_ceiling() {
             .tail_append_plain_paragraph("tail")
             .with_limits(adversarial_settings_limits(source_xml.len(), 4096))
             .prepare()
-            .and_then(|plan| plan.write_to_stream(&mut small_output))
+            .and_then(|plan| plan.write_to(&mut small_output))
             .expect("one extension with long inherited namespaces fits the workspace envelope");
         assert_eq!(semantic_texts(&small_output), ["seed", "tail"]);
 
@@ -1908,7 +1908,7 @@ fn inherited_settings_namespace_copies_hit_the_workspace_ceiling() {
             .tail_append_plain_paragraph("tail")
             .with_limits(adversarial_settings_limits(source_xml.len(), 4096))
             .prepare()
-            .and_then(|plan| plan.write_to_stream(&mut large_output));
+            .and_then(|plan| plan.write_to(&mut large_output));
         match result {
             Err(TailAppendError::Limit {
                 resource: "settings XML workspace",
@@ -1942,7 +1942,7 @@ fn nested_long_mce_directives_account_for_decoded_expanded_names() {
             .tail_append_plain_paragraph("tail")
             .with_limits(adversarial_settings_limits(source_xml.len(), 4096))
             .prepare()
-            .and_then(|plan| plan.write_to_stream(&mut small_output))
+            .and_then(|plan| plan.write_to(&mut small_output))
             .expect("small nested MCE directive fixture must remain admitted");
         assert_eq!(semantic_texts(&small_output), ["seed", "tail"]);
 
@@ -1961,7 +1961,7 @@ fn nested_long_mce_directives_account_for_decoded_expanded_names() {
             .tail_append_plain_paragraph("tail")
             .with_limits(adversarial_settings_limits(source_xml.len(), 4096))
             .prepare()
-            .and_then(|plan| plan.write_to_stream(&mut large_output));
+            .and_then(|plan| plan.write_to(&mut large_output));
         match result {
             Err(TailAppendError::Limit {
                 resource: "settings XML workspace",
@@ -2043,7 +2043,7 @@ fn settings_scalar_duplicates_and_malformed_on_off_values_refuse_before_output()
                 .tail_append_plain_paragraph("tail")
                 .with_limits(limits(source_xml.len()))
                 .prepare()
-                .and_then(|plan| plan.write_to_stream(&mut output));
+                .and_then(|plan| plan.write_to(&mut output));
             let complete_parser_error = matches!(&result, Err(TailAppendError::Document(_)));
             let guarded_duplicate_error =
                 duplicate_attribute && matches!(&result, Err(TailAppendError::Scan(_)));
@@ -2103,7 +2103,7 @@ fn repeated_protection_and_tracking_elements_refuse_before_output() {
                 .tail_append_plain_paragraph("tail")
                 .with_limits(limits(source_xml.len()))
                 .prepare()
-                .and_then(|plan| plan.write_to_stream(&mut output));
+                .and_then(|plan| plan.write_to(&mut output));
             assert!(
                 matches!(&result, Err(TailAppendError::Document(_))),
                 "{label} must be rejected by settings cardinality validation: {:?}",
@@ -2182,7 +2182,7 @@ fn malformed_mail_merge_schema_refuses_before_output() {
                 .tail_append_plain_paragraph("tail")
                 .with_limits(limits(source_xml.len()))
                 .prepare()
-                .and_then(|plan| plan.write_to_stream(&mut output));
+                .and_then(|plan| plan.write_to(&mut output));
             assert!(
                 matches!(&result, Err(TailAppendError::Document(_))),
                 "{label} must be rejected by the complete mailMerge parser: {:?}",
@@ -2206,7 +2206,7 @@ fn append_and_source_limits_are_checked_before_output() {
         .tail_append_plain_paragraph("text exceeds limit")
         .with_limits(too_small_text)
         .prepare()
-        .and_then(|plan| plan.write_to_stream(&mut output));
+        .and_then(|plan| plan.write_to(&mut output));
     assert!(result.is_err());
     assert!(output.is_empty());
 
@@ -2217,7 +2217,7 @@ fn append_and_source_limits_are_checked_before_output() {
         .tail_append_plain_paragraph("tail")
         .with_limits(too_small_source)
         .prepare()
-        .and_then(|plan| plan.write_to_stream(&mut output));
+        .and_then(|plan| plan.write_to(&mut output));
     assert!(result.is_err());
     assert!(output.is_empty());
 }
@@ -2235,7 +2235,7 @@ fn one_large_token_is_rejected_by_the_token_ceiling_before_output() {
         .tail_append_plain_paragraph("tail")
         .with_limits(token_limited)
         .prepare()
-        .and_then(|plan| plan.write_to_stream(&mut output));
+        .and_then(|plan| plan.write_to(&mut output));
     assert!(result.is_err());
     assert!(
         output.is_empty(),
@@ -2256,7 +2256,7 @@ fn bounded_prepare_and_publication_keep_main_xml_out_of_the_payload_cache() {
     assert_eq!(prepared.retained_entries, before.retained_entries);
 
     let mut output = Vec::new();
-    plan.write_to_stream(&mut output)
+    plan.write_to(&mut output)
         .expect("bounded publication must succeed");
     let after = package.cache_diagnostics();
     assert_eq!(after.cold_loads, before.cold_loads);
@@ -2275,7 +2275,7 @@ fn source_change_after_preparation_is_rejected_without_output() {
     let plan = append_plan(&package, "tail", xml.len());
     source.bump();
     let mut output = Vec::new();
-    assert!(plan.write_to_stream(&mut output).is_err());
+    assert!(plan.write_to(&mut output).is_err());
     assert!(output.is_empty(), "stale source must fail before output");
 }
 
@@ -2318,7 +2318,7 @@ fn sink_failure_reports_partial_output_after_preflight() {
     let package = bounded_package(archive);
     let plan = append_plan(&package, "tail", xml.len());
     let mut sink = PrefixFailSink::after(19);
-    let result = plan.write_to_stream(&mut sink);
+    let result = plan.write_to(&mut sink);
     assert!(result.is_err(), "short sink must fail after output starts");
     assert!(!sink.bytes.is_empty());
 }
@@ -2371,7 +2371,7 @@ fn managed_memory_limit_refuses_before_archive_output() {
         .tail_append_plain_paragraph("tail")
         .with_limits(limits(source_xml.len()))
         .prepare()
-        .and_then(|plan| plan.write_to_stream(&mut output));
+        .and_then(|plan| plan.write_to(&mut output));
     let resource = match result {
         Err(TailAppendError::Execution(ExecutionError::ResourceLimit(limit))) => {
             Some(limit.resource)
@@ -2402,7 +2402,7 @@ fn managed_work_limit_exhaustion_refuses_before_archive_output() {
         .tail_append_plain_paragraph("tail")
         .with_limits(limits(source_xml.len()))
         .prepare()
-        .and_then(|plan| plan.write_to_stream(&mut output));
+        .and_then(|plan| plan.write_to(&mut output));
     let resource = match result {
         Err(TailAppendError::Execution(ExecutionError::ResourceLimit(limit))) => {
             Some(limit.resource)
@@ -2435,7 +2435,7 @@ fn managed_cancellation_during_short_publication_is_typed_after_a_prefix() {
         chunk: 1,
         cancelled: false,
     };
-    let result = plan.write_to_stream(&mut sink);
+    let result = plan.write_to(&mut sink);
     match result {
         Err(TailAppendError::Document(DocumentError::Opc(OpcError::IncompleteOutput {
             written,
@@ -2474,7 +2474,7 @@ fn options_cancellation_during_short_publication_is_typed_after_a_prefix() {
         chunk: 1,
         cancelled: false,
     };
-    let result = plan.write_to_stream(&mut sink);
+    let result = plan.write_to(&mut sink);
     match result {
         Err(TailAppendError::Document(DocumentError::Opc(OpcError::IncompleteOutput {
             written,
@@ -2505,7 +2505,7 @@ fn source_backed_append_accepts_one_byte_reads_and_retries_interrupted_once() {
         source_backed::Package::from_read_at(one_byte).expect("one-byte source must open");
     let plan = append_plan(&package, "tail", source_xml.len());
     let mut output = Vec::new();
-    plan.write_to_stream(&mut output)
+    plan.write_to(&mut output)
         .expect("one-byte source must publish");
     assert_eq!(semantic_texts(&output), ["seed", "tail"]);
 
@@ -2516,7 +2516,7 @@ fn source_backed_append_accepts_one_byte_reads_and_retries_interrupted_once() {
     interrupted.arm();
     let plan = append_plan(&package, "tail", source_xml.len());
     let mut output = Vec::new();
-    plan.write_to_stream(&mut output)
+    plan.write_to(&mut output)
         .expect("one interrupted source read must be retried");
     assert_eq!(semantic_texts(&output), ["seed", "tail"]);
 }

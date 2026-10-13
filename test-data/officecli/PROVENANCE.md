@@ -13,6 +13,7 @@ Litchi reads as text.
 | `examples/word/run-formatting.sh` | `examples/word/run-formatting.sh` | `crates/litchi-cli/tests/officecli_smoke.sh` (cited lines) |
 | `examples/excel/cell-formatting.sh` | `examples/excel/cell-formatting.sh` | same |
 | `examples/ppt/presentation.sh` | `examples/ppt/presentation.sh` | same |
+| `examples/word/revisions.docx` (7,238 bytes, SHA-256 `430fb0c10c1111ad4cc6a36fbf4fe5b90ed638e091351cfbbf287b87c7353bae`) | `examples/word/revisions.docx` | `crates/litchi-docx/tests/formatting_engine.rs` (record 0251; added after the 0257 copy, same upstream commit) |
 
 The whole help tree is vendored because the delta table hashes every schema
 file and composes `extends` bases across formats. The example scripts are

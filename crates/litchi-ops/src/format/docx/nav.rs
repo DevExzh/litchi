@@ -80,13 +80,7 @@ pub(super) fn body_node(docx: &Docx) -> Result<Node<'_>> {
 /// The direct hyperlinks of a main-story paragraph, with their targets
 /// resolved through the main part's relationships.
 pub(super) fn hyperlinks(docx: &Docx, paragraph: &Paragraph) -> Result<Vec<InlineHyperlink>> {
-    let inlines = match docx.owner() {
-        DocxOwner::Eager(package) => {
-            let document = package.document()?;
-            paragraph.inlines_with_relationships(document.part().part().rels())?
-        },
-        DocxOwner::Source(package) => package.paragraph_inlines(paragraph)?,
-    };
+    let inlines = inlines(docx, paragraph)?;
     Ok(inlines
         .into_iter()
         .filter_map(|inline| match inline {
@@ -94,6 +88,52 @@ pub(super) fn hyperlinks(docx: &Docx, paragraph: &Paragraph) -> Result<Vec<Inlin
             _ => None,
         })
         .collect())
+}
+
+/// The inline children of a main-story paragraph, with hyperlinks resolved
+/// through the main part's relationships.
+pub(super) fn inlines(docx: &Docx, paragraph: &Paragraph) -> Result<Vec<Inline>> {
+    Ok(match docx.owner() {
+        DocxOwner::Eager(package) => {
+            let document = package.document()?;
+            paragraph.inlines_with_relationships(document.part().part().rels())?
+        },
+        DocxOwner::Source(package) => package.paragraph_inlines(paragraph)?,
+    })
+}
+
+/// Whether the main document relates a comments part.
+pub(super) fn has_comments(docx: &Docx) -> Result<bool> {
+    let comments = |relationship: &litchi_opc::rel::Relationship| {
+        !relationship.is_external()
+            && matches!(
+                relationship.reltype(),
+                litchi_opc::constants::relationship_type::COMMENTS
+                    | litchi_opc::constants::relationship_type::STRICT_COMMENTS
+            )
+    };
+    let result = match docx.owner() {
+        DocxOwner::Eager(package) => Ok(package
+            .opc_package()
+            .main_document_part()?
+            .rels()
+            .iter()
+            .any(comments)),
+        DocxOwner::Source(package) => package
+            .source_backed_package()
+            .and_then(|source| Ok(source.main_document_part()?.rels().iter().any(comments)))
+            .map_err(Error::from),
+    };
+    docx.owner().finish(result)
+}
+
+/// The comments of the main document, in part order.
+pub(super) fn comments(docx: &Docx) -> Result<Vec<litchi_docx::comment::Comment>> {
+    let result = match docx.owner() {
+        DocxOwner::Eager(package) => package.document()?.comments().map_err(Error::from),
+        DocxOwner::Source(package) => package.comments().map_err(Error::from),
+    };
+    docx.owner().finish(result)
 }
 
 /// What a container selection picked.
@@ -328,6 +368,54 @@ impl<'f> Navigate<'f> for Nav<'f> {
                     Pick::NotApplicable => Lookup::NotApplicable,
                 })
             },
+            (Value::Document, Kind::Comments) => {
+                let found = match step.select {
+                    Select::None | Select::Last => true,
+                    Select::Ordinal(position) => position.get() == 0,
+                    _ => return Ok(Lookup::NotApplicable),
+                };
+                if !found || !has_comments(self.docx)? {
+                    return Ok(Lookup::Missing);
+                }
+                Ok(Lookup::Found(Node::new(
+                    self.docx,
+                    Kind::Comments,
+                    Value::Comments,
+                    address.with(Step::new(Kind::Comments, 0)),
+                )))
+            },
+            (Value::Comments, Kind::Comment) => {
+                let comments = comments(self.docx)?;
+                let picked = if let Select::Identity(identities) = &step.select {
+                    let mut wanted = None;
+                    for (_, value) in identities.iter() {
+                        let id = value.trim().parse::<u32>().map_err(|_| {
+                            Error::new(crate::Code::InvalidPath, "invalid comment identifier")
+                        })?;
+                        if wanted.is_some_and(|held| held != id) {
+                            wanted = None;
+                            break;
+                        }
+                        wanted = Some(id);
+                    }
+                    Some(wanted.and_then(|id| comments.iter().position(|c| c.id() == id)))
+                } else {
+                    pick_index(comments.len(), &step.select)
+                };
+                Ok(match picked {
+                    Some(Some(index)) => {
+                        let comment = comments.into_iter().nth(index).ok_or_else(missing_child)?;
+                        Lookup::Found(Node::new(
+                            self.docx,
+                            Kind::Comment,
+                            Value::Comment(Arc::new(comment)),
+                            address.with(Step::new(Kind::Comment, ordinal(index))),
+                        ))
+                    },
+                    Some(None) => Lookup::Missing,
+                    None => Lookup::NotApplicable,
+                })
+            },
             (Value::Table(_), Kind::Row) => {
                 let rows = Self::rows(parent)?;
                 Ok(match pick_index(rows.len(), &step.select) {
@@ -370,6 +458,22 @@ impl<'f> Navigate<'f> for Nav<'f> {
                             Kind::Run,
                             Value::Run(run),
                             address.with(Step::new(Kind::Run, ordinal(index))),
+                        ))
+                    },
+                    Some(None) => Lookup::Missing,
+                    None => Lookup::NotApplicable,
+                })
+            },
+            (Value::Paragraph { paragraph, .. }, Kind::Picture) => {
+                let pictures = paragraph.images()?;
+                Ok(match pick_index(pictures.len(), &step.select) {
+                    Some(Some(index)) => {
+                        let picture = pictures.into_iter().nth(index).ok_or_else(missing_child)?;
+                        Lookup::Found(Node::new(
+                            self.docx,
+                            Kind::Picture,
+                            Value::Picture(Arc::new(picture)),
+                            address.with(Step::new(Kind::Picture, ordinal(index))),
                         ))
                     },
                     Some(None) => Lookup::Missing,
@@ -429,6 +533,7 @@ impl<'f> Navigate<'f> for Nav<'f> {
             Value::Paragraph { paragraph, .. } => {
                 out.kind("r", paragraph.addressable_runs()?.len());
                 out.kind("hyperlink", hyperlinks(self.docx, paragraph)?.len());
+                out.kind("picture", paragraph.images()?.len());
             },
             _ => {},
         }

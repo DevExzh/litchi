@@ -21,8 +21,8 @@ differs from the hash recorded below.
 
 | Input | File | SHA-256 |
 |---|---|---|
-| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `d5fc15a161bbd97b0c502f62bda778ebdccd41acdefe8b3d85f3a94e4f460cc6` |
-| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `35697bb9b6d2d5112153f5ee26d926acd437ef6f9a33da3fb024d36cb6761d9c` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `5a8edde9124a45f8e3e1a90d6877211fd94cf2b1bc6f75b3f969f290cd59f6b6` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `3a1cc3f959c8f9e4f42414bed26990ce7b8392ca9678ce0d79a39f8256218140` |
 | golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `058012097bee2177a9b74042591068db0216f738ba762b0747ffdf5d99915764` |
 | golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `b80c09f5723f4a3da889e473913cb9abfb9bf4cf31aecd4e2deafb79859b9b7f` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `4e7b212643def7f109a5c16da8f19abd855a0331adb9a527524a0f0e4bc14d4a` |
@@ -68,7 +68,7 @@ Elements:
 
 | Format | supported | gap | folded | pending | missing | out of scope | litchi-only |
 |---|---|---|---|---|---|---|---|
-| docx | 11 | 24 | 0 | 0 | 9 | 2 | 5 |
+| docx | 13 | 22 | 0 | 0 | 9 | 2 | 5 |
 | doc | 15 | 11 | 0 | 0 | 18 | 2 | 1 |
 | rtf | 7 | 12 | 0 | 0 | 25 | 2 | 0 |
 | xlsx | 8 | 30 | 0 | 0 | 1 | 2 | 1 |
@@ -81,7 +81,7 @@ Property reads:
 
 | Format | supported | gap | element gap | pending | write-only | raw-only | missing | litchi-only |
 |---|---|---|---|---|---|---|---|---|
-| docx | 131 | 4 | 428 | 0 | 101 | 2 | 295 | 27 |
+| docx | 138 | 3 | 391 | 0 | 113 | 2 | 314 | 28 |
 | doc | 39 | 0 | 231 | 0 | 205 | 1 | 485 | 38 |
 | rtf | 25 | 0 | 225 | 0 | 196 | 1 | 514 | 39 |
 | xlsx | 89 | 16 | 489 | 0 | 26 | 1 | 70 | 63 |
@@ -94,7 +94,7 @@ Property writes:
 
 | Format | supported | partial | gap | pending | litchi-only | — |
 |---|---|---|---|---|---|---|
-| docx | 76 | 19 | 701 | 0 | 11 | 181 |
+| docx | 92 | 30 | 674 | 0 | 12 | 181 |
 | doc | 1 | 13 | 782 | 0 | 21 | 182 |
 | rtf | 12 | 9 | 775 | 0 | 33 | 171 |
 | xlsx | 11 | 39 | 494 | 0 | 67 | 143 |
@@ -116,7 +116,7 @@ Property writes:
 | chart-axis |  | missing |  |
 | chart-series |  | missing |  |
 | chart | chart | gap | R4x |
-| comment | comment | gap | L-DOCX-R5 |
+| comment | comment | supported |  |
 | diagram |  | missing |  |
 | document | document | supported |  |
 | endnote | endnote | gap | L-DOCX-R5 |
@@ -137,7 +137,7 @@ Property writes:
 | pagebreak | break | gap | R4x |
 | paragraph | paragraph | supported |  |
 | permStart |  | missing |  |
-| picture | picture | gap | R4x |
+| picture | picture | supported |  |
 | ptab |  | missing |  |
 | raw |  | out of scope | the raw XML layer (`raw`/`raw-set` commands), not an element (design §3) |
 | revision | revision | gap | R4x |
@@ -157,7 +157,7 @@ Property writes:
 | watermark | watermark | gap | R4x |
 |  | footnotes | litchi-only | L-DOCX-R5 |
 |  | endnotes | litchi-only | L-DOCX-R5 |
-|  | comments | litchi-only | L-DOCX-R5 |
+|  | comments | litchi-only |  |
 |  | settings | litchi-only | L-DOCX-R6 (R4x) |
 |  | theme | litchi-only | L-DOCX-R6 (R4x) |
 
@@ -337,16 +337,16 @@ Property writes:
 | chart | `varyColors` | string | asg |  | element gap | gap | R4x |
 | chart | `view3d` | string | asg |  | element gap | gap | R4x |
 | chart | `width` | length | asg |  | element gap | gap | R4x |
-| comment | `id` | number | --g |  | element gap | — | L-DOCX-R5 |
-| comment | `anchoredTo` | string | --g |  | element gap | — | L-DOCX-R5 |
-| comment | `runStart` | int | a-- |  | element gap | gap | L-DOCX-R5 |
-| comment | `range` | bool | a-- |  | element gap | gap | L-DOCX-R5 |
-| comment | `parentId` | number | a-g |  | element gap | gap | L-DOCX-R5 |
-| comment | `done` | bool | asg |  | element gap | gap | L-DOCX-R5 |
-| comment | `date` | string | asg |  | element gap | gap | L-DOCX-R5 |
-| comment | `initials` | string | asg |  | element gap | gap | L-DOCX-R5 |
-| comment | `author` | string | asg |  | element gap | gap | L-DOCX-R5 |
-| comment | `text` | string | asg |  | element gap | gap | L-DOCX-R5 |
+| comment | `id` | number | --g | --g | supported | — |  |
+| comment | `anchoredTo` | string | --g |  | missing | — |  |
+| comment | `runStart` | int | a-- |  | write-only | gap |  |
+| comment | `range` | bool | a-- |  | write-only | gap |  |
+| comment | `parentId` | number | a-g |  | missing | gap |  |
+| comment | `done` | bool | asg |  | missing | gap |  |
+| comment | `date` | string | asg | a-g | supported | partial |  |
+| comment | `initials` | string | asg | a-g | supported | partial |  |
+| comment | `author` | string | asg | a-g | supported | partial |  |
+| comment | `text` | string | asg | a-g | supported | partial |  |
 | diagram | `mermaid` | string | a-- |  | write-only | gap |  |
 | diagram | `src` | string | a-- |  | write-only | gap |  |
 | diagram | `width` | length | a-- |  | write-only | gap |  |
@@ -517,17 +517,17 @@ Property writes:
 | header | `italic` | bool | asg |  | element gap | gap | L-DOCX-R5 |
 | header | `color` | color | asg |  | element gap | gap | L-DOCX-R5 |
 | header | `field` | enum | a-- |  | element gap | gap | L-DOCX-R5 |
-| hyperlink | `url` | string | asg | --g | supported | gap |  |
-| hyperlink | `anchor` | string | a-g | --g | supported | gap |  |
+| hyperlink | `url` | string | asg | asg | supported | supported |  |
+| hyperlink | `anchor` | string | a-g | a-g | supported | supported |  |
 | hyperlink | `tooltip` | string | a-g | --g | supported | gap |  |
-| hyperlink | `text` | string | asg |  | supported | gap | the node's text |
-| hyperlink | `rStyle` | string | a-g | --g | supported | gap |  |
-| hyperlink | `color` | color | a-g | --g | supported | gap |  |
-| hyperlink | `font` | string | a-g | --g | supported | gap |  |
-| hyperlink | `size` | length | a-g | --g | supported | gap |  |
-| hyperlink | `underline` | enum | a-g | --g | supported | gap |  |
-| hyperlink | `bold` | bool | a-g | --g | supported | gap |  |
-| hyperlink | `italic` | bool | a-g | --g | supported | gap |  |
+| hyperlink | `text` | string | asg | as- | write-only | supported |  |
+| hyperlink | `rStyle` | string | a-g | a-g | supported | supported |  |
+| hyperlink | `color` | color | a-g | a-g | supported | supported |  |
+| hyperlink | `font` | string | a-g | a-g | supported | supported |  |
+| hyperlink | `size` | length | a-g | a-g | supported | supported |  |
+| hyperlink | `underline` | enum | a-g | a-g | supported | supported |  |
+| hyperlink | `bold` | bool | a-g | a-g | supported | supported |  |
+| hyperlink | `italic` | bool | a-g | a-g | supported | supported |  |
 | hyperlink | `docLocation` | string | --g | --g | supported | — |  |
 | hyperlink | `tgtFrame` | string |  | --g | litchi-only | — |  |
 | hyperlink | `font.cs` | string |  | --g | litchi-only | — |  |
@@ -584,10 +584,10 @@ Property writes:
 | paragraph | `spaceAfter` | length | asg | asg | supported | supported |  |
 | paragraph | `spaceBeforeAuto` | boolean | asg | asg | supported | supported |  |
 | paragraph | `spaceAfterAuto` | boolean | asg | asg | supported | supported |  |
-| paragraph | `listStyle` | enum | asg |  | gap | gap | L-DOCX-R6 (R4x) |
+| paragraph | `listStyle` | enum | asg | -s- | write-only | partial |  |
 | paragraph | `numId` | int | asg | asg | supported | supported |  |
 | paragraph | `numLevel` | int | asg | asg | supported | supported |  |
-| paragraph | `start` | int | as- |  | write-only | gap |  |
+| paragraph | `start` | int | as- | -s- | write-only | partial |  |
 | paragraph | `bold` | bool | asg | a-- | write-only | partial |  |
 | paragraph | `italic` | bool | asg | a-- | write-only | partial |  |
 | paragraph | `font` | string | as- |  | write-only | gap |  |
@@ -730,33 +730,34 @@ Property writes:
 | permStart | `ed` | string | a-g |  | missing | gap |  |
 | permStart | `colFirst` | number | a-g |  | missing | gap |  |
 | permStart | `colLast` | number | a-g |  | missing | gap |  |
-| picture | `decorative` | bool | asg |  | element gap | gap | R4x |
-| picture | `crop` | string | asg |  | element gap | gap | R4x |
-| picture | `cropLeft` | string | as- |  | element gap | gap | R4x |
-| picture | `cropTop` | string | as- |  | element gap | gap | R4x |
-| picture | `cropRight` | string | as- |  | element gap | gap | R4x |
-| picture | `cropBottom` | string | as- |  | element gap | gap | R4x |
-| picture | `anchor` | bool | a-g |  | element gap | gap | R4x |
-| picture | `wrap` | string | asg |  | element gap | gap | R4x |
-| picture | `behindText` | bool | asg |  | element gap | gap | R4x |
-| picture | `relativeHeight` | integer | a-g |  | element gap | gap | R4x |
-| picture | `effectExtent` | string | a-- |  | element gap | gap | R4x |
-| picture | `hPosition` | length | asg |  | element gap | gap | R4x |
-| picture | `vPosition` | length | asg |  | element gap | gap | R4x |
-| picture | `hRelative` | string | asg |  | element gap | gap | R4x |
-| picture | `vRelative` | string | asg |  | element gap | gap | R4x |
-| picture | `hAlign` | string | a-g |  | element gap | gap | R4x |
-| picture | `vAlign` | string | a-g |  | element gap | gap | R4x |
-| picture | `link` | string | a-g |  | element gap | gap | R4x |
-| picture | `width` | length | asg |  | element gap | gap | R4x |
-| picture | `height` | length | asg |  | element gap | gap | R4x |
-| picture | `fallback` | string | a-- |  | element gap | gap | R4x |
-| picture | `id` | number | --g |  | element gap | — | R4x |
-| picture | `alt` | string | asg |  | element gap | gap | R4x |
-| picture | `contentType` | string | --g |  | element gap | — | R4x |
-| picture | `fileSize` | number | --g |  | element gap | — | R4x |
-| picture | `relId` | string | --g |  | element gap | — | R4x |
-| picture | `src` | string | as- |  | element gap | gap | R4x |
+| picture | `decorative` | bool | asg |  | missing | gap |  |
+| picture | `crop` | string | asg |  | missing | gap |  |
+| picture | `cropLeft` | string | as- |  | write-only | gap |  |
+| picture | `cropTop` | string | as- |  | write-only | gap |  |
+| picture | `cropRight` | string | as- |  | write-only | gap |  |
+| picture | `cropBottom` | string | as- |  | write-only | gap |  |
+| picture | `anchor` | bool | a-g |  | missing | gap |  |
+| picture | `wrap` | string | asg |  | missing | gap |  |
+| picture | `behindText` | bool | asg |  | missing | gap |  |
+| picture | `relativeHeight` | integer | a-g |  | missing | gap |  |
+| picture | `effectExtent` | string | a-- |  | write-only | gap |  |
+| picture | `hPosition` | length | asg |  | missing | gap |  |
+| picture | `vPosition` | length | asg |  | missing | gap |  |
+| picture | `hRelative` | string | asg |  | missing | gap |  |
+| picture | `vRelative` | string | asg |  | missing | gap |  |
+| picture | `hAlign` | string | a-g |  | missing | gap |  |
+| picture | `vAlign` | string | a-g |  | missing | gap |  |
+| picture | `link` | string | a-g |  | missing | gap |  |
+| picture | `width` | length | asg | a-g | supported | partial |  |
+| picture | `height` | length | asg | a-g | supported | partial |  |
+| picture | `fallback` | string | a-- |  | write-only | gap |  |
+| picture | `id` | number | --g |  | missing | — |  |
+| picture | `alt` | string | asg | a-g | supported | partial |  |
+| picture | `contentType` | string | --g |  | missing | — |  |
+| picture | `fileSize` | number | --g |  | missing | — |  |
+| picture | `relId` | string | --g | --g | supported | — |  |
+| picture | `src` | string | as- | a-- | write-only | partial |  |
+| picture | `name` | string |  | a-g | litchi-only | litchi-only |  |
 | ptab | `align` | enum | asg |  | missing | gap |  |
 | ptab | `relativeTo` | enum | asg |  | missing | gap |  |
 | ptab | `leader` | enum | asg |  | missing | gap |  |
@@ -1062,7 +1063,7 @@ Property writes:
 | cell | `border.tl2br` | string | asg |  | missing | gap |  |
 | cell | `border.top` | string | -s- |  | write-only | gap |  |
 | cell | `border.tr2bl` | string | asg |  | missing | gap |  |
-| cell | `text` | string | asg |  | supported | gap | the node's text |
+| cell | `text` | string | asg | as- | write-only | supported |  |
 | column | `width` | length | a-- |  | write-only | gap |  |
 | column | `text` | string | a-- |  | write-only | gap |  |
 | row | `height.exact` | length | as- |  | write-only | gap |  |
@@ -1075,11 +1076,11 @@ Property writes:
 | row | `gridAfter` | int | asg | --g | supported | gap |  |
 | row | `wAfter` | string | asg | --g | supported | gap |  |
 | row | `cellSpacing` | number | -sg | --g | supported | gap |  |
-| row | `cols` | int | a-- |  | write-only | gap |  |
+| row | `cols` | int | a-- | a-- | write-only | supported |  |
 | row | `height` | length | asg | --g | supported | gap |  |
 | row | `hidden` | bool |  | --g | litchi-only | — |  |
 | row | `rowAlign` | enum |  | --g | litchi-only | — |  |
-| table | `colWidths` | string | a-g | --g | supported | gap |  |
+| table | `colWidths` | string | a-g | a-g | supported | supported |  |
 | table | `direction` | enum | asg | --g | supported | gap |  |
 | table | `align` | enum | asg | --g | supported | gap |  |
 | table | `indent` | int | asg | --g | supported | gap |  |
@@ -1098,11 +1099,11 @@ Property writes:
 | table | `border.right` | string | as- |  | write-only | gap |  |
 | table | `border.top` | string | as- |  | write-only | gap |  |
 | table | `border.vertical` | string | as- |  | write-only | gap |  |
-| table | `cols` | int | a-g | --g | supported | gap |  |
-| table | `data` | string | a-- |  | write-only | gap |  |
-| table | `rows` | int | a-g | --g | supported | gap |  |
+| table | `cols` | int | a-g | a-g | supported | supported |  |
+| table | `data` | string | a-- | a-- | write-only | supported |  |
+| table | `rows` | int | a-g | a-g | supported | supported |  |
 | table | `width` | string | asg | --g | supported | gap |  |
-| table | `style` | string | asg | --g | supported | gap |  |
+| table | `style` | string | asg | a-g | supported | partial |  |
 | table | `padding.top` | int |  | --g | litchi-only | — |  |
 | table | `padding.bottom` | int |  | --g | litchi-only | — |  |
 | table | `padding.left` | int |  | --g | litchi-only | — |  |
@@ -1160,22 +1161,24 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 
 | Verb | Element | Context | Reason | Follow-up |
 |---|---|---|---|---|
-| `set` | `paragraph` | `nested-or-unproven-selection` | paragraphs in cells, content controls or wrappers are readable, but their raw transaction position is not proven for editing | L-DOCX-W3 |
-| `set` | `run` | `nested-or-unproven-selection` | the editor addresses only direct runs whose raw ordinal is proven against the paragraph; nested and wrapped run selections are refused | L-DOCX-W2 |
+| `set` | `paragraph` | `wrapped-or-unproven-selection` | paragraphs in cells and content controls are edited through proven element paths (record 0251a); paragraphs in w:customXml wrappers, wrapped rows or cells, or markup-compatibility-selected content have no proven raw position | L-DOCX-W3 |
+| `set` | `run` | `wrapped-or-unproven-selection` | direct runs and direct runs of hyperlinks are edited (record 0251a); runs in tracked changes, smart tags, custom XML or other wrappers, and paragraphs with comment-reference runs, have no proven raw ordinal | L-DOCX-W2 |
 | `set` | `paragraph/run` | `mixed-paragraph-run-fanout` | one DOCX mutation admits one target kind, so a paragraph/run union is refused before staging rather than applying a descendant ordinal to the wrong leaf | M2 (homogeneous mutation fanout) |
 | `set` | `paragraph/run` | `managed-transaction` | the formatting transaction has not proven edit admission and publication for execution-context-managed DOCX owners; the read projection remains available | L-DOCX-W5 |
-| `set` | `paragraph/run` | `complex-leaf-content` | fields, hyperlinks, markup-compatibility branches and other nested or unmodeled run content lack a proven raw ownership and address mapping for leaf edits | L-DOCX-W2 / record 0011 |
+| `set` | `paragraph/run` | `complex-leaf-content` | fields, markup-compatibility branches and other nested or unmodeled run content lack a proven raw ownership and address mapping for leaf edits | L-DOCX-W2 / record 0011 |
 | `add` | `paragraph/run` | `managed-transaction` | structural insertion uses the unmanaged DOCX transaction path; execution-context-managed owners refuse the leaf splice until managed admission is proven | L-DOCX-W5 |
-| `add` | `paragraph` | `nested-or-unproven-parent` | paragraph creation is admitted only under the direct main body, so cells, content controls and other nested parents are refused | L-DOCX-W3 |
-| `add` | `run` | `nested-or-unproven-parent` | run creation is admitted only under a proven direct body paragraph and refuses wrapped or nested paragraph parents | L-DOCX-W2 |
+| `add` | `paragraph` | `wrapped-or-unproven-parent` | paragraphs are added under the body, cells and block content controls (record 0251a); parents whose raw position is not proven are refused | L-DOCX-W3 |
+| `add` | `run` | `wrapped-or-unproven-parent` | runs are added beside the direct runs of any proven paragraph (record 0251a); insertion inside a hyperlink and under wrapped paragraphs is refused | L-DOCX-W2 |
 | `remove` | `paragraph/run` | `managed-transaction` | structural removal uses the unmanaged DOCX transaction path; execution-context-managed owners refuse the leaf splice until managed admission is proven | L-DOCX-W5 |
-| `remove` | `paragraph/run` | `nested-or-unproven-selection` | only direct body paragraphs and their direct runs have transaction positions proven for removal; nested selections are refused | L-DOCX-W2 / L-DOCX-W3 |
+| `remove` | `paragraph/run` | `wrapped-or-unproven-selection` | paragraphs, runs, hyperlinks, tables, rows, cells and content controls are removed through proven element paths (record 0251a); wrapped selections, the last paragraph of a cell, the last cell of a row and the last row of a table are refused | L-DOCX-W2 / L-DOCX-W3 |
 | `remove` | `paragraph/run` | `complex-leaf-content` | paragraph and run dependency scans refuse open ranges, field interiors, tracked changes and story references rather than dropping their relationships | L-DOCX-W2 / record 0011 |
 | `move` | `paragraph/run` | `managed-transaction` | paragraph and direct-run movement use the unmanaged DOCX transaction path; execution-context-managed owners refuse the leaf splice until managed admission is proven | L-DOCX-W5 |
-| `move` | `paragraph/run` | `nested-or-unproven-selection` | only direct main-body paragraphs and their direct runs can be moved; nested and wrapped selections have no proven body or run anchor | L-DOCX-W3 |
+| `move` | `paragraph/run` | `wrapped-or-unproven-selection` | body paragraphs, direct runs, tables, rows and nested paragraphs move through proven anchors (record 0251a); nested runs and wrapped selections have no proven anchor | L-DOCX-W3 |
 | `move` | `paragraph/run` | `complex-leaf-content` | paragraph and direct-run movement preserves exact source fragments but refuses open ranges, field interiors, namespace changes, tracked changes and unmodeled dependencies | L-DOCX-W2 / record 0011 |
 | `swap` | `paragraph/run` | `managed-transaction` | paragraph and direct-run swapping compose unmanaged fragment moves; execution-context-managed owners refuse the leaf splice until managed admission is proven | L-DOCX-W5 |
 | `swap` | `paragraph/run` | `nested-or-unproven-selection` | only direct main-body paragraphs or direct runs can be swapped; nested and wrapped selections have no proven anchors | L-DOCX-W3 |
+| `add` | `cell` | `cell-insertion` | a cell changes the table grid; rows are added with the grid's cells, and adding a single cell is not integrated | M2 (DOCX table grid editing) |
+| `set` | `table/row` | `table-properties` | table and row properties are read and seed new tables and rows; changing them on an existing table is not integrated | M2 (DOCX table properties) |
 | `swap` | `paragraph/run` | `complex-leaf-content` | paragraph and direct-run swapping preserves exact source fragments but refuses field interiors, namespace changes, tracked changes and unmodeled dependencies | L-DOCX-W2 / record 0011 |
 | `create` | `document` | `strict-conformance` | the DOCX creator emits Transitional packages and refuses a Strict conformance request rather than silently downgrading it | CreateOptions::conformance(Conformance::Transitional) |
 | `create` | `document` | `noncore-initial-metadata` | initial metadata outside the DOCX core-properties part is not representable by the creator and is refused rather than dropped | CreateOptions::metadata (DOCX core properties) |

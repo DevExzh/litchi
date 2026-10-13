@@ -24,10 +24,6 @@ NEEDLE = re.compile(r"\b3rd" + r"party\b")
 # Temporary exceptions: files that parallel branches own and are fixing.
 # Each entry names its owner; delete the entry when that branch merges.
 ALLOWLIST: dict[str, str] = {
-    "crates/litchi-docx/tests/drawing_svg_lifecycle.rs": "parallel fixture-vendoring branch, litchi-docx tests",
-    "crates/litchi-docx/tests/drawing_svg_source.rs": "parallel fixture-vendoring branch, litchi-docx tests",
-    "crates/litchi-docx/tests/formatting_engine.rs": "parallel fixture-vendoring branch, litchi-docx tests",
-    "crates/litchi-docx/tests/property_revision_corpus.rs": "parallel fixture-vendoring branch, litchi-docx tests",
 }
 
 

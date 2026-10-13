@@ -41,13 +41,14 @@ fn create_glossary_docx(directory: &Path) -> Result<()> {
     const BUILDING_BLOCK_TEXT: &str = "Litchi reusable native building block";
 
     let destination = directory.join("glossary-owner.dotx");
-    let mut package = Package::new_template()?;
-    package
-        .document_mut()?
+    let mut builder = litchi_docx::Builder::new_template()?;
+    builder
+        .document()?
         .add_heading("Litchi DOCX glossary owner", 1)?;
-    package
-        .document_mut()?
+    builder
+        .document()?
         .add_paragraph_with_text("This document carries a typed AutoText building block.");
+    let mut package = builder.build()?;
 
     let body = format!(
         r#"<w:docPartBody xmlns:w="{W}"><w:p><w:r><w:t>{BUILDING_BLOCK_TEXT}</w:t></w:r></w:p></w:docPartBody>"#
@@ -91,13 +92,14 @@ fn verify_glossary_docx(path: &Path) -> Result<()> {
 
 fn create_docx(directory: &Path) -> Result<()> {
     let destination = directory.join("web-settings-owner.docx");
-    let mut package = Package::new()?;
-    package
-        .document_mut()?
+    let mut builder = litchi_docx::Builder::new()?;
+    builder
+        .document()?
         .add_heading("Litchi DOCX web-settings owner", 1)?;
-    package
-        .document_mut()?
+    builder
+        .document()?
         .add_paragraph_with_text("Typed web settings survived package authoring.");
+    let mut package = builder.build()?;
 
     let (mut settings, conformance) = package.web()?.unwrap_or_default();
     settings

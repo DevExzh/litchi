@@ -8,7 +8,7 @@
 //! cargo run --example office_crud_demo
 //! ```
 
-use litchi::docx::Package as DocxPackage;
+use litchi::docx::{Builder as DocxBuilder, Package as DocxPackage};
 use litchi::pptx::Package as PptxPackage;
 use litchi::xlsx::{Formula, Package};
 use litchi_core::Metadata;
@@ -41,8 +41,8 @@ fn demo_docx_operations() -> ExampleResult<()> {
 
     // CREATE: Create a new document
     println!("Creating new Word document...");
-    let mut pkg = DocxPackage::new()?;
-    let doc = pkg.document_mut()?;
+    let mut builder = DocxBuilder::new()?;
+    let doc = builder.document()?;
 
     // Add content
     doc.add_heading("Product Catalog", 1)?;
@@ -79,12 +79,14 @@ fn demo_docx_operations() -> ExampleResult<()> {
     table.cell(3, 2).unwrap().set_text("200");
 
     // Set metadata
-    let _ = pkg.put_props(Metadata {
+    let mut metadata = builder.build()?.edit_metadata();
+    metadata.set(Metadata {
         title: Some("Product Catalog".to_owned()),
         author: Some("Litchi Demo".to_owned()),
         description: Some("Demonstration of DOCX creation".to_owned()),
         ..Metadata::default()
     });
+    let mut pkg = metadata.commit()?.into_package();
 
     // Save
     pkg.save("demo_catalog.docx")?;
@@ -103,23 +105,29 @@ fn demo_docx_operations() -> ExampleResult<()> {
     println!("  Found 'Widget' in {} paragraphs", matches.len());
 
     // Access metadata
-    if let Some(title) = pkg.props().and_then(|props| props.title.as_deref()) {
+    if let Some(title) = pkg.metadata().and_then(|props| props.title.as_deref()) {
         println!("  Title: {}", title);
     }
 
     // UPDATE: Modify existing document
     println!("Updating Word document...");
-    let mut pkg = DocxPackage::open("demo_catalog.docx")?;
-    let doc = pkg.document_mut()?;
-
-    doc.add_heading("Contact Information", 2)?;
-    doc.add_paragraph_with_text("For more information, please contact us:");
-    doc.add_paragraph_with_text("Email: sales@example.com");
-    doc.add_paragraph_with_text("Phone: (555) 123-4567");
-
-    if let Some(props) = pkg.props_mut() {
-        props.last_modified_by = Some("Litchi Update".to_string());
+    let pkg = DocxPackage::open("demo_catalog.docx")?;
+    let end = pkg.document_snapshot()?.paragraph_count();
+    let mut edit = pkg.edit()?;
+    for (offset, text) in [
+        "Contact Information",
+        "For more information, please contact us:",
+        "Email: sales@example.com",
+        "Phone: (555) 123-4567",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        edit.insert_paragraph(litchi::common::Position::new(end + offset), text)?;
     }
+    let mut metadata = edit.commit()?.into_package().edit_metadata();
+    metadata.update(|props| props.last_modified_by = Some("Litchi Update".to_string()));
+    let mut pkg = metadata.commit()?.into_package();
     pkg.save("demo_catalog_updated.docx")?;
     println!("✓ Updated: demo_catalog_updated.docx");
 

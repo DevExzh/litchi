@@ -112,6 +112,10 @@
         {
           "element": "body",
           "pathSegment": "body"
+        },
+        {
+          "element": "comments",
+          "pathSegment": "comments"
         }
       ],
       "properties": {
@@ -444,6 +448,18 @@
           "add": true,
           "set": true,
           "get": true
+        },
+        "listStyle": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "start": {
+          "type": "int",
+          "add": false,
+          "set": true,
+          "get": false
         },
         "outlineLvl": {
           "type": "int",
@@ -1140,11 +1156,11 @@
       "element": "hyperlink",
       "parent": "paragraph",
       "operations": {
-        "add": false,
-        "set": false,
+        "add": true,
+        "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -1154,13 +1170,13 @@
       "properties": {
         "url": {
           "type": "string",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "anchor": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
@@ -1184,7 +1200,7 @@
         },
         "font": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
@@ -1196,25 +1212,25 @@
         },
         "size": {
           "type": "font-size",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "bold": {
           "type": "bool",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "italic": {
           "type": "bool",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "color": {
           "type": "color",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
@@ -1240,7 +1256,7 @@
             "wavyHeavy",
             "wavyDouble"
           ],
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
@@ -1283,9 +1299,15 @@
         },
         "rStyle": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
         }
       },
       "predicates": {
@@ -1308,11 +1330,11 @@
         "tbl"
       ],
       "operations": {
-        "add": false,
+        "add": true,
         "set": false,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -1329,19 +1351,19 @@
       "properties": {
         "cols": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "rows": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "style": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
@@ -1488,9 +1510,15 @@
         },
         "colWidths": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
+        },
+        "data": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
         }
       },
       "predicates": {
@@ -1509,11 +1537,11 @@
         "tr"
       ],
       "operations": {
-        "add": false,
+        "add": true,
         "set": false,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -1604,6 +1632,12 @@
           "add": false,
           "set": false,
           "get": true
+        },
+        "cols": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
         }
       },
       "predicates": {
@@ -1623,10 +1657,10 @@
       ],
       "operations": {
         "add": false,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -1757,6 +1791,12 @@
           "add": false,
           "set": false,
           "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
         }
       },
       "predicates": {
@@ -1783,7 +1823,7 @@
         "set": false,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -2054,8 +2094,8 @@
       "operations": {
         "add": false,
         "set": false,
-        "get": false,
-        "query": false,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
@@ -2063,11 +2103,19 @@
           "/comments"
         ]
       },
+      "children": [
+        {
+          "element": "comment",
+          "pathSegment": "comment"
+        }
+      ],
       "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "L-DOCX-R5",
-        "reason": "the comments part is read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet"
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -2075,22 +2123,55 @@
       "element": "comment",
       "parent": "comments",
       "operations": {
-        "add": false,
+        "add": true,
         "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
           "/comments/comment[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "L-DOCX-R5",
-        "reason": "comment stories are read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet"
+      "properties": {
+        "id": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "author": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "initials": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "date": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -2342,9 +2423,9 @@
         "img"
       ],
       "operations": {
-        "add": false,
+        "add": true,
         "set": false,
-        "get": false,
+        "get": true,
         "query": false,
         "remove": false
       },
@@ -2353,11 +2434,43 @@
           "/body/p[N]/picture[M]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "R4x",
-        "reason": "pictures have no located reader yet"
+      "properties": {
+        "width": {
+          "type": "length",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "relId": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "src": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        }
       }
     },
     {
@@ -2625,20 +2738,6 @@
     },
     {
       "subject": "element",
-      "element": "comments",
-      "code": "unsupported_capability",
-      "followUp": "L-DOCX-R5",
-      "reason": "the comments part is read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet"
-    },
-    {
-      "subject": "element",
-      "element": "comment",
-      "code": "unsupported_capability",
-      "followUp": "L-DOCX-R5",
-      "reason": "comment stories are read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet"
-    },
-    {
-      "subject": "element",
       "element": "styles",
       "code": "unsupported_capability",
       "followUp": "L-DOCX-R6 (R4x)",
@@ -2713,13 +2812,6 @@
       "code": "unsupported_capability",
       "followUp": "R4x",
       "reason": "legacy form fields have no located reader yet"
-    },
-    {
-      "subject": "element",
-      "element": "picture",
-      "code": "unsupported_capability",
-      "followUp": "R4x",
-      "reason": "pictures have no located reader yet"
     },
     {
       "subject": "element",
@@ -2802,14 +2894,6 @@
     },
     {
       "subject": "property",
-      "element": "paragraph",
-      "key": "listStyle",
-      "code": "unsupported_capability",
-      "followUp": "L-DOCX-R6 (R4x)",
-      "reason": "list kinds need the numbering part, which the node view does not read yet"
-    },
-    {
-      "subject": "property",
       "element": "sdt",
       "key": "type",
       "code": "unsupported_capability",
@@ -2836,19 +2920,19 @@
       "subject": "operation",
       "verb": "set",
       "element": "paragraph",
-      "context": "nested-or-unproven-selection",
+      "context": "wrapped-or-unproven-selection",
       "code": "unsupported_capability",
       "followUp": "L-DOCX-W3",
-      "reason": "paragraphs in cells, content controls or wrappers are readable, but their raw transaction position is not proven for editing"
+      "reason": "paragraphs in cells and content controls are edited through proven element paths (record 0251a); paragraphs in w:customXml wrappers, wrapped rows or cells, or markup-compatibility-selected content have no proven raw position"
     },
     {
       "subject": "operation",
       "verb": "set",
       "element": "run",
-      "context": "nested-or-unproven-selection",
+      "context": "wrapped-or-unproven-selection",
       "code": "unsupported_capability",
       "followUp": "L-DOCX-W2",
-      "reason": "the editor addresses only direct runs whose raw ordinal is proven against the paragraph; nested and wrapped run selections are refused"
+      "reason": "direct runs and direct runs of hyperlinks are edited (record 0251a); runs in tracked changes, smart tags, custom XML or other wrappers, and paragraphs with comment-reference runs, have no proven raw ordinal"
     },
     {
       "subject": "operation",
@@ -2875,7 +2959,7 @@
       "context": "complex-leaf-content",
       "code": "unsupported_capability",
       "followUp": "L-DOCX-W2 / record 0011",
-      "reason": "fields, hyperlinks, markup-compatibility branches and other nested or unmodeled run content lack a proven raw ownership and address mapping for leaf edits"
+      "reason": "fields, markup-compatibility branches and other nested or unmodeled run content lack a proven raw ownership and address mapping for leaf edits"
     },
     {
       "subject": "operation",
@@ -2890,19 +2974,19 @@
       "subject": "operation",
       "verb": "add",
       "element": "paragraph",
-      "context": "nested-or-unproven-parent",
+      "context": "wrapped-or-unproven-parent",
       "code": "unsupported_capability",
       "followUp": "L-DOCX-W3",
-      "reason": "paragraph creation is admitted only under the direct main body, so cells, content controls and other nested parents are refused"
+      "reason": "paragraphs are added under the body, cells and block content controls (record 0251a); parents whose raw position is not proven are refused"
     },
     {
       "subject": "operation",
       "verb": "add",
       "element": "run",
-      "context": "nested-or-unproven-parent",
+      "context": "wrapped-or-unproven-parent",
       "code": "unsupported_capability",
       "followUp": "L-DOCX-W2",
-      "reason": "run creation is admitted only under a proven direct body paragraph and refuses wrapped or nested paragraph parents"
+      "reason": "runs are added beside the direct runs of any proven paragraph (record 0251a); insertion inside a hyperlink and under wrapped paragraphs is refused"
     },
     {
       "subject": "operation",
@@ -2917,10 +3001,10 @@
       "subject": "operation",
       "verb": "remove",
       "element": "paragraph/run",
-      "context": "nested-or-unproven-selection",
+      "context": "wrapped-or-unproven-selection",
       "code": "unsupported_capability",
       "followUp": "L-DOCX-W2 / L-DOCX-W3",
-      "reason": "only direct body paragraphs and their direct runs have transaction positions proven for removal; nested selections are refused"
+      "reason": "paragraphs, runs, hyperlinks, tables, rows, cells and content controls are removed through proven element paths (record 0251a); wrapped selections, the last paragraph of a cell, the last cell of a row and the last row of a table are refused"
     },
     {
       "subject": "operation",
@@ -2944,10 +3028,10 @@
       "subject": "operation",
       "verb": "move",
       "element": "paragraph/run",
-      "context": "nested-or-unproven-selection",
+      "context": "wrapped-or-unproven-selection",
       "code": "unsupported_capability",
       "followUp": "L-DOCX-W3",
-      "reason": "only direct main-body paragraphs and their direct runs can be moved; nested and wrapped selections have no proven body or run anchor"
+      "reason": "body paragraphs, direct runs, tables, rows and nested paragraphs move through proven anchors (record 0251a); nested runs and wrapped selections have no proven anchor"
     },
     {
       "subject": "operation",
@@ -2975,6 +3059,24 @@
       "code": "unsupported_capability",
       "followUp": "L-DOCX-W3",
       "reason": "only direct main-body paragraphs or direct runs can be swapped; nested and wrapped selections have no proven anchors"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "cell",
+      "context": "cell-insertion",
+      "code": "unsupported_capability",
+      "followUp": "M2 (DOCX table grid editing)",
+      "reason": "a cell changes the table grid; rows are added with the grid's cells, and adding a single cell is not integrated"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "table/row",
+      "context": "table-properties",
+      "code": "unsupported_capability",
+      "followUp": "M2 (DOCX table properties)",
+      "reason": "table and row properties are read and seed new tables and rows; changing them on an existing table is not integrated"
     },
     {
       "subject": "operation",

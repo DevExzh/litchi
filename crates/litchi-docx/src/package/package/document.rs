@@ -2,7 +2,8 @@
 
 use super::super::model::{Error, MutableDocument, PackURI, Package, Result};
 use super::transfer::{
-    apply_transfer_graph, relationship_graph_digest, relationship_graph_digest_opc,
+    apply_graph_change, apply_transfer_graph, relationship_graph_digest,
+    relationship_graph_digest_opc,
 };
 use litchi_opc::OpcError;
 
@@ -181,6 +182,16 @@ impl Package {
         let source = self.document_patch_source(patch)?;
         self.validate_transfer_operations(patch.operations())?;
         let graph_transition = transfer_graph_transition(patch.operations())?;
+        let graph_changes: Vec<(std::sync::Arc<crate::document::GraphChange>, bool)> = patch
+            .operations()
+            .iter()
+            .filter_map(|operation| match operation {
+                crate::document::Operation::ChangeGraph { change, forward } => {
+                    Some((std::sync::Arc::clone(change), *forward))
+                },
+                _ => None,
+            })
+            .collect();
         let candidate = match source {
             DocumentPatchSource::Reused(candidate) => candidate,
             DocumentPatchSource::Rescanned(current) => patch.apply(&current)?,
@@ -201,6 +212,10 @@ impl Package {
             None => MainReplacement::Copied(candidate.xml_bytes().to_vec()),
         };
         self.edit_semantic_opc("apply", move |opc| {
+            for (change, forward) in &graph_changes {
+                apply_graph_change(opc, change, *forward)
+                    .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+            }
             if let Some((graph, insert, expected_digest)) = graph_transition {
                 apply_transfer_graph(opc, &graph, insert)
                     .map_err(|error| Error::InvalidFormat(error.to_string()))?;
@@ -317,6 +332,15 @@ impl Package {
                     return Err(crate::document::Error::StaleSource);
                 }
             }
+        }
+        if patch
+            .operations()
+            .iter()
+            .any(|operation| operation.op == "graph.change")
+        {
+            return Err(crate::document::Error::InvalidDurable(
+                "package graph changes publish through Package::apply".into(),
+            ));
         }
         let transfer_operations = crate::document::durable_transfer_operations(patch)?;
         let graph_transition = transfer_graph_transition(&transfer_operations)?;
@@ -445,43 +469,14 @@ impl Package {
         Ok(())
     }
 
-    /// Get a mutable document for writing and modification.
-    ///
-    /// This returns a `MutableDocument` that allows you to add and modify
-    /// paragraphs, tables, and other document elements.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// use litchi_docx::Package;
-    ///
-    /// let mut pkg = Package::new()?;
-    /// let mut doc = pkg.document_mut()?;
-    ///
-    /// // Add content
-    /// doc.add_paragraph_with_text("Hello, World!");
-    /// let para = doc.add_paragraph();
-    /// para.add_run_with_text("Bold text").bold(true);
-    ///
-    /// // Add a table
-    /// let table = doc.add_table(3, 2);
-    /// if let Some(cell) = table.cell(0, 0) {
-    ///     cell.set_text("Header 1");
-    /// }
-    ///
-    /// pkg.save("output.docx")?;
-    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
-    /// ```
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when mutable semantic state cannot be synchronized or
-    /// the main document XML is invalid.
-    pub fn document_mut(&mut self) -> Result<&mut MutableDocument> {
+    /// The legacy authoring document, hydrated from the main part on first
+    /// use. Public authoring goes through [`crate::Builder::document`];
+    /// opened packages change through [`Self::edit`].
+    pub(crate) fn authoring_document(&mut self) -> Result<&mut MutableDocument> {
         if self.raw_edit_committed {
             return Err(Error::UnsafeEdit {
                 format: "DOCX",
-                operation: "document_mut",
+                operation: "authoring_document",
                 reason: "a raw OPC edit committed; use edit_opc for further low-level changes",
             });
         }
@@ -572,7 +567,11 @@ fn transfer_graph_transition(
             | crate::document::Operation::InsertParagraphFragment { .. }
             | crate::document::Operation::RemoveParagraphFragment { .. }
             | crate::document::Operation::InsertRun { .. }
-            | crate::document::Operation::RemoveRun { .. } => None,
+            | crate::document::Operation::RemoveRun { .. }
+            | crate::document::Operation::ReplaceElement { .. }
+            | crate::document::Operation::InsertElement { .. }
+            | crate::document::Operation::RemoveElement { .. }
+            | crate::document::Operation::ChangeGraph { .. } => None,
         };
         if let Some(selected_transition) = candidate {
             if selected.is_some() {

@@ -229,14 +229,13 @@ fn bom_and_mce_visibility_are_preserved_across_repeated_index_queries() {
 
 #[test]
 fn eager_mutable_save_replaces_cached_ranges_and_survives_reopen() {
-    let mut package =
-        Package::from_reader(Cursor::new(docx_bytes(document_xml(&["before"])))).unwrap();
+    let package = Package::from_reader(Cursor::new(docx_bytes(document_xml(&["before"])))).unwrap();
     assert_eager_view(&package.document().unwrap(), &["before"]);
 
-    package
-        .document_mut()
-        .unwrap()
-        .add_paragraph_with_text("after");
+    let mut edit = package.edit().unwrap();
+    edit.insert_paragraph(litchi_core::Position::new(1), "after")
+        .unwrap();
+    let mut package = edit.commit().unwrap().into_package();
     let output = tempfile::NamedTempFile::with_suffix(".docx").unwrap();
     package.save(output.path()).unwrap();
 
@@ -313,20 +312,21 @@ fn eager_root_relationship_retarget_replaces_cached_ranges_and_survives_save() {
 
 #[test]
 fn eager_failed_save_keeps_warmed_generation_retryable() {
-    let mut package =
-        Package::from_reader(Cursor::new(docx_bytes(document_xml(&["before"])))).unwrap();
+    let package = Package::from_reader(Cursor::new(docx_bytes(document_xml(&["before"])))).unwrap();
     assert_eager_view(&package.document().unwrap(), &["before"]);
 
-    package
-        .document_mut()
-        .unwrap()
-        .add_paragraph_with_text("after");
-    assert!(package.write_to(FailingWriter).is_err());
+    let mut edit = package.edit().unwrap();
+    edit.insert_paragraph(litchi_core::Position::new(1), "after")
+        .unwrap();
+    let mut changed = edit.commit().unwrap().into_package();
+    assert!(changed.write_to(FailingWriter).is_err());
 
-    // The failed sink must leave the published OPC generation unchanged. The
-    // staged mutable document remains retryable, while the warmed index still
-    // describes the old XML rather than an unpublished candidate.
+    // The failed sink must leave both published OPC generations unchanged:
+    // the source keeps its warmed index of the old XML, and the committed
+    // package stays retryable.
     assert_eager_view(&package.document().unwrap(), &["before"]);
+    assert_eager_view(&changed.document().unwrap(), &["before", "after"]);
+    let mut package = changed;
 
     let output = tempfile::NamedTempFile::with_suffix(".docx").unwrap();
     package.save(output.path()).unwrap();
@@ -572,13 +572,12 @@ fn owned_eager_projection_survives_failed_edit_and_failed_save() {
     });
     assert!(error.is_err());
     assert!(std::ptr::eq(document.opc_package(), package.opc_package()));
-    package
-        .document_mut()
-        .unwrap()
-        .add_paragraph_with_text("after");
+    let mut edit = package.edit().unwrap();
+    edit.insert_paragraph(litchi_core::Position::new(1), "after")
+        .unwrap();
+    let mut package = edit.commit().unwrap().into_package();
     assert!(package.write_to(FailingWriter).is_err());
     assert_eager_view(&document, &["before"]);
-    assert!(std::ptr::eq(document.opc_package(), package.opc_package()));
     let mut output = Cursor::new(Vec::new());
     package.write_to(&mut output).unwrap();
     assert_eager_view(&package.document().unwrap(), &["before", "after"]);

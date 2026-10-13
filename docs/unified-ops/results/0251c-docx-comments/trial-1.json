@@ -1,0 +1,82 @@
+{
+  "schema": "docx_element_set_benchmark.v1",
+  "fixture": {
+    "body_paragraphs": 200,
+    "table_rows": 20,
+    "table_columns": 5,
+    "bytes": 2120
+  },
+  "rounds": 9,
+  "warmup_rounds": 2,
+  "iterations_per_sample": 64,
+  "order": "ABBA",
+  "timing": "eager owners opened once; each sample stages and commits one write from the same immutable owner; output checks excluded",
+  "cases": [
+    {
+      "case": "cell_paragraph_align",
+      "skipped": true
+    },
+    {
+      "case": "cell_text",
+      "skipped": true
+    },
+    {
+      "case": "hyperlink_run_bold",
+      "skipped": true
+    },
+    {
+      "case": "table_add_3x3",
+      "skipped": true
+    },
+    {
+      "case": "hyperlink_add_url",
+      "skipped": true
+    },
+    {
+      "case": "comment_add_paragraph",
+      "leaf_median_ns": 191180.015625,
+      "unified_median_ns": 200371.875,
+      "ratio": 1.048079603639273,
+      "leaf_samples_ns": [
+        190684.625,
+        190720.40625,
+        190728.375,
+        190776.03125,
+        190836.34375,
+        191036.03125,
+        191117.125,
+        191124.78125,
+        191168.0625,
+        191191.96875,
+        191224.796875,
+        191419.328125,
+        191530.5625,
+        191537.4375,
+        191582.90625,
+        191763.375,
+        191843.0625,
+        191862.4375
+      ],
+      "unified_samples_ns": [
+        199541.25,
+        199771.09375,
+        199865.0,
+        200097.65625,
+        200122.96875,
+        200190.625,
+        200256.875,
+        200319.84375,
+        200370.46875,
+        200373.28125,
+        200395.0,
+        200420.0,
+        200422.34375,
+        200451.71875,
+        200488.59375,
+        200646.71875,
+        200674.703125,
+        200937.03125
+      ]
+    }
+  ]
+}

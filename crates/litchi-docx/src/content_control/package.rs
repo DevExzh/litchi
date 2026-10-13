@@ -1806,7 +1806,7 @@ mod tests {
         assert!(!commit.patch().is_applied());
 
         package
-            .document_mut()
+            .authoring_document()
             .unwrap()
             .add_paragraph_with_text("pending facade state");
 

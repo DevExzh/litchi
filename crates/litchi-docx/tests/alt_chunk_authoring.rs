@@ -17,6 +17,25 @@ const HEADER_FIXTURE: &[u8] = include_bytes!(
     "../../../test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx"
 );
 
+/// The package as a reader sees it after publication: the alt-chunk
+/// mutators stage their edits until the package is written.
+fn published(package: &Package) -> Package {
+    Package::from_bytes(&package.clone().to_bytes().unwrap()).unwrap()
+}
+
+fn published_main_xml(package: &Package) -> String {
+    let published = published(package);
+    String::from_utf8(
+        published
+            .opc_package()
+            .main_document_part()
+            .unwrap()
+            .blob()
+            .to_vec(),
+    )
+    .unwrap()
+}
+
 fn package_with_document(
     xml: String,
     relationships: &[(&str, &str, &str, bool)],
@@ -127,7 +146,15 @@ fn markup_compatibility_selectors_and_package_indexes_share_the_active_branch() 
         assert_eq!(paragraph.text().unwrap(), "active");
         assert!(matches!(blocks[1], Block::Alt(_)));
     }
-    assert_eq!(package.document_mut().unwrap().alts().len(), 1);
+    assert_eq!(
+        published(&package)
+            .document()
+            .unwrap()
+            .alts()
+            .unwrap()
+            .len(),
+        1
+    );
     assert!(package.remove_alt(1).is_err());
     let old = package
         .replace_alt(
@@ -137,7 +164,7 @@ fn markup_compatibility_selectors_and_package_indexes_share_the_active_branch() 
         )
         .unwrap();
     assert_eq!(old.relationship().as_str(), "fallback");
-    let output = package.document_mut().unwrap().to_xml().unwrap();
+    let output = published_main_xml(&package);
     assert!(output.contains(r#"<w:altChunk r:id="inactive"/>"#));
     assert!(output.contains("<w:t>inactive</w:t>"));
     assert!(!output.contains(r#"r:id="fallback""#));
@@ -179,7 +206,7 @@ fn inherited_transitional_and_strict_aliases_support_package_crud() {
             "old"
         );
         assert_eq!(
-            package.document_mut().unwrap().alts()[0]
+            published(&package).document().unwrap().alts().unwrap()[0]
                 .relationship()
                 .as_str(),
             "old"
@@ -194,7 +221,7 @@ fn inherited_transitional_and_strict_aliases_support_package_crud() {
             .unwrap();
         package.move_alt(1, 0).unwrap();
         assert_eq!(
-            package.document_mut().unwrap().alts()[0]
+            published(&package).document().unwrap().alts().unwrap()[0]
                 .relationship()
                 .as_str(),
             "old"
@@ -209,7 +236,7 @@ fn inherited_transitional_and_strict_aliases_support_package_crud() {
         assert_eq!(replaced.relationship().as_str(), "old");
         let removed = package.remove_alt(1).unwrap();
         assert_eq!(removed, inserted);
-        let output = package.document_mut().unwrap().to_xml().unwrap();
+        let output = published_main_xml(&package);
         assert!(output.contains("<d:document"));
         assert!(output.contains("<d:t>preserved</d:t>"));
 
@@ -383,7 +410,15 @@ fn removal_preserves_a_target_still_referenced_by_another_relationship() {
     package.remove_alt(0).unwrap();
     let target = PackURI::new("/word/shared.html").unwrap();
     assert!(package.opc_package().get_part(&target).is_ok());
-    assert_eq!(package.document_mut().unwrap().alts().len(), 1);
+    assert_eq!(
+        published(&package)
+            .document()
+            .unwrap()
+            .alts()
+            .unwrap()
+            .len(),
+        1
+    );
 }
 
 #[test]
@@ -441,14 +476,30 @@ fn malformed_relationship_and_invalid_index_leave_the_package_unchanged() {
     );
     let part_count = package.opc_package().part_count();
     assert!(package.remove_alt(0).is_err());
-    assert_eq!(package.document_mut().unwrap().alts().len(), 1);
+    assert_eq!(
+        published(&package)
+            .document()
+            .unwrap()
+            .alts()
+            .unwrap()
+            .len(),
+        1
+    );
     assert!(
         package
             .insert_alt(2, Import::data(Data::Html(b"new".to_vec())), None,)
             .is_err()
     );
     assert_eq!(package.opc_package().part_count(), part_count);
-    assert_eq!(package.document_mut().unwrap().alts().len(), 1);
+    assert_eq!(
+        published(&package)
+            .document()
+            .unwrap()
+            .alts()
+            .unwrap()
+            .len(),
+        1
+    );
 }
 
 #[test]
@@ -475,7 +526,15 @@ fn authoring_refuses_to_exceed_the_parser_anchor_limit() {
             .is_err()
     );
     assert_eq!(package.opc_package().part_count(), part_count);
-    assert_eq!(package.document_mut().unwrap().alts().len(), MAX_CHUNKS);
+    assert_eq!(
+        published(&package)
+            .document()
+            .unwrap()
+            .alts()
+            .unwrap()
+            .len(),
+        MAX_CHUNKS
+    );
 }
 
 #[test]
@@ -500,7 +559,7 @@ fn semantic_insert_preserves_unrelated_mce_and_unknown_xml() {
             Some(true),
         )
         .unwrap();
-    let output = package.document_mut().unwrap().to_xml().unwrap();
+    let output = published_main_xml(&package);
     assert!(output.contains(r#"<x:sentinel value="untouched"/>"#));
     assert!(output.contains(r#"<x:opaque keep="yes">foreign</x:opaque>"#));
     assert!(output.contains(r#"<x:tail keep="yes"/>"#));

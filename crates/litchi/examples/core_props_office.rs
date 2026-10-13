@@ -27,19 +27,20 @@ fn main() -> Result<()> {
 fn create_docx(directory: &Path) -> Result<()> {
     let authored = directory.join("core-props.docx");
     let cleared = directory.join("core-props-cleared.docx");
-    let mut package = docx::Package::new()?;
-    package
-        .document_mut()?
+    let mut builder = docx::Builder::new()?;
+    builder
+        .document()?
         .add_heading("Litchi core-properties verification", 1)?;
-    package
-        .document_mut()?
+    builder
+        .document()?
         .add_paragraph_with_text("Word opened a move-authored metadata package.");
-    let _ = package.put_props(smoke_props("DOCX"));
-    package.save(&authored)?;
+    let mut metadata = builder.build()?.edit_metadata();
+    metadata.set(smoke_props("DOCX"));
+    metadata.commit()?.into_package().save(&authored)?;
 
-    let mut package = docx::Package::open(&authored)?;
-    let _ = package.clear_props();
-    package.save(&cleared)?;
+    let mut metadata = docx::Package::open(&authored)?.edit_metadata();
+    metadata.clear();
+    metadata.commit()?.into_package().save(&cleared)?;
     Ok(())
 }
 

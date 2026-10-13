@@ -716,12 +716,29 @@ impl Owner {
     /// package — change 0593's `noop` scenario.
     fn edit(&mut self, corpus: &SaveCorpus) -> Result<EditOutcome, Box<dyn Error>> {
         match self {
-            Self::Docx(package) => match package.document_mut() {
-                Ok(document) => {
-                    document.add_paragraph_with_text(EDIT_MARKER);
-                    Ok(EditOutcome::Admitted)
-                },
-                Err(error) => Ok(EditOutcome::Refused(format!("refused:{error}"))),
+            Self::Docx(package) => {
+                // `document_mut` hydration was deleted (ADR 0034 §9); the
+                // documented editor of an opened package is the immutable
+                // main-document edit, appending one plain paragraph.
+                let outcome = (|| -> Result<litchi_docx::Package, String> {
+                    let count = package
+                        .document_snapshot()
+                        .map_err(|error| error.to_string())?
+                        .paragraph_count();
+                    let mut edit = package.edit().map_err(|error| error.to_string())?;
+                    edit.insert_paragraph(litchi_core::Position::new(count), EDIT_MARKER)
+                        .map_err(|error| error.to_string())?;
+                    edit.commit()
+                        .map(litchi_docx::document::Commit::into_package)
+                        .map_err(|error| error.to_string())
+                })();
+                match outcome {
+                    Ok(next) => {
+                        **package = next;
+                        Ok(EditOutcome::Admitted)
+                    },
+                    Err(error) => Ok(EditOutcome::Refused(format!("refused:{error}"))),
+                }
             },
             Self::Xlsx(workbook) => {
                 let outcome = (|| -> Result<litchi_xlsx::Package, String> {
@@ -1179,7 +1196,7 @@ pub(crate) fn build_corpus(
         .unwrap_or_else(|| "admitted".to_owned());
     let edit_description = match format {
         Format::Docx => {
-            format!("Package::document_mut().add_paragraph_with_text({EDIT_MARKER:?})")
+            format!("Package::edit().insert_paragraph(end, {EDIT_MARKER:?}) and commit")
         },
         Format::Xlsx => format!(
             "Workbook::edit().sheet({xlsx_sheet:?}).set({xlsx_address:?}, {EDIT_MARKER:?}) and commit"

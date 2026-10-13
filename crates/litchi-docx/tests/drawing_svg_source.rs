@@ -29,11 +29,11 @@ const SVG_URI: &str = "{96DAC541-7B7A-43D3-8B79-37D633B846F1}";
 
 const INLINE_FIXTURE: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../3rdparty/Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/svg.docx"
+    "/../../test-data/Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/svg.docx"
 );
 const FLOATING_FIXTURE: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../3rdparty/libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf164835_nonDummyLineHeight.docx"
+    "/../../test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf164835_nonDummyLineHeight.docx"
 );
 
 #[derive(Debug, Eq, PartialEq)]

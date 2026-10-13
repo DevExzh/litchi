@@ -48,9 +48,9 @@ fn accepts_strict_sections_and_rejects_malformed_body_final_placement() {
 
 #[test]
 fn package_roundtrip_keeps_distinct_section_header_footer_parts() {
-    let mut package = Package::new().unwrap();
+    let mut builder = litchi_docx::Builder::new().unwrap();
     {
-        let document = package.document_mut().unwrap();
+        let document = builder.document().unwrap();
         document.add_paragraph_with_text("first");
         document.add_paragraph_with_text("second");
         let mut first = SectionProperties::default().with_start_type(Start::NewPage);
@@ -79,6 +79,7 @@ fn package_roundtrip_keeps_distinct_section_header_footer_parts() {
             )
             .unwrap();
     }
+    let mut package = builder.build().unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
     package.write_to(&mut bytes).unwrap();

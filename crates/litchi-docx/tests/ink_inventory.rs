@@ -460,12 +460,13 @@ fn payload_annotation_relationship_and_dirty_state_limits_are_enforced() {
     ] {
         assert!(package.ink_with_limits(limits).is_err());
     }
-    let mut package = Package::new().unwrap();
-    package
-        .document_mut()
+    let mut builder = litchi_docx::Builder::new().unwrap();
+    builder
+        .document()
         .unwrap()
         .add_paragraph()
         .add_run_with_text("pending");
+    let package = builder.package();
     assert!(matches!(package.ink(), Err(Error::UnsafeEdit { .. })));
 }
 

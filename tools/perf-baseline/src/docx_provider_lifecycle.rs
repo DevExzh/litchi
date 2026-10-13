@@ -1441,11 +1441,12 @@ mod tests {
 
     #[test]
     fn source_change_is_rejected_by_the_typed_owner() {
-        let mut package = OwnedPackage::new().expect("small DOCX package");
-        package
-            .document_mut()
+        let mut builder = litchi_docx::Builder::new().expect("small DOCX package");
+        builder
+            .document()
             .expect("document")
             .add_paragraph_with_text("source-change");
+        let mut package = builder.build().expect("finalized DOCX package");
         let mut bytes = Cursor::new(Vec::new());
         package.write_to(&mut bytes).expect("serialize DOCX");
         let source: Arc<dyn ReadAt> = Arc::new(ChangingSource {

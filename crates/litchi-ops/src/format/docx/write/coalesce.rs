@@ -14,7 +14,7 @@ impl Plan {
     }
     fn stage(&self, edit: &mut WorkEdit) -> Result<()> {
         for assignment in &self.assignments {
-            edit.apply(self.target.selection, assignment)?;
+            edit.apply(&self.target, assignment)?;
         }
         Ok(())
     }
@@ -44,7 +44,7 @@ impl Docx {
             return Ok(None);
         }
         let result = (|| {
-            let mut targets = admit_targets(self.resolve_targets(target)?)?;
+            let mut targets = admit_targets(&self.resolve_targets(target)?)?;
             let target = targets
                 .pop()
                 .ok_or_else(|| Error::new(Code::InternalError, "direct target is missing"))?;
@@ -59,7 +59,12 @@ fn plan(target: Target, props: &Props<'_>) -> Result<Option<Plan>> {
         if assignment
             .entry
             .prepare(Operation::Set, &assignment.value, |setter, _| {
-                Ok(setter.is_text())
+                // Lists stage numbering definitions: a barrier (0251e).
+                Ok(setter.is_text()
+                    || matches!(
+                        setter,
+                        super::Setter::ParagraphListStyle | super::Setter::ParagraphListStart
+                    ))
             })?
         {
             return Ok(None);
@@ -93,7 +98,7 @@ impl Run {
     ) -> Result<Option<Plan>> {
         if let Some((key, proven)) = &self.last_target {
             if key.as_ref() == spelling {
-                return self.base.owner().finish(plan(*proven, props));
+                return self.base.owner().finish(plan(proven.clone(), props));
             }
         }
         self.base.formatting_plan(target, props)
@@ -144,7 +149,7 @@ impl Run {
                     .as_ref()
                     .is_none_or(|(key, _)| key.as_ref() != spelling)
                 {
-                    self.last_target = Some((spelling.into(), plan.target));
+                    self.last_target = Some((spelling.into(), plan.target.clone()));
                 }
             } else {
                 self.last_target = None;

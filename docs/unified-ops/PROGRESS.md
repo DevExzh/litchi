@@ -328,6 +328,12 @@ Cut from `e467bcf4e8`:
   - Read overhead of 1.6–7× is traced to the shared resolver and walker and handed to the p8 perf stream.
   - Feature-subset build fixes made at the merge: signature-test imports, an encryption-gated test, and the `round_trip` dead code in pptx-less builds.
 
+- Merged `p7a-docx` (0251–0251f):
+  - Leaf: docx metadata transaction, `Builder` and `write_to`.
+  - Writes: nested paragraph/run/hyperlink/table; hyperlink add and retarget; comments add and remove; picture add; list definitions and `listStyle`.
+  - A 10k fanout is one write (op cap 4,096 → 65,536), ~1.05×.
+  - Misses: single set 1.18×; cell writes ~1.24×.
+
 Still running from R1: `p7a-docx` (0251), `p7c-pptx` (0252), `p6-ooxml-meta` (0253).
 
 Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-pptx-w4` 9474e2b6ce, `uo/m2-l-xlsb-w1` 876588a23c, `uo/m1-r4-perf` 012fd509ff.

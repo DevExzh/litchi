@@ -13,8 +13,8 @@ use litchi_core::patch::{
 use serde_json::Value;
 
 use super::{
-    Commit, CompositionLimits, Edit, Error as TransactionError, HistoryLimits,
-    MAX_DOCUMENT_XML_BYTES, MAX_OPERATIONS, ManagedAdmission, Operation, Patch,
+    Commit, CompositionLimits, Edit, Error as TransactionError, GraphChange, HistoryLimits,
+    MAX_DOCUMENT_XML_BYTES, MAX_OPERATIONS, ManagedAdmission, Operation, Patch, ReplacedPart,
     Result as TransactionResult, RevisionAction, RevisionKind, Snapshot, SourceIdentity,
     TableCellAddress, TransferGraph, TransferPart, TransferRelationship, XmlStorage,
 };
@@ -878,7 +878,11 @@ fn history_graph_transition(
             | Operation::InsertParagraphFragment { .. }
             | Operation::RemoveParagraphFragment { .. }
             | Operation::InsertRun { .. }
-            | Operation::RemoveRun { .. } => None,
+            | Operation::RemoveRun { .. }
+            | Operation::ReplaceElement { .. }
+            | Operation::InsertElement { .. }
+            | Operation::RemoveElement { .. }
+            | Operation::ChangeGraph { .. } => None,
         };
         if let Some(selected_transition) = candidate {
             if selected.is_some() {
@@ -1198,6 +1202,24 @@ fn operation_effects(
                 // selector of the paragraph reads this key.
                 reads.push("body/paragraph-order".to_owned());
                 writes.push(format!("body/paragraph:{}/all-text", paragraph.get()));
+            },
+            Operation::ReplaceElement { path, .. } => {
+                // A path-addressed element is reached through the body's
+                // block order; a direct-body paragraph's whole text changes
+                // with it.
+                reads.push("body/paragraph-order".to_owned());
+                if let Some(super::ElementStep::Paragraph(position)) = path.steps().first() {
+                    writes.push(format!("body/paragraph:{}/all-text", position.get()));
+                }
+                writes.push(format!("body/element:{path}"));
+            },
+            Operation::InsertElement { container, .. }
+            | Operation::RemoveElement { container, .. } => {
+                writes.push("body/paragraph-order".to_owned());
+                writes.push(format!("body/element:{container}/children"));
+            },
+            Operation::ChangeGraph { .. } => {
+                writes.push("package/graph".to_owned());
             },
         }
     }
@@ -1678,6 +1700,48 @@ fn durable_operation(
             ),
             markup_value(xml, "run")?,
         ),
+        Operation::ChangeGraph { change, forward } => {
+            let identifier = blobs.insert(&encode_graph_change(change)?)?;
+            (
+                "graph.change",
+                if *forward {
+                    "package-graph:forward".to_owned()
+                } else {
+                    "package-graph:inverse".to_owned()
+                },
+                Value::String(identifier.as_hex()),
+            )
+        },
+        Operation::ReplaceElement {
+            path,
+            before,
+            after,
+        } => {
+            preconditions.insert("before".to_owned(), markup_value(before, "element")?);
+            (
+                "element.replace",
+                format!("element:{path}"),
+                markup_value(after, "element")?,
+            )
+        },
+        Operation::InsertElement {
+            container,
+            child,
+            xml,
+        } => (
+            "element.insert",
+            format!("container:{container}/child:{}", child.get()),
+            markup_value(xml, "element")?,
+        ),
+        Operation::RemoveElement {
+            container,
+            child,
+            xml,
+        } => (
+            "element.remove",
+            format!("container:{container}/child:{}", child.get()),
+            markup_value(xml, "element")?,
+        ),
     };
     PatchOperation::new(limits, name, target, preconditions, value)
 }
@@ -1782,7 +1846,11 @@ fn restore_transfer_operation(
         | Operation::InsertParagraphFragment { .. }
         | Operation::RemoveParagraphFragment { .. }
         | Operation::InsertRun { .. }
-        | Operation::RemoveRun { .. } => return Ok(None),
+        | Operation::RemoveRun { .. }
+        | Operation::ReplaceElement { .. }
+        | Operation::InsertElement { .. }
+        | Operation::RemoveElement { .. }
+        | Operation::ChangeGraph { .. } => return Ok(None),
     };
     let graph_identifier = blobs.insert(encode_transfer_graph(graph)?)?;
     let mut preconditions = artifact_precondition(artifact);
@@ -1839,6 +1907,74 @@ fn encode_transfer_graph(graph: &TransferGraph) -> Result<Vec<u8>, litchi_core::
         }
     }
     Ok(output)
+}
+
+/// A package-graph change: its transfer-graph form, then its replaced
+/// parts (name, before, after).
+fn encode_graph_change(change: &GraphChange) -> Result<Vec<u8>, litchi_core::patch::PatchError> {
+    let mut output = encode_transfer_graph(&TransferGraph {
+        main_relationships: Arc::clone(&change.relationships),
+        parts: Arc::clone(&change.parts),
+    })?;
+    put_transfer_count(&mut output, change.replaced.len())?;
+    for replaced in change.replaced.iter() {
+        put_transfer_bytes(&mut output, replaced.name.as_bytes())?;
+        put_transfer_bytes(&mut output, replaced.before.as_slice())?;
+        put_transfer_bytes(&mut output, replaced.after.as_slice())?;
+    }
+    Ok(output)
+}
+
+fn decode_graph_change(bytes: &[u8]) -> TransactionResult<GraphChange> {
+    let mut decoder = TransferGraphDecoder::new(bytes)?;
+    let main_count = decoder.count(crate::document::LimitKind::MainRelationships, 64)?;
+    let mut relationships = Vec::with_capacity(main_count);
+    for _ in 0..main_count {
+        relationships.push(decoder.relationship()?);
+    }
+    let part_count = decoder.count(crate::document::LimitKind::Parts, 256)?;
+    let mut parts = Vec::with_capacity(part_count);
+    let mut total_bytes = 0usize;
+    for _ in 0..part_count {
+        let name = decoder.string()?;
+        let content_type = decoder.string()?;
+        let blob = decoder.bytes()?;
+        total_bytes = checked_transfer_graph_bytes(total_bytes, blob.len())?;
+        let blob = blob.to_vec();
+        let relationship_count =
+            decoder.count(crate::document::LimitKind::PartRelationships, 256)?;
+        let mut part_relationships = Vec::with_capacity(relationship_count);
+        for _ in 0..relationship_count {
+            part_relationships.push(decoder.relationship()?);
+        }
+        parts.push(TransferPart {
+            name,
+            content_type,
+            blob: Arc::new(blob),
+            relationships: part_relationships.into(),
+        });
+    }
+    let replaced_count = decoder.count(crate::document::LimitKind::Parts, 256)?;
+    let mut replaced = Vec::with_capacity(replaced_count);
+    for _ in 0..replaced_count {
+        let name = decoder.string()?;
+        let before = decoder.bytes()?;
+        total_bytes = checked_transfer_graph_bytes(total_bytes, before.len())?;
+        let before = Arc::new(before.to_vec());
+        let after = decoder.bytes()?;
+        total_bytes = checked_transfer_graph_bytes(total_bytes, after.len())?;
+        replaced.push(ReplacedPart {
+            name,
+            before,
+            after: Arc::new(after.to_vec()),
+        });
+    }
+    decoder.finish()?;
+    Ok(GraphChange {
+        relationships: relationships.into(),
+        parts: parts.into(),
+        replaced: replaced.into(),
+    })
 }
 
 fn encode_transfer_relationship(
@@ -2189,6 +2325,64 @@ fn parse_durable_operation(
                 }
             })
         },
+        "graph.change" if operation.preconditions.len() == 2 => {
+            let forward = match operation.target.as_str() {
+                "package-graph:forward" => true,
+                "package-graph:inverse" => false,
+                _ => return Err(invalid_durable("invalid package graph target")),
+            };
+            let identifier = operation
+                .value
+                .as_str()
+                .ok_or_else(|| invalid_durable("graph change value must be a blob identifier"))?;
+            let blob_id = blobs
+                .ids()
+                .find(|candidate| candidate.as_hex() == identifier)
+                .ok_or_else(|| invalid_durable("missing graph change blob"))?;
+            let bytes = blobs
+                .get(blob_id)
+                .ok_or_else(|| invalid_durable("missing graph change blob"))?;
+            Ok(Operation::ChangeGraph {
+                change: Arc::new(decode_graph_change(bytes)?),
+                forward,
+            })
+        },
+        "element.replace" if operation.preconditions.len() == 3 => {
+            let path = operation
+                .target
+                .strip_prefix("element:")
+                .and_then(super::ElementPath::parse)
+                .ok_or_else(|| invalid_durable("invalid element target"))?;
+            Ok(Operation::ReplaceElement {
+                path,
+                before: Arc::new(before()?.into_bytes()),
+                after: Arc::new(after()?.into_bytes()),
+            })
+        },
+        "element.insert" | "element.remove" if operation.preconditions.len() == 2 => {
+            let target = || invalid_durable("invalid element container target");
+            let rest = operation
+                .target
+                .strip_prefix("container:")
+                .ok_or_else(target)?;
+            let (container, child) = rest.rsplit_once("/child:").ok_or_else(target)?;
+            let container = super::ElementPath::parse(container).ok_or_else(target)?;
+            let child = parse_position(child)?;
+            let xml = Arc::new(after()?.into_bytes());
+            Ok(if operation.op == "element.insert" {
+                Operation::InsertElement {
+                    container,
+                    child,
+                    xml,
+                }
+            } else {
+                Operation::RemoveElement {
+                    container,
+                    child,
+                    xml,
+                }
+            })
+        },
         "run.fragment.insert" | "run.fragment.remove" if operation.preconditions.len() == 2 => {
             let target = || invalid_durable("invalid run fragment target");
             let rest = operation
@@ -2346,7 +2540,7 @@ fn validate_semantic_blobs<Mode>(patch: &CorePatch<Mode>) -> TransactionResult<(
     for operation in patch.operations().iter().filter(|operation| {
         matches!(
             operation.op.as_str(),
-            "paragraph.transfer.insert" | "paragraph.transfer.remove"
+            "paragraph.transfer.insert" | "paragraph.transfer.remove" | "graph.change"
         )
     }) {
         referenced.insert(

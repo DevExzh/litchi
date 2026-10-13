@@ -50,7 +50,7 @@ fn demo_unified_api() -> Result<(), Box<dyn std::error::Error>> {
                     let document = package.document()?;
                     let text = document.text()?;
                     println!("Text from {file}: {} characters", text.len());
-                    print_props("  ", package.props());
+                    print_props("  ", package.metadata());
                 },
                 Err(error) => println!("Could not read {file}: {error}"),
             },
@@ -151,7 +151,7 @@ fn demo_docx_reading() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             println!("  Metadata:");
-            print_props("    ", package.props());
+            print_props("    ", package.metadata());
         },
         Err(error) => {
             println!("  File not found or error: {error}");

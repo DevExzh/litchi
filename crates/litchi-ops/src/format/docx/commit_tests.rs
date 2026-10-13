@@ -473,20 +473,22 @@ fn immediate_assignment_borrows_and_deferred_assignment_owns_input() {
 }
 
 #[test]
-fn fanout_write_proofs_load_one_body_per_admission() {
+fn fanout_write_proofs_load_at_most_one_body_per_admission() {
     use crate::format::docx::nav::BODY_LOADS;
     for eager in [true, false] {
         let handle = open(eager);
-        for selector in ["/body/p", "/body/p/r"] {
+        // Paragraphs reuse the body index they were resolved from (record
+        // 0251f); runs read it once per admission.
+        for (selector, loads_expected) in [("/body/p", 0), ("/body/p/r", 1)] {
             let query = crate::query::Query::parse(selector).unwrap();
             let target = query.into_target().unwrap();
             let nodes = handle.resolve_targets(&target).unwrap();
             assert!(nodes.len() >= 2);
             let count = nodes.len();
             BODY_LOADS.with(|loads| loads.set(0));
-            let targets = super::admit_targets(nodes).unwrap();
+            let targets = super::admit_targets(&nodes).unwrap();
             assert_eq!(targets.len(), count);
-            BODY_LOADS.with(|loads| assert_eq!(loads.get(), 1));
+            BODY_LOADS.with(|loads| assert_eq!(loads.get(), loads_expected));
         }
     }
 }

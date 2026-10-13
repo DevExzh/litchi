@@ -212,11 +212,11 @@ class NodeViewGoldenTests(unittest.TestCase):
                 self.assertSameView(file.find(path), golden(f"node_view/{expected}"))
 
     def test_docx_story_gaps_refuse_as_capabilities_list(self):
-        # Headers, notes and comments are listed gaps (L-DOCX-R5) on trunk.
+        # Headers and notes are listed gaps (L-DOCX-R5) on trunk; comments
+        # are read since record 0251c.
         cases = (
             ("ooxml/docx/headerFooter.docx", "/header[@type=default]", "header"),
             ("ooxml/docx/footnotes.docx", "/footnote[1]", "footnote"),
-            ("ooxml/docx/comment.docx", "/comments", "comments"),
         )
         for relative, path, element in cases:
             with self.subTest(path=path):
@@ -227,6 +227,16 @@ class NodeViewGoldenTests(unittest.TestCase):
                 self.assertIn(f'"{element}"', error.message)
                 elements = {entry["element"]: entry for entry in file.capabilities()["elements"]}
                 self.assertFalse(any(elements[element].get("operations", {}).values()))
+
+    def test_docx_comments_are_read(self):
+        file = open_fixture("ooxml/docx/comment.docx")
+        comments = file.get("/comments")
+        self.assertEqual(comments["type"], "comments")
+        self.assertEqual(comments["childCount"], 1)
+        comment = file.get("/comments/comment[1]")
+        self.assertEqual(comment["format"]["author"], "Unbekannter Autor")
+        # Three paragraphs, the middle one empty, one per line (record 0251c).
+        self.assertEqual(comment["text"], "This is the first line\n\nThis is the second line")
 
     def test_xlsx_fixtures(self):
         cases = (

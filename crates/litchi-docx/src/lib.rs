@@ -13,6 +13,7 @@ mod error;
 pub mod alt;
 pub mod bibliography;
 pub mod bookmark;
+pub mod builder;
 pub mod chart;
 pub mod color;
 pub mod comment;
@@ -33,6 +34,7 @@ pub mod leniency;
 pub mod list;
 pub mod mail_merge;
 pub mod math;
+pub mod metadata;
 pub mod modern_comments;
 mod namespace;
 pub mod numbering;
@@ -119,6 +121,7 @@ pub use bibliography::{
     OOXML_BIBLIOGRAPHY_NAMESPACE, STRICT_OOXML_BIBLIOGRAPHY_NAMESPACE, is_bibliography_namespace,
     is_bibliography_node, is_bibliography_root, parse_bibliography_source_store,
 };
+pub use builder::Builder;
 pub use error::{Error, Result};
 pub use field::{
     ActiveContent, ActiveContentKind, Advance, AdvanceAdjustment, AdvanceOperation, AutoNumber,

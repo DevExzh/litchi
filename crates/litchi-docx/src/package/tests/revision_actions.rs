@@ -10,7 +10,7 @@ const REVISION_DATE_UTC: &str = "2026-07-17T00:00:00.123456+00:00";
 fn authored_source_docx() -> Vec<u8> {
     let mut package = Package::new().unwrap();
     {
-        let document = package.document_mut().unwrap();
+        let document = package.authoring_document().unwrap();
         let paragraph = document.add_paragraph();
         paragraph.add_run_with_text("before ");
         paragraph

@@ -631,7 +631,7 @@ mod tests {
             .set_vba_with(project, &supplemental, &Limits::default())
             .unwrap();
         package
-            .document_mut()
+            .authoring_document()
             .unwrap()
             .add_paragraph_with_text("materialize");
         let mut bytes = Cursor::new(Vec::new());

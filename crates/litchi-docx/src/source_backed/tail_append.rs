@@ -430,8 +430,8 @@ impl<'package> Plan<'package> {
     }
 
     /// Publish the prepared plan to a sequential sink.
-    pub fn write_to_stream(self, writer: impl Write) -> Result<Publication> {
-        self.commit().write_to_stream(writer)
+    pub fn write_to(self, writer: impl Write) -> Result<Publication> {
+        self.commit().write_to(writer)
     }
 }
 
@@ -460,7 +460,7 @@ impl<'package> Commit<'package> {
     }
 
     /// Publish and retain an exact inverse authorization.
-    pub fn write_to_stream(self, writer: impl Write) -> Result<Publication> {
+    pub fn write_to(self, writer: impl Write) -> Result<Publication> {
         publish_commit(self, writer)
     }
 }

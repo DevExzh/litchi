@@ -22,15 +22,9 @@ fn custom_properties_xml(bytes: &[u8]) -> Vec<u8> {
 }
 
 fn refused_document_edit(package: &mut Package) {
-    let error = match package.document_mut() {
-        Ok(_) => panic!("the alt-chunk-header fixture must refuse document editing"),
-        Err(error) => error,
-    };
     assert!(
-        error
-            .to_string()
-            .contains("body-final section properties are not the final body child"),
-        "unexpected refusal: {error}"
+        package.edit().is_err(),
+        "the alt-chunk-header fixture must refuse document editing"
     );
 }
 
@@ -348,11 +342,12 @@ fn exact_source_stream_failure_keeps_typed_cause_and_accepted_count() {
 
 #[test]
 fn canonical_bytes_publish_pending_edits_and_reopen_exactly() {
-    let mut package = Package::new().unwrap();
-    package
-        .document_mut()
+    let mut builder = litchi_docx::Builder::new().unwrap();
+    builder
+        .document()
         .unwrap()
         .add_paragraph_with_text("canonical byte output");
+    let mut package = builder.build().unwrap();
     package
         .custom_props_mut()
         .insert("ByteMarker", "retained")

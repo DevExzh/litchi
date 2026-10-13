@@ -233,7 +233,7 @@ fn managed_read_ahead_supports_semantic_read_then_releases_before_docx_publicati
     assert_eq!(prepared.retained_window_bytes, 0);
     let mut output = Vec::new();
     let publication = plan
-        .write_to_stream(&mut output)
+        .write_to(&mut output)
         .expect("DOCX publication must succeed");
     assert!(!publication.is_noop());
     drop(publication);

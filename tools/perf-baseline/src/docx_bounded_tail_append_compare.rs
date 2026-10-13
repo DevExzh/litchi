@@ -982,7 +982,7 @@ fn build_bounded_candidate(
         return Err("bounded candidate scalar proof is incomplete".into());
     }
     let mut output = Vec::new();
-    let publication = plan.write_to_stream(&mut output)?;
+    let publication = plan.write_to(&mut output)?;
     let replay_verified = publication.candidate_proof() == candidate_proof;
     let candidate_source = litchi_docx::source_backed::Package::from_read_at(Arc::new(
         OwnedSource::new(output.clone()),
@@ -1030,7 +1030,7 @@ fn bounded_stale_source_refusal(
     let plan = edit.prepare()?;
     source.bump_revision();
     let mut output = Vec::new();
-    let result = plan.write_to_stream(&mut output);
+    let result = plan.write_to(&mut output);
     Ok(result.is_err() && output.is_empty())
 }
 
@@ -1043,7 +1043,7 @@ fn bounded_noop_oracle(source_archive_bytes: &[u8], limits: TailAppendLimits) ->
         return Ok(false);
     }
     let mut output = Vec::new();
-    let publication = plan.write_to_stream(&mut output)?;
+    let publication = plan.write_to(&mut output)?;
     if !publication.is_noop() || output != source_archive_bytes {
         return Ok(false);
     }
@@ -1346,7 +1346,7 @@ fn run_bounded_iteration(
         )?;
         let plan = edit.prepare()?;
         let mut output = HashingSink::new();
-        let _publication = plan.write_to_stream(&mut output)?;
+        let _publication = plan.write_to(&mut output)?;
         let sink = output.finish();
         let reads = source.reads();
         (sink, reads)

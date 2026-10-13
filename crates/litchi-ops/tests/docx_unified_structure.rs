@@ -672,10 +672,19 @@ fn invalid_indices_properties_overlaps_and_security_refuse_without_partial_edits
         original_bytes
     );
 
-    let unsupported_table = original.remove("/body/tbl[1]");
-    assert_one_of(
-        unsupported_table.expect_err("table removal is outside the direct-text surface"),
-        &[Code::UnsupportedElement, Code::UnsupportedCapability],
+    // Tables are removable through their element path (record 0251a).
+    let without_table = original
+        .remove("/body/tbl[1]")
+        .unwrap_or_else(|error| panic!("table removal: {error}"));
+    assert!(
+        without_table
+            .find("/body/tbl[1]")
+            .expect("table lookup")
+            .is_none()
+    );
+    assert_eq!(
+        original.to_bytes().expect("republish after table removal"),
+        original_bytes
     );
 
     let no_retain =
