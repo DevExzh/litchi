@@ -1384,6 +1384,9 @@ pub struct Builder {
     pub(super) encryption: Option<WriterEncryption>,
     /// One-use caller-supplied salt and verifier for RC4 authoring.
     pub(super) encryption_entropy: Option<EncryptionEntropy>,
+    /// Workbook properties for the `\x05SummaryInformation` and
+    /// `\x05DocumentSummaryInformation` streams; none are written while empty.
+    pub(super) properties: litchi_ole_common::property_set::SummaryProperties,
 }
 
 impl Default for Builder {

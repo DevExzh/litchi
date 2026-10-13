@@ -1,0 +1,9 @@
+{"case":"doc","bytes":27136,"repeats":50,"native_us":85.2,"unified_us":86.3,"overhead_pct":1.37}
+{"case":"xls","bytes":13824,"repeats":50,"native_us":57.5,"unified_us":58.0,"overhead_pct":0.70}
+{"case":"ppt","bytes":125440,"repeats":50,"native_us":197.9,"unified_us":208.0,"overhead_pct":5.08}
+{"case":"doc","bytes":27136,"repeats":50,"native_us":84.6,"unified_us":86.0,"overhead_pct":1.69}
+{"case":"xls","bytes":13824,"repeats":50,"native_us":57.2,"unified_us":57.9,"overhead_pct":1.29}
+{"case":"ppt","bytes":125440,"repeats":50,"native_us":200.4,"unified_us":210.5,"overhead_pct":5.06}
+{"case":"doc","bytes":27136,"repeats":50,"native_us":83.8,"unified_us":85.9,"overhead_pct":2.41}
+{"case":"xls","bytes":13824,"repeats":50,"native_us":57.2,"unified_us":57.7,"overhead_pct":0.78}
+{"case":"ppt","bytes":125440,"repeats":50,"native_us":171.0,"unified_us":181.9,"overhead_pct":6.33}

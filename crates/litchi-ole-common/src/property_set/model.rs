@@ -303,6 +303,17 @@ impl Section {
         self.properties.get(&identifier)
     }
 
+    /// Whether the section holds no property at all, not even a code page or
+    /// a dictionary.
+    ///
+    /// Such a section carries no information: the format crates' property-set
+    /// transactions treat a blank `SummaryInformation` or
+    /// `DocumentSummaryInformation` section like an absent one.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.properties.is_empty() && self.dictionary.is_empty()
+    }
+
     pub fn property_name(&self, identifier: u32) -> Option<&str> {
         self.dictionary.get(&identifier).map(String::as_str)
     }

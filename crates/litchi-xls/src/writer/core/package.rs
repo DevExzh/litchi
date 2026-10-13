@@ -37,12 +37,16 @@ impl Builder {
             ),
             _ => None,
         };
+        let properties = self.property_streams()?;
         if self.worksheets.is_empty() {
             self.add_worksheet("Sheet1")?;
         }
         let streams = self.generate_workbook_streams(encryption_entropy.as_ref())?;
         let mut ole_writer = OleWriter::new();
         self.populate_compound_document(&mut ole_writer, streams)?;
+        if let Some(properties) = properties {
+            properties.write_into(&mut ole_writer)?;
+        }
         let mut output = std::io::Cursor::new(Vec::new());
         ole_writer.write_to(&mut output)?;
         let password = self

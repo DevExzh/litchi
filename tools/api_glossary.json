@@ -2137,10 +2137,16 @@
           "name": "ResourceLimit",
           "scope": "litchi_doc::Error",
           "replacement": "use Error::Limit"
+        },
+        {
+          "name": "set_property",
+          "scope": "litchi_doc::Builder",
+          "replacement": "Builder::set_metadata(Metadata) plus summary_properties_mut() for custom properties (ADR 0034 §7, record 0254)"
         }
       ],
       "families": [
-        "litchi_doc::package::edit"
+        "litchi_doc::package::edit",
+        "litchi_doc::package::metadata"
       ]
     },
     {
@@ -2329,10 +2335,16 @@
           "name": "ResourceLimit",
           "scope": "litchi_doc::Error",
           "replacement": "use Error::Limit"
+        },
+        {
+          "name": "set_property",
+          "scope": "litchi_doc::Builder",
+          "replacement": "Builder::set_metadata(Metadata) plus summary_properties_mut() for custom properties (ADR 0034 §7, record 0254)"
         }
       ],
       "families": [
-        "litchi_doc::package::edit"
+        "litchi_doc::package::edit",
+        "litchi_doc::package::metadata"
       ]
     },
     {
@@ -2460,10 +2472,16 @@
           "name": "to_bytes",
           "scope": "litchi_xls::Builder",
           "replacement": "call build, then publish the returned Package"
+        },
+        {
+          "name": "set_property",
+          "scope": "litchi_xls::Builder",
+          "replacement": "Builder::set_metadata(Metadata) plus summary_properties_mut() for custom properties (ADR 0034 §7, record 0254)"
         }
       ],
       "families": [
-        "litchi_xls::package::edit"
+        "litchi_xls::package::edit",
+        "litchi_xls::package::metadata"
       ]
     },
     {
@@ -2646,10 +2664,16 @@
           "name": "to_bytes",
           "scope": "litchi_ppt::Builder",
           "replacement": "publish the built Package"
+        },
+        {
+          "name": "set_property",
+          "scope": "litchi_ppt::Builder",
+          "replacement": "Builder::set_metadata(Metadata) plus summary_properties_mut() for custom properties (ADR 0034 §7, record 0254)"
         }
       ],
       "families": [
-        "litchi_ppt::package::edit"
+        "litchi_ppt::package::edit",
+        "litchi_ppt::package::metadata"
       ]
     },
     {

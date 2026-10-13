@@ -19,8 +19,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating PPT file with transitions...");
 
     let mut writer = Builder::new_widescreen();
-    writer.set_property("Title", "Transition Effects Showcase");
-    writer.set_property("Author", "Litchi Transition Demo");
+    writer.set_metadata(litchi_core::Metadata {
+        title: Some("Transition Effects Showcase".to_owned()),
+        author: Some("Litchi Transition Demo".to_owned()),
+        ..litchi_core::Metadata::default()
+    })?;
 
     // Slide 1: Classic Transitions
     println!("Creating slide 1: Classic Transitions");

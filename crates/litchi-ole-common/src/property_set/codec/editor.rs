@@ -2,7 +2,7 @@
 
 use super::super::binding::Binding;
 use super::super::model::{
-    Section, Stream, USER_DEFINED_PROPERTIES_FMTID, invalid, try_clone_property_set,
+    CodePage, Section, Stream, USER_DEFINED_PROPERTIES_FMTID, invalid, try_clone_property_set,
     try_clone_string, try_hash_set_with_capacity, try_vec_with_capacity,
 };
 use super::package::try_path_refs;
@@ -75,12 +75,19 @@ impl Editor {
         F: FnOnce(&mut Section) -> Result<(), OleError>,
     {
         let mut stream = self.load_stream_for_rewrite(kind)?.unwrap_or_else(|| {
-            let base = if kind == Binding::UserDefinedProperties {
-                Binding::DocumentSummaryInformation.format_identifier()
+            if kind == Binding::UserDefinedProperties {
+                // The user-defined section lives second in the
+                // `DocumentSummaryInformation` stream, whose own section
+                // [MS-OSHARED] 2.3.3.2.2 requires to carry a code page: a
+                // blank one would make the stream unreadable to the typed
+                // `document_summary` owner.
+                let mut base =
+                    Section::new(Binding::DocumentSummaryInformation.format_identifier());
+                base.set_page(CodePage::WINDOWS_1252);
+                Stream::new(base)
             } else {
-                kind.format_identifier()
-            };
-            Stream::new(Section::new(base))
+                Stream::new(Section::new(kind.format_identifier()))
+            }
         });
         if stream.section(kind.format_identifier()).is_none() {
             stream.add_section(Section::new(kind.format_identifier()))?;
@@ -155,6 +162,11 @@ impl Editor {
             return Ok(self.original);
         }
         let mut writer = OleWriter::new();
+        // Adopting the source keeps its root and storage class identifiers
+        // (a Word document's `Word.Document.8` CLSID, for one) and lets the
+        // writer reuse the source sector layout while the stream set still
+        // matches; a source it cannot adopt is serialized from scratch.
+        writer.adopt_source_layout(&self.original)?;
         let written_capacity = self
             .streams
             .len()

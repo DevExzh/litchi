@@ -96,3 +96,37 @@ fn reader_opens_a_guid_derived_binding_without_a_format_specific_path() {
         binding.format_identifier()
     );
 }
+
+#[test]
+fn a_user_defined_edit_creates_a_typed_document_summary_section() {
+    let mut writer = OleWriter::new();
+    writer.create_stream(&["Workbook"], b"host").expect("host");
+    let mut source = Cursor::new(Vec::new());
+    writer.write_to(&mut source).expect("CFB source");
+
+    let mut editor = Editor::new(source.into_inner()).expect("editor source");
+    editor
+        .update(Binding::UserDefinedProperties, |section| {
+            section.add_named(2, "Department".into(), Value::Lpstr("Research".into()))
+        })
+        .expect("user-defined edit");
+    let mut ole =
+        OleFile::open(Cursor::new(editor.finish().expect("edited CFB"))).expect("edited CFB opens");
+    let stream = PropertySetReader::property_set(&mut ole, Binding::DocumentSummaryInformation)
+        .expect("document summary stream");
+    assert_eq!(stream.sections.len(), 2);
+    assert_eq!(
+        stream.sections[0].page(),
+        Some(super::super::model::CodePage::WINDOWS_1252)
+    );
+    // The standard section now satisfies the typed owner.
+    super::super::document_summary::Snapshot::from_stream(&stream)
+        .expect("typed document summary section");
+    assert!(
+        stream
+            .section(super::super::model::USER_DEFINED_PROPERTIES_FMTID)
+            .expect("user-defined section")
+            .find_named("Department")
+            .is_some()
+    );
+}

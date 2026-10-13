@@ -10,10 +10,12 @@ fn test_create_writer() {
 #[test]
 fn file_and_seekable_outputs_are_byte_identical() {
     let mut writer = Builder::new();
-    assert!(matches!(
-        writer.set_property("Title", "Canonical output"),
-        Err(WriteError::UnsupportedProperty)
-    ));
+    writer
+        .set_metadata(litchi_core::Metadata {
+            title: Some("Canonical output".to_owned()),
+            ..litchi_core::Metadata::default()
+        })
+        .unwrap();
     writer.add_paragraph("One output assembly path").unwrap();
 
     let mut memory = Cursor::new(Vec::new());
@@ -35,16 +37,27 @@ fn file_and_seekable_outputs_are_byte_identical() {
 }
 
 #[test]
-fn test_set_property() {
+fn test_set_metadata() {
     let mut writer = Builder::new();
-    assert!(matches!(
-        writer.set_property("Title", "Test Document"),
-        Err(WriteError::UnsupportedProperty)
-    ));
-    assert!(matches!(
-        writer.set_property("Author", "Test Author"),
-        Err(WriteError::UnsupportedProperty)
-    ));
+    writer
+        .set_metadata(litchi_core::Metadata {
+            title: Some("Test Document".to_owned()),
+            author: Some("Test Author".to_owned()),
+            ..litchi_core::Metadata::default()
+        })
+        .unwrap();
+    let summary = writer.summary_properties().summary_information();
+    assert_eq!(summary.title(), Some("Test Document"));
+    assert_eq!(summary.author(), Some("Test Author"));
+    let refused = writer.set_metadata(litchi_core::Metadata {
+        identifier: Some("urn:x".to_owned()),
+        ..litchi_core::Metadata::default()
+    });
+    assert!(matches!(refused, Err(WriteError::Metadata(_))));
+    assert_eq!(
+        writer.summary_properties().summary_information().title(),
+        Some("Test Document")
+    );
 }
 
 #[test]

@@ -27,12 +27,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating comprehensive PPT with animations and transitions...");
 
     let mut writer = Builder::new_widescreen();
-    writer.set_property("Title", "Complete Animation & Transition Demo");
-    writer.set_property("Author", "Litchi Comprehensive Demo");
-    writer.set_property(
-        "Subject",
-        "Showcasing PPT Animation and Transition Features",
-    );
+    writer.set_metadata(litchi_core::Metadata {
+        title: Some("Complete Animation & Transition Demo".to_owned()),
+        author: Some("Litchi Comprehensive Demo".to_owned()),
+        subject: Some("Showcasing PPT Animation and Transition Features".to_owned()),
+        ..litchi_core::Metadata::default()
+    })?;
 
     // SLIDE 1: Title Slide with Fade Transition
     println!("Creating slide 1: Title with Fade transition");

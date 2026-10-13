@@ -6,6 +6,7 @@ mod owner;
 pub(crate) use model::Reader;
 pub use owner::Package;
 pub mod edit;
+pub mod metadata;
 pub mod property_set;
 mod source;
 
