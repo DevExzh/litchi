@@ -146,8 +146,18 @@ pub(crate) struct Set {
     /// The node path or scoped selector.
     pub(crate) path: String,
     /// A property assignment `key=value`; repeat for several.
-    #[arg(long = "prop", value_name = "KEY=VALUE", required = true)]
+    #[arg(
+        long = "prop",
+        value_name = "KEY=VALUE",
+        required_unless_present_any = ["find", "replace"]
+    )]
     pub(crate) props: Vec<String>,
+    /// Text to find: the same as `--prop find=TEXT` (OfficeCLI's option).
+    #[arg(long, value_name = "TEXT")]
+    pub(crate) find: Option<String>,
+    /// Replacement for `--find` matches: the same as `--prop replace=TEXT`.
+    #[arg(long, value_name = "TEXT")]
+    pub(crate) replace: Option<String>,
     #[command(flatten)]
     pub(crate) output: Output,
 }
@@ -159,8 +169,17 @@ pub(crate) struct Add {
     /// The parent path, for example `/body` or `/Sheet1`.
     pub(crate) parent: String,
     /// The element type, for example paragraph, run, sheet, slide, shape.
-    #[arg(long = "type", value_name = "TYPE")]
-    pub(crate) kind: String,
+    #[arg(
+        long = "type",
+        value_name = "TYPE",
+        required_unless_present = "from",
+        conflicts_with = "from"
+    )]
+    pub(crate) kind: Option<String>,
+    /// Copy the element at this path instead of creating a new one of a
+    /// type (OfficeCLI `--from`).
+    #[arg(long, value_name = "PATH")]
+    pub(crate) from: Option<String>,
     /// A property assignment `key=value`; repeat for several.
     #[arg(long = "prop", value_name = "KEY=VALUE")]
     pub(crate) props: Vec<String>,
@@ -176,6 +195,10 @@ pub(crate) struct Remove {
     pub(crate) file: PathBuf,
     /// The node path or scoped selector.
     pub(crate) path: String,
+    /// A property assignment `key=value` for the removal (OfficeCLI takes
+    /// revision attributes here); repeat for several.
+    #[arg(long = "prop", value_name = "KEY=VALUE")]
+    pub(crate) props: Vec<String>,
     #[command(flatten)]
     pub(crate) output: Output,
 }

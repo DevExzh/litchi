@@ -25,15 +25,23 @@ pub(crate) fn run(cli: Cli, out: &mut impl Write) -> Result<u8> {
         Command::Capabilities(args) => capabilities(&args, json, out),
         Command::Schema(args) => schema(&args, json, out),
         Command::Set(args) => {
+            // OfficeCLI's `--find T` and `--replace T` are `--prop find=T`
+            // and `--prop replace=T`; they lead the assignments.
+            let assignments: Vec<String> = [("find", &args.find), ("replace", &args.replace)]
+                .into_iter()
+                .filter_map(|(key, value)| value.as_ref().map(|value| format!("{key}={value}")))
+                .chain(args.props.iter().cloned())
+                .collect();
             let mut item = BatchItem::new("set");
             item.path = Some(args.path.as_str().into());
-            item.props = Some(props(&args.props)?);
+            item.props = Some(props(&assignments)?);
             write(&args.file, item, &args.output, "set", json, out)
         },
         Command::Add(args) => {
             let mut item = BatchItem::new("add");
             item.parent = Some(args.parent.as_str().into());
-            item.kind = Some(args.kind.as_str().into());
+            item.kind = args.kind.as_deref().map(Into::into);
+            item.from = args.from.as_deref().map(Into::into);
             if !args.props.is_empty() {
                 item.props = Some(props(&args.props)?);
             }
@@ -43,6 +51,9 @@ pub(crate) fn run(cli: Cli, out: &mut impl Write) -> Result<u8> {
         Command::Remove(args) => {
             let mut item = BatchItem::new("remove");
             item.path = Some(args.path.as_str().into());
+            if !args.props.is_empty() {
+                item.props = Some(props(&args.props)?);
+            }
             write(&args.file, item, &args.output, "remove", json, out)
         },
         Command::Move(args) => {

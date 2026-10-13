@@ -289,6 +289,10 @@ jobs:
         run: python3 -m unittest tools.test_officecli_capability_delta
       - name: Check the capability delta table is current
         run: python3 tools/officecli_capability_delta.py --check
+      - name: Check the OfficeCLI corpus classifier and its table (record 0265)
+        run: |
+          python3 -m unittest tools.test_officecli_corpus
+          python3 tools/officecli_corpus.py --check
 
       - name: Check registered API glossary waves
         run: python3 tools/check_api_glossary.py --target-dir target/api-glossary
