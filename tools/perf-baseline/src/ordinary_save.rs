@@ -692,7 +692,7 @@ impl EditOutcome {
 /// One opened and edited owner of the documented kind.
 enum Owner {
     Docx(Box<litchi_docx::Package>),
-    Xlsx(Box<litchi_xlsx::Workbook>),
+    Xlsx(Box<litchi_xlsx::Package>),
     Pptx(Box<litchi_pptx::Package>),
 }
 
@@ -700,7 +700,7 @@ impl Owner {
     fn open(format: Format, path: &Path) -> Result<Self, Box<dyn Error>> {
         Ok(match format {
             Format::Docx => Self::Docx(Box::new(litchi_docx::Package::open(path)?)),
-            Format::Xlsx => Self::Xlsx(Box::new(litchi_xlsx::Workbook::open(path)?)),
+            Format::Xlsx => Self::Xlsx(Box::new(litchi_xlsx::Package::open(path)?)),
             Format::Pptx => Self::Pptx(Box::new(litchi_pptx::Package::open(path)?)),
         })
     }
@@ -724,7 +724,7 @@ impl Owner {
                 Err(error) => Ok(EditOutcome::Refused(format!("refused:{error}"))),
             },
             Self::Xlsx(workbook) => {
-                let outcome = (|| -> Result<litchi_xlsx::Workbook, String> {
+                let outcome = (|| -> Result<litchi_xlsx::Package, String> {
                     let mut edit = workbook.edit().map_err(|error| error.to_string())?;
                     {
                         let mut sheet = edit
@@ -738,10 +738,10 @@ impl Owner {
                             .map_err(|error| error.to_string())?;
                     }
                     let commit = edit.commit().map_err(|error| error.to_string())?;
-                    if commit.patch().is_empty() {
+                    if commit.patch().is_noop() {
                         return Err("the edit produced an empty patch".to_owned());
                     }
-                    Ok(commit.into_workbook())
+                    Ok(commit.into_package())
                 })();
                 match outcome {
                     Ok(edited) => {
@@ -1047,8 +1047,9 @@ fn checked_uncompressed_member_bytes(
 /// Derives the XLSX edit target from the workbook itself: the first worksheet
 /// the reader reports, and a fixed address inside it.
 fn xlsx_edit_target(path: &Path) -> Result<(String, String), Box<dyn Error>> {
-    let workbook = litchi_xlsx::Workbook::open(path)?;
+    let workbook = litchi_xlsx::Package::open(path)?;
     let sheet = workbook
+        .workbook_ref()
         .sheets()
         .next()
         .ok_or("ordinary-save XLSX corpus declares no worksheet")?;

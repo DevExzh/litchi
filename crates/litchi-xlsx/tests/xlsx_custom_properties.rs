@@ -7,7 +7,7 @@ use litchi_xlsx::{Error, Package};
 const CUSTOM_PART: &str = "/docProps/custom.xml";
 
 fn package() -> OpcPackage {
-    Package::create()
+    Package::new()
         .expect("create XLSX package")
         .into_plain_opc()
 }
@@ -36,7 +36,7 @@ fn signed_package() -> Package {
 
 #[test]
 fn custom_properties_absence_is_explicit() {
-    let mut package = Package::create().expect("create XLSX package");
+    let mut package = Package::new().expect("create XLSX package");
 
     assert!(
         package
@@ -59,12 +59,12 @@ fn custom_properties_round_trip_through_the_xlsx_facade() {
         .insert("Version", Value::I32(38))
         .expect("insert integer property");
 
-    let mut package = Package::create().expect("create XLSX package");
+    let mut package = Package::new().expect("create XLSX package");
     package
         .put_custom_props(props)
         .expect("store custom properties");
     let bytes = package.to_bytes().expect("serialize XLSX package");
-    let reopened = Package::from_bytes(bytes).expect("reopen XLSX package");
+    let reopened = Package::from_bytes(&bytes).expect("reopen XLSX package");
     let props = reopened.custom_props().expect("read custom properties");
 
     assert_eq!(
@@ -84,7 +84,7 @@ fn custom_properties_are_nameable_through_the_xlsx_context() {
         .validate_for(Host::Excel)
         .expect("validate contextual Excel custom property");
 
-    let mut package = Package::create().expect("create XLSX package");
+    let mut package = Package::new().expect("create XLSX package");
     package
         .put_custom_props(props)
         .expect("store contextual custom property");
@@ -101,7 +101,7 @@ fn custom_properties_reject_reserved_non_excel_host_metadata() {
         .insert("ClassificationContentMarkingHeaderText", "Header")
         .expect("valid Word or PowerPoint metadata");
 
-    let mut package = Package::create().expect("create XLSX package");
+    let mut package = Package::new().expect("create XLSX package");
     assert!(matches!(
         package.put_custom_props(props),
         Err(Error::Common(_))
@@ -114,7 +114,7 @@ fn removing_custom_properties_removes_the_complete_package_graph() {
     let mut props = Props::new();
     props.insert("Project", "Litchi").unwrap();
 
-    let mut package = Package::create().expect("create XLSX package");
+    let mut package = Package::new().expect("create XLSX package");
     package.put_custom_props(props).unwrap();
     package.remove_custom_props().unwrap();
     assert!(package.custom_props().unwrap().is_empty());

@@ -58,7 +58,7 @@ fn public_parser_rejects_undeclared_or_malformed_opaque_attribute_entities() {
 #[test]
 fn public_model_import_closes_inherited_xml_context_without_rebasing_nested_overrides() {
     let source_bytes = source_with_context(SOURCE, SOURCE_BASE);
-    let source = Package::from_bytes(source_bytes.clone()).unwrap();
+    let source = Package::from_bytes(&source_bytes).unwrap();
     let model = source.data_model().unwrap().model().unwrap().to_owned();
     let extension = String::from_utf8(
         model
@@ -82,7 +82,7 @@ fn public_model_import_closes_inherited_xml_context_without_rebasing_nested_over
     let destination_bytes = replace_workbook(&destination_bytes, |xml| {
         xml.replace(SOURCE_BASE, DESTINATION_BASE)
     });
-    let mut destination = Package::from_bytes(destination_bytes).unwrap();
+    let mut destination = Package::from_bytes(&destination_bytes).unwrap();
     destination.put_data_model(model).unwrap();
 
     let imported = String::from_utf8(
@@ -113,7 +113,7 @@ fn public_model_context_capture_survives_descriptor_edit_and_exact_inverse() {
         .unwrap()
         .blob()
         .to_vec();
-    let mut package = Package::from_bytes(source_bytes).unwrap();
+    let mut package = Package::from_bytes(&source_bytes).unwrap();
     let mut edit = package.edit_data_model().unwrap();
     edit.edit_definition(|definition| {
         definition.min_version_load += 1;

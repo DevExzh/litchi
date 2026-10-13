@@ -307,11 +307,10 @@ fn changed_edit_reopens_inverts_and_changes_only_the_selected_worksheet() {
             assert_eq!(part.blob(), output_part.blob());
         }
     }
-    let reopened = Package::from_bytes(output).unwrap();
+    let reopened = Package::from_bytes(&output).unwrap();
     assert_eq!(
         reopened
             .workbook()
-            .unwrap()
             .sheet("Sheet1")
             .unwrap()
             .unwrap()

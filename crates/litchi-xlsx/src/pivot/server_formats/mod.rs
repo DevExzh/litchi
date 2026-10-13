@@ -11,12 +11,12 @@
 //!
 //! The ordinary workbook surface is `Workbook::pivot_table_server_formats`
 //! (also available as `Workbook::pivot_server_formats`) for typed reads and
-//! `Workbook::edit_pivot_table` for a source-checked edit.  Selectors are a
+//! `Package::edit_pivot_table` for a source-checked edit.  Selectors are a
 //! semantic PivotTable name or workbook position; callers do not provide OPC
 //! relationship IDs or Part names.  An edit stages `ServerFormat` values or
 //! explicit `AttributeEdit::{Keep,Set,Clear}` operations for `culture` and
-//! `format`, then publishes through `WorkbookCommit::workbook` and its exact
-//! reversible `WorkbookPatch`.
+//! `format`, then publishes through `PackageCommit::workbook` and its exact
+//! reversible `PackagePatch`.
 //!
 //! This owner covers the C510 `pivotTableServerFormats` payload under a
 //! non-worksheet PivotTable and its required `pivotTableReferences`/external
@@ -1062,9 +1062,9 @@ impl Commit {
 /// Start an ordinary semantic edit against an immutable [`Workbook`] snapshot.
 ///
 /// The package owner and its source-bound ranges stay private.  Callers stage
-/// only typed server-format values and receive a new Workbook through
-/// [`WorkbookCommit::workbook`] after commit.
-pub struct WorkbookTransaction {
+/// only typed server-format values and receive a new Package through
+/// [`PackageCommit::package`] after commit.
+pub struct PackageEdit {
     source: Workbook,
     before: Snapshot,
     staged: Vec<ServerFormat>,
@@ -1072,7 +1072,7 @@ pub struct WorkbookTransaction {
     selection: usize,
 }
 
-impl WorkbookTransaction {
+impl PackageEdit {
     pub(crate) fn new<'selector>(
         source: &Workbook,
         selector: impl Into<PivotTableSelector<'selector>>,
@@ -1299,7 +1299,7 @@ impl WorkbookTransaction {
     }
 
     /// Validate, reopen, and publish a new immutable Workbook snapshot.
-    pub fn commit(self) -> Result<WorkbookCommit> {
+    pub fn commit(self) -> Result<PackageCommit> {
         let source = self.source;
         let staged = self.staged;
         let staged_sources = self.staged_sources;
@@ -1313,20 +1313,20 @@ impl WorkbookTransaction {
         let changed = committed.changed();
         let low_patch = committed.patch().clone();
         let workbook = source.adopt_published_package(candidate)?;
-        let patch = WorkbookPatch::new(source, workbook.clone(), low_patch);
-        Ok(WorkbookCommit::new(workbook, patch, changed))
+        let patch = PackagePatch::new(source, workbook.clone(), low_patch);
+        Ok(PackageCommit::new(workbook, patch, changed))
     }
 }
 
 /// An exact reversible patch over ordinary Workbook snapshots.
 #[derive(Clone, Debug)]
-pub struct WorkbookPatch {
+pub struct PackagePatch {
     before: Workbook,
     after: Workbook,
     source_patch: Patch,
 }
 
-impl WorkbookPatch {
+impl PackagePatch {
     fn new(before: Workbook, after: Workbook, source_patch: Patch) -> Self {
         Self {
             before,
@@ -1349,7 +1349,7 @@ impl WorkbookPatch {
 
     /// Whether this patch preserves the complete source owner byte-for-byte.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.source_patch.is_empty()
     }
 
@@ -1364,40 +1364,47 @@ impl WorkbookPatch {
     }
 
     /// Apply after checking the complete source-bound owner closure.
-    pub fn apply(&self, source: &Workbook) -> Result<WorkbookCommit> {
+    pub fn apply(&self, source: &crate::Package) -> Result<PackageCommit> {
+        let source = source.workbook_ref();
         source.ensure_mutation_allowed("apply_pivot_table_server_formats_patch")?;
         let mut candidate = source.pivot_package().clone();
         self.source_patch.apply_readset(&mut candidate)?;
         let workbook = source.adopt_published_package(candidate)?;
-        Ok(WorkbookCommit::new(
+        Ok(PackageCommit::new(
             workbook.clone(),
             Self::new(source.clone(), workbook, self.source_patch.clone()),
-            !self.is_empty(),
+            !self.is_noop(),
         ))
     }
 }
 
 /// A committed ordinary Workbook server-format edit.
 #[derive(Clone, Debug)]
-pub struct WorkbookCommit {
-    workbook: Workbook,
-    patch: WorkbookPatch,
+pub struct PackageCommit {
+    package: crate::Package,
+    patch: PackagePatch,
     changed: bool,
 }
 
-impl WorkbookCommit {
-    fn new(workbook: Workbook, patch: WorkbookPatch, changed: bool) -> Self {
+impl PackageCommit {
+    fn new(workbook: Workbook, patch: PackagePatch, changed: bool) -> Self {
         Self {
-            workbook,
+            package: crate::Package::from_workbook(workbook),
             patch,
             changed,
         }
     }
 
-    /// Resulting immutable Workbook snapshot.
+    /// The published immutable package.
     #[must_use]
-    pub fn workbook(&self) -> &Workbook {
-        &self.workbook
+    pub const fn package(&self) -> &crate::Package {
+        &self.package
+    }
+
+    /// Consume the commit into its published package.
+    #[must_use]
+    pub fn into_package(self) -> crate::Package {
+        self.package
     }
 
     /// Alias for callers using snapshot terminology.
@@ -1408,7 +1415,7 @@ impl WorkbookCommit {
 
     /// Exact reversible Workbook patch.
     #[must_use]
-    pub fn patch(&self) -> &WorkbookPatch {
+    pub fn patch(&self) -> &PackagePatch {
         &self.patch
     }
 
@@ -1419,8 +1426,8 @@ impl WorkbookCommit {
     }
 
     /// Consume the commit into its Workbook and patch.
-    pub fn into_parts(self) -> (Workbook, WorkbookPatch) {
-        (self.workbook, self.patch)
+    pub fn into_parts(self) -> (crate::Package, PackagePatch) {
+        (self.package, self.patch)
     }
 }
 
@@ -1439,8 +1446,8 @@ pub(crate) fn view_workbook<'selector>(
 pub(crate) fn edit_workbook<'selector>(
     workbook: &Workbook,
     selector: impl Into<PivotTableSelector<'selector>>,
-) -> Result<WorkbookTransaction> {
-    WorkbookTransaction::new(workbook, selector)
+) -> Result<PackageEdit> {
+    PackageEdit::new(workbook, selector)
 }
 
 struct Graph {

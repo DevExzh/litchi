@@ -1851,9 +1851,487 @@
           "name": "id",
           "scope": "litchi_xlsx::style::cell_format::NumberFormat",
           "replacement": "use cell_format::raw::number_format_id for explicit native metadata"
+        },
+        {
+          "name": "create",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "use Package::new()",
+          "recursive": false
+        },
+        {
+          "name": "from_slice",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "use Package::from_bytes(&[u8]) or from_bytes_with_options",
+          "recursive": false
+        },
+        {
+          "name": "from_slice_with_limits",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "use Package::from_bytes(&[u8]) or from_bytes_with_options",
+          "recursive": false
+        },
+        {
+          "name": "from_slice_with_password",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "use Package::from_bytes(&[u8]) or from_bytes_with_options",
+          "recursive": false
+        },
+        {
+          "name": "from_slice_with_password_and_limits",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "use Package::from_bytes(&[u8]) or from_bytes_with_options",
+          "recursive": false
+        },
+        {
+          "name": "from_slice_with_leniency",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "use Package::from_bytes(&[u8]) or from_bytes_with_options",
+          "recursive": false
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "from_bytes_with_limits",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "from_reader_with_limits",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "open_with_password_and_limits",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "from_bytes_with_password_and_limits",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "from_reader_with_password_and_limits",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "open_with_leniency",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "from_reader_with_leniency",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "from_package_with_leniency",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "into_workbook",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "Package is the owner; use Package::workbook() for the projection",
+          "recursive": false
+        },
+        {
+          "name": "create",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "use Package::new()",
+          "recursive": false
+        },
+        {
+          "name": "from_slice",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "use Package::from_bytes(&[u8]) or from_bytes_with_options",
+          "recursive": false
+        },
+        {
+          "name": "from_slice_with_limits",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "use Package::from_bytes(&[u8]) or from_bytes_with_options",
+          "recursive": false
+        },
+        {
+          "name": "from_slice_with_password",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "use Package::from_bytes(&[u8]) or from_bytes_with_options",
+          "recursive": false
+        },
+        {
+          "name": "from_slice_with_password_and_limits",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "use Package::from_bytes(&[u8]) or from_bytes_with_options",
+          "recursive": false
+        },
+        {
+          "name": "from_slice_with_leniency",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "use Package::from_bytes(&[u8]) or from_bytes_with_options",
+          "recursive": false
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "from_bytes_with_limits",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "from_reader_with_limits",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "open_with_password_and_limits",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "from_bytes_with_password_and_limits",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "from_reader_with_password_and_limits",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "open_with_leniency",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "from_reader_with_leniency",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "from_package_with_leniency",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "into_workbook",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Package is the owner; use Package::workbook() for the projection",
+          "recursive": false
+        },
+        {
+          "name": "new",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "open",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "from_bytes",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "from_reader",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "from_opc",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "from_package",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "edit",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "apply",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "unsigned",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "save",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "save_with_durability",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "save_plain",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "save_plain_with_durability",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "to_bytes",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "to_plain_bytes",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "write_to",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "write_plain_to",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "to_encrypted",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "to_reencrypted",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "save_encrypted",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "save_reencrypted",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "encryption",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "edit_pivot_table",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "edit_pivot_table_data",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "edit_pivot_cache",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "apply_pivot_table_server_formats_patch",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "apply_pivot_table_data_patch",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "apply_pivot_server_formats_patch",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "edit_pivot_table_server_formats",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "same_content",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "unsigned",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "use Package::unsign()",
+          "recursive": false
+        },
+        {
+          "name": "workbook",
+          "scope": "litchi_xlsx::workbook::edit::Commit",
+          "replacement": "use Commit::package()",
+          "recursive": false
+        },
+        {
+          "name": "into_workbook",
+          "scope": "litchi_xlsx::workbook::edit::Commit",
+          "replacement": "use Commit::into_package()",
+          "recursive": false
+        },
+        {
+          "name": "workbook",
+          "scope": "litchi_xlsx::Commit",
+          "replacement": "use Commit::package()",
+          "recursive": false
+        },
+        {
+          "name": "into_workbook",
+          "scope": "litchi_xlsx::Commit",
+          "replacement": "use Commit::into_package()",
+          "recursive": false
+        },
+        {
+          "name": "is_empty",
+          "scope": "litchi_xlsx::workbook::edit::Patch",
+          "replacement": "use Patch::is_noop(); Diagnostics::changed() describes commits",
+          "recursive": false
+        },
+        {
+          "name": "len",
+          "scope": "litchi_xlsx::workbook::edit::Patch",
+          "replacement": "use Patch::operation_count()",
+          "recursive": false
+        },
+        {
+          "name": "is_empty",
+          "scope": "litchi_xlsx::Patch",
+          "replacement": "use Patch::is_noop(); Diagnostics::changed() describes commits",
+          "recursive": false
+        },
+        {
+          "name": "len",
+          "scope": "litchi_xlsx::Patch",
+          "replacement": "use Patch::operation_count()",
+          "recursive": false
+        },
+        {
+          "name": "WorkbookPatch",
+          "scope": "litchi_xlsx",
+          "replacement": "commits publish Package; use the PackageEdit/PackagePatch/PackageCommit family"
+        },
+        {
+          "name": "WorkbookCommit",
+          "scope": "litchi_xlsx",
+          "replacement": "commits publish Package; use the PackageEdit/PackagePatch/PackageCommit family"
+        },
+        {
+          "name": "WorkbookTransaction",
+          "scope": "litchi_xlsx",
+          "replacement": "commits publish Package; use the PackageEdit/PackagePatch/PackageCommit family"
+        },
+        {
+          "name": "PivotTableServerFormatsWorkbookCommit",
+          "scope": "litchi_xlsx",
+          "replacement": "commits publish Package; use the PackageEdit/PackagePatch/PackageCommit family"
+        },
+        {
+          "name": "PivotTableServerFormatsWorkbookPatch",
+          "scope": "litchi_xlsx",
+          "replacement": "commits publish Package; use the PackageEdit/PackagePatch/PackageCommit family"
+        },
+        {
+          "name": "PivotTableDataWorkbookCommit",
+          "scope": "litchi_xlsx",
+          "replacement": "commits publish Package; use the PackageEdit/PackagePatch/PackageCommit family"
+        },
+        {
+          "name": "PivotTableDataWorkbookPatch",
+          "scope": "litchi_xlsx",
+          "replacement": "commits publish Package; use the PackageEdit/PackagePatch/PackageCommit family"
+        },
+        {
+          "name": "CachedUniqueNamesWorkbookCommit",
+          "scope": "litchi_xlsx",
+          "replacement": "commits publish Package; use the PackageEdit/PackagePatch/PackageCommit family"
+        },
+        {
+          "name": "CachedUniqueNamesWorkbookPatch",
+          "scope": "litchi_xlsx",
+          "replacement": "commits publish Package; use the PackageEdit/PackagePatch/PackageCommit family"
+        },
+        {
+          "name": "CachedUniqueNamesWorkbookTransaction",
+          "scope": "litchi_xlsx",
+          "replacement": "commits publish Package; use the PackageEdit/PackagePatch/PackageCommit family"
         }
       ],
-      "families": []
+      "families": [
+        "litchi_xlsx::workbook::edit"
+      ]
     },
     {
       "id": "xlsx-full",
@@ -1903,9 +2381,487 @@
           "name": "id",
           "scope": "litchi_xlsx::style::cell_format::NumberFormat",
           "replacement": "use cell_format::raw::number_format_id for explicit native metadata"
+        },
+        {
+          "name": "create",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "use Package::new()",
+          "recursive": false
+        },
+        {
+          "name": "from_slice",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "use Package::from_bytes(&[u8]) or from_bytes_with_options",
+          "recursive": false
+        },
+        {
+          "name": "from_slice_with_limits",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "use Package::from_bytes(&[u8]) or from_bytes_with_options",
+          "recursive": false
+        },
+        {
+          "name": "from_slice_with_password",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "use Package::from_bytes(&[u8]) or from_bytes_with_options",
+          "recursive": false
+        },
+        {
+          "name": "from_slice_with_password_and_limits",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "use Package::from_bytes(&[u8]) or from_bytes_with_options",
+          "recursive": false
+        },
+        {
+          "name": "from_slice_with_leniency",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "use Package::from_bytes(&[u8]) or from_bytes_with_options",
+          "recursive": false
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "from_bytes_with_limits",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "from_reader_with_limits",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "open_with_password_and_limits",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "from_bytes_with_password_and_limits",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "from_reader_with_password_and_limits",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "open_with_leniency",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "from_reader_with_leniency",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "from_package_with_leniency",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "into_workbook",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "Package is the owner; use Package::workbook() for the projection",
+          "recursive": false
+        },
+        {
+          "name": "create",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "use Package::new()",
+          "recursive": false
+        },
+        {
+          "name": "from_slice",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "use Package::from_bytes(&[u8]) or from_bytes_with_options",
+          "recursive": false
+        },
+        {
+          "name": "from_slice_with_limits",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "use Package::from_bytes(&[u8]) or from_bytes_with_options",
+          "recursive": false
+        },
+        {
+          "name": "from_slice_with_password",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "use Package::from_bytes(&[u8]) or from_bytes_with_options",
+          "recursive": false
+        },
+        {
+          "name": "from_slice_with_password_and_limits",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "use Package::from_bytes(&[u8]) or from_bytes_with_options",
+          "recursive": false
+        },
+        {
+          "name": "from_slice_with_leniency",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "use Package::from_bytes(&[u8]) or from_bytes_with_options",
+          "recursive": false
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "from_bytes_with_limits",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "from_reader_with_limits",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "open_with_password_and_limits",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "from_bytes_with_password_and_limits",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "from_reader_with_password_and_limits",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "open_with_leniency",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "from_reader_with_leniency",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "from_package_with_leniency",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "use the *_with_options ingress with OpenOptions",
+          "recursive": false
+        },
+        {
+          "name": "into_workbook",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Package is the owner; use Package::workbook() for the projection",
+          "recursive": false
+        },
+        {
+          "name": "new",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "open",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "from_bytes",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "from_reader",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "from_opc",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "from_package",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "edit",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "apply",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "unsigned",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "save",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "save_with_durability",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "save_plain",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "save_plain_with_durability",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "to_bytes",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "to_plain_bytes",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "write_to",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "write_plain_to",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "to_encrypted",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "to_reencrypted",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "save_encrypted",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "save_reencrypted",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "encryption",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "edit_pivot_table",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "edit_pivot_table_data",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "edit_pivot_cache",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "apply_pivot_table_server_formats_patch",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "apply_pivot_table_data_patch",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "apply_pivot_server_formats_patch",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "edit_pivot_table_server_formats",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "same_content",
+          "scope": "litchi_xlsx::Workbook",
+          "replacement": "Workbook is the read-only projection; state verbs live on Package",
+          "recursive": false
+        },
+        {
+          "name": "unsigned",
+          "scope": "litchi_xlsx::Package",
+          "replacement": "use Package::unsign()",
+          "recursive": false
+        },
+        {
+          "name": "workbook",
+          "scope": "litchi_xlsx::workbook::edit::Commit",
+          "replacement": "use Commit::package()",
+          "recursive": false
+        },
+        {
+          "name": "into_workbook",
+          "scope": "litchi_xlsx::workbook::edit::Commit",
+          "replacement": "use Commit::into_package()",
+          "recursive": false
+        },
+        {
+          "name": "workbook",
+          "scope": "litchi_xlsx::Commit",
+          "replacement": "use Commit::package()",
+          "recursive": false
+        },
+        {
+          "name": "into_workbook",
+          "scope": "litchi_xlsx::Commit",
+          "replacement": "use Commit::into_package()",
+          "recursive": false
+        },
+        {
+          "name": "is_empty",
+          "scope": "litchi_xlsx::workbook::edit::Patch",
+          "replacement": "use Patch::is_noop(); Diagnostics::changed() describes commits",
+          "recursive": false
+        },
+        {
+          "name": "len",
+          "scope": "litchi_xlsx::workbook::edit::Patch",
+          "replacement": "use Patch::operation_count()",
+          "recursive": false
+        },
+        {
+          "name": "is_empty",
+          "scope": "litchi_xlsx::Patch",
+          "replacement": "use Patch::is_noop(); Diagnostics::changed() describes commits",
+          "recursive": false
+        },
+        {
+          "name": "len",
+          "scope": "litchi_xlsx::Patch",
+          "replacement": "use Patch::operation_count()",
+          "recursive": false
+        },
+        {
+          "name": "WorkbookPatch",
+          "scope": "litchi_xlsx",
+          "replacement": "commits publish Package; use the PackageEdit/PackagePatch/PackageCommit family"
+        },
+        {
+          "name": "WorkbookCommit",
+          "scope": "litchi_xlsx",
+          "replacement": "commits publish Package; use the PackageEdit/PackagePatch/PackageCommit family"
+        },
+        {
+          "name": "WorkbookTransaction",
+          "scope": "litchi_xlsx",
+          "replacement": "commits publish Package; use the PackageEdit/PackagePatch/PackageCommit family"
+        },
+        {
+          "name": "PivotTableServerFormatsWorkbookCommit",
+          "scope": "litchi_xlsx",
+          "replacement": "commits publish Package; use the PackageEdit/PackagePatch/PackageCommit family"
+        },
+        {
+          "name": "PivotTableServerFormatsWorkbookPatch",
+          "scope": "litchi_xlsx",
+          "replacement": "commits publish Package; use the PackageEdit/PackagePatch/PackageCommit family"
+        },
+        {
+          "name": "PivotTableDataWorkbookCommit",
+          "scope": "litchi_xlsx",
+          "replacement": "commits publish Package; use the PackageEdit/PackagePatch/PackageCommit family"
+        },
+        {
+          "name": "PivotTableDataWorkbookPatch",
+          "scope": "litchi_xlsx",
+          "replacement": "commits publish Package; use the PackageEdit/PackagePatch/PackageCommit family"
+        },
+        {
+          "name": "CachedUniqueNamesWorkbookCommit",
+          "scope": "litchi_xlsx",
+          "replacement": "commits publish Package; use the PackageEdit/PackagePatch/PackageCommit family"
+        },
+        {
+          "name": "CachedUniqueNamesWorkbookPatch",
+          "scope": "litchi_xlsx",
+          "replacement": "commits publish Package; use the PackageEdit/PackagePatch/PackageCommit family"
+        },
+        {
+          "name": "CachedUniqueNamesWorkbookTransaction",
+          "scope": "litchi_xlsx",
+          "replacement": "commits publish Package; use the PackageEdit/PackagePatch/PackageCommit family"
         }
       ],
-      "families": []
+      "families": [
+        "litchi_xlsx::workbook::edit"
+      ]
     },
     {
       "id": "xlsb-minimal",

@@ -341,7 +341,7 @@ pub(super) fn commit_removals(edit: Edit) -> Result<Commit> {
     }
     let workbook = Workbook::from_package_with_styles(package, Some(&base))?;
     Ok(Commit {
-        workbook: workbook.clone(),
+        package: crate::Package::from_workbook(workbook.clone()),
         patch: Patch {
             changes: changes.into_boxed_slice(),
             package_changes: Box::new([]),

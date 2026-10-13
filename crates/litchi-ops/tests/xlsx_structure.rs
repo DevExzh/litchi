@@ -15,14 +15,14 @@ const SHEET3: &str = "/sheet[3]";
 const A1: &str = "/sheet[1]/A1";
 
 fn fixture() -> Vec<u8> {
-    litchi_xlsx::Workbook::create()
+    litchi_xlsx::Package::new()
         .expect("create native workbook")
         .to_bytes()
         .expect("serialize native workbook")
 }
 
 fn formula_fixture() -> Vec<u8> {
-    let workbook = litchi_xlsx::Workbook::create().expect("create native workbook");
+    let workbook = litchi_xlsx::Package::new().expect("create native workbook");
     let mut edit = workbook.edit().expect("start native edit");
     {
         let mut data = edit.add("Data").expect("add Data worksheet");
@@ -38,31 +38,31 @@ fn formula_fixture() -> Vec<u8> {
         .expect("seed formula");
     edit.commit()
         .expect("commit formula fixture")
-        .into_workbook()
+        .into_package()
         .to_bytes()
         .expect("serialize formula fixture")
 }
 
 fn multi_sheet_fixture() -> Vec<u8> {
-    let workbook = litchi_xlsx::Workbook::create().expect("create native workbook");
+    let workbook = litchi_xlsx::Package::new().expect("create native workbook");
     let mut edit = workbook.edit().expect("start native workbook edit");
     edit.add("Data").expect("add Data worksheet");
     edit.add("Archive").expect("add Archive worksheet");
     edit.commit()
         .expect("commit multi-sheet fixture")
-        .into_workbook()
+        .into_package()
         .to_bytes()
         .expect("serialize multi-sheet fixture")
 }
 
 fn a1_sheet_fixture() -> Vec<u8> {
-    let workbook = litchi_xlsx::Workbook::create().expect("create native workbook");
+    let workbook = litchi_xlsx::Package::new().expect("create native workbook");
     let mut edit = workbook.edit().expect("start native workbook edit");
     let mut sheet = edit.add("A1").expect("add A1-named worksheet");
     sheet.set("A1", "seed").expect("seed A1-named worksheet");
     edit.commit()
         .expect("commit A1-named worksheet fixture")
-        .into_workbook()
+        .into_package()
         .to_bytes()
         .expect("serialize A1-named worksheet fixture")
 }

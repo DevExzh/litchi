@@ -24,7 +24,7 @@ const B2: &str = "/sheet[1]/B2";
 const C2: &str = "/sheet[1]/C2";
 
 fn fixture() -> Vec<u8> {
-    let workbook = litchi_xlsx::Workbook::create().expect("create native workbook");
+    let workbook = litchi_xlsx::Package::new().expect("create native workbook");
     let mut edit = workbook.edit().expect("start native workbook edit");
     {
         let mut sheet = edit
@@ -40,13 +40,13 @@ fn fixture() -> Vec<u8> {
     }
     edit.commit()
         .expect("commit native fixture")
-        .into_workbook()
+        .into_package()
         .to_bytes()
         .expect("serialize native fixture")
 }
 
 fn multi_sheet_fixture() -> Vec<u8> {
-    let workbook = litchi_xlsx::Workbook::create().expect("create native workbook");
+    let workbook = litchi_xlsx::Package::new().expect("create native workbook");
     let mut edit = workbook.edit().expect("start native workbook edit");
     {
         let mut sheet = edit
@@ -61,7 +61,7 @@ fn multi_sheet_fixture() -> Vec<u8> {
     }
     edit.commit()
         .expect("commit multi-sheet fixture")
-        .into_workbook()
+        .into_package()
         .to_bytes()
         .expect("serialize multi-sheet fixture")
 }

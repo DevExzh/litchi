@@ -33,7 +33,7 @@ fn set_metadata(package: &mut Package, properties: Properties, features: Feature
 
 #[test]
 fn absent_metadata_round_trips_typed_properties_and_inert_feature_occurrences() {
-    let mut package = Package::create().expect("fresh package");
+    let mut package = Package::new().expect("fresh package");
     let absent = package.calculation_metadata().expect("initial metadata");
     assert!(absent.properties().is_none());
     assert!(absent.features().is_none());
@@ -84,7 +84,7 @@ fn absent_metadata_round_trips_typed_properties_and_inert_feature_occurrences() 
     );
     assert_eq!(feature_names(&reopened_metadata), expected_names);
 
-    let workbook = reopened.workbook().expect("workbook facade");
+    let workbook = reopened.workbook();
     let workbook_metadata = workbook
         .calculation_metadata()
         .expect("workbook calculation metadata");
@@ -97,7 +97,7 @@ fn absent_metadata_round_trips_typed_properties_and_inert_feature_occurrences() 
 
 #[test]
 fn patch_inverse_restores_exact_source_and_stale_application_is_atomic() {
-    let baseline = Package::create().expect("baseline package");
+    let baseline = Package::new().expect("baseline package");
     let baseline_xml = baseline
         .calculation_metadata()
         .expect("baseline metadata")
@@ -148,7 +148,7 @@ fn patch_inverse_restores_exact_source_and_stale_application_is_atomic() {
 
 #[test]
 fn feature_name_and_output_limits_fail_without_partial_publication() {
-    let mut package = Package::create().expect("package");
+    let mut package = Package::new().expect("package");
     set_metadata(
         &mut package,
         Properties::new(),
@@ -193,7 +193,7 @@ fn feature_name_and_output_limits_fail_without_partial_publication() {
 
 #[test]
 fn metadata_removal_restores_workbook_markup_and_preserves_unrelated_part_bytes() {
-    let mut raw = Package::create().expect("package").into_plain_opc();
+    let mut raw = Package::new().expect("package").into_plain_opc();
     let workbook_name = raw
         .main_document_part()
         .expect("workbook part")
@@ -251,7 +251,7 @@ fn metadata_removal_restores_workbook_markup_and_preserves_unrelated_part_bytes(
 
 #[test]
 fn signed_no_op_is_exact_but_changed_metadata_is_refused() {
-    let mut raw = Package::create().expect("package").into_plain_opc();
+    let mut raw = Package::new().expect("package").into_plain_opc();
     let origin_name = PackURI::new("/_xmlsignatures/origin.sigs").unwrap();
     let mut origin = BlobPart::new(
         origin_name,
@@ -311,7 +311,7 @@ fn signed_no_op_is_exact_but_changed_metadata_is_refused() {
 
 #[test]
 fn formula_edit_exposes_recalculation_invalidation_through_workbook_owner() {
-    let mut package = Package::create().expect("package");
+    let mut package = Package::new().expect("package");
     let mut metadata = package.edit_calculation_metadata().unwrap();
     metadata.set_properties(
         Properties::new()
@@ -322,7 +322,7 @@ fn formula_edit_exposes_recalculation_invalidation_through_workbook_owner() {
             .with_force_full_calculation(Some(false)),
     );
     metadata.commit().unwrap();
-    let workbook = package.into_workbook().expect("workbook");
+    let workbook = package;
     let mut edit = workbook.edit().expect("workbook edit");
     edit.sheet("Sheet1")
         .expect("sheet lookup")
@@ -331,7 +331,7 @@ fn formula_edit_exposes_recalculation_invalidation_through_workbook_owner() {
         .expect("formula edit");
     let committed = edit.commit().expect("formula commit");
     let properties = committed
-        .workbook()
+        .package()
         .calculation_metadata()
         .expect("metadata through workbook owner")
         .properties()
@@ -347,7 +347,7 @@ fn formula_edit_exposes_recalculation_invalidation_through_workbook_owner() {
 #[test]
 fn mce_projected_metadata_is_readable_but_changed_edits_are_refused() {
     const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
-    let mut raw = Package::create().unwrap().into_plain_opc();
+    let mut raw = Package::new().unwrap().into_plain_opc();
     let workbook_name = raw.main_document_part().unwrap().partname().clone();
     let xml = std::str::from_utf8(raw.get_part(&workbook_name).unwrap().blob())
         .unwrap()
@@ -386,17 +386,17 @@ fn encrypted_source_refuses_metadata_mutation_until_explicit_plain_reopen() {
     use litchi_xlsx::encryption::Mode as EncryptionMode;
 
     const PASSWORD: &str = "calculation-metadata-password";
-    let plaintext = Package::create().unwrap().to_plain_bytes().unwrap();
+    let plaintext = Package::new().unwrap().to_plain_bytes().unwrap();
     let encrypted =
         litchi_xlsx::encryption::encrypt(plaintext, PASSWORD, EncryptionMode::Standard).unwrap();
-    let mut opened = Package::from_bytes_with_password(encrypted, PASSWORD).unwrap();
+    let mut opened = Package::from_bytes_with_password(&encrypted, PASSWORD).unwrap();
     assert!(matches!(
         opened.edit_calculation_metadata(),
         Err(Error::EncryptionPolicy { .. })
     ));
 
     let explicit_plaintext = opened.to_plain_bytes().expect("explicit plaintext output");
-    let mut plain = Package::from_bytes(explicit_plaintext).expect("explicit plain reopen");
+    let mut plain = Package::from_bytes(&explicit_plaintext).expect("explicit plain reopen");
     let mut edit = plain.edit_calculation_metadata().expect("plain edit");
     edit.set_properties(Properties::new().with_calculation_id(Some(11)));
     edit.commit().expect("plain metadata commit");

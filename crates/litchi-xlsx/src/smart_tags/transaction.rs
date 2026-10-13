@@ -18,16 +18,16 @@ use crate::error::Result;
 /// Remove the signature explicitly before the transaction starts
 /// ([`crate::Package::unsign`]) to edit a signed workbook.
 pub struct Transaction<'a> {
-    target: &'a mut OpcPackage,
+    target: crate::package::Target<'a>,
     staged: OpcPackage,
     worksheet: PackURI,
 }
 
 impl<'a> Transaction<'a> {
-    pub(crate) fn new(target: &'a mut OpcPackage, worksheet: PackURI) -> Result<Self> {
-        super::package::load(target, &worksheet)?;
+    pub(crate) fn new(target: crate::package::Target<'a>, worksheet: PackURI) -> Result<Self> {
+        super::package::load(&target, &worksheet)?;
         Ok(Self {
-            staged: target.clone(),
+            staged: (*target).clone(),
             target,
             worksheet,
         })
@@ -76,9 +76,9 @@ impl<'a> Transaction<'a> {
 
     /// Publish the staged worksheet after a final bounded parse and
     /// validation pass.
-    pub fn commit(self) -> Result<()> {
+    pub fn commit(mut self) -> Result<()> {
         super::package::load(&self.staged, &self.worksheet)?;
-        *self.target = self.staged;
+        self.target.publish(self.staged)?;
         Ok(())
     }
 

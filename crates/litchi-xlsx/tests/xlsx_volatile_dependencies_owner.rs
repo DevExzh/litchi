@@ -18,7 +18,7 @@ fn fixture_value() -> VolatileDependencies {
 }
 
 fn package() -> OpcPackage {
-    Package::create()
+    Package::new()
         .expect("create workbook package")
         .into_plain_opc()
 }

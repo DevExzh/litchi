@@ -11,7 +11,7 @@ const COL_B: &str = "/sheet[1]/col[B]";
 const COL_D: &str = "/sheet[1]/col[D]";
 
 fn fixture() -> Vec<u8> {
-    let workbook = litchi_xlsx::Workbook::create().expect("create native workbook");
+    let workbook = litchi_xlsx::Package::new().expect("create native workbook");
     let mut edit = workbook.edit().expect("start native workbook edit");
     let mut sheet = edit
         .sheet("Sheet1")
@@ -27,7 +27,7 @@ fn fixture() -> Vec<u8> {
         .expect("seed column B width");
     edit.commit()
         .expect("commit dimension fixture")
-        .into_workbook()
+        .into_package()
         .to_bytes()
         .expect("serialize dimension fixture")
 }

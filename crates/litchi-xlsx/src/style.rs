@@ -1021,9 +1021,9 @@ impl BorderChange {
 /// resolve row, column, or named-style inheritance.
 ///
 /// ```
-/// use litchi_xlsx::{Workbook, style::{AlignmentChange, Horizontal, Indent}};
+/// use litchi_xlsx::{Package, style::{AlignmentChange, Horizontal, Indent}};
 ///
-/// let workbook = Workbook::create()?;
+/// let workbook = Package::new()?;
 /// let mut edit = workbook.edit()?;
 /// let change = AlignmentChange::new()
 ///     .horizontal(Some(Horizontal::Center))
@@ -1031,7 +1031,7 @@ impl BorderChange {
 ///     .indent(Some(Indent::new(2)));
 /// edit.sheet("Sheet1")?.expect("initial worksheet")
 ///     .alignment("A1", &change)?;
-/// let updated = edit.commit()?.into_workbook();
+/// let updated = edit.commit()?.into_package();
 /// # let _ = updated;
 /// # Ok::<(), litchi_xlsx::Error>(())
 /// ```

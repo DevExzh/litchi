@@ -10,15 +10,15 @@
 )]
 
 use litchi_opc::PackURI;
-use litchi_xlsx::{Error, FontChange, Package, Workbook};
+use litchi_xlsx::{Error, FontChange, Package};
 
 const STYLES_URI: &str = "/xl/styles.xml";
 const MAIN_NS: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const MCE_NS: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
 const X14AC_NS: &str = "http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac";
 
-fn fixture() -> Workbook {
-    let workbook = Workbook::new().expect("create workbook");
+fn fixture() -> Package {
+    let workbook = Package::new().expect("create workbook");
     let mut edit = workbook.edit().expect("begin fixture edit");
     let mut sheet = edit
         .sheet("Sheet1")
@@ -29,11 +29,11 @@ fn fixture() -> Workbook {
         .and_then(|sheet| sheet.set("B1", "shared font neighbour"))
         .and_then(|sheet| sheet.set("C1", "shared font reuse"))
         .expect("seed fixture cells");
-    edit.commit().expect("commit fixture").into_workbook()
+    edit.commit().expect("commit fixture").into_package()
 }
 
-fn styles_xml(workbook: &Workbook) -> Vec<u8> {
-    let package = Package::from_bytes(workbook.to_plain_bytes().expect("serialize workbook"))
+fn styles_xml(workbook: &Package) -> Vec<u8> {
+    let package = Package::from_bytes(&workbook.to_plain_bytes().expect("serialize workbook"))
         .expect("reopen workbook package")
         .into_plain_opc();
     package
@@ -43,8 +43,8 @@ fn styles_xml(workbook: &Workbook) -> Vec<u8> {
         .to_vec()
 }
 
-fn typical_excel_styles_fixture() -> Workbook {
-    let package = Package::create().expect("create package").into_plain_opc();
+fn typical_excel_styles_fixture() -> Package {
+    let package = Package::new().expect("create package").into_plain_opc();
     let styles_uri = PackURI::new(STYLES_URI).expect("styles URI");
     let styles = std::str::from_utf8(package.get_part(&styles_uri).expect("styles").blob())
         .expect("styles XML")
@@ -71,17 +71,14 @@ fn typical_excel_styles_fixture() -> Workbook {
         .get_part_mut(&styles_uri)
         .expect("styles part")
         .set_blob(styles.into_bytes());
-    let workbook = Package::from_opc(package)
-        .expect("adopt typical Excel styles")
-        .into_workbook()
-        .expect("open typical Excel styles");
+    let workbook = Package::from_opc(package).expect("adopt typical Excel styles");
     let mut edit = workbook.edit().expect("begin fixture edit");
     edit.sheet("Sheet1")
         .expect("find fixture sheet")
         .expect("fixture worksheet")
         .set("A1", "typical Excel styles")
         .expect("seed fixture cell");
-    edit.commit().expect("commit fixture").into_workbook()
+    edit.commit().expect("commit fixture").into_package()
 }
 
 fn direct_tag_count(xml: &[u8], tag: &str) -> usize {
@@ -96,8 +93,9 @@ fn direct_tag_count(xml: &[u8], tag: &str) -> usize {
         .count()
 }
 
-fn bold(workbook: &Workbook, cell: &str) -> Option<bool> {
+fn bold(workbook: &Package, cell: &str) -> Option<bool> {
     workbook
+        .workbook_ref()
         .sheet("Sheet1")
         .expect("find sheet")
         .expect("worksheet")
@@ -107,8 +105,9 @@ fn bold(workbook: &Workbook, cell: &str) -> Option<bool> {
         .and_then(|font| font.bold())
 }
 
-fn italic(workbook: &Workbook, cell: &str) -> Option<bool> {
+fn italic(workbook: &Package, cell: &str) -> Option<bool> {
     workbook
+        .workbook_ref()
         .sheet("Sheet1")
         .expect("find sheet")
         .expect("worksheet")
@@ -118,7 +117,7 @@ fn italic(workbook: &Workbook, cell: &str) -> Option<bool> {
         .and_then(|font| font.italic())
 }
 
-fn apply_font(workbook: &Workbook, cell: &str, change: FontChange) -> litchi_xlsx::Commit {
+fn apply_font(workbook: &Package, cell: &str, change: FontChange) -> litchi_xlsx::Commit {
     let mut edit = workbook.edit().expect("begin font edit");
     edit.sheet("Sheet1")
         .expect("find sheet")
@@ -136,7 +135,7 @@ fn changing_one_cell_does_not_mutate_a_shared_font_neighbour() {
     assert_ne!(bold(&source, "B1"), Some(true));
 
     let committed = apply_font(&source, "A1", FontChange::new().bold(Some(true)));
-    let target = committed.workbook();
+    let target = committed.package();
 
     assert_eq!(bold(target, "A1"), Some(true));
     assert_ne!(bold(target, "B1"), Some(true));
@@ -165,7 +164,7 @@ fn one_font_and_one_cell_format_are_reused_for_multiple_targets() {
     let target = edit
         .commit()
         .expect("commit shared font edits")
-        .into_workbook();
+        .into_package();
     let after = styles_xml(&target);
 
     assert_eq!(
@@ -186,21 +185,21 @@ fn one_font_and_one_cell_format_are_reused_for_multiple_targets() {
 fn repeating_the_same_font_request_is_an_exact_noop() {
     let source = fixture();
     let first = apply_font(&source, "A1", FontChange::new().bold(Some(true)));
-    let first_bytes = first.workbook().to_plain_bytes().expect("first bytes");
-    let first_styles = styles_xml(first.workbook());
+    let first_bytes = first.package().to_plain_bytes().expect("first bytes");
+    let first_styles = styles_xml(first.package());
 
-    let repeated = apply_font(first.workbook(), "A1", FontChange::new().bold(Some(true)));
-    assert!(repeated.patch().is_noop().expect("check repeated no-op"));
+    let repeated = apply_font(first.package(), "A1", FontChange::new().bold(Some(true)));
+    assert!(repeated.patch().is_noop());
     assert_eq!(
-        repeated.workbook().to_plain_bytes().expect("repeat bytes"),
+        repeated.package().to_plain_bytes().expect("repeat bytes"),
         first_bytes
     );
-    assert_eq!(styles_xml(repeated.workbook()), first_styles);
+    assert_eq!(styles_xml(repeated.package()), first_styles);
 }
 
 #[test]
 fn opaque_stylesheet_markup_survives_font_authoring() {
-    let package = Package::create().expect("create package").into_plain_opc();
+    let package = Package::new().expect("create package").into_plain_opc();
     let styles_uri = PackURI::new(STYLES_URI).expect("styles URI");
     let styles = std::str::from_utf8(package.get_part(&styles_uri).expect("styles").blob())
         .expect("styles XML")
@@ -213,10 +212,7 @@ fn opaque_stylesheet_markup_survives_font_authoring() {
         .get_part_mut(&styles_uri)
         .expect("styles part")
         .set_blob(styles.into_bytes());
-    let source = Package::from_opc(package)
-        .expect("adopt opaque stylesheet")
-        .into_workbook()
-        .expect("open opaque stylesheet");
+    let source = Package::from_opc(package).expect("adopt opaque stylesheet");
 
     let source = {
         let mut edit = source.edit().expect("seed opaque fixture");
@@ -225,14 +221,14 @@ fn opaque_stylesheet_markup_survives_font_authoring() {
             .expect("worksheet")
             .set("A1", "opaque style")
             .expect("seed cell");
-        edit.commit().expect("seed commit").into_workbook()
+        edit.commit().expect("seed commit").into_package()
     };
     let committed = apply_font(&source, "A1", FontChange::new().bold(Some(true)));
-    let after_styles = styles_xml(committed.workbook());
+    let after_styles = styles_xml(committed.package());
     let after = std::str::from_utf8(&after_styles).expect("styles XML");
     assert!(after.contains("urn:litchi:font-test"));
     assert!(after.contains("marker=\"keep-me\""));
-    assert_eq!(bold(committed.workbook(), "A1"), Some(true));
+    assert_eq!(bold(committed.package(), "A1"), Some(true));
 }
 
 #[test]
@@ -241,10 +237,10 @@ fn typical_excel_ignorable_font_markup_survives_the_patch_lifecycle() {
     let before = source.to_plain_bytes().expect("source bytes");
     let before_styles = styles_xml(&source);
     let committed = apply_font(&source, "A1", FontChange::new().bold(Some(true)));
-    let after_styles = styles_xml(committed.workbook());
+    let after_styles = styles_xml(committed.package());
     let after_text = std::str::from_utf8(&after_styles).expect("edited styles XML");
 
-    assert_eq!(bold(committed.workbook(), "A1"), Some(true));
+    assert_eq!(bold(committed.package(), "A1"), Some(true));
     assert!(after_text.contains(r#"mc:Ignorable="x14ac""#));
     assert!(after_text.contains(r#"x14ac:knownFonts="1""#));
     assert!(after_text.contains(r#"x14ac:fontMarker="keep""#));
@@ -254,11 +250,11 @@ fn typical_excel_ignorable_font_markup_survives_the_patch_lifecycle() {
     let replayed = source
         .apply(committed.patch())
         .expect("forward replay with ignorable styles")
-        .into_workbook();
+        .into_package();
     assert_eq!(
         replayed.to_plain_bytes().expect("replayed bytes"),
         committed
-            .workbook()
+            .package()
             .to_plain_bytes()
             .expect("committed bytes")
     );
@@ -277,28 +273,28 @@ fn typical_excel_ignorable_font_markup_survives_the_patch_lifecycle() {
     );
 
     let restored = committed
-        .workbook()
+        .package()
         .apply(&committed.patch().inverse())
         .expect("inverse replay with ignorable styles")
-        .into_workbook();
+        .into_package();
     assert_eq!(styles_xml(&restored), before_styles);
     assert_eq!(restored.to_plain_bytes().expect("restored bytes"), before);
 
     let repeated = apply_font(
-        committed.workbook(),
+        committed.package(),
         "A1",
         FontChange::new().bold(Some(true)),
     );
-    assert!(repeated.patch().is_noop().expect("repeat no-op"));
+    assert!(repeated.patch().is_noop());
     assert_eq!(
-        repeated.workbook().to_plain_bytes().expect("repeat bytes"),
-        committed.workbook().to_plain_bytes().expect("first bytes")
+        repeated.package().to_plain_bytes().expect("repeat bytes"),
+        committed.package().to_plain_bytes().expect("first bytes")
     );
 }
 
 #[test]
 fn alternate_content_in_styles_refuses_atomically() {
-    let package = Package::create().expect("create package").into_plain_opc();
+    let package = Package::new().expect("create package").into_plain_opc();
     let styles_uri = PackURI::new(STYLES_URI).expect("styles URI");
     let styles = std::str::from_utf8(package.get_part(&styles_uri).expect("styles").blob())
         .expect("styles XML")
@@ -317,10 +313,7 @@ fn alternate_content_in_styles_refuses_atomically() {
         .get_part_mut(&styles_uri)
         .expect("styles part")
         .set_blob(styles.into_bytes());
-    let source = Package::from_opc(package)
-        .expect("adopt AlternateContent styles")
-        .into_workbook()
-        .expect("open AlternateContent styles");
+    let source = Package::from_opc(package).expect("adopt AlternateContent styles");
     let before = source.to_plain_bytes().expect("source bytes");
     let mut edit = source.edit().expect("begin rejected edit");
     edit.sheet("Sheet1")
@@ -337,6 +330,7 @@ fn font_patch_replays_and_inverts_with_style_lineage_rebinding() {
     let source = fixture();
     let source_bytes = source.to_plain_bytes().expect("source bytes");
     let source_style = source
+        .workbook_ref()
         .sheet("Sheet1")
         .expect("find sheet")
         .expect("worksheet")
@@ -345,7 +339,8 @@ fn font_patch_replays_and_inverts_with_style_lineage_rebinding() {
         .expect("source style");
     let committed = apply_font(&source, "A1", FontChange::new().bold(Some(true)));
     let target_style = committed
-        .workbook()
+        .package()
+        .workbook_ref()
         .sheet("Sheet1")
         .expect("find target sheet")
         .expect("target worksheet")
@@ -358,10 +353,11 @@ fn font_patch_replays_and_inverts_with_style_lineage_rebinding() {
     let replayed = source
         .apply(committed.patch())
         .expect("forward replay")
-        .into_workbook();
+        .into_package();
     assert_eq!(bold(&replayed, "A1"), Some(true));
     assert!(
         !replayed
+            .workbook_ref()
             .sheet("Sheet1")
             .expect("find replayed sheet")
             .expect("replayed worksheet")
@@ -372,10 +368,10 @@ fn font_patch_replays_and_inverts_with_style_lineage_rebinding() {
     );
 
     let restored = committed
-        .workbook()
+        .package()
         .apply(&committed.patch().inverse())
         .expect("inverse replay")
-        .into_workbook();
+        .into_package();
     assert_eq!(
         restored.to_plain_bytes().expect("restored bytes"),
         source_bytes
@@ -387,7 +383,7 @@ fn stale_stylesheet_bytes_refuse_a_font_patch_before_publication() {
     let source = fixture();
     let committed = apply_font(&source, "A1", FontChange::new().bold(Some(true)));
     let stale_bytes = source.to_plain_bytes().expect("stale source bytes");
-    let mut package = Package::from_bytes(stale_bytes)
+    let mut package = Package::from_bytes(&stale_bytes)
         .expect("open stale candidate")
         .into_plain_opc();
     let styles_uri = PackURI::new(STYLES_URI).expect("styles URI");
@@ -398,10 +394,7 @@ fn stale_stylesheet_bytes_refuse_a_font_patch_before_publication() {
         .get_part_mut(&styles_uri)
         .expect("styles part")
         .set_blob(stale_styles.into_bytes());
-    let stale = Package::from_opc(package)
-        .expect("adopt stale candidate")
-        .into_workbook()
-        .expect("open stale candidate workbook");
+    let stale = Package::from_opc(package).expect("adopt stale candidate");
     let before = stale.to_plain_bytes().expect("stale bytes before apply");
     assert!(matches!(
         stale.apply(committed.patch()),
@@ -430,7 +423,7 @@ fn disjoint_font_requests_and_orthogonal_payloads_join_but_overlaps_refuse() {
         .font("B1", &FontChange::new().italic(Some(true)))
         .expect("right font");
     left.join(right).expect("disjoint font requests join");
-    let joined = left.commit().expect("disjoint font commit").into_workbook();
+    let joined = left.commit().expect("disjoint font commit").into_package();
     assert_eq!(bold(&joined, "A1"), Some(true));
     assert_eq!(italic(&joined, "B1"), Some(true));
 
@@ -454,7 +447,7 @@ fn disjoint_font_requests_and_orthogonal_payloads_join_but_overlaps_refuse() {
     let joined = bold_edit
         .commit()
         .expect("same-cell font commit")
-        .into_workbook();
+        .into_package();
     assert_eq!(bold(&joined, "A1"), Some(true));
     assert_eq!(italic(&joined, "A1"), Some(true));
 
@@ -472,11 +465,11 @@ fn disjoint_font_requests_and_orthogonal_payloads_join_but_overlaps_refuse() {
         .set("A1", "joined payload")
         .expect("payload change");
     font.join(payload).expect("font and payload join");
-    let joined = font.commit().expect("joined commit").into_workbook();
+    let joined = font.commit().expect("joined commit").into_package();
     assert_eq!(bold(&joined, "A1"), Some(true));
     assert!(matches!(
         joined
-            .sheet("Sheet1")
+            .workbook_ref().sheet("Sheet1")
             .expect("joined sheet")
             .expect("joined worksheet")
             .cell("A1")

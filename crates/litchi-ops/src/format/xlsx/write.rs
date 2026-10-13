@@ -30,8 +30,8 @@ use crate::value::Scalar;
 /// semantic equality without serializing and reopening the workbook.
 pub(crate) struct Commit {
     after_xlsx: Xlsx,
-    source: xlsx::Workbook,
-    target: xlsx::Workbook,
+    source: xlsx::Package,
+    target: xlsx::Package,
     native_patch: xlsx::workbook::Patch,
 }
 
@@ -39,7 +39,7 @@ impl Commit {
     /// Adapt a native commit without serializing or losing its source-bound patch.
     pub(super) fn from_native(
         base: &Xlsx,
-        source: xlsx::Workbook,
+        source: xlsx::Package,
         native: xlsx::workbook::Commit,
     ) -> Result<Self> {
         base.check_source()?;
@@ -63,9 +63,7 @@ impl Commit {
     }
 
     /// Consume the adapter result for explicit transaction history.
-    pub(crate) fn into_parts(
-        self,
-    ) -> (Xlsx, xlsx::Workbook, xlsx::Workbook, xlsx::workbook::Patch) {
+    pub(crate) fn into_parts(self) -> (Xlsx, xlsx::Package, xlsx::Package, xlsx::workbook::Patch) {
         (self.after_xlsx, self.source, self.target, self.native_patch)
     }
 
@@ -2654,7 +2652,7 @@ pub(crate) mod coalesce {
     pub(crate) struct Run {
         base: Xlsx,
         resolution: Xlsx,
-        source: xlsx::Workbook,
+        source: xlsx::Package,
         edit: xlsx::workbook::Edit,
         items: Vec<Item>,
         seen: HashSet<CellTarget>,
@@ -2900,14 +2898,14 @@ pub(crate) mod coalesce {
 
     fn make_commit(
         base: &Xlsx,
-        source: &xlsx::Workbook,
+        source: &xlsx::Package,
         native: xlsx::workbook::Commit,
     ) -> Result<(Xlsx, super::Commit)> {
         let commit = super::Commit::from_native(base, source.clone(), native)?;
         Ok((base.clone(), commit))
     }
 
-    fn replay(base: &Xlsx, source: &xlsx::Workbook, items: &[Item]) -> Result<xlsx::Workbook> {
+    fn replay(base: &Xlsx, source: &xlsx::Package, items: &[Item]) -> Result<xlsx::Package> {
         base.check_source()?;
         let mut edit = source.clone().edit().map_err(native_error)?;
         for item in items {
@@ -2941,11 +2939,11 @@ pub(crate) mod coalesce {
         Ok(())
     }
 
-    fn locate_failure(base: &Xlsx, source: &xlsx::Workbook, items: &[Item], error: Error) -> Error {
+    fn locate_failure(base: &Xlsx, source: &xlsx::Package, items: &[Item], error: Error) -> Error {
         locate_with(base, source, items, error)
     }
 
-    fn locate_with(base: &Xlsx, source: &xlsx::Workbook, items: &[Item], error: Error) -> Error {
+    fn locate_with(base: &Xlsx, source: &xlsx::Package, items: &[Item], error: Error) -> Error {
         let Some(first) = items.first() else {
             return error;
         };

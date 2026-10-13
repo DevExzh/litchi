@@ -18,7 +18,7 @@ pub(super) fn task_panes(app_ref: &str) -> common_web::Panes {
     panes
 }
 
-pub(super) fn rename_reference_workbook() -> Workbook {
+pub(super) fn rename_reference_workbook() -> crate::Package {
     let source = two_sheet_workbook(WorksheetKind::Worksheet);
     let mut package = source.inner.package.clone();
     package
@@ -74,7 +74,7 @@ pub(super) fn rename_reference_workbook() -> Workbook {
                 )))
                 .expect("reference part");
         }
-    Workbook::from_package(package).expect("rename reference workbook")
+    crate::Package::from_opc(package).expect("rename reference workbook")
 }
 
 pub(super) fn part_text<'a>(workbook: &'a Workbook, uri: &str) -> &'a str {
@@ -88,8 +88,8 @@ pub(super) fn part_text<'a>(workbook: &'a Workbook, uri: &str) -> &'a str {
     std::str::from_utf8(bytes).expect("XML part")
 }
 
-pub(super) fn styled_workbook() -> Workbook {
-    let baseline = Workbook::new().expect("baseline");
+pub(super) fn styled_workbook() -> crate::Package {
+    let baseline = crate::Package::new().expect("baseline");
     let mut package = baseline.inner.package.clone();
     package
             .get_part_mut(&PackURI::new("/xl/styles.xml").expect("styles URI"))
@@ -103,10 +103,10 @@ pub(super) fn styled_workbook() -> Workbook {
             .set_blob(
                 br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" s="1"><v>1</v></c><c r="B1"><v>2</v></c></row></sheetData></worksheet>"#.to_vec(),
             );
-    Workbook::from_package(package).expect("styled workbook")
+    crate::Package::from_opc(package).expect("styled workbook")
 }
 
-pub(super) fn styled_column_workbook() -> Workbook {
+pub(super) fn styled_column_workbook() -> crate::Package {
     let baseline = styled_workbook();
     let mut package = baseline.inner.package.clone();
     package
@@ -115,10 +115,10 @@ pub(super) fn styled_column_workbook() -> Workbook {
             .set_blob(
                 br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="3" max="3" style="1"/></cols><sheetData><row r="1"><c r="A1" s="1"><v>1</v></c><c r="B1"><v>2</v></c></row></sheetData></worksheet>"#.to_vec(),
             );
-    Workbook::from_package(package).expect("styled column workbook")
+    crate::Package::from_opc(package).expect("styled column workbook")
 }
 
-pub(super) fn styled_row_workbook() -> Workbook {
+pub(super) fn styled_row_workbook() -> crate::Package {
     let baseline = styled_workbook();
     let mut package = baseline.inner.package.clone();
     package
@@ -127,11 +127,11 @@ pub(super) fn styled_row_workbook() -> Workbook {
             .set_blob(
                 br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" s="1"><v>1</v></c></row><row r="2" s="1" customFormat="1"/></sheetData></worksheet>"#.to_vec(),
             );
-    Workbook::from_package(package).expect("styled row workbook")
+    crate::Package::from_opc(package).expect("styled row workbook")
 }
 
-pub(super) fn defaults_workbook() -> Workbook {
-    let baseline = Workbook::new().expect("baseline");
+pub(super) fn defaults_workbook() -> crate::Package {
+    let baseline = crate::Package::new().expect("baseline");
     let mut package = baseline.inner.package.clone();
     package
             .get_part_mut(&PackURI::new("/xl/worksheets/sheet1.xml").expect("sheet URI"))
@@ -139,11 +139,11 @@ pub(super) fn defaults_workbook() -> Workbook {
             .set_blob(
                 br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:ac="http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac" mc:Ignorable="ac"><sheetFormatPr baseColWidth="10" defaultColWidth="12" defaultRowHeight="15" customHeight="0" zeroHeight="1" thickTop="1" ac:dyDescent="0.1"/><sheetData><row r="2" customHeight="0" ac:dyDescent="0.2"/></sheetData></worksheet>"#.to_vec(),
             );
-    Workbook::from_package(package).expect("defaults workbook")
+    crate::Package::from_opc(package).expect("defaults workbook")
 }
 
-pub(super) fn merged_workbook() -> Workbook {
-    let baseline = Workbook::new().expect("baseline");
+pub(super) fn merged_workbook() -> crate::Package {
+    let baseline = crate::Package::new().expect("baseline");
     let mut package = baseline.inner.package.clone();
     package
             .get_part_mut(&PackURI::new("/xl/worksheets/sheet1.xml").expect("sheet URI"))
@@ -151,11 +151,11 @@ pub(super) fn merged_workbook() -> Workbook {
             .set_blob(
                 br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1:E2"/><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>anchor</t></is></c></row><row r="2"><c r="E2" t="inlineStr"><is><t>keep</t></is></c></row></sheetData><mergeCells count="1"><mergeCell ref="A1:B2"/></mergeCells></worksheet>"#.to_vec(),
             );
-    Workbook::from_package(package).expect("merged workbook")
+    crate::Package::from_opc(package).expect("merged workbook")
 }
 
-pub(super) fn two_sheet_workbook(second_kind: WorksheetKind) -> Workbook {
-    let baseline = Workbook::new().expect("baseline");
+pub(super) fn two_sheet_workbook(second_kind: WorksheetKind) -> crate::Package {
+    let baseline = crate::Package::new().expect("baseline");
     let mut package = baseline.inner.package.clone();
     package
             .get_part_mut(&baseline.inner.workbook_uri)
@@ -204,10 +204,10 @@ pub(super) fn two_sheet_workbook(second_kind: WorksheetKind) -> Workbook {
             part_xml.to_vec(),
         )))
         .expect("second sheet part");
-    Workbook::from_package(package).expect("two-sheet workbook")
+    crate::Package::from_opc(package).expect("two-sheet workbook")
 }
 
-pub(super) fn three_sheet_workbook() -> Workbook {
+pub(super) fn three_sheet_workbook() -> crate::Package {
     let source = two_sheet_workbook(WorksheetKind::Worksheet);
     let mut package = source.inner.package.clone();
     package
@@ -246,10 +246,10 @@ pub(super) fn three_sheet_workbook() -> Workbook {
             .set_blob(
                 br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><dimension ref="A1"/><sheetViews><sheetView tabSelected="1" workbookViewId="0"/></sheetViews><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>two</t></is></c></row></sheetData></worksheet>"#.to_vec(),
             );
-    Workbook::from_package(package).expect("three-sheet workbook")
+    crate::Package::from_opc(package).expect("three-sheet workbook")
 }
 
-pub(super) fn active_second_sheet_workbook(second_kind: WorksheetKind) -> Workbook {
+pub(super) fn active_second_sheet_workbook(second_kind: WorksheetKind) -> crate::Package {
     let source = two_sheet_workbook(second_kind);
     let mut package = source.inner.package.clone();
     package
@@ -273,5 +273,5 @@ pub(super) fn active_second_sheet_workbook(second_kind: WorksheetKind) -> Workbo
         .get_part_mut(&source.inner.sheets[1].part_uri)
         .expect("second sheet part")
         .set_blob(second_xml.to_vec());
-    Workbook::from_package(package).expect("active second sheet workbook")
+    crate::Package::from_opc(package).expect("active second sheet workbook")
 }

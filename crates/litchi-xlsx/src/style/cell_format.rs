@@ -864,10 +864,10 @@ impl FormatTable {
 /// [`crate::SourceWorksheet::format`] on a source-backed one.
 ///
 /// ```no_run
-/// use litchi_xlsx::Workbook;
+/// use litchi_xlsx::Package;
 ///
-/// let workbook = Workbook::open("report.xlsx")?;
-/// let sheet = workbook.sheet("Summary")?.expect("sheet");
+/// let package = Package::open("report.xlsx")?;
+/// let sheet = package.workbook().sheet("Summary")?.expect("sheet");
 /// if let Some(style) = sheet.style("B2")? {
 ///     let format = style.format()?;
 ///     let bold = format.font().and_then(|font| font.bold()) == Some(true);

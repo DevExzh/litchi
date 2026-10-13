@@ -661,10 +661,11 @@ fn source_editor_promotion_reuses_exact_snapshot_for_clones_and_selections() {
     let second = clone.editor().expect("reuse promoted workbook");
     assert!(
         first
+            .workbook_ref()
             .sheet(0_usize)
             .unwrap()
             .unwrap()
-            .same_workbook(&second.sheet(0_usize).unwrap().unwrap()),
+            .same_workbook(&second.workbook_ref().sheet(0_usize).unwrap().unwrap()),
         "promotion is memoized per open"
     );
     assert_eq!(second.to_bytes().expect("cloned promoted bytes"), bytes);
@@ -672,10 +673,11 @@ fn source_editor_promotion_reuses_exact_snapshot_for_clones_and_selections() {
     let third = handle.editor().expect("reuse after selection");
     assert!(
         first
+            .workbook_ref()
             .sheet(0_usize)
             .unwrap()
             .unwrap()
-            .same_workbook(&third.sheet(0_usize).unwrap().unwrap())
+            .same_workbook(&third.workbook_ref().sheet(0_usize).unwrap().unwrap())
     );
 }
 
@@ -705,10 +707,11 @@ fn concurrent_source_promotions_share_one_native_snapshot() {
     for snapshot in snapshots.iter().skip(1) {
         assert!(
             snapshots[0]
+                .workbook_ref()
                 .sheet(0_usize)
                 .unwrap()
                 .unwrap()
-                .same_workbook(&snapshot.sheet(0_usize).unwrap().unwrap())
+                .same_workbook(&snapshot.workbook_ref().sheet(0_usize).unwrap().unwrap())
         );
     }
 }
@@ -798,9 +801,10 @@ fn transient_promotion_read_failure_can_retry_the_same_source() {
     let repeated = handle.editor().unwrap();
     assert!(
         promoted
+            .workbook_ref()
             .sheet(0_usize)
             .unwrap()
             .unwrap()
-            .same_workbook(&repeated.sheet(0_usize).unwrap().unwrap())
+            .same_workbook(&repeated.workbook_ref().sheet(0_usize).unwrap().unwrap())
     );
 }

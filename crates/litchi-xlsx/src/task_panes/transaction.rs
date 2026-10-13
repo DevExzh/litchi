@@ -7,7 +7,7 @@ use crate::error::Result;
 
 /// An atomic transaction over the package-level task-pane graph.
 pub struct Transaction<'a> {
-    target: &'a mut OpcPackage,
+    target: crate::package::Target<'a>,
     staged: OpcPackage,
     conformance: Conformance,
 }
@@ -15,7 +15,18 @@ pub struct Transaction<'a> {
 impl<'a> Transaction<'a> {
     /// Start a transaction after validating any existing task-pane graph.
     pub fn new(target: &'a mut OpcPackage, conformance: Conformance) -> Result<Self> {
-        let staged = target.clone();
+        Self::start(target.into(), conformance)
+    }
+
+    pub(crate) fn for_package(
+        package: &'a mut crate::Package,
+        conformance: Conformance,
+    ) -> Result<Self> {
+        Self::start(crate::package::Target::Package(package), conformance)
+    }
+
+    fn start(target: crate::package::Target<'a>, conformance: Conformance) -> Result<Self> {
+        let staged = (*target).clone();
         common_web::load(&staged).map_err(crate::Error::from)?;
         Ok(Self {
             target,
@@ -93,9 +104,9 @@ impl<'a> Transaction<'a> {
     }
 
     /// Publish the staged package. Dropping without committing rolls back.
-    pub fn commit(self) -> Result<()> {
+    pub fn commit(mut self) -> Result<()> {
         common_web::load(&self.staged).map_err(crate::Error::from)?;
-        *self.target = self.staged;
+        self.target.publish(self.staged)?;
         Ok(())
     }
 

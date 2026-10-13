@@ -405,11 +405,10 @@ pub(crate) fn array_formulas(sheet: &Worksheet) -> Result<Vec<ArrayFormula>> {
 
 #[cfg(test)]
 mod tests {
-    use crate::Workbook;
 
     #[test]
     fn empty_snapshot_exposes_typed_worksheet_facades() {
-        let workbook = Workbook::new().expect("minimal workbook");
+        let workbook = crate::Package::new().expect("minimal workbook");
         let sheet = workbook.active_sheet().expect("active worksheet");
 
         assert!(

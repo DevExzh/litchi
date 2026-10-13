@@ -15,7 +15,7 @@ use soapberry_zip::office::StreamingArchiveWriter;
 
 use super::values::limit_retained_weight;
 use super::{SourceBackedWorkbook, SourceCellView};
-use crate::{Cell, Error, Value, Workbook};
+use crate::{Cell, Error, Value};
 
 const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
@@ -488,7 +488,7 @@ fn tolerance_report_survives_eviction() {
 #[test]
 fn grid_delegates_match_the_eager_owner() {
     let bytes = rich_workbook();
-    let eager = Workbook::from_bytes(bytes.clone()).unwrap();
+    let eager = crate::Package::from_bytes(&bytes).unwrap();
     let expected = eager.sheet("Data").unwrap().unwrap();
     let (_source, workbook) = open(&bytes);
     let sheet = workbook.sheet("Data").unwrap().unwrap();
@@ -561,7 +561,7 @@ fn grid_outlives_its_worksheet_and_workbook() {
 #[test]
 fn defined_names_match_the_eager_owner() {
     let bytes = rich_workbook();
-    let eager = Workbook::from_bytes(bytes.clone()).unwrap();
+    let eager = crate::Package::from_bytes(&bytes).unwrap();
     let (source, workbook) = open(&bytes);
     let reads = source.reads();
     assert_eq!(workbook.defined_names(), eager.defined_names());
@@ -573,7 +573,7 @@ fn defined_names_match_the_eager_owner() {
 #[test]
 fn block_reads_match_the_eager_owner_and_scan_once() {
     let bytes = rich_workbook();
-    let eager = Workbook::from_bytes(bytes.clone()).unwrap();
+    let eager = crate::Package::from_bytes(&bytes).unwrap();
     let expected = eager.sheet("Data").unwrap().unwrap();
     let (source, workbook) = open(&bytes);
     let sheet = workbook.sheet("Data").unwrap().unwrap();
@@ -651,7 +651,7 @@ fn block_reads_do_not_count_cell_events() {
     xml.push_str(r#"</sheetData><autoFilter ref="A1:J21000"/></worksheet>"#);
     let bytes = workbook_bytes(&[sheet("Large", xml)], "");
 
-    let eager = Workbook::from_bytes(bytes.clone()).unwrap();
+    let eager = crate::Package::from_bytes(&bytes).unwrap();
     let error = eager
         .sheet("Large")
         .unwrap()
@@ -752,7 +752,7 @@ fn stream_route_admits_inert_children_without_materializing() {
         r#"<worksheet xmlns="{SML}"><dimension ref="A1:B2"/><sheetViews><sheetView tabSelected="1" workbookViewId="0"><selection activeCell="B2" sqref="B2"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/><sheetData><row r="1" spans="1:2"><c r="A1"><v>1</v></c><c r="B1" t="s"><v>1</v></c></row><row r="2" spans="1:2"><c r="B2"><v>4</v></c></row></sheetData><pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/></worksheet>"#
     );
     let bytes = workbook_bytes(&[sheet("Plain", xml)], "");
-    let eager = Workbook::from_bytes(bytes.clone()).unwrap();
+    let eager = crate::Package::from_bytes(&bytes).unwrap();
     let expected = eager.sheet("Plain").unwrap().unwrap();
     let (_source, workbook) = open(&bytes);
     let sheet = workbook.sheet("Plain").unwrap().unwrap();
@@ -829,7 +829,7 @@ fn block_projection_preserves_mce_parser_results() {
             r#"<worksheet xmlns="{SML}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main" mc:Ignorable="x14"><sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData>{tail}</worksheet>"#
         );
         let bytes = workbook_bytes(&[sheet("Data", xml)], "");
-        let eager = Workbook::from_bytes(bytes.clone()).unwrap();
+        let eager = crate::Package::from_bytes(&bytes).unwrap();
         let (_, source) = open(&bytes);
         let eager = eager.sheet("Data").unwrap().unwrap();
         let source = source.sheet("Data").unwrap().unwrap();

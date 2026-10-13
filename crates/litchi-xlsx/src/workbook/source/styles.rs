@@ -520,7 +520,11 @@ mod tests {
             .build()
             .unwrap();
 
-        let eager = crate::Workbook::from_bytes_with_limits(bytes.clone(), limits).unwrap();
+        let eager = crate::Package::from_bytes_with_options(
+            &bytes,
+            crate::OpenOptions::new().source_limits(limits),
+        )
+        .unwrap();
         let eager_style = eager.styles().unwrap().get(1).unwrap();
         assert_depth_limit(eager_style.format().unwrap_err());
 

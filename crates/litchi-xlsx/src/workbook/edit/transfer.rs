@@ -205,7 +205,7 @@ fn ensure_plain_unprotected(workbook: &Workbook, sheet: &Worksheet) -> Result<()
     // encryption feature is enabled. This operation intentionally refuses it
     // instead of silently declassifying a donor into an ordinary target plan.
     #[cfg(feature = "encryption")]
-    if workbook.encryption().is_some() {
+    if workbook.encryption_state().mode().is_some() {
         return Err(Error::Unsupported {
             feature: "cross-workbook scalar transfer with encrypted workbooks",
         });

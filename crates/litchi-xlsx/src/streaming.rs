@@ -1142,7 +1142,7 @@ mod tests {
                 .windows(b"dimension".len())
                 .any(|window| window == b"dimension")
         );
-        let workbook = crate::Workbook::from_bytes(bytes).unwrap();
+        let workbook = crate::Package::from_bytes(&bytes).unwrap();
         let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
         assert!(matches!(
             sheet.cell("A1").unwrap().stored(),
@@ -1180,7 +1180,7 @@ mod tests {
                 .windows(b"sharedStrings".len())
                 .any(|window| window == b"sharedStrings")
         );
-        let workbook = crate::Workbook::from_bytes(bytes).unwrap();
+        let workbook = crate::Package::from_bytes(&bytes).unwrap();
         let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
         assert!(sheet.cell("A1").unwrap().is_missing());
     }
@@ -1317,7 +1317,7 @@ mod tests {
             )
             .unwrap();
         let bytes = writer.finish().unwrap();
-        let workbook = crate::Workbook::from_bytes(bytes).unwrap();
+        let workbook = crate::Package::from_bytes(&bytes).unwrap();
         let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
         assert!(matches!(
             sheet.cell("A1").unwrap().stored(),
@@ -2341,7 +2341,7 @@ mod tests {
             )
             .unwrap();
         let bytes = short.finish().unwrap().0;
-        assert!(crate::Workbook::from_bytes(bytes).is_ok());
+        assert!(crate::Package::from_bytes(&bytes).is_ok());
 
         let mut interrupted = StreamingWorkbookWriter::new(
             InterruptedOnce {

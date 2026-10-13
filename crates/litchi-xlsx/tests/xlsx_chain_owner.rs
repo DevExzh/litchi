@@ -6,7 +6,7 @@ const CHAIN_CONTENT_TYPE: &str =
     "application/vnd.openxmlformats-officedocument.spreadsheetml.calcChain+xml";
 
 fn package() -> OpcPackage {
-    Package::create()
+    Package::new()
         .expect("create workbook package")
         .into_plain_opc()
 }

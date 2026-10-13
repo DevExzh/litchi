@@ -6,8 +6,8 @@ use super::support::part_text;
 use crate::cell::{Number, Value};
 use crate::{History, HistoryLimits, Margins, PageMargin};
 
-fn strict_unknown_worksheet() -> Workbook {
-    let source = Workbook::new().expect("source workbook");
+fn strict_unknown_worksheet() -> crate::Package {
+    let source = crate::Package::new().expect("source workbook");
     let mut package = source.inner.package.clone();
     package
         .get_part_mut(&source.inner.sheets[0].part_uri)
@@ -15,7 +15,7 @@ fn strict_unknown_worksheet() -> Workbook {
         .set_blob(
             br#"<x:worksheet xmlns:x="http://purl.oclc.org/ooxml/spreadsheetml/main" xmlns:u="urn:litchi:future"><x:sheetData><x:row r="1"><x:c r="A1"><x:v>7</x:v></x:c></x:row></x:sheetData><u:future marker="keep"/></x:worksheet>"#.to_vec(),
         );
-    Workbook::from_package(package).expect("strict unknown worksheet")
+    crate::Package::from_opc(package).expect("strict unknown worksheet")
 }
 
 fn test_margins() -> Margins {
@@ -38,14 +38,14 @@ fn metadata_only_edit_preserves_strict_namespace_and_unknown_xml() {
         .expect("put margins")
         .expect("worksheet selector");
     let committed = edit.commit().expect("metadata commit");
-    let xml = part_text(committed.workbook(), "/xl/worksheets/sheet1.xml");
+    let xml = part_text(committed.package(), "/xl/worksheets/sheet1.xml");
 
     assert!(xml.contains("<x:worksheet"));
     assert!(xml.contains("<u:future marker=\"keep\"/>"));
     assert!(xml.contains("<x:pageMargins"));
     assert_eq!(
         committed
-            .workbook()
+            .package()
             .sheet("Sheet1")
             .expect("sheet lookup")
             .expect("worksheet")
@@ -57,7 +57,7 @@ fn metadata_only_edit_preserves_strict_namespace_and_unknown_xml() {
 
 #[test]
 fn metadata_only_edit_rejects_malformed_worksheet_like_the_source_parser() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let mut package = source.inner.package.clone();
     let uri = source.inner.sheets[0].part_uri.clone();
     let malformed = br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData></worksheet>"#;
@@ -65,7 +65,7 @@ fn metadata_only_edit_rejects_malformed_worksheet_like_the_source_parser() {
         .get_part_mut(&uri)
         .expect("worksheet part")
         .set_blob(malformed.to_vec());
-    let malformed = Workbook::from_package(package).expect("catalog validation");
+    let malformed = crate::Package::from_opc(package).expect("catalog validation");
     let mut edit = malformed.edit().expect("metadata edit");
     edit.put_page_margins("Sheet1", test_margins())
         .expect("stage margins")
@@ -75,7 +75,7 @@ fn metadata_only_edit_rejects_malformed_worksheet_like_the_source_parser() {
 
 #[test]
 fn metadata_only_edit_with_the_existing_value_is_a_byte_no_op() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let margins = test_margins();
     let mut install = source.edit().expect("install edit");
     install
@@ -83,24 +83,24 @@ fn metadata_only_edit_with_the_existing_value_is_a_byte_no_op() {
         .expect("put margins")
         .expect("worksheet selector");
     let installed = install.commit().expect("install commit");
-    let before = installed.workbook().to_plain_bytes().expect("before bytes");
+    let before = installed.package().to_plain_bytes().expect("before bytes");
 
-    let mut no_op = installed.workbook().edit().expect("no-op edit");
+    let mut no_op = installed.package().edit().expect("no-op edit");
     no_op
         .put_page_margins("Sheet1", margins)
         .expect("put existing margins")
         .expect("worksheet selector");
     let no_op = no_op.commit().expect("no-op commit");
-    assert!(no_op.patch().is_empty());
+    assert!(no_op.patch().is_noop());
     assert_eq!(
-        no_op.workbook().to_plain_bytes().expect("after bytes"),
+        no_op.package().to_plain_bytes().expect("after bytes"),
         before
     );
 }
 
 #[test]
 fn page_margins_merge_replay_inverse_and_record_history() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let source_bytes = source.to_plain_bytes().expect("source bytes");
     let margins = Margins::new(
         PageMargin::from_inches(0.7).unwrap(),
@@ -137,7 +137,7 @@ fn page_margins_merge_replay_inverse_and_record_history() {
     }));
     assert_eq!(
         commit
-            .workbook()
+            .package()
             .sheet("Sheet1")
             .expect("lookup")
             .expect("sheet")
@@ -154,7 +154,7 @@ fn page_margins_merge_replay_inverse_and_record_history() {
     let replayed = durable.apply(&source).expect("replay margins patch");
     assert_eq!(
         replayed.to_plain_bytes().expect("replayed bytes"),
-        commit.workbook().to_plain_bytes().expect("committed bytes")
+        commit.package().to_plain_bytes().expect("committed bytes")
     );
     assert_eq!(
         durable
@@ -173,7 +173,7 @@ fn page_margins_merge_replay_inverse_and_record_history() {
         .expect("sheet")
         .set("A1", "stale")
         .expect("stale cell");
-    let stale = stale_edit.commit().expect("stale commit").into_workbook();
+    let stale = stale_edit.commit().expect("stale commit").into_package();
     assert!(matches!(
         durable.apply(&stale),
         Err(Error::PatchConflict { .. })
@@ -205,7 +205,7 @@ fn independently_prepared_disjoint_edits_join_after_threaded_work() {
     fn assert_send<T: Send>() {}
     assert_send::<Edit>();
 
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let (mut left, right) = std::thread::scope(|scope| {
         let left_source = source.clone();
         let right_source = source.clone();
@@ -237,7 +237,7 @@ fn independently_prepared_disjoint_edits_join_after_threaded_work() {
     assert_eq!(left.len(), 2);
     let committed = left.commit().expect("joined commit");
     let sheet = committed
-        .workbook()
+        .package()
         .sheet("Sheet1")
         .expect("lookup")
         .expect("sheet");
@@ -263,7 +263,7 @@ fn independently_prepared_disjoint_edits_join_after_threaded_work() {
 }
 #[test]
 fn join_conflicts_are_structured_and_return_the_rejected_edit() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let mut left = source.edit().expect("left edit");
     let mut left_sheet = left.sheet(0usize).expect("lookup").expect("sheet");
     left_sheet
@@ -299,7 +299,7 @@ fn join_conflicts_are_structured_and_return_the_rejected_edit() {
     let rejected = error.into_rejected();
     assert_eq!(rejected.len(), 2);
 
-    let other_source = Workbook::new().expect("other source");
+    let other_source = crate::Package::new().expect("other source");
     let other = other_source.edit().expect("other edit");
     let error = match left.join(other) {
         Ok(_) => panic!("different snapshots must not join"),
@@ -312,7 +312,7 @@ fn join_conflicts_are_structured_and_return_the_rejected_edit() {
 
 #[test]
 fn row_visibility_joins_with_cells_and_conflicts_by_row() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let mut cell = source.edit().expect("cell edit");
     cell.sheet(0usize)
         .expect("lookup")
@@ -329,7 +329,7 @@ fn row_visibility_joins_with_cells_and_conflicts_by_row() {
     cell.join(row).expect("orthogonal row and cell effects");
     let committed = cell.commit().expect("joined commit");
     let sheet = committed
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("sheet");

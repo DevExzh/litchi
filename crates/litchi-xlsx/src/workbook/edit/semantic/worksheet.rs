@@ -408,9 +408,9 @@ impl WorksheetEdit<'_> {
     ///
     /// ```
     /// # fn main() -> litchi_xlsx::Result<()> {
-    /// use litchi_xlsx::{Cell, State, Value, Workbook};
+    /// use litchi_xlsx::{Cell, State, Value, Package};
     ///
-    /// let workbook = Workbook::create()?;
+    /// let workbook = Package::new()?;
     /// let mut edit = workbook.edit()?;
     /// let mut sheet = edit.sheet("Sheet1")?.expect("worksheet");
     /// sheet.set("A1", "draft")?;
@@ -637,10 +637,10 @@ impl WorksheetEdit<'_> {
     /// ```
     /// use litchi_xlsx::{
     ///     style::{cell_format::{Line, Side}, BorderChange},
-    ///     Workbook,
+    ///     Package,
     /// };
     ///
-    /// let workbook = Workbook::create()?;
+    /// let workbook = Package::new()?;
     /// let mut edit = workbook.edit()?;
     /// let change = BorderChange::new().left(Some(Side::new(Line::Thin)));
     /// edit.sheet("Sheet1")?.expect("initial worksheet")
@@ -670,9 +670,9 @@ impl WorksheetEdit<'_> {
     /// # Examples
     ///
     /// ```
-    /// use litchi_xlsx::{style::{cell_format::Pattern, FillChange}, Workbook};
+    /// use litchi_xlsx::{style::{cell_format::Pattern, FillChange}, Package};
     ///
-    /// let workbook = Workbook::create()?;
+    /// let workbook = Package::new()?;
     /// let mut edit = workbook.edit()?;
     /// let change = FillChange::new().pattern(Some(Pattern::Solid));
     /// edit.sheet("Sheet1")?.expect("initial worksheet")
@@ -685,10 +685,10 @@ impl WorksheetEdit<'_> {
     /// ```
     /// use litchi_xlsx::{
     ///     style::{cell_format::{Color, Fill, GradientFill, GradientStop}, FillChange},
-    ///     Workbook,
+    ///     Package,
     /// };
     ///
-    /// let workbook = Workbook::create()?;
+    /// let workbook = Package::new()?;
     /// let mut edit = workbook.edit()?;
     /// let gradient = GradientFill::linear(
     ///     0.0,
@@ -764,9 +764,9 @@ impl WorksheetEdit<'_> {
     /// # Examples
     ///
     /// ```
-    /// use litchi_xlsx::Workbook;
+    /// use litchi_xlsx::Package;
     ///
-    /// let workbook = Workbook::create()?;
+    /// let workbook = Package::new()?;
     /// let mut edit = workbook.edit()?;
     /// let mut sheet = edit.sheet("Sheet1")?.expect("the minimal workbook has Sheet1");
     /// sheet.number_format("A1", Some("0.00"))?;

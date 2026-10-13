@@ -897,7 +897,7 @@ mod smart_tags_family {
     fn a_signed_workbook_refuses_changes_and_keeps_exact_noops() {
         for name in SIGNED {
             let original = signed_fixture(name);
-            let mut package = Package::from_bytes(original.clone()).unwrap();
+            let mut package = Package::from_bytes(&original).unwrap();
             assert!(package.is_signed());
 
             let mut transaction = package.edit_smart_tags(0_usize).unwrap();
@@ -915,17 +915,17 @@ mod smart_tags_family {
             transaction.commit().unwrap();
             let output = package.to_bytes().unwrap();
             assert!(!carries_signature(&output), "{name}");
-            let reopened = Package::from_bytes(output).unwrap();
+            let reopened = Package::from_bytes(&output).unwrap();
             assert_eq!(reopened.smart_tags(0_usize).unwrap().unwrap().len(), 1);
         }
 
-        let mut plain = Package::from_bytes(signed_fixture(SIGNED[1])).unwrap();
+        let mut plain = Package::from_bytes(&signed_fixture(SIGNED[1])).unwrap();
         plain.unsign().unwrap();
         let mut transaction = plain.edit_smart_tags(0_usize).unwrap();
         transaction.set(cell()).unwrap();
         transaction.commit().unwrap();
         let signed = sign(&open(&plain.to_bytes().unwrap()));
-        let mut package = Package::from_bytes(signed.clone()).unwrap();
+        let mut package = Package::from_bytes(&signed).unwrap();
         let mut transaction = package.edit_smart_tags(0_usize).unwrap();
         assert_signed(transaction.remove("A1"));
         assert_signed(transaction.clear());
@@ -994,7 +994,7 @@ mod slicer_and_timeline_family {
     fn a_signed_workbook_refuses_slicer_and_timeline_changes() {
         for name in SIGNED {
             let original = signed_fixture(name);
-            let mut package = Package::from_bytes(original.clone()).unwrap();
+            let mut package = Package::from_bytes(&original).unwrap();
             let worksheet = first_worksheet(&open(&original));
 
             let mut slicers = package.edit_slicers().unwrap();
@@ -1041,7 +1041,7 @@ mod slicer_and_timeline_family {
 
     #[test]
     fn a_signed_workbook_with_slicers_and_timelines_refuses_their_changes() {
-        let mut plain = Package::from_bytes(signed_fixture(SIGNED[0])).unwrap();
+        let mut plain = Package::from_bytes(&signed_fixture(SIGNED[0])).unwrap();
         plain.unsign().unwrap();
         let worksheet = first_worksheet(&open(&plain.to_bytes().unwrap()));
         let mut slicers = plain.edit_slicers().unwrap();
@@ -1061,7 +1061,7 @@ mod slicer_and_timeline_family {
             .unwrap();
         timelines.commit().unwrap();
         let signed = sign(&open(&plain.to_bytes().unwrap()));
-        let mut package = Package::from_bytes(signed.clone()).unwrap();
+        let mut package = Package::from_bytes(&signed).unwrap();
 
         let mut slicers = package.edit_slicers().unwrap();
         // Library-authored parts reserialize to their own bytes, so a reorder
@@ -1117,7 +1117,7 @@ mod slicer_and_timeline_family {
 fn package_unsign_is_explicit_and_leaves_an_unsigned_package_untouched() {
     for name in SIGNED {
         let original = signed_fixture(name);
-        let mut package = litchi_xlsx::Package::from_bytes(original.clone()).unwrap();
+        let mut package = litchi_xlsx::Package::from_bytes(&original).unwrap();
         assert!(package.is_signed());
         assert_eq!(package.to_bytes().unwrap(), original);
         package.unsign().unwrap();
@@ -1125,7 +1125,7 @@ fn package_unsign_is_explicit_and_leaves_an_unsigned_package_untouched() {
         let output = package.to_bytes().unwrap();
         assert!(!carries_signature(&output), "{name}");
 
-        let mut unsigned = litchi_xlsx::Package::from_bytes(output.clone()).unwrap();
+        let mut unsigned = litchi_xlsx::Package::from_bytes(&output).unwrap();
         unsigned.unsign().unwrap();
         assert_eq!(unsigned.to_bytes().unwrap(), output, "{name}");
     }
@@ -1149,7 +1149,7 @@ mod shared_owners {
     fn custom_properties_refuse_a_signed_fixture_and_keep_exact_noops() {
         for name in SIGNED {
             let original = signed_fixture(name);
-            let mut package = litchi_xlsx::Package::from_bytes(original.clone()).unwrap();
+            let mut package = litchi_xlsx::Package::from_bytes(&original).unwrap();
             package.remove_custom_props().unwrap();
             package.put_custom_props(Props::new()).unwrap();
             assert_eq!(package.to_bytes().unwrap(), original, "{name}: no-ops");
@@ -1162,7 +1162,7 @@ mod shared_owners {
             package.put_custom_props(props()).unwrap();
             let output = package.to_bytes().unwrap();
             assert!(!carries_signature(&output), "{name}");
-            let reopened = litchi_xlsx::Package::from_bytes(output).unwrap();
+            let reopened = litchi_xlsx::Package::from_bytes(&output).unwrap();
             assert!(reopened.custom_props().unwrap().get("Project").is_some());
         }
     }
@@ -1172,7 +1172,7 @@ mod shared_owners {
         let mut plain = unsigned_fixture(SIGNED[0]);
         props().write_for(&mut plain, Host::Excel).unwrap();
         let signed = sign(&plain);
-        let mut package = litchi_xlsx::Package::from_bytes(signed.clone()).unwrap();
+        let mut package = litchi_xlsx::Package::from_bytes(&signed).unwrap();
 
         package.put_custom_props(props()).unwrap();
         assert_eq!(package.to_bytes().unwrap(), signed, "an equal store");

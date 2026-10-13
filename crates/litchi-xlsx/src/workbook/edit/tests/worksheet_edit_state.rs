@@ -9,7 +9,7 @@ use litchi_opc::{BlobPart, PackURI, TargetMode};
 
 #[test]
 fn projected_state_distinguishes_missing_empty_payload_and_formula() {
-    let source = Workbook::create().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let mut edit = source.edit().expect("edit");
     let mut sheet = edit.sheet(0usize).expect("lookup").expect("worksheet");
 
@@ -65,7 +65,7 @@ fn projected_state_distinguishes_missing_empty_payload_and_formula() {
 
 #[test]
 fn projected_state_refuses_deferred_style_lowering() {
-    let source = Workbook::create().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let mut edit = source.edit().expect("edit");
     let mut sheet = edit.sheet(0usize).expect("lookup").expect("worksheet");
     sheet
@@ -121,7 +121,7 @@ fn projected_state_retains_rich_shared_string_identity_for_staged_transfer() {
         .set_blob(
             br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="s"><v>0</v></c></row></sheetData></worksheet>"#.to_vec(),
         );
-    let source = Workbook::from_package(package).expect("rich-string workbook");
+    let source = crate::Package::from_opc(package).expect("rich-string workbook");
 
     let mut edit = source.edit().expect("edit");
     edit.copy_cells("Sheet1", "A1", "Sheet2", "B2")

@@ -1,4 +1,4 @@
-//! Immutable workbook snapshots and selector-first sheet lookup.
+//! The read-only workbook projection and selector-first sheet lookup.
 //!
 //! The public surface is a semantic facade. Workbook and worksheet models are
 //! kept in `model`, OPC relationship ownership in `package`, raw-to-typed
@@ -26,9 +26,10 @@ pub use drawing::{
     WorksheetSvgDescriptor, WorksheetSvgImage,
 };
 pub use edit::{
-    ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, DefaultsEdit, DurablePatch, Edit,
-    FormControlEdit, JoinError, JoinFailure, MergeChoice, MergeLimits, NewSheet, PackageChange,
-    Patch, RowEdit, SealedPatch, State, TabEdit, ThreeWayPlan, WorksheetEdit,
+    ActiveTab, Change, ColumnEdit, Commit, Conflict, ConflictSet, DefaultsEdit, Diagnostics,
+    DurablePatch, Edit, FormControlEdit, JoinError, JoinFailure, MergeChoice, MergeLimits,
+    NewSheet, PackageChange, Patch, RowEdit, SealedPatch, State, TabEdit, ThreeWayPlan,
+    WorksheetEdit,
 };
 /// Finite step and retained-weight bounds for [`History`].
 pub use litchi_core::patch::HistoryLimits;
@@ -41,5 +42,5 @@ pub use source_merge::{
     SourceBackedEditor as SourceBackedMergeEditor, SourceEdit as SourceBackedMergeEdit,
 };
 
-/// Explicit budgeted undo/redo retention for immutable workbook snapshots.
-pub type History = litchi_core::patch::History<Workbook>;
+/// Explicit budgeted undo/redo retention for immutable package snapshots.
+pub type History = litchi_core::patch::History<crate::Package>;
