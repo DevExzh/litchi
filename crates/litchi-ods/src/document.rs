@@ -219,13 +219,16 @@ impl EditOptions {
 }
 
 impl Package {
-    /// Create the minimal valid spreadsheet (one empty worksheet).
+    /// Create the minimal valid spreadsheet: one empty worksheet named
+    /// `Sheet1`, as a spreadsheet application authors a new document.
     ///
     /// # Errors
     ///
     /// Returns an error only when the fixed minimal package cannot be built.
     pub fn new() -> std::result::Result<Self, PackageError> {
-        crate::Builder::new().build()
+        let mut builder = crate::Builder::new();
+        builder.add_sheet(crate::Sheet::new("Sheet1")?)?;
+        builder.build()
     }
 
     /// Open an ODS package from a path with the default [`OpenOptions`].
@@ -1271,6 +1274,33 @@ impl Edit {
             true,
         )
         .map(|_| ())
+    }
+
+    /// Replace the document properties `meta.xml` projects
+    /// ([`litchi_core::Metadata`]): title, subject, description, keywords,
+    /// author, last author, creation and modification times, language and
+    /// revision. Every other `meta.xml` element and attribute is retained
+    /// byte-for-byte; a change to a field `meta.xml` cannot store is refused
+    /// before staging. An equal projection stages nothing.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the metadata change is unsupported or the
+    /// patched `meta.xml` fails validation or the package bound.
+    pub fn set_metadata(&mut self, metadata: &litchi_core::Metadata) -> Result<()> {
+        let package = Arc::clone(&self.package);
+        let snapshot = package.metadata_snapshot()?;
+        let mut transaction = snapshot.transaction();
+        transaction.replace(metadata.clone())?;
+        let commit = transaction.commit()?;
+        if !commit.changed() {
+            return Ok(());
+        }
+        let xml = commit
+            .into_owned_xml()
+            .ok_or_else(|| invalid_error("changed ODS metadata transaction produced no XML"))?;
+        let bytes = package.replace_metadata_xml(Some(&xml))?.into_bytes();
+        self.stage("metadata.edit", "metadata", bytes).map(|_| ())
     }
 
     /// Stage inert RDF graph and triple CRUD.
@@ -3445,6 +3475,7 @@ fn known_operation(operation: &str) -> bool {
             | "definition.edit"
             | "annotation.edit"
             | "rdf.edit"
+            | "metadata.edit"
             | "protection.edit"
             | "data-pilot.edit"
             | "tracked-change.edit"
@@ -3656,8 +3687,18 @@ fn validate_authored_parts(
             continue;
         };
         if is_xml_media_type(&file.media_type) && !provenance_spliced.contains(&path) {
-            litchi_odf_common::compact_xml::validate(&file.bytes).map_err(CoreError::from)?;
+            // Prolog whitespace (a producer's newline after the declaration)
+            // is not authored content.
+            let bytes = crate::package::compact_prolog_bytes(&file.bytes);
+            litchi_odf_common::compact_xml::validate(&bytes).map_err(CoreError::from)?;
         }
+    }
+    // An unchanged manifest is the producer's (LibreOffice indents it); only
+    // a manifest this edit authored must be compact.
+    if raw_identical_members(source, target)
+        .is_some_and(|paths| paths.contains("META-INF/manifest.xml"))
+    {
+        return Ok(());
     }
     let package = Archive::from_bytes(target.to_vec())?;
     let manifest = package.package().get_file("META-INF/manifest.xml")?;

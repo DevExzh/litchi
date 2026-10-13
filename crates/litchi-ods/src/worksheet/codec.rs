@@ -17,6 +17,8 @@ use std::num::NonZeroUsize;
 
 pub(crate) const OFFICE_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 pub(crate) const TABLE_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";
+pub(crate) const CALCEXT_NAMESPACE: &str =
+    "urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0";
 pub(crate) const TEXT_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
 pub(crate) const XLINK_NAMESPACE: &str = "http://www.w3.org/1999/xlink";
 const MAX_XML_DEPTH: usize = 1_024;
@@ -2369,11 +2371,52 @@ pub(crate) fn write_sheet_bounded(sheet: &Sheet, max_bytes: usize) -> Result<Str
 
 /// Render row fragments under an exact allocation and output byte bound.
 pub(crate) fn write_rows_bounded(rows: &[Row], max_bytes: usize) -> Result<String> {
+    write_rows_with_calcext_bounded(rows, max_bytes, false)
+}
+
+/// Render rows for a provenance splice. With `calcext`, every typed cell
+/// also carries LibreOffice's `calcext:value-type` restatement of its
+/// `office:value-type`, as the source rows did; the row binds the
+/// namespace itself.
+pub(crate) fn write_rows_with_calcext_bounded(
+    rows: &[Row],
+    max_bytes: usize,
+    calcext: bool,
+) -> Result<String> {
     let mut output = String::new();
     for row in rows {
-        write_row_bounded(&mut output, row, max_bytes, true)?;
+        write_row_with_calcext_bounded(&mut output, row, max_bytes, true, calcext)?;
     }
     Ok(output)
+}
+
+/// The `calcext:value-type` token the row writer re-emits for an
+/// `office:value-type`, or `None` for one it does not restate (`error`,
+/// unknown producer tokens).
+pub(crate) fn calcext_value_type_token(office: &str) -> Option<&'static str> {
+    Some(match office {
+        "string" => "string",
+        "float" => "float",
+        "currency" => "currency",
+        "percentage" => "percentage",
+        "boolean" => "boolean",
+        "date" => "date",
+        "time" => "time",
+        _ => return None,
+    })
+}
+
+fn calcext_token(value: &CellValue) -> Option<&'static str> {
+    Some(match value {
+        CellValue::Text(_) => "string",
+        CellValue::Number(_) => "float",
+        CellValue::Currency { .. } => "currency",
+        CellValue::Percentage(_) => "percentage",
+        CellValue::Boolean(_) => "boolean",
+        CellValue::Date(_) => "date",
+        CellValue::Time(_) => "time",
+        CellValue::Empty | CellValue::Unknown { .. } => return None,
+    })
 }
 
 fn bounded_push(output: &mut String, value: &str, max_bytes: usize) -> Result<()> {
@@ -2532,6 +2575,16 @@ fn write_row_bounded(
     max_bytes: usize,
     bind_namespaces: bool,
 ) -> Result<()> {
+    write_row_with_calcext_bounded(output, row, max_bytes, bind_namespaces, false)
+}
+
+fn write_row_with_calcext_bounded(
+    output: &mut String,
+    row: &Row,
+    max_bytes: usize,
+    bind_namespaces: bool,
+    calcext: bool,
+) -> Result<()> {
     validation::validate_cell_runs(&row.cells)?;
     bounded_push(output, "<table:table-row", max_bytes)?;
     if bind_namespaces {
@@ -2550,6 +2603,11 @@ fn write_row_bounded(
             ),
             max_bytes,
         )?;
+        if calcext {
+            bounded_push(output, " xmlns:calcext=\"", max_bytes)?;
+            bounded_push(output, CALCEXT_NAMESPACE, max_bytes)?;
+            bounded_push(output, "\"", max_bytes)?;
+        }
     }
     if row.repeat() > 1 {
         bounded_push(output, " table:number-rows-repeated=\"", max_bytes)?;
@@ -2571,12 +2629,17 @@ fn write_row_bounded(
     }
     bounded_push(output, ">", max_bytes)?;
     for cell in &row.cells {
-        write_cell_bounded(output, cell, max_bytes)?;
+        write_cell_bounded(output, cell, max_bytes, calcext && bind_namespaces)?;
     }
     bounded_push(output, "</table:table-row>", max_bytes)
 }
 
-fn write_cell_bounded(output: &mut String, cell: &Cell, max_bytes: usize) -> Result<()> {
+fn write_cell_bounded(
+    output: &mut String,
+    cell: &Cell,
+    max_bytes: usize,
+    calcext: bool,
+) -> Result<()> {
     validation::validate_cell(cell)?;
     let covered = matches!(cell.merge, Merge::Covered);
     bounded_push(
@@ -2612,6 +2675,11 @@ fn write_cell_bounded(output: &mut String, cell: &Cell, max_bytes: usize) -> Res
     }
     if !covered {
         write_value_attributes_bounded(output, &cell.value, max_bytes)?;
+        if calcext && let Some(token) = calcext_token(&cell.value) {
+            bounded_push(output, " calcext:value-type=\"", max_bytes)?;
+            bounded_push(output, token, max_bytes)?;
+            bounded_push(output, "\"", max_bytes)?;
+        }
     }
     if cell.text.is_empty()
         && cell.hyperlinks.is_empty()

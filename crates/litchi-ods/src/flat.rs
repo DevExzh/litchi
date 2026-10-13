@@ -200,6 +200,15 @@ impl Snapshot {
         &self.state.metadata
     }
 
+    /// Extract displayed worksheet text with the packaged projection's
+    /// layout: tab-separated cells, newline-separated rows, sheet order.
+    ///
+    /// # Errors
+    /// Returns an error when the bounded projection cannot reserve its output.
+    pub fn text(&self) -> Result<String> {
+        crate::facade::source::project_text(&self.state.sheets)
+    }
+
     #[must_use]
     pub fn odf_metadata(&self) -> &OdfMetadata {
         &self.state.odf_metadata
@@ -667,11 +676,14 @@ fn validate_flat_xml(xml: &str) -> Result<()> {
                 }
             },
             Event::Text(text) => {
+                // XML `Misc` around the root admits whitespace only; every
+                // producer ends a flat document with a newline.
                 let text: &[u8] = text.as_ref();
-                if root_closed {
+                let blank = text.iter().all(|byte| byte.is_ascii_whitespace());
+                if root_closed && !blank {
                     return Err(invalid("flat ODS XML has trailing text after its root"));
                 }
-                if !root_seen && text.iter().any(|byte| !byte.is_ascii_whitespace()) {
+                if !root_seen && !blank {
                     return Err(invalid("flat ODS XML has text before its root"));
                 }
             },
@@ -682,8 +694,10 @@ fn validate_flat_xml(xml: &str) -> Result<()> {
             },
             Event::Eof => break,
             Event::Decl(_) if !root_seen && !root_closed => {},
-            Event::PI(_) | Event::Comment(_) if root_seen && !root_closed => {},
-            Event::Decl(_) | Event::PI(_) | Event::Comment(_) => {
+            // Comments and processing instructions are XML `Misc`, admitted
+            // before and after the root as inside it; both stay inert.
+            Event::PI(_) | Event::Comment(_) => {},
+            Event::Decl(_) => {
                 return Err(invalid("flat ODS XML has markup outside its root"));
             },
         }
