@@ -88,9 +88,9 @@ pub struct CellCursor {
 
 enum Stage {
     Streaming(Box<Streaming>),
+    /// The complete grid, walked after the last cell returned.
     Complete {
         grid: Grid,
-        cells: std::vec::IntoIter<(u32, u32)>,
     },
     /// The complete grid, not read yet.
     Pending,
@@ -222,7 +222,7 @@ impl CellCursor {
             match &mut self.stage {
                 Stage::Done => return Ok(None),
                 Stage::Pending => self.stage = self.complete()?,
-                Stage::Complete { cells, .. } => return Ok(cells.next()),
+                Stage::Complete { grid } => return Ok(grid.worksheet().cell_after(self.last)),
                 Stage::Streaming(streaming) => {
                     if let Some(at) = streaming.batch.pop_front() {
                         return Ok(Some(at));
@@ -243,19 +243,11 @@ impl CellCursor {
         }
     }
 
-    /// The complete grid, positioned after the last cell returned.
+    /// The complete grid; the walk continues after the last cell returned.
     fn complete(&self) -> Result<Stage> {
-        let grid = self.sheet.grid()?;
-        let cells = grid
-            .cells_in(crate::sheet::Rect::ALL)?
-            .map(|cell| {
-                use litchi_core::sheet::Cell as _;
-                (cell.row(), cell.column())
-            })
-            .filter(|at| self.last.is_none_or(|last| *at > last))
-            .collect::<Vec<_>>()
-            .into_iter();
-        Ok(Stage::Complete { grid, cells })
+        Ok(Stage::Complete {
+            grid: self.sheet.grid()?,
+        })
     }
 }
 
