@@ -119,4 +119,4 @@ zerocopy-derive = "0.8" # Derive macros for zerocopy traits
 clap = { version = "4", features = ["derive"] }
 proptest = "1.5"
 tempfile = "3"
-zip = { version = "8", default-features = false, features = ["deflate"] }
+zip = { version = "9", default-features = false, features = ["deflate"] }
