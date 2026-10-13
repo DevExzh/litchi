@@ -3930,9 +3930,11 @@ impl Edit {
             vec![None; paragraphs.len()]
         };
         let mut staged = Vec::new();
-        staged.try_reserve_exact(insertions.len()).map_err(|_error| {
-            Error::Write("could not reserve run-insertion operations".to_string())
-        })?;
+        staged
+            .try_reserve_exact(insertions.len())
+            .map_err(|_error| {
+                Error::Write("could not reserve run-insertion operations".to_string())
+            })?;
         for insertion in insertions {
             let paragraph_index = insertion.paragraph.get();
             let runs = paragraph_runs
@@ -6009,24 +6011,20 @@ fn ordinary_run_insertion_source_offsets(
         .map_err(|_error| Error::Write("could not reserve run-insertion offsets".to_string()))?;
     let mut source_run_cursor = 0usize;
     for operation in operations {
-        let Operation::RunInsert {
-            paragraph, run, ..
-        } = operation
-        else {
+        let Operation::RunInsert { paragraph, run, .. } = operation else {
             return Err(Error::StructuralPropertyConflict);
         };
-        let run_count = *paragraph_run_counts
-            .get(*paragraph)
-            .ok_or(Error::ParagraphOutOfRange {
-                position: *paragraph,
-                count: paragraph_run_counts.len(),
-            })?;
+        let run_count =
+            *paragraph_run_counts
+                .get(*paragraph)
+                .ok_or(Error::ParagraphOutOfRange {
+                    position: *paragraph,
+                    count: paragraph_run_counts.len(),
+                })?;
         let source_offset = if *run < run_count {
             while source_runs
                 .get(source_run_cursor)
-                .is_some_and(|candidate| {
-                    (candidate.paragraph, candidate.run) < (*paragraph, *run)
-                })
+                .is_some_and(|candidate| (candidate.paragraph, candidate.run) < (*paragraph, *run))
             {
                 source_run_cursor = source_run_cursor.saturating_add(1);
             }
@@ -6041,12 +6039,9 @@ fn ordinary_run_insertion_source_offsets(
             candidate.source.start
         } else if *run != 0 {
             let target_run = run.saturating_sub(1);
-            while source_runs
-                .get(source_run_cursor)
-                .is_some_and(|candidate| {
-                    (candidate.paragraph, candidate.run) < (*paragraph, target_run)
-                })
-            {
+            while source_runs.get(source_run_cursor).is_some_and(|candidate| {
+                (candidate.paragraph, candidate.run) < (*paragraph, target_run)
+            }) {
                 source_run_cursor = source_run_cursor.saturating_add(1);
             }
             let candidate = source_runs
@@ -6098,7 +6093,9 @@ fn commit_body_run_insertions(edit: Edit, operation_count: usize) -> Result<Comm
     let mut replacements = Vec::new();
     replacements
         .try_reserve_exact(edit.operations.len())
-        .map_err(|_error| Error::Write("could not reserve run-insertion replacements".to_string()))?;
+        .map_err(|_error| {
+            Error::Write("could not reserve run-insertion replacements".to_string())
+        })?;
     for (operation, source_offset) in edit.operations.iter().zip(&source_offsets) {
         let Operation::RunInsert {
             paragraph,
@@ -6110,12 +6107,13 @@ fn commit_body_run_insertions(edit: Edit, operation_count: usize) -> Result<Comm
         else {
             return Err(Error::StructuralPropertyConflict);
         };
-        let paragraph_run_count = *paragraph_run_counts
-            .get(*paragraph)
-            .ok_or(Error::ParagraphOutOfRange {
-                position: *paragraph,
-                count: paragraph_run_counts.len(),
-            })?;
+        let paragraph_run_count =
+            *paragraph_run_counts
+                .get(*paragraph)
+                .ok_or(Error::ParagraphOutOfRange {
+                    position: *paragraph,
+                    count: paragraph_run_counts.len(),
+                })?;
         let encoding_format = if paragraph_run_count == 0 {
             RunFormatPatch::all_from_format(after)
         } else {
@@ -6398,21 +6396,23 @@ fn validate_run_insert_candidate(
         for target_run in target_paragraph.runs() {
             let mut remaining = target_run.text();
             while !remaining.is_empty() {
-                let (expected_text, expected_format) = expected
-                    .get(expected_index)
-                    .ok_or(Error::UnsupportedSource(
-                        "candidate run-insertion publication has excess text",
-                    ))?;
+                let (expected_text, expected_format) =
+                    expected
+                        .get(expected_index)
+                        .ok_or(Error::UnsupportedSource(
+                            "candidate run-insertion publication has excess text",
+                        ))?;
                 if *expected_format != *target_run.format().raw() {
                     return Err(Error::UnsupportedSource(
                         "candidate run-insertion publication changed character formatting",
                     ));
                 }
-                let expected_remaining = expected_text
-                    .get(expected_offset..)
-                    .ok_or(Error::UnsupportedSource(
-                        "candidate run-insertion expected text boundary is invalid",
-                    ))?;
+                let expected_remaining =
+                    expected_text
+                        .get(expected_offset..)
+                        .ok_or(Error::UnsupportedSource(
+                            "candidate run-insertion expected text boundary is invalid",
+                        ))?;
                 let common_limit = expected_remaining.len().min(remaining.len());
                 let common = expected_remaining
                     .char_indices()
@@ -6879,9 +6879,7 @@ fn commit_raw_paragraph_structure(edit: Edit, operation_count: usize) -> Result<
                 }];
                 (snapshot, semantic_delta)
             },
-            Operation::Text { .. }
-            | Operation::RunFormat { .. }
-            | Operation::RunInsert { .. } => {
+            Operation::Text { .. } | Operation::RunFormat { .. } | Operation::RunInsert { .. } => {
                 return Err(Error::BodyDestinationConflict);
             },
             _ => return Err(Error::BodyDestinationConflict),
@@ -8210,12 +8208,13 @@ fn empty_paragraph_boundary_formats(
             })?;
         while next_empty < empty_paragraphs.len() {
             let paragraph_index = next_empty;
-            let paragraph_start = *paragraph_starts.get(paragraph_index).ok_or(
-                Error::ParagraphOutOfRange {
-                    position: paragraph_index,
-                    count: paragraph_starts.len(),
-                },
-            )?;
+            let paragraph_start =
+                *paragraph_starts
+                    .get(paragraph_index)
+                    .ok_or(Error::ParagraphOutOfRange {
+                        position: paragraph_index,
+                        count: paragraph_starts.len(),
+                    })?;
             if paragraph_start >= block_end {
                 break;
             }
@@ -8230,9 +8229,11 @@ fn empty_paragraph_boundary_formats(
                     "empty paragraph has no retained native newline block",
                 ));
             }
-            let format = formats.get_mut(paragraph_index).ok_or(Error::UnsupportedSource(
-                "empty paragraph formatting slot is missing",
-            ))?;
+            let format = formats
+                .get_mut(paragraph_index)
+                .ok_or(Error::UnsupportedSource(
+                    "empty paragraph formatting slot is missing",
+                ))?;
             *format = Some(block.formatting);
             next_empty = paragraph_index.saturating_add(1);
             while empty_paragraphs.get(next_empty) == Some(&false) {
@@ -11579,9 +11580,10 @@ fn ordinary_run_text_spans(
             requested.push((*paragraph, *run, after.len()));
         }
     }
-    if requested.windows(2).any(|pair| {
-        matches!(pair, [left, right] if (right.0, right.1) <= (left.0, left.1))
-    }) {
+    if requested
+        .windows(2)
+        .any(|pair| matches!(pair, [left, right] if (right.0, right.1) <= (left.0, left.1)))
+    {
         return Err(Error::UnsupportedSource(
             "run-text operations are not source ordered",
         ));
@@ -11603,12 +11605,13 @@ fn ordinary_run_text_spans(
     let mut body_position = 0usize;
     let mut requested_index = 0usize;
     for (paragraph_index, paragraph) in source.body().paragraphs().enumerate() {
-        let paragraph_end = body_position
-            .checked_add(paragraph.len())
-            .ok_or(Error::InputTooLarge {
-                observed: usize::MAX,
-                limit: usize::MAX,
-            })?;
+        let paragraph_end =
+            body_position
+                .checked_add(paragraph.len())
+                .ok_or(Error::InputTooLarge {
+                    observed: usize::MAX,
+                    limit: usize::MAX,
+                })?;
         let mut run_start = body_position;
         for (run_index, run) in paragraph.runs().enumerate() {
             let run_end = run_start
@@ -11647,12 +11650,13 @@ fn ordinary_run_text_spans(
             run_start = run_end;
         }
         let terminated = source.text().as_bytes().get(paragraph_end) == Some(&b'\n');
-        body_position = paragraph_end
-            .checked_add(usize::from(terminated))
-            .ok_or(Error::InputTooLarge {
-                observed: usize::MAX,
-                limit: usize::MAX,
-            })?;
+        body_position =
+            paragraph_end
+                .checked_add(usize::from(terminated))
+                .ok_or(Error::InputTooLarge {
+                    observed: usize::MAX,
+                    limit: usize::MAX,
+                })?;
     }
     if let Some((paragraph, run, _)) = requested.get(requested_index).copied() {
         if paragraph >= source.paragraph_count() {
@@ -11711,12 +11715,10 @@ fn base_position_changes(
                 ..
             } => {
                 if source.is_some() {
-                    let (span, replacement_len) = run_text_spans
-                        .get(run_text_index)
-                        .copied()
-                        .ok_or(Error::UnsupportedSource(
-                            "run-text source span cursor disappeared",
-                        ))?;
+                    let (span, replacement_len) =
+                        run_text_spans.get(run_text_index).copied().ok_or(
+                            Error::UnsupportedSource("run-text source span cursor disappeared"),
+                        )?;
                     raw.push((span, replacement_len, false));
                     run_text_index = run_text_index.saturating_add(1);
                 }
@@ -11793,17 +11795,17 @@ fn project_base_position_from_changes(
     // validation bounded when a source carries many opaque anchors and run
     // replacements.
     let change_count = changes.partition_point(|change| {
-        change.span.start < position
-            || (change.shift_start && change.span.start == position)
+        change.span.start < position || (change.shift_start && change.span.start == position)
     });
     let (source_cursor, projected_cursor) = if change_count == 0 {
         (0, 0)
     } else {
-        let change = changes
-            .get(change_count.saturating_sub(1))
-            .ok_or(Error::UnsupportedSource(
-                "body position change cursor disappeared",
-            ))?;
+        let change =
+            changes
+                .get(change_count.saturating_sub(1))
+                .ok_or(Error::UnsupportedSource(
+                    "body position change cursor disappeared",
+                ))?;
         (change.source_end, change.projected_end)
     };
     projected_cursor
@@ -11922,11 +11924,7 @@ fn body_opaque_source_offsets(source: &Package) -> Result<Vec<usize>, Error> {
     let source_bytes = source
         .source_bytes()
         .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
-    let body_span = ordinary_run_body_source_span(
-        source_bytes,
-        source.text(),
-        source.options(),
-    )?;
+    let body_span = ordinary_run_body_source_span(source_bytes, source.text(), source.options())?;
     let mut search_start = body_span.start;
     let mut offsets = Vec::new();
     for node in source
@@ -11940,11 +11938,12 @@ fn body_opaque_source_offsets(source: &Package) -> Result<Vec<usize>, Error> {
                 "an empty body-anchored opaque node cannot be located",
             ));
         }
-        let haystack = source_bytes
-            .get(search_start..body_span.end)
-            .ok_or(Error::UnsupportedSource(
-                "body opaque search range is outside the source",
-            ))?;
+        let haystack =
+            source_bytes
+                .get(search_start..body_span.end)
+                .ok_or(Error::UnsupportedSource(
+                    "body opaque search range is outside the source",
+                ))?;
         let relative = haystack
             .windows(node_source.len())
             .position(|window| window == node_source)
@@ -12060,7 +12059,8 @@ fn validate_opaque_preservation(
         .as_ref()
         .map(|source_offsets| run_insertion_position_changes(operations, source_offsets))
         .transpose()?;
-    let position_changes = run_insert_source_offsets.is_none()
+    let position_changes = run_insert_source_offsets
+        .is_none()
         .then(|| base_position_changes(Some(source), operations))
         .transpose()?;
     for (node_index, (source_node, target_node)) in
@@ -12079,17 +12079,18 @@ fn validate_opaque_preservation(
         let projected_position = if let (Some(_source_offsets), Some(opaque_offsets)) =
             (&run_insert_source_offsets, &opaque_source_offsets)
         {
-            let node_source_offset = *opaque_offsets.get(node_index).ok_or(
-                Error::UnsupportedSource("body opaque source cursor disappeared"),
-            )?;
-            let changes = insertion_position_changes.as_ref().ok_or(
-                Error::UnsupportedSource("run-insertion position changes are unavailable"),
-            )?;
-            project_run_insertion_opaque_position(
-                source_position,
-                node_source_offset,
-                changes,
-            )?
+            let node_source_offset =
+                *opaque_offsets
+                    .get(node_index)
+                    .ok_or(Error::UnsupportedSource(
+                        "body opaque source cursor disappeared",
+                    ))?;
+            let changes = insertion_position_changes
+                .as_ref()
+                .ok_or(Error::UnsupportedSource(
+                    "run-insertion position changes are unavailable",
+                ))?;
+            project_run_insertion_opaque_position(source_position, node_source_offset, changes)?
         } else {
             let changes = position_changes.as_ref().ok_or(Error::UnsupportedSource(
                 "body position changes are unavailable",

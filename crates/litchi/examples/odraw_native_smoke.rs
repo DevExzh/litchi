@@ -7,9 +7,7 @@ use std::{error::Error, fs, path::PathBuf};
 
 use litchi_doc::builder::Builder;
 use litchi_doc::writer::{FloatingPosition, Kind, Shape};
-use litchi_ppt::writer::{
-    FillStyle, LineStyleConfig, ShapeColor, ShapeStyle, ShapeType, Table, Writer as PptWriter,
-};
+use litchi_ppt::writer::{FillStyle, LineStyleConfig, ShapeColor, ShapeStyle, ShapeType, Table};
 use litchi_xls::writer as xls_writer;
 use litchi_xls::writer::shape::{Anchor, Behavior, Rect};
 
@@ -70,7 +68,7 @@ fn write_doc(path: &std::path::Path, mode: &str) -> Result<(), Box<dyn Error>> {
 }
 
 fn write_ppt(path: &std::path::Path) -> Result<(), Box<dyn Error>> {
-    let mut ppt = PptWriter::new_widescreen();
+    let mut ppt = litchi_ppt::Builder::new_widescreen();
     let slide = ppt.add_slide()?;
     ppt.add_textbox(slide, 50, 25, 650, 40, "Litchi OfficeArt native smoke test")?;
     let rectangle = ShapeStyle::default()
@@ -101,7 +99,7 @@ fn write_ppt(path: &std::path::Path) -> Result<(), Box<dyn Error>> {
     table.set_cell_text(1, 0, "safe")?;
     table.set_cell_text(1, 1, "anchor")?;
     ppt.add_table(slide, 80, 380, table)?;
-    ppt.save(path)?;
+    ppt.build()?.save(path)?;
     Ok(())
 }
 

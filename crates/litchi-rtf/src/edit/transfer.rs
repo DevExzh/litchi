@@ -312,12 +312,12 @@ impl TransferPlan {
                 .stylesheet()
                 .get_typed(style.style_type, style.id)
             {
-                Some(existing) if existing == style => {}
+                Some(existing) if existing == style => {},
                 Some(_) => {
                     return Err(Error::UnsupportedSource(
                         "style transfer found a conflicting typed style ID",
                     ));
-                }
+                },
                 None => additions.push(owned_style(style)),
             }
         }
@@ -355,7 +355,7 @@ impl TransferPlan {
                 return Err(Error::UnsupportedSource(
                     "list transfer found a conflicting list ID",
                 ));
-            }
+            },
             None => true,
         };
         let mut overrides = Vec::new();
@@ -367,12 +367,12 @@ impl TransferPlan {
             .filter(|entry| entry.list_id == id)
         {
             match target.model().list_override_table().get(entry.index) {
-                Some(existing) if existing == entry => {}
+                Some(existing) if existing == entry => {},
                 Some(_) => {
                     return Err(Error::UnsupportedSource(
                         "list transfer found a conflicting override index",
                     ));
-                }
+                },
                 None => overrides.push(entry.clone()),
             }
         }
@@ -697,20 +697,20 @@ fn field_transfer_class(field: &crate::Field<'_>) -> FieldTransferClass {
             } else {
                 FieldTransferClass::Unknown
             }
-        }
+        },
         FieldType::Reference if matches!(&parsed_code, crate::ParsedFieldCode::Reference(_)) => {
             FieldTransferClass::Passive
-        }
+        },
         FieldType::PageReference
             if matches!(&parsed_code, crate::ParsedFieldCode::PageReference(_)) =>
         {
             FieldTransferClass::Passive
-        }
+        },
         FieldType::NoteReference
             if matches!(&parsed_code, crate::ParsedFieldCode::NoteReference(_)) =>
         {
             FieldTransferClass::Passive
-        }
+        },
         FieldType::ReferencedDocument
         | FieldType::Dde
         | FieldType::DdeAuto
@@ -760,7 +760,7 @@ fn field_transfer_class(field: &crate::Field<'_>) -> FieldTransferClass {
             } else {
                 FieldTransferClass::Passive
             }
-        }
+        },
         _ => FieldTransferClass::Unknown,
     }
 }

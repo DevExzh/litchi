@@ -316,21 +316,21 @@ impl fmt::Display for TailAppendPublicationError {
             Self::Plan(error) => write!(formatter, "RTF tail publication plan failed: {error}"),
             Self::InvalidLimits(reason) => {
                 write!(formatter, "invalid RTF tail publication limits: {reason}")
-            }
+            },
             Self::SourceVersionChanged { expected, observed } => write!(
                 formatter,
                 "RTF tail publication source version changed from {expected:?} to {observed:?}"
             ),
             Self::SourceFingerprintChanged { .. } => {
                 formatter.write_str("RTF tail publication source fingerprint changed")
-            }
+            },
             Self::SourceLengthChanged { expected, observed } => write!(
                 formatter,
                 "RTF source length changed from {expected} to {observed}"
             ),
             Self::SourceDigestChanged { .. } => {
                 formatter.write_str("RTF source-backed publication source digest changed")
-            }
+            },
             Self::Source { error, written } => write!(
                 formatter,
                 "RTF tail publication source failed ({}) after {written} bytes: {error}",
@@ -493,33 +493,42 @@ impl fmt::Display for Error {
         match self {
             Self::UnsupportedSelector => {
                 formatter.write_str("RTF logical-tail selector is not supported")
-            }
+            },
             Self::UnsupportedSource(reason) => {
                 write!(
                     formatter,
                     "RTF logical-tail source is unsupported: {reason}"
                 )
-            }
+            },
             Self::ProtectedDocument(protection) => {
                 write!(
                     formatter,
                     "RTF protected document refuses logical-tail publication ({protection:?})"
                 )
-            }
+            },
             Self::EmptyInput => formatter.write_str("RTF logical-tail input must not be empty"),
             Self::AlreadyStaged => {
                 formatter.write_str("RTF logical-tail edit already has a staged batch")
-            }
-            Self::InvalidLimit { kind, value, maximum } => write!(
-                formatter, "invalid RTF tail {kind:?} limit: {value}, maximum {maximum}"
+            },
+            Self::InvalidLimit {
+                kind,
+                value,
+                maximum,
+            } => write!(
+                formatter,
+                "invalid RTF tail {kind:?} limit: {value}, maximum {maximum}"
             ),
-            Self::Limit { kind, observed, maximum } => write!(
+            Self::Limit {
+                kind,
+                observed,
+                maximum,
+            } => write!(
                 formatter,
                 "RTF logical-tail {kind:?} limit exceeded: observed {observed}, maximum {maximum}"
             ),
             Self::InvalidText(reason) => {
                 write!(formatter, "invalid RTF logical-tail text: {reason}")
-            }
+            },
             Self::AllocationFailed {
                 resource,
                 requested,
@@ -530,7 +539,7 @@ impl fmt::Display for Error {
             Self::Rtf(error) => error.fmt(formatter),
             Self::DurablePatch(reason) => {
                 write!(formatter, "invalid RTF logical-tail patch: {reason}")
-            }
+            },
             Self::PatchConflict => formatter.write_str(
                 "RTF logical-tail patch source does not match its exact expected artifact",
             ),
@@ -539,7 +548,7 @@ impl fmt::Display for Error {
                     formatter,
                     "RTF logical-tail sink failed ({kind}) after {written} bytes"
                 )
-            }
+            },
         }
     }
 }
@@ -596,7 +605,11 @@ impl Edit {
 
     /// Starts a transaction with explicit append and wire bounds.
     #[must_use]
-    pub fn new_with_options(source: &Package, selector: TailSelector, options: EditOptions) -> Self {
+    pub fn new_with_options(
+        source: &Package,
+        selector: TailSelector,
+        options: EditOptions,
+    ) -> Self {
         let mut edit = Self::new(source, selector);
         edit.limits = options.semantic_limits_value();
         edit
@@ -660,28 +673,26 @@ impl Edit {
             preflight_plain_paragraphs(paragraphs, self.limits)?;
 
         let mut owned = Vec::new();
-        owned.try_reserve(observed_paragraphs).map_err(|_error| {
-            Error::AllocationFailed {
+        owned
+            .try_reserve(observed_paragraphs)
+            .map_err(|_error| Error::AllocationFailed {
                 resource: "tail paragraphs",
                 requested: observed_paragraphs.saturating_mul(size_of::<OwnedParagraph>()),
-            }
-        })?;
+            })?;
         for paragraph in paragraphs {
             let mut runs = Vec::new();
-            runs.try_reserve(paragraph.runs().len()).map_err(|_error| {
-                Error::AllocationFailed {
+            runs.try_reserve(paragraph.runs().len())
+                .map_err(|_error| Error::AllocationFailed {
                     resource: "tail runs",
                     requested: paragraph.runs().len().saturating_mul(size_of::<String>()),
-                }
-            })?;
+                })?;
             for run in paragraph.runs() {
                 let mut text = String::new();
-                text.try_reserve(run.text().len()).map_err(|_error| {
-                    Error::AllocationFailed {
+                text.try_reserve(run.text().len())
+                    .map_err(|_error| Error::AllocationFailed {
                         resource: "tail text",
                         requested: run.text().len(),
-                    }
-                })?;
+                    })?;
                 text.push_str(run.text());
                 runs.push(text);
             }
@@ -695,10 +706,7 @@ impl Edit {
 
     /// Alias that makes the plain-text ownership boundary explicit at call
     /// Convenience staging method for one plain-text run per paragraph.
-    pub fn append_text_paragraphs(
-        &mut self,
-        paragraphs: &[&str],
-    ) -> Result<&mut Self, Error> {
+    pub fn append_text_paragraphs(&mut self, paragraphs: &[&str]) -> Result<&mut Self, Error> {
         if !self.paragraphs.is_empty() {
             return Err(Error::AlreadyStaged);
         }
@@ -777,10 +785,8 @@ impl Edit {
                 | TailAppendPublicationError::LimitExceeded { .. }
                 | TailAppendPublicationError::Sink { .. }
                 | TailAppendPublicationError::IncompleteOutput { .. } => {
-                    Error::UnsupportedSource(
-                        "publication planning failed outside the source proof",
-                    )
-                }
+                    Error::UnsupportedSource("publication planning failed outside the source proof")
+                },
             })
     }
 
@@ -823,9 +829,7 @@ impl Edit {
         let source_bytes = self
             .source
             .source_bytes()
-            .ok_or(Error::UnsupportedSource(
-                "snapshot has no exact RTF source",
-            ))?;
+            .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
         let source_length = source_bytes.len();
         if source_length > self.limits.max_output_bytes {
             return Err(Error::Limit {
@@ -867,14 +871,13 @@ impl Edit {
             }
             .into());
         }
-        let output_length =
-            source_length
-                .checked_add(inserted_len)
-                .ok_or(Error::Limit {
-                    kind: LimitKind::OutputBytes,
-                    observed: usize::MAX,
-                    maximum: self.limits.max_output_bytes,
-                })?;
+        let output_length = source_length
+            .checked_add(inserted_len)
+            .ok_or(Error::Limit {
+                kind: LimitKind::OutputBytes,
+                observed: usize::MAX,
+                maximum: self.limits.max_output_bytes,
+            })?;
         if output_length > self.limits.max_output_bytes {
             return Err(Error::Limit {
                 kind: LimitKind::OutputBytes,
@@ -970,9 +973,7 @@ impl Edit {
         let source_bytes = self
             .source
             .source_bytes()
-            .ok_or(Error::UnsupportedSource(
-                "snapshot has no exact RTF source",
-            ))?;
+            .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
         let inserted_len =
             encoded_inserted_len(&self.source, &self.paragraphs, proof.ends_with_par)?;
         if inserted_len > self.limits.max_inserted_bytes {
@@ -982,15 +983,14 @@ impl Edit {
                 maximum: self.limits.max_inserted_bytes,
             });
         }
-        let output_len =
-            source_bytes
-                .len()
-                .checked_add(inserted_len)
-                .ok_or(Error::Limit {
-                    kind: LimitKind::OutputBytes,
-                    observed: usize::MAX,
-                    maximum: self.limits.max_output_bytes,
-                })?;
+        let output_len = source_bytes
+            .len()
+            .checked_add(inserted_len)
+            .ok_or(Error::Limit {
+                kind: LimitKind::OutputBytes,
+                observed: usize::MAX,
+                maximum: self.limits.max_output_bytes,
+            })?;
         if output_len > self.limits.max_output_bytes {
             return Err(Error::Limit {
                 kind: LimitKind::OutputBytes,
@@ -1018,18 +1018,16 @@ impl Edit {
                 resource: "tail candidate",
                 requested: output_len,
             })?;
-        let prefix =
-            source_bytes
-                .get(..proof.root_close)
-                .ok_or(Error::UnsupportedSource(
-                    "root-close proof is outside the source",
-                ))?;
-        let suffix =
-            source_bytes
-                .get(proof.root_close..)
-                .ok_or(Error::UnsupportedSource(
-                    "root-close proof is outside the source",
-                ))?;
+        let prefix = source_bytes
+            .get(..proof.root_close)
+            .ok_or(Error::UnsupportedSource(
+                "root-close proof is outside the source",
+            ))?;
+        let suffix = source_bytes
+            .get(proof.root_close..)
+            .ok_or(Error::UnsupportedSource(
+                "root-close proof is outside the source",
+            ))?;
         output.extend_from_slice(prefix);
         output.extend_from_slice(&inserted);
         output.extend_from_slice(suffix);
@@ -1210,15 +1208,13 @@ impl TailAppendPublicationPlan {
     ) -> Result<TailAppendPublicationReport, TailAppendPublicationError> {
         self.publication_limits.validate()?;
         if self.selector != TailSelector::Body {
-            return Err(TailAppendPublicationError::Plan(
-                Error::UnsupportedSelector,
-            ));
+            return Err(TailAppendPublicationError::Plan(Error::UnsupportedSelector));
         }
         let source_bytes = source
             .source_bytes()
-            .ok_or(TailAppendPublicationError::Plan(
-                Error::UnsupportedSource("snapshot has no exact RTF source"),
-            ))?;
+            .ok_or(TailAppendPublicationError::Plan(Error::UnsupportedSource(
+                "snapshot has no exact RTF source",
+            )))?;
         let observed_version = source.source_version();
         if observed_version != self.source_version {
             return Err(TailAppendPublicationError::SourceVersionChanged {
@@ -1252,11 +1248,9 @@ impl TailAppendPublicationPlan {
             },
         )?;
         if output_length != self.output_bytes() {
-            return Err(TailAppendPublicationError::Plan(
-                Error::UnsupportedSource(
-                    "publication output length no longer matches its proof",
-                ),
-            ));
+            return Err(TailAppendPublicationError::Plan(Error::UnsupportedSource(
+                "publication output length no longer matches its proof",
+            )));
         }
         if output_length > self.append_limits.max_output_bytes {
             return Err(TailAppendPublicationError::LimitExceeded {
@@ -1275,11 +1269,9 @@ impl TailAppendPublicationPlan {
             });
         }
         if self.root_close > source_bytes.len() {
-            return Err(TailAppendPublicationError::Plan(
-                Error::UnsupportedSource(
-                    "publication root-close proof is outside the source",
-                ),
-            ));
+            return Err(TailAppendPublicationError::Plan(Error::UnsupportedSource(
+                "publication root-close proof is outside the source",
+            )));
         }
         let expected = u64::try_from(output_length).map_err(|_error| {
             TailAppendPublicationError::LimitExceeded {
@@ -1337,18 +1329,14 @@ impl TailAppendPublicationPlan {
         };
         let prefix = source_bytes
             .get(..root_close)
-            .ok_or(TailAppendPublicationError::Plan(
-                Error::UnsupportedSource(
-                    "publication prefix proof is outside the source",
-                ),
-            ))?;
+            .ok_or(TailAppendPublicationError::Plan(Error::UnsupportedSource(
+                "publication prefix proof is outside the source",
+            )))?;
         let suffix = source_bytes
             .get(root_close..)
-            .ok_or(TailAppendPublicationError::Plan(
-                Error::UnsupportedSource(
-                    "publication suffix proof is outside the source",
-                ),
-            ))?;
+            .ok_or(TailAppendPublicationError::Plan(Error::UnsupportedSource(
+                "publication suffix proof is outside the source",
+            )))?;
         let segments = [prefix, self.inserted.as_ref(), suffix];
         let chunk_limit = self
             .publication_limits
@@ -1484,10 +1472,7 @@ struct TailAppendSourceCapability;
 impl TailAppendSourceProof {
     /// Issues a proof for the exact source retained by an already parsed
     /// document.
-    pub fn from_document(
-        source: &Package,
-        selector: TailSelector,
-    ) -> Result<Self, Error> {
+    pub fn from_document(source: &Package, selector: TailSelector) -> Result<Self, Error> {
         Self::from_document_with_source_version(source, selector, source.source_version())
     }
 
@@ -1504,9 +1489,7 @@ impl TailAppendSourceProof {
         let splice = prove_splice_source(source, selector)?;
         let bytes = source
             .source_bytes()
-            .ok_or(Error::UnsupportedSource(
-                "snapshot has no exact RTF source",
-            ))?;
+            .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
         Ok(Self {
             selector,
             source_version,
@@ -1560,9 +1543,9 @@ impl TailAppendSourceProof {
             prove_splice_source(document, selector).map_err(TailAppendPublicationError::Plan)?;
         let document_bytes = document
             .source_bytes()
-            .ok_or(TailAppendPublicationError::Plan(
-                Error::UnsupportedSource("snapshot has no exact RTF source"),
-            ))?;
+            .ok_or(TailAppendPublicationError::Plan(Error::UnsupportedSource(
+                "snapshot has no exact RTF source",
+            )))?;
         let expected_version = source
             .version()
             .map_err(|error| source_publication_io(error, 0))?;
@@ -1615,7 +1598,7 @@ impl TailAppendSourceProof {
                     let _ = work.commit(units);
                 }
                 return Err(source_scan_publication_error(error, 0));
-            }
+            },
         };
         if let Some((memory, input, work)) = scan_reservations {
             let _ = memory.commit(0);
@@ -1836,10 +1819,7 @@ impl TailAppendSourceEdit {
     }
 
     /// Convenience staging method for one plain run per paragraph.
-    pub fn append_text_paragraphs(
-        &mut self,
-        paragraphs: &[&str],
-    ) -> Result<&mut Self, Error> {
+    pub fn append_text_paragraphs(&mut self, paragraphs: &[&str]) -> Result<&mut Self, Error> {
         if !self.paragraphs.is_empty() {
             return Err(Error::AlreadyStaged);
         }
@@ -1926,14 +1906,10 @@ impl TailAppendSourceEdit {
         publication_limits.validate()?;
         let _capability = self.proof.capability;
         if self.selector != TailSelector::Body || self.proof.selector != TailSelector::Body {
-            return Err(TailAppendPublicationError::Plan(
-                Error::UnsupportedSelector,
-            ));
+            return Err(TailAppendPublicationError::Plan(Error::UnsupportedSelector));
         }
         if self.selector != self.proof.selector {
-            return Err(TailAppendPublicationError::Plan(
-                Error::UnsupportedSelector,
-            ));
+            return Err(TailAppendPublicationError::Plan(Error::UnsupportedSelector));
         }
         let source_version = self
             .source
@@ -1969,11 +1945,9 @@ impl TailAppendSourceEdit {
             self.proof.root_close
         };
         if root_close > source_length_usize {
-            return Err(TailAppendPublicationError::Plan(
-                Error::UnsupportedSource(
-                    "source-backed root-close proof is outside the source",
-                ),
-            ));
+            return Err(TailAppendPublicationError::Plan(Error::UnsupportedSource(
+                "source-backed root-close proof is outside the source",
+            )));
         }
         let inserted_len = if self.paragraphs.is_empty() {
             0
@@ -1985,13 +1959,11 @@ impl TailAppendSourceEdit {
             )?
         };
         if inserted_len > self.limits.max_inserted_bytes {
-            return Err(TailAppendPublicationError::Plan(
-                Error::Limit {
-                    kind: LimitKind::InsertedBytes,
-                    observed: inserted_len,
-                    maximum: self.limits.max_inserted_bytes,
-                },
-            ));
+            return Err(TailAppendPublicationError::Plan(Error::Limit {
+                kind: LimitKind::InsertedBytes,
+                observed: inserted_len,
+                maximum: self.limits.max_inserted_bytes,
+            }));
         }
         let output_length = source_length_usize.checked_add(inserted_len).ok_or(
             TailAppendPublicationError::Plan(Error::Limit {
@@ -2001,22 +1973,18 @@ impl TailAppendSourceEdit {
             }),
         )?;
         if output_length > self.limits.max_output_bytes {
-            return Err(TailAppendPublicationError::Plan(
-                Error::Limit {
-                    kind: LimitKind::OutputBytes,
-                    observed: output_length,
-                    maximum: self.limits.max_output_bytes,
-                },
-            ));
+            return Err(TailAppendPublicationError::Plan(Error::Limit {
+                kind: LimitKind::OutputBytes,
+                observed: output_length,
+                maximum: self.limits.max_output_bytes,
+            }));
         }
         if output_length > self.proof.source_limit {
-            return Err(TailAppendPublicationError::Plan(
-                Error::Limit {
-                    kind: LimitKind::SourceBytes,
-                    observed: output_length,
-                    maximum: self.proof.source_limit,
-                },
-            ));
+            return Err(TailAppendPublicationError::Plan(Error::Limit {
+                kind: LimitKind::SourceBytes,
+                observed: output_length,
+                maximum: self.proof.source_limit,
+            }));
         }
         let mut planning_input = None;
         let mut planning_work = None;
@@ -2028,13 +1996,11 @@ impl TailAppendSourceEdit {
                 .max_window_bytes
                 .min(source_length_usize)
                 .checked_add(inserted_len)
-                .ok_or(TailAppendPublicationError::Plan(
-                    Error::Limit {
-                        kind: LimitKind::MemoryBytes,
-                        observed: usize::MAX,
-                        maximum: self.limits.max_output_bytes,
-                    },
-                ))?;
+                .ok_or(TailAppendPublicationError::Plan(Error::Limit {
+                    kind: LimitKind::MemoryBytes,
+                    observed: usize::MAX,
+                    maximum: self.limits.max_output_bytes,
+                }))?;
             let scan_amount = source_length_usize.checked_add(inserted_len).ok_or(
                 TailAppendPublicationError::Plan(Error::Limit {
                     kind: LimitKind::InputBytes,
@@ -2077,11 +2043,9 @@ impl TailAppendSourceEdit {
             .into_boxed_slice()
         };
         if inserted.len() != inserted_len {
-            return Err(TailAppendPublicationError::Plan(
-                Error::UnsupportedSource(
-                    "source-backed encoded insertion changed after preflight",
-                ),
-            ));
+            return Err(TailAppendPublicationError::Plan(Error::UnsupportedSource(
+                "source-backed encoded insertion changed after preflight",
+            )));
         }
         let mut source_scanned = 0usize;
         let mut inserted_scanned = 0usize;
@@ -2108,7 +2072,7 @@ impl TailAppendSourceEdit {
                     let _ = reservation.commit(source_scan_units(source_scanned, inserted_scanned));
                 }
                 return Err(source_scan_publication_error(error, 0));
-            }
+            },
         };
         if let Some(reservation) = planning_input.take() {
             let _ = reservation.commit(
@@ -2424,9 +2388,7 @@ impl TailAppendSourcePublicationPlan {
     ) -> Result<TailAppendSourcePublicationReport, TailAppendPublicationError> {
         self.publication_limits.validate()?;
         if self.selector != TailSelector::Body || self.proof.selector != TailSelector::Body {
-            return Err(TailAppendPublicationError::Plan(
-                Error::UnsupportedSelector,
-            ));
+            return Err(TailAppendPublicationError::Plan(Error::UnsupportedSelector));
         }
         let expected = u64::try_from(self.source_bytes).unwrap_or(u64::MAX);
         let observed_version = source
@@ -2456,11 +2418,9 @@ impl TailAppendSourcePublicationPlan {
             }
         })?;
         if source_length != self.source_bytes || self.root_close > source_length {
-            return Err(TailAppendPublicationError::Plan(
-                Error::UnsupportedSource(
-                    "source-backed publication bounds no longer match the proof",
-                ),
-            ));
+            return Err(TailAppendPublicationError::Plan(Error::UnsupportedSource(
+                "source-backed publication bounds no longer match the proof",
+            )));
         }
         let output_length = source_length.checked_add(self.inserted.len()).ok_or(
             TailAppendPublicationError::LimitExceeded {
@@ -2479,11 +2439,9 @@ impl TailAppendSourcePublicationPlan {
             }
         })?;
         if output_length != self.output_bytes() {
-            return Err(TailAppendPublicationError::Plan(
-                Error::UnsupportedSource(
-                    "source-backed output length no longer matches its plan",
-                ),
-            ));
+            return Err(TailAppendPublicationError::Plan(Error::UnsupportedSource(
+                "source-backed output length no longer matches its plan",
+            )));
         }
         if output_length > self.append_limits.max_output_bytes {
             return Err(TailAppendPublicationError::LimitExceeded {
@@ -2575,7 +2533,7 @@ impl TailAppendSourcePublicationPlan {
                     0,
                 );
                 return Err(source_scan_publication_error(error, 0));
-            }
+            },
         };
         if observed_digest != self.source_digest {
             settle_source_publication_reservations(
@@ -2620,7 +2578,7 @@ impl TailAppendSourcePublicationPlan {
                     0,
                 );
                 return Err(error);
-            }
+            },
         };
         if stable_version != self.proof.source_version {
             settle_source_publication_reservations(
@@ -2651,7 +2609,7 @@ impl TailAppendSourcePublicationPlan {
                     0,
                 );
                 return Err(error);
-            }
+            },
         };
         if stable_length != expected {
             settle_source_publication_reservations(
@@ -2678,12 +2636,10 @@ impl TailAppendSourcePublicationPlan {
                 source_scan_units(source_scanned, inserted_scanned),
                 0,
             );
-            return Err(TailAppendPublicationError::Plan(
-                Error::AllocationFailed {
-                    resource: "source publication window",
-                    requested: source_window_len,
-                },
-            ));
+            return Err(TailAppendPublicationError::Plan(Error::AllocationFailed {
+                resource: "source publication window",
+                requested: source_window_len,
+            }));
         }
         source_window.resize(source_window_len, 0);
 
@@ -2798,7 +2754,7 @@ impl TailAppendSourcePublicationPlan {
                     u64::try_from(accepted).unwrap_or(u64::MAX),
                 );
                 return Err(incomplete_source_failure(error, expected_output));
-            }
+            },
         };
         if final_version != self.proof.source_version {
             settle_source_publication_reservations(
@@ -2831,7 +2787,7 @@ impl TailAppendSourcePublicationPlan {
                     u64::try_from(accepted).unwrap_or(u64::MAX),
                 );
                 return Err(incomplete_source_failure(error, expected_output));
-            }
+            },
         };
         if final_length != expected {
             settle_source_publication_reservations(
@@ -2903,7 +2859,7 @@ impl TailAppendSourcePublicationPlan {
                     });
                 }
                 digest
-            }
+            },
             Err(SourceScanFailure::Execution(error)) => {
                 settle_source_publication_reservations(
                     &mut memory,
@@ -2919,7 +2875,7 @@ impl TailAppendSourcePublicationPlan {
                     },
                     source: Box::new(publication_execution(error, expected_output)),
                 });
-            }
+            },
             Err(SourceScanFailure::Io(error)) => {
                 settle_source_publication_reservations(
                     &mut memory,
@@ -2930,7 +2886,7 @@ impl TailAppendSourcePublicationPlan {
                     u64::try_from(accepted).unwrap_or(u64::MAX),
                 );
                 return Err(incomplete_source_failure(error, expected_output));
-            }
+            },
             Err(SourceScanFailure::Allocation {
                 resource,
                 requested,
@@ -2947,14 +2903,12 @@ impl TailAppendSourcePublicationPlan {
                     progress: TailAppendOutputProgress::CompleteUnverified {
                         bytes: expected_output,
                     },
-                    source: Box::new(TailAppendPublicationError::Plan(
-                        Error::AllocationFailed {
-                            resource,
-                            requested,
-                        },
-                    )),
+                    source: Box::new(TailAppendPublicationError::Plan(Error::AllocationFailed {
+                        resource,
+                        requested,
+                    })),
                 });
-            }
+            },
         };
         settle_source_publication_reservations(
             &mut memory,
@@ -3025,21 +2979,20 @@ fn preflight_plain_paragraphs(
     let mut observed_input_bytes = 0usize;
     for paragraph in paragraphs {
         for run in paragraph.runs() {
-            observed_runs = observed_runs
-                .checked_add(1)
-                .ok_or(Error::Limit {
-                    kind: LimitKind::Runs,
-                    observed: usize::MAX,
-                    maximum: limits.max_runs,
-                })?;
+            observed_runs = observed_runs.checked_add(1).ok_or(Error::Limit {
+                kind: LimitKind::Runs,
+                observed: usize::MAX,
+                maximum: limits.max_runs,
+            })?;
             validate_plain_text(run.text())?;
-            observed_input_bytes = observed_input_bytes.checked_add(run.text().len()).ok_or(
-                Error::Limit {
-                    kind: LimitKind::InputBytes,
-                    observed: usize::MAX,
-                    maximum: limits.max_input_bytes,
-                },
-            )?;
+            observed_input_bytes =
+                observed_input_bytes
+                    .checked_add(run.text().len())
+                    .ok_or(Error::Limit {
+                        kind: LimitKind::InputBytes,
+                        observed: usize::MAX,
+                        maximum: limits.max_input_bytes,
+                    })?;
         }
     }
     if observed_runs > limits.max_runs {
@@ -3115,20 +3068,18 @@ fn stage_plain_paragraphs(
         })?;
     for paragraph in paragraphs {
         let mut runs = Vec::new();
-        runs.try_reserve(paragraph.runs().len()).map_err(|_error| {
-            Error::AllocationFailed {
+        runs.try_reserve(paragraph.runs().len())
+            .map_err(|_error| Error::AllocationFailed {
                 resource: "tail runs",
                 requested: paragraph.runs().len().saturating_mul(size_of::<String>()),
-            }
-        })?;
+            })?;
         for run in paragraph.runs() {
             let mut text = String::new();
-            text.try_reserve(run.text().len()).map_err(|_error| {
-                Error::AllocationFailed {
+            text.try_reserve(run.text().len())
+                .map_err(|_error| Error::AllocationFailed {
                     resource: "tail text",
                     requested: run.text().len(),
-                }
-            })?;
+                })?;
             text.push_str(run.text());
             runs.push(text);
         }
@@ -3211,18 +3162,18 @@ fn read_source_window(
                     io::ErrorKind::UnexpectedEof,
                     "positional source ended before the requested range",
                 )));
-            }
+            },
             Ok(count) if count > remaining.len() => {
                 return Err(SourceScanFailure::Io(io::Error::new(
                     io::ErrorKind::InvalidData,
                     "positional source reported more bytes than requested",
                 )));
-            }
+            },
             Ok(count) => {
                 filled = filled.saturating_add(count);
                 *source_scanned = (*source_scanned).saturating_add(count);
-            }
-            Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
+            },
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => {},
             Err(error) => return Err(SourceScanFailure::Io(error)),
         }
     }
@@ -3441,10 +3392,10 @@ fn write_publication_segment<W: Write>(
                         kind: io::ErrorKind::WriteZero,
                         message: "publication sink returned zero progress".to_string(),
                     });
-                }
+                },
                 Ok(count) if count > remaining.len() => {
                     return Err(PublicationWriteFailure::Overreported);
-                }
+                },
                 Ok(count) => {
                     window_offset = window_offset.saturating_add(count);
                     *accepted = accepted.saturating_add(count);
@@ -3454,14 +3405,14 @@ fn write_publication_segment<W: Write>(
                     context
                         .check()
                         .map_err(PublicationWriteFailure::Execution)?;
-                }
-                Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
+                },
+                Err(error) if error.kind() == io::ErrorKind::Interrupted => {},
                 Err(error) => {
                     return Err(PublicationWriteFailure::Sink {
                         kind: error.kind(),
                         message: error.to_string(),
                     });
-                }
+                },
             }
         }
         offset = end;
@@ -3658,17 +3609,11 @@ impl Commit {
     /// Writes the accepted artifact sequentially without requiring a seekable
     /// sink.  The source snapshot and patch remain unchanged on partial sink
     /// failure.
-    pub fn write_to<W: Write>(
-        &self,
-        sink: &mut W,
-        limits: SemanticLimits,
-    ) -> Result<usize, Error> {
+    pub fn write_to<W: Write>(&self, sink: &mut W, limits: SemanticLimits) -> Result<usize, Error> {
         let bytes = self
             .snapshot
             .source_bytes()
-            .ok_or(Error::UnsupportedSource(
-                "snapshot has no exact RTF source",
-            ))?;
+            .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
         if bytes.len() > limits.max_output_bytes {
             return Err(Error::Limit {
                 kind: LimitKind::OutputBytes,
@@ -3756,22 +3701,13 @@ impl Patch {
     }
 
     /// Converts this patch to a deterministic bounded JSON envelope.
-    pub fn to_durable(
-        &self,
-        limits: SemanticLimits,
-    ) -> Result<DurableTailAppendPatch, Error> {
-        let before = self
-            .before
-            .source_bytes()
-            .ok_or(Error::UnsupportedSource(
-                "patch source has no exact RTF source",
-            ))?;
-        let after = self
-            .after
-            .source_bytes()
-            .ok_or(Error::UnsupportedSource(
-                "patch target has no exact RTF source",
-            ))?;
+    pub fn to_durable(&self, limits: SemanticLimits) -> Result<DurableTailAppendPatch, Error> {
+        let before = self.before.source_bytes().ok_or(Error::UnsupportedSource(
+            "patch source has no exact RTF source",
+        ))?;
+        let after = self.after.source_bytes().ok_or(Error::UnsupportedSource(
+            "patch target has no exact RTF source",
+        ))?;
         let wire = DurableTailAppendPatch {
             selector: self.selector,
             direction: self.direction,
@@ -3875,10 +3811,7 @@ impl DurableTailAppendPatch {
     }
 
     /// Parses a canonical deterministic JSON envelope under explicit bounds.
-    pub fn from_deterministic_json(
-        bytes: &[u8],
-        limits: SemanticLimits,
-    ) -> Result<Self, Error> {
+    pub fn from_deterministic_json(bytes: &[u8], limits: SemanticLimits) -> Result<Self, Error> {
         if bytes.len() > limits.max_patch_bytes {
             return Err(Error::Limit {
                 kind: LimitKind::PatchBytes,
@@ -3894,9 +3827,7 @@ impl DurableTailAppendPatch {
             return Err(Error::DurablePatch("JSON is not canonical"));
         }
         let Value::Object(object) = value else {
-            return Err(Error::DurablePatch(
-                "patch root must be an object",
-            ));
+            return Err(Error::DurablePatch("patch root must be an object"));
         };
         let expected = [
             "after",
@@ -3918,9 +3849,7 @@ impl DurableTailAppendPatch {
             || object.get("selector") != Some(&Value::String("body".to_string()))
             || object.get("version") != Some(&Value::from(1_u64))
         {
-            return Err(Error::DurablePatch(
-                "unsupported patch format or version",
-            ));
+            return Err(Error::DurablePatch("unsupported patch format or version"));
         }
         let before_digest = string_field(&object, "before")?.to_string();
         let after_digest = string_field(&object, "after")?.to_string();
@@ -3993,9 +3922,7 @@ impl DurableTailAppendPatch {
         )?;
         let source_bytes = source
             .source_bytes()
-            .ok_or(Error::UnsupportedSource(
-                "snapshot has no exact RTF source",
-            ))?;
+            .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
         if self.direction == Direction::Append && source_bytes.len() > self.limits.max_output_bytes
         {
             return Err(Error::Limit {
@@ -4029,95 +3956,94 @@ impl DurableTailAppendPatch {
         if expected_root_close != proof.root_close {
             return Err(Error::PatchConflict);
         }
-        let output = match self.direction {
-            Direction::Append => {
-                if self.root_close > source_bytes.len() {
-                    return Err(Error::PatchConflict);
-                }
-                let mut output = Vec::new();
-                let output_len = source_bytes.len().checked_add(self.inserted.len()).ok_or(
-                    Error::Limit {
-                        kind: LimitKind::OutputBytes,
-                        observed: usize::MAX,
-                        maximum: self.limits.max_output_bytes,
-                    },
-                )?;
-                if output_len != self.after_bytes {
-                    return Err(Error::PatchConflict);
-                }
-                if output_len > source.limits().max_input_bytes() {
-                    return Err(Error::Limit {
-                        kind: LimitKind::SourceBytes,
-                        observed: output_len,
-                        maximum: source.limits().max_input_bytes(),
-                    });
-                }
-                if output_len > self.limits.max_output_bytes {
-                    return Err(Error::Limit {
-                        kind: LimitKind::OutputBytes,
-                        observed: output_len,
-                        maximum: self.limits.max_output_bytes,
-                    });
-                }
-                output.try_reserve(output_len).map_err(|_error| {
-                    Error::AllocationFailed {
-                        resource: "durable tail candidate",
-                        requested: output_len,
+        let output =
+            match self.direction {
+                Direction::Append => {
+                    if self.root_close > source_bytes.len() {
+                        return Err(Error::PatchConflict);
                     }
-                })?;
-                let prefix = source_bytes
-                    .get(..self.root_close)
-                    .ok_or(Error::PatchConflict)?;
-                let suffix = source_bytes
-                    .get(self.root_close..)
-                    .ok_or(Error::PatchConflict)?;
-                output.extend_from_slice(prefix);
-                output.extend_from_slice(&self.inserted);
-                output.extend_from_slice(suffix);
-                output
-            }
-            Direction::Remove => {
-                let end = self
-                    .root_close
-                    .checked_add(self.inserted.len())
-                    .ok_or(Error::PatchConflict)?;
-                if end > source_bytes.len()
-                    || source_bytes.get(self.root_close..end) != Some(&self.inserted)
-                {
-                    return Err(Error::PatchConflict);
-                }
-                let output_len = source_bytes
-                    .len()
-                    .checked_sub(self.inserted.len())
-                    .ok_or(Error::PatchConflict)?;
-                if output_len > self.limits.max_output_bytes {
-                    return Err(Error::Limit {
-                        kind: LimitKind::OutputBytes,
-                        observed: output_len,
-                        maximum: self.limits.max_output_bytes,
-                    });
-                }
-                if output_len != self.after_bytes {
-                    return Err(Error::PatchConflict);
-                }
-                let mut output = Vec::new();
-                output.try_reserve(output_len).map_err(|_error| {
-                    Error::AllocationFailed {
-                        resource: "durable inverse candidate",
-                        requested: output_len,
+                    let mut output = Vec::new();
+                    let output_len = source_bytes.len().checked_add(self.inserted.len()).ok_or(
+                        Error::Limit {
+                            kind: LimitKind::OutputBytes,
+                            observed: usize::MAX,
+                            maximum: self.limits.max_output_bytes,
+                        },
+                    )?;
+                    if output_len != self.after_bytes {
+                        return Err(Error::PatchConflict);
                     }
-                })?;
-                let prefix = source_bytes
-                    .get(..self.root_close)
-                    .ok_or(Error::PatchConflict)?;
-                let suffix = source_bytes
-                    .get(end..)
-                    .ok_or(Error::PatchConflict)?;
-                output.extend_from_slice(prefix);
-                output.extend_from_slice(suffix);
-                output
-            }
-        };
+                    if output_len > source.limits().max_input_bytes() {
+                        return Err(Error::Limit {
+                            kind: LimitKind::SourceBytes,
+                            observed: output_len,
+                            maximum: source.limits().max_input_bytes(),
+                        });
+                    }
+                    if output_len > self.limits.max_output_bytes {
+                        return Err(Error::Limit {
+                            kind: LimitKind::OutputBytes,
+                            observed: output_len,
+                            maximum: self.limits.max_output_bytes,
+                        });
+                    }
+                    output
+                        .try_reserve(output_len)
+                        .map_err(|_error| Error::AllocationFailed {
+                            resource: "durable tail candidate",
+                            requested: output_len,
+                        })?;
+                    let prefix = source_bytes
+                        .get(..self.root_close)
+                        .ok_or(Error::PatchConflict)?;
+                    let suffix = source_bytes
+                        .get(self.root_close..)
+                        .ok_or(Error::PatchConflict)?;
+                    output.extend_from_slice(prefix);
+                    output.extend_from_slice(&self.inserted);
+                    output.extend_from_slice(suffix);
+                    output
+                },
+                Direction::Remove => {
+                    let end = self
+                        .root_close
+                        .checked_add(self.inserted.len())
+                        .ok_or(Error::PatchConflict)?;
+                    if end > source_bytes.len()
+                        || source_bytes.get(self.root_close..end) != Some(&self.inserted)
+                    {
+                        return Err(Error::PatchConflict);
+                    }
+                    let output_len = source_bytes
+                        .len()
+                        .checked_sub(self.inserted.len())
+                        .ok_or(Error::PatchConflict)?;
+                    if output_len > self.limits.max_output_bytes {
+                        return Err(Error::Limit {
+                            kind: LimitKind::OutputBytes,
+                            observed: output_len,
+                            maximum: self.limits.max_output_bytes,
+                        });
+                    }
+                    if output_len != self.after_bytes {
+                        return Err(Error::PatchConflict);
+                    }
+                    let mut output = Vec::new();
+                    output
+                        .try_reserve(output_len)
+                        .map_err(|_error| Error::AllocationFailed {
+                            resource: "durable inverse candidate",
+                            requested: output_len,
+                        })?;
+                    let prefix = source_bytes
+                        .get(..self.root_close)
+                        .ok_or(Error::PatchConflict)?;
+                    let suffix = source_bytes.get(end..).ok_or(Error::PatchConflict)?;
+                    output.extend_from_slice(prefix);
+                    output.extend_from_slice(suffix);
+                    output
+                },
+            };
         if BlobId::of(&output).as_hex() != self.after_digest {
             return Err(Error::PatchConflict);
         }
@@ -4206,14 +4132,11 @@ fn validate_wire_bounds(
     }
     match direction {
         Direction::Append => {
-            let expected_after =
-                before_bytes
-                    .checked_add(inserted_len)
-                    .ok_or(Error::Limit {
-                        kind: LimitKind::AfterBytes,
-                        observed: usize::MAX,
-                        maximum: limits.max_output_bytes,
-                    })?;
+            let expected_after = before_bytes.checked_add(inserted_len).ok_or(Error::Limit {
+                kind: LimitKind::AfterBytes,
+                observed: usize::MAX,
+                maximum: limits.max_output_bytes,
+            })?;
             if after_bytes != expected_after {
                 return Err(Error::DurablePatch(
                     "append before/after byte sizes do not match inserted bytes",
@@ -4224,16 +4147,13 @@ fn validate_wire_bounds(
                     "append offset exceeds before artifact size",
                 ));
             }
-        }
+        },
         Direction::Remove => {
-            let expected_before =
-                after_bytes
-                    .checked_add(inserted_len)
-                    .ok_or(Error::Limit {
-                        kind: LimitKind::BeforeBytes,
-                        observed: usize::MAX,
-                        maximum: limits.max_output_bytes,
-                    })?;
+            let expected_before = after_bytes.checked_add(inserted_len).ok_or(Error::Limit {
+                kind: LimitKind::BeforeBytes,
+                observed: usize::MAX,
+                maximum: limits.max_output_bytes,
+            })?;
             if before_bytes != expected_before {
                 return Err(Error::DurablePatch(
                     "remove before/after byte sizes do not match inserted bytes",
@@ -4244,15 +4164,13 @@ fn validate_wire_bounds(
                     "remove offset exceeds after artifact size",
                 ));
             }
-        }
+        },
     }
-    let end = root_close
-        .checked_add(inserted_len)
-        .ok_or(Error::Limit {
-            kind: LimitKind::OutputBytes,
-            observed: usize::MAX,
-            maximum: limits.max_output_bytes,
-        })?;
+    let end = root_close.checked_add(inserted_len).ok_or(Error::Limit {
+        kind: LimitKind::OutputBytes,
+        observed: usize::MAX,
+        maximum: limits.max_output_bytes,
+    })?;
     if direction == Direction::Append && end > limits.max_output_bytes {
         return Err(Error::Limit {
             kind: LimitKind::OutputBytes,
@@ -4307,26 +4225,22 @@ fn validate_artifact_splice(
     }
     match direction {
         Direction::Append => {
-            let expected_after =
-                before
-                    .len()
-                    .checked_add(inserted.len())
-                    .ok_or(Error::Limit {
-                        kind: LimitKind::OutputBytes,
-                        observed: usize::MAX,
-                        maximum: limits.max_output_bytes,
-                    })?;
+            let expected_after = before
+                .len()
+                .checked_add(inserted.len())
+                .ok_or(Error::Limit {
+                    kind: LimitKind::OutputBytes,
+                    observed: usize::MAX,
+                    maximum: limits.max_output_bytes,
+                })?;
             if after.len() != expected_after {
                 return Err(Error::DurablePatch(
                     "append source/target sizes do not match inserted bytes",
                 ));
             }
-            let end =
-                root_close
-                    .checked_add(inserted.len())
-                    .ok_or(Error::DurablePatch(
-                        "append offset overflows inserted span",
-                    ))?;
+            let end = root_close
+                .checked_add(inserted.len())
+                .ok_or(Error::DurablePatch("append offset overflows inserted span"))?;
             if root_close > before.len() || end > after.len() {
                 return Err(Error::DurablePatch(
                     "append offset is outside the source/target artifacts",
@@ -4340,28 +4254,24 @@ fn validate_artifact_splice(
                     "append artifacts do not contain the exact inserted span",
                 ));
             }
-        }
+        },
         Direction::Remove => {
-            let expected_before =
-                after
-                    .len()
-                    .checked_add(inserted.len())
-                    .ok_or(Error::Limit {
-                        kind: LimitKind::OutputBytes,
-                        observed: usize::MAX,
-                        maximum: limits.max_output_bytes,
-                    })?;
+            let expected_before = after
+                .len()
+                .checked_add(inserted.len())
+                .ok_or(Error::Limit {
+                    kind: LimitKind::OutputBytes,
+                    observed: usize::MAX,
+                    maximum: limits.max_output_bytes,
+                })?;
             if before.len() != expected_before {
                 return Err(Error::DurablePatch(
                     "remove source/target sizes do not match inserted bytes",
                 ));
             }
-            let end =
-                root_close
-                    .checked_add(inserted.len())
-                    .ok_or(Error::DurablePatch(
-                        "remove offset overflows inserted span",
-                    ))?;
+            let end = root_close
+                .checked_add(inserted.len())
+                .ok_or(Error::DurablePatch("remove offset overflows inserted span"))?;
             if root_close > after.len() || end > before.len() {
                 return Err(Error::DurablePatch(
                     "remove offset is outside the source/target artifacts",
@@ -4375,7 +4285,7 @@ fn validate_artifact_splice(
                     "remove artifacts do not contain the exact inserted span",
                 ));
             }
-        }
+        },
     }
     Ok(())
 }
@@ -4386,15 +4296,14 @@ fn deterministic_json_len(patch: &DurableTailAppendPatch) -> Result<usize, Error
             Error::DurablePatch("patch number exceeds the durable integer range")
         })?;
     }
-    let encoded_len =
-        patch
-            .inserted
-            .len()
-            .checked_mul(2)
-            .ok_or(Error::AllocationFailed {
-                resource: "durable inserted hex",
-                requested: usize::MAX,
-            })?;
+    let encoded_len = patch
+        .inserted
+        .len()
+        .checked_mul(2)
+        .ok_or(Error::AllocationFailed {
+            resource: "durable inserted hex",
+            requested: usize::MAX,
+        })?;
     let offset_len = decimal_len_usize(patch.root_close);
     let parts = [
         b"{\"after\":\"".len(),
@@ -4414,12 +4323,10 @@ fn deterministic_json_len(patch: &DurableTailAppendPatch) -> Result<usize, Error
         b",\"selector\":\"body\",\"version\":1}".len(),
     ];
     parts.into_iter().try_fold(0usize, |total, part| {
-        total
-            .checked_add(part)
-            .ok_or(Error::AllocationFailed {
-                resource: "durable JSON size",
-                requested: usize::MAX,
-            })
+        total.checked_add(part).ok_or(Error::AllocationFailed {
+            resource: "durable JSON size",
+            requested: usize::MAX,
+        })
     })
 }
 
@@ -4438,10 +4345,7 @@ struct SpliceProof {
     ends_with_par: bool,
 }
 
-fn prove_splice_source(
-    source: &Package,
-    selector: TailSelector,
-) -> Result<SpliceProof, Error> {
+fn prove_splice_source(source: &Package, selector: TailSelector) -> Result<SpliceProof, Error> {
     if selector != TailSelector::Body {
         return Err(Error::UnsupportedSelector);
     }
@@ -4462,18 +4366,18 @@ fn prove_splice_source(
         ));
     }
     reject_active_or_external_surfaces(source)?;
-    if crate::compressed::is_compressed_rtf(source.source_bytes().ok_or(
-        Error::UnsupportedSource("snapshot has no exact RTF source"),
-    )?) {
+    if crate::compressed::is_compressed_rtf(
+        source
+            .source_bytes()
+            .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?,
+    ) {
         return Err(Error::UnsupportedSource(
             "compressed RTF is not an exact uncompressed splice source",
         ));
     }
     let bytes = source
         .source_bytes()
-        .ok_or(Error::UnsupportedSource(
-            "snapshot has no exact RTF source",
-        ))?;
+        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
     if !bytes.is_ascii() {
         return Err(Error::UnsupportedSource(
             "non-ASCII transport requires an explicit code-page writer",
@@ -4514,7 +4418,7 @@ fn reject_active_or_external_surfaces(source: &Package) -> Result<(), Error> {
     }
     for safety in model.field_safety() {
         match safety {
-            crate::validation::FieldSafety::Neutral => {}
+            crate::validation::FieldSafety::Neutral => {},
             crate::validation::FieldSafety::External
             | crate::validation::FieldSafety::ExternalUnknown
             | crate::validation::FieldSafety::ExternalAndActive
@@ -4522,13 +4426,11 @@ fn reject_active_or_external_surfaces(source: &Package) -> Result<(), Error> {
                 return Err(Error::UnsupportedSource(
                     "external field content is present",
                 ));
-            }
+            },
             crate::validation::FieldSafety::Active
             | crate::validation::FieldSafety::ActiveUnknown => {
-                return Err(Error::UnsupportedSource(
-                    "active field content is present",
-                ));
-            }
+                return Err(Error::UnsupportedSource("active field content is present"));
+            },
         }
     }
     Ok(())
@@ -4543,27 +4445,20 @@ fn scan_root_close(bytes: &[u8]) -> Result<usize, Error> {
     let mut depth = 1usize;
     let mut index = 1usize;
     while index < bytes.len() {
-        let byte = bytes
-            .get(index)
-            .copied()
-            .ok_or(Error::UnsupportedSource(
-                "root scanner offset is outside the source",
-            ))?;
+        let byte = bytes.get(index).copied().ok_or(Error::UnsupportedSource(
+            "root scanner offset is outside the source",
+        ))?;
         match byte {
             b'{' => {
                 depth = depth
                     .checked_add(1)
-                    .ok_or(Error::UnsupportedSource(
-                        "root nesting depth overflowed",
-                    ))?;
+                    .ok_or(Error::UnsupportedSource("root nesting depth overflowed"))?;
                 index += 1;
-            }
+            },
             b'}' => {
-                depth = depth
-                    .checked_sub(1)
-                    .ok_or(Error::UnsupportedSource(
-                        "root group closed before its opening brace",
-                    ))?;
+                depth = depth.checked_sub(1).ok_or(Error::UnsupportedSource(
+                    "root group closed before its opening brace",
+                ))?;
                 if depth == 0 {
                     if bytes
                         .get(index + 1..)
@@ -4580,10 +4475,10 @@ fn scan_root_close(bytes: &[u8]) -> Result<usize, Error> {
                     return Ok(index);
                 }
                 index += 1;
-            }
+            },
             b'\\' => {
                 index = skip_control(bytes, index)?;
-            }
+            },
             _ => index += 1,
         }
     }
@@ -4595,9 +4490,7 @@ fn scan_root_close(bytes: &[u8]) -> Result<usize, Error> {
 fn skip_control(bytes: &[u8], slash: usize) -> Result<usize, Error> {
     let next = slash
         .checked_add(1)
-        .ok_or(Error::UnsupportedSource(
-            "control offset overflowed",
-        ))?;
+        .ok_or(Error::UnsupportedSource("control offset overflowed"))?;
     let Some(&byte) = bytes.get(next) else {
         return Err(Error::UnsupportedSource(
             "source ends after a control slash",
@@ -4609,20 +4502,14 @@ fn skip_control(bytes: &[u8], slash: usize) -> Result<usize, Error> {
     if byte == b'\'' {
         let end = next
             .checked_add(3)
-            .ok_or(Error::UnsupportedSource(
-                "hex control offset overflowed",
-            ))?;
+            .ok_or(Error::UnsupportedSource("hex control offset overflowed"))?;
         let digits = bytes
             .get(next + 1..next + 3)
-            .ok_or(Error::UnsupportedSource(
-                "malformed hexadecimal control",
-            ))?;
+            .ok_or(Error::UnsupportedSource("malformed hexadecimal control"))?;
         if !digits.first().is_some_and(u8::is_ascii_hexdigit)
             || !digits.get(1).is_some_and(u8::is_ascii_hexdigit)
         {
-            return Err(Error::UnsupportedSource(
-                "malformed hexadecimal control",
-            ));
+            return Err(Error::UnsupportedSource("malformed hexadecimal control"));
         }
         return Ok(end);
     }
@@ -4635,9 +4522,7 @@ fn skip_control(bytes: &[u8], slash: usize) -> Result<usize, Error> {
     }
     let name = bytes
         .get(next..end)
-        .ok_or(Error::UnsupportedSource(
-            "control word span is invalid",
-        ))?;
+        .ok_or(Error::UnsupportedSource("control word span is invalid"))?;
     if name.eq_ignore_ascii_case(b"bin") {
         return Err(Error::UnsupportedSource(
             "binary destinations are outside the exact ASCII splice proof",
@@ -4746,12 +4631,13 @@ fn encoded_inserted_len_for_body(
     ends_with_par: bool,
 ) -> Result<usize, Error> {
     let separator = body_nonempty && !ends_with_par;
-    let mut length = usize::from(separator).checked_mul(b"\\par ".len()).ok_or(
-        Error::AllocationFailed {
-            resource: "tail encoded estimate",
-            requested: usize::MAX,
-        },
-    )?;
+    let mut length =
+        usize::from(separator)
+            .checked_mul(b"\\par ".len())
+            .ok_or(Error::AllocationFailed {
+                resource: "tail encoded estimate",
+                requested: usize::MAX,
+            })?;
     for paragraph in paragraphs {
         length = length
             .checked_add(b"\\pard ".len())
@@ -4797,7 +4683,7 @@ fn encoded_plain_text_len(text: &str) -> Result<usize, Error> {
                         })?;
                 }
                 units_length
-            }
+            },
         };
         length = length
             .checked_add(addition)
@@ -4818,7 +4704,7 @@ fn encode_plain_text(text: &str, output: &mut Vec<u8>) {
             '\t' => output.extend_from_slice(b"\\tab "),
             character if character.is_ascii() && !character.is_control() => {
                 output.push(character as u8)
-            }
+            },
             character => {
                 let mut units = [0u16; 2];
                 let count = character.encode_utf16(&mut units).len();
@@ -4834,7 +4720,7 @@ fn encode_plain_text(text: &str, output: &mut Vec<u8>) {
                 for _ in 0..count {
                     output.push(b'?');
                 }
-            }
+            },
         }
     }
 }
@@ -4892,30 +4778,24 @@ fn verify_candidate(
             "candidate changed the pre-existing body text",
         ));
     }
-    let suffix =
-        candidate_text
-            .get(source_text.len()..)
-            .ok_or(Error::UnsupportedSource(
-                "candidate text prefix is invalid",
-            ))?;
+    let suffix = candidate_text
+        .get(source_text.len()..)
+        .ok_or(Error::UnsupportedSource("candidate text prefix is invalid"))?;
     let separator = !source.body().is_empty() && !ends_with_par;
     let mut expected_len = usize::from(separator);
     for paragraph in paragraphs {
         for run in &paragraph.runs {
-            expected_len =
-                expected_len
-                    .checked_add(run.len())
-                    .ok_or(Error::AllocationFailed {
-                        resource: "tail readback text",
-                        requested: usize::MAX,
-                    })?;
+            expected_len = expected_len
+                .checked_add(run.len())
+                .ok_or(Error::AllocationFailed {
+                    resource: "tail readback text",
+                    requested: usize::MAX,
+                })?;
         }
-        expected_len = expected_len
-            .checked_add(1)
-            .ok_or(Error::AllocationFailed {
-                resource: "tail readback text",
-                requested: usize::MAX,
-            })?;
+        expected_len = expected_len.checked_add(1).ok_or(Error::AllocationFailed {
+            resource: "tail readback text",
+            requested: usize::MAX,
+        })?;
     }
     let mut expected = String::new();
     expected
@@ -4954,7 +4834,7 @@ fn write_sequential<W: Write>(sink: &mut W, bytes: &[u8]) -> Result<usize, Error
                     kind: io::ErrorKind::WriteZero,
                     written,
                 });
-            }
+            },
             Ok(count) => {
                 if count > bytes.len().saturating_sub(written) {
                     return Err(Error::Sink {
@@ -4963,14 +4843,14 @@ fn write_sequential<W: Write>(sink: &mut W, bytes: &[u8]) -> Result<usize, Error
                     });
                 }
                 written = written.saturating_add(count);
-            }
-            Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
+            },
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => {},
             Err(error) => {
                 return Err(Error::Sink {
                     kind: error.kind(),
                     written,
                 });
-            }
+            },
         }
     }
     sink.flush().map_err(|error| Error::Sink {
@@ -4981,13 +4861,10 @@ fn write_sequential<W: Write>(sink: &mut W, bytes: &[u8]) -> Result<usize, Error
 }
 
 fn hex_encode(bytes: &[u8]) -> Result<String, Error> {
-    let encoded_len = bytes
-        .len()
-        .checked_mul(2)
-        .ok_or(Error::AllocationFailed {
-            resource: "durable inserted hex",
-            requested: usize::MAX,
-        })?;
+    let encoded_len = bytes.len().checked_mul(2).ok_or(Error::AllocationFailed {
+        resource: "durable inserted hex",
+        requested: usize::MAX,
+    })?;
     let mut text = String::new();
     text.try_reserve(encoded_len)
         .map_err(|_error| Error::AllocationFailed {
@@ -4999,15 +4876,11 @@ fn hex_encode(bytes: &[u8]) -> Result<String, Error> {
         let high = HEX
             .get((byte >> 4) as usize)
             .copied()
-            .ok_or(Error::DurablePatch(
-                "hex encoder index overflowed",
-            ))?;
+            .ok_or(Error::DurablePatch("hex encoder index overflowed"))?;
         let low = HEX
             .get((byte & 0x0f) as usize)
             .copied()
-            .ok_or(Error::DurablePatch(
-                "hex encoder index overflowed",
-            ))?;
+            .ok_or(Error::DurablePatch("hex encoder index overflowed"))?;
         text.push(high as char);
         text.push(low as char);
     }
@@ -5065,15 +4938,12 @@ fn string_field<'a>(object: &'a Map<String, Value>, key: &str) -> Result<&'a str
     object
         .get(key)
         .and_then(Value::as_str)
-        .ok_or(Error::DurablePatch(
-            "patch string field is missing",
-        ))
+        .ok_or(Error::DurablePatch("patch string field is missing"))
 }
 
 fn number(value: usize) -> Result<Value, Error> {
-    let value = u64::try_from(value).map_err(|_error| {
-        Error::DurablePatch("patch offset exceeds the durable integer range")
-    })?;
+    let value = u64::try_from(value)
+        .map_err(|_error| Error::DurablePatch("patch offset exceeds the durable integer range"))?;
     Ok(Value::from(value))
 }
 
@@ -5082,8 +4952,7 @@ fn number_field(object: &Map<String, Value>, key: &str) -> Result<usize, Error> 
         .get(key)
         .and_then(Value::as_u64)
         .ok_or(Error::DurablePatch("patch offset is missing"))?;
-    usize::try_from(value)
-        .map_err(|_error| Error::DurablePatch("patch offset overflows usize"))
+    usize::try_from(value).map_err(|_error| Error::DurablePatch("patch offset overflows usize"))
 }
 
 fn validate_digest(value: &str) -> Result<(), Error> {
