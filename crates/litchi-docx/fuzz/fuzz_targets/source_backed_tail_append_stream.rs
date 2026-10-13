@@ -326,7 +326,7 @@ fn exercise(archive: &[u8], recipe: &[u8]) -> bool {
         .expect("bounded authored paragraph count fits usize");
 
     let mut output = Vec::new();
-    let Ok(publication) = plan.write_to_stream(&mut output) else {
+    let Ok(publication) = plan.write_to(&mut output) else {
         return false;
     };
     assert!(
@@ -365,7 +365,7 @@ fn exercise(archive: &[u8], recipe: &[u8]) -> bool {
         return false;
     };
     let mut sink = PrefixFailSink::after(48);
-    let result = partial_plan.write_to_stream(&mut sink);
+    let result = partial_plan.write_to(&mut sink);
     assert!(
         result.is_err(),
         "short sink unexpectedly accepted full archive"

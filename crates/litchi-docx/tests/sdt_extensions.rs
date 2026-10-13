@@ -859,12 +859,13 @@ fn signed_remove_preserves_noops_and_requires_explicit_unsign_for_real_publicati
 #[test]
 fn pending_managed_document_state_refuses_custom_xml_removal() {
     let payload = b"<root xmlns='urn:test'><value>pending</value></root>";
-    let mut package = Package::new().unwrap();
-    package.add_custom_xml(store(payload)).unwrap();
-    package
-        .document_mut()
+    let mut builder = litchi_docx::Builder::new().unwrap();
+    builder.package().add_custom_xml(store(payload)).unwrap();
+    builder
+        .document()
         .unwrap()
         .add_paragraph_with_text("pending managed edit");
+    let package = builder.package();
     assert!(package.remove_custom_xml(ITEM).is_err());
     assert!(package.custom_xml_by_id(ITEM).unwrap().is_some());
 }

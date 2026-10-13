@@ -140,7 +140,7 @@ fn eager_oracle(bytes: &[u8]) -> Oracle {
     document.text().unwrap();
     let text = paragraph_lines(&document.paragraphs().unwrap());
     let metadata = package
-        .props()
+        .metadata()
         .cloned()
         .map(litchi_core::Metadata::from)
         .unwrap_or_default();

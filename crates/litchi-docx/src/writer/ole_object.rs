@@ -48,12 +48,12 @@ const MAX_SHAPE_ID_LENGTH: usize = 255;
 /// # Examples
 ///
 /// ```rust,no_run
-/// use litchi_docx::{MutableOleObject, Package};
+/// use litchi_docx::{Builder, MutableOleObject};
 ///
-/// let mut package = Package::new()?;
+/// let mut builder = Builder::new()?;
 /// let object = MutableOleObject::new("Package", b"opaque bytes".to_vec())?;
-/// package.document_mut()?.add_ole_object(object)?;
-/// package.save("out.docx")?;
+/// builder.document()?.add_ole_object(object)?;
+/// builder.build()?.save("out.docx")?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 #[derive(Debug, Clone)]
@@ -407,12 +407,12 @@ mod tests {
         let payload: Vec<u8> = (0u8..=255).collect();
         let mut package = Package::new().unwrap();
         package
-            .document_mut()
+            .authoring_document()
             .unwrap()
             .add_paragraph_with_text("host paragraph");
         let object = MutableOleObject::new("Package", payload.clone()).unwrap();
         let object = package
-            .document_mut()
+            .authoring_document()
             .unwrap()
             .add_ole_object(object)
             .unwrap();
@@ -447,7 +447,7 @@ mod tests {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut package = Package::new().unwrap();
         {
-            let document = package.document_mut().unwrap();
+            let document = package.authoring_document().unwrap();
             let first = MutableOleObject::new("Package", b"first".to_vec()).unwrap();
             let first = document.add_ole_object(first).unwrap();
             assert_eq!(first.shape_id(), "_x0000_i1025");
@@ -493,7 +493,7 @@ mod tests {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut package = Package::new().unwrap();
         {
-            let document = package.document_mut().unwrap();
+            let document = package.authoring_document().unwrap();
 
             let mut text_box = MutableTextBox::new("Companion Box", 914_400, 457200).unwrap();
             text_box.add_run("box story").unwrap();

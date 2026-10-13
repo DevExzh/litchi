@@ -25,7 +25,7 @@ Rules of reading:
 
 | Concept | Canonical | Banned | Notes / status |
 |---|---|---|---|
-| Immutable owner snapshot (physical + semantic, all state verbs) | `Package` | — | ✅ numbers/pages/keynote/doc/ods · ✅ RTF owner split (0223; atomic publication 0226) · ✅ XLS (0197–0198) · ✅ PPT immutable owner/publication and primary edit (0211–0212) · 🔴 pptx remaining direct mutators (0127 removes the package writer) · 🔴 docx immutable public owner (0019 shares the physical graph; mutable APIs remain) · 🔴 odt/odp (split out of the merged type, W3) · 🔴 xlsb (W2) |
+| Immutable owner snapshot (physical + semantic, all state verbs) | `Package` | — | ✅ numbers/pages/keynote/doc/ods · ✅ RTF owner split (0223; atomic publication 0226) · ✅ XLS (0197–0198) · ✅ PPT immutable owner/publication and primary edit (0211–0212) · 🔴 pptx remaining direct mutators (0127 removes the package writer) · 🔴 docx immutable public owner (0019 shares the physical graph; `document_mut`/`props*` removed 0251, package-level legacy mutators remain) · 🔴 odt/odp (split out of the merged type, W3) · 🔴 xlsb (W2) |
 | Read-only semantic projection, word processing | `Document` | — | ✅ pages · ✅ RTF shared owned projection (0223) · ✅ docx owned `Package::document()` projection (0019) |
 | Read-only semantic projection, spreadsheets | `Workbook` | `Spreadsheet` | 🔴 numbers `Document`→`Workbook` (W1) · 🔴 xlsx `Workbook` demoted to projection (W2) · 🔴 ods `Spreadsheet`→`Workbook` (W3) · ✅ XLS (0197) |
 | Read-only semantic projection, decks | `Presentation` | — | 🔴 keynote `Document`→`Presentation` (W1) · ✅ pptx view / odp name (shape changes W2/W3) · ✅ PPT shared owned projection (0211) |
@@ -57,7 +57,7 @@ transaction is the bare `Package::edit()`.
 | No-op introspection | `commit.diagnostics().changed()`; `patch.is_noop()` | `Transaction::is_changed()`, `Commit::is_changed()` (pptx), `Patch::is_empty()` (xlsx) | ✅ iWork/docx/PPTX primary (0118) · 🔴 remaining W2 |
 | Inverse patch | `Patch::inverse()` | — | ✅ everywhere |
 | Rollback | *dropping the `Edit`* | `Transaction::rollback()` (pptx) | ✅ primary PPTX edit (0116); 🔴 scoped PPTX families (W2) |
-| Mutable writer on a package | *none — `edit()` is the only write path* | `document_mut()` (docx), `presentation_mut()` (pptx) | PPTX `presentation_mut` removed (0127); 🔴 remaining W2 authoring verbs move into `Edit`, direct mutators and `UnsafeEdit` vocabulary still require migration |
+| Mutable writer on a package | *none — `edit()` is the only write path* | `document_mut()` (docx), `presentation_mut()` (pptx) | PPTX `presentation_mut` removed (0127); ✅ DOCX `document_mut` removed, fresh authoring on `Builder::document()` (0251); 🔴 remaining direct package mutators and `UnsafeEdit` vocabulary still require migration |
 
 Deferred (own tracks, not this glossary): `History`/undo-redo, patch
 composition (`join`, `three_way`), durable patch formats beyond pptx/xlsx.
@@ -93,7 +93,7 @@ and redaction vocabulary remain pending.
 | Save to path | `save(path)` — **always atomic** (sibling temp + rename) | non-atomic `Builder::save` (odt/odp) | ✅ OOXML, including lazy DOCX (0041), and RTF (0226) · 🔴 ODF (W3, behavior change with CRUD evidence) |
 | Save with explicit durability | `save_with_durability(path, Durability)` | — | ✅ OOXML and RTF (0226); extended everywhere |
 | Bytes output | `to_bytes()` | `Builder::build() -> Vec<u8>` as output (ODF) | ✅ owning DOCX (0044); lazy managed DOCX bytes pending. `build()` returns `Package`; output lives on `Package` |
-| Stream output | `write_to(impl Write)` | `to_stream`, `write_to_stream` | ✅ owning/lazy DOCX Package (0041–0042); 🔴 specialized routes and remaining W2 |
+| Stream output | `write_to(impl Write)` | `to_stream`, `write_to_stream` | ✅ owning/lazy DOCX Package (0041–0042); ✅ DOCX source tail-append `Plan`/`Commit` (0251); 🔴 OPC and remaining W2 |
 | Open encrypted | `open_with_password(path, password)` | — | ✅ where encryption exists; ODF keeps same name |
 | Save encrypted / re-encrypted | `save_encrypted(path, pw, Mode)` / `save_reencrypted(path, pw)` | — | ✅ OOXML |
 | Explicit plain output | `save_plain(path)` / `to_plain_bytes()` | — | ✅ OOXML, including owning DOCX bytes (0044); the only plain output of an encrypted source |
@@ -244,8 +244,8 @@ semantic-limit migrations.
 | Concept | Canonical | Banned | Notes / status |
 |---|---|---|---|
 | Semantic metadata type | `Metadata` (merged field union; typed `Keywords`; real time types) | `ooxml_common::Props`; the `creator` field name (→ `author`) | 🔴 W2 |
-| Metadata read | `Package::metadata()` | `Package::props()` (docx) | ✅ facade/ODF/iWork reads · 🔴 docx rename (W2) · 🔴 pptx/xlsx typed entry added (W2) |
-| Metadata mutation | `Package::{edit_metadata, apply_metadata}` + `metadata::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` | `put_props()`, `props_mut()`, `clear_props()` | 🔴 W2 |
+| Metadata read | `Package::metadata()` | `Package::props()` (docx) | ✅ facade/ODF/iWork reads · ✅ docx typed `Option<&Props>` read (0251) · 🔴 pptx/xlsx typed entry added (W2) |
+| Metadata mutation | `Package::{edit_metadata, apply_metadata}` + `metadata::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` | `put_props()`, `props_mut()`, `clear_props()` | ✅ docx `metadata` family, registered in `docx-minimal`/`docx-full` (0251) · 🔴 pptx/xlsx (W2) |
 | Custom properties | `custom_props()` / `edit_custom_props()` | — | ✅ name (docx/pptx/xlsx); mutation transactionalized W2 |
 | Application properties (OOXML-only) | `app_props()` | — | format-specific layer, OOXML only |
 | Fresh-authoring metadata | `Builder::set_metadata(Metadata)` | — | ✅ ODF; not an opened-document mutation |
@@ -1503,3 +1503,27 @@ editable document model is introduced. Temporary source indexes are bounded;
 staging windows close at their limits, while scalar admission stays available
 when the optimization index cannot fit. Source-changing boundaries publish
 before resolving later positional paths.
+
+## DOCX metadata transaction, Builder and stream output (0251)
+
+`litchi_docx::metadata::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}`
+is the core-properties family: `Package::metadata()` reads the typed value
+(`None` is an absent part), `Package::edit_metadata()` stages `set`/`update`/
+`clear`, `Edit::commit()` returns a new package, and
+`Package::apply_metadata(&patch)` replays a patch whose base matches. A
+changed write to a signed package is `metadata::Error::Signed` at commit; an
+equal value is an exact no-op that keeps the signature. The family wraps the
+shared `litchi_ooxml_common::properties` codec; its value type is re-exported
+as `metadata::Props` until the shared `Metadata` merge lands.
+`Package::{props, props_mut, put_props, clear_props}` are deleted.
+
+`Package::document_mut()` is deleted. Fresh authoring uses
+`Builder::{new, new_template, document, package, font_embedding, build}`;
+`build()` materializes the authored document into the package graph without a
+ZIP round trip. An opened package changes only through `edit()` and its scoped
+families; it never hydrates into the legacy writer.
+
+The source-backed tail-append `Plan::write_to_stream` and
+`Commit::write_to_stream` (both tail-append families) are renamed `write_to`.
+Both DOCX profiles ban the six retired names and register the
+`litchi_docx::metadata` family.

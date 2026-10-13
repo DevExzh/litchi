@@ -129,11 +129,12 @@ fn cloned_encrypted_package_retains_policy_and_refuses_plain_apply() {
 fn byte_output_requires_explicit_plaintext_and_retains_provenance() {
     use litchi_ooxml_common::package_encryption::PolicyError;
     for mode in [Mode::Standard, Mode::Agile] {
-        let mut source = Package::new().unwrap();
-        source
-            .document_mut()
+        let mut builder = litchi_docx::Builder::new().unwrap();
+        builder
+            .document()
             .unwrap()
             .add_paragraph_with_text("byte output");
+        let mut source = builder.build().unwrap();
         let plain = source.to_bytes().unwrap();
         let encrypted = source.to_encrypted(PASSWORD, mode).unwrap();
         let mut package = Package::from_bytes_with_password(&encrypted, PASSWORD).unwrap();

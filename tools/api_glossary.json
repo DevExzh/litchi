@@ -214,9 +214,41 @@
           "name": "to_stream",
           "scope": "litchi_docx::Package",
           "replacement": "use write_to"
+        },
+        {
+          "name": "document_mut",
+          "scope": "litchi_docx::Package",
+          "replacement": "author fresh content with Builder::document(); change an opened package with Package::edit()"
+        },
+        {
+          "name": "props",
+          "scope": "litchi_docx::Package",
+          "replacement": "use Package::metadata()"
+        },
+        {
+          "name": "props_mut",
+          "scope": "litchi_docx::Package",
+          "replacement": "use Package::edit_metadata() and commit()"
+        },
+        {
+          "name": "put_props",
+          "scope": "litchi_docx::Package",
+          "replacement": "use Package::edit_metadata() and commit()"
+        },
+        {
+          "name": "clear_props",
+          "scope": "litchi_docx::Package",
+          "replacement": "use Package::edit_metadata(), Edit::clear() and commit()"
+        },
+        {
+          "name": "write_to_stream",
+          "scope": "litchi_docx",
+          "replacement": "use write_to"
         }
       ],
-      "families": []
+      "families": [
+        "litchi_docx::metadata"
+      ]
     },
     {
       "id": "docx-full",
@@ -428,9 +460,41 @@
           "name": "to_stream",
           "scope": "litchi_docx::Package",
           "replacement": "use write_to"
+        },
+        {
+          "name": "document_mut",
+          "scope": "litchi_docx::Package",
+          "replacement": "author fresh content with Builder::document(); change an opened package with Package::edit()"
+        },
+        {
+          "name": "props",
+          "scope": "litchi_docx::Package",
+          "replacement": "use Package::metadata()"
+        },
+        {
+          "name": "props_mut",
+          "scope": "litchi_docx::Package",
+          "replacement": "use Package::edit_metadata() and commit()"
+        },
+        {
+          "name": "put_props",
+          "scope": "litchi_docx::Package",
+          "replacement": "use Package::edit_metadata() and commit()"
+        },
+        {
+          "name": "clear_props",
+          "scope": "litchi_docx::Package",
+          "replacement": "use Package::edit_metadata(), Edit::clear() and commit()"
+        },
+        {
+          "name": "write_to_stream",
+          "scope": "litchi_docx",
+          "replacement": "use write_to"
         }
       ],
-      "families": []
+      "families": [
+        "litchi_docx::metadata"
+      ]
     },
     {
       "id": "opc-minimal",

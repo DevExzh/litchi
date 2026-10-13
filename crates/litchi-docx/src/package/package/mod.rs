@@ -9,6 +9,7 @@ mod alternatives;
 mod data_stores;
 mod document;
 mod merge;
+mod metadata;
 mod parts;
 mod settings;
 mod story_edit;

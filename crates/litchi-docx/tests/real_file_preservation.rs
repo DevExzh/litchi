@@ -13,8 +13,6 @@ use litchi_opc::phys_pkg::OwnedPhysPkgReader;
 const SOURCE: &[u8] = include_bytes!("../../../test-data/ooxml/docx/documentProperties.docx");
 const RELATIONSHIPS_MEMBER: &str = "word/_rels/document.xml.rels";
 const EDIT_MARKER: &str = "litchi-docx-preservation-regression";
-const HYPERLINK_URL: &str = "https://example.test/litchi-docx-changed-relationship";
-const HYPERLINK_TEXT: &str = "litchi-docx-changed-relationship-regression";
 
 fn member(bytes: &[u8], name: &str) -> Result<Vec<u8>, Box<dyn Error>> {
     Ok(OwnedPhysPkgReader::from_bytes(bytes.to_vec())?.read_member(name)?)
@@ -28,8 +26,11 @@ fn docx_ordinary_save_preserves_document_relationship_bytes() -> Result<(), Box<
     std::fs::write(&source_path, SOURCE)?;
 
     let source_relationships = member(SOURCE, RELATIONSHIPS_MEMBER)?;
-    let mut package = Package::open(&source_path)?;
-    package.document_mut()?.add_paragraph_with_text(EDIT_MARKER);
+    let package = Package::open(&source_path)?;
+    let count = package.document_snapshot()?.paragraph_count();
+    let mut edit = package.edit()?;
+    edit.insert_paragraph(litchi_core::Position::new(count), EDIT_MARKER)?;
+    let mut package = edit.commit()?.into_package();
     package.save(&output_path)?;
 
     let output = std::fs::read(&output_path)?;
@@ -43,48 +44,6 @@ fn docx_ordinary_save_preserves_document_relationship_bytes() -> Result<(), Box<
     assert!(
         reopened.document()?.text()?.contains(EDIT_MARKER),
         "the semantic edit must survive the save"
-    );
-    Ok(())
-}
-
-#[test]
-fn docx_changed_document_relationships_are_serialized() -> Result<(), Box<dyn Error>> {
-    let directory = tempfile::tempdir()?;
-    let source_path = directory.path().join("source.docx");
-    let output_path = directory.path().join("output.docx");
-    std::fs::write(&source_path, SOURCE)?;
-
-    let source_relationships = member(SOURCE, RELATIONSHIPS_MEMBER)?;
-    let mut package = Package::open(&source_path)?;
-    package
-        .document_mut()?
-        .add_paragraph()
-        .add_hyperlink(HYPERLINK_URL, HYPERLINK_TEXT);
-    package.save(&output_path)?;
-
-    let output = std::fs::read(&output_path)?;
-    let output_relationships = member(&output, RELATIONSHIPS_MEMBER)?;
-    assert_ne!(
-        output_relationships, source_relationships,
-        "a changed document relationship graph must not reuse source XML"
-    );
-    assert!(
-        std::str::from_utf8(&output_relationships)?.contains(HYPERLINK_URL),
-        "the generated external relationship must be published"
-    );
-    let reopened = Package::open(&output_path)?;
-    assert!(
-        reopened.document()?.text()?.contains(HYPERLINK_TEXT),
-        "the changed relationship target's document content must be published"
-    );
-    let main = reopened.opc_package().main_document_part()?;
-    assert!(
-        main.rels().iter().any(|relationship| {
-            relationship.reltype() == litchi_opc::constants::relationship_type::HYPERLINK
-                && relationship.is_external()
-                && relationship.target_ref() == HYPERLINK_URL
-        }),
-        "the reopened graph must contain the new external hyperlink target"
     );
     Ok(())
 }

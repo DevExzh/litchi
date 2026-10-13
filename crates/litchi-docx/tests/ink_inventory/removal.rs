@@ -441,14 +441,4 @@ fn edit_limits_and_dirty_state_refuse_before_publication() {
     assert!(edit.remove(Position::new(1)).is_err());
     let commit = edit.commit().unwrap();
     assert_eq!(commit.snapshot().annotations().len(), 7);
-    package
-        .document_mut()
-        .unwrap()
-        .add_paragraph()
-        .add_run_with_text("pending");
-    assert!(matches!(package.edit_ink(), Err(Error::UnsafeEdit { .. })));
-    assert!(matches!(
-        package.apply_ink_patch(commit.patch()),
-        Err(Error::UnsafeEdit { .. })
-    ));
 }

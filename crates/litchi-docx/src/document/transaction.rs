@@ -13004,7 +13004,7 @@ mod tests {
     fn generated_corpus_snapshot(paragraphs: usize) -> Snapshot {
         let mut package = crate::Package::new().unwrap();
         {
-            let document = package.document_mut().unwrap();
+            let document = package.authoring_document().unwrap();
             for index in 0..paragraphs {
                 document.add_paragraph_with_text(&format!(
                     "litchi-perf-baseline-docx-semantic-v1-source-{index:05}"

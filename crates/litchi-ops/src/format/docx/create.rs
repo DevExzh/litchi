@@ -4,7 +4,7 @@ use litchi_core::Metadata;
 
 use super::Docx;
 use crate::create::{self, Conformance, CreateOptions, Flavor};
-use crate::error::{Code, Error, Result};
+use crate::error::{Error, Result};
 use crate::options::OpenOptions;
 
 /// Build and adopt a DOCX package without a ZIP serialization round trip.
@@ -35,33 +35,29 @@ fn apply_metadata(package: &mut litchi_docx::Package, metadata: &Metadata) -> Re
         return Err(create::invalid_created_metadata());
     }
 
-    let props = package.props_mut().ok_or_else(|| {
-        Error::new(
-            Code::InternalError,
-            "the DOCX creator did not initialize core properties",
-        )
-        .with_format(litchi_core::FileFormat::Docx)
-    })?;
+    let mut edit = package.edit_metadata();
+    edit.update(|props| {
+        props.title = metadata.title.clone();
+        props.subject = metadata.subject.clone();
+        props.creator = metadata.author.clone();
+        props.keywords = metadata.keywords.clone().map(Into::into);
+        props.description = metadata.description.clone();
+        props.identifier = metadata.identifier.clone();
+        props.language = metadata.language.clone();
+        props.last_modified_by = metadata.last_modified_by.clone();
+        props.category = metadata.category.clone();
+        props.content_status = metadata.content_status.clone();
+        props.revision = metadata.revision.clone();
+        props.version = metadata.version.clone();
 
-    props.title = metadata.title.clone();
-    props.subject = metadata.subject.clone();
-    props.creator = metadata.author.clone();
-    props.keywords = metadata.keywords.clone().map(Into::into);
-    props.description = metadata.description.clone();
-    props.identifier = metadata.identifier.clone();
-    props.language = metadata.language.clone();
-    props.last_modified_by = metadata.last_modified_by.clone();
-    props.category = metadata.category.clone();
-    props.content_status = metadata.content_status.clone();
-    props.revision = metadata.revision.clone();
-    props.version = metadata.version.clone();
-
-    // `Props` uses the same typed W3CDTF and xsd:dateTime wrappers as the
-    // unified metadata conversion.  The destination field supplies the
-    // concrete type to `Into`, so this keeps conversion in the leaf codec.
-    props.created = metadata.created.map(Into::into);
-    props.modified = metadata.modified.map(Into::into);
-    props.last_printed = metadata.last_printed_time.map(Into::into);
+        // `Props` uses the same typed W3CDTF and xsd:dateTime wrappers as the
+        // unified metadata conversion.  The destination field supplies the
+        // concrete type to `Into`, so this keeps conversion in the leaf codec.
+        props.created = metadata.created.map(Into::into);
+        props.modified = metadata.modified.map(Into::into);
+        props.last_printed = metadata.last_printed_time.map(Into::into);
+    });
+    *package = edit.commit()?.into_package();
     Ok(())
 }
 

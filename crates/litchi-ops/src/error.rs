@@ -325,6 +325,9 @@ pub enum Source {
     /// A `WordprocessingML` main-document transaction error.
     #[cfg(feature = "docx")]
     DocxTransaction(litchi_docx::document::Error),
+    /// A `WordprocessingML` core-properties transaction error.
+    #[cfg(feature = "docx")]
+    DocxMetadata(litchi_docx::metadata::Error),
     /// A `PresentationML` error.
     #[cfg(feature = "pptx")]
     Pptx(litchi_pptx::Error),
@@ -428,6 +431,8 @@ impl Source {
             Self::Docx(error) => Some(error),
             #[cfg(feature = "docx")]
             Self::DocxTransaction(error) => Some(error),
+            #[cfg(feature = "docx")]
+            Self::DocxMetadata(error) => Some(error),
             #[cfg(feature = "pptx")]
             Self::Pptx(error) => Some(error),
             #[cfg(feature = "xlsx")]
@@ -1040,6 +1045,19 @@ impl Classify for litchi_docx::document::Error {
                 Class::of(Code::InvalidInput)
             },
             _ => Class::of(Code::CorruptFile),
+        }
+    }
+}
+
+#[cfg(feature = "docx")]
+impl Classify for litchi_docx::metadata::Error {
+    fn classify(&self) -> Class {
+        match self {
+            Self::Package(error) => error.classify(),
+            Self::Signed => Class::of(Code::DocumentProtected),
+            Self::Limit { .. } => Class::of(Code::LimitExceeded),
+            Self::PatchConflict => Class::of(Code::IoError),
+            _ => Class::of(Code::InternalError),
         }
     }
 }
@@ -1822,6 +1840,10 @@ from_leaf!(#[cfg(feature = "docx")] litchi_docx::Error => Docx, Some(FileFormat:
 from_leaf!(
     #[cfg(feature = "docx")]
     litchi_docx::document::Error => DocxTransaction, Some(FileFormat::Docx)
+);
+from_leaf!(
+    #[cfg(feature = "docx")]
+    litchi_docx::metadata::Error => DocxMetadata, Some(FileFormat::Docx)
 );
 from_leaf!(#[cfg(feature = "pptx")] litchi_pptx::Error => Pptx, Some(FileFormat::Pptx));
 from_leaf!(#[cfg(feature = "xlsx")] litchi_xlsx::Error => Xlsx, Some(FileFormat::Xlsx));

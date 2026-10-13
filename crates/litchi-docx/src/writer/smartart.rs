@@ -71,18 +71,18 @@ pub(crate) struct SmartArtPartXml {
 /// # Examples
 ///
 /// ```rust,no_run
-/// use litchi_docx::Package;
+/// use litchi_docx::Builder;
 /// use litchi_docx::writer::MutableSmartArt;
 /// use litchi_drawingml::diagram::{DiagramType, SmartArtBuilder};
 ///
-/// let mut package = Package::new()?;
+/// let mut builder = Builder::new()?;
 /// let smartart = SmartArtBuilder::new(DiagramType::Process)
 ///     .add_items(["Plan", "Build", "Ship"])
 ///     .build();
-/// package
-///     .document_mut()?
+/// builder
+///     .document()?
 ///     .add_smart_art(MutableSmartArt::new(smartart)?)?;
-/// package.save("out.docx")?;
+/// builder.build()?.save("out.docx")?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 #[derive(Debug, Clone)]
@@ -328,7 +328,7 @@ mod tests {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut package = Package::new().unwrap();
         {
-            let document = package.document_mut().unwrap();
+            let document = package.authoring_document().unwrap();
             document.add_paragraph_with_text("before the diagram");
 
             let mut hierarchy = DiagramNode::new("Root");
@@ -380,7 +380,7 @@ mod tests {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut package = Package::new().unwrap();
         {
-            let document = package.document_mut().unwrap();
+            let document = package.authoring_document().unwrap();
             let first = MutableSmartArt::new(built()).unwrap();
             let first = document.add_smart_art(first).unwrap();
             assert_eq!(first.anchor_key(), "smartart1");
@@ -427,7 +427,7 @@ mod tests {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut package = Package::new().unwrap();
         {
-            let document = package.document_mut().unwrap();
+            let document = package.authoring_document().unwrap();
 
             let mut text_box = MutableTextBox::new("Companion Box", 914_400, 457200).unwrap();
             text_box.add_run("box story").unwrap();

@@ -828,7 +828,7 @@ fn header_story_patch_publishes_only_to_its_story_and_refuses_stale_topology() {
 }
 
 #[test]
-fn conflict_publication_preserves_document_mut_composition() {
+fn conflict_publication_preserves_document_edit_composition() {
     let main = minimal_document(
         r#"<w:p><q14:conflictIns w:id="81" w:author="before"><w:r><w:t>payload</w:t></w:r></q14:conflictIns></w:p>"#,
     );
@@ -842,7 +842,7 @@ fn conflict_publication_preserves_document_mut_composition() {
 
     package.apply_conflicts(&commit).unwrap();
 
-    assert!(package.document_mut().is_ok());
+    assert!(package.edit().is_ok());
 }
 
 #[test]

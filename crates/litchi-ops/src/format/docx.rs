@@ -455,7 +455,7 @@ impl Docx {
         }
         let metadata = match &self.0.owner {
             DocxOwner::Eager(package) => package
-                .props()
+                .metadata()
                 .cloned()
                 .map(Metadata::from)
                 .unwrap_or_default(),

@@ -445,43 +445,14 @@ impl Package {
         Ok(())
     }
 
-    /// Get a mutable document for writing and modification.
-    ///
-    /// This returns a `MutableDocument` that allows you to add and modify
-    /// paragraphs, tables, and other document elements.
-    ///
-    /// # Examples
-    ///
-    /// ```rust,no_run
-    /// use litchi_docx::Package;
-    ///
-    /// let mut pkg = Package::new()?;
-    /// let mut doc = pkg.document_mut()?;
-    ///
-    /// // Add content
-    /// doc.add_paragraph_with_text("Hello, World!");
-    /// let para = doc.add_paragraph();
-    /// para.add_run_with_text("Bold text").bold(true);
-    ///
-    /// // Add a table
-    /// let table = doc.add_table(3, 2);
-    /// if let Some(cell) = table.cell(0, 0) {
-    ///     cell.set_text("Header 1");
-    /// }
-    ///
-    /// pkg.save("output.docx")?;
-    /// # Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
-    /// ```
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when mutable semantic state cannot be synchronized or
-    /// the main document XML is invalid.
-    pub fn document_mut(&mut self) -> Result<&mut MutableDocument> {
+    /// The legacy authoring document, hydrated from the main part on first
+    /// use. Public authoring goes through [`crate::Builder::document`];
+    /// opened packages change through [`Self::edit`].
+    pub(crate) fn authoring_document(&mut self) -> Result<&mut MutableDocument> {
         if self.raw_edit_committed {
             return Err(Error::UnsafeEdit {
                 format: "DOCX",
-                operation: "document_mut",
+                operation: "authoring_document",
                 reason: "a raw OPC edit committed; use edit_opc for further low-level changes",
             });
         }

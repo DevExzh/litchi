@@ -7,7 +7,7 @@ fn body_edits_preserve_settings_part_byte_for_byte() {
     let before = package.opc.get_part(&settings_uri).unwrap().blob().to_vec();
 
     package
-        .document_mut()
+        .authoring_document()
         .unwrap()
         .add_paragraph_with_text("body-only edit");
     package.write_to(Cursor::new(Vec::new())).unwrap();
@@ -38,7 +38,7 @@ fn body_edits_preserve_web_settings_part_byte_for_byte() {
         .to_vec();
 
     package
-        .document_mut()
+        .authoring_document()
         .unwrap()
         .add_paragraph_with_text("body-only edit");
     package.write_to(Cursor::new(Vec::new())).unwrap();
@@ -410,7 +410,7 @@ fn protection_rewrite_preserves_attached_template_relationship() {
         .relationship_id()
         .to_owned();
     package
-        .document_mut()
+        .authoring_document()
         .unwrap()
         .set_protection(ProtectionType::ReadOnly);
     package.write_to(Cursor::new(Vec::new())).unwrap();
@@ -516,7 +516,7 @@ fn document_variable_mutation_preserves_xml_relationships_and_protection() {
     assert!(part.rels().get(&attached_id).is_some());
 
     package
-        .document_mut()
+        .authoring_document()
         .unwrap()
         .set_protection(ProtectionType::ReadOnly);
     package.write_to(Cursor::new(Vec::new())).unwrap();

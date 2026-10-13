@@ -289,7 +289,7 @@ fn source_metadata_matches_dialects_absence_and_graph_failures() {
         false,
     );
     let eager = Package::from_reader(io::Cursor::new(transitional.clone())).unwrap();
-    let eager_props = eager.props().unwrap();
+    let eager_props = eager.metadata().unwrap();
     let source =
         source_backed::Package::from_read_at(Arc::new(OwnedSource::new(transitional))).unwrap();
     let metadata = source.metadata().unwrap();

@@ -23,7 +23,7 @@ impl Write for ForwardOnlySink {
 fn plain_stream_accepts_a_forward_only_sink() {
     let mut package = Package::new().unwrap();
     package
-        .document_mut()
+        .authoring_document()
         .unwrap()
         .add_paragraph_with_text("forward-only DOCX output");
 
@@ -69,7 +69,7 @@ fn saves_and_reopens_package() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();
     let mut package = Package::new().unwrap();
     package
-        .document_mut()
+        .authoring_document()
         .unwrap()
         .add_paragraph_with_text("round-trip text");
     package.save(file.path()).unwrap();
@@ -85,7 +85,7 @@ fn saves_and_reopens_package() {
     );
 
     reopened
-        .document_mut()
+        .authoring_document()
         .unwrap()
         .add_paragraph_with_text("appended after reopen");
     reopened.save(file.path()).unwrap();
@@ -178,7 +178,7 @@ fn appending_a_paragraph_preserves_existing_note_edges_and_payloads() {
     let source_bytes = litchi_opc::PackageWriter::to_bytes(&source_opc).unwrap();
     let mut package = Package::from_reader(Cursor::new(source_bytes)).unwrap();
     package
-        .document_mut()
+        .authoring_document()
         .unwrap()
         .add_paragraph_with_text("appended beside opaque notes");
     let mut output = Cursor::new(Vec::new());
@@ -267,7 +267,7 @@ fn authored_notes_replace_existing_strict_note_edges() {
     let source_bytes = litchi_opc::PackageWriter::to_bytes(&source_opc).unwrap();
     let mut package = Package::from_reader(Cursor::new(source_bytes)).unwrap();
     {
-        let document = package.document_mut().unwrap();
+        let document = package.authoring_document().unwrap();
         let (footnote_id, footnote) = document.add_footnote();
         footnote.add_paragraph_with_text("generated footnote payload");
         let (endnote_id, endnote) = document.add_endnote();
@@ -955,10 +955,12 @@ fn document_relationship_inventory(package: &Package) -> Vec<(String, String, St
 fn failed_stream_keeps_document_and_properties_retryable() {
     let mut package = Package::new().unwrap();
     package
-        .document_mut()
+        .authoring_document()
         .unwrap()
         .add_paragraph_with_text("retryable document");
-    package.put_props(Props::new().title("retryable properties"));
+    package
+        .properties
+        .put(Props::new().title("retryable properties"));
     let document_before = package.opc.main_document_part().unwrap().blob_arc();
     let core_properties_uri = PackURI::new("/docProps/core.xml").unwrap();
     let core_properties_before = package
@@ -997,7 +999,7 @@ fn failed_stream_keeps_document_and_properties_retryable() {
     assert!(package.properties.is_dirty());
 
     package
-        .document_mut()
+        .authoring_document()
         .unwrap()
         .add_paragraph_with_text("second attempt");
     let mut output = Cursor::new(Vec::new());
@@ -1010,11 +1012,13 @@ fn failed_stream_keeps_document_and_properties_retryable() {
 fn panicking_stream_restores_package_and_retryable_state() {
     let mut package = Package::new().unwrap();
     {
-        let document = package.document_mut().unwrap();
+        let document = package.authoring_document().unwrap();
         document.add_heading("panic-safe heading", 1).unwrap();
         document.add_toc(crate::TableOfContents::new()).unwrap();
     }
-    package.put_props(Props::new().title("panic-safe properties"));
+    package
+        .properties
+        .put(Props::new().title("panic-safe properties"));
     package
         .custom_props_mut()
         .insert("RetryMarker", "panic-safe custom property")
@@ -1078,7 +1082,7 @@ fn unchanged_stream_preserves_exact_bytes_and_part_payload_sharing() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();
     let mut source = Package::new().unwrap();
     source
-        .document_mut()
+        .authoring_document()
         .unwrap()
         .add_paragraph_with_text("unchanged package");
     source.save(file.path()).unwrap();
@@ -1117,13 +1121,13 @@ fn raw_opc_rejects_automatic_font_embedding_policy() {
     let file = NamedTempFile::with_suffix(".docx").unwrap();
     let mut source = Package::new().unwrap();
     source
-        .document_mut()
+        .authoring_document()
         .unwrap()
         .add_paragraph_with_text("preserved text");
     source.save(file.path()).unwrap();
 
     let mut opened = Package::open(file.path()).unwrap();
-    let _ = opened.document_mut().unwrap();
+    let _ = opened.authoring_document().unwrap();
     opened
         .set_font_embedding(litchi_fonts::embedding::Mode::Subset)
         .unwrap();
@@ -1157,9 +1161,9 @@ fn raw_opc_transaction_publishes_candidate_and_disables_writer() {
         b"raw edit"
     );
     assert!(matches!(
-        package.document_mut(),
+        package.authoring_document(),
         Err(Error::UnsafeEdit {
-            operation: "document_mut",
+            operation: "authoring_document",
             ..
         })
     ));
@@ -1190,14 +1194,14 @@ fn failed_raw_opc_transaction_preserves_graph_and_writer_state() {
             .unwrap()
             .blob_arc()
     ));
-    assert!(package.document_mut().is_ok());
+    assert!(package.authoring_document().is_ok());
 }
 
 #[test]
 fn raw_opc_transaction_rejects_pending_managed_state() {
     let mut package = Package::new().unwrap();
     package
-        .document_mut()
+        .authoring_document()
         .unwrap()
         .add_paragraph_with_text("managed edit");
 
@@ -1424,10 +1428,10 @@ fn immutable_apply_shares_noops_and_keeps_each_package_revision_readable() {
 fn cloned_dirty_writer_and_metadata_detach_and_remain_retryable() {
     let mut source = Package::new().unwrap();
     source
-        .document_mut()
+        .authoring_document()
         .unwrap()
         .add_paragraph_with_text("source");
-    source.put_props(Props::new().title("source title"));
+    source.properties.put(Props::new().title("source title"));
     source
         .custom_props_mut()
         .insert("Marker", "source value")
@@ -1440,10 +1444,10 @@ fn cloned_dirty_writer_and_metadata_detach_and_remain_retryable() {
     assert!(std::ptr::eq(&*source.properties, &*changed.properties));
     assert!(std::ptr::eq(&*source.custom_props, &*changed.custom_props));
     changed
-        .document_mut()
+        .authoring_document()
         .unwrap()
         .add_paragraph_with_text("changed");
-    changed.props_mut().unwrap().title = Some("changed title".into());
+    changed.properties.get_mut().unwrap().title = Some("changed title".into());
     changed
         .custom_props_mut()
         .insert("Marker", "changed value")
@@ -1454,7 +1458,7 @@ fn cloned_dirty_writer_and_metadata_detach_and_remain_retryable() {
     assert!(source.custom_props_dirty);
     assert!(changed.custom_props_dirty);
     assert_eq!(
-        source.props().unwrap().title.as_deref(),
+        source.metadata().unwrap().title.as_deref(),
         Some("source title")
     );
     assert_ne!(
@@ -1471,7 +1475,7 @@ fn cloned_dirty_writer_and_metadata_detach_and_remain_retryable() {
         "sourcechanged"
     );
     assert_eq!(
-        changed_read.props().unwrap().title.as_deref(),
+        changed_read.metadata().unwrap().title.as_deref(),
         Some("changed title")
     );
     let mut source_bytes = Vec::new();
@@ -1479,7 +1483,7 @@ fn cloned_dirty_writer_and_metadata_detach_and_remain_retryable() {
     let source_read = Package::from_reader(Cursor::new(source_bytes)).unwrap();
     assert_eq!(source_read.document().unwrap().text().unwrap(), "source");
     assert_eq!(
-        source_read.props().unwrap().title.as_deref(),
+        source_read.metadata().unwrap().title.as_deref(),
         Some("source title")
     );
     assert_eq!(
@@ -1488,16 +1492,16 @@ fn cloned_dirty_writer_and_metadata_detach_and_remain_retryable() {
     );
 
     let mut replaced = source.clone();
-    replaced.put_props(Props::new().title("replacement"));
+    replaced.properties.put(Props::new().title("replacement"));
     let mut cleared = source.clone();
-    cleared.clear_props();
+    cleared.properties.clear();
     assert_eq!(
-        source.props().unwrap().title.as_deref(),
+        source.metadata().unwrap().title.as_deref(),
         Some("source title")
     );
     assert_eq!(
-        replaced.props().unwrap().title.as_deref(),
+        replaced.metadata().unwrap().title.as_deref(),
         Some("replacement")
     );
-    assert!(cleared.props().is_none());
+    assert!(cleared.metadata().is_none());
 }
