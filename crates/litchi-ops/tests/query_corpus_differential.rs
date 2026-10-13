@@ -1,19 +1,27 @@
-//! Differential evidence for record 0262: representative queries over the
-//! XLSX, DOCX and PPTX corpora return exactly what they returned before the
-//! query-walker optimizations (typed comparison, small nodes, direct
-//! iteration, walker shortcuts).
+//! Differential evidence for records 0262 and 0267: representative queries
+//! over the XLSX, DOCX, PPTX, XLS and XLSB corpora return exactly what they
+//! returned before the query-walker optimizations (typed comparison, small
+//! nodes, direct iteration, walker shortcuts) and the streaming cell cursors.
 //!
 //! `tests/golden/query_corpus/digests.json` holds the digests the trunk
 //! build before record 0262 printed (`examples/query_corpus_digest.rs`, base
 //! `949224c319`; re-recorded over the larger corpus after the merge into
 //! trunk, where the pre-0262 build `ab7e4b7480` and the merged build
-//! `80915b091b` printed byte-identical digests). Each digest covers, file by file, every match's kind,
+//! `80915b091b` printed byte-identical digests). The XLS and XLSB digests
+//! were added by record 0267, printed by trunk `4d1afe92bc` before its
+//! changes. Each digest covers, file by file, every match's kind,
 //! path, positional path and text, and every error, so a changed result set
 //! on any file changes it. Set `LITCHI_BLESS_GOLDEN=1` to write the current
 //! build's digests instead, after showing that a change of results is
 //! intended.
 
-#![cfg(all(feature = "xlsx", feature = "docx", feature = "pptx"))]
+#![cfg(all(
+    feature = "xlsx",
+    feature = "docx",
+    feature = "pptx",
+    feature = "xls",
+    feature = "xlsb"
+))]
 
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -60,6 +68,8 @@ fn corpus_queries_return_what_they_returned_before() {
         ("xlsx", query_corpus::XLSX),
         ("docx", query_corpus::DOCX),
         ("pptx", query_corpus::PPTX),
+        ("xls", query_corpus::XLS),
+        ("xlsb", query_corpus::XLSB),
     ] {
         let matched = selectors
             .iter()

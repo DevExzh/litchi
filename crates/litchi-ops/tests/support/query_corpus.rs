@@ -1,5 +1,6 @@
-//! Representative selectors over the OOXML corpus, with one digest per
-//! format and selector of everything the queries return (record 0262).
+//! Representative selectors over the workbook, document and presentation
+//! corpus, with one digest per format and selector of everything the
+//! queries return (records 0262 and 0267).
 //!
 //! The digest of a selector hashes, file by file in path order, each match's
 //! kind, path, positional path and text, or the error code that refused or
@@ -62,6 +63,15 @@ pub(crate) const XLSX: &[&str] = &[
     "table",
     "namedrange",
 ];
+
+/// Legacy and binary workbook selectors (record 0267): the XLSX selectors,
+/// so the three worksheet adapters are held to the same routes. XLS and
+/// XLSB digests were recorded from trunk `4d1afe92bc` before the streaming
+/// cell cursors.
+pub(crate) const XLS: &[&str] = XLSX;
+
+/// Binary workbook selectors (record 0267); see [`XLS`].
+pub(crate) const XLSB: &[&str] = XLSX;
 
 /// Document selectors.
 pub(crate) const DOCX: &[&str] = &[
@@ -153,6 +163,117 @@ impl Fnv {
     }
 }
 
+/// Appends one record per match or error of `matches` to `record`, and
+/// returns the number of matches.
+fn record_matches(
+    record: &mut String,
+    matches: litchi_ops::Result<litchi_ops::query::Matches<'_, '_>>,
+) -> usize {
+    let mut count = 0;
+    match matches {
+        Err(error) => {
+            let _ = writeln!(record, "refused {:?}", error.code());
+        },
+        Ok(matches) => {
+            for node in matches {
+                match node {
+                    Ok(node) => {
+                        count += 1;
+                        let text = node.view().text().ok().flatten();
+                        let _ = writeln!(
+                            record,
+                            "{} {} {} {:?}",
+                            node.kind(),
+                            node.path(),
+                            node.positional_path(),
+                            text.as_deref()
+                        );
+                    },
+                    Err(error) => {
+                        let _ = writeln!(record, "failed {:?}", error.code());
+                    },
+                }
+            }
+        },
+    }
+    count
+}
+
+/// Early-stopping queries on cold handles (record 0267): for every
+/// selector, a freshly opened file-backed handle runs `limit(3)` and a
+/// freshly opened in-memory handle runs `first()`, so the first matches of
+/// a sheet that no earlier query has read are compared too. Keys are
+/// `format limit3 selector` and `format first selector`.
+fn early_stop_digests(
+    root: &Path,
+    extension: &str,
+    format: FileFormat,
+    selectors: &[&str],
+    out: &mut BTreeMap<String, String>,
+) {
+    let wanted = |file: &File| file.format() == Some(format) && !matches!(file, File::Locked(_));
+    let paths = corpus(root, extension);
+    for selector in selectors {
+        let (mut limited, mut first) = (Fnv::new(), Fnv::new());
+        let (mut limited_count, mut first_count) = (0_usize, 0_usize);
+        for path in &paths {
+            let name = path
+                .strip_prefix(root)
+                .unwrap_or(path)
+                .to_string_lossy()
+                .replace('\\', "/");
+            let Ok(bytes) = std::fs::read(path) else {
+                continue;
+            };
+            if let Ok(file) = litchi_ops::open(path)
+                && wanted(&file)
+            {
+                let mut record = format!("{name}\n");
+                limited_count += record_matches(
+                    &mut record,
+                    file.query(*selector).map(|matches| matches.limit(3)),
+                );
+                limited.update(record.as_bytes());
+            }
+            if let Ok(file) = litchi_ops::open_bytes(bytes)
+                && wanted(&file)
+            {
+                let mut record = format!("{name}\n");
+                match file
+                    .query(*selector)
+                    .and_then(litchi_ops::query::Matches::first)
+                {
+                    Err(error) => {
+                        let _ = writeln!(record, "failed {:?}", error.code());
+                    },
+                    Ok(None) => record.push_str("none\n"),
+                    Ok(Some(node)) => {
+                        first_count += 1;
+                        let text = node.view().text().ok().flatten();
+                        let _ = writeln!(
+                            record,
+                            "{} {} {} {:?}",
+                            node.kind(),
+                            node.path(),
+                            node.positional_path(),
+                            text.as_deref()
+                        );
+                    },
+                }
+                first.update(record.as_bytes());
+            }
+        }
+        out.insert(
+            format!("{extension} limit3 {selector}"),
+            format!("{limited_count} {}", limited.hex()),
+        );
+        out.insert(
+            format!("{extension} first {selector}"),
+            format!("{first_count} {}", first.hex()),
+        );
+    }
+}
+
 /// The corpus files with `extension` under `root`, in path order.
 pub(crate) fn corpus(root: &Path, extension: &str) -> Vec<PathBuf> {
     fn walk(directory: &Path, extension: &str, out: &mut Vec<PathBuf>) {
@@ -187,6 +308,8 @@ pub(crate) fn digests(root: &Path) -> BTreeMap<String, String> {
         ("xlsx", FileFormat::Xlsx, XLSX),
         ("docx", FileFormat::Docx, DOCX),
         ("pptx", FileFormat::Pptx, PPTX),
+        ("xls", FileFormat::Xls, XLS),
+        ("xlsb", FileFormat::Xlsb, XLSB),
     ] {
         let mut hashers: Vec<Fnv> = selectors.iter().map(|_| Fnv::new()).collect();
         let mut counts = vec![0_usize; selectors.len()];
@@ -214,34 +337,12 @@ pub(crate) fn digests(root: &Path) -> BTreeMap<String, String> {
             files += 1;
             for (index, selector) in selectors.iter().enumerate() {
                 let mut record = format!("{name}\n");
-                match file.query(*selector) {
-                    Err(error) => {
-                        let _ = writeln!(record, "refused {:?}", error.code());
-                    },
-                    Ok(matches) => {
-                        for node in matches {
-                            match node {
-                                Ok(node) => {
-                                    counts[index] += 1;
-                                    let text = node.view().text().ok().flatten();
-                                    let _ = writeln!(
-                                        record,
-                                        "{} {} {} {:?}",
-                                        node.kind(),
-                                        node.path(),
-                                        node.positional_path(),
-                                        text.as_deref()
-                                    );
-                                },
-                                Err(error) => {
-                                    let _ = writeln!(record, "failed {:?}", error.code());
-                                },
-                            }
-                        }
-                    },
-                }
+                counts[index] += record_matches(&mut record, file.query(*selector));
                 hashers[index].update(record.as_bytes());
             }
+        }
+        if matches!(extension, "xlsx" | "xls" | "xlsb") {
+            early_stop_digests(root, extension, format, selectors, &mut out);
         }
         for ((selector, hasher), count) in selectors.iter().zip(hashers).zip(counts) {
             out.insert(
