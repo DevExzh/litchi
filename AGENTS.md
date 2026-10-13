@@ -51,3 +51,17 @@ git diff --cached --name-only --diff-filter=AM | grep '/binaries/'
 - Older checkouts may still hold the purged files on disk as untracked files.
   Do not add them back. `.gitignore` lists the purged command logs by name,
   because its evidence-log exception would otherwise re-include them.
+
+## Test data: never reference 3rdparty/
+
+`3rdparty/` holds untracked upstream checkouts (LibreOffice, Apache POI,
+OfficeCLI and others). It is absent from worktrees, CI and other checkouts.
+
+- **Never reference a file under `3rdparty/`** from code, tests, benches,
+  examples, fuzz targets or tool scripts. This covers `include_bytes!`,
+  `include_str!`, path joins and `../3rdparty/...` relative paths.
+- **Copy the needed fixture into the tracked `test-data/` tree** and reference
+  it there. Next to it, record where it came from: the upstream project, its
+  path in that project and its license.
+- The repository size rules above still apply. Keep fixtures small, and never
+  commit a binary executable.

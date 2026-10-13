@@ -4,7 +4,7 @@ use litchi_xlsx::calculation_properties::{
     Feature, Features, Mode, Patch as CalculationPatch, Properties,
 };
 use litchi_xlsx::formula::Formula;
-use litchi_xlsx::{Error, Package, Workbook};
+use litchi_xlsx::{Error, Package};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
 const CALC_CHAIN_CONTENT_TYPE: &str =
@@ -14,8 +14,8 @@ const SIGNATURE_REL: &str =
 const ORIGIN_BYTES: &[u8] = b"origin";
 const SIGNATURE_BYTES: &[u8] = b"signature";
 
-fn calculation_source() -> Workbook {
-    let seed = Workbook::create().expect("seed workbook");
+fn calculation_source() -> Package {
+    let seed = Package::new().expect("seed workbook");
     let mut edit = seed.edit().expect("seed edit");
     edit.sheet("Sheet1")
         .expect("sheet lookup")
@@ -23,10 +23,10 @@ fn calculation_source() -> Workbook {
         .set("A1", 2_i32)
         .and_then(|sheet| sheet.set("B1", Formula::new("A1+1").expect("formula")))
         .expect("seed cells");
-    let seed = edit.commit().expect("seed commit").into_workbook();
+    let seed = edit.commit().expect("seed commit").into_package();
 
     let mut package =
-        Package::from_bytes(seed.to_plain_bytes().expect("seed bytes")).expect("seed package");
+        Package::from_bytes(&seed.to_plain_bytes().expect("seed bytes")).expect("seed package");
     let mut metadata = package.edit_calculation_metadata().expect("metadata edit");
     assert!(
         metadata.set_properties(
@@ -63,13 +63,10 @@ fn calculation_source() -> Workbook {
             TargetMode::Internal,
         )
         .expect("chain relationship");
-    Package::from_opc(raw)
-        .expect("calculation package")
-        .into_workbook()
-        .expect("calculation workbook")
+    Package::from_opc(raw).expect("calculation package")
 }
 
-fn has_calculation_chain(workbook: &Workbook) -> bool {
+fn has_calculation_chain(workbook: &Package) -> bool {
     let bytes = workbook.to_plain_bytes().expect("workbook bytes");
     let package = OpcPackage::from_bytes(&bytes).expect("OPC package");
     let workbook_part = package.main_document_part().expect("workbook part");
@@ -87,7 +84,7 @@ fn has_calculation_chain(workbook: &Workbook) -> bool {
         .is_ok_and(|target| package.get_part(&target).is_ok())
 }
 
-fn assert_invalidated(workbook: &Workbook) {
+fn assert_invalidated(workbook: &Package) {
     let properties = workbook
         .calculation_metadata()
         .expect("calculation metadata")
@@ -103,7 +100,7 @@ fn assert_invalidated(workbook: &Workbook) {
 }
 
 fn calculation_metadata_patches() -> (Package, CalculationPatch, CalculationPatch) {
-    let baseline = Package::create().expect("baseline Package");
+    let baseline = Package::new().expect("baseline Package");
     let mut no_op_author = baseline.clone();
     let no_op = no_op_author
         .edit_calculation_metadata()
@@ -174,11 +171,11 @@ fn effective_cell_content_transitions_invalidate_flags_and_remove_calc_chain() {
         let commit = edit
             .commit()
             .unwrap_or_else(|error| panic!("{transition:?}: {error}"));
-        assert!(!commit.patch().is_empty(), "{transition:?}");
-        assert_invalidated(commit.workbook());
+        assert!(!commit.patch().is_noop(), "{transition:?}");
+        assert_invalidated(commit.package());
         assert!(
             commit
-                .workbook()
+                .package()
                 .calculation_metadata()
                 .expect("calculation metadata")
                 .features()
@@ -191,7 +188,7 @@ fn effective_cell_content_transitions_invalidate_flags_and_remove_calc_chain() {
 #[test]
 fn formula_invalidation_preserves_ordered_duplicate_calc_features_exactly() {
     let source = calculation_source();
-    let mut package = Package::from_bytes(source.to_plain_bytes().expect("source bytes"))
+    let mut package = Package::from_bytes(&source.to_plain_bytes().expect("source bytes"))
         .expect("source Package");
     let mut metadata = package
         .edit_calculation_metadata()
@@ -207,7 +204,7 @@ fn formula_invalidation_preserves_ordered_duplicate_calc_features_exactly() {
         )
     );
     metadata.commit().expect("feature metadata commit");
-    let source = package.into_workbook().expect("feature workbook");
+    let source = package;
 
     let mut edit = source.edit().expect("formula edit");
     edit.sheet("Sheet1")
@@ -216,9 +213,9 @@ fn formula_invalidation_preserves_ordered_duplicate_calc_features_exactly() {
         .set("B1", Formula::new("A1+99").expect("replacement formula"))
         .expect("replace formula");
     let committed = edit.commit().expect("formula commit");
-    assert_invalidated(committed.workbook());
+    assert_invalidated(committed.package());
     let metadata = committed
-        .workbook()
+        .package()
         .calculation_metadata()
         .expect("invalidated metadata");
     let names = metadata
@@ -238,7 +235,12 @@ fn style_only_edit_preserves_calc_flags_and_chain() {
         .expect("source metadata")
         .source_xml()
         .to_vec();
-    let style = source.styles().expect("styles").base().expect("base style");
+    let style = source
+        .workbook_ref()
+        .styles()
+        .expect("styles")
+        .base()
+        .expect("base style");
     let mut edit = source.edit().expect("style edit");
     edit.sheet("Sheet1")
         .expect("sheet lookup")
@@ -247,11 +249,11 @@ fn style_only_edit_preserves_calc_flags_and_chain() {
         .expect("style cell");
     let commit = edit.commit().expect("style commit");
 
-    assert!(!commit.patch().is_empty());
-    assert!(has_calculation_chain(commit.workbook()));
+    assert!(!commit.patch().is_noop());
+    assert!(has_calculation_chain(commit.package()));
     assert_eq!(
         commit
-            .workbook()
+            .package()
             .calculation_metadata()
             .expect("preserved metadata")
             .source_xml(),
@@ -269,11 +271,11 @@ fn empty_and_effective_no_op_patches_preserve_exact_workbook_bytes() {
         .expect("empty edit")
         .commit()
         .expect("empty commit");
-    assert!(empty.patch().is_empty());
-    assert_eq!(empty.workbook().to_plain_bytes().unwrap(), source_bytes);
+    assert!(empty.patch().is_noop());
+    assert_eq!(empty.package().to_plain_bytes().unwrap(), source_bytes);
     let replayed_empty = source.apply(empty.patch()).expect("replay empty patch");
     assert_eq!(
-        replayed_empty.workbook().to_plain_bytes().unwrap(),
+        replayed_empty.package().to_plain_bytes().unwrap(),
         source_bytes
     );
 
@@ -284,14 +286,14 @@ fn empty_and_effective_no_op_patches_preserve_exact_workbook_bytes() {
         .set("A1", 2_i32)
         .expect("same input value");
     let no_op = edit.commit().expect("effective no-op commit");
-    assert!(no_op.patch().is_empty());
-    assert_eq!(no_op.workbook().to_plain_bytes().unwrap(), source_bytes);
+    assert!(no_op.patch().is_noop());
+    assert_eq!(no_op.package().to_plain_bytes().unwrap(), source_bytes);
     let replayed_no_op = source.apply(no_op.patch()).expect("replay no-op patch");
     assert_eq!(
-        replayed_no_op.workbook().to_plain_bytes().unwrap(),
+        replayed_no_op.package().to_plain_bytes().unwrap(),
         source_bytes
     );
-    assert!(has_calculation_chain(replayed_no_op.workbook()));
+    assert!(has_calculation_chain(replayed_no_op.package()));
 }
 
 fn append_before_closing(xml: Vec<u8>, closing: &str, addition: &str) -> Vec<u8> {
@@ -385,7 +387,7 @@ fn inert_signed_fixture(source: &[u8]) -> Package {
         .write_deflated("_xmlsignatures/sig1.xml", SIGNATURE_BYTES)
         .expect("raw malformed signature member");
     let bytes = writer.finish_to_bytes().expect("signed fixture ZIP");
-    let package = Package::from_bytes(bytes).expect("signed fixture package");
+    let package = Package::from_bytes(&bytes).expect("signed fixture package");
     assert_inert_signature_graph(&package);
     package
 }
@@ -401,10 +403,10 @@ fn changed_public_patch_is_refused_on_workbook_from_signed_package() {
         .set("A1", 7_i32)
         .expect("change input");
     let patch = edit.commit().expect("patch commit").patch().clone();
-    assert!(!patch.is_empty());
+    assert!(!patch.is_noop());
 
     let signed_package = inert_signed_fixture(&source_bytes);
-    let signed = signed_package.workbook().expect("signed workbook facade");
+    let signed = signed_package.clone();
     let signed_before = signed.to_plain_bytes().expect("signed bytes");
     assert!(matches!(signed.apply(&patch), Err(Error::Signed)));
     assert_eq!(signed.to_plain_bytes().unwrap(), signed_before);
@@ -444,15 +446,15 @@ fn changed_public_patch_is_refused_on_encrypted_provenance_facade() {
         .set("A1", 7_i32)
         .expect("change input");
     let patch = edit.commit().expect("patch commit").patch().clone();
-    assert!(!patch.is_empty());
+    assert!(!patch.is_noop());
 
-    let encrypted = Package::from_bytes(source_bytes)
+    let encrypted = Package::from_bytes(&source_bytes)
         .expect("plain package")
         .to_encrypted(PASSWORD, EncryptionMode::Standard)
         .expect("encrypted bytes");
-    let package = Package::from_bytes_with_password(encrypted, PASSWORD)
+    let package = Package::from_bytes_with_password(&encrypted, PASSWORD)
         .expect("encrypted provenance Package");
-    let workbook = package.workbook().expect("encrypted workbook facade");
+    let workbook = package.clone();
     assert_eq!(workbook.encryption(), Some(EncryptionMode::Standard));
     let before = workbook.to_plain_bytes().expect("clear inner bytes");
     assert!(matches!(
@@ -476,7 +478,7 @@ fn calculation_metadata_patches_are_refused_exactly_on_encrypted_provenance_pack
     let encrypted = baseline
         .to_encrypted(PASSWORD, EncryptionMode::Standard)
         .expect("encrypted bytes");
-    let mut package = Package::from_bytes_with_password(encrypted, PASSWORD)
+    let mut package = Package::from_bytes_with_password(&encrypted, PASSWORD)
         .expect("encrypted provenance Package");
     let before = package.to_plain_bytes().expect("clear inner source bytes");
 
@@ -498,10 +500,10 @@ fn calculation_metadata_patches_are_refused_exactly_on_encrypted_provenance_pack
     assert_eq!(package.to_plain_bytes().unwrap(), before);
 }
 
-fn mce_projected_source() -> Workbook {
+fn mce_projected_source() -> Package {
     const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
     let source = calculation_source();
-    let mut package = Package::from_bytes(source.to_plain_bytes().expect("source bytes"))
+    let mut package = Package::from_bytes(&source.to_plain_bytes().expect("source bytes"))
         .expect("source package");
     let mut metadata = package
         .edit_calculation_metadata()
@@ -526,10 +528,7 @@ fn mce_projected_source() -> Workbook {
     raw.get_part_mut(&workbook_uri)
         .expect("mutable workbook part")
         .set_blob(xml);
-    Package::from_opc(raw)
-        .expect("MCE Package")
-        .into_workbook()
-        .expect("MCE workbook")
+    Package::from_opc(raw).expect("MCE Package")
 }
 
 #[test]

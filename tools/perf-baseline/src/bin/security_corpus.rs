@@ -34,7 +34,7 @@ use litchi_docx::source_backed::Package as DocxSourcePackage;
 use litchi_opc::{OpcError, OpcPackage, SourceBackedPackage, SourceLimits};
 use litchi_sign::{Policy, Status};
 use litchi_xls::raw::Reader as XlsReader;
-use litchi_xlsx::Workbook as XlsxWorkbook;
+use litchi_xlsx::Package as XlsxPackage;
 use serde::Serialize;
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
@@ -993,7 +993,10 @@ fn validate_zip(fixture: &Fixture, bytes: &[u8]) -> Result<OperationResult> {
             }
         },
         Oracle::Xxe => {
-            let _ = XlsxWorkbook::from_slice_with_limits(bytes, opc_limits()?)?;
+            let _ = XlsxPackage::from_bytes_with_options(
+                bytes,
+                litchi_xlsx::OpenOptions::new().source_limits(opc_limits()?),
+            )?;
             if !target
                 .windows(b"schemaLocation".len())
                 .any(|window| window == b"schemaLocation")
@@ -1005,7 +1008,10 @@ fn validate_zip(fixture: &Fixture, bytes: &[u8]) -> Result<OperationResult> {
             }
         },
         Oracle::SharedStrings => {
-            let _ = XlsxWorkbook::from_slice_with_limits(bytes, opc_limits()?)?;
+            let _ = XlsxPackage::from_bytes_with_options(
+                bytes,
+                litchi_xlsx::OpenOptions::new().source_limits(opc_limits()?),
+            )?;
             if !target.windows(b"sst".len()).any(|window| window == b"sst") {
                 return Err(format!("{} shared-string target missing", fixture.id).into());
             }

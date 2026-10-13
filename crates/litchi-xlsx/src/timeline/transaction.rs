@@ -14,7 +14,7 @@ use litchi_opc::{OpcPackage, PackURI};
 /// before the transaction starts ([`crate::Package::unsign`] or
 /// [`OpcPackage::unsign`]) to edit a signed workbook.
 pub struct Transaction<'a> {
-    target: &'a mut OpcPackage,
+    target: crate::package::Target<'a>,
     workbook: PackURI,
     staged: OpcPackage,
 }
@@ -22,9 +22,17 @@ pub struct Transaction<'a> {
 impl<'a> Transaction<'a> {
     /// Start a transaction after validating the existing timeline graph.
     pub fn new(target: &'a mut OpcPackage, workbook: &PackURI) -> Result<Self> {
-        super::validation::graph(target, workbook)?;
+        Self::start(target.into(), workbook)
+    }
+
+    pub(crate) fn for_package(package: &'a mut crate::Package, workbook: &PackURI) -> Result<Self> {
+        Self::start(crate::package::Target::Package(package), workbook)
+    }
+
+    fn start(target: crate::package::Target<'a>, workbook: &PackURI) -> Result<Self> {
+        super::validation::graph(&target, workbook)?;
         Ok(Self {
-            staged: target.clone(),
+            staged: (*target).clone(),
             target,
             workbook: workbook.clone(),
         })
@@ -127,9 +135,9 @@ impl<'a> Transaction<'a> {
     }
 
     /// Publish the staged graph. Dropping without calling this discards it.
-    pub fn commit(self) -> Result<()> {
+    pub fn commit(mut self) -> Result<()> {
         super::validation::graph(&self.staged, &self.workbook)?;
-        *self.target = self.staged;
+        self.target.publish(self.staged)?;
         Ok(())
     }
 

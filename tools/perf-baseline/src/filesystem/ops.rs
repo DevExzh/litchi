@@ -1449,8 +1449,9 @@ fn verify_xlsx_selected_cell(
     if sheet.name() != expected_sheet_name || sheet.position() != target.sheet {
         return Err("XLSX selected-cell worksheet identity differs from the corpus".into());
     }
-    let typed = litchi_xlsx::Workbook::from_bytes(corpus.archive.clone())?;
+    let typed = litchi_xlsx::Package::from_bytes(&corpus.archive)?;
     let typed_sheet = typed
+        .workbook_ref()
         .sheet(expected_sheet_name.as_str())?
         .ok_or("typed XLSX selected-cell oracle sheet is missing")?;
     let expected = match typed_sheet.cell(expected_address.as_str())? {

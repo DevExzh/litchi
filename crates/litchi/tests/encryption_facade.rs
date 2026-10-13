@@ -5,15 +5,15 @@ const NEW_PASSWORD: &str = "FacadeSecret456";
 
 #[cfg(feature = "xlsx")]
 #[test]
-fn xlsx_facade_exposes_managed_package_and_workbook_encryption() {
-    use litchi::xlsx::{Package, Workbook, encryption::Mode};
+fn xlsx_facade_exposes_managed_package_encryption() {
+    use litchi::xlsx::{Package, encryption::Mode};
     use std::io::Cursor;
 
-    let workbook = Workbook::create().expect("create workbook");
+    let workbook = Package::new().expect("create workbook");
     let encrypted = workbook
         .to_encrypted(PASSWORD, Mode::Agile)
         .expect("encrypt workbook");
-    let reopened = Workbook::from_reader_with_password(Cursor::new(encrypted), PASSWORD)
+    let reopened = Package::from_reader_with_password(Cursor::new(encrypted), PASSWORD)
         .expect("open encrypted workbook");
     assert_eq!(reopened.encryption(), Some(Mode::Agile));
 

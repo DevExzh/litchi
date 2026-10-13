@@ -42,7 +42,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let title = "Quarterly review";
         let native_once: Box<dyn Fn() -> Result<(), Box<dyn std::error::Error>>> = match format {
             FileFormat::Xlsx => {
-                let workbook = litchi_xlsx::Workbook::from_slice(&bytes)?;
+                let workbook = litchi_xlsx::Package::from_bytes(&bytes)?;
                 Box::new(move || {
                     let mut edit = workbook.edit_metadata()?;
                     edit.update(|m| m.title = Some(title.to_owned()))?;

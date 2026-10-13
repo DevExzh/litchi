@@ -124,7 +124,7 @@ fn native_relationship_token_removal_and_inverse_preserve_exact_xml() {
 
 #[test]
 fn native_descriptor_patch_rejects_relationship_lexical_source_changes() {
-    let mut package = Package::from_bytes(SOURCE.to_vec()).unwrap();
+    let mut package = Package::from_bytes(SOURCE).unwrap();
     let mut edit = package.edit_data_model().unwrap();
     edit.edit_definition(|definition| {
         definition.min_version_load += 1;
@@ -161,7 +161,7 @@ fn native_descriptor_patch_rejects_relationship_lexical_source_changes() {
 
 #[test]
 fn public_structural_descriptor_and_payload_replacement_is_refused_without_inner_identity_proof() {
-    let mut package = Package::from_bytes(SOURCE.to_vec()).unwrap();
+    let mut package = Package::from_bytes(SOURCE).unwrap();
     let mut edit = package.edit_data_model().unwrap();
     let mut replacement = edit.model().unwrap().to_owned();
     replacement.definition.tables[0].id.push_str("-replacement");
@@ -238,7 +238,7 @@ fn native_model_removal_retains_connections_and_restores_exact_source() {
             let patch = commit.patch().clone();
             let mut output = Vec::new();
             package.write_to(&mut output).unwrap();
-            let mut reopened = Package::from_bytes(output).unwrap().into_plain_opc();
+            let mut reopened = Package::from_bytes(&output).unwrap().into_plain_opc();
             assert!(
                 reopened
                     .get_part(&PackURI::new("/xl/model/item.data").unwrap())
@@ -337,14 +337,14 @@ fn native_model_removal_preserves_connections_processing_instructions_and_tokens
         .without_relationship("rId6", before_relationships.bytes().len())
         .unwrap();
 
-    let mut package = Package::from_bytes(source.clone()).unwrap();
+    let mut package = Package::from_bytes(&source).unwrap();
     let mut edit = package.edit_data_model().unwrap();
     assert!(edit.remove().unwrap());
     let patch = edit.commit().unwrap().patch().clone();
 
     let mut output = Vec::new();
     package.write_to(&mut output).unwrap();
-    let mut reopened = Package::from_bytes(output).unwrap().into_plain_opc();
+    let mut reopened = Package::from_bytes(&output).unwrap().into_plain_opc();
     let connections = reopened.get_part(&connections_name).unwrap().blob();
     assert_eq!(connections, expected_connections.as_bytes());
     assert!(
@@ -425,13 +425,13 @@ fn native_removal_honors_auto_delete_and_addin_retention_with_exact_inverse() {
             )
         });
         let original = OpcPackage::from_vec(source.clone()).unwrap();
-        let mut package = Package::from_bytes(source).unwrap();
+        let mut package = Package::from_bytes(&source).unwrap();
         let mut edit = package.edit_data_model().unwrap();
         edit.remove().unwrap();
         let patch = edit.commit().unwrap().patch().clone();
         let mut output = Vec::new();
         package.write_to(&mut output).unwrap();
-        let mut reopened = Package::from_bytes(output).unwrap().into_plain_opc();
+        let mut reopened = Package::from_bytes(&output).unwrap().into_plain_opc();
         let connections = litchi_xlsx::connections::Connections::parse(
             reopened
                 .get_part(&PackURI::new("/xl/connections.xml").unwrap())
@@ -649,7 +649,7 @@ fn check_native_model_descriptor_round_trip(raw: OpcPackage) {
             .unwrap(),
         relationship_xml
     );
-    let reopened = Package::from_bytes(output).unwrap();
+    let reopened = Package::from_bytes(&output).unwrap();
     assert_eq!(
         reopened
             .data_model()
@@ -1144,7 +1144,7 @@ fn connections_owner_inverse_rejects_uri_reuse_even_with_unchanged_manifest() {
             .unwrap();
     }
     let source = writer.finish_to_bytes().unwrap();
-    let mut package = Package::from_bytes(source).unwrap();
+    let mut package = Package::from_bytes(&source).unwrap();
     let mut edit = package.edit_data_model().unwrap();
     edit.remove().unwrap();
     let inverse = edit.commit().unwrap().patch().inverse();
@@ -1178,7 +1178,7 @@ fn connections_owner_inverse_rejects_uri_reuse_even_with_unchanged_manifest() {
 #[test]
 fn connections_owner_inverse_rejects_new_incoming_edges_to_absent_uri() {
     let source = all_auto_delete_connections_source();
-    let mut package = Package::from_bytes(source).unwrap();
+    let mut package = Package::from_bytes(&source).unwrap();
     let mut edit = package.edit_data_model().unwrap();
     edit.remove().unwrap();
     let inverse = edit.commit().unwrap().patch().inverse();
@@ -1238,7 +1238,7 @@ fn final_connections_owner_resolves_case_variant_owning_target() {
     let source = source_with_xml_change(&source, "xl/_rels/workbook.xml.rels", |xml| {
         xml.replace("Target=\"connections.xml\"", "Target=\"CONNECTIONS.XML\"")
     });
-    let mut package = Package::from_bytes(source.clone()).unwrap();
+    let mut package = Package::from_bytes(&source).unwrap();
     let mut edit = package.edit_data_model().unwrap();
     edit.remove().unwrap();
     let patch = edit.commit().unwrap().patch().clone();
@@ -1294,7 +1294,7 @@ fn native_model_workbook_edge_resolves_case_equivalent_target() {
     let source = native_source_with_xml_change("xl/_rels/workbook.xml.rels", |xml| {
         xml.replace("Target=\"model/item.data\"", "Target=\"model/ITEM.DATA\"")
     });
-    let mut package = Package::from_bytes(source.clone()).unwrap();
+    let mut package = Package::from_bytes(&source).unwrap();
     assert!(package.data_model().unwrap().model().is_some());
     let mut edit = package.edit_data_model().unwrap();
     edit.remove().unwrap();

@@ -671,7 +671,7 @@ mod legacy_tests {
             PivotAxis, PivotDataField, PivotFieldRole, PivotTable, PivotValueFunction,
         };
 
-        let mut workbook = crate::Workbook::create().unwrap();
+        let mut workbook = crate::Package::new().unwrap();
         {
             let worksheet = workbook.worksheet_mut(0).unwrap();
             worksheet.set_cell_value(1, 1, "Region");
@@ -742,7 +742,7 @@ mod legacy_tests {
         let path = temp_xlsx_path("round-trip");
         workbook.save(&path).unwrap();
 
-        let reopened = Workbook::open(&path).unwrap();
+        let reopened = Package::open(&path).unwrap();
         std::fs::remove_file(&path).ok();
         // The authored pivot table survives the round trip.
         let tables = reopened.pivot_tables().unwrap();
@@ -827,7 +827,7 @@ mod legacy_tests {
         let path = temp_xlsx_path("pivot-chartsheet");
         workbook.save(&path).unwrap();
 
-        let reopened = Workbook::open(&path).unwrap();
+        let reopened = Package::open(&path).unwrap();
         std::fs::remove_file(&path).ok();
         let sheets = load(reopened.package()).unwrap();
         assert_eq!(sheets.len(), 1);

@@ -3338,7 +3338,7 @@ impl Snapshot {
 
 /// A clone-staged transaction over table-owned Survey parts.
 pub struct Transaction<'a> {
-    target: &'a mut OpcPackage,
+    target: crate::package::Target<'a>,
     before: Snapshot,
     draft: Vec<Part>,
     limits: Limits,
@@ -3352,7 +3352,15 @@ impl<'a> Transaction<'a> {
 
     /// Start a transaction using an explicit Survey resource policy.
     pub fn with_limits(target: &'a mut OpcPackage, limits: &Limits) -> Result<Self> {
-        let before = Snapshot::load_with_limits(target, limits)?;
+        Self::start(target.into(), limits)
+    }
+
+    pub(crate) fn for_package(package: &'a mut crate::Package, limits: &Limits) -> Result<Self> {
+        Self::start(crate::package::Target::Package(package), limits)
+    }
+
+    fn start(target: crate::package::Target<'a>, limits: &Limits) -> Result<Self> {
+        let before = Snapshot::load_with_limits(&target, limits)?;
         Ok(Self {
             target,
             draft: before.entries.to_vec(),
@@ -3452,7 +3460,7 @@ impl<'a> Transaction<'a> {
             return Err(invalid("survey IDs must be unique within a workbook"));
         }
         let relationship_id = allocate_relationship_id(table, &self.draft, &table_part_name);
-        let part_name = allocate_part_name(self.target, &self.draft)?;
+        let part_name = allocate_part_name(&self.target, &self.draft)?;
         let relationship_target = part_name.relative_ref(table_part_name.base_uri());
         self.draft.push(Part {
             survey: Arc::new(survey),
@@ -3482,7 +3490,7 @@ impl<'a> Transaction<'a> {
     /// authored. This keeps ordinary authoring independent of physical table
     /// part URIs and numeric column UIDs.
     pub fn insert_for_table(&mut self, table_name: &str, mut survey: Survey) -> Result<usize> {
-        let table_part_name = find_table_part(self.target, table_name)?;
+        let table_part_name = find_table_part(&self.target, table_name)?;
         let table = crate::table::parse_table_xml(self.target.get_part(&table_part_name)?.blob())?
             .ok_or_else(|| invalid("Survey owner table is not a supported table part"))?;
         for question in survey.questions_mut().values_mut() {
@@ -3511,7 +3519,7 @@ impl<'a> Transaction<'a> {
     }
 
     /// Validate and atomically publish the staged Survey catalog.
-    pub fn commit(self) -> Result<Commit> {
+    pub fn commit(mut self) -> Result<Commit> {
         if !self.is_changed() {
             let patch = Patch::new(self.before.clone(), self.before.clone());
             return Ok(Commit::new(self.before, patch, false));
@@ -3519,7 +3527,7 @@ impl<'a> Transaction<'a> {
         if self.target.is_signed() || self.target.requires_signature_edit_policy() {
             return Err(Error::Signed);
         }
-        let current = Snapshot::load_with_limits(self.target, &self.limits)?;
+        let current = Snapshot::load_with_limits(&self.target, &self.limits)?;
         if !current.same_source(&self.before) {
             return Err(Error::PatchConflict {
                 part: "Survey catalog".into(),
@@ -3543,7 +3551,7 @@ impl<'a> Transaction<'a> {
             return Err(invalid("Survey publication changed the staged semantics"));
         }
         let patch = Patch::new(self.before, snapshot.clone());
-        *self.target = candidate;
+        self.target.publish(candidate)?;
         Ok(Commit::new(snapshot, patch, true))
     }
 
@@ -5435,12 +5443,14 @@ mod tests {
             )
             .expect("survey relationship");
 
-        let workbook = crate::Workbook::from_package(package).expect("workbook");
-        assert_eq!(workbook.surveys().expect("surveys").len(), 1);
+        let workbook = crate::Package::from_opc(package).expect("workbook");
+        assert_eq!(workbook.workbook_ref().surveys().expect("surveys").len(), 1);
         let bytes = workbook.to_bytes().expect("save");
-        let reopened = crate::Workbook::from_bytes(bytes).expect("reopen");
+        let reopened = crate::Package::from_bytes(&bytes).expect("reopen");
         assert_eq!(
-            reopened.surveys().expect("surveys")[0].survey().id(),
+            reopened.workbook_ref().surveys().expect("surveys")[0]
+                .survey()
+                .id(),
             Id::new(7)
         );
     }

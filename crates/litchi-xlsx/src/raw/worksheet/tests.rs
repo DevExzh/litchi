@@ -2976,7 +2976,7 @@ mod streaming_0365_range_tests {
 
     #[test]
     fn dense_wide_generated_worksheet_uses_plain_path_and_matches_authoritative_scan() {
-        let workbook = crate::Workbook::new().expect("dense-wide workbook");
+        let workbook = crate::Package::new().expect("dense-wide workbook");
         let mut edit = workbook.edit().expect("dense-wide edit");
         {
             let mut sheet = edit
@@ -3002,7 +3002,7 @@ mod streaming_0365_range_tests {
                 }
             }
         }
-        let committed = edit.commit().expect("dense-wide commit").workbook().clone();
+        let committed = edit.commit().expect("dense-wide commit").package().clone();
         let archive = committed
             .to_bytes()
             .expect("dense-wide package serialization");
@@ -4050,7 +4050,7 @@ mod streaming_0366_general_reference_tests {
         // character reference after it is no longer seen by this stream. The
         // materialized parser — the reader that owns this payload's mandatory
         // validation — accepts the same bytes, and accepted them before this
-        // change too, so `litchi_xlsx::Workbook::open` already returned a value
+        // change too, so `litchi_xlsx::Package::open` already returned a value
         // for this worksheet. The change converges the source-backed read onto
         // that answer instead of keeping a refusal only this path raised; the
         // witness is recorded in change 0658.

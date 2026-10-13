@@ -41,7 +41,7 @@ fn workloads() -> Vec<Workload> {
 }
 
 fn native_set(
-    base: &litchi_xlsx::Workbook,
+    base: &litchi_xlsx::Package,
     addresses: &[String],
 ) -> Result<litchi_xlsx::workbook::Commit> {
     let mut edit = base.edit()?;
@@ -56,12 +56,12 @@ fn native_set(
     Ok(edit.commit()?)
 }
 
-fn promote_source(bytes: &[u8]) -> Result<litchi_xlsx::Workbook> {
+fn promote_source(bytes: &[u8]) -> Result<litchi_xlsx::Package> {
     let source = litchi_xlsx::SourceBackedWorkbook::from_reader(Cursor::new(bytes.to_vec()))?;
     let package = source
         .source_backed_package()
         .to_opc_package_preserving_source()?;
-    Ok(litchi_xlsx::Package::from_opc(package)?.into_workbook()?)
+    Ok(litchi_xlsx::Package::from_opc(package)?)
 }
 
 fn verify_unified(
@@ -104,22 +104,22 @@ fn median(values: &[u128]) -> u128 {
 }
 
 fn measure(
-    native: &litchi_xlsx::Workbook,
+    native: &litchi_xlsx::Package,
     unified: &litchi_ops::File,
     rounds: usize,
 ) -> Result<Vec<serde_json::Value>> {
     let mut results = Vec::new();
     for workload in workloads() {
         let native_warm = native_set(native, &workload.addresses)?;
-        if native_warm.patch().len() != workload.count {
+        if native_warm.patch().operation_count() != workload.count {
             return Err(format!(
                 "native patch accounting mismatch for {} cells: {} changes",
                 workload.count,
-                native_warm.patch().len(),
+                native_warm.patch().operation_count(),
             )
             .into());
         }
-        let expected = native_warm.workbook().to_bytes()?;
+        let expected = native_warm.package().to_bytes()?;
         let unified_warm = unified.batch(workload.commands.iter().cloned(), BatchMode::Atomic)?;
         verify_unified(&unified_warm, &workload, &expected)?;
         drop((native_warm, unified_warm));
@@ -181,7 +181,7 @@ fn main() -> Result<()> {
         return Err("at least three ABBA rounds required".into());
     }
 
-    let native_blank = litchi_xlsx::Workbook::create()?;
+    let native_blank = litchi_xlsx::Package::new()?;
     let corpus = native_blank.to_bytes()?;
     let corpus_sha256 = Sha256::digest(&corpus)
         .iter()
@@ -192,7 +192,7 @@ fn main() -> Result<()> {
         corpus.clone(),
         &litchi_ops::OpenOptions::new().source_mode(litchi_ops::SourceMode::Eager),
     )?;
-    let eager_native = litchi_xlsx::Workbook::from_bytes(corpus.clone())?;
+    let eager_native = litchi_xlsx::Package::from_bytes(&corpus)?;
     let eager_results = measure(&eager_native, &eager_unified, rounds)?;
 
     let source_unified = litchi_ops::open_bytes(corpus.clone())?;
@@ -208,7 +208,7 @@ fn main() -> Result<()> {
             "schema": 1,
             "performance_claim": "scoped timing evidence only; full acceptance pending",
             "corpus": {
-                "generator": "litchi_xlsx::Workbook::create",
+                "generator": "litchi_xlsx::Package::create",
                 "bytes": corpus.len(),
                 "sha256": corpus_sha256,
             },

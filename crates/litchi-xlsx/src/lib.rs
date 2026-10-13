@@ -1,7 +1,9 @@
 //! Typed Excel Open XML documents.
 //!
-//! The ordinary API exposes immutable, cheap-to-share workbook and sheet
-//! handles. Package relationships and physical identifiers remain in [`raw`].
+//! [`Package`] is the immutable, cheap-to-share owner of every state verb:
+//! open, create, edit, apply and save. [`Package::workbook`] returns the owned,
+//! read-only [`Workbook`] projection with its sheet handles. Package
+//! relationships and physical identifiers remain in [`raw`].
 
 #![forbid(unsafe_code)]
 // quick-xml's checked attribute iteration is quadratic on hostile tags; read
@@ -100,6 +102,7 @@ pub mod merge;
 pub mod metadata;
 pub mod named_sheet_view;
 pub mod ole_objects;
+mod open_options;
 mod outline;
 pub mod outline_properties;
 pub mod package;
@@ -256,6 +259,7 @@ pub use ole_objects::{
     OleObjectRelationshipKind, OleObjectResource, OleObjectTarget, OleObjectUpdate, OleObjects,
     load_ole_objects, parse_ole_objects, store_ole_objects, write_ole_objects,
 };
+pub use open_options::OpenOptions;
 pub use outline::{Outline, OutlineAt};
 pub use outline_properties::{OutlineProperties, parse_outline_properties};
 pub use package::Package;
@@ -274,11 +278,11 @@ pub use pivot::{
     PivotCellAddress, PivotCellType, PivotCellValueEdit, PivotRowView,
     PivotServerFormatAttributeEdit, PivotServerFormatsCommit, PivotServerFormatsPatch,
     PivotServerFormatsSnapshot, PivotServerFormatsTransaction, PivotTableDataCommit,
-    PivotTableDataDiagnostic, PivotTableDataEdit, PivotTableDataLimits, PivotTableDataPatch,
-    PivotTableDataSnapshot, PivotTableDataTransaction, PivotTableDataView,
-    PivotTableDataWorkbookCommit, PivotTableDataWorkbookPatch, PivotTableSelector,
-    PivotTableServerFormats, PivotTableServerFormatsEdit, PivotTableServerFormatsWorkbookCommit,
-    PivotTableServerFormatsWorkbookPatch, PivotTableView, PivotValueAttributeEdit,
+    PivotTableDataDiagnostic, PivotTableDataEdit, PivotTableDataLimits,
+    PivotTableDataPackageCommit, PivotTableDataPackagePatch, PivotTableDataPatch,
+    PivotTableDataSnapshot, PivotTableDataTransaction, PivotTableDataView, PivotTableSelector,
+    PivotTableServerFormats, PivotTableServerFormatsEdit, PivotTableServerFormatsPackageCommit,
+    PivotTableServerFormatsPackagePatch, PivotTableView, PivotValueAttributeEdit,
     PivotValueCellExtraEdit, PivotValueCellExtraView, PivotValueCellView, ServerFormat,
     ServerFormatEdit, apply_pivot_server_formats_patch, edit_pivot_server_formats,
     edit_pivot_table_data, edit_pivot_table_data_with_limits, load_pivot_server_formats,

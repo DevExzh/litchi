@@ -198,24 +198,25 @@ fn readback_docx(input: &Path) -> Result<()> {
 #[cfg(feature = "xlsx")]
 fn generate_xlsx(output: &Path) -> Result<()> {
     let source = fixture("test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx");
-    let workbook = litchi_xlsx::Workbook::open(source)?;
+    let package = litchi_xlsx::Package::open(source)?;
+    let workbook = package.workbook();
     let sheet = workbook
         .sheets()
         .next()
         .ok_or_else(|| missing("XLSX has no worksheet"))?;
     let name = sheet.name().to_string();
-    let mut edit = workbook.edit()?;
+    let mut edit = package.edit()?;
     edit.sheet(name.as_str())?
         .ok_or_else(|| missing("XLSX first sheet is not editable"))?
         .set("A1", SENTINEL)?;
-    let changed = edit.commit()?.into_workbook();
+    let changed = edit.commit()?.into_package();
     changed.save_plain(output)?;
     readback_xlsx(output)
 }
 
 #[cfg(feature = "xlsx")]
 fn readback_xlsx(input: &Path) -> Result<()> {
-    let workbook = litchi_xlsx::Workbook::open(input)?;
+    let workbook = litchi_xlsx::Package::open(input)?.workbook();
     let sheet = workbook
         .sheets()
         .next()

@@ -103,7 +103,7 @@ fn publish_source(
 /// Publish an owning workbook. Cloning occurs before entering the helper so
 /// the immutable unified handle is unaffected by any leaf bookkeeping.
 fn publish_owned(
-    workbook: &litchi_xlsx::Workbook,
+    workbook: &litchi_xlsx::Package,
     path: &Path,
     options: &SaveOptions,
     context: Option<&ExecutionContext>,
@@ -141,7 +141,7 @@ fn publish_owned(
 
 #[cfg(feature = "encryption")]
 fn publish_reencrypted(
-    workbook: &litchi_xlsx::Workbook,
+    workbook: &litchi_xlsx::Package,
     path: &Path,
     options: &SaveOptions,
     context: Option<&ExecutionContext>,
@@ -267,20 +267,17 @@ mod tests {
 
     #[test]
     fn write_to_uses_the_owned_leaf_writer() {
-        let workbook = litchi_xlsx::Workbook::create().expect("create workbook");
+        let workbook = litchi_xlsx::Package::new().expect("create workbook");
         let handle = Xlsx::from_workbook(workbook, &OpenOptions::new()).expect("adopt workbook");
         let mut output = Vec::new();
         handle.write_to(&mut output).expect("stream workbook");
-        let reopened = litchi_xlsx::Package::from_bytes(output)
-            .expect("parse output")
-            .into_workbook()
-            .expect("materialize output");
-        assert_eq!(reopened.len(), 1);
+        let reopened = litchi_xlsx::Package::from_bytes(&output).expect("parse output");
+        assert_eq!(reopened.workbook().len(), 1);
     }
 
     #[test]
     fn source_write_to_copies_the_exact_retained_artifact() {
-        let source = litchi_xlsx::Workbook::create()
+        let source = litchi_xlsx::Package::new()
             .expect("create workbook")
             .to_bytes()
             .expect("serialize source");

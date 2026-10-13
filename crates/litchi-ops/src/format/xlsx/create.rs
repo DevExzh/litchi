@@ -21,7 +21,7 @@ pub(crate) fn create(options: &CreateOptions) -> Result<Xlsx> {
             "use Conformance::Transitional; Strict authoring is not integrated",
         ));
     }
-    let workbook = litchi_xlsx::Workbook::create().map_err(Error::from)?;
+    let workbook = litchi_xlsx::Package::new().map_err(Error::from)?;
     match options.metadata_value() {
         Some(metadata) => super::metadata::create(workbook, metadata),
         None => Xlsx::from_workbook(workbook, &OpenOptions::new()),

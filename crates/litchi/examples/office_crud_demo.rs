@@ -10,7 +10,7 @@
 
 use litchi::docx::Package as DocxPackage;
 use litchi::pptx::Package as PptxPackage;
-use litchi::xlsx::{Formula, Workbook};
+use litchi::xlsx::{Formula, Package};
 use litchi_core::Metadata;
 
 type ExampleResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
@@ -132,7 +132,7 @@ fn demo_xlsx_operations() -> ExampleResult<()> {
 
     // CREATE: Create a new workbook
     println!("Creating new Excel workbook...");
-    let wb = Workbook::create()?;
+    let wb = Package::new()?;
     let mut edit = wb.edit()?;
 
     // XLSX authoring is an atomic semantic transaction over an immutable
@@ -169,7 +169,7 @@ fn demo_xlsx_operations() -> ExampleResult<()> {
             .set("B2", Formula::new("AVERAGE(Sheet1!C2:C5)")?)?;
     }
 
-    let wb = edit.commit()?.into_workbook();
+    let wb = edit.commit()?.into_package();
 
     // Save
     wb.save("demo_employees.xlsx")?;
@@ -177,15 +177,16 @@ fn demo_xlsx_operations() -> ExampleResult<()> {
 
     // READ: Open and read the workbook
     println!("Reading Excel workbook...");
-    let wb = Workbook::open("demo_employees.xlsx")?;
+    let wb = Package::open("demo_employees.xlsx")?;
 
-    println!("  Worksheets: {}", wb.len());
-    for sheet in wb.sheets() {
+    println!("  Worksheets: {}", wb.workbook_ref().len());
+    for sheet in wb.workbook_ref().sheets() {
         println!("    - {}", sheet.name());
     }
 
     // Read data from first worksheet
     let ws = wb
+        .workbook_ref()
         .sheet(0)?
         .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "first worksheet"))?;
     println!(
@@ -200,7 +201,7 @@ fn demo_xlsx_operations() -> ExampleResult<()> {
 
     // UPDATE: Modify existing workbook
     println!("Updating Excel workbook...");
-    let wb = Workbook::open("demo_employees.xlsx")?;
+    let wb = Package::open("demo_employees.xlsx")?;
     let mut edit = wb.edit()?;
     let mut sheet = edit
         .sheet("Sheet1")?
@@ -209,7 +210,7 @@ fn demo_xlsx_operations() -> ExampleResult<()> {
         .set("A6", "Eve Davis")?
         .set("B6", "HR")?
         .set("C6", 65000_i32)?;
-    let wb = edit.commit()?.into_workbook();
+    let wb = edit.commit()?.into_package();
     wb.save("demo_employees_updated.xlsx")?;
     println!("✓ Updated: demo_employees_updated.xlsx");
 

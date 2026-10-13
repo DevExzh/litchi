@@ -343,7 +343,7 @@ fn synthetic_fixture(
     extension: bool,
 ) -> Fixture {
     assert_eq!(storage_ids.len(), payloads.len());
-    let mut package = Package::create()
+    let mut package = Package::new()
         .expect("minimal XLSX package creates")
         .into_plain_opc();
     let mut properties = BTreeMap::new();
@@ -399,7 +399,7 @@ fn synthetic_fixture(
         );
     }
     let bytes = physical_source(&package, &relationship_overrides);
-    let package = Package::from_bytes(bytes).expect("physical XLSX fixture reopens");
+    let package = Package::from_bytes(&bytes).expect("physical XLSX fixture reopens");
     Fixture {
         package,
         properties,
@@ -421,7 +421,7 @@ fn heavy_workbook_relationships(storage_count: usize) -> Vec<u8> {
 }
 
 fn relationship_heavy_fixture() -> Fixture {
-    let mut package = Package::create()
+    let mut package = Package::new()
         .expect("minimal XLSX package creates")
         .into_plain_opc();
     let property_uri = "/xl/customData/props1.xml";
@@ -450,7 +450,7 @@ fn relationship_heavy_fixture() -> Fixture {
     relationship_overrides.insert(WORKBOOK_URI.to_owned(), heavy_workbook_relationships(1));
     let bytes = physical_source(&package, &relationship_overrides);
     Fixture {
-        package: Package::from_bytes(bytes).expect("relationship fixture reopens"),
+        package: Package::from_bytes(&bytes).expect("relationship fixture reopens"),
         properties: BTreeMap::from([(property_uri.to_owned(), property_bytes)]),
         connections: None,
     }
@@ -465,7 +465,7 @@ fn content_types_self_closed_heavy_fixture() -> Fixture {
 }
 
 fn content_types_heavy_fixture_with_overrides(expanded_overrides: bool) -> Fixture {
-    let mut package = Package::create()
+    let mut package = Package::new()
         .expect("minimal XLSX package creates")
         .into_plain_opc();
     let property_uri = "/xl/customData/props1.xml";
@@ -492,7 +492,7 @@ fn content_types_heavy_fixture_with_overrides(expanded_overrides: bool) -> Fixtu
     let content_types = generated_content_types(&package, expanded_overrides, 8);
     let bytes = physical_source_with_content_types(&package, &BTreeMap::new(), Some(content_types));
     Fixture {
-        package: Package::from_bytes(bytes).expect("content-types fixture reopens"),
+        package: Package::from_bytes(&bytes).expect("content-types fixture reopens"),
         properties: BTreeMap::from([(property_uri.to_owned(), property_bytes)]),
         connections: None,
     }
@@ -545,7 +545,7 @@ fn query_table_fixture_with_connections(
     query_table: Vec<u8>,
     connection_bytes: Vec<u8>,
 ) -> Fixture {
-    let mut package = Package::create()
+    let mut package = Package::new()
         .expect("minimal XLSX package creates")
         .into_plain_opc();
     let property_uri = "/xl/customData/props1.xml";
@@ -588,7 +588,7 @@ fn query_table_fixture_with_connections(
     );
     let bytes = physical_source(&package, &BTreeMap::new());
     Fixture {
-        package: Package::from_bytes(bytes).expect("query-table fixture reopens"),
+        package: Package::from_bytes(&bytes).expect("query-table fixture reopens"),
         properties: BTreeMap::from([(property_uri.to_owned(), property_bytes)]),
         connections: Some(connection_bytes),
     }
@@ -610,7 +610,7 @@ fn signed_fixture() -> Fixture {
         false,
     );
     Fixture {
-        package: Package::from_bytes(physical_source(&package, &BTreeMap::new()))
+        package: Package::from_bytes(&physical_source(&package, &BTreeMap::new()))
             .expect("signed fixture reopens"),
         properties: base.properties,
         connections: base.connections,
@@ -634,7 +634,7 @@ fn foreign_inbound_fixture() -> Fixture {
         "rIdForeign",
     );
     Fixture {
-        package: Package::from_bytes(physical_source(&package, &BTreeMap::new()))
+        package: Package::from_bytes(&physical_source(&package, &BTreeMap::new()))
             .expect("foreign inbound fixture reopens"),
         properties: base.properties,
         connections: base.connections,
@@ -684,7 +684,7 @@ fn single_fixture_with_connection_relationship_member(explicit: bool) -> Fixture
         overrides.insert(CONNECTIONS_URI.to_owned(), empty_relationships());
     }
     Fixture {
-        package: Package::from_bytes(physical_source(&package, &overrides))
+        package: Package::from_bytes(&physical_source(&package, &overrides))
             .expect("connection relationship fixture reopens"),
         properties: base.properties,
         connections: base.connections,
@@ -710,7 +710,7 @@ fn fixture_with_connections_xml(xml: Vec<u8>) -> Fixture {
         .expect("connections part exists")
         .set_blob(xml.clone());
     Fixture {
-        package: Package::from_bytes(physical_source(&package, &BTreeMap::new()))
+        package: Package::from_bytes(&physical_source(&package, &BTreeMap::new()))
             .expect("custom namespace fixture reopens"),
         properties: base.properties,
         connections: Some(xml),
@@ -1283,7 +1283,7 @@ fn relationship_xml_cap_includes_inserted_edges_and_removal_inverse_restores_sou
             .is_err()
     );
     assert_eq!(package_bytes(&under_removal_package), before_under_removal);
-    Package::from_bytes(before_under_removal.clone())
+    Package::from_bytes(&before_under_removal)
         .expect("one-under removal rejection leaves a reopenable source");
 
     let before_remove = package_bytes(&two.package);
@@ -1439,7 +1439,7 @@ fn retained_xml_can_shrink_below_temporary_cap_and_inverse_restores_source() {
         expected_properties
     );
 
-    let mut reopened = Package::from_bytes(package_bytes(&changed)).expect("changed reopens");
+    let mut reopened = Package::from_bytes(&package_bytes(&changed)).expect("changed reopens");
     reopened
         .apply_custom_data_patch(&commit.patch().inverse())
         .expect("inverse restores retained source above temporary cap");
@@ -1475,7 +1475,7 @@ fn retained_properties_xml_can_shrink_below_temporary_cap_and_inverse_restores_s
         expected_properties
     );
 
-    let mut reopened = Package::from_bytes(package_bytes(&changed)).expect("changed reopens");
+    let mut reopened = Package::from_bytes(&package_bytes(&changed)).expect("changed reopens");
     reopened
         .apply_custom_data_patch(&commit.patch().inverse())
         .expect("inverse restores retained Properties source above temporary cap");
@@ -1517,7 +1517,7 @@ fn retained_content_types_manifest_can_shrink_below_temporary_cap_and_inverse_re
         .len();
     assert!(candidate_content_types < temporary);
 
-    let mut reopened = Package::from_bytes(package_bytes(&changed)).expect("changed reopens");
+    let mut reopened = Package::from_bytes(&package_bytes(&changed)).expect("changed reopens");
     reopened
         .apply_custom_data_patch(&commit.patch().inverse())
         .expect("inverse restores retained content-types source above temporary cap");
@@ -1703,7 +1703,7 @@ fn retained_limits_survive_public_patch_inverse_after_reopen() {
     assert_eq!(commit.snapshot().limits(), profile);
 
     let mut reopened =
-        Package::from_bytes(package_bytes(&changed)).expect("changed package reopens");
+        Package::from_bytes(&package_bytes(&changed)).expect("changed package reopens");
     reopened
         .apply_custom_data_patch(&commit.patch().inverse())
         .expect("inverse patch applies with retained profile");
@@ -1752,7 +1752,7 @@ fn source_bound_noop_and_inverse_preserve_lexical_zip_members() {
             .any(|window| window == b"urn:synthetic-opaque")
     );
 
-    let mut reopened = Package::from_bytes(changed_bytes).expect("changed package reopens");
+    let mut reopened = Package::from_bytes(&changed_bytes).expect("changed package reopens");
     reopened
         .apply_custom_data_patch(&commit.patch().inverse())
         .expect("inverse applies after reopen");
@@ -1801,14 +1801,14 @@ fn connection_owner_relationship_presence_is_source_bound_and_inverse_exact() {
         absent_before
     );
 
-    let mut reopened = Package::from_bytes(package_bytes(&changed)).expect("changed reopens");
+    let mut reopened = Package::from_bytes(&package_bytes(&changed)).expect("changed reopens");
     reopened
         .apply_custom_data_patch(&commit.patch().inverse())
         .expect("inverse applies to the changed source");
     assert_eq!(archive_members(&package_bytes(&reopened)), absent_before);
 
     let mut explicit_reopened =
-        Package::from_bytes(package_bytes(&explicit_changed)).expect("explicit change reopens");
+        Package::from_bytes(&package_bytes(&explicit_changed)).expect("explicit change reopens");
     explicit_reopened
         .apply_custom_data_patch(&explicit_commit.patch().inverse())
         .expect("explicit-owner inverse restores the empty relationship member");

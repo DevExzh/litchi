@@ -16,7 +16,7 @@ const RANGE_D1_E2: &str = "/sheet[1]/D1:E2";
 const RANGE_F1_G2: &str = "/sheet[1]/F1:G2";
 
 fn fixture() -> Vec<u8> {
-    let workbook = litchi_xlsx::Workbook::create().expect("create native workbook");
+    let workbook = litchi_xlsx::Package::new().expect("create native workbook");
     let mut edit = workbook.edit().expect("start native workbook edit");
     let mut sheet = edit
         .sheet("Sheet1")
@@ -32,13 +32,13 @@ fn fixture() -> Vec<u8> {
         .expect("seed fourth anchor");
     edit.commit()
         .expect("commit merge fixture")
-        .into_workbook()
+        .into_package()
         .to_bytes()
         .expect("serialize merge fixture")
 }
 
 fn follower_fixture() -> Vec<u8> {
-    let workbook = litchi_xlsx::Workbook::from_bytes(fixture()).expect("open merge fixture");
+    let workbook = litchi_xlsx::Package::from_bytes(&fixture()).expect("open merge fixture");
     let mut edit = workbook.edit().expect("start follower edit");
     edit.sheet("Sheet1")
         .expect("find Sheet1")
@@ -47,13 +47,13 @@ fn follower_fixture() -> Vec<u8> {
         .expect("seed follower content");
     edit.commit()
         .expect("commit follower fixture")
-        .into_workbook()
+        .into_package()
         .to_bytes()
         .expect("serialize follower fixture")
 }
 
 fn sparse_fixture() -> Vec<u8> {
-    let workbook = litchi_xlsx::Workbook::create().expect("create sparse workbook");
+    let workbook = litchi_xlsx::Package::new().expect("create sparse workbook");
     let mut edit = workbook.edit().expect("start sparse edit");
     edit.sheet("Sheet1")
         .expect("find Sheet1")
@@ -62,13 +62,13 @@ fn sparse_fixture() -> Vec<u8> {
         .expect("seed sparse anchor");
     edit.commit()
         .expect("commit sparse fixture")
-        .into_workbook()
+        .into_package()
         .to_bytes()
         .expect("serialize sparse fixture")
 }
 
 fn two_sheet_fixture() -> Vec<u8> {
-    let workbook = litchi_xlsx::Workbook::create().expect("create two-sheet workbook");
+    let workbook = litchi_xlsx::Package::new().expect("create two-sheet workbook");
     let mut edit = workbook.edit().expect("start two-sheet edit");
     {
         let mut sheet = edit
@@ -91,7 +91,7 @@ fn two_sheet_fixture() -> Vec<u8> {
     }
     edit.commit()
         .expect("commit two-sheet fixture")
-        .into_workbook()
+        .into_package()
         .to_bytes()
         .expect("serialize two-sheet fixture")
 }

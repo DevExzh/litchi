@@ -5,7 +5,7 @@
 //! are published through `Workbook::edit`.
 
 use litchi::sheet::view::{Mode, Scale, View, Zoom};
-use litchi::xlsx::{Number, Workbook};
+use litchi::xlsx::{Number, Package};
 use std::env;
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -23,7 +23,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     };
     let page_breaks = [("row", 21_u32), ("row", 41), ("column", 3)];
 
-    let workbook = Workbook::create()?;
+    let workbook = Package::new()?;
     let mut edit = workbook.edit()?;
     edit.tab(0)?
         .ok_or("default worksheet is missing")?
@@ -68,7 +68,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         sorted.set((row, 2), Number::new(format!("{units}"))?)?;
     }
 
-    let workbook = edit.commit()?.into_workbook();
+    let workbook = edit.commit()?.into_package();
     workbook.save(&output_file)?;
     println!("Saved {output_file}");
     println!("Typed view: {page_view:?}; breaks: {page_breaks:?}");

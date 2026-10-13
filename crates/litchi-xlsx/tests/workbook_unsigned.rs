@@ -28,16 +28,14 @@ fn fixture(name: &str) -> Vec<u8> {
 fn an_unsigned_copy_authorizes_an_edit_and_publishes_no_signature() {
     for name in SIGNED {
         let bytes = fixture(name);
-        let workbook = Package::from_bytes(bytes.clone())
-            .unwrap()
-            .into_workbook()
-            .unwrap();
+        let workbook = Package::from_bytes(&bytes).unwrap();
         assert!(
             matches!(workbook.edit().and_then(Edit::commit), Err(Error::Signed)),
             "{name}: a signed workbook refuses a transaction"
         );
 
-        let unsigned = workbook.unsigned().unwrap();
+        let mut unsigned = workbook.clone();
+        unsigned.unsign().unwrap();
         // The signed snapshot is left as it was.
         assert_eq!(workbook.to_bytes().unwrap(), bytes, "{name}");
 
@@ -47,7 +45,7 @@ fn an_unsigned_copy_authorizes_an_edit_and_publishes_no_signature() {
             .expect("a first worksheet")
             .set("A1", "edited")
             .unwrap();
-        let output = edit.commit().unwrap().workbook().to_bytes().unwrap();
+        let output = edit.commit().unwrap().package().to_bytes().unwrap();
         let reopened = OpcPackage::from_bytes(&output).unwrap();
         assert!(!reopened.is_signed(), "{name}");
         assert!(
@@ -61,9 +59,10 @@ fn an_unsigned_copy_authorizes_an_edit_and_publishes_no_signature() {
 
 #[test]
 fn an_unsigned_workbook_comes_back_as_itself() {
-    let workbook = litchi_xlsx::Workbook::create().unwrap();
-    let unsigned = workbook.unsigned().unwrap();
-    assert_eq!(unsigned.len(), workbook.len());
+    let workbook = Package::new().unwrap();
+    let mut unsigned = workbook.clone();
+    unsigned.unsign().unwrap();
+    assert_eq!(unsigned.workbook_ref().len(), workbook.workbook_ref().len());
     assert_eq!(unsigned.to_bytes().unwrap(), workbook.to_bytes().unwrap());
     let mut edit = unsigned.edit().unwrap();
     edit.sheet(0_usize)

@@ -1,11 +1,11 @@
 //! Document metadata of a workbook: the core, application and custom
 //! property families, edited as one exact and reversible transaction.
 //!
-//! [`Workbook::metadata`] reads the unified [`Metadata`];
-//! [`Workbook::edit_metadata`] starts an [`Edit`] whose [`Edit::commit`]
-//! returns a [`Commit`] holding the new snapshot, the [`Patch`] and the
-//! [`Diagnostics`]. [`Workbook::apply_metadata`] replays a patch onto an
-//! equal snapshot. The source snapshot never changes.
+//! [`Package::metadata`] reads the unified [`Metadata`];
+//! [`Package::edit_metadata`] starts an [`Edit`] whose [`Edit::commit`]
+//! returns a [`Commit`] holding the new package, the [`Patch`] and the
+//! [`Diagnostics`]. [`Package::apply_metadata`] replays a patch onto an
+//! equal package. The source package never changes.
 //!
 //! The shared OOXML engine ([`litchi_ooxml_common::properties`]) routes each
 //! field to the part that stores it and keeps the lexical form of every
@@ -13,20 +13,16 @@
 //! [`Error::Unsupported`]; a changed edit of a signed workbook is refused
 //! with [`Error::Signed`]; an exact no-op keeps every byte.
 //!
-//! This module names the current owner, [`Workbook`]. When the package
-//! becomes the owner of edits (ADR 0034 W2), the entry points move to it
-//! unchanged.
-//!
 //! ```
-//! use litchi_xlsx::Workbook;
+//! use litchi_xlsx::Package;
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! let workbook = Workbook::new()?;
-//! let mut edit = workbook.edit_metadata()?;
+//! let package = Package::new()?;
+//! let mut edit = package.edit_metadata()?;
 //! edit.update(|metadata| metadata.title = Some("Budget".to_owned()))?;
 //! let after = edit.commit()?.into_package();
 //! assert_eq!(after.metadata()?.title.as_deref(), Some("Budget"));
-//! assert_eq!(workbook.metadata()?.title, None);
+//! assert_eq!(package.metadata()?.title, None);
 //! # Ok(())
 //! # }
 //! ```
@@ -37,16 +33,16 @@ use litchi_ooxml_common::properties::{self, Snapshot, app};
 
 pub use litchi_ooxml_common::properties::{Diagnostics, Error, LimitKind, Patch};
 
-use crate::Workbook;
+use crate::Package;
 
 type Result<T> = std::result::Result<T, Error>;
 
-/// A staged metadata edit of one [`Workbook`] snapshot.
+/// A staged metadata edit of one [`Package`].
 ///
 /// Dropping the edit discards it.
 #[derive(Debug)]
 pub struct Edit<'a> {
-    workbook: &'a Workbook,
+    package: &'a Package,
     inner: properties::Edit,
 }
 
@@ -107,9 +103,9 @@ impl Edit<'_> {
     /// workbook.
     pub fn commit(self) -> Result<Commit> {
         let (_, patch, diagnostics) = self.inner.commit()?.into_parts();
-        let workbook = self.workbook.apply_metadata(&patch)?;
+        let package = self.package.apply_metadata(&patch)?;
         Ok(Commit {
-            workbook,
+            package,
             patch,
             diagnostics,
         })
@@ -119,22 +115,22 @@ impl Edit<'_> {
 /// The result of [`Edit::commit`].
 #[derive(Debug)]
 pub struct Commit {
-    workbook: Workbook,
+    package: Package,
     patch: Patch,
     diagnostics: Diagnostics,
 }
 
 impl Commit {
-    /// The snapshot after the edit.
+    /// The package after the edit.
     #[must_use]
-    pub const fn package(&self) -> &Workbook {
-        &self.workbook
+    pub const fn package(&self) -> &Package {
+        &self.package
     }
 
-    /// Consume the commit into the snapshot after the edit.
+    /// Consume the commit into the package after the edit.
     #[must_use]
-    pub fn into_package(self) -> Workbook {
-        self.workbook
+    pub fn into_package(self) -> Package {
+        self.package
     }
 
     /// The exact, reversible patch.
@@ -149,16 +145,16 @@ impl Commit {
         &self.diagnostics
     }
 
-    /// Consume the commit into the snapshot and the patch.
+    /// Consume the commit into the package and the patch.
     #[must_use]
-    pub fn into_parts(self) -> (Workbook, Patch) {
-        (self.workbook, self.patch)
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
     }
 }
 
-impl Workbook {
+impl Package {
     fn metadata_snapshot(&self) -> Result<Snapshot> {
-        Snapshot::read(self.pivot_package(), Host::Excel)
+        Snapshot::read(self.opc(), Host::Excel)
     }
 
     /// The document metadata: the core and application properties.
@@ -186,28 +182,30 @@ impl Workbook {
     /// Returns the strict graph errors of the property families.
     pub fn edit_metadata(&self) -> Result<Edit<'_>> {
         Ok(Edit {
-            workbook: self,
+            package: self,
             inner: self.metadata_snapshot()?.edit(),
         })
     }
 
-    /// Apply a metadata patch to a new snapshot; this one is unchanged.
+    /// Apply a metadata patch to a new package; this one is unchanged.
     ///
-    /// An empty patch returns this snapshot, a signed one included. The new
-    /// snapshot keeps this one's encryption provenance and repair policy.
+    /// An empty patch returns this package, a signed one included. The new
+    /// package keeps this one's encryption provenance and repair policy.
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Conflict`] when this snapshot is not the patch's
+    /// Returns [`Error::Conflict`] when this package is not the patch's
     /// before state and [`Error::Signed`] for a changed patch of a signed
     /// workbook.
     pub fn apply_metadata(&self, patch: &Patch) -> Result<Self> {
         if patch.is_noop() {
             return Ok(self.clone());
         }
-        let mut package = self.pivot_package().clone();
-        patch.apply(&mut package)?;
-        self.adopt_published_package(package)
+        let mut candidate = self.opc().clone();
+        patch.apply(&mut candidate)?;
+        self.workbook_ref()
+            .adopt_published_package(candidate)
+            .map(Self::from_workbook)
             .map_err(|error| Error::Invalid(error.to_string()))
     }
 }
@@ -218,8 +216,8 @@ mod tests {
 
     #[test]
     fn edits_publish_a_new_snapshot_and_replay_exactly() {
-        let workbook = Workbook::new().unwrap();
-        let mut edit = workbook.edit_metadata().unwrap();
+        let package = Package::new().unwrap();
+        let mut edit = package.edit_metadata().unwrap();
         edit.update(|metadata| {
             metadata.author = Some("Ada".to_owned());
             metadata.company = Some("Litchi".to_owned());
@@ -233,22 +231,22 @@ mod tests {
             after.app_props().unwrap().unwrap().company.as_deref(),
             Some("Litchi")
         );
-        assert!(!workbook.same_content(&after).unwrap());
+        assert!(!package.same_content(&after).unwrap());
 
-        let replayed = workbook.apply_metadata(&patch).unwrap();
+        let replayed = package.apply_metadata(&patch).unwrap();
         assert!(replayed.same_content(&after).unwrap());
         let restored = after.apply_metadata(&patch.inverse()).unwrap();
-        assert!(restored.same_content(&workbook).unwrap());
+        assert!(restored.same_content(&package).unwrap());
     }
 
     #[test]
     fn no_op_edits_return_the_same_snapshot() {
-        let workbook = Workbook::new().unwrap();
-        let mut edit = workbook.edit_metadata().unwrap();
-        edit.set(workbook.metadata().unwrap());
+        let package = Package::new().unwrap();
+        let mut edit = package.edit_metadata().unwrap();
+        edit.set(package.metadata().unwrap());
         let commit = edit.commit().unwrap();
         assert!(!commit.diagnostics().changed());
         assert!(commit.patch().is_noop());
-        assert!(commit.package().same_content(&workbook).unwrap());
+        assert!(commit.package().same_content(&package).unwrap());
     }
 }

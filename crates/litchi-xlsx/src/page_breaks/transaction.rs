@@ -8,7 +8,7 @@ use crate::error::{Error, Result, invalid};
 
 /// One isolated page-break transaction over a selected worksheet.
 pub struct Transaction<'a> {
-    target: &'a mut OpcPackage,
+    target: crate::package::Target<'a>,
     before: Snapshot,
     staged: PageBreaks,
 }
@@ -24,7 +24,21 @@ impl<'a> Transaction<'a> {
         target: &'a mut OpcPackage,
         selector: impl Into<Selector<'selector>>,
     ) -> Result<Self> {
-        let before = Snapshot::load(target, selector)?;
+        Self::start(target.into(), selector)
+    }
+
+    pub(crate) fn for_package<'selector>(
+        package: &'a mut crate::Package,
+        selector: impl Into<Selector<'selector>>,
+    ) -> Result<Self> {
+        Self::start(crate::package::Target::Package(package), selector)
+    }
+
+    fn start<'selector>(
+        target: crate::package::Target<'a>,
+        selector: impl Into<Selector<'selector>>,
+    ) -> Result<Self> {
+        let before = Snapshot::load(&target, selector)?;
         let staged = before.page_breaks().clone();
         Ok(Self {
             target,
@@ -115,7 +129,7 @@ impl<'a> Transaction<'a> {
     ///
     /// Returns an error for stale source bytes, signed packages, invalid
     /// staged state, rewrite failures, or semantic readback failures.
-    pub fn commit(self) -> Result<Commit> {
+    pub fn commit(mut self) -> Result<Commit> {
         if !self.is_changed() {
             let patch = Patch::new(self.before.clone(), self.before.clone());
             return Ok(Commit::new(self.before, patch, false));
@@ -123,7 +137,7 @@ impl<'a> Transaction<'a> {
         if self.target.is_signed() {
             return Err(Error::Signed);
         }
-        if !self.before.matches_current_source(self.target) {
+        if !self.before.matches_current_source(&self.target) {
             return Err(Error::PatchConflict {
                 part: self.before.worksheet_part_name().to_string(),
             });
@@ -140,7 +154,7 @@ impl<'a> Transaction<'a> {
             ));
         }
         let patch = Patch::new(self.before, snapshot.clone());
-        *self.target = candidate;
+        self.target.publish(candidate)?;
         Ok(Commit::new(snapshot, patch, true))
     }
 }

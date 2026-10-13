@@ -7,11 +7,11 @@
 use litchi_xlsx::sheet::sparklines::{
     AxisMinMax, Color, DisplayEmptyCellsAs, Group, Item, Type, write_groups_ext,
 };
-use litchi_xlsx::{Number, Workbook};
+use litchi_xlsx::{Number, Package};
 use std::env;
 
 fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let workbook = Workbook::create()?;
+    let workbook = Package::new()?;
     let mut edit = workbook.edit()?;
     edit.tab(0)?
         .ok_or("default worksheet is missing")?
@@ -69,7 +69,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let output = env::args()
         .nth(1)
         .unwrap_or_else(|| "sparklines_output.xlsx".to_string());
-    edit.commit()?.into_workbook().save(&output)?;
+    edit.commit()?.into_package().save(&output)?;
     println!(
         "Wrote {output}; validated sparkline extension ({} bytes)",
         extension_xml.len()

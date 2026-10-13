@@ -295,11 +295,9 @@ fn fixture(signed: bool) -> Vec<u8> {
 }
 
 fn eager_links(bytes: &[u8]) -> Vec<Hyperlink> {
-    let workbook = Package::from_bytes(bytes.to_vec())
-        .unwrap()
-        .into_workbook()
-        .unwrap();
+    let workbook = Package::from_bytes(bytes).unwrap();
     workbook
+        .workbook_ref()
         .sheet("Sheet1")
         .unwrap()
         .unwrap()
@@ -308,8 +306,9 @@ fn eager_links(bytes: &[u8]) -> Vec<Hyperlink> {
 }
 
 fn eager_links_from_opc(package: OpcPackage) -> Vec<Hyperlink> {
-    let workbook = Package::from_opc(package).unwrap().into_workbook().unwrap();
+    let workbook = Package::from_opc(package).unwrap();
     workbook
+        .workbook_ref()
         .sheet("Sheet1")
         .unwrap()
         .unwrap()
@@ -349,10 +348,7 @@ fn changed_commit(editor: &SourceBackedHyperlinkEditor) -> SourceBackedHyperlink
 }
 
 fn eager_changed_links(bytes: &[u8]) -> Vec<Hyperlink> {
-    let workbook = Package::from_bytes(bytes.to_vec())
-        .unwrap()
-        .into_workbook()
-        .unwrap();
+    let workbook = Package::from_bytes(bytes).unwrap();
     let mut edit = workbook.edit().unwrap();
     {
         let mut sheet = edit.sheet("Sheet1").unwrap().unwrap();
@@ -377,8 +373,9 @@ fn eager_changed_links(bytes: &[u8]) -> Vec<Hyperlink> {
                 .is_some()
         );
     }
-    let committed = edit.commit().unwrap().into_workbook();
+    let committed = edit.commit().unwrap().into_package();
     committed
+        .workbook_ref()
         .sheet("Sheet1")
         .unwrap()
         .unwrap()

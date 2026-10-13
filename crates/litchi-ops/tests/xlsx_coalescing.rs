@@ -16,7 +16,7 @@ const C1: &str = "/sheet[1]/C1";
 const D1: &str = "/sheet[1]/D1";
 
 fn fixture() -> Vec<u8> {
-    let workbook = litchi_xlsx::Workbook::create().expect("create native workbook");
+    let workbook = litchi_xlsx::Package::new().expect("create native workbook");
     let mut edit = workbook.edit().expect("start native workbook edit");
     {
         let mut sheet = edit
@@ -35,16 +35,17 @@ fn fixture() -> Vec<u8> {
     }
     edit.commit()
         .expect("commit native fixture")
-        .into_workbook()
+        .into_package()
         .to_bytes()
         .expect("serialize fixture")
 }
 
 fn merged_payload_fixture() -> Vec<u8> {
-    let workbook = litchi_xlsx::Workbook::from_bytes(fixture()).expect("open fixture");
-    let package = litchi_xlsx::Package::from_bytes(workbook.to_bytes().expect("serialize fixture"))
-        .expect("open fixture package")
-        .into_plain_opc();
+    let workbook = litchi_xlsx::Package::from_bytes(&fixture()).expect("open fixture");
+    let package =
+        litchi_xlsx::Package::from_bytes(&workbook.to_bytes().expect("serialize fixture"))
+            .expect("open fixture package")
+            .into_plain_opc();
     let sheet_uri = PackURI::new("/xl/worksheets/sheet1.xml").expect("worksheet URI");
     let sheet = std::str::from_utf8(package.get_part(&sheet_uri).expect("worksheet").blob())
         .expect("worksheet XML");

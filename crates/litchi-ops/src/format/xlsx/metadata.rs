@@ -21,10 +21,10 @@ fn native(error: xlsx::metadata::Error) -> crate::Error {
 
 /// Commit `update` to `workbook`'s metadata.
 pub(super) fn commit(
-    workbook: &xlsx::Workbook,
+    workbook: &xlsx::Package,
     update: impl FnOnce(&mut Metadata),
     custom: Option<&Assignments>,
-) -> Result<(xlsx::Workbook, Metadata, bool)> {
+) -> Result<(xlsx::Package, Metadata, bool)> {
     let mut edit = workbook.edit_metadata().map_err(native)?;
     edit.update(update).map_err(native)?;
     if let Some(assignments) = custom.filter(|assignments| assignments.has_custom()) {
@@ -68,7 +68,7 @@ impl Xlsx {
 
     /// Adopt a metadata revision: [`Self::adopt_workbook`] with the new
     /// metadata.
-    fn adopt_metadata(&self, workbook: xlsx::Workbook, metadata: Metadata) -> Self {
+    fn adopt_metadata(&self, workbook: xlsx::Package, metadata: Metadata) -> Self {
         let options = OpenOptions::new().retain_source(self.0.retain_source);
         let signature = match self.signature() {
             super::Signature::RemovalAuthorized => super::Signature::Unsigned,
@@ -86,7 +86,7 @@ impl Xlsx {
 }
 
 /// Create-time metadata: commit `metadata` to a fresh workbook.
-pub(super) fn create(workbook: xlsx::Workbook, metadata: &Metadata) -> Result<Xlsx> {
+pub(super) fn create(workbook: xlsx::Package, metadata: &Metadata) -> Result<Xlsx> {
     let (workbook, metadata, _) = commit(&workbook, |value| *value = metadata.clone(), None)?;
     Ok(Xlsx::from_workbook(workbook, &OpenOptions::new())?.with_metadata(metadata))
 }

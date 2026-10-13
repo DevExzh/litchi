@@ -21,7 +21,7 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use litchi_core::{ReadAt, SourceVersion};
 use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter};
-use litchi_xlsx::workbook::{SourceBackedMergeEditor, Workbook};
+use litchi_xlsx::workbook::SourceBackedMergeEditor;
 use litchi_xlsx::{Cell, Error as XlsxError, Value};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -785,7 +785,7 @@ fn run_eager(operation: Operation) -> AnyResult<SampleRecord> {
     let fixture_target_sha256 = fixture_target_sha256(&fixture)?;
     let lifecycle_started = Instant::now();
     let preparation_started = Instant::now();
-    let workbook = Workbook::from_slice(&fixture)?;
+    let workbook = litchi_xlsx::Package::from_bytes(&fixture)?;
     let mut edit = workbook.edit()?;
     {
         let mut sheet = edit
@@ -799,7 +799,7 @@ fn run_eager(operation: Operation) -> AnyResult<SampleRecord> {
     let sink_capacity = sink.capacity();
     let primary_started = Instant::now();
     let committed = edit.commit()?;
-    let changed = committed.into_workbook();
+    let changed = committed.into_package();
     changed.write_to(&mut sink)?;
     let primary_ns = elapsed_ns(primary_started.elapsed())?;
     let sink_write_calls = sink.write_calls();
@@ -934,7 +934,7 @@ fn stage_source(
 }
 
 fn fixture_for(operation: Operation) -> AnyResult<Vec<u8>> {
-    let workbook = Workbook::new()?;
+    let workbook = litchi_xlsx::Package::new()?;
     let mut edit = workbook.edit()?;
     {
         let mut sheet = edit
@@ -946,7 +946,7 @@ fn fixture_for(operation: Operation) -> AnyResult<Vec<u8>> {
             sheet.merge("A1:B2")?;
         }
     }
-    let committed = edit.commit()?.into_workbook();
+    let committed = edit.commit()?.into_package();
     let mut output = Vec::new();
     committed.write_to(&mut output)?;
     let mut package = OpcPackage::from_bytes(&output)?;
@@ -965,7 +965,7 @@ fn fixture_target_sha256(bytes: &[u8]) -> AnyResult<String> {
 }
 
 fn semantic_oracle(bytes: &[u8], operation: Operation) -> AnyResult<SemanticCheck> {
-    let workbook = Workbook::from_slice(bytes)?;
+    let workbook = litchi_xlsx::Package::from_bytes(bytes)?.workbook();
     let sheet = workbook
         .sheet("Sheet1")?
         .ok_or("semantic reopen lost Sheet1")?;
