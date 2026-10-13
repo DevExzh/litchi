@@ -1,12 +1,25 @@
 //! Source-checked, lossless edits of text already owned by a PPT shape.
 //!
-//! Length-changing replacement is supported when the selected
-//! `TextCharsAtom` or `TextBytesAtom` has either no style record or a single
-//! paragraph-formatting run and a single character-formatting run. The two
-//! style coverage counts are then updated with the text atom and every owning
+//! Length-changing replacement is supported when the selected text body is a
+//! `TextHeaderAtom` and one `TextCharsAtom` or `TextBytesAtom` followed by at
+//! most one each of:
+//!
+//! - a `StyleTextPropAtom` with one paragraph run and one character run
+//!   (optionally plus a one-character run for the paragraph mark);
+//! - a `TextSpecialInfoAtom` with one run, or one text run plus a mark run;
+//! - a `TextRulerAtom`, which holds no character position.
+//!
+//! The coverage counts are then updated with the text atom and every owning
 //! container length. `[MS-PPT]` associates other formatting, interaction,
-//! bookmark, metacharacter, and special-information records with UTF-16
-//! positions; their presence remains a typed dependency-closure refusal.
+//! bookmark, metacharacter, and multi-run special-information records with
+//! UTF-16 positions; their presence remains a typed dependency-closure
+//! refusal for a changed length (same-length replacement stays available).
+//!
+//! The text of a title or body placeholder that `PowerPoint` keeps in the
+//! slide list (its `ClientTextbox` holds only an `OutlineTextRefAtom`, MS-PPT
+//! 2.9.78) is edited in place in the live `DocumentContainer`'s
+//! `SlideListWithTextContainer` body the reference selects, under the same
+//! rules, by the root transaction's batch publisher.
 
 use std::collections::{BTreeMap, BTreeSet, btree_map::Entry};
 use std::fmt;
@@ -2053,11 +2066,18 @@ pub(crate) struct RootBatchPublication {
     source: Arc<[u8]>,
     output: Arc<[u8]>,
     changes: Vec<RootShapeTextChange>,
+    /// Whether the publication replaced the live `DocumentContainer`, which
+    /// owns slide-list (outline) text bodies.
+    document_changed: bool,
 }
 
 impl RootBatchPublication {
     pub(crate) fn source(&self) -> &[u8] {
         &self.source
+    }
+
+    pub(crate) const fn document_changed(&self) -> bool {
+        self.document_changed
     }
 
     pub(crate) fn changes(&self) -> &[RootShapeTextChange] {
@@ -2349,7 +2369,18 @@ pub(crate) fn inspect_shape_text_readonly(
     options: crate::package::OpenOptions<'_>,
 ) -> Result<String> {
     let location = resolve_shape_readonly(bytes, target, options)?;
-    Ok(inspect_slide(&location.slide_record, location.shape_id)?.text)
+    match inspect_slide(&location.slide_record, location.shape_id) {
+        Ok(atom) => Ok(atom.text),
+        Err(Error::Refused(Refusal::NoTextAtom)) => {
+            let Some(body) = outline_reference(&location.slide_record, location.shape_id)? else {
+                return Err(Error::Refused(Refusal::NoTextAtom));
+            };
+            let presentation = presentation_with_options(bytes, options)?;
+            let document = presentation.live_document_bytes()?;
+            Ok(inspect_outline_body(&document, location.persist_id, body)?.text)
+        },
+        Err(error) => Err(error),
+    }
 }
 
 /// Reads one shape's anchor without opening the mutation-capable persisted
@@ -2436,6 +2467,9 @@ struct PreparedBatchText {
     resolved: Resolved,
     replacement: String,
     encoded: Vec<u8>,
+    /// The slide-list text body the shape's `OutlineTextRefAtom` selects, when
+    /// the shape's text lives in the live document instead of its drawing.
+    outline_body: Option<usize>,
 }
 
 /// Replaces a bounded caller-preflighted set of semantic shape targets through
@@ -2468,6 +2502,7 @@ pub(crate) fn replace_shape_texts_batch(
         max_output_bytes,
     )?;
     let presentation = presentation_shared(source.clone())?;
+    let document_persist_id = presentation.slide_directory().document_persist_id();
     let slides = presentation.slides()?;
     let mut targets = Vec::with_capacity(replacements.len());
     let mut original_slides = BTreeMap::<u32, Arc<[u8]>>::new();
@@ -2530,7 +2565,8 @@ pub(crate) fn replace_shape_texts_batch(
     let mut index_failures = BTreeSet::new();
     let mut prepared = Vec::with_capacity(targets.len());
     let mut encoded_bytes = 0usize;
-    let mut inspected_shapes = BTreeMap::<(u32, u32), TextAtom>::new();
+    let mut inspected_shapes = BTreeMap::<(u32, u32), (TextAtom, Option<usize>)>::new();
+    let mut live_document: Option<Vec<u8>> = None;
 
     // Complete text/dependency resolution and replacement validation before
     // the editor receives its first staged mutation.  The index was built by
@@ -2567,11 +2603,13 @@ pub(crate) fn replace_shape_texts_batch(
                 },
             }
         }
-        let text = match inspected_shapes.get(&(target.slide_persist_id, target.native_shape_id)) {
-            Some(text) => text.clone(),
+        let (text, outline_body) = match inspected_shapes
+            .get(&(target.slide_persist_id, target.native_shape_id))
+        {
+            Some(inspected) => inspected.clone(),
             None => {
-                let text = if index_failures.contains(&target.slide_persist_id) {
-                    inspect_slide(&target.slide_record, target.native_shape_id)?
+                let inspected = if index_failures.contains(&target.slide_persist_id) {
+                    inspect_slide(&target.slide_record, target.native_shape_id)
                 } else {
                     let index = indexed_shapes
                         .get(&target.slide_persist_id)
@@ -2580,13 +2618,40 @@ pub(crate) fn replace_shape_texts_batch(
                                 "PPT batch shape-text validation lost its drawing index".into(),
                             )
                         })?;
-                    inspect_indexed_shape_text(index, target.native_shape_id)?
+                    inspect_indexed_shape_text(index, target.native_shape_id)
+                };
+                let inspected = match inspected {
+                    Ok(text) => (text, None),
+                    Err(Error::Refused(Refusal::NoTextAtom)) => {
+                        // A placeholder whose text lives in the slide
+                        // list holds only an `OutlineTextRefAtom`
+                        // (MS-PPT 2.9.78); its body is edited in the live
+                        // document instead of the drawing.
+                        let Some(body) =
+                            outline_reference(&target.slide_record, target.native_shape_id)?
+                        else {
+                            return Err(Error::Refused(Refusal::NoTextAtom));
+                        };
+                        if live_document.is_none() {
+                            live_document = Some(editor.persisted_record(document_persist_id)?);
+                        }
+                        let document = live_document.as_deref().ok_or_else(|| {
+                            PackageError::Corrupted(
+                                "PPT outline text lost its live document".into(),
+                            )
+                        })?;
+                        (
+                            inspect_outline_body(document, target.slide_persist_id, body)?,
+                            Some(body),
+                        )
+                    },
+                    Err(error) => return Err(error),
                 };
                 inspected_shapes.insert(
                     (target.slide_persist_id, target.native_shape_id),
-                    text.clone(),
+                    inspected.clone(),
                 );
-                text
+                inspected
             },
         };
         let resolved = Resolved {
@@ -2619,6 +2684,7 @@ pub(crate) fn replace_shape_texts_batch(
                 resolved,
                 replacement: target.replacement,
                 encoded,
+                outline_body,
             });
         }
     }
@@ -2636,7 +2702,25 @@ pub(crate) fn replace_shape_texts_batch(
     // succeed; the rewrite itself visits the OfficeArt tree once and applies
     // every selected textbox while preserving wire order.
     let mut grouped = BTreeMap::<u32, Vec<ShapeTextRewrite<'_>>>::new();
+    let mut outline = BTreeMap::<(u32, usize), ShapeTextRewrite<'_>>::new();
     for prepared in &prepared {
+        if let Some(body) = prepared.outline_body {
+            let rewrite = ShapeTextRewrite {
+                shape_id: prepared.resolved.native_shape_id,
+                kind: prepared.resolved.kind,
+                before: &prepared.resolved.payload,
+                after: &prepared.encoded,
+            };
+            if outline
+                .insert((prepared.resolved.slide_persist_id, body), rewrite)
+                .is_some()
+            {
+                // Two shapes referencing one body would publish two texts
+                // into one record.
+                return Err(Error::Refused(Refusal::AmbiguousTextbox));
+            }
+            continue;
+        }
         grouped
             .entry(prepared.resolved.slide_persist_id)
             .or_default()
@@ -2673,6 +2757,20 @@ pub(crate) fn replace_shape_texts_batch(
             .into());
         }
         editor.replace_persisted_record(persist_id, staged)?;
+    }
+    let document_changed = !outline.is_empty();
+    if document_changed {
+        let original = live_document.as_deref().ok_or_else(|| {
+            PackageError::Corrupted("PPT outline text publication lost its live document".into())
+        })?;
+        let staged = rewrite_outline_bodies(original, &outline)?;
+        if editor.persisted_record(document_persist_id)?.as_slice() != original {
+            return Err(PackageError::Corrupted(
+                "PPT outline text transaction source changed before publication".into(),
+            )
+            .into());
+        }
+        editor.replace_persisted_record(document_persist_id, staged)?;
     }
 
     let candidate = editor.finish()?;
@@ -2720,6 +2818,7 @@ pub(crate) fn replace_shape_texts_batch(
         source,
         output,
         changes,
+        document_changed,
     }))
 }
 
@@ -3139,10 +3238,19 @@ fn inspect_drawing(drawing: &[u8], shape_id: u32) -> Result<TextAtom> {
 }
 
 fn inspect_textbox(textbox: &[u8]) -> Result<TextAtom> {
+    inspect_text_records(children(textbox)?)
+}
+
+/// Inspects the records of one text body: a `ClientTextbox` payload or a
+/// slide-list text body, which share the same record vocabulary.
+fn inspect_text_records<'a>(
+    records: impl Iterator<Item = PackageResult<&'a [u8]>>,
+) -> Result<TextAtom> {
     let mut atom = None;
     let mut child_types = Vec::new();
     let mut style_record = None;
-    for child_result in children(textbox)? {
+    let mut special_info_record = None;
+    for child_result in records {
         let child = child_result?;
         let child_type = record_type(child)?;
         child_types.push(child_type);
@@ -3150,6 +3258,9 @@ fn inspect_textbox(textbox: &[u8]) -> Result<TextAtom> {
             && style_record.replace(child).is_some()
         {
             return Err(Error::Refused(Refusal::DependencyClosure));
+        }
+        if child_type == RecordType::TextSpecInfoAtom as u16 {
+            special_info_record = Some(child);
         }
         let atom_kind = match child_type {
             value if value == RecordType::TextBytesAtom as u16 => Some(TextKind::Bytes),
@@ -3176,43 +3287,79 @@ fn inspect_textbox(textbox: &[u8]) -> Result<TextAtom> {
     text_atom.can_resize = resize_dependency_closure_is_modeled(
         &child_types,
         style_record,
+        special_info_record,
         text_units(text_atom.kind, text_atom.payload.len())?,
     )?;
     Ok(text_atom)
 }
 
+/// Whether a length-changing replacement keeps every dependent range of the
+/// text body valid.
+///
+/// The body must be a `TextHeaderAtom` followed by its one text atom, then at
+/// most one each of:
+///
+/// - `StyleTextPropAtom` with one paragraph run and one character run, whose
+///   two coverage counts are resized;
+/// - `TextSpecialInfoAtom` with one run (language and spelling), whose
+///   coverage count is resized;
+/// - `TextRulerAtom`, which holds indents and tab stops but no character
+///   position, so it stays exact.
+///
+/// Any other record (interactions, bookmarks, metacharacter fields, several
+/// formatting runs) associates data with character positions that a whole
+/// replacement would invalidate; the body then keeps the same-length-only
+/// contract and a changed length is a typed dependency-closure refusal.
 fn resize_dependency_closure_is_modeled(
     child_types: &[u16],
     style_record: Option<&[u8]>,
+    special_info_record: Option<&[u8]>,
     old_text_units: usize,
 ) -> Result<bool> {
     let text_header = RecordType::TextHeaderAtom as u16;
     let text_bytes = RecordType::TextBytesAtom as u16;
     let text_chars = RecordType::TextCharsAtom as u16;
-    let style = RecordType::StyleTextPropAtom as u16;
-    let supported_shape = matches!(
-        child_types,
-        [header, text]
-            if *header == text_header && (*text == text_bytes || *text == text_chars)
-    ) || matches!(
-        child_types,
-        [header, text, style_type]
-            if *header == text_header
-                && (*text == text_bytes || *text == text_chars)
-                && *style_type == style
-    );
-    if !supported_shape {
+    let [header, text, rest @ ..] = child_types else {
+        return Ok(false);
+    };
+    if *header != text_header || (*text != text_bytes && *text != text_chars) {
         return Ok(false);
     }
-    let Some(style_bytes) = style_record else {
-        return Ok(true);
-    };
-    Ok(crate::StyleTextPropAtom::resize_single_run_record(
-        style_bytes,
-        old_text_units,
-        old_text_units,
-    )?
-    .is_some())
+    let resizable = [
+        RecordType::StyleTextPropAtom as u16,
+        RecordType::TextSpecInfoAtom as u16,
+        RecordType::TextRulerAtom as u16,
+    ];
+    let mut seen = [false; 3];
+    for child_type in rest {
+        let Some(slot) = resizable.iter().position(|kind| kind == child_type) else {
+            return Ok(false);
+        };
+        if std::mem::replace(&mut seen[slot], true) {
+            return Ok(false);
+        }
+    }
+    if let Some(style_bytes) = style_record
+        && crate::StyleTextPropAtom::resize_single_run_record(
+            style_bytes,
+            old_text_units,
+            old_text_units,
+        )?
+        .is_none()
+    {
+        return Ok(false);
+    }
+    if let Some(special_info_bytes) = special_info_record
+        && crate::TextSpecialInfoRuns::resize_single_run_record(
+            special_info_bytes,
+            old_text_units,
+            old_text_units,
+        )?
+        .is_none()
+    {
+        return Ok(false);
+    }
+    Ok(true)
 }
 
 fn rewrite_slide(
@@ -3600,11 +3747,24 @@ fn rewrite_shape_container(
 }
 
 fn rewrite_textbox(textbox: &[u8], kind: TextKind, before: &[u8], after: &[u8]) -> Result<Vec<u8>> {
+    let data = rewrite_text_records(children(textbox)?, kind, before, after)?;
+    rebuild(textbox, &data).map_err(Into::into)
+}
+
+/// Rewrites the text atom of one text body and resizes the dependent ranges
+/// [`resize_dependency_closure_is_modeled`] admits, returning the body's
+/// re-encoded records. Every other record is copied exactly.
+fn rewrite_text_records<'a>(
+    records: impl Iterator<Item = PackageResult<&'a [u8]>>,
+    kind: TextKind,
+    before: &[u8],
+    after: &[u8],
+) -> Result<Vec<u8>> {
     let mut count = 0usize;
-    let mut data = Vec::with_capacity(drawing_payload(textbox)?.len());
+    let mut data = Vec::with_capacity(after.len().saturating_add(64));
     let old_text_units = text_units(kind, before.len())?;
     let new_text_units = text_units(kind, after.len())?;
-    for child_result in children(textbox)? {
+    for child_result in records {
         let child = child_result?;
         let record_type = record_type(child)?;
         let is_target = match kind {
@@ -3631,13 +3791,23 @@ fn rewrite_textbox(textbox: &[u8], kind: TextKind, before: &[u8], after: &[u8]) 
             )?
             .ok_or(Error::Refused(Refusal::DependencyClosure))?;
             data.extend_from_slice(&rewritten);
+        } else if record_type == RecordType::TextSpecInfoAtom as u16
+            && old_text_units != new_text_units
+        {
+            let rewritten = crate::TextSpecialInfoRuns::resize_single_run_record(
+                child,
+                old_text_units,
+                new_text_units,
+            )?
+            .ok_or(Error::Refused(Refusal::DependencyClosure))?;
+            data.extend_from_slice(&rewritten);
         } else {
             data.extend_from_slice(child);
         }
     }
     match count {
         0 => Err(Error::Refused(Refusal::NoTextAtom)),
-        1 => rebuild(textbox, &data).map_err(Into::into),
+        1 => Ok(data),
         _ => Err(Error::Refused(Refusal::MultipleTextAtoms)),
     }
 }
@@ -3717,6 +3887,181 @@ fn shape_id_of(record: &[u8]) -> PackageResult<Option<u32>> {
         }
     }
     Ok(None)
+}
+
+/// The slide-list body index an outline-backed shape's `ClientTextbox`
+/// selects, or `None` when the shape is not outline-backed.
+///
+/// The textbox must hold exactly one `OutlineTextRefAtom` and no text atom;
+/// a `TextRulerAtom` beside it is allowed. A negative index selects nothing
+/// and is reported as a missing text atom.
+fn outline_reference(slide: &[u8], shape_id: u32) -> Result<Option<usize>> {
+    let (_, consumed) = crate::Record::parse_strict(slide, 0)?;
+    if consumed != slide.len() {
+        return Err(PackageError::Corrupted("selected slide has trailing bytes".into()).into());
+    }
+    let drawing = find_ppt_record(slide, RecordType::PPDrawing as u16, 0)?
+        .ok_or(Error::Refused(Refusal::ShapeNotFound))?;
+    let mut matches = 0usize;
+    let mut reference = None;
+    visit_officeart(
+        drawing_payload(drawing)?,
+        shape_id,
+        0,
+        &mut matches,
+        &mut |textbox| {
+            let mut found = None;
+            for child_result in children(textbox)? {
+                let child = child_result?;
+                let child_type = record_type(child)?;
+                if child_type == RecordType::OutlineTextRefAtom as u16 {
+                    if found.is_some() {
+                        return Ok(());
+                    }
+                    let payload: [u8; 4] = drawing_payload(child)?.try_into().map_err(|_err| {
+                        PackageError::Corrupted("malformed OutlineTextRefAtom".into())
+                    })?;
+                    found = Some(i32::from_le_bytes(payload));
+                } else if child_type != RecordType::TextRulerAtom as u16 {
+                    return Ok(());
+                }
+            }
+            reference = found.and_then(|index| usize::try_from(index).ok());
+            Ok(())
+        },
+    )?;
+    match matches {
+        0 => Err(Error::Refused(Refusal::ShapeNotFound)),
+        1 => Ok(reference),
+        _ => Err(Error::Refused(Refusal::AmbiguousShape)),
+    }
+}
+
+/// Visits the records of every text body of each slide in the live
+/// document's slide `SlideListWithTextContainer` (instance 0).
+///
+/// Bodies are numbered per slide in slide-list order, as an
+/// `OutlineTextRefAtom` counts them; records before a slide's first
+/// `TextHeaderAtom` belong to no body. `visit` receives the slide persist
+/// identifier, the body index and the body's records.
+fn for_each_outline_body<'a>(
+    slide_list: &'a [u8],
+    mut visit: impl FnMut(Option<(u32, usize)>, &[&'a [u8]]) -> Result<()>,
+) -> Result<()> {
+    let mut slide = None;
+    let mut body = None::<usize>;
+    let mut segment: Vec<&'a [u8]> = Vec::new();
+    for child_result in children(slide_list)? {
+        let child = child_result?;
+        let child_type = record_type(child)?;
+        let starts_segment = child_type == RecordType::SlidePersistAtom as u16
+            || child_type == RecordType::TextHeaderAtom as u16;
+        if starts_segment {
+            let key = slide.zip(body);
+            visit(key, &segment)?;
+            segment.clear();
+            if child_type == RecordType::SlidePersistAtom as u16 {
+                let payload = drawing_payload(child)?;
+                let persist_id: [u8; 4] = payload
+                    .get(..4)
+                    .and_then(|value| value.try_into().ok())
+                    .ok_or_else(|| PackageError::Corrupted("malformed SlidePersistAtom".into()))?;
+                slide = Some(u32::from_le_bytes(persist_id));
+                body = None;
+            } else {
+                body = Some(body.map_or(0, |index| index.saturating_add(1)));
+            }
+        }
+        segment.push(child);
+    }
+    visit(slide.zip(body), &segment)
+}
+
+/// The live document's slide `SlideListWithTextContainer`.
+fn slide_list_of(document: &[u8]) -> Result<&[u8]> {
+    if record_type(document)? != RecordType::Document as u16 {
+        return Err(
+            PackageError::Corrupted("live PPT record is not a DocumentContainer".into()).into(),
+        );
+    }
+    let mut found = None;
+    for child_result in children(document)? {
+        let child = child_result?;
+        if record_type(child)? == RecordType::SlideListWithText as u16
+            && record_instance(child)? == 0
+            && found.replace(child).is_some()
+        {
+            return Err(
+                PackageError::Corrupted("PPT document has several slide lists".into()).into(),
+            );
+        }
+    }
+    found.ok_or(Error::Refused(Refusal::NoTextAtom))
+}
+
+/// Inspects the slide-list text body an outline-backed shape selects.
+fn inspect_outline_body(document: &[u8], slide_persist_id: u32, body: usize) -> Result<TextAtom> {
+    let mut selected = None;
+    for_each_outline_body(slide_list_of(document)?, |key, records| {
+        if key == Some((slide_persist_id, body)) {
+            if selected.is_some() {
+                return Err(Error::Refused(Refusal::AmbiguousTextbox));
+            }
+            selected = Some(inspect_text_records(
+                records.iter().map(|record| Ok(*record)),
+            )?);
+        }
+        Ok(())
+    })?;
+    selected.ok_or(Error::Refused(Refusal::NoTextAtom))
+}
+
+/// Rewrites selected slide-list text bodies of the live document; every
+/// other record of the document is copied exactly.
+fn rewrite_outline_bodies(
+    document: &[u8],
+    rewrites: &BTreeMap<(u32, usize), ShapeTextRewrite<'_>>,
+) -> Result<Vec<u8>> {
+    let slide_list = slide_list_of(document)?;
+    let mut list_data = Vec::with_capacity(drawing_payload(slide_list)?.len().saturating_add(64));
+    let mut applied = 0usize;
+    for_each_outline_body(slide_list, |key, records| {
+        match key.and_then(|key| rewrites.get(&key)) {
+            Some(rewrite) => {
+                let body = rewrite_text_records(
+                    records.iter().map(|record| Ok(*record)),
+                    rewrite.kind,
+                    rewrite.before,
+                    rewrite.after,
+                )?;
+                list_data.extend_from_slice(&body);
+                applied = applied.saturating_add(1);
+            },
+            None => {
+                for record in records {
+                    list_data.extend_from_slice(record);
+                }
+            },
+        }
+        Ok(())
+    })?;
+    if applied != rewrites.len() {
+        return Err(PackageError::Corrupted(
+            "PPT outline text rewrite did not find every selected body".into(),
+        )
+        .into());
+    }
+    let rebuilt_list = rebuild(slide_list, &list_data)?;
+    let mut document_data = Vec::with_capacity(drawing_payload(document)?.len().saturating_add(64));
+    for child_result in children(document)? {
+        let child = child_result?;
+        if std::ptr::eq(child.as_ptr(), slide_list.as_ptr()) {
+            document_data.extend_from_slice(&rebuilt_list);
+        } else {
+            document_data.extend_from_slice(child);
+        }
+    }
+    rebuild(document, &document_data).map_err(Into::into)
 }
 
 fn encode_replacement(value: &str, kind: TextKind) -> Result<Vec<u8>> {
@@ -5658,6 +6003,35 @@ mod tests {
                     crate::RecordType::StyleTextPropAtom as u16,
                     crate::RecordType::TextInteractiveInfoAtom as u16,
                 ],
+                None,
+                None,
+                3,
+            )
+            .unwrap()
+        );
+        // A repeated position-free record is not one modeled body either.
+        assert!(
+            !super::resize_dependency_closure_is_modeled(
+                &[
+                    crate::RecordType::TextHeaderAtom as u16,
+                    crate::RecordType::TextBytesAtom as u16,
+                    crate::RecordType::TextRulerAtom as u16,
+                    crate::RecordType::TextRulerAtom as u16,
+                ],
+                None,
+                None,
+                3,
+            )
+            .unwrap()
+        );
+        assert!(
+            super::resize_dependency_closure_is_modeled(
+                &[
+                    crate::RecordType::TextHeaderAtom as u16,
+                    crate::RecordType::TextBytesAtom as u16,
+                    crate::RecordType::TextRulerAtom as u16,
+                ],
+                None,
                 None,
                 3,
             )

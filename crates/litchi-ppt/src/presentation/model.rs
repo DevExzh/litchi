@@ -904,6 +904,27 @@ impl Presentation {
         Ok(record)
     }
 
+    /// The exact encoded bytes of the live `DocumentContainer` record.
+    pub(crate) fn live_document_bytes(&self) -> Result<Vec<u8>> {
+        self.check_source()?;
+        let offset = self.inner.slide_directory.document_offset();
+        let (record, consumed) = Record::parse_with_limits(
+            &self.inner.powerpoint_document,
+            offset,
+            self.inner.source_limits,
+        )?;
+        if record.record_type != RecordType::Document {
+            return Err(Error::Corrupted(
+                "document persist ID does not resolve to a DocumentContainer".to_string(),
+            ));
+        }
+        offset
+            .checked_add(consumed)
+            .and_then(|end| self.inner.powerpoint_document.get(offset..end))
+            .map(<[u8]>::to_vec)
+            .ok_or_else(|| Error::Corrupted("live DocumentContainer exceeds its stream".into()))
+    }
+
     pub(crate) fn document_stream(&self) -> &[u8] {
         &self.inner.powerpoint_document
     }

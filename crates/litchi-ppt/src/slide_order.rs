@@ -803,7 +803,20 @@ impl Snapshot {
             .into());
         }
 
+        let document_changed = publication.document_changed();
         let (bytes, changes) = publication.into_parts();
+        if document_changed {
+            // Outline-backed text lives in the live document: reopen so the
+            // retained document structure is the published one.
+            let reopened = Self::from_bytes_with_options(bytes.to_vec(), self.open_options())?;
+            if reopened.document.slides() != self.document.slides() {
+                return Err(PackageError::Corrupted(
+                    "PPT outline text publication changed slide structure".into(),
+                )
+                .into());
+            }
+            return Ok((reopened, changes));
+        }
         if self.limits != SourceLimits::default() {
             let reopened = Self::from_bytes_with_options(bytes.to_vec(), self.open_options())?;
             return Ok((reopened, changes));
@@ -970,6 +983,7 @@ impl Snapshot {
             formatting: Vec::new(),
             inserted_records: BTreeMap::new(),
             inserted_pictures: BTreeMap::new(),
+            live_document_changed: false,
         })
     }
 
@@ -1705,6 +1719,9 @@ pub struct Transaction {
     formatting: Vec<FormattingChange>,
     inserted_records: BTreeMap<u32, Vec<u8>>,
     inserted_pictures: BTreeMap<u32, Vec<u8>>,
+    /// Whether a staged text edit republished the live document (outline
+    /// text), so staged structure must be rebased over it at commit.
+    live_document_changed: bool,
 }
 
 impl Transaction {
@@ -1965,7 +1982,17 @@ impl Transaction {
         }
         let text_snapshot =
             crate::text_edit::Snapshot::from_shared_bytes(self.working.shared_bytes())?;
-        let mut text_edit = text_snapshot.edit_text(source_target)?;
+        let mut text_edit = match text_snapshot.edit_text(source_target) {
+            Ok(text_edit) => text_edit,
+            Err(crate::text_edit::Error::Refused(crate::text_edit::Refusal::NoTextAtom)) => {
+                // Outline-backed placeholder text is owned by the live
+                // document; the batch owner publishes that body.
+                return self
+                    .set_shape_texts_mapped(&[(target, after.as_str())])
+                    .map(drop);
+            },
+            Err(error) => return Err(error.into()),
+        };
         let before = text_edit.text().to_string();
         text_edit.set_text(after.clone())?;
         let commit = text_edit.commit()?;
@@ -2099,9 +2126,11 @@ impl Transaction {
             }
         }
 
+        let document_changed = publication.document_changed();
         let (working, published_changes) = self
             .working
             .adopt_text_edit_batch_publication(publication)?;
+        self.live_document_changed |= document_changed;
         let changes = published_changes
             .into_iter()
             .map(|change| ShapeTextChange {
@@ -2409,7 +2438,9 @@ impl Transaction {
             return Err(Error::Refused(Refusal::Signed));
         }
         let document_commit = if self.structural.is_empty()
-            || (self.media_path_changes.is_empty() && self.media_playback_changes.is_empty())
+            || (self.media_path_changes.is_empty()
+                && self.media_playback_changes.is_empty()
+                && !self.live_document_changed)
         {
             self.document.commit()?
         } else {
@@ -2546,7 +2577,9 @@ impl Transaction {
             return Err(Error::Refused(Refusal::Signed));
         }
         let document_commit = if self.structural.is_empty()
-            || (self.media_path_changes.is_empty() && self.media_playback_changes.is_empty())
+            || (self.media_path_changes.is_empty()
+                && self.media_playback_changes.is_empty()
+                && !self.live_document_changed)
         {
             observe_phase(&mut observer, DiagnosticPhase::DocumentCommit, || {
                 Ok(self.document.commit()?)

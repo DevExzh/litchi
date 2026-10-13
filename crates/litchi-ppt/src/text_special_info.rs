@@ -361,6 +361,74 @@ impl TextSpecialInfoRuns {
         Ok(Self { runs })
     }
 
+    /// Rewrites only the first coverage count of a complete
+    /// `TextSpecialInfoAtom` record whose runs describe the text as one
+    /// language/spelling span.
+    ///
+    /// Two layouts are modeled, the ones `PowerPoint` writes for a text body
+    /// with uniform language and spelling state:
+    ///
+    /// - one run over the text, or over the text plus its terminating
+    ///   paragraph mark (`old_text_length` or `old_text_length + 1`; MS-PPT
+    ///   2.9.54 names the text length alone);
+    /// - one run over the text followed by a one-character run for the
+    ///   paragraph mark (`[old_text_length, 1]`).
+    ///
+    /// The first run then covers the new text the same way; the mark run,
+    /// every exception byte and the record header are copied exactly.
+    ///
+    /// `Ok(None)` means the change cannot be modeled losslessly: the runs
+    /// split the text (distributing a new length across them would need a
+    /// semantic choice), they cover neither layout, or the resized first run
+    /// would be empty, which MS-PPT forbids.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the record is malformed.
+    pub(crate) fn resize_single_run_record(
+        record_bytes: &[u8],
+        old_text_length: usize,
+        new_text_length: usize,
+    ) -> Result<Option<Vec<u8>>> {
+        let (record, consumed) = Record::parse_strict(record_bytes, 0)?;
+        if consumed != record_bytes.len() {
+            return Err(corrupted("TextSpecialInfoAtom has trailing record bytes"));
+        }
+        let parsed = Self::parse_record(&record)?;
+        let to_usize = |count: u32| {
+            usize::try_from(count)
+                .map_err(|_err| corrupted("TextSIRun count exceeds this platform"))
+        };
+        let excess = match parsed.runs.as_slice() {
+            [run] => {
+                let Some(excess) = to_usize(run.count)?
+                    .checked_sub(old_text_length)
+                    .filter(|excess| *excess <= 1)
+                else {
+                    return Ok(None);
+                };
+                excess
+            },
+            [text, mark] if mark.count == 1 && to_usize(text.count)? == old_text_length => 0,
+            _ => return Ok(None),
+        };
+        let Some(new_count) = new_text_length
+            .checked_add(excess)
+            .filter(|count| *count != 0)
+            .and_then(|count| u32::try_from(count).ok())
+        else {
+            return Ok(None);
+        };
+        // The first run's count is the first field of the payload, right
+        // after the eight-byte record header.
+        if record_bytes.len() < 12 {
+            return Err(corrupted("TextSpecialInfoAtom run is truncated"));
+        }
+        let mut rewritten = record_bytes.to_vec();
+        rewritten[8..12].copy_from_slice(&new_count.to_le_bytes());
+        Ok(Some(rewritten))
+    }
+
     /// Serialize the complete record, including its header.
     #[allow(
         clippy::cast_possible_truncation,
@@ -563,6 +631,55 @@ mod tests {
         data.extend_from_slice(&0u32.to_le_bytes());
         data.extend_from_slice(&7u32.to_le_bytes());
         data
+    }
+
+    /// A complete record of runs with only a language mask.
+    fn language_runs(counts: &[u32]) -> Vec<u8> {
+        let mut payload = Vec::new();
+        for count in counts {
+            payload.extend_from_slice(&count.to_le_bytes());
+            payload.extend_from_slice(&0x0002u32.to_le_bytes());
+            payload.extend_from_slice(&0x0409u16.to_le_bytes());
+        }
+        TextSpecialInfoRuns::parse(&payload).unwrap().to_bytes()
+    }
+
+    fn counts(record: &[u8]) -> Vec<u32> {
+        let (record, _) = Record::parse_strict(record, 0).unwrap();
+        TextSpecialInfoRuns::parse_record(&record)
+            .unwrap()
+            .runs()
+            .iter()
+            .map(TextSIRun::count)
+            .collect()
+    }
+
+    #[test]
+    fn resizes_only_uniform_special_info_layouts() {
+        let resize = |counts: &[u32], old: usize, new: usize| {
+            TextSpecialInfoRuns::resize_single_run_record(&language_runs(counts), old, new)
+                .unwrap()
+                .map(|record| self::counts(&record))
+        };
+        // One run over the text, or over the text and its paragraph mark.
+        assert_eq!(resize(&[5], 5, 9), Some(vec![9]));
+        assert_eq!(resize(&[6], 5, 9), Some(vec![10]));
+        assert_eq!(resize(&[6], 5, 0), Some(vec![1]));
+        // A text run plus a one-character mark run.
+        assert_eq!(resize(&[5, 1], 5, 2), Some(vec![2, 1]));
+        // Not modeled: a split text, a mismatched cover, an empty run.
+        assert_eq!(resize(&[3, 2], 5, 9), None);
+        assert_eq!(resize(&[2, 3, 1], 5, 9), None);
+        assert_eq!(resize(&[8], 5, 9), None);
+        assert_eq!(resize(&[5], 5, 0), None);
+        assert_eq!(resize(&[5, 1], 5, 0), None);
+        // The exception bytes are copied exactly.
+        let source = language_runs(&[5, 1]);
+        let resized = TextSpecialInfoRuns::resize_single_run_record(&source, 5, 7)
+            .unwrap()
+            .unwrap();
+        assert_eq!(resized.len(), source.len());
+        assert_eq!(resized[12..], source[12..]);
     }
 
     #[test]
