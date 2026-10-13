@@ -319,6 +319,16 @@ RULES: list[Rule] = [
         lambda c, e: c.result == "invalid_value" and c.detail == "formula",
     ),
     When(
+        "D9", "delta", "Chart formatting the chart type cannot carry",
+        "a chart-level key the chart group's schema omits (`labelPos` on an area, "
+        "doughnut, radar or stock chart) is reported as unsupported and the chart is "
+        "still added (exit 2)",
+        "the key is `invalid_value` and the whole `add` is refused, so no chart "
+        "carries a dropped setting (record 0270)",
+        lambda c, e: c.result == "invalid_value" and c.kind.lower() == "chart"
+        and c.detail == "labelPos",
+    ),
+    When(
         "G1", "gap", "Missing verbs",
         "`validate`, `raw-set`, `raw`, `add-part`, `dump` (and `import`, `merge`, "
         "`refresh`, `help`, ...)",

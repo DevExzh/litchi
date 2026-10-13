@@ -25,10 +25,10 @@ Kinds:
 
 | Family | Lines | Passed | of which translated | Gap | Delta | Cascade | Bug | Resident (not run) | Read-back |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| excel | 1633 | 869 | 0 | 749 | 4 | 11 | 0 | 20 | 20/20 |
-| excel/charts | 743 | 103 | 0 | 635 | 5 | 0 | 0 | 32 | 32/32 |
+| excel | 1633 | 873 | 0 | 745 | 4 | 11 | 0 | 20 | 20/20 |
+| excel/charts | 743 | 134 | 0 | 603 | 5 | 1 | 0 | 32 | 32/32 |
 | ppt | 310 | 43 | 32 | 139 | 0 | 128 | 0 | 10 | 12/12 |
-| ppt/charts | 735 | 127 | 113 | 605 | 0 | 3 | 0 | 28 | 28/28 |
+| ppt/charts | 735 | 285 | 113 | 427 | 1 | 22 | 0 | 28 | 28/28 |
 | ppt/ole | 26 | 13 | 2 | 11 | 0 | 2 | 0 | 6 | 6/6 |
 | ppt/pictures | 68 | 6 | 5 | 49 | 7 | 6 | 0 | 2 | 2/2 |
 | ppt/shapes | 220 | 23 | 19 | 193 | 0 | 4 | 0 | 8 | 8/8 |
@@ -37,7 +37,7 @@ Kinds:
 | ppt/textboxes | 132 | 12 | 10 | 105 | 0 | 15 | 0 | 4 | 4/4 |
 | ppt/transitions | 522 | 136 | 127 | 386 | 0 | 0 | 0 | 18 | 18/18 |
 | word | 1133 | 614 | 3 | 415 | 6 | 98 | 0 | 24 | 32/32 |
-| **total** | **6431** | **2003** | **344** | **3616** | **139** | **673** | **0** | **177** | **200/200** |
+| **total** | **6431** | **2196** | **344** | **3402** | **140** | **693** | **0** | **177** | **200/200** |
 
 ## Summary by format
 
@@ -46,9 +46,9 @@ The format is the extension of the document each call names.
 | Format | Lines | Passed | of which translated | Gap | Delta | Cascade | Bug | Resident (not run) | Read-back |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | docx | 949 | 466 | 0 | 379 | 6 | 98 | 0 | 22 | 30/30 |
-| pptx | 2959 | 418 | 344 | 1853 | 124 | 564 | 0 | 99 | 114/114 |
-| xlsx | 2523 | 1119 | 0 | 1384 | 9 | 11 | 0 | 56 | 56/56 |
-| **total** | **6431** | **2003** | **344** | **3616** | **139** | **673** | **0** | **177** | **200/200** |
+| pptx | 2959 | 576 | 344 | 1675 | 125 | 583 | 0 | 99 | 114/114 |
+| xlsx | 2523 | 1154 | 0 | 1348 | 9 | 12 | 0 | 56 | 56/56 |
+| **total** | **6431** | **2196** | **344** | **3402** | **140** | **693** | **0** | **177** | **200/200** |
 
 ## Deltas
 
@@ -62,6 +62,7 @@ The format is the extension of the document each call names.
 | U2 | Upstream script error: batch input not shipped | the script pipes `slideN.json` files that the upstream example directory does not contain, so OfficeCLI reads an empty batch too | an empty batch payload is `corrupt_batch` | 6 | `ppt/templates/styles/tech--wildlife-company/build.sh:256`, `ppt/templates/styles/tech--wildlife-company/build.sh:261`, `ppt/templates/styles/tech--wildlife-company/build.sh:266` |
 | H1 | Harness: generated inputs need Pillow | the script draws its input pictures with Pillow before adding them | the harness runs `python3 -I -S` (standard library only) so every machine replays the same lines; the pictures are missing (`file_not_found`) | 7 | `ppt/pictures/pictures-basic.sh:128`, `ppt/pictures/pictures-basic.sh:261`, `ppt/pictures/pictures-basic.sh:265` |
 | D8 | Formula with a leading `=` | the help schema documents `formula` "without leading =" (cell.json), but the cell handler also strips a leading `=` | the documented contract: a leading `=` is `invalid_value` | 4 | `excel/workbook-settings.sh:29`, `excel/workbook-settings.sh:32` |
+| D9 | Chart formatting the chart type cannot carry | a chart-level key the chart group's schema omits (`labelPos` on an area, doughnut, radar or stock chart) is reported as unsupported and the chart is still added (exit 2) | the key is `invalid_value` and the whole `add` is refused, so no chart carries a dropped setting (record 0270) | 1 | `ppt/charts/charts-area.sh:50` |
 
 ## Named gaps
 
@@ -169,31 +170,59 @@ The format is the extension of the document each call names.
 | Verb | Element | Refusal | Property | Lines | Registry cross-check | Examples |
 |---|---|---|---|---:|---|---|
 | add | shape | `unsupported_property` | `size` | 461 | registry: `size` is not add-able; OfficeCLI documents it | `ppt/charts/charts-3d.sh:39`, `ppt/charts/charts-3d.sh:47` |
-| add | chart | `unsupported_type` | - | 446 | registry: no add on chart | `ppt/charts/charts-3d.sh:40`, `ppt/charts/charts-3d.sh:41` |
 | add | shape | `unsupported_property` | `fill` | 162 | registry gap L-PPTX-R6b; OfficeCLI documents it | `ppt/shapes/shapes-effects.sh:49`, `ppt/shapes/shapes-effects.sh:59` |
 | set | slide | `unsupported_property` | `transition` | 136 | registry gap M1-extended; OfficeCLI documents it | `ppt/animations.sh:39`, `ppt/animations.sh:68` |
 | add | shape | `unsupported_property` | `geometry` | 93 | registry gap L-PPTX-R6b; OfficeCLI documents it | `ppt/presentation-settings.sh:20`, `ppt/shapes/shapes-basic.sh:30` |
 | add | table | `unsupported_type` | - | 51 | registry: no add on table | `ppt/tables/tables-basic.sh:23`, `ppt/tables/tables-basic.sh:34` |
+| add | chart | `unsupported_property` | `preset` | 37 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-3d.sh:96`, `ppt/charts/charts-3d.sh:97` |
 | add | slide | `unsupported_property` | `background` | 30 | registry gap M1-extended; OfficeCLI documents it | `ppt/3d-model.sh:19`, `ppt/templates/styles/brand--aura-coffee/build.sh:8` |
+| add | chart | `unsupported_capability` | - | 29 | registry lists add; refused for this target (operation gap) | `ppt/charts/charts-waterfall.sh:33`, `ppt/charts/charts-waterfall.sh:34` |
 | add | run | `unsupported_type` | - | 29 | registry: no add on run | `ppt/textboxes/textboxes-advanced.sh:145`, `ppt/textboxes/textboxes-advanced.sh:146` |
 | batch | - | `unsupported_property` | `transition` | 25 | refused on a batch item; not in the registry | `ppt/templates/styles/brand--aura-coffee/build.sh:72`, `ppt/templates/styles/brand--aura-coffee/build.sh:101` |
 | add | paragraph | `unsupported_type` | - | 21 | registry: no add on paragraph | `ppt/shapes/shapes-typography.sh:30`, `ppt/shapes/shapes-typography.sh:31` |
 | add | diagram | `unsupported_capability` | - | 19 | element not in the registry | `ppt/diagram.sh:98`, `ppt/diagram.sh:138` |
-| set | series | `unsupported_property` | `color` | 18 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:288`, `ppt/charts/charts-area.sh:94` |
+| add | chart | `unsupported_property` | `labelfont` | 17 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-area.sh:49`, `ppt/charts/charts-area.sh:51` |
 | set | tc | `unsupported_property` | `valign` | 14 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-nested.sh:59`, `ppt/tables/tables-nested.sh:60` |
 | add | connector | `unsupported_type` | - | 13 | registry: no add on connector | `ppt/shapes/shapes-connectors.sh:36`, `ppt/shapes/shapes-connectors.sh:50` |
+| add | chart | `unsupported_property` | `legendFont` | 12 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-3d.sh:81`, `ppt/charts/charts-area.sh:42` |
+| add | chart | `unsupported_property` | `title.font` | 12 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-3d.sh:80`, `ppt/charts/charts-area.sh:41` |
 | set | shape | `unsupported_property` | `rotation` | 12 | registry: `rotation` is not set-able; OfficeCLI documents it | `ppt/templates/styles/lifestyle--cat-secret-life/build.sh:105`, `ppt/templates/styles/lifestyle--cat-secret-life/build.sh:108` |
 | set | slide | `unsupported_property` | `background` | 12 | registry gap M1-extended; OfficeCLI documents it | `ppt/animations.sh:33`, `ppt/animations.sh:47` |
+| add | chart | `unsupported_property` | `seriesoutline` | 11 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-3d.sh:88`, `ppt/charts/charts-area.sh:65` |
+| add | chart | `unsupported_property` | `chartareafill` | 10 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-area.sh:81`, `ppt/charts/charts-column.sh:91` |
+| add | chart | `unsupported_property` | `gradient` | 10 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-3d.sh:89`, `ppt/charts/charts-area.sh:66` |
+| add | chart | `unsupported_property` | `transparency` | 9 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-3d.sh:90`, `ppt/charts/charts-area.sh:68` |
 | add | slide | `unsupported_property` | `title` | 9 | not in the registry; OfficeCLI documents it | `ppt/animations.sh:46`, `ppt/animations.sh:74` |
 | set | shape | `unsupported_property` | `animation` | 9 | not in the registry; OfficeCLI documents it | `ppt/templates/styles/lifestyle--cat-secret-life/build.sh:133`, `ppt/templates/styles/lifestyle--cat-secret-life/build.sh:134` |
 | set | shape | `unsupported_property` | `opacity` | 9 | registry gap L-PPTX-R6b; OfficeCLI documents it | `ppt/templates/styles/lifestyle--cat-secret-life/build.sh:106`, `ppt/templates/styles/lifestyle--cat-secret-life/build.sh:107` |
+| add | chart | `unsupported_property` | `gradients` | 8 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-3d.sh:91`, `ppt/charts/charts-area.sh:67` |
+| add | chart | `unsupported_property` | `labelrotation` | 8 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-area.sh:59`, `ppt/charts/charts-bar.sh:69` |
+| add | chart | `unsupported_property` | `shape` | 8 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-3d.sh:72`, `ppt/charts/charts-3d.sh:73` |
 | set | tc | `unsupported_property` | `gridSpan` | 8 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-financial.sh:48`, `ppt/tables/tables-financial.sh:70` |
 | set | shape | `unsupported_property` | `preset` | 7 | not in the registry; OfficeCLI documents it | `ppt/templates/styles/lifestyle--cat-secret-life/build.sh:102`, `ppt/templates/styles/lifestyle--cat-secret-life/build.sh:123` |
+| add | chart | `unsupported_property` | `axisfont` | 6 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-area.sh:57`, `ppt/charts/charts-bubble.sh:79` |
+| add | chart | `unsupported_property` | `plotFill` | 6 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-area.sh:83`, `ppt/charts/charts-column.sh:93` |
+| add | chart | `unsupported_property` | `roundedcorners` | 6 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-area.sh:82`, `ppt/charts/charts-column.sh:92` |
+| add | chart | `unsupported_property` | `secondaryaxis` | 6 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-column.sh:66`, `ppt/charts/charts-combo.sh:53` |
+| add | chart | `unsupported_property` | `trendline` | 6 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-area.sh:75`, `ppt/charts/charts-area.sh:76` |
 | add | picture | `unsupported_property` | `rotation` | 6 | registry: `rotation` is not add-able; OfficeCLI documents it | `ppt/pictures/pictures-basic.sh:182` |
 | add | shape | `unsupported_capability` | - | 6 | registry lists add; refused for this target (operation gap) | `ppt/shapes/shapes-typography.sh:260`, `ppt/templates/styles/lifestyle--cat-secret-life/build.sh:50` |
+| add | chart | `unsupported_property` | `dataTable` | 5 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-area.sh:84`, `ppt/charts/charts-bar.sh:87` |
+| add | chart | `unsupported_property` | `dispunits` | 5 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-area.sh:60`, `ppt/charts/charts-bar.sh:70` |
+| add | chart | `unsupported_property` | `gapdepth` | 5 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-3d.sh:64`, `ppt/charts/charts-3d.sh:65` |
+| add | chart | `unsupported_property` | `bubbleScale` | 4 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-bubble.sh:39`, `ppt/charts/charts-bubble.sh:40` |
+| add | chart | `unsupported_property` | `errbars` | 4 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-area.sh:74`, `ppt/charts/charts-bar.sh:85` |
+| add | chart | `unsupported_property` | `leaderlines` | 4 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-doughnut.sh:60`, `ppt/charts/charts-doughnut.sh:61` |
+| add | chart | `unsupported_property` | `majorTickMark` | 4 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-area.sh:58`, `ppt/charts/charts-bar.sh:68` |
+| add | chart | `unsupported_property` | `referenceline` | 4 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-area.sh:73`, `ppt/charts/charts-bar.sh:84` |
+| add | chart | `unsupported_property` | `series1.name` | 4 | not in the registry; not in OfficeCLI's help schema | `ppt/charts/charts-area.sh:92`, `ppt/charts/charts-bar.sh:95` |
+| add | chart | `unsupported_property` | `showMarker` | 4 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:164`, `ppt/charts/charts-advanced.sh:208` |
+| add | chart | `unsupported_property` | `shownegbubbles` | 4 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-bubble.sh:55`, `ppt/charts/charts-bubble.sh:56` |
+| add | chart | `unsupported_property` | `sizerepresents` | 4 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-bubble.sh:47`, `ppt/charts/charts-bubble.sh:48` |
 | add | ole | `unsupported_type` | - | 4 | registry: no add on ole | `ppt/ole/ole-embed.sh:102`, `ppt/ole/ole-embed.sh:115` |
 | add | shape | `unsupported_property` | `shape` | 4 | not in the registry; OfficeCLI documents it | `ppt/transitions/transitions-morph.sh:32`, `ppt/transitions/transitions-morph.sh:45` |
-| set | axis | `unsupported_property` | `title` | 4 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:297`, `ppt/charts/charts-bar.sh:71` |
+| add | chart | `unsupported_property` | `linedash` | 3 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-line.sh:52`, `ppt/charts/charts-line.sh:53` |
+| add | chart | `unsupported_property` | `updownbars` | 3 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-line.sh:84`, `ppt/charts/charts-stock.sh:45` |
 | add | diagram | `unsupported_type` | - | 3 | element not in the registry | `ppt/diagram.sh:79`, `ppt/diagram.sh:91` |
 | add | picture | `unsupported_property` | `alt` | 3 | registry: `alt` is not add-able; OfficeCLI documents it | `ppt/pictures/pictures-basic.sh:87`, `ppt/pictures/pictures-basic.sh:97` |
 | add | picture | `unsupported_property` | `crop` | 3 | not in the registry; OfficeCLI documents it | `ppt/pictures/pictures-basic.sh:136`, `ppt/pictures/pictures-basic.sh:144` |
@@ -201,6 +230,13 @@ The format is the extension of the document each call names.
 | set | shape | `unsupported_property` | `list` | 3 | registry gap M1-extended; OfficeCLI documents it | `ppt/textboxes/textboxes-basic.sh:58`, `ppt/textboxes/textboxes-basic.sh:71` |
 | set | tc | `unsupported_property` | `border.tl2br` | 3 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-borders.sh:81`, `ppt/tables/tables-borders.sh:111` |
 | set | tc | `unsupported_property` | `merge.down` | 3 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-nested.sh:121`, `ppt/tables/tables-rows-cols.sh:198` |
+| add | chart | `unsupported_property` | `crossBetween` | 2 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:94`, `ppt/charts/charts-advanced.sh:99` |
+| add | chart | `unsupported_property` | `hilowlines` | 2 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-stock.sh:43`, `ppt/charts/charts-stock.sh:44` |
+| add | chart | `unsupported_property` | `labeloffset` | 2 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:127`, `ppt/charts/charts-advanced.sh:134` |
+| add | chart | `unsupported_property` | `logbase` | 2 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-line.sh:78`, `ppt/charts/charts-scatter.sh:71` |
+| add | chart | `unsupported_property` | `minorunit` | 2 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-bar.sh:67`, `ppt/charts/charts-column.sh:63` |
+| add | chart | `unsupported_property` | `style` | 2 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:197`, `ppt/charts/charts-advanced.sh:202` |
+| add | chart | `unsupported_property` | `ticklabelskip` | 2 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:141`, `ppt/charts/charts-advanced.sh:148` |
 | add | picture | `unsupported_property` | `cropLeft` | 2 | not in the registry; OfficeCLI documents it | `ppt/pictures/pictures-basic.sh:152`, `ppt/pictures/pictures-basic.sh:294` |
 | add | shape | `unsupported_property` | `bold` | 2 | registry: `bold` is not add-able; OfficeCLI documents it | `ppt/textboxes/textboxes-basic.sh:46`, `ppt/textboxes/textboxes-basic.sh:61` |
 | batch | - | `unsupported_property` | `background` | 2 | refused on a batch item; not in the registry | `ppt/templates/styles/brand--aura-coffee-dark/build.sh:157`, `ppt/templates/styles/science--space-exploration/build.sh:16` |
@@ -217,14 +253,32 @@ The format is the extension of the document each call names.
 | set | tc | `unsupported_property` | `textdirection` | 2 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-basic.sh:209`, `ppt/tables/tables-nested.sh:119` |
 | set | tc | `unsupported_property` | `underline` | 2 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-basic.sh:120`, `ppt/tables/tables-nested.sh:135` |
 | set | tc | `unsupported_property` | `wrap` | 2 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-basic.sh:135`, `ppt/tables/tables-nested.sh:118` |
+| add | chart | `unsupported_property` | `anchor` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:49` |
+| add | chart | `unsupported_property` | `areafill` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:170` |
+| add | chart | `unsupported_property` | `axisnumfmt` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-radar.sh:60` |
+| add | chart | `unsupported_property` | `axisorientation` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:78` |
+| add | chart | `unsupported_property` | `axisvisible` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:63` |
+| add | chart | `unsupported_property` | `catAxisVisible` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:73` |
+| add | chart | `unsupported_property` | `chartFill` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:176` |
+| add | chart | `unsupported_property` | `crosses` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:104` |
+| add | chart | `unsupported_property` | `crossesAt` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:112` |
+| add | chart | `unsupported_property` | `dataRange` | 1 | not in the registry; not in OfficeCLI's help schema | `ppt/charts/charts-advanced.sh:217` |
+| add | chart | `unsupported_property` | `droplines` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-line.sh:83` |
+| add | chart | `unsupported_property` | `invertifneg` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-column.sh:76` |
+| add | chart | `unsupported_property` | `markercolor` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-scatter.sh:46` |
+| add | chart | `unsupported_property` | `plotvisonly` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:182` |
+| add | chart | `unsupported_property` | `seriesshadow` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-stock.sh:78` |
+| add | chart | `unsupported_property` | `serlines` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-bar.sh:79` |
+| add | chart | `unsupported_property` | `title.overlay` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-scatter.sh:55` |
+| add | chart | `unsupported_property` | `valaxisvisible` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:68` |
 | add | group | `unsupported_type` | - | 1 | registry: no add on group | `ppt/shapes/shapes-connectors.sh:146` |
 | add | picture | `unsupported_property` | `cropRight` | 1 | not in the registry; OfficeCLI documents it | `ppt/pictures/pictures-basic.sh:290` |
 | set | axis | `unsupported_property` | `dispUnits` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:236` |
+| set | axis | `unsupported_property` | `format` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:297` |
 | set | axis | `unsupported_property` | `labelRotation` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:257` |
 | set | axis | `unsupported_property` | `logBase` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:244` |
 | set | axis | `unsupported_property` | `visible` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:251` |
 | set | chart | `unsupported_property` | `direction` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:46` |
-| set | chart | `unsupported_property` | `dispBlanksAs` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:212` |
 | set | presentation | `unsupported_property` | `author` | 1 | registry: `author` is not set-able; OfficeCLI documents it | `ppt/presentation-settings.sh:26` |
 | set | presentation | `unsupported_property` | `extended.company` | 1 | registry: `extended.company` is not set-able; OfficeCLI documents it | `ppt/presentation-settings.sh:30` |
 | set | presentation | `unsupported_property` | `print.what` | 1 | not in the registry; OfficeCLI documents it | `ppt/presentation-settings.sh:38` |
@@ -232,7 +286,7 @@ The format is the extension of the document each call names.
 | set | presentation | `unsupported_property` | `show.loop` | 1 | not in the registry; OfficeCLI documents it | `ppt/presentation-settings.sh:42` |
 | set | presentation | `unsupported_property` | `theme.color.dk1` | 1 | not in the registry; OfficeCLI documents it | `ppt/presentation-settings.sh:49` |
 | set | presentation | `unsupported_property` | `theme.font.major.latin` | 1 | not in the registry; OfficeCLI documents it | `ppt/presentation-settings.sh:56` |
-| set | series | `unsupported_property` | `values` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:274` |
+| set | series | `unsupported_property` | `color` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:288` |
 | set | table | `unsupported_property` | `border.all` | 1 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-nested.sh:91` |
 | set | table | `unsupported_property` | `firstRow` | 1 | registry: `firstRow` is not set-able; OfficeCLI documents it | `ppt/tables/tables-nested.sh:86` |
 | set | table | `unsupported_property` | `style` | 1 | registry: `style` is not set-able; OfficeCLI documents it | `ppt/tables/tables-nested.sh:54` |
@@ -249,20 +303,77 @@ The format is the extension of the document each call names.
 
 | Verb | Element | Refusal | Property | Lines | Registry cross-check | Examples |
 |---|---|---|---|---:|---|---|
-| add | chart | `unsupported_capability` | - | 317 | registry gap L-XLSX-R7 | `excel/charts.sh:160`, `excel/charts.sh:172` |
+| add | chart | `unsupported_capability` | - | 69 | registry lists add; refused for this target (operation gap) | `excel/charts/charts-boxwhisker.sh:24`, `excel/charts/charts-boxwhisker.sh:36` |
 | add | conditionalFormatting | `unsupported_capability` | - | 25 | registry gap M1-extended (R4x) | `excel/conditional-formatting.sh:32`, `excel/conditional-formatting.sh:33` |
 | add | dataValidation | `unsupported_capability` | - | 22 | registry gap M1-extended (R4x) | `excel/data-validation.sh:42`, `excel/data-validation.sh:44` |
 | add | shape | `unsupported_capability` | - | 20 | registry gap L-XLSX-R7 | `excel/shapes.sh:39`, `excel/shapes.sh:44` |
 | add | pivottable | `unsupported_capability` | - | 18 | registry gap M1-extended (R4x) | `excel/pivot-tables.sh:121`, `excel/pivot-tables.sh:138` |
+| add | chart | `unsupported_property` | `secondaryAxis` | 15 | not in the registry; OfficeCLI documents it | `excel/charts/charts-advanced.sh:122`, `excel/charts/charts-area.sh:338` |
+| add | chart | `unsupported_property` | `title.font` | 11 | not in the registry; OfficeCLI documents it | `excel/charts/charts-area.sh:209`, `excel/charts/charts-basic.sh:83` |
+| add | chart | `unsupported_property` | `transparency` | 11 | not in the registry; OfficeCLI documents it | `excel/charts/charts-advanced.sh:210`, `excel/charts/charts-area.sh:109` |
+| add | chart | `unsupported_property` | `referenceLine` | 10 | not in the registry; OfficeCLI documents it | `excel/charts/charts-advanced.sh:47`, `excel/charts/charts-area.sh:351` |
+| add | chart | `unsupported_property` | `axisfont` | 9 | not in the registry; OfficeCLI documents it | `excel/charts/charts-area.sh:240`, `excel/charts/charts-bar.sh:87` |
 | set | cell | `unsupported_property` | `type` | 9 | registry: `type` is not set-able; OfficeCLI documents it | `excel/cell-formatting.sh:124`, `excel/cell-formatting.sh:126` |
+| add | chart | `unsupported_property` | `gradients` | 8 | not in the registry; OfficeCLI documents it | `excel/charts/charts-area.sh:135`, `excel/charts/charts-bar.sh:230` |
+| add | chart | `unsupported_property` | `labelFont` | 8 | not in the registry; OfficeCLI documents it | `excel/charts/charts-area.sh:275`, `excel/charts/charts-basic.sh:361` |
+| add | chart | `unsupported_property` | `legendfont` | 8 | not in the registry; OfficeCLI documents it | `excel/charts/charts-area.sh:303`, `excel/charts/charts-bar.sh:336` |
+| add | chart | `unsupported_property` | `plotFill` | 7 | not in the registry; OfficeCLI documents it | `excel/charts/charts-area.sh:152`, `excel/charts/charts-bar.sh:242` |
 | add | sparkline | `unsupported_capability` | - | 7 | registry gap M1-extended (R4x) | `excel/sparklines.sh:55`, `excel/sparklines.sh:57` |
 | add | cell | `unsupported_capability` | - | 6 | registry: no add on cell | `excel/cell-formatting.sh:181`, `excel/cell-formatting.sh:183` |
+| add | chart | `unsupported_property` | `colorRule` | 6 | not in the registry; OfficeCLI documents it | `excel/charts/charts-area.sh:380`, `excel/charts/charts-basic.sh:418` |
+| add | chart | `unsupported_property` | `errBars` | 6 | not in the registry; OfficeCLI documents it | `excel/charts/charts-bar.sh:430`, `excel/charts/charts-basic.sh:375` |
+| add | chart | `unsupported_property` | `logBase` | 6 | not in the registry; OfficeCLI documents it | `excel/charts/charts-bar.sh:275`, `excel/charts/charts-basic.sh:348` |
+| add | chart | `unsupported_property` | `series.outline` | 6 | not in the registry; OfficeCLI documents it | `excel/charts/charts-bar.sh:110`, `excel/charts/charts-basic.sh:60` |
+| add | chart | `unsupported_property` | `series.shadow` | 6 | not in the registry; OfficeCLI documents it | `excel/charts/charts-area.sh:224`, `excel/charts/charts-bar.sh:216` |
 | set | workbook | `unsupported_element` | - | 6 | registry: no set on workbook | `excel/workbook-settings.sh:35`, `excel/workbook-settings.sh:39` |
+| add | chart | `unsupported_property` | `axisNumFmt` | 5 | not in the registry; OfficeCLI documents it | `excel/charts/charts-area.sh:164`, `excel/charts/charts-bar.sh:155` |
+| add | chart | `unsupported_property` | `bubbleScale` | 5 | not in the registry; OfficeCLI documents it | `excel/charts/charts-advanced.sh:84`, `excel/charts/charts-advanced.sh:227` |
+| add | chart | `unsupported_property` | `plotArea.x` | 5 | not in the registry; not in OfficeCLI's help schema | `excel/charts/charts-area.sh:318`, `excel/charts/charts-bar.sh:348` |
 | get | shape | `unsupported_capability` | - | 5 | registry gap L-XLSX-R7 | `excel/shapes.sh:186`, `excel/shapes.sh:187` |
+| add | chart | `unsupported_property` | `chartArea.border` | 4 | not in the registry; OfficeCLI documents it | `excel/charts/charts-bubble.sh:175`, `excel/charts/charts-combo.sh:241` |
+| add | chart | `unsupported_property` | `chartFill` | 4 | not in the registry; OfficeCLI documents it | `excel/charts/charts-area.sh:254`, `excel/charts/charts-basic.sh:141` |
+| add | chart | `unsupported_property` | `series1.marker` | 4 | not in the registry; not in OfficeCLI's help schema | `excel/charts/charts-advanced.sh:63`, `excel/charts/charts-scatter.sh:92` |
+| add | chart | `unsupported_property` | `title.glow` | 4 | not in the registry; not in OfficeCLI's help schema | `excel/charts/charts-bar.sh:412`, `excel/charts/charts-column.sh:380` |
+| add | chart | `unsupported_property` | `trendline` | 4 | not in the registry; OfficeCLI documents it | `excel/charts.sh:183`, `excel/charts/charts-scatter.sh:161` |
+| add | chart | `unsupported_property` | `dataLabel1.delete` | 3 | not in the registry; not in OfficeCLI's help schema | `excel/charts/charts-area.sh:288`, `excel/charts/charts-column.sh:303` |
+| add | chart | `unsupported_property` | `dispUnits` | 3 | not in the registry; OfficeCLI documents it | `excel/charts/charts-area.sh:364`, `excel/charts/charts-column.sh:256` |
+| add | chart | `unsupported_property` | `hiLowLines` | 3 | not in the registry; OfficeCLI documents it | `excel/charts/charts-line.sh:495`, `excel/charts/charts-stock.sh:55` |
+| add | chart | `unsupported_property` | `series1.name` | 3 | not in the registry; not in OfficeCLI's help schema | `excel/charts/charts-basic.sh:159`, `excel/charts/charts-column.sh:79` |
+| add | chart | `unsupported_property` | `shape` | 3 | not in the registry; OfficeCLI documents it | `excel/charts/charts-bar.sh:183`, `excel/charts/charts-column.sh:442` |
+| add | chart | `unsupported_property` | `updownbars` | 3 | not in the registry; OfficeCLI documents it | `excel/charts/charts-line.sh:513`, `excel/charts/charts-stock.sh:69` |
 | add | slicer | `unsupported_capability` | - | 3 | registry gap M1-extended (R4x) | `excel/slicers.sh:81`, `excel/slicers.sh:92` |
+| add | chart | `unsupported_property` | `areafill` | 2 | not in the registry; OfficeCLI documents it | `excel/charts/charts-area.sh:123`, `excel/charts/charts-basic.sh:406` |
+| add | chart | `unsupported_property` | `axisVisible` | 2 | not in the registry; OfficeCLI documents it | `excel/charts/charts-column.sh:272`, `excel/charts/charts-line.sh:119` |
+| add | chart | `unsupported_property` | `crosses` | 2 | not in the registry; OfficeCLI documents it | `excel/charts/charts-bar.sh:449`, `excel/charts/charts-line.sh:589` |
+| add | chart | `unsupported_property` | `dispBlanksAs` | 2 | not in the registry; OfficeCLI documents it | `excel/charts/charts-line.sh:559`, `excel/charts/charts-line.sh:574` |
+| add | chart | `unsupported_property` | `gapDepth` | 2 | not in the registry; OfficeCLI documents it | `excel/charts/charts-column.sh:147`, `excel/charts/charts-line.sh:527` |
+| add | chart | `unsupported_property` | `lineDash` | 2 | not in the registry; OfficeCLI documents it | `excel/charts/charts-basic.sh:194`, `excel/charts/charts-line.sh:134` |
+| add | chart | `unsupported_property` | `majorTickMark` | 2 | not in the registry; OfficeCLI documents it | `excel/charts/charts-basic.sh:184`, `excel/charts/charts-line.sh:187` |
+| add | chart | `unsupported_property` | `minorUnit` | 2 | not in the registry; OfficeCLI documents it | `excel/charts/charts-column.sh:226`, `excel/charts/charts-line.sh:245` |
+| add | chart | `unsupported_property` | `point1.color` | 2 | not in the registry; not in OfficeCLI's help schema | `excel/charts/charts-basic.sh:297`, `excel/charts/charts-pie.sh:35` |
+| add | chart | `unsupported_property` | `preset` | 2 | not in the registry; OfficeCLI documents it | `excel/charts/charts-extended.sh:280`, `excel/charts/charts-extended.sh:291` |
+| add | chart | `unsupported_property` | `showMarker` | 2 | not in the registry; OfficeCLI documents it | `excel/charts/charts-scatter.sh:73`, `excel/charts/charts-scatter.sh:141` |
+| add | chart | `unsupported_property` | `style` | 2 | not in the registry; OfficeCLI documents it | `excel/charts/charts-bar.sh:170`, `excel/charts/charts-basic.sh:429` |
+| add | chart | `unsupported_property` | `title.overlay` | 2 | not in the registry; OfficeCLI documents it | `excel/charts/charts-pie.sh:171`, `excel/charts/charts-pie.sh:185` |
+| add | chart | `unsupported_property` | `anchor` | 1 | not in the registry; OfficeCLI documents it | `excel/charts/charts-extended.sh:258` |
+| add | chart | `unsupported_property` | `axisLine` | 1 | not in the registry; OfficeCLI documents it | `excel/charts/charts-bar.sh:262` |
+| add | chart | `unsupported_property` | `axisReverse` | 1 | not in the registry; OfficeCLI documents it | `excel/charts/charts-line.sh:287` |
+| add | chart | `unsupported_property` | `axisposition` | 1 | not in the registry; OfficeCLI documents it | `excel/charts/charts-bar.sh:473` |
+| add | chart | `unsupported_property` | `crossesAt` | 1 | not in the registry; OfficeCLI documents it | `excel/charts/charts-line.sh:546` |
+| add | chart | `unsupported_property` | `dataTable` | 1 | not in the registry; OfficeCLI documents it | `excel/charts/charts-line.sh:225` |
+| add | chart | `unsupported_property` | `dropLines` | 1 | not in the registry; OfficeCLI documents it | `excel/charts/charts-line.sh:483` |
+| add | chart | `unsupported_property` | `hilowlines` | 1 | not in the registry; OfficeCLI documents it | `excel/charts.sh:271` |
+| add | chart | `unsupported_property` | `labelrotation` | 1 | not in the registry; OfficeCLI documents it | `excel/charts/charts-bar.sh:461` |
+| add | chart | `unsupported_property` | `leaderlines` | 1 | not in the registry; OfficeCLI documents it | `excel/charts/charts-pie.sh:157` |
+| add | chart | `unsupported_property` | `markercolor` | 1 | not in the registry; OfficeCLI documents it | `excel/charts/charts-bar.sh:486` |
+| add | chart | `unsupported_property` | `plotvisonly` | 1 | not in the registry; OfficeCLI documents it | `excel/charts/charts-extended.sh:269` |
+| add | chart | `unsupported_property` | `secondaryaxis` | 1 | not in the registry; OfficeCLI documents it | `excel/charts.sh:160` |
+| add | chart | `unsupported_property` | `series1.bubbleSize` | 1 | not in the registry; not in OfficeCLI's help schema | `excel/charts/charts-bubble.sh:210` |
+| add | chart | `unsupported_property` | `series1.trendline` | 1 | not in the registry; not in OfficeCLI's help schema | `excel/charts/charts-scatter.sh:203` |
+| add | chart | `unsupported_property` | `shownegbubbles` | 1 | not in the registry; OfficeCLI documents it | `excel/charts/charts-bubble.sh:194` |
+| add | chart | `unsupported_property` | `sizeRepresents` | 1 | not in the registry; OfficeCLI documents it | `excel/charts/charts-bubble.sh:62` |
 | add | sheet | `unsupported_property` | `tabColor` | 1 | registry gap M1-extended (R4x); OfficeCLI documents it | `excel/sheet-settings.sh:128` |
 | query | shape | `unsupported_capability` | - | 1 | registry gap L-XLSX-R7 | `excel/shapes.sh:185` |
-| set | axis | `unsupported_capability` | - | 1 | registry gap L-XLSX-R7 | `excel/charts/charts-line.sh:263` |
 | set | cell | `unsupported_property` | `arrayformula` | 1 | registry: `arrayformula` is not set-able; OfficeCLI documents it | `excel/cell-formatting.sh:166` |
 | set | cell | `unsupported_property` | `link` | 1 | registry gap M1-extended (R4x); OfficeCLI documents it | `excel/cell-formatting.sh:158` |
 | set | sheet | `unsupported_property` | `freeze` | 1 | registry gap M1-extended (R4x); OfficeCLI documents it | `excel/sheet-settings.sh:55` |
@@ -286,7 +397,7 @@ None.
 
 | Follow-up | What | Lines |
 |---|---|---:|
-| F3 | property-granularity "apply the rest and warn": calls refused for one unsupported property (OfficeCLI applies the others and exits 2) | 2172 |
+| F3 | property-granularity "apply the rest and warn": calls refused for one unsupported property (OfficeCLI applies the others and exits 2) | 2624 |
 | F4 | view options (`--start`, `--end`, `--max-lines`, ...) | 0 |
 | F6 | `add --from`, find/replace on `set`, `remove --shift`, `get --save` | 40 |
 | D6 | missing verbs (`validate`, `raw-set`, `add-part`, `dump`) | 138 |
@@ -296,22 +407,22 @@ None.
 | Script | Lines | Passed | of which translated | Gap | Delta | Cascade | Bug | Resident (not run) | Read-back |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | `excel/cell-formatting.sh` | 109 | 94 | 0 | 15 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts.sh` | 320 | 309 | 0 | 11 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-advanced.sh` | 17 | 4 | 0 | 13 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-area.sh` | 92 | 6 | 0 | 86 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-bar.sh` | 82 | 8 | 0 | 70 | 4 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-basic.sh` | 102 | 8 | 0 | 94 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts.sh` | 320 | 313 | 0 | 7 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-advanced.sh` | 17 | 10 | 0 | 7 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-area.sh` | 92 | 9 | 0 | 83 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-bar.sh` | 82 | 12 | 0 | 66 | 4 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-basic.sh` | 102 | 11 | 0 | 91 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/charts/charts-boxwhisker.sh` | 13 | 4 | 0 | 9 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-bubble.sh` | 24 | 6 | 0 | 18 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-column.sh` | 102 | 8 | 0 | 94 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-combo.sh` | 23 | 6 | 0 | 17 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-bubble.sh` | 24 | 7 | 0 | 17 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-column.sh` | 102 | 12 | 0 | 90 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-combo.sh` | 23 | 8 | 0 | 15 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/charts/charts-extended.sh` | 28 | 7 | 0 | 21 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/charts/charts-histogram.sh` | 37 | 7 | 0 | 30 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-line.sh` | 108 | 9 | 0 | 99 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-pie.sh` | 18 | 5 | 0 | 12 | 1 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-radar.sh` | 23 | 6 | 0 | 17 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-scatter.sh` | 33 | 8 | 0 | 25 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-stock.sh` | 18 | 5 | 0 | 13 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-line.sh` | 108 | 10 | 0 | 97 | 0 | 1 | 0 | 2 | 2/2 |
+| `excel/charts/charts-pie.sh` | 18 | 6 | 0 | 11 | 1 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-radar.sh` | 23 | 8 | 0 | 15 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-scatter.sh` | 33 | 11 | 0 | 22 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-stock.sh` | 18 | 6 | 0 | 12 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/charts/charts-waterfall.sh` | 23 | 6 | 0 | 17 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/conditional-formatting.sh` | 165 | 139 | 0 | 26 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/data-validation.sh` | 88 | 65 | 0 | 23 | 0 | 0 | 0 | 2 | 2/2 |
@@ -323,19 +434,19 @@ None.
 | `excel/workbook-settings.sh` | 25 | 14 | 0 | 7 | 4 | 0 | 0 | 2 | 2/2 |
 | `ppt/3d-model.sh` | 35 | 1 | 0 | 9 | 0 | 25 | 0 | 2 | 2/2 |
 | `ppt/animations.sh` | 119 | 4 | 1 | 21 | 0 | 94 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-3d.sh` | 50 | 9 | 8 | 41 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-advanced.sh` | 61 | 9 | 8 | 50 | 0 | 2 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-area.sh` | 51 | 9 | 8 | 42 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-bar.sh` | 52 | 9 | 8 | 43 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-bubble.sh` | 52 | 9 | 8 | 43 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-column.sh` | 53 | 9 | 8 | 43 | 0 | 1 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-combo.sh` | 53 | 9 | 8 | 44 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-doughnut.sh` | 51 | 9 | 8 | 42 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-line.sh` | 52 | 9 | 8 | 43 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-pie.sh` | 51 | 9 | 8 | 42 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-radar.sh` | 51 | 9 | 8 | 42 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-scatter.sh` | 58 | 10 | 9 | 48 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-stock.sh` | 53 | 9 | 8 | 44 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-3d.sh` | 50 | 23 | 8 | 27 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-advanced.sh` | 61 | 20 | 8 | 40 | 0 | 1 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-area.sh` | 51 | 16 | 8 | 33 | 1 | 1 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-bar.sh` | 52 | 17 | 8 | 33 | 0 | 2 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-bubble.sh` | 52 | 16 | 8 | 34 | 0 | 2 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-column.sh` | 53 | 17 | 8 | 33 | 0 | 3 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-combo.sh` | 53 | 25 | 8 | 25 | 0 | 3 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-doughnut.sh` | 51 | 26 | 8 | 24 | 0 | 1 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-line.sh` | 52 | 21 | 8 | 29 | 0 | 2 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-pie.sh` | 51 | 26 | 8 | 24 | 0 | 1 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-radar.sh` | 51 | 24 | 8 | 26 | 0 | 1 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-scatter.sh` | 58 | 26 | 9 | 30 | 0 | 2 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-stock.sh` | 53 | 19 | 8 | 31 | 0 | 3 | 0 | 2 | 2/2 |
 | `ppt/charts/charts-waterfall.sh` | 47 | 9 | 8 | 38 | 0 | 0 | 0 | 2 | 2/2 |
 | `ppt/diagram.sh` | 72 | 24 | 23 | 47 | 0 | 1 | 0 | 0 | 2/2 |
 | `ppt/ole/ole-embed.sh` | 26 | 13 | 2 | 11 | 0 | 2 | 0 | 6 | 6/6 |
@@ -391,4 +502,4 @@ None.
 | `word/sections.sh` | 33 | 24 | 0 | 9 | 0 | 0 | 0 | 2 | 2/2 |
 | `word/tables.sh` | 357 | 201 | 3 | 128 | 0 | 28 | 0 | 6 | 6/6 |
 | `word/textbox.sh` | 67 | 14 | 0 | 14 | 0 | 39 | 0 | 1 | 2/2 |
-| **total** | **6431** | **2003** | **344** | **3616** | **139** | **673** | **0** | **177** | **200/200** |
+| **total** | **6431** | **2196** | **344** | **3402** | **140** | **693** | **0** | **177** | **200/200** |
