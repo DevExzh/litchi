@@ -130,6 +130,10 @@ struct SourceInner {
 #[derive(Clone)]
 pub struct SourceBackedWorkbook {
     inner: Arc<SourceInner>,
+    /// Document-property edits published over the retained source
+    /// ([`crate::metadata::source`]). The workbook parts are unchanged, so
+    /// every semantic read and cache stays shared with the source owner.
+    pub(crate) metadata: Option<Arc<crate::metadata::source::Revision>>,
 }
 
 /// A source-bound handle for one sheet in an XLSB workbook.
@@ -766,6 +770,7 @@ impl SourceBackedWorkbook {
         postflight_package(&package)?;
 
         Ok(Self {
+            metadata: None,
             inner: Arc::new(SourceInner {
                 package,
                 sheets,
@@ -1175,6 +1180,50 @@ impl SourceBackedWorkbook {
         &self.inner.package
     }
 
+    /// Publish this snapshot to a sequential sink.
+    ///
+    /// An unedited catalog streams its source artifact byte for byte. After
+    /// a document-property edit ([`Self::edit_metadata`]) the property
+    /// parts, their package relationships and content types are replaced,
+    /// and every other member keeps its source bytes and compression.
+    ///
+    /// # Errors
+    ///
+    /// Returns the source-change, execution and sink errors of the OPC
+    /// publisher.
+    pub fn write_to(&self, writer: impl Write) -> Result<()> {
+        match &self.metadata {
+            Some(revision) => revision
+                .topology(&self.inner.package)
+                .map_err(publication_error)?
+                .publish_to_stream(writer)?,
+            None => self
+                .inner
+                .package
+                .source_artifact()
+                .write_to_stream(writer)?,
+        }
+        Ok(())
+    }
+
+    /// The same source owner with another document-property revision.
+    pub(crate) fn with_metadata_revision(
+        &self,
+        metadata: Option<Arc<crate::metadata::source::Revision>>,
+    ) -> Self {
+        Self {
+            inner: Arc::clone(&self.inner),
+            metadata,
+        }
+    }
+
+    /// Whether this snapshot carries document-property edits over its
+    /// source ([`Self::edit_metadata`]).
+    #[must_use]
+    pub fn has_metadata_edits(&self) -> bool {
+        self.metadata.is_some()
+    }
+
     /// Materialize the eager, editable [`Workbook`] from this catalog.
     ///
     /// The owning OPC graph is built from the package indexed at open,
@@ -1192,7 +1241,13 @@ impl SourceBackedWorkbook {
     /// limit and allocation errors otherwise.
     pub fn to_workbook(&self) -> Result<Workbook> {
         preflight_package(&self.inner.package)?;
-        let package = self.inner.package.to_opc_package()?;
+        let package = match &self.metadata {
+            Some(revision) => revision
+                .topology(&self.inner.package)
+                .map_err(publication_error)?
+                .to_opc_package()?,
+            None => self.inner.package.to_opc_package()?,
+        };
         let mut workbook = Workbook::from_opc_package_with_external_link_limits(
             package,
             self.inner.external_link_limits,
@@ -2438,6 +2493,23 @@ fn preflight_indexed_part(
         });
     }
     Ok(())
+}
+
+/// Classify a failure to plan a document-property revision over the source.
+fn publication_error(error: crate::metadata::Error) -> Error {
+    let message = error.to_string();
+    match error {
+        crate::metadata::Error::Package(litchi_ooxml_common::Error::Opc(error)) => {
+            Error::Opc(error)
+        },
+        crate::metadata::Error::Package(error) => Error::Common(error),
+        crate::metadata::Error::Signed => Error::Signed,
+        crate::metadata::Error::Conflict(part) => Error::PatchConflict { part },
+        crate::metadata::Error::Unsupported { .. }
+        | crate::metadata::Error::Invalid(_)
+        | crate::metadata::Error::Limit { .. }
+        | _ => Error::InvalidFormat(message),
+    }
 }
 
 #[cfg(test)]

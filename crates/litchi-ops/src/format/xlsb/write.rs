@@ -1791,10 +1791,8 @@ pub(crate) fn write_to<W: Write>(file: &Xlsb, mut sink: W) -> Result<()> {
         match &file.0.owner {
             XlsbOwner::Source(workbook) => workbook
                 .workbook()
-                .source_backed_package()
-                .source_artifact()
-                .write_to_stream(&mut sink)
-                .map_err(Error::from),
+                .write_to(&mut sink)
+                .map_err(native_error),
             XlsbOwner::Eager(workbook) => workbook
                 .to_package()
                 .write_to(&mut sink)
