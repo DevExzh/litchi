@@ -1707,3 +1707,17 @@ bounded `Snapshot::parse_with_options_and_policy` result through
 and every `rollback` are removed and banned in both DOC profiles (dropping a
 transaction is the rollback). See
 [0258](unified-ops/0258-doc-p0-surface.md).
+
+## Registry schema export (record 0263)
+
+`litchi_ops::schema(format) -> schema::Schema` is the one export of the
+property registry (`litchi::schema` in the facade, `litchi schema <type>` in
+the CLI, `litchi_py.schema(format)` in Python). `Schema::{format,
+registered, elements, element, gaps}` reuses the capability report's
+`Element`/`Property`/`Gap` types; it is not a second element model.
+`capabilities::Property` gains `aliases()`, `constraint()`, `clearable()`
+and `write_gap()`, and `capabilities::Constraint` (`None`, `Int`, `Number`,
+`Length`, `Chars`, `NotEmpty`) names the registry's value domain. The
+format-level report stays `Capabilities::of`; the file-level one stays
+`File::capabilities`. No alias names are added. See
+[0263](unified-ops/0263-registry-schema-export.md).

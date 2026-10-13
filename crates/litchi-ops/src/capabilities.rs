@@ -40,8 +40,10 @@
 //!    plus tests of protected and pending-format refusals. Complete property liveness
 //!    and OfficeCLI parity remain follow-up work;
 //! 4. a golden JSON snapshot per format (`tests/golden/capabilities/`,
-//!    regenerated only with `LITCHI_BLESS=1`), from which the OfficeCLI
-//!    delta table is generated (`tools/officecli_capability_delta.py`).
+//!    regenerated only with `LITCHI_BLESS=1`), beside the registry export's
+//!    snapshots (`tests/golden/registry/`, [`crate::schema()`]), from which
+//!    the OfficeCLI delta table is generated
+//!    (`tools/officecli_capability_delta.py`).
 //!
 //! # JSON
 //!
@@ -117,6 +119,7 @@ use crate::error::{Code, Error};
 pub use crate::node::spec::Subject;
 use crate::node::spec::{GapSpec, PropSpec};
 use crate::read::{Adapter, with_spec};
+pub use crate::registry::Constraint;
 use crate::value::ValueType;
 use crate::view::Mode;
 use crate::{Family, File};
@@ -2691,6 +2694,7 @@ impl Element {
     /// write-only entries remain visible with `get == false`.
     pub fn properties(&self) -> Properties {
         Properties {
+            aliases: self.data().prop_aliases,
             props: self.data().props.iter(),
             element: *self,
             retains_source: self.retains_source,
@@ -2899,7 +2903,7 @@ impl Element {
 
     /// Whether a selector's keys that are not properties name table header
     /// columns (`row[Sales>5000]`, record 0010 §5.4): workbook rows.
-    fn header_columns(&self) -> bool {
+    pub(crate) fn header_columns(&self) -> bool {
         #[cfg(feature = "xls")]
         if self.adapter == Adapter::Xls {
             return false;
@@ -2917,6 +2921,7 @@ struct Data {
     aliases: &'static [&'static str],
     paths: &'static [&'static str],
     props: &'static [PropSpec],
+    prop_aliases: &'static [crate::registry::PropAlias],
     gap: Option<&'static GapSpec>,
 }
 
@@ -2980,12 +2985,14 @@ fn element_data(adapter: Adapter, index: u16) -> Data {
         } else {
             props
         };
+        let canonical = crate::path::navigate::ElementKind::name(element.kind);
         Data {
             name: element.name,
-            canonical: crate::path::navigate::ElementKind::name(element.kind),
+            canonical,
             aliases: element.aliases,
             paths: element.paths,
             props,
+            prop_aliases: crate::schema::prop_aliases(adapter, canonical),
             gap: element.gap,
         }
     })
@@ -3396,6 +3403,7 @@ fn ordinary_template(template: &str) -> bool {
 #[derive(Debug, Clone)]
 pub struct Properties {
     element: Element,
+    aliases: &'static [crate::registry::PropAlias],
     retains_source: Option<bool>,
     props: std::slice::Iter<'static, PropSpec>,
 }
@@ -3413,6 +3421,7 @@ impl Iterator for Properties {
             })
             .map(|spec| Property {
                 spec,
+                aliases: self.aliases,
                 retains_source: self.retains_source,
                 structural_add_supported: {
                     #[cfg(feature = "pptx")]
@@ -3449,6 +3458,7 @@ impl Iterator for Properties {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Property {
     spec: &'static PropSpec,
+    aliases: &'static [crate::registry::PropAlias],
     retains_source: Option<bool>,
     structural_add_supported: Option<bool>,
 }
@@ -3479,6 +3489,38 @@ impl Property {
         match self.retains_source {
             Some(false) => false,
             Some(true) | None => self.spec.access.set,
+        }
+    }
+
+    /// The other spellings `set` and `add` accept for the key
+    /// (`font.strike` for `strike`), as the registry declares them.
+    pub fn aliases(&self) -> impl Iterator<Item = &'static str> + Clone {
+        let name = self.spec.name;
+        self.aliases
+            .iter()
+            .filter(move |alias| alias.name == name)
+            .map(|alias| alias.alias)
+    }
+
+    /// The domain a written value must lie in beyond its type.
+    #[must_use]
+    pub const fn constraint(&self) -> Constraint {
+        self.spec.admission.constraint
+    }
+
+    /// Whether a write of `null` clears the property.
+    #[must_use]
+    pub const fn clearable(&self) -> bool {
+        self.spec.admission.clear
+    }
+
+    /// The gap a write of the key reports when the registry declares it but
+    /// its setter is pending, with the follow-up that closes it.
+    #[must_use]
+    pub const fn write_gap(&self) -> Option<Gap> {
+        match self.spec.admission.gap {
+            Some(spec) => Some(Gap { spec }),
+            None => None,
         }
     }
 

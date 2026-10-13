@@ -872,6 +872,62 @@
           "add": false,
           "set": true,
           "get": false
+        },
+        "border": {
+          "type": "enum",
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot",
+            "none"
+          ],
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.all": {
+          "type": "enum",
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot",
+            "none"
+          ],
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.color": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.all.color": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": false
         }
       },
       "predicates": {

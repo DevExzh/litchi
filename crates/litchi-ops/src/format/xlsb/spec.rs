@@ -106,6 +106,7 @@ const fn cell_capability_array() -> [PropSpec; CELL_PROPS.len() + 2] {
             if same_name(prop.name, write.name) {
                 prop.access.set = write.access.set;
                 prop.access.add = write.access.add;
+                prop.admission = write.admission;
             }
             write_index += 1;
         }
@@ -154,6 +155,7 @@ const fn sheet_props_with_writes() -> [PropSpec; workbook::SHEET_PROPS.len()] {
             if same_name(prop.name, write.name) {
                 prop.access.set = write.access.set;
                 prop.access.add = write.access.add;
+                prop.admission = write.admission;
             }
             write_index += 1;
         }

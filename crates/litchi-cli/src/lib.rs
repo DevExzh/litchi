@@ -19,6 +19,7 @@
 //! | `swap <file> <path1> <path2>` | `File::apply` with a `swap` item |
 //! | `batch <file> (--input F \| --commands JSON) [--atomic \| --best-effort]` | `batch::from_bytes_with_limits`, `File::batch` |
 //! | `capabilities (<file> \| --format T)` | `File::capabilities` or `Capabilities::of` |
+//! | `schema <type>` | `litchi_ops::schema` |
 //!
 //! `--at` is accepted as another name of `--index`.
 //!
@@ -42,6 +43,8 @@
 //!   each result the node view.
 //! - `view`: `File::view_json`.
 //! - `capabilities`: the serialized `Capabilities`.
+//! - `schema`: the serialized `Schema`, OfficeCLI's help-schema shape per
+//!   element with the registry's units, aliases and constraints.
 //! - `create`: `{"path", "type", "bytes"}`.
 //! - writes and `batch`: OfficeCLI's batch rendering, `{"results": [...],
 //!   "summary": {...}}`. Each result has `index` and `success`; a success

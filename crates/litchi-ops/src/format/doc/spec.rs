@@ -182,6 +182,7 @@ const fn prop(name: &'static str, ty: ValueType, access: Access) -> PropSpec {
         ty,
         access,
         raw: false,
+        admission: crate::registry::Admission::NONE,
     }
 }
 

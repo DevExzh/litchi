@@ -1,0 +1,1182 @@
+{
+  "format": "xls",
+  "elements": [
+    {
+      "format": "xls",
+      "element": "workbook",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/"
+        ]
+      },
+      "children": [
+        {
+          "element": "sheet",
+          "pathSegment": "<sheet>"
+        },
+        {
+          "element": "namedrange",
+          "pathSegment": "namedrange"
+        }
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "author": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "subject": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "keywords": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "description": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "category": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "lastModifiedBy": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "revisionNumber": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "created": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "modified": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "workbook.date1904": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "propertyGaps": {
+        "activeTab": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R6b)",
+          "reason": "the legacy XLS Package read bridge does not project the workbook window selection"
+        }
+      }
+    },
+    {
+      "format": "xls",
+      "element": "sheet",
+      "parent": "workbook",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>",
+          "<sheet>!<A1>"
+        ],
+        "positional": [
+          "/sheet[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "column",
+          "pathSegment": "col"
+        },
+        {
+          "element": "row",
+          "pathSegment": "row"
+        },
+        {
+          "element": "cell",
+          "pathSegment": "<A1>"
+        },
+        {
+          "element": "table",
+          "pathSegment": "table"
+        },
+        {
+          "element": "comment",
+          "pathSegment": "comment"
+        },
+        {
+          "element": "chart",
+          "pathSegment": "chart"
+        },
+        {
+          "element": "pivottable",
+          "pathSegment": "pivottable"
+        },
+        {
+          "element": "slicer",
+          "pathSegment": "slicer"
+        },
+        {
+          "element": "sparkline",
+          "pathSegment": "sparkline"
+        },
+        {
+          "element": "dataValidation",
+          "pathSegment": "dataValidation"
+        },
+        {
+          "element": "conditionalFormatting",
+          "pathSegment": "cf"
+        },
+        {
+          "element": "autofilter",
+          "pathSegment": "autofilter"
+        },
+        {
+          "element": "hyperlink",
+          "pathSegment": "hyperlink"
+        },
+        {
+          "element": "mergeCell",
+          "pathSegment": "mergeCell"
+        },
+        {
+          "element": "picture",
+          "pathSegment": "picture"
+        },
+        {
+          "element": "shape",
+          "pathSegment": "shape"
+        },
+        {
+          "element": "ole",
+          "pathSegment": "ole"
+        },
+        {
+          "element": "rowbreak",
+          "pathSegment": "rowbreak"
+        },
+        {
+          "element": "colbreak",
+          "pathSegment": "colbreak"
+        }
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "hidden": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "visibility": {
+          "type": "enum",
+          "values": [
+            "visible",
+            "hidden",
+            "veryHidden"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xls",
+      "element": "cell",
+      "parent": [
+        "sheet",
+        "range"
+      ],
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>/<A1>"
+        ]
+      },
+      "children": [
+        {
+          "element": "run",
+          "pathSegment": "run"
+        }
+      ],
+      "properties": {
+        "type": {
+          "type": "enum",
+          "values": [
+            "Number",
+            "String",
+            "SharedString",
+            "Boolean",
+            "Error",
+            "InlineString",
+            "Date",
+            "Unknown"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "empty": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "value": {
+          "type": "scalar",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "clear": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        }
+      },
+      "propertyGaps": {
+        "formula": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R6b)",
+          "reason": "the Package cell projection retains formula classification and cached scalar values but not formula token text"
+        },
+        "cachedValue": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R6b)",
+          "reason": "the legacy source-backed cell projection does not expose a separate cached-value property"
+        },
+        "evaluated": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R6b)",
+          "reason": "the XLS adapter has no formula evaluator or stable cached-result admission flag"
+        },
+        "arrayformula": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R6b)",
+          "reason": "array-formula metadata is not projected by the Package read bridge"
+        },
+        "arrayref": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R6b)",
+          "reason": "array-formula ranges are not projected by the Package read bridge"
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type",
+          "value"
+        ]
+      }
+    },
+    {
+      "format": "xls",
+      "element": "range",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>/<A1>:<A1>"
+        ]
+      },
+      "children": [
+        {
+          "element": "cell",
+          "pathSegment": "<A1>"
+        }
+      ],
+      "properties": {}
+    },
+    {
+      "format": "xls",
+      "element": "row",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "<sheet>!N:N"
+        ],
+        "positional": [
+          "/<sheet>/row[N]"
+        ]
+      },
+      "properties": {},
+      "propertyGaps": {
+        "height": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R6b)",
+          "reason": "BIFF ROW layout is not projected"
+        },
+        "hidden": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R6b)",
+          "reason": "BIFF ROW layout is not projected"
+        },
+        "outlineLevel": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R6b)",
+          "reason": "BIFF ROW layout is not projected"
+        },
+        "collapsed": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R6b)",
+          "reason": "BIFF ROW layout is not projected"
+        },
+        "customHeight": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R6b)",
+          "reason": "BIFF ROW layout is not projected"
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xls",
+      "element": "column",
+      "parent": "sheet",
+      "elementAliases": [
+        "col"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>/col[<letters>]",
+          "<sheet>!B:B"
+        ],
+        "positional": [
+          "/<sheet>/col[N]"
+        ]
+      },
+      "properties": {},
+      "propertyGaps": {
+        "width": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R6b)",
+          "reason": "BIFF COLINFO layout is not projected"
+        },
+        "hidden": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R6b)",
+          "reason": "BIFF COLINFO layout is not projected"
+        },
+        "customWidth": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R6b)",
+          "reason": "BIFF COLINFO layout is not projected"
+        },
+        "outlineLevel": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R6b)",
+          "reason": "BIFF COLINFO layout is not projected"
+        },
+        "collapsed": {
+          "code": "unsupported_capability",
+          "followUp": "M1-extended (R6b)",
+          "reason": "BIFF COLINFO layout is not projected"
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xls",
+      "element": "table",
+      "parent": [
+        "sheet",
+        "workbook"
+      ],
+      "elementAliases": [
+        "listobject"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>/table[@name=<name>]",
+          "/table[@name=<name>]"
+        ],
+        "positional": [
+          "/<sheet>/table[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R6b)",
+        "reason": "the legacy XLS Package read bridge does not project ListObject records into unified nodes yet"
+      }
+    },
+    {
+      "format": "xls",
+      "element": "namedrange",
+      "parent": "workbook",
+      "elementAliases": [
+        "definedname"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/namedrange[<name>]",
+          "/namedrange[@name=<name>]"
+        ],
+        "positional": [
+          "/namedrange[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R6b)",
+        "reason": "the legacy XLS Package read bridge does not project defined names into unified nodes yet"
+      }
+    },
+    {
+      "format": "xls",
+      "element": "comment",
+      "parent": "sheet",
+      "elementAliases": [
+        "note"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/comment[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R6b)",
+        "reason": "legacy XLS comments are retained by the leaf but are not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xls",
+      "element": "chart",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/chart[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "series",
+          "pathSegment": "series"
+        },
+        {
+          "element": "axis",
+          "pathSegment": "axis"
+        }
+      ],
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R6b)",
+        "reason": "legacy XLS chart metadata is not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xls",
+      "element": "series",
+      "parent": "chart",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/chart[N]/series[K]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R6b)",
+        "reason": "legacy XLS chart series are not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xls",
+      "element": "axis",
+      "parent": "chart",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/chart[N]/axis[@role=<role>]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R6b)",
+        "reason": "legacy XLS chart axes are not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xls",
+      "element": "pivottable",
+      "parent": "sheet",
+      "elementAliases": [
+        "pivot"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/pivottable[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R6b)",
+        "reason": "legacy XLS pivot tables are not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xls",
+      "element": "slicer",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/slicer[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R6b)",
+        "reason": "legacy XLS slicers are not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xls",
+      "element": "sparkline",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/sparkline[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R6b)",
+        "reason": "legacy XLS sparkline groups are not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xls",
+      "element": "dataValidation",
+      "parent": "sheet",
+      "elementAliases": [
+        "validation"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/dataValidation[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R6b)",
+        "reason": "legacy XLS data validations are not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xls",
+      "element": "conditionalFormatting",
+      "parent": "sheet",
+      "elementAliases": [
+        "cf"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/cf[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R6b)",
+        "reason": "legacy XLS conditional formats are not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xls",
+      "element": "autofilter",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>/autofilter"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R6b)",
+        "reason": "legacy XLS auto-filters are not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xls",
+      "element": "hyperlink",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/hyperlink[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R6b)",
+        "reason": "legacy XLS hyperlinks are not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xls",
+      "element": "mergeCell",
+      "parent": "sheet",
+      "elementAliases": [
+        "merge",
+        "mergedrange"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/mergeCell[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R6b)",
+        "reason": "legacy XLS merged ranges are not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xls",
+      "element": "picture",
+      "parent": "sheet",
+      "elementAliases": [
+        "image",
+        "media"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/picture[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R6b)",
+        "reason": "legacy XLS drawings are not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xls",
+      "element": "shape",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/shape[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R6b)",
+        "reason": "legacy XLS drawing shapes are not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xls",
+      "element": "ole",
+      "parent": "sheet",
+      "elementAliases": [
+        "embed",
+        "object",
+        "oleobject"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/ole[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R6b)",
+        "reason": "legacy XLS OLE objects are not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xls",
+      "element": "rowbreak",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/rowbreak[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R6b)",
+        "reason": "legacy XLS row page breaks are not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xls",
+      "element": "colbreak",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/colbreak[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R6b)",
+        "reason": "legacy XLS column page breaks are not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xls",
+      "element": "run",
+      "parent": "cell",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/<A1>/run[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R6b)",
+        "reason": "legacy XLS rich-text runs are flattened by the native cell projection"
+      }
+    }
+  ],
+  "gaps": [
+    {
+      "subject": "operation",
+      "verb": "query",
+      "element": "row",
+      "context": "header-column-predicates",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R6b)",
+      "reason": "legacy XLS does not yet bind row predicate names to header columns"
+    },
+    {
+      "subject": "operation",
+      "verb": "get",
+      "element": "cell",
+      "context": "non-worksheet-tab",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R6b)",
+      "reason": "chart and macro tabs retain catalog positions but do not expose ordinary worksheet cells"
+    },
+    {
+      "subject": "operation",
+      "verb": "view",
+      "element": "workbook",
+      "context": "non-worksheet-content",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R6b)",
+      "reason": "text, outline and cell statistics cover ordinary worksheets; chart and macro payloads remain unprojected"
+    },
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "workbook",
+      "context": "template",
+      "code": "unsupported_capability",
+      "followUp": "use Flavor::Document; M2 XLS template creation",
+      "reason": "the XLS creator currently authors ordinary workbooks and refuses template requests"
+    },
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "workbook",
+      "context": "strict-conformance",
+      "code": "unsupported_capability",
+      "followUp": "CreateOptions::conformance(Conformance::Transitional)",
+      "reason": "the XLS creator emits binary BIFF8 workbooks and refuses Strict requests"
+    },
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "workbook",
+      "context": "unrepresentable-initial-metadata",
+      "code": "unsupported_capability",
+      "followUp": "CreateOptions::metadata (OLE property sets, record 0254)",
+      "reason": "initial metadata is written to the OLE property sets; identifier, hyperlink_base and unzoned timestamps have no property-set slot and are refused rather than dropped"
+    },
+    {
+      "subject": "operation",
+      "verb": "get",
+      "element": "metadata",
+      "context": "path-read",
+      "code": "unsupported_capability",
+      "followUp": "File::metadata(); /metadata node reads with the shared metadata vocabulary",
+      "reason": "`set(\"/metadata\", ..)` writes the OLE document properties (root-metadata keys and custom.<name>); the path is set-only, and reads go through File::metadata()"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "cell",
+      "context": "native-dependency-closure",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLS dependency-complete cell removal",
+      "reason": "formula cells and unrepresented range or drawing dependencies remain refused; removing the last rich or opaque string identity requires a semantic inverse that retains its metadata"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "cell",
+      "context": "non-scalar-properties",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLS formatting and formula setters",
+      "reason": "the initial XLS writer accepts only scalar value and clear payloads; formulas, formatting and other cell metadata remain read-only"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "cell",
+      "context": "existing-formula-cells",
+      "code": "unsupported_capability",
+      "followUp": "M4 XLS formula-token and formula-cache writes",
+      "reason": "scalar replacement and null or explicit clear on an existing formula cell would change its cached result without changing formula tokens, so the initial writer refuses the operation"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "cell",
+      "context": "native-dependency-closure",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLS dependency-complete scalar replacement",
+      "reason": "admitted scalar storage-family replacements preserve the XF and use native row-block and SST rewrites; packed MulBlank cells, unsupported formula ownership, non-adjacent ExtSST records and removal of the last rich or opaque string identity remain typed refusals until their dependency closures and semantic inverses are represented"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "sheet",
+      "context": "tab-state",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLS worksheet visibility setters",
+      "reason": "the initial XLS writer renames worksheets but does not yet change hidden or very-hidden tab state"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "workbook",
+      "context": "structural-elements",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLS structural add handlers",
+      "reason": "worksheet and other structural additions are not integrated into the initial XLS write adapter"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "workbook",
+      "context": "structural-elements",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLS structural remove handlers",
+      "reason": "cell-record removal is integrated for ordinary stored cells; worksheet, row, column and other structural removals require their own native dependency-aware handlers"
+    },
+    {
+      "subject": "operation",
+      "verb": "move",
+      "element": "workbook",
+      "context": "structural-elements",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLS structural move handlers",
+      "reason": "worksheet and cell movement is not integrated into the initial XLS write adapter"
+    },
+    {
+      "subject": "operation",
+      "verb": "swap",
+      "element": "workbook",
+      "context": "structural-elements",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLS structural swap handlers",
+      "reason": "worksheet and cell swapping is not integrated into the initial XLS write adapter"
+    },
+    {
+      "subject": "operation",
+      "verb": "batch",
+      "element": "workbook",
+      "context": "extended-commands",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLS extended batch commands",
+      "reason": "XLS batches currently compose admitted scalar cell and worksheet-name sets; structural, formatting and read commands remain pending"
+    },
+    {
+      "subject": "view",
+      "mode": "issues",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "forms",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "html",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "svg",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "screenshot",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "pdf",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    }
+  ]
+}

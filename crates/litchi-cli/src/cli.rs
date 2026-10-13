@@ -60,6 +60,9 @@ pub(crate) enum Command {
     Batch(Batch),
     /// Print what a file or a format supports.
     Capabilities(Capabilities),
+    /// Print a format's property registry: every element's properties with
+    /// type, unit, values, aliases, constraint and get/set/add flags.
+    Schema(Schema),
 }
 
 /// Where a write publishes its result.
@@ -238,6 +241,13 @@ pub(crate) struct Capabilities {
     /// A format whose static capabilities to print, for example docx.
     #[arg(long, value_name = "TYPE")]
     pub(crate) format: Option<String>,
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct Schema {
+    /// The format whose registry to print, for example docx.
+    #[arg(value_name = "TYPE")]
+    pub(crate) format: String,
 }
 
 #[cfg(test)]

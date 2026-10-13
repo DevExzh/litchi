@@ -172,6 +172,7 @@ const fn raw(name: &'static str, ty: ValueType) -> PropSpec {
         ty,
         access: Access::READ,
         raw: true,
+        admission: crate::registry::Admission::NONE,
     }
 }
 
