@@ -32,6 +32,7 @@ differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `aacdf00a1d10834d59799fe149b44a78b0a9a6157437fe2f2a78c8841aa51d86` |
 | golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `2038cde02828395f020df3d9b9732cc9350ce839bba5bc5aee3089cdd0e81fab` |
 | golden | `crates/litchi-ops/tests/golden/registry/ods.json` | `0c1b9c65f4c932c9ef36d6f1d61183724b98354c9c1a0d04adaada0505ca1fb4` |
+| golden | `crates/litchi-ops/tests/golden/registry/odt.json` | `530031295ae44a24667d22c7270cebc1afe59c456466d71014d85fe657180b3a` |
 | officecli | `schemas/help` (152 files, OfficeCLI commit `dced0d74`) | `0bcd8cae45fabc0c5e45ff99d1994465fb213ac1b8db3f7eadd87339fb40ced4` |
 
 ## Statuses
@@ -78,6 +79,7 @@ Elements:
 | pptx | 25 | 8 | 0 | 0 | 0 | 1 | 8 |
 | ppt | 15 | 18 | 0 | 0 | 0 | 1 | 8 |
 | ods | 8 | 30 | 0 | 0 | 1 | 2 | 1 |
+| odt | 19 | 12 | 0 | 0 | 13 | 2 | 5 |
 
 Property reads:
 
@@ -92,6 +94,7 @@ Property reads:
 | pptx | 167 | 22 | 70 | 0 | 144 | 0 | 284 | 249 |
 | ppt | 41 | 3 | 318 | 0 | 48 | 0 | 277 | 47 |
 | ods | 25 | 11 | 501 | 0 | 26 | 1 | 127 | 6 |
+| odt | 63 | 0 | 199 | 0 | 168 | 1 | 530 | 45 |
 
 Property writes:
 
@@ -106,6 +109,7 @@ Property writes:
 | pptx | 53 | 55 | 453 | 0 | 133 | 242 |
 | ppt | 0 | 14 | 547 | 0 | 16 | 157 |
 | ods | 6 | 5 | 533 | 0 | 6 | 147 |
+| odt | 12 | 32 | 752 | 0 | 31 | 179 |
 
 ## docx
 
@@ -8459,3 +8463,1091 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | `set` | `namedrange` | `scope` | a named range's scope is fixed once added; named expressions are retargeted through `ref` and are not added | ODS adapter follow-up (record 0277) |
 | `set` | `workbook` | `flat-odf` | flat single-XML spreadsheets (.fods) open read-only; their leaf transaction admits scalar cell writes only and is not integrated | ODS adapter follow-up (record 0277) |
 | `batch` | `cell` | `coalescing` | consecutive direct cell value, text, clear and formula sets share one leaf edit; style, merge, range and query sets and every other verb close the run | ODS adapter follow-up (record 0277) |
+
+## odt
+
+### Elements
+
+| OfficeCLI element | Litchi element | Status | Follow-up |
+|---|---|---|---|
+| abstractNum |  | missing |  |
+| body | body | supported |  |
+| bookmark | bookmark | supported |  |
+| bookmarkEnd |  | missing |  |
+| chart-axis |  | missing |  |
+| chart-series |  | missing |  |
+| chart |  | gap | M6 ODT body index (record 0276) |
+| comment | comment | supported |  |
+| diagram |  | missing |  |
+| document | document | supported |  |
+| endnote | endnote | supported |  |
+| equation |  | gap | M6 ODT body index (record 0276) |
+| field |  | gap | M6 ODT body index (record 0276) |
+| fieldChar |  | missing |  |
+| footer |  | gap | M6 ODT body index (record 0276) |
+| footnote | footnote | supported |  |
+| formfield |  | gap | M6 ODT body index (record 0276) |
+| header |  | gap | M6 ODT body index (record 0276) |
+| hyperlink | hyperlink | supported |  |
+| instrText |  | missing |  |
+| level |  | missing |  |
+| markdown |  | out of scope | an add-time import format, not an element of the document |
+| num |  | missing |  |
+| numbering |  | gap | M6 ODT body index (record 0276) |
+| ole | run | supported |  |
+| pagebreak | run | supported |  |
+| paragraph | paragraph | supported |  |
+| permStart |  | missing |  |
+| picture | picture | supported |  |
+| ptab |  | missing |  |
+| raw |  | out of scope | the raw XML layer (`raw`/`raw-set` commands), not an element (design §3) |
+| revision |  | gap | M6 ODT body index (record 0276) |
+| run | run | supported |  |
+| sdt |  | missing |  |
+| section | section | supported |  |
+| shape |  | gap | M6 ODT body index (record 0276) |
+| style | style | supported |  |
+| styles | styles | supported |  |
+| tab |  | gap | M6 ODT body index (record 0276) |
+| cell | cell | supported |  |
+| column |  | gap | M6 ODT body index (record 0276) |
+| row | row | supported |  |
+| table | table | supported |  |
+| textbox | textbox | supported |  |
+| toc |  | gap | M6 ODT body index (record 0276) |
+| watermark |  | missing |  |
+|  | heading | litchi-only |  |
+|  | list | litchi-only |  |
+|  | listItem | litchi-only |  |
+|  | frame | litchi-only |  |
+|  | metadata | litchi-only |  |
+
+### Properties
+
+| Element | Property | Type | OfficeCLI `asg` | Litchi `asg` | Read | Write | Follow-up |
+|---|---|---|---|---|---|---|---|
+| abstractNum | `id` | int | a-g |  | missing | gap |  |
+| abstractNum | `type` | enum | asg |  | missing | gap |  |
+| abstractNum | `name` | string | asg |  | missing | gap |  |
+| abstractNum | `styleLink` | string | asg |  | missing | gap |  |
+| abstractNum | `numStyleLink` | string | asg |  | missing | gap |  |
+| abstractNum | `format` | string | a-- |  | write-only | gap |  |
+| abstractNum | `text` | string | a-- |  | write-only | gap |  |
+| abstractNum | `start` | int | a-- |  | write-only | gap |  |
+| abstractNum | `indent` | int | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.format` | string | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.text` | string | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.start` | int | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.indent` | int | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.hanging` | int | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.justification` | enum | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.suff` | enum | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.font` | string | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.size` | font-size | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.color` | color | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.bold` | bool | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.italic` | bool | a-- |  | write-only | gap |  |
+| abstractNum | `abstractNumId` | int | --g |  | missing | — |  |
+| bookmark | `name` | string | asg | asg | supported | supported |  |
+| bookmark | `text` | string | a-- |  | supported | gap | the node's text |
+| bookmark | `id` | string | --g |  | missing | — |  |
+| bookmarkEnd | `id` | number | a-g |  | missing | gap |  |
+| bookmarkEnd | `name` | string | a-- |  | write-only | gap |  |
+| chart-axis | `axisFont` | string | --g |  | missing | — |  |
+| chart-axis | `axisMax` | number | --g |  | missing | — |  |
+| chart-axis | `axisMin` | number | --g |  | missing | — |  |
+| chart-axis | `axisNumFmt` | string | --g |  | missing | — |  |
+| chart-axis | `axisOrientation` | string | --g |  | missing | — |  |
+| chart-axis | `axisTitle` | string | --g |  | missing | — |  |
+| chart-axis | `format` | string | -sg |  | missing | gap |  |
+| chart-axis | `labelOffset` | number | --g |  | missing | — |  |
+| chart-axis | `labelRotation` | number | -sg |  | missing | gap |  |
+| chart-axis | `logBase` | number | -sg |  | missing | gap |  |
+| chart-axis | `majorGridlines` | bool | -sg |  | missing | gap |  |
+| chart-axis | `max` | number | -sg |  | missing | gap |  |
+| chart-axis | `min` | number | -sg |  | missing | gap |  |
+| chart-axis | `minorGridlines` | bool | -sg |  | missing | gap |  |
+| chart-axis | `tickLabelSkip` | number | --g |  | missing | — |  |
+| chart-axis | `title` | string | -sg |  | missing | gap |  |
+| chart-axis | `visible` | bool | -sg |  | missing | gap |  |
+| chart-series | `categories` | string | asg |  | missing | gap |  |
+| chart-series | `categoriesRef` | string | --g |  | missing | — |  |
+| chart-series | `color` | color | asg |  | missing | gap |  |
+| chart-series | `dataLabels.numFmt` | string | --g |  | missing | — |  |
+| chart-series | `dataLabels.separator` | string | --g |  | missing | — |  |
+| chart-series | `errBars` | string | -sg |  | missing | gap |  |
+| chart-series | `invertIfNeg` | string | -sg |  | missing | gap |  |
+| chart-series | `lineDash` | enum | -sg |  | missing | gap |  |
+| chart-series | `lineWidth` | number | -sg |  | missing | gap |  |
+| chart-series | `marker` | string | -sg |  | missing | gap |  |
+| chart-series | `markerSize` | number | -sg |  | missing | gap |  |
+| chart-series | `markerColor` | string | -sg |  | missing | gap |  |
+| chart-series | `name` | string | asg |  | missing | gap |  |
+| chart-series | `nameRef` | string | --g |  | missing | — |  |
+| chart-series | `scatterStyle` | string | --g |  | missing | — |  |
+| chart-series | `secondaryAxis` | bool | --g |  | missing | — |  |
+| chart-series | `smooth` | string | -sg |  | missing | gap |  |
+| chart-series | `values` | string | asg |  | missing | gap |  |
+| chart-series | `bubbleSize` | string | a-g |  | missing | gap |  |
+| chart-series | `bubbleSizeRef` | string | a-g |  | missing | gap |  |
+| chart | `dispUnits` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `seriesCount` | number | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| chart | `radarstyle` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `roundedcorners` | bool | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `valaxisvisible` | bool | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `areafill` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `autotitledeleted` | bool | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `axisfont` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `axisline` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `axismax` | number | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `axismin` | number | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `axisnumfmt` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `axisorientation` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `axisposition` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `axistitle` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `axisvisible` | bool | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `bubbleScale` | number | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `catAxisVisible` | bool | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `catTitle` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `cataxisline` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `categories` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `chartFill` | color | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `chartType` | enum | a-g |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `chartareafill` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `chartborder` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `colorrule` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `colors` | string | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `combosplit` | number | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `combotypes` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `crossBetween` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `crosses` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `crossesAt` | number | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `data` | string | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `dataLabels` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `dataTable` | bool | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `decreaseColor` | color | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `dispBlanksAs` | enum | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `droplines` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `errbars` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `explosion` | number | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `firstSliceAngle` | number | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `gapdepth` | number | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `gapwidth` | number | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `gradient` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `gradients` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `gridlines` | bool | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `height` | length | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `hilowlines` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `holeSize` | number | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `increaseColor` | color | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `invertifneg` | bool | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `labelPos` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `labelfont` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `labelFont.size` | number | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| chart | `labelFont.color` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| chart | `labelFont.bold` | bool | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| chart | `labelFont.name` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| chart | `labeloffset` | number | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `labelrotation` | number | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `leaderlines` | bool | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `legend` | enum | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `legend.overlay` | bool | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `legendFont` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `linedash` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `linewidth` | number | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `logbase` | number | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `majorTickMark` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `majorunit` | number | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `marker` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `markersize` | number | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `markercolor` | string | -sg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `minorGridlines` | bool | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `minorTickMark` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `minorunit` | number | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `overlap` | number | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `plotFill` | color | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `plotborder` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `plotvisonly` | bool | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `preset` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `referenceline` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `scatterstyle` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `secondaryaxis` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `series{N}` | string | -s- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `seriesoutline` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `seriesshadow` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `serlines` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `shape` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `showMarker` | string | -sg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `shownegbubbles` | bool | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `sizerepresents` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `smooth` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `style` | number | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `tickLabelPos` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `ticklabelskip` | number | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `title` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `title.bold` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `title.color` | color | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `title.font` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `title.overlay` | bool | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `title.size` | font-size | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `totalColor` | color | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `transparency` | number | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `trendline` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `updownbars` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `valaxisline` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `varyColors` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `view3d` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `width` | length | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| comment | `id` | number | --g |  | missing | — |  |
+| comment | `anchoredTo` | string | --g |  | missing | — |  |
+| comment | `runStart` | int | a-- |  | write-only | gap |  |
+| comment | `range` | bool | a-- |  | write-only | gap |  |
+| comment | `parentId` | number | a-g |  | missing | gap |  |
+| comment | `done` | bool | asg |  | missing | gap |  |
+| comment | `date` | string | asg | --g | supported | gap |  |
+| comment | `initials` | string | asg |  | missing | gap |  |
+| comment | `author` | string | asg | a-g | supported | partial |  |
+| comment | `text` | string | asg | asg | supported | supported |  |
+| diagram | `mermaid` | string | a-- |  | write-only | gap |  |
+| diagram | `src` | string | a-- |  | write-only | gap |  |
+| diagram | `width` | length | a-- |  | write-only | gap |  |
+| diagram | `height` | length | a-- |  | write-only | gap |  |
+| diagram | `render` | string | a-- |  | write-only | gap |  |
+| diagram | `poster` | boolean | a-- |  | write-only | gap |  |
+| diagram | `theme` | string | a-- |  | write-only | gap |  |
+| diagram | `layout` | string | a-- |  | write-only | gap |  |
+| diagram | `look` | string | a-- |  | write-only | gap |  |
+| diagram | `background` | string | a-- |  | write-only | gap |  |
+| document | `author` | string | -sg |  | missing | gap |  |
+| document | `title` | string | -sg |  | missing | gap |  |
+| document | `keywords` | string | -sg |  | missing | gap |  |
+| document | `description` | string | -sg |  | missing | gap |  |
+| document | `lastModifiedBy` | string | -sg |  | missing | gap |  |
+| document | `category` | string | --g |  | missing | — |  |
+| document | `revisionNumber` | string | --g |  | missing | — |  |
+| document | `created` | string | --g |  | missing | — |  |
+| document | `modified` | string | --g |  | missing | — |  |
+| document | `protection` | enum | --g |  | missing | — |  |
+| document | `protectionEnforced` | bool | --g |  | missing | — |  |
+| document | `docGrid.type` | enum | -sg |  | missing | gap |  |
+| document | `docGrid.linePitch` | number | -sg |  | missing | gap |  |
+| document | `docGrid.charSpace` | number | -sg |  | missing | gap |  |
+| document | `charSpacingControl` | enum | -sg |  | missing | gap |  |
+| document | `compatibility.mode` | string | -sg |  | missing | gap |  |
+| document | `docDefaults.font` | string | -sg |  | missing | gap |  |
+| document | `docDefaults.font.eastAsia` | string | -sg |  | missing | gap |  |
+| document | `docDefaults.font.hAnsi` | string | -sg |  | missing | gap |  |
+| document | `docDefaults.font.complexScript` | string | -sg |  | missing | gap |  |
+| document | `docDefaults.fontSize` | font-size | -sg |  | missing | gap |  |
+| document | `docDefaults.color` | color | -sg |  | missing | gap |  |
+| document | `docDefaults.bold` | bool | -sg |  | missing | gap |  |
+| document | `docDefaults.italic` | bool | -sg |  | missing | gap |  |
+| document | `docDefaults.rtl` | bool | -sg |  | missing | gap |  |
+| document | `docDefaults.alignment` | string | -sg |  | missing | gap |  |
+| document | `docDefaults.spaceBefore` | string | -sg |  | missing | gap |  |
+| document | `docDefaults.spaceAfter` | string | -sg |  | missing | gap |  |
+| document | `docDefaults.lineSpacing` | string | -sg |  | missing | gap |  |
+| document | `autoSpaceDE` | bool | -s- |  | write-only | gap |  |
+| document | `autoSpaceDN` | bool | -s- |  | write-only | gap |  |
+| document | `kinsoku` | bool | -s- |  | write-only | gap |  |
+| document | `overflowPunct` | bool | -s- |  | write-only | gap |  |
+| document | `embedFonts` | bool | -s- |  | write-only | gap |  |
+| document | `embedSystemFonts` | bool | -s- |  | write-only | gap |  |
+| document | `saveSubsetFonts` | bool | -s- |  | write-only | gap |  |
+| document | `mirrorMargins` | bool | -s- |  | write-only | gap |  |
+| document | `gutterAtTop` | bool | -s- |  | write-only | gap |  |
+| document | `bookFoldPrinting` | bool | -s- |  | write-only | gap |  |
+| document | `evenAndOddHeaders` | bool | -sg |  | missing | gap |  |
+| document | `updateFields` | bool | -sg |  | missing | gap |  |
+| document | `recalcFields` | enum | -s- |  | write-only | gap |  |
+| document | `autoHyphenation` | bool | -sg |  | missing | gap |  |
+| document | `trackRevisions` | bool | -sg |  | missing | gap |  |
+| document | `defaultTabStop` | string | -s- |  | write-only | gap |  |
+| document | `displayBackgroundShape` | bool | -s- |  | write-only | gap |  |
+| document | `removePersonalInformation` | bool | -s- |  | write-only | gap |  |
+| document | `removeDateAndTime` | bool | -s- |  | write-only | gap |  |
+| document | `printFormsData` | bool | -s- |  | write-only | gap |  |
+| document | `pageWidth` | length | -sg |  | missing | gap |  |
+| document | `sectPr` | enum | -s- |  | write-only | gap |  |
+| document | `pageHeight` | length | -sg |  | missing | gap |  |
+| document | `orientation` | enum | -sg |  | missing | gap |  |
+| document | `marginTop` | length | -sg |  | missing | gap |  |
+| document | `marginBottom` | length | -sg |  | missing | gap |  |
+| document | `marginLeft` | length | -sg |  | missing | gap |  |
+| document | `marginRight` | length | -sg |  | missing | gap |  |
+| document | `marginHeader` | length | -sg |  | missing | gap |  |
+| document | `marginFooter` | length | -sg |  | missing | gap |  |
+| document | `marginGutter` | length | -sg |  | missing | gap |  |
+| document | `extended.application` | string | --g |  | missing | — |  |
+| document | `bookFoldPrintingSheets` | number | --g |  | missing | — |  |
+| document | `bookFoldReversePrinting` | bool | --g |  | missing | — |  |
+| document | `doNotDisplayPageBoundaries` | bool | --g |  | missing | — |  |
+| document | `columns.equalWidth` | bool | --g |  | missing | — |  |
+| document | `columns.separator` | bool | --g |  | missing | — |  |
+| document | `locale` | string | --g |  | missing | — |  |
+| document | `extended.applicationVersion` | string | --g |  | missing | — |  |
+| document | `extended.characters` | number | --g |  | missing | — |  |
+| document | `extended.company` | string | -sg |  | missing | gap |  |
+| document | `extended.lines` | number | --g |  | missing | — |  |
+| document | `extended.manager` | string | -sg |  | missing | gap |  |
+| document | `extended.pages` | number | --g |  | missing | — |  |
+| document | `extended.paragraphs` | number | --g |  | missing | — |  |
+| document | `extended.template` | string | -sg |  | missing | gap |  |
+| document | `extended.totalTime` | number | --g |  | missing | — |  |
+| document | `extended.words` | number | --g |  | missing | — |  |
+| document | `subject` | string | -sg |  | missing | gap |  |
+| document | `theme.color.accent1` | color | -sg |  | missing | gap |  |
+| document | `theme.color.accent2` | color | -sg |  | missing | gap |  |
+| document | `theme.color.accent3` | color | -sg |  | missing | gap |  |
+| document | `theme.color.accent4` | color | -sg |  | missing | gap |  |
+| document | `theme.color.accent5` | color | -sg |  | missing | gap |  |
+| document | `theme.color.accent6` | color | -sg |  | missing | gap |  |
+| document | `theme.color.dk1` | color | -sg |  | missing | gap |  |
+| document | `theme.color.dk2` | color | -sg |  | missing | gap |  |
+| document | `theme.color.folHlink` | color | -sg |  | missing | gap |  |
+| document | `theme.color.hlink` | color | -sg |  | missing | gap |  |
+| document | `theme.color.lt1` | color | -sg |  | missing | gap |  |
+| document | `theme.color.lt2` | color | -sg |  | missing | gap |  |
+| document | `theme.colorScheme` | string | --g |  | missing | — |  |
+| document | `theme.font.major.eastAsia` | string | -sg |  | missing | gap |  |
+| document | `theme.font.major.latin` | string | -sg |  | missing | gap |  |
+| document | `theme.font.minor.eastAsia` | string | -sg |  | missing | gap |  |
+| document | `theme.font.minor.latin` | string | -sg |  | missing | gap |  |
+| document | `theme.fontScheme` | string | --g |  | missing | — |  |
+| document | `theme.formatScheme` | string | --g |  | missing | — |  |
+| document | `theme.name` | string | --g |  | missing | — |  |
+| endnote | `text` | string | asg | asg | supported | supported |  |
+| endnote | `direction` | enum | as- |  | write-only | gap |  |
+| endnote | `align` | enum | as- |  | write-only | gap |  |
+| endnote | `font.cs` | string | as- |  | write-only | gap |  |
+| endnote | `font.ea` | string | as- |  | write-only | gap |  |
+| endnote | `font.latin` | string | as- |  | write-only | gap |  |
+| endnote | `bold.cs` | bool | as- |  | write-only | gap |  |
+| endnote | `italic.cs` | bool | as- |  | write-only | gap |  |
+| endnote | `size.cs` | font-size | as- |  | write-only | gap |  |
+| endnote | `id` | number | --g |  | missing | — |  |
+| endnote | `citation` | string |  | --g | litchi-only | — |  |
+| endnote | `class` | enum |  | --g | litchi-only | — |  |
+| equation | `mode` | enum | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| equation | `formula` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| field | `evaluated` | bool | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| field | `fieldType` | enum | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| field | `name` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| field | `id` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| field | `expression` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| field | `trueText` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| field | `falseText` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| field | `hyperlink` | bool | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| field | `format` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| field | `instruction` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| field | `vertAlign` | enum | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| field | `fldLock` | bool | a-g |  | element gap | gap | M6 ODT body index (record 0276) |
+| fieldChar | `fieldCharType` | enum | -sg |  | missing | gap |  |
+| footer | `type` | enum | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| footer | `text` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| footer | `align` | enum | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| footer | `direction` | enum | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| footer | `font` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| footer | `size` | font-size | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| footer | `bold` | bool | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| footer | `italic` | bool | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| footer | `color` | color | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| footer | `field` | enum | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| footnote | `text` | string | asg | asg | supported | supported |  |
+| footnote | `direction` | enum | as- |  | write-only | gap |  |
+| footnote | `align` | enum | as- |  | write-only | gap |  |
+| footnote | `font.cs` | string | as- |  | write-only | gap |  |
+| footnote | `font.ea` | string | as- |  | write-only | gap |  |
+| footnote | `font.latin` | string | as- |  | write-only | gap |  |
+| footnote | `bold.cs` | bool | as- |  | write-only | gap |  |
+| footnote | `italic.cs` | bool | as- |  | write-only | gap |  |
+| footnote | `size.cs` | font-size | as- |  | write-only | gap |  |
+| footnote | `id` | number | --g |  | missing | — |  |
+| footnote | `citation` | string |  | --g | litchi-only | — |  |
+| footnote | `class` | enum |  | --g | litchi-only | — |  |
+| formfield | `type` | enum | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| formfield | `name` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| formfield | `text` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| formfield | `checked` | bool | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| formfield | `default` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| formfield | `enabled` | bool | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| formfield | `hasFormFieldData` | bool | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| header | `type` | enum | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| header | `text` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| header | `align` | enum | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| header | `direction` | enum | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| header | `font` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| header | `size` | font-size | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| header | `bold` | bool | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| header | `italic` | bool | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| header | `color` | color | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| header | `field` | enum | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| hyperlink | `url` | string | asg | asg | supported | supported |  |
+| hyperlink | `anchor` | string | a-g |  | missing | gap |  |
+| hyperlink | `tooltip` | string | a-g | -sg | supported | gap |  |
+| hyperlink | `text` | string | asg | asg | supported | supported |  |
+| hyperlink | `rStyle` | string | a-g |  | missing | gap |  |
+| hyperlink | `color` | color | a-g |  | missing | gap |  |
+| hyperlink | `font` | string | a-g |  | missing | gap |  |
+| hyperlink | `size` | length | a-g |  | missing | gap |  |
+| hyperlink | `underline` | enum | a-g |  | missing | gap |  |
+| hyperlink | `bold` | bool | a-g |  | missing | gap |  |
+| hyperlink | `italic` | bool | a-g |  | missing | gap |  |
+| hyperlink | `docLocation` | string | --g |  | missing | — |  |
+| hyperlink | `tgtFrame` | string |  | -sg | litchi-only | litchi-only |  |
+| instrText | `instruction` | string | -sg |  | missing | gap |  |
+| level | `ilvl` | int | a-g |  | missing | gap |  |
+| level | `format` | string | asg |  | missing | gap |  |
+| level | `lvlText` | string | asg |  | missing | gap |  |
+| level | `start` | int | asg |  | missing | gap |  |
+| level | `indent` | int | asg |  | missing | gap |  |
+| level | `hanging` | int | asg |  | missing | gap |  |
+| level | `justification` | enum | asg |  | missing | gap |  |
+| level | `suff` | enum | as- |  | write-only | gap |  |
+| level | `lvlRestart` | int | as- |  | write-only | gap |  |
+| level | `isLgl` | bool | as- |  | write-only | gap |  |
+| level | `direction` | enum | a-- |  | write-only | gap |  |
+| level | `font` | string | as- |  | write-only | gap |  |
+| level | `size` | font-size | as- |  | write-only | gap |  |
+| level | `color` | color | as- |  | write-only | gap |  |
+| level | `bold` | bool | as- |  | write-only | gap |  |
+| level | `italic` | bool | as- |  | write-only | gap |  |
+| num | `id` | int | a-g |  | missing | gap |  |
+| num | `abstractNumId` | int | asg |  | missing | gap |  |
+| num | `format` | string | a-- |  | write-only | gap |  |
+| num | `text` | string | a-- |  | write-only | gap |  |
+| num | `indent` | int | a-- |  | write-only | gap |  |
+| num | `type` | enum | a-- |  | write-only | gap |  |
+| num | `start` | int | a-- |  | write-only | gap |  |
+| num | `startOverride.<N>` | int | a-- |  | write-only | gap |  |
+| num | `continue` | bool | a-- |  | write-only | gap |  |
+| num | `numId` | int | --g |  | missing | — |  |
+| numbering | `abstractNumCount` | number | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| numbering | `abstractNumId` | number | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| ole | `objectType` | string | --g |  | missing | — |  |
+| ole | `display` | string | --g |  | missing | — |  |
+| ole | `relId` | string | --g |  | missing | — |  |
+| ole | `fileSize` | number | --g |  | missing | — |  |
+| ole | `contentType` | string | a-g |  | missing | gap |  |
+| ole | `height` | length | asg |  | missing | gap |  |
+| ole | `width` | length | asg |  | missing | gap |  |
+| ole | `preview` | string | a-- |  | write-only | gap |  |
+| ole | `progId` | string | asg |  | missing | gap |  |
+| ole | `src` | string | as- |  | write-only | gap |  |
+| ole | `oleKind` | enum | a-- |  | write-only | gap |  |
+| ole | `embedExt` | string | a-- |  | write-only | gap |  |
+| ole | `text` | string |  | asg | litchi-only | litchi-only |  |
+| ole | `style` | string |  | --g | litchi-only | — |  |
+| ole | `bold` | bool |  | -sg | litchi-only | litchi-only |  |
+| ole | `italic` | bool |  | -sg | litchi-only | litchi-only |  |
+| ole | `underline` | bool |  | -sg | litchi-only | litchi-only |  |
+| ole | `strike` | bool |  | -sg | litchi-only | litchi-only |  |
+| ole | `size` | font-size |  | -sg | litchi-only | litchi-only |  |
+| ole | `color` | color |  | -sg | litchi-only | litchi-only |  |
+| ole | `font` | string |  | -sg | litchi-only | litchi-only |  |
+| ole | `highlight` | color |  | -sg | litchi-only | litchi-only |  |
+| ole | `superscript` | bool |  | -sg | litchi-only | litchi-only |  |
+| ole | `subscript` | bool |  | -sg | litchi-only | litchi-only |  |
+| ole | `caps` | bool |  | -sg | litchi-only | litchi-only |  |
+| ole | `smallcaps` | bool |  | -sg | litchi-only | litchi-only |  |
+| pagebreak | `type` | enum | a-g |  | supported | gap | the node's text |
+| pagebreak | `breakType` | enum | -sg |  | missing | gap |  |
+| pagebreak | `text` | string |  | asg | litchi-only | litchi-only |  |
+| pagebreak | `style` | string |  | --g | litchi-only | — |  |
+| pagebreak | `bold` | bool |  | -sg | litchi-only | litchi-only |  |
+| pagebreak | `italic` | bool |  | -sg | litchi-only | litchi-only |  |
+| pagebreak | `underline` | bool |  | -sg | litchi-only | litchi-only |  |
+| pagebreak | `strike` | bool |  | -sg | litchi-only | litchi-only |  |
+| pagebreak | `size` | font-size |  | -sg | litchi-only | litchi-only |  |
+| pagebreak | `color` | color |  | -sg | litchi-only | litchi-only |  |
+| pagebreak | `font` | string |  | -sg | litchi-only | litchi-only |  |
+| pagebreak | `highlight` | color |  | -sg | litchi-only | litchi-only |  |
+| pagebreak | `superscript` | bool |  | -sg | litchi-only | litchi-only |  |
+| pagebreak | `subscript` | bool |  | -sg | litchi-only | litchi-only |  |
+| pagebreak | `caps` | bool |  | -sg | litchi-only | litchi-only |  |
+| pagebreak | `smallcaps` | bool |  | -sg | litchi-only | litchi-only |  |
+| paragraph | `lineRule` | enum | asg |  | missing | gap |  |
+| paragraph | `align` | enum | asg | asg | supported | supported |  |
+| paragraph | `style` | string | asg | asg | supported | supported |  |
+| paragraph | `spaceBefore` | length | asg | -sg | supported | partial |  |
+| paragraph | `spaceAfter` | length | asg | -sg | supported | partial |  |
+| paragraph | `spaceBeforeAuto` | boolean | asg |  | missing | gap |  |
+| paragraph | `spaceAfterAuto` | boolean | asg |  | missing | gap |  |
+| paragraph | `listStyle` | enum | asg |  | missing | gap |  |
+| paragraph | `numId` | int | asg |  | missing | gap |  |
+| paragraph | `numLevel` | int | asg |  | missing | gap |  |
+| paragraph | `start` | int | as- |  | write-only | gap |  |
+| paragraph | `bold` | bool | asg | -sg | supported | partial |  |
+| paragraph | `italic` | bool | asg | -sg | supported | partial |  |
+| paragraph | `font` | string | as- | -sg | supported | partial |  |
+| paragraph | `size` | font-size | asg | -sg | supported | partial |  |
+| paragraph | `color` | color | asg | -sg | supported | partial |  |
+| paragraph | `underline` | string | asg | -sg | supported | partial |  |
+| paragraph | `underline.color` | color | asg |  | missing | gap |  |
+| paragraph | `strike` | bool | asg | -sg | supported | partial |  |
+| paragraph | `highlight` | string | asg | -sg | supported | partial |  |
+| paragraph | `caps` | bool | a-- |  | write-only | gap |  |
+| paragraph | `smallcaps` | bool | a-- |  | write-only | gap |  |
+| paragraph | `dstrike` | bool | a-- |  | write-only | gap |  |
+| paragraph | `vanish` | bool | a-- |  | write-only | gap |  |
+| paragraph | `outline` | bool | a-- |  | write-only | gap |  |
+| paragraph | `shadow` | bool | a-- |  | write-only | gap |  |
+| paragraph | `emboss` | bool | a-- |  | write-only | gap |  |
+| paragraph | `imprint` | bool | a-- |  | write-only | gap |  |
+| paragraph | `noproof` | bool | a-- |  | write-only | gap |  |
+| paragraph | `superscript` | bool | a-- |  | write-only | gap |  |
+| paragraph | `subscript` | bool | a-- |  | write-only | gap |  |
+| paragraph | `vertAlign` | enum | a-- |  | write-only | gap |  |
+| paragraph | `charSpacing` | length | a-- |  | write-only | gap |  |
+| paragraph | `rtl` | bool | a-- |  | write-only | gap |  |
+| paragraph | `direction` | enum | asg |  | missing | gap |  |
+| paragraph | `font.cs` | string | asg |  | missing | gap |  |
+| paragraph | `font.ea` | string | asg |  | missing | gap |  |
+| paragraph | `font.latin` | string | asg |  | missing | gap |  |
+| paragraph | `font.asciiTheme` | string | asg |  | missing | gap |  |
+| paragraph | `font.hAnsiTheme` | string | asg |  | missing | gap |  |
+| paragraph | `font.eaTheme` | string | asg |  | missing | gap |  |
+| paragraph | `font.csTheme` | string | asg |  | missing | gap |  |
+| paragraph | `bold.cs` | bool | asg |  | missing | gap |  |
+| paragraph | `italic.cs` | bool | asg |  | missing | gap |  |
+| paragraph | `size.cs` | font-size | asg |  | missing | gap |  |
+| paragraph | `shd` | string | as- | -sg | supported | partial |  |
+| paragraph | `firstLineIndent` | length | asg | -sg | supported | partial |  |
+| paragraph | `rightIndent` | length | asg | -sg | supported | partial |  |
+| paragraph | `hangingIndent` | length | asg |  | missing | gap |  |
+| paragraph | `keepNext` | bool | asg | -sg | supported | partial |  |
+| paragraph | `keepLines` | bool | asg |  | missing | gap |  |
+| paragraph | `pageBreakBefore` | bool | asg | -sg | supported | partial |  |
+| paragraph | `widowControl` | bool | asg |  | missing | gap |  |
+| paragraph | `wordWrap` | bool | asg |  | missing | gap |  |
+| paragraph | `contextualSpacing` | bool | asg |  | missing | gap |  |
+| paragraph | `effective.size` | font-size | --g |  | missing | — |  |
+| paragraph | `effective.size.src` | string | --g |  | missing | — |  |
+| paragraph | `effective.font.ascii` | string | --g |  | missing | — |  |
+| paragraph | `effective.font.ascii.src` | string | --g |  | missing | — |  |
+| paragraph | `effective.font.eastAsia` | string | --g |  | missing | — |  |
+| paragraph | `effective.font.eastAsia.src` | string | --g |  | missing | — |  |
+| paragraph | `effective.font.hAnsi` | string | --g |  | missing | — |  |
+| paragraph | `effective.font.hAnsi.src` | string | --g |  | missing | — |  |
+| paragraph | `effective.font.cs` | string | --g |  | missing | — |  |
+| paragraph | `effective.font.cs.src` | string | --g |  | missing | — |  |
+| paragraph | `effective.bold` | bool | --g |  | missing | — |  |
+| paragraph | `effective.bold.src` | string | --g |  | missing | — |  |
+| paragraph | `effective.italic` | bool | --g |  | missing | — |  |
+| paragraph | `effective.italic.src` | string | --g |  | missing | — |  |
+| paragraph | `effective.color` | color | --g |  | missing | — |  |
+| paragraph | `effective.color.src` | string | --g |  | missing | — |  |
+| paragraph | `effective.underline` | string | --g |  | missing | — |  |
+| paragraph | `effective.underline.src` | string | --g |  | missing | — |  |
+| paragraph | `effective.rtl` | bool | --g |  | missing | — |  |
+| paragraph | `effective.rtl.src` | string | --g |  | missing | — |  |
+| paragraph | `numFmt` | string | --g |  | missing | — |  |
+| paragraph | `fill` | color | asg | -sg | supported | partial |  |
+| paragraph | `shading.val` | string | -sg |  | missing | gap |  |
+| paragraph | `shading.fill` | string | -sg |  | missing | gap |  |
+| paragraph | `shading.color` | string | -sg |  | missing | gap |  |
+| paragraph | `paraId` | string | --g |  | raw-only | — | ADR 0034: native selection requires explicit raw admission |
+| paragraph | `outlineLvl` | number | asg |  | missing | gap |  |
+| paragraph | `rStyle` | string | asg |  | missing | gap |  |
+| paragraph | `tabs` | array | -sg |  | missing | gap |  |
+| paragraph | `pbdr.top` | string | asg |  | missing | gap |  |
+| paragraph | `pbdr.bottom` | string | asg |  | missing | gap |  |
+| paragraph | `pbdr.left` | string | asg |  | missing | gap |  |
+| paragraph | `pbdr.right` | string | asg |  | missing | gap |  |
+| paragraph | `pbdr.between` | string | asg |  | missing | gap |  |
+| paragraph | `pbdr.bar` | string | asg |  | missing | gap |  |
+| paragraph | `firstLineChars` | number | -sg |  | missing | gap |  |
+| paragraph | `hangingChars` | number | -sg |  | missing | gap |  |
+| paragraph | `markRPr.bold` | bool | -sg |  | missing | gap |  |
+| paragraph | `markRPr.italic` | bool | -sg |  | missing | gap |  |
+| paragraph | `markRPr.strike` | bool | -sg |  | missing | gap |  |
+| paragraph | `markRPr.rtl` | bool | asg |  | missing | gap |  |
+| paragraph | `markRPr.rStyle` | string | asg |  | missing | gap |  |
+| paragraph | `markRPr.underline` | string | -sg |  | missing | gap |  |
+| paragraph | `markRPr.size` | length | -sg |  | missing | gap |  |
+| paragraph | `markRPr.color` | color | -sg |  | missing | gap |  |
+| paragraph | `markRPr.highlight` | string | -sg |  | missing | gap |  |
+| paragraph | `markRPr.font.latin` | string | -sg |  | missing | gap |  |
+| paragraph | `markRPr.font.ea` | string | -sg |  | missing | gap |  |
+| paragraph | `markRPr.font.cs` | string | -sg |  | missing | gap |  |
+| paragraph | `markRPr.font.hint` | string | -sg |  | missing | gap |  |
+| paragraph | `markRPr.font.asciiTheme` | string | asg |  | missing | gap |  |
+| paragraph | `markRPr.font.hAnsiTheme` | string | asg |  | missing | gap |  |
+| paragraph | `markRPr.font.eaTheme` | string | asg |  | missing | gap |  |
+| paragraph | `markRPr.font.csTheme` | string | asg |  | missing | gap |  |
+| paragraph | `markRPr.charSpacing` | length | -sg |  | missing | gap |  |
+| paragraph | `markRPr.size.cs` | length | -sg |  | missing | gap |  |
+| paragraph | `markRPr.bold.cs` | bool | -sg |  | missing | gap |  |
+| paragraph | `markRPr.italic.cs` | bool | -sg |  | missing | gap |  |
+| paragraph | `markRPr.kern` | integer | -sg |  | missing | gap |  |
+| paragraph | `markRPr.font.ascii` | string | -sg |  | missing | gap |  |
+| paragraph | `markRPr.font.hAnsi` | string | -sg |  | missing | gap |  |
+| paragraph | `markRPr.lang.latin` | string | -sg |  | missing | gap |  |
+| paragraph | `markRPr.lang.ea` | string | -sg |  | missing | gap |  |
+| paragraph | `markRPr.lang.cs` | string | -sg |  | missing | gap |  |
+| paragraph | `kern` | integer | --g |  | missing | — |  |
+| paragraph | `adjustRightInd` | boolean | asg |  | missing | gap |  |
+| paragraph | `autoSpaceDE` | boolean | asg |  | missing | gap |  |
+| paragraph | `autoSpaceDN` | boolean | asg |  | missing | gap |  |
+| paragraph | `kinsoku` | boolean | asg |  | missing | gap |  |
+| paragraph | `leftChars` | number | asg |  | missing | gap |  |
+| paragraph | `lineSpacing` | string | asg | -sg | supported | partial |  |
+| paragraph | `mirrorIndents` | boolean | asg |  | missing | gap |  |
+| paragraph | `overflowPunct` | boolean | asg |  | missing | gap |  |
+| paragraph | `rightChars` | number | asg |  | missing | gap |  |
+| paragraph | `snapToGrid` | boolean | asg |  | missing | gap |  |
+| paragraph | `spaceAfterLines` | number | asg |  | missing | gap |  |
+| paragraph | `spaceBeforeLines` | number | asg |  | missing | gap |  |
+| paragraph | `suppressAutoHyphens` | boolean | asg |  | missing | gap |  |
+| paragraph | `suppressLineNumbers` | boolean | asg |  | missing | gap |  |
+| paragraph | `suppressOverlap` | boolean | asg |  | missing | gap |  |
+| paragraph | `textAlignment` | string | asg |  | missing | gap |  |
+| paragraph | `textboxTightWrap` | string | asg |  | missing | gap |  |
+| paragraph | `topLinePunct` | boolean | asg |  | missing | gap |  |
+| paragraph | `indent` | length | asg | -sg | supported | partial |  |
+| paragraph | `text` | string | asg | asg | supported | supported |  |
+| permStart | `id` | number | a-g |  | missing | gap |  |
+| permStart | `edGrp` | enum | a-g |  | missing | gap |  |
+| permStart | `ed` | string | a-g |  | missing | gap |  |
+| permStart | `colFirst` | number | a-g |  | missing | gap |  |
+| permStart | `colLast` | number | a-g |  | missing | gap |  |
+| picture | `decorative` | bool | asg |  | missing | gap |  |
+| picture | `crop` | string | asg |  | missing | gap |  |
+| picture | `cropLeft` | string | as- |  | write-only | gap |  |
+| picture | `cropTop` | string | as- |  | write-only | gap |  |
+| picture | `cropRight` | string | as- |  | write-only | gap |  |
+| picture | `cropBottom` | string | as- |  | write-only | gap |  |
+| picture | `anchor` | bool | a-g |  | missing | gap |  |
+| picture | `wrap` | string | asg |  | missing | gap |  |
+| picture | `behindText` | bool | asg |  | missing | gap |  |
+| picture | `relativeHeight` | integer | a-g |  | missing | gap |  |
+| picture | `effectExtent` | string | a-- |  | write-only | gap |  |
+| picture | `hPosition` | length | asg |  | missing | gap |  |
+| picture | `vPosition` | length | asg |  | missing | gap |  |
+| picture | `hRelative` | string | asg |  | missing | gap |  |
+| picture | `vRelative` | string | asg |  | missing | gap |  |
+| picture | `hAlign` | string | a-g |  | missing | gap |  |
+| picture | `vAlign` | string | a-g |  | missing | gap |  |
+| picture | `link` | string | a-g |  | missing | gap |  |
+| picture | `width` | length | asg |  | missing | gap |  |
+| picture | `height` | length | asg |  | missing | gap |  |
+| picture | `fallback` | string | a-- |  | write-only | gap |  |
+| picture | `id` | number | --g |  | missing | — |  |
+| picture | `alt` | string | asg |  | missing | gap |  |
+| picture | `contentType` | string | --g |  | missing | — |  |
+| picture | `fileSize` | number | --g |  | missing | — |  |
+| picture | `relId` | string | --g |  | missing | — |  |
+| picture | `src` | string | as- | --g | supported | gap |  |
+| ptab | `align` | enum | asg |  | missing | gap |  |
+| ptab | `relativeTo` | enum | asg |  | missing | gap |  |
+| ptab | `leader` | enum | asg |  | missing | gap |  |
+| revision | `type` | enum | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `text` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `author` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `date` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `id` | integer | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `nativePath` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `action` | enum | -s- |  | element gap | gap | M6 ODT body index (record 0276) |
+| revision | `paraMarkIns.author` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `paraMarkIns.date` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `paraMarkIns.id` | int | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `paraMarkDel.author` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `paraMarkDel.date` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `paraMarkDel.id` | int | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `revision.beforeLost` | bool | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `sectPrChange.author` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `sectPrChange.date` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `sectPrChange.id` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `tblPrChange.author` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `tblPrChange.date` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `trPrChange.author` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `trPrChange.date` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `tcPrChange.author` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `tcPrChange.date` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| run | `highlight` | color | asg | -sg | supported | partial |  |
+| run | `strike` | bool | asg | -sg | supported | partial |  |
+| run | `dstrike` | bool | asg |  | missing | gap |  |
+| run | `caps` | bool | asg | -sg | supported | partial |  |
+| run | `smallcaps` | bool | asg | -sg | supported | partial |  |
+| run | `vanish` | bool | asg |  | missing | gap |  |
+| run | `outline` | bool | asg |  | missing | gap |  |
+| run | `shadow` | bool | asg |  | missing | gap |  |
+| run | `emboss` | bool | asg |  | missing | gap |  |
+| run | `imprint` | bool | asg |  | missing | gap |  |
+| run | `noproof` | bool | asg |  | missing | gap |  |
+| run | `rtl` | bool | as- |  | write-only | gap |  |
+| run | `direction` | enum | asg |  | missing | gap |  |
+| run | `font.cs` | string | asg |  | missing | gap |  |
+| run | `font.ea` | string | asg |  | missing | gap |  |
+| run | `font.latin` | string | asg |  | missing | gap |  |
+| run | `font.hint` | string | asg |  | missing | gap |  |
+| run | `font.asciiTheme` | string | asg |  | missing | gap |  |
+| run | `font.hAnsiTheme` | string | asg |  | missing | gap |  |
+| run | `font.eaTheme` | string | asg |  | missing | gap |  |
+| run | `font.csTheme` | string | asg |  | missing | gap |  |
+| run | `bold.cs` | bool | asg |  | missing | gap |  |
+| run | `italic.cs` | bool | asg |  | missing | gap |  |
+| run | `size.cs` | font-size | asg |  | missing | gap |  |
+| run | `lang.latin` | string | -sg |  | missing | gap |  |
+| run | `lang.ea` | string | -sg |  | missing | gap |  |
+| run | `lang.cs` | string | -sg |  | missing | gap |  |
+| run | `vertAlign` | enum | as- |  | write-only | gap |  |
+| run | `kern` | int | asg |  | missing | gap |  |
+| run | `position` | length | asg |  | missing | gap |  |
+| run | `charSpacing` | length | asg |  | missing | gap |  |
+| run | `fill` | color | asg |  | missing | gap |  |
+| run | `shading` | color | as- |  | write-only | gap |  |
+| run | `shading.val` | string | --g |  | missing | — |  |
+| run | `shading.fill` | string | --g |  | missing | — |  |
+| run | `shading.color` | string | --g |  | missing | — |  |
+| run | `textOutline` | string | asg |  | missing | gap |  |
+| run | `textFill` | string | asg |  | missing | gap |  |
+| run | `w14shadow` | string | asg |  | missing | gap |  |
+| run | `w14glow` | string | asg |  | missing | gap |  |
+| run | `w14reflection` | string | asg |  | missing | gap |  |
+| run | `effective.size.src` | string | --- |  | write-only | — |  |
+| run | `effective.font.ascii` | string | --g |  | missing | — |  |
+| run | `effective.font.ascii.src` | string | --- |  | write-only | — |  |
+| run | `effective.font.eastAsia` | string | --g |  | missing | — |  |
+| run | `effective.font.eastAsia.src` | string | --- |  | write-only | — |  |
+| run | `effective.font.hAnsi` | string | --g |  | missing | — |  |
+| run | `effective.font.hAnsi.src` | string | --- |  | write-only | — |  |
+| run | `effective.font.cs` | string | --g |  | missing | — |  |
+| run | `effective.font.cs.src` | string | --- |  | write-only | — |  |
+| run | `effective.bold.src` | string | --- |  | write-only | — |  |
+| run | `effective.italic` | bool | --g |  | missing | — |  |
+| run | `effective.italic.src` | string | --- |  | write-only | — |  |
+| run | `effective.color.src` | string | --- |  | write-only | — |  |
+| run | `effective.underline` | string | --g |  | missing | — |  |
+| run | `effective.underline.src` | string | --- |  | write-only | — |  |
+| run | `effective.rtl` | bool | --g |  | missing | — |  |
+| run | `effective.rtl.src` | string | --g |  | missing | — |  |
+| run | `dirty` | bool | --g |  | missing | — |  |
+| run | `font.ascii` | string | --g |  | missing | — |  |
+| run | `font.eastAsia` | string | --- |  | write-only | — |  |
+| run | `font.hAnsi` | string | --g |  | missing | — |  |
+| run | `color` | color | asg | -sg | supported | partial |  |
+| run | `em` | string | asg |  | missing | gap |  |
+| run | `bdr` | string | asg |  | missing | gap |  |
+| run | `specVanish` | boolean | asg |  | missing | gap |  |
+| run | `snapToGrid` | boolean | asg |  | missing | gap |  |
+| run | `subscript` | bool | asg | -sg | supported | partial |  |
+| run | `superscript` | bool | asg | -sg | supported | partial |  |
+| run | `effective.bold` | bool | --g |  | missing | — |  |
+| run | `effective.color` | color | --g |  | missing | — |  |
+| run | `effective.size` | font-size | --g |  | missing | — |  |
+| run | `underline` | enum | asg | -sg | supported | partial |  |
+| run | `bold` | bool | asg | -sg | supported | partial |  |
+| run | `font` | string | as- | -sg | supported | partial |  |
+| run | `italic` | bool | asg | -sg | supported | partial |  |
+| run | `size` | font-size | asg | -sg | supported | partial |  |
+| run | `text` | string | asg | asg | supported | supported |  |
+| run | `style` | string |  | --g | litchi-only | — |  |
+| sdt | `type` | enum | a-g |  | missing | gap |  |
+| sdt | `tag` | string | asg |  | missing | gap |  |
+| sdt | `alias` | string | asg |  | missing | gap |  |
+| sdt | `text` | string | asg |  | missing | gap |  |
+| sdt | `checked` | bool | asg |  | missing | gap |  |
+| sdt | `format` | string | asg |  | missing | gap |  |
+| sdt | `items` | string | asg |  | missing | gap |  |
+| sdt | `lock` | enum | asg |  | missing | gap |  |
+| sdt | `placeholder` | bool | asg |  | missing | gap |  |
+| sdt | `placeholderText` | string | asg |  | missing | gap |  |
+| sdt | `date.fullDate` | string | asg |  | missing | gap |  |
+| sdt | `date.calendar` | string | asg |  | missing | gap |  |
+| sdt | `date.lid` | string | asg |  | missing | gap |  |
+| sdt | `date.storeMappedDataAs` | string | asg |  | missing | gap |  |
+| sdt | `comboBox.lastValue` | string | asg |  | missing | gap |  |
+| sdt | `dropDown.lastValue` | string | asg |  | missing | gap |  |
+| sdt | `id` | number | --g |  | missing | — |  |
+| sdt | `editable` | bool | --g |  | missing | — |  |
+| section | `type` | enum | asg |  | supported | gap | the node's text |
+| section | `pageWidth` | length | asg |  | missing | gap |  |
+| section | `pageHeight` | length | asg |  | missing | gap |  |
+| section | `orientation` | enum | asg |  | missing | gap |  |
+| section | `marginTop` | length | asg |  | missing | gap |  |
+| section | `marginBottom` | length | asg |  | missing | gap |  |
+| section | `marginLeft` | length | asg |  | missing | gap |  |
+| section | `marginRight` | length | asg |  | missing | gap |  |
+| section | `marginHeader` | length | asg |  | missing | gap |  |
+| section | `marginFooter` | length | asg |  | missing | gap |  |
+| section | `marginGutter` | length | asg |  | missing | gap |  |
+| section | `columns` | int | asg |  | missing | gap |  |
+| section | `columnSpace` | length | asg |  | missing | gap |  |
+| section | `titlePage` | bool | asg |  | missing | gap |  |
+| section | `pageNumFmt` | enum | asg |  | missing | gap |  |
+| section | `direction` | enum | asg |  | missing | gap |  |
+| section | `rtlGutter` | bool | asg |  | missing | gap |  |
+| section | `pageStart` | int | asg |  | missing | gap |  |
+| section | `lineNumbers` | enum | asg |  | missing | gap |  |
+| section | `lineNumberCountBy` | int | asg |  | missing | gap |  |
+| section | `lineNumberDistance` | int | asg |  | missing | gap |  |
+| section | `headerRef` | string | --g |  | missing | — |  |
+| section | `headerRef.default` | string | --g |  | missing | — |  |
+| section | `headerRef.first` | string | --g |  | missing | — |  |
+| section | `headerRef.even` | string | --g |  | missing | — |  |
+| section | `footerRef` | string | --g |  | missing | — |  |
+| section | `footerRef.default` | string | --g |  | missing | — |  |
+| section | `footerRef.first` | string | --g |  | missing | — |  |
+| section | `footerRef.even` | string | --g |  | missing | — |  |
+| section | `colSpaces` | string | --g |  | missing | — |  |
+| section | `columns.equalWidth` | bool | --g |  | missing | — |  |
+| section | `columns.separator` | bool | --g |  | missing | — |  |
+| section | `pgBorders` | enum | as- |  | write-only | gap |  |
+| section | `pgBorders.top` | string | asg |  | missing | gap |  |
+| section | `pgBorders.left` | string | asg |  | missing | gap |  |
+| section | `pgBorders.bottom` | string | asg |  | missing | gap |  |
+| section | `pgBorders.right` | string | asg |  | missing | gap |  |
+| section | `pgBorders.offsetFrom` | enum | asg |  | missing | gap |  |
+| section | `pgBorders.zOrder` | enum | asg |  | missing | gap |  |
+| section | `pgBorders.display` | enum | asg |  | missing | gap |  |
+| section | `paperSrc.first` | int | asg |  | missing | gap |  |
+| section | `paperSrc.other` | int | asg |  | missing | gap |  |
+| section | `formProt` | bool | asg |  | missing | gap |  |
+| section | `vAlign` | enum | asg |  | missing | gap |  |
+| section | `textDirection` | enum | asg |  | missing | gap |  |
+| section | `footnotePr.numFmt` | enum | asg |  | missing | gap |  |
+| section | `footnotePr.numRestart` | enum | asg |  | missing | gap |  |
+| section | `footnotePr.numStart` | int | asg |  | missing | gap |  |
+| section | `footnotePr.pos` | enum | asg |  | missing | gap |  |
+| section | `endnotePr.numFmt` | enum | asg |  | missing | gap |  |
+| section | `endnotePr.numRestart` | enum | asg |  | missing | gap |  |
+| section | `endnotePr.numStart` | int | asg |  | missing | gap |  |
+| section | `endnotePr.pos` | enum | asg |  | missing | gap |  |
+| section | `name` | string |  | asg | litchi-only | litchi-only |  |
+| section | `protected` | bool |  | -sg | litchi-only | litchi-only |  |
+| section | `hidden` | bool |  | -sg | litchi-only | litchi-only |  |
+| shape | `geometry` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| shape | `width` | length | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| shape | `height` | length | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| shape | `wrap` | enum | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| shape | `hAlign` | enum | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| shape | `vAlign` | enum | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| shape | `hRelative` | enum | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| shape | `vRelative` | enum | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| shape | `anchor.x` | length | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| shape | `anchor.y` | length | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| shape | `fill` | color | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| shape | `line` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| shape | `line.color` | color | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| shape | `line.width` | length | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| shape | `line.style` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| shape | `alt` | string | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| style | `id` | string | a-g |  | missing | gap |  |
+| style | `name` | string | asg | --g | supported | gap |  |
+| style | `type` | enum | a-g |  | supported | gap | the node's text |
+| style | `basedOn` | string | asg |  | missing | gap |  |
+| style | `basedOn.path` | string | --g |  | missing | — |  |
+| style | `next` | string | asg |  | missing | gap |  |
+| style | `linked` | string | asg |  | missing | gap |  |
+| style | `qFormat` | bool | asg |  | missing | gap |  |
+| style | `uiPriority` | int | asg |  | missing | gap |  |
+| style | `semiHidden` | bool | asg |  | missing | gap |  |
+| style | `unhideWhenUsed` | bool | asg |  | missing | gap |  |
+| style | `locked` | bool | asg |  | missing | gap |  |
+| style | `customStyle` | bool | a-g |  | missing | gap |  |
+| style | `align` | enum | asg | --g | supported | gap |  |
+| style | `spaceBefore` | length | asg |  | missing | gap |  |
+| style | `spaceAfter` | length | asg |  | missing | gap |  |
+| style | `spaceBeforeAuto` | boolean | asg |  | missing | gap |  |
+| style | `spaceAfterAuto` | boolean | asg |  | missing | gap |  |
+| style | `font` | string | asg | --g | supported | gap |  |
+| style | `font.ea` | string | asg |  | missing | gap |  |
+| style | `font.cs` | string | asg |  | missing | gap |  |
+| style | `font.asciiTheme` | string | asg |  | missing | gap |  |
+| style | `font.hAnsiTheme` | string | asg |  | missing | gap |  |
+| style | `font.eaTheme` | string | asg |  | missing | gap |  |
+| style | `font.csTheme` | string | asg |  | missing | gap |  |
+| style | `size` | font-size | asg | --g | supported | gap |  |
+| style | `bold` | bool | asg | --g | supported | gap |  |
+| style | `italic` | bool | asg | --g | supported | gap |  |
+| style | `color` | color | asg | --g | supported | gap |  |
+| style | `underline` | string | asg |  | missing | gap |  |
+| style | `strike` | bool | asg |  | missing | gap |  |
+| style | `dstrike` | bool | asg |  | missing | gap |  |
+| style | `highlight` | string | asg |  | missing | gap |  |
+| style | `caps` | bool | asg |  | missing | gap |  |
+| style | `smallCaps` | bool | asg |  | missing | gap |  |
+| style | `vanish` | bool | asg |  | missing | gap |  |
+| style | `rtl` | bool | asg |  | missing | gap |  |
+| style | `vertAlign` | enum | asg |  | missing | gap |  |
+| style | `charSpacing` | length | asg |  | missing | gap |  |
+| style | `shading` | color | asg |  | missing | gap |  |
+| style | `lineSpacing` | string | asg |  | missing | gap |  |
+| style | `lineRule` | enum | asg |  | missing | gap |  |
+| style | `contextualSpacing` | bool | asg |  | missing | gap |  |
+| style | `outlineLvl` | int | asg |  | missing | gap |  |
+| style | `kinsoku` | bool | asg |  | missing | gap |  |
+| style | `snapToGrid` | bool | as- |  | write-only | gap |  |
+| style | `wordWrap` | bool | as- |  | write-only | gap |  |
+| style | `autoSpaceDE` | bool | asg |  | missing | gap |  |
+| style | `autoSpaceDN` | bool | asg |  | missing | gap |  |
+| style | `bidi` | bool | asg |  | missing | gap |  |
+| style | `direction` | enum | asg |  | missing | gap |  |
+| style | `overflowPunct` | bool | asg |  | missing | gap |  |
+| style | `topLinePunct` | bool | as- |  | write-only | gap |  |
+| style | `suppressAutoHyphens` | bool | as- |  | write-only | gap |  |
+| style | `suppressLineNumbers` | bool | as- |  | write-only | gap |  |
+| style | `keepNext` | bool | asg |  | missing | gap |  |
+| style | `keepLines` | bool | asg |  | missing | gap |  |
+| style | `pageBreakBefore` | bool | asg |  | missing | gap |  |
+| style | `widowControl` | bool | asg |  | missing | gap |  |
+| style | `pbdr` | string | -s- |  | write-only | gap |  |
+| style | `numId` | int | asg |  | missing | gap |  |
+| style | `ilvl` | int | asg |  | missing | gap |  |
+| style | `effective.alignment` | string | --g |  | missing | — |  |
+| style | `effective.alignment.src` | string | --g |  | missing | — |  |
+| style | `effective.direction` | string | --g |  | missing | — |  |
+| style | `effective.direction.src` | string | --g |  | missing | — |  |
+| style | `effective.highlight` | string | --g |  | missing | — |  |
+| style | `effective.lineSpacing` | string | --g |  | missing | — |  |
+| style | `effective.lineSpacing.src` | string | --g |  | missing | — |  |
+| style | `effective.spaceBefore` | string | --g |  | missing | — |  |
+| style | `effective.spaceBefore.src` | string | --g |  | missing | — |  |
+| style | `effective.spaceAfter` | string | --g |  | missing | — |  |
+| style | `effective.spaceAfter.src` | string | --g |  | missing | — |  |
+| style | `effective.strike` | bool | --g |  | missing | — |  |
+| style | `displayName` | string |  | --g | litchi-only | — |  |
+| style | `family` | string |  | --g | litchi-only | — |  |
+| style | `parent` | string |  | --g | litchi-only | — |  |
+| styles | `count` | number | --g |  | missing | — |  |
+| tab | `pos` | length | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| tab | `val` | enum | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| tab | `leader` | enum | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| cell | `width` | string | asg |  | missing | gap |  |
+| cell | `skipGridSync` | bool | -s- |  | write-only | gap |  |
+| cell | `font` | string | -sg |  | missing | gap |  |
+| cell | `size` | font-size | -sg |  | missing | gap |  |
+| cell | `bold` | bool | -sg |  | missing | gap |  |
+| cell | `italic` | bool | -sg |  | missing | gap |  |
+| cell | `underline` | enum | -sg |  | missing | gap |  |
+| cell | `strike` | bool | -sg |  | missing | gap |  |
+| cell | `color` | color | -sg |  | missing | gap |  |
+| cell | `highlight` | color | -sg |  | missing | gap |  |
+| cell | `fill` | color | -sg | --g | supported | gap |  |
+| cell | `align` | enum | -sg |  | missing | gap |  |
+| cell | `valign` | enum | -sg | --g | supported | gap |  |
+| cell | `colspan` | int | -sg | --g | supported | gap |  |
+| cell | `fitText` | bool | -s- |  | write-only | gap |  |
+| cell | `textDirection` | enum | -sg |  | missing | gap |  |
+| cell | `direction` | enum | asg |  | missing | gap |  |
+| cell | `nowrap` | bool | asg |  | missing | gap |  |
+| cell | `hideMark` | bool | asg |  | missing | gap |  |
+| cell | `tcFitText` | bool | asg |  | missing | gap |  |
+| cell | `padding.top` | number | -sg |  | missing | gap |  |
+| cell | `padding.bottom` | number | -sg |  | missing | gap |  |
+| cell | `padding.left` | number | -sg |  | missing | gap |  |
+| cell | `padding.right` | number | -sg |  | missing | gap |  |
+| cell | `vmerge` | enum | -sg |  | missing | gap |  |
+| cell | `hmerge` | enum | -sg |  | missing | gap |  |
+| cell | `cnfStyle` | string | -sg |  | missing | gap |  |
+| cell | `border.all` | string | as- |  | write-only | gap |  |
+| cell | `border.bottom` | string | -s- |  | write-only | gap |  |
+| cell | `border.left` | string | -s- |  | write-only | gap |  |
+| cell | `border.right` | string | -s- |  | write-only | gap |  |
+| cell | `border.tl2br` | string | asg |  | missing | gap |  |
+| cell | `border.top` | string | -s- |  | write-only | gap |  |
+| cell | `border.tr2bl` | string | asg |  | missing | gap |  |
+| cell | `text` | string | asg | -sg | supported | partial |  |
+| cell | `rowspan` | int |  | --g | litchi-only | — |  |
+| cell | `covered` | bool |  | --g | litchi-only | — |  |
+| cell | `valueType` | string |  | --g | litchi-only | — |  |
+| column | `width` | length | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| column | `text` | string | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| row | `height.exact` | length | as- |  | write-only | gap |  |
+| row | `header` | bool | asg |  | missing | gap |  |
+| row | `cantSplit` | bool | asg |  | missing | gap |  |
+| row | `height.rule` | string | --g |  | missing | — |  |
+| row | `cnfStyle` | string | -sg |  | missing | gap |  |
+| row | `gridBefore` | int | asg |  | missing | gap |  |
+| row | `wBefore` | string | asg |  | missing | gap |  |
+| row | `gridAfter` | int | asg |  | missing | gap |  |
+| row | `wAfter` | string | asg |  | missing | gap |  |
+| row | `cellSpacing` | number | -sg |  | missing | gap |  |
+| row | `cols` | int | a-- |  | write-only | gap |  |
+| row | `height` | length | asg |  | missing | gap |  |
+| row | `cells` | int |  | --g | litchi-only | — |  |
+| table | `colWidths` | string | a-g |  | missing | gap |  |
+| table | `direction` | enum | asg |  | missing | gap |  |
+| table | `align` | enum | asg |  | missing | gap |  |
+| table | `indent` | int | asg |  | missing | gap |  |
+| table | `cellSpacing` | int | asg |  | missing | gap |  |
+| table | `layout` | enum | asg |  | missing | gap |  |
+| table | `padding` | int | as- |  | write-only | gap |  |
+| table | `caption` | string | asg |  | missing | gap |  |
+| table | `description` | string | asg |  | missing | gap |  |
+| table | `rowBandSize` | integer | a-g |  | missing | gap |  |
+| table | `colBandSize` | integer | a-g |  | missing | gap |  |
+| table | `tblLook` | string | asg |  | missing | gap |  |
+| table | `border.all` | string | as- |  | write-only | gap |  |
+| table | `border.bottom` | string | as- |  | write-only | gap |  |
+| table | `border.horizontal` | string | as- |  | write-only | gap |  |
+| table | `border.left` | string | as- |  | write-only | gap |  |
+| table | `border.right` | string | as- |  | write-only | gap |  |
+| table | `border.top` | string | as- |  | write-only | gap |  |
+| table | `border.vertical` | string | as- |  | write-only | gap |  |
+| table | `cols` | int | a-g | a-g | supported | supported |  |
+| table | `data` | string | a-- |  | write-only | gap |  |
+| table | `rows` | int | a-g | a-g | supported | supported |  |
+| table | `width` | string | asg |  | missing | gap |  |
+| table | `style` | string | asg | --g | supported | gap |  |
+| table | `name` | string |  | -sg | litchi-only | litchi-only |  |
+| textbox | `text` | string | a-- | -sg | supported | gap |  |
+| textbox | `width` | length | as- |  | write-only | gap |  |
+| textbox | `height` | length | as- |  | write-only | gap |  |
+| textbox | `geometry` | string | as- |  | write-only | gap |  |
+| textbox | `wrap` | enum | a-- |  | write-only | gap |  |
+| textbox | `hAlign` | enum | a-- |  | write-only | gap |  |
+| textbox | `vAlign` | enum | a-- |  | write-only | gap |  |
+| textbox | `hRelative` | enum | a-- |  | write-only | gap |  |
+| textbox | `vRelative` | enum | a-- |  | write-only | gap |  |
+| textbox | `anchor.x` | length | a-- |  | write-only | gap |  |
+| textbox | `anchor.y` | length | a-- |  | write-only | gap |  |
+| textbox | `fill` | color | as- |  | write-only | gap |  |
+| textbox | `fill.gradient` | string | a-- |  | write-only | gap |  |
+| textbox | `fill.opacity` | string | a-- |  | write-only | gap |  |
+| textbox | `line.color` | color | as- |  | write-only | gap |  |
+| textbox | `line.width` | length | as- |  | write-only | gap |  |
+| textbox | `line.style` | string | as- |  | write-only | gap |  |
+| textbox | `inset.left` | length | a-- |  | write-only | gap |  |
+| textbox | `inset.top` | length | a-- |  | write-only | gap |  |
+| textbox | `inset.right` | length | a-- |  | write-only | gap |  |
+| textbox | `inset.bottom` | length | a-- |  | write-only | gap |  |
+| textbox | `textDirection` | string | a-- |  | write-only | gap |  |
+| textbox | `textAnchor` | string | a-- |  | write-only | gap |  |
+| textbox | `autoFit` | bool | a-- |  | write-only | gap |  |
+| textbox | `rotation` | string | a-- |  | write-only | gap |  |
+| textbox | `shadow` | string | a-- |  | write-only | gap |  |
+| textbox | `alt` | string | a-- |  | write-only | gap |  |
+| toc | `levels` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| toc | `title` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| toc | `hyperlinks` | bool | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| toc | `pageNumbers` | bool | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| watermark | `text` | string | asg |  | missing | gap |  |
+| watermark | `image` | string | as- |  | write-only | gap |  |
+| watermark | `color` | color | asg |  | missing | gap |  |
+| watermark | `font` | string | asg |  | missing | gap |  |
+| watermark | `rotation` | int | asg |  | missing | gap |  |
+| watermark | `opacity` | string | asg |  | missing | gap |  |
+| watermark | `size` | string | asg |  | missing | gap |  |
+| watermark | `width` | string | asg |  | missing | gap |  |
+| watermark | `height` | string | asg |  | missing | gap |  |
+
+### Contextual operation gaps
+
+These operation gaps apply only to the named selection or leaf context; ordinary element operation support remains in the capability report.
+
+| Verb | Element | Context | Reason | Follow-up |
+|---|---|---|---|---|
+| `remove` | `cell` | `table-grid` | cells keep the table grid: remove or move the whole row, or set the cell's text | M6 ODT table grid edits |
+| `add` | `cell` | `table-grid` | adding a cell would break the table grid; add a row, which spans the first row's columns | M6 ODT table grid edits |
+| `move` | `cell` | `table-grid` | cells move only with their row | M6 ODT table grid edits |
+| `remove` | `row` | `vertical-merge` | a row holding vertically merged or covered cells cannot leave the table | M6 ODT table grid edits |
+| `add` | `picture` | `image-resources` | adding an image needs a package media resource and a frame; frames and images are readable, settable (frame geometry) and removable | M6 ODT drawing and media edits |
+| `add` | `frame` | `drawing-resources` | frames are created with their content (image or text box), which the body edits do not author yet | M6 ODT drawing and media edits |
+| `set` | `style` | `common-styles` | common styles in styles.xml are read-only; paragraph and run formatting derives automatic styles instead | M6 ODT style definitions |
+| `set` | `run` | `clear-formatting` | a null value cannot remove a character or paragraph property; set the property's off value instead | M6 ODT formatting removal |
+| `set` | `cell` | `typed-values` | cell text writes a string cell; numeric, date and formula cell values are not authored | M6 ODT typed cell values |
+| `set` | `document` | `signed-or-encrypted-package` | the leaf preserves signed and encrypted packages only as exact no-ops; changed writes are refused | ADR 0034 ODF security vocabulary (record 0268 G5) |
+| `get` | `document` | `flat-odf-input` | single-XML .fodt input is detected but refused; the leaf flat snapshot has no body index or package owner the adapter can publish through | M6 flat ODF owner |
+| `create` | `document` | `template` | ODT template creation (.ott) is not supported | use Flavor::Document |

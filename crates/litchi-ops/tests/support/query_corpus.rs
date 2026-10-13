@@ -144,6 +144,47 @@ pub(crate) const PPTX: &[&str] = &[
     "comment",
 ];
 
+/// OpenDocument text selectors (record 0276): the element kinds of the body
+/// index, character formatting predicates, structure, positions and nested
+/// selectors.
+#[cfg(feature = "odt")]
+pub(crate) const ODT: &[&str] = &[
+    "p",
+    "h",
+    "r",
+    "r[bold=true]",
+    "r[italic=true]",
+    "r[size>=12pt]",
+    "r[color]",
+    "p:contains(the)",
+    "p:empty",
+    "p[style=Standard]",
+    "p[align=center]",
+    "tbl",
+    "tr",
+    "tc",
+    "tbl p",
+    "tbl > tr",
+    "p[1]",
+    "p[last()]",
+    "p:has(r[bold=true])",
+    "p:not(:empty)",
+    "hyperlink",
+    "list",
+    "listItem",
+    "section",
+    "frame",
+    "picture",
+    "textbox",
+    "footnote",
+    "endnote",
+    "comment",
+    "bookmark",
+    "style",
+    "/body/p",
+    "/body/r[bold=true]",
+];
+
 /// FNV-1a over two 64-bit lanes with different offsets.
 struct Fnv([u64; 2]);
 
@@ -317,6 +358,8 @@ pub(crate) fn digests(root: &Path) -> BTreeMap<String, String> {
         ("xlsb", FileFormat::Xlsb, XLSB),
         ("ods", FileFormat::Ods, ODS),
         ("fods", FileFormat::Ods, ODS),
+        #[cfg(feature = "odt")]
+        ("odt", FileFormat::Odt, ODT),
     ] {
         let mut hashers: Vec<Fnv> = selectors.iter().map(|_| Fnv::new()).collect();
         let mut counts = vec![0_usize; selectors.len()];

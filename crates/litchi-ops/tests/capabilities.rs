@@ -24,6 +24,7 @@ fn capability_goldens_follow_enabled_formats() {
         (FileFormat::Ppt, "ppt", cfg!(feature = "ppt")),
         (FileFormat::Pptx, "pptx", cfg!(feature = "pptx")),
         (FileFormat::Ods, "ods", cfg!(feature = "ods")),
+        (FileFormat::Odt, "odt", cfg!(feature = "odt")),
     ] {
         if !enabled {
             continue;

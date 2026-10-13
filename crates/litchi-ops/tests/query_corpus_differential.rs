@@ -10,7 +10,8 @@
 //! `80915b091b` printed byte-identical digests). The XLS and XLSB digests
 //! were added by record 0267, printed by trunk `4d1afe92bc` before its
 //! changes. The ODS and flat ODS digests were added by record 0277, printed
-//! by its read adapter before the ODS writers landed. Each digest covers,
+//! by its read adapter before the ODS writers landed; the ODT digests were
+//! added by record 0276 the same way. Each digest covers,
 //! file by file, every match's kind,
 //! path, positional path and text, and every error, so a changed result set
 //! on any file changes it. Set `LITCHI_BLESS_GOLDEN=1` to write the current
@@ -23,7 +24,8 @@
     feature = "pptx",
     feature = "xls",
     feature = "xlsb",
-    feature = "ods"
+    feature = "ods",
+    feature = "odt"
 ))]
 
 use std::collections::BTreeMap;
@@ -75,6 +77,7 @@ fn corpus_queries_return_what_they_returned_before() {
         ("xlsb", query_corpus::XLSB),
         ("ods", query_corpus::ODS),
         ("fods", query_corpus::ODS),
+        ("odt", query_corpus::ODT),
     ] {
         let matched = selectors
             .iter()

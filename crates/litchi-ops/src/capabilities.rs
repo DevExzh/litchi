@@ -882,6 +882,20 @@ impl Capabilities {
             {
                 return Support::Supported;
             }
+            #[cfg(feature = "odt")]
+            if matches!(
+                verb,
+                Verb::Set
+                    | Verb::Add
+                    | Verb::Remove
+                    | Verb::Move
+                    | Verb::Swap
+                    | Verb::Edit
+                    | Verb::Batch
+            ) && self.adapter() == Some(Adapter::Odt)
+            {
+                return Support::Supported;
+            }
             return EDITS.support();
         }
         match verb {
@@ -917,6 +931,9 @@ impl Capabilities {
             return Support::Supported;
         }
         if self.format == Some(FileFormat::Ods) && cfg!(feature = "ods") {
+            return Support::Supported;
+        }
+        if self.format == Some(FileFormat::Odt) && cfg!(feature = "odt") {
             return Support::Supported;
         }
         #[cfg(feature = "ppt")]
@@ -955,6 +972,9 @@ impl Capabilities {
             return Support::Supported;
         }
         if self.format == Some(FileFormat::Ods) && cfg!(feature = "ods") {
+            return Support::Supported;
+        }
+        if self.format == Some(FileFormat::Odt) && cfg!(feature = "odt") {
             return Support::Supported;
         }
 
@@ -2226,6 +2246,8 @@ const fn view_gap(adapter: Adapter, mode: Mode) -> Option<&'static GapSpec> {
         Adapter::Rtf => m1_view_gap(mode),
         #[cfg(feature = "ods")]
         Adapter::Ods => m1_view_gap(mode),
+        #[cfg(feature = "odt")]
+        Adapter::Odt => m1_view_gap(mode),
     }
 }
 
@@ -2364,6 +2386,8 @@ check_capabilities!(crate::format::rtf::SPEC);
 
 #[cfg(feature = "ods")]
 check_capabilities!(crate::format::ods::SPEC);
+#[cfg(feature = "odt")]
+check_capabilities!(crate::format::odt::SPEC);
 
 /// Byte equality usable in constant evaluation.
 const fn same(a: &str, b: &str) -> bool {
@@ -2648,6 +2672,11 @@ impl Element {
             || (self.adapter == Adapter::Ods
                 && crate::format::ods::SETTABLE.contains(&self.data().canonical)
                 && readable);
+        #[cfg(feature = "odt")]
+        let settable = settable
+            || (self.adapter == Adapter::Odt
+                && crate::format::odt::SETTABLE.contains(&self.data().canonical)
+                && readable);
         let structural = {
             #[cfg(feature = "docx")]
             {
@@ -2723,6 +2752,11 @@ impl Element {
             || (self.adapter == Adapter::Ods
                 && crate::format::ods::ADDABLE.contains(&self.data().canonical)
                 && readable);
+        #[cfg(feature = "odt")]
+        let add = add
+            || (self.adapter == Adapter::Odt
+                && crate::format::odt::ADDABLE.contains(&self.data().canonical)
+                && readable);
         #[cfg(feature = "pptx")]
         let remove = structural
             || (self.adapter == Adapter::Pptx
@@ -2784,6 +2818,11 @@ impl Element {
         let remove = remove
             || (self.adapter == Adapter::Ods
                 && crate::format::ods::REMOVABLE.contains(&self.data().canonical)
+                && readable);
+        #[cfg(feature = "odt")]
+        let remove = remove
+            || (self.adapter == Adapter::Odt
+                && crate::format::odt::REMOVABLE.contains(&self.data().canonical)
                 && readable);
         Operations {
             add,
@@ -3256,6 +3295,10 @@ fn option_gap(adapter: Adapter, index: usize) -> Option<Option<&'static GapSpec>
     #[cfg(feature = "ods")]
     if adapter == Adapter::Ods {
         return crate::format::ods::WRITE_GAPS.get(index).map(Some);
+    }
+    #[cfg(feature = "odt")]
+    if adapter == Adapter::Odt {
+        return crate::format::odt::WRITE_GAPS.get(index).map(Some);
     }
     let _ = (adapter, index);
     None

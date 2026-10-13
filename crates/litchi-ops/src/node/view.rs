@@ -390,6 +390,9 @@ pub(crate) enum Source<'a> {
     /// An ODS node's leaf values.
     #[cfg(feature = "ods")]
     Ods(crate::format::ods::Props<'a>),
+    /// An ODT node's leaf values.
+    #[cfg(feature = "odt")]
+    Odt(crate::format::odt::Props<'a>),
 }
 
 impl<'a> Source<'a> {
@@ -423,6 +426,8 @@ impl<'a> Source<'a> {
             Self::Doc(ref props) => props.get(index),
             #[cfg(feature = "ods")]
             Self::Ods(ref props) => props.get(index),
+            #[cfg(feature = "odt")]
+            Self::Odt(ref props) => props.get(index),
         }
     }
 }
@@ -443,7 +448,7 @@ impl<'a> Format<'a> {
     }
 
     /// Omit raw properties from ordinary projection; indexed query access remains explicit.
-    #[cfg(any(feature = "doc", feature = "docx", feature = "rtf"))]
+    #[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
     pub(crate) const fn without(mut self, hidden: &'static [&'static str]) -> Self {
         self.hidden = hidden;
         self
@@ -622,6 +627,9 @@ enum Inner<'n, 'f> {
     /// The ODS iterator borrows the handle's cached content index.
     #[cfg(feature = "ods")]
     Ods(crate::format::ods::Children<'f>),
+    /// The ODT iterator carries per-kind ordinals through the body index.
+    #[cfg(feature = "odt")]
+    Odt(Box<crate::format::odt::children::Children<'f>>),
 }
 
 impl<'n, 'f> Children<'n, 'f> {
@@ -699,6 +707,14 @@ impl<'n, 'f> Children<'n, 'f> {
         }
     }
 
+    /// An ODT node's children.
+    #[cfg(feature = "odt")]
+    pub(crate) fn odt(children: crate::format::odt::children::Children<'f>) -> Self {
+        Self {
+            inner: Inner::Odt(Box::new(children)),
+        }
+    }
+
     /// An RTF node's children.
     #[cfg(feature = "rtf")]
     pub(crate) const fn rtf(children: crate::format::rtf::children::Children<'f>) -> Self {
@@ -743,6 +759,8 @@ impl<'f> Iterator for Children<'_, 'f> {
             Inner::Rtf(children) => children.next().map(|child| child.map(Node::Rtf)),
             #[cfg(feature = "ods")]
             Inner::Ods(children) => children.next().map(|child| child.map(Node::Ods)),
+            #[cfg(feature = "odt")]
+            Inner::Odt(children) => children.next().map(|child| child.map(Node::Odt)),
         };
         if matches!(item, Some(Err(_)) | None) {
             self.inner = Inner::Empty(PhantomData);

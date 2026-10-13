@@ -17,7 +17,7 @@ Oracles, strongest first:
   unsupported raises ``UnsupportedError`` with the report's code.
 
 Formats: every verb is exercised on every format whose capability report
-supports it (DOCX, XLSX, PPTX, XLSB, DOC, XLS, PPT, RTF, ODS); ODT and ODP
+supports it (DOCX, XLSX, PPTX, XLSB, DOC, XLS, PPT, RTF, ODS, ODT); ODP
 refuse every write verb. The cross-thread and GIL tests of the write verbs
 are in test_threads.py.
 """
@@ -44,10 +44,9 @@ NOTES_PPT = "poi/test-data/slideshow/basic_test_ppt_file.ppt"
 RTF_INPUT = rb"{\rtf1\ansi First\par Second\par Third\par Fourth}"
 
 #: The formats ``create`` builds.
-CREATABLE = ("docx", "xlsx", "pptx", "xlsb", "doc", "xls", "ppt", "rtf", "ods")
+CREATABLE = ("docx", "xlsx", "pptx", "xlsb", "doc", "xls", "ppt", "rtf", "ods", "odt")
 #: The formats File holds read-only, and a fixture of each.
 READ_ONLY = (
-    ("odf/corpus/writer-table.odt", "Odt"),
     ("odf/odp/tdf169979.odp", "Odp"),
 )
 #: Python suggestion of a document_protected error on a locked file.
@@ -142,7 +141,7 @@ class CreateTests(WriteAssertions):
         self.assertError(raised(lambda: L.create(5)), L.PropertyError, "invalid_argument")
 
     def test_formats_without_a_builder_are_unsupported(self):
-        for name in ("odt", "odp", "pages", "odg"):
+        for name in ("odp", "pages", "odg"):
             with self.subTest(format=name):
                 error = raised(lambda: L.create(name))
                 self.assertIsInstance(error, L.UnsupportedError)
@@ -366,6 +365,41 @@ class RtfVerbTests(WriteAssertions):
         self.assertEqual(texts(file.swap("/body/p[1]", "/body/p[4]"), "/body"), ["Fourth", "Second", "Third", "First"])
 
 
+class OdtVerbTests(WriteAssertions):
+    """ODT writes through the leaf body edits (record 0276)."""
+
+    def test_round_trip(self):
+        source = L.open(fixture("odf/corpus/writer-table.odt"))
+        before = source.to_bytes()
+        file, path = source.add("/body", "paragraph", {"text": "Added  text"})
+        self.assertTrue(path.startswith("/body/p["), path)
+        file = file.set(path, {"align": "center", "bold": True})
+        file = file.set("/body/tbl[1]/tr[1]/tc[1]", {"text": "cell"})
+        file = file.set("/metadata", {"title": "Round trip"})
+        reopened = self.assertReopens(file)
+        self.assertEqual(reopened.get(path, 0)["text"], "Added  text")
+        self.assertEqual(reopened.get(path, 0)["format"]["align"], "center")
+        self.assertIs(reopened.get(path, 0)["format"]["bold"], True)
+        self.assertEqual(reopened.get("/body/tbl[1]/tr[1]/tc[1]", 0)["text"], "cell")
+        self.assertEqual(reopened.get("/metadata", 0)["format"]["title"], "Round trip")
+        self.assertUnchanged(source, before)
+
+    def test_structure_and_create(self):
+        file = L.create("odt")
+        for text in ("a", "b", "c"):
+            file, _ = file.add("/body", "paragraph", {"text": text})
+        self.assertEqual(texts(file.remove("/body/p[2]"), "/body"), ["a", "c"])
+        self.assertEqual(texts(file.move("/body/p[3]", index=0), "/body"), ["c", "a", "b"])
+        self.assertEqual(texts(file.swap("/body/p[1]", "/body/p[3]"), "/body"), ["c", "b", "a"])
+        batched = file.batch(
+            [
+                {"command": "set", "path": f"/body/p[{index}]", "props": {"italic": True}}
+                for index in (1, 2, 3)
+            ]
+        ).file
+        self.assertIs(batched.get("/body/p[3]", 0)["format"]["italic"], True)
+
+
 class CapabilityAgreementTests(WriteAssertions):
     """A write verb the report marks unsupported raises its code."""
 
@@ -398,7 +432,7 @@ class CapabilityAgreementTests(WriteAssertions):
                     self.assertIsInstance(error, L.UnsupportedError)
                     self.assertEqual(error.code, verbs[verb]["code"])
         # DOC (0258), PPT (0260) and XLS (0259) support every write verb.
-        self.assertTrue({"Odt", "Odp"} <= seen, seen)
+        self.assertTrue({"Odp"} <= seen, seen)
 
     def test_read_only_formats_refuse_every_write(self):
         for relative, name in READ_ONLY:

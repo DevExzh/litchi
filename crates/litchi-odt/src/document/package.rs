@@ -151,6 +151,7 @@ impl Document {
                 meta,
                 style_registry,
                 tolerance,
+                body: std::sync::OnceLock::new(),
             }),
         })
     }
@@ -306,6 +307,7 @@ mod tests {
                 meta,
                 style_registry,
                 tolerance,
+                body: std::sync::OnceLock::new(),
             }),
         })
     }

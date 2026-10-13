@@ -205,9 +205,22 @@ fn every_format_has_one_answer_for_its_reads() {
                         | Verb::Edit
                         | Verb::Batch
                 );
+            let odt_edit = format == FileFormat::Odt
+                && cfg!(feature = "odt")
+                && matches!(
+                    verb,
+                    Verb::Set
+                        | Verb::Add
+                        | Verb::Remove
+                        | Verb::Move
+                        | Verb::Swap
+                        | Verb::Edit
+                        | Verb::Batch
+                );
             assert_eq!(
                 capabilities.verb(verb),
                 if rtf_edit
+                    || odt_edit
                     || doc_edit
                     || docx_edit
                     || xlsx_edit
@@ -250,7 +263,8 @@ fn every_format_has_one_answer_for_its_reads() {
                 || (format == FileFormat::Pptx && cfg!(feature = "pptx"))
                 || (format == FileFormat::Xlsb && cfg!(feature = "xlsb"))
                 || (format == FileFormat::Rtf && cfg!(feature = "rtf"))
-                || (format == FileFormat::Ods && cfg!(feature = "ods"));
+                || (format == FileFormat::Ods && cfg!(feature = "ods"))
+                || (format == FileFormat::Odt && cfg!(feature = "odt"));
             let expected = if integrated {
                 Support::Supported
             } else if get.is_supported() {
@@ -472,7 +486,8 @@ fn rtf_advertises_native_paragraph_structural_writes_and_keeps_closure_gaps() {
     feature = "xlsx",
     feature = "xlsb",
     feature = "xls",
-    feature = "rtf"
+    feature = "rtf",
+    feature = "odt"
 ))]
 #[test]
 fn spec_tables_agree_with_their_vocabularies() {
@@ -531,6 +546,8 @@ fn spec_tables_agree_with_their_vocabularies() {
     check(&crate::format::pptx::SPEC, FileFormat::Pptx);
     #[cfg(feature = "rtf")]
     check(&crate::format::rtf::SPEC, FileFormat::Rtf);
+    #[cfg(feature = "odt")]
+    check(&crate::format::odt::SPEC, FileFormat::Odt);
 }
 
 #[test]

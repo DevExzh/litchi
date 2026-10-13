@@ -17,7 +17,8 @@ use litchi_core::FileFormat;
         feature = "xlsb",
         feature = "xls",
         feature = "rtf",
-        feature = "ods"
+        feature = "ods",
+        feature = "odt"
     )),
     allow(
         clippy::only_used_in_recursion,
@@ -122,6 +123,12 @@ impl File {
                 crate::path::resolve::get(&crate::format::ods::Nav::new(handle), &path)
                     .map(Node::Ods)
             },
+            #[cfg(feature = "odt")]
+            Self::Odt(handle) => {
+                let path = path.into_path()?;
+                crate::path::resolve::get(&crate::format::odt::Nav::new(handle), &path)
+                    .map(Node::Odt)
+            },
             Self::Signed(signed) => signed.file().get(path),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -189,6 +196,12 @@ impl File {
                 crate::path::resolve::find(&crate::format::ods::Nav::new(handle), &path)
                     .map(|node| node.map(Node::Ods))
             },
+            #[cfg(feature = "odt")]
+            Self::Odt(handle) => {
+                let path = path.into_path()?;
+                crate::path::resolve::find(&crate::format::odt::Nav::new(handle), &path)
+                    .map(|node| node.map(Node::Odt))
+            },
             Self::Signed(signed) => signed.file().find(path),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -253,6 +266,10 @@ impl File {
             #[cfg(feature = "ods")]
             Self::Ods(handle) => {
                 crate::query::run(crate::format::ods::Nav::new(handle), selector).map(Matches::ods)
+            },
+            #[cfg(feature = "odt")]
+            Self::Odt(handle) => {
+                crate::query::run(crate::format::odt::Nav::new(handle), selector).map(Matches::odt)
             },
             Self::Signed(signed) => signed.file().query(selector),
             Self::Locked(locked) => Err(locked.read_error()),
@@ -323,6 +340,10 @@ impl File {
                 crate::format::ods::view_json(handle, mode, &crate::view::mode::Options::default())
                     .map(crate::view::Json::ods)
             },
+            #[cfg(feature = "odt")]
+            Self::Odt(handle) => {
+                crate::format::odt::views::view_json(handle, mode).map(crate::view::Json::odt)
+            },
             Self::Signed(signed) => signed.file().view_json(mode),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -382,6 +403,8 @@ impl File {
             ),
             #[cfg(feature = "rtf")]
             Self::Rtf(handle) => crate::format::rtf::views::view_to(handle, mode, output),
+            #[cfg(feature = "odt")]
+            Self::Odt(handle) => crate::format::odt::views::view_to(handle, mode, output),
             #[cfg(feature = "ods")]
             Self::Ods(handle) => crate::format::ods::view_to(
                 handle,
@@ -420,6 +443,9 @@ pub(crate) enum Adapter {
     Pptx,
     #[cfg(feature = "ppt")]
     Ppt,
+    /// OpenDocument Text (`.odt`, tier-3 adapter, record 0276).
+    #[cfg(feature = "odt")]
+    Odt,
     #[cfg(feature = "xlsb")]
     Xlsb,
     #[cfg(feature = "xls")]
@@ -443,6 +469,8 @@ impl Adapter {
             FileFormat::Docx => Some(Self::Docx),
             #[cfg(feature = "xlsx")]
             FileFormat::Xlsx => Some(Self::Xlsx),
+            #[cfg(feature = "odt")]
+            FileFormat::Odt => Some(Self::Odt),
             #[cfg(feature = "pptx")]
             FileFormat::Pptx => Some(Self::Pptx),
             #[cfg(feature = "ppt")]
@@ -466,6 +494,8 @@ impl Adapter {
             Self::Doc => FileFormat::Doc,
             #[cfg(feature = "docx")]
             Self::Docx => FileFormat::Docx,
+            #[cfg(feature = "odt")]
+            Self::Odt => FileFormat::Odt,
             #[cfg(feature = "xlsx")]
             Self::Xlsx => FileFormat::Xlsx,
             #[cfg(feature = "pptx")]
@@ -539,6 +569,11 @@ macro_rules! with_spec {
             #[cfg(feature = "ods")]
             $crate::read::Adapter::Ods => {
                 let $spec = &$crate::format::ods::SPEC;
+                $body
+            },
+            #[cfg(feature = "odt")]
+            $crate::read::Adapter::Odt => {
+                let $spec = &$crate::format::odt::SPEC;
                 $body
             },
         }

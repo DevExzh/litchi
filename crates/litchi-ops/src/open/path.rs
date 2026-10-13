@@ -14,6 +14,7 @@ use std::path::Path;
     feature = "rtf",
     feature = "xlsb",
     feature = "ods",
+    feature = "odt",
     all(
         any(unix, windows),
         any(
@@ -42,6 +43,7 @@ use crate::{File, OpenOptions};
     feature = "rtf",
     feature = "xlsb",
     feature = "ods",
+    feature = "odt",
     all(
         any(unix, windows),
         any(
@@ -463,9 +465,10 @@ mod zip {
                 }
                 let candidate =
                     crate::detect::detected::OdtSourcePathCandidate::new(source, version);
-                Ok(File::Odt(crate::format::odt::Odt::from_source_candidate(
-                    candidate, options,
-                )?))
+                Ok(File::Odt(
+                    crate::format::odt::Odt::from_source_candidate(candidate, options)?
+                        .with_origin(Some(super::stable_origin(path)?)),
+                ))
             },
             #[cfg(feature = "ods")]
             FileFormat::Ods => {

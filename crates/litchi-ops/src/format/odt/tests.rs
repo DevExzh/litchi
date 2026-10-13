@@ -187,3 +187,140 @@ fn malformed_body_is_a_typed_core_error() {
     );
     assert_eq!(error.format(), Some(FileFormat::Odt));
 }
+
+/// The unified reads of the record 0276 adapter.
+mod unified {
+    use super::*;
+    use crate::view::Mode;
+
+    fn open_fixture(name: &str) -> crate::File {
+        crate::open_bytes(std::fs::read(fixture(name)).expect("read")).expect("open")
+    }
+
+    #[test]
+    fn root_body_and_paragraphs_resolve() {
+        let file = open_fixture("odf/corpus/writer-paragraph-styles.odt");
+        let root = file.root().expect("root");
+        assert_eq!(root.kind(), "document");
+        let kinds: Vec<_> = root
+            .children()
+            .map(|child| child.expect("child").kind())
+            .collect();
+        assert_eq!(kinds, ["body", "styles", "metadata"]);
+        let paragraph = file.get("/body/p[1]").expect("first paragraph");
+        assert_eq!(paragraph.kind(), "paragraph");
+        assert_eq!(paragraph.path().to_string(), "/body/p[1]");
+        let leaf = litchi_odt::Package::from_bytes(
+            &std::fs::read(fixture("odf/corpus/writer-paragraph-styles.odt")).unwrap(),
+        )
+        .unwrap()
+        .document()
+        .unwrap();
+        let body = leaf.body().unwrap();
+        let first = body
+            .root()
+            .children()
+            .find(|node| node.kind() == litchi_odt::body::Kind::Paragraph)
+            .unwrap();
+        assert_eq!(
+            paragraph.view().text().unwrap().as_deref(),
+            Some(&*first.text().unwrap())
+        );
+        // Every queried paragraph re-resolves by its own path.
+        for node in file.query("p").expect("query") {
+            let node = node.expect("node");
+            let path = node.path().to_string();
+            let again = file.get(path.as_str()).expect("path resolves");
+            assert_eq!(again.path().to_string(), path);
+        }
+    }
+
+    #[test]
+    fn missing_and_foreign_steps_are_typed() {
+        let file = open_fixture("odf/corpus/writer-paragraph-styles.odt");
+        assert_eq!(
+            file.get("/body/p[9999]").unwrap_err().code(),
+            Code::PathNotFound
+        );
+        assert!(file.find("/body/p[9999]").unwrap().is_none());
+        assert_eq!(
+            file.get("/body/sdt[1]").unwrap_err().code(),
+            Code::UnsupportedPath
+        );
+        assert_eq!(
+            file.get("/slide[1]").unwrap_err().code(),
+            Code::UnsupportedPath
+        );
+    }
+
+    #[test]
+    fn tables_rows_cells_and_styles() {
+        let file = open_fixture("odf/corpus/writer-table.odt");
+        let table = file.get("/body/tbl[1]").expect("table");
+        assert_eq!(table.kind(), "table");
+        let cell = file.get("/body/tbl[1]/tr[1]/tc[1]").expect("cell");
+        assert_eq!(cell.kind(), "cell");
+        let cells = file.query("tc").unwrap().count();
+        assert!(cells > 0);
+        let styles = file.get("/styles").expect("styles");
+        let first = styles
+            .children()
+            .next()
+            .expect("a common style")
+            .expect("style");
+        let path = first.path().to_string();
+        assert!(path.starts_with("/styles/"), "{path}");
+        assert_eq!(file.get(path.as_str()).unwrap().kind(), "style");
+    }
+
+    #[test]
+    fn views_render_every_text_mode() {
+        let file = open_fixture("odf/corpus/writer-paragraph-styles.odt");
+        for mode in [Mode::Text, Mode::Annotated, Mode::Outline, Mode::Stats] {
+            let text = file.view(mode).expect("view");
+            assert!(!text.is_empty(), "{mode:?}");
+            serde_json::to_string(&file.view_json(mode).expect("json")).expect("serialize");
+        }
+        assert_eq!(
+            file.view(Mode::Html).unwrap_err().code(),
+            Code::UnsupportedCapability
+        );
+    }
+
+    #[test]
+    fn queries_are_deterministic_across_runs() {
+        let digest = || {
+            let file = open_fixture("odf/corpus/writer-images-frames.odt");
+            let mut out = String::new();
+            for selector in ["p", "r", "frame", "picture", "tc", "h", "r[bold=true]"] {
+                for node in file.query(selector).unwrap() {
+                    let node = node.unwrap();
+                    out.push_str(&format!(
+                        "{} {} {:?}\n",
+                        node.kind(),
+                        node.path(),
+                        node.view().text().ok().flatten()
+                    ));
+                }
+            }
+            out
+        };
+        assert_eq!(digest(), digest());
+    }
+
+    #[cfg(any(unix, windows))]
+    #[test]
+    fn source_route_reads_through_the_same_index() {
+        let path = fixture("odf/corpus/writer-table.odt");
+        let source = open_source(&path);
+        let file = crate::File::Odt(source);
+        let eager = open_fixture("odf/corpus/writer-table.odt");
+        let paths = |file: &crate::File| -> Vec<String> {
+            file.query("tc")
+                .unwrap()
+                .map(|node| node.unwrap().path().to_string())
+                .collect()
+        };
+        assert_eq!(paths(&file), paths(&eager));
+    }
+}

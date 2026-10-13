@@ -1,0 +1,2068 @@
+{
+  "format": "odt",
+  "elements": [
+    {
+      "format": "odt",
+      "element": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/"
+        ]
+      },
+      "children": [
+        {
+          "element": "body",
+          "pathSegment": "body"
+        },
+        {
+          "element": "styles",
+          "pathSegment": "styles"
+        },
+        {
+          "element": "metadata",
+          "pathSegment": "metadata"
+        }
+      ],
+      "properties": {}
+    },
+    {
+      "format": "odt",
+      "element": "body",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/body"
+        ]
+      },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "p"
+        },
+        {
+          "element": "heading",
+          "pathSegment": "h"
+        },
+        {
+          "element": "list",
+          "pathSegment": "list"
+        },
+        {
+          "element": "table",
+          "pathSegment": "tbl"
+        },
+        {
+          "element": "section",
+          "pathSegment": "section"
+        },
+        {
+          "element": "frame",
+          "pathSegment": "frame"
+        }
+      ],
+      "properties": {},
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odt",
+      "element": "paragraph",
+      "parent": [
+        "body",
+        "section",
+        "cell",
+        "textbox",
+        "footnote",
+        "endnote",
+        "comment",
+        "listItem"
+      ],
+      "elementAliases": [
+        "p"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "run",
+          "pathSegment": "r"
+        },
+        {
+          "element": "hyperlink",
+          "pathSegment": "hyperlink"
+        },
+        {
+          "element": "bookmark",
+          "pathSegment": "bookmark"
+        },
+        {
+          "element": "footnote",
+          "pathSegment": "footnote"
+        },
+        {
+          "element": "endnote",
+          "pathSegment": "endnote"
+        },
+        {
+          "element": "comment",
+          "pathSegment": "comment"
+        },
+        {
+          "element": "frame",
+          "pathSegment": "frame"
+        }
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "style": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "align": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "justify"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "spaceBefore": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "spaceAfter": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "indent": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "rightIndent": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "firstLineIndent": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "lineSpacing": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "keepNext": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "pageBreakBefore": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "shading": {
+          "type": "color",
+          "colorContext": "word",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "bold": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "underline": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "strike": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "unit": "pt",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "colorContext": "word",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "highlight": {
+          "type": "color",
+          "colorContext": "word",
+          "add": false,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odt",
+      "element": "heading",
+      "parent": [
+        "body",
+        "section",
+        "cell",
+        "textbox",
+        "footnote",
+        "endnote",
+        "comment",
+        "listItem"
+      ],
+      "elementAliases": [
+        "h"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/h[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "run",
+          "pathSegment": "r"
+        },
+        {
+          "element": "hyperlink",
+          "pathSegment": "hyperlink"
+        },
+        {
+          "element": "bookmark",
+          "pathSegment": "bookmark"
+        },
+        {
+          "element": "footnote",
+          "pathSegment": "footnote"
+        },
+        {
+          "element": "endnote",
+          "pathSegment": "endnote"
+        },
+        {
+          "element": "comment",
+          "pathSegment": "comment"
+        },
+        {
+          "element": "frame",
+          "pathSegment": "frame"
+        }
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "style": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "align": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "justify"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "spaceBefore": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "spaceAfter": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "indent": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "rightIndent": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "firstLineIndent": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "lineSpacing": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "keepNext": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "pageBreakBefore": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "shading": {
+          "type": "color",
+          "colorContext": "word",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "bold": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "underline": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "strike": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "unit": "pt",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "colorContext": "word",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "highlight": {
+          "type": "color",
+          "colorContext": "word",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "level": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odt",
+      "element": "run",
+      "parent": [
+        "paragraph",
+        "heading",
+        "hyperlink"
+      ],
+      "elementAliases": [
+        "r",
+        "span"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]/r[N]"
+        ]
+      },
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "style": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "bold": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "underline": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "strike": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "unit": "pt",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "colorContext": "word",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "highlight": {
+          "type": "color",
+          "colorContext": "word",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "superscript": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "subscript": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "caps": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "smallcaps": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odt",
+      "element": "hyperlink",
+      "parent": [
+        "paragraph",
+        "heading",
+        "hyperlink"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]/hyperlink[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "run",
+          "pathSegment": "r"
+        },
+        {
+          "element": "hyperlink",
+          "pathSegment": "hyperlink"
+        },
+        {
+          "element": "bookmark",
+          "pathSegment": "bookmark"
+        },
+        {
+          "element": "footnote",
+          "pathSegment": "footnote"
+        },
+        {
+          "element": "endnote",
+          "pathSegment": "endnote"
+        },
+        {
+          "element": "comment",
+          "pathSegment": "comment"
+        },
+        {
+          "element": "frame",
+          "pathSegment": "frame"
+        }
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "url": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "tooltip": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "tgtFrame": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odt",
+      "element": "list",
+      "parent": [
+        "body",
+        "section",
+        "cell",
+        "textbox",
+        "footnote",
+        "endnote",
+        "comment",
+        "listItem"
+      ],
+      "operations": {
+        "add": true,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/list[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "listItem",
+          "pathSegment": "listItem"
+        }
+      ],
+      "properties": {
+        "style": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odt",
+      "element": "listItem",
+      "parent": "list",
+      "elementAliases": [
+        "li"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/list[N]/listItem[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "p"
+        },
+        {
+          "element": "heading",
+          "pathSegment": "h"
+        },
+        {
+          "element": "list",
+          "pathSegment": "list"
+        }
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odt",
+      "element": "table",
+      "parent": [
+        "body",
+        "section",
+        "cell",
+        "textbox",
+        "footnote",
+        "endnote",
+        "comment",
+        "listItem"
+      ],
+      "elementAliases": [
+        "tbl"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/tbl[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "row",
+          "pathSegment": "tr"
+        }
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "rows": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "cols": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "style": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odt",
+      "element": "row",
+      "parent": "table",
+      "elementAliases": [
+        "tr"
+      ],
+      "operations": {
+        "add": true,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/tbl[N]/tr[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "cell",
+          "pathSegment": "tc"
+        }
+      ],
+      "properties": {
+        "cells": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odt",
+      "element": "cell",
+      "parent": "row",
+      "elementAliases": [
+        "tc"
+      ],
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/tbl[N]/tr[N]/tc[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "p"
+        },
+        {
+          "element": "heading",
+          "pathSegment": "h"
+        },
+        {
+          "element": "list",
+          "pathSegment": "list"
+        },
+        {
+          "element": "table",
+          "pathSegment": "tbl"
+        },
+        {
+          "element": "section",
+          "pathSegment": "section"
+        },
+        {
+          "element": "frame",
+          "pathSegment": "frame"
+        }
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "colspan": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "rowspan": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "covered": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "valueType": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "shading": {
+          "type": "color",
+          "colorContext": "word",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "valign": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odt",
+      "element": "section",
+      "parent": [
+        "body",
+        "section",
+        "cell",
+        "textbox",
+        "footnote",
+        "endnote",
+        "comment",
+        "listItem"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/section[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "p"
+        },
+        {
+          "element": "heading",
+          "pathSegment": "h"
+        },
+        {
+          "element": "list",
+          "pathSegment": "list"
+        },
+        {
+          "element": "table",
+          "pathSegment": "tbl"
+        },
+        {
+          "element": "section",
+          "pathSegment": "section"
+        },
+        {
+          "element": "frame",
+          "pathSegment": "frame"
+        }
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "protected": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "hidden": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odt",
+      "element": "frame",
+      "parent": [
+        "body",
+        "section",
+        "cell",
+        "textbox",
+        "footnote",
+        "endnote",
+        "comment",
+        "listItem",
+        "paragraph",
+        "heading",
+        "hyperlink"
+      ],
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]/frame[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "picture",
+          "pathSegment": "picture"
+        },
+        {
+          "element": "textbox",
+          "pathSegment": "textbox"
+        }
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "x": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "y": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "anchor": {
+          "type": "enum",
+          "values": [
+            "paragraph",
+            "char",
+            "as-char",
+            "page",
+            "frame"
+          ],
+          "add": false,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odt",
+      "element": "picture",
+      "parent": "frame",
+      "elementAliases": [
+        "image",
+        "img"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]/frame[N]/picture[N]"
+        ]
+      },
+      "properties": {
+        "src": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odt",
+      "element": "textbox",
+      "parent": "frame",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]/frame[N]/textbox"
+        ]
+      },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "p"
+        },
+        {
+          "element": "heading",
+          "pathSegment": "h"
+        },
+        {
+          "element": "list",
+          "pathSegment": "list"
+        },
+        {
+          "element": "table",
+          "pathSegment": "tbl"
+        },
+        {
+          "element": "section",
+          "pathSegment": "section"
+        },
+        {
+          "element": "frame",
+          "pathSegment": "frame"
+        }
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odt",
+      "element": "footnote",
+      "parent": [
+        "paragraph",
+        "heading",
+        "hyperlink"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]/footnote[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "p"
+        },
+        {
+          "element": "heading",
+          "pathSegment": "h"
+        },
+        {
+          "element": "list",
+          "pathSegment": "list"
+        },
+        {
+          "element": "table",
+          "pathSegment": "tbl"
+        },
+        {
+          "element": "section",
+          "pathSegment": "section"
+        },
+        {
+          "element": "frame",
+          "pathSegment": "frame"
+        }
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "citation": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "class": {
+          "type": "enum",
+          "values": [
+            "footnote",
+            "endnote"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odt",
+      "element": "endnote",
+      "parent": [
+        "paragraph",
+        "heading",
+        "hyperlink"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]/endnote[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "p"
+        },
+        {
+          "element": "heading",
+          "pathSegment": "h"
+        },
+        {
+          "element": "list",
+          "pathSegment": "list"
+        },
+        {
+          "element": "table",
+          "pathSegment": "tbl"
+        },
+        {
+          "element": "section",
+          "pathSegment": "section"
+        },
+        {
+          "element": "frame",
+          "pathSegment": "frame"
+        }
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "citation": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "class": {
+          "type": "enum",
+          "values": [
+            "footnote",
+            "endnote"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odt",
+      "element": "comment",
+      "parent": [
+        "paragraph",
+        "heading",
+        "hyperlink"
+      ],
+      "elementAliases": [
+        "annotation"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]/comment[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "p"
+        },
+        {
+          "element": "heading",
+          "pathSegment": "h"
+        },
+        {
+          "element": "list",
+          "pathSegment": "list"
+        },
+        {
+          "element": "table",
+          "pathSegment": "tbl"
+        },
+        {
+          "element": "section",
+          "pathSegment": "section"
+        },
+        {
+          "element": "frame",
+          "pathSegment": "frame"
+        }
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "author": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "date": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odt",
+      "element": "bookmark",
+      "parent": [
+        "paragraph",
+        "heading",
+        "hyperlink"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]/bookmark[N]",
+          "/body/p[N]/bookmark[@name=<name>]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odt",
+      "element": "styles",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/styles"
+        ]
+      },
+      "children": [
+        {
+          "element": "style",
+          "pathSegment": "<name>"
+        }
+      ],
+      "properties": {},
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odt",
+      "element": "style",
+      "parent": "styles",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/styles/<name>"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "displayName": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "family": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "parent": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "align": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "justify"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "bold": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "unit": "pt",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "colorContext": "word",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "odt",
+      "element": "metadata",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/metadata"
+        ]
+      },
+      "properties": {
+        "title": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "subject": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "description": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "author": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "lastModifiedBy": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "language": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "keywords": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "created": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "modified": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "application": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "revisionNumber": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    }
+  ],
+  "gaps": [
+    {
+      "subject": "element",
+      "element": "header",
+      "code": "unsupported_capability",
+      "followUp": "M6 ODT body index (record 0276)",
+      "reason": "the ODT body index does not model this element yet"
+    },
+    {
+      "subject": "element",
+      "element": "footer",
+      "code": "unsupported_capability",
+      "followUp": "M6 ODT body index (record 0276)",
+      "reason": "the ODT body index does not model this element yet"
+    },
+    {
+      "subject": "element",
+      "element": "numbering",
+      "code": "unsupported_capability",
+      "followUp": "M6 ODT body index (record 0276)",
+      "reason": "the ODT body index does not model this element yet"
+    },
+    {
+      "subject": "element",
+      "element": "field",
+      "code": "unsupported_capability",
+      "followUp": "M6 ODT body index (record 0276)",
+      "reason": "the ODT body index does not model this element yet"
+    },
+    {
+      "subject": "element",
+      "element": "shape",
+      "code": "unsupported_capability",
+      "followUp": "M6 ODT body index (record 0276)",
+      "reason": "the ODT body index does not model this element yet"
+    },
+    {
+      "subject": "element",
+      "element": "chart",
+      "code": "unsupported_capability",
+      "followUp": "M6 ODT body index (record 0276)",
+      "reason": "the ODT body index does not model this element yet"
+    },
+    {
+      "subject": "element",
+      "element": "ole",
+      "code": "unsupported_capability",
+      "followUp": "M6 ODT body index (record 0276)",
+      "reason": "the ODT body index does not model this element yet"
+    },
+    {
+      "subject": "element",
+      "element": "toc",
+      "code": "unsupported_capability",
+      "followUp": "M6 ODT body index (record 0276)",
+      "reason": "the ODT body index does not model this element yet"
+    },
+    {
+      "subject": "element",
+      "element": "revision",
+      "code": "unsupported_capability",
+      "followUp": "M6 ODT body index (record 0276)",
+      "reason": "the ODT body index does not model this element yet"
+    },
+    {
+      "subject": "element",
+      "element": "col",
+      "code": "unsupported_capability",
+      "followUp": "M6 ODT body index (record 0276)",
+      "reason": "the ODT body index does not model this element yet"
+    },
+    {
+      "subject": "element",
+      "element": "equation",
+      "code": "unsupported_capability",
+      "followUp": "M6 ODT body index (record 0276)",
+      "reason": "the ODT body index does not model this element yet"
+    },
+    {
+      "subject": "element",
+      "element": "break",
+      "code": "unsupported_capability",
+      "followUp": "M6 ODT body index (record 0276)",
+      "reason": "the ODT body index does not model this element yet"
+    },
+    {
+      "subject": "element",
+      "element": "tab",
+      "code": "unsupported_capability",
+      "followUp": "M6 ODT body index (record 0276)",
+      "reason": "the ODT body index does not model this element yet"
+    },
+    {
+      "subject": "element",
+      "element": "group",
+      "code": "unsupported_capability",
+      "followUp": "M6 ODT body index (record 0276)",
+      "reason": "the ODT body index does not model this element yet"
+    },
+    {
+      "subject": "element",
+      "element": "formfield",
+      "code": "unsupported_capability",
+      "followUp": "M6 ODT body index (record 0276)",
+      "reason": "the ODT body index does not model this element yet"
+    },
+    {
+      "subject": "element",
+      "element": "settings",
+      "code": "unsupported_capability",
+      "followUp": "M6 ODT body index (record 0276)",
+      "reason": "the ODT body index does not model this element yet"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "cell",
+      "context": "table-grid",
+      "code": "unsupported_capability",
+      "followUp": "M6 ODT table grid edits",
+      "reason": "cells keep the table grid: remove or move the whole row, or set the cell's text"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "cell",
+      "context": "table-grid",
+      "code": "unsupported_capability",
+      "followUp": "M6 ODT table grid edits",
+      "reason": "adding a cell would break the table grid; add a row, which spans the first row's columns"
+    },
+    {
+      "subject": "operation",
+      "verb": "move",
+      "element": "cell",
+      "context": "table-grid",
+      "code": "unsupported_capability",
+      "followUp": "M6 ODT table grid edits",
+      "reason": "cells move only with their row"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "row",
+      "context": "vertical-merge",
+      "code": "unsupported_capability",
+      "followUp": "M6 ODT table grid edits",
+      "reason": "a row holding vertically merged or covered cells cannot leave the table"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "picture",
+      "context": "image-resources",
+      "code": "unsupported_capability",
+      "followUp": "M6 ODT drawing and media edits",
+      "reason": "adding an image needs a package media resource and a frame; frames and images are readable, settable (frame geometry) and removable"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "frame",
+      "context": "drawing-resources",
+      "code": "unsupported_capability",
+      "followUp": "M6 ODT drawing and media edits",
+      "reason": "frames are created with their content (image or text box), which the body edits do not author yet"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "style",
+      "context": "common-styles",
+      "code": "unsupported_capability",
+      "followUp": "M6 ODT style definitions",
+      "reason": "common styles in styles.xml are read-only; paragraph and run formatting derives automatic styles instead"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "run",
+      "context": "clear-formatting",
+      "code": "unsupported_capability",
+      "followUp": "M6 ODT formatting removal",
+      "reason": "a null value cannot remove a character or paragraph property; set the property's off value instead"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "cell",
+      "context": "typed-values",
+      "code": "unsupported_capability",
+      "followUp": "M6 ODT typed cell values",
+      "reason": "cell text writes a string cell; numeric, date and formula cell values are not authored"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "document",
+      "context": "signed-or-encrypted-package",
+      "code": "unsupported_capability",
+      "followUp": "ADR 0034 ODF security vocabulary (record 0268 G5)",
+      "reason": "the leaf preserves signed and encrypted packages only as exact no-ops; changed writes are refused"
+    },
+    {
+      "subject": "operation",
+      "verb": "get",
+      "element": "document",
+      "context": "flat-odf-input",
+      "code": "unsupported_capability",
+      "followUp": "M6 flat ODF owner",
+      "reason": "single-XML .fodt input is detected but refused; the leaf flat snapshot has no body index or package owner the adapter can publish through"
+    },
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "document",
+      "context": "template",
+      "code": "unsupported_capability",
+      "followUp": "use Flavor::Document",
+      "reason": "ODT template creation (.ott) is not supported"
+    },
+    {
+      "subject": "view",
+      "mode": "issues",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "forms",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "html",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "svg",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "screenshot",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "pdf",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    }
+  ],
+  "setKeywords": {
+    "verb": "replace",
+    "support": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0273 follow-up: a find adapter over the format's run-level text edits",
+      "reason": "find/replace is not integrated for this format"
+    },
+    "keywords": {
+      "find": {
+        "type": "string",
+        "constraint": {
+          "notEmpty": true
+        },
+        "set": true
+      },
+      "replace": {
+        "type": "string",
+        "set": true
+      },
+      "matchCase": {
+        "type": "bool",
+        "default": true,
+        "set": true
+      },
+      "wholeWord": {
+        "type": "bool",
+        "default": false,
+        "set": true
+      },
+      "regex": {
+        "type": "bool",
+        "default": false,
+        "set": true,
+        "writeGap": {
+          "code": "unsupported_capability",
+          "followUp": "record 0010 Q3: an owner-approved regular-expression dependency",
+          "reason": "Litchi has no approved regular-expression engine; `regex=true` and OfficeCLI's `r\"...\"` patterns are refused"
+        }
+      }
+    }
+  }
+}

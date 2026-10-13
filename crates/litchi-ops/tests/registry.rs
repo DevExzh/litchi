@@ -19,6 +19,7 @@ fn registry_goldens_follow_enabled_formats() {
         (FileFormat::Ppt, "ppt", cfg!(feature = "ppt")),
         (FileFormat::Pptx, "pptx", cfg!(feature = "pptx")),
         (FileFormat::Rtf, "rtf", cfg!(feature = "rtf")),
+        (FileFormat::Odt, "odt", cfg!(feature = "odt")),
         (FileFormat::Xls, "xls", cfg!(feature = "xls")),
         (FileFormat::Xlsb, "xlsb", cfg!(feature = "xlsb")),
         (FileFormat::Xlsx, "xlsx", cfg!(feature = "xlsx")),

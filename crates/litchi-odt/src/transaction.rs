@@ -48,6 +48,9 @@ pub use litchi_odf_common::OpenOptions;
 const MAX_PACKAGE_BYTES: usize = 64 * 1024 * 1024;
 const MAX_DURABLE_TRANSFER_EXPANSION_BYTES: usize = MAX_PACKAGE_BYTES;
 const MAX_OPERATIONS: usize = 1_024;
+/// Body edits compile to one splice publication, so one edit admits more of
+/// them than of the operations that each republish the package.
+const MAX_BODY_OPERATIONS: usize = 65_536;
 const MAX_WIRE_JSON_BYTES: usize = 192 * 1024 * 1024;
 const MAX_SEMANTIC_TEXT_BYTES: usize = 1024 * 1024;
 const MAX_PLAIN_PARAGRAPH_MOVE_POSITIONS: usize = 4_096;
@@ -410,7 +413,27 @@ impl Package {
         Edit {
             source: self.clone(),
             operations: Vec::new(),
+            body: None,
         }
+    }
+
+    /// Starts a detached edit of the document properties in `meta.xml`.
+    #[must_use]
+    pub fn edit_metadata(&self) -> crate::metadata::Edit {
+        crate::metadata::Edit::new(self)
+    }
+
+    /// Applies a metadata patch to the exact snapshot it was made from.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PackageError::Core`] when this package is not the patch's
+    /// source snapshot.
+    pub fn apply_metadata(
+        &self,
+        patch: &crate::metadata::Patch,
+    ) -> std::result::Result<Self, PackageError> {
+        self.apply(patch.primary())
     }
 
     /// Starts a bounded deterministic collection of independently prepared edits.
@@ -610,6 +633,8 @@ impl ParagraphSelector {
 pub struct Edit {
     source: Package,
     operations: Vec<Operation>,
+    /// Structural body edits against the source's [`crate::body::Tree`].
+    body: Option<Box<crate::body::BodyEdits>>,
 }
 
 impl Edit {
@@ -1448,6 +1473,186 @@ impl Edit {
         }))
     }
 
+    /// Stage one structural body edit against the source's body index.
+    fn stage_body(
+        &mut self,
+        stage: impl FnOnce(&mut crate::body::BodyEdits, crate::body::Body<'_>) -> Result<()>,
+    ) -> Result<&mut Self> {
+        let staged = match self.operations.as_slice() {
+            [] => 0,
+            [Operation::Body { count }] => *count,
+            _ => {
+                return Err(CoreError::InvalidFormat(
+                    "ODT body edits address the source body and must precede other staged operations"
+                        .to_string(),
+                ));
+            },
+        };
+        if staged >= MAX_BODY_OPERATIONS {
+            return Err(CoreError::InvalidFormat(format!(
+                "ODT transaction exceeds {MAX_BODY_OPERATIONS} staged body edits"
+            )));
+        }
+        let document = self.source.document()?;
+        let body = document.body()?;
+        let edits = self.body.get_or_insert_with(Box::default);
+        stage(edits, body)?;
+        match self.operations.first_mut() {
+            Some(Operation::Body { count }) => {
+                *count += 1;
+                Ok(self)
+            },
+            _ => self.push(Operation::Body { count: 1 }),
+        }
+    }
+
+    /// Stages replacement of a body node's text (paragraph, heading, run,
+    /// hyperlink, cell, list item, text box, note or annotation). Spaces,
+    /// tabs and line feeds are kept as `text:s`, `text:tab` and
+    /// `text:line-break`; a cell becomes a string cell.
+    ///
+    /// Body edits name nodes of [`Document::body`] of this edit's source and
+    /// must be staged before any other operation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a node without text, text XML cannot carry, or
+    /// an edit overlapping another staged body edit.
+    pub fn set_text(
+        &mut self,
+        node: crate::body::NodeId,
+        text: impl Into<String>,
+    ) -> Result<&mut Self> {
+        let text = text.into();
+        self.stage_body(|edits, body| edits.set_text(body, node, text))
+    }
+
+    /// Stages setting (`Some`) or removing (`None`) one typed attribute of
+    /// a body node.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the node's kind has no such attribute, the value
+    /// is invalid (an unknown style, a script hyperlink, a grid attribute),
+    /// or the edit overlaps another staged body edit.
+    pub fn set_attribute(
+        &mut self,
+        node: crate::body::NodeId,
+        attribute: crate::body::Attribute,
+        value: Option<&str>,
+    ) -> Result<&mut Self> {
+        let value = value.map(str::to_owned);
+        self.stage_body(|edits, body| edits.set_attribute(body, node, attribute, value))
+    }
+
+    /// Stages character formatting of a run, paragraph or heading. The
+    /// commit derives one new automatic style (from the node's automatic
+    /// style when it has one) and points the node at it; a run without a
+    /// style of its own becomes a `text:span`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a node without character formatting, an invalid
+    /// value, or an overlapping body edit.
+    pub fn set_text_properties(
+        &mut self,
+        node: crate::body::NodeId,
+        properties: &crate::body::TextPropertyEdit,
+    ) -> Result<&mut Self> {
+        self.stage_body(|edits, body| edits.set_text_properties(body, node, properties))
+    }
+
+    /// Stages paragraph formatting of a paragraph or heading through a
+    /// derived automatic paragraph style.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::set_text_properties`].
+    pub fn set_paragraph_properties(
+        &mut self,
+        node: crate::body::NodeId,
+        properties: &crate::body::ParagraphPropertyEdit,
+    ) -> Result<&mut Self> {
+        self.stage_body(|edits, body| edits.set_paragraph_properties(body, node, properties))
+    }
+
+    /// Stages insertion of a new body node at `location`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the parent cannot hold the node, the anchor is
+    /// not the parent's child, a value is invalid, or the insertion lies in
+    /// a node another staged body edit replaces.
+    pub fn insert(
+        &mut self,
+        location: crate::body::Location,
+        node: &crate::body::NewNode,
+    ) -> Result<&mut Self> {
+        self.stage_body(|edits, body| edits.insert(body, location, node))
+    }
+
+    /// Stages removal of a body node with everything inside it. A range
+    /// bookmark or a comment loses its end marker with it. Cells and rows
+    /// with vertically merged cells keep the table grid and are refused.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for the body, a grid-bound node, or an overlapping
+    /// body edit.
+    pub fn remove(&mut self, node: crate::body::NodeId) -> Result<&mut Self> {
+        self.stage_body(|edits, body| edits.remove(body, node))
+    }
+
+    /// Stages a move of a body node, keeping its exact bytes.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::remove`], and when the destination cannot hold the node.
+    pub fn relocate(
+        &mut self,
+        node: crate::body::NodeId,
+        location: crate::body::Location,
+    ) -> Result<&mut Self> {
+        self.stage_body(|edits, body| edits.relocate(body, node, location))
+    }
+
+    /// Stages an exchange of two body nodes, keeping both nodes' bytes.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::remove`], and when either destination cannot hold the
+    /// other node or one node contains the other.
+    pub fn swap(
+        &mut self,
+        left: crate::body::NodeId,
+        right: crate::body::NodeId,
+    ) -> Result<&mut Self> {
+        self.stage_body(|edits, body| edits.swap(body, left, right))
+    }
+
+    /// Stages setting (`Some`) or removing (`None`) one `meta.xml`
+    /// property; the public route is [`crate::metadata::Edit`].
+    pub(crate) fn set_metadata(
+        &mut self,
+        field: crate::metadata::Field,
+        value: Option<&str>,
+    ) -> Result<&mut Self> {
+        let value = value.map(str::to_owned);
+        self.stage_body(|edits, _| edits.set_metadata(field, value))
+    }
+
+    /// The number of staged operations, body edits included.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.operations.len()
+    }
+
+    /// Whether nothing is staged.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.operations.is_empty()
+    }
+
     fn push(&mut self, operation: Operation) -> Result<&mut Self> {
         if self.operations.len() >= MAX_OPERATIONS {
             return Err(CoreError::InvalidFormat(format!(
@@ -1497,9 +1702,14 @@ impl Edit {
     }
 
     #[inline(never)]
-    fn commit_changed(self) -> Result<Commit> {
+    fn commit_changed(mut self) -> Result<Commit> {
         ensure_editable_envelope(&self.source)?;
         let mut document = self.source.document()?;
+        if let Some(body) = self.body.take() {
+            if let Some(bytes) = crate::body::apply_body_edits(&document, *body)? {
+                document = Document::from_bytes(bytes)?;
+            }
+        }
         let mut results = Vec::new();
         results
             .try_reserve_exact(self.operations.len())
@@ -1536,6 +1746,18 @@ impl Edit {
             }
             let result = match operation {
                 Operation::Noop => OperationResult::Unit,
+                Operation::Body { count } => {
+                    // One result per staged body edit; the edits were applied
+                    // together before this loop.
+                    results
+                        .try_reserve(*count)
+                        .map_err(|source| CoreError::Allocation {
+                            resource: "ODT transaction results",
+                            source,
+                        })?;
+                    results.extend((1..*count).map(|_| OperationResult::Unit));
+                    OperationResult::Unit
+                },
                 Operation::RestoreSnapshot => {
                     return Err(CoreError::Unsupported(
                         "snapshot restoration is available only through patch application"
@@ -2318,8 +2540,9 @@ impl JoinedEdit {
         identifier: impl Into<String>,
         edit: Edit,
     ) -> std::result::Result<&mut Self, JoinConflict> {
-        if !transfer_operations_are_isolated(&edit.operations) {
-            // The core composition vocabulary has no format-specific
+        if !transfer_operations_are_isolated(&edit.operations) || edit.body.is_some() {
+            // Body edits address one source tree and do not compose; the
+            // core composition vocabulary has no format-specific
             // isolation variant. Report this admission refusal through its
             // invalid-effect branch rather than retaining an unsafe payload.
             return Err(JoinConflict {
@@ -2373,6 +2596,7 @@ impl JoinedEdit {
         Edit {
             source: self.source,
             operations,
+            body: None,
         }
         .commit_core()
     }
@@ -2528,6 +2752,12 @@ impl History {
 enum Operation {
     Noop,
     RestoreSnapshot,
+    /// `count` staged structural body edits; the edits themselves live in
+    /// [`Edit::body`] and are applied together, before every other
+    /// operation.
+    Body {
+        count: usize,
+    },
     InsertParagraph {
         index: usize,
         text: String,
@@ -2843,7 +3073,15 @@ impl Commit {
     pub fn diagnostics(&self) -> Diagnostics {
         Diagnostics {
             changed: !self.patch.is_noop(),
-            operation_count: self.patch.operations.len(),
+            operation_count: self
+                .patch
+                .operations
+                .iter()
+                .map(|operation| match operation {
+                    Operation::Body { count } => *count,
+                    _ => 1,
+                })
+                .sum(),
         }
     }
 
@@ -3426,6 +3664,7 @@ impl TransferPlan {
         Edit {
             source: self.destination,
             operations: self.operations,
+            body: None,
         }
         .commit_core()
     }
@@ -4221,7 +4460,7 @@ fn semantic_patch_operation(
             format!("/package/scripts/{path}"),
             Value::Null,
         ),
-        Operation::RestoreSnapshot | Operation::Annotation(_) => {
+        Operation::RestoreSnapshot | Operation::Annotation(_) | Operation::Body { .. } => {
             return Err(CoreError::Unsupported(
                 "this ODT operation has not migrated to the semantic durable vocabulary"
                     .to_string(),
@@ -4502,6 +4741,7 @@ fn apply_durable_patch<Mode>(patch: &CorePatch<Mode>, source: &Package) -> Resul
     let committed = Edit {
         source: source.clone(),
         operations,
+        body: None,
     }
     .commit()?;
     if BlobId::of(committed.package().as_bytes()).as_hex() != lineage.target_id {
@@ -5945,6 +6185,7 @@ fn operation_effects(operations: &[Operation]) -> (Vec<String>, Vec<String>) {
         }
         match operation {
             Operation::Noop => {},
+            Operation::Body { .. } => writes.push("/body".to_string()),
             Operation::Annotation(_) => writes.push("/body/annotations".to_string()),
             Operation::InsertParagraph { index, .. } | Operation::RemoveParagraph { index } => {
                 writes.push("/body/paragraphs/order".to_string());

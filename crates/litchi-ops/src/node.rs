@@ -25,7 +25,7 @@
 //!
 //! # Status
 //!
-//! DOC, DOCX, XLSX, XLSB, XLS, PPT, PPTX, RTF and ODS carry concrete leaf-backed
+//! DOC, DOCX, XLSX, XLSB, XLS, PPT, PPTX, RTF, ODS and ODT carry concrete leaf-backed
 //! nodes. Other formats retain the uninhabited [`Pending`] placeholder until
 //! their adapters land. These nodes are available through File navigation and
 //! lazy queries.
@@ -141,7 +141,8 @@ pub(crate) use view::Project;
     feature = "ppt",
     feature = "xlsb",
     feature = "xls",
-    feature = "ods"
+    feature = "ods",
+    feature = "odt"
 ))]
 pub(crate) use view::Source;
 pub use view::{
@@ -196,9 +197,9 @@ pub enum Node<'f> {
     /// A Rich Text Format node (tier-3 adapter, step R7).
     #[cfg(feature = "rtf")]
     Rtf(crate::format::rtf::Node<'f>),
-    /// An OpenDocument text node (tier-3 adapter, step R7).
+    /// An OpenDocument text node (tier-3 adapter, record 0276).
     #[cfg(feature = "odt")]
-    Odt(Pending<'f, crate::format::odt::Odt>),
+    Odt(crate::format::odt::Node<'f>),
     /// An OpenDocument spreadsheet node (tier-3 adapter, record 0277).
     #[cfg(feature = "ods")]
     Ods(crate::format::ods::Node<'f>),
@@ -378,6 +379,17 @@ impl<'f> Node<'f> {
     pub fn as_ods(&self) -> Option<&crate::format::ods::Node<'f>> {
         match self {
             Self::Ods(node) => Some(node),
+            #[allow(unreachable_patterns, reason = "format variants depend on features")]
+            _ => None,
+        }
+    }
+
+    /// Borrow the typed ODT node.
+    #[cfg(feature = "odt")]
+    #[must_use]
+    pub fn as_odt(&self) -> Option<&crate::format::odt::Node<'f>> {
+        match self {
+            Self::Odt(node) => Some(node),
             #[allow(unreachable_patterns, reason = "format variants depend on features")]
             _ => None,
         }

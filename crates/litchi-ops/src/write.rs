@@ -9,7 +9,8 @@
     feature = "xlsb",
     feature = "xls",
     feature = "rtf",
-    feature = "ods"
+    feature = "ods",
+    feature = "odt"
 ))]
 use std::io;
 use std::io::Write;
@@ -90,6 +91,14 @@ impl File {
                 let (commit, path) = handle.add(_parent.into_path()?, _node.into_node()?)?;
                 Ok(Added {
                     file: Self::Rtf(commit.after),
+                    path,
+                })
+            },
+            #[cfg(feature = "odt")]
+            Self::Odt(handle) => {
+                let (commit, path) = handle.add(_parent.into_path()?, _node.into_node()?)?;
+                Ok(Added {
+                    file: Self::Odt(commit.after),
                     path,
                 })
             },
@@ -194,6 +203,10 @@ impl File {
             Self::Rtf(handle) => handle
                 .move_to(_path.into_path()?, _to.into_placement()?)
                 .map(|commit| Self::Rtf(commit.after)),
+            #[cfg(feature = "odt")]
+            Self::Odt(handle) => handle
+                .move_to(_path.into_path()?, _to.into_placement()?)
+                .map(|commit| Self::Odt(commit.after)),
             #[cfg(feature = "doc")]
             Self::Doc(handle) => handle
                 .move_to(_path.into_path()?, _to.into_placement()?)
@@ -266,6 +279,10 @@ impl File {
             Self::Rtf(handle) => handle
                 .remove(_target.into_target()?)
                 .map(|commit| Self::Rtf(commit.after)),
+            #[cfg(feature = "odt")]
+            Self::Odt(handle) => handle
+                .remove(_target.into_target()?)
+                .map(|commit| Self::Odt(commit.after)),
             #[cfg(feature = "doc")]
             Self::Doc(handle) => handle
                 .remove(_target.into_target()?)
@@ -338,6 +355,10 @@ impl File {
             Self::Rtf(handle) => handle
                 .swap(_a.into_path()?, _b.into_path()?)
                 .map(|commit| Self::Rtf(commit.after)),
+            #[cfg(feature = "odt")]
+            Self::Odt(handle) => handle
+                .swap(_a.into_path()?, _b.into_path()?)
+                .map(|commit| Self::Odt(commit.after)),
             #[cfg(feature = "doc")]
             Self::Doc(handle) => handle
                 .swap(_a.into_path()?, _b.into_path()?)
@@ -466,6 +487,10 @@ impl File {
             Self::Ods(handle) => handle
                 .set(_target.into_target()?, _props)
                 .map(|commit| Self::Ods(commit.after)),
+            #[cfg(feature = "odt")]
+            Self::Odt(handle) => handle
+                .set(_target.into_target()?, _props)
+                .map(|commit| Self::Odt(commit.after)),
             Self::Signed(_) => Err(protected(self)),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -503,7 +528,8 @@ impl File {
             feature = "xlsb",
             feature = "xls",
             feature = "rtf",
-            feature = "ods"
+            feature = "ods",
+            feature = "odt"
         )),
         allow(
             clippy::only_used_in_recursion,
@@ -514,6 +540,12 @@ impl File {
         match self {
             #[cfg(feature = "rtf")]
             Self::Rtf(handle) => {
+                let mut counted = Counted { sink, bytes: 0 };
+                handle.write_to(&mut counted)?;
+                Ok(counted.bytes)
+            },
+            #[cfg(feature = "odt")]
+            Self::Odt(handle) => {
                 let mut counted = Counted { sink, bytes: 0 };
                 handle.write_to(&mut counted)?;
                 Ok(counted.bytes)
@@ -605,7 +637,8 @@ fn pending(file: &File, operation: &str) -> Error {
     feature = "xlsb",
     feature = "xls",
     feature = "rtf",
-    feature = "ods"
+    feature = "ods",
+    feature = "odt"
 ))]
 pub(crate) struct Counted<W> {
     pub(crate) sink: W,
@@ -621,7 +654,8 @@ pub(crate) struct Counted<W> {
     feature = "xlsb",
     feature = "xls",
     feature = "rtf",
-    feature = "ods"
+    feature = "ods",
+    feature = "odt"
 ))]
 impl<W: Write> Write for Counted<W> {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {

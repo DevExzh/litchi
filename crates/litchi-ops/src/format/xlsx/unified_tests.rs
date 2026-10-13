@@ -344,7 +344,7 @@ fn plans_compile_for_xlsx_and_run_on_any_workbook() {
             ]
         );
     }
-    let other = crate::query::Plan::compile(&query, litchi_core::FileFormat::Odt).unwrap_err();
+    let other = crate::query::Plan::compile(&query, litchi_core::FileFormat::Odg).unwrap_err();
     assert_eq!(other.code(), Code::UnsupportedCapability);
 }
 

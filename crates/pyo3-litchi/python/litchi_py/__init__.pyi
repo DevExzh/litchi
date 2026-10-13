@@ -841,7 +841,7 @@ def create(format: Union[FileFormat, str]) -> File:
     """Create a new, empty document of ``format`` through the unified API.
 
     The new File has no path: write it with ``save_as`` or ``to_bytes``.
-    .docx, .xlsx, .pptx, .xlsb, .doc, .xls, .ppt and .rtf can be created.
+    .docx, .xlsx, .pptx, .xlsb, .doc, .xls, .ppt, .rtf and .odt can be created.
     The GIL is released while the document is built.
 
     Args:

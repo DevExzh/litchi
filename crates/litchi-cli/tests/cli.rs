@@ -430,7 +430,7 @@ fn applied(run: &Run) -> Value {
 fn create_writes_every_creatable_format_and_refuses_overwrite() {
     let dir = tempfile::tempdir().expect("tempdir");
     for format in [
-        "docx", "xlsx", "pptx", "xlsb", "doc", "xls", "ppt", "rtf", "ods",
+        "docx", "xlsx", "pptx", "xlsb", "doc", "xls", "ppt", "rtf", "ods", "odt",
     ] {
         let path = scratch(dir.path(), &format!("blank.{format}"), None);
         let file = litchi_ops::open(&path).expect("reopen in process");
@@ -757,6 +757,46 @@ fn document_writes_save_in_place() {
     let path = scratch(dir.path(), "w.doc", None);
     expect(0, ["set", arg(&path), "/body/p[1]", "--prop", "text=Hello"]);
     assert_eq!(text_of(&path, "/body/p[1]"), "Hello");
+}
+
+#[test]
+fn odt_writes_save_in_place() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = scratch(dir.path(), "w.odt", Some("odf/corpus/writer-table.odt"));
+    let file = arg(&path);
+    let run = expect(
+        0,
+        [
+            "add",
+            file,
+            "/body",
+            "--type",
+            "paragraph",
+            "--prop",
+            "text=Added",
+            "--json",
+        ],
+    );
+    applied(&run);
+    expect(
+        0,
+        [
+            "set",
+            file,
+            "/body/tbl[1]/tr[1]/tc[1]",
+            "--prop",
+            "text=cell",
+        ],
+    );
+    assert_eq!(text_of(&path, "/body/tbl[1]/tr[1]/tc[1]"), "cell");
+    expect(0, ["set", file, "/metadata", "--prop", "title=CLI"]);
+    assert_eq!(
+        expect(0, ["get", file, "/metadata", "--json"]).json()["format"]["title"],
+        "CLI"
+    );
+    let reopened = litchi_ops::open(&path).expect("reopen in process");
+    assert_eq!(reopened.format(), Some(litchi_core::FileFormat::Odt));
+    assert!(reopened.text().expect("text").contains("Added"));
 }
 
 const ITEMS: &str = r#"[

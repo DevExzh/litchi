@@ -79,6 +79,27 @@ impl Document {
         TextElements::write_text_to(self.state.content.xml_content(), output, options)
     }
 
+    /// The structural index of the text body: every paragraph, heading,
+    /// run, hyperlink, list, table, section, frame, note, annotation and
+    /// bookmark with its source byte range. Built on first use and shared by
+    /// every clone of this document.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `content.xml` has no text body or exceeds the
+    /// index limits.
+    pub fn body(&self) -> Result<crate::body::Body<'_>> {
+        let styles = self.state.styles.as_ref().map(Styles::xml_content);
+        let tree = match self.state.body.get() {
+            Some(tree) => tree,
+            None => {
+                let tree = crate::body::Tree::build(self.state.content.xml_content(), styles)?;
+                self.state.body.get_or_init(|| tree)
+            },
+        };
+        Ok(tree.view(self.state.content.xml_content(), styles))
+    }
+
     /// Get the number of paragraphs in the document.
     ///
     /// # Examples
