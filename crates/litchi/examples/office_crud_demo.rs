@@ -9,9 +9,9 @@
 //! ```
 
 use litchi::docx::Package as DocxPackage;
-use litchi::ooxml_common::Props;
 use litchi::pptx::Package as PptxPackage;
 use litchi::xlsx::{Formula, Workbook};
+use litchi_core::Metadata;
 
 type ExampleResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
@@ -79,12 +79,12 @@ fn demo_docx_operations() -> ExampleResult<()> {
     table.cell(3, 2).unwrap().set_text("200");
 
     // Set metadata
-    let _ = pkg.put_props(
-        Props::new()
-            .title("Product Catalog")
-            .creator("Litchi Demo")
-            .description("Demonstration of DOCX creation"),
-    );
+    let _ = pkg.put_props(Metadata {
+        title: Some("Product Catalog".to_owned()),
+        author: Some("Litchi Demo".to_owned()),
+        description: Some("Demonstration of DOCX creation".to_owned()),
+        ..Metadata::default()
+    });
 
     // Save
     pkg.save("demo_catalog.docx")?;

@@ -62,6 +62,22 @@ impl Commit {
         result
     }
 
+    /// Adapt a metadata commit (record 0253). The workbook patch is empty:
+    /// the leaf metadata patch changes only the `docProps` parts, which the
+    /// retained endpoints' content comparison observes.
+    pub(super) fn from_metadata(
+        after_xlsx: Xlsx,
+        source: xlsx::Workbook,
+        target: xlsx::Workbook,
+    ) -> Self {
+        Self {
+            after_xlsx,
+            source,
+            target,
+            native_patch: xlsx::workbook::Patch::default(),
+        }
+    }
+
     /// Consume the adapter result for explicit transaction history.
     pub(crate) fn into_parts(
         self,
@@ -209,6 +225,9 @@ impl Xlsx {
         limits: &SemanticLimits,
     ) -> Result<Commit> {
         let props = Props::from_props(props)?;
+        if let Some(commit) = self.try_set_metadata(&target, &props)? {
+            return Ok(commit);
+        }
         if let Some(commit) = self.try_set_merge(&target, &props, limits)? {
             return Ok(commit);
         }

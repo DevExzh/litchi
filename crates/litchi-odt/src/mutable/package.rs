@@ -342,13 +342,7 @@ impl MutableDocument {
         }
 
         if let Some(created) = &self.metadata.created {
-            let value = created.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true);
-            meta_fields.push_str(&xml_minifier::minified_xml_format!(
-                r#"<meta:creation-date>{}</meta:creation-date>"#,
-                value
-            ));
-        } else if let Some(created) = &self.metadata.created_local {
-            let value = created.format("%Y-%m-%dT%H:%M:%S%.f").to_string();
+            let value = created.to_string();
             meta_fields.push_str(&xml_minifier::minified_xml_format!(
                 r#"<meta:creation-date>{}</meta:creation-date>"#,
                 value
@@ -356,13 +350,7 @@ impl MutableDocument {
         }
 
         if let Some(modified) = &self.metadata.modified {
-            let value = modified.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true);
-            meta_fields.push_str(&xml_minifier::minified_xml_format!(
-                r#"<dc:date>{}</dc:date>"#,
-                value
-            ));
-        } else if let Some(modified) = &self.metadata.modified_local {
-            let value = modified.format("%Y-%m-%dT%H:%M:%S%.f").to_string();
+            let value = modified.to_string();
             meta_fields.push_str(&xml_minifier::minified_xml_format!(
                 r#"<dc:date>{}</dc:date>"#,
                 value

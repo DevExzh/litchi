@@ -557,12 +557,11 @@ fn created_presentation_is_an_immutable_native_owner_and_publishes() {
 
 #[test]
 fn pptx_creation_refuses_unimplemented_options_explicitly() {
-    use litchi_core::{FileFormat, Metadata};
+    use litchi_core::FileFormat;
     use litchi_ops::{Conformance, CreateOptions, Flavor};
     for options in [
         CreateOptions::new().flavor(Flavor::Template),
         CreateOptions::new().conformance(Conformance::Strict),
-        CreateOptions::new().metadata(Metadata::default()),
     ] {
         let error = litchi_ops::create_with(FileFormat::Pptx, &options).unwrap_err();
         assert_eq!(error.code(), Code::UnsupportedCapability);

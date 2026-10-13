@@ -1260,11 +1260,45 @@ fn workbook_value(file: &Xlsx, key: WorkbookKey) -> Option<Value<'_>> {
         WorkbookKey::LastModifiedBy => optional(metadata.last_modified_by.as_ref()),
         WorkbookKey::RevisionNumber => optional(metadata.revision.as_ref()),
         WorkbookKey::Created => {
-            timestamp!(metadata.created.as_ref(), metadata.created_local.as_ref())
+            timestamp!(
+                metadata
+                    .created
+                    .and_then(litchi_core::metadata::Timestamp::utc)
+                    .as_ref(),
+                metadata
+                    .created
+                    .and_then(litchi_core::metadata::Timestamp::unzoned)
+                    .as_ref()
+            )
         },
         WorkbookKey::Modified => {
-            timestamp!(metadata.modified.as_ref(), metadata.modified_local.as_ref())
+            timestamp!(
+                metadata
+                    .modified
+                    .and_then(litchi_core::metadata::Timestamp::utc)
+                    .as_ref(),
+                metadata
+                    .modified
+                    .and_then(litchi_core::metadata::Timestamp::unzoned)
+                    .as_ref()
+            )
         },
+        WorkbookKey::ExtendedTemplate => metadata.template.as_ref().map(|value| text(value)),
+        WorkbookKey::ExtendedManager => metadata.manager.as_ref().map(|value| text(value)),
+        WorkbookKey::ExtendedCompany => metadata.company.as_ref().map(|value| text(value)),
+        WorkbookKey::ExtendedApplication => metadata.application.as_ref().map(|value| text(value)),
+        WorkbookKey::ExtendedPages => metadata
+            .page_count
+            .map(|value| Value::Int(i64::from(value))),
+        WorkbookKey::ExtendedWords => metadata
+            .word_count
+            .map(|value| Value::Int(i64::from(value))),
+        WorkbookKey::ExtendedCharacters => metadata
+            .character_count
+            .map(|value| Value::Int(i64::from(value))),
+        WorkbookKey::ExtendedTotalTime => metadata
+            .editing_time_minutes
+            .map(|value| Value::Int(i64::from(value))),
         WorkbookKey::Date1904 => {
             let date_system = match &file.0.owner {
                 XlsxOwner::Source(workbook) => workbook.date_system(),

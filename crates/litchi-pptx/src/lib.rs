@@ -94,6 +94,7 @@ pub mod model3d;
 pub mod modern_comments;
 
 pub mod master_layout;
+pub mod metadata;
 pub(crate) mod namespace;
 pub mod notes;
 pub mod opened;

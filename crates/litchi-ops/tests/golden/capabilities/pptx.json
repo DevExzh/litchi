@@ -163,41 +163,107 @@
         "title": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "author": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "subject": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "keywords": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "description": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "lastModifiedBy": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "revisionNumber": {
           "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "category": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "created": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "modified": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "extended.template": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "extended.manager": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "extended.company": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "extended.application": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "extended.pages": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "extended.words": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "extended.characters": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "extended.totalTime": {
+          "type": "int",
           "add": false,
           "set": false,
           "get": true
@@ -2985,22 +3051,6 @@
       "code": "unsupported_capability",
       "followUp": "L-PPTX-R4",
       "reason": "the theme is not readable on the source-backed owner yet"
-    },
-    {
-      "subject": "property",
-      "element": "presentation",
-      "key": "created",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended",
-      "reason": "OfficeCLI prints .NET round-trip timestamps; the adapter does not format them yet"
-    },
-    {
-      "subject": "property",
-      "element": "presentation",
-      "key": "modified",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended",
-      "reason": "OfficeCLI prints .NET round-trip timestamps; the adapter does not format them yet"
     },
     {
       "subject": "property",

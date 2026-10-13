@@ -299,9 +299,7 @@ fn unsupported_equal(left: &CoreMetadata, right: &CoreMetadata) -> bool {
         && left.last_modified_by == right.last_modified_by
         && left.revision == right.revision
         && left.created == right.created
-        && left.created_local == right.created_local
         && left.modified == right.modified
-        && left.modified_local == right.modified_local
         && left.page_count == right.page_count
         && left.word_count == right.word_count
         && left.character_count == right.character_count
@@ -314,9 +312,8 @@ fn unsupported_equal(left: &CoreMetadata, right: &CoreMetadata) -> bool {
         && left.content_status == right.content_status
         && left.content_type == right.content_type
         && left.version == right.version
-        && left.last_printed_time == right.last_printed_time
-        && left.last_printed_local == right.last_printed_local
-        && left.last_backup_local == right.last_backup_local
+        && left.last_printed == right.last_printed
+        && left.last_backup == right.last_backup
         && left.hyperlink_base == right.hyperlink_base
         && left.security == right.security
         && left.codepage == right.codepage

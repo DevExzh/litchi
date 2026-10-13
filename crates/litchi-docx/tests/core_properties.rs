@@ -1,13 +1,16 @@
+use litchi_core::Metadata;
 use litchi_docx::Package;
-use litchi_ooxml_common::Props;
 use tempfile::NamedTempFile;
 
 #[test]
 fn package_facade_owns_core_property_crud() {
     let mut package = Package::new().expect("fresh DOCX");
-    assert_eq!(package.props().cloned(), Some(Props::new()));
+    assert_eq!(package.props().cloned(), Some(Metadata::default()));
 
-    let previous = package.put_props(Props::new().title("Moved"));
+    let previous = package.put_props(Metadata {
+        title: Some("Moved".to_owned()),
+        ..Metadata::default()
+    });
     assert!(previous.is_some());
     assert_eq!(
         package.props().and_then(|props| props.title.as_deref()),

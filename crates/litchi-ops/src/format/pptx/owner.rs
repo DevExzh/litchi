@@ -422,8 +422,12 @@ impl Pptx {
                 };
                 let metadata = presentation
                     .properties_with_tolerance(&mut pptx::ToleranceReport::default())?
-                    .map(Metadata::from)
-                    .filter(Metadata::has_data);
+                    .unwrap_or_default();
+                let metadata = crate::format::metadata::with_source_app_props(
+                    metadata,
+                    presentation.source_backed_package(),
+                );
+                let metadata = Some(metadata).filter(Metadata::has_data);
                 let _ = self.0.metadata.set(metadata);
             }
             Ok(self.0.metadata.get().and_then(Option::as_ref))

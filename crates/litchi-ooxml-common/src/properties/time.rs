@@ -1,6 +1,6 @@
 //! Lossless validated XML Schema time values used by core properties.
 
-use super::{MAX_PROPERTY_TEXT, keyword::collapse_xml_whitespace};
+use super::{MAX_PROPERTY_TEXT, collapse_xml_whitespace};
 use crate::{Error, Result};
 use chrono::{DateTime as ChronoDateTime, NaiveDateTime, SecondsFormat, Utc};
 use std::fmt;

@@ -119,6 +119,10 @@ const fn cell_capability_array() -> [PropSpec; CELL_PROPS.len() + 2] {
 
 pub(crate) static CELL_CAPABILITY_PROPS: &[PropSpec] = &cell_capability_array();
 
+/// The workbook root with its settable document-property keys (record 0253).
+static WORKBOOK_CAPABILITY_PROPS: &[PropSpec] =
+    &crate::format::metadata::root_capabilities::<{ WORKBOOK_PROPS.len() }>(WORKBOOK_PROPS);
+
 const fn same_name(left: &str, right: &str) -> bool {
     let left = left.as_bytes();
     let right = right.as_bytes();
@@ -398,7 +402,7 @@ const fn with_gap(
 // indices of the common table.  Rebuild the array in that order so the XLSB
 // resolver can use the local `SPEC` without duplicating the vocabulary.
 static ELEMENTS: [ElementSpec<Kind>; 26] = [
-    with_gap(&workbook::SPEC.elements[0], None),
+    with_props(&workbook::SPEC.elements[0], WORKBOOK_CAPABILITY_PROPS, None),
     with_props(&workbook::SPEC.elements[1], SHEET_PROPS, None),
     with_props(&workbook::SPEC.elements[2], CELL_CAPABILITY_PROPS, None),
     with_props(&workbook::SPEC.elements[3], CELL_WRITE_PROPS, None),

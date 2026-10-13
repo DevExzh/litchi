@@ -217,21 +217,13 @@ impl Builder {
 
         if let Some(created) = &self.metadata.created {
             meta.push_str("<meta:creation-date>");
-            meta.push_str(&created.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true));
-            meta.push_str("</meta:creation-date>");
-        } else if let Some(created) = &self.metadata.created_local {
-            meta.push_str("<meta:creation-date>");
-            meta.push_str(&created.format("%Y-%m-%dT%H:%M:%S%.f").to_string());
+            meta.push_str(&created.to_string());
             meta.push_str("</meta:creation-date>");
         }
 
         if let Some(modified) = &self.metadata.modified {
             meta.push_str("<dc:date>");
-            meta.push_str(&modified.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true));
-            meta.push_str("</dc:date>");
-        } else if let Some(modified) = &self.metadata.modified_local {
-            meta.push_str("<dc:date>");
-            meta.push_str(&modified.format("%Y-%m-%dT%H:%M:%S%.f").to_string());
+            meta.push_str(&modified.to_string());
             meta.push_str("</dc:date>");
         }
 

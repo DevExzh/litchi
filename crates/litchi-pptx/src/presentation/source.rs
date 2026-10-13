@@ -1717,7 +1717,7 @@ impl SourceBackedPresentation {
     pub fn properties_with_tolerance(
         &self,
         tolerance: &mut crate::leniency::ToleranceReport,
-    ) -> Result<Option<litchi_ooxml_common::Props>> {
+    ) -> Result<Option<litchi_core::Metadata>> {
         self.inner.package.check_execution()?;
         let mut repairs = litchi_ooxml_common::leniency::ToleranceReport::default();
         let properties = litchi_ooxml_common::properties::read_source_backed_with_report(

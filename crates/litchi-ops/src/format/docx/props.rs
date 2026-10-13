@@ -449,9 +449,11 @@ fn document<'a>(metadata: &Metadata, index: usize) -> Option<NodeValue<'a>> {
         D_REVISION => text(&metadata.revision),
         D_CREATED => metadata
             .created
+            .and_then(litchi_core::metadata::Timestamp::utc)
             .map(|at| NodeValue::Text(Cow::Owned(at.format("%Y-%m-%dT%H:%M:%SZ").to_string()))),
         D_MODIFIED => metadata
             .modified
+            .and_then(litchi_core::metadata::Timestamp::utc)
             .map(|at| NodeValue::Text(Cow::Owned(at.format("%Y-%m-%dT%H:%M:%SZ").to_string()))),
         _ => None,
     }

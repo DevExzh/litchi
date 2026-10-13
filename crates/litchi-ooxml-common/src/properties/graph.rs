@@ -33,6 +33,19 @@ pub(super) fn inspect_tolerant(
     )
 }
 
+/// Inspect a source-backed package's graph strictly, as [`inspect`] does.
+pub(super) fn inspect_source_strict(package: &SourceBackedPackage) -> Result<Graph> {
+    package.source_version()?;
+    let result = inspect_parts(
+        || Ok(package.iter_parts()),
+        package.rels(),
+        || Ok(package.check_execution()?),
+        None,
+    );
+    package.source_version()?;
+    result
+}
+
 /// Inspect the same core-properties graph over the metadata-only
 /// source-backed catalog. No ordinary part payload is read here. The
 /// metadata-only part projection is deliberately fed through the same graph

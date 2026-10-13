@@ -17,7 +17,7 @@ use litchi::docx::{
     MutableDocument, MutableTheme, Package, PageNumberFormat, PageOrientation, ParagraphAlignment,
     Style, TableOfContents, UnderlineStyle, Watermark,
 };
-use litchi::ooxml_common::Props;
+use litchi_core::Metadata;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("╔════════════════════════════════════════════════════════════╗");
@@ -650,12 +650,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Set document properties
     let _ = package.put_props(
-        Props::new()
-            .title("Comprehensive DOCX Feature Test")
-            .subject("Feature Verification and Regression Testing")
-            .creator("Litchi OOXML Library")
-            .keywords("docx, test, verification, regression, features, themes, watermarks, toc")
-            .description("Complete test document for all DOCX writer features including new theme, watermark, and TOC support"),
+        Metadata {
+title: Some("Comprehensive DOCX Feature Test".to_owned()),
+subject: Some("Feature Verification and Regression Testing".to_owned()),
+author: Some("Litchi OOXML Library".to_owned()),
+keywords: Some("docx, test, verification, regression, features, themes, watermarks, toc".to_owned()),
+description: Some("Complete test document for all DOCX writer features including new theme, watermark, and TOC support".to_owned()),
+..Metadata::default()
+},
     );
 
     let filename = "comprehensive_test.docx";

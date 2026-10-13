@@ -74,8 +74,8 @@ fn metadata_matches_the_facade_projection() {
     assert_eq!(metadata.last_modified_by.as_deref(), Some("Hunglm"));
     let stamp =
         chrono::NaiveDate::from_ymd_opt(2014, 11, 15).and_then(|date| date.and_hms_opt(23, 9, 0));
-    assert_eq!(metadata.created_local, stamp);
-    assert_eq!(metadata.modified_local, stamp);
+    assert_eq!(metadata.created.and_then(Timestamp::unzoned), stamp);
+    assert_eq!(metadata.modified.and_then(Timestamp::unzoned), stamp);
     // The remaining fields are the facade's field-for-field projection of
     // the leaf's `\info` model.
     assert_eq!(metadata.title.as_deref(), info.title.as_deref());
@@ -100,9 +100,9 @@ fn metadata_matches_the_facade_projection() {
         leaf.generator()
             .map(|generator| generator.value.to_string())
     );
-    // Fields RTF has no source for stay empty.
-    assert_eq!(metadata.created, None);
-    assert_eq!(metadata.modified, None);
+    // RTF timestamps carry no zone; fields RTF has no source for stay empty.
+    assert_eq!(metadata.created.and_then(Timestamp::utc), None);
+    assert_eq!(metadata.modified.and_then(Timestamp::utc), None);
     assert_eq!(metadata.language, None);
     assert_eq!(metadata.codepage, None);
 }

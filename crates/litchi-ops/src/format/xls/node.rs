@@ -417,14 +417,22 @@ fn workbook_value(
         WorkbookKey::RevisionNumber => metadata.revision.as_ref().map(|value| text(value)),
         WorkbookKey::Created => metadata
             .created
-            .as_ref()
+            .and_then(litchi_core::metadata::Timestamp::utc)
             .map(|value| Value::Text(Cow::Owned(value.to_string()))),
         WorkbookKey::Modified => metadata
             .modified
-            .as_ref()
+            .and_then(litchi_core::metadata::Timestamp::utc)
             .map(|value| Value::Text(Cow::Owned(value.to_string()))),
         WorkbookKey::Date1904 => date_1904.then_some(Value::Bool(true)),
-        WorkbookKey::ActiveTab => None,
+        WorkbookKey::ActiveTab
+        | WorkbookKey::ExtendedTemplate
+        | WorkbookKey::ExtendedManager
+        | WorkbookKey::ExtendedCompany
+        | WorkbookKey::ExtendedApplication
+        | WorkbookKey::ExtendedPages
+        | WorkbookKey::ExtendedWords
+        | WorkbookKey::ExtendedCharacters
+        | WorkbookKey::ExtendedTotalTime => None,
     }
 }
 

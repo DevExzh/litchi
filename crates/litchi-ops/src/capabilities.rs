@@ -2881,6 +2881,7 @@ fn element_data(adapter: Adapter, index: u16) -> Data {
                 "sheet" => crate::format::xlsx::SHEET_CAPABILITY_PROPS,
                 "row" => crate::format::xlsx::ROW_CAPABILITY_PROPS,
                 "col" => crate::format::xlsx::COLUMN_CAPABILITY_PROPS,
+                "workbook" => crate::format::xlsx::WORKBOOK_CAPABILITY_PROPS,
                 _ => props,
             }
         } else { props };
@@ -2899,6 +2900,7 @@ fn element_data(adapter: Adapter, index: u16) -> Data {
                 "shape" => crate::format::pptx::SHAPE_CAPABILITY_PROPS,
                 "placeholder" => crate::format::pptx::PLACEHOLDER_CAPABILITY_PROPS,
                 "slide" => crate::format::pptx::SLIDE_CAPABILITY_PROPS,
+                "presentation" => crate::format::pptx::PRESENTATION_CAPABILITY_PROPS,
                 _ => props,
             }
         } else {

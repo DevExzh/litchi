@@ -50,6 +50,7 @@ use crate::{opc, pptx};
 
 mod children;
 pub(crate) mod create;
+mod metadata;
 mod nav;
 mod node;
 mod order;
@@ -69,7 +70,8 @@ pub(crate) use nav::Nav;
 pub use node::Node;
 pub(crate) use node::Props;
 pub(crate) use spec::{
-    PLACEHOLDER_CAPABILITY_PROPS, SHAPE_CAPABILITY_PROPS, SLIDE_CAPABILITY_PROPS, SPEC,
+    PLACEHOLDER_CAPABILITY_PROPS, PRESENTATION_CAPABILITY_PROPS, SHAPE_CAPABILITY_PROPS,
+    SLIDE_CAPABILITY_PROPS, SPEC,
 };
 pub(crate) use views::{Json as ViewJson, view_json, view_to};
 
@@ -375,8 +377,9 @@ impl Pptx {
             &mut litchi_ooxml_common::leniency::ToleranceReport::default(),
         )
         .map_err(pptx::Error::from)?
-        .map(Metadata::from)
-        .filter(Metadata::has_data);
+        .unwrap_or_default();
+        let metadata = Some(crate::format::metadata::with_app_props(metadata, &package))
+            .filter(Metadata::has_data);
         let package = pptx::Package::from_opc_package(package)?;
         Ok(Self::new(
             PptxOwner::Eager(Arc::new(package)),
@@ -395,7 +398,11 @@ impl Pptx {
             &mut litchi_ooxml_common::leniency::ToleranceReport::default(),
         )
         .map_err(pptx::Error::from)?
-        .map(Metadata::from)
+        .unwrap_or_default();
+        let metadata = Some(crate::format::metadata::with_app_props(
+            metadata,
+            package.opc()?,
+        ))
         .filter(Metadata::has_data);
         Ok(Self::new(
             PptxOwner::Eager(Arc::new(package)),
@@ -664,8 +671,12 @@ impl Pptx {
             // this read applies are reported by `tolerance_report`.
             let metadata = presentation
                 .properties_with_tolerance(&mut pptx::ToleranceReport::default())?
-                .map(Metadata::from)
-                .filter(Metadata::has_data);
+                .unwrap_or_default();
+            let metadata = crate::format::metadata::with_source_app_props(
+                metadata,
+                presentation.source_backed_package(),
+            );
+            let metadata = Some(metadata).filter(Metadata::has_data);
             let _ = self.0.metadata.set(metadata.clone());
             Ok(metadata)
         })

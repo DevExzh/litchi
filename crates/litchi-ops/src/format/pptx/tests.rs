@@ -141,8 +141,10 @@ fn expected(name: &str) -> Expected {
         &mut litchi_ooxml_common::leniency::ToleranceReport::default(),
     )
     .expect("core properties")
-    .map(Metadata::from)
-    .filter(Metadata::has_data);
+    .unwrap_or_default();
+    // The application properties join the core ones (record 0253).
+    let metadata =
+        Some(crate::format::metadata::with_app_props(metadata, &opc)).filter(Metadata::has_data);
 
     let source =
         pptx::SourceBackedPresentation::from_reader(bytes.as_slice()).expect("source leaf");

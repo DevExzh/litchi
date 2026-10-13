@@ -21,15 +21,11 @@ pub(crate) fn create(options: &CreateOptions) -> Result<Pptx> {
             "use Conformance::Transitional; Strict authoring is not integrated",
         ));
     }
-    if options.metadata_value().is_some() {
-        return Err(unsupported_option(
-            "the PPTX creator cannot author initial unified metadata",
-            "omit initial metadata; unified PPTX metadata authoring is not integrated",
-        ));
-    }
-
     let presentation = litchi_pptx::Package::new()?;
-    Pptx::from_package(presentation, &OpenOptions::new())
+    match options.metadata_value() {
+        Some(metadata) => super::metadata::create(presentation, metadata),
+        None => Pptx::from_package(presentation, &OpenOptions::new()),
+    }
 }
 
 fn unsupported_option(message: &'static str, suggestion: &'static str) -> Error {

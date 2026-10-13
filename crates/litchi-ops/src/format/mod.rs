@@ -17,6 +17,8 @@ mod cell_text;
 pub mod doc;
 #[cfg(feature = "docx")]
 pub mod docx;
+#[cfg(any(feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+pub(crate) mod metadata;
 #[cfg(feature = "odp")]
 pub mod odp;
 #[cfg(feature = "ods")]

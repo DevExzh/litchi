@@ -63,6 +63,7 @@ pub(crate) mod create;
 mod dimension_write;
 mod header;
 mod merge_write;
+mod metadata;
 mod nav;
 mod node;
 mod publish;
@@ -80,7 +81,7 @@ pub use node::Node;
 pub(crate) use node::Props;
 pub(crate) use spec::{
     CELL_CAPABILITY_PROPS, COLUMN_CAPABILITY_PROPS, RANGE_CAPABILITY_PROPS, ROW_CAPABILITY_PROPS,
-    SHEET_CAPABILITY_PROPS, SPEC,
+    SHEET_CAPABILITY_PROPS, SPEC, WORKBOOK_CAPABILITY_PROPS,
 };
 pub(crate) use views::{Json as ViewJson, view_json, view_to};
 
@@ -290,8 +291,8 @@ impl Xlsx {
         let metadata =
             litchi_ooxml_common::properties::read_with_report(&package, &mut metadata_repairs)
                 .map_err(metadata_error)?
-                .map(Metadata::from)
                 .unwrap_or_default();
+        let metadata = super::metadata::with_app_props(metadata, &package);
         let workbook = xlsx::Package::from_opc(package)?.into_workbook()?;
         Ok(Self::with_owner(
             XlsxOwner::Eager(workbook),
@@ -341,10 +342,18 @@ impl Xlsx {
         let mut metadata_repairs = MetadataRepairs::default();
         let metadata = package
             .core_properties_with_report(&mut metadata_repairs)?
-            .map(Metadata::from)
             .unwrap_or_default();
+        let workbook = package.into_workbook()?;
+        let metadata = match workbook.app_props() {
+            Ok(Some(app)) => {
+                let mut metadata = metadata;
+                app.project_into(&mut metadata);
+                metadata
+            },
+            _ => metadata,
+        };
         Ok(Self::with_owner(
-            XlsxOwner::Eager(package.into_workbook()?),
+            XlsxOwner::Eager(workbook),
             metadata,
             metadata_repairs,
             options,

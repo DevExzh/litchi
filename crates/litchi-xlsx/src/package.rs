@@ -278,7 +278,7 @@ impl Package {
     pub fn core_properties_with_report(
         &self,
         report: &mut litchi_ooxml_common::leniency::ToleranceReport,
-    ) -> Result<Option<litchi_ooxml_common::Props>> {
+    ) -> Result<Option<litchi_core::Metadata>> {
         Ok(litchi_ooxml_common::properties::read_with_report(
             &self.0, report,
         )?)
