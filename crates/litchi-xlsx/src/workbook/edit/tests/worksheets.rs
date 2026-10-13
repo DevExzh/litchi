@@ -11,7 +11,7 @@ use litchi_opc::{BlobPart, TargetMode};
 
 #[test]
 fn worksheet_add_is_atomic_populatable_active_and_reversible() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let source_bytes = source.to_bytes().expect("source bytes");
     let mut edit = source.edit().expect("edit");
     {
@@ -30,18 +30,18 @@ fn worksheet_add_is_atomic_populatable_active_and_reversible() {
     assert_eq!(source.to_bytes().expect("source unchanged"), source_bytes);
     assert_eq!(
         committed
-            .workbook()
+            .package()
             .sheets()
             .map(|sheet| sheet.name().to_owned())
             .collect::<Vec<_>>(),
         ["Sheet1", "Summary"]
     );
     assert_eq!(
-        committed.workbook().active_sheet().expect("active").name(),
+        committed.package().active_sheet().expect("active").name(),
         "Summary"
     );
     let summary = committed
-        .workbook()
+        .package()
         .sheet("summary")
         .expect("caseless lookup")
         .expect("created sheet");
@@ -65,17 +65,17 @@ fn worksheet_add_is_atomic_populatable_active_and_reversible() {
     );
 
     let restored = committed
-        .workbook()
+        .package()
         .apply(&committed.patch().inverse())
         .expect("inverse create");
     assert_eq!(
-        restored.workbook().to_bytes().expect("restored"),
+        restored.package().to_bytes().expect("restored"),
         source_bytes
     );
     let replayed = source.apply(committed.patch()).expect("forward replay");
     assert!(
         replayed
-            .workbook()
+            .package()
             .sheet("Summary")
             .expect("lookup")
             .is_some()
@@ -129,7 +129,7 @@ fn worksheet_insert_is_selector_first_order_aware_and_reversible() {
 
     let committed = edit.commit().expect("insert commit");
     let names = committed
-        .workbook()
+        .package()
         .sheets()
         .map(|sheet| sheet.name().to_owned())
         .collect::<Vec<_>>();
@@ -147,11 +147,11 @@ fn worksheet_insert_is_selector_first_order_aware_and_reversible() {
             "Tail",
         ]
     );
-    let active = committed.workbook().active_sheet().expect("active");
+    let active = committed.package().active_sheet().expect("active");
     assert_eq!((active.name(), active.position()), ("After B", 6));
     assert!(matches!(
         committed
-            .workbook()
+            .package()
             .sheet("Before A")
             .expect("lookup")
             .expect("created")
@@ -162,7 +162,7 @@ fn worksheet_insert_is_selector_first_order_aware_and_reversible() {
     ));
     assert_eq!(
         committed
-            .workbook()
+            .package()
             .defined_names()
             .iter()
             .map(|name| (name.name.as_str(), name.local_sheet_id))
@@ -190,22 +190,22 @@ fn worksheet_insert_is_selector_first_order_aware_and_reversible() {
         ]
     );
 
-    let committed_bytes = committed.workbook().to_bytes().expect("committed bytes");
+    let committed_bytes = committed.package().to_bytes().expect("committed bytes");
     assert_eq!(
         source
             .apply(committed.patch())
             .expect("forward replay")
-            .workbook()
+            .package()
             .to_bytes()
             .expect("replayed bytes"),
         committed_bytes
     );
     assert_eq!(
         committed
-            .workbook()
+            .package()
             .apply(&committed.patch().inverse())
             .expect("inverse")
-            .workbook()
+            .package()
             .to_bytes()
             .expect("restored bytes"),
         source_bytes
@@ -228,7 +228,7 @@ fn worksheet_insert_join_preserves_explicit_edit_order() {
     assert_eq!(
         left.commit()
             .expect("joined insertion")
-            .workbook()
+            .package()
             .sheets()
             .map(|sheet| sheet.name().to_owned())
             .collect::<Vec<_>>(),
@@ -238,7 +238,7 @@ fn worksheet_insert_join_preserves_explicit_edit_order() {
 
 #[test]
 fn worksheet_add_validates_names_visibility_and_parallel_joins() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
 
     let mut duplicate = source.edit().expect("duplicate edit");
     duplicate.add("sheet1").expect("checked spelling");
@@ -287,12 +287,12 @@ fn worksheet_add_validates_names_visibility_and_parallel_joins() {
     replacement.add("Replacement").expect("visible replacement");
     let replaced = replacement.commit().expect("replacement commit");
     assert_eq!(
-        replaced.workbook().active_sheet().expect("active").name(),
+        replaced.package().active_sheet().expect("active").name(),
         "Replacement"
     );
     assert!(matches!(
         replaced
-            .workbook()
+            .package()
             .sheet("Sheet1")
             .expect("lookup")
             .expect("old tab")
@@ -315,7 +315,7 @@ fn worksheet_add_validates_names_visibility_and_parallel_joins() {
     let joined = left.commit().expect("joined create");
     assert_eq!(
         joined
-            .workbook()
+            .package()
             .sheets()
             .map(|sheet| sheet.name().to_owned())
             .collect::<Vec<_>>(),
@@ -349,7 +349,7 @@ fn worksheet_add_closes_rename_formula_and_extended_property_dependencies() {
         .expect("formula");
     let committed = edit.commit().expect("composed structural commit");
     let created = committed
-        .workbook()
+        .package()
         .sheet("New & Sheet")
         .expect("lookup")
         .expect("created sheet");
@@ -357,18 +357,18 @@ fn worksheet_add_closes_rename_formula_and_extended_property_dependencies() {
         created.cell("A1").expect("formula").stored(),
         Some(Cell::Formula(formula)) if formula.text() == "Input!A1"
     ));
-    let properties = part_text(committed.workbook(), "/docProps/app.xml");
+    let properties = part_text(committed.package(), "/docProps/app.xml");
     assert!(properties.contains("size=\"4\""));
     assert!(properties.contains(
             "<vt:lpstr>Input</vt:lpstr><vt:lpstr>Calc</vt:lpstr><vt:lpstr>New &amp; Sheet</vt:lpstr><vt:lpstr>Input!Print_Area</vt:lpstr>"
         ));
 
     let restored = committed
-        .workbook()
+        .package()
         .apply(&committed.patch().inverse())
         .expect("inverse");
     assert_eq!(
-        restored.workbook().to_bytes().expect("restored"),
+        restored.package().to_bytes().expect("restored"),
         source_bytes
     );
 }
@@ -388,13 +388,13 @@ fn worksheet_add_synchronizes_optional_properties_during_a_simultaneous_reorder(
     let committed = edit.commit().expect("composed commit");
     assert_eq!(
         committed
-            .workbook()
+            .package()
             .sheets()
             .map(|sheet| sheet.name().to_owned())
             .collect::<Vec<_>>(),
         ["Calc", "Middle", "Data", "Tail"]
     );
-    let properties = part_text(committed.workbook(), "/docProps/app.xml");
+    let properties = part_text(committed.package(), "/docProps/app.xml");
     assert!(properties.contains("size=\"5\""));
     assert!(properties.contains(concat!(
         "<vt:lpstr>Calc</vt:lpstr>",
@@ -405,10 +405,10 @@ fn worksheet_add_synchronizes_optional_properties_during_a_simultaneous_reorder(
     )));
     assert_eq!(
         committed
-            .workbook()
+            .package()
             .apply(&committed.patch().inverse())
             .expect("inverse")
-            .workbook()
+            .package()
             .to_bytes()
             .expect("restored bytes"),
         source_bytes
@@ -417,7 +417,7 @@ fn worksheet_add_synchronizes_optional_properties_during_a_simultaneous_reorder(
 
 #[test]
 fn worksheet_add_allocates_strict_graph_identity_without_exposing_it() {
-    let baseline = Workbook::new().expect("baseline");
+    let baseline = crate::Package::new().expect("baseline");
     let mut package = baseline.inner.package.clone();
     let main = package
         .get_part_mut(&baseline.inner.workbook_uri)
@@ -440,14 +440,14 @@ fn worksheet_add_allocates_strict_graph_identity_without_exposing_it() {
             .set_blob(
                 br#"<worksheet xmlns="http://purl.oclc.org/ooxml/spreadsheetml/main"><sheetData/></worksheet>"#.to_vec(),
         );
-    let source = Workbook::from_package(package).expect("strict source");
+    let source = crate::Package::from_opc(package).expect("strict source");
     let mut edit = source.edit().expect("edit");
     edit.add_before("Strict2", "Strict1")
         .expect("lookup")
         .expect("strict anchor");
     let committed = edit.commit().expect("strict create");
     let sheet = committed
-        .workbook()
+        .package()
         .sheet("Strict2")
         .expect("lookup")
         .expect("created");
@@ -456,10 +456,10 @@ fn worksheet_add_allocates_strict_graph_identity_without_exposing_it() {
     assert_eq!(sheet.data.relationship_id, "rId1");
     assert_eq!(sheet.data.part_uri.as_str(), "/xl/worksheets/sheet2.xml");
     let main = committed
-        .workbook()
+        .package()
         .inner
         .package
-        .get_part(&committed.workbook().inner.workbook_uri)
+        .get_part(&committed.package().inner.workbook_uri)
         .expect("workbook part");
     assert_eq!(
         main.rels()
@@ -469,7 +469,7 @@ fn worksheet_add_allocates_strict_graph_identity_without_exposing_it() {
         litchi_opc::constants::relationship_type::STRICT_WORKSHEET
     );
     assert!(
-        part_text(committed.workbook(), sheet.data.part_uri.as_str())
+        part_text(committed.package(), sheet.data.part_uri.as_str())
             .contains("http://purl.oclc.org/ooxml/spreadsheetml/main")
     );
 }
@@ -480,13 +480,13 @@ fn worksheet_add_blocks_protected_and_compatibility_owned_catalogs() {
             br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><workbookProtection lockStructure="1"/><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>"#.as_slice(),
             br#"<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:test"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/><mc:AlternateContent><mc:Choice Requires="x"><x:payload/></mc:Choice><mc:Fallback/></mc:AlternateContent></sheets></workbook>"#.as_slice(),
         ] {
-            let baseline = Workbook::new().expect("baseline");
+            let baseline = crate::Package::new().expect("baseline");
             let mut package = baseline.inner.package.clone();
             package
                 .get_part_mut(&baseline.inner.workbook_uri)
                 .expect("workbook")
                 .set_blob(xml.to_vec());
-            let source = Workbook::from_package(package).expect("source");
+            let source = crate::Package::from_opc(package).expect("source");
             let mut edit = source.edit().expect("edit");
             edit.add_before("Blocked", "Sheet1")
                 .expect("lookup")
@@ -504,7 +504,7 @@ fn worksheet_add_blocks_protected_and_compatibility_owned_catalogs() {
 
 #[test]
 fn worksheet_remove_is_selector_first_active_relocating_and_reversible() {
-    let baseline = Workbook::new().expect("baseline");
+    let baseline = crate::Package::new().expect("baseline");
     let mut create = baseline.edit().expect("create edit");
     create
         .add("Delete")
@@ -517,7 +517,7 @@ fn worksheet_remove_is_selector_first_active_relocating_and_reversible() {
         .expect("Keep")
         .set("A1", 42_i32)
         .expect("retained payload");
-    let source = create.commit().expect("create source").into_workbook();
+    let source = create.commit().expect("create source").into_package();
     let source_bytes = source.to_bytes().expect("source bytes");
     assert_eq!(source.active_sheet().expect("active").name(), "Delete");
 
@@ -530,19 +530,19 @@ fn worksheet_remove_is_selector_first_active_relocating_and_reversible() {
     let committed = edit.commit().expect("remove commit");
     assert_eq!(
         committed
-            .workbook()
+            .package()
             .sheets()
             .map(|sheet| sheet.name().to_owned())
             .collect::<Vec<_>>(),
         ["Sheet1", "Keep"]
     );
     assert_eq!(
-        committed.workbook().active_sheet().expect("active").name(),
+        committed.package().active_sheet().expect("active").name(),
         "Keep"
     );
     assert!(
         committed
-            .workbook()
+            .package()
             .sheet("Delete")
             .expect("lookup")
             .is_none()
@@ -564,17 +564,17 @@ fn worksheet_remove_is_selector_first_active_relocating_and_reversible() {
         );
 
     let restored = committed
-        .workbook()
+        .package()
         .apply(&committed.patch().inverse())
         .expect("inverse remove");
     assert_eq!(
-        restored.workbook().to_bytes().expect("restored"),
+        restored.package().to_bytes().expect("restored"),
         source_bytes
     );
     let replayed = source.apply(committed.patch()).expect("forward replay");
     assert!(
         replayed
-            .workbook()
+            .package()
             .sheet("Delete")
             .expect("lookup")
             .is_none()
@@ -589,14 +589,14 @@ fn worksheet_remove_is_selector_first_active_relocating_and_reversible() {
     let active_last = activate_last
         .commit()
         .expect("active-last source")
-        .into_workbook();
+        .into_package();
     let mut remove_last = active_last.edit().expect("remove last");
     remove_last.remove("Keep").expect("lookup").expect("Keep");
     assert_eq!(
         remove_last
             .commit()
             .expect("remove last active")
-            .workbook()
+            .package()
             .active_sheet()
             .expect("replacement active")
             .name(),
@@ -606,7 +606,7 @@ fn worksheet_remove_is_selector_first_active_relocating_and_reversible() {
 
 #[test]
 fn worksheet_remove_blocks_live_formulas_last_sheet_and_mixed_edits() {
-    let baseline = Workbook::new().expect("baseline");
+    let baseline = crate::Package::new().expect("baseline");
     let mut create = baseline.edit().expect("create edit");
     create.add("Delete").expect("Delete");
     create
@@ -615,7 +615,7 @@ fn worksheet_remove_blocks_live_formulas_last_sheet_and_mixed_edits() {
         .expect("Sheet1")
         .set("A1", Formula::new("Delete!A1").expect("formula"))
         .expect("formula cell");
-    let source = create.commit().expect("source").into_workbook();
+    let source = create.commit().expect("source").into_package();
     let mut remove = source.edit().expect("remove edit");
     remove.remove("Delete").expect("lookup").expect("Delete");
     assert!(matches!(
@@ -627,7 +627,7 @@ fn worksheet_remove_blocks_live_formulas_last_sheet_and_mixed_edits() {
         }) if sheet == "Delete"
     ));
 
-    let single = Workbook::new().expect("single");
+    let single = crate::Package::new().expect("single");
     let mut last = single.edit().expect("last edit");
     last.remove(0usize).expect("lookup").expect("only sheet");
     assert!(matches!(
@@ -638,7 +638,7 @@ fn worksheet_remove_blocks_live_formulas_last_sheet_and_mixed_edits() {
         })
     ));
 
-    let baseline = Workbook::new().expect("visibility baseline");
+    let baseline = crate::Package::new().expect("visibility baseline");
     let mut create = baseline.edit().expect("visibility create");
     create
         .tab("Sheet1")
@@ -646,7 +646,7 @@ fn worksheet_remove_blocks_live_formulas_last_sheet_and_mixed_edits() {
         .expect("Sheet1")
         .hide();
     create.add("Delete").expect("Delete").activate();
-    let visibility = create.commit().expect("visibility source").into_workbook();
+    let visibility = create.commit().expect("visibility source").into_package();
     let mut last_visible = visibility.edit().expect("last-visible edit");
     last_visible
         .remove("Delete")
@@ -675,7 +675,7 @@ fn worksheet_remove_blocks_live_formulas_last_sheet_and_mixed_edits() {
         })
     ));
 
-    let baseline = Workbook::new().expect("dynamic baseline");
+    let baseline = crate::Package::new().expect("dynamic baseline");
     let mut create = baseline.edit().expect("dynamic create");
     create.add("Delete").expect("Delete");
     create
@@ -687,7 +687,7 @@ fn worksheet_remove_blocks_live_formulas_last_sheet_and_mixed_edits() {
             Formula::new(r#"INDIRECT("Delete!A1")"#).expect("dynamic formula"),
         )
         .expect("dynamic cell");
-    let dynamic = create.commit().expect("dynamic source").into_workbook();
+    let dynamic = create.commit().expect("dynamic source").into_package();
     let mut remove = dynamic.edit().expect("dynamic removal");
     remove.remove("Delete").expect("lookup").expect("Delete");
     assert!(matches!(
@@ -701,11 +701,11 @@ fn worksheet_remove_blocks_live_formulas_last_sheet_and_mixed_edits() {
 
 #[test]
 fn worksheet_remove_joins_disjoint_plans_and_blocks_unknown_dependencies() {
-    let baseline = Workbook::new().expect("baseline");
+    let baseline = crate::Package::new().expect("baseline");
     let mut create = baseline.edit().expect("create edit");
     create.add("North").expect("North");
     create.add("South").expect("South");
-    let source = create.commit().expect("source").into_workbook();
+    let source = create.commit().expect("source").into_package();
 
     let mut north = source.edit().expect("north edit");
     north.remove("North").expect("lookup").expect("North");
@@ -715,7 +715,7 @@ fn worksheet_remove_joins_disjoint_plans_and_blocks_unknown_dependencies() {
     let committed = north.commit().expect("joined removal");
     assert_eq!(
         committed
-            .workbook()
+            .package()
             .sheets()
             .map(|sheet| sheet.name().to_owned())
             .collect::<Vec<_>>(),
@@ -742,7 +742,7 @@ fn worksheet_remove_joins_disjoint_plans_and_blocks_unknown_dependencies() {
             TargetMode::Internal,
         )
         .expect("custom relationship");
-    let unknown = Workbook::from_package(package).expect("unknown producer workbook");
+    let unknown = crate::Package::from_opc(package).expect("unknown producer workbook");
     let mut edit = unknown.edit().expect("remove edit");
     edit.remove("North").expect("lookup").expect("North");
     assert!(matches!(
@@ -757,10 +757,10 @@ fn worksheet_remove_joins_disjoint_plans_and_blocks_unknown_dependencies() {
 
 #[test]
 fn worksheet_remove_blocks_macro_projects_and_extra_incoming_relationships() {
-    let baseline = Workbook::new().expect("baseline");
+    let baseline = crate::Package::new().expect("baseline");
     let mut create = baseline.edit().expect("create edit");
     create.add("Delete").expect("Delete");
-    let source = create.commit().expect("source").into_workbook();
+    let source = create.commit().expect("source").into_package();
 
     let mut macro_package = source.inner.package.clone();
     macro_package
@@ -781,7 +781,7 @@ fn worksheet_remove_blocks_macro_projects_and_extra_incoming_relationships() {
             TargetMode::Internal,
         )
         .expect("VBA relationship");
-    let macro_book = Workbook::from_package(macro_package).expect("macro workbook");
+    let macro_book = crate::Package::from_opc(macro_package).expect("macro workbook");
     let mut remove = macro_book.edit().expect("macro remove");
     remove.remove("Delete").expect("lookup").expect("Delete");
     assert!(matches!(
@@ -817,7 +817,7 @@ fn worksheet_remove_blocks_macro_projects_and_extra_incoming_relationships() {
     incoming_package
         .try_add_part(Box::new(referrer))
         .expect("referrer part");
-    let incoming = Workbook::from_package(incoming_package).expect("incoming workbook");
+    let incoming = crate::Package::from_opc(incoming_package).expect("incoming workbook");
     let mut remove = incoming.edit().expect("incoming remove");
     remove.remove("Delete").expect("lookup").expect("Delete");
     assert!(matches!(
@@ -832,10 +832,10 @@ fn worksheet_remove_blocks_macro_projects_and_extra_incoming_relationships() {
 
 #[test]
 fn worksheet_remove_blocks_custom_workbook_view_identity() {
-    let baseline = Workbook::new().expect("baseline");
+    let baseline = crate::Package::new().expect("baseline");
     let mut create = baseline.edit().expect("create edit");
     create.add("Delete").expect("Delete");
-    let source = create.commit().expect("source").into_workbook();
+    let source = create.commit().expect("source").into_package();
     let native_id = source.inner.sheets[1].native_id;
     let mut package = source.inner.package.clone();
     let workbook = package
@@ -851,7 +851,7 @@ fn worksheet_remove_blocks_custom_workbook_view_identity() {
             );
     assert!(xml.contains("customWorkbookView"));
     workbook.set_blob(xml.into_bytes());
-    let source = Workbook::from_package(package).expect("custom-view workbook");
+    let source = crate::Package::from_opc(package).expect("custom-view workbook");
     let mut remove = source.edit().expect("remove edit");
     remove.remove("Delete").expect("lookup").expect("Delete");
     assert!(matches!(
@@ -866,10 +866,10 @@ fn worksheet_remove_blocks_custom_workbook_view_identity() {
 
 #[test]
 fn worksheet_remove_accepts_case_equivalent_opc_targets() {
-    let baseline = Workbook::new().expect("baseline");
+    let baseline = crate::Package::new().expect("baseline");
     let mut create = baseline.edit().expect("create edit");
     create.add("Delete").expect("Delete");
-    let source = create.commit().expect("source").into_workbook();
+    let source = create.commit().expect("source").into_package();
     let relationship_id = source.inner.sheets[1].relationship_id.clone();
     let mut package = source.inner.package.clone();
     let relationships = package
@@ -887,14 +887,14 @@ fn worksheet_remove_accepts_case_equivalent_opc_targets() {
             TargetMode::Internal,
         )
         .expect("case-equivalent relationship");
-    let source = Workbook::from_package(package).expect("case-equivalent workbook");
+    let source = crate::Package::from_opc(package).expect("case-equivalent workbook");
     let mut remove = source.edit().expect("remove edit");
     remove.remove("Delete").expect("lookup").expect("Delete");
     assert!(
         remove
             .commit()
             .expect("case-equivalent removal")
-            .workbook()
+            .package()
             .sheet("Delete")
             .expect("lookup")
             .is_none()

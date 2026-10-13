@@ -25,9 +25,9 @@ Rules of reading:
 
 | Concept | Canonical | Banned | Notes / status |
 |---|---|---|---|
-| Immutable owner snapshot (physical + semantic, all state verbs) | `Package` | — | ✅ numbers/pages/keynote/doc/ods · ✅ RTF owner split (0223; atomic publication 0226) · ✅ XLS (0197–0198) · ✅ PPT immutable owner/publication and primary edit (0211–0212) · 🔴 pptx remaining direct mutators (0127 removes the package writer) · 🔴 docx immutable public owner (0019 shares the physical graph; mutable APIs remain) · 🔴 odt/odp (split out of the merged type, W3) · 🔴 xlsb (W2) |
+| Immutable owner snapshot (physical + semantic, all state verbs) | `Package` | — | ✅ numbers/pages/keynote/doc/ods · ✅ XLSX primary owner (0250; scoped `&mut` families pending) · ✅ RTF owner split (0223; atomic publication 0226) · ✅ XLS (0197–0198) · ✅ PPT immutable owner/publication and primary edit (0211–0212) · 🔴 pptx remaining direct mutators (0127 removes the package writer) · 🔴 docx immutable public owner (0019 shares the physical graph; mutable APIs remain) · 🔴 odt/odp (split out of the merged type, W3) · 🔴 xlsb (W2) |
 | Read-only semantic projection, word processing | `Document` | — | ✅ pages · ✅ RTF shared owned projection (0223) · ✅ docx owned `Package::document()` projection (0019) |
-| Read-only semantic projection, spreadsheets | `Workbook` | `Spreadsheet` | 🔴 numbers `Document`→`Workbook` (W1) · 🔴 xlsx `Workbook` demoted to projection (W2) · 🔴 ods `Spreadsheet`→`Workbook` (W3) · ✅ XLS (0197) |
+| Read-only semantic projection, spreadsheets | `Workbook` | `Spreadsheet` | 🔴 numbers `Document`→`Workbook` (W1) · ✅ xlsx `Workbook` owned projection via `Package::workbook()` (0250) · 🔴 ods `Spreadsheet`→`Workbook` (W3) · ✅ XLS (0197) |
 | Read-only semantic projection, decks | `Presentation` | — | 🔴 keynote `Document`→`Presentation` (W1) · ✅ pptx view / odp name (shape changes W2/W3) · ✅ PPT shared owned projection (0211) |
 | Projection accessor | `Package::{document, workbook, presentation}()` | — | owned projections primary; borrowed `*_ref()` views secondary |
 | Option-bearing fresh authoring | per-format `Builder` in a focused module | `WorkbookWriter` (xlsb), `Writer` (doc), `*DocumentBuilder` prefixes (litchi-iwa) | ✅ XLSB (0175), XLS (0200), PPT (0213) and RTF (0225) `Builder::build()` return `Package`; 🔴 remaining W2–W4 |
@@ -42,7 +42,7 @@ transaction is the bare `Package::edit()`.
 
 | Concept | Canonical | Banned | Notes / status |
 |---|---|---|---|
-| Edit entry, primary transaction | `Package::edit()` | `edit_document()` (docx), `opened_presentation_transaction()` (pptx), `Workbook::edit()` (xlsx — moves to `Package`) | ✅ docx eager/source entry name (0018; eager package-bound commit 0022, source 0031) · ✅ iWork/xlsx-name · ✅ pptx eager entry (0116) · 🔴 xlsx owner (W2), odt already `edit` but moves onto `Package` (W3) |
+| Edit entry, primary transaction | `Package::edit()` | `edit_document()` (docx), `opened_presentation_transaction()` (pptx), `Workbook::edit()` (xlsx — moves to `Package`) | ✅ docx eager/source entry name (0018; eager package-bound commit 0022, source 0031) · ✅ iWork/xlsx-name · ✅ pptx eager entry (0116) · ✅ xlsx `Package::edit()` (0250) · 🔴 odt already `edit` but moves onto `Package` (W3) |
 | Edit entry, scoped family | `Package::edit_x()` | — | ✅ numbers/keynote/pages families |
 | PPTX slide metadata | `Edit::{set_slide_name, set_slide_hidden}` | — | Eager/source primary edits and unified slide `name`/`hidden` setters; eager, source primary and focused source edits accept combined `set_slide_properties` (0162–0163) |
 | PPTX combined shape properties | `Edit::set_shape_properties`, `ShapePropertiesReplacement` | — | Eager/source primary edits share checked `Position` targets and optional text/bounds in one atomic operation (0153); broader shape properties remain pending |
@@ -50,11 +50,11 @@ transaction is the bare `Package::edit()`.
 | PPT chunked text publication | `Edit::set_shape_text_chunks` | — | At most 4096 globally distinct targets across at most 4096 chunks, each bounded at 256; one native publication and complete readback per call (0220); ordinary `set_shape_texts` remains bounded at 256 |
 | Transaction type | `Edit` | `Transaction` (pptx), `WorkbookEdit` (xlsb) | ✅ pptx primary `opened::Edit` (0116), XLSB structural and cell-value `Edit/Commit/Patch` families, diagnostics and Package commit triads (0165–0171); 🔴 remaining XLSB mutators/error families and scoped PPTX families (W2) |
 | Commit | `Edit::commit() -> Result<Commit>` | — | ✅ everywhere; shape fixed by the rows below |
-| New snapshot accessor | `Commit::package()` / `Commit::into_package()` | `Commit::snapshot()` (docx/pptx), `Commit::{workbook, into_workbook}` (xlsx) | ✅ iWork/docx eager (0022) and source (0031), PPTX eager (0118) · 🔴 other W2 |
-| Diagnostics on every commit | `Commit::diagnostics()` | commits without diagnostics (xlsx, pptx) | ✅ docx/iWork/PPTX eager (0118) · 🔴 remaining owners (W2) |
-| Split commit | `Commit::into_parts() -> (Package, Patch)` | — | ✅ docx eager (0022) and source (0031), PPTX eager (0118); 🔴 remaining owner shapes |
-| Patch application | `Package::apply(&patch)`; scoped `Package::apply_x(&patch)` | `publish_document_commit()`, `apply_document_patch()` (docx), `apply_opened_presentation_commit/patch()` (pptx), `Workbook::apply` (xlsx — moves) | ✅ PPT primary immutable `apply` (0212) · ✅ iWork · ✅ docx eager immutable `apply` (0020) and source (0030); ✅ PPTX primary immutable apply (0118); 🔴 other W2 owners |
-| No-op introspection | `commit.diagnostics().changed()`; `patch.is_noop()` | `Transaction::is_changed()`, `Commit::is_changed()` (pptx), `Patch::is_empty()` (xlsx) | ✅ iWork/docx/PPTX primary (0118) · 🔴 remaining W2 |
+| New snapshot accessor | `Commit::package()` / `Commit::into_package()` | `Commit::snapshot()` (docx/pptx), `Commit::{workbook, into_workbook}` (xlsx) | ✅ iWork/docx eager (0022) and source (0031), PPTX eager (0118), XLSX primary (0250) · 🔴 other W2 |
+| Diagnostics on every commit | `Commit::diagnostics()` | commits without diagnostics (xlsx, pptx) | ✅ docx/iWork/PPTX eager (0118), XLSX primary `workbook::edit::Diagnostics` (0250) · 🔴 remaining owners (W2) |
+| Split commit | `Commit::into_parts() -> (Package, Patch)` | — | ✅ docx eager (0022) and source (0031), PPTX eager (0118), XLSX primary (0250); 🔴 remaining owner shapes |
+| Patch application | `Package::apply(&patch)`; scoped `Package::apply_x(&patch)` | `publish_document_commit()`, `apply_document_patch()` (docx), `apply_opened_presentation_commit/patch()` (pptx), `Workbook::apply` (xlsx — moves) | ✅ PPT primary immutable `apply` (0212) · ✅ iWork · ✅ docx eager immutable `apply` (0020) and source (0030); ✅ PPTX primary immutable apply (0118); ✅ XLSX primary `Package::apply` and pivot `apply_pivot_*` (0250); 🔴 other W2 owners |
+| No-op introspection | `commit.diagnostics().changed()`; `patch.is_noop()` | `Transaction::is_changed()`, `Commit::is_changed()` (pptx), `Patch::is_empty()` (xlsx) | ✅ iWork/docx/PPTX primary (0118), XLSX primary (0250) · 🔴 remaining W2 |
 | Inverse patch | `Patch::inverse()` | — | ✅ everywhere |
 | Rollback | *dropping the `Edit`* | `Transaction::rollback()` (pptx) | ✅ primary PPTX edit (0116); 🔴 scoped PPTX families (W2) |
 | Mutable writer on a package | *none — `edit()` is the only write path* | `document_mut()` (docx), `presentation_mut()` (pptx) | PPTX `presentation_mut` removed (0127); 🔴 remaining W2 authoring verbs move into `Edit`, direct mutators and `UnsafeEdit` vocabulary still require migration |
@@ -85,11 +85,11 @@ and redaction vocabulary remain pending.
 | Concept | Canonical | Banned | Notes / status |
 |---|---|---|---|
 | Open from path | `open(path)` | — | ✅ everywhere |
-| Open from bytes (copy allowed) | `from_bytes(&[u8])` | `from_bytes(Vec<u8>)` signatures (xlsx/odt/odp), `from_slice` (xlsx) | ✅ DOCX owning/lazy Package (0038/0040); 🔴 W2/W3 |
+| Open from bytes (copy allowed) | `from_bytes(&[u8])` | `from_bytes(Vec<u8>)` signatures (xlsx/odt/odp), `from_slice` (xlsx) | ✅ DOCX owning/lazy Package (0038/0040); ✅ XLSX `Package` (0250; copies into the owned source archive) · 🔴 W2/W3 |
 | Open from shared bytes (zero-copy) | `from_shared_bytes(Arc<[u8]>)` | — | ✅ numbers; offered only where zero-copy is real |
 | Open from reader | `from_reader(R)` | — | ✅ docx/xlsx; extended per wave |
-| Configured open | `open_with_options(path, OpenOptions)`, `from_bytes_with_options(bytes, OpenOptions)` | `open_with_limits`, `open_with` (doc), `open_with_options` under other type names | envelope decided in §5 |
-| Minimal fresh artifact | `Package::new()` | `Workbook::create()` duplicate (xlsx) | ✅ docx; ✅ canonical PPTX constructor (0127); ✅ XLSB (0175); ✅ XLS (0199); ✅ RTF (0225) · 🔴 xlsx (W2); all formats gain it |
+| Configured open | `open_with_options(path, OpenOptions)`, `from_bytes_with_options(bytes, OpenOptions)` | `open_with_limits`, `open_with` (doc), `open_with_options` under other type names | envelope decided in §5 · ✅ XLSX `OpenOptions` (source limits, leniency, encryption limits; 0250) |
+| Minimal fresh artifact | `Package::new()` | `Workbook::create()` duplicate (xlsx) | ✅ docx; ✅ canonical PPTX constructor (0127); ✅ XLSB (0175); ✅ XLS (0199); ✅ RTF (0225); ✅ XLSX (0250) · all formats gain it |
 | Save to path | `save(path)` — **always atomic** (sibling temp + rename) | non-atomic `Builder::save` (odt/odp) | ✅ OOXML, including lazy DOCX (0041), and RTF (0226) · 🔴 ODF (W3, behavior change with CRUD evidence) |
 | Save with explicit durability | `save_with_durability(path, Durability)` | — | ✅ OOXML and RTF (0226); extended everywhere |
 | Bytes output | `to_bytes()` | `Builder::build() -> Vec<u8>` as output (ODF) | ✅ owning DOCX (0044); lazy managed DOCX bytes pending. `build()` returns `Package`; output lives on `Package` |
@@ -853,7 +853,8 @@ follow-ups for command families and text/dump semantics not yet implemented.
 
 ## XLSX unified creation and publication (record 0095)
 
-`create(FileFormat::Xlsx)` adopts the native `Workbook::create` owner directly.
+`create(FileFormat::Xlsx)` adopts the native `Package::new` owner directly
+(record 0250 replaced the removed `Workbook::create`).
 `File::{to_bytes, write_to, save, save_as, save_with}` share the existing
 publication vocabulary and strict policies across DOCX and XLSX. Path-backed
 XLSX handles retain their origin through unlock; bytes and newly created
@@ -1503,3 +1504,22 @@ editable document model is introduced. Temporary source indexes are bounded;
 staging windows close at their limits, while scalar admission stays available
 when the optimization index cannot fit. Source-changing boundaries publish
 before resolving later positional paths.
+
+## XLSX W2 owner reshape (record 0250)
+
+`xlsx::Package` is the immutable owner of every state verb: `new`, `open`,
+`from_bytes(&[u8])`, `from_reader`, the `*_with_options(.., OpenOptions)`
+ingress, `edit`, `apply`, the save/bytes/stream outputs and the security
+verbs. `xlsx::Workbook` is the owned read-only projection
+(`Package::workbook()`, borrowed `workbook_ref()`). `workbook::edit` is a
+registered family: `Commit::{package, patch, diagnostics, into_package,
+into_parts}`, `Patch::{is_noop, operation_count}`, `Diagnostics::changed`,
+`LimitKind` with `Error::Limit { kind, observed, maximum }`; `Error` is still
+the crate error (module split pending). Removed: `Package::create`,
+`Workbook::create`, `from_slice*`, `from_bytes(Vec)`, `*_with_limits` and
+`*_with_leniency` ingress, `Package::into_workbook`, `Commit::{workbook,
+into_workbook}`, `Patch::{is_empty, len}`, `Workbook::unsigned` (use
+`Package::unsign`) and the pivot `Workbook{Transaction,Patch,Commit}` types,
+now `PackageEdit`/`PackagePatch`/`PackageCommit` with `Package::apply_pivot_*`.
+Scoped `&mut` families and `SourceBackedWorkbook` ingress names remain W2
+residue.

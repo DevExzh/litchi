@@ -125,8 +125,8 @@ enum Leaf {
     Rtf(Box<litchi_rtf::edit::Patch>),
     #[cfg(feature = "xlsx")]
     Xlsx {
-        source: litchi_xlsx::Workbook,
-        target: litchi_xlsx::Workbook,
+        source: litchi_xlsx::Package,
+        target: litchi_xlsx::Package,
         // Retain the complete native proof even though process-local replay
         // reuses a validated owner-bound endpoint.
         _patch: Box<litchi_xlsx::workbook::Patch>,
@@ -2059,7 +2059,7 @@ fn wrap_xlsx<T>(
 ) -> Result<(Step, T)> {
     let (after, source, target, patch) = commit.into_parts();
     let snapshot_bytes = patch.retained_bytes();
-    let leaf_operations = patch.len();
+    let leaf_operations = patch.operation_count();
     Ok((
         Step {
             before: File::Xlsx(before.clone()),

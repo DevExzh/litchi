@@ -18,7 +18,7 @@ use litchi_xlsx::drawing::{
     ContentPartProfile, DrawingAnchor, DrawingDialect, EditAs, Object, RelationshipDialect,
     SourceDrawing, UnknownKind,
 };
-use litchi_xlsx::{Package, SourceLimits, Workbook};
+use litchi_xlsx::{Package, SourceLimits};
 
 const XDR: &str = "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing";
 const STRICT_XDR: &str = "http://purl.oclc.org/ooxml/drawingml/spreadsheetDrawing";
@@ -249,7 +249,7 @@ fn target_payload(index: usize, fault: PackageFault) -> Vec<u8> {
 }
 
 fn content_part_package(strict: bool, fault: PackageFault, owner_count: usize) -> Vec<u8> {
-    let mut package = Package::create().unwrap().into_plain_opc();
+    let mut package = Package::new().unwrap().into_plain_opc();
     package
         .get_part_mut(&PackURI::new(SHEET).unwrap())
         .unwrap()
@@ -697,8 +697,8 @@ fn worksheet_content_part_facade_pairs_source_typed_geometry_and_borrowed_payloa
             .blob()
             .to_vec();
 
-        let workbook = Workbook::from_slice(&bytes).expect("content-part package must open");
-        let worksheet = workbook.sheet("Sheet1").unwrap().unwrap();
+        let workbook = Package::from_bytes(&bytes).expect("content-part package must open");
+        let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
         let drawing = worksheet
             .drawing(0)
             .expect("worksheet drawing must resolve");
@@ -800,8 +800,8 @@ fn worksheet_content_part_relation_and_target_graph_failures_are_typed() {
     ] {
         for strict in [false, true] {
             let bytes = content_part_package(strict, fault, 3);
-            let workbook = Workbook::from_slice(&bytes).expect("graph fixture package must open");
-            let worksheet = workbook.sheet("Sheet1").unwrap().unwrap();
+            let workbook = Package::from_bytes(&bytes).expect("graph fixture package must open");
+            let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
             let drawing = worksheet
                 .drawing(0)
                 .expect("drawing source must remain readable");
@@ -816,13 +816,13 @@ fn worksheet_content_part_relation_and_target_graph_failures_are_typed() {
     let missing_content_type =
         content_part_package(false, PackageFault::MissingTargetContentType, 1);
     assert!(
-        Workbook::from_slice(&missing_content_type).is_err(),
+        Package::from_bytes(&missing_content_type).is_err(),
         "an XML target without a content-type mapping must fail package ingress"
     );
 
     let malformed_target = content_part_package(false, PackageFault::MalformedTarget, 1);
-    let workbook = Workbook::from_slice(&malformed_target).unwrap();
-    let worksheet = workbook.sheet("Sheet1").unwrap().unwrap();
+    let workbook = Package::from_bytes(&malformed_target).unwrap();
+    let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
     let drawing = worksheet.drawing(0).unwrap();
     assert!(drawing.content_part(0).unwrap().payload().is_err());
 }
@@ -849,8 +849,8 @@ fn worksheet_content_part_payload_xml_contract_is_bounded_and_preserving() {
         PackageFault::EmptyTarget,
     ] {
         let bytes = content_part_package(false, fault, 1);
-        let workbook = Workbook::from_slice(&bytes).expect("payload fixture package must open");
-        let worksheet = workbook.sheet("Sheet1").unwrap().unwrap();
+        let workbook = Package::from_bytes(&bytes).expect("payload fixture package must open");
+        let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
         let drawing = worksheet.drawing(0).unwrap();
         assert!(
             drawing.content_part(0).unwrap().payload().is_err(),
@@ -859,8 +859,8 @@ fn worksheet_content_part_payload_xml_contract_is_bounded_and_preserving() {
     }
 
     let legal = content_part_package(false, PackageFault::LegalOpaqueTarget, 1);
-    let workbook = Workbook::from_slice(&legal).unwrap();
-    let worksheet = workbook.sheet("Sheet1").unwrap().unwrap();
+    let workbook = Package::from_bytes(&legal).unwrap();
+    let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
     let drawing = worksheet.drawing(0).unwrap();
     let payload = drawing.content_part(0).unwrap().payload().unwrap();
     assert!(
@@ -890,8 +890,12 @@ fn worksheet_content_part_payload_xml_contract_is_bounded_and_preserving() {
         .unwrap()
         .build()
         .unwrap();
-    let workbook = Workbook::from_slice_with_limits(&empty_root, root_limit).unwrap();
-    let worksheet = workbook.sheet("Sheet1").unwrap().unwrap();
+    let workbook = Package::from_bytes_with_options(
+        &empty_root,
+        litchi_xlsx::OpenOptions::new().source_limits(root_limit),
+    )
+    .unwrap();
+    let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
     let drawing = worksheet.drawing(0).unwrap();
     assert_eq!(
         drawing.content_part(0).unwrap().payload().unwrap().bytes(),
@@ -905,8 +909,12 @@ fn worksheet_content_part_payload_xml_contract_is_bounded_and_preserving() {
         .unwrap()
         .build()
         .unwrap();
-    let workbook = Workbook::from_slice_with_limits(&nested_empty, one_under).unwrap();
-    let worksheet = workbook.sheet("Sheet1").unwrap().unwrap();
+    let workbook = Package::from_bytes_with_options(
+        &nested_empty,
+        litchi_xlsx::OpenOptions::new().source_limits(one_under),
+    )
+    .unwrap();
+    let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
     let drawing = worksheet.drawing(0).unwrap();
     assert!(drawing.content_part(0).unwrap().payload().is_err());
 
@@ -916,8 +924,12 @@ fn worksheet_content_part_payload_xml_contract_is_bounded_and_preserving() {
         .unwrap()
         .build()
         .unwrap();
-    let workbook = Workbook::from_slice_with_limits(&nested, limits).unwrap();
-    let worksheet = workbook.sheet("Sheet1").unwrap().unwrap();
+    let workbook = Package::from_bytes_with_options(
+        &nested,
+        litchi_xlsx::OpenOptions::new().source_limits(limits),
+    )
+    .unwrap();
+    let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
     let drawing = worksheet.drawing(0).unwrap();
     assert!(drawing.content_part(0).unwrap().payload().is_err());
 }
@@ -925,8 +937,8 @@ fn worksheet_content_part_payload_xml_contract_is_bounded_and_preserving() {
 #[test]
 fn worksheet_content_part_shared_target_and_outbound_graph_are_retained_and_bounded() {
     let shared = content_part_package(false, PackageFault::SharedTarget, 3);
-    let workbook = Workbook::from_slice(&shared).unwrap();
-    let worksheet = workbook.sheet("Sheet1").unwrap().unwrap();
+    let workbook = Package::from_bytes(&shared).unwrap();
+    let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
     let drawing = worksheet.drawing(0).unwrap();
     let batch = drawing.content_parts().unwrap();
     assert_eq!(batch.len(), 3);
@@ -946,8 +958,8 @@ fn worksheet_content_part_shared_target_and_outbound_graph_are_retained_and_boun
     );
 
     let outbound = content_part_package(false, PackageFault::OutboundGraph, 1);
-    let workbook = Workbook::from_slice(&outbound).unwrap();
-    let worksheet = workbook.sheet("Sheet1").unwrap().unwrap();
+    let workbook = Package::from_bytes(&outbound).unwrap();
+    let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
     let drawing = worksheet.drawing(0).unwrap();
     let payload = drawing.content_part(0).unwrap().payload().unwrap();
     assert_eq!(payload.outbound_relationships().len(), 1);
@@ -979,8 +991,12 @@ fn worksheet_content_part_limit_accepts_exact_and_rejects_one_under() {
         .unwrap()
         .build()
         .unwrap();
-    let workbook = Workbook::from_slice_with_limits(&bytes, exact).unwrap();
-    let worksheet = workbook.sheet("Sheet1").unwrap().unwrap();
+    let workbook = Package::from_bytes_with_options(
+        &bytes,
+        litchi_xlsx::OpenOptions::new().source_limits(exact),
+    )
+    .unwrap();
+    let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
     assert_eq!(worksheet.drawing(0).unwrap().content_part_count(), 3);
 
     let one_under = SourceLimits::builder()
@@ -992,7 +1008,11 @@ fn worksheet_content_part_limit_accepts_exact_and_rejects_one_under() {
     // relationship ceiling so the failure is charged to the source owner
     // cap, rather than to OPC ingress itself.
     let bytes_under = content_part_package(false, PackageFault::MissingRelation, 3);
-    let workbook = Workbook::from_slice_with_limits(&bytes_under, one_under).unwrap();
-    let worksheet = workbook.sheet("Sheet1").unwrap().unwrap();
+    let workbook = Package::from_bytes_with_options(
+        &bytes_under,
+        litchi_xlsx::OpenOptions::new().source_limits(one_under),
+    )
+    .unwrap();
+    let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
     assert!(worksheet.drawing(0).is_err());
 }

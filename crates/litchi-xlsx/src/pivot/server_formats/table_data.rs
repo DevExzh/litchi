@@ -3254,20 +3254,20 @@ pub(crate) fn view_workbook_with_limits<'a>(
 pub(crate) fn edit_workbook<'a>(
     workbook: &Workbook,
     selector: impl Into<PivotTableSelector<'a>>,
-) -> Result<WorkbookTransaction> {
-    WorkbookTransaction::new(workbook, selector)
+) -> Result<PackageEdit> {
+    PackageEdit::new(workbook, selector)
 }
 
 pub(crate) fn edit_workbook_with_limits<'a>(
     workbook: &Workbook,
     selector: impl Into<PivotTableSelector<'a>>,
     limits: &PivotTableDataLimits,
-) -> Result<WorkbookTransaction> {
-    WorkbookTransaction::with_limits(workbook, selector, limits)
+) -> Result<PackageEdit> {
+    PackageEdit::with_limits(workbook, selector, limits)
 }
 
 /// Ordinary Workbook transaction over one data owner.
-pub struct WorkbookTransaction {
+pub struct PackageEdit {
     source: Workbook,
     before: Snapshot,
     staged: Vec<CellState>,
@@ -3276,7 +3276,7 @@ pub struct WorkbookTransaction {
     staged_text_bytes: usize,
 }
 
-impl WorkbookTransaction {
+impl PackageEdit {
     pub(crate) fn new<'a>(
         source: &Workbook,
         selector: impl Into<PivotTableSelector<'a>>,
@@ -3421,7 +3421,7 @@ impl WorkbookTransaction {
         !states_equal(&self.before, &self.staged)
     }
 
-    pub fn commit(self) -> Result<WorkbookCommit> {
+    pub fn commit(self) -> Result<PackageCommit> {
         let changed = self.is_changed();
         let source = self.source;
         let before = self.before;
@@ -3429,8 +3429,8 @@ impl WorkbookTransaction {
         if !changed {
             let workbook = source.clone();
             let low_patch = Patch::new(before.clone(), before);
-            let patch = WorkbookPatch::new(source, workbook.clone(), low_patch);
-            return Ok(WorkbookCommit::new(workbook, patch, false));
+            let patch = PackagePatch::new(source, workbook.clone(), low_patch);
+            return Ok(PackageCommit::new(workbook, patch, false));
         }
         if source.pivot_package().is_signed()
             || source.pivot_package().requires_signature_edit_policy()
@@ -3463,20 +3463,20 @@ impl WorkbookTransaction {
         }
         let low_patch = Patch::new(before, after);
         let workbook = source.adopt_published_package(candidate)?;
-        let patch = WorkbookPatch::new(source, workbook.clone(), low_patch);
-        Ok(WorkbookCommit::new(workbook, patch, true))
+        let patch = PackagePatch::new(source, workbook.clone(), low_patch);
+        Ok(PackageCommit::new(workbook, patch, true))
     }
 }
 
 /// Exact reversible ordinary Workbook patch.
 #[derive(Clone, Debug)]
-pub struct WorkbookPatch {
+pub struct PackagePatch {
     before: Workbook,
     after: Workbook,
     source_patch: Patch,
 }
 
-impl WorkbookPatch {
+impl PackagePatch {
     fn new(before: Workbook, after: Workbook, source_patch: Patch) -> Self {
         Self {
             before,
@@ -3495,11 +3495,12 @@ impl WorkbookPatch {
     }
 
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.source_patch.is_empty()
     }
 
-    pub fn apply(&self, source: &Workbook) -> Result<WorkbookCommit> {
+    pub fn apply(&self, source: &crate::Package) -> Result<PackageCommit> {
+        let source = source.workbook_ref();
         source.ensure_mutation_allowed("apply_pivot_table_data_patch")?;
         let mut candidate = source.pivot_package().clone();
         self.source_patch.apply(&mut candidate)?;
@@ -3512,30 +3513,37 @@ impl WorkbookPatch {
         let low_patch = Patch::new(before, after);
         let changed = !low_patch.is_empty();
         let workbook = source.adopt_published_package(candidate)?;
-        let patch = WorkbookPatch::new(source.clone(), workbook.clone(), low_patch);
-        Ok(WorkbookCommit::new(workbook, patch, changed))
+        let patch = PackagePatch::new(source.clone(), workbook.clone(), low_patch);
+        Ok(PackageCommit::new(workbook, patch, changed))
     }
 }
 
 #[derive(Clone, Debug)]
-pub struct WorkbookCommit {
-    workbook: Workbook,
-    patch: WorkbookPatch,
+pub struct PackageCommit {
+    package: crate::Package,
+    patch: PackagePatch,
     changed: bool,
 }
 
-impl WorkbookCommit {
-    fn new(workbook: Workbook, patch: WorkbookPatch, changed: bool) -> Self {
+impl PackageCommit {
+    fn new(workbook: Workbook, patch: PackagePatch, changed: bool) -> Self {
         Self {
-            workbook,
+            package: crate::Package::from_workbook(workbook),
             patch,
             changed,
         }
     }
 
+    /// The published immutable package.
     #[must_use]
-    pub fn workbook(&self) -> &Workbook {
-        &self.workbook
+    pub const fn package(&self) -> &crate::Package {
+        &self.package
+    }
+
+    /// Consume the commit into its published package.
+    #[must_use]
+    pub fn into_package(self) -> crate::Package {
+        self.package
     }
 
     #[must_use]
@@ -3544,7 +3552,7 @@ impl WorkbookCommit {
     }
 
     #[must_use]
-    pub fn patch(&self) -> &WorkbookPatch {
+    pub fn patch(&self) -> &PackagePatch {
         &self.patch
     }
 
@@ -3554,7 +3562,7 @@ impl WorkbookCommit {
     }
 }
 
-impl WorkbookPatch {
+impl PackagePatch {
     fn after_data(&self) -> &PivotTableDataView {
         &self.source_patch.after.value
     }
@@ -3747,7 +3755,7 @@ mod tests {
             .and_then(|bytes| bytes.checked_add(first.len()))
             .unwrap();
         let limits = PivotTableDataLimits::new().with_max_retained_bytes(required);
-        let workbook = Workbook::from_package(package).unwrap();
+        let workbook = crate::Package::from_opc(package).unwrap();
         let mut transaction = workbook
             .edit_pivot_table_data_with_limits("Pivot", &limits)
             .unwrap();
@@ -3774,7 +3782,7 @@ mod tests {
         assert!(!transaction.is_changed());
         assert!(!transaction.commit().unwrap().changed());
 
-        let workbook = Workbook::from_package(package()).unwrap();
+        let workbook = crate::Package::from_opc(package()).unwrap();
         let mut transaction = workbook.edit_pivot_table_data("Pivot").unwrap();
         assert!(transaction.set_extra((0, 1), invalid_edit()).is_err());
         assert!(!transaction.is_changed());
@@ -3783,7 +3791,7 @@ mod tests {
 
     #[test]
     fn applied_workbook_patch_retains_the_incoming_snapshot_pair() {
-        let original = Workbook::from_package(package()).unwrap();
+        let original = crate::Package::from_opc(package()).unwrap();
         let mut edit = original.edit_pivot_table_data("Pivot").unwrap();
         edit.set_text((0, 0), "replacement").unwrap();
         let committed = edit.commit().unwrap();
@@ -3794,18 +3802,21 @@ mod tests {
             "application/octet-stream".into(),
             b"incoming-only".to_vec(),
         )));
-        let incoming = Workbook::from_package(incoming_package).unwrap();
+        let incoming = crate::Package::from_opc(incoming_package).unwrap();
         let incoming_bytes = incoming.to_bytes().unwrap();
         assert_ne!(incoming_bytes, original.to_bytes().unwrap());
 
         let applied = committed.patch().apply(&incoming).unwrap();
-        assert_eq!(applied.patch().before.to_bytes().unwrap(), incoming_bytes);
         assert_eq!(
-            applied.patch().after.to_bytes().unwrap(),
-            applied.workbook().to_bytes().unwrap()
+            crate::writer::to_bytes(applied.patch().before.opc_package()).unwrap(),
+            incoming_bytes
         );
-        let restored = applied.patch().inverse().apply(applied.workbook()).unwrap();
-        assert_eq!(restored.workbook().to_bytes().unwrap(), incoming_bytes);
+        assert_eq!(
+            crate::writer::to_bytes(applied.patch().after.opc_package()).unwrap(),
+            applied.package().to_bytes().unwrap()
+        );
+        let restored = applied.patch().inverse().apply(applied.package()).unwrap();
+        assert_eq!(restored.package().to_bytes().unwrap(), incoming_bytes);
     }
 
     fn local_traversal_visits_for_authored_cells(cell_count: usize) -> usize {

@@ -31,7 +31,7 @@ const X14AC_NS: &str = "http://schemas.microsoft.com/office/spreadsheetml/2009/9
 /// Build a small workbook with every scalar kind used by the first XLSX
 /// write surface, plus a cacheless formula and an explicit boolean cell.
 fn fixture() -> Vec<u8> {
-    let workbook = litchi_xlsx::Workbook::create().expect("create native workbook");
+    let workbook = litchi_xlsx::Package::new().expect("create native workbook");
     let mut edit = workbook.edit().expect("start native workbook edit");
     {
         let mut sheet = edit
@@ -50,15 +50,15 @@ fn fixture() -> Vec<u8> {
     }
     edit.commit()
         .expect("commit native fixture")
-        .into_workbook()
+        .into_package()
         .to_bytes()
         .expect("serialize native fixture")
 }
 
 fn custom_styles_fixture() -> Vec<u8> {
-    let workbook = litchi_xlsx::Workbook::from_bytes(fixture()).expect("open native XLSX fixture");
+    let workbook = litchi_xlsx::Package::from_bytes(&fixture()).expect("open native XLSX fixture");
     let package = litchi_xlsx::Package::from_bytes(
-        workbook.to_bytes().expect("serialize native XLSX fixture"),
+        &workbook.to_bytes().expect("serialize native XLSX fixture"),
     )
     .expect("open fixture package")
     .into_plain_opc();
@@ -99,9 +99,9 @@ fn custom_styles_fixture() -> Vec<u8> {
 /// that references the explicit style, so query results can distinguish
 /// authored false/zero/none values from absent font metadata.
 fn source_long_tail_font_fixture() -> Vec<u8> {
-    let workbook = litchi_xlsx::Workbook::from_bytes(fixture()).expect("open native XLSX fixture");
+    let workbook = litchi_xlsx::Package::from_bytes(&fixture()).expect("open native XLSX fixture");
     let package = litchi_xlsx::Package::from_bytes(
-        workbook.to_bytes().expect("serialize native XLSX fixture"),
+        &workbook.to_bytes().expect("serialize native XLSX fixture"),
     )
     .expect("open fixture package")
     .into_plain_opc();
@@ -145,9 +145,9 @@ fn source_long_tail_font_fixture() -> Vec<u8> {
 /// latter is deliberately outside the shared facade vocabulary: a cell edit
 /// must preserve it while changing a known alignment child.
 fn source_alignment_fixture() -> Vec<u8> {
-    let workbook = litchi_xlsx::Workbook::from_bytes(fixture()).expect("open native XLSX fixture");
+    let workbook = litchi_xlsx::Package::from_bytes(&fixture()).expect("open native XLSX fixture");
     let package = litchi_xlsx::Package::from_bytes(
-        workbook.to_bytes().expect("serialize native XLSX fixture"),
+        &workbook.to_bytes().expect("serialize native XLSX fixture"),
     )
     .expect("open fixture package")
     .into_plain_opc();
@@ -204,7 +204,7 @@ fn source_alignment_fixture() -> Vec<u8> {
 /// start with different pattern/background pairs so range edits exercise
 /// per-cell source-style composition rather than one shared default style.
 fn source_fill_fixture() -> Vec<u8> {
-    let workbook = litchi_xlsx::Workbook::from_bytes(fixture()).expect("open native XLSX fixture");
+    let workbook = litchi_xlsx::Package::from_bytes(&fixture()).expect("open native XLSX fixture");
     let mut edit = workbook.edit().expect("start source fill edit");
     {
         let mut sheet = edit
@@ -234,9 +234,9 @@ fn source_fill_fixture() -> Vec<u8> {
     let workbook = edit
         .commit()
         .expect("commit source fill styles")
-        .into_workbook();
+        .into_package();
     let package = litchi_xlsx::Package::from_bytes(
-        workbook.to_bytes().expect("serialize source fill workbook"),
+        &workbook.to_bytes().expect("serialize source fill workbook"),
     )
     .expect("open source fill package")
     .into_plain_opc();
@@ -327,9 +327,9 @@ fn source_fill_fixture() -> Vec<u8> {
 /// positions, and every authored colour remain available to the leaf.
 fn source_path_gradient_fixture() -> Vec<u8> {
     let workbook =
-        litchi_xlsx::Workbook::from_bytes(source_fill_fixture()).expect("open source fill fixture");
+        litchi_xlsx::Package::from_bytes(&source_fill_fixture()).expect("open source fill fixture");
     let package = litchi_xlsx::Package::from_bytes(
-        workbook
+        &workbook
             .to_bytes()
             .expect("serialize source path-gradient fixture"),
     )
@@ -360,9 +360,9 @@ fn source_path_gradient_fixture() -> Vec<u8> {
 /// border edit can be checked against both the source projection and the
 /// native format reader without changing the shared default border.
 fn source_border_fixture() -> Vec<u8> {
-    let workbook = litchi_xlsx::Workbook::from_bytes(fixture()).expect("open native XLSX fixture");
+    let workbook = litchi_xlsx::Package::from_bytes(&fixture()).expect("open native XLSX fixture");
     let package = litchi_xlsx::Package::from_bytes(
-        workbook.to_bytes().expect("serialize native XLSX fixture"),
+        &workbook.to_bytes().expect("serialize native XLSX fixture"),
     )
     .expect("open fixture package")
     .into_plain_opc();
@@ -435,9 +435,9 @@ fn source_border_fixture() -> Vec<u8> {
 /// node projection intentionally omits inherited/default format details.
 fn source_base_pattern_fixture() -> Vec<u8> {
     let workbook =
-        litchi_xlsx::Workbook::from_bytes(source_fill_fixture()).expect("open source fill fixture");
+        litchi_xlsx::Package::from_bytes(&source_fill_fixture()).expect("open source fill fixture");
     let package = litchi_xlsx::Package::from_bytes(
-        workbook
+        &workbook
             .to_bytes()
             .expect("serialize source base-pattern fixture"),
     )
@@ -506,7 +506,7 @@ fn cell_property(file: &File, path: &str, key: &str) -> Option<String> {
 }
 
 fn styles_bytes(file: &File) -> Vec<u8> {
-    let package = litchi_xlsx::Package::from_bytes(file.to_bytes().expect("publish XLSX"))
+    let package = litchi_xlsx::Package::from_bytes(&file.to_bytes().expect("publish XLSX"))
         .expect("open published XLSX package")
         .into_plain_opc();
     package
@@ -1728,9 +1728,10 @@ fn source_borders_keep_native_typed_values_and_opaque_markup() {
             );
         }
 
-        let native = litchi_xlsx::Workbook::from_bytes(bytes.clone())
-            .expect("open native source border workbook");
+        let native =
+            litchi_xlsx::Package::from_bytes(&bytes).expect("open native source border workbook");
         let native_format = native
+            .workbook_ref()
             .sheet(0usize)
             .expect("native sheet lookup")
             .expect("native worksheet")
@@ -5041,9 +5042,9 @@ fn gradient_fill_readback_retains_all_stops_and_path_geometry() {
             );
         }
 
-        let workbook =
-            litchi_xlsx::Workbook::from_bytes(bytes.clone()).expect("open native path gradient");
+        let workbook = litchi_xlsx::Package::from_bytes(&bytes).expect("open native path gradient");
         let native_format = workbook
+            .workbook_ref()
             .sheet(0usize)
             .expect("native sheet lookup")
             .expect("native worksheet")
@@ -5612,10 +5613,8 @@ fn stale_source_and_released_source_are_refused_before_cell_edit() {
 #[test]
 fn unlocked_encrypted_xlsx_refuses_cell_edit_and_transaction_admission() {
     let password = "xlsx-cell-write-password";
-    let encrypted = litchi_xlsx::Package::from_bytes(fixture())
+    let encrypted = litchi_xlsx::Package::from_bytes(&fixture())
         .expect("open clear XLSX through native package")
-        .into_workbook()
-        .expect("materialize native XLSX workbook")
         .to_encrypted(password, litchi_xlsx::encryption::Mode::Agile)
         .expect("encrypt XLSX fixture");
     let locked = litchi_ops::open_bytes(encrypted).expect("open encrypted XLSX");

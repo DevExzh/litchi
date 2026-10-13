@@ -212,7 +212,7 @@ fn ordered_list_refuses_removing_required_final_child() {
 
 #[test]
 fn ordinary_workbook_structural_edit_uses_same_public_path() {
-    let workbook = Workbook::from_package(package()).unwrap();
+    let workbook = crate::Package::from_opc(package()).unwrap();
     let mut edit = workbook.edit_pivot_table("Pivot").unwrap();
     edit.push_server_format(ServerFormat::new(None, Some("0".to_owned())))
         .unwrap();
@@ -220,7 +220,7 @@ fn ordinary_workbook_structural_edit_uses_same_public_path() {
     let commit = edit.commit().unwrap();
     assert_eq!(commit.snapshot().formats().len(), 3);
     assert_eq!(commit.snapshot().formats()[0].format.as_deref(), Some("0"));
-    let round_trip = commit.patch().inverse().apply(commit.workbook()).unwrap();
+    let round_trip = commit.patch().inverse().apply(commit.package()).unwrap();
     assert_eq!(round_trip.snapshot().formats().len(), 2);
 }
 
@@ -260,7 +260,7 @@ fn worksheet_metadata_deduplicates_canonical_target_edges() {
 
 #[test]
 fn workbook_contextual_edit_returns_immutable_commit_and_patch() {
-    let workbook = Workbook::from_package(package()).unwrap();
+    let workbook = crate::Package::from_opc(package()).unwrap();
     let view = workbook.pivot_table("Pivot").unwrap();
     assert_eq!(view.table_name(), "Pivot");
     assert_eq!(
@@ -284,7 +284,7 @@ fn workbook_contextual_edit_returns_immutable_commit_and_patch() {
         Some("#,##0")
     );
 
-    let next = commit.workbook();
+    let next = commit.package();
     assert_eq!(
         next.pivot_table("Pivot").unwrap().formats()[0]
             .format

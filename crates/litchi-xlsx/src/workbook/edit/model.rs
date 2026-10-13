@@ -2649,15 +2649,16 @@ impl Patch {
         &self.package_changes
     }
 
+    /// Number of semantic changes retained by this patch.
     #[must_use]
-    pub fn len(&self) -> usize {
+    pub fn operation_count(&self) -> usize {
         self.changes
             .len()
             .saturating_add(self.package_changes.len())
     }
 
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
+    /// Whether the patch carries no change category at all.
+    pub(crate) fn is_structurally_empty(&self) -> bool {
         self.changes.is_empty()
             && self.package_changes.is_empty()
             && self.parts.is_empty()
@@ -2698,18 +2699,45 @@ impl Patch {
         })
     }
 
-    /// Whether the retained endpoints have the same native OPC content.
+    /// Whether applying this patch leaves the package bytes unchanged.
     ///
-    /// This compares the complete native package graph and does not infer a
-    /// no-op from the semantic change list: a staged `A -> B -> A` sequence
-    /// can have non-empty changes while its final endpoints are identical.
-    ///
-    /// # Errors
-    ///
-    /// Propagates payload decode failures and explicit refusals for opaque
-    /// package state whose equality cannot be proved.
-    pub fn is_noop(&self) -> Result<bool> {
-        self.source()?.same_content(self.target()?)
+    /// A commit that published nothing returns its source snapshot, and its
+    /// patch is a no-op. A patch whose only package delta is a set of part
+    /// payloads that equal their sources byte for byte is a no-op as well.
+    /// The check is proportional to the changed closure, never to the
+    /// package; use [`crate::Package::same_content`] to compare two complete
+    /// snapshots, for example the endpoints of an `A -> B -> A` sequence of
+    /// separate commits.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        if let (Some(source), Some(target)) = (&self.source, &self.target) {
+            if Arc::ptr_eq(&source.inner, &target.inner) {
+                return true;
+            }
+        }
+        if self.is_structurally_empty() {
+            return true;
+        }
+        self.relationships.is_empty()
+            && self.content_types.is_none()
+            && self.svg_parts.is_empty()
+            && self.graph.is_empty()
+            && self.web.is_none()
+            && self
+                .parts
+                .iter()
+                .all(|part| part.before.as_slice() == part.after.as_slice())
+    }
+
+    /// Content-free facts about the publication this patch describes.
+    #[must_use]
+    pub fn diagnostics(&self) -> super::Diagnostics {
+        super::Diagnostics {
+            changed: !self.is_noop(),
+            changes: self.changes.len(),
+            package_changes: self.package_changes.len(),
+            changed_parts: self.parts.len(),
+        }
     }
 
     /// Conservative retained-data charge for this patch.
@@ -2948,7 +2976,7 @@ impl Patch {
         super::DurablePatch::from_patch(self)
     }
 
-    pub(in crate::workbook) fn apply_to(&self, workbook: &Workbook) -> Result<Commit> {
+    pub(crate) fn apply_to(&self, workbook: &Workbook) -> Result<Commit> {
         ensure_unsigned(workbook)?;
         if let Some(authority) = &self.authority {
             authority.validate(workbook)?;
@@ -2979,7 +3007,7 @@ impl Patch {
                 });
             }
             return Ok(Commit {
-                workbook: workbook.clone(),
+                package: crate::Package::from_workbook(workbook.clone()),
                 patch,
             });
         }
@@ -3087,7 +3115,7 @@ impl Patch {
         }
         patch.source = Some(source);
         patch.target = Some(workbook.clone());
-        Ok(Commit { workbook, patch })
+        Ok(Commit::new(workbook, patch))
     }
 }
 
@@ -3199,31 +3227,52 @@ fn relationship_retained_bytes(relationships: &Relationships) -> usize {
 }
 
 /// Successful atomic transaction result.
+///
+/// The commit carries the published immutable [`crate::Package`], the
+/// reversible [`Patch`] from its source, and content-free
+/// [`super::Diagnostics`].
 #[derive(Debug)]
 pub struct Commit {
-    pub(super) workbook: Workbook,
+    pub(super) package: crate::Package,
     pub(super) patch: Patch,
 }
 
 impl Commit {
-    #[must_use]
-    pub fn workbook(&self) -> &Workbook {
-        &self.workbook
+    pub(super) fn new(workbook: Workbook, patch: Patch) -> Self {
+        Self {
+            package: crate::Package::from_workbook(workbook),
+            patch,
+        }
     }
 
+    /// The published immutable package.
     #[must_use]
-    pub fn patch(&self) -> &Patch {
+    pub const fn package(&self) -> &crate::Package {
+        &self.package
+    }
+
+    /// The reversible patch from the source package.
+    #[must_use]
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
+    /// Content-free publication facts.
     #[must_use]
-    pub fn into_workbook(self) -> Workbook {
-        self.workbook
+    pub fn diagnostics(&self) -> super::Diagnostics {
+        self.patch.diagnostics()
     }
 
+    /// Consume the commit into its published package.
     #[must_use]
-    pub fn into_parts(self) -> (Workbook, Patch) {
-        (self.workbook, self.patch)
+    pub fn into_package(self) -> crate::Package {
+        self.package
+    }
+
+    /// Consume the commit into its published package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (crate::Package, Patch) {
+        (self.package, self.patch)
     }
 
     /// Record this committed snapshot in bounded undo/redo history.
@@ -3236,7 +3285,7 @@ impl Commit {
     ///
     /// Returns an error for a stale history head, durable serialization
     /// failure, or a transition heavier than the history budget.
-    pub fn record(&self, history: &mut crate::workbook::History) -> Result<Vec<Workbook>> {
+    pub fn record(&self, history: &mut crate::workbook::History) -> Result<Vec<crate::Package>> {
         let durable = self.patch.durable()?;
         let next = durable.apply(history.current())?;
         let weight = u64::try_from(durable.to_deterministic_json()?.len())

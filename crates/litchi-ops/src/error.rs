@@ -1119,7 +1119,7 @@ impl Classify for litchi_xlsx::Error {
                 litchi_ooxml_common::package_encryption::PolicyError::OrdinaryOutputWouldRemoveEncryption { .. } => Class::suggest(Code::DocumentProtected, "use SaveOptions::reencrypt for encrypted publication"),
                 litchi_ooxml_common::package_encryption::PolicyError::NoRetainedMode => Class::of(Code::UnsupportedCapability),
             },
-            Self::ResourceLimit(_) => Class::of(Code::LimitExceeded),
+            Self::ResourceLimit(_) | Self::Limit { .. } => Class::of(Code::LimitExceeded),
             Self::Signed => Class::suggest(Code::DocumentProtected, SIGNED_SUGGESTION),
             Self::Unsupported { .. } | Self::UnsupportedSelector => {
                 Class::of(Code::UnsupportedCapability)

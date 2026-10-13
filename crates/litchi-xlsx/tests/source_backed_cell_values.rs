@@ -751,7 +751,7 @@ fn first_middle_last_batch_reopens_preserves_unselected_parts_and_inverts() {
         .unwrap();
     let source = OpcPackage::from_bytes(&source_bytes).unwrap();
     let published = OpcPackage::from_bytes(&output).unwrap();
-    litchi_xlsx::Package::from_bytes(output).unwrap();
+    litchi_xlsx::Package::from_bytes(&output).unwrap();
     assert_eq!(
         source
             .get_part(&PackURI::new(UNUSED).unwrap())

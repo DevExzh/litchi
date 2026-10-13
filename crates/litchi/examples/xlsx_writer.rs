@@ -6,7 +6,7 @@
 //! worksheet package attachment is not exposed by that facade yet.
 
 use litchi_xlsx::Formula;
-use litchi_xlsx::Workbook;
+use litchi_xlsx::Package;
 use litchi_xlsx::data_validation::{
     Collection, ListSource, Source, Sqref, Validation, ValidationType,
 };
@@ -18,7 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let output_file = env::args()
         .nth(1)
         .unwrap_or_else(|| "output.xlsx".to_string());
-    let workbook = Workbook::create()?;
+    let workbook = Package::new()?;
     let mut edit = workbook.edit()?;
 
     edit.tab(0)?
@@ -103,7 +103,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let validations = Collection::new(Source::Core, vec![department])?;
     let _typed_models = (header_format, title_alignment, validations);
 
-    let workbook = edit.commit()?.into_workbook();
+    let workbook = edit.commit()?.into_package();
     workbook.save(&output_file)?;
     println!("Created transactional workbook at {output_file}");
     println!("Supported: cells, formulas, merges, dimensions, and tab names");

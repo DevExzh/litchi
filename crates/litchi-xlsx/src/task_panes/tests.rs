@@ -48,7 +48,7 @@ fn root_task_pane_relationship(package: &Package) -> (String, String) {
 
 #[test]
 fn crud_is_atomic_and_preserves_relationships_and_opaque_extensions() {
-    let mut package = Package::create().unwrap();
+    let mut package = Package::new().unwrap();
     let mut value = pane("addin-one");
     value
         .add_in_mut()
@@ -79,7 +79,7 @@ fn crud_is_atomic_and_preserves_relationships_and_opaque_extensions() {
     transaction.commit().unwrap();
 
     assert_eq!(root_task_pane_relationship(&package), relationship_before);
-    let workbook = package.workbook().unwrap();
+    let workbook = package.workbook();
     let panes = workbook.task_panes().unwrap().unwrap();
     let stored = panes.get("addin-one").unwrap();
     assert!(!stored.visible());
@@ -101,7 +101,7 @@ fn crud_is_atomic_and_preserves_relationships_and_opaque_extensions() {
 
 #[test]
 fn strict_task_panes_round_trip_through_facade() {
-    let mut package = Package::create().unwrap();
+    let mut package = Package::new().unwrap();
     let mut transaction = package.edit_task_panes_with(Conformance::Strict).unwrap();
     transaction.add(pane("strict-addin")).unwrap();
     transaction.commit().unwrap();
@@ -133,7 +133,7 @@ fn strict_task_panes_round_trip_through_facade() {
 
 #[test]
 fn malformed_task_pane_graph_is_rejected_without_mutation() {
-    let mut raw = Package::create().unwrap().into_plain_opc();
+    let mut raw = Package::new().unwrap().into_plain_opc();
     let part_name = PackURI::new("/xl/webextensions/taskpanes.xml").unwrap();
     raw.try_add_part(Box::new(BlobPart::new(
         part_name.clone(),
@@ -156,7 +156,7 @@ fn malformed_task_pane_graph_is_rejected_without_mutation() {
 #[test]
 fn unknown_root_parts_survive_task_pane_edits() {
     let mut package: Package = {
-        let mut raw = Package::create().unwrap().into_plain_opc();
+        let mut raw = Package::new().unwrap().into_plain_opc();
         let opaque_name = PackURI::new("/xl/opaque.bin").unwrap();
         raw.try_add_part(Box::new(BlobPart::new(
             opaque_name.clone(),

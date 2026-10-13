@@ -10,7 +10,7 @@
 use std::path::{Path, PathBuf};
 
 use litchi_core::Durability;
-use litchi_xlsx::{Package, Workbook};
+use litchi_xlsx::Package;
 
 const LEVELS: [Durability; 3] = [Durability::Full, Durability::FileOnly, Durability::NoSync];
 
@@ -23,7 +23,7 @@ fn seeded(directory: &Path, name: &str, durability: Durability) -> PathBuf {
 #[test]
 fn every_level_publishes_the_default_save_bytes() {
     let directory = tempfile::tempdir().unwrap();
-    let workbook = Workbook::create().unwrap();
+    let workbook = Package::new().unwrap();
     let reference = directory.path().join("reference.xlsx");
     workbook.save(&reference).unwrap();
     let expected = std::fs::read(&reference).unwrap();
@@ -75,7 +75,7 @@ fn every_level_publishes_the_default_save_bytes() {
         );
     }
 
-    Workbook::open(directory.path().join("workbook-no-sync.xlsx")).unwrap();
+    Package::open(directory.path().join("workbook-no-sync.xlsx")).unwrap();
     // Two references plus four routes at three levels; no temporary remains.
     assert_eq!(std::fs::read_dir(directory.path()).unwrap().count(), 14);
 }

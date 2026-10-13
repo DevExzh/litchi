@@ -74,6 +74,16 @@ pub enum Error {
     /// can distinguish resource exhaustion from malformed document input.
     #[error(transparent)]
     ResourceLimit(#[from] litchi_core::ResourceLimit),
+    /// A fixed bound of the primary workbook transaction was exceeded.
+    #[error("XLSX edit limit exceeded for {kind}: {observed} exceeds {maximum}")]
+    Limit {
+        /// The bounded transaction dimension.
+        kind: crate::workbook::edit::LimitKind,
+        /// The observed amount.
+        observed: u64,
+        /// The fixed maximum.
+        maximum: u64,
+    },
     /// The bounded form-control properties codec refused a payload or edit.
     #[error(transparent)]
     FormControl(#[from] crate::form_control::FormControlError),

@@ -2350,14 +2350,15 @@ fn run_xlsx_bytes(
     // The predecessor's oracle: the typed eager owner and an independently
     // opened OPC/property package, both outside the timer.
     let spec = crate::xlsx_spec(corpus)?;
-    let typed = litchi_xlsx::Workbook::from_bytes(corpus.archive.clone())?;
+    let typed = litchi_xlsx::Package::from_bytes(&corpus.archive)?;
     crate::verify_xlsx_cells(&typed, spec, &[])?;
     let expected = workbook_projection(
         typed
+            .workbook_ref()
             .sheets()
             .map(|sheet| sheet.name().to_owned())
             .collect(),
-        typed.len(),
+        typed.workbook_ref().len(),
         &crate::xlsx_typed_full_text(&typed, spec)?,
         crate::xlsx_root_metadata_digest(&crate::xlsx_root_metadata_oracle(
             &OpcPackage::from_bytes(&corpus.archive)?,

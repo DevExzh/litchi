@@ -30,7 +30,7 @@ fn fixture_info() -> XmlMapInfo {
 }
 
 fn package() -> OpcPackage {
-    Package::create()
+    Package::new()
         .expect("create workbook package")
         .into_plain_opc()
 }

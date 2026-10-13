@@ -295,8 +295,8 @@ fn relationship_signatures(relationships: &litchi_opc::Relationships) -> Vec<Str
 }
 
 fn eager_output(source: &[u8]) -> Vec<u8> {
-    let package = Package::from_bytes(source.to_vec()).unwrap();
-    let workbook = package.into_workbook().unwrap();
+    let package = Package::from_bytes(source).unwrap();
+    let workbook = package;
     let mut edit = workbook.edit().unwrap();
     assert!(
         edit.put_page_setup("Sheet1", target_setup())
@@ -305,7 +305,7 @@ fn eager_output(source: &[u8]) -> Vec<u8> {
     );
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
-    commit.workbook().write_to(&mut output).unwrap();
+    commit.package().write_to(&mut output).unwrap();
     output
 }
 
@@ -370,13 +370,8 @@ fn changed_edit_matches_eager_reopens_inverts_and_preserves_every_relationship()
             assert_eq!(part.blob(), output_part.blob());
         }
     }
-    let reopened = Package::from_bytes(output).unwrap();
-    let sheet = reopened
-        .workbook()
-        .unwrap()
-        .sheet("Sheet1")
-        .unwrap()
-        .unwrap();
+    let reopened = Package::from_bytes(&output).unwrap();
+    let sheet = reopened.workbook().sheet("Sheet1").unwrap().unwrap();
     assert_eq!(sheet.page_setup().unwrap(), Some(target_setup()));
     assert!(
         parse_worksheet_page_setup_relationship_id(

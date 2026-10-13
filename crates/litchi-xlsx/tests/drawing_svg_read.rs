@@ -17,7 +17,7 @@ use litchi_xlsx::drawing::{
     DrawingAnchor, DrawingDialect, PictureSelector, RelationshipDialect, SourceDrawing,
     SvgOwnerState, WorksheetSourceLimits, WorksheetSourceScan,
 };
-use litchi_xlsx::{Package, SourceLimits, Workbook};
+use litchi_xlsx::{Package, SourceLimits};
 
 const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const XDR: &str = "http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing";
@@ -175,7 +175,7 @@ fn package_bytes(
     worksheet: Option<Vec<u8>>,
     fault: MediaFault,
 ) -> Vec<u8> {
-    let mut package = Package::create().unwrap().into_plain_opc();
+    let mut package = Package::new().unwrap().into_plain_opc();
     package
         .get_part_mut(&PackURI::new(SHEET).unwrap())
         .unwrap()
@@ -390,8 +390,8 @@ fn encoded_drawing_namespace_fixture(bytes: &[u8]) -> Vec<u8> {
     })
 }
 
-fn workbook(bytes: &[u8]) -> Workbook {
-    Workbook::from_bytes(bytes.to_vec()).unwrap()
+fn workbook(bytes: &[u8]) -> Package {
+    Package::from_bytes(bytes).unwrap()
 }
 
 fn worksheet_source(inner: &str) -> Vec<u8> {
@@ -416,7 +416,7 @@ fn source_limits_reject(source: &[u8], mutate: impl FnOnce(&mut WorksheetSourceL
 #[test]
 fn native_fixture_pairs_typed_source_and_borrows_svg_payload() {
     let workbook = workbook(NATIVE_XLSX);
-    let worksheet = workbook.sheet("Sheet1").unwrap().unwrap();
+    let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
     let drawing = worksheet.drawing(0).unwrap();
 
     assert_eq!(drawing.source().dialect(), DrawingDialect::Transitional);
@@ -467,6 +467,7 @@ fn native_fixture_pairs_typed_source_and_borrows_svg_payload() {
     assert_eq!(first.bytes(), second.bytes());
     assert_eq!(first_ptr, second.bytes().as_ptr());
     let workbook_read = workbook
+        .workbook_ref()
         .read_svg_image("Sheet1", PictureSelector::new(0, 1))
         .unwrap();
     assert_eq!(workbook_read.bytes(), first.bytes());
@@ -475,7 +476,7 @@ fn native_fixture_pairs_typed_source_and_borrows_svg_payload() {
 #[test]
 fn synthetic_all_anchor_forms_pair_source_and_typed_geometry() {
     let workbook = workbook(&synthetic_fixture(false, 3, true));
-    let worksheet = workbook.sheet("Sheet1").unwrap().unwrap();
+    let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
     let drawing = worksheet.drawing(0).unwrap();
     assert_eq!(drawing.picture_count(), 3);
     assert!(matches!(
@@ -511,7 +512,7 @@ fn synthetic_all_anchor_forms_pair_source_and_typed_geometry() {
 #[test]
 fn strict_core_with_transitional_svg_attribute_is_read_as_strict() {
     let workbook = workbook(&synthetic_fixture(true, 1, true));
-    let worksheet = workbook.sheet("Sheet1").unwrap().unwrap();
+    let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
     let drawing = worksheet.drawing(0).unwrap();
     assert_eq!(drawing.source().dialect(), DrawingDialect::Strict);
     assert_eq!(
@@ -566,7 +567,11 @@ fn worksheet_namespace_aliases_and_opaque_lookalikes_keep_direct_ownership() {
     let scan = WorksheetSourceScan::scan(alias.as_bytes()).unwrap();
     assert_eq!(scan.relationship_ids().collect::<Vec<_>>(), ["rIdDrawing"]);
     let bytes = rewrite_sheet(&synthetic_fixture(false, 1, true), alias.into_bytes());
-    let worksheet = workbook(&bytes).sheet("Sheet1").unwrap().unwrap();
+    let worksheet = workbook(&bytes)
+        .workbook_ref()
+        .sheet("Sheet1")
+        .unwrap()
+        .unwrap();
     assert_eq!(worksheet.drawing(0).unwrap().picture_count(), 1);
 
     let opaque = format!(
@@ -575,14 +580,22 @@ fn worksheet_namespace_aliases_and_opaque_lookalikes_keep_direct_ownership() {
     let scan = WorksheetSourceScan::scan(opaque.as_bytes()).unwrap();
     assert_eq!(scan.drawings().len(), 1);
     let bytes = rewrite_sheet(&synthetic_fixture(false, 1, true), opaque.into_bytes());
-    let worksheet = workbook(&bytes).sheet("Sheet1").unwrap().unwrap();
+    let worksheet = workbook(&bytes)
+        .workbook_ref()
+        .sheet("Sheet1")
+        .unwrap()
+        .unwrap();
     assert_eq!(worksheet.drawing(0).unwrap().picture_count(), 1);
 }
 
 #[test]
 fn case_variant_svg_media_target_resolves_the_canonical_package_part() {
     let bytes = case_variant_svg_target_fixture(&synthetic_fixture(false, 1, true));
-    let worksheet = workbook(&bytes).sheet("Sheet1").unwrap().unwrap();
+    let worksheet = workbook(&bytes)
+        .workbook_ref()
+        .sheet("Sheet1")
+        .unwrap()
+        .unwrap();
     let image = worksheet
         .read_svg_image(PictureSelector::new(0, 0))
         .unwrap();
@@ -608,7 +621,7 @@ fn entity_escaped_drawing_namespace_uris_pair_source_and_typed_reads() {
     );
 
     let workbook = workbook(&bytes);
-    let worksheet = workbook.sheet("Sheet1").unwrap().unwrap();
+    let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
     let drawing = worksheet.drawing(0).unwrap();
     assert_eq!(drawing.picture_count(), 1);
     assert_eq!(drawing.typed().pictures().count(), 1);
@@ -632,7 +645,11 @@ fn mce_foreign_wrappers_are_opaque_but_direct_choice_drawings_refuse() {
         &synthetic_fixture(false, 1, true),
         foreign_wrapper.into_bytes(),
     );
-    let worksheet = workbook(&bytes).sheet("Sheet1").unwrap().unwrap();
+    let worksheet = workbook(&bytes)
+        .workbook_ref()
+        .sheet("Sheet1")
+        .unwrap()
+        .unwrap();
     assert!(worksheet.drawing(0).is_err());
 
     let direct_choice = format!(
@@ -651,7 +668,11 @@ fn duplicate_direct_and_hidden_mce_drawing_owners_are_refused() {
     );
     assert!(WorksheetSourceScan::scan(canonical.as_bytes()).is_err());
     let bytes = rewrite_sheet(&synthetic_fixture(true, 1, true), canonical.into_bytes());
-    let worksheet = workbook(&bytes).sheet("Sheet1").unwrap().unwrap();
+    let worksheet = workbook(&bytes)
+        .workbook_ref()
+        .sheet("Sheet1")
+        .unwrap()
+        .unwrap();
     assert!(worksheet.drawing(0).is_err());
 
     let foreign = format!(
@@ -660,7 +681,11 @@ fn duplicate_direct_and_hidden_mce_drawing_owners_are_refused() {
     let scan = WorksheetSourceScan::scan(foreign.as_bytes()).unwrap();
     assert_eq!(scan.relationship_ids().collect::<Vec<_>>(), ["rIdDrawing"]);
     let bytes = rewrite_sheet(&synthetic_fixture(true, 1, true), foreign.into_bytes());
-    let worksheet = workbook(&bytes).sheet("Sheet1").unwrap().unwrap();
+    let worksheet = workbook(&bytes)
+        .workbook_ref()
+        .sheet("Sheet1")
+        .unwrap()
+        .unwrap();
     assert_eq!(worksheet.drawing(0).unwrap().picture_count(), 1);
 
     let package = OpcPackage::from_bytes(&bytes).unwrap();
@@ -827,7 +852,13 @@ fn caller_part_xml_cap_refuses_mce_heavy_worksheet_before_read_projection() {
     let limits = SourceLimits::builder()
         .max_part_bytes((source.len() - 1) as u64)
         .unwrap();
-    assert!(Workbook::from_bytes_with_limits(bytes, limits.build().unwrap()).is_err());
+    assert!(
+        Package::from_bytes_with_options(
+            &bytes,
+            litchi_xlsx::OpenOptions::new().source_limits(limits.build().unwrap())
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -840,7 +871,7 @@ fn media_relationship_graph_faults_are_refused_without_payload_guessing() {
         MediaFault::RasterOutbound,
     ] {
         let workbook = workbook(&package_bytes(false, 1, true, None, fault));
-        let worksheet = workbook.sheet("Sheet1").unwrap().unwrap();
+        let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
         assert!(
             worksheet.picture(PictureSelector::new(0, 0)).is_err(),
             "raster graph fault {fault:?} was admitted"
@@ -854,7 +885,7 @@ fn media_relationship_graph_faults_are_refused_without_payload_guessing() {
         MediaFault::SvgOutbound,
     ] {
         let workbook = workbook(&package_bytes(false, 1, true, None, fault));
-        let worksheet = workbook.sheet("Sheet1").unwrap().unwrap();
+        let worksheet = workbook.workbook_ref().sheet("Sheet1").unwrap().unwrap();
         let picture = worksheet.picture(PictureSelector::new(0, 0)).unwrap();
         assert!(
             picture.svg().is_err(),

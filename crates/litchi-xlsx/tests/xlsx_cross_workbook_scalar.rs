@@ -5,14 +5,14 @@
 
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, TargetMode};
-use litchi_xlsx::{Cell, DurablePatch, Error, Formula, Number, Value, Workbook};
+use litchi_xlsx::{Cell, DurablePatch, Error, Formula, Number, Value};
 
 const WORKBOOK_URI: &str = "/xl/workbook.xml";
 const WORKSHEET_URI: &str = "/xl/worksheets/sheet1.xml";
 const STYLES_URI: &str = "/xl/styles.xml";
 const SHARED_STRINGS_URI: &str = "/xl/sharedStrings.xml";
 
-fn workbook_with_sheet_xml(sheet: &str, shared_strings: Option<&str>) -> Workbook {
+fn workbook_with_sheet_xml(sheet: &str, shared_strings: Option<&str>) -> litchi_xlsx::Package {
     let mut package = OpcPackage::new();
     let workbook = BlobPart::new(
         PackURI::new(WORKBOOK_URI).unwrap(),
@@ -76,11 +76,11 @@ fn workbook_with_sheet_xml(sheet: &str, shared_strings: Option<&str>) -> Workboo
             .unwrap();
     }
     package.relate_to(WORKBOOK_URI.trim_start_matches('/'), rt::OFFICE_DOCUMENT);
-    Workbook::from_bytes(PackageWriter::to_bytes(&package).unwrap()).unwrap()
+    litchi_xlsx::Package::from_bytes(&PackageWriter::to_bytes(&package).unwrap()).unwrap()
 }
 
-fn workbook_with_scalar_values() -> Workbook {
-    let workbook = Workbook::new().unwrap();
+fn workbook_with_scalar_values() -> litchi_xlsx::Package {
+    let workbook = litchi_xlsx::Package::new().unwrap();
     let mut edit = workbook.edit().unwrap();
     edit.sheet("Sheet1")
         .unwrap()
@@ -93,28 +93,29 @@ fn workbook_with_scalar_values() -> Workbook {
         .unwrap()
         .set("D1", Value::date("2026-08-14").unwrap())
         .unwrap();
-    edit.commit().unwrap().into_workbook()
+    edit.commit().unwrap().into_package()
 }
 
 #[test]
 fn cross_workbook_scalar_copy_is_immutable_reversible_and_reopenable() {
     let donor = workbook_with_scalar_values();
     let donor_before = donor.to_plain_bytes().unwrap();
-    let target = Workbook::new().unwrap();
+    let target = litchi_xlsx::Package::new().unwrap();
 
     let mut edit = target.edit().unwrap();
-    edit.copy_cells_from(&donor, "Sheet1", "A1:D1", "Sheet1", "F3")
+    edit.copy_cells_from(donor.workbook_ref(), "Sheet1", "A1:D1", "Sheet1", "F3")
         .unwrap();
     let commit = edit.commit().unwrap();
-    let foreign_memory = Workbook::from_bytes(target.to_plain_bytes().unwrap()).unwrap();
+    let foreign_memory =
+        litchi_xlsx::Package::from_bytes(&target.to_plain_bytes().unwrap()).unwrap();
     assert!(matches!(
         foreign_memory.apply(commit.patch()),
         Err(Error::PatchConflict { .. })
     ));
-    assert!(commit.workbook().apply(&commit.patch().inverse()).is_ok());
+    assert!(commit.package().apply(&commit.patch().inverse()).is_ok());
     let durable = commit.patch().durable().unwrap();
     let changed = durable.apply(&target).unwrap();
-    let sheet = changed.sheet("Sheet1").unwrap().unwrap();
+    let sheet = changed.workbook_ref().sheet("Sheet1").unwrap().unwrap();
 
     assert!(matches!(
         sheet.cell("F3").unwrap().stored(),
@@ -133,9 +134,10 @@ fn cross_workbook_scalar_copy_is_immutable_reversible_and_reopenable() {
         Some(Cell::Value(Value::Date(date))) if date.as_str() == "2026-08-14"
     ));
 
-    let reopened = Workbook::from_bytes(changed.to_plain_bytes().unwrap()).unwrap();
+    let reopened = litchi_xlsx::Package::from_bytes(&changed.to_plain_bytes().unwrap()).unwrap();
     assert!(
         reopened
+            .workbook_ref()
             .sheet("Sheet1")
             .unwrap()
             .unwrap()
@@ -162,7 +164,7 @@ fn cross_workbook_scalar_copy_is_immutable_reversible_and_reopenable() {
 #[test]
 fn cross_workbook_scalar_copy_refuses_dependencies_and_occupied_targets_atomically() {
     let donor = workbook_with_scalar_values();
-    let target = Workbook::new().unwrap();
+    let target = litchi_xlsx::Package::new().unwrap();
 
     let mut occupied = target.edit().unwrap();
     occupied
@@ -172,13 +174,13 @@ fn cross_workbook_scalar_copy_refuses_dependencies_and_occupied_targets_atomical
         .set("F3", 99_i32)
         .unwrap();
     assert!(matches!(
-        occupied.copy_cells_from(&donor, "Sheet1", "A1", "Sheet1", "F3"),
+        occupied.copy_cells_from(donor.workbook_ref(), "Sheet1", "A1", "Sheet1", "F3"),
         Err(Error::Unsupported { .. })
     ));
-    let still_original = occupied.commit().unwrap().into_workbook();
+    let still_original = occupied.commit().unwrap().into_package();
     assert!(matches!(
         still_original
-            .sheet("Sheet1")
+            .workbook_ref().sheet("Sheet1")
             .unwrap()
             .unwrap()
             .cell("F3")
@@ -187,23 +189,23 @@ fn cross_workbook_scalar_copy_refuses_dependencies_and_occupied_targets_atomical
         Some(Cell::Value(Value::Number(number))) if number.as_str() == "99"
     ));
 
-    let mut formula_edit = Workbook::new().unwrap().edit().unwrap();
+    let mut formula_edit = litchi_xlsx::Package::new().unwrap().edit().unwrap();
     formula_edit
         .sheet("Sheet1")
         .unwrap()
         .unwrap()
         .set("A1", Formula::new("1+1").unwrap())
         .unwrap();
-    let formula_donor = formula_edit.commit().unwrap().into_workbook();
+    let formula_donor = formula_edit.commit().unwrap().into_package();
     let mut formula_copy = target.edit().unwrap();
     assert!(matches!(
-        formula_copy.copy_cells_from(&formula_donor, "Sheet1", "A1", "Sheet1", "F3"),
+        formula_copy.copy_cells_from(formula_donor.workbook_ref(), "Sheet1", "A1", "Sheet1", "F3"),
         Err(Error::Unsupported { .. })
     ));
 
     let style_donor = {
-        let style_base = Workbook::new().unwrap();
-        let style = style_base.styles().unwrap().base().unwrap();
+        let style_base = litchi_xlsx::Package::new().unwrap();
+        let style = style_base.workbook_ref().styles().unwrap().base().unwrap();
         let mut edit = style_base.edit().unwrap();
         edit.sheet("Sheet1")
             .unwrap()
@@ -212,11 +214,11 @@ fn cross_workbook_scalar_copy_refuses_dependencies_and_occupied_targets_atomical
             .unwrap()
             .style("A1", &style)
             .unwrap();
-        edit.commit().unwrap().into_workbook()
+        edit.commit().unwrap().into_package()
     };
     let mut style_copy = target.edit().unwrap();
     assert!(matches!(
-        style_copy.copy_cells_from(&style_donor, "Sheet1", "A1", "Sheet1", "F3"),
+        style_copy.copy_cells_from(style_donor.workbook_ref(), "Sheet1", "A1", "Sheet1", "F3"),
         Err(Error::Unsupported { .. })
     ));
 
@@ -228,7 +230,7 @@ fn cross_workbook_scalar_copy_refuses_dependencies_and_occupied_targets_atomical
     );
     let mut shared_copy = target.edit().unwrap();
     assert!(matches!(
-        shared_copy.copy_cells_from(&shared_donor, "Sheet1", "A1", "Sheet1", "F3"),
+        shared_copy.copy_cells_from(shared_donor.workbook_ref(), "Sheet1", "A1", "Sheet1", "F3"),
         Err(Error::Unsupported { .. })
     ));
 
@@ -238,7 +240,13 @@ fn cross_workbook_scalar_copy_refuses_dependencies_and_occupied_targets_atomical
     );
     let mut rich_inline_copy = target.edit().unwrap();
     assert!(matches!(
-        rich_inline_copy.copy_cells_from(&rich_inline_donor, "Sheet1", "A1", "Sheet1", "F3"),
+        rich_inline_copy.copy_cells_from(
+            rich_inline_donor.workbook_ref(),
+            "Sheet1",
+            "A1",
+            "Sheet1",
+            "F3"
+        ),
         Err(Error::Unsupported { .. })
     ));
 
@@ -248,7 +256,13 @@ fn cross_workbook_scalar_copy_refuses_dependencies_and_occupied_targets_atomical
     );
     let mut hyperlink_copy = target.edit().unwrap();
     assert!(matches!(
-        hyperlink_copy.copy_cells_from(&hyperlink_donor, "Sheet1", "A1", "Sheet1", "F3"),
+        hyperlink_copy.copy_cells_from(
+            hyperlink_donor.workbook_ref(),
+            "Sheet1",
+            "A1",
+            "Sheet1",
+            "F3"
+        ),
         Err(Error::Unsupported { .. })
     ));
 
@@ -269,7 +283,7 @@ fn cross_workbook_scalar_copy_refuses_dependencies_and_occupied_targets_atomical
         let hostile_donor = workbook_with_sheet_xml(sheet, None);
         let mut hostile_copy = target.edit().unwrap();
         let result =
-            hostile_copy.copy_cells_from(&hostile_donor, "Sheet1", "A1", "Sheet1", "F3");
+            hostile_copy.copy_cells_from(hostile_donor.workbook_ref(), "Sheet1", "A1", "Sheet1", "F3");
         assert!(
             matches!(&result, Err(Error::Unsupported { .. })),
             "hostile worksheet fixture {index} returned {result:?}"
@@ -277,7 +291,7 @@ fn cross_workbook_scalar_copy_refuses_dependencies_and_occupied_targets_atomical
     }
 
     let merged_donor = {
-        let mut edit = Workbook::new().unwrap().edit().unwrap();
+        let mut edit = litchi_xlsx::Package::new().unwrap().edit().unwrap();
         edit.sheet("Sheet1")
             .unwrap()
             .unwrap()
@@ -285,18 +299,18 @@ fn cross_workbook_scalar_copy_refuses_dependencies_and_occupied_targets_atomical
             .unwrap()
             .set("A1", 1_i32)
             .unwrap();
-        edit.commit().unwrap().into_workbook()
+        edit.commit().unwrap().into_package()
     };
     let mut merged_copy = target.edit().unwrap();
     assert!(matches!(
-        merged_copy.copy_cells_from(&merged_donor, "Sheet1", "A1", "Sheet1", "F3"),
+        merged_copy.copy_cells_from(merged_donor.workbook_ref(), "Sheet1", "A1", "Sheet1", "F3"),
         Err(Error::Unsupported { .. })
     ));
 }
 
 #[test]
 fn cross_workbook_scalar_copy_refuses_formula_owned_ranges_beyond_selected_cells() {
-    let target = Workbook::new().unwrap();
+    let target = litchi_xlsx::Package::new().unwrap();
     let scalar_donor = workbook_with_scalar_values();
 
     let source_fixtures = [
@@ -307,7 +321,7 @@ fn cross_workbook_scalar_copy_refuses_formula_owned_ranges_beyond_selected_cells
     for (index, source_xml) in source_fixtures.into_iter().enumerate() {
         let donor = workbook_with_sheet_xml(source_xml, None);
         let mut edit = target.edit().unwrap();
-        let result = edit.copy_cells_from(&donor, "Sheet1", "B1", "Sheet1", "F3");
+        let result = edit.copy_cells_from(donor.workbook_ref(), "Sheet1", "B1", "Sheet1", "F3");
         assert!(
             matches!(&result, Err(Error::Unsupported { .. })),
             "source formula-owned fixture {index} returned {result:?}"
@@ -319,14 +333,15 @@ fn cross_workbook_scalar_copy_refuses_formula_owned_ranges_beyond_selected_cells
         None,
     );
     let mut target_edit = target_array.edit().unwrap();
-    let result = target_edit.copy_cells_from(&scalar_donor, "Sheet1", "A1", "Sheet1", "B1");
+    let result =
+        target_edit.copy_cells_from(scalar_donor.workbook_ref(), "Sheet1", "A1", "Sheet1", "B1");
     assert!(matches!(result, Err(Error::Unsupported { .. })));
 }
 
 #[test]
 fn same_workbook_copy_from_delegates_to_existing_transfer_semantics() {
-    let workbook = Workbook::new().unwrap();
-    let style = workbook.styles().unwrap().base().unwrap();
+    let workbook = litchi_xlsx::Package::new().unwrap();
+    let style = workbook.workbook_ref().styles().unwrap().base().unwrap();
     let mut prepare = workbook.edit().unwrap();
     prepare
         .sheet("Sheet1")
@@ -336,15 +351,15 @@ fn same_workbook_copy_from_delegates_to_existing_transfer_semantics() {
         .unwrap()
         .style("A1", &style)
         .unwrap();
-    let prepared = prepare.commit().unwrap().into_workbook();
+    let prepared = prepare.commit().unwrap().into_package();
 
     let mut edit = prepared.edit().unwrap();
-    edit.copy_cells_from(&prepared, "Sheet1", "A1", "Sheet1", "D4")
+    edit.copy_cells_from(prepared.workbook_ref(), "Sheet1", "A1", "Sheet1", "D4")
         .unwrap();
-    let copied = edit.commit().unwrap().into_workbook();
+    let copied = edit.commit().unwrap().into_package();
     assert!(matches!(
         copied
-            .sheet("Sheet1")
+            .workbook_ref().sheet("Sheet1")
             .unwrap()
             .unwrap()
             .cell("D4")
@@ -357,19 +372,20 @@ fn same_workbook_copy_from_delegates_to_existing_transfer_semantics() {
 #[test]
 fn cross_workbook_scalar_copies_join_when_targets_are_disjoint_and_conflict_when_overlapping() {
     let donor = workbook_with_scalar_values();
-    let target = Workbook::new().unwrap();
+    let target = litchi_xlsx::Package::new().unwrap();
 
     let mut left = target.edit().unwrap();
-    left.copy_cells_from(&donor, "Sheet1", "A1", "Sheet1", "F3")
+    left.copy_cells_from(donor.workbook_ref(), "Sheet1", "A1", "Sheet1", "F3")
         .unwrap();
     let mut right = target.edit().unwrap();
     right
-        .copy_cells_from(&donor, "Sheet1", "B1", "Sheet1", "H3")
+        .copy_cells_from(donor.workbook_ref(), "Sheet1", "B1", "Sheet1", "H3")
         .unwrap();
     left.join(right).unwrap();
-    let joined = left.commit().unwrap().into_workbook();
+    let joined = left.commit().unwrap().into_package();
     assert!(
         joined
+            .workbook_ref()
             .sheet("Sheet1")
             .unwrap()
             .unwrap()
@@ -380,6 +396,7 @@ fn cross_workbook_scalar_copies_join_when_targets_are_disjoint_and_conflict_when
     );
     assert!(
         joined
+            .workbook_ref()
             .sheet("Sheet1")
             .unwrap()
             .unwrap()
@@ -391,11 +408,11 @@ fn cross_workbook_scalar_copies_join_when_targets_are_disjoint_and_conflict_when
 
     let mut conflict_left = target.edit().unwrap();
     conflict_left
-        .copy_cells_from(&donor, "Sheet1", "A1", "Sheet1", "F3")
+        .copy_cells_from(donor.workbook_ref(), "Sheet1", "A1", "Sheet1", "F3")
         .unwrap();
     let mut conflict_right = target.edit().unwrap();
     conflict_right
-        .copy_cells_from(&donor, "Sheet1", "C1", "Sheet1", "F3")
+        .copy_cells_from(donor.workbook_ref(), "Sheet1", "C1", "Sheet1", "F3")
         .unwrap();
     assert!(conflict_left.join(conflict_right).is_err());
 }

@@ -30,7 +30,7 @@ use litchi_xlsx::form_control::{
 };
 use litchi_xlsx::{
     Change, Conflict, Error, JoinFailure, MergeChoice, MergeLimits, PackageChange,
-    SourceBackedWorkbook, Workbook,
+    SourceBackedWorkbook,
 };
 use serde_json::Value;
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
@@ -350,8 +350,12 @@ fn local_design_fixture_provenance_and_baseline_owner_views_are_stable() {
     ] {
         let source = fixture_bytes(name);
         assert_local_provenance(name, &source);
-        let workbook = Workbook::from_bytes(source.clone()).expect("eager fixture owner");
-        let sheet = workbook.sheet(0).expect("sheet lookup").expect("sheet");
+        let workbook = litchi_xlsx::Package::from_bytes(&source).expect("eager fixture owner");
+        let sheet = workbook
+            .workbook_ref()
+            .sheet(0)
+            .expect("sheet lookup")
+            .expect("sheet");
         assert!(!sheet.form_controls().expect("form controls").is_empty());
         let source_workbook =
             SourceBackedWorkbook::from_reader(Cursor::new(source)).expect("source owner");
@@ -484,8 +488,9 @@ fn source_scalar_changes_properties_and_vml_as_one_write_set() {
             .any(|window| window == b"<x:Checked>1</x:Checked>")
     );
 
-    let reopened = Workbook::from_bytes(output).expect("reopen changed scalar");
+    let reopened = litchi_xlsx::Package::from_bytes(&output).expect("reopen changed scalar");
     let control = reopened
+        .workbook_ref()
         .sheet(0)
         .expect("sheet")
         .expect("worksheet")
@@ -742,9 +747,11 @@ fn source_scalar_ignores_foreign_namespace_client_data_before_real_owner() {
             .any(|window| window == b"<x:Checked>0</x:Checked>"),
         "real x:ClientData was not updated"
     );
-    let reopened = Workbook::from_bytes(output).expect("reopen foreign ClientData source");
+    let reopened =
+        litchi_xlsx::Package::from_bytes(&output).expect("reopen foreign ClientData source");
     assert_eq!(
         reopened
+            .workbook_ref()
             .sheet("Sheet1")
             .expect("reopened sheet lookup")
             .expect("reopened worksheet")
@@ -853,9 +860,11 @@ fn source_scalar_resolves_xml_escaped_vml_shape_id() {
             .any(|window| window == b"<x:Checked>0</x:Checked>"),
         "escaped shape id target was not updated"
     );
-    let reopened = Workbook::from_bytes(output).expect("reopen escaped-shape-id source");
+    let reopened =
+        litchi_xlsx::Package::from_bytes(&output).expect("reopen escaped-shape-id source");
     assert_eq!(
         reopened
+            .workbook_ref()
             .sheet("Sheet1")
             .expect("reopened escaped-id sheet lookup")
             .expect("reopened escaped-id worksheet")
@@ -1070,7 +1079,7 @@ fn source_scalar_multi_control_batches_refuse_mixed_targets_atomically() {
 #[test]
 fn ordinary_worksheet_edit_publishes_the_same_paired_scalar_closure() {
     let source = fixture_bytes("singlecontrol.xlsx");
-    let base = Workbook::from_bytes(source.clone()).expect("open ordinary workbook");
+    let base = litchi_xlsx::Package::from_bytes(&source).expect("open ordinary workbook");
     let mut edit = base.edit().expect("begin ordinary workbook edit");
     {
         let mut sheet = edit
@@ -1092,7 +1101,7 @@ fn ordinary_worksheet_edit_publishes_the_same_paired_scalar_closure() {
     }
     let commit = edit.commit().expect("commit ordinary paired scalar");
     let output = commit
-        .into_workbook()
+        .into_package()
         .to_plain_bytes()
         .expect("write ordinary workbook");
     assert_only_members_changed(&source, &output, &[CONTROL_PROPERTIES_MEMBER, VML_MEMBER]);
@@ -1174,8 +1183,10 @@ fn source_scalar_composes_two_fields_on_one_control_without_losing_the_first_ove
             .any(|window| window == b"<x:NoThreeD>False</x:NoThreeD>")
     );
 
-    let reopened = Workbook::from_bytes(output).expect("reopen mixed scalar composition");
+    let reopened =
+        litchi_xlsx::Package::from_bytes(&output).expect("reopen mixed scalar composition");
     let reopened_control = reopened
+        .workbook_ref()
         .sheet(0)
         .expect("reopened sheet lookup")
         .expect("reopened worksheet")
@@ -1560,7 +1571,7 @@ fn empty_patch_still_checks_the_complete_source_read_set() {
 
 #[test]
 fn ordinary_form_control_scalar_noops_have_empty_patches() {
-    let base = Workbook::from_bytes(fixture_bytes("singlecontrol.xlsx"))
+    let base = litchi_xlsx::Package::from_bytes(&fixture_bytes("singlecontrol.xlsx"))
         .expect("open ordinary form-control workbook");
     let base_bytes = base.to_plain_bytes().expect("serialize ordinary base");
 
@@ -1575,11 +1586,11 @@ fn ordinary_form_control_scalar_noops_have_empty_patches() {
         )
         .expect("stage authored same-value scalar");
     let same_commit = same.commit().expect("commit authored same-value scalar");
-    assert!(same_commit.patch().is_empty());
-    assert_eq!(same_commit.patch().len(), 0);
+    assert!(same_commit.patch().is_noop());
+    assert_eq!(same_commit.patch().operation_count(), 0);
     assert_eq!(
         same_commit
-            .into_workbook()
+            .into_package()
             .to_plain_bytes()
             .expect("serialize same-value result"),
         base_bytes
@@ -1607,11 +1618,11 @@ fn ordinary_form_control_scalar_noops_have_empty_patches() {
         )
         .expect("restore original scalar");
     let restored_commit = restored.commit().expect("commit restored scalar");
-    assert!(restored_commit.patch().is_empty());
-    assert_eq!(restored_commit.patch().len(), 0);
+    assert!(restored_commit.patch().is_noop());
+    assert_eq!(restored_commit.patch().operation_count(), 0);
     assert_eq!(
         restored_commit
-            .into_workbook()
+            .into_package()
             .to_plain_bytes()
             .expect("serialize restored result"),
         base_bytes
@@ -1626,8 +1637,9 @@ fn inverse_patch_reopens_to_the_original_scalar_state() {
         ScalarField::Checked,
         checked_scalar(Checked::Unchecked),
     );
-    let forward_control = Workbook::from_bytes(forward)
+    let forward_control = litchi_xlsx::Package::from_bytes(&forward)
         .expect("reopen forward pair")
+        .workbook_ref()
         .sheet(0)
         .expect("forward sheet")
         .expect("forward worksheet")
@@ -1752,7 +1764,7 @@ fn scalar_resource_limits_fail_before_any_pair_is_published() {
 
 #[test]
 fn ordinary_form_control_join_rejects_name_and_position_aliases_without_losing_either_edit() {
-    let base = Workbook::from_bytes(fixture_bytes("singlecontrol.xlsx"))
+    let base = litchi_xlsx::Package::from_bytes(&fixture_bytes("singlecontrol.xlsx"))
         .expect("open ordinary form-control workbook");
     let mut by_position = base.edit().expect("begin position edit");
     by_position
@@ -1806,7 +1818,7 @@ fn ordinary_form_control_join_rejects_name_and_position_aliases_without_losing_e
         .commit()
         .expect("commit recovered rejected branch");
     for commit in [&left_commit, &right_commit] {
-        assert!(!commit.patch().is_empty());
+        assert!(!commit.patch().is_noop());
         assert_eq!(
             commit.patch().changes().len(),
             0,
@@ -1821,7 +1833,7 @@ fn ordinary_form_control_join_rejects_name_and_position_aliases_without_losing_e
             }] if sheet.as_ref() == "Sheet1"
         ));
         assert_eq!(
-            commit.patch().len(),
+            commit.patch().operation_count(),
             1,
             "form-control package change was omitted from Patch::len"
         );
@@ -1830,7 +1842,7 @@ fn ordinary_form_control_join_rejects_name_and_position_aliases_without_losing_e
 
 #[test]
 fn ordinary_form_control_three_way_plan_conflicts_across_selector_aliases_and_resolves() {
-    let base = Workbook::from_bytes(fixture_bytes("singlecontrol.xlsx"))
+    let base = litchi_xlsx::Package::from_bytes(&fixture_bytes("singlecontrol.xlsx"))
         .expect("open ordinary form-control workbook");
     let mut left = base.edit().expect("begin left form-control edit");
     left.sheet("Sheet1")
@@ -1876,9 +1888,10 @@ fn ordinary_form_control_three_way_plan_conflicts_across_selector_aliases_and_re
         .expect("resolve aliased form-control plan")
         .commit()
         .expect("commit resolved form-control plan")
-        .into_workbook();
+        .into_package();
     assert_eq!(
         merged
+            .workbook_ref()
             .sheet("Sheet1")
             .expect("merged sheet lookup")
             .expect("merged worksheet")
@@ -1895,7 +1908,7 @@ fn ordinary_form_control_three_way_plan_conflicts_across_selector_aliases_and_re
 
 #[test]
 fn ordinary_form_control_and_cell_edits_join_on_the_same_sheet() {
-    let base = Workbook::from_bytes(fixture_bytes("singlecontrol.xlsx"))
+    let base = litchi_xlsx::Package::from_bytes(&fixture_bytes("singlecontrol.xlsx"))
         .expect("open ordinary form-control workbook");
     let mut control_edit = base.edit().expect("begin form-control edit");
     control_edit
@@ -1924,15 +1937,15 @@ fn ordinary_form_control_and_cell_edits_join_on_the_same_sheet() {
         .expect("commit joined control and cell edits");
     assert_eq!(commit.patch().changes().len(), 1);
     assert!(matches!(commit.patch().changes(), [Change::Cell { .. }]));
-    assert!(!commit.patch().is_empty());
+    assert!(!commit.patch().is_noop());
     let output = commit
-        .into_workbook()
+        .into_package()
         .to_plain_bytes()
         .expect("write joined workbook");
-    let reopened = Workbook::from_bytes(output).expect("reopen joined workbook");
+    let reopened = litchi_xlsx::Package::from_bytes(&output).expect("reopen joined workbook");
     assert!(matches!(
         reopened
-            .sheet("Sheet1")
+            .workbook_ref().sheet("Sheet1")
             .expect("reopened sheet lookup")
             .expect("reopened worksheet")
             .cell("A1")
@@ -1944,6 +1957,7 @@ fn ordinary_form_control_and_cell_edits_join_on_the_same_sheet() {
     ));
     assert_eq!(
         reopened
+            .workbook_ref()
             .sheet("Sheet1")
             .expect("reopened control sheet lookup")
             .expect("reopened control worksheet")
@@ -1960,7 +1974,7 @@ fn ordinary_form_control_and_cell_edits_join_on_the_same_sheet() {
 
 #[test]
 fn ordinary_form_control_patch_replays_forward_and_inverse_with_lineage_guards() {
-    let base = Workbook::from_bytes(fixture_bytes("singlecontrol.xlsx"))
+    let base = litchi_xlsx::Package::from_bytes(&fixture_bytes("singlecontrol.xlsx"))
         .expect("open ordinary form-control workbook");
     let mut edit = base.edit().expect("begin ordinary form-control edit");
     edit.sheet("Sheet1")
@@ -1974,14 +1988,15 @@ fn ordinary_form_control_patch_replays_forward_and_inverse_with_lineage_guards()
         .expect("stage ordinary form-control scalar");
     let commit = edit.commit().expect("commit ordinary form-control scalar");
     assert_eq!(commit.patch().package_changes().len(), 1);
-    assert!(!commit.patch().is_empty());
+    assert!(!commit.patch().is_noop());
 
     let applied = base
         .apply(commit.patch())
         .expect("replay ordinary forward patch")
-        .into_workbook();
+        .into_package();
     assert_eq!(
         applied
+            .workbook_ref()
             .sheet("Sheet1")
             .expect("applied sheet lookup")
             .expect("applied worksheet")
@@ -1996,10 +2011,10 @@ fn ordinary_form_control_patch_replays_forward_and_inverse_with_lineage_guards()
     );
 
     let restored = commit
-        .workbook()
+        .package()
         .apply(&commit.patch().inverse())
         .expect("replay ordinary inverse patch from committed target")
-        .into_workbook();
+        .into_package();
     assert_eq!(
         restored
             .to_plain_bytes()
@@ -2007,9 +2022,9 @@ fn ordinary_form_control_patch_replays_forward_and_inverse_with_lineage_guards()
         base.to_plain_bytes().expect("serialize base workbook")
     );
 
-    let reopened_target = Workbook::from_bytes(
-        commit
-            .workbook()
+    let reopened_target = litchi_xlsx::Package::from_bytes(
+        &commit
+            .package()
             .to_plain_bytes()
             .expect("serialize committed target"),
     )
@@ -2025,7 +2040,7 @@ fn ordinary_form_control_patch_replays_forward_and_inverse_with_lineage_guards()
 
 #[test]
 fn ordinary_form_control_durable_patch_replays_forward_and_inverse() {
-    let base = Workbook::from_bytes(fixture_bytes("singlecontrol.xlsx"))
+    let base = litchi_xlsx::Package::from_bytes(&fixture_bytes("singlecontrol.xlsx"))
         .expect("open ordinary form-control workbook");
     let mut edit = base.edit().expect("begin ordinary form-control edit");
     edit.sheet("Sheet1")

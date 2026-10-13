@@ -205,10 +205,8 @@ fn create_xlsx_is_eager_deterministic_and_reopens() {
 #[test]
 fn source_and_eager_write_to_match_and_preserve_opaque_members() {
     let bytes = fixture();
-    let native_bytes = litchi_xlsx::Package::from_bytes(bytes.clone())
+    let native_bytes = litchi_xlsx::Package::from_bytes(&bytes)
         .expect("open fixture through the native XLSX package")
-        .into_workbook()
-        .expect("materialize fixture through the native XLSX workbook")
         .to_bytes()
         .expect("serialize fixture through the native XLSX workbook");
     let mut outputs = Vec::new();
@@ -497,10 +495,8 @@ fn signed_xlsx_save_preserves_signature_and_explicit_unsign_removes_it() {
 #[test]
 fn encrypted_xlsx_save_requires_reencryption_and_round_trips() {
     let password = "xlsx-save-password";
-    let encrypted = litchi_xlsx::Package::from_bytes(fixture())
+    let encrypted = litchi_xlsx::Package::from_bytes(&fixture())
         .expect("open clear XLSX through the native package")
-        .into_workbook()
-        .expect("materialize native XLSX workbook")
         .to_encrypted(password, litchi_xlsx::encryption::Mode::Agile)
         .expect("encrypt XLSX fixture through the native workbook API");
     let directory = tempfile::tempdir().expect("encrypted save directory");
@@ -653,7 +649,7 @@ fn prepared_eager_open_retains_the_exact_source_archive() {
 #[test]
 fn signed_encrypted_xlsx_capabilities_keep_output_protection() {
     use litchi_ops::capabilities::{Support, Verb};
-    let encrypted = litchi_xlsx::Workbook::from_bytes(signed_fixture())
+    let encrypted = litchi_xlsx::Package::from_bytes(&signed_fixture())
         .unwrap()
         .to_encrypted("protected", litchi_xlsx::encryption::Mode::Agile)
         .unwrap();

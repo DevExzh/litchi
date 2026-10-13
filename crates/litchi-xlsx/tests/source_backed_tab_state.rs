@@ -17,9 +17,7 @@ use litchi_opc::{
     BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, SourceCacheLimits, TargetMode,
 };
 use litchi_xlsx::tab_state::{Commit, SourceBackedEditor};
-use litchi_xlsx::{
-    Error, Package, SourceBackedWorkbook, SourceLimits, Visibility, Workbook, WorksheetKind,
-};
+use litchi_xlsx::{Error, Package, SourceBackedWorkbook, SourceLimits, Visibility, WorksheetKind};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
 const TRANSITIONAL: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
@@ -339,19 +337,29 @@ fn visibility_operations_use_one_part_and_preserve_every_unrelated_member() {
             assert_eq!(actual.blob(), part.blob());
         }
     }
-    let workbook = Package::from_bytes(output)
-        .unwrap()
-        .into_workbook()
-        .unwrap();
+    let workbook = Package::from_bytes(&output).unwrap();
     assert_eq!(
-        workbook.sheet("Two").unwrap().unwrap().visibility(),
+        workbook
+            .workbook_ref()
+            .sheet("Two")
+            .unwrap()
+            .unwrap()
+            .visibility(),
         &Visibility::Visible
     );
     assert_eq!(
-        workbook.sheet("Three").unwrap().unwrap().visibility(),
+        workbook
+            .workbook_ref()
+            .sheet("Three")
+            .unwrap()
+            .unwrap()
+            .visibility(),
         &Visibility::VeryHidden
     );
-    assert_eq!(workbook.active_sheet().unwrap().name(), "One");
+    assert_eq!(
+        workbook.workbook_ref().active_sheet().unwrap().name(),
+        "One"
+    );
 }
 
 #[test]
@@ -402,11 +410,11 @@ fn activation_and_implicit_relocation_use_three_parts_and_are_reversible() {
         editor
             .publish_commit_to_stream(&mut output, &commit)
             .unwrap();
-        let published = Package::from_bytes(output.clone())
-            .unwrap()
-            .into_workbook()
-            .unwrap();
-        assert_eq!(published.active_sheet().unwrap().name(), "Three");
+        let published = Package::from_bytes(&output).unwrap();
+        assert_eq!(
+            published.workbook_ref().active_sheet().unwrap().name(),
+            "Three"
+        );
         let output = OpcPackage::from_bytes(&output).unwrap();
         for name in [TWO, MEDIA] {
             let uri = PackURI::new(name).unwrap();
@@ -432,10 +440,10 @@ fn strict_dialog_sheet_kind_matches_eager_and_source_catalogs() {
         three_kind: Some((STRICT_DIALOG_REL, "application/xml", "dialogsheet")),
         ..Fixture::default()
     });
-    let eager = Workbook::from_bytes(bytes.clone()).unwrap();
+    let eager = Package::from_bytes(&bytes).unwrap();
     let source = SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
 
-    let eager_sheet = eager.sheet("Three").unwrap().unwrap();
+    let eager_sheet = eager.workbook_ref().sheet("Three").unwrap().unwrap();
     let source_sheet = source.sheet("Three").unwrap().unwrap();
     assert_eq!(eager_sheet.kind(), WorksheetKind::Dialog);
     assert_eq!(source_sheet.kind(), eager_sheet.kind());
@@ -859,12 +867,14 @@ fn managed_workbook_payload_is_budgeted_streamed_and_released() {
         .publish_commit_to_stream(&mut output, &commit)
         .unwrap();
     assert_eq!(published.tabs()[1].visibility(), &Visibility::Visible);
-    let reopened = Package::from_bytes(output)
-        .unwrap()
-        .into_workbook()
-        .unwrap();
+    let reopened = Package::from_bytes(&output).unwrap();
     assert_eq!(
-        reopened.sheet("Two").unwrap().unwrap().visibility(),
+        reopened
+            .workbook_ref()
+            .sheet("Two")
+            .unwrap()
+            .unwrap()
+            .visibility(),
         &Visibility::Visible
     );
     drop(commit);

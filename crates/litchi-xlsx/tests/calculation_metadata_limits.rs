@@ -35,7 +35,7 @@ fn nested_workbook(depth: usize) -> Vec<u8> {
 }
 
 fn package() -> OpcPackage {
-    Package::create().expect("create package").into_plain_opc()
+    Package::new().expect("create package").into_plain_opc()
 }
 
 fn source(package: &OpcPackage) -> Arc<Vec<u8>> {

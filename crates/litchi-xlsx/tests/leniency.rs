@@ -14,7 +14,7 @@
 
 use std::io::Cursor;
 
-use litchi_xlsx::{Defect, SourceBackedWorkbook, ToleranceLocation, ToleranceReport, Workbook};
+use litchi_xlsx::{Defect, SourceBackedWorkbook, ToleranceLocation, ToleranceReport};
 use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
 
 const BASE: &[u8] = include_bytes!("../../../test-data/ooxml/xlsx/DateFormatTests.xlsx");
@@ -50,11 +50,11 @@ fn replace(from: &'static str, to: &'static str) -> impl Fn(&str) -> String {
 /// Open through the owned facade, parse every worksheet, and return the
 /// aggregate report.
 fn owned_report(bytes: &[u8]) -> ToleranceReport {
-    let workbook = Workbook::from_slice(bytes).expect("owned open");
-    for sheet in workbook.sheets() {
+    let workbook = litchi_xlsx::Package::from_bytes(bytes).expect("owned open");
+    for sheet in workbook.workbook_ref().sheets() {
         sheet.tolerance_report().expect("owned worksheet parse");
     }
-    workbook.tolerance_report()
+    workbook.workbook_ref().tolerance_report()
 }
 
 /// Open through the source-backed facade, parse every worksheet, and return
@@ -78,8 +78,8 @@ fn both_reports(bytes: &[u8]) -> ToleranceReport {
 #[test]
 fn the_conformant_base_reports_clean_on_every_path() {
     assert!(both_reports(BASE).is_clean());
-    let package = litchi_xlsx::Package::from_slice(BASE).unwrap();
-    assert!(package.workbook().unwrap().tolerance_report().is_clean());
+    let package = litchi_xlsx::Package::from_bytes(BASE).unwrap();
+    assert!(package.workbook().tolerance_report().is_clean());
 }
 
 #[test]
@@ -110,8 +110,8 @@ fn duplicate_relationship_id_is_folded_into_the_workbook_report() {
         }
     );
 
-    let package = litchi_xlsx::Package::from_slice(&bytes).unwrap();
-    assert_eq!(package.workbook().unwrap().tolerance_report(), report);
+    let package = litchi_xlsx::Package::from_bytes(&bytes).unwrap();
+    assert_eq!(package.workbook().tolerance_report(), report);
 }
 
 #[test]
@@ -141,11 +141,11 @@ fn duplicate_content_type_default_is_folded_into_the_workbook_report() {
 fn package_framing_stays_fatal() {
     let mut truncated = BASE.to_vec();
     truncated.truncate(BASE.len() / 2);
-    assert!(Workbook::from_slice(&truncated).is_err());
+    assert!(litchi_xlsx::Package::from_bytes(&truncated).is_err());
     assert!(SourceBackedWorkbook::from_reader(Cursor::new(truncated)).is_err());
 
     let malformed = patched(&[("_rels/.rels", &replace("</Relationships>", ""))]);
-    assert!(Workbook::from_slice(&malformed).is_err());
+    assert!(litchi_xlsx::Package::from_bytes(&malformed).is_err());
     assert!(SourceBackedWorkbook::from_reader(Cursor::new(malformed)).is_err());
 }
 
@@ -163,7 +163,10 @@ fn core_properties_repairs_fold_through_the_public_hand_off() {
     litchi_ooxml_common::properties::read_with_report(&opc, &mut metadata).unwrap();
     assert!(!metadata.is_clean());
 
-    let mut report = Workbook::from_slice(&bytes).unwrap().tolerance_report();
+    let mut report = litchi_xlsx::Package::from_bytes(&bytes)
+        .unwrap()
+        .workbook_ref()
+        .tolerance_report();
     assert!(report.is_clean());
     report.append_properties(&metadata);
     assert_eq!(report.total(), metadata.total());
@@ -225,8 +228,8 @@ fn out_of_domain_geometry_is_clamped_and_recorded() {
         ]
     );
 
-    let workbook = Workbook::from_slice(&bytes).unwrap();
-    let sheet = workbook.sheet(0usize).unwrap().unwrap();
+    let workbook = litchi_xlsx::Package::from_bytes(&bytes).unwrap();
+    let sheet = workbook.workbook_ref().sheet(0usize).unwrap().unwrap();
     assert_eq!(sheet.row(0).unwrap().height().map(|h| h.get()), Some(409.0));
     assert_eq!(sheet.column(1).unwrap().width(), None);
     assert_eq!(sheet.defaults().unwrap().unwrap().height().get(), 15.0);
@@ -284,8 +287,8 @@ fn malformed_value_lexicals_are_repaired_per_cell_and_recorded() {
         ]
     );
 
-    let workbook = Workbook::from_slice(&bytes).unwrap();
-    let flags = workbook.sheet(0usize).unwrap().unwrap();
+    let workbook = litchi_xlsx::Package::from_bytes(&bytes).unwrap();
+    let flags = workbook.workbook_ref().sheet(0usize).unwrap().unwrap();
     assert!(matches!(
         flags.cell("B3").unwrap(),
         litchi_xlsx::cell::View::Stored(Cell::Value(Value::Bool(true)))
@@ -391,9 +394,13 @@ fn stale_active_tab_and_local_sheet_id_are_repaired_at_open() {
         ]
     );
 
-    let workbook = Workbook::from_slice(&bytes).unwrap();
-    assert_eq!(workbook.active_sheet().unwrap().name(), "Flags");
+    let workbook = litchi_xlsx::Package::from_bytes(&bytes).unwrap();
+    assert_eq!(
+        workbook.workbook_ref().active_sheet().unwrap().name(),
+        "Flags"
+    );
     let names = workbook
+        .workbook_ref()
         .defined_names()
         .iter()
         .map(|name| name.name.as_str())
@@ -419,25 +426,37 @@ fn sheet_name_authoring_rules_are_tolerated_only_when_opted_in() {
         ),
     )]);
 
-    assert!(Workbook::from_slice(&bytes).is_err());
+    assert!(litchi_xlsx::Package::from_bytes(&bytes).is_err());
     assert!(SourceBackedWorkbook::from_reader(Cursor::new(bytes.clone())).is_err());
 
     let lenient = Leniency::TolerateSheetNameRules;
-    let workbook = Workbook::from_slice_with_leniency(&bytes, lenient).unwrap();
+    let workbook = litchi_xlsx::Package::from_bytes_with_options(
+        &bytes,
+        litchi_xlsx::OpenOptions::new().leniency(lenient),
+    )
+    .unwrap();
     let source =
         SourceBackedWorkbook::from_reader_with_leniency(Cursor::new(bytes.clone()), lenient)
             .unwrap();
     assert_eq!(workbook.leniency(), lenient);
-    assert_eq!(workbook.sheet(0usize).unwrap().unwrap().name(), NAME);
+    assert_eq!(
+        workbook
+            .workbook_ref()
+            .sheet(0usize)
+            .unwrap()
+            .unwrap()
+            .name(),
+        NAME
+    );
     assert_eq!(source.sheet(0usize).unwrap().unwrap().name(), NAME);
-    assert!(workbook.sheet(NAME).unwrap().is_some());
-    for sheet in workbook.sheets() {
+    assert!(workbook.workbook_ref().sheet(NAME).unwrap().is_some());
+    for sheet in workbook.workbook_ref().sheets() {
         sheet.tolerance_report().unwrap();
     }
     for sheet in source.sheets() {
         sheet.tolerance_report().unwrap();
     }
-    let report = workbook.tolerance_report();
+    let report = workbook.workbook_ref().tolerance_report();
     assert_eq!(report, source.tolerance_report());
     assert_eq!(
         worksheet_entries(&report),
@@ -451,16 +470,26 @@ fn sheet_name_authoring_rules_are_tolerated_only_when_opted_in() {
     // The opt-in admits only authoring-rule violations: a conformant
     // workbook reports clean, and an empty name stays fatal.
     assert!(
-        Workbook::from_slice_with_leniency(BASE, lenient)
-            .unwrap()
-            .tolerance_report()
-            .is_clean()
+        litchi_xlsx::Package::from_bytes_with_options(
+            BASE,
+            litchi_xlsx::OpenOptions::new().leniency(lenient)
+        )
+        .unwrap()
+        .workbook_ref()
+        .tolerance_report()
+        .is_clean()
     );
     let empty = patched(&[(
         "xl/workbook.xml",
         &replace(r#"<sheet name="Flags""#, r#"<sheet name="""#),
     )]);
-    assert!(Workbook::from_slice_with_leniency(&empty, lenient).is_err());
+    assert!(
+        litchi_xlsx::Package::from_bytes_with_options(
+            &empty,
+            litchi_xlsx::OpenOptions::new().leniency(lenient)
+        )
+        .is_err()
+    );
     assert!(SourceBackedWorkbook::from_reader_with_leniency(Cursor::new(empty), lenient).is_err());
 }
 
@@ -550,8 +579,8 @@ fn worksheet_sequencing_and_advisory_metadata_are_repaired_and_recorded() {
         ]
     );
 
-    let workbook = Workbook::from_slice(&bytes).unwrap();
-    let flags = workbook.sheet(0usize).unwrap().unwrap();
+    let workbook = litchi_xlsx::Package::from_bytes(&bytes).unwrap();
+    let flags = workbook.workbook_ref().sheet(0usize).unwrap().unwrap();
     // The repeated row 2 merges last-wins: its earlier cells survive.
     assert!(matches!(
         flags.cell("A2").unwrap(),

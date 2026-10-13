@@ -898,13 +898,13 @@ impl Commit {
 }
 
 /// Source-bound ordinary Workbook edit.
-pub struct WorkbookTransaction {
+pub struct PackageEdit {
     source: Workbook,
     before: Snapshot,
     staged: Vec<String>,
 }
 
-impl WorkbookTransaction {
+impl PackageEdit {
     pub(crate) fn new<'selector>(
         source: &Workbook,
         cache_selector: impl Into<PivotCacheSelector>,
@@ -1013,7 +1013,7 @@ impl WorkbookTransaction {
     }
 
     /// Commit to a new immutable Workbook snapshot.
-    pub fn commit(self) -> Result<WorkbookCommit> {
+    pub fn commit(self) -> Result<PackageCommit> {
         let changed = self.is_changed();
         let source = self.source;
         let before = self.before;
@@ -1021,8 +1021,8 @@ impl WorkbookTransaction {
         if !changed {
             let workbook = source.clone();
             let low_patch = Patch::new(before.clone(), before);
-            let patch = WorkbookPatch::new(source, workbook.clone(), low_patch);
-            return Ok(WorkbookCommit::new(workbook, patch, false));
+            let patch = PackagePatch::new(source, workbook.clone(), low_patch);
+            return Ok(PackageCommit::new(workbook, patch, false));
         }
         ensure_editable(&before)?;
         let mut candidate = source.pivot_package().clone();
@@ -1031,20 +1031,20 @@ impl WorkbookTransaction {
         let changed = committed.changed();
         let low_patch = committed.patch().clone();
         let workbook = source.adopt_published_package(candidate)?;
-        let patch = WorkbookPatch::new(source, workbook.clone(), low_patch);
-        Ok(WorkbookCommit::new(workbook, patch, changed))
+        let patch = PackagePatch::new(source, workbook.clone(), low_patch);
+        Ok(PackageCommit::new(workbook, patch, changed))
     }
 }
 
 /// Exact reversible ordinary Workbook patch.
 #[derive(Clone, Debug)]
-pub struct WorkbookPatch {
+pub struct PackagePatch {
     before: Workbook,
     after: Workbook,
     source_patch: Patch,
 }
 
-impl WorkbookPatch {
+impl PackagePatch {
     fn new(before: Workbook, after: Workbook, source_patch: Patch) -> Self {
         Self {
             before,
@@ -1067,7 +1067,7 @@ impl WorkbookPatch {
 
     /// Whether the patch is a byte-exact no-op.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.source_patch.is_empty()
     }
 
@@ -1082,7 +1082,8 @@ impl WorkbookPatch {
     }
 
     /// Apply after ordinary Workbook mutation-policy and source-readset checks.
-    pub fn apply(&self, source: &Workbook) -> Result<WorkbookCommit> {
+    pub fn apply(&self, source: &crate::Package) -> Result<PackageCommit> {
+        let source = source.workbook_ref();
         source.ensure_mutation_allowed("apply_cached_unique_names_patch")?;
         let mut candidate = source.pivot_package().clone();
         let current = Snapshot::load(
@@ -1095,8 +1096,8 @@ impl WorkbookPatch {
                 part: self.source_patch.before.cache_part().to_string(),
             });
         }
-        if self.is_empty() {
-            return Ok(WorkbookCommit::new(
+        if self.is_noop() {
+            return Ok(PackageCommit::new(
                 source.clone(),
                 Self::new(source.clone(), source.clone(), self.source_patch.clone()),
                 false,
@@ -1122,7 +1123,7 @@ impl WorkbookPatch {
             ));
         }
         let workbook = source.adopt_published_package(candidate)?;
-        Ok(WorkbookCommit::new(
+        Ok(PackageCommit::new(
             workbook.clone(),
             Self::new(source.clone(), workbook, self.source_patch.clone()),
             true,
@@ -1132,25 +1133,31 @@ impl WorkbookPatch {
 
 /// Committed ordinary Workbook edit.
 #[derive(Clone, Debug)]
-pub struct WorkbookCommit {
-    workbook: Workbook,
-    patch: WorkbookPatch,
+pub struct PackageCommit {
+    package: crate::Package,
+    patch: PackagePatch,
     changed: bool,
 }
 
-impl WorkbookCommit {
-    fn new(workbook: Workbook, patch: WorkbookPatch, changed: bool) -> Self {
+impl PackageCommit {
+    fn new(workbook: Workbook, patch: PackagePatch, changed: bool) -> Self {
         Self {
-            workbook,
+            package: crate::Package::from_workbook(workbook),
             patch,
             changed,
         }
     }
 
-    /// Resulting immutable Workbook.
+    /// The published immutable package.
     #[must_use]
-    pub fn workbook(&self) -> &Workbook {
-        &self.workbook
+    pub const fn package(&self) -> &crate::Package {
+        &self.package
+    }
+
+    /// Consume the commit into its published package.
+    #[must_use]
+    pub fn into_package(self) -> crate::Package {
+        self.package
     }
 
     /// Resulting typed cache-field state.
@@ -1161,7 +1168,7 @@ impl WorkbookCommit {
 
     /// Exact reversible patch.
     #[must_use]
-    pub fn patch(&self) -> &WorkbookPatch {
+    pub fn patch(&self) -> &PackagePatch {
         &self.patch
     }
 
@@ -1204,8 +1211,8 @@ pub struct PivotCacheEditHandle {
 
 impl PivotCacheEditHandle {
     /// Resolve a field and begin its source-bound transaction.
-    pub fn field<'a>(self, selector: PivotCacheFieldSelector<'a>) -> Result<WorkbookTransaction> {
-        WorkbookTransaction::new(&self.workbook, self.selector, selector)
+    pub fn field<'a>(self, selector: PivotCacheFieldSelector<'a>) -> Result<PackageEdit> {
+        PackageEdit::new(&self.workbook, self.selector, selector)
     }
 }
 
