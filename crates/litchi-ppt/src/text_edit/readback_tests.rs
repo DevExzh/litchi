@@ -45,11 +45,21 @@ struct Tally {
     incremental_accepts: usize,
     full_accepts: usize,
     reopen_failures: usize,
+    single_proofs: usize,
 }
 
 /// The equivalence property for one candidate.
 fn check(verdicts: &DifferentialVerdicts, tally: &mut Tally, context: &str) {
     tally.cases += 1;
+    if let Some(single) = &verdicts.single {
+        // The single-commit readback returns exactly the reference result,
+        // including the error.
+        assert_eq!(
+            single.proven, single.reference,
+            "{context}: single readback"
+        );
+        tally.single_proofs += usize::from(single.used_proof);
+    }
     if !verdicts.reopened {
         tally.reopen_failures += 1;
         assert!(verdicts.incremental.is_none() && !verdicts.full_accepted);
@@ -161,24 +171,29 @@ fn genuine_publications_are_proven_incrementally() {
 fn every_byte_flip_of_the_staged_slide_keeps_verdicts_equal() {
     let mut tally = Tally::default();
     let source = deck(3);
-    let replacements = [
+    let batch: &[(Target, &str)] = &[
         (target(0, 0), "first replacement, longer"),
         (target(0, 2), "x"),
     ];
-    let clean = run(&source, &replacements, &|_, _| {}).unwrap();
-    assert!(clean.incremental.is_some());
-    // Size of the staged record, learnt from a no-op corruption probe.
-    let size = std::cell::Cell::new(0usize);
-    run(&source, &replacements, &|_, record| size.set(record.len())).unwrap();
-    for offset in 0..size.get() {
-        for mask in [0xFF_u8, 0x01, 0x80] {
-            if let Some(verdicts) = run(&source, &replacements, &|_, record| {
-                record[offset] ^= mask;
-            }) {
-                check(&verdicts, &mut tally, &format!("flip {offset} ^ {mask:#x}"));
+    // One target also runs the single-commit readback on each candidate.
+    let single: &[(Target, &str)] = &[(target(0, 1), "single replacement")];
+    for replacements in [batch, single] {
+        let clean = run(&source, replacements, &|_, _| {}).unwrap();
+        assert!(clean.incremental.is_some());
+        // Size of the staged record, learnt from a no-op corruption probe.
+        let size = std::cell::Cell::new(0usize);
+        run(&source, replacements, &|_, record| size.set(record.len())).unwrap();
+        for offset in 0..size.get() {
+            for mask in [0xFF_u8, 0x01, 0x80] {
+                if let Some(verdicts) = run(&source, replacements, &|_, record| {
+                    record[offset] ^= mask;
+                }) {
+                    check(&verdicts, &mut tally, &format!("flip {offset} ^ {mask:#x}"));
+                }
             }
         }
     }
+    assert!(tally.single_proofs > 0, "{tally:?}");
     // Some flips must be caught only by the full verifier (or by neither),
     // and some must still be proven incrementally (text bytes of the target
     // that still read back are a different text: those are refusals).
@@ -459,9 +474,267 @@ fn corpus_publications_keep_verdicts_equal() {
     // parse repaired are left to the full verifier.
     eprintln!("corpus genuine: {genuine:?}; corpus flips: {tally:?}");
     assert!(genuine.cases >= 30, "{genuine:?}");
+    assert_eq!(
+        genuine.single_proofs, genuine.incremental_accepts,
+        "{genuine:?}"
+    );
     assert!(
         genuine.incremental_accepts * 10 >= genuine.cases * 8,
         "{genuine:?}"
     );
     assert!(tally.cases > 1000, "{tally:?}");
+}
+
+/// Chunked native edits hand each publication's proven shapes to the next
+/// edit: the published package's memo holds exactly what a fresh parse of
+/// the published bytes returns, and the chain's bytes equal those of the
+/// same edits on freshly opened packages (which parse everything).
+#[test]
+fn chunked_edits_seed_exactly_what_a_fresh_parse_returns() {
+    let source = deck(120);
+    let replacements = (0..120)
+        .map(|index| {
+            crate::slide_order::ShapeTextReplacement::new(
+                target(0, index),
+                format!("chunked replacement {index} of another length"),
+            )
+        })
+        .collect::<Vec<_>>();
+    let options = crate::package::edit::EditOptions::new()
+        .max_operations(50)
+        .unwrap();
+    let mut chained = crate::Package::from_bytes(&source).unwrap();
+    let mut fresh = crate::Package::from_bytes(&source).unwrap();
+    for operations in replacements.chunks(50) {
+        let chunks = operations.chunks(16).collect::<Vec<_>>();
+        let mut edit = chained.edit_with_options(options).unwrap();
+        edit.set_shape_text_chunks(&chunks).unwrap();
+        chained = edit.commit().unwrap().into_package();
+        let mut edit = fresh.edit_with_options(options).unwrap();
+        edit.set_shape_text_chunks(&chunks).unwrap();
+        let bytes = edit.commit().unwrap().into_package().to_bytes().unwrap();
+        fresh = crate::Package::from_bytes(&bytes).unwrap();
+
+        assert_eq!(chained.to_bytes().unwrap(), bytes);
+        let presentation = chained.presentation().unwrap();
+        let persist_id = presentation.slide_at(0).unwrap().unwrap().persist_id();
+        assert!(presentation.inner.shape_memo.holds(persist_id));
+        let seeded = format!(
+            "{:?}",
+            presentation.slide_at(0).unwrap().unwrap().shapes().unwrap()
+        );
+        let reparsed = crate::Package::from_bytes(&bytes).unwrap();
+        let reparsed = reparsed.presentation().unwrap();
+        assert!(!reparsed.inner.shape_memo.holds(persist_id));
+        let parsed = format!(
+            "{:?}",
+            reparsed.slide_at(0).unwrap().unwrap().shapes().unwrap()
+        );
+        assert_eq!(seeded, parsed);
+    }
+}
+
+/// Sequential single-shape edits hand their proven shapes on as well.
+#[test]
+fn sequential_single_edits_seed_exactly_what_a_fresh_parse_returns() {
+    let source = deck(30);
+    let mut package = crate::Package::from_bytes(&source).unwrap();
+    for (step, shape) in [3usize, 17, 3, 29].into_iter().enumerate() {
+        let mut edit = package.edit().unwrap();
+        edit.set_shape_text(
+            target(0, shape),
+            format!("single edit {step} of shape {shape}"),
+        )
+        .unwrap();
+        package = edit.commit().unwrap().into_package();
+        let presentation = package.presentation().unwrap();
+        let persist_id = presentation.slide_at(0).unwrap().unwrap().persist_id();
+        assert!(presentation.inner.shape_memo.holds(persist_id));
+        let seeded = format!(
+            "{:?}",
+            presentation.slide_at(0).unwrap().unwrap().shapes().unwrap()
+        );
+        let reparsed = crate::Package::from_bytes(&package.to_bytes().unwrap()).unwrap();
+        let parsed = format!(
+            "{:?}",
+            reparsed
+                .presentation()
+                .unwrap()
+                .slide_at(0)
+                .unwrap()
+                .unwrap()
+                .shapes()
+                .unwrap()
+        );
+        assert_eq!(seeded, parsed, "step {step}");
+    }
+}
+
+/// The per-record rebuild that the single-buffer drawing rewrites replaced
+/// (record 0264), kept as the byte and error oracle.
+fn reference_rewrite(
+    record: &[u8],
+    shape_id: u32,
+    kind: super::TextKind,
+    before: &[u8],
+    after: &[u8],
+    depth: usize,
+    matches: &mut usize,
+) -> super::Result<Vec<u8>> {
+    use super::{
+        Error, OFFICEART_SP_CONTAINER, PackageError, children, drawing_payload, rebuild,
+        record_type, record_version, rewrite_shape_container, shape_id_of,
+    };
+    if depth >= 128 {
+        return Err(
+            PackageError::Corrupted("OfficeArt nesting exceeds text-edit limit".into()).into(),
+        );
+    }
+    if record_type(record)? == OFFICEART_SP_CONTAINER && shape_id_of(record)? == Some(shape_id) {
+        *matches = matches.saturating_add(1);
+        return rewrite_shape_container(record, kind, before, after);
+    }
+    if record_version(record)? != 0xF {
+        return Ok(record.to_vec());
+    }
+    let mut data = Vec::with_capacity(drawing_payload(record)?.len());
+    for child_result in children(record)? {
+        data.extend_from_slice(&reference_rewrite(
+            child_result?,
+            shape_id,
+            kind,
+            before,
+            after,
+            depth + 1,
+            matches,
+        )?);
+    }
+    rebuild(record, &data).map_err(Error::from)
+}
+
+/// The grouped per-record rebuild replaced in record 0264 (error oracle).
+fn reference_grouped(
+    record: &[u8],
+    replacements: &std::collections::BTreeMap<u32, Vec<ShapeTextRewrite<'_>>>,
+    match_counts: &mut std::collections::BTreeMap<u32, usize>,
+    depth: usize,
+) -> super::Result<Vec<u8>> {
+    use super::{
+        Error, OFFICEART_SP_CONTAINER, PackageError, children, drawing_payload, rebuild,
+        record_type, record_version, rewrite_shape_container_grouped, shape_id_of,
+    };
+    if depth >= 128 {
+        return Err(
+            PackageError::Corrupted("OfficeArt nesting exceeds text-edit limit".into()).into(),
+        );
+    }
+    if record_type(record)? == OFFICEART_SP_CONTAINER
+        && let Some(shape_id) = shape_id_of(record)?
+        && let Some(shape_replacements) = replacements.get(&shape_id)
+    {
+        let count = match_counts.get_mut(&shape_id).ok_or_else(|| {
+            PackageError::Corrupted("PPT grouped rewrite lost shape identity".into())
+        })?;
+        *count = count.saturating_add(1);
+        return rewrite_shape_container_grouped(record, shape_replacements);
+    }
+    if record_version(record)? != 0xF {
+        return Ok(record.to_vec());
+    }
+    let mut data = Vec::with_capacity(drawing_payload(record)?.len());
+    for child_result in children(record)? {
+        data.extend_from_slice(&reference_grouped(
+            child_result?,
+            replacements,
+            match_counts,
+            depth + 1,
+        )?);
+    }
+    rebuild(record, &data).map_err(Error::from)
+}
+
+/// The single-buffer rewrites produce the reference bytes and errors, for
+/// every text shape of the corpus slides and for corrupted drawings.
+#[test]
+fn single_buffer_rewrites_match_the_per_record_rebuild() {
+    let mut compared = 0usize;
+    for deck_bytes in [
+        deck(12),
+        fixture("ole/ppt/text_shapes.ppt"),
+        fixture("poi/test-data/slideshow/basic_test_ppt_file.ppt"),
+        fixture("poi/test-data/slideshow/41246-1.ppt"),
+    ] {
+        let presentation = super::presentation(&deck_bytes).unwrap();
+        let editor = crate::embedded::object::Editor::open_records(deck_bytes.clone()).unwrap();
+        for slide in presentation.slides().unwrap() {
+            let record = editor.persisted_record(slide.persist_id()).unwrap();
+            let Ok(Some(drawing)) =
+                super::find_ppt_record(&record, crate::consts::RecordType::PPDrawing as u16, 0)
+            else {
+                continue;
+            };
+            let payload = super::drawing_payload(drawing).unwrap().to_vec();
+            for shape in slide.shapes().unwrap() {
+                let shape_id = super::native_shape_id(shape);
+                let Ok(atom) = super::inspect_slide(&record, shape_id) else {
+                    continue;
+                };
+                let after = super::encode_replacement("rewritten", atom.kind).unwrap();
+                let mut variants = vec![payload.clone()];
+                for offset in (0..payload.len()).step_by((payload.len() / 40).max(1)) {
+                    let mut corrupted = payload.clone();
+                    corrupted[offset] ^= 0x5A;
+                    variants.push(corrupted);
+                }
+                for variant in variants {
+                    let (mut left, mut right) = (0, 0);
+                    let single = super::rewrite_officeart(
+                        &variant,
+                        shape_id,
+                        atom.kind,
+                        &atom.payload,
+                        &after,
+                        0,
+                        &mut left,
+                    );
+                    let reference = reference_rewrite(
+                        &variant,
+                        shape_id,
+                        atom.kind,
+                        &atom.payload,
+                        &after,
+                        0,
+                        &mut right,
+                    );
+                    assert_eq!(format!("{single:?}"), format!("{reference:?}"));
+                    assert_eq!(left, right);
+                    let rewrites = [ShapeTextRewrite {
+                        shape_id,
+                        kind: atom.kind,
+                        before: &atom.payload,
+                        after: &after,
+                    }];
+                    let by_shape =
+                        std::collections::BTreeMap::from([(shape_id, rewrites.to_vec())]);
+                    let mut counts = std::collections::BTreeMap::from([(shape_id, 0usize)]);
+                    let grouped =
+                        super::rewrite_officeart_grouped(&variant, &by_shape, &mut counts, 0);
+                    let mut reference_counts =
+                        std::collections::BTreeMap::from([(shape_id, 0usize)]);
+                    let grouped_reference =
+                        reference_grouped(&variant, &by_shape, &mut reference_counts, 0);
+                    assert_eq!(format!("{grouped:?}"), format!("{grouped_reference:?}"));
+                    assert_eq!(counts, reference_counts);
+                    // The grouped rewrite has its own textbox refusals; its
+                    // bytes agree with the single rewrite whenever both
+                    // succeed.
+                    if let (Ok(grouped), Ok(reference)) = (&grouped, &reference) {
+                        assert_eq!(grouped, reference);
+                    }
+                    compared += 1;
+                }
+            }
+        }
+    }
+    assert!(compared > 500, "{compared}");
 }

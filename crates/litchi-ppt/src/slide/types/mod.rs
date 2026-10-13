@@ -93,33 +93,100 @@ type ParsedShapes = (Arc<[ShapeEnum<'static>]>, crate::leniency::ToleranceReport
 /// change. A hit returns exactly what parsing would; a miss parses and
 /// replaces the entry; a parse failure is never stored. The resident cost is
 /// one slide's shapes. A poisoned lock is treated as a miss.
+///
+/// A committed text edit may instead seed the memo with [`PatchedShapes`]
+/// that it proved equal to a parse of the published slide (record 0264).
+/// They are materialized on the first hit, so a publication that nobody
+/// reads again pays nothing for the seed.
 #[derive(Default)]
-pub(crate) struct ShapeMemo(std::sync::Mutex<Option<(u32, ParsedShapes)>>);
+pub(crate) struct ShapeMemo(std::sync::Mutex<Option<(u32, MemoEntry)>>);
+
+enum MemoEntry {
+    Parsed(ParsedShapes),
+    Patched(Arc<PatchedShapes>),
+}
+
+/// A slide's shapes as a source array with some positions replaced: the
+/// value a parse of the slide returns, as proven by an incremental readback
+/// (record 0264). Parsing such a slide reports no repairs.
+pub(crate) struct PatchedShapes {
+    base: Arc<[ShapeEnum<'static>]>,
+    /// Replaced positions, strictly increasing.
+    replacements: Vec<(usize, ShapeEnum<'static>)>,
+}
+
+impl PatchedShapes {
+    /// Combine a source array with replacements at strictly increasing
+    /// in-bounds positions; `None` otherwise.
+    pub(crate) fn new(
+        base: Arc<[ShapeEnum<'static>]>,
+        replacements: Vec<(usize, ShapeEnum<'static>)>,
+    ) -> Option<Self> {
+        let ordered = replacements.windows(2).all(|pair| pair[0].0 < pair[1].0);
+        let bounded = replacements
+            .last()
+            .is_none_or(|(position, _)| *position < base.len());
+        (ordered && bounded).then_some(Self { base, replacements })
+    }
+
+    /// The patched array: unchanged shapes cloned, replacements in place.
+    pub(crate) fn materialize(&self) -> Arc<[ShapeEnum<'static>]> {
+        let mut replacements = self.replacements.iter().peekable();
+        let mut shapes = Vec::with_capacity(self.base.len());
+        for (position, before) in self.base.iter().enumerate() {
+            match replacements.next_if(|(replaced, _)| *replaced == position) {
+                Some((_, after)) => shapes.push(after.clone()),
+                None => shapes.push(before.clone()),
+            }
+        }
+        Arc::from(shapes)
+    }
+}
 
 impl ShapeMemo {
     fn get(&self, persist_id: u32) -> Option<ParsedShapes> {
-        let entry = self.0.lock().ok()?;
-        entry
-            .as_ref()
-            .filter(|(key, _)| *key == persist_id)
-            .map(|(_, value)| (Arc::clone(&value.0), value.1.clone()))
+        let mut entry = self.0.lock().ok()?;
+        let (key, value) = entry.as_mut()?;
+        if *key != persist_id {
+            return None;
+        }
+        if let MemoEntry::Patched(patched) = value {
+            *value = MemoEntry::Parsed((
+                patched.materialize(),
+                crate::leniency::ToleranceReport::default(),
+            ));
+        }
+        match value {
+            MemoEntry::Parsed(parsed) => Some((Arc::clone(&parsed.0), parsed.1.clone())),
+            MemoEntry::Patched(_) => None,
+        }
     }
 
     /// Seed the memo with a slide's shapes that were proven equal to what
     /// parsing this presentation's slide `persist_id` returns (record 0264:
     /// a committed text edit hands its incrementally verified shapes to the
-    /// published package, so the next chunked edit does not parse them
-    /// again). Callers must hold that proof; the memo cannot check it.
-    pub(crate) fn seed(&self, persist_id: u32, shapes: Arc<[ShapeEnum<'static>]>) {
-        self.put(
-            persist_id,
-            &(shapes, crate::leniency::ToleranceReport::default()),
-        );
+    /// published package, so a following edit does not parse them again).
+    /// Callers must hold that proof; the memo cannot check it.
+    pub(crate) fn seed(&self, persist_id: u32, shapes: Arc<PatchedShapes>) {
+        if let Ok(mut entry) = self.0.lock() {
+            *entry = Some((persist_id, MemoEntry::Patched(shapes)));
+        }
+    }
+
+    /// Whether the memo holds slide `persist_id` (tests only).
+    #[cfg(test)]
+    pub(crate) fn holds(&self, persist_id: u32) -> bool {
+        self.0
+            .lock()
+            .is_ok_and(|entry| entry.as_ref().is_some_and(|(key, _)| *key == persist_id))
     }
 
     fn put(&self, persist_id: u32, value: &ParsedShapes) {
         if let Ok(mut entry) = self.0.lock() {
-            *entry = Some((persist_id, (Arc::clone(&value.0), value.1.clone())));
+            *entry = Some((
+                persist_id,
+                MemoEntry::Parsed((Arc::clone(&value.0), value.1.clone())),
+            ));
         }
     }
 }

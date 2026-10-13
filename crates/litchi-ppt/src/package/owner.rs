@@ -292,7 +292,7 @@ impl Package {
     pub(crate) fn seed_slide_shapes(
         &self,
         persist_id: u32,
-        shapes: Arc<[crate::shapes::ShapeEnum<'static>]>,
+        shapes: Arc<crate::slide::PatchedShapes>,
     ) {
         self.inner
             .presentation

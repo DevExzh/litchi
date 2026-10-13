@@ -1805,7 +1805,7 @@ pub(crate) struct VerifiedSlideShapes {
     /// The slide's persist identifier in that artifact.
     pub(crate) persist_id: u32,
     /// What parsing that slide returns.
-    pub(crate) shapes: Arc<[crate::shapes::ShapeEnum<'static>]>,
+    pub(crate) shapes: Arc<crate::slide::PatchedShapes>,
 }
 
 /// Shapes a parse of slide `persist_id` of exactly `bytes` returns.
@@ -1813,7 +1813,7 @@ pub(crate) struct VerifiedSlideShapes {
 struct VerifiedShapes {
     bytes: Arc<[u8]>,
     persist_id: u32,
-    shapes: Arc<[crate::shapes::ShapeEnum<'static>]>,
+    shapes: Arc<crate::slide::PatchedShapes>,
 }
 
 impl fmt::Debug for VerifiedShapes {
@@ -1821,7 +1821,6 @@ impl fmt::Debug for VerifiedShapes {
         formatter
             .debug_struct("VerifiedShapes")
             .field("persist_id", &self.persist_id)
-            .field("shapes", &self.shapes.len())
             .finish_non_exhaustive()
     }
 }
@@ -2139,7 +2138,7 @@ impl Transaction {
         };
         let before = text_edit.text().to_string();
         text_edit.set_text(after.clone())?;
-        let commit = text_edit.commit()?;
+        let (commit, verified) = text_edit.commit_verified()?;
         if commit.patch().is_empty() {
             return Ok(());
         }
@@ -2149,6 +2148,12 @@ impl Transaction {
         self.working = self
             .working
             .adopt_text_edit_publication(publication, persist_id)?;
+        // As for batches: proven shapes describe exactly the adopted bytes.
+        self.verified_shapes = verified.map(|(persist_id, shapes)| VerifiedShapes {
+            bytes: self.working.shared_bytes(),
+            persist_id,
+            shapes: Arc::new(shapes),
+        });
         let change = ShapeTextChange {
             target: source_target,
             before,
@@ -2341,7 +2346,7 @@ impl Transaction {
             .map(|(persist_id, shapes)| VerifiedShapes {
                 bytes: working.shared_bytes(),
                 persist_id,
-                shapes,
+                shapes: Arc::new(shapes),
             });
         self.live_document_changed |= document_changed;
         let changes = published_changes

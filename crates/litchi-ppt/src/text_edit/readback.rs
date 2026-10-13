@@ -1,7 +1,10 @@
-//! Readback verification of a batch shape-text publication (record 0264).
+//! Readback verification of shape-text publications (record 0264).
 //!
-//! A batch publication appends rewritten slide records and must prove, before
-//! adoption, that the published package reads back the requested texts. The
+//! A shape-text publication appends rewritten slide records and must prove,
+//! before adoption, that the published package reads back the requested
+//! texts. This module serves the batch publisher; the single-shape commit
+//! uses [`readback_incremental`] for its target resolution in the same way
+//! (`resolve_published`). The
 //! reference verifier, [`readback_full`], reopens the candidate and parses the
 //! whole drawing of every edited slide. Its verdict for a publication `P`
 //! with targets `T` is *accept* exactly when:
@@ -50,6 +53,13 @@
 //! atom and meta records, which are unchanged), and so a full parse returns
 //! the source shapes with the targets replaced, no repairs, and the expected
 //! texts at the target positions: the full verifier accepts.
+//!
+//! An accept also yields those shapes ([`PatchedShapes`]): the committed
+//! package's slide memo is seeded with them, so the next edit of the same
+//! slide resolves its targets and starts its own readback without parsing
+//! the slide again. `src/text_edit/readback_tests.rs` runs both verifiers
+//! on genuine, corrupted and adversarial publications and requires that an
+//! incremental accept is always a full accept with exactly the parsed shapes.
 
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -57,7 +67,7 @@ use std::sync::Arc;
 use super::{Error, Refusal, Result, Target, native_shape_id};
 use crate::package::Error as PackageError;
 use crate::shapes::ShapeEnum;
-use crate::slide::Slide;
+use crate::slide::{PatchedShapes, Slide};
 
 const DG_CONTAINER: u16 = 0xF002;
 const SPGR_CONTAINER: u16 = 0xF003;
@@ -68,11 +78,21 @@ const CLIENT_TEXTBOX: u16 = 0xF00D;
 const BACKGROUND_FLAG: u32 = 0x0400;
 
 /// What the source parse of one edited slide established.
-pub(super) struct SourceSlideView {
+pub(crate) struct SourceSlideView {
     shapes: Arc<[ShapeEnum<'static>]>,
     clean: bool,
     outline: Vec<crate::OutlineTextBody>,
     drawing: Option<Vec<u8>>,
+}
+
+impl std::fmt::Debug for SourceSlideView {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("SourceSlideView")
+            .field("shapes", &self.shapes.len())
+            .field("clean", &self.clean)
+            .finish_non_exhaustive()
+    }
 }
 
 impl SourceSlideView {
@@ -97,20 +117,19 @@ pub(super) struct ReadbackTarget<'a> {
     pub(super) replacement: &'a str,
 }
 
-/// Shapes a parse of the published slide returns, proven by the incremental
-/// verifier.
-pub(super) type VerifiedSlides = Vec<(u32, Arc<[ShapeEnum<'static>]>)>;
+/// Shapes a parse of each edited published slide returns, proven by the
+/// incremental verifier, keyed by persist identifier.
+pub(crate) type VerifiedSlides = Vec<(u32, PatchedShapes)>;
 
 /// Verify a publication: incrementally when that can be proven, otherwise
 /// with the reference verifier. Returns the proven shapes of each edited
-/// slide when the incremental verifier accepted and `build` was requested.
+/// slide when the incremental verifier accepted (empty otherwise).
 pub(super) fn readback(
     slides: &[Slide<'_>],
     targets: &[ReadbackTarget<'_>],
-    sources: &BTreeMap<u32, SourceSlideView>,
-    build: bool,
+    sources: &BTreeMap<u32, Arc<SourceSlideView>>,
 ) -> Result<VerifiedSlides> {
-    if let Some(verified) = readback_incremental(slides, targets, sources, build) {
+    if let Some(verified) = readback_incremental(slides, targets, sources) {
         return Ok(verified);
     }
     readback_full(slides, targets)?;
@@ -149,8 +168,7 @@ pub(super) fn readback_full(slides: &[Slide<'_>], targets: &[ReadbackTarget<'_>]
 pub(super) fn readback_incremental(
     slides: &[Slide<'_>],
     targets: &[ReadbackTarget<'_>],
-    sources: &BTreeMap<u32, SourceSlideView>,
-    build: bool,
+    sources: &BTreeMap<u32, Arc<SourceSlideView>>,
 ) -> Option<VerifiedSlides> {
     let mut groups = BTreeMap::<u32, (&Slide<'_>, Vec<&ReadbackTarget<'_>>)>::new();
     for target in targets {
@@ -207,22 +225,12 @@ pub(super) fn readback_incremental(
         if by_index.iter().any(Option::is_some) {
             return None;
         }
-        if build {
-            // Clone only the unchanged shapes; replaced ones are moved in.
-            replacements.sort_unstable_by_key(|(position, _)| *position);
-            let mut replacements = replacements.into_iter().peekable();
-            let mut shapes = Vec::with_capacity(source.shapes.len());
-            for (position, before) in source.shapes.iter().enumerate() {
-                match replacements.next_if(|(replaced, _)| *replaced == position) {
-                    Some((_, after)) => shapes.push(after),
-                    None => shapes.push(before.clone()),
-                }
-            }
-            if replacements.next().is_some() {
-                return None;
-            }
-            verified.push((persist_id, Arc::from(shapes)));
-        }
+        // Materialized only if the published slide is read again.
+        replacements.sort_unstable_by_key(|(position, _)| *position);
+        verified.push((
+            persist_id,
+            PatchedShapes::new(Arc::clone(&source.shapes), replacements)?,
+        ));
     }
     Some(verified)
 }
