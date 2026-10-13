@@ -1658,10 +1658,13 @@ pub(super) enum SlideProperty {
     Layout,
     Name,
     Hidden,
+    /// Speaker-notes text; set only, routed before slide metadata.
+    Notes,
 }
-const fn slide_write_entries() -> [crate::registry::Entry<SlideProperty>; SLIDE_PROPS.len()] {
+const SLIDE_WRITE_COUNT: usize = SLIDE_PROPS.len() + 1;
+const fn slide_write_entries() -> [crate::registry::Entry<SlideProperty>; SLIDE_WRITE_COUNT] {
     use crate::registry::{Access, Constraint, Entry};
-    let mut entries = [Entry::read(SLIDE_PROPS[0]); SLIDE_PROPS.len()];
+    let mut entries = [Entry::read(SLIDE_PROPS[0]); SLIDE_WRITE_COUNT];
     let mut index = 0;
     while index < SLIDE_PROPS.len() {
         entries[index] = Entry::read(SLIDE_PROPS[index]);
@@ -1685,11 +1688,152 @@ const fn slide_write_entries() -> [crate::registry::Entry<SlideProperty>; SLIDE_
         constraint: Constraint::None,
         clear: false,
     };
+    entries[SLIDE_PROPS.len()] = Entry {
+        spec: write_only("notes", ValueType::Text),
+        access: Access::Set(SlideProperty::Notes),
+        constraint: Constraint::None,
+        clear: true,
+    };
     entries
 }
-pub(super) const SLIDE_WRITE_TABLE: crate::registry::Table<
-    SlideProperty,
-    { SLIDE_PROPS.len() },
+pub(super) const SLIDE_WRITE_TABLE: crate::registry::Table<SlideProperty, SLIDE_WRITE_COUNT, 0> =
+    crate::registry::Table::new(slide_write_entries(), []);
+
+/// Speaker-notes `text` (set; null clears the text).
+const fn notes_write_entries() -> [crate::registry::Entry<()>; NOTES_PROPS.len()] {
+    use crate::registry::{Access, Constraint, Entry};
+    [Entry {
+        spec: NOTES_PROPS[0],
+        access: Access::Set(()),
+        constraint: Constraint::None,
+        clear: true,
+    }]
+}
+const NOTES_WRITE_TABLE: crate::registry::Table<(), { NOTES_PROPS.len() }, 0> =
+    crate::registry::Table::new(notes_write_entries(), []);
+pub(crate) const NOTES_CAPABILITY_PROPS: &[PropSpec] = &NOTES_WRITE_TABLE.readable();
+
+/// Legacy comment assignments.
+#[derive(Clone, Copy)]
+pub(super) enum CommentSetter {
+    Text,
+    Author,
+    Initials,
+    Date,
+    X,
+    Y,
+}
+const fn comment_write_entries() -> [crate::registry::Entry<CommentSetter>; COMMENT_PROPS.len()] {
+    use crate::registry::{Access, Constraint, Entry};
+    let mut entries = [Entry::read(COMMENT_PROPS[0]); COMMENT_PROPS.len()];
+    let mut index = 0;
+    while index < COMMENT_PROPS.len() {
+        let spec = COMMENT_PROPS[index];
+        let access = if index == CommentKey::Text as usize {
+            Some(Access::SetAndAdd(CommentSetter::Text))
+        } else if index == CommentKey::Author as usize {
+            Some(Access::Add(CommentSetter::Author))
+        } else if index == CommentKey::Initials as usize {
+            Some(Access::Add(CommentSetter::Initials))
+        } else if index == CommentKey::Date as usize {
+            Some(Access::Add(CommentSetter::Date))
+        } else if index == CommentKey::X as usize {
+            Some(Access::SetAndAdd(CommentSetter::X))
+        } else if index == CommentKey::Y as usize {
+            Some(Access::SetAndAdd(CommentSetter::Y))
+        } else {
+            None
+        };
+        entries[index] = match access {
+            Some(access) => Entry {
+                spec,
+                access,
+                constraint: if index == CommentKey::Author as usize {
+                    Constraint::NotEmpty
+                } else {
+                    Constraint::None
+                },
+                clear: false,
+            },
+            None => Entry::read(spec),
+        };
+        index += 1;
+    }
+    entries
+}
+pub(super) const COMMENT_WRITE_TABLE: crate::registry::Table<
+    CommentSetter,
+    { COMMENT_PROPS.len() },
     0,
-> = crate::registry::Table::new(slide_write_entries(), []);
+> = crate::registry::Table::new(comment_write_entries(), []);
+pub(crate) const COMMENT_CAPABILITY_PROPS: &[PropSpec] = &COMMENT_WRITE_TABLE.readable();
+
+/// Picture insertion assignments (`add` only).
+#[derive(Clone, Copy)]
+pub(super) enum PictureSetter {
+    Src,
+    Name,
+    X,
+    Y,
+    Width,
+    Height,
+}
+const PICTURE_WRITE_COUNT: usize = FRAME_PROPS.len() + 1;
+const fn picture_write_entries() -> [crate::registry::Entry<PictureSetter>; PICTURE_WRITE_COUNT] {
+    use crate::registry::{Access, Constraint, Entry};
+    let mut entries = [Entry::read(FRAME_PROPS[0]); PICTURE_WRITE_COUNT];
+    let mut index = 0;
+    while index < FRAME_PROPS.len() {
+        let spec = FRAME_PROPS[index];
+        let setter = if index == FrameKey::Name as usize {
+            Some(PictureSetter::Name)
+        } else if index == FrameKey::X as usize {
+            Some(PictureSetter::X)
+        } else if index == FrameKey::Y as usize {
+            Some(PictureSetter::Y)
+        } else if index == FrameKey::Width as usize {
+            Some(PictureSetter::Width)
+        } else if index == FrameKey::Height as usize {
+            Some(PictureSetter::Height)
+        } else {
+            None
+        };
+        entries[index] = match setter {
+            Some(setter) => Entry {
+                spec,
+                access: Access::Add(setter),
+                constraint: if matches!(setter, PictureSetter::Width | PictureSetter::Height) {
+                    Constraint::Length {
+                        min: crate::value::Length::from_emu(1),
+                        max: crate::value::Length::from_emu(i64::MAX),
+                    }
+                } else {
+                    Constraint::None
+                },
+                clear: false,
+            },
+            None => Entry::read(spec),
+        };
+        index += 1;
+    }
+    entries[FRAME_PROPS.len()] = Entry {
+        spec: write_only("src", ValueType::Text),
+        access: Access::Add(PictureSetter::Src),
+        constraint: Constraint::NotEmpty,
+        clear: false,
+    };
+    entries
+}
+pub(super) const PICTURE_WRITE_TABLE: crate::registry::Table<
+    PictureSetter,
+    PICTURE_WRITE_COUNT,
+    1,
+> = crate::registry::Table::new(
+    picture_write_entries(),
+    [crate::registry::Alias {
+        name: "path",
+        entry: FRAME_PROPS.len(),
+    }],
+);
+pub(crate) const PICTURE_CAPABILITY_PROPS: &[PropSpec] = &PICTURE_WRITE_TABLE.readable();
 pub(crate) const SLIDE_CAPABILITY_PROPS: &[PropSpec] = &SLIDE_WRITE_TABLE.readable();

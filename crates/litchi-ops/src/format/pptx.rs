@@ -49,11 +49,13 @@ use crate::options::OpenOptions;
 use crate::{opc, pptx};
 
 mod children;
+mod comments;
 pub(crate) mod create;
 mod nav;
 mod node;
 mod order;
 mod owner;
+mod picture;
 mod publish;
 mod remove;
 mod shape_add;
@@ -69,7 +71,8 @@ pub(crate) use nav::Nav;
 pub use node::Node;
 pub(crate) use node::Props;
 pub(crate) use spec::{
-    CELL_CAPABILITY_PROPS, PARAGRAPH_CAPABILITY_PROPS, PLACEHOLDER_CAPABILITY_PROPS,
+    CELL_CAPABILITY_PROPS, COMMENT_CAPABILITY_PROPS, NOTES_CAPABILITY_PROPS,
+    PARAGRAPH_CAPABILITY_PROPS, PICTURE_CAPABILITY_PROPS, PLACEHOLDER_CAPABILITY_PROPS,
     RUN_CAPABILITY_PROPS, SHAPE_CAPABILITY_PROPS, SLIDE_CAPABILITY_PROPS, SPEC,
 };
 pub(crate) use views::{Json as ViewJson, view_json, view_to};

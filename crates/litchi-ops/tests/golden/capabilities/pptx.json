@@ -322,6 +322,12 @@
           "add": true,
           "set": true,
           "get": true
+        },
+        "notes": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
         }
       },
       "predicates": {
@@ -987,7 +993,7 @@
       "properties": {
         "name": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
@@ -999,25 +1005,25 @@
         },
         "x": {
           "type": "length",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "y": {
           "type": "length",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "width": {
           "type": "length",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "height": {
           "type": "length",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
@@ -1044,6 +1050,12 @@
           "add": false,
           "set": false,
           "get": true
+        },
+        "src": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
         }
       },
       "predicates": {
@@ -2154,7 +2166,7 @@
         "text": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         }
       },
@@ -2185,19 +2197,19 @@
       "properties": {
         "text": {
           "type": "string",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "author": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "initials": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
@@ -2209,20 +2221,20 @@
         },
         "date": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "x": {
           "type": "length",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "y": {
           "type": "length",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         }
       },

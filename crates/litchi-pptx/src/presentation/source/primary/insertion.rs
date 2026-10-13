@@ -135,13 +135,20 @@ pub(super) fn plan(
 
     let part_uri = next_slide_part_name(package)?;
 
+    let placeholders = {
+        let layout_part = source.part(&layout)?;
+        let data = layout_part.data()?;
+        crate::opened::plan_new_slide_placeholders(data.as_bytes())?
+    };
     let (slide_xml, relationships_xml) = authored_slide(
         package.owner.limits,
         part_uri.clone(),
         layout,
         slide_id,
         strict,
+        &placeholders,
     )?;
+    crate::opened::read_back_new_slide(&slide_xml, &placeholders)?;
     crate::source_limits::validate_xml_limits(&slide_xml, package.owner.limits)?;
     crate::opened::validate_removal_slide_surface(&slide_xml).map_err(map_error)?;
     crate::source_limits::validate_xml_limits(&relationships_xml, package.owner.limits)?;
@@ -351,8 +358,9 @@ fn authored_slide(
     layout: PackURI,
     slide_id: u32,
     strict: bool,
+    placeholders: &[crate::opened::NewSlidePlaceholder],
 ) -> Result<(Vec<u8>, Vec<u8>)> {
-    let mut slide_xml = crate::writer::MutableSlide::new(slide_id).generate_slide_xml()?;
+    let mut slide_xml = crate::opened::new_slide_xml(slide_id, placeholders)?;
     if strict {
         for (old, new) in [
             (

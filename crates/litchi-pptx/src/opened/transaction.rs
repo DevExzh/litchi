@@ -1,5 +1,8 @@
 //! Detached composition of ordinary presentation-domain edits.
 
+mod comments;
+mod notes;
+
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::sync::{Arc, Weak};
 
@@ -993,45 +996,74 @@ impl Edit {
         Ok(shape_id)
     }
 
-    /// Replace the existing notes text owned by one checked slide.
+    /// Replace the notes text owned by one checked slide, creating the
+    /// slide's notes page from the presentation's notes master when it has
+    /// none (an empty text on a slide without notes is a no-op).
     ///
     /// # Errors
     ///
-    /// Returns an error when the slide has no notes, the notes graph has an
-    /// unsupported dependency, or the replacement is malformed or unbounded.
+    /// Returns [`Error::UnsafeEdit`] when a notes page must be created but
+    /// the presentation has no single notes master or is strict, and an
+    /// error when the notes graph has an unsupported dependency or the
+    /// replacement is malformed or unbounded. A failure leaves the edit
+    /// unchanged.
     pub fn set_notes_text<'s>(
         &mut self,
         slide: impl Into<crate::slide::Selector<'s>>,
         text: impl AsRef<str>,
     ) -> Result<bool> {
         let selected_slide = self.resolve_slide(slide.into())?;
-        let source = crate::notes::load_snapshot(&self.working, &self.source.presentation_name)?
-            .ok_or_else(|| invalid("opened-presentation notes graph is absent"))?;
-        let note = source
-            .slides()
-            .iter()
-            .find(|note| note.owner() == selected_slide.part_name.as_str())
-            .ok_or_else(|| invalid("opened-presentation selected slide has no notes"))?;
         let text = text.as_ref();
-        if note.text()?.as_deref() == (!text.is_empty()).then_some(text) {
-            return Ok(false);
-        }
         if text.len() > self.source.limits.max_text_bytes() {
             return Err(Error::EditLimit {
                 kind: crate::opened::LimitKind::TextBytes,
                 maximum: self.source.limits.max_text_bytes(),
             });
         }
-        let part_name = PackURI::new(note.part())
-            .map_err(|_error| invalid("opened-presentation notes part name is invalid"))?;
-        let xml = crate::notes::rewrite_text(note.xml(), text)?;
-        self.working.get_part_mut(&part_name)?.set_blob(xml);
+        let source = crate::notes::load_snapshot(&self.working, &self.source.presentation_name)?;
+        let note = source.as_ref().and_then(|source| {
+            source
+                .slides()
+                .iter()
+                .find(|note| note.owner() == selected_slide.part_name.as_str())
+        });
+        match note {
+            Some(note) => {
+                if note.text()?.as_deref() == (!text.is_empty()).then_some(text) {
+                    return Ok(false);
+                }
+                let part_name = PackURI::new(note.part())
+                    .map_err(|_error| invalid("opened-presentation notes part name is invalid"))?;
+                let xml = crate::notes::rewrite_text(note.xml(), text)?;
+                self.working.get_part_mut(&part_name)?.set_blob(xml);
+            },
+            // A slide without notes and empty text is already as requested.
+            None if text.is_empty() => return Ok(false),
+            None => {
+                let slide_part = selected_slide.part_name.clone();
+                let before = self.working.clone();
+                let created = self
+                    .create_notes_slide(&slide_part, text)
+                    .and_then(|()| self.verify_notes_text(&slide_part, text));
+                if let Err(error) = created {
+                    self.working = before;
+                    return Err(error);
+                }
+                return Ok(true);
+            },
+        }
+        self.verify_notes_text(&selected_slide.part_name, text)?;
+        Ok(true)
+    }
+
+    /// Read the staged notes of `slide` back and require `text`.
+    fn verify_notes_text(&self, slide: &PackURI, text: &str) -> Result<()> {
         let staged = crate::notes::load_snapshot(&self.working, &self.source.presentation_name)?
             .ok_or_else(|| invalid("opened-presentation staged notes graph disappeared"))?;
         let staged_note = staged
             .slides()
             .iter()
-            .find(|note| note.owner() == selected_slide.part_name.as_str())
+            .find(|note| note.owner() == slide.as_str())
             .ok_or_else(|| invalid("opened-presentation staged notes owner disappeared"))?;
         let actual = staged_note.text()?;
         if actual.as_deref() != (!text.is_empty()).then_some(text) {
@@ -1039,7 +1071,7 @@ impl Edit {
                 "opened-presentation notes text did not round-trip semantically",
             ));
         }
-        Ok(true)
+        Ok(())
     }
 
     /// Create or replace the validated table-style catalog in this transaction.

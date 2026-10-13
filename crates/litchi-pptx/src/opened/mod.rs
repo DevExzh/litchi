@@ -14,6 +14,7 @@ mod geometry;
 mod insert;
 mod limit;
 mod model;
+mod new_slide;
 mod patch;
 mod properties;
 mod removal_proof;
@@ -65,6 +66,10 @@ pub(crate) use geometry::geometry_skeleton;
 pub(crate) use model::{
     PartDigests, capture_with_parent_digests, capture_with_provenance, package_fingerprint,
     package_fingerprint_with_memo,
+};
+pub(crate) use new_slide::{
+    Planned as NewSlidePlaceholder, plan as plan_new_slide_placeholders,
+    read_back as read_back_new_slide, slide_xml as new_slide_xml,
 };
 pub(crate) use patch::{apply, apply_to_new};
 pub(crate) use properties::stage_shape_properties;

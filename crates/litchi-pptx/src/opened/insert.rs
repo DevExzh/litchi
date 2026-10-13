@@ -177,7 +177,8 @@ pub(super) fn plan(source: &Snapshot, position: usize, layout_name: &str) -> Res
         &[],
         policy,
     )?;
-    let mut slide_xml = crate::writer::MutableSlide::new(id).generate_slide_xml()?;
+    let placeholders = super::new_slide::plan(source.package.get_part(&layout)?.blob())?;
+    let mut slide_xml = super::new_slide::slide_xml(id, &placeholders)?;
     if strict {
         for (old, new) in [
             (
@@ -209,7 +210,7 @@ pub(super) fn plan(source: &Snapshot, position: usize, layout_name: &str) -> Res
     )?;
     let xml =
         super::xml::insert_slide(main.blob(), &source.slides, position, id, &relationship_id)?;
-    crate::shape::Scene::read(slide.blob())?;
+    super::new_slide::read_back(slide.blob(), &placeholders)?;
     let sizes = [
         main.blob().len(),
         xml.len(),

@@ -23,7 +23,7 @@ fails while a golden differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/capabilities/xlsx.json` | `402174221748379047c6fd6cd6b5b7e89abb558f32f31e174b4ef03934be5549` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/xlsb.json` | `457978593767efb194d16b90d471bc8ced452f7bba01ce44079bbf9edd5d37d9` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/xls.json` | `0c1d087c21028c60fd6ef79c2d6df73b31826f95b48cc12cbf6f8d57193d56df` |
-| golden | `crates/litchi-ops/tests/golden/capabilities/pptx.json` | `58f45996cc67524648c3a73cebd9d0a468201af3e1e820ee83c7d559a5aa42f6` |
+| golden | `crates/litchi-ops/tests/golden/capabilities/pptx.json` | `8fa6da3921b2ff111ac4ec08ddda4efa56a194f61ba21c340042a27747e7723f` |
 | officecli | `schemas/help` (152 files, OfficeCLI commit `dced0d74`) | `0bcd8cae45fabc0c5e45ff99d1994465fb213ac1b8db3f7eadd87339fb40ced4` |
 
 ## Statuses
@@ -62,7 +62,7 @@ Properties:
 | xlsx | 89 | 16 | 489 | 0 | 18 | 1 | 78 | 62 |
 | xlsb | 56 | 45 | 489 | 0 | 22 | 1 | 78 | 2 |
 | xls | 18 | 17 | 509 | 0 | 22 | 1 | 124 | 0 |
-| pptx | 164 | 30 | 113 | 0 | 109 | 0 | 271 | 157 |
+| pptx | 166 | 29 | 113 | 0 | 108 | 0 | 271 | 159 |
 
 ## docx
 
@@ -3821,6 +3821,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | diagram | `layoutType` | string |  | litchi-only |  |
 | diagram | `name` | string |  | litchi-only |  |
 | diagram | `hidden` | bool |  | litchi-only |  |
+| diagram | `notes` | string |  | litchi-only |  |
 | equation | `id` | number | a-g | element gap | L-PPTX-R11 |
 | equation | `formula` | string | asg | element gap | L-PPTX-R11 |
 | equation | `x` | length | asg | element gap | L-PPTX-R11 |
@@ -3940,7 +3941,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | picture | `contentType` | string | --g | missing |  |
 | picture | `fileSize` | number | --g | missing |  |
 | picture | `relId` | string | --g | missing |  |
-| picture | `src` | string | as- | write-only | M2 |
+| picture | `src` | string | as- | supported |  |
 | picture | `zorder` | int |  | litchi-only |  |
 | placeholder | `id` | number | a-g | missing |  |
 | placeholder | `phType` | enum | a-g | supported |  |
@@ -4186,7 +4187,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | slide | `transition` | string | asg | gap | M1-extended |
 | slide | `advanceTime` | number | asg | missing |  |
 | slide | `advanceClick` | bool | asg | missing |  |
-| slide | `notes` | string | -sg | gap | M1-Δ1 |
+| slide | `notes` | string | -sg | supported |  |
 | slide | `hidden` | bool | asg | supported |  |
 | slide | `name` | string | asg | supported |  |
 | slide | `layoutType` | string | --g | supported |  |
@@ -4427,6 +4428,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | transition | `layoutType` | string |  | litchi-only |  |
 | transition | `name` | string |  | litchi-only |  |
 | transition | `hidden` | bool |  | litchi-only |  |
+| transition | `notes` | string |  | litchi-only |  |
 | zoom | `target` | int | asg | element gap | M1-extended |
 | zoom | `x` | length | asg | element gap | M1-extended |
 | zoom | `y` | length | asg | element gap | M1-extended |

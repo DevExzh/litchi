@@ -157,3 +157,55 @@ Verdict against the single-set budget (≤ 10 %):
 Not measured: paragraph, shape-level and cell formatting, query fan-out, and
 the 1k-op batch for text formatting (batches reuse per-item `set`; the
 shape coalescer declines formatting payloads).
+
+## 6. Notes, comments, pictures and layout placeholders (plan 7c items 3–5)
+
+Leaf (`litchi-pptx`):
+- `opened::Edit::set_notes_text` creates a notes slide when the selected
+  slide has none: `/ppt/notesSlides/notesSlideN.xml` related to the slide
+  and the single notes master, slide → notes relationship, read back before
+  the edit changes; failures restore the edit. Strict decks and decks
+  without exactly one notes master are refused (`UnsafeEdit`).
+- `opened::Edit::{add_comment_text, set_comment_at}`: positional legacy
+  comment append/replace over the existing comment codec; authors are
+  matched by exact name and created (next id) when absent; indexes follow
+  the author's `lastIdx`.
+- Slide insertion (`opened::Edit::insert_slide` and the source-backed
+  `source::Edit::insert_slide`) instantiates the selected layout's
+  placeholders as PowerPoint does (port of reference 9474e2b6ce
+  `add_slide.rs`, adapted: the trunk insert APIs and their exact-name layout
+  selection, durable patches and source topology are kept; only the slide
+  body changes). Repeated placeholder identities get their layout bounds.
+  The new slide is read back against the plan.
+- `TextTarget::Shape` text replaces a whole body, so an empty placeholder
+  (no run for the run-slot writer) can be filled.
+
+Unified (`litchi-ops`):
+- notes: `set(/slide[N], {notes})` creates or replaces the page;
+  `set(/slide[N]/notes, {text})` replaces it (registry: slide `notes`
+  write-only set, notes `text` set).
+- comments: `add(/slide[N], comment, {text, author, initials, date, x, y})`
+  returns `/slide[N]/comment[K]`; `set(/slide[N]/comment[K], {text, x, y})`.
+- pictures: `add(/slide[N], picture, {src|path, name, x, y, width, height})`
+  where `src` is a base64 `data:` URI or a local file path, bounded by the
+  staging limit before decoding/reading, classified by signature
+  (PNG/JPEG/GIF/BMP/TIFF); default extent 2in × 1.5in. `base64` becomes a
+  dependency of the ops `pptx` feature.
+- shape `text` on an empty body (a new placeholder) goes through the body
+  edit; the shape coalescer declines such targets.
+- These verbs edit separate parts the source-backed slide edit cannot stage,
+  so a source-backed handle is promoted to an eager package (one bounded
+  copy of the current bytes) and the result is an eager handle.
+- Tests: `crates/litchi-pptx/tests/new_slide_content.rs` (4) and
+  `crates/litchi-ops/tests/pptx_slide_content.rs` (6), both owners, byte
+  round trips. Capability golden re-blessed; OfficeCLI delta: pptx 164→166
+  supported.
+
+Gaps left (follow-ups): picture `set` (geometry for `p:pic` needs the
+source geometry proof extended to pictures), comment remove through the
+unified `remove`, modern (threaded) comment writes, notes on strict decks
+or decks without a notes master, p14 section maintenance for inserted and
+moved slides (reference `sections.rs` not ported; trunk still refuses
+section decks in source-backed order edits), and no paired measurement for
+notes/comment/picture/slide-add (they are not single-property hot paths;
+the source→eager promotion costs one copy and reparse of the package).

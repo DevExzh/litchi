@@ -95,10 +95,11 @@ pub struct TextProperties<'a> {
 )]
 impl<'a> TextProperties<'a> {
     /// Replace the target's text. A run keeps its run properties; a
-    /// paragraph or cell keeps its paragraph properties and the first run's
-    /// properties. A line feed starts a line break inside a paragraph and a
-    /// new paragraph inside a cell. Shape targets use
-    /// [`super::Edit::set_shape_texts`] instead.
+    /// paragraph, shape or cell keeps its first paragraph's properties and
+    /// first run's properties. A line feed starts a line break inside a
+    /// paragraph and a new paragraph inside a shape or cell; unlike
+    /// [`super::Edit::set_shape_texts`], a shape whose body holds no run
+    /// (an empty placeholder) is accepted.
     #[must_use]
     pub const fn with_text(mut self, text: &'a str) -> Self {
         self.text = Some(text);
@@ -249,18 +250,19 @@ pub(crate) fn stage_text_properties(
             let replacement = match edit.target {
                 TextTarget::Cell { row, column, .. } => {
                     if !is_table {
-                        return Err(Error::Invalid(
-                            "a table cell edit requires a table graphic frame".into(),
-                        ));
+                        return Err(Error::UnsafeEdit {
+                            operation: "set_text_properties",
+                            reason: "a table cell edit requires a table graphic frame",
+                        });
                     }
                     rewrite_cell_frame(element, row.get(), column.get(), &edit.properties)?
                 },
                 _ => {
                     if is_table || edit.properties.fill.is_some() {
-                        return Err(Error::Invalid(
-                            "text formatting requires a shape text body; fill applies to table cells"
-                                .into(),
-                        ));
+                        return Err(Error::UnsafeEdit {
+                            operation: "set_text_properties",
+                            reason: "text formatting requires a shape text body; fill applies to table cells",
+                        });
                     }
                     rewrite_shape(element, edit.target, &edit.properties)?
                 },
@@ -349,11 +351,6 @@ fn validate(edit: &TextEdit<'_>) -> Result<()> {
     }
     if let Some(text) = properties.text {
         check_characters(text)?;
-        if matches!(edit.target, TextTarget::Shape { .. }) {
-            return Err(Error::Invalid(
-                "shape text is replaced through set_shape_texts".into(),
-            ));
-        }
         if matches!(edit.target, TextTarget::Run { .. }) && text.contains(['\n', '\r']) {
             return Err(Error::Invalid(
                 "run text cannot contain a line break".into(),
@@ -872,7 +869,10 @@ fn rewrite_run(run: &[u8], properties: &TextProperties<'_>, text: Option<&str>) 
     let node = root(run)?;
     let prefix = node.prefix(run).to_vec();
     if text.is_some() && node.local(run) != b"r" {
-        return Err(invalid("run text applies to a text run (a:r)"));
+        return Err(Error::UnsafeEdit {
+            operation: "set_text_properties",
+            reason: "run text applies to a text run (a:r)",
+        });
     }
     let kids = children(run, &node)?;
     let mut splices = Splices::new();
@@ -1150,15 +1150,29 @@ fn rewrite_shape(
 ) -> Result<Vec<u8>> {
     let node = root(shape)?;
     let kids = children(shape, &node)?;
-    let body =
-        child(shape, &kids, b"txBody").ok_or_else(|| invalid("the shape has no text body"))?;
+    let body = child(shape, &kids, b"txBody").ok_or(Error::UnsafeEdit {
+        operation: "set_text_properties",
+        reason: "the shape has no text body",
+    })?;
     let (paragraph, run) = match target {
         TextTarget::Shape { .. } => (None, None),
         TextTarget::Paragraph { paragraph, .. } => (Some(paragraph.get()), None),
         TextTarget::Run { paragraph, run, .. } => (Some(paragraph.get()), Some(run.get())),
         TextTarget::Cell { .. } => unreachable!("cells are rewritten through their frame"),
     };
-    let replaced = rewrite_body(&shape[body.span.clone()], paragraph, run, properties)?;
+    let element = &shape[body.span.clone()];
+    let replaced = match (target, properties.text) {
+        (TextTarget::Shape { .. }, Some(text)) => {
+            let body_node = root(element)?;
+            let body_kids = children(element, &body_node)?;
+            let prefix = child(element, &body_kids, b"bodyPr")
+                .or_else(|| child(element, &body_kids, b"p"))
+                .map(|node| node.prefix(element).to_vec())
+                .ok_or_else(|| invalid("the shape text body has no drawing children"))?;
+            rewrite_body_text(element, &prefix, text, properties)?
+        },
+        _ => rewrite_body(element, paragraph, run, properties)?,
+    };
     let mut splices = Splices::new();
     splices.replace(body.span.clone(), replaced);
     splices.apply(shape)
@@ -1219,10 +1233,13 @@ fn rewrite_cell(cell: &[u8], properties: &TextProperties<'_>) -> Result<Vec<u8>>
     let body = child(cell, &kids, b"txBody");
     let formatting = properties.has_run_properties() || properties.align.is_some();
     if properties.text.is_some() || formatting {
-        let body = body.ok_or_else(|| invalid("the table cell has no text body"))?;
+        let body = body.ok_or(Error::UnsafeEdit {
+            operation: "set_text_properties",
+            reason: "the table cell has no text body",
+        })?;
         let element = &cell[body.span.clone()];
         let rewritten = match properties.text {
-            Some(text) => rewrite_cell_text(element, &prefix, text, properties)?,
+            Some(text) => rewrite_body_text(element, &prefix, text, properties)?,
             None => rewrite_body(element, None, None, properties)?,
         };
         splices.replace(body.span.clone(), rewritten);
@@ -1254,9 +1271,10 @@ fn rewrite_cell(cell: &[u8], properties: &TextProperties<'_>) -> Result<Vec<u8>>
     splices.apply(cell)
 }
 
-/// Replace a cell body's paragraphs with one paragraph per line, keeping the
-/// first paragraph's `a:pPr` and its first run's `a:rPr`.
-fn rewrite_cell_text(
+/// Replace a text body's paragraphs with one paragraph per line, keeping the
+/// first paragraph's `a:pPr`, its first run's `a:rPr` and its
+/// `a:endParaRPr`.
+fn rewrite_body_text(
     body: &[u8],
     prefix: &[u8],
     text: &str,

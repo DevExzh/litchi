@@ -263,6 +263,11 @@ fn shape_plan(
         return Ok(None);
     };
     let common = handle.view().common();
+    // A body without a run slot (an empty placeholder) takes its text
+    // through the ordinary body edit, not the coalesced slot writer.
+    if values.text.is_some() && common.text().is_none_or(str::is_empty) {
+        return Ok(None);
+    }
     if values.has_geometry() && kind == DirectKind::Placeholder {
         return Err(error(
             Code::UnsupportedCapability,
@@ -325,6 +330,7 @@ fn shape_plan(
     }
     Ok(Some(Plan {
         target: Target {
+            slot: true,
             slide,
             position: handle.position().get(),
             bounds,

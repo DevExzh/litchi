@@ -510,6 +510,9 @@ fn pptx_text_format_set(element: &str, property: &str) -> bool {
             property,
             "fill" | "text" | "bold" | "italic" | "size" | "color" | "font" | "align"
         ),
+        "notes" => property == "text",
+        "slide" => property == "notes",
+        "comment" => matches!(property, "text" | "x" | "y"),
         _ => false,
     }
 }
@@ -521,6 +524,8 @@ fn pptx_write_only(element: &str, property: &str) -> bool {
         "paragraph" => matches!(property, "text" | "bold" | "italic" | "color" | "font"),
         "run" => matches!(property, "text" | "font"),
         "tc" => property != "fill",
+        "slide" => property == "notes",
+        "picture" => property == "src",
         _ => false,
     }
 }
@@ -565,9 +570,19 @@ fn pptx_reports_selection_and_structural_writes() {
                 && matches!(property.name(), "layout" | "name" | "hidden");
             let shape_add = element.name() == "shape"
                 && matches!(property.name(), "text" | "x" | "y" | "width" | "height");
+            let picture_add = element.name() == "picture"
+                && matches!(
+                    property.name(),
+                    "src" | "name" | "x" | "y" | "width" | "height"
+                );
+            let comment_add = element.name() == "comment"
+                && matches!(
+                    property.name(),
+                    "text" | "author" | "initials" | "date" | "x" | "y"
+                );
             assert_eq!(
                 property.add(),
-                slide_add || shape_add,
+                slide_add || shape_add || picture_add || comment_add,
                 "{} / {}",
                 element.name(),
                 property.name()

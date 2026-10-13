@@ -1563,3 +1563,18 @@ These families remain snapshot-scoped (`Snapshot::edit()`); moving them to
 `Package::{x, edit_x, apply_x}` entries with full `Error`/`LimitKind`
 families is a follow-up.
 
+
+## PPTX notes, comments, pictures and layout slides (0252)
+
+`opened::Edit::set_notes_text` now creates the slide's notes page from the
+presentation's single notes master when the slide has none (transitional
+decks; other cases are typed `UnsafeEdit` refusals). Legacy comments gain
+positional verbs on the same edit: `add_comment_text(slide, author,
+initials, text, location, date_time)` (creates the named author when
+absent; the caller supplies any timestamp, the editor reads no clock) and
+`set_comment_at(slide, Position, text, location)`. Slide insertion on both
+primary edits instantiates the layout's placeholders (title, body, object,
+… with type, orientation, size and index; date, footer, slide-number,
+header and slide-image placeholders are not instantiated).
+`TextTarget::Shape` accepts text, so an empty placeholder body can be filled.
+No parallel transaction type is introduced.
