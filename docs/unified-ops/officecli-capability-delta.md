@@ -18,8 +18,8 @@ fails while a golden differs from the hash recorded below.
 
 | Input | File | SHA-256 |
 |---|---|---|
-| golden | `crates/litchi-ops/tests/golden/capabilities/docx.json` | `2346df7c5afcf5597a4a3caf4cf1ca5467f80d948e93e7f87b8fdf13461921e2` |
-| golden | `crates/litchi-ops/tests/golden/capabilities/docx-encryption.json` | `6b275d274a890fbc57f4ec07b8f6e61990df6daf2d351cd4e790f0cd79c7adcf` |
+| golden | `crates/litchi-ops/tests/golden/capabilities/docx.json` | `8e777a64f1aaa5270ee703f061649e221aa40c0a82cc98bdee69ae319e3cb5f4` |
+| golden | `crates/litchi-ops/tests/golden/capabilities/docx-encryption.json` | `f6cd484efa2157b225e98fea4faf3b278f2619c06c0ae8214c5ede1d9dc29731` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/xlsx.json` | `402174221748379047c6fd6cd6b5b7e89abb558f32f31e174b4ef03934be5549` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/xlsb.json` | `457978593767efb194d16b90d471bc8ced452f7bba01ce44079bbf9edd5d37d9` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/xls.json` | `0c1d087c21028c60fd6ef79c2d6df73b31826f95b48cc12cbf6f8d57193d56df` |
@@ -58,7 +58,7 @@ Properties:
 
 | Format | supported | gap | element gap | pending | write-only | raw-only | missing | litchi-only |
 |---|---|---|---|---|---|---|---|---|
-| docx | 164 | 4 | 428 | 0 | 68 | 2 | 295 | 27 |
+| docx | 166 | 4 | 428 | 0 | 66 | 2 | 295 | 27 |
 | xlsx | 89 | 16 | 489 | 0 | 18 | 1 | 78 | 62 |
 | xlsb | 56 | 45 | 489 | 0 | 22 | 1 | 78 | 2 |
 | xls | 18 | 17 | 509 | 0 | 22 | 1 | 124 | 0 |
@@ -481,7 +481,7 @@ Properties:
 | hyperlink | `url` | string | asg | supported |  |
 | hyperlink | `anchor` | string | a-g | supported |  |
 | hyperlink | `tooltip` | string | a-g | supported |  |
-| hyperlink | `text` | string | asg | supported | the node's text |
+| hyperlink | `text` | string | asg | supported |  |
 | hyperlink | `rStyle` | string | a-g | supported |  |
 | hyperlink | `color` | color | a-g | supported |  |
 | hyperlink | `font` | string | a-g | supported |  |
@@ -1023,7 +1023,7 @@ Properties:
 | cell | `border.tl2br` | string | asg | missing |  |
 | cell | `border.top` | string | -s- | write-only | M2 |
 | cell | `border.tr2bl` | string | asg | missing |  |
-| cell | `text` | string | asg | supported | the node's text |
+| cell | `text` | string | asg | supported |  |
 | column | `width` | length | a-- | write-only |  |
 | column | `text` | string | a-- | write-only |  |
 | row | `height.exact` | length | as- | write-only | M2 |
@@ -1036,7 +1036,7 @@ Properties:
 | row | `gridAfter` | int | asg | supported |  |
 | row | `wAfter` | string | asg | supported |  |
 | row | `cellSpacing` | number | -sg | supported |  |
-| row | `cols` | int | a-- | write-only | M2 |
+| row | `cols` | int | a-- | supported |  |
 | row | `height` | length | asg | supported |  |
 | row | `hidden` | bool |  | litchi-only |  |
 | row | `rowAlign` | enum |  | litchi-only |  |
@@ -1060,7 +1060,7 @@ Properties:
 | table | `border.top` | string | as- | write-only | M2 |
 | table | `border.vertical` | string | as- | write-only | M2 |
 | table | `cols` | int | a-g | supported |  |
-| table | `data` | string | a-- | write-only | M2 |
+| table | `data` | string | a-- | supported |  |
 | table | `rows` | int | a-g | supported |  |
 | table | `width` | string | asg | supported |  |
 | table | `style` | string | asg | supported |  |
@@ -1121,22 +1121,24 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 
 | Verb | Element | Context | Reason | Follow-up |
 |---|---|---|---|---|
-| `set` | `paragraph` | `nested-or-unproven-selection` | paragraphs in cells, content controls or wrappers are readable, but their raw transaction position is not proven for editing | L-DOCX-W3 |
-| `set` | `run` | `nested-or-unproven-selection` | the editor addresses only direct runs whose raw ordinal is proven against the paragraph; nested and wrapped run selections are refused | L-DOCX-W2 |
+| `set` | `paragraph` | `wrapped-or-unproven-selection` | paragraphs in cells and content controls are edited through proven element paths (record 0251a); paragraphs in w:customXml wrappers, wrapped rows or cells, or markup-compatibility-selected content have no proven raw position | L-DOCX-W3 |
+| `set` | `run` | `wrapped-or-unproven-selection` | direct runs and direct runs of hyperlinks are edited (record 0251a); runs in tracked changes, smart tags, custom XML or other wrappers, and paragraphs with comment-reference runs, have no proven raw ordinal | L-DOCX-W2 |
 | `set` | `paragraph/run` | `mixed-paragraph-run-fanout` | one DOCX mutation admits one target kind, so a paragraph/run union is refused before staging rather than applying a descendant ordinal to the wrong leaf | M2 (homogeneous mutation fanout) |
 | `set` | `paragraph/run` | `managed-transaction` | the formatting transaction has not proven edit admission and publication for execution-context-managed DOCX owners; the read projection remains available | L-DOCX-W5 |
-| `set` | `paragraph/run` | `complex-leaf-content` | fields, hyperlinks, markup-compatibility branches and other nested or unmodeled run content lack a proven raw ownership and address mapping for leaf edits | L-DOCX-W2 / record 0011 |
+| `set` | `paragraph/run` | `complex-leaf-content` | fields, markup-compatibility branches and other nested or unmodeled run content lack a proven raw ownership and address mapping for leaf edits | L-DOCX-W2 / record 0011 |
 | `add` | `paragraph/run` | `managed-transaction` | structural insertion uses the unmanaged DOCX transaction path; execution-context-managed owners refuse the leaf splice until managed admission is proven | L-DOCX-W5 |
-| `add` | `paragraph` | `nested-or-unproven-parent` | paragraph creation is admitted only under the direct main body, so cells, content controls and other nested parents are refused | L-DOCX-W3 |
-| `add` | `run` | `nested-or-unproven-parent` | run creation is admitted only under a proven direct body paragraph and refuses wrapped or nested paragraph parents | L-DOCX-W2 |
+| `add` | `paragraph` | `wrapped-or-unproven-parent` | paragraphs are added under the body, cells and block content controls (record 0251a); parents whose raw position is not proven are refused | L-DOCX-W3 |
+| `add` | `run` | `wrapped-or-unproven-parent` | runs are added beside the direct runs of any proven paragraph (record 0251a); insertion inside a hyperlink and under wrapped paragraphs is refused | L-DOCX-W2 |
 | `remove` | `paragraph/run` | `managed-transaction` | structural removal uses the unmanaged DOCX transaction path; execution-context-managed owners refuse the leaf splice until managed admission is proven | L-DOCX-W5 |
-| `remove` | `paragraph/run` | `nested-or-unproven-selection` | only direct body paragraphs and their direct runs have transaction positions proven for removal; nested selections are refused | L-DOCX-W2 / L-DOCX-W3 |
+| `remove` | `paragraph/run` | `wrapped-or-unproven-selection` | paragraphs, runs, hyperlinks, tables, rows, cells and content controls are removed through proven element paths (record 0251a); wrapped selections, the last paragraph of a cell, the last cell of a row and the last row of a table are refused | L-DOCX-W2 / L-DOCX-W3 |
 | `remove` | `paragraph/run` | `complex-leaf-content` | paragraph and run dependency scans refuse open ranges, field interiors, tracked changes and story references rather than dropping their relationships | L-DOCX-W2 / record 0011 |
 | `move` | `paragraph/run` | `managed-transaction` | paragraph and direct-run movement use the unmanaged DOCX transaction path; execution-context-managed owners refuse the leaf splice until managed admission is proven | L-DOCX-W5 |
-| `move` | `paragraph/run` | `nested-or-unproven-selection` | only direct main-body paragraphs and their direct runs can be moved; nested and wrapped selections have no proven body or run anchor | L-DOCX-W3 |
+| `move` | `paragraph/run` | `wrapped-or-unproven-selection` | body paragraphs, direct runs, tables, rows and nested paragraphs move through proven anchors (record 0251a); nested runs and wrapped selections have no proven anchor | L-DOCX-W3 |
 | `move` | `paragraph/run` | `complex-leaf-content` | paragraph and direct-run movement preserves exact source fragments but refuses open ranges, field interiors, namespace changes, tracked changes and unmodeled dependencies | L-DOCX-W2 / record 0011 |
 | `swap` | `paragraph/run` | `managed-transaction` | paragraph and direct-run swapping compose unmanaged fragment moves; execution-context-managed owners refuse the leaf splice until managed admission is proven | L-DOCX-W5 |
 | `swap` | `paragraph/run` | `nested-or-unproven-selection` | only direct main-body paragraphs or direct runs can be swapped; nested and wrapped selections have no proven anchors | L-DOCX-W3 |
+| `add` | `cell` | `cell-insertion` | a cell changes the table grid; rows are added with the grid's cells, and adding a single cell is not integrated | M2 (DOCX table grid editing) |
+| `set` | `table/row` | `table-properties` | table and row properties are read and seed new tables and rows; changing them on an existing table is not integrated | M2 (DOCX table properties) |
 | `swap` | `paragraph/run` | `complex-leaf-content` | paragraph and direct-run swapping preserves exact source fragments but refuses field interiors, namespace changes, tracked changes and unmodeled dependencies | L-DOCX-W2 / record 0011 |
 | `create` | `document` | `strict-conformance` | the DOCX creator emits Transitional packages and refuses a Strict conformance request rather than silently downgrading it | CreateOptions::conformance(Conformance::Transitional) |
 | `create` | `document` | `noncore-initial-metadata` | initial metadata outside the DOCX core-properties part is not representable by the creator and is refused rather than dropped | CreateOptions::metadata (DOCX core properties) |

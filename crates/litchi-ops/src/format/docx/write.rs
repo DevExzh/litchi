@@ -14,13 +14,24 @@ use litchi_docx::source_backed;
 use super::Docx;
 use super::DocxEditor;
 use super::Nav;
+use super::element;
 use super::node::{Node, WriteSelection};
 use super::setters::Setter;
-use super::spec::{Kind, PARAGRAPH_REGISTRY, RUN_REGISTRY};
+use super::spec::{CELL_REGISTRY, HYPERLINK_REGISTRY, Kind, PARAGRAPH_REGISTRY, RUN_REGISTRY};
 use crate::error::{Code, Error, Result};
 use crate::props::{IntoProps, Key, PropValue, Props};
 use crate::registry::{Entry, Operation, Table};
 use crate::target::TargetArg;
+
+/// Evaluate `$body` against whichever owner's leaf edit `$work` holds.
+macro_rules! both {
+    ($work:expr, |$edit:ident| $body:expr) => {
+        match $work {
+            WorkEdit::Eager($edit) => $body,
+            WorkEdit::Source($edit) => $body,
+        }
+    };
+}
 
 /// Complete result of one DOCX leaf transaction.
 ///
@@ -46,6 +57,11 @@ impl Commit {
 
     pub(crate) fn into_file(self) -> Docx {
         self.into_parts().0
+    }
+
+    /// The committed handle.
+    pub(super) const fn file(&self) -> &Docx {
+        &self.file
     }
 }
 
@@ -77,15 +93,25 @@ impl Assignment<'_> {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum TargetKind {
     Paragraph,
     Run,
+    Hyperlink,
+    Cell,
 }
 
-#[derive(Clone, Copy)]
+/// Where a set lands: a direct-body paragraph or run on the body-position
+/// route, or any other element through its leaf element path (record 0251a).
+#[derive(Clone)]
+enum Selection {
+    Body(WriteSelection),
+    Element(litchi_docx::document::ElementPath),
+}
+
+#[derive(Clone)]
 struct Target {
-    selection: WriteSelection,
+    selection: Selection,
     kind: TargetKind,
 }
 
@@ -168,7 +194,7 @@ impl Docx {
         }
         for target in &targets {
             for assignment in &assignments {
-                editor.apply_with_policy(target.selection, assignment, command_text)?;
+                editor.apply_with_policy(target, assignment, command_text)?;
             }
         }
         editor.commit(self)
@@ -239,7 +265,7 @@ impl WorkEdit {
         }
         let mut previous = None;
         for target in targets {
-            let WriteSelection::Paragraph(position) = target.selection else {
+            let Selection::Body(WriteSelection::Paragraph(position)) = target.selection else {
                 return Ok(false);
             };
             if previous.is_some_and(|prior| position.get() <= prior) {
@@ -265,7 +291,7 @@ impl WorkEdit {
             .try_reserve_exact(targets.len())
             .map_err(|source| Error::from(crate::transaction::Error::Allocation { source }))?;
         for target in targets {
-            if let WriteSelection::Paragraph(position) = target.selection {
+            if let Selection::Body(WriteSelection::Paragraph(position)) = target.selection {
                 replacements.push(litchi_docx::document::ParagraphTextReplacement::new(
                     position,
                     text.clone(),
@@ -286,16 +312,24 @@ impl WorkEdit {
         Ok(true)
     }
 
-    fn apply(&mut self, selection: WriteSelection, assignment: &Assignment<'_>) -> Result<()> {
-        self.apply_with_policy(selection, assignment, false)
+    fn apply(&mut self, target: &Target, assignment: &Assignment<'_>) -> Result<()> {
+        self.apply_with_policy(target, assignment, false)
     }
 
     fn apply_with_policy(
         &mut self,
-        selection: WriteSelection,
+        target: &Target,
         assignment: &Assignment<'_>,
         command_text: bool,
     ) -> Result<()> {
+        let selection = match &target.selection {
+            Selection::Body(selection) => *selection,
+            Selection::Element(path) => {
+                return self
+                    .apply_element(path, target.kind, assignment)
+                    .map_err(|error| property_error(error, &assignment.key));
+            },
+        };
         let result = match selection {
             WriteSelection::Paragraph(position) => {
                 assignment
@@ -327,6 +361,59 @@ impl WorkEdit {
             },
         };
         result.map_err(|error| property_error(error, &assignment.key))
+    }
+
+    /// Apply one admitted assignment to an element reached by its leaf path.
+    fn apply_element(
+        &mut self,
+        path: &litchi_docx::document::ElementPath,
+        kind: TargetKind,
+        assignment: &Assignment<'_>,
+    ) -> Result<()> {
+        assignment
+            .entry
+            .prepare(Operation::Set, &assignment.value, |setter, value| {
+                if setter.is_text() {
+                    let text = text_value(value)?;
+                    return if kind == TargetKind::Cell {
+                        both!(self, |edit| edit
+                            .replace_cell_text_at(path, text)
+                            .map(|_| ())
+                            .map_err(Error::from))
+                    } else {
+                        both!(self, |edit| edit
+                            .replace_text_at(path, text)
+                            .map(|_| ())
+                            .map_err(Error::from))
+                    };
+                }
+                let mut failure = None;
+                match kind {
+                    TargetKind::Paragraph => both!(self, |edit| edit
+                        .format_paragraph_at(path, |paragraph| {
+                            if let Err(error) = setter.apply_paragraph(paragraph, value) {
+                                failure = Some(error);
+                            }
+                        })
+                        .map(|_| ())
+                        .map_err(Error::from))?,
+                    TargetKind::Run => both!(self, |edit| edit
+                        .format_run_at(path, |run| {
+                            if let Err(error) = setter.apply_run(run, value) {
+                                failure = Some(error);
+                            }
+                        })
+                        .map(|_| ())
+                        .map_err(Error::from))?,
+                    TargetKind::Hyperlink | TargetKind::Cell => {
+                        return Err(Error::new(
+                            Code::UnsupportedProperty,
+                            "the DOCX element accepts only its text property",
+                        ));
+                    },
+                }
+                failure.map_or(Ok(()), Err)
+            })
     }
 
     fn replace_paragraph_text(&mut self, position: Position, text: String) -> Result<()> {
@@ -584,6 +671,71 @@ impl WorkEdit {
         }
     }
 
+    pub(super) fn insert_paragraph_at(
+        &mut self,
+        container: &litchi_docx::document::ElementPath,
+        anchor: litchi_docx::document::ElementAnchor,
+        paragraph: &litchi_docx::document::NewParagraph,
+    ) -> Result<Position> {
+        both!(self, |edit| edit
+            .insert_paragraph_at(container, anchor, paragraph)
+            .map_err(Error::from))
+    }
+
+    pub(super) fn insert_table_at(
+        &mut self,
+        container: &litchi_docx::document::ElementPath,
+        anchor: litchi_docx::document::ElementAnchor,
+        table: &litchi_docx::document::NewTable,
+    ) -> Result<Position> {
+        both!(self, |edit| edit
+            .insert_table_at(container, anchor, table)
+            .map_err(Error::from))
+    }
+
+    pub(super) fn insert_row_at(
+        &mut self,
+        table: &litchi_docx::document::ElementPath,
+        at: Option<Position>,
+        cells: Option<usize>,
+    ) -> Result<Position> {
+        both!(self, |edit| edit
+            .insert_row_at(table, at, cells, &[])
+            .map_err(Error::from))
+    }
+
+    pub(super) fn insert_run_at(
+        &mut self,
+        owner: &litchi_docx::document::ElementPath,
+        at: Option<Position>,
+        run: &litchi_docx::document::NewRun,
+    ) -> Result<Position> {
+        both!(self, |edit| edit
+            .insert_run_at(owner, at, run)
+            .map_err(Error::from))
+    }
+
+    pub(super) fn remove_element_at(
+        &mut self,
+        path: &litchi_docx::document::ElementPath,
+    ) -> Result<()> {
+        both!(self, |edit| edit
+            .remove_element_at(path)
+            .map(|_| ())
+            .map_err(Error::from))
+    }
+
+    pub(super) fn move_element_at(
+        &mut self,
+        path: &litchi_docx::document::ElementPath,
+        container: &litchi_docx::document::ElementPath,
+        anchor: litchi_docx::document::ElementAnchor,
+    ) -> Result<litchi_docx::document::ElementPath> {
+        both!(self, |edit| edit
+            .move_element_at(path, container, anchor)
+            .map_err(Error::from))
+    }
+
     pub(super) fn commit(self, source: &Docx) -> Result<Commit> {
         match self {
             Self::Eager(edit) => {
@@ -616,47 +768,54 @@ fn admit_targets(nodes: Vec<Node<'_>>) -> Result<Vec<Target>> {
     // Cache only within this admission; later operations may have a new body.
     let mut body = None;
     for node in nodes {
-        let (kind, selection) = match node.element_kind() {
-            Kind::Paragraph => (
-                TargetKind::Paragraph,
-                node.write_selection_cached(&mut body)?,
-            ),
-            Kind::Run => (TargetKind::Run, node.write_selection_cached(&mut body)?),
+        let kind = match node.element_kind() {
+            Kind::Paragraph => TargetKind::Paragraph,
+            Kind::Run => TargetKind::Run,
+            Kind::Hyperlink => TargetKind::Hyperlink,
+            Kind::Cell => TargetKind::Cell,
             _ => {
                 return Err(Error::new(
                     Code::UnsupportedElement,
-                    "the DOCX write target must be a paragraph or run",
+                    "the DOCX write target must be a paragraph, run, hyperlink or cell",
                 )
                 .with_format(FileFormat::Docx));
+            },
+        };
+        let selection = match kind {
+            TargetKind::Paragraph | TargetKind::Run => {
+                match node.write_selection_cached(&mut body) {
+                    Ok(selection) => Selection::Body(selection),
+                    // Not a direct-body paragraph or direct run: try the
+                    // element path, which proves nested positions itself.
+                    Err(error) if error.code() == Code::UnsupportedCapability => {
+                        Selection::Element(element::element_path(&node)?)
+                    },
+                    Err(error) => return Err(error),
+                }
+            },
+            TargetKind::Hyperlink | TargetKind::Cell => {
+                Selection::Element(element::element_path(&node)?)
             },
         };
         targets.push(Target { selection, kind });
     }
     let first = targets[0].kind;
-    if targets
-        .iter()
-        .any(|target| !same_target_kind(target.kind, first))
-    {
+    if targets.iter().any(|target| target.kind != first) {
         return Err(Error::new(
             Code::UnsupportedCapability,
-            "one DOCX mutation cannot mix paragraph and run targets",
+            "one DOCX mutation cannot mix target kinds",
         )
         .with_format(FileFormat::Docx));
     }
     Ok(targets)
 }
 
-fn same_target_kind(left: TargetKind, right: TargetKind) -> bool {
-    matches!(
-        (left, right),
-        (TargetKind::Paragraph, TargetKind::Paragraph) | (TargetKind::Run, TargetKind::Run)
-    )
-}
-
 fn admit_assignments<'a>(kind: TargetKind, props: &'a Props<'_>) -> Result<Vec<Assignment<'a>>> {
     match kind {
         TargetKind::Paragraph => admit_table(&PARAGRAPH_REGISTRY, kind, props),
         TargetKind::Run => admit_table(&RUN_REGISTRY, kind, props),
+        TargetKind::Hyperlink => admit_table(&HYPERLINK_REGISTRY, kind, props),
+        TargetKind::Cell => admit_table(&CELL_REGISTRY, kind, props),
     }
 }
 
@@ -688,6 +847,8 @@ fn admit_table<'a, const N: usize, const A: usize>(
                             let mut probe = litchi_docx::properties::Run::default();
                             setter.apply_run(&mut probe, value)?;
                         },
+                        // Their registries hold only `text` as writable.
+                        TargetKind::Hyperlink | TargetKind::Cell => {},
                     }
                     Ok(setter)
                 }

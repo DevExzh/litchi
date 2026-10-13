@@ -4,6 +4,8 @@
 mod attribute_tests;
 mod debug;
 mod durable;
+#[cfg(test)]
+mod element_tests;
 mod formatting;
 #[cfg(test)]
 mod formatting_tests;
@@ -37,7 +39,10 @@ use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 pub(crate) use durable::durable_transfer_operations;
 pub use durable::{Composition, History, JoinError, PreparedEdit, ThreeWayError, ThreeWayPlan};
-pub use formatting::{BodyAnchor, BodyBlock, NewParagraph, NewRun, RunAnchor};
+pub use formatting::{
+    BodyAnchor, BodyBlock, ElementAnchor, ElementPath, ElementStep, MAX_NEW_TABLE_DIMENSION,
+    NewParagraph, NewRun, NewTable, RunAnchor,
+};
 pub use litchi_core::patch::{
     CompositionLimits, HistoryLimits, MergeChoice, SubEditConflict, SubEditJoinFailure,
     ThreeWayMergeFailure,
@@ -2338,6 +2343,47 @@ pub enum Operation {
         /// Exact run XML required at the position.
         xml: Arc<Vec<u8>>,
     },
+    /// Replace the exact bytes of one element reached through a path.
+    ///
+    /// Recorded by the path-addressed edits ([`Edit::format_paragraph_at`],
+    /// [`Edit::format_run_at`], [`Edit::replace_text_at`],
+    /// [`Edit::replace_cell_text_at`], [`Edit::insert_run_at`]).
+    ReplaceElement {
+        /// Path of the element from `w:body`.
+        path: ElementPath,
+        /// Exact element bytes required before the operation.
+        before: Arc<Vec<u8>>,
+        /// Exact element bytes the operation writes.
+        after: Arc<Vec<u8>>,
+    },
+    /// Insert one exact element as a direct child of a container.
+    ///
+    /// Recorded by [`Edit::insert_paragraph_at`], [`Edit::insert_table_at`],
+    /// [`Edit::insert_row_at`] and [`Edit::move_element_at`], and by the
+    /// inverse of [`Self::RemoveElement`].
+    InsertElement {
+        /// Path of the container (the body for the empty path; a content
+        /// control's children are those of its `w:sdtContent`).
+        container: ElementPath,
+        /// Index among the container's direct element children that the
+        /// element has after the insertion.
+        child: Position,
+        /// Exact element XML.
+        xml: Arc<Vec<u8>>,
+    },
+    /// Remove one exact direct child element of a container.
+    ///
+    /// Recorded by [`Edit::remove_element_at`] and
+    /// [`Edit::move_element_at`]; see [`Self::InsertElement`].
+    RemoveElement {
+        /// Path of the container.
+        container: ElementPath,
+        /// Index of the element among the container's direct element
+        /// children.
+        child: Position,
+        /// Exact element XML required at the index.
+        xml: Arc<Vec<u8>>,
+    },
 }
 
 impl Operation {
@@ -2368,7 +2414,10 @@ impl Operation {
             | Self::InsertParagraphFragment { .. }
             | Self::RemoveParagraphFragment { .. }
             | Self::InsertRun { .. }
-            | Self::RemoveRun { .. } => true,
+            | Self::RemoveRun { .. }
+            | Self::ReplaceElement { .. }
+            | Self::InsertElement { .. }
+            | Self::RemoveElement { .. } => true,
             Self::InsertTransferredParagraph { .. } | Self::RemoveTransferredParagraph { .. } => {
                 false
             },
@@ -2390,6 +2439,9 @@ impl Operation {
                 | Self::RemoveParagraphFragment { .. }
                 | Self::InsertRun { .. }
                 | Self::RemoveRun { .. }
+                | Self::ReplaceElement { .. }
+                | Self::InsertElement { .. }
+                | Self::RemoveElement { .. }
         )
     }
 
@@ -2697,6 +2749,33 @@ impl Operation {
                 paragraph: *paragraph,
                 child: *child,
                 run: *run,
+                xml: Arc::clone(xml),
+            },
+            Self::ReplaceElement {
+                path,
+                before,
+                after,
+            } => Self::ReplaceElement {
+                path: path.clone(),
+                before: Arc::clone(after),
+                after: Arc::clone(before),
+            },
+            Self::InsertElement {
+                container,
+                child,
+                xml,
+            } => Self::RemoveElement {
+                container: container.clone(),
+                child: *child,
+                xml: Arc::clone(xml),
+            },
+            Self::RemoveElement {
+                container,
+                child,
+                xml,
+            } => Self::InsertElement {
+                container: container.clone(),
+                child: *child,
                 xml: Arc::clone(xml),
             },
         }
@@ -5699,6 +5778,21 @@ impl Edit {
                 run,
                 xml,
             } => self.remove_run_fragment(*paragraph, *child, *run, xml),
+            Operation::ReplaceElement {
+                path,
+                before,
+                after,
+            } => self.replace_element(path, before, after),
+            Operation::InsertElement {
+                container,
+                child,
+                xml,
+            } => self.insert_element(container, *child, xml),
+            Operation::RemoveElement {
+                container,
+                child,
+                xml,
+            } => self.remove_element(container, *child, xml),
         }
     }
 
@@ -6663,7 +6757,12 @@ fn operation_string_bytes(operation: &Operation) -> usize {
         Operation::InsertParagraphFragment { xml, .. }
         | Operation::RemoveParagraphFragment { xml, .. }
         | Operation::InsertRun { xml, .. }
-        | Operation::RemoveRun { xml, .. } => xml.capacity(),
+        | Operation::RemoveRun { xml, .. }
+        | Operation::InsertElement { xml, .. }
+        | Operation::RemoveElement { xml, .. } => xml.capacity(),
+        Operation::ReplaceElement { before, after, .. } => {
+            before.capacity().saturating_add(after.capacity())
+        },
     }
 }
 

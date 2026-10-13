@@ -58,12 +58,13 @@ pub use blocks::{BlockContentControl, BlockKind, Blocks, IndexedBlock};
 pub(crate) use blocks::{BlockIndex, ContainerRoot, index as index_blocks};
 pub use model::{Block, Document, Element, ImageWatermarkPart, OpaqueBlock};
 pub use transaction::{
-    BodyAnchor, BodyBlock, CompactionPolicy, Composition, CompositionLimits, Diagnostics, Error,
-    History, HistoryLimits, HyperlinkTextReplacement, JoinError, MergeChoice, NewParagraph, NewRun,
-    Operation, ParagraphHyperlinkAddress, ParagraphTextReplacement, ParagraphTransfer, Patch,
-    PreparedEdit, Refusal, Result, RevisionAction, RevisionKind, RevisionSelector, RunAnchor,
-    Snapshot, SubEditConflict, SubEditJoinFailure, TableCellAddress, ThreeWayError,
-    ThreeWayMergeFailure, ThreeWayPlan, TransferGraph, TransferRefusal,
+    BodyAnchor, BodyBlock, CompactionPolicy, Composition, CompositionLimits, Diagnostics,
+    ElementAnchor, ElementPath, ElementStep, Error, History, HistoryLimits,
+    HyperlinkTextReplacement, JoinError, MAX_NEW_TABLE_DIMENSION, MergeChoice, NewParagraph,
+    NewRun, NewTable, Operation, ParagraphHyperlinkAddress, ParagraphTextReplacement,
+    ParagraphTransfer, Patch, PreparedEdit, Refusal, Result, RevisionAction, RevisionKind,
+    RevisionSelector, RunAnchor, Snapshot, SubEditConflict, SubEditJoinFailure, TableCellAddress,
+    ThreeWayError, ThreeWayMergeFailure, ThreeWayPlan, TransferGraph, TransferRefusal,
 };
 
 /// Explicit native identifiers for indexed document blocks.

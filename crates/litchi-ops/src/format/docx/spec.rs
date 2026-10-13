@@ -446,6 +446,38 @@ const fn add_only_run(
     }
 }
 
+/// A read property that also seeds a newly added element (record 0251a).
+const fn read_add(
+    name: &'static str,
+    ty: ValueType,
+    setter: Setter,
+    constraint: Constraint,
+) -> crate::registry::Entry<Setter> {
+    crate::registry::Entry {
+        spec: PropSpec::new(name, ty),
+        access: crate::registry::Access::Add(setter),
+        constraint,
+        clear: false,
+    }
+}
+
+/// A property accepted only while adding an element.
+const fn add_only(
+    name: &'static str,
+    ty: ValueType,
+    setter: Setter,
+    constraint: Constraint,
+) -> crate::registry::Entry<Setter> {
+    let mut spec = PropSpec::new(name, ty);
+    spec.access.get = false;
+    crate::registry::Entry {
+        spec,
+        access: crate::registry::Access::Add(setter),
+        constraint,
+        clear: false,
+    }
+}
+
 /// One write-only property declaration.  Text has a dedicated write handler
 /// but is intentionally absent from the read model; the appended registry
 /// row keeps all pre-existing paragraph/run read indices stable.
@@ -608,7 +640,7 @@ crate::registry::registry! {
 // `HyperlinkToNode`, in its order: the link's attributes, then the
 // formatting of its first run that holds text.
 crate::registry::registry! {
-    pub(crate) HYPERLINK_PROPS, HYPERLINK_REGISTRY: () {
+    pub(crate) HYPERLINK_PROPS, HYPERLINK_REGISTRY: Setter {
     crate::registry::Entry::read(PropSpec::new("url", ValueType::Text)),
     crate::registry::Entry::read(PropSpec::new("anchor", ValueType::Text)),
     crate::registry::Entry::read(PropSpec::new("docLocation", ValueType::Text)),
@@ -625,6 +657,7 @@ crate::registry::registry! {
     crate::registry::Entry::read(PropSpec::new("strike", ValueType::Bool)),
     crate::registry::Entry::read(PropSpec::new("highlight", ValueType::Token(&HIGHLIGHT))),
     crate::registry::Entry::read(PropSpec::new("rStyle", ValueType::Text)),
+    write_only("text", ValueType::Text, Setter::HyperlinkText),
     }
 }
 
@@ -632,10 +665,10 @@ crate::registry::registry! {
 // `width` is a string (`"5000"`, `"50%"`, `"auto"`) and `indent` a number
 // of twips or a percentage string.
 crate::registry::registry! {
-    pub(crate) TABLE_PROPS, TABLE_REGISTRY: () {
-    crate::registry::Entry::read(PropSpec::new("cols", ValueType::Text)),
-    crate::registry::Entry::read(PropSpec::new("rows", ValueType::Text)),
-    crate::registry::Entry::read(PropSpec::new("style", ValueType::Text)),
+    pub(crate) TABLE_PROPS, TABLE_REGISTRY: Setter {
+    read_add("cols", ValueType::Text, Setter::TableColumns, Constraint::NotEmpty),
+    read_add("rows", ValueType::Text, Setter::TableRows, Constraint::NotEmpty),
+    read_add("style", ValueType::Text, Setter::TableStyle, Constraint::NotEmpty),
     crate::registry::Entry::read(PropSpec::new("rowBandSize", ValueType::Int)),
     crate::registry::Entry::read(PropSpec::new("colBandSize", ValueType::Int)),
     crate::registry::Entry::read(PropSpec::new("width", ValueType::Text)),
@@ -657,14 +690,15 @@ crate::registry::registry! {
     crate::registry::Entry::read(PropSpec::new("bandedCols", ValueType::Bool)),
     crate::registry::Entry::read(PropSpec::new("caption", ValueType::Text)),
     crate::registry::Entry::read(PropSpec::new("description", ValueType::Text)),
-    crate::registry::Entry::read(PropSpec::new("colWidths", ValueType::Text)),
+    read_add("colWidths", ValueType::Text, Setter::TableColumnWidths, Constraint::NotEmpty),
+    add_only("data", ValueType::Text, Setter::TableData, Constraint::None),
     }
 }
 
 // `ReadRowProps`, in its order. Heights and widths are strings with a
 // `dxa` unit there, grid counts strings.
 crate::registry::registry! {
-    pub(crate) ROW_PROPS, ROW_REGISTRY: () {
+    pub(crate) ROW_PROPS, ROW_REGISTRY: Setter {
     crate::registry::Entry::read(PropSpec::new("height", ValueType::Text)),
     crate::registry::Entry::read(PropSpec::new("height.rule", ValueType::Token(&HEIGHT_RULE))),
     crate::registry::Entry::read(PropSpec::new("header", ValueType::Bool)),
@@ -676,13 +710,14 @@ crate::registry::registry! {
     crate::registry::Entry::read(PropSpec::new("gridAfter", ValueType::Text)),
     crate::registry::Entry::read(PropSpec::new("wAfter", ValueType::Text)),
     crate::registry::Entry::read(PropSpec::new("cellSpacing", ValueType::Int)),
+    add_only("cols", ValueType::Int, Setter::RowColumns, Constraint::Int { min: 1, max: 4096 }),
     }
 }
 
 // `ReadCellProps`, in its order. `width` is a string (`"2880dxa"`,
 // `"50%"`, `"auto"`, `"nil"`) there.
 crate::registry::registry! {
-    pub(crate) CELL_PROPS, CELL_REGISTRY: () {
+    pub(crate) CELL_PROPS, CELL_REGISTRY: Setter {
     crate::registry::Entry::read(PropSpec::new("width", ValueType::Text)),
     crate::registry::Entry::read(PropSpec::new("valign", ValueType::Token(&VALIGN))),
     crate::registry::Entry::read(PropSpec::new("vmerge", ValueType::Token(&MERGE))),
@@ -696,6 +731,7 @@ crate::registry::registry! {
     crate::registry::Entry::read(PropSpec::new("nowrap", ValueType::Bool)),
     crate::registry::Entry::read(PropSpec::new("hideMark", ValueType::Bool)),
     crate::registry::Entry::read(PropSpec::new("tcFitText", ValueType::Bool)),
+    write_only("text", ValueType::Text, Setter::CellText),
     }
 }
 
@@ -1257,21 +1293,21 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 subject: Subject::Operation {
                     verb: "set",
                     element: "paragraph",
-                    context: "nested-or-unproven-selection",
+                    context: "wrapped-or-unproven-selection",
                 },
                 code: Code::UnsupportedCapability,
                 follow_up: "L-DOCX-W3",
-                reason: "paragraphs in cells, content controls or wrappers are readable, but their raw transaction position is not proven for editing",
+                reason: "paragraphs in cells and content controls are edited through proven element paths (record 0251a); paragraphs in w:customXml wrappers, wrapped rows or cells, or markup-compatibility-selected content have no proven raw position",
             },
             GapSpec {
                 subject: Subject::Operation {
                     verb: "set",
                     element: "run",
-                    context: "nested-or-unproven-selection",
+                    context: "wrapped-or-unproven-selection",
                 },
                 code: Code::UnsupportedCapability,
                 follow_up: "L-DOCX-W2",
-                reason: "the editor addresses only direct runs whose raw ordinal is proven against the paragraph; nested and wrapped run selections are refused",
+                reason: "direct runs and direct runs of hyperlinks are edited (record 0251a); runs in tracked changes, smart tags, custom XML or other wrappers, and paragraphs with comment-reference runs, have no proven raw ordinal",
             },
             GapSpec {
                 subject: Subject::Operation {
@@ -1301,7 +1337,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 },
                 code: Code::UnsupportedCapability,
                 follow_up: "L-DOCX-W2 / record 0011",
-                reason: "fields, hyperlinks, markup-compatibility branches and other nested or unmodeled run content lack a proven raw ownership and address mapping for leaf edits",
+                reason: "fields, markup-compatibility branches and other nested or unmodeled run content lack a proven raw ownership and address mapping for leaf edits",
             },
             GapSpec {
                 subject: Subject::Operation {
@@ -1317,21 +1353,21 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 subject: Subject::Operation {
                     verb: "add",
                     element: "paragraph",
-                    context: "nested-or-unproven-parent",
+                    context: "wrapped-or-unproven-parent",
                 },
                 code: Code::UnsupportedCapability,
                 follow_up: "L-DOCX-W3",
-                reason: "paragraph creation is admitted only under the direct main body, so cells, content controls and other nested parents are refused",
+                reason: "paragraphs are added under the body, cells and block content controls (record 0251a); parents whose raw position is not proven are refused",
             },
             GapSpec {
                 subject: Subject::Operation {
                     verb: "add",
                     element: "run",
-                    context: "nested-or-unproven-parent",
+                    context: "wrapped-or-unproven-parent",
                 },
                 code: Code::UnsupportedCapability,
                 follow_up: "L-DOCX-W2",
-                reason: "run creation is admitted only under a proven direct body paragraph and refuses wrapped or nested paragraph parents",
+                reason: "runs are added beside the direct runs of any proven paragraph (record 0251a); insertion inside a hyperlink and under wrapped paragraphs is refused",
             },
             GapSpec {
                 subject: Subject::Operation {
@@ -1347,11 +1383,11 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 subject: Subject::Operation {
                     verb: "remove",
                     element: "paragraph/run",
-                    context: "nested-or-unproven-selection",
+                    context: "wrapped-or-unproven-selection",
                 },
                 code: Code::UnsupportedCapability,
                 follow_up: "L-DOCX-W2 / L-DOCX-W3",
-                reason: "only direct body paragraphs and their direct runs have transaction positions proven for removal; nested selections are refused",
+                reason: "paragraphs, runs, hyperlinks, tables, rows, cells and content controls are removed through proven element paths (record 0251a); wrapped selections, the last paragraph of a cell, the last cell of a row and the last row of a table are refused",
             },
             GapSpec {
                 subject: Subject::Operation {
@@ -1377,11 +1413,11 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 subject: Subject::Operation {
                     verb: "move",
                     element: "paragraph/run",
-                    context: "nested-or-unproven-selection",
+                    context: "wrapped-or-unproven-selection",
                 },
                 code: Code::UnsupportedCapability,
                 follow_up: "L-DOCX-W3",
-                reason: "only direct main-body paragraphs and their direct runs can be moved; nested and wrapped selections have no proven body or run anchor",
+                reason: "body paragraphs, direct runs, tables, rows and nested paragraphs move through proven anchors (record 0251a); nested runs and wrapped selections have no proven anchor",
             },
             GapSpec {
                 subject: Subject::Operation {
@@ -1412,6 +1448,26 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 code: Code::UnsupportedCapability,
                 follow_up: "L-DOCX-W3",
                 reason: "only direct main-body paragraphs or direct runs can be swapped; nested and wrapped selections have no proven anchors",
+            },
+            GapSpec {
+                subject: Subject::Operation {
+                    verb: "add",
+                    element: "cell",
+                    context: "cell-insertion",
+                },
+                code: Code::UnsupportedCapability,
+                follow_up: "M2 (DOCX table grid editing)",
+                reason: "a cell changes the table grid; rows are added with the grid's cells, and adding a single cell is not integrated",
+            },
+            GapSpec {
+                subject: Subject::Operation {
+                    verb: "set",
+                    element: "table/row",
+                    context: "table-properties",
+                },
+                code: Code::UnsupportedCapability,
+                follow_up: "M2 (DOCX table properties)",
+                reason: "table and row properties are read and seed new tables and rows; changing them on an existing table is not integrated",
             },
             GapSpec {
                 subject: Subject::Operation {

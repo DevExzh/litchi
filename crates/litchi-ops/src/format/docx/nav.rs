@@ -80,13 +80,7 @@ pub(super) fn body_node(docx: &Docx) -> Result<Node<'_>> {
 /// The direct hyperlinks of a main-story paragraph, with their targets
 /// resolved through the main part's relationships.
 pub(super) fn hyperlinks(docx: &Docx, paragraph: &Paragraph) -> Result<Vec<InlineHyperlink>> {
-    let inlines = match docx.owner() {
-        DocxOwner::Eager(package) => {
-            let document = package.document()?;
-            paragraph.inlines_with_relationships(document.part().part().rels())?
-        },
-        DocxOwner::Source(package) => package.paragraph_inlines(paragraph)?,
-    };
+    let inlines = inlines(docx, paragraph)?;
     Ok(inlines
         .into_iter()
         .filter_map(|inline| match inline {
@@ -94,6 +88,18 @@ pub(super) fn hyperlinks(docx: &Docx, paragraph: &Paragraph) -> Result<Vec<Inlin
             _ => None,
         })
         .collect())
+}
+
+/// The inline children of a main-story paragraph, with hyperlinks resolved
+/// through the main part's relationships.
+pub(super) fn inlines(docx: &Docx, paragraph: &Paragraph) -> Result<Vec<Inline>> {
+    Ok(match docx.owner() {
+        DocxOwner::Eager(package) => {
+            let document = package.document()?;
+            paragraph.inlines_with_relationships(document.part().part().rels())?
+        },
+        DocxOwner::Source(package) => package.paragraph_inlines(paragraph)?,
+    })
 }
 
 /// What a container selection picked.

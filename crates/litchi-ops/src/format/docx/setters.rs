@@ -20,6 +20,22 @@ use crate::value::{Base, Length, LengthContext, Scalar, Scheme, parse_number};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Setter {
     ParagraphText,
+    /// A hyperlink's display text (record 0251a).
+    HyperlinkText,
+    /// A table cell's text, replacing its content with one paragraph.
+    CellText,
+    /// A new table's row count.
+    TableRows,
+    /// A new table's column count.
+    TableColumns,
+    /// A new table's style identifier.
+    TableStyle,
+    /// A new table's comma-separated grid widths, in twips.
+    TableColumnWidths,
+    /// A new table's cell text: rows separated by `;`, cells by `,`.
+    TableData,
+    /// A new row's cell count.
+    RowColumns,
     ParagraphStyle,
     ParagraphAlign,
     ParagraphSpaceBefore,
@@ -93,7 +109,10 @@ impl Setter {
     /// Whether this setter is handled by a text replacement operation rather
     /// than a direct-property formatting closure.
     pub(crate) const fn is_text(self) -> bool {
-        matches!(self, Self::ParagraphText | Self::RunText)
+        matches!(
+            self,
+            Self::ParagraphText | Self::RunText | Self::HyperlinkText | Self::CellText
+        )
     }
 
     /// Apply a paragraph property through the leaf's typed formatting model.
@@ -103,7 +122,9 @@ impl Setter {
         value: Option<Scalar<'_>>,
     ) -> Result<()> {
         match self {
-            Self::ParagraphText | Self::RunText => Err(unsupported_text()),
+            Self::ParagraphText | Self::RunText | Self::HyperlinkText | Self::CellText => {
+                Err(unsupported_text())
+            },
             Self::ParagraphStyle => {
                 paragraph.style = text(value)?.map(str::to_owned);
                 Ok(())
@@ -313,7 +334,9 @@ impl Setter {
     /// Apply a run property through the leaf's typed formatting model.
     pub(crate) fn apply_run(self, run: &mut direct::Run, value: Option<Scalar<'_>>) -> Result<()> {
         match self {
-            Self::ParagraphText | Self::RunText => Err(unsupported_text()),
+            Self::ParagraphText | Self::RunText | Self::HyperlinkText | Self::CellText => {
+                Err(unsupported_text())
+            },
             Self::RunFontLatin => {
                 let value = text(value)?.map(str::to_owned);
                 let fonts = run.fonts.get_or_insert_default();

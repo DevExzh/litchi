@@ -878,7 +878,10 @@ fn history_graph_transition(
             | Operation::InsertParagraphFragment { .. }
             | Operation::RemoveParagraphFragment { .. }
             | Operation::InsertRun { .. }
-            | Operation::RemoveRun { .. } => None,
+            | Operation::RemoveRun { .. }
+            | Operation::ReplaceElement { .. }
+            | Operation::InsertElement { .. }
+            | Operation::RemoveElement { .. } => None,
         };
         if let Some(selected_transition) = candidate {
             if selected.is_some() {
@@ -1198,6 +1201,21 @@ fn operation_effects(
                 // selector of the paragraph reads this key.
                 reads.push("body/paragraph-order".to_owned());
                 writes.push(format!("body/paragraph:{}/all-text", paragraph.get()));
+            },
+            Operation::ReplaceElement { path, .. } => {
+                // A path-addressed element is reached through the body's
+                // block order; a direct-body paragraph's whole text changes
+                // with it.
+                reads.push("body/paragraph-order".to_owned());
+                if let Some(super::ElementStep::Paragraph(position)) = path.steps().first() {
+                    writes.push(format!("body/paragraph:{}/all-text", position.get()));
+                }
+                writes.push(format!("body/element:{path}"));
+            },
+            Operation::InsertElement { container, .. }
+            | Operation::RemoveElement { container, .. } => {
+                writes.push("body/paragraph-order".to_owned());
+                writes.push(format!("body/element:{container}/children"));
             },
         }
     }
@@ -1678,6 +1696,36 @@ fn durable_operation(
             ),
             markup_value(xml, "run")?,
         ),
+        Operation::ReplaceElement {
+            path,
+            before,
+            after,
+        } => {
+            preconditions.insert("before".to_owned(), markup_value(before, "element")?);
+            (
+                "element.replace",
+                format!("element:{path}"),
+                markup_value(after, "element")?,
+            )
+        },
+        Operation::InsertElement {
+            container,
+            child,
+            xml,
+        } => (
+            "element.insert",
+            format!("container:{container}/child:{}", child.get()),
+            markup_value(xml, "element")?,
+        ),
+        Operation::RemoveElement {
+            container,
+            child,
+            xml,
+        } => (
+            "element.remove",
+            format!("container:{container}/child:{}", child.get()),
+            markup_value(xml, "element")?,
+        ),
     };
     PatchOperation::new(limits, name, target, preconditions, value)
 }
@@ -1782,7 +1830,10 @@ fn restore_transfer_operation(
         | Operation::InsertParagraphFragment { .. }
         | Operation::RemoveParagraphFragment { .. }
         | Operation::InsertRun { .. }
-        | Operation::RemoveRun { .. } => return Ok(None),
+        | Operation::RemoveRun { .. }
+        | Operation::ReplaceElement { .. }
+        | Operation::InsertElement { .. }
+        | Operation::RemoveElement { .. } => return Ok(None),
     };
     let graph_identifier = blobs.insert(encode_transfer_graph(graph)?)?;
     let mut preconditions = artifact_precondition(artifact);
@@ -2185,6 +2236,42 @@ fn parse_durable_operation(
                 Operation::RemoveParagraphFragment {
                     child,
                     position,
+                    xml,
+                }
+            })
+        },
+        "element.replace" if operation.preconditions.len() == 3 => {
+            let path = operation
+                .target
+                .strip_prefix("element:")
+                .and_then(super::ElementPath::parse)
+                .ok_or_else(|| invalid_durable("invalid element target"))?;
+            Ok(Operation::ReplaceElement {
+                path,
+                before: Arc::new(before()?.into_bytes()),
+                after: Arc::new(after()?.into_bytes()),
+            })
+        },
+        "element.insert" | "element.remove" if operation.preconditions.len() == 2 => {
+            let target = || invalid_durable("invalid element container target");
+            let rest = operation
+                .target
+                .strip_prefix("container:")
+                .ok_or_else(target)?;
+            let (container, child) = rest.rsplit_once("/child:").ok_or_else(target)?;
+            let container = super::ElementPath::parse(container).ok_or_else(target)?;
+            let child = parse_position(child)?;
+            let xml = Arc::new(after()?.into_bytes());
+            Ok(if operation.op == "element.insert" {
+                Operation::InsertElement {
+                    container,
+                    child,
+                    xml,
+                }
+            } else {
+                Operation::RemoveElement {
+                    container,
+                    child,
                     xml,
                 }
             })

@@ -14,7 +14,7 @@ use litchi_docx::{BlockKind, IndexedBlock};
 
 use super::Docx;
 use super::Nav;
-use super::node::{Node, WriteSelection};
+use super::node::{Node, Value, WriteSelection};
 use super::setters::Setter;
 use super::spec::{Kind, PARAGRAPH_REGISTRY, RUN_REGISTRY};
 use super::write::{Commit, WorkEdit};
@@ -99,7 +99,16 @@ impl Docx {
                 )
             },
             (NewKind::Run, Kind::Paragraph) => {
-                let selection = parent.write_selection()?;
+                let selection = match parent.write_selection() {
+                    Ok(selection) => selection,
+                    // A nested paragraph, or a body paragraph whose
+                    // addressable runs include hyperlink runs, takes the
+                    // element-path route.
+                    Err(error) if error.code() == Code::UnsupportedCapability => {
+                        return self.add_nested(editor, &parent, kind, &node);
+                    },
+                    Err(error) => return Err(error),
+                };
                 let paragraph = match selection {
                     WriteSelection::Paragraph(position) => position,
                     WriteSelection::Run { .. } => {
@@ -108,6 +117,16 @@ impl Docx {
                         ));
                     },
                 };
+                // Hyperlink runs make the addressable run axis differ from
+                // the direct runs the body route counts.
+                if let Value::Paragraph {
+                    paragraph: value, ..
+                } = &parent.value
+                    && super::element::run_locations(self, value)
+                        .is_ok_and(|locations| locations.iter().any(|location| location.len() != 1))
+                {
+                    return self.add_nested(editor, &parent, kind, &node);
+                }
                 let run = new_run(node.props())?;
                 let at = run_position(self, &parent, placement.as_ref())?;
                 (
@@ -115,15 +134,11 @@ impl Docx {
                     PlannedAnchor::Run { paragraph, at },
                 )
             },
-            (NewKind::Paragraph, _) => {
-                return Err(refusal(
-                    "a DOCX paragraph can only be added directly under the main body",
-                ));
-            },
             (NewKind::Run, _) => {
-                return Err(refusal(
-                    "a DOCX run can only be added under a direct body paragraph",
-                ));
+                return Err(refusal("a DOCX run can only be added under a paragraph"));
+            },
+            (NewKind::Paragraph | NewKind::Table | NewKind::Row, _) => {
+                return self.add_nested(editor, &parent, kind, &node);
             },
         };
         self.owner().check_source()?;
@@ -158,7 +173,20 @@ impl Docx {
     fn remove_inner<'p>(&self, target: TargetArg<'p>) -> Result<Commit> {
         let editor = self.edit()?;
         let nodes = self.resolve_targets(&target)?;
-        let selections = admit_remove(nodes)?;
+        let selections = match admit_remove(&nodes) {
+            Ok(selections) => selections,
+            // Anything beyond direct-body paragraphs and runs takes the
+            // element-path route.
+            Err(error)
+                if matches!(
+                    error.code(),
+                    Code::UnsupportedCapability | Code::UnsupportedElement
+                ) =>
+            {
+                return self.remove_nested(editor, &nodes);
+            },
+            Err(error) => return Err(error),
+        };
         self.owner().check_source()?;
         if selections.is_empty() {
             return WorkEdit::from(editor)?.commit(self);
@@ -188,7 +216,13 @@ impl Docx {
     fn move_inner<'p, 'q>(&self, path: PathArg<'p>, placement: Placement<'q>) -> Result<Commit> {
         let editor = self.edit()?;
         let node = resolve_path(self, &path)?;
-        let selection = Selection::from_node(&node)?;
+        let selection = match Selection::from_node(&node) {
+            Ok(selection) => selection,
+            Err(error) if error.code() == Code::UnsupportedCapability => {
+                return self.move_nested(editor, &node, &placement);
+            },
+            Err(error) => return Err(error),
+        };
         let destination = match selection {
             Selection::Paragraph(position) => {
                 MoveDestination::Paragraph(move_anchor(self, &node, position, &placement)?)
@@ -284,9 +318,11 @@ impl Docx {
 }
 
 #[derive(Clone, Copy)]
-enum NewKind {
+pub(super) enum NewKind {
     Paragraph,
     Run,
+    Table,
+    Row,
 }
 
 enum PlannedNode {
@@ -315,6 +351,10 @@ fn new_kind(name: &str) -> Result<NewKind> {
         Ok(NewKind::Paragraph)
     } else if name.eq_ignore_ascii_case("r") || name.eq_ignore_ascii_case("run") {
         Ok(NewKind::Run)
+    } else if name.eq_ignore_ascii_case("tbl") || name.eq_ignore_ascii_case("table") {
+        Ok(NewKind::Table)
+    } else if name.eq_ignore_ascii_case("tr") || name.eq_ignore_ascii_case("row") {
+        Ok(NewKind::Row)
     } else {
         Err(Error::new(
             Code::UnsupportedElement,
@@ -324,7 +364,7 @@ fn new_kind(name: &str) -> Result<NewKind> {
     }
 }
 
-fn resolve_path<'f>(docx: &'f Docx, path: &PathArg<'_>) -> Result<Node<'f>> {
+pub(super) fn resolve_path<'f>(docx: &'f Docx, path: &PathArg<'_>) -> Result<Node<'f>> {
     crate::path::resolve::get(&Nav::new(docx), path)
 }
 
@@ -374,7 +414,7 @@ fn insert_command_paragraphs(
     first.ok_or_else(|| internal("paragraph splitting produced no paragraph"))
 }
 
-fn new_paragraph(props: &Props<'_>) -> Result<NewParagraph> {
+pub(super) fn new_paragraph(props: &Props<'_>) -> Result<NewParagraph> {
     let mut paragraph = NewParagraph::new();
     let mut run = NewRun::new("");
     let mut has_run = false;
@@ -399,7 +439,7 @@ fn new_paragraph(props: &Props<'_>) -> Result<NewParagraph> {
     Ok(paragraph)
 }
 
-fn new_run(props: &Props<'_>) -> Result<NewRun> {
+pub(super) fn new_run(props: &Props<'_>) -> Result<NewRun> {
     let mut run = NewRun::new("");
     let mut has_text = false;
     for (key, value) in props.iter() {
@@ -806,11 +846,11 @@ fn is_direct_body(node: &Node<'_>) -> bool {
     steps.len() == 2 && steps.first().is_some_and(|step| step.name() == "body")
 }
 
-fn admit_remove(nodes: Vec<Node<'_>>) -> Result<Vec<Selection>> {
+fn admit_remove(nodes: &[Node<'_>]) -> Result<Vec<Selection>> {
     let mut selections = Vec::with_capacity(nodes.len());
     for node in nodes {
         match node.element_kind() {
-            Kind::Paragraph | Kind::Run => selections.push(Selection::from_node(&node)?),
+            Kind::Paragraph | Kind::Run => selections.push(Selection::from_node(node)?),
             _ => {
                 return Err(refusal(
                     "the DOCX structural remove target must be a paragraph or run",

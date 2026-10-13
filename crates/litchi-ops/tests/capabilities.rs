@@ -133,15 +133,20 @@ fn ordinary_reports_hide_native_selection_fields() {
     assert!(!serialized.contains("<id>"));
     for element in caps.elements() {
         let writable_element = matches!(element.name(), "paragraph" | "run");
-        if writable_element {
-            assert!(element.operations().set);
-            assert!(element.operations().add);
-            assert!(element.operations().remove);
-        } else {
-            assert!(!element.operations().set);
-            assert!(!element.operations().add);
-            assert!(!element.operations().remove);
-        }
+        let operations = element.operations();
+        // Record 0251a: cells and hyperlinks take `text`; tables and rows
+        // are added and removed; cells, hyperlinks and content controls are
+        // removed.
+        let (set, add, remove) = match element.name() {
+            "paragraph" | "run" => (true, true, true),
+            "hyperlink" | "cell" => (true, false, true),
+            "table" | "row" => (false, true, true),
+            "sdt" => (false, false, true),
+            _ => (false, false, false),
+        };
+        assert_eq!(operations.set, set, "{} set", element.name());
+        assert_eq!(operations.add, add, "{} add", element.name());
+        assert_eq!(operations.remove, remove, "{} remove", element.name());
         for property in element.properties() {
             if writable_element {
                 let paragraph_initial_run = element.name() == "paragraph"
@@ -203,6 +208,19 @@ fn ordinary_reports_hide_native_selection_fields() {
                     assert!(!property.set(), "{}", property.name());
                     assert!(!property.add(), "{}", property.name());
                 }
+            } else if property.name() == "text" {
+                // `text` of a hyperlink or cell is write-only.
+                assert!(!property.get(), "{} text", element.name());
+                assert!(property.set(), "{} text", element.name());
+            } else if matches!(element.name(), "table" | "row")
+                && matches!(
+                    property.name(),
+                    "cols" | "rows" | "style" | "colWidths" | "data"
+                )
+            {
+                // Seeds of a new table or row.
+                assert!(!property.set(), "{} {}", element.name(), property.name());
+                assert!(property.add(), "{} {}", element.name(), property.name());
             } else {
                 assert!(property.get());
                 assert!(!property.set());
@@ -224,7 +242,7 @@ fn docx_write_context_gaps_are_explicit() {
         .collect();
     assert_eq!(
         operation_gaps.len(),
-        25 + if cfg!(feature = "encryption") { 8 } else { 0 }
+        27 + if cfg!(feature = "encryption") { 8 } else { 0 }
     );
 
     let subjects: Vec<_> = operation_gaps.iter().map(|gap| gap.subject()).collect();
@@ -232,12 +250,12 @@ fn docx_write_context_gaps_are_explicit() {
         Subject::Operation {
             verb: "set",
             element: "paragraph",
-            context: "nested-or-unproven-selection",
+            context: "wrapped-or-unproven-selection",
         },
         Subject::Operation {
             verb: "set",
             element: "run",
-            context: "nested-or-unproven-selection",
+            context: "wrapped-or-unproven-selection",
         },
         Subject::Operation {
             verb: "set",
@@ -262,12 +280,12 @@ fn docx_write_context_gaps_are_explicit() {
         Subject::Operation {
             verb: "add",
             element: "paragraph",
-            context: "nested-or-unproven-parent",
+            context: "wrapped-or-unproven-parent",
         },
         Subject::Operation {
             verb: "add",
             element: "run",
-            context: "nested-or-unproven-parent",
+            context: "wrapped-or-unproven-parent",
         },
         Subject::Operation {
             verb: "remove",
@@ -277,7 +295,7 @@ fn docx_write_context_gaps_are_explicit() {
         Subject::Operation {
             verb: "remove",
             element: "paragraph/run",
-            context: "nested-or-unproven-selection",
+            context: "wrapped-or-unproven-selection",
         },
         Subject::Operation {
             verb: "remove",
@@ -292,7 +310,7 @@ fn docx_write_context_gaps_are_explicit() {
         Subject::Operation {
             verb: "move",
             element: "paragraph/run",
-            context: "nested-or-unproven-selection",
+            context: "wrapped-or-unproven-selection",
         },
         Subject::Operation {
             verb: "move",

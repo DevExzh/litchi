@@ -14,7 +14,7 @@ impl Plan {
     }
     fn stage(&self, edit: &mut WorkEdit) -> Result<()> {
         for assignment in &self.assignments {
-            edit.apply(self.target.selection, assignment)?;
+            edit.apply(&self.target, assignment)?;
         }
         Ok(())
     }
@@ -93,7 +93,7 @@ impl Run {
     ) -> Result<Option<Plan>> {
         if let Some((key, proven)) = &self.last_target {
             if key.as_ref() == spelling {
-                return self.base.owner().finish(plan(*proven, props));
+                return self.base.owner().finish(plan(proven.clone(), props));
             }
         }
         self.base.formatting_plan(target, props)
@@ -144,7 +144,7 @@ impl Run {
                     .as_ref()
                     .is_none_or(|(key, _)| key.as_ref() != spelling)
                 {
-                    self.last_target = Some((spelling.into(), plan.target));
+                    self.last_target = Some((spelling.into(), plan.target.clone()));
                 }
             } else {
                 self.last_target = None;

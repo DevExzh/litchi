@@ -1527,3 +1527,16 @@ The source-backed tail-append `Plan::write_to_stream` and
 `Commit::write_to_stream` (both tail-append families) are renamed `write_to`.
 Both DOCX profiles ban the six retired names and register the
 `litchi_docx::metadata` family.
+
+## DOCX element paths (0251a)
+
+`document::{ElementPath, ElementStep, ElementAnchor, NewTable}` address and
+create main-story elements beyond the direct body: a path is the direct-child
+steps from `w:body`, each a `Position` among same-named direct children
+(`Paragraph`, `Run`, `Hyperlink`, `Table`, `Row`, `Cell`, `ContentControl`).
+The element verbs carry an `_at` suffix on the existing `Edit`
+(`format_paragraph_at`, `format_run_at`, `replace_text_at`,
+`replace_cell_text_at`, `insert_run_at`, `insert_paragraph_at`,
+`insert_table_at`, `insert_row_at`, `remove_element_at`, `move_element_at`)
+and record `Operation::{ReplaceElement, InsertElement, RemoveElement}`. No
+second transaction family is introduced.

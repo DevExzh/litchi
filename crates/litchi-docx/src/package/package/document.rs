@@ -543,7 +543,10 @@ fn transfer_graph_transition(
             | crate::document::Operation::InsertParagraphFragment { .. }
             | crate::document::Operation::RemoveParagraphFragment { .. }
             | crate::document::Operation::InsertRun { .. }
-            | crate::document::Operation::RemoveRun { .. } => None,
+            | crate::document::Operation::RemoveRun { .. }
+            | crate::document::Operation::ReplaceElement { .. }
+            | crate::document::Operation::InsertElement { .. }
+            | crate::document::Operation::RemoveElement { .. } => None,
         };
         if let Some(selected_transition) = candidate {
             if selected.is_some() {
