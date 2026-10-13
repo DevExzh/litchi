@@ -278,8 +278,14 @@ class MessageSnapshotTests(unittest.TestCase):
                  "Word 6.0 documents (nFib 0x0065) predate the Word 97 binary format and"
                  " are not supported"),
             ]
-            for relative, name in zip(FLAT_ODF, ("Odt", "Ods", "Odp")):
+            for relative, name in zip(FLAT_ODF[:2], ("Odt", "Ods")):
                 rows += [(opener, fixture(relative), self.FLAT.format(name)) for opener in OPENERS]
+            # Flat ODP opens through the leaf's flat reader (record 0278),
+            # which refuses this drawing-bodied fixture.
+            rows += [
+                (opener, fixture(FLAT_ODF[2]), "Invalid format: flat ODP has a misplaced or empty office:body")
+                for opener in OPENERS
+            ]
             for opener, path, expected in rows:
                 with self.subTest(opener=opener.__name__, input=os.path.basename(path)):
                     self.assertEqual(self._message(opener, path), expected)

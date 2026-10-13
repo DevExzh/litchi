@@ -101,6 +101,11 @@ const READS: &[(&str, &[&str], &str)] = &[
         "slide",
     ),
     ("rtf/column-break.rtf", &["/", "/body/p[1]"], "p"),
+    (
+        "odf/corpus/impress-basic.odp",
+        &["/", "/slide[1]", "/slide[1]/shape[1]"],
+        "shape",
+    ),
 ];
 
 #[test]
@@ -424,7 +429,9 @@ fn applied(run: &Run) -> Value {
 #[test]
 fn create_writes_every_creatable_format_and_refuses_overwrite() {
     let dir = tempfile::tempdir().expect("tempdir");
-    for format in ["docx", "xlsx", "pptx", "xlsb", "doc", "xls", "ppt", "rtf"] {
+    for format in [
+        "docx", "xlsx", "pptx", "xlsb", "doc", "xls", "ppt", "rtf", "odp",
+    ] {
         let path = scratch(dir.path(), &format!("blank.{format}"), None);
         let file = litchi_ops::open(&path).expect("reopen in process");
         assert_eq!(
@@ -660,6 +667,40 @@ fn presentation_writes_save_in_place() {
     assert_eq!(text_of(&path, "/slide[1]"), first);
     expect(0, ["remove", file, "/slide[2]"]);
     expect(3, ["get", file, "/slide[2]"]);
+
+    // ODP (record 0278): a text box, a text set, a slide swap and move,
+    // each saved in place through the leaf's atomic publication.
+    let path = scratch(dir.path(), "w.odp", Some("odf/odp/tdf169979.odp"));
+    let file = arg(&path);
+    let run = expect(
+        0,
+        [
+            "add",
+            file,
+            "/slide[1]",
+            "--type",
+            "textbox",
+            "--prop",
+            "text=Hello",
+            "--prop",
+            "width=4cm",
+            "--prop",
+            "height=2cm",
+            "--json",
+        ],
+    );
+    let added = applied(&run)["results"][0]["path"]
+        .as_str()
+        .expect("path")
+        .to_owned();
+    expect(0, ["set", file, &added, "--prop", "text=Changed"]);
+    assert_eq!(text_of(&path, &added), "Changed");
+    let first = text_of(&path, "/slide[1]/shape[1]");
+    expect(0, ["swap", file, "/slide[1]", "/slide[2]"]);
+    expect(0, ["move", file, "/slide[2]", "--index", "0"]);
+    assert_eq!(text_of(&path, "/slide[1]/shape[1]"), first);
+    expect(0, ["remove", file, "/slide[3]"]);
+    expect(3, ["get", file, "/slide[3]"]);
 }
 
 #[test]

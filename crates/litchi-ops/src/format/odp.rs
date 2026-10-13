@@ -12,12 +12,15 @@
 pub(crate) mod children;
 mod nav;
 mod node;
+mod registry;
 mod spec;
 pub(crate) mod views;
+pub(crate) mod write;
 
 pub(crate) use nav::Nav;
 pub use node::Node;
 pub(crate) use node::Props;
+pub(crate) use registry::{ADDABLE, REMOVABLE, SETTABLE, WRITE_GAPS, capability_props};
 pub use spec::Kind;
 pub(crate) use spec::SPEC;
 
@@ -50,7 +53,6 @@ struct OdpState {
     layouts: OnceLock<Vec<litchi_odp::layout::Layout>>,
     annotations: OnceLock<Vec<litchi_odp::annotation::Info>>,
     /// The package a source-backed owner materializes for its first write.
-    #[allow(dead_code, reason = "TEMP-READ-COMMIT: used by the write handlers")]
     materialized: OnceLock<litchi_odp::Package>,
 }
 
@@ -192,19 +194,16 @@ impl Odp {
     }
 
     /// The path a path-backed open retained.
-    #[allow(dead_code, reason = "TEMP-READ-COMMIT: used by the write handlers")]
     pub(crate) fn origin(&self) -> Option<&Arc<Path>> {
         self.0.origin.as_ref()
     }
 
     /// Adopt the package one checked edit published, keeping the origin.
-    #[allow(dead_code, reason = "TEMP-READ-COMMIT: used by the write handlers")]
     pub(crate) fn with_package(&self, package: litchi_odp::Package) -> Result<Self> {
         Self::from_package(package, self.0.origin.clone(), self.0.odf_options)
     }
 
     /// Create a presentation with one blank slide.
-    #[allow(dead_code, reason = "TEMP-READ-COMMIT: used by the write handlers")]
     pub(crate) fn create(options: &crate::CreateOptions) -> Result<Self> {
         use crate::{Conformance, Flavor};
         let reason = if options.flavor_value() != Flavor::Document {
@@ -342,7 +341,6 @@ impl Odp {
     /// The immutable package writes start from: the eager owner, or a
     /// source-backed owner's file materialized once under its revision
     /// fence. Flat documents have no package.
-    #[allow(dead_code, reason = "TEMP-READ-COMMIT: used by the write handlers")]
     pub(crate) fn package(&self) -> Result<&litchi_odp::Package> {
         match &self.0.owner {
             OdpOwner::Eager { package, .. } => Ok(package),
@@ -372,21 +370,22 @@ impl Odp {
     }
 
     /// Whether this is a flat (single XML) document.
-    #[allow(dead_code, reason = "TEMP-READ-COMMIT: used by the write handlers")]
     pub(crate) fn is_flat(&self) -> bool {
         matches!(self.0.owner, OdpOwner::Flat(_))
     }
 
-    /// Admit a write: the snapshot must have an editable package.
-    #[allow(dead_code, reason = "TEMP-READ-COMMIT: used by the write handlers")]
+    /// Admit a write: the snapshot must have an editable package. A signed
+    /// or encrypted package reports the refusal its leaf edit gives.
     pub(crate) fn admit_edit(&self) -> Result<()> {
         let package = self.package()?;
+        if package.security_policy().map_err(core_error)?.is_editable() {
+            return Ok(());
+        }
         drop(package.edit().map_err(odf_error)?);
         Ok(())
     }
 
     /// Whether two handles retain the same immutable snapshot.
-    #[allow(dead_code, reason = "TEMP-READ-COMMIT: used by the write handlers")]
     pub(crate) fn same_snapshot(&self, other: &Self) -> bool {
         if Arc::ptr_eq(&self.0, &other.0) {
             return true;
@@ -400,12 +399,109 @@ impl Odp {
     }
 
     /// Whether two handles publish the same bytes.
-    #[allow(dead_code, reason = "TEMP-READ-COMMIT: used by the write handlers")]
     pub(crate) fn same_content(&self, other: &Self) -> Result<bool> {
         if self.same_snapshot(other) {
             return Ok(true);
         }
         Ok(self.package()?.as_bytes() == other.package()?.as_bytes())
+    }
+
+    /// Set properties with the default unified limits.
+    pub(crate) fn set<'p, 'v>(
+        &self,
+        target: crate::TargetArg<'p>,
+        props: impl crate::IntoProps<'v>,
+    ) -> Result<write::WriteCommit> {
+        self.set_with_limits(
+            target,
+            props,
+            &crate::transaction::SemanticLimits::default(),
+        )
+    }
+
+    /// Set properties through one checked leaf scene splice.
+    pub(crate) fn set_with_limits<'p, 'v>(
+        &self,
+        target: crate::TargetArg<'p>,
+        props: impl crate::IntoProps<'v>,
+        limits: &crate::transaction::SemanticLimits,
+    ) -> Result<write::WriteCommit> {
+        write::set_with_limits(self, target, props, limits)
+    }
+
+    /// Add a slide, a text box or a paragraph.
+    pub(crate) fn add<'p, 'n>(
+        &self,
+        parent: crate::path::PathArg<'p>,
+        node: crate::NewNode<'n>,
+    ) -> Result<(write::WriteCommit, crate::path::Path<'static>)> {
+        self.add_with_limits(parent, node, &crate::transaction::SemanticLimits::default())
+    }
+
+    /// Add with the caller's transaction limits.
+    pub(crate) fn add_with_limits<'p, 'n>(
+        &self,
+        parent: crate::path::PathArg<'p>,
+        node: crate::NewNode<'n>,
+        limits: &crate::transaction::SemanticLimits,
+    ) -> Result<(write::WriteCommit, crate::path::Path<'static>)> {
+        write::add_with_limits(self, parent, node, limits)
+    }
+
+    /// Remove the selected slides, objects, paragraphs or runs.
+    pub(crate) fn remove<'p>(&self, target: crate::TargetArg<'p>) -> Result<write::WriteCommit> {
+        self.remove_with_limits(target, &crate::transaction::SemanticLimits::default())
+    }
+
+    /// Remove with the caller's transaction limits.
+    pub(crate) fn remove_with_limits<'p>(
+        &self,
+        target: crate::TargetArg<'p>,
+        limits: &crate::transaction::SemanticLimits,
+    ) -> Result<write::WriteCommit> {
+        write::remove_with_limits(self, target, limits)
+    }
+
+    /// Move a slide or a top-level slide object.
+    pub(crate) fn move_to<'p, 'q>(
+        &self,
+        path: crate::path::PathArg<'p>,
+        placement: crate::Placement<'q>,
+    ) -> Result<write::WriteCommit> {
+        self.move_to_with_limits(
+            path,
+            placement,
+            &crate::transaction::SemanticLimits::default(),
+        )
+    }
+
+    /// Move with the caller's transaction limits.
+    pub(crate) fn move_to_with_limits<'p, 'q>(
+        &self,
+        path: crate::path::PathArg<'p>,
+        placement: crate::Placement<'q>,
+        limits: &crate::transaction::SemanticLimits,
+    ) -> Result<write::WriteCommit> {
+        write::move_to_with_limits(self, path, placement, limits)
+    }
+
+    /// Exchange two slides or two objects of one slide.
+    pub(crate) fn swap<'p, 'q>(
+        &self,
+        left: crate::path::PathArg<'p>,
+        right: crate::path::PathArg<'q>,
+    ) -> Result<write::WriteCommit> {
+        self.swap_with_limits(left, right, &crate::transaction::SemanticLimits::default())
+    }
+
+    /// Swap with the caller's transaction limits.
+    pub(crate) fn swap_with_limits<'p, 'q>(
+        &self,
+        left: crate::path::PathArg<'p>,
+        right: crate::path::PathArg<'q>,
+        limits: &crate::transaction::SemanticLimits,
+    ) -> Result<write::WriteCommit> {
+        write::swap_with_limits(self, left, right, limits)
     }
 
     /// The text of every slide.
@@ -502,7 +598,6 @@ impl Odp {
     }
 
     /// Publish the snapshot's exact package bytes.
-    #[allow(dead_code, reason = "TEMP-READ-COMMIT: used by the write handlers")]
     pub(crate) fn write_to(&self, mut sink: impl std::io::Write) -> Result<()> {
         if let OdpOwner::Flat(flat) = &self.0.owner {
             sink.write_all(flat.as_bytes()).map_err(Error::from)?;
@@ -514,7 +609,6 @@ impl Odp {
     }
 
     /// Atomically publish the snapshot to `path`.
-    #[allow(dead_code, reason = "TEMP-READ-COMMIT: used by the write handlers")]
     pub(crate) fn save_to(&self, path: &Path, options: &crate::SaveOptions) -> Result<u64> {
         let bytes: &[u8] = match &self.0.owner {
             OdpOwner::Flat(flat) => flat.as_bytes(),
@@ -537,7 +631,6 @@ impl Odp {
     }
 }
 
-#[allow(dead_code, reason = "TEMP-READ-COMMIT: used by the write handlers")]
 fn flat_write() -> Error {
     Error::new(
         Code::UnsupportedCapability,

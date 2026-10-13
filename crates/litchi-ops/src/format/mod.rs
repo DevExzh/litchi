@@ -22,6 +22,8 @@ pub mod docx;
 #[cfg(any(feature = "pptx", feature = "xlsx", feature = "xlsb"))]
 pub(crate) mod metadata;
 #[cfg(feature = "odp")]
+pub(crate) mod odf_odp;
+#[cfg(feature = "odp")]
 pub mod odp;
 #[cfg(feature = "ods")]
 pub mod ods;

@@ -193,9 +193,22 @@ fn every_format_has_one_answer_for_its_reads() {
                         | Verb::Edit
                         | Verb::Batch
                 );
+            let odp_edit = format == FileFormat::Odp
+                && cfg!(feature = "odp")
+                && matches!(
+                    verb,
+                    Verb::Set
+                        | Verb::Add
+                        | Verb::Remove
+                        | Verb::Move
+                        | Verb::Swap
+                        | Verb::Edit
+                        | Verb::Batch
+                );
             assert_eq!(
                 capabilities.verb(verb),
                 if rtf_edit
+                    || odp_edit
                     || doc_edit
                     || docx_edit
                     || xlsx_edit
@@ -236,7 +249,8 @@ fn every_format_has_one_answer_for_its_reads() {
                 || (format == FileFormat::Xlsx && cfg!(feature = "xlsx"))
                 || (format == FileFormat::Pptx && cfg!(feature = "pptx"))
                 || (format == FileFormat::Xlsb && cfg!(feature = "xlsb"))
-                || (format == FileFormat::Rtf && cfg!(feature = "rtf"));
+                || (format == FileFormat::Rtf && cfg!(feature = "rtf"))
+                || (format == FileFormat::Odp && cfg!(feature = "odp"));
             let expected = if integrated {
                 Support::Supported
             } else if get.is_supported() {

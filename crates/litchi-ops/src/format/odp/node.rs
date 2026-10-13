@@ -36,7 +36,7 @@ pub struct Node<'f> {
 }
 
 /// The scene address a node carries.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum Item {
     Presentation,
     Slide(usize),

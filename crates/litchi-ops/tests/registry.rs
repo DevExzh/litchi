@@ -22,6 +22,7 @@ fn registry_goldens_follow_enabled_formats() {
         (FileFormat::Xls, "xls", cfg!(feature = "xls")),
         (FileFormat::Xlsb, "xlsb", cfg!(feature = "xlsb")),
         (FileFormat::Xlsx, "xlsx", cfg!(feature = "xlsx")),
+        (FileFormat::Odp, "odp", cfg!(feature = "odp")),
     ] {
         let schema = litchi_ops::schema(format);
         assert_eq!(schema.registered(), enabled, "{name}");
@@ -62,6 +63,7 @@ fn registry_export_matches_capabilities() {
         FileFormat::Xls,
         FileFormat::Xlsb,
         FileFormat::Xlsx,
+        FileFormat::Odp,
     ] {
         let schema = litchi_ops::schema(format);
         let capabilities = Capabilities::of(format);

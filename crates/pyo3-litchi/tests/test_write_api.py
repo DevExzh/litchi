@@ -17,8 +17,8 @@ Oracles, strongest first:
   unsupported raises ``UnsupportedError`` with the report's code.
 
 Formats: every verb is exercised on every format whose capability report
-supports it (DOCX, XLSX, PPTX, XLSB, DOC, XLS, PPT, RTF); ODT, ODS and ODP
-refuse every write verb. The cross-thread and GIL tests of the write verbs
+supports it (DOCX, XLSX, PPTX, XLSB, DOC, XLS, PPT, RTF, ODP — record 0278);
+ODT and ODS refuse every write verb. The cross-thread and GIL tests of the write verbs
 are in test_threads.py.
 """
 
@@ -44,13 +44,14 @@ NOTES_PPT = "poi/test-data/slideshow/basic_test_ppt_file.ppt"
 RTF_INPUT = rb"{\rtf1\ansi First\par Second\par Third\par Fourth}"
 
 #: The formats ``create`` builds.
-CREATABLE = ("docx", "xlsx", "pptx", "xlsb", "doc", "xls", "ppt", "rtf")
+CREATABLE = ("docx", "xlsx", "pptx", "xlsb", "doc", "xls", "ppt", "rtf", "odp")
 #: The formats File holds read-only, and a fixture of each.
 READ_ONLY = (
     ("odf/corpus/writer-table.odt", "Odt"),
     ("odf/corpus/calc-two-sheets.ods", "Ods"),
-    ("odf/odp/tdf169979.odp", "Odp"),
 )
+#: An ODP fixture for the presentation write verbs (record 0278).
+ODP_INPUT = "odf/odp/tdf169979.odp"
 #: Python suggestion of a document_protected error on a locked file.
 PROTECTED_SUGGESTION = (
     "remove the password in the application that created the file; "
@@ -143,7 +144,7 @@ class CreateTests(WriteAssertions):
         self.assertError(raised(lambda: L.create(5)), L.PropertyError, "invalid_argument")
 
     def test_formats_without_a_builder_are_unsupported(self):
-        for name in ("odt", "ods", "odp", "pages", "odg"):
+        for name in ("odt", "ods", "pages", "odg"):
             with self.subTest(format=name):
                 error = raised(lambda: L.create(name))
                 self.assertIsInstance(error, L.UnsupportedError)
@@ -367,6 +368,34 @@ class RtfVerbTests(WriteAssertions):
         self.assertEqual(texts(file.swap("/body/p[1]", "/body/p[4]"), "/body"), ["Fourth", "Second", "Third", "First"])
 
 
+class OdpVerbTests(WriteAssertions):
+    """ODP writes through checked scene splices (record 0278)."""
+
+    def test_round_trip(self):
+        file = L.open(fixture(ODP_INPUT))
+        before = file.to_bytes()
+        titles = [file.get(path, 0)["preview"] for path in child_paths(file, "/", "slide")]
+        changed = file.set("/slide[1]/shape[1]", {"text": "Retitled", "width": "20cm"})
+        view = changed.get("/slide[1]/shape[1]", 0)
+        self.assertEqual((view["text"], view["format"]["width"]), ("Retitled", "20cm"))
+        added, path = changed.add("/slide[2]", "textbox", {"text": "Box", "width": "4cm", "height": "2cm"})
+        self.assertEqual(path, "/slide[2]/shape[2]")
+        order = lambda f: [f.get(p, 0)["preview"] for p in child_paths(f, "/", "slide")]
+        self.assertEqual(order(file.swap("/slide[1]", "/slide[2]"))[:2], [titles[1], titles[0]])
+        self.assertEqual(order(file.move("/slide[3]", index=0))[0], titles[2])
+        self.assertEqual(len(order(file.remove("/slide[2]"))), len(titles) - 1)
+        noted = added.set("/metadata", {"title": "ODP deck"})
+        reopened = self.assertReopens(noted)
+        self.assertEqual(reopened.get("/slide[1]/shape[1]", 0)["text"], "Retitled")
+        self.assertEqual(reopened.get(path, 0)["text"], "Box")
+        self.assertEqual(reopened.get("/", 0)["format"]["title"], "ODP deck")
+        self.assertUnchanged(file, before)
+        with tempfile.TemporaryDirectory() as directory:
+            target = os.path.join(directory, "deck.odp")
+            noted.save_as(target)
+            self.assertEqual(L.open(target).get(path, 0)["text"], "Box")
+
+
 class CapabilityAgreementTests(WriteAssertions):
     """A write verb the report marks unsupported raises its code."""
 
@@ -399,7 +428,7 @@ class CapabilityAgreementTests(WriteAssertions):
                     self.assertIsInstance(error, L.UnsupportedError)
                     self.assertEqual(error.code, verbs[verb]["code"])
         # DOC (0258), PPT (0260) and XLS (0259) support every write verb.
-        self.assertTrue({"Odt", "Ods", "Odp"} <= seen, seen)
+        self.assertTrue({"Odt", "Ods"} <= seen, seen)
 
     def test_read_only_formats_refuse_every_write(self):
         for relative, name in READ_ONLY:

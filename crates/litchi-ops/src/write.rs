@@ -8,7 +8,8 @@
     feature = "pptx",
     feature = "xlsb",
     feature = "xls",
-    feature = "rtf"
+    feature = "rtf",
+    feature = "odp"
 ))]
 use std::io;
 use std::io::Write;
@@ -120,6 +121,14 @@ impl File {
                     path,
                 })
             },
+            #[cfg(feature = "odp")]
+            Self::Odp(handle) => {
+                let (commit, path) = handle.add(_parent.into_path()?, _node.into_node()?)?;
+                Ok(Added {
+                    file: Self::Odp(commit.after),
+                    path,
+                })
+            },
             Self::Signed(_) => Err(protected(self)),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -188,6 +197,10 @@ impl File {
             Self::Doc(handle) => handle
                 .move_to(_path.into_path()?, _to.into_placement()?)
                 .map(|commit| Self::Doc(commit.after)),
+            #[cfg(feature = "odp")]
+            Self::Odp(handle) => handle
+                .move_to(_path.into_path()?, _to.into_placement()?)
+                .map(|commit| Self::Odp(commit.after)),
             Self::Signed(_) => Err(protected(self)),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -256,6 +269,10 @@ impl File {
             Self::Doc(handle) => handle
                 .remove(_target.into_target()?)
                 .map(|commit| Self::Doc(commit.after)),
+            #[cfg(feature = "odp")]
+            Self::Odp(handle) => handle
+                .remove(_target.into_target()?)
+                .map(|commit| Self::Odp(commit.after)),
             Self::Signed(_) => Err(protected(self)),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -324,6 +341,10 @@ impl File {
             Self::Doc(handle) => handle
                 .swap(_a.into_path()?, _b.into_path()?)
                 .map(|commit| Self::Doc(commit.after)),
+            #[cfg(feature = "odp")]
+            Self::Odp(handle) => handle
+                .swap(_a.into_path()?, _b.into_path()?)
+                .map(|commit| Self::Odp(commit.after)),
             Self::Signed(_) => Err(protected(self)),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -403,6 +424,10 @@ impl File {
             Self::Rtf(handle) => handle
                 .set(_target.into_target()?, _props)
                 .map(|commit| Self::Rtf(commit.after)),
+            #[cfg(feature = "odp")]
+            Self::Odp(handle) => handle
+                .set(_target.into_target()?, _props)
+                .map(|commit| Self::Odp(commit.after)),
             Self::Signed(_) => Err(protected(self)),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -439,7 +464,8 @@ impl File {
             feature = "pptx",
             feature = "xlsb",
             feature = "xls",
-            feature = "rtf"
+            feature = "rtf",
+            feature = "odp"
         )),
         allow(
             clippy::only_used_in_recursion,
@@ -496,6 +522,12 @@ impl File {
                 handle.write_to(&mut counted)?;
                 Ok(counted.bytes)
             },
+            #[cfg(feature = "odp")]
+            Self::Odp(handle) => {
+                let mut counted = Counted { sink, bytes: 0 };
+                handle.write_to(&mut counted)?;
+                Ok(counted.bytes)
+            },
             Self::Signed(signed) => signed.file().write_to(sink),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -534,7 +566,8 @@ fn pending(file: &File, operation: &str) -> Error {
     feature = "pptx",
     feature = "xlsb",
     feature = "xls",
-    feature = "rtf"
+    feature = "rtf",
+    feature = "odp"
 ))]
 pub(crate) struct Counted<W> {
     pub(crate) sink: W,
@@ -549,7 +582,8 @@ pub(crate) struct Counted<W> {
     feature = "pptx",
     feature = "xlsb",
     feature = "xls",
-    feature = "rtf"
+    feature = "rtf",
+    feature = "odp"
 ))]
 impl<W: Write> Write for Counted<W> {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
