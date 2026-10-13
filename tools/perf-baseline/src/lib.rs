@@ -2109,77 +2109,77 @@ impl Case {
             Self::PptTextEditOneEditSave => "ppt_text_edit_one_edit_save",
             Self::PptSemanticNoopEditSave => "ppt_semantic_noop_edit_save",
             Self::PptSemanticOneEditSave => "ppt_semantic_one_edit_save",
-            Self::PptTextAggregateEagerNative1 => "ppt_text_batch_eager_native_1_aggregate_v2",
-            Self::PptTextAggregateEagerNative10 => "ppt_text_batch_eager_native_10_aggregate_v2",
-            Self::PptTextAggregateEagerNative100 => "ppt_text_batch_eager_native_100_aggregate_v2",
-            Self::PptTextAggregateEagerNative256 => "ppt_text_batch_eager_native_256_aggregate_v2",
+            Self::PptTextAggregateEagerNative1 => "ppt_text_batch_eager_native_1_aggregate_v3",
+            Self::PptTextAggregateEagerNative10 => "ppt_text_batch_eager_native_10_aggregate_v3",
+            Self::PptTextAggregateEagerNative100 => "ppt_text_batch_eager_native_100_aggregate_v3",
+            Self::PptTextAggregateEagerNative256 => "ppt_text_batch_eager_native_256_aggregate_v3",
             Self::PptTextAggregateEagerNative1000 => {
-                "ppt_text_batch_eager_native_1000_aggregate_v2"
+                "ppt_text_batch_eager_native_1000_aggregate_v3"
             },
             Self::PptTextAggregateEagerNative4096 => {
-                "ppt_text_batch_eager_native_4096_aggregate_v2"
+                "ppt_text_batch_eager_native_4096_aggregate_v3"
             },
             Self::PptTextAggregateEagerNative10000 => {
-                "ppt_text_batch_eager_native_10000_aggregate_v2"
+                "ppt_text_batch_eager_native_10000_aggregate_v3"
             },
-            Self::PptTextAggregateEagerUnified1 => "ppt_text_batch_eager_unified_1_aggregate_v2",
-            Self::PptTextAggregateEagerUnified10 => "ppt_text_batch_eager_unified_10_aggregate_v2",
+            Self::PptTextAggregateEagerUnified1 => "ppt_text_batch_eager_unified_1_aggregate_v3",
+            Self::PptTextAggregateEagerUnified10 => "ppt_text_batch_eager_unified_10_aggregate_v3",
             Self::PptTextAggregateEagerUnified100 => {
-                "ppt_text_batch_eager_unified_100_aggregate_v2"
+                "ppt_text_batch_eager_unified_100_aggregate_v3"
             },
             Self::PptTextAggregateEagerUnified256 => {
-                "ppt_text_batch_eager_unified_256_aggregate_v2"
+                "ppt_text_batch_eager_unified_256_aggregate_v3"
             },
             Self::PptTextAggregateEagerUnified1000 => {
-                "ppt_text_batch_eager_unified_1000_aggregate_v2"
+                "ppt_text_batch_eager_unified_1000_aggregate_v3"
             },
             Self::PptTextAggregateEagerUnified4096 => {
-                "ppt_text_batch_eager_unified_4096_aggregate_v2"
+                "ppt_text_batch_eager_unified_4096_aggregate_v3"
             },
             Self::PptTextAggregateEagerUnified10000 => {
-                "ppt_text_batch_eager_unified_10000_aggregate_v2"
+                "ppt_text_batch_eager_unified_10000_aggregate_v3"
             },
             Self::PptTextAggregatePositionalNative1 => {
-                "ppt_text_batch_positional_native_1_aggregate_v2"
+                "ppt_text_batch_positional_native_1_aggregate_v3"
             },
             Self::PptTextAggregatePositionalNative10 => {
-                "ppt_text_batch_positional_native_10_aggregate_v2"
+                "ppt_text_batch_positional_native_10_aggregate_v3"
             },
             Self::PptTextAggregatePositionalNative100 => {
-                "ppt_text_batch_positional_native_100_aggregate_v2"
+                "ppt_text_batch_positional_native_100_aggregate_v3"
             },
             Self::PptTextAggregatePositionalNative256 => {
-                "ppt_text_batch_positional_native_256_aggregate_v2"
+                "ppt_text_batch_positional_native_256_aggregate_v3"
             },
             Self::PptTextAggregatePositionalNative1000 => {
-                "ppt_text_batch_positional_native_1000_aggregate_v2"
+                "ppt_text_batch_positional_native_1000_aggregate_v3"
             },
             Self::PptTextAggregatePositionalNative4096 => {
-                "ppt_text_batch_positional_native_4096_aggregate_v2"
+                "ppt_text_batch_positional_native_4096_aggregate_v3"
             },
             Self::PptTextAggregatePositionalNative10000 => {
-                "ppt_text_batch_positional_native_10000_aggregate_v2"
+                "ppt_text_batch_positional_native_10000_aggregate_v3"
             },
             Self::PptTextAggregatePositionalUnified1 => {
-                "ppt_text_batch_positional_unified_1_aggregate_v2"
+                "ppt_text_batch_positional_unified_1_aggregate_v3"
             },
             Self::PptTextAggregatePositionalUnified10 => {
-                "ppt_text_batch_positional_unified_10_aggregate_v2"
+                "ppt_text_batch_positional_unified_10_aggregate_v3"
             },
             Self::PptTextAggregatePositionalUnified100 => {
-                "ppt_text_batch_positional_unified_100_aggregate_v2"
+                "ppt_text_batch_positional_unified_100_aggregate_v3"
             },
             Self::PptTextAggregatePositionalUnified256 => {
-                "ppt_text_batch_positional_unified_256_aggregate_v2"
+                "ppt_text_batch_positional_unified_256_aggregate_v3"
             },
             Self::PptTextAggregatePositionalUnified1000 => {
-                "ppt_text_batch_positional_unified_1000_aggregate_v2"
+                "ppt_text_batch_positional_unified_1000_aggregate_v3"
             },
             Self::PptTextAggregatePositionalUnified4096 => {
-                "ppt_text_batch_positional_unified_4096_aggregate_v2"
+                "ppt_text_batch_positional_unified_4096_aggregate_v3"
             },
             Self::PptTextAggregatePositionalUnified10000 => {
-                "ppt_text_batch_positional_unified_10000_aggregate_v2"
+                "ppt_text_batch_positional_unified_10000_aggregate_v3"
             },
             Self::PptPicturesEagerOpen => "ppt_pictures_eager_open",
             Self::PptPicturesSourceBackedOpen => "ppt_pictures_source_backed_open",
@@ -13735,82 +13735,82 @@ fn parse_case(value: &str) -> Option<Case> {
         "ppt_text_edit_one_edit_save" => Some(Case::PptTextEditOneEditSave),
         "ppt_semantic_noop_edit_save" => Some(Case::PptSemanticNoopEditSave),
         "ppt_semantic_one_edit_save" => Some(Case::PptSemanticOneEditSave),
-        "ppt_text_batch_eager_native_1_aggregate_v2" => Some(Case::PptTextAggregateEagerNative1),
-        "ppt_text_batch_eager_native_10_aggregate_v2" => Some(Case::PptTextAggregateEagerNative10),
-        "ppt_text_batch_eager_native_100_aggregate_v2" => {
+        "ppt_text_batch_eager_native_1_aggregate_v3" => Some(Case::PptTextAggregateEagerNative1),
+        "ppt_text_batch_eager_native_10_aggregate_v3" => Some(Case::PptTextAggregateEagerNative10),
+        "ppt_text_batch_eager_native_100_aggregate_v3" => {
             Some(Case::PptTextAggregateEagerNative100)
         },
-        "ppt_text_batch_eager_native_256_aggregate_v2" => {
+        "ppt_text_batch_eager_native_256_aggregate_v3" => {
             Some(Case::PptTextAggregateEagerNative256)
         },
-        "ppt_text_batch_eager_native_1000_aggregate_v2" => {
+        "ppt_text_batch_eager_native_1000_aggregate_v3" => {
             Some(Case::PptTextAggregateEagerNative1000)
         },
-        "ppt_text_batch_eager_native_4096_aggregate_v2" => {
+        "ppt_text_batch_eager_native_4096_aggregate_v3" => {
             Some(Case::PptTextAggregateEagerNative4096)
         },
-        "ppt_text_batch_eager_native_10000_aggregate_v2" => {
+        "ppt_text_batch_eager_native_10000_aggregate_v3" => {
             Some(Case::PptTextAggregateEagerNative10000)
         },
-        "ppt_text_batch_eager_unified_1_aggregate_v2" => Some(Case::PptTextAggregateEagerUnified1),
-        "ppt_text_batch_eager_unified_10_aggregate_v2" => {
+        "ppt_text_batch_eager_unified_1_aggregate_v3" => Some(Case::PptTextAggregateEagerUnified1),
+        "ppt_text_batch_eager_unified_10_aggregate_v3" => {
             Some(Case::PptTextAggregateEagerUnified10)
         },
-        "ppt_text_batch_eager_unified_100_aggregate_v2" => {
+        "ppt_text_batch_eager_unified_100_aggregate_v3" => {
             Some(Case::PptTextAggregateEagerUnified100)
         },
-        "ppt_text_batch_eager_unified_256_aggregate_v2" => {
+        "ppt_text_batch_eager_unified_256_aggregate_v3" => {
             Some(Case::PptTextAggregateEagerUnified256)
         },
-        "ppt_text_batch_eager_unified_1000_aggregate_v2" => {
+        "ppt_text_batch_eager_unified_1000_aggregate_v3" => {
             Some(Case::PptTextAggregateEagerUnified1000)
         },
-        "ppt_text_batch_eager_unified_4096_aggregate_v2" => {
+        "ppt_text_batch_eager_unified_4096_aggregate_v3" => {
             Some(Case::PptTextAggregateEagerUnified4096)
         },
-        "ppt_text_batch_eager_unified_10000_aggregate_v2" => {
+        "ppt_text_batch_eager_unified_10000_aggregate_v3" => {
             Some(Case::PptTextAggregateEagerUnified10000)
         },
-        "ppt_text_batch_positional_native_1_aggregate_v2" => {
+        "ppt_text_batch_positional_native_1_aggregate_v3" => {
             Some(Case::PptTextAggregatePositionalNative1)
         },
-        "ppt_text_batch_positional_native_10_aggregate_v2" => {
+        "ppt_text_batch_positional_native_10_aggregate_v3" => {
             Some(Case::PptTextAggregatePositionalNative10)
         },
-        "ppt_text_batch_positional_native_100_aggregate_v2" => {
+        "ppt_text_batch_positional_native_100_aggregate_v3" => {
             Some(Case::PptTextAggregatePositionalNative100)
         },
-        "ppt_text_batch_positional_native_256_aggregate_v2" => {
+        "ppt_text_batch_positional_native_256_aggregate_v3" => {
             Some(Case::PptTextAggregatePositionalNative256)
         },
-        "ppt_text_batch_positional_native_1000_aggregate_v2" => {
+        "ppt_text_batch_positional_native_1000_aggregate_v3" => {
             Some(Case::PptTextAggregatePositionalNative1000)
         },
-        "ppt_text_batch_positional_native_4096_aggregate_v2" => {
+        "ppt_text_batch_positional_native_4096_aggregate_v3" => {
             Some(Case::PptTextAggregatePositionalNative4096)
         },
-        "ppt_text_batch_positional_native_10000_aggregate_v2" => {
+        "ppt_text_batch_positional_native_10000_aggregate_v3" => {
             Some(Case::PptTextAggregatePositionalNative10000)
         },
-        "ppt_text_batch_positional_unified_1_aggregate_v2" => {
+        "ppt_text_batch_positional_unified_1_aggregate_v3" => {
             Some(Case::PptTextAggregatePositionalUnified1)
         },
-        "ppt_text_batch_positional_unified_10_aggregate_v2" => {
+        "ppt_text_batch_positional_unified_10_aggregate_v3" => {
             Some(Case::PptTextAggregatePositionalUnified10)
         },
-        "ppt_text_batch_positional_unified_100_aggregate_v2" => {
+        "ppt_text_batch_positional_unified_100_aggregate_v3" => {
             Some(Case::PptTextAggregatePositionalUnified100)
         },
-        "ppt_text_batch_positional_unified_256_aggregate_v2" => {
+        "ppt_text_batch_positional_unified_256_aggregate_v3" => {
             Some(Case::PptTextAggregatePositionalUnified256)
         },
-        "ppt_text_batch_positional_unified_1000_aggregate_v2" => {
+        "ppt_text_batch_positional_unified_1000_aggregate_v3" => {
             Some(Case::PptTextAggregatePositionalUnified1000)
         },
-        "ppt_text_batch_positional_unified_4096_aggregate_v2" => {
+        "ppt_text_batch_positional_unified_4096_aggregate_v3" => {
             Some(Case::PptTextAggregatePositionalUnified4096)
         },
-        "ppt_text_batch_positional_unified_10000_aggregate_v2" => {
+        "ppt_text_batch_positional_unified_10000_aggregate_v3" => {
             Some(Case::PptTextAggregatePositionalUnified10000)
         },
         "ppt_pictures_eager_open" => Some(Case::PptPicturesEagerOpen),
@@ -14717,22 +14717,22 @@ fn usage_text() -> String {
                                        ppt_slide_order_snapshot_open,\n\
                                        ppt_text_edit_one_edit_save,\n\
                                        ppt_semantic_noop_edit_save,ppt_semantic_one_edit_save,\n\
-                                       ppt_text_batch_eager_native_1_aggregate_v2,ppt_text_batch_eager_native_10_aggregate_v2,\n\
-                                       ppt_text_batch_eager_native_100_aggregate_v2,ppt_text_batch_eager_native_1000_aggregate_v2,\n\
-                                       ppt_text_batch_eager_native_256_aggregate_v2,ppt_text_batch_eager_native_4096_aggregate_v2,\n\
-                                       ppt_text_batch_eager_native_10000_aggregate_v2,\n\
-                                       ppt_text_batch_eager_unified_1_aggregate_v2,ppt_text_batch_eager_unified_10_aggregate_v2,\n\
-                                       ppt_text_batch_eager_unified_100_aggregate_v2,ppt_text_batch_eager_unified_1000_aggregate_v2,\n\
-                                       ppt_text_batch_eager_unified_256_aggregate_v2,ppt_text_batch_eager_unified_4096_aggregate_v2,\n\
-                                       ppt_text_batch_eager_unified_10000_aggregate_v2,\n\
-                                       ppt_text_batch_positional_native_1_aggregate_v2,ppt_text_batch_positional_native_10_aggregate_v2,\n\
-                                       ppt_text_batch_positional_native_100_aggregate_v2,ppt_text_batch_positional_native_1000_aggregate_v2,\n\
-                                       ppt_text_batch_positional_native_256_aggregate_v2,ppt_text_batch_positional_native_4096_aggregate_v2,\n\
-                                       ppt_text_batch_positional_native_10000_aggregate_v2,\n\
-                                       ppt_text_batch_positional_unified_1_aggregate_v2,ppt_text_batch_positional_unified_10_aggregate_v2,\n\
-                                       ppt_text_batch_positional_unified_100_aggregate_v2,ppt_text_batch_positional_unified_1000_aggregate_v2,\n\
-                                       ppt_text_batch_positional_unified_256_aggregate_v2,ppt_text_batch_positional_unified_4096_aggregate_v2,\n\
-                                       ppt_text_batch_positional_unified_10000_aggregate_v2,\n\
+                                       ppt_text_batch_eager_native_1_aggregate_v3,ppt_text_batch_eager_native_10_aggregate_v3,\n\
+                                       ppt_text_batch_eager_native_100_aggregate_v3,ppt_text_batch_eager_native_1000_aggregate_v3,\n\
+                                       ppt_text_batch_eager_native_256_aggregate_v3,ppt_text_batch_eager_native_4096_aggregate_v3,\n\
+                                       ppt_text_batch_eager_native_10000_aggregate_v3,\n\
+                                       ppt_text_batch_eager_unified_1_aggregate_v3,ppt_text_batch_eager_unified_10_aggregate_v3,\n\
+                                       ppt_text_batch_eager_unified_100_aggregate_v3,ppt_text_batch_eager_unified_1000_aggregate_v3,\n\
+                                       ppt_text_batch_eager_unified_256_aggregate_v3,ppt_text_batch_eager_unified_4096_aggregate_v3,\n\
+                                       ppt_text_batch_eager_unified_10000_aggregate_v3,\n\
+                                       ppt_text_batch_positional_native_1_aggregate_v3,ppt_text_batch_positional_native_10_aggregate_v3,\n\
+                                       ppt_text_batch_positional_native_100_aggregate_v3,ppt_text_batch_positional_native_1000_aggregate_v3,\n\
+                                       ppt_text_batch_positional_native_256_aggregate_v3,ppt_text_batch_positional_native_4096_aggregate_v3,\n\
+                                       ppt_text_batch_positional_native_10000_aggregate_v3,\n\
+                                       ppt_text_batch_positional_unified_1_aggregate_v3,ppt_text_batch_positional_unified_10_aggregate_v3,\n\
+                                       ppt_text_batch_positional_unified_100_aggregate_v3,ppt_text_batch_positional_unified_1000_aggregate_v3,\n\
+                                       ppt_text_batch_positional_unified_256_aggregate_v3,ppt_text_batch_positional_unified_4096_aggregate_v3,\n\
+                                       ppt_text_batch_positional_unified_10000_aggregate_v3,\n\
                                        ppt_pictures_eager_open,\n\
                                        ppt_pictures_source_backed_open,\n\
                                        ppt_pictures_eager_first_image,\n\
@@ -62923,8 +62923,11 @@ mod tests {
         // increase the selectable registry without changing the default
         // cases or the separate default allocator contract. M0a step S9
         // removed the 47 predecessor selectors that timed the deleted facade
-        // types (652 -> 605).
-        const EXPECTED_SELECTABLE_CASE_COUNT: usize = 605;
+        // types (652 -> 605). Record 0220 added the 28 opt-in PPT aggregate
+        // text-batch routes ({eager,positional} x {native,unified} x seven
+        // counts; 605 -> 633), audited in record 0272, which renamed them
+        // `_aggregate_v2` -> `_aggregate_v3` without changing the count.
+        const EXPECTED_SELECTABLE_CASE_COUNT: usize = 633;
         let source = include_str!("lib.rs");
         let case_body = source
             .split_once("enum Case {")

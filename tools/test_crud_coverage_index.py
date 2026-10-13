@@ -26,12 +26,13 @@ CATALOG_PATH = ROOT / "docs/performance/results/perf-corpus-manifest-v2.json"
 SELECTOR_PATH = ROOT / "tools/perf-baseline/src/lib.rs"
 CHECKLIST_PATH = ROOT / "docs/CRUD_Scenario_Checklist.md"
 # The authoritative registry now has 633 names: the existing 605-name
-# catalog plus the 28 PPT text batch routes added by the current harness.
+# catalog plus the 28 PPT text batch routes added by the current harness
+# (record 0220; renamed `_aggregate_v2` -> `_aggregate_v3` by record 0272).
 # Earlier changes added `xlsx_producer_medium_source_full_cell_scan`, paired
 # unified/leaf routes, and removed predecessor selectors for deleted facades.
 EXPECTED_SELECTOR_COUNT = 633
 EXPECTED_SELECTOR_NAMES_SHA256 = (
-    "944299b4e1d87d1fdf166869a6d15c4b4af46d6ee6f403311f89c555920a32e6"
+    "c1df7e401764ac59b0e3ae8e4f504383eac5c63eea28c1dc2ad7c9f2fa915c5c"
 )
 EXPECTED_HISTORICAL_INDEX_SHA256 = (
     "5002b254d1f2111dcbf86bf2401fe56891c4c257ab1b064c273bba0984ad82ce"

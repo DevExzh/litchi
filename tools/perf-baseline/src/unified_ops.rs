@@ -2148,10 +2148,10 @@ fn run_ppt_text_batch(
         twin: Some(entry.twin.name()),
         timed_calls: match entry.leg {
             PptTextBatchLeg::Native => {
-                "prepared litchi_ppt::Package::edit with one set_shape_text_chunks publication per 4096-operation edit, inner chunks bounded at 256"
+                "prepared litchi_ppt::Package::edit with one set_shape_text_chunks publication per 16384-operation edit, inner chunks bounded at 256"
             },
             PptTextBatchLeg::Unified => {
-                "prepared litchi::File::edit shape text sets from string paths (path parsing included) in one facade transaction with 4096-operation native rollover"
+                "prepared litchi::File::edit shape text sets from string paths (path parsing included) in one facade transaction with 16384-operation native rollover"
             },
         },
         performance_claim: PERFORMANCE_CLAIM,
@@ -3542,6 +3542,11 @@ mod tests {
 
     #[test]
     fn ppt_text_batch_routes_are_named_paired_and_opt_in() {
+        // The `_aggregate_v3` identity is bound to this native operation
+        // bound: it decides the expected publication count and the output
+        // bytes (record 0272). A bound change must retire these names, as
+        // record 0272 retired `_aggregate_v2` for the 4096 bound.
+        assert_eq!(PPT_TEXT_BATCH_NATIVE_OPERATION_LIMIT, 16_384);
         assert_eq!(PPT_TEXT_BATCH_CATALOG.len(), 28);
         for entry in PPT_TEXT_BATCH_CATALOG {
             assert_eq!(crate::parse_case(entry.case.name()), Some(entry.case));
@@ -3565,14 +3570,19 @@ mod tests {
                 entry.count,
                 1 | 10 | 100 | 256 | 1_000 | 4_096 | 10_000
             ));
-            assert!(entry.case.name().ends_with("_aggregate_v2"));
-            let retired = entry.case.name().replace("_aggregate_v2", "_v1");
+            assert!(entry.case.name().ends_with("_aggregate_v3"));
+            let retired = entry.case.name().replace("_aggregate_v3", "_v1");
             assert_eq!(crate::parse_case(&retired), None, "frozen v1 is historical");
+            // Record 0272: the 0220 `_aggregate_v2` selectors qualified the
+            // 4096-operation native bound; their frozen evidence keeps them.
+            let retired = entry.case.name().replace("_aggregate_v3", "_aggregate_v2");
+            assert_eq!(crate::parse_case(&retired), None, "frozen v2 is historical");
         }
         for invalid in [
-            "ppt_text_batch_eager_native_0_aggregate_v2",
+            "ppt_text_batch_eager_native_0_aggregate_v3",
             "ppt_text_batch_eager_native_1",
-            "ppt_text_batch_positional_unified_10001_aggregate_v2",
+            "ppt_text_batch_positional_unified_10001_aggregate_v3",
+            "ppt_text_batch_eager_unified_10000_aggregate_v2",
             "ppt_text_batch_source_native_10_v1",
         ] {
             assert_eq!(crate::parse_case(invalid), None, "{invalid}");
