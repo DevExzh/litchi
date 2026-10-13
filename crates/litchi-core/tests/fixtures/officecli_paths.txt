@@ -1,4 +1,4 @@
-# Element paths harvested from OfficeCLI (3rdparty/OfficeCLI, not in git):
+# Element paths harvested from OfficeCLI (upstream checkout, not in git):
 # the path arguments of `officecli get|set|add|remove|move|swap` and the
 # --after/--before/--to anchors in examples/{word,excel,ppt}/**, README.md,
 # SKILL.md, skills/**, and the schemas/help/**/*.json `paths` templates (with

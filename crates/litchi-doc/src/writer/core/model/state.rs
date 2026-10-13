@@ -79,6 +79,9 @@ pub struct Builder {
     pub(in crate::writer::core) encryption: Option<WriterEncryption>,
     /// Complete inert MS-OVBA project written under the MS-DOC `Macros` storage.
     pub(in crate::writer::core) vba_project: Option<litchi_vba::Payload>,
+    /// Document properties for the `\x05SummaryInformation` and
+    /// `\x05DocumentSummaryInformation` streams; none are written while empty.
+    pub(in crate::writer::core) properties: litchi_ole_common::property_set::SummaryProperties,
 }
 
 pub(in crate::writer::core) struct WriterEncryption {

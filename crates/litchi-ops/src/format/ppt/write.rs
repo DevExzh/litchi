@@ -30,10 +30,14 @@ use crate::transaction::{Error as TransactionError, LimitKind, SemanticLimits};
 use crate::value::Scalar;
 
 /// The native proof and immutable endpoints of one unified PPT write.
+/// The patch a PPT write step retains: a primary edit or a metadata edit.
+pub(crate) type StepPatch =
+    crate::format::ole_metadata::StepPatch<litchi_ppt::Patch, litchi_ppt::package::metadata::Patch>;
+
 pub(crate) struct WriteCommit {
     pub(crate) before: Ppt,
     pub(crate) after: Ppt,
-    pub(crate) patch: litchi_ppt::Patch,
+    pub(crate) patch: StepPatch,
     pub(crate) operations: usize,
     pub(crate) snapshot_bytes: usize,
 }
@@ -107,6 +111,9 @@ pub(crate) fn set_with_limits<'p, 'v>(
 ) -> Result<WriteCommit> {
     file.admit_edit()?;
     let props = Props::from_props(props)?;
+    if crate::format::ole_metadata::is_target(&target) {
+        return file.set_metadata(&props, limits);
+    }
     let nodes = resolve_nodes(file, &target, limits)?;
     let plans = build_plans(nodes, &props, limits)?;
     let native = stage_plans(file, plans, limits)?;
@@ -911,7 +918,7 @@ fn finish_commit(
     Ok(WriteCommit {
         before: file.clone(),
         after,
-        patch,
+        patch: StepPatch::Primary(patch),
         operations,
         snapshot_bytes,
     })

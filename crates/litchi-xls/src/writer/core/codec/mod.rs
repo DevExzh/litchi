@@ -8,6 +8,7 @@ mod drawings;
 mod lifecycle;
 mod names;
 mod pivots;
+mod properties;
 mod protection;
 mod tables;
 mod workbook;

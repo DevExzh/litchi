@@ -2,6 +2,7 @@
 
 mod codec;
 pub mod edit;
+pub mod metadata;
 mod model;
 pub mod property_set;
 /// Low-level cursor-backed CFB access for format-specific callers.

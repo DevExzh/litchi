@@ -55,6 +55,7 @@ impl Builder {
             next_shape_id: crate::writer::images::FIRST_PICTURE_SHAPE_ID,
             encryption: None,
             vba_project: None,
+            properties: litchi_ole_common::property_set::SummaryProperties::new(),
         }
     }
 
@@ -1036,13 +1037,56 @@ impl Builder {
         Ok(())
     }
 
-    /// Reject an unmodeled document property instead of silently dropping it.
+    /// Replaces the document's metadata with `metadata`.
     ///
-    /// Generic DOC property serialization is not implemented by this fresh
-    /// authoring model. Callers must use a focused typed property API once one
-    /// exists for the property family they need.
-    pub fn set_property(&mut self, _name: &str, _value: &str) -> Result<(), WriteError> {
-        Err(WriteError::UnsupportedProperty)
+    /// The fields are written to the `\x05SummaryInformation` and
+    /// `\x05DocumentSummaryInformation` streams by the shared
+    /// [`SummaryProperties`](litchi_ole_common::property_set::SummaryProperties)
+    /// conversion
+    /// ([`SummaryProperties::merge_metadata`](litchi_ole_common::property_set::SummaryProperties::merge_metadata)
+    /// lists the mapping). It replaces every property set earlier, including
+    /// custom ones, so set custom properties through
+    /// [`Self::summary_properties_mut`] afterwards. Empty metadata writes no
+    /// property stream, exactly as a builder that never set one. Nothing
+    /// reads the clock: a creation or save time is written only when given.
+    ///
+    /// ```
+    /// let mut builder = litchi_doc::Builder::new();
+    /// builder.add_paragraph("Body")?;
+    /// builder.set_metadata(litchi_core::Metadata {
+    ///     title: Some("Quarterly report".to_owned()),
+    ///     author: Some("Ada".to_owned()),
+    ///     ..litchi_core::Metadata::default()
+    /// })?;
+    /// let package = builder.build()?;
+    /// assert_eq!(package.metadata().title.as_deref(), Some("Quarterly report"));
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WriteError::Metadata`], leaving the properties unchanged, for
+    /// a field the property sets cannot store (`identifier`,
+    /// `hyperlink_base`, unzoned timestamps) or a refused value.
+    pub fn set_metadata(&mut self, metadata: litchi_core::Metadata) -> Result<(), WriteError> {
+        self.properties =
+            litchi_ole_common::property_set::SummaryProperties::from_metadata(&metadata)?;
+        Ok(())
+    }
+
+    /// The document properties the builder writes, including typed counts and
+    /// custom properties that [`litchi_core::Metadata`] does not carry.
+    #[must_use]
+    pub const fn summary_properties(&self) -> &litchi_ole_common::property_set::SummaryProperties {
+        &self.properties
+    }
+
+    /// Mutable access to the document properties, for custom properties and
+    /// typed section edits.
+    pub fn summary_properties_mut(
+        &mut self,
+    ) -> &mut litchi_ole_common::property_set::SummaryProperties {
+        &mut self.properties
     }
 }
 

@@ -10,7 +10,7 @@ const ROW_XML: &[u8] = b"<rowBreaks count=\"1\" manualBreakCount=\"1\"><brk id=\
 
 #[test]
 fn package_transaction_round_trips_and_inverts_exactly() {
-    let mut package = Package::create().unwrap();
+    let mut package = Package::new().unwrap();
     let source = package.page_breaks("Sheet1").unwrap().source_arc().unwrap();
 
     let mut edit = package.edit_page_breaks("Sheet1").unwrap();
@@ -32,7 +32,7 @@ fn package_transaction_round_trips_and_inverts_exactly() {
     assert!(xml.windows(ROW_XML.len()).any(|window| window == ROW_XML));
 
     let bytes = package.to_plain_bytes().unwrap();
-    let reopened = Package::from_bytes(bytes).unwrap();
+    let reopened = Package::from_bytes(&bytes).unwrap();
     let value = reopened.page_breaks(0usize).unwrap();
     assert_eq!(value.page_breaks(), commit.snapshot().page_breaks());
 
@@ -44,7 +44,7 @@ fn package_transaction_round_trips_and_inverts_exactly() {
 
 #[test]
 fn no_op_shares_source_and_stale_patch_is_rejected() {
-    let mut package = Package::create().unwrap();
+    let mut package = Package::new().unwrap();
     let source = package.page_breaks(0usize).unwrap().source_arc().unwrap();
     let commit = package.edit_page_breaks(0usize).unwrap().commit().unwrap();
     assert!(!commit.changed());
@@ -73,8 +73,8 @@ fn no_op_shares_source_and_stale_patch_is_rejected() {
 
 #[test]
 fn worksheet_facade_uses_the_canonical_owner() {
-    let package = Package::create().unwrap();
-    let workbook = package.workbook().unwrap();
+    let package = Package::new().unwrap();
+    let workbook = package.workbook();
     let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
     assert_eq!(sheet.page_breaks().unwrap(), PageBreaks::new());
 }
@@ -86,7 +86,7 @@ fn reads_real_poi_manual_breaks() {
         "/../../test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xlsx"
     ))
     .unwrap();
-    let workbook = package.workbook().unwrap();
+    let workbook = package.workbook();
     let values = workbook
         .sheets()
         .map(|sheet| {

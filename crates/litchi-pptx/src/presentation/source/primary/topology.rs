@@ -139,7 +139,7 @@ impl Revision {
         self.check()?;
         let part = self.prepared.part(&key.part_uri)?;
         if !part.partname().is_equivalent_to(&key.part_uri) {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         let data = part.data()?;
         let bytes = data.as_bytes();
@@ -224,7 +224,7 @@ pub(super) fn remove(package: &Package, key: &StableSlideKey) -> Result<Package>
         .order
         .iter()
         .position(|candidate| candidate == key)
-        .ok_or(Error::StaleSource)?;
+        .ok_or(Error::PatchConflict)?;
     if package.order.len() < 2 {
         return Err(Error::SlideRemovalPlan {
             kind: crate::SlideRemovalRefusal::FinalSlide,
@@ -257,7 +257,7 @@ pub(super) fn remove(package: &Package, key: &StableSlideKey) -> Result<Package>
             let existing = changes
                 .iter()
                 .find(|change| &change.key == key)
-                .ok_or(Error::StaleSource)?;
+                .ok_or(Error::PatchConflict)?;
             (
                 None,
                 existing.content_type.clone(),
@@ -312,7 +312,7 @@ pub(super) fn reorder(
     root: Arc<Vec<u8>>,
     order: Arc<[StableSlideKey]>,
 ) -> Result<Package> {
-    let revision = package.topology.as_ref().ok_or(Error::StaleSource)?;
+    let revision = package.topology.as_ref().ok_or(Error::PatchConflict)?;
     let revision = build_revision(
         package,
         root,
@@ -329,13 +329,13 @@ pub(super) fn replace_snapshot(
     package: &Package,
     snapshot: SourceBackedSlideSnapshot,
 ) -> Result<Package> {
-    let revision = package.topology.as_ref().ok_or(Error::StaleSource)?;
+    let revision = package.topology.as_ref().ok_or(Error::PatchConflict)?;
     let key = package
         .order
         .iter()
         .find(|candidate| candidate.part_uri == snapshot.part_uri)
         .cloned()
-        .ok_or(Error::StaleSource)?;
+        .ok_or(Error::PatchConflict)?;
     let mut changes = revision.data.changes.to_vec();
     let existing = changes.iter().find(|change| change.key == key).cloned();
     let mut seed = Retention::default();
@@ -343,7 +343,7 @@ pub(super) fn replace_snapshot(
         Some(image) => image.relationships.clone(),
         None => {
             physical_image(package, &key, &mut seed)?
-                .ok_or(Error::StaleSource)?
+                .ok_or(Error::PatchConflict)?
                 .0
                 .relationships
         },
@@ -351,7 +351,7 @@ pub(super) fn replace_snapshot(
     let (content_type, relationship_type, before) = if let Some(change) = existing {
         (change.content_type, change.relationship_type, change.before)
     } else {
-        let image = physical_image(package, &key, &mut seed)?.ok_or(Error::StaleSource)?;
+        let image = physical_image(package, &key, &mut seed)?.ok_or(Error::PatchConflict)?;
         (image.1, image.2, Some(image.0))
     };
     let xml = match snapshot.xml {
@@ -395,7 +395,7 @@ pub(super) fn patch_from_packages(source: &Package, target: &Package) -> Result<
     source.check()?;
     target.check()?;
     if !source.same_source_owner(target) {
-        return Err(Error::StaleSource);
+        return Err(Error::PatchConflict);
     }
     let (before, mut retained) = effective_state_with_retention(source)?;
     let (after, target_retained) = effective_state_with_retention(target)?;
@@ -425,7 +425,7 @@ pub(super) fn apply(package: &Package, data: &Data, shape_removals: bool) -> Res
     package.check()?;
     let (current, _current_retention) = effective_state_with_retention(package)?;
     if !state_equal(&current, &data.before) {
-        return Err(Error::StaleSource);
+        return Err(Error::PatchConflict);
     }
     validate_root_delta(package, &data.before, &data.after)?;
     let mut retained = Retention::default();
@@ -581,7 +581,7 @@ fn build_revision_with_retention(
                 package.owner._presentation.source_partname(),
                 package.owner.limits.max_relationship_xml_bytes(),
             )?
-            .ok_or(Error::StaleSource)?;
+            .ok_or(Error::PatchConflict)?;
         let candidate_ct = prepared
             .content_types_data_with_limit(package.owner.limits.max_content_types_bytes())?;
         retained.prepared_metadata.push(candidate_rels.clone());
@@ -589,7 +589,7 @@ fn build_revision_with_retention(
         if candidate_rels.as_bytes() != state.presentation_relationships.as_slice()
             || candidate_ct.as_bytes() != state.content_types.as_slice()
         {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         (
             Arc::clone(&state.presentation_relationships),
@@ -601,7 +601,7 @@ fn build_revision_with_retention(
                 package.owner._presentation.source_partname(),
                 package.owner.limits.max_relationship_xml_bytes(),
             )?
-            .ok_or(Error::StaleSource)?;
+            .ok_or(Error::PatchConflict)?;
         let ct = prepared
             .content_types_data_with_limit(package.owner.limits.max_content_types_bytes())?;
         retained.prepared_metadata.push(rels.clone());
@@ -615,7 +615,7 @@ fn build_revision_with_retention(
     let topology_digest = topology_digest::prepared_digest(&prepared)?;
     if let Some(state) = target_state {
         if topology_digest != state.topology_digest {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
     }
     let after = State {
@@ -663,7 +663,7 @@ fn build_plan(
     let mut seen = HashSet::new();
     for change in changes {
         if !seen.insert(change.key.clone()) {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         let physical = match owner.package.part(&change.key.part_uri) {
             Ok(view) => Some((view.content_type().to_owned(), view)),
@@ -699,7 +699,7 @@ fn build_plan(
             Some(image) => {
                 if let Some((content_type, view)) = physical {
                     if content_type != change.content_type {
-                        return Err(Error::StaleSource);
+                        return Err(Error::PatchConflict);
                     }
                     let physical_data = view.data()?;
                     let xml_changed = physical_data.as_bytes() != image.xml.as_slice();
@@ -816,7 +816,7 @@ fn restore_metadata(
             owner,
             package.owner.limits.max_relationship_xml_bytes(),
         )?
-        .ok_or(Error::StaleSource)?;
+        .ok_or(Error::PatchConflict)?;
     let source_rels_arc = copy_state_bytes(package, source_rels.as_bytes(), retained)?;
     retained.source_metadata.push(source_rels);
     if source_rels_arc.as_slice() != target.presentation_relationships.as_slice() {
@@ -890,7 +890,7 @@ fn stage_root_replacement(
     }
     let source_xml = source_part.source_xml()?;
     if source_xml.bytes() != physical_root {
-        return Err(Error::StaleSource);
+        return Err(Error::PatchConflict);
     }
     let replacement =
         source_xml.with_replacement_xml(copy_state_bytes(package, replacement, retained)?)?;
@@ -962,7 +962,7 @@ fn validate_changes_against_effective(
     let mut seen = HashSet::new();
     for change in changes {
         if !seen.insert(change.key.clone()) {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         if change.content_type != litchi_opc::constants::content_type::PML_SLIDE
             || !crate::parts::is_relationship_type(
@@ -971,18 +971,18 @@ fn validate_changes_against_effective(
                 "slide",
             )
         {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         let current = effective_image(package, &change.key, retained)?;
         match (&current, &change.before) {
             (None, None) => {},
             (Some(current), Some(before)) if current == before => {},
-            _ => return Err(Error::StaleSource),
+            _ => return Err(Error::PatchConflict),
         }
         match (&change.before, &change.after) {
             (Some(before), Some(after)) => {
                 if before.relationships != after.relationships {
-                    return Err(Error::StaleSource);
+                    return Err(Error::PatchConflict);
                 }
                 super::durable::validate_pair(
                     before.xml.as_slice(),
@@ -1029,7 +1029,7 @@ fn validate_removal_admission(
         .physical
         .get(key)
         .copied()
-        .ok_or(Error::StaleSource)?;
+        .ok_or(Error::PatchConflict)?;
     if allows_empty_result {
         package
             .owner
@@ -1113,7 +1113,7 @@ fn source_metadata(
         .owner
         .package
         .relationships_data_for_with_limit(root, package.owner.limits.max_relationship_xml_bytes())?
-        .ok_or(Error::StaleSource)?;
+        .ok_or(Error::PatchConflict)?;
     let ct = package
         .owner
         .package
@@ -1132,7 +1132,7 @@ fn current_changes(package: &Package, retained: &mut Retention) -> Result<Vec<Ch
     let mut changes = Vec::new();
     for snapshot in package.overlays.iter() {
         let key = super::source_key_for_position(package, snapshot.position)?;
-        let image = physical_image(package, &key, retained)?.ok_or(Error::StaleSource)?;
+        let image = physical_image(package, &key, retained)?.ok_or(Error::PatchConflict)?;
         let (before_image, content_type, relationship_type) = image;
         let after_xml = match &snapshot.xml {
             SourcePayload::Original(data) => copy_state_bytes(package, data.as_bytes(), retained)?,
@@ -1187,7 +1187,9 @@ fn diff_changes(
         if before == after {
             continue;
         }
-        let metadata = target_change.or(source_change).ok_or(Error::StaleSource)?;
+        let metadata = target_change
+            .or(source_change)
+            .ok_or(Error::PatchConflict)?;
         changes.push(Change {
             key,
             content_type: metadata.content_type.clone(),
@@ -1330,7 +1332,7 @@ fn effective_slide_binding(
         .changes
         .iter()
         .find(|change| &change.key == key)
-        .ok_or(Error::StaleSource)?;
+        .ok_or(Error::PatchConflict)?;
     let presentation_uri = package.owner._presentation.source_partname();
     Ok(SlideBinding {
         slide_reference_id: key.relationship_id.clone(),

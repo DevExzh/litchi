@@ -1312,10 +1312,19 @@
       "subject": "operation",
       "verb": "create",
       "element": "workbook",
-      "context": "initial-metadata",
+      "context": "unrepresentable-initial-metadata",
       "code": "unsupported_capability",
-      "followUp": "M2 XLS metadata creation",
-      "reason": "the XLS creator refuses initial metadata until typed metadata authoring is integrated"
+      "followUp": "CreateOptions::metadata (OLE property sets, record 0254)",
+      "reason": "initial metadata is written to the OLE property sets; identifier, hyperlink_base and unzoned timestamps have no property-set slot and are refused rather than dropped"
+    },
+    {
+      "subject": "operation",
+      "verb": "get",
+      "element": "metadata",
+      "context": "path-read",
+      "code": "unsupported_capability",
+      "followUp": "File::metadata(); /metadata node reads with the shared metadata vocabulary",
+      "reason": "`set(\"/metadata\", ..)` writes the OLE document properties (root-metadata keys and custom.<name>); the path is set-only, and reads go through File::metadata()"
     },
     {
       "subject": "operation",

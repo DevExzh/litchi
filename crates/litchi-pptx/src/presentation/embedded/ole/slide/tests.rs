@@ -76,8 +76,8 @@ fn exact_noop_is_byte_identical() {
     let before = snapshot(&package);
     let source = before.source_xml().to_vec();
     let commit = before.edit().commit().unwrap();
-    assert!(!commit.is_changed());
-    assert!(commit.patch().is_empty());
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
     apply_patch(&mut package, commit.patch()).unwrap();
     assert_eq!(snapshot(&package).source_xml(), source.as_slice());
     assert_eq!(

@@ -326,7 +326,7 @@ fn changed_edit_reopens_and_changes_only_the_selected_worksheet() {
             assert_eq!(part.blob(), output_part.blob());
         }
     }
-    let reopened = Package::from_bytes(output).unwrap();
+    let reopened = Package::from_bytes(&output).unwrap();
     let page_breaks = reopened.page_breaks("Sheet1").unwrap();
     assert_eq!(page_breaks.page_breaks(), commit.snapshot().page_breaks());
 }

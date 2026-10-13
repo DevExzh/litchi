@@ -372,10 +372,11 @@ fn changed_commit(file: &File) -> (Vec<u8>, String) {
             let repeated = handle.editor().expect("reuse unsigned XLSX owner");
             assert!(
                 workbook
+                    .workbook_ref()
                     .sheet(0_usize)
                     .unwrap()
                     .unwrap()
-                    .same_workbook(&repeated.sheet(0_usize).unwrap().unwrap()),
+                    .same_workbook(&repeated.workbook_ref().sheet(0_usize).unwrap().unwrap()),
                 "signature-authorized promotion is shared"
             );
             let mut edit = workbook.edit().unwrap();
@@ -384,7 +385,7 @@ fn changed_commit(file: &File) -> (Vec<u8>, String) {
                 .expect("a first worksheet")
                 .set("A1", MARKER)
                 .unwrap();
-            let output = edit.commit().unwrap().workbook().to_bytes().unwrap();
+            let output = edit.commit().unwrap().package().to_bytes().unwrap();
             (output, MARKER.to_owned())
         },
         #[cfg(feature = "xlsb")]
@@ -569,7 +570,7 @@ fn assert_exact_noop(input: &Input) {
                 .unwrap();
             assert_eq!(&output, bytes, "{label}: source-backed no-op");
 
-            let mut package = litchi_pptx::Package::from_vec(bytes.clone()).unwrap();
+            let mut package = litchi_pptx::Package::from_reader(&bytes[..]).unwrap();
             let commit = package.edit().unwrap().commit().unwrap();
             assert!(!commit.diagnostics().changed(), "{label}");
             package = commit.into_package();
@@ -591,10 +592,7 @@ fn assert_exact_noop(input: &Input) {
 
             // The eager semantic transaction refuses a signed workbook, even
             // for an exact no-op: it never strips the signature.
-            let workbook = litchi_xlsx::Package::from_bytes(bytes.clone())
-                .unwrap()
-                .into_workbook()
-                .unwrap();
+            let workbook = litchi_xlsx::Package::from_bytes(bytes).unwrap();
             let refused = workbook.edit().and_then(litchi_xlsx::Edit::commit);
             assert!(
                 matches!(refused, Err(litchi_xlsx::Error::Signed)),

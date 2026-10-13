@@ -21,10 +21,14 @@ use crate::transaction::{Error as TransactionError, LimitKind, SemanticLimits};
 use crate::value::Scalar;
 
 /// The native proof and immutable endpoints of one unified XLS write.
+/// The patch an XLS write step retains: a primary edit or a metadata edit.
+pub(crate) type StepPatch =
+    crate::format::ole_metadata::StepPatch<litchi_xls::Patch, litchi_xls::package::metadata::Patch>;
+
 pub(crate) struct WriteCommit {
     pub(crate) before: Xls,
     pub(crate) after: Xls,
-    pub(crate) patch: litchi_xls::Patch,
+    pub(crate) patch: StepPatch,
     pub(crate) operations: usize,
     pub(crate) snapshot_bytes: usize,
 }
@@ -68,7 +72,11 @@ pub(crate) fn set_with_limits<'p, 'v>(
     file.admit_edit()?;
     let props = Props::from_props(props)?;
 
-    let result = if is_sheet_property(&props) {
+    // `/metadata` names the document properties unless the call carries a
+    // sheet property: a worksheet named `metadata` stays renamable there.
+    let result = if crate::format::ole_metadata::is_target(&target) && !is_sheet_property(&props) {
+        file.set_metadata(&props, limits)
+    } else if is_sheet_property(&props) {
         set_sheet_with_limits(file, target, &props, limits)
     } else {
         set_cells_with_limits(file, target, &props, limits)
@@ -677,7 +685,7 @@ fn finish_commit(
     Ok(WriteCommit {
         before: file.clone(),
         after,
-        patch,
+        patch: StepPatch::Primary(patch),
         operations,
         snapshot_bytes,
     })

@@ -300,7 +300,6 @@ fn changed_edit_reopens_inverts_and_preserves_unselected_parts() {
     assert_eq!(
         package
             .workbook()
-            .unwrap()
             .sheet("Sheet1")
             .unwrap()
             .unwrap()

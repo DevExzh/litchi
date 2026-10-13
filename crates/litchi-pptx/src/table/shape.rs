@@ -6,6 +6,7 @@
 
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::mce::{InScopeNamespaces, Limits as MceLimits};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_ooxml_common::xml::{
     DRAWINGML_NAMESPACE, STRICT_DRAWINGML_NAMESPACE, decode_xml_reference,
     unqualified_attribute_value,
@@ -301,6 +302,69 @@ impl<'a> Cell<'a> {
     pub fn text(self) -> Result<String> {
         extract_text(self.xml()?, self.context)
     }
+
+    /// The cell's local solid RGB fill (`a:tcPr/a:solidFill/a:srgbClr`).
+    ///
+    /// Scheme, preset and system colours, gradient, picture and pattern
+    /// fills, and fills inherited from a table style return `None`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the cell XML is malformed or its colour value is
+    /// not six hexadecimal digits.
+    pub fn fill(self) -> Result<Option<[u8; 3]>> {
+        let xml = self.xml()?;
+        let mut reader = quick_xml::Reader::from_reader(xml);
+        reader.config_mut().check_end_names = true;
+        // Path of local names below the cell root.
+        let mut path: Vec<Vec<u8>> = Vec::new();
+        loop {
+            let event = reader
+                .read_event()
+                .map_err(|_| invalid("malformed table cell XML"))?;
+            let (start, empty) = match &event {
+                Event::Start(start) => (Some(start), false),
+                Event::Empty(start) => (Some(start), true),
+                Event::End(_) => {
+                    path.pop();
+                    continue;
+                },
+                Event::Eof => return Ok(None),
+                _ => continue,
+            };
+            let Some(start) = start else { continue };
+            let local = start.local_name().as_ref().to_vec();
+            let inside = path.len() == 3
+                && path[1].as_slice() == b"tcPr"
+                && path[2].as_slice() == b"solidFill";
+            if inside && local.as_slice() == b"srgbClr" {
+                for attribute in start.checked_attributes() {
+                    let attribute = attribute.map_err(|_| invalid("malformed table cell XML"))?;
+                    if attribute.key.as_ref() == b"val" {
+                        return parse_rgb(&attribute.value).map(Some);
+                    }
+                }
+                return Err(invalid("table cell colour has no value"));
+            }
+            if !empty {
+                path.push(local);
+            }
+        }
+    }
+}
+
+fn parse_rgb(value: &[u8]) -> Result<[u8; 3]> {
+    if value.len() != 6 {
+        return Err(invalid("table cell colour is not six hexadecimal digits"));
+    }
+    let mut rgb = [0u8; 3];
+    for (index, slot) in rgb.iter_mut().enumerate() {
+        let pair = std::str::from_utf8(&value[index * 2..index * 2 + 2])
+            .map_err(|_| invalid("table cell colour is not hexadecimal"))?;
+        *slot = u8::from_str_radix(pair, 16)
+            .map_err(|_| invalid("table cell colour is not hexadecimal"))?;
+    }
+    Ok(rgb)
 }
 
 fn invalid(message: impl Into<String>) -> Error {

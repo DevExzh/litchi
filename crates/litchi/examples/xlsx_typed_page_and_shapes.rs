@@ -12,7 +12,7 @@ use litchi::xlsx::style::format::{CellFont, CellFormat};
 use litchi::xlsx::style::stylesheet::{Scheme, Underline};
 use litchi::xlsx::writer::shape::ShapeSpec;
 use litchi::xlsx::{Fit, Orientation, Paper, Setup};
-use litchi::xlsx::{Formula, Rgb, Workbook};
+use litchi::xlsx::{Formula, Package, Rgb};
 use std::path::PathBuf;
 
 fn marker(column: u32, row: u32) -> CellMarker {
@@ -38,7 +38,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("xlsx_typed_page_and_shapes.xlsx"));
 
-    let workbook = Workbook::create()?;
+    let workbook = Package::new()?;
     let mut edit = workbook.edit()?;
     edit.tab(0)?
         .ok_or("missing worksheet tab")?
@@ -93,7 +93,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     ];
     let _accent = Rgb::new(0x2F, 0x75, 0xB5);
 
-    let workbook = edit.commit()?.into_workbook();
+    let workbook = edit.commit()?.into_package();
     workbook.save(&output)?;
     println!("saved {}", output.display());
     Ok(())

@@ -55,7 +55,7 @@ under migration.
 
 ## Shared specification map
 
-The protocol ToCs and front matter under `3rdparty/specs/` are the audit input. A detailed matrix
+The protocol ToCs and front matter of the Microsoft Open Specifications ([MS-DOCX], [MS-OI29500] and their dependencies) and ECMA-376 are the audit input. A detailed matrix
 must use the most specific format specification available and then account for shared dependencies.
 
 | Family | Role in the audit |

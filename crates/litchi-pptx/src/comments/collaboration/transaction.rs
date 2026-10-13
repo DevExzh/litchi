@@ -110,8 +110,8 @@ impl AuthorPresenceSnapshot {
     }
 
     #[must_use]
-    pub fn edit(&self) -> AuthorPresenceTransaction {
-        AuthorPresenceTransaction {
+    pub fn edit(&self) -> AuthorPresenceEdit {
+        AuthorPresenceEdit {
             original: self.clone(),
             working: self.value().cloned(),
         }
@@ -132,22 +132,26 @@ impl AuthorPresenceSnapshot {
 
 /// Detached edit of one author presence extension.
 #[derive(Debug, Clone)]
-pub struct AuthorPresenceTransaction {
+pub struct AuthorPresenceEdit {
     original: AuthorPresenceSnapshot,
     working: Option<PresenceInfo>,
 }
 
-impl AuthorPresenceTransaction {
+impl AuthorPresenceEdit {
     #[inline]
     #[must_use]
     pub fn value(&self) -> Option<&PresenceInfo> {
         self.working.as_ref()
     }
 
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.original.value() != self.value()
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Set or remove the optional presence extension.
@@ -221,10 +225,14 @@ pub struct AuthorPresenceCommit {
 }
 
 impl AuthorPresenceCommit {
-    #[inline]
-    #[must_use]
-    pub const fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.changed
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     #[inline]
@@ -271,7 +279,7 @@ impl AuthorPresencePatch {
 
     #[inline]
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
@@ -294,7 +302,7 @@ impl AuthorPresencePatch {
         if target.as_slice() != self.before.source_xml.as_slice() {
             return Err(invalid("author presence source is stale"));
         }
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(self.before.clone());
         }
         let located = codec::locate(
@@ -453,8 +461,8 @@ impl CommentThreadingSnapshot {
     }
 
     #[must_use]
-    pub fn edit(&self) -> CommentThreadingTransaction {
-        CommentThreadingTransaction {
+    pub fn edit(&self) -> CommentThreadingEdit {
+        CommentThreadingEdit {
             original: self.clone(),
             working: self.value().cloned(),
         }
@@ -477,22 +485,26 @@ impl CommentThreadingSnapshot {
 
 /// Detached edit of one comment threading extension.
 #[derive(Debug, Clone)]
-pub struct CommentThreadingTransaction {
+pub struct CommentThreadingEdit {
     original: CommentThreadingSnapshot,
     working: Option<ThreadingInfo>,
 }
 
-impl CommentThreadingTransaction {
+impl CommentThreadingEdit {
     #[inline]
     #[must_use]
     pub fn value(&self) -> Option<&ThreadingInfo> {
         self.working.as_ref()
     }
 
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.original.value() != self.value()
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Set or remove the optional threading extension.
@@ -571,10 +583,14 @@ pub struct CommentThreadingCommit {
 }
 
 impl CommentThreadingCommit {
-    #[inline]
-    #[must_use]
-    pub const fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.changed
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     #[inline]
@@ -621,7 +637,7 @@ impl CommentThreadingPatch {
 
     #[inline]
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
     }
 
@@ -644,7 +660,7 @@ impl CommentThreadingPatch {
         if target.as_slice() != self.before.source_xml.as_slice() {
             return Err(invalid("comment threading source is stale"));
         }
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(self.before.clone());
         }
         let located = codec::locate(

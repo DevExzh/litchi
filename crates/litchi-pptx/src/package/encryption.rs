@@ -32,27 +32,26 @@ impl Package {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn open_with_password<P: AsRef<Path>>(path: P, password: &str) -> Result<Self> {
-        Self::open_with_password_and_limits(
-            path,
-            password,
-            Limits::default(),
-            SourceLimits::default(),
-        )
+        Self::open_with_password_and_options(path, password, crate::OpenOptions::default())
     }
 
-    /// Open an ordinary or encrypted package with independent crypto and OPC limits.
+    /// Open an ordinary or encrypted package with explicit ingress options.
+    ///
+    /// The options' encryption limits bound the outer container and
+    /// decryption; their source limits bound the clear OPC archive.
     ///
     /// # Errors
     ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn open_with_password_and_limits<P: AsRef<Path>>(
+    /// Returns [`Error::UnsupportedOpenPolicy`] for cache or execution
+    /// policies, and an error if the input cannot be read or is malformed.
+    pub fn open_with_password_and_options<P: AsRef<Path>>(
         path: P,
         password: &str,
-        encryption_limits: Limits,
-        opc_limits: SourceLimits,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
+        options.check_owning()?;
         let input = File::open(path)?;
-        Self::from_reader_with_password_and_limits(input, password, encryption_limits, opc_limits)
+        Self::from_reader_with_password_and_options(input, password, options)
     }
 
     /// Read an ordinary or encrypted package using a password and safe limits.
@@ -61,56 +60,23 @@ impl Package {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn from_reader_with_password<R: Read>(reader: R, password: &str) -> Result<Self> {
-        Self::from_reader_with_password_and_limits(
-            reader,
-            password,
-            Limits::default(),
-            SourceLimits::default(),
-        )
+        Self::from_reader_with_password_and_options(reader, password, crate::OpenOptions::default())
     }
 
-    /// Read an ordinary or encrypted package with independent crypto and OPC limits.
+    /// Read an ordinary or encrypted package with explicit ingress options.
     ///
     /// # Errors
     ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_reader_with_password_and_limits<R: Read>(
+    /// Returns [`Error::UnsupportedOpenPolicy`] for cache or execution
+    /// policies, and an error if the input cannot be read or is malformed.
+    pub fn from_reader_with_password_and_options<R: Read>(
         reader: R,
         password: &str,
-        encryption_limits: Limits,
-        opc_limits: SourceLimits,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
-        let opened = ooxml::load_with(reader, password, &encryption_limits)?;
-        Self::from_opened_encryption(opened, opc_limits)
-    }
-
-    /// Open an owned ordinary or encrypted package buffer using a password.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_vec_with_password(bytes: Vec<u8>, password: &str) -> Result<Self> {
-        Self::from_vec_with_password_and_limits(
-            bytes,
-            password,
-            Limits::default(),
-            SourceLimits::default(),
-        )
-    }
-
-    /// Open an owned package buffer with independent crypto and OPC limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_vec_with_password_and_limits(
-        bytes: Vec<u8>,
-        password: &str,
-        encryption_limits: Limits,
-        opc_limits: SourceLimits,
-    ) -> Result<Self> {
-        let opened = ooxml::open_with(bytes, password, &encryption_limits)?;
-        Self::from_opened_encryption(opened, opc_limits)
+        options.check_owning()?;
+        let opened = ooxml::load_with(reader, password, &options.encryption_limits)?;
+        Self::from_opened_encryption(opened, options.source_limits)
     }
 
     /// Open a borrowed ordinary or encrypted package buffer using a password.
@@ -119,25 +85,21 @@ impl Package {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn from_bytes_with_password(bytes: &[u8], password: &str) -> Result<Self> {
-        Self::from_bytes_with_password_and_limits(
-            bytes,
-            password,
-            Limits::default(),
-            SourceLimits::default(),
-        )
+        Self::from_bytes_with_password_and_options(bytes, password, crate::OpenOptions::default())
     }
 
-    /// Open a borrowed package buffer with independent crypto and OPC limits.
+    /// Open a borrowed package buffer with explicit ingress options.
     ///
     /// # Errors
     ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_bytes_with_password_and_limits(
+    /// Returns [`Error::UnsupportedOpenPolicy`] for cache or execution
+    /// policies, and an error if the input cannot be read or is malformed.
+    pub fn from_bytes_with_password_and_options(
         bytes: &[u8],
         password: &str,
-        encryption_limits: Limits,
-        opc_limits: SourceLimits,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
+        options.check_owning()?;
         let mut owned = Vec::new();
         owned
             .try_reserve_exact(bytes.len())
@@ -146,7 +108,8 @@ impl Package {
                 source,
             })?;
         owned.extend_from_slice(bytes);
-        Self::from_vec_with_password_and_limits(owned, password, encryption_limits, opc_limits)
+        let opened = ooxml::open_with(owned, password, &options.encryption_limits)?;
+        Self::from_opened_encryption(opened, options.source_limits)
     }
 
     /// Explicitly serialize a clear OPC package, permitting an encryption downgrade.
@@ -374,7 +337,7 @@ impl Package {
     ///
     /// `opened` comes from [`litchi_crypto::ooxml::open`] or one of its limit
     /// and policy variants. The package keeps the source mode exactly as
-    /// [`Self::from_vec_with_password_and_limits`] does, so plain output
+    /// [`Self::from_reader_with_password_and_options`] does, so plain output
     /// stays refused until the caller chooses re-encryption or plaintext.
     /// This lets one decryption serve both a caller's own classification of
     /// the clear package and the open.
@@ -389,7 +352,10 @@ impl Package {
 
     fn from_opened_encryption(opened: ooxml::Opened, limits: SourceLimits) -> Result<Self> {
         let mode = opened.mode();
-        let mut package = Self::from_vec_with_limits(opened.into_bytes(), limits)?;
+        let mut package = Self::from_opc_package_with_provenance(
+            litchi_opc::OpcPackage::from_vec_with_limits(opened.into_bytes(), limits)?,
+            true,
+        )?;
         package.encryption = match mode {
             Some(mode) => PackageEncryption::encrypted(mode),
             None => PackageEncryption::plain(),

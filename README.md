@@ -227,7 +227,7 @@ function that returns `Result<(), Box<dyn std::error::Error + Send + Sync>>`.
 ```rust
 use litchi::docx::Builder;
 use litchi::pptx::Package as PptxPackage;
-use litchi::xlsx::Workbook;
+use litchi::xlsx::Package as XlsxPackage;
 
 // Create Word document
 let mut builder = Builder::new()?;
@@ -236,13 +236,13 @@ doc.add_heading("My Document", 1)?;
 doc.add_paragraph_with_text("Hello, World!");
 builder.build()?.save("output.docx")?;
 
-// Create Excel workbook: edits are transactions over an immutable workbook
-let mut edit = Workbook::create()?.edit()?;
+// Create Excel workbook: edits are transactions over an immutable package
+let mut edit = XlsxPackage::new()?.edit()?;
 edit.sheet("Sheet1")?
     .ok_or("missing worksheet")?
     .set("A1", "Hello")?
     .set("B1", "World")?;
-edit.commit()?.into_workbook().save("output.xlsx")?;
+edit.commit()?.into_package().save("output.xlsx")?;
 
 // Create PowerPoint presentation
 let mut pkg = PptxPackage::new()?;

@@ -710,7 +710,7 @@ impl Snapshot {
                             Error::Invalid("ink-action source selector is absent".into())
                         })?;
                     if raw.fingerprint != context {
-                        return Err(Error::StaleSource);
+                        return Err(Error::PatchConflict);
                     }
                     return Err(Error::Invalid(
                         "ink-action source selector names an unsupported branch".into(),
@@ -723,7 +723,7 @@ impl Snapshot {
             len: self.anchors.len(),
         })?;
         if anchor.fingerprint != selector.context() {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         Ok(index)
     }

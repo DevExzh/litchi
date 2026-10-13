@@ -26,6 +26,7 @@ use super::signature::{self, Opened, Signature};
 use crate::{OpenOptions, Result};
 
 mod children;
+mod metadata;
 mod nav;
 mod node;
 mod spec;
@@ -124,11 +125,6 @@ impl Ppt {
                 "legacy PPT does not support OOXML Strict conformance",
                 "use Conformance::Transitional; Strict authoring is not integrated",
             ))
-        } else if options.metadata_value().is_some() {
-            Some((
-                "initial PPT metadata authoring is not integrated",
-                "omit initial metadata",
-            ))
         } else {
             None
         };
@@ -138,7 +134,10 @@ impl Ppt {
                 .with_suggestion(suggestion));
         }
 
-        let package = Package::new()?;
+        let package = match options.metadata_value() {
+            Some(metadata) => metadata::create(metadata)?,
+            None => Package::new()?,
+        };
         Self::from_package(package)
     }
 

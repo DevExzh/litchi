@@ -98,7 +98,7 @@ fn rejects_ambiguous_or_unsafe_metadata() {
 
 #[test]
 fn package_transaction_is_semantic_atomic_and_ergonomic() {
-    let mut package = Package::create().unwrap();
+    let mut package = Package::new().unwrap();
     {
         let mut edit = package.edit_smart_tags("Sheet1").unwrap();
         edit.set(Cell::new("B2", vec![Tag::new(3).unwrap()]).unwrap())
@@ -117,7 +117,6 @@ fn package_transaction_is_semantic_atomic_and_ergonomic() {
     assert_eq!(
         package
             .workbook()
-            .unwrap()
             .sheet("Sheet1")
             .unwrap()
             .unwrap()

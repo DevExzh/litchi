@@ -3,16 +3,13 @@
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::convert::Infallible;
-use std::io::{Read, Write};
 use std::mem::size_of;
-use std::path::Path;
 use std::sync::{Arc, Mutex, OnceLock};
 
-use super::edit::{Commit, Edit, Patch};
 use super::worksheet;
 use super::{codec, package};
 use litchi_core::Selector as CoreSelector;
-use litchi_opc::{OpcPackage, PackURI, Relationships, SourceLimits};
+use litchi_opc::{OpcPackage, PackURI, Relationships};
 use litchi_sheet::{Area, At, ColumnAt, Rect, RowAt};
 use once_cell::sync::OnceCell;
 
@@ -442,7 +439,12 @@ pub(crate) struct Inner {
     pub(super) leniency: Leniency,
 }
 
-/// Immutable, cheap-to-share XLSX workbook snapshot.
+/// The owned, read-only semantic projection of an XLSX [`crate::Package`].
+///
+/// A projection is cheap to clone and shares the package's immutable state;
+/// [`crate::Package::workbook`] produces one. It exposes the workbook catalog,
+/// sheet handles, cells, styles and the other semantic reads. Every state
+/// verb (open, edit, apply, save) lives on the package.
 #[derive(Debug, Clone)]
 pub struct Workbook {
     pub(super) inner: Arc<Inner>,
@@ -451,196 +453,21 @@ pub struct Workbook {
 }
 
 impl Workbook {
-    /// Create a deterministic minimal workbook with one visible worksheet.
-    pub fn new() -> Result<Self> {
-        Self::from_package(crate::package::build_minimal_package()?)
-    }
-
-    /// Create a deterministic minimal workbook with one visible worksheet.
-    pub fn create() -> Result<Self> {
-        Self::new()
-    }
-
-    /// Open an XLSX-family package from a filesystem path.
-    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::open_with_limits(path, SourceLimits::default())
-    }
-
-    /// Open an XLSX-family package from a filesystem path with explicit OPC
-    /// resource limits.
-    pub fn open_with_limits(path: impl AsRef<Path>, limits: SourceLimits) -> Result<Self> {
-        Self::from_package(OpcPackage::open_with_limits(path, limits)?)
-    }
-
-    /// Open an ordinary or encrypted workbook using safe independent resource
-    /// policies.
-    #[cfg(feature = "encryption")]
-    pub fn open_with_password(path: impl AsRef<Path>, password: &str) -> Result<Self> {
-        crate::Package::open_with_password(path, password)?.into_workbook()
-    }
-
-    /// Open an ordinary or encrypted workbook with independent outer
-    /// encryption and inner OPC resource policies.
-    #[cfg(feature = "encryption")]
-    pub fn open_with_password_and_limits(
-        path: impl AsRef<Path>,
-        password: &str,
-        encryption_limits: &crate::encryption::Limits,
-        opc_limits: SourceLimits,
-    ) -> Result<Self> {
-        crate::Package::open_with_password_and_limits(
-            path,
-            password,
-            encryption_limits,
-            opc_limits,
-        )?
-        .into_workbook()
-    }
-
-    /// Move bytes into the XLSX parser.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, SourceLimits::default())
-    }
-
-    /// Move bytes into the XLSX parser with explicit OPC resource limits.
-    pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: SourceLimits) -> Result<Self> {
-        let package = OpcPackage::from_vec_with_limits(bytes, limits)?;
-        Self::from_package(package)
-    }
-
-    /// Move ordinary or encrypted bytes into the workbook parser using safe
-    /// independent resource policies.
-    #[cfg(feature = "encryption")]
-    pub fn from_bytes_with_password(bytes: Vec<u8>, password: &str) -> Result<Self> {
-        crate::Package::from_bytes_with_password(bytes, password)?.into_workbook()
-    }
-
-    /// Move ordinary or encrypted bytes into the workbook parser with
-    /// independent outer encryption and inner OPC resource policies.
-    #[cfg(feature = "encryption")]
-    pub fn from_bytes_with_password_and_limits(
-        bytes: Vec<u8>,
-        password: &str,
-        encryption_limits: &crate::encryption::Limits,
-        opc_limits: SourceLimits,
-    ) -> Result<Self> {
-        crate::Package::from_bytes_with_password_and_limits(
-            bytes,
-            password,
-            encryption_limits,
-            opc_limits,
-        )?
-        .into_workbook()
-    }
-
-    /// Open a borrowed XLSX byte slice.
-    pub fn from_slice(bytes: &[u8]) -> Result<Self> {
-        Self::from_slice_with_limits(bytes, SourceLimits::default())
-    }
-
-    /// Open a borrowed XLSX byte slice with explicit OPC resource limits.
-    pub fn from_slice_with_limits(bytes: &[u8], limits: SourceLimits) -> Result<Self> {
-        Self::from_package(OpcPackage::from_bytes_with_limits(bytes, limits)?)
-    }
-
-    /// Read an ordinary or encrypted borrowed byte slice using safe
-    /// independent resource policies.
-    #[cfg(feature = "encryption")]
-    pub fn from_slice_with_password(bytes: &[u8], password: &str) -> Result<Self> {
-        crate::Package::from_slice_with_password(bytes, password)?.into_workbook()
-    }
-
-    /// Read an ordinary or encrypted borrowed byte slice with independent
-    /// outer encryption and inner OPC resource policies.
-    #[cfg(feature = "encryption")]
-    pub fn from_slice_with_password_and_limits(
-        bytes: &[u8],
-        password: &str,
-        encryption_limits: &crate::encryption::Limits,
-        opc_limits: SourceLimits,
-    ) -> Result<Self> {
-        crate::Package::from_slice_with_password_and_limits(
-            bytes,
-            password,
-            encryption_limits,
-            opc_limits,
-        )?
-        .into_workbook()
-    }
-
-    /// Read an XLSX package from a synchronous reader.
-    pub fn from_reader(reader: impl Read) -> Result<Self> {
-        Self::from_reader_with_limits(reader, SourceLimits::default())
-    }
-
-    /// Read an XLSX package from a synchronous reader with explicit OPC
-    /// resource limits.
-    pub fn from_reader_with_limits(reader: impl Read, limits: SourceLimits) -> Result<Self> {
-        Self::from_package(OpcPackage::from_reader_with_limits(reader, limits)?)
-    }
-
-    /// Read an ordinary or encrypted workbook from a synchronous reader using
-    /// safe independent resource policies.
-    #[cfg(feature = "encryption")]
-    pub fn from_reader_with_password(reader: impl Read, password: &str) -> Result<Self> {
-        crate::Package::from_reader_with_password(reader, password)?.into_workbook()
-    }
-
-    /// Read an ordinary or encrypted workbook from a synchronous reader with
-    /// independent outer encryption and inner OPC resource policies.
-    #[cfg(feature = "encryption")]
-    pub fn from_reader_with_password_and_limits(
-        reader: impl Read,
-        password: &str,
-        encryption_limits: &crate::encryption::Limits,
-        opc_limits: SourceLimits,
-    ) -> Result<Self> {
-        crate::Package::from_reader_with_password_and_limits(
-            reader,
-            password,
-            encryption_limits,
-            opc_limits,
-        )?
-        .into_workbook()
-    }
-
-    /// Build a snapshot from a validated OPC package without exposing it in
-    /// ordinary sheet APIs.
-    ///
-    /// This raw compatibility boundary deliberately treats the supplied clear
-    /// OPC graph as plaintext and does not infer encryption provenance.
-    pub fn from_package(package: OpcPackage) -> Result<Self> {
+    /// Validate a clear OPC graph and build its strict projection. The
+    /// public ingress is [`crate::Package`]; this raw boundary is internal.
+    pub(crate) fn from_package(package: OpcPackage) -> Result<Self> {
         Self::from_package_with_styles(package, None)
     }
 
-    /// Adopt a parsed OPC package after validating its `SpreadsheetML` graph.
-    pub fn from_opc(package: OpcPackage) -> Result<Self> {
-        Self::from_package(package)
-    }
-
-    /// [`Self::from_package`] with the opt-in repairs `leniency` allows; see
-    /// [`crate::leniency`]. The Excel-compatible repairs apply under every
-    /// policy.
-    pub fn from_package_with_leniency(package: OpcPackage, leniency: Leniency) -> Result<Self> {
+    /// [`Self::from_package`] with the opt-in repairs `leniency` allows.
+    pub(crate) fn from_package_with_leniency(
+        package: OpcPackage,
+        leniency: Leniency,
+    ) -> Result<Self> {
         Self::open_package(package, None, leniency)
     }
 
-    /// [`Self::open`] with the opt-in repairs `leniency` allows.
-    pub fn open_with_leniency(path: impl AsRef<Path>, leniency: Leniency) -> Result<Self> {
-        Self::from_package_with_leniency(OpcPackage::open(path)?, leniency)
-    }
-
-    /// [`Self::from_slice`] with the opt-in repairs `leniency` allows.
-    pub fn from_slice_with_leniency(bytes: &[u8], leniency: Leniency) -> Result<Self> {
-        Self::from_package_with_leniency(OpcPackage::from_bytes(bytes)?, leniency)
-    }
-
-    /// [`Self::from_reader`] with the opt-in repairs `leniency` allows.
-    pub fn from_reader_with_leniency(reader: impl Read, leniency: Leniency) -> Result<Self> {
-        Self::from_package_with_leniency(OpcPackage::from_reader(reader)?, leniency)
-    }
-
-    /// The opt-in repair policy this workbook was opened with.
+    /// The opt-in repair policy the owning package was opened with.
     #[must_use]
     pub fn leniency(&self) -> Leniency {
         self.inner.leniency
@@ -650,13 +477,25 @@ impl Workbook {
     pub(crate) fn from_package_with_encryption(
         package: OpcPackage,
         encryption: PackageEncryption,
+        leniency: Leniency,
     ) -> Result<Self> {
-        let mut workbook = Self::from_package(package)?;
+        let mut workbook = Self::open_package(package, None, leniency)?;
         workbook.encryption = encryption;
         Ok(workbook)
     }
 
-    pub(super) fn from_package_with_styles(
+    /// Encryption provenance retained from the owning package.
+    #[cfg(feature = "encryption")]
+    pub(crate) const fn encryption_state(&self) -> PackageEncryption {
+        self.encryption
+    }
+
+    #[cfg(feature = "encryption")]
+    pub(crate) fn mark_encrypted(&mut self, mode: crate::encryption::Mode) {
+        self.encryption.mark_encrypted(mode);
+    }
+
+    pub(crate) fn from_package_with_styles(
         package: OpcPackage,
         source: Option<&Workbook>,
     ) -> Result<Self> {
@@ -916,7 +755,7 @@ impl Workbook {
     /// or separately opened opaque non-part ZIP members, return an explicit
     /// unsupported error because their behavior or bytes cannot be proved
     /// through the typed OPC graph.
-    pub fn same_content(&self, other: &Self) -> Result<bool> {
+    pub(crate) fn same_content(&self, other: &Self) -> Result<bool> {
         if Arc::ptr_eq(&self.inner, &other.inner) {
             return Ok(true);
         }
@@ -1092,17 +931,6 @@ impl Workbook {
         crate::pivot::cached_unique_names::workbook_cache(self, selector)
     }
 
-    /// Begin an ordinary semantic edit handle for one workbook PivotCache.
-    /// Select the cache field with [`crate::pivot::PivotCacheEdit::field`]
-    /// before staging an existing-name replacement.
-    #[must_use]
-    pub fn edit_pivot_cache(
-        &self,
-        selector: impl Into<crate::pivot::PivotCacheSelector>,
-    ) -> crate::pivot::PivotCacheEdit {
-        crate::pivot::cached_unique_names::edit_workbook(self, selector)
-    }
-
     /// Resolve the typed `pivotTableServerFormats` metadata for one semantic
     /// workbook PivotTable.  XML source ranges and package identities remain
     /// behind the low-level `pivot_table_server_formats_source` method.
@@ -1132,40 +960,6 @@ impl Workbook {
         selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
     ) -> Result<crate::pivot::PivotTableView> {
         crate::pivot::server_formats::view_workbook(self, selector)
-    }
-
-    /// Start an ordinary semantic PivotTable server-format edit.
-    pub fn edit_pivot_table<'a>(
-        &self,
-        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
-    ) -> Result<crate::pivot::PivotTableServerFormatsEdit> {
-        self.ensure_mutation_allowed("edit_pivot_table")?;
-        crate::pivot::server_formats::edit_workbook(self, selector)
-    }
-
-    /// Alias spelling that includes the edited extension name.
-    pub fn edit_pivot_table_server_formats<'a>(
-        &self,
-        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
-    ) -> Result<crate::pivot::PivotTableServerFormatsEdit> {
-        self.edit_pivot_table(selector)
-    }
-
-    /// Apply an exact ordinary Workbook server-format patch.
-    pub fn apply_pivot_table_server_formats_patch(
-        &self,
-        patch: &crate::pivot::PivotTableServerFormatsWorkbookPatch,
-    ) -> Result<crate::pivot::PivotTableServerFormatsWorkbookCommit> {
-        self.ensure_mutation_allowed("apply_pivot_table_server_formats_patch")?;
-        patch.apply(self)
-    }
-
-    /// Alias spelling for the pivot server-format owner.
-    pub fn apply_pivot_server_formats_patch(
-        &self,
-        patch: &crate::pivot::PivotTableServerFormatsWorkbookPatch,
-    ) -> Result<crate::pivot::PivotTableServerFormatsWorkbookCommit> {
-        self.apply_pivot_table_server_formats_patch(patch)
     }
 
     /// Alias for the typed extension collection view.
@@ -1203,36 +997,22 @@ impl Workbook {
         crate::pivot::server_formats::table_data::view_workbook_with_limits(self, selector, limits)
     }
 
-    /// Begin an ordinary semantic scalar edit of one `pivotTableData` owner.
-    pub fn edit_pivot_table_data<'a>(
-        &self,
-        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
-    ) -> Result<crate::pivot::PivotTableDataEdit> {
-        self.ensure_mutation_allowed("edit_pivot_table_data")?;
-        crate::pivot::server_formats::table_data::edit_workbook(self, selector)
-    }
-
-    /// Start a C444 edit with a caller-lowered semantic resource policy.
-    pub fn edit_pivot_table_data_with_limits<'a>(
-        &self,
-        selector: impl Into<crate::pivot::PivotTableSelector<'a>>,
-        limits: &crate::pivot::PivotTableDataLimits,
-    ) -> Result<crate::pivot::PivotTableDataEdit> {
-        self.ensure_mutation_allowed("edit_pivot_table_data_with_limits")?;
-        crate::pivot::server_formats::table_data::edit_workbook_with_limits(self, selector, limits)
-    }
-
-    /// Apply an exact ordinary Workbook `pivotTableData` patch.
-    pub fn apply_pivot_table_data_patch(
-        &self,
-        patch: &crate::pivot::PivotTableDataWorkbookPatch,
-    ) -> Result<crate::pivot::PivotTableDataWorkbookCommit> {
-        self.ensure_mutation_allowed("apply_pivot_table_data_patch")?;
-        patch.apply(self)
-    }
-
     pub(crate) fn pivot_package(&self) -> &OpcPackage {
         &self.inner.package
+    }
+
+    /// The validated OPC graph behind this projection.
+    pub(crate) fn opc_package(&self) -> &OpcPackage {
+        &self.inner.package
+    }
+
+    /// The OPC graph behind this projection, moved out when this is its only
+    /// owner and cloned (sharing every part payload) otherwise.
+    pub(crate) fn into_opc_package(self) -> OpcPackage {
+        match Arc::try_unwrap(self.inner) {
+            Ok(inner) => inner.package,
+            Err(inner) => inner.package.clone(),
+        }
     }
 
     pub(crate) fn adopt_published_package(&self, package: OpcPackage) -> Result<Self> {
@@ -1314,188 +1094,10 @@ impl Workbook {
         self.inner.format_cache.trim_clean()
     }
 
-    /// Serialize the immutable package snapshot to bytes.
-    pub fn to_bytes(&self) -> Result<Vec<u8>> {
-        self.ensure_ordinary_output("to_bytes")?;
-        self.to_plain_bytes()
-    }
-
-    /// Explicitly serialize a plaintext OPC package, declassifying encrypted
-    /// source provenance for this output only.
-    pub fn to_plain_bytes(&self) -> Result<Vec<u8>> {
-        crate::writer::to_bytes(&self.inner.package)
-    }
-
-    /// Stream a finalized workbook to any sequential sink without seeking.
-    ///
-    /// A sink failure can leave caller-owned output incomplete. Use [`Self::save`]
-    /// for atomic filesystem replacement.
-    pub fn write_to(&self, writer: impl Write) -> Result<()> {
-        self.ensure_ordinary_output("write_to")?;
-        self.write_plain_to(writer)
-    }
-
-    /// Explicitly stream the plaintext OPC package to a sequential sink.
-    pub fn write_plain_to(&self, writer: impl Write) -> Result<()> {
-        crate::writer::write_to(&self.inner.package, writer)
-    }
-
-    /// Atomically save through a finalized sibling temporary artifact.
-    ///
-    /// Serialization, flushing, and file synchronization finish before the
-    /// destination is replaced. Existing symbolic-link destinations are
-    /// refused instead of being followed or silently replaced. This is
-    /// [`Self::save_with_durability`] at `Durability::Full`.
-    pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
-        self.save_with_durability(path, litchi_core::Durability::Full)
-    }
-
-    /// Atomically save at a caller-chosen
-    /// [`Durability`](litchi_core::Durability).
-    ///
-    /// Every level serializes and flushes the same bytes into the same
-    /// sibling temporary artifact, refuses the same destinations and replaces
-    /// the destination with one rename, so a failure before the rename leaves
-    /// it untouched. A weaker level only skips the parent-directory sync
-    /// (`FileOnly`) or both the file and directory syncs (`NoSync`), with the
-    /// crash guarantees `Durability` states. The level applies to this call
-    /// only; the immutable workbook is unchanged.
-    pub fn save_with_durability(
-        &self,
-        path: impl AsRef<Path>,
-        durability: litchi_core::Durability,
-    ) -> Result<()> {
-        self.ensure_ordinary_output("save")?;
-        self.save_plain_with_durability(path, durability)
-    }
-
-    /// Explicitly save the plaintext OPC package atomically.
-    pub fn save_plain(&self, path: impl AsRef<Path>) -> Result<()> {
-        self.save_plain_with_durability(path, litchi_core::Durability::Full)
-    }
-
-    /// Explicitly save the plaintext OPC package atomically at a
-    /// caller-chosen [`Durability`](litchi_core::Durability); see
-    /// [`Self::save_with_durability`].
-    pub fn save_plain_with_durability(
-        &self,
-        path: impl AsRef<Path>,
-        durability: litchi_core::Durability,
-    ) -> Result<()> {
-        crate::writer::save(&self.inner.package, path, durability)
-    }
-
-    /// Encryption profile retained from source ingress or the latest
-    /// successful encrypted save. In-memory byte generation is side-effect-free.
-    #[cfg(feature = "encryption")]
-    #[must_use]
-    pub const fn encryption(&self) -> Option<crate::encryption::Mode> {
-        self.encryption.mode()
-    }
-
-    /// Serialize and encrypt using an explicitly selected profile.
-    #[cfg(feature = "encryption")]
-    pub fn to_encrypted(&self, password: &str, mode: crate::encryption::Mode) -> Result<Vec<u8>> {
-        self.to_encrypted_with_limits(password, mode, &crate::encryption::Limits::default())
-    }
-
-    /// Serialize and encrypt using an explicit encryption resource policy.
-    #[cfg(feature = "encryption")]
-    pub fn to_encrypted_with_limits(
-        &self,
-        password: &str,
-        mode: crate::encryption::Mode,
-        limits: &crate::encryption::Limits,
-    ) -> Result<Vec<u8>> {
-        self.encrypt_with_mode(password, mode, limits)
-    }
-
-    /// Serialize and encrypt using the source package's retained profile.
-    #[cfg(feature = "encryption")]
-    pub fn to_reencrypted(&self, password: &str) -> Result<Vec<u8>> {
-        self.to_reencrypted_with_limits(password, &crate::encryption::Limits::default())
-    }
-
-    /// Re-encrypt using the retained profile and explicit resource policy.
-    #[cfg(feature = "encryption")]
-    pub fn to_reencrypted_with_limits(
-        &self,
-        password: &str,
-        limits: &crate::encryption::Limits,
-    ) -> Result<Vec<u8>> {
-        let mode = self.retained_mode("to_reencrypted")?;
-        self.to_encrypted_with_limits(password, mode, limits)
-    }
-
-    /// Atomically save with an explicitly selected encryption profile.
-    #[cfg(feature = "encryption")]
-    pub fn save_encrypted(
-        &mut self,
-        path: impl AsRef<Path>,
-        password: &str,
-        mode: crate::encryption::Mode,
-    ) -> Result<()> {
-        self.save_encrypted_with_limits(path, password, mode, &crate::encryption::Limits::default())
-    }
-
-    /// Atomically save with explicit encryption profile and resource policy.
-    #[cfg(feature = "encryption")]
-    pub fn save_encrypted_with_limits(
-        &mut self,
-        path: impl AsRef<Path>,
-        password: &str,
-        mode: crate::encryption::Mode,
-        limits: &crate::encryption::Limits,
-    ) -> Result<()> {
-        let output = self.encrypt_with_mode(password, mode, limits)?;
-        crate::writer::save_encrypted(&output, path)?;
-        self.encryption.mark_encrypted(mode);
-        Ok(())
-    }
-
-    /// Atomically save using the encrypted source's retained profile.
-    #[cfg(feature = "encryption")]
-    pub fn save_reencrypted(&mut self, path: impl AsRef<Path>, password: &str) -> Result<()> {
-        self.save_reencrypted_with_limits(path, password, &crate::encryption::Limits::default())
-    }
-
-    /// Atomically save using the retained profile and explicit resource policy.
-    #[cfg(feature = "encryption")]
-    pub fn save_reencrypted_with_limits(
-        &mut self,
-        path: impl AsRef<Path>,
-        password: &str,
-        limits: &crate::encryption::Limits,
-    ) -> Result<()> {
-        let mode = self.retained_mode("save_reencrypted")?;
-        self.save_encrypted_with_limits(path, password, mode, limits)
-    }
-
-    /// Start an isolated semantic transaction over this immutable snapshot.
-    pub fn edit(&self) -> Result<Edit> {
-        self.ensure_mutation_allowed("edit")?;
-        Edit::new(self.clone())
-    }
-
-    /// A copy of this snapshot with every package signature removed
-    /// explicitly (ADR 0006).
-    ///
-    /// A transaction over a signed workbook is refused with [`Error::Signed`],
-    /// because any change invalidates every signature; this is the explicit
-    /// removal that authorizes editing. Every signature relationship and part
-    /// is removed from the copy's OPC graph
-    /// ([`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign)), and the copy
-    /// shares every other part payload with this snapshot, which is left
-    /// unchanged. A workbook that carries no signature, and no
-    /// signature-policy requirement, comes back as itself.
-    ///
-    /// # Errors
-    ///
-    /// Returns the encryption-policy error for a workbook opened with a
-    /// password, whose mutations are refused, and the copy's validation error
-    /// otherwise.
-    pub fn unsigned(&self) -> Result<Self> {
-        self.ensure_mutation_allowed("unsigned")?;
+    /// Remove every package signature from a copy of this snapshot; see
+    /// [`crate::Package::unsign`].
+    pub(crate) fn unsigned(&self) -> Result<Self> {
+        self.ensure_mutation_allowed("unsign")?;
         let package = &self.inner.package;
         if !package.is_signed() && !package.requires_signature_edit_policy() {
             return Ok(self.clone());
@@ -1505,13 +1107,7 @@ impl Workbook {
         Self::from_package_with_styles(package, Some(self))
     }
 
-    /// Apply a reversible patch after checking every expected source part.
-    pub fn apply(&self, patch: &Patch) -> Result<Commit> {
-        self.ensure_mutation_allowed("apply")?;
-        patch.apply_to(self)
-    }
-
-    fn ensure_ordinary_output(&self, operation: &'static str) -> Result<()> {
+    pub(crate) fn ensure_ordinary_output(&self, operation: &'static str) -> Result<()> {
         #[cfg(feature = "encryption")]
         self.encryption
             .ordinary_output()
@@ -1526,23 +1122,10 @@ impl Workbook {
     }
 
     #[cfg(feature = "encryption")]
-    fn retained_mode(&self, operation: &'static str) -> Result<crate::encryption::Mode> {
+    pub(crate) fn retained_mode(&self, operation: &'static str) -> Result<crate::encryption::Mode> {
         self.encryption
             .require_retained_mode()
             .map_err(|source| Error::EncryptionPolicy { operation, source })
-    }
-
-    #[cfg(feature = "encryption")]
-    fn encrypt_with_mode(
-        &self,
-        password: &str,
-        mode: crate::encryption::Mode,
-        limits: &crate::encryption::Limits,
-    ) -> Result<Vec<u8>> {
-        let plaintext = self.to_plain_bytes()?;
-        Ok(crate::encryption::encrypt_with(
-            plaintext, password, mode, limits,
-        )?)
     }
 }
 

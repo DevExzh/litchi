@@ -7,7 +7,7 @@
 use super::{Error, Result};
 use litchi_cfb::{OleError, OleFile};
 use litchi_ole_common::property_set::{
-    self, Binding, PropertySetReader, Section, Stream, USER_DEFINED_PROPERTIES_FMTID,
+    self, Binding, CodePage, PropertySetReader, Section, Stream, USER_DEFINED_PROPERTIES_FMTID,
 };
 use std::io::Cursor;
 use std::sync::Arc;
@@ -120,6 +120,18 @@ impl Transaction {
         })
     }
 
+    /// The shared property-set editor, for the package metadata transaction.
+    pub(crate) const fn editor(&self) -> &property_set::Editor {
+        &self.editor
+    }
+
+    /// Mutable access to the shared editor; staging through it marks the
+    /// transaction changed.
+    pub(crate) fn editor_mut(&mut self) -> &mut property_set::Editor {
+        self.changed = true;
+        &mut self.editor
+    }
+
     /// Whether a successful edit has changed the transaction state.
     #[must_use]
     pub const fn is_changed(&self) -> bool {
@@ -174,6 +186,11 @@ impl Transaction {
 
     /// Applies a typed `SummaryInformation` edit through the common PIDSI owner.
     ///
+    /// A package without a `\u{5}SummaryInformation` stream starts from an
+    /// empty section with the Windows-1252 code page, and the stream is
+    /// created when the edit changes it; an existing blank section (no
+    /// property, not even a code page) is treated the same way.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
@@ -183,11 +200,12 @@ impl Transaction {
             &mut property_set::summary_information::Edit<'a>,
         ) -> std::result::Result<(), OleError>,
     {
-        let source = self
-            .editor
-            .property_set(Binding::SummaryInformation)?
-            .ok_or(OleError::StreamNotFound)?;
-        let snapshot = property_set::summary_information::Snapshot::from_section(&source)?;
+        let snapshot = match self.editor.property_set(Binding::SummaryInformation)? {
+            Some(source) if !source.is_empty() => {
+                property_set::summary_information::Snapshot::from_section(&source)?
+            },
+            _ => property_set::summary_information::Snapshot::new(CodePage::WINDOWS_1252)?,
+        };
         let mut transaction = snapshot.transaction()?;
         {
             let mut draft = transaction.edit();
@@ -205,6 +223,14 @@ impl Transaction {
 
     /// Applies a typed `DocumentSummaryInformation` edit through the common PIDDSI owner.
     ///
+    /// A missing or blank section is handled as in
+    /// [`Self::edit_summary_information`]. The blank case matters for the
+    /// presentations [`crate::Builder`] builds without document
+    /// properties: their fixed `\u{5}DocumentSummaryInformation` stream
+    /// carries an empty section with no code page, which the typed owner
+    /// would otherwise refuse. A user-defined section already in the stream
+    /// is kept.
+    ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
@@ -214,11 +240,15 @@ impl Transaction {
             &mut property_set::document_summary::Edit<'a>,
         ) -> std::result::Result<(), OleError>,
     {
-        let source = self
+        let snapshot = match self
             .editor
             .property_set(Binding::DocumentSummaryInformation)?
-            .ok_or(OleError::StreamNotFound)?;
-        let snapshot = property_set::document_summary::Snapshot::from_section(&source)?;
+        {
+            Some(source) if !source.is_empty() => {
+                property_set::document_summary::Snapshot::from_section(&source)?
+            },
+            _ => property_set::document_summary::Snapshot::new(CodePage::WINDOWS_1252)?,
+        };
         let mut transaction = snapshot.transaction()?;
         {
             let mut draft = transaction.edit();
@@ -506,6 +536,44 @@ mod tests {
         let applied = commit.patch().apply(&snapshot).unwrap();
         assert_eq!(applied.bytes(), commit.snapshot().bytes());
         assert_eq!(commit.patch().revert(&applied).unwrap().bytes(), source);
+    }
+
+    #[test]
+    fn missing_streams_are_created_by_typed_edits() {
+        let mut writer = OleWriter::new();
+        writer
+            .create_stream(&["PowerPoint Document"], b"ppt")
+            .unwrap();
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        let snapshot = Snapshot::from_bytes(output.into_inner()).unwrap();
+        assert!(snapshot.summary_information().unwrap().is_none());
+
+        let mut transaction = snapshot.transaction().unwrap();
+        assert!(!transaction.edit_summary_information(|_| Ok(())).unwrap());
+        assert!(
+            transaction
+                .edit_summary_information(|edit| edit.set_title("title"))
+                .unwrap()
+        );
+        assert!(
+            transaction
+                .edit_document_summary_information(|edit| edit.set_company("company"))
+                .unwrap()
+        );
+        let commit = transaction.commit().unwrap();
+        let edited = commit.snapshot();
+        let summary = edited.summary_information().unwrap().unwrap();
+        assert_eq!(summary.title(), Some("title"));
+        assert_eq!(summary.codepage(), Some(CodePage::WINDOWS_1252));
+        assert_eq!(
+            edited
+                .document_summary_information()
+                .unwrap()
+                .unwrap()
+                .company(),
+            Some("company")
+        );
     }
 
     #[test]

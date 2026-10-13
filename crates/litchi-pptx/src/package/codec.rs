@@ -200,19 +200,22 @@ impl Package {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        Self::open_with_limits(path, litchi_opc::SourceLimits::default())
+        Self::open_with_options(path, crate::OpenOptions::default())
     }
 
-    /// Open a PPTX from a filesystem path with explicit OPC resource limits.
+    /// Open a PPTX from a filesystem path with explicit ingress options.
     ///
     /// # Errors
     ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn open_with_limits<P: AsRef<Path>>(
-        path: P,
-        limits: litchi_opc::SourceLimits,
-    ) -> Result<Self> {
-        Self::from_opc_package_with_provenance(OpcPackage::open_with_limits(path, limits)?, true)
+    /// Returns [`crate::Error::UnsupportedOpenPolicy`] for cache or execution
+    /// policies, which only positional-source owners honor, and an error if
+    /// the input exceeds the source limits, cannot be read or is malformed.
+    pub fn open_with_options<P: AsRef<Path>>(path: P, options: crate::OpenOptions) -> Result<Self> {
+        options.check_owning()?;
+        Self::from_opc_package_with_provenance(
+            OpcPackage::open_with_limits(path, options.source_limits)?,
+            true,
+        )
     }
 
     /// Parse a PPTX from a reader.
@@ -221,41 +224,25 @@ impl Package {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
-        Self::from_reader_with_limits(reader, litchi_opc::SourceLimits::default())
+        Self::from_reader_with_options(reader, crate::OpenOptions::default())
     }
 
-    /// Parse a PPTX from a reader with explicit OPC resource limits.
+    /// Parse a PPTX from a reader with explicit ingress options.
+    ///
+    /// Reader ingestion is bounded by the selected source limits.
     ///
     /// # Errors
     ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_reader_with_limits<R: Read>(
+    /// Returns [`crate::Error::UnsupportedOpenPolicy`] for cache or execution
+    /// policies, and an error if the input exceeds the source limits, cannot
+    /// be read or is malformed.
+    pub fn from_reader_with_options<R: Read>(
         reader: R,
-        limits: litchi_opc::SourceLimits,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
+        options.check_owning()?;
         Self::from_opc_package_with_provenance(
-            OpcPackage::from_reader_with_limits(reader, limits)?,
-            true,
-        )
-    }
-
-    /// Parse a PPTX from an owned ZIP buffer.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_vec(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_vec_with_limits(bytes, litchi_opc::SourceLimits::default())
-    }
-
-    /// Parse a PPTX from an owned ZIP buffer with explicit OPC resource limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_vec_with_limits(bytes: Vec<u8>, limits: litchi_opc::SourceLimits) -> Result<Self> {
-        Self::from_opc_package_with_provenance(
-            OpcPackage::from_vec_with_limits(bytes, limits)?,
+            OpcPackage::from_reader_with_limits(reader, options.source_limits)?,
             true,
         )
     }
@@ -266,16 +253,22 @@ impl Package {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, litchi_opc::SourceLimits::default())
+        Self::from_bytes_with_options(bytes, crate::OpenOptions::default())
     }
 
-    /// Parse a PPTX from a borrowed ZIP buffer with explicit OPC resource limits.
+    /// Parse a PPTX from a borrowed ZIP buffer with explicit ingress options.
     ///
     /// # Errors
     ///
-    /// Returns an error if the input cannot be read or is malformed.
-    pub fn from_bytes_with_limits(bytes: &[u8], limits: litchi_opc::SourceLimits) -> Result<Self> {
-        Self::from_opc_package(OpcPackage::from_bytes_with_limits(bytes, limits)?)
+    /// Returns [`crate::Error::UnsupportedOpenPolicy`] for cache or execution
+    /// policies, and an error if the input exceeds the source limits or is
+    /// malformed.
+    pub fn from_bytes_with_options(bytes: &[u8], options: crate::OpenOptions) -> Result<Self> {
+        options.check_owning()?;
+        Self::from_opc_package(OpcPackage::from_bytes_with_limits(
+            bytes,
+            options.source_limits,
+        )?)
     }
 
     /// Adopt an already parsed OPC graph without hydrating a mutable model.
@@ -287,7 +280,7 @@ impl Package {
         Self::from_opc_package_with_provenance(opc, false)
     }
 
-    fn from_opc_package_with_provenance(
+    pub(crate) fn from_opc_package_with_provenance(
         opc: OpcPackage,
         physical_source_provenance: bool,
     ) -> Result<Self> {

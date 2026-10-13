@@ -19,8 +19,8 @@
 //! # References
 //!
 //! - ODF 1.2 Specification: Attribute types and valid values
-//! - odfpy: `3rdparty/odfpy/odf/attrconverters.py`
-//! - odfdo: `3rdparty/odfdo/src/odfdo/element.py`
+//! - odfpy: `odf/attrconverters.py`
+//! - odfdo: `src/odfdo/element.py`
 use atoi_simd::parse;
 use fast_float2::parse_partial;
 use litchi_core::{Error, Result};

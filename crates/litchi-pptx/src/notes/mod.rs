@@ -6,6 +6,7 @@ mod package;
 mod transaction;
 mod validation;
 
+pub use crate::diagnostics::Diagnostics;
 pub use codec::{master_xml, write_text, write_text_with};
 pub(crate) use codec::{
     rewrite_text, root_conformance, root_conformance_from_processed, scan_xml,
@@ -18,7 +19,7 @@ pub(crate) use package::{
 };
 #[cfg(test)]
 pub(crate) use package::{clear, put, remove, with_refused_slide_root_reservation};
-pub use transaction::{Commit, Patch, Revision, Snapshot, Transaction};
+pub use transaction::{Commit, Edit, Patch, Revision, Snapshot};
 pub(crate) use validation::validate_id;
 
 pub(crate) const P: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";

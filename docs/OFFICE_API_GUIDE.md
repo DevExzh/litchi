@@ -332,10 +332,10 @@ builder.build()?.save("output.docx")?;
 ### Creating Workbooks
 
 ```rust
-use litchi_xlsx::Workbook;
+use litchi_xlsx::Package;
 
-// Create new workbook
-let mut wb = Workbook::create()?;
+// Create new workbook package
+let mut wb = Package::new()?;
 
 // Access first worksheet
 let mut ws = wb.worksheet_mut(0)?;

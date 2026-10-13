@@ -43,36 +43,63 @@ fn direct_pptx_constructors_apply_exact_and_over_input_limits() {
     let over = input_limit(bytes.len() - 1);
 
     Package::from_bytes(&bytes).expect("default slice accepts valid PPTX");
-    Package::from_bytes_with_limits(&bytes, exact).expect("exact slice limit accepts PPTX");
+    Package::from_bytes_with_options(
+        &bytes,
+        litchi_pptx::OpenOptions::default().source_limits(exact),
+    )
+    .expect("exact slice limit accepts PPTX");
     assert_input_limit(
-        Package::from_bytes_with_limits(&bytes, over)
-            .expect_err("slice must propagate OPC input limit"),
+        Package::from_bytes_with_options(
+            &bytes,
+            litchi_pptx::OpenOptions::default().source_limits(over),
+        )
+        .expect_err("slice must propagate OPC input limit"),
         bytes.len(),
         bytes.len() - 1,
     );
 
-    Package::from_vec_with_limits(bytes.clone(), exact).expect("exact owned limit accepts PPTX");
+    Package::from_reader_with_options(
+        Cursor::new(bytes.clone()),
+        litchi_pptx::OpenOptions::default().source_limits(exact),
+    )
+    .expect("exact owned limit accepts PPTX");
     assert_input_limit(
-        Package::from_vec_with_limits(bytes.clone(), over)
-            .expect_err("owned bytes must propagate OPC input limit"),
+        Package::from_reader_with_options(
+            Cursor::new(bytes.clone()),
+            litchi_pptx::OpenOptions::default().source_limits(over),
+        )
+        .expect_err("owned bytes must propagate OPC input limit"),
         bytes.len(),
         bytes.len() - 1,
     );
-    Package::from_reader_with_limits(Cursor::new(bytes.clone()), exact)
-        .expect("exact reader limit accepts PPTX");
+    Package::from_reader_with_options(
+        Cursor::new(bytes.clone()),
+        litchi_pptx::OpenOptions::default().source_limits(exact),
+    )
+    .expect("exact reader limit accepts PPTX");
     assert_input_limit(
-        Package::from_reader_with_limits(Cursor::new(bytes.clone()), over)
-            .expect_err("reader must propagate OPC input limit"),
+        Package::from_reader_with_options(
+            Cursor::new(bytes.clone()),
+            litchi_pptx::OpenOptions::default().source_limits(over),
+        )
+        .expect_err("reader must propagate OPC input limit"),
         bytes.len(),
         bytes.len() - 1,
     );
 
     let file = NamedTempFile::new().expect("temporary PPTX path");
     std::fs::write(file.path(), &bytes).expect("write PPTX fixture");
-    Package::open_with_limits(file.path(), exact).expect("exact path limit accepts PPTX");
+    Package::open_with_options(
+        file.path(),
+        litchi_pptx::OpenOptions::default().source_limits(exact),
+    )
+    .expect("exact path limit accepts PPTX");
     assert_input_limit(
-        Package::open_with_limits(file.path(), over)
-            .expect_err("path must propagate OPC input limit"),
+        Package::open_with_options(
+            file.path(),
+            litchi_pptx::OpenOptions::default().source_limits(over),
+        )
+        .expect_err("path must propagate OPC input limit"),
         bytes.len(),
         bytes.len() - 1,
     );

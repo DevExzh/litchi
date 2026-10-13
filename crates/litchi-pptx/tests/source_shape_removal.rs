@@ -248,7 +248,7 @@ fn assert_source_remove_refused(bytes: &[u8]) {
 fn eager_and_source_remove_one_plain_top_level_shape() {
     let before = fixture(1, 2);
 
-    let mut eager = Package::from_vec(before.clone()).unwrap();
+    let mut eager = Package::from_reader(std::io::Cursor::new(before.clone())).unwrap();
     let mut eager_edit = eager.edit().unwrap();
     assert!(eager_edit.remove_shape(0, 0_usize).unwrap());
     eager = eager_edit.commit().unwrap().into_package();
@@ -432,7 +432,7 @@ fn shape_removal_accepts_an_xml_declaration() {
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
     );
 
-    let mut eager = Package::from_vec(before.clone()).unwrap();
+    let mut eager = Package::from_reader(std::io::Cursor::new(before.clone())).unwrap();
     let mut eager_edit = eager.edit().unwrap();
     assert!(eager_edit.remove_shape(0, 0_usize).unwrap());
     eager = eager_edit.commit().unwrap().into_package();

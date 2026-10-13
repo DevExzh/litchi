@@ -85,7 +85,10 @@ fn scoped_selector_batches_and_failed_properties_are_atomic() {
         );
         assert_eq!(
             source
-                .set(FIRST, props! { "text" => "partial", "bold" => true })
+                .set(
+                    FIRST,
+                    props! { "text" => "partial", "underline" => "single" }
+                )
                 .unwrap_err()
                 .code(),
             Code::UnsupportedProperty
@@ -154,7 +157,7 @@ fn transactions_replay_inverse_poison_and_detect_net_noop() {
         assert_eq!(noop.file.to_bytes().unwrap(), before);
         let poisoned = source.edit(|edit| {
             edit.set(FIRST, props! { "text" => "discarded" })?;
-            let _ = edit.set(FIRST, props! { "bold" => true });
+            let _ = edit.set(FIRST, props! { "underline" => "single" });
             Ok(())
         });
         assert!(poisoned.is_err());
@@ -662,7 +665,8 @@ fn slide_addition_refuses_properties_placements_and_limits_atomically() {
     let before = source.to_bytes().unwrap();
     for (node, code) in [
         (NewNode::new("slide"), Code::MissingProperty),
-        (NewNode::new("picture"), Code::UnsupportedElement),
+        (NewNode::new("picture"), Code::UnsupportedType),
+        (NewNode::new("chart"), Code::UnsupportedElement),
         (
             NewNode::new("slide").prop("layout", "missing"),
             Code::NotFound,

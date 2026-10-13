@@ -89,7 +89,7 @@ fn snapshot_crud_preserves_opaque_xml_and_relationships() {
     edit.reorder(&[9, 7]).unwrap();
 
     let commit = edit.commit().unwrap();
-    assert!(commit.is_changed());
+    assert!(commit.diagnostics().changed());
     let output = String::from_utf8_lossy(commit.snapshot().source_xml());
     assert!(output.contains("future=\"keep\""));
     assert!(output.contains("<x:listOpaque/>"));
@@ -132,8 +132,8 @@ fn no_op_commit_is_byte_exact() {
     let snapshot = load_snapshot(&package).unwrap();
     let source = snapshot.source_xml().to_vec();
     let commit = snapshot.edit().commit().unwrap();
-    assert!(!commit.is_changed());
-    assert!(commit.patch().is_empty());
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
     apply_commit(&mut package, commit).unwrap();
     assert_eq!(
         package.get_part(&presentation_name()).unwrap().blob(),

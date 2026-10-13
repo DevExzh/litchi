@@ -11,8 +11,6 @@ readme = "../../README.md"
 keywords = ["office", "docx", "xlsx", "pptx", "parser"]
 categories = ["parser-implementations", "encoding", "text-processing"]
 exclude = [
-    # Reference materials and third-party projects
-    "3rdparty/*",
     # Examples
     "examples/*",
     # Test files

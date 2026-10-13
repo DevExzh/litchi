@@ -166,7 +166,7 @@ fn facade_publishes_and_reverses_exact_source_checked_commit() {
         .edit()
         .commit()
         .unwrap();
-    assert!(!no_op.is_changed());
+    assert!(no_op.patch().is_noop());
     package.apply_change_tracking_commit(no_op).unwrap();
     assert!(package.opc.is_signed());
 

@@ -76,7 +76,7 @@ fn source_backed_cross_copy_supports_one_relationship_free_chart_leaf() -> TestR
             .windows(b"<c:chartSpace".len())
             .any(|window| window == b"<c:chartSpace")
     );
-    Package::from_vec(output.clone())?;
+    Package::from_reader(io::Cursor::new(output.clone()))?;
     open_source(&output)?;
     Ok(())
 }
@@ -156,7 +156,7 @@ fn source_backed_cross_copy_deduplicates_shared_chart_physical_members() -> Test
 #[test]
 fn source_backed_cross_copy_allocates_chart_uri_and_slide_relationship_collisions() -> TestResult {
     let destination = destination_fixture_with_chart_collision_0383()?;
-    let destination_package = Package::from_vec(destination.clone())?;
+    let destination_package = Package::from_reader(io::Cursor::new(destination.clone()))?;
     let anchor_uri = PackURI::new("/ppt/slides/slide2.xml").map_err(Error::Uri)?;
     let anchor = destination_package.opc()?.get_part(&anchor_uri)?;
     let destination_layout_id = anchor
@@ -1031,7 +1031,7 @@ fn plan_refused(source_bytes: &[u8], destination_bytes: &[u8]) -> TestResult<boo
 
 fn is_source_changed(error: &Error) -> bool {
     match error {
-        Error::StaleSource => true,
+        Error::PatchConflict => true,
         Error::Opc(OpcError::SourceChanged { .. }) => true,
         Error::Opc(OpcError::IncompleteOutput { source, .. }) => {
             matches!(source.as_ref(), OpcError::SourceChanged { .. })
@@ -1107,7 +1107,7 @@ fn source_backed_cross_copy_reopens_through_source_and_eager_facades() -> TestRe
         "Source One"
     );
 
-    let eager = Package::from_vec(output.clone())?;
+    let eager = Package::from_reader(io::Cursor::new(output.clone()))?;
     let opened = eager.opened_presentation()?;
     assert_eq!(opened.slides().len(), 3);
     assert_eq!(opened.slides()[1].name(), "Source One");
@@ -2607,7 +2607,7 @@ fn source_backed_cross_copy_copies_one_embedded_picture_closure() -> TestResult 
             Some(target_uri.as_str())
         );
 
-        let package = Package::from_vec(output.clone())?;
+        let package = Package::from_reader(io::Cursor::new(output.clone()))?;
         let opc = package.opc()?;
         let collision = opc.get_part(&collision_uri)?;
         assert_eq!(collision.blob(), DESTINATION_COLLISION_MEDIA);
@@ -2790,7 +2790,7 @@ fn source_backed_cross_copy_refuses_duplicate_scene_trees_and_misplaced_picture_
 #[test]
 fn source_backed_cross_copy_rewrites_image_layout_relationship_id_collision() -> TestResult {
     let destination = destination_fixture_with_media_collision()?;
-    let destination_package = Package::from_vec(destination.clone())?;
+    let destination_package = Package::from_reader(io::Cursor::new(destination.clone()))?;
     let destination_opc = destination_package.opc()?;
     let anchor_uri = PackURI::new("/ppt/slides/slide2.xml").map_err(Error::Uri)?;
     let anchor = destination_opc.get_part(&anchor_uri)?;
@@ -2816,7 +2816,7 @@ fn source_backed_cross_copy_rewrites_image_layout_relationship_id_collision() ->
     assert_ne!(image_media[0].1.as_str(), "/ppt/media/source-only.png");
     assert_eq!(image_media[0].2, b"source-only-media");
     assert_eq!(image_media[0].3, ct::PNG);
-    Package::from_vec(output.clone())?;
+    Package::from_reader(io::Cursor::new(output.clone()))?;
     open_source(&output)?;
     Ok(())
 }
@@ -3317,7 +3317,7 @@ fn copied_slide_uri(bytes: &[u8]) -> TestResult<PackURI> {
 
 fn copied_media(bytes: &[u8]) -> TestResult<(PackURI, Vec<u8>, String)> {
     let slide_uri = copied_slide_uri(bytes)?;
-    let package = Package::from_vec(bytes.to_vec())?;
+    let package = Package::from_reader(io::Cursor::new(bytes.to_vec()))?;
     let opc = package.opc()?;
     let slide = opc.get_part(&slide_uri)?;
     let image_relationships = slide
@@ -3353,7 +3353,7 @@ fn copied_media(bytes: &[u8]) -> TestResult<(PackURI, Vec<u8>, String)> {
 fn copied_image_media(bytes: &[u8]) -> TestResult<Vec<(String, PackURI, Vec<u8>, String)>> {
     let (slide_uri, slide_xml, rels_xml) = copied_slide_parts(bytes)?;
     let relationship_ids = xml_attribute_values(&slide_xml, "r:embed");
-    let package = Package::from_vec(bytes.to_vec())?;
+    let package = Package::from_reader(io::Cursor::new(bytes.to_vec()))?;
     let opc = package.opc()?;
     let slide = opc.get_part(&slide_uri)?;
     let mut images = Vec::with_capacity(relationship_ids.len());
@@ -3460,7 +3460,7 @@ fn source_backed_cross_copy_copies_multiple_embedded_images_in_source_order() ->
         (0..=31).collect::<Vec<_>>()
     );
 
-    let package = Package::from_vec(output.clone())?;
+    let package = Package::from_reader(io::Cursor::new(output.clone()))?;
     let opc = package.opc()?;
     for (member, content_type) in [
         ("ppt/media/source-only-copy1.png", ct::PNG),
@@ -3496,7 +3496,7 @@ fn source_backed_cross_copy_copies_shared_image_once_with_coherent_relationships
     assert_eq!(image_media[0].1, image_media[1].1);
     assert_eq!(image_media[0].2, b"source-only-media");
     assert_eq!(output, publish(&source, &destination, 0, 1, 1)?);
-    Package::from_vec(output.clone())?;
+    Package::from_reader(io::Cursor::new(output.clone()))?;
     open_source(&output)?;
     Ok(())
 }
@@ -3530,7 +3530,7 @@ fn source_backed_cross_copy_allocates_case_equivalent_media_collision() -> TestR
         DESTINATION_COLLISION_MEDIA
     );
     assert_eq!(output, publish(&source, &destination, 0, 1, 1)?);
-    Package::from_vec(output.clone())?;
+    Package::from_reader(io::Cursor::new(output.clone()))?;
     open_source(&output)?;
     Ok(())
 }
@@ -4642,7 +4642,7 @@ fn source_backed_cross_copy_accepts_picture_on_destination_anchor_and_preserves_
     assert_eq!(image_media.len(), 1);
     assert_eq!(image_media[0].2, SOURCE_PICTURE_MEDIA);
     assert_eq!(image_media[0].3, ct::PNG);
-    Package::from_vec(output.clone())?;
+    Package::from_reader(io::Cursor::new(output.clone()))?;
     open_source(&output)?;
     Ok(())
 }
@@ -5386,7 +5386,7 @@ fn source_backed_cross_copy_lazily_copies_shared_payload_on_writer_memory_refusa
                     "fallback changed {name}"
                 );
             }
-            Package::from_vec(output.clone())?;
+            Package::from_reader(io::Cursor::new(output.clone()))?;
             open_source(&output)?;
             drop(plan);
             drop(source);

@@ -6,7 +6,7 @@
 //! and validates both table models through serialize/read-back.
 
 use litchi_xlsx::{
-    Number, Table, TableStyleInfo, TableType, TotalsRowFunction, Value, Workbook, parse_table_xml,
+    Number, Table, TableStyleInfo, TableType, TotalsRowFunction, Value, parse_table_xml,
     serialize_table,
 };
 
@@ -61,7 +61,7 @@ fn summary_table(headers: &[&str]) -> Table {
 fn main() -> ExampleResult<()> {
     println!("Creating XLSX file with typed tables...");
 
-    let workbook = Workbook::create()?;
+    let workbook = litchi::xlsx::Package::new()?;
     let mut edit = workbook.edit()?;
     edit.tab(0)?
         .ok_or("missing initial worksheet tab")?
@@ -113,7 +113,7 @@ fn main() -> ExampleResult<()> {
 
     let sales = round_trip_table(sales_table(&["Product", "Q1", "Q2", "Q3", "Q4"]))?;
     let summary_model = round_trip_table(summary_table(&summary_headers))?;
-    let workbook = edit.commit()?.into_workbook();
+    let workbook = edit.commit()?.into_package();
 
     let output_path = std::env::args()
         .nth(1)

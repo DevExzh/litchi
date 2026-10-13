@@ -1,8 +1,6 @@
 use std::error::Error;
 use std::io;
 
-use litchi_xlsx::Workbook;
-
 fn main() -> Result<(), Box<dyn Error>> {
     let arguments = std::env::args_os().skip(1).collect::<Vec<_>>();
     let [input, output] = arguments.as_slice() else {
@@ -13,7 +11,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .into());
     };
 
-    let workbook = Workbook::open(input)?;
+    let workbook = litchi_xlsx::Package::open(input)?;
     let mut edit = workbook.edit()?;
     {
         let mut sheet = edit
@@ -30,7 +28,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let committed = edit.commit()?;
     let sheet = committed
-        .workbook()
+        .package()
+        .workbook_ref()
         .sheet(0usize)?
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "first sheet is missing"))?;
     let defaults = sheet
@@ -49,10 +48,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Err(io::Error::other("committed row layout differs").into());
     }
 
-    committed.workbook().save(output)?;
+    committed.package().save(output)?;
     println!(
         "saved worksheet defaults and row 2 layout in {} semantic changes",
-        committed.patch().len()
+        committed.patch().operation_count()
     );
     Ok(())
 }

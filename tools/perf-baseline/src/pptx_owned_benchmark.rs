@@ -280,7 +280,7 @@ fn timed_iteration(
 
         let ingress_start = Instant::now();
         let mut package = match route {
-            Route::Owned => litchi_pptx::Package::from_vec(input)?,
+            Route::Owned => litchi_pptx::Package::from_reader(std::io::Cursor::new(input))?,
             Route::Materialized => {
                 let source: Arc<dyn ReadAt> = Arc::new(OwnedSource::new(input));
                 let package = SourceBackedPackage::from_read_at(source)?;

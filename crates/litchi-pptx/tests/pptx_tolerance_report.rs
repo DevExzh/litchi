@@ -32,7 +32,7 @@ fn package_open_of_a_conformant_fixture_reports_no_repairs() {
 fn every_package_open_path_carries_an_empty_report_for_a_conformant_fixture() {
     assert_clean(Package::from_bytes(SHAPES).unwrap().tolerance_report());
     assert_clean(
-        Package::from_vec(SHAPES.to_vec())
+        Package::from_reader(std::io::Cursor::new(SHAPES.to_vec()))
             .unwrap()
             .tolerance_report(),
     );
@@ -136,7 +136,7 @@ fn slide_xml(timing: &str, edit: impl FnOnce(String) -> String) -> Vec<u8> {
 /// Write `slide` over the first slide and round-trip the package through
 /// its serialized bytes, so the result is an ordinary file opened by default.
 fn deck_with_slide(slide: Vec<u8>) -> Package {
-    Package::from_vec(deck_bytes_with_part(SLIDE1, slide)).unwrap()
+    Package::from_reader(std::io::Cursor::new(deck_bytes_with_part(SLIDE1, slide))).unwrap()
 }
 
 /// The serialized `shapes.pptx` deck with part `name` replaced by `blob`.
@@ -493,7 +493,8 @@ fn placeholder_extension_hygiene_is_tolerated_per_placeholder_and_recorded() {
             r#"<p:ph type="subTitle" idx="1"><p:extLst><p:ext><x:a xmlns:x="urn:x"/><x:b xmlns:x="urn:x"/></p:ext></p:extLst></p:ph>"#,
         )
     });
-    let package = Package::from_vec(deck_bytes_with_part(SLIDE2, slide)).unwrap();
+    let package =
+        Package::from_reader(std::io::Cursor::new(deck_bytes_with_part(SLIDE2, slide))).unwrap();
     let (placeholders, report) = second_slide_placeholders(&package);
 
     assert_eq!(placeholders, [(Some(3), None), (Some(4), None)]);
@@ -524,7 +525,8 @@ fn conformant_placeholder_extensions_report_nothing() {
             ),
         )
     });
-    let package = Package::from_vec(deck_bytes_with_part(SLIDE2, slide)).unwrap();
+    let package =
+        Package::from_reader(std::io::Cursor::new(deck_bytes_with_part(SLIDE2, slide))).unwrap();
     let (placeholders, report) = second_slide_placeholders(&package);
     assert_eq!(
         placeholders,
@@ -680,7 +682,7 @@ fn slide_list_defects_are_repaired_first_wins_and_recorded_at_open() {
         (content, 0, Some(PRESENTATION)),
     ];
 
-    let package = Package::from_vec(deck.clone()).unwrap();
+    let package = Package::from_reader(std::io::Cursor::new(deck.clone())).unwrap();
     assert_eq!(located(package.tolerance_report()), expected);
     let presentation = package.presentation().unwrap();
     let ids: Vec<u32> = presentation
@@ -720,7 +722,7 @@ fn conformant_slide_list_records_nothing_and_invalid_entries_stay_fatal() {
             r#"<p:sldId id="255" r:id="rId2"/>"#,
         )
     });
-    let package = Package::from_vec(invalid).unwrap();
+    let package = Package::from_reader(std::io::Cursor::new(invalid)).unwrap();
     assert_clean(package.tolerance_report());
     assert!(
         package
@@ -796,7 +798,8 @@ fn unparseable_shape_id_and_placeholder_index_degrade_and_are_recorded() {
                 r#"<p:ph type="subTitle" idx="x1"/>"#,
             )
     });
-    let package = Package::from_vec(deck_bytes_with_part(SLIDE2, slide)).unwrap();
+    let package =
+        Package::from_reader(std::io::Cursor::new(deck_bytes_with_part(SLIDE2, slide))).unwrap();
     let presentation = package.presentation().unwrap();
     let slides = presentation.slides().unwrap();
     let scene = slides[1].shapes().unwrap();
@@ -865,7 +868,7 @@ fn packaging_repairs_are_folded_into_the_open_report() {
         litchi_opc::leniency::RelationshipDefect::DuplicateId,
     ));
 
-    let package = Package::from_vec(deck.clone()).unwrap();
+    let package = Package::from_reader(std::io::Cursor::new(deck.clone())).unwrap();
     let report = package.tolerance_report();
     assert_eq!(report.defects().len(), 1, "{report:?}");
     let tolerated = &report.defects()[0];
@@ -896,7 +899,7 @@ fn core_properties_repairs_are_folded_into_the_open_report() {
         litchi_ooxml_common::leniency::CorePropertiesDefect::DuplicateProperty,
     ));
 
-    let package = Package::from_vec(deck.clone()).unwrap();
+    let package = Package::from_reader(std::io::Cursor::new(deck.clone())).unwrap();
     let defects = package.tolerance_report().defects();
     assert_eq!(defects.len(), 1, "{defects:?}");
     assert_eq!(defects[0].defect, duplicate);
@@ -935,7 +938,7 @@ fn ill_formed_package_manifests_stay_fatal() {
         // unknown-but-well-formed elements are skipped since F8.11.
         xml.replacen("</Relationships>", "", 1)
     });
-    assert!(Package::from_vec(deck).is_err());
+    assert!(Package::from_reader(std::io::Cursor::new(deck)).is_err());
 }
 
 // ---------------------------------------------------------------------------
@@ -987,7 +990,7 @@ fn comment_index_zero_and_duplicate_keys_are_kept_and_recorded() {
         load_presentation_comments, load_presentation_comments_strict,
         load_presentation_comments_with_tolerance,
     };
-    let package = Package::from_vec(deck_with_comment_defects()).unwrap();
+    let package = Package::from_reader(std::io::Cursor::new(deck_with_comment_defects())).unwrap();
     let opc = package.opc().unwrap();
 
     let mut report = litchi_pptx::ToleranceReport::default();
@@ -1100,7 +1103,7 @@ fn conformant_comments_record_nothing_and_malformed_comments_stay_fatal() {
     let deck = archive_with_member(COMMENTED, "ppt/comments/comment1.xml", |xml| {
         xml.replace(r#"idx="1""#, r#"idx="one""#)
     });
-    let package = Package::from_vec(deck).unwrap();
+    let package = Package::from_reader(std::io::Cursor::new(deck)).unwrap();
     assert!(litchi_pptx::comments::load_presentation_comments(package.opc().unwrap()).is_err());
 }
 
@@ -1131,7 +1134,7 @@ fn foreign_text_elements_are_skipped_and_recorded_by_text_extraction() {
         )
     });
     let deck = deck_bytes_with_part(SLIDE1, slide);
-    let package = Package::from_vec(deck.clone()).unwrap();
+    let package = Package::from_reader(std::io::Cursor::new(deck.clone())).unwrap();
     let presentation = package.presentation().unwrap();
     let slides = presentation.slides().unwrap();
 
@@ -1165,7 +1168,8 @@ fn foreign_text_elements_are_skipped_and_recorded_by_text_extraction() {
             "<a:t>Learning <a:t>PPTX</a:t></a:t>",
         )
     });
-    let package = Package::from_vec(deck_bytes_with_part(SLIDE1, nested)).unwrap();
+    let package =
+        Package::from_reader(std::io::Cursor::new(deck_bytes_with_part(SLIDE1, nested))).unwrap();
     let presentation = package.presentation().unwrap();
     assert!(presentation.slides().unwrap()[0].text().is_err());
 }
@@ -1181,7 +1185,7 @@ const PIE_CHART: &[u8] = include_bytes!("../../../test-data/ooxml/pptx/pie-chart
 const CHART1: &str = "/ppt/charts/chart1.xml";
 
 fn chart_infos(deck: Vec<u8>) -> Vec<litchi_pptx::chart::Info> {
-    let package = Package::from_vec(deck).unwrap();
+    let package = Package::from_reader(std::io::Cursor::new(deck)).unwrap();
     let presentation = package.presentation().unwrap();
     presentation
         .slides()
@@ -1284,7 +1288,7 @@ fn view_properties_ignore_unknown_markup_and_accept_any_order() {
             r#"<p:gridSpacing cx="76200" cy="76200"/><p:gridSpacing cx="1" cy="1"/>"#,
         )
     });
-    let package = Package::from_vec(deck).unwrap();
+    let package = Package::from_reader(std::io::Cursor::new(deck)).unwrap();
     let mut report = litchi_pptx::ToleranceReport::default();
     let repaired =
         view_properties::load_from_package_with_tolerance(package.opc().unwrap(), &mut report)
@@ -1347,7 +1351,7 @@ fn instruction_at(part: &str) -> (Defect, u32, Option<&str>) {
 fn feature_readers_skip_and_record_processing_instructions() {
     // View properties.
     let deck = shapes_with_member("ppt/viewProps.xml", with_instruction);
-    let package = Package::from_vec(deck).unwrap();
+    let package = Package::from_reader(std::io::Cursor::new(deck)).unwrap();
     let mut report = litchi_pptx::ToleranceReport::default();
     let view =
         view_properties::load_from_package_with_tolerance(package.opc().unwrap(), &mut report)
@@ -1366,7 +1370,7 @@ fn feature_readers_skip_and_record_processing_instructions() {
 
     // Presentation properties.
     let deck = shapes_with_member("ppt/presProps.xml", with_instruction);
-    let package = Package::from_vec(deck).unwrap();
+    let package = Package::from_reader(std::io::Cursor::new(deck)).unwrap();
     let mut report = litchi_pptx::ToleranceReport::default();
     assert!(
         litchi_pptx::presentation_properties::load_from_package_with_tolerance(
@@ -1408,7 +1412,7 @@ fn feature_readers_skip_and_record_processing_instructions() {
 
     // Legacy comments.
     let deck = archive_with_member(COMMENTED, "ppt/comments/comment1.xml", with_instruction);
-    let package = Package::from_vec(deck).unwrap();
+    let package = Package::from_reader(std::io::Cursor::new(deck)).unwrap();
     let mut report = litchi_pptx::ToleranceReport::default();
     let comments = litchi_pptx::comments::load_presentation_comments_with_tolerance(
         package.opc().unwrap(),

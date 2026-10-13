@@ -19,9 +19,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut writer = Builder::new_widescreen();
 
     // Set presentation properties
-    writer.set_property("Title", "Sample Presentation");
-    writer.set_property("Author", "Litchi Example");
-    writer.set_property("Subject", "Demonstrating PPT writing");
+    writer.set_metadata(litchi_core::Metadata {
+        title: Some("Sample Presentation".to_owned()),
+        author: Some("Litchi Example".to_owned()),
+        subject: Some("Demonstrating PPT writing".to_owned()),
+        ..litchi_core::Metadata::default()
+    })?;
 
     // Add title slide
     let slide1 = writer.add_slide()?;

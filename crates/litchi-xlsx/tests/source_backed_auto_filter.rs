@@ -323,7 +323,6 @@ fn changed_edit_reopens_inverts_and_preserves_unselected_parts() {
         Package::from_opc(candidate)
             .unwrap()
             .workbook()
-            .unwrap()
             .sheet("Sheet1")
             .unwrap()
             .unwrap()

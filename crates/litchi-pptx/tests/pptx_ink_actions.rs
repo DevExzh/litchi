@@ -496,7 +496,7 @@ fn scalar_profile_edit_changes_only_the_target_and_replays_mce_exactly() {
         .expect("scalar profile edit")
     );
     let commit = edit.commit().expect("action target commit");
-    assert!(commit.is_changed());
+    assert!(commit.diagnostics().changed());
     assert_eq!(commit.snapshot().source_xml(), source.source_xml());
     assert_eq!(commit.snapshot().anchors()[0].owner_xml(), original_owner);
     assert_eq!(commit.snapshot().anchors()[0].choice_xml(), original_choice);
@@ -569,15 +569,15 @@ fn exact_scalar_noop_reuses_source_and_has_an_empty_forward_and_inverse_patch() 
             .unwrap()
     );
     let commit = edit.commit().unwrap();
-    assert!(!commit.is_changed());
-    assert!(commit.patch().is_empty());
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
     assert_eq!(commit.snapshot().source_xml().as_ptr(), source_pointer);
     ink_actions::apply_patch(&mut package, commit.patch()).unwrap();
     assert_eq!(
         action_snapshot(&package, &slide_name).source_xml(),
         source.source_xml()
     );
-    assert!(commit.patch().inverse().is_empty());
+    assert!(commit.patch().inverse().is_noop());
 }
 
 #[test]
@@ -639,7 +639,7 @@ fn signed_package_root_edge_allows_exact_noop_and_requires_unsign_reload_for_cha
             .unwrap()
     );
     let noop = noop_edit.commit().unwrap();
-    assert!(!noop.is_changed());
+    assert!(!noop.diagnostics().changed());
     let signed_before = serialized_opc(&package);
     ink_actions::apply_patch(&mut package, noop.patch()).unwrap();
     assert!(package.is_signed());
@@ -677,7 +677,7 @@ fn signed_package_root_edge_allows_exact_noop_and_requires_unsign_reload_for_cha
     );
     let before_stale_target = package.get_part(&action_name).unwrap().blob().to_vec();
     let stale_error = ink_actions::apply_patch(&mut package, signed_commit.patch()).unwrap_err();
-    assert!(matches!(stale_error, litchi_pptx::Error::StaleSource));
+    assert!(matches!(stale_error, litchi_pptx::Error::PatchConflict));
     assert_eq!(
         package.get_part(&action_name).unwrap().blob(),
         before_stale_target
@@ -749,7 +749,7 @@ fn shared_target_updates_all_owners_and_retains_the_complete_inbound_graph() {
     })
     .unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.is_changed());
+    assert!(commit.diagnostics().changed());
     assert_eq!(
         commit.snapshot().anchors()[0].target_bytes(),
         commit.snapshot().anchors()[1].target_bytes(),
@@ -1101,7 +1101,7 @@ fn patch_read_sets_reject_owner_relationship_target_and_content_type_staleness_a
             .into_bytes();
         package.get_part_mut(&slide_name).unwrap().set_blob(updated);
         let error = ink_actions::apply_patch(&mut package, commit.patch()).unwrap_err();
-        assert!(matches!(error, litchi_pptx::Error::StaleSource));
+        assert!(matches!(error, litchi_pptx::Error::PatchConflict));
         assert_ne!(package.get_part(&slide_name).unwrap().blob(), before_owner);
         assert_eq!(source.source_xml(), commit.snapshot().source_xml());
     }
@@ -1124,7 +1124,7 @@ fn patch_read_sets_reject_owner_relationship_target_and_content_type_staleness_a
             false,
         );
         let error = ink_actions::apply_patch(&mut package, commit.patch()).unwrap_err();
-        assert!(matches!(error, litchi_pptx::Error::StaleSource));
+        assert!(matches!(error, litchi_pptx::Error::PatchConflict));
     }
 
     {
@@ -1162,7 +1162,7 @@ fn patch_read_sets_reject_owner_relationship_target_and_content_type_staleness_a
             .unwrap()
             .set_blob(changed);
         let error = ink_actions::apply_patch(&mut package, commit.patch()).unwrap_err();
-        assert!(matches!(error, litchi_pptx::Error::StaleSource));
+        assert!(matches!(error, litchi_pptx::Error::PatchConflict));
         assert_ne!(package.get_part(&action_name).unwrap().blob(), before);
     }
 
@@ -1200,7 +1200,7 @@ fn selector_context_is_checked_against_the_new_snapshot() {
     let error = edit
         .edit_profile(selector, |_profile| Ok(()))
         .expect_err("old selector must be stale");
-    assert!(matches!(error, litchi_pptx::Error::StaleSource));
+    assert!(matches!(error, litchi_pptx::Error::PatchConflict));
 }
 
 #[test]
@@ -1230,7 +1230,7 @@ fn selector_context_includes_changed_relationship_graph_diagnostics() {
     let error = edit
         .edit_profile(selector, |_profile| Ok(()))
         .expect_err("a selector from the pre-graph-change snapshot must be stale");
-    assert!(matches!(error, litchi_pptx::Error::StaleSource));
+    assert!(matches!(error, litchi_pptx::Error::PatchConflict));
 }
 
 fn load_error(package: &OpcPackage, slide_name: &PackURI) -> litchi_pptx::Error {
@@ -1593,7 +1593,7 @@ fn public_package_facade_reads_edits_publishes_and_reopens_ink_actions() {
     })
     .unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.is_changed());
+    assert!(commit.diagnostics().changed());
 
     let published = package
         .apply_ink_actions_patch(commit.patch())
@@ -1610,7 +1610,7 @@ fn public_package_facade_reads_edits_publishes_and_reopens_ink_actions() {
     );
 
     let bytes = package.to_bytes().unwrap();
-    let reopened = Package::from_vec(bytes).unwrap();
+    let reopened = Package::from_reader(std::io::Cursor::new(bytes)).unwrap();
     let snapshots = reopened.ink_actions().unwrap();
     assert_eq!(snapshots.len(), 1);
     assert_eq!(
@@ -1971,7 +1971,7 @@ fn owner_relationship_metadata_and_read_policy_are_stale_patch_inputs() {
                 true,
             );
         let error = ink_actions::apply_patch(&mut package, commit.patch()).unwrap_err();
-        assert!(matches!(error, litchi_pptx::Error::StaleSource));
+        assert!(matches!(error, litchi_pptx::Error::PatchConflict));
         assert_eq!(package.get_part(&slide_name).unwrap().blob(), before_owner);
         assert_eq!(
             package.get_part(&action_name).unwrap().blob(),
@@ -1996,7 +1996,7 @@ fn owner_relationship_metadata_and_read_policy_are_stale_patch_inputs() {
     .unwrap();
     let commit = edit.commit().unwrap();
     let error = ink_actions::apply_patch(&mut package_b, commit.patch()).unwrap_err();
-    assert!(matches!(error, litchi_pptx::Error::StaleSource));
+    assert!(matches!(error, litchi_pptx::Error::PatchConflict));
 }
 
 #[test]
@@ -2053,7 +2053,7 @@ fn exact_root_and_owner_relationship_source_members_are_stale_patch_inputs() {
             .to_vec();
         let error = ink_actions::apply_patch(&mut mutated, commit.patch()).unwrap_err();
         assert!(
-            matches!(error, litchi_pptx::Error::StaleSource),
+            matches!(error, litchi_pptx::Error::PatchConflict),
             "{member} lexical source change must be stale: {error:?}"
         );
         assert_eq!(mutated.get_part(&slide_name).unwrap().blob(), before_owner);
@@ -2096,7 +2096,7 @@ fn exact_root_relationship_readset_rejects_a_boundary_free_hash_collision() {
         false,
     );
     let error = ink_actions::apply_patch(&mut package, commit.patch()).unwrap_err();
-    assert!(matches!(error, litchi_pptx::Error::StaleSource));
+    assert!(matches!(error, litchi_pptx::Error::PatchConflict));
 }
 
 #[test]
@@ -2154,7 +2154,7 @@ fn oversized_profile_bytes_hit_the_target_cap_before_profile_parse_or_staging() 
         "unexpected early target-cap error: {error:?}"
     );
     assert!(
-        !edit.is_changed(),
+        !edit.diagnostics().changed(),
         "a refused replacement must not be staged"
     );
     assert_eq!(package.get_part(&action_name).unwrap().blob(), before);

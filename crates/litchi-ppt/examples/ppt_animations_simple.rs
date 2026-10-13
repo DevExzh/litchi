@@ -14,7 +14,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("Creating simple PPT animation demo...");
 
     let mut writer = Builder::new_widescreen();
-    writer.set_property("Title", "Simple Animation Demo");
+    writer.set_metadata(litchi_core::Metadata {
+        title: Some("Simple Animation Demo".to_owned()),
+        ..litchi_core::Metadata::default()
+    })?;
 
     // Slide with 4 animated shapes
     let slide = writer.add_slide()?;

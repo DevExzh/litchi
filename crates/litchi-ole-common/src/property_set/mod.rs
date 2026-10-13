@@ -17,6 +17,7 @@ pub mod document_summary;
 mod model;
 pub mod non_simple;
 pub mod summary_information;
+pub mod summary_properties;
 pub mod user_defined;
 
 #[cfg(test)]
@@ -61,3 +62,4 @@ pub use non_simple::{
     ElementKind as NonSimpleElementKind, Limits as NonSimpleLimits, Patch as NonSimplePatch,
     Revision as NonSimpleRevision, Snapshot as NonSimpleSnapshot,
 };
+pub use summary_properties::SummaryProperties;

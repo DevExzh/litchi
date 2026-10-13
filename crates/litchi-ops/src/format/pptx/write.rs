@@ -1,6 +1,8 @@
 //! Immutable native shape writes; no XML editing in the facade.
 pub(crate) mod coalesce;
+mod notes;
 mod slides;
+mod text;
 use super::node::Item;
 use super::spec::{Kind, SHAPE_WRITE_TABLE, ShapeSetter};
 use super::{Editable, Nav, Pptx};
@@ -55,6 +57,8 @@ impl Editable {
 pub(super) struct ShapeValues {
     pub(super) text: Option<String>,
     pub(super) geometry: [Option<i64>; 4],
+    /// Rich formatting for every paragraph and run of the text body.
+    pub(super) format: text::TextValues,
 }
 
 impl ShapeValues {
@@ -72,6 +76,11 @@ impl ShapeValues {
                 0
             })
             .saturating_add(2 * size_of::<usize>())
+            .saturating_add(if self.format.is_empty() {
+                0
+            } else {
+                self.format.charge()
+            })
     }
 }
 
@@ -83,6 +92,7 @@ pub(super) fn admit_shape_props(props: &Props<'_>, limits: &SemanticLimits) -> R
     let mut values = ShapeValues {
         text: None,
         geometry: [None; 4],
+        format: text::TextValues::default(),
     };
     // The PPTX table currently has fewer than 64 canonical entries.  A bit
     // set keeps duplicate aliases allocation-free on the successful path
@@ -119,7 +129,9 @@ pub(super) fn admit_shape_props(props: &Props<'_>, limits: &SemanticLimits) -> R
                         ShapeSetter::Y => 1,
                         ShapeSetter::Width => 2,
                         ShapeSetter::Height => 3,
-                        ShapeSetter::Text => unreachable!("shape text setter"),
+                        ShapeSetter::Text | ShapeSetter::Format(_) => {
+                            unreachable!("shape text setter")
+                        },
                     };
                     values.geometry[index] = Some(value.emu());
                 },
@@ -140,6 +152,7 @@ pub(super) fn admit_shape_props(props: &Props<'_>, limits: &SemanticLimits) -> R
                     owned.push_str(value);
                     values.text = Some(owned);
                 },
+                ShapeSetter::Format(setter) => values.format.stage(setter, value, limits)?,
             }
             Ok(())
         })?;
@@ -173,6 +186,28 @@ impl Pptx {
         props: Props<'_>,
         limits: &SemanticLimits,
     ) -> Result<Commit> {
+        if let Some(path) = target.path()
+            && path
+                .path()
+                .steps()
+                .last()
+                .is_some_and(|step| step.name().eq_ignore_ascii_case("comment"))
+        {
+            let node = crate::path::resolve::get(&Nav::new(self), path)?;
+            let Item::Comment(comment) = node.item() else {
+                return Err(error(
+                    Code::UnsupportedCapability,
+                    "comment writes take one legacy comment path",
+                ));
+            };
+            return self.set_comment(comment.slide, comment.index, &props, limits);
+        }
+        if notes::accepts(&target, &props) {
+            return self.set_notes(target, &props, limits);
+        }
+        if let Some(kind) = text::classify(&target) {
+            return self.set_text(target, kind, &props, limits);
+        }
         if slides::accepts(&target, &props) {
             return self.set_slide_properties(target, &props, limits);
         }
@@ -263,6 +298,13 @@ impl Pptx {
             targets.push(Target {
                 slide: target.0,
                 position: target.1,
+                // An empty body (a new placeholder) has no run slot for the
+                // text writer; its text goes through the body edit.
+                slot: tree
+                    .handle
+                    .view()
+                    .text()
+                    .is_some_and(|text| !text.is_empty()),
                 bounds,
             });
             Ok(())
@@ -291,6 +333,7 @@ impl Pptx {
             ));
         }
         targets.sort_unstable_by_key(|target| (target.slide, target.position));
+        let body_edits = body_edits(&targets, text, &values.format)?;
         let source = self.editable_owner()?;
         let mut operations = 0;
         let (target, proof, changed) = match &source {
@@ -314,6 +357,13 @@ impl Pptx {
                         };
                         Ok(())
                     })?;
+                }
+                for (slide, edits) in &body_edits {
+                    for chunk in
+                        edits.chunks(litchi_pptx::opened::MAX_SHAPE_PROPERTIES_REPLACEMENTS)
+                    {
+                        operations += edit.set_text_properties(*slide, chunk)?;
+                    }
                 }
                 let (target, patch) = edit.commit()?.into_parts();
                 let changed = !patch.is_noop();
@@ -339,6 +389,13 @@ impl Pptx {
                         };
                         Ok(())
                     })?;
+                }
+                for (slide, edits) in &body_edits {
+                    for chunk in
+                        edits.chunks(litchi_pptx::opened::MAX_SHAPE_PROPERTIES_REPLACEMENTS)
+                    {
+                        operations += edit.set_text_properties(*slide, chunk)?;
+                    }
                 }
                 let (target, patch) = edit.commit()?.into_parts();
                 let changed = !patch.is_noop();
@@ -369,9 +426,47 @@ impl Pptx {
 
 #[derive(Clone, Copy)]
 struct Target {
+    slot: bool,
     slide: usize,
     position: usize,
     bounds: Option<(i64, i64, i64, i64)>,
+}
+
+/// Slide-grouped body edits: rich formatting for every target, and the text
+/// of targets whose body has no run slot.
+fn body_edits<'t>(
+    targets: &[Target],
+    text: Option<&'t str>,
+    format: &'t text::TextValues,
+) -> Result<Vec<(usize, Vec<litchi_pptx::opened::TextEdit<'t>>)>> {
+    let formatting = format.properties();
+    let filled = text.map(|text| formatting.with_text(text));
+    let mut groups: Vec<(usize, Vec<litchi_pptx::opened::TextEdit<'t>>)> = Vec::new();
+    for target in targets {
+        let properties = match filled {
+            Some(filled) if !target.slot => filled,
+            _ if !format.is_empty() => formatting,
+            _ => continue,
+        };
+        if groups
+            .last()
+            .is_none_or(|(slide, _)| *slide != target.slide)
+        {
+            groups.try_reserve(1).map_err(allocation)?;
+            groups.push((target.slide, Vec::new()));
+        }
+        let Some((_, edits)) = groups.last_mut() else {
+            unreachable!("a group was just pushed")
+        };
+        edits.try_reserve(1).map_err(allocation)?;
+        edits.push(litchi_pptx::opened::TextEdit::new(
+            litchi_pptx::opened::TextTarget::Shape {
+                shape: litchi_core::Position::new(target.position),
+            },
+            properties,
+        ));
+    }
+    Ok(groups)
 }
 
 fn stage(
@@ -386,11 +481,14 @@ fn stage(
         replacements
             .try_reserve_exact(group.len())
             .map_err(allocation)?;
-        for target in group {
+        for target in group.iter().filter(|target| target.slot) {
             replacements.push(litchi_pptx::opened::ShapeTextReplacement::new(
                 target.position.into(),
                 text,
             ));
+        }
+        if replacements.is_empty() {
+            continue;
         }
         apply_chunks(group[0].slide, &replacements, text.len(), &mut apply)?;
     }
@@ -413,7 +511,7 @@ fn stage_properties(
         for target in group {
             let mut replacement =
                 litchi_pptx::opened::ShapePropertiesReplacement::new(target.position.into());
-            if let Some(text) = text {
+            if let Some(text) = text.filter(|_| target.slot) {
                 replacement = replacement.with_text(text);
             }
             if let Some(bounds) = target.bounds {

@@ -823,7 +823,7 @@ impl Snapshot {
 
 /// A clone-staged source-bound Data Model transaction.
 pub struct Transaction<'a> {
-    target: &'a mut OpcPackage,
+    target: crate::package::Target<'a>,
     before: Snapshot,
     draft: Option<ModelView>,
 }
@@ -831,7 +831,15 @@ pub struct Transaction<'a> {
 impl<'a> Transaction<'a> {
     /// Start a transaction from the package's current Data Model graph.
     pub fn new(target: &'a mut OpcPackage) -> Result<Self> {
-        let before = Snapshot::load(target)?;
+        Self::start(target.into())
+    }
+
+    pub(crate) fn for_package(package: &'a mut crate::Package) -> Result<Self> {
+        Self::start(crate::package::Target::Package(package))
+    }
+
+    fn start(target: crate::package::Target<'a>) -> Result<Self> {
+        let before = Snapshot::load(&target)?;
         Ok(Self {
             draft: before.model.clone(),
             target,
@@ -875,7 +883,7 @@ impl<'a> Transaction<'a> {
                 .as_ref()
                 .is_some_and(|before| same_structure(&before.definition, &model.definition))
         {
-            prepare_import(self.target, &self.before.workbook_name, model)?
+            prepare_import(&self.target, &self.before.workbook_name, model)?
         } else {
             model
         };
@@ -897,7 +905,7 @@ impl<'a> Transaction<'a> {
             model.payload(),
             model.definition.model_time_groupings()?.as_ref(),
         )?;
-        validate_model(self.target, &self.before.workbook_name, &model)?;
+        validate_model(&self.target, &self.before.workbook_name, &model)?;
         self.draft = Some(model);
         Ok(true)
     }
@@ -961,7 +969,7 @@ impl<'a> Transaction<'a> {
             candidate.payload(),
             candidate.definition.model_time_groupings()?.as_ref(),
         )?;
-        validate_model(self.target, &self.before.workbook_name, &candidate)?;
+        validate_model(&self.target, &self.before.workbook_name, &candidate)?;
         self.draft = Some(candidate);
         Ok(true)
     }
@@ -982,7 +990,7 @@ impl<'a> Transaction<'a> {
     }
 
     /// Validate the source closure and atomically publish the staged model.
-    pub fn commit(self) -> Result<Commit> {
+    pub fn commit(mut self) -> Result<Commit> {
         if !self.is_changed() {
             return Ok(Commit::new(
                 self.before.clone(),
@@ -993,7 +1001,7 @@ impl<'a> Transaction<'a> {
         if self.target.is_signed() || self.target.requires_signature_edit_policy() {
             return Err(Error::Signed);
         }
-        let current = Snapshot::load(self.target)?;
+        let current = Snapshot::load(&self.target)?;
         if !current.same_source(&self.before) {
             return Err(Error::PatchConflict {
                 part: "Data Model source closure".into(),
@@ -1010,7 +1018,7 @@ impl<'a> Transaction<'a> {
             return Err(invalid("Data Model publication changed staged semantics"));
         }
         let patch = Patch::new(self.before, snapshot.clone());
-        *self.target = candidate;
+        self.target.publish(candidate)?;
         Ok(Commit::new(snapshot, patch, true))
     }
 }

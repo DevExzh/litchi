@@ -23,6 +23,7 @@ use crate::{IntoProps, OpenOptions, Props, Result, TargetArg};
 // manufacture a Pending value for an element that the binary reader already
 // knows how to answer.
 pub(crate) mod children;
+mod metadata;
 mod nav;
 mod node;
 mod spec;
@@ -79,14 +80,10 @@ impl Doc {
             )
             .with_format(FileFormat::Doc));
         }
-        if options.metadata.is_some() {
-            return Err(crate::Error::new(
-                crate::Code::UnsupportedCapability,
-                "DOC creation does not yet author initial metadata",
-            )
-            .with_format(FileFormat::Doc));
-        }
         let mut builder = litchi_doc::Builder::new();
+        if let Some(metadata) = &options.metadata {
+            metadata::author(&mut builder, metadata)?;
+        }
         builder.add_paragraph("")?;
         Ok(Self::from_package(builder.build()?, true))
     }
@@ -356,7 +353,11 @@ impl Doc {
     ) -> Result<WriteCommit> {
         self.check_source()?;
         let result = (|| -> Result<WriteCommit> {
-            let text = paragraph_text_assignment(&Props::from_props(props)?)?;
+            let props = Props::from_props(props)?;
+            if crate::format::ole_metadata::is_target(&target) {
+                return self.set_metadata(&props, limits);
+            }
+            let text = paragraph_text_assignment(&props)?;
             let positions =
                 resolve_paragraph_targets(self, &target, limits.max_expanded_targets())?;
             if positions.len() > limits.max_operations() {
@@ -403,7 +404,7 @@ impl Doc {
             Ok(WriteCommit {
                 before: self.clone(),
                 after,
-                patch,
+                patch: StepPatch::Primary(patch),
                 operations,
                 snapshot_bytes,
             })
@@ -448,11 +449,15 @@ impl Doc {
     }
 }
 
+/// The patch a DOC write step retains: a body edit or a metadata edit.
+pub(crate) type StepPatch =
+    crate::format::ole_metadata::StepPatch<litchi_doc::Patch, litchi_doc::package::metadata::Patch>;
+
 /// The format-specific result retained by the generic transaction history.
 pub(crate) struct WriteCommit {
     pub(crate) before: Doc,
     pub(crate) after: Doc,
-    pub(crate) patch: litchi_doc::Patch,
+    pub(crate) patch: StepPatch,
     pub(crate) operations: usize,
     pub(crate) snapshot_bytes: usize,
 }

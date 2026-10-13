@@ -42,7 +42,10 @@ fn creation_options_are_explicit_refusals_and_capabilities_agree() {
     for options in [
         CreateOptions::new().flavor(Flavor::Template),
         CreateOptions::new().conformance(Conformance::Strict),
-        CreateOptions::new().metadata(Metadata::default()),
+        CreateOptions::new().metadata(Metadata {
+            identifier: Some("urn:x".to_owned()),
+            ..Metadata::default()
+        }),
     ] {
         let error = create_with(FileFormat::Xls, &options).unwrap_err();
         assert_eq!(error.code(), Code::UnsupportedCapability);
@@ -52,7 +55,11 @@ fn creation_options_are_explicit_refusals_and_capabilities_agree() {
     assert!(capabilities.verb(Verb::Create).is_supported());
     assert!(capabilities.verb(Verb::Save).is_supported());
     let gaps = format!("{:?}", capabilities.gaps().collect::<Vec<_>>());
-    for context in ["template", "strict-conformance", "initial-metadata"] {
+    for context in [
+        "template",
+        "strict-conformance",
+        "unrepresentable-initial-metadata",
+    ] {
         assert!(gaps.contains(context), "missing {context}: {gaps}");
     }
 }

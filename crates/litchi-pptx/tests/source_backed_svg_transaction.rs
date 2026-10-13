@@ -257,7 +257,7 @@ fn svg_transaction_retargets_media_and_preserves_opaque_slide_bytes() {
     );
     assert!(edit.replace(replacement).unwrap());
     let commit = edit.commit_checked().unwrap();
-    assert!(commit.is_changed());
+    assert!(commit.diagnostics().changed());
     let inverse = commit.patch().inverse();
     let restored = inverse.apply(commit.snapshot()).unwrap();
     assert_eq!(
@@ -336,7 +336,7 @@ fn svg_transaction_noop_inverse_stale_and_signed_are_atomic() {
     let mut edit = original_svg;
     assert!(!edit.replace(replacement).unwrap());
     let noop = edit.commit_checked().unwrap();
-    assert!(!noop.is_changed());
+    assert!(!noop.diagnostics().changed());
     let mut exact = Vec::new();
     editor
         .publish_svg_commit_to_stream(&mut exact, &noop)

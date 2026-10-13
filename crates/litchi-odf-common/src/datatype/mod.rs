@@ -6,7 +6,7 @@
 //! small contextual validators used by other ODF owners.
 //!
 //! Based on the reference implementation in
-//! `3rdparty/odfdo/src/odfdo/datatype.py`.
+//! odfdo, `src/odfdo/datatype.py`.
 
 mod codec;
 mod model;

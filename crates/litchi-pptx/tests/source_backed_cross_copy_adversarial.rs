@@ -24,14 +24,15 @@ fn cross_copy_rejects_stale_semantic_and_physical_inputs_without_mutation() -> T
     let source_bytes = authored_package(&["Source A"])?;
     let destination_bytes = authored_package(&["Destination A", "Destination B"])?;
 
-    let mut source = Package::from_vec(source_bytes.clone())?;
-    let planned_destination = Package::from_vec(destination_bytes.clone())?;
+    let mut source = Package::from_reader(std::io::Cursor::new(source_bytes.clone()))?;
+    let planned_destination =
+        Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
     let source_snapshot = source.opened_presentation()?;
     let destination_snapshot = planned_destination.opened_presentation()?;
     let plan = destination_snapshot.plan_cross_slide_copy(&source_snapshot, 0_usize, 0_usize, 1)?;
 
     let stale_metadata_bytes = authored_package(&["Destination A", "Destination Changed"])?;
-    let mut stale_metadata = Package::from_vec(stale_metadata_bytes)?;
+    let mut stale_metadata = Package::from_reader(std::io::Cursor::new(stale_metadata_bytes))?;
     let stale_metadata_before = serialized(&mut stale_metadata)?;
     let error = stale_metadata
         .apply_cross_slide_copy_plan(&source, &plan)
@@ -40,14 +41,15 @@ fn cross_copy_rejects_stale_semantic_and_physical_inputs_without_mutation() -> T
     assert_eq!(serialized(&mut stale_metadata)?, stale_metadata_before);
 
     let stale_source_bytes = with_eocd_comment(source_bytes.clone(), b"changed source archive")?;
-    let stale_source = Package::from_vec(stale_source_bytes)?;
+    let stale_source = Package::from_reader(std::io::Cursor::new(stale_source_bytes))?;
     let stale_source_snapshot = stale_source.opened_presentation()?;
     assert_eq!(
         stale_source_snapshot.slides()[0].name(),
         source_snapshot.slides()[0].name()
     );
 
-    let mut stale_source_destination = Package::from_vec(destination_bytes.clone())?;
+    let mut stale_source_destination =
+        Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
     let stale_source_destination_before = serialized(&mut stale_source_destination)?;
     let error = stale_source_destination
         .apply_cross_slide_copy_plan(&stale_source, &plan)
@@ -61,7 +63,8 @@ fn cross_copy_rejects_stale_semantic_and_physical_inputs_without_mutation() -> T
 
     let stale_destination_bytes =
         with_eocd_comment(destination_bytes.clone(), b"changed destination archive")?;
-    let mut stale_destination = Package::from_vec(stale_destination_bytes)?;
+    let mut stale_destination =
+        Package::from_reader(std::io::Cursor::new(stale_destination_bytes))?;
     let stale_destination_before = serialized(&mut stale_destination)?;
     let error = stale_destination
         .apply_cross_slide_copy_plan(&source, &plan)
@@ -78,8 +81,9 @@ fn cross_copy_rejects_stale_semantic_and_physical_inputs_without_mutation() -> T
 fn cross_copy_rejects_tampered_durable_patch_and_limits_before_mutation() -> TestResult {
     let source_bytes = authored_package(&["Source A"])?;
     let destination_bytes = authored_package(&["Destination A", "Destination B"])?;
-    let source = Package::from_vec(source_bytes)?;
-    let destination_for_plan = Package::from_vec(destination_bytes.clone())?;
+    let source = Package::from_reader(std::io::Cursor::new(source_bytes))?;
+    let destination_for_plan =
+        Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
     let plan = destination_for_plan
         .opened_presentation()?
         .plan_cross_slide_copy(&source.opened_presentation()?, 0_usize, 0_usize, 1)?;
@@ -93,7 +97,7 @@ fn cross_copy_rejects_tampered_durable_patch_and_limits_before_mutation() -> Tes
     tampered_bytes[source_physical_revision_offset] ^= 1;
     let tampered = CrossSlideCopyPatch::from_bytes(&tampered_bytes)?;
 
-    let mut destination = Package::from_vec(destination_bytes.clone())?;
+    let mut destination = Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
     let before = serialized(&mut destination)?;
     let error = destination
         .apply_cross_slide_copy_patch(&source, &tampered)
@@ -117,18 +121,21 @@ fn cross_copy_plan_and_durable_patch_are_byte_equivalent_and_inverse_exact() -> 
         b"destination archive comment",
     )?;
 
-    let mut source = Package::from_vec(source_bytes.clone())?;
-    let destination_for_plan = Package::from_vec(destination_bytes.clone())?;
+    let mut source = Package::from_reader(std::io::Cursor::new(source_bytes.clone()))?;
+    let destination_for_plan =
+        Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
     let source_snapshot = source.opened_presentation()?;
     let destination_snapshot = destination_for_plan.opened_presentation()?;
     let plan = destination_snapshot.plan_cross_slide_copy(&source_snapshot, 0_usize, 0_usize, 1)?;
     let durable = CrossSlideCopyPatch::from_bytes(&plan.patch().to_bytes()?)?;
 
-    let mut plan_destination = Package::from_vec(destination_bytes.clone())?;
+    let mut plan_destination =
+        Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
     plan_destination.apply_cross_slide_copy_plan(&source, &plan)?;
     let plan_output = serialized(&mut plan_destination)?;
 
-    let mut patch_destination = Package::from_vec(destination_bytes.clone())?;
+    let mut patch_destination =
+        Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
     patch_destination.apply_cross_slide_copy_patch(&source, &durable)?;
     let patch_output = serialized(&mut patch_destination)?;
     assert_eq!(plan_output, patch_output);
@@ -142,8 +149,8 @@ fn cross_copy_plan_and_durable_patch_are_byte_equivalent_and_inverse_exact() -> 
     assert_eq!(serialized(&mut patch_destination)?, destination_bytes);
     assert_eq!(serialized(&mut source)?, source_bytes);
 
-    let second_source = Package::from_vec(source_bytes)?;
-    let second_destination = Package::from_vec(destination_bytes)?;
+    let second_source = Package::from_reader(std::io::Cursor::new(source_bytes))?;
+    let second_destination = Package::from_reader(std::io::Cursor::new(destination_bytes))?;
     let second_plan = second_destination
         .opened_presentation()?
         .plan_cross_slide_copy(&second_source.opened_presentation()?, 0_usize, 0_usize, 1)?;
@@ -158,9 +165,9 @@ fn cross_copy_replans_after_dirty_destination_for_sequential_copies() -> TestRes
         authored_package(&["Destination First", "Destination Last"])?,
         b"dirty destination archive",
     )?;
-    let mut source = Package::from_vec(source_bytes.clone())?;
+    let mut source = Package::from_reader(std::io::Cursor::new(source_bytes.clone()))?;
     let source_snapshot = source.opened_presentation()?;
-    let mut destination = Package::from_vec(destination_bytes.clone())?;
+    let mut destination = Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
 
     let first_plan = destination.opened_presentation()?.plan_cross_slide_copy(
         &source_snapshot,
@@ -187,7 +194,7 @@ fn cross_copy_replans_after_dirty_destination_for_sequential_copies() -> TestRes
     )?;
     destination.apply_cross_slide_copy_plan(&source, &second_plan)?;
     let output = serialized(&mut destination)?;
-    let reopened = Package::from_vec(output.clone())?;
+    let reopened = Package::from_reader(std::io::Cursor::new(output.clone()))?;
     let reopened_snapshot = reopened.opened_presentation()?;
     let slides = reopened_snapshot.slides();
     assert_eq!(
@@ -201,7 +208,7 @@ fn cross_copy_replans_after_dirty_destination_for_sequential_copies() -> TestRes
     );
     assert_eq!(archive_comment(&output)?, b"dirty destination archive");
 
-    let mut replay = Package::from_vec(destination_bytes)?;
+    let mut replay = Package::from_reader(std::io::Cursor::new(destination_bytes))?;
     replay.apply_cross_slide_copy_plan(&source, &first_plan)?;
     replay.apply_cross_slide_copy_plan(&source, &second_plan)?;
     assert_eq!(serialized(&mut replay)?, output);
@@ -214,8 +221,9 @@ fn cross_copy_exact_archive_limit_accepts_and_one_short_rejects_before_publicati
     let source_bytes = authored_package(&["Source A"])?;
     let destination_bytes = authored_package(&["Destination A", "Destination B"])?;
 
-    let source = Package::from_vec(source_bytes.clone())?;
-    let mut baseline_destination = Package::from_vec(destination_bytes.clone())?;
+    let source = Package::from_reader(std::io::Cursor::new(source_bytes.clone()))?;
+    let mut baseline_destination =
+        Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
     let plan = baseline_destination
         .opened_presentation()?
         .plan_cross_slide_copy(&source.opened_presentation()?, 0_usize, 0_usize, 1)?;
@@ -237,8 +245,9 @@ fn cross_copy_exact_archive_limit_accepts_and_one_short_rejects_before_publicati
     };
 
     let exact_limits = limits(expected.len())?;
-    let mut exact_source = Package::from_vec(source_bytes.clone())?;
-    let mut exact_destination = Package::from_vec(destination_bytes.clone())?;
+    let mut exact_source = Package::from_reader(std::io::Cursor::new(source_bytes.clone()))?;
+    let mut exact_destination =
+        Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
     let exact_source_before = source_bytes.clone();
     let exact_destination_before = destination_bytes.clone();
     let exact_plan = exact_destination
@@ -262,8 +271,9 @@ fn cross_copy_exact_archive_limit_accepts_and_one_short_rejects_before_publicati
         .checked_sub(1)
         .ok_or_else(|| Error::Invalid("cross-copy output is empty".into()))?;
     let short_limits = limits(one_short)?;
-    let mut short_source = Package::from_vec(source_bytes.clone())?;
-    let mut short_destination = Package::from_vec(destination_bytes.clone())?;
+    let mut short_source = Package::from_reader(std::io::Cursor::new(source_bytes.clone()))?;
+    let mut short_destination =
+        Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
     let short_source_before = source_bytes.clone();
     let short_destination_before = destination_bytes.clone();
     let error = short_destination
@@ -293,10 +303,10 @@ fn cross_copy_exact_archive_limit_accepts_and_one_short_rejects_before_publicati
 #[test]
 fn borrowed_real_producer_fixture_refuses_cross_copy_authorization() -> TestResult {
     let source = Package::from_bytes(include_bytes!("../../../test-data/ooxml/pptx/shapes.pptx"))?;
-    let mut destination = Package::from_vec(authored_package(&[
+    let mut destination = Package::from_reader(std::io::Cursor::new(authored_package(&[
         "Destination First",
         "Destination Last",
-    ])?)?;
+    ])?))?;
     let source_snapshot = source.opened_presentation()?;
     let destination_snapshot = destination.opened_presentation()?;
     let before = serialized(&mut destination)?;
@@ -317,7 +327,7 @@ fn borrowed_real_producer_fixture_refuses_cross_copy_authorization() -> TestResu
 #[test]
 fn cross_copy_preserves_custom_parts_and_save_options_through_forward_and_inverse() -> TestResult {
     let source_bytes = authored_package(&["Source A"])?;
-    let source = Package::from_vec(source_bytes)?;
+    let source = Package::from_reader(std::io::Cursor::new(source_bytes))?;
     let sentinel_name = PackURI::new(SENTINEL_PART).map_err(Error::Uri)?;
     let mut plan_destination = custom_destination(&sentinel_name)?;
     let before = serialized(&mut plan_destination)?;
@@ -383,7 +393,10 @@ fn authored_package(names: &[&str]) -> TestResult<Vec<u8>> {
 }
 
 fn custom_destination(sentinel_name: &PackURI) -> TestResult<Package> {
-    let mut package = Package::from_vec(authored_package(&["Destination A", "Destination B"])?)?;
+    let mut package = Package::from_reader(std::io::Cursor::new(authored_package(&[
+        "Destination A",
+        "Destination B",
+    ])?))?;
     let sentinel_name = sentinel_name.clone();
     package.edit_opc(|opc| {
         opc.try_add_part(Box::new(SentinelPart::new(sentinel_name)))?;

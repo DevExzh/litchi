@@ -56,7 +56,7 @@ fn demo_unified_api() -> Result<(), Box<dyn std::error::Error>> {
             },
             Some("xlsx") => match XlsxPackage::open(file) {
                 Ok(package) => {
-                    let workbook = package.workbook()?;
+                    let workbook = package.workbook();
                     let names: Vec<_> = workbook
                         .sheets()
                         .map(|sheet| sheet.name().to_owned())
@@ -171,7 +171,7 @@ fn demo_xlsx_reading() -> Result<(), Box<dyn std::error::Error>> {
 
     match XlsxPackage::open(filename) {
         Ok(package) => {
-            let workbook = package.workbook()?;
+            let workbook = package.workbook();
             println!("  Worksheets: {}", workbook.len());
 
             println!("  Sheet names:");

@@ -882,7 +882,7 @@ fn source_adoption_rejects_a_revision_from_an_independently_opened_owner() {
     assert_eq!(error.code(), Code::IoError);
     assert!(matches!(
         error.leaf(),
-        Source::Pptx(pptx::Error::StaleSource)
+        Source::Pptx(pptx::Error::PatchConflict)
     ));
 }
 

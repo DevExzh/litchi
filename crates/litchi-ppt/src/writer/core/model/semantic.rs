@@ -32,7 +32,7 @@ use crate::writer::smart_tags::{SmartTagDefinition, SmartTagIndex};
 use crate::writer::table::{PositionedTable, Table};
 use crate::writer::text_format::{FontEntity, Paragraph, TextAlign};
 use litchi_core::unit::pt_to_emu_i32;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use zeroize::Zeroizing;
 
@@ -59,7 +59,7 @@ impl Builder {
     pub fn with_dimensions(width: i32, height: i32) -> Self {
         Self {
             slides: Vec::new(),
-            properties: HashMap::new(),
+            properties: litchi_ole_common::property_set::SummaryProperties::new(),
             slide_width: width,
             slide_height: height,
             blip_store: Pictures::new(),
@@ -1768,14 +1768,55 @@ impl Builder {
 }
 
 impl Builder {
-    /// Set a presentation property
+    /// Replaces the presentation's metadata with `metadata`.
     ///
-    /// # Arguments
+    /// The fields are written to the `\x05SummaryInformation` and
+    /// `\x05DocumentSummaryInformation` streams by the shared
+    /// [`SummaryProperties`](litchi_ole_common::property_set::SummaryProperties)
+    /// conversion
+    /// ([`SummaryProperties::merge_metadata`](litchi_ole_common::property_set::SummaryProperties::merge_metadata)
+    /// lists the mapping). It replaces every property set earlier, including
+    /// custom ones, so set custom properties through
+    /// [`Self::summary_properties_mut`] afterwards. Empty metadata keeps the
+    /// fixed blank property streams, exactly as a builder that never set one.
+    /// Nothing reads the clock: a creation or save time is written only when
+    /// given. Properties cannot be combined with password-to-open encryption.
     ///
-    /// * `name` - Property name (e.g., "Title", "Author", "Subject")
-    /// * `value` - Property value
-    pub fn set_property(&mut self, name: &str, value: &str) {
-        self.properties.insert(name.to_string(), value.to_string());
+    /// ```
+    /// let mut builder = litchi_ppt::Builder::new();
+    /// builder.set_metadata(litchi_core::Metadata {
+    ///     title: Some("Roadmap".to_owned()),
+    ///     ..litchi_core::Metadata::default()
+    /// })?;
+    /// let package = builder.build()?;
+    /// assert_eq!(package.metadata()?.title.as_deref(), Some("Roadmap"));
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WriteError::Metadata`], leaving the properties unchanged, for
+    /// a field the property sets cannot store (`identifier`,
+    /// `hyperlink_base`, unzoned timestamps) or a refused value.
+    pub fn set_metadata(&mut self, metadata: litchi_core::Metadata) -> Result<(), WriteError> {
+        self.properties =
+            litchi_ole_common::property_set::SummaryProperties::from_metadata(&metadata)?;
+        Ok(())
+    }
+
+    /// The presentation properties the builder writes, including typed counts
+    /// and custom properties that [`litchi_core::Metadata`] does not carry.
+    #[must_use]
+    pub const fn summary_properties(&self) -> &litchi_ole_common::property_set::SummaryProperties {
+        &self.properties
+    }
+
+    /// Mutable access to the presentation properties, for custom properties
+    /// and typed section edits.
+    pub fn summary_properties_mut(
+        &mut self,
+    ) -> &mut litchi_ole_common::property_set::SummaryProperties {
+        &mut self.properties
     }
 
     /// Get the number of slides

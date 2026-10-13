@@ -318,8 +318,7 @@ fn is_iwork_owner(path: &Path) -> bool {
 }
 
 fn is_provenance_fixture(path: &Path) -> bool {
-    let root = workspace_root();
-    path.starts_with(root.join("test-data")) || path.starts_with(root.join("3rdparty"))
+    path.starts_with(workspace_root().join("test-data"))
 }
 
 fn xml_include_paths(source: &str) -> Vec<&str> {

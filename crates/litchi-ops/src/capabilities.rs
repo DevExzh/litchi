@@ -1195,11 +1195,11 @@ static DOC_CREATION_OPTION_GAPS: [GapSpec; 3] = [
         subject: Subject::Operation {
             verb: "create",
             element: "document",
-            context: "initial-metadata",
+            context: "unrepresentable-initial-metadata",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 DOC initial metadata authoring",
-        reason: "the DOC creator currently emits a blank body only and refuses initial metadata rather than dropping it",
+        follow_up: "CreateOptions::metadata (OLE property sets, record 0254)",
+        reason: "initial metadata is written to the OLE property sets; identifier, hyperlink_base and unzoned timestamps have no property-set slot and are refused rather than dropped, as is metadata combined with CryptoAPI encryption",
     },
 ];
 
@@ -1347,9 +1347,9 @@ static PPT_CREATION_OPTION_GAPS: [GapSpec; 3] = [
         "legacy PPT has one canonical binary writer and refuses an OOXML Strict conformance request",
     ),
     ppt_creation_gap(
-        "initial-metadata",
-        "M2 PPT metadata creation",
-        "the PPT creator refuses initial metadata until typed metadata authoring is integrated",
+        "unrepresentable-initial-metadata",
+        "CreateOptions::metadata (OLE property sets, record 0254)",
+        "initial metadata is written to the OLE property sets; identifier, hyperlink_base and unzoned timestamps have no property-set slot and are refused rather than dropped",
     ),
 ];
 
@@ -1386,7 +1386,17 @@ const _: () = {
 /// paragraph text setter. `batch` remains supported for atomic text sets;
 /// structural commands are listed here so the report does not overclaim it.
 #[cfg(feature = "doc")]
-static DOC_WRITE_GAPS: [GapSpec; 5] = [
+static DOC_WRITE_GAPS: [GapSpec; 6] = [
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "get",
+            element: "metadata",
+            context: "path-read",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "File::metadata(); /metadata node reads with the shared metadata vocabulary",
+        reason: "`set(\"/metadata\", ..)` writes the OLE document properties (root-metadata keys and custom.<name>); the path is set-only, and reads go through File::metadata()",
+    },
     GapSpec {
         subject: Subject::Operation {
             verb: "add",
@@ -1501,9 +1511,9 @@ static XLS_CREATION_OPTION_GAPS: [GapSpec; 3] = [
         "the XLS creator emits binary BIFF8 workbooks and refuses Strict requests",
     ),
     xls_creation_gap(
-        "initial-metadata",
-        "M2 XLS metadata creation",
-        "the XLS creator refuses initial metadata until typed metadata authoring is integrated",
+        "unrepresentable-initial-metadata",
+        "CreateOptions::metadata (OLE property sets, record 0254)",
+        "initial metadata is written to the OLE property sets; identifier, hyperlink_base and unzoned timestamps have no property-set slot and are refused rather than dropped",
     ),
 ];
 
@@ -1513,7 +1523,17 @@ static XLS_CREATION_OPTION_GAPS: [GapSpec; 3] = [
 /// verb has an implementation merely because a subset of `set`, `remove`,
 /// `edit` and `batch` is integrated.
 #[cfg(feature = "xls")]
-static XLS_WRITE_GAPS: [GapSpec; 10] = [
+static XLS_WRITE_GAPS: [GapSpec; 11] = [
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "get",
+            element: "metadata",
+            context: "path-read",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "File::metadata(); /metadata node reads with the shared metadata vocabulary",
+        reason: "`set(\"/metadata\", ..)` writes the OLE document properties (root-metadata keys and custom.<name>); the path is set-only, and reads go through File::metadata()",
+    },
     GapSpec {
         subject: Subject::Operation {
             verb: "remove",
@@ -2910,6 +2930,12 @@ fn element_data(adapter: Adapter, index: u16) -> Data {
                 "shape" => crate::format::pptx::SHAPE_CAPABILITY_PROPS,
                 "placeholder" => crate::format::pptx::PLACEHOLDER_CAPABILITY_PROPS,
                 "slide" => crate::format::pptx::SLIDE_CAPABILITY_PROPS,
+                "paragraph" => crate::format::pptx::PARAGRAPH_CAPABILITY_PROPS,
+                "run" => crate::format::pptx::RUN_CAPABILITY_PROPS,
+                "tc" => crate::format::pptx::CELL_CAPABILITY_PROPS,
+                "notes" => crate::format::pptx::NOTES_CAPABILITY_PROPS,
+                "comment" => crate::format::pptx::COMMENT_CAPABILITY_PROPS,
+                "picture" => crate::format::pptx::PICTURE_CAPABILITY_PROPS,
                 _ => props,
             }
         } else {
@@ -3127,6 +3153,16 @@ static PPTX_WRITE_GAPS: [GapSpec; 14] = [
 
 #[cfg(feature = "ppt")]
 const PPT_WRITE_GAPS: &[GapSpec] = &[
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "get",
+            element: "metadata",
+            context: "path-read",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "File::metadata(); /metadata node reads with the shared metadata vocabulary",
+        reason: "`set(\"/metadata\", ..)` writes the OLE document properties (root-metadata keys and custom.<name>); the path is set-only, and reads go through File::metadata()",
+    },
     GapSpec {
         subject: Subject::Operation {
             verb: "remove",

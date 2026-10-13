@@ -169,7 +169,10 @@ fn rename_across_two_builds(companions: bool) -> litchi_pptx::Result<slide::Snap
     let mut edit = snapshot(&source).edit();
     edit.set_name(Some("Renamed".to_owned())).unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.is_changed(), "the rename changes the slide XML");
+    assert!(
+        commit.diagnostics().changed(),
+        "the rename changes the slide XML"
+    );
     slide::apply_patch(&mut target, commit.patch())
 }
 

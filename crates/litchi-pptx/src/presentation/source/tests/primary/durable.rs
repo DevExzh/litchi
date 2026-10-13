@@ -118,7 +118,10 @@ fn durable_binding_and_before_state_drift_refuse_without_changing_destination() 
         }
         let bytes = litchi_opc::PackageWriter::to_bytes(&raw).unwrap();
         let destination = fresh(bytes.clone());
-        assert!(matches!(destination.apply(&patch), Err(Error::StaleSource)));
+        assert!(matches!(
+            destination.apply(&patch),
+            Err(Error::PatchConflict)
+        ));
         assert_eq!(destination.to_bytes().unwrap(), bytes);
     }
     let (before, after) = xmls(&encoded);
@@ -128,7 +131,7 @@ fn durable_binding_and_before_state_drift_refuse_without_changing_destination() 
     let forged = Patch::from_bytes(&with_xmls(&encoded, before.as_bytes(), after)).unwrap();
     assert!(matches!(
         fresh(bytes).apply(&forged),
-        Err(Error::StaleSource)
+        Err(Error::PatchConflict)
     ));
 }
 
@@ -363,7 +366,10 @@ fn second_slide_conflict_rejects_complete_durable_batch() {
     encoded[offset..offset + 12].copy_from_slice(b"Oldbad slide");
     let patch = Patch::from_bytes(&encoded).unwrap();
     let destination = fresh(bytes.clone());
-    assert!(matches!(destination.apply(&patch), Err(Error::StaleSource)));
+    assert!(matches!(
+        destination.apply(&patch),
+        Err(Error::PatchConflict)
+    ));
     assert_eq!(destination.to_bytes().unwrap(), bytes);
 }
 

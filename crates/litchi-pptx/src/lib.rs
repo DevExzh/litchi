@@ -82,6 +82,7 @@ pub mod change_tracking;
 pub mod chart;
 pub mod comments;
 pub mod custom;
+pub mod diagnostics;
 mod error;
 pub mod font;
 pub mod format;
@@ -96,6 +97,7 @@ pub mod modern_comments;
 pub mod master_layout;
 pub(crate) mod namespace;
 pub mod notes;
+mod open_options;
 pub mod opened;
 pub mod package;
 pub mod parts;
@@ -127,12 +129,12 @@ pub use animations::*;
 pub use backgrounds::{GradientStop, GradientType, PatternType, PictureStyle, SlideBackground};
 pub use chart::{Chart, Info as ChartInfo, Series as ChartSeries, Type as ChartType};
 pub use comments::collaboration::{
-    AuthorPresenceCommit, AuthorPresencePatch, AuthorPresenceSnapshot, AuthorPresenceTransaction,
-    CommentThreadingCommit, CommentThreadingPatch, CommentThreadingSnapshot,
-    CommentThreadingTransaction, ParentComment, PresenceInfo, ThreadingInfo, apply_presence_commit,
-    apply_presence_patch, apply_threading_commit, apply_threading_patch, load_presence,
-    load_presence_snapshot, load_threading, load_threading_snapshot, put_presence, put_threading,
-    remove_presence, remove_threading,
+    AuthorPresenceCommit, AuthorPresenceEdit, AuthorPresencePatch, AuthorPresenceSnapshot,
+    CommentThreadingCommit, CommentThreadingEdit, CommentThreadingPatch, CommentThreadingSnapshot,
+    ParentComment, PresenceInfo, ThreadingInfo, apply_presence_commit, apply_presence_patch,
+    apply_threading_commit, apply_threading_patch, load_presence, load_presence_snapshot,
+    load_threading, load_threading_snapshot, put_presence, put_threading, remove_presence,
+    remove_threading,
 };
 pub use comments::{
     Author, Comment, Comments, Conformance, List, add_presentation_comment,
@@ -181,6 +183,7 @@ pub use media_parts::{
     load_slide_media, parse_slide_media, store_slide_media, write_slide_media_pictures,
 };
 pub use modern_comments::*;
+pub use open_options::{OpenOptions, OpenPolicy};
 pub use opened::{
     CrossSlideCopyPatch, CrossSlideCopyPlan, MAX_SHAPE_PROPERTIES_REPLACEMENTS,
     MAX_SHAPE_TEXT_REPLACEMENTS, ShapePropertiesReplacement, ShapeTextReplacement, SlideCopyPart,

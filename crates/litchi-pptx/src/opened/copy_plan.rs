@@ -239,9 +239,9 @@ impl Snapshot {
         reject_cycles(&owned, &edges)?;
         validate_registered_layout(self.package.as_ref(), presentation, &reused_layout)?;
         if self.package.part_count() > self.limits.max_parts() {
-            return Err(Error::Limit {
-                resource: "slide-copy package parts",
-                limit: self.limits.max_parts(),
+            return Err(Error::EditLimit {
+                kind: crate::opened::LimitKind::Parts,
+                maximum: self.limits.max_parts(),
             });
         }
 
@@ -319,9 +319,9 @@ fn preflight_copy_candidate(
         .checked_add(parts.len())
         .ok_or_else(|| invalid("slide-copy resulting part count overflow"))?;
     if resulting_parts > snapshot.limits.max_parts() {
-        return Err(Error::Limit {
-            resource: "slide-copy resulting package parts",
-            limit: snapshot.limits.max_parts(),
+        return Err(Error::EditLimit {
+            kind: crate::opened::LimitKind::Parts,
+            maximum: snapshot.limits.max_parts(),
         });
     }
     let presentation_bytes = checked_plan_bytes(0, presentation)?;
@@ -348,9 +348,9 @@ fn preflight_copy_candidate(
         .and_then(|value| value.checked_add(128))
         .ok_or_else(|| invalid("slide-copy candidate byte count overflow"))?;
     if conservative_patch_bytes > snapshot.limits.max_patch_bytes() {
-        return Err(Error::Limit {
-            resource: "slide-copy candidate patch bytes",
-            limit: snapshot.limits.max_patch_bytes(),
+        return Err(Error::EditLimit {
+            kind: crate::opened::LimitKind::PatchBytes,
+            maximum: snapshot.limits.max_patch_bytes(),
         });
     }
     let mut targets = HashSet::new();
@@ -535,17 +535,17 @@ pub(super) fn collect_owned_closure(
             continue;
         }
         if owned.len() > limits.max_parts() {
-            return Err(Error::Limit {
-                resource: "slide-copy dependency parts",
-                limit: limits.max_parts(),
+            return Err(Error::EditLimit {
+                kind: crate::opened::LimitKind::Parts,
+                maximum: limits.max_parts(),
             });
         }
         let part = package.get_part(&name)?;
         planned_bytes = checked_plan_bytes(planned_bytes, part)?;
         if planned_bytes > limits.max_patch_bytes() {
-            return Err(Error::Limit {
-                resource: "slide-copy planned closure bytes",
-                limit: limits.max_patch_bytes(),
+            return Err(Error::EditLimit {
+                kind: crate::opened::LimitKind::PatchBytes,
+                maximum: limits.max_patch_bytes(),
             });
         }
         let mut outgoing = Vec::new();

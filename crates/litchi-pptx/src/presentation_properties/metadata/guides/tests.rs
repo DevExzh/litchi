@@ -79,8 +79,8 @@ fn no_op_commit_keeps_exact_source_and_raw_payloads() {
     let snapshot = Snapshot::from_xml(&source).expect("guide source parses");
     let commit = snapshot.edit().commit().expect("no-op commit");
 
-    assert!(!commit.is_changed());
-    assert!(commit.patch().is_empty());
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
     assert_eq!(commit.snapshot().source_xml(), source.as_slice());
     assert!(
         std::str::from_utf8(

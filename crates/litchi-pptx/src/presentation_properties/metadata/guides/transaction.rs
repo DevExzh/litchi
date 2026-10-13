@@ -112,8 +112,8 @@ impl Snapshot {
     /// Start an atomic detached edit over the typed guide value.
     #[inline]
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub fn edit(&self) -> Edit {
+        Edit {
             original: self.clone(),
             working: self.guides.clone(),
         }
@@ -133,12 +133,12 @@ impl Snapshot {
 
 /// A failure-atomic edit staged against one guide catalog.
 #[derive(Clone, Debug)]
-pub struct Transaction {
+pub struct Edit {
     original: Snapshot,
     working: Guides,
 }
 
-impl Transaction {
+impl Edit {
     /// Borrow the immutable source snapshot used by this edit.
     #[inline]
     #[must_use]
@@ -167,11 +167,14 @@ impl Transaction {
         self.working.list(kind)
     }
 
-    /// Return whether the staged typed value differs from the source.
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.original.guides != self.working
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Replace both owner lists after validating IDs, bounds, and opaque XML.
@@ -438,18 +441,14 @@ pub struct Commit {
 }
 
 impl Commit {
-    /// Whether publication changes the exact presentation bytes.
-    #[inline]
-    #[must_use]
-    pub const fn changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.changed
     }
 
-    /// Alias for [`Self::changed`].
-    #[inline]
+    /// The outcome of this edit or commit.
     #[must_use]
-    pub const fn is_changed(&self) -> bool {
-        self.changed
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Borrow the projected post-edit snapshot.
@@ -502,15 +501,8 @@ impl Patch {
     /// Whether this patch is an exact no-op.
     #[inline]
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
-    }
-
-    /// Alias for [`Self::is_empty`] with mutation-oriented naming.
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.is_empty()
     }
 
     /// Return the exact inverse patch.
@@ -554,7 +546,7 @@ impl Patch {
         if target.as_slice() != self.before.source_xml() {
             return Err(invalid("extended-guide source is stale"));
         }
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(self.before.clone());
         }
         let parsed = Snapshot::from_wire(

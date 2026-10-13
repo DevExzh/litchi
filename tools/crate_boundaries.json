@@ -40,6 +40,10 @@
     "litchi-cfb": [
       "litchi-core"
     ],
+    "litchi-cli": [
+      "litchi-core",
+      "litchi-ops"
+    ],
     "litchi-codepage": [],
     "litchi-core": [],
     "litchi-crypto": [
@@ -510,6 +514,7 @@
   ],
   "runtime_neutral": [
     "litchi-biff",
+    "litchi-cli",
     "litchi-codepage",
     "litchi-core",
     "litchi-crypto",

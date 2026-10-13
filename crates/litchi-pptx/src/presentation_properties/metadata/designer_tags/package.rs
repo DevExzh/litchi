@@ -177,7 +177,7 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
             "Designer-tag selected slide-ID source is stale or rebound".into(),
         ));
     }
-    if !patch.is_changed() {
+    if patch.is_noop() {
         return Ok(current);
     }
     let desired = patch.after.singular()?;

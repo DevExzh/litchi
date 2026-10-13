@@ -12,7 +12,7 @@
 
 use std::env;
 
-use litchi_xlsx::{Workbook, WorksheetKind};
+use litchi_xlsx::WorksheetKind;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
@@ -23,15 +23,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     println!("Opening XLSX: {}", path);
-    let wb = Workbook::open(&path)?;
+    let wb = litchi_xlsx::Package::open(&path)?;
 
-    let sheets = wb.sheets().collect::<Vec<_>>();
+    let sheets = wb.workbook_ref().sheets().collect::<Vec<_>>();
     let names = sheets.iter().map(|sheet| sheet.name()).collect::<Vec<_>>();
     println!("Worksheet count: {}", sheets.len());
     println!("Worksheet names: {:?}", names);
     println!(
         "Active sheet: {:?}",
-        wb.active_sheet().map(|sheet| sheet.name().to_owned())
+        wb.workbook_ref()
+            .active_sheet()
+            .map(|sheet| sheet.name().to_owned())
     );
 
     for (index, ws) in sheets.into_iter().enumerate() {

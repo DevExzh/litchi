@@ -1,4 +1,4 @@
-# Query selectors harvested from OfficeCLI (3rdparty/OfficeCLI, not in git):
+# Query selectors harvested from OfficeCLI (upstream checkout, not in git):
 # the selector argument of `officecli query` in examples/**, README.md,
 # SKILL.md, skills/**, and schemas/help/**/*.json. Strings only; no OfficeCLI
 # code. One selector per line; `#` lines and blank lines are ignored.

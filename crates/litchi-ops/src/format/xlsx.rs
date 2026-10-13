@@ -124,20 +124,20 @@ struct XlsxState {
     /// A successfully promoted source-backed workbook. The lock is initialized
     /// lazily so read-only opens do not pay for an edit cache, and failed
     /// promotions are never retained.
-    promotion: OnceLock<Mutex<Option<xlsx::Workbook>>>,
+    promotion: OnceLock<Mutex<Option<xlsx::Package>>>,
     /// A successfully unsigned workbook for a removal-authorized signature
     /// disposition. It is separate from `promotion`: the original promoted
     /// snapshot remains reusable by ordinary handles and signed aliases still
     /// refuse before either cache is consulted.
-    unsigned_promotion: OnceLock<Mutex<Option<xlsx::Workbook>>>,
+    unsigned_promotion: OnceLock<Mutex<Option<xlsx::Package>>>,
 }
 
 /// The two owner states of an XLSX handle (record 0003 §2.3).
 pub(crate) enum XlsxOwner {
     /// Deferred catalog over the retained positional source.
     Source(xlsx::SourceBackedWorkbook),
-    /// The owning workbook snapshot.
-    Eager(xlsx::Workbook),
+    /// The owning package snapshot.
+    Eager(xlsx::Package),
 }
 
 const _: () = {
@@ -168,7 +168,7 @@ impl XlsxOwner {
     fn len(&self) -> usize {
         match self {
             Self::Source(workbook) => workbook.len(),
-            Self::Eager(workbook) => workbook.len(),
+            Self::Eager(package) => package.workbook_ref().len(),
         }
     }
 
@@ -178,7 +178,8 @@ impl XlsxOwner {
                 .sheets()
                 .map(|sheet| sheet.name().to_owned())
                 .collect(),
-            Self::Eager(workbook) => workbook
+            Self::Eager(package) => package
+                .workbook_ref()
                 .sheets()
                 .map(|sheet| sheet.name().to_owned())
                 .collect(),
@@ -188,14 +189,14 @@ impl XlsxOwner {
     fn select<'a>(&self, selector: impl Into<WorksheetSelector<'a>>) -> Result<Option<Sheet>> {
         Ok(match self {
             Self::Source(workbook) => workbook.sheet(selector)?.map(Sheet::source),
-            Self::Eager(workbook) => workbook.sheet(selector)?.map(Sheet::owned),
+            Self::Eager(package) => package.workbook_ref().sheet(selector)?.map(Sheet::owned),
         })
     }
 
     fn active(&self) -> Option<Sheet> {
         match self {
             Self::Source(workbook) => workbook.active_sheet().map(Sheet::source),
-            Self::Eager(workbook) => workbook.active_sheet().map(Sheet::owned),
+            Self::Eager(package) => package.workbook_ref().active_sheet().map(Sheet::owned),
         }
     }
 }
@@ -292,7 +293,7 @@ impl Xlsx {
                 .map_err(metadata_error)?
                 .map(Metadata::from)
                 .unwrap_or_default();
-        let workbook = xlsx::Package::from_opc(package)?.into_workbook()?;
+        let workbook = xlsx::Package::from_opc(package)?;
         Ok(Self::with_owner(
             XlsxOwner::Eager(workbook),
             metadata,
@@ -304,13 +305,13 @@ impl Xlsx {
 
     /// Adopt a newly created owning workbook without serializing and
     /// reopening its package.
-    pub(crate) fn from_workbook(workbook: xlsx::Workbook, options: &OpenOptions) -> Result<Self> {
+    pub(crate) fn from_workbook(workbook: xlsx::Package, options: &OpenOptions) -> Result<Self> {
         Self::from_workbook_with_origin(workbook, options, None)
     }
 
     /// Adopt a newly created workbook and retain an optional path origin.
     pub(crate) fn from_workbook_with_origin(
-        workbook: xlsx::Workbook,
+        workbook: xlsx::Package,
         options: &OpenOptions,
         origin: Option<Arc<Path>>,
     ) -> Result<Self> {
@@ -344,7 +345,7 @@ impl Xlsx {
             .map(Metadata::from)
             .unwrap_or_default();
         Ok(Self::with_owner(
-            XlsxOwner::Eager(package.into_workbook()?),
+            XlsxOwner::Eager(package),
             metadata,
             metadata_repairs,
             options,
@@ -390,7 +391,7 @@ impl Xlsx {
     /// metadata repair sidecar and path origin of the input. A removal-
     /// authorized handle becomes ordinary unsigned state after its native
     /// editor has already removed the signature graph.
-    pub(crate) fn adopt_workbook(&self, workbook: xlsx::Workbook) -> Self {
+    pub(crate) fn adopt_workbook(&self, workbook: xlsx::Package) -> Self {
         let options = OpenOptions::new().retain_source(self.0.retain_source);
         let signature = match self.signature() {
             Signature::RemovalAuthorized => Signature::Unsigned,
@@ -490,7 +491,7 @@ impl Xlsx {
         self.0.owner.ensure_current()?;
         let mut report = match &self.0.owner {
             XlsxOwner::Source(workbook) => workbook.tolerance_report(),
-            XlsxOwner::Eager(workbook) => workbook.tolerance_report(),
+            XlsxOwner::Eager(package) => package.workbook_ref().tolerance_report(),
         };
         report.append_properties(&self.0.metadata_repairs);
         Ok(report)
@@ -517,9 +518,10 @@ impl Xlsx {
                 XlsxOwner::Source(workbook) => workbook
                     .sheet(selector)?
                     .map(SelectedWorksheet::from_source),
-                XlsxOwner::Eager(workbook) => {
-                    workbook.sheet(selector)?.map(SelectedWorksheet::from_owned)
-                },
+                XlsxOwner::Eager(package) => package
+                    .workbook_ref()
+                    .sheet(selector)?
+                    .map(SelectedWorksheet::from_owned),
             })
         })
     }
@@ -543,7 +545,7 @@ impl Xlsx {
     /// [`Code::UnsupportedCapability`] when the handle was opened with
     /// [`OpenOptions::retain_source`] `false`; [`Code::IoError`] when the
     /// file changed; and the XLSX error of a failed promotion.
-    pub(crate) fn editor(&self) -> Result<xlsx::Workbook> {
+    pub(crate) fn editor(&self) -> Result<xlsx::Package> {
         if self.0.signature() == Signature::Signed {
             return Err(signature::refusal(FileFormat::Xlsx));
         }
@@ -563,7 +565,7 @@ impl Xlsx {
     /// Promote a source-backed owner once and return a native snapshot clone.
     /// The conversion and cache publication are source-fenced independently;
     /// the native OPC conversion also keeps its own checks for each stage.
-    fn promote_source(&self, source: &xlsx::SourceBackedWorkbook) -> Result<xlsx::Workbook> {
+    fn promote_source(&self, source: &xlsx::SourceBackedWorkbook) -> Result<xlsx::Package> {
         let cache = self.0.promotion.get_or_init(|| Mutex::new(None));
         let mut cached = cache
             .lock()
@@ -584,11 +586,11 @@ impl Xlsx {
     }
 
     /// An owning copy of the workbook whose signature the leaf removed
-    /// explicitly ([`xlsx::Workbook::unsigned`]): promoted through the
+    /// explicitly ([`xlsx::Package::unsign`]): promoted through the
     /// source-preserving OPC conversion for a source-backed owner, copied from
     /// the eager snapshot otherwise. An unlocked encrypted snapshot refuses,
     /// as its edits do.
-    fn unsigned_workbook(&self) -> Result<xlsx::Workbook> {
+    fn unsigned_workbook(&self) -> Result<xlsx::Package> {
         let cache = self.0.unsigned_promotion.get_or_init(|| Mutex::new(None));
         let mut cached = cache
             .lock()
@@ -600,9 +602,11 @@ impl Xlsx {
             };
         }
         let workbook = match &self.0.owner {
-            XlsxOwner::Source(workbook) => self.promote_source(workbook)?.unsigned()?,
-            XlsxOwner::Eager(workbook) => workbook.unsigned()?,
+            XlsxOwner::Source(workbook) => self.promote_source(workbook)?,
+            XlsxOwner::Eager(workbook) => workbook.clone(),
         };
+        let mut workbook = workbook;
+        workbook.unsign()?;
         *cached = Some(workbook.clone());
         if let Err(error) = self.0.owner.ensure_current() {
             *cached = None;
@@ -627,11 +631,11 @@ impl Xlsx {
 
 /// Build the owning snapshot from a source-backed package through its
 /// existing index.
-fn materialize(package: &SourceBackedPackage) -> Result<xlsx::Workbook> {
+fn materialize(package: &SourceBackedPackage) -> Result<xlsx::Package> {
     let package = package
         .to_opc_package_preserving_source()
         .map_err(|error| Error::from(error).with_format(FileFormat::Xlsx))?;
-    Ok(xlsx::Package::from_opc(package)?.into_workbook()?)
+    Ok(xlsx::Package::from_opc(package)?)
 }
 
 /// Classify a core-properties read failure. OPC failures keep their own
@@ -730,7 +734,7 @@ impl WorkbookTrait for Xlsx {
     fn is_1904_date_system(&self) -> bool {
         let date_system = match &self.0.owner {
             XlsxOwner::Source(workbook) => workbook.date_system(),
-            XlsxOwner::Eager(workbook) => workbook.date_system(),
+            XlsxOwner::Eager(workbook) => workbook.workbook_ref().date_system(),
         };
         matches!(date_system, xlsx::DateSystem::Excel1904)
     }

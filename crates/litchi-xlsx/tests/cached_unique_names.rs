@@ -19,7 +19,6 @@ use litchi_xlsx::pivot::cached_unique_names::{
     CacheSelector, CachedUniqueName, DiagnosticStatus, FieldSelector, PivotCacheId, Snapshot,
     Transaction,
 };
-use litchi_xlsx::workbook::Workbook;
 
 const TRANSITIONAL_MAIN: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
 const STRICT_MAIN: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
@@ -2214,13 +2213,15 @@ fn duplicate_field_names_are_not_a_semantic_name_selector() {
 #[test]
 fn ordinary_workbook_facade_reads_semantic_cache_and_field_selectors() {
     let fixture = Fixture::build(FixtureOptions::default());
-    let workbook = Workbook::from_bytes(fixture.bytes.clone()).unwrap();
+    let workbook = litchi_xlsx::Package::from_bytes(&fixture.bytes).unwrap();
     let by_ordinal = workbook
+        .workbook_ref()
         .pivot_cache(cache_selector())
         .field(field_selector())
         .cached_unique_names()
         .unwrap();
     let by_name = workbook
+        .workbook_ref()
         .pivot_cache(cache_selector())
         .field(field_name_selector())
         .cached_unique_names()
@@ -2235,6 +2236,7 @@ fn ordinary_workbook_facade_reads_semantic_cache_and_field_selectors() {
     assert_eq!(by_ordinal.diagnostic_status(), DiagnosticStatus::Unresolved);
 
     let source = workbook
+        .workbook_ref()
         .pivot_cache(cache_selector())
         .field(field_selector())
         .cached_unique_names_source()
@@ -2245,7 +2247,7 @@ fn ordinary_workbook_facade_reads_semantic_cache_and_field_selectors() {
 #[test]
 fn ordinary_workbook_edit_returns_new_snapshot_preserves_original_and_reopens() {
     let fixture = Fixture::build(FixtureOptions::default());
-    let original = Workbook::from_bytes(fixture.bytes.clone()).unwrap();
+    let original = litchi_xlsx::Package::from_bytes(&fixture.bytes).unwrap();
     let original_bytes = original.to_bytes().unwrap();
     let mut edit = original
         .edit_pivot_cache(cache_selector())
@@ -2259,6 +2261,7 @@ fn ordinary_workbook_edit_returns_new_snapshot_preserves_original_and_reopens() 
     assert_eq!(original.to_bytes().unwrap(), original_bytes);
     assert_eq!(
         original
+            .workbook_ref()
             .pivot_cache(cache_selector())
             .field(field_selector())
             .cached_unique_names()
@@ -2267,12 +2270,13 @@ fn ordinary_workbook_edit_returns_new_snapshot_preserves_original_and_reopens() 
             .name,
         "North & South"
     );
-    let edited = committed.workbook();
+    let edited = committed.package();
     let edited_bytes = edited.to_bytes().unwrap();
     assert_ne!(edited_bytes, original_bytes);
-    let reopened = Workbook::from_bytes(edited_bytes).unwrap();
+    let reopened = litchi_xlsx::Package::from_bytes(&edited_bytes).unwrap();
     assert_eq!(
         reopened
+            .workbook_ref()
             .pivot_cache(cache_selector())
             .field(field_selector())
             .cached_unique_names()
@@ -2286,7 +2290,7 @@ fn ordinary_workbook_edit_returns_new_snapshot_preserves_original_and_reopens() 
 #[test]
 fn ordinary_workbook_no_op_preserves_bytes_and_reports_empty_patch() {
     let fixture = Fixture::build(FixtureOptions::default());
-    let original = Workbook::from_bytes(fixture.bytes).unwrap();
+    let original = litchi_xlsx::Package::from_bytes(&fixture.bytes).unwrap();
     let before = original.to_bytes().unwrap();
     let mut edit = original
         .edit_pivot_cache(cache_selector())
@@ -2296,14 +2300,14 @@ fn ordinary_workbook_no_op_preserves_bytes_and_reports_empty_patch() {
     let committed = edit.commit().unwrap();
 
     assert!(!committed.changed());
-    assert!(committed.patch().is_empty());
-    assert_eq!(committed.workbook().to_bytes().unwrap(), before);
+    assert!(committed.patch().is_noop());
+    assert_eq!(committed.package().to_bytes().unwrap(), before);
 }
 
 #[test]
 fn ordinary_workbook_patch_is_fresh_source_bound_stale_atomic_and_exactly_reversible() {
     let fixture = Fixture::build(FixtureOptions::default());
-    let base = Workbook::from_bytes(fixture.bytes.clone()).unwrap();
+    let base = litchi_xlsx::Package::from_bytes(&fixture.bytes).unwrap();
     let base_bytes = base.to_bytes().unwrap();
     let mut edit = base
         .edit_pivot_cache(cache_selector())
@@ -2312,14 +2316,14 @@ fn ordinary_workbook_patch_is_fresh_source_bound_stale_atomic_and_exactly_revers
     assert!(edit.set_cached_unique_name(7, "South").unwrap());
     let committed = edit.commit().unwrap();
     let patch = committed.patch().clone();
-    assert!(!patch.is_empty());
+    assert!(!patch.is_noop());
 
-    let fresh = Workbook::from_bytes(fixture.bytes.clone()).unwrap();
+    let fresh = litchi_xlsx::Package::from_bytes(&fixture.bytes).unwrap();
     let forwarded = patch.apply(&fresh).unwrap();
     assert!(forwarded.changed());
     assert_eq!(
-        forwarded.workbook().to_bytes().unwrap(),
-        committed.workbook().to_bytes().unwrap()
+        forwarded.package().to_bytes().unwrap(),
+        committed.package().to_bytes().unwrap()
     );
 
     let mut stale_package = fixture.package();
@@ -2330,13 +2334,14 @@ fn ordinary_workbook_patch_is_fresh_source_bound_stale_atomic_and_exactly_revers
         .get_part_mut(&PackURI::new(CACHE_URI).unwrap())
         .unwrap()
         .set_blob(stale_cache_xml.into_bytes());
-    let stale = Workbook::from_bytes(PackageWriter::to_bytes(&stale_package).unwrap()).unwrap();
+    let stale = litchi_xlsx::Package::from_bytes(&PackageWriter::to_bytes(&stale_package).unwrap())
+        .unwrap();
     let stale_before = stale.to_bytes().unwrap();
     assert!(patch.apply(&stale).is_err());
     assert_eq!(stale.to_bytes().unwrap(), stale_before);
 
-    let restored = patch.inverse().apply(committed.workbook()).unwrap();
-    let restored_bytes = restored.workbook().to_bytes().unwrap();
+    let restored = patch.inverse().apply(committed.package()).unwrap();
+    let restored_bytes = restored.package().to_bytes().unwrap();
     assert_eq!(restored_bytes, base_bytes);
     let base_package = OpcPackage::from_bytes(&base_bytes).unwrap();
     let restored_package = OpcPackage::from_bytes(&restored_bytes).unwrap();

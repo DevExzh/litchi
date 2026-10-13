@@ -9,6 +9,11 @@ They tolerate exactly the known drift recorded in ``_support`` (D2, D3, D5)
 and fail on any new gap, in either direction. Adding API means adding it to
 the runtime and the stub together. The today/intended pairs for the known
 drift live in test_known_drift.py.
+
+Stub classes whose name starts with ``_`` are typing helpers that exist only
+in the stub (the TypedDicts of the dicts the unified ``File`` API returns);
+``test_typing_only_declarations`` checks that they stay private and
+stub-only, and test_file_api.py checks their keys against real results.
 """
 
 from __future__ import annotations
@@ -78,6 +83,15 @@ class StubSyncTests(unittest.TestCase):
                     else:
                         continue
                     self.assertEqual(actual, member.params)
+
+    def test_typing_only_declarations(self):
+        self.assertTrue(STUB.typing_only, "the stub declares the shapes of returned dicts")
+        for name, stub_class in STUB.typing_only.items():
+            with self.subTest(cls=name):
+                self.assertTrue(name.startswith("_"))
+                self.assertIn("TypedDict", stub_class.bases)
+                self.assertFalse(hasattr(L, name), "a typing-only name exists at runtime")
+                self.assertNotIn(name, STUB.all)
 
     def test_declared_bases_modulo_known_drift(self):
         for name, stub_class in STUB.classes.items():

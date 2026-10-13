@@ -235,8 +235,8 @@ fn no_op_and_inverse_patches_preserve_exact_source_and_opaque_xml() {
     let source_xml = source.source_xml().to_vec();
 
     let no_op = source.edit().commit().unwrap();
-    assert!(!no_op.is_changed());
-    assert!(no_op.patch().is_empty());
+    assert!(!no_op.diagnostics().changed());
+    assert!(no_op.patch().is_noop());
     apply_commit(&mut package, no_op).unwrap();
     assert_eq!(presentation_xml(&package), source_xml);
 
@@ -266,7 +266,7 @@ fn no_op_and_inverse_patches_preserve_exact_source_and_opaque_xml() {
     .unwrap();
     let commit = edit.commit().unwrap();
     let after_xml = commit.snapshot().source_xml().to_vec();
-    assert!(commit.is_changed());
+    assert!(commit.diagnostics().changed());
     assert!(String::from_utf8_lossy(&after_xml).contains("<x:future>keep</x:future>"));
 
     apply_commit(&mut package, commit.clone()).unwrap();

@@ -124,11 +124,11 @@ fn read_pptx(bytes: &[u8]) -> String {
 }
 
 fn read_xlsx(bytes: &[u8]) -> String {
-    let cells = litchi_xlsx::Workbook::from_bytes(bytes.to_vec())
+    let cells = litchi_xlsx::Package::from_bytes(bytes)
         .map_err(|error| error.to_string())
         .and_then(|workbook| {
             let mut summary = String::new();
-            for sheet in workbook.sheets() {
+            for sheet in workbook.workbook().sheets() {
                 let cells = sheet
                     .cells("A1:XFD1048576")
                     .map_err(|error| error.to_string())?;

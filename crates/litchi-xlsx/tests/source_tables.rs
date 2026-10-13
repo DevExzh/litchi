@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 use litchi_opc::{OpcError, SourceLimitKind};
 use litchi_xlsx::workbook::worksheet::TablePart;
-use litchi_xlsx::{Error, Rect, SourceBackedWorkbook, SourceLimits, Workbook, WorksheetKind};
+use litchi_xlsx::{Error, Rect, SourceBackedWorkbook, SourceLimits, WorksheetKind};
 
 fn fixture(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -61,12 +61,13 @@ fn source_tables_equal_the_eager_owner_tables_across_the_corpus() {
             if path.extension().and_then(|value| value.to_str()) != Some("xlsx") {
                 continue;
             }
-            let (Ok(eager), Ok(source)) =
-                (Workbook::open(&path), SourceBackedWorkbook::open(&path))
-            else {
+            let (Ok(eager), Ok(source)) = (
+                litchi_xlsx::Package::open(&path),
+                SourceBackedWorkbook::open(&path),
+            ) else {
                 continue;
             };
-            for (eager_sheet, source_sheet) in eager.sheets().zip(source.sheets()) {
+            for (eager_sheet, source_sheet) in eager.workbook_ref().sheets().zip(source.sheets()) {
                 match (eager_sheet.tables(), source_sheet.tables()) {
                     (Ok(left), Ok(right)) => {
                         assert_eq!(describe(&left), describe(&right), "{}", path.display());
@@ -141,19 +142,25 @@ fn table_ranges_split_header_data_and_totals_rows() {
     );
     assert!(table.column("Field 6").unwrap().is_none());
 
-    let workbook = Workbook::open(fixture("ExcelTables.xlsx")).unwrap();
-    let (_, part) = workbook.table("TABLENAME").unwrap().unwrap();
+    let workbook = litchi_xlsx::Package::open(fixture("ExcelTables.xlsx")).unwrap();
+    let (_, part) = workbook.workbook_ref().table("TABLENAME").unwrap().unwrap();
     let table = part.table();
     assert_eq!(table.header_range().unwrap(), Some(range("G1:I1")));
     assert_eq!(table.data_range().unwrap(), Some(range("G2:I4")));
     assert_eq!(table.totals_range().unwrap(), None);
-    assert!(workbook.table("NoSuchTable").unwrap().is_none());
+    assert!(
+        workbook
+            .workbook_ref()
+            .table("NoSuchTable")
+            .unwrap()
+            .is_none()
+    );
 }
 
 #[test]
 fn workbook_lookup_searches_every_worksheet_in_order() {
     let path = fixture("ConditionalFormattingSamples.xlsx");
-    let eager = Workbook::open(&path).unwrap();
+    let eager = litchi_xlsx::Package::open(&path).unwrap();
     let source = SourceBackedWorkbook::open(&path).unwrap();
     let mut seen = 0usize;
     for sheet in source.sheets() {
@@ -165,7 +172,7 @@ fn workbook_lookup_searches_every_worksheet_in_order() {
             let (found_sheet, found) = source.table(&name).unwrap().unwrap();
             assert_eq!(found_sheet.position(), sheet.position());
             assert_eq!(found.part_name(), part.part_name());
-            let (eager_sheet, eager_found) = eager.table(&name).unwrap().unwrap();
+            let (eager_sheet, eager_found) = eager.workbook_ref().table(&name).unwrap().unwrap();
             assert_eq!(eager_sheet.position(), sheet.position());
             assert_eq!(eager_found.part_name(), part.part_name());
             seen += 1;
@@ -197,9 +204,9 @@ fn non_cell_sheets_own_no_tables() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/poi/test-data/spreadsheet/chart_sheet.xlsx");
     let source = SourceBackedWorkbook::open(&path).unwrap();
-    let eager = Workbook::open(&path).unwrap();
+    let eager = litchi_xlsx::Package::open(&path).unwrap();
     let mut checked = false;
-    for (source_sheet, eager_sheet) in source.sheets().zip(eager.sheets()) {
+    for (source_sheet, eager_sheet) in source.sheets().zip(eager.workbook_ref().sheets()) {
         if source_sheet.kind() == WorksheetKind::Worksheet {
             continue;
         }
@@ -215,7 +222,7 @@ fn non_cell_sheets_own_no_tables() {
     }
     assert!(checked, "the fixture has a chart sheet");
     assert!(source.table("anything").unwrap().is_none());
-    assert!(eager.table("anything").unwrap().is_none());
+    assert!(eager.workbook_ref().table("anything").unwrap().is_none());
 }
 
 #[test]
@@ -231,8 +238,12 @@ fn caller_event_limits_reach_eager_and_source_table_reads() {
         .build()
         .unwrap();
 
-    let eager = Workbook::from_bytes_with_limits(bytes.clone(), limits).unwrap();
-    let eager_sheet = eager.sheet(0_usize).unwrap().unwrap();
+    let eager = litchi_xlsx::Package::from_bytes_with_options(
+        &bytes,
+        litchi_xlsx::OpenOptions::new().source_limits(limits),
+    )
+    .unwrap();
+    let eager_sheet = eager.workbook_ref().sheet(0_usize).unwrap().unwrap();
     assert_event_limit(eager_sheet.tables().unwrap_err());
 
     let source = SourceBackedWorkbook::from_reader_with_limits(Cursor::new(bytes), limits).unwrap();

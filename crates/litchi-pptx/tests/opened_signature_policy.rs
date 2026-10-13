@@ -39,7 +39,7 @@ fn carries_signature(bytes: &[u8]) -> bool {
 fn changed_commit_on_a_signed_package_is_refused() {
     for name in SIGNED {
         let bytes = fixture(name);
-        let mut package = Package::from_vec(bytes.clone()).unwrap();
+        let mut package = Package::from_reader(std::io::Cursor::new(bytes.clone())).unwrap();
         assert!(package.opc().unwrap().is_signed(), "{name}");
         let mut transaction = package.edit().unwrap();
         transaction
@@ -62,7 +62,7 @@ fn changed_commit_on_a_signed_package_is_refused() {
 fn exact_noop_commit_keeps_the_signature_bytes() {
     for name in SIGNED {
         let bytes = fixture(name);
-        let mut package = Package::from_vec(bytes.clone()).unwrap();
+        let mut package = Package::from_reader(std::io::Cursor::new(bytes.clone())).unwrap();
         let commit = package.edit().unwrap().commit().unwrap();
         assert!(!commit.diagnostics().changed(), "{name}");
         package = commit.into_package();
@@ -73,7 +73,7 @@ fn exact_noop_commit_keeps_the_signature_bytes() {
 #[test]
 fn explicit_unsign_authorizes_a_changed_commit() {
     for name in SIGNED {
-        let mut package = Package::from_vec(fixture(name)).unwrap();
+        let mut package = Package::from_reader(std::io::Cursor::new(fixture(name))).unwrap();
         package.unsign().unwrap();
         assert!(!package.opc().unwrap().is_signed(), "{name}");
         let mut transaction = package.edit().unwrap();
@@ -85,7 +85,7 @@ fn explicit_unsign_authorizes_a_changed_commit() {
         package = commit.into_package();
         let output = package.to_bytes().unwrap();
         assert!(!carries_signature(&output), "{name}");
-        let reopened = Package::from_vec(output).unwrap();
+        let reopened = Package::from_reader(std::io::Cursor::new(output)).unwrap();
         let text = reopened.presentation().unwrap().slides().unwrap()[0]
             .text()
             .unwrap();
@@ -99,7 +99,7 @@ fn unsigning_an_unsigned_package_changes_nothing() {
     builder.presentation().unwrap().add_slide().unwrap();
     let mut authored = builder.build().unwrap();
     let bytes = authored.to_bytes().unwrap();
-    let mut package = Package::from_vec(bytes.clone()).unwrap();
+    let mut package = Package::from_reader(std::io::Cursor::new(bytes.clone())).unwrap();
     package.unsign().unwrap();
     assert!(!package.opc().unwrap().is_signed());
     let commit = package.edit().unwrap().commit().unwrap();
@@ -110,7 +110,7 @@ fn unsigning_an_unsigned_package_changes_nothing() {
 #[test]
 fn insertion_refuses_signed_sources_before_layout_resolution() {
     for name in SIGNED {
-        let mut source = Package::from_vec(fixture(name)).unwrap();
+        let mut source = Package::from_reader(std::io::Cursor::new(fixture(name))).unwrap();
         let before = source.to_bytes().unwrap();
         let mut edit = source.edit().unwrap();
         assert!(matches!(

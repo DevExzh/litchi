@@ -681,9 +681,9 @@ impl Metadata {
             }
         }
         if count > limits.max_parts().saturating_mul(2).saturating_add(2) {
-            return Err(Error::Limit {
-                resource: "opened-presentation metadata owners",
-                limit: limits.max_parts(),
+            return Err(Error::EditLimit {
+                kind: crate::opened::LimitKind::Parts,
+                maximum: limits.max_parts(),
             });
         }
         require_capture_bytes(length, limits)?;
@@ -693,9 +693,9 @@ impl Metadata {
     }
     pub(super) fn check(&self, limits: Limits) -> Result<()> {
         if self.members.len() > limits.max_parts().saturating_mul(2).saturating_add(2) {
-            return Err(Error::Limit {
-                resource: "opened-presentation metadata owners",
-                limit: limits.max_parts(),
+            return Err(Error::EditLimit {
+                kind: crate::opened::LimitKind::Parts,
+                maximum: limits.max_parts(),
             });
         }
         require_capture_bytes(self.encoded_len()?, limits)?;
@@ -729,9 +729,9 @@ impl Metadata {
             .map_err(allocation)?;
         let mut push_owner = |owner: Owner| -> Result<()> {
             if owners.len() >= limits.max_parts().saturating_mul(2).saturating_add(2) {
-                return Err(Error::Limit {
-                    resource: "opened-presentation metadata owners",
-                    limit: limits.max_parts(),
+                return Err(Error::EditLimit {
+                    kind: crate::opened::LimitKind::Parts,
+                    maximum: limits.max_parts(),
                 });
             }
             owners.try_reserve(1).map_err(allocation)?;
@@ -847,9 +847,9 @@ impl Metadata {
     pub(super) fn preflight(input: &mut Input<'_>, limits: Limits) -> Result<()> {
         let count = input.usize32()?;
         if count > limits.max_parts().saturating_mul(2).saturating_add(2) {
-            return Err(Error::Limit {
-                resource: "opened-presentation metadata owners",
-                limit: limits.max_parts(),
+            return Err(Error::EditLimit {
+                kind: crate::opened::LimitKind::Parts,
+                maximum: limits.max_parts(),
             });
         }
         for _ in 0..count {
@@ -878,9 +878,9 @@ impl Metadata {
     pub(super) fn parse(input: &mut Input<'_>, limits: Limits) -> Result<Self> {
         let count = input.usize32()?;
         if count > limits.max_parts().saturating_mul(2).saturating_add(2) {
-            return Err(Error::Limit {
-                resource: "opened-presentation metadata owners",
-                limit: limits.max_parts(),
+            return Err(Error::EditLimit {
+                kind: crate::opened::LimitKind::Parts,
+                maximum: limits.max_parts(),
             });
         }
         let mut members = Vec::new();

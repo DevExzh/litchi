@@ -62,11 +62,11 @@ fn marked_slides_package(count: usize, marked: &[usize]) -> Result<Package> {
     }
     let mut package = builder.build()?;
     let bytes = package.to_bytes()?;
-    let mut package = Package::from_vec(bytes)?;
+    let mut package = Package::from_reader(std::io::Cursor::new(bytes))?;
     for &index in marked {
         add_mce_marker(&mut package, index)?;
     }
-    Package::from_vec(package.to_bytes()?)
+    Package::from_reader(std::io::Cursor::new(package.to_bytes()?))
 }
 
 fn add_mce_marker(package: &mut Package, index: usize) -> Result<()> {

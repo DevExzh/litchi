@@ -20,9 +20,9 @@ pub use package::{
     put_threading, remove_presence, remove_threading,
 };
 pub use transaction::{
-    AuthorPresenceCommit, AuthorPresencePatch, AuthorPresenceSnapshot, AuthorPresenceTransaction,
-    CommentThreadingCommit, CommentThreadingPatch, CommentThreadingSnapshot,
-    CommentThreadingTransaction, Revision,
+    AuthorPresenceCommit, AuthorPresenceEdit, AuthorPresencePatch, AuthorPresenceSnapshot,
+    CommentThreadingCommit, CommentThreadingEdit, CommentThreadingPatch, CommentThreadingSnapshot,
+    Revision,
 };
 
 /// The namespace introduced by [MS-PPTX] 2.4 for these extensions.

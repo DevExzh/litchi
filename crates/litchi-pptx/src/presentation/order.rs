@@ -254,16 +254,14 @@ impl SourceBackedSlideOrderEdit {
         &self.source
     }
 
-    /// Whether this edit has a byte-changing move staged.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.source.xml.as_bytes() != self.working.as_bytes()
     }
 
-    /// Alias for [`Self::is_changed`].
+    /// The outcome of this edit or commit.
     #[must_use]
-    pub fn changed(&self) -> bool {
-        self.is_changed()
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Stage a positional move in the currently staged slide list.
@@ -406,21 +404,13 @@ impl SourceBackedSlideOrderPatch {
         &self.after
     }
 
-    /// Whether this patch changes the presentation XML bytes.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         !self.before.same_source(&self.after)
-    }
-
-    /// Alias for [`Self::is_changed`].
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        self.is_changed()
     }
 
     /// Whether this patch is an exact source no-op.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         !self.is_changed()
     }
 
@@ -441,7 +431,7 @@ impl SourceBackedSlideOrderPatch {
         self.before.check_execution()?;
         source.check_execution()?;
         if !source.same_source(&self.before) {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         let target = if self.is_changed() {
             self.after.clone()
@@ -466,16 +456,14 @@ impl SourceBackedSlideOrderCommit {
         &self.patch
     }
 
-    /// Whether the ordered slide entries change.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.patch.is_changed()
     }
 
-    /// Alias for [`Self::is_changed`].
+    /// The outcome of this edit or commit.
     #[must_use]
-    pub fn changed(&self) -> bool {
-        self.is_changed()
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Exact reversible inverse patch for this edit.
@@ -492,7 +480,7 @@ fn capture(editor: &SourceBackedPresentationEditor) -> Result<SourceBackedSlideO
     let raw = editor._presentation.source_data().clone();
     editor.package.check_execution()?;
     if view.partname() != editor._presentation.source_partname() {
-        return Err(Error::StaleSource);
+        return Err(Error::PatchConflict);
     }
 
     let bindings = slide_order_bindings(editor)?;
@@ -500,7 +488,7 @@ fn capture(editor: &SourceBackedPresentationEditor) -> Result<SourceBackedSlideO
     let pinned_relationships =
         root_relationship_bindings(editor._presentation.source_relationships())?;
     if relationships != pinned_relationships {
-        return Err(Error::StaleSource);
+        return Err(Error::PatchConflict);
     }
     editor.package.source_version()?;
     let lineage = editor.package.source_lineage();

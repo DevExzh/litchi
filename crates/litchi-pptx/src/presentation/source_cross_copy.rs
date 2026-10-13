@@ -453,7 +453,7 @@ impl SourceBackedPresentationEditor {
         if self.package.source_lineage() != plan.destination_lineage
             || plan.source.inner.package.source_lineage() != plan.source_lineage
         {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         let current = prepare(
             &self,
@@ -464,7 +464,7 @@ impl SourceBackedPresentationEditor {
             Some(plan),
         )?;
         if !current.matches(plan) {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         verify_candidate(&self, &plan.source, &current)?;
         let _memory_reservation = current.memory_reservation.clone();
@@ -861,14 +861,14 @@ fn prepare(
     if source_refs.len() != source.inner.slides.len()
         || destination_refs.len() != editor.slides.len()
     {
-        return Err(Error::StaleSource);
+        return Err(Error::PatchConflict);
     }
     for (reference, slide) in source_refs.iter().zip(source.inner.slides.iter()) {
         check_execution(execution_context)?;
         if reference.id() != slide.slide_id
             || reference.relationship_id() != slide.binding.slide_reference_id
         {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
     }
     for (reference, slide) in destination_refs.iter().zip(editor.slides.iter()) {
@@ -876,7 +876,7 @@ fn prepare(
         if reference.id() != slide.slide_id
             || reference.relationship_id() != slide.binding.slide_reference_id
         {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
     }
     validate_registered_slide_parts(
@@ -2029,10 +2029,10 @@ fn verify_candidate(
     let source_data = source_view.data()?;
     if let Some(original) = &prepared.source_slide_original_xml {
         if source_data.as_bytes() != original.as_slice() {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
     } else if source_data.as_bytes() != prepared.source_slide_xml.as_slice() {
-        return Err(Error::StaleSource);
+        return Err(Error::PatchConflict);
     }
     let mut second_read_bytes = 0usize;
     for image in &prepared.images {
@@ -2048,7 +2048,7 @@ fn verify_candidate(
             });
         }
         if declared_size != image.bytes.len() {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         let image_view =
             source
@@ -2056,15 +2056,15 @@ fn verify_candidate(
                 .package
                 .part(&image.source_uri)
                 .map_err(|error| match error {
-                    litchi_opc::OpcError::PartNotFound(_) => Error::StaleSource,
+                    litchi_opc::OpcError::PartNotFound(_) => Error::PatchConflict,
                     other => Error::Opc(other),
                 })?;
         if image_view.declared_uncompressed_size()? != image.declared_size {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         if image_view.content_type() != image.content_type.as_str() || !image_view.rels().is_empty()
         {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         second_read_bytes = second_read_bytes
             .checked_add(declared_size)
@@ -2083,7 +2083,7 @@ fn verify_candidate(
             });
         }
         if declared_size != chart.bytes.len() {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         let chart_view =
             source
@@ -2091,14 +2091,14 @@ fn verify_candidate(
                 .package
                 .part(&chart.source_uri)
                 .map_err(|error| match error {
-                    litchi_opc::OpcError::PartNotFound(_) => Error::StaleSource,
+                    litchi_opc::OpcError::PartNotFound(_) => Error::PatchConflict,
                     other => Error::Opc(other),
                 })?;
         if chart_view.declared_uncompressed_size()? != chart.declared_size
             || chart_view.content_type() != chart.content_type.as_str()
             || !chart_view.rels().is_empty()
         {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         second_read_bytes = second_read_bytes
             .checked_add(declared_size)
@@ -2131,14 +2131,14 @@ fn verify_candidate(
                 .package
                 .part(&image.source_uri)
                 .map_err(|error| match error {
-                    litchi_opc::OpcError::PartNotFound(_) => Error::StaleSource,
+                    litchi_opc::OpcError::PartNotFound(_) => Error::PatchConflict,
                     other => Error::Opc(other),
                 })?;
         if image_view.declared_uncompressed_size()? != image.declared_size
             || image_view.content_type() != image.content_type.as_str()
             || !image_view.rels().is_empty()
         {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         let image_data = image_view.data()?;
         let actual_size = u64::try_from(image_data.as_bytes().len())
@@ -2148,7 +2148,7 @@ fn verify_candidate(
             || image_view.content_type() != image.content_type.as_str()
             || !image_view.rels().is_empty()
         {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
     }
     let staged_source_dialect = validate_source_slide_xml(
@@ -2164,20 +2164,20 @@ fn verify_candidate(
                 .package
                 .part(&chart.source_uri)
                 .map_err(|error| match error {
-                    litchi_opc::OpcError::PartNotFound(_) => Error::StaleSource,
+                    litchi_opc::OpcError::PartNotFound(_) => Error::PatchConflict,
                     other => Error::Opc(other),
                 })?;
         if chart_view.declared_uncompressed_size()? != chart.declared_size
             || chart_view.content_type() != chart.content_type.as_str()
             || !chart_view.rels().is_empty()
         {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         let chart_data = chart_view.data()?;
         let actual_size = u64::try_from(chart_data.as_bytes().len())
             .map_err(|_| invalid("embedded chart byte count exceeds u64"))?;
         if actual_size != chart.declared_size || chart_data.as_bytes() != chart.bytes.as_slice() {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         validate_chart_xml(
             chart_data.as_bytes(),
@@ -3303,7 +3303,7 @@ fn stage_inserted_source_xml(
     target_bytes: &[u8],
 ) -> Result<SourceXmlPart> {
     if source_xml.bytes() != source_bytes {
-        return Err(Error::StaleSource);
+        return Err(Error::PatchConflict);
     }
     if target_bytes.len() <= source_bytes.len() {
         return Err(invalid(
@@ -3388,7 +3388,7 @@ fn stage_rewritten_source_xml(
     execution_context: Option<&ExecutionContext>,
 ) -> Result<SourceXmlPart> {
     if source_xml.bytes() != source_bytes {
-        return Err(Error::StaleSource);
+        return Err(Error::PatchConflict);
     }
     let references = rewrite_references(image_references, chart_references, execution_context)?;
     let mut edits = Vec::new();
@@ -4263,7 +4263,7 @@ fn validate_presentation_slide_bindings(
     execution_context: Option<&ExecutionContext>,
 ) -> Result<()> {
     if references.len() != slides.len() {
-        return Err(Error::StaleSource);
+        return Err(Error::PatchConflict);
     }
     for (reference, slide) in references.iter().zip(slides.iter()) {
         check_execution(execution_context)?;

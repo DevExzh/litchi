@@ -244,6 +244,56 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 ## Awaiting owner confirmation
 
+- Record 0248 decisions (provisional coordinator defaults, 2026-10-13):
+  - D1, iWork placement: (a), a facade-level `File` wraps `litchi_ops::File` plus the iWork variants, so `litchi-ops` stays iWork-free.
+  - D2: the W1 iWork renames and the leaf API requests stay with the iWork owners (`IWORK_API_REQUESTS.md`).
+  - D3: tiers stay strict. Phase F (RTF/ODF/iWork) waits until tiers 1–2 reach P0 CRUD; the RTF work already landed is kept.
+  - D4: earlier provisional decisions remain provisional.
+  - D5: budget misses get engineering first. Explanations come only after a fix attempt.
+
+## Wave R1 (2026-10-13, coordinator restart)
+Branches `uo2/*` cut from `908f9cccdd`; records 0249–0255:
+- `a23-gate`: plan steps 2–3, the glossary gate and truthful capabilities.
+- `p4-xlsx-w2`: step 4, the xlsx W2 reshape.
+- `p7a-docx`: docx W2 residue and P0.
+- `p7c-pptx`: pptx W2 residue and P0.
+- `p6-ooxml-meta`: shared OOXML metadata.
+- `p10-ole-meta`: legacy metadata.
+- `p14-python`: the Python surface.
+
+- Merged `a23-gate` (0249, `47a44b5506`):
+  - The glossary gate now checks 21 profiles, 673 bans and 8 families.
+  - DOC `capabilities()` lists 22 element gaps.
+  - The delta table shows read and write status per property; 48 write-only properties are no longer counted as read-supported.
+  - Not done: facade profile (unresolvable glob re-exports), core `Limits` ban (owner decision).
+
+- Merged `p10-ole-meta` (0254, `3f0df8f7e4`):
+  - DOC/XLS/PPT `Builder::set_metadata` and the `package::metadata` family;
+  - create-time metadata, and a set-only `/metadata` path;
+  - unified overhead +0.7–6.3%.
+- Merged `p15-cli` (0256, `8288737b90`): new `litchi-cli` crate, the `litchi` binary.
+- Merged `p14-python` (0255, `8def70fbcf`): the Python read and write surface; 242 tests.
+- Merged `p4-xlsx-w2` (0250, `b3e04abd1b`):
+  - xlsx `Package` owner, with `Workbook` as its projection; `workbook::edit` registered;
+  - 81 new bans;
+  - no regression above 5%.
+- New owner rule (2026-10-13, AGENTS.md `e467bcf4e8`): code never references `3rdparty/`; fixtures are copied into `test-data/`. The trunk worktree's untracked partial `3rdparty/` directory, left by the Codex session, was moved aside to the session scratchpad.
+
+- Merged `p7c-pptx` (0252, `c3f3f11a8c`):
+  - pptx W2 residue: `OpenOptions`, `PatchConflict`, typed `EditLimit`, `opened` family registered, scoped `Transaction`/`rollback` removed;
+  - P0 writes: rich text, cells, notes, comments, picture add, layout placeholders and sections;
+  - eager run formatting at ≥100 shapes misses the budget (+17–22%), a follow-up for plan step 8;
+  - picture `set` remains open.
+
+## Wave R2 (2026-10-13)
+Cut from `e467bcf4e8`:
+- `fix-3rdparty` (0257): vendor the fixtures into `test-data/`, plus a guard.
+- `p11-doc` (0258), `p12-xls` (0259), `p13-ppt` (0260): tier 2 P0.
+
+Still running from R1: `p7a-docx` (0251), `p7c-pptx` (0252), `p6-ooxml-meta` (0253).
+
+Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-pptx-w4` 9474e2b6ce, `uo/m2-l-xlsb-w1` 876588a23c, `uo/m1-r4-perf` 012fd509ff.
+
 - M0a S10 (`docs/unified-ops/s10-measurement.md` §9). M0a landed on the strength of two explanations. If either is rejected, the chosen alternative becomes a harness follow-up; M0a is not reverted.
   - F1: accept E1. Seven rows over their trigger time one call in a fresh child process, so they measure the harness executable. Standalone probes give the same first-call time at both revisions (XLSX open 187.6 vs 187.9 µs); Callgrind shows +0.75% instructions. Alternatives: an untimed warm-up call in the child (new route names), or standalone binaries for first calls.
   - F2: accept E2. The RTF open row depends on the allocator state the untimed projection leaves; with malloc trimming off, the unified open is 0.98× the pre-M0a one. Alternatives: fixed malloc tunables for RTF children, or bare-loop variants.

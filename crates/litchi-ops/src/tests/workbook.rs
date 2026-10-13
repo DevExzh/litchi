@@ -206,9 +206,10 @@ mod xlsx {
             bytes_view.worksheet_count().unwrap()
         );
         assert_eq!(generic_names(&source_view), ["First", "Second"]);
-        let eager = litchi_xlsx::Workbook::from_bytes(bytes).unwrap();
+        let eager = litchi_xlsx::Package::from_bytes(&bytes).unwrap();
         assert_eq!(
             eager
+                .workbook_ref()
                 .sheets()
                 .map(|sheet| sheet.name().to_owned())
                 .collect::<Vec<_>>(),

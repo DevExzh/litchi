@@ -6,9 +6,11 @@
 
 use crate::error::Result;
 use litchi_cfb::{OleError, OleFile};
+use litchi_ole_common::property_set::document_summary::Snapshot as DocumentSummary;
+use litchi_ole_common::property_set::summary_information::Snapshot as SummaryInformation;
 use litchi_ole_common::property_set::{
-    Binding, CodePage, DOCUMENT_SUMMARY_INFORMATION_FMTID, Editor, PropertySetReader, Section,
-    USER_DEFINED_PROPERTIES_FMTID,
+    Binding, CodePage, DOCUMENT_SUMMARY_INFORMATION_FMTID, Editor, PropertySetReader,
+    SUMMARY_INFORMATION_FMTID, Section, USER_DEFINED_PROPERTIES_FMTID,
 };
 use std::io::{Cursor, Read, Seek};
 use std::sync::Arc;
@@ -37,12 +39,18 @@ impl Snapshot {
         let mut ole = OleFile::open(Cursor::new(bytes.clone()))?;
         validate_host(&mut ole)?;
 
+        // A blank standard section (no property, not even a code page)
+        // carries nothing and is read as absent, so a later edit starts it
+        // afresh instead of failing on the typed owner's code-page rule.
         let summary_information = match ole.property_set(Binding::SummaryInformation) {
-            Ok(stream) => Some(
-                litchi_ole_common::property_set::summary_information::Snapshot::from_stream(
-                    &stream,
-                )?,
-            ),
+            Ok(stream)
+                if stream
+                    .section(SUMMARY_INFORMATION_FMTID)
+                    .is_some_and(Section::is_empty) =>
+            {
+                None
+            },
+            Ok(stream) => Some(SummaryInformation::from_stream(&stream)?),
             Err(OleError::StreamNotFound) => None,
             Err(error) => return Err(error.into()),
         };
@@ -50,16 +58,14 @@ impl Snapshot {
         let (document_summary_information, user_defined_properties) =
             match ole.property_set(Binding::DocumentSummaryInformation) {
                 Ok(stream) => {
-                    let document_summary_information =
-                        if stream.section(DOCUMENT_SUMMARY_INFORMATION_FMTID).is_some() {
-                            Some(
-                        litchi_ole_common::property_set::document_summary::Snapshot::from_stream(
-                            &stream,
-                        )?,
-                    )
-                        } else {
-                            None
-                        };
+                    let document_summary_information = if stream
+                        .section(DOCUMENT_SUMMARY_INFORMATION_FMTID)
+                        .is_some_and(|section| !section.is_empty())
+                    {
+                        Some(DocumentSummary::from_stream(&stream)?)
+                    } else {
+                        None
+                    };
                     let user_defined_properties =
                         stream.section(USER_DEFINED_PROPERTIES_FMTID).cloned();
                     (document_summary_information, user_defined_properties)
@@ -127,6 +133,17 @@ pub struct Transaction {
 }
 
 impl Transaction {
+    /// The shared property-set editor, for the package metadata transaction.
+    pub(crate) const fn editor(&self) -> &Editor {
+        &self.editor
+    }
+
+    /// Mutable access to the shared editor, for the package metadata
+    /// transaction.
+    pub(crate) fn editor_mut(&mut self) -> &mut Editor {
+        &mut self.editor
+    }
+
     /// Returns the immutable package source used for conflict checks.
     #[must_use]
     pub const fn before(&self) -> &Snapshot {
@@ -134,6 +151,9 @@ impl Transaction {
     }
 
     /// Applies a typed PIDSI edit, staging only an actual section change.
+    ///
+    /// A missing or blank section (no property, not even a code page) starts
+    /// from an empty one with the Windows-1252 code page.
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
@@ -145,12 +165,12 @@ impl Transaction {
     {
         let section = self.editor.property_set(Binding::SummaryInformation)?;
         let snapshot = match section {
-            Some(section) => {
+            Some(section) if !section.is_empty() => {
                 litchi_ole_common::property_set::summary_information::Snapshot::from_section(
                     &section,
                 )?
             },
-            None => litchi_ole_common::property_set::summary_information::Snapshot::new(
+            _ => litchi_ole_common::property_set::summary_information::Snapshot::new(
                 CodePage::WINDOWS_1252,
             )?,
         };
@@ -165,6 +185,10 @@ impl Transaction {
     }
 
     /// Applies a typed PIDDSI edit, staging only an actual section change.
+    ///
+    /// A missing or blank section starts from an empty one with the
+    /// Windows-1252 code page; a user-defined section already in the stream
+    /// is kept.
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
@@ -178,10 +202,10 @@ impl Transaction {
             .editor
             .property_set(Binding::DocumentSummaryInformation)?;
         let snapshot = match section {
-            Some(section) => {
+            Some(section) if !section.is_empty() => {
                 litchi_ole_common::property_set::document_summary::Snapshot::from_section(&section)?
             },
-            None => litchi_ole_common::property_set::document_summary::Snapshot::new(
+            _ => litchi_ole_common::property_set::document_summary::Snapshot::new(
                 CodePage::WINDOWS_1252,
             )?,
         };
@@ -477,6 +501,66 @@ mod tests {
         let commit = transaction.commit().unwrap();
         assert!(!commit.changed());
         assert_eq!(commit.into_bytes(), source);
+    }
+
+    #[test]
+    fn blank_standard_sections_read_as_absent_and_are_replaced_by_edits() {
+        // The shape the shared editor used to give a `DocumentSummaryInformation`
+        // stream it created for a user-defined edit: a blank standard section
+        // (no code page) followed by the user-defined section.
+        let mut user_defined = Section::new(USER_DEFINED_PROPERTIES_FMTID);
+        user_defined.set_page(CodePage::WINDOWS_1252);
+        user_defined
+            .add_named(
+                2,
+                "Department".to_string(),
+                Value::Lpstr("Research".to_string()),
+            )
+            .unwrap();
+        let mut document_summary =
+            PropertyStream::new(Section::new(DOCUMENT_SUMMARY_INFORMATION_FMTID));
+        document_summary.add_section(user_defined).unwrap();
+        let document_summary = document_summary.to_bytes().unwrap();
+        let summary = PropertyStream::new(Section::new(SUMMARY_INFORMATION_FMTID))
+            .to_bytes()
+            .unwrap();
+
+        let mut writer = OleWriter::new();
+        writer.create_stream(&["Workbook"], b"xls").unwrap();
+        writer
+            .create_stream(&["\u{0005}SummaryInformation"], &summary)
+            .unwrap();
+        writer
+            .create_stream(&["\u{0005}DocumentSummaryInformation"], &document_summary)
+            .unwrap();
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+
+        let snapshot = Snapshot::from_bytes(output.into_inner()).unwrap();
+        assert!(snapshot.summary_information().is_none());
+        assert!(snapshot.document_summary_information().is_none());
+        assert!(snapshot.user_defined_properties().is_some());
+
+        let mut transaction = snapshot.transaction().unwrap();
+        transaction
+            .edit_summary_information(|edit| edit.set_title("title"))
+            .unwrap();
+        transaction
+            .edit_document_summary_information(|edit| edit.set_company("company"))
+            .unwrap();
+        let commit = transaction.commit().unwrap();
+        let edited = commit.snapshot();
+        assert_eq!(edited.summary_information().unwrap().title(), Some("title"));
+        let document_summary = edited.document_summary_information().unwrap();
+        assert_eq!(document_summary.company(), Some("company"));
+        assert_eq!(document_summary.codepage(), Some(CodePage::WINDOWS_1252));
+        assert!(
+            edited
+                .user_defined_properties()
+                .unwrap()
+                .find_named("Department")
+                .is_some()
+        );
     }
 
     #[test]
