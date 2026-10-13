@@ -159,7 +159,7 @@ pub(crate) fn add_axis(
     }
     admit(limits)?;
     let mut edit = file.editable_package()?.edit().map_err(native_edit_error)?;
-    let selector = Selector::Position(sheet);
+    let selector = Selector::Position(Position::new(sheet));
     match axis {
         Axis::Row => edit.insert_rows(selector, index as u16, 1),
         Axis::Column => edit.insert_columns(selector, index as u8, 1),
@@ -207,7 +207,7 @@ pub(crate) fn remove_axis(
     let sheet = node.sheet_position();
     admit(limits)?;
     let mut edit = file.editable_package()?.edit().map_err(native_edit_error)?;
-    let selector = Selector::Position(sheet);
+    let selector = Selector::Position(Position::new(sheet));
     match axis {
         Axis::Row => edit.delete_rows(selector, index as u16, 1),
         Axis::Column => edit.delete_columns(selector, index as u8, 1),
@@ -426,22 +426,26 @@ pub(crate) fn set_layout(
         match target {
             LayoutTarget::Row { sheet, row } => {
                 if let Some(twips) = assignments.size {
-                    edit.set_row_height(Selector::Position(sheet), row, twips)
+                    edit.set_row_height(Selector::Position(Position::new(sheet)), row, twips)
                         .map_err(native_edit_error)?;
                 }
                 if let Some(hidden) = assignments.hidden {
-                    edit.set_row_hidden(Selector::Position(sheet), row, hidden)
+                    edit.set_row_hidden(Selector::Position(Position::new(sheet)), row, hidden)
                         .map_err(native_edit_error)?;
                 }
             },
             LayoutTarget::Column { sheet, column } => {
                 if let Some(width) = assignments.size {
-                    edit.set_column_width(Selector::Position(sheet), column, width)
+                    edit.set_column_width(Selector::Position(Position::new(sheet)), column, width)
                         .map_err(native_edit_error)?;
                 }
                 if let Some(hidden) = assignments.hidden {
-                    edit.set_column_hidden(Selector::Position(sheet), column, hidden)
-                        .map_err(native_edit_error)?;
+                    edit.set_column_hidden(
+                        Selector::Position(Position::new(sheet)),
+                        column,
+                        hidden,
+                    )
+                    .map_err(native_edit_error)?;
                 }
             },
         }

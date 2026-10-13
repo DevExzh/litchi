@@ -212,8 +212,8 @@ impl Snapshot {
 
     /// Start a detached, failure-atomic edit.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction::new(self.clone())
+    pub fn edit(&self) -> Edit {
+        Edit::new(self.clone())
     }
 
     /// Publish the exact validated source stream.
@@ -246,13 +246,13 @@ impl Eq for Snapshot {}
 
 /// A detached, source-checked transaction over user metadata and membership.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Edit {
     source: Snapshot,
     candidate: Arc<[u8]>,
     package: Arc<Package>,
 }
 
-impl Transaction {
+impl Edit {
     fn new(source: Snapshot) -> Self {
         Self {
             candidate: Arc::clone(&source.bytes),
@@ -295,12 +295,6 @@ impl Transaction {
             return Ok(self.source.clone());
         }
         self.parse_candidate(Arc::clone(&self.candidate))
-    }
-
-    /// Whether staged bytes differ from the exact source stream.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.candidate.as_ref() != self.source.bytes()
     }
 
     /// Change one user name while retaining its GUID, timestamp, and reserved byte.
@@ -398,12 +392,6 @@ impl Transaction {
         let (candidate, removed) = self.package.remove_user(self.candidate.as_ref(), index)?;
         self.replace_candidate(candidate)?;
         Ok(removed)
-    }
-
-    /// Discard staged changes and return the original source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
     }
 
     /// Validate and publish the candidate with a reversible source-checked patch.
@@ -526,12 +514,6 @@ impl Patch {
     #[must_use]
     pub fn is_noop(&self) -> bool {
         self.before == self.after
-    }
-
-    /// Alias for [`Self::is_noop`].
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.is_noop()
     }
 
     /// Apply this patch only to its exact source snapshot.

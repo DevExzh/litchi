@@ -11,13 +11,13 @@ use super::{Commit, Patch, Snapshot};
 /// A detached transaction over inert RTD topics, cached values, and subscriber
 /// cells.  The source snapshot is never modified.
 #[derive(Clone)]
-pub struct Transaction {
+pub struct Edit {
     source: Snapshot,
     candidate: Vec<u8>,
     package: Package,
 }
 
-impl Transaction {
+impl Edit {
     pub(crate) fn new(source: Snapshot) -> Self {
         Self {
             candidate: source.bytes().to_vec(),
@@ -72,12 +72,6 @@ impl Transaction {
         } else {
             Snapshot::parse(&self.candidate)
         }
-    }
-
-    /// Whether any staged operation changes source bytes.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.candidate.as_slice() != self.source.bytes()
     }
 
     /// Replace one typed RTD record by semantic collection index.
@@ -183,12 +177,6 @@ impl Transaction {
         let candidate = self.package.remove_real_time_data(&self.candidate, index)?;
         self.replace_candidate(candidate, None)?;
         Ok(removed)
-    }
-
-    /// Discard all staged edits and return the original source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
     }
 
     /// Validate and publish the staged candidate with a reversible patch.

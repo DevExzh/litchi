@@ -11,6 +11,7 @@ use std::io::Cursor;
 use std::ops::Deref;
 
 use litchi_core::FileFormat;
+use litchi_core::Position;
 use litchi_core::selector::{Path as SelectorPath, Query, Scope};
 use litchi_ops::transaction::SemanticLimits;
 use litchi_ops::{
@@ -106,7 +107,7 @@ fn styled_fixture() -> Vec<u8> {
 fn native_cell_style(bytes: &[u8], row: u32, column: u32) -> Option<u16> {
     let snapshot = Snapshot::from_bytes(bytes.to_vec()).expect("open native XLS snapshot");
     snapshot
-        .worksheet(Selector::Position(0))
+        .worksheet(Selector::Position(Position::new(0)))
         .expect("resolve native worksheet")
         .and_then(|worksheet| {
             worksheet
@@ -119,7 +120,7 @@ fn native_cell_style(bytes: &[u8], row: u32, column: u32) -> Option<u16> {
 fn native_cell_value(bytes: &[u8], row: u32, column: u32) -> Option<XlsValue> {
     let snapshot = Snapshot::from_bytes(bytes.to_vec()).expect("open native XLS snapshot");
     snapshot
-        .worksheet(Selector::Position(0))
+        .worksheet(Selector::Position(Position::new(0)))
         .expect("resolve native worksheet")
         .and_then(|worksheet| {
             worksheet

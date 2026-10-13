@@ -233,7 +233,7 @@ impl Snapshot {
                 .inner
                 .sheets
                 .iter()
-                .position(|sheet| sheet.workbook_position == position)),
+                .position(|sheet| sheet.workbook_position == position.get())),
             Selector::Name(name) => {
                 let mut matches = self
                     .inner
@@ -811,7 +811,7 @@ impl Patch {
     }
 
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before == self.after
     }
 
@@ -841,7 +841,7 @@ impl Patch {
                 "XLS comment patch source does not match its base snapshot".into(),
             ));
         }
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(source.clone());
         }
         Snapshot::from_bytes(self.after.to_vec())

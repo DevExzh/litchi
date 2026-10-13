@@ -32,7 +32,7 @@ fn formula_at(snapshot: &Snapshot, row: u32, column: u32) -> (Option<String>, Op
         .get_cell(row, column)
         .and_then(|cell| cell.formula().map(str::to_owned));
     let storage = snapshot
-        .worksheet(Selector::Position(0))
+        .worksheet(Selector::Position(Position::new(0)))
         .unwrap()
         .unwrap()
         .cell(reference(row, column))
@@ -46,7 +46,7 @@ fn formulas_are_authored_into_absent_and_scalar_cells() {
     let bytes = fixture();
     let source = Snapshot::from_bytes(bytes.clone()).unwrap();
     let original_style = source
-        .worksheet(Selector::Position(0))
+        .worksheet(Selector::Position(Position::new(0)))
         .unwrap()
         .unwrap()
         .cell(reference(0, 1))
@@ -58,12 +58,24 @@ fn formulas_are_authored_into_absent_and_scalar_cells() {
     // sheet's other row compose in one edit.
     edit.set_formula(Selector::Name("data"), reference(5, 5), "A1*2")
         .unwrap();
-    edit.set_formula(Selector::Position(0), reference(0, 1), "A1*3")
-        .unwrap();
-    edit.set_formula(Selector::Position(0), reference(1, 0), "SUM(A1:B1)")
-        .unwrap();
-    edit.insert_cell(Selector::Position(0), reference(6, 0), Value::Number(1.5))
-        .unwrap();
+    edit.set_formula(
+        Selector::Position(Position::new(0)),
+        reference(0, 1),
+        "A1*3",
+    )
+    .unwrap();
+    edit.set_formula(
+        Selector::Position(Position::new(0)),
+        reference(1, 0),
+        "SUM(A1:B1)",
+    )
+    .unwrap();
+    edit.insert_cell(
+        Selector::Position(Position::new(0)),
+        reference(6, 0),
+        Value::Number(1.5),
+    )
+    .unwrap();
     let (target, patch) = edit.commit().unwrap().into_parts();
     assert_eq!(
         formula_at(&target, 5, 5),
@@ -78,7 +90,7 @@ fn formulas_are_authored_into_absent_and_scalar_cells() {
         (Some("=SUM((A1:B1))".into()), Some(Storage::Formula))
     );
     let replaced = target
-        .worksheet(Selector::Position(0))
+        .worksheet(Selector::Position(Position::new(0)))
         .unwrap()
         .unwrap()
         .cell(reference(0, 1))
@@ -103,13 +115,17 @@ fn formulas_are_authored_into_absent_and_scalar_cells() {
 fn existing_formula_cells_and_bad_expressions_are_refused_atomically() {
     let source = Snapshot::from_bytes(fixture()).unwrap();
     let mut edit = source.edit();
-    edit.set_formula(Selector::Position(0), reference(0, 0), "B1")
+    edit.set_formula(Selector::Position(Position::new(0)), reference(0, 0), "B1")
         .unwrap();
     for (row, column, expression) in [(3, 0, "A1+2"), (2, 2, ""), (2, 2, "Other!A1")] {
         let before = edit.clone();
         assert!(
-            edit.set_formula(Selector::Position(0), reference(row, column), expression)
-                .is_err(),
+            edit.set_formula(
+                Selector::Position(Position::new(0)),
+                reference(row, column),
+                expression
+            )
+            .is_err(),
             "{expression:?}"
         );
         assert_eq!(
@@ -120,11 +136,16 @@ fn existing_formula_cells_and_bad_expressions_are_refused_atomically() {
     }
     // A second operation on a replaced coordinate is refused.
     assert!(
-        edit.set_value(Selector::Position(0), reference(0, 0), Value::Number(1.0))
-            .is_err()
+        edit.set_value(
+            Selector::Position(Position::new(0)),
+            reference(0, 0),
+            Value::Number(1.0)
+        )
+        .is_err()
     );
     assert!(
-        edit.insert_rows(Selector::Position(0), 10, 1).is_err(),
+        edit.insert_rows(Selector::Position(Position::new(0)), 10, 1)
+            .is_err(),
         "an axis shift would move the authored Formula"
     );
     let target = edit.commit().unwrap().into_parts().0;

@@ -7,7 +7,7 @@
 
 use std::collections::HashSet;
 
-use litchi_core::FileFormat;
+use litchi_core::{FileFormat, Position};
 use litchi_xls::cell_values::{Reference, Selector, Value as NativeValue};
 
 use super::node::{CellState, Item, Node};
@@ -134,8 +134,11 @@ pub(crate) fn remove_with_limits(
     let mut edit = file.editable_package()?.edit().map_err(native_edit_error)?;
     for target in targets {
         if target.present {
-            edit.remove_cell(Selector::Position(target.sheet), target.reference)
-                .map_err(native_edit_error)?;
+            edit.remove_cell(
+                Selector::Position(Position::new(target.sheet)),
+                target.reference,
+            )
+            .map_err(native_edit_error)?;
         }
     }
     let native = edit.commit().map_err(native_edit_error)?;
@@ -181,7 +184,7 @@ fn set_sheet_with_limits(
     let SheetAssignment::Name(name) = assignment;
     super::structure::validate_sheet_name(file, Some(position), &name)?;
     let mut edit = file.editable_package()?.edit().map_err(native_edit_error)?;
-    edit.rename_sheet(Selector::Position(position), &name)
+    edit.rename_sheet(Selector::Position(Position::new(position)), &name)
         .map_err(native_edit_error)?;
     let native = edit.commit().map_err(native_edit_error)?;
     finish_commit(file, native, 1, limits)
@@ -216,8 +219,12 @@ fn set_cells_with_limits(
         // and absent coordinates are admitted alike.
         let mut edit = file.editable_package()?.edit().map_err(native_edit_error)?;
         for target in targets {
-            edit.set_cell_format(Selector::Position(target.sheet), target.reference, change)
-                .map_err(format_error)?;
+            edit.set_cell_format(
+                Selector::Position(Position::new(target.sheet)),
+                target.reference,
+                change,
+            )
+            .map_err(format_error)?;
         }
         let native = edit.commit().map_err(native_edit_error)?;
         return finish_commit(file, native, 1, limits);
@@ -245,7 +252,7 @@ fn set_cells_with_limits(
         // and a scalar cell is replaced with one keeping its XF.
         for target in targets {
             edit.set_formula(
-                Selector::Position(target.sheet),
+                Selector::Position(Position::new(target.sheet)),
                 target.reference,
                 expression,
             )
@@ -255,7 +262,7 @@ fn set_cells_with_limits(
         return finish_commit(file, native, 1, limits);
     }
     for target in targets {
-        let selector = Selector::Position(target.sheet);
+        let selector = Selector::Position(Position::new(target.sheet));
         if matches!(&plan.assignment, CellAssignment::Clear) {
             // Keep an explicit BIFF8 blank record so the existing cell's
             // style survives and the read projection retains its `empty`
@@ -1067,6 +1074,7 @@ pub(crate) mod coalesce {
     use crate::error::{Code, Error};
     use crate::props::Props;
     use crate::transaction::{Error as TransactionError, SemanticLimits};
+    use litchi_core::Position;
     use litchi_core::sheet::CellValue;
     use litchi_xls::Package;
     use litchi_xls::cell_values::{Reference, Selector};
@@ -1336,7 +1344,7 @@ pub(crate) mod coalesce {
                 .map_err(|source| TransactionError::Allocation { source })?;
             match &plan.action {
                 Action::Set(value) => {
-                    let selector = Selector::Position(plan.target.sheet);
+                    let selector = Selector::Position(Position::new(plan.target.sheet));
                     if plan.target.present {
                         self.edit
                             .set_value(selector, plan.target.reference, value.clone())
@@ -1351,7 +1359,7 @@ pub(crate) mod coalesce {
                     if plan.target.present {
                         self.edit
                             .set_value(
-                                Selector::Position(plan.target.sheet),
+                                Selector::Position(Position::new(plan.target.sheet)),
                                 plan.target.reference,
                                 NativeValue::Blank,
                             )
@@ -1360,7 +1368,10 @@ pub(crate) mod coalesce {
                 },
                 Action::Remove => {
                     self.edit
-                        .remove_cell(Selector::Position(plan.target.sheet), plan.target.reference)
+                        .remove_cell(
+                            Selector::Position(Position::new(plan.target.sheet)),
+                            plan.target.reference,
+                        )
                         .map_err(native_edit_error)?;
                 },
                 Action::Noop => {},
@@ -1398,7 +1409,7 @@ pub(crate) mod coalesce {
     fn apply_item(edit: &mut litchi_xls::package::edit::Edit, item: &Item) -> Result<()> {
         match &item.plan.action {
             Action::Set(value) => {
-                let selector = Selector::Position(item.plan.target.sheet);
+                let selector = Selector::Position(Position::new(item.plan.target.sheet));
                 if item.plan.target.present {
                     edit.set_value(selector, item.plan.target.reference, value.clone())
                         .map_err(native_edit_error)?;
@@ -1409,14 +1420,14 @@ pub(crate) mod coalesce {
             },
             Action::Clear if item.plan.target.present => edit
                 .set_value(
-                    Selector::Position(item.plan.target.sheet),
+                    Selector::Position(Position::new(item.plan.target.sheet)),
                     item.plan.target.reference,
                     NativeValue::Blank,
                 )
                 .map_err(native_edit_error)?,
             Action::Remove if item.plan.target.present => edit
                 .remove_cell(
-                    Selector::Position(item.plan.target.sheet),
+                    Selector::Position(Position::new(item.plan.target.sheet)),
                     item.plan.target.reference,
                 )
                 .map_err(native_edit_error)?,
@@ -1508,7 +1519,10 @@ pub(crate) mod coalesce {
         let reference = Reference::new(row, column).map_err(native_value_error)?;
         let (present, formula, current) = if let Some(source) = source {
             let cell = source
-                .source_cell(Selector::Position(node.sheet_position()), reference)
+                .source_cell(
+                    Selector::Position(Position::new(node.sheet_position())),
+                    reference,
+                )
                 .map_err(native_edit_error)?;
             (
                 cell.is_some(),

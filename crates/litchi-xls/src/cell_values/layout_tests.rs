@@ -60,12 +60,15 @@ fn row_heights_and_hidden_flags_round_trip() {
     let source = Snapshot::from_bytes(bytes.clone()).unwrap();
     let mut edit = source.edit();
     // A row with cells, the custom row, and an empty row without a record.
-    edit.set_row_height(Selector::Position(0), 0, 500).unwrap();
-    edit.set_row_hidden(Selector::Position(0), 2, true).unwrap();
+    edit.set_row_height(Selector::Position(Position::new(0)), 0, 500)
+        .unwrap();
+    edit.set_row_hidden(Selector::Position(Position::new(0)), 2, true)
+        .unwrap();
     edit.set_row_height(Selector::Name("data"), 9, 720).unwrap();
-    edit.set_row_hidden(Selector::Position(0), 9, true).unwrap();
+    edit.set_row_hidden(Selector::Position(Position::new(0)), 9, true)
+        .unwrap();
     // Unhiding an absent row is an exact no-op.
-    edit.set_row_hidden(Selector::Position(0), 30, false)
+    edit.set_row_hidden(Selector::Position(Position::new(0)), 30, false)
         .unwrap();
     let (target, patch) = edit.commit().unwrap().into_parts();
     assert_eq!(row(&target, 0), Some((500, false, true)));
@@ -95,13 +98,13 @@ fn column_widths_split_ranges_and_create_ranges() {
     let original = column(&source, 2).unwrap();
     let mut edit = source.edit();
     // Inside an existing range, then an uncovered column, then hide one.
-    edit.set_column_width(Selector::Position(0), 2, 3_000)
+    edit.set_column_width(Selector::Position(Position::new(0)), 2, 3_000)
         .unwrap();
-    edit.set_column_width(Selector::Position(0), 7, 4_096)
+    edit.set_column_width(Selector::Position(Position::new(0)), 7, 4_096)
         .unwrap();
-    edit.set_column_hidden(Selector::Position(0), 3, true)
+    edit.set_column_hidden(Selector::Position(Position::new(0)), 3, true)
         .unwrap();
-    edit.set_column_hidden(Selector::Position(0), 9, true)
+    edit.set_column_hidden(Selector::Position(Position::new(0)), 9, true)
         .unwrap();
     let (target, patch) = edit.commit().unwrap().into_parts();
     assert_eq!(column(&target, 1), Some(original));
@@ -132,15 +135,19 @@ fn layout_composes_with_cells_but_not_axis_shifts() {
     let source = Snapshot::from_bytes(fixture()).unwrap();
     let mut edit = source.edit();
     edit.insert_cell(
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         Reference::new(9, 0).unwrap(),
         Value::Number(5.0),
     )
     .unwrap();
-    edit.set_row_height(Selector::Position(0), 9, 400).unwrap();
-    edit.set_column_width(Selector::Position(0), 0, 2_560)
+    edit.set_row_height(Selector::Position(Position::new(0)), 9, 400)
         .unwrap();
-    assert!(edit.insert_rows(Selector::Position(0), 4, 1).is_err());
+    edit.set_column_width(Selector::Position(Position::new(0)), 0, 2_560)
+        .unwrap();
+    assert!(
+        edit.insert_rows(Selector::Position(Position::new(0)), 4, 1)
+            .is_err()
+    );
     let target = edit.commit().unwrap().into_parts().0;
     assert_eq!(row(&target, 9), Some((400, false, true)));
     assert_eq!(column(&target, 0), Some((2_560, false)));
@@ -157,13 +164,16 @@ fn layout_composes_with_cells_but_not_axis_shifts() {
             .is_err()
     );
     let mut edit = source.edit();
-    assert!(edit.set_row_height(Selector::Position(0), 0, 0).is_err());
     assert!(
-        edit.set_row_height(Selector::Position(0), 0, 9_000)
+        edit.set_row_height(Selector::Position(Position::new(0)), 0, 0)
             .is_err()
     );
     assert!(
-        edit.set_column_width(Selector::Position(0), 0, u16::MAX)
+        edit.set_row_height(Selector::Position(Position::new(0)), 0, 9_000)
+            .is_err()
+    );
+    assert!(
+        edit.set_column_width(Selector::Position(Position::new(0)), 0, u16::MAX)
             .is_err()
     );
     assert!(edit.layout_changes.is_empty());

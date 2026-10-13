@@ -836,13 +836,17 @@ impl Edit {
     ///
     /// ```
     /// use litchi_xls::Package;
+    /// use litchi_core::Position;
     /// use litchi_xls::cell_values::Selector;
     /// let mut builder = litchi_xls::Builder::new();
     /// builder.add_worksheet("A")?;
     /// builder.add_worksheet("B")?;
     /// let package = builder.build()?;
     /// let mut edit = package.edit()?;
-    /// edit.reorder_sheets(&[Selector::Position(1), Selector::Position(0)])?;
+    /// edit.reorder_sheets(&[
+    ///     Selector::Position(Position::new(1)),
+    ///     Selector::Position(Position::new(0)),
+    /// ])?;
     /// let package = edit.commit()?.into_package();
     /// assert_eq!(package.workbook().worksheet_names()?, ["B", "A"]);
     /// # Ok::<(), Box<dyn std::error::Error>>(())

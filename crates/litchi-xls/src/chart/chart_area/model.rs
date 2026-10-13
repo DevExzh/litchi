@@ -33,8 +33,8 @@ impl Snapshot {
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn edit(self) -> Result<super::Transaction> {
-        super::Transaction::new(self)
+    pub fn edit(self) -> Result<super::Edit> {
+        super::Edit::new(self)
     }
 
     pub(crate) const fn from_wire(rect: Rect) -> Self {

@@ -93,7 +93,7 @@ fn reorder_moves_tabs_and_keeps_every_cell_and_reference() {
     let mut edit = source.edit();
     edit.reorder_sheets(&[
         Selector::Name("third"),
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         Selector::Name("SECOND"),
     ])
     .unwrap();
@@ -122,9 +122,9 @@ fn identity_reorder_is_an_exact_noop() {
     let source = Snapshot::from_bytes(bytes.clone()).unwrap();
     let mut edit = source.edit();
     edit.reorder_sheets(&[
-        Selector::Position(0),
-        Selector::Position(1),
-        Selector::Position(2),
+        Selector::Position(Position::new(0)),
+        Selector::Position(Position::new(1)),
+        Selector::Position(Position::new(2)),
     ])
     .unwrap();
     let commit = edit.commit().unwrap();
@@ -138,21 +138,24 @@ fn identity_reorder_is_an_exact_noop() {
 fn reorder_refuses_incomplete_repeated_and_unknown_orders() {
     let source = Snapshot::from_bytes(three_sheets()).unwrap();
     for order in [
-        vec![Selector::Position(0), Selector::Position(1)],
         vec![
-            Selector::Position(0),
-            Selector::Position(0),
-            Selector::Position(1),
+            Selector::Position(Position::new(0)),
+            Selector::Position(Position::new(1)),
+        ],
+        vec![
+            Selector::Position(Position::new(0)),
+            Selector::Position(Position::new(0)),
+            Selector::Position(Position::new(1)),
         ],
         vec![
             Selector::Name("Nope"),
-            Selector::Position(0),
-            Selector::Position(1),
+            Selector::Position(Position::new(0)),
+            Selector::Position(Position::new(1)),
         ],
         vec![
-            Selector::Position(3),
-            Selector::Position(0),
-            Selector::Position(1),
+            Selector::Position(Position::new(3)),
+            Selector::Position(Position::new(0)),
+            Selector::Position(Position::new(1)),
         ],
     ] {
         let mut edit = source.edit();
@@ -256,7 +259,10 @@ fn remove_drops_a_tab_and_restores_exactly() {
 fn remove_refuses_the_last_tab_and_referenced_tabs() {
     let source = Snapshot::from_bytes(crate::Package::new().unwrap().to_bytes().unwrap()).unwrap();
     let mut edit = source.edit();
-    assert!(edit.remove_sheet(Selector::Position(0)).is_err());
+    assert!(
+        edit.remove_sheet(Selector::Position(Position::new(0)))
+            .is_err()
+    );
 
     // Sheet1 owns the sheet-scoped Print_Area name.
     let source = Snapshot::from_bytes(fixture("SimpleWithPrintArea.xls")).unwrap();
@@ -296,8 +302,8 @@ fn three_dimensional_ranges_follow_or_refuse_tab_moves() {
     );
     // Moving the first tab (outside every 3-D range) to the end keeps every
     // range contiguous and its rendered formula unchanged.
-    let mut order: Vec<_> = (1..catalog.len()).map(Selector::Position).collect();
-    order.push(Selector::Position(0));
+    let mut order: Vec<_> = (1..catalog.len()).map(Selector::from).collect();
+    order.push(Selector::Position(Position::new(0)));
     let mut edit = source.edit();
     edit.reorder_sheets(&order).unwrap();
     let target = edit.commit().unwrap().into_parts().0;
@@ -305,19 +311,21 @@ fn three_dimensional_ranges_follow_or_refuse_tab_moves() {
     assert_eq!(sorted(contents(&bytes)), sorted(contents(target.bytes())));
     // Splitting a 3-D range by moving an interior tab out is refused, as is
     // removing a tab a range covers or inserting inside a range.
-    let mut split: Vec<_> = (0..catalog.len()).map(Selector::Position).collect();
+    let mut split: Vec<_> = (0..catalog.len()).map(Selector::from).collect();
     split.swap(2, catalog.len() - 1);
     split.swap(1, 2);
     let mut edit = source.edit();
     let refusals = [
         edit.reorder_sheets(&[
-            Selector::Position(2),
-            Selector::Position(0),
-            Selector::Position(1),
-            Selector::Position(3),
-            Selector::Position(4),
+            Selector::Position(Position::new(2)),
+            Selector::Position(Position::new(0)),
+            Selector::Position(Position::new(1)),
+            Selector::Position(Position::new(3)),
+            Selector::Position(Position::new(4)),
         ]),
-        source.edit().remove_sheet(Selector::Position(2)),
+        source
+            .edit()
+            .remove_sheet(Selector::Position(Position::new(2))),
         source.edit().insert_sheet(Position::new(2), "Inside"),
     ];
     assert!(
@@ -333,16 +341,16 @@ fn a_tab_change_is_exclusive_within_its_edit() {
     let source = Snapshot::from_bytes(three_sheets()).unwrap();
     let mut edit = source.edit();
     edit.set_value(
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         Reference::new(0, 0).unwrap(),
         Value::Number(5.0),
     )
     .unwrap();
     assert!(
         edit.reorder_sheets(&[
-            Selector::Position(2),
-            Selector::Position(1),
-            Selector::Position(0)
+            Selector::Position(Position::new(2)),
+            Selector::Position(Position::new(1)),
+            Selector::Position(Position::new(0))
         ])
         .is_err()
     );
@@ -393,7 +401,7 @@ fn corpus_tab_changes_reopen_or_refuse() {
         let before = sorted(contents(&bytes));
         let mut attempts: Vec<Box<dyn Fn(&mut Edit) -> Result<()>>> = Vec::new();
         attempts.push(Box::new(move |edit| {
-            let order: Vec<_> = (0..count).rev().map(Selector::Position).collect();
+            let order: Vec<_> = (0..count).rev().map(Selector::from).collect();
             edit.reorder_sheets(&order)
         }));
         attempts.push(Box::new(|edit| {
@@ -401,7 +409,7 @@ fn corpus_tab_changes_reopen_or_refuse() {
         }));
         for position in 0..count {
             attempts.push(Box::new(move |edit| {
-                edit.remove_sheet(Selector::Position(position))
+                edit.remove_sheet(Selector::Position(Position::new(position)))
             }));
         }
         for (index, attempt) in attempts.iter().enumerate() {
@@ -454,7 +462,7 @@ fn fixture_with_chart_tab_reorders_complete_catalog() {
     if !catalog.iter().any(|tab| tab.kind == 2) {
         return;
     }
-    let order: Vec<_> = (0..catalog.len()).rev().map(Selector::Position).collect();
+    let order: Vec<_> = (0..catalog.len()).rev().map(Selector::from).collect();
     let mut edit = source.edit();
     edit.reorder_sheets(&order).unwrap();
     let target = edit.commit().unwrap().into_parts().0;

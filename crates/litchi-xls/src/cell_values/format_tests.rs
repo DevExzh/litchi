@@ -38,20 +38,20 @@ fn alignment_border_and_fill_changes_author_one_shared_xf() {
     };
     let mut edit = source.edit();
     edit.set_cell_format(
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         Reference::new(0, 0).unwrap(),
         &change,
     )
     .unwrap();
     edit.set_cell_format(
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         Reference::new(0, 1).unwrap(),
         &change,
     )
     .unwrap();
     // An absent coordinate gains a formatting-only blank cell.
     edit.set_cell_format(
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         Reference::new(5, 5).unwrap(),
         &change,
     )
@@ -81,7 +81,7 @@ fn alignment_border_and_fill_changes_author_one_shared_xf() {
     // The untouched cell keeps its original XF.
     assert_eq!(
         target
-            .worksheet(Selector::Position(0))
+            .worksheet(Selector::Position(Position::new(0)))
             .unwrap()
             .unwrap()
             .cell(Reference::new(1, 0).unwrap())
@@ -89,7 +89,7 @@ fn alignment_border_and_fill_changes_author_one_shared_xf() {
             .unwrap()
             .style(),
         source
-            .worksheet(Selector::Position(0))
+            .worksheet(Selector::Position(Position::new(0)))
             .unwrap()
             .unwrap()
             .cell(Reference::new(1, 0).unwrap())
@@ -107,7 +107,7 @@ fn ineffective_and_invalid_format_changes() {
     let source = Snapshot::from_bytes(fixture()).unwrap();
     let mut edit = source.edit();
     edit.set_cell_format(
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         Reference::new(0, 0).unwrap(),
         &FormatChange::default(),
     )
@@ -126,8 +126,12 @@ fn ineffective_and_invalid_format_changes() {
         horizontal: Some(current),
         ..FormatChange::default()
     };
-    edit.set_cell_format(Selector::Position(0), Reference::new(0, 0).unwrap(), &same)
-        .unwrap();
+    edit.set_cell_format(
+        Selector::Position(Position::new(0)),
+        Reference::new(0, 0).unwrap(),
+        &same,
+    )
+    .unwrap();
     let commit = edit.commit().unwrap();
     assert!(!commit.diagnostics().changed());
 
@@ -138,7 +142,7 @@ fn ineffective_and_invalid_format_changes() {
     };
     assert!(
         edit.set_cell_format(
-            Selector::Position(0),
+            Selector::Position(Position::new(0)),
             Reference::new(0, 0).unwrap(),
             &change
         )
@@ -150,7 +154,7 @@ fn ineffective_and_invalid_format_changes() {
     };
     assert!(matches!(
         edit.set_cell_format(
-            Selector::Position(0),
+            Selector::Position(Position::new(0)),
             Reference::new(0, 0).unwrap(),
             &change
         ),

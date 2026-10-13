@@ -447,8 +447,12 @@ fn changed_commit(file: &File) -> (Vec<u8>, String) {
                 })
                 .expect("a numeric XLS cell");
             let mut edit = snapshot.edit();
-            edit.set_value(Selector::Position(sheet), reference, Value::Number(4242.0))
-                .unwrap();
+            edit.set_value(
+                Selector::Position(Position::new(sheet)),
+                reference,
+                Value::Number(4242.0),
+            )
+            .unwrap();
             let commit = edit.commit().unwrap();
             (commit.snapshot().bytes().to_vec(), "4242".to_owned())
         },

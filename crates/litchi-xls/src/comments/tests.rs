@@ -2,6 +2,7 @@
 
 use super::codec::{CommentCollector, parse_note_record, parse_txo_runs};
 use super::model::*;
+use litchi_core::Position;
 
 fn obj(object_id: u16) -> Vec<u8> {
     let mut data = Vec::new();
@@ -309,7 +310,7 @@ fn generic_commit_publishes_the_artifact_a_second_render_would_produce() {
         let source = super::Snapshot::from_bytes(output.into_inner()).unwrap();
         let mut edit = source.edit();
         edit.replace(
-            Selector::Position(0),
+            Selector::Position(Position::new(0)),
             Reference::new(comments - 1, 1).unwrap(),
             super::Value::new("Probe", "a replacement of another length").unwrap(),
         )

@@ -9,6 +9,7 @@
 use std::io::Cursor;
 use std::ops::Deref;
 
+use litchi_core::Position;
 use litchi_core::selector::{Path as SelectorPath, Query, Scope};
 use litchi_ops::error::Source;
 use litchi_ops::transaction::{Error as TransactionError, LimitKind, SemanticLimits};
@@ -108,7 +109,7 @@ fn fixture_with_blank() -> Vec<u8> {
     let snapshot = Snapshot::from_bytes(source).expect("open blank fixture source");
     let mut edit = snapshot.edit();
     edit.insert_cell(
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         Reference::new(1, 2).expect("blank reference"),
         Value::Blank,
     )
@@ -134,7 +135,7 @@ fn rich_fixture() -> Vec<u8> {
     let snapshot = Snapshot::from_bytes(bytes).expect("open rich fixture");
     let mut edit = snapshot.edit();
     edit.insert_rich_text_cell(
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         Reference::new(0, 0).expect("rich reference"),
         "rich".to_owned(),
         vec![litchi_xls::SharedStringFormatRun {

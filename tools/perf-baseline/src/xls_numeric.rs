@@ -10,7 +10,7 @@ use super::{
     SourceSnapshot, SourceSummary, sha256_hex,
 };
 use litchi_cfb::{OleFile, OleWriter, OverlayOperationShape, PublishReport};
-use litchi_core::ReadAt;
+use litchi_core::{Position, ReadAt};
 use serde::Serialize;
 use std::io::{self, Cursor, Write};
 use std::time::Instant;
@@ -1147,9 +1147,9 @@ fn verify_security_refusal(
     };
     let mut edit = snapshot.edit();
     let staged = match storage {
-        Storage::Number => edit.set_number(Selector::Position(sheet), reference, value + 1.0),
+        Storage::Number => edit.set_number(Selector::Position(Position::new(sheet)), reference, value + 1.0),
         Storage::Rk | Storage::MulRk => {
-            edit.set_numeric(Selector::Position(sheet), reference, value + 1.0)
+            edit.set_numeric(Selector::Position(Position::new(sheet)), reference, value + 1.0)
         },
         _ => {
             return Err(format!("XLS {label} numeric guard selected an unsupported family").into());
@@ -1474,7 +1474,7 @@ fn verify_real_producer(implementation: Implementation) -> Result<(), Box<dyn st
             let replacement = [*value + 1.0, *value - 1.0].into_iter().find(|candidate| {
                 let mut edit = source.edit();
                 edit.set_numeric(
-                    Selector::Position(sheet.position()),
+                    Selector::Position(Position::new(sheet.position())),
                     cell.reference(),
                     *candidate,
                 )
@@ -1492,13 +1492,13 @@ fn verify_real_producer(implementation: Implementation) -> Result<(), Box<dyn st
     let (sheet, reference, replacement) =
         selected.ok_or("XLS real-producer fixture has no representable RK/MulRK replacement")?;
     let mut edit = source.edit();
-    edit.set_numeric(Selector::Position(sheet), reference, replacement)?;
+    edit.set_numeric(Selector::Position(Position::new(sheet)), reference, replacement)?;
     let commit = commit_source_backed_transaction(edit, implementation)?;
     let mut output = Vec::new();
     commit.write_to(&mut output)?;
     let reopened = Snapshot::from_bytes(output)?;
     let cell = reopened
-        .worksheet(Selector::Position(sheet))?
+        .worksheet(Selector::Position(Position::new(sheet)))?
         .ok_or("XLS real-producer output lost worksheet")?
         .cell(reference)?
         .ok_or("XLS real-producer output lost cell")?;

@@ -234,7 +234,7 @@ pub(crate) fn remove_sheet(
     };
     admit(1, 64, limits)?;
     let mut edit = file.editable_package()?.edit().map_err(native_edit_error)?;
-    edit.remove_sheet(Selector::Position(position))
+    edit.remove_sheet(Selector::Position(Position::new(position)))
         .map_err(native_edit_error)?;
     let native = edit.commit().map_err(native_edit_error)?;
     finish_commit(file, native, 1, limits).map(Some)
@@ -350,7 +350,7 @@ fn reorder(
     selectors
         .try_reserve_exact(order.len())
         .map_err(|_| refusal(Code::InternalError, "could not allocate the XLS tab order"))?;
-    selectors.extend(order.iter().copied().map(Selector::Position));
+    selectors.extend(order.iter().copied().map(Selector::from));
     let mut edit = file.editable_package()?.edit().map_err(native_edit_error)?;
     edit.reorder_sheets(&selectors).map_err(native_edit_error)?;
     let native = edit.commit().map_err(native_edit_error)?;

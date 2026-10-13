@@ -46,7 +46,7 @@ use litchi_core::patch::{
     Reversible, ReversibleOperation,
 };
 use litchi_core::sheet::{Cell as _, CellValue};
-use litchi_core::{ReadAt, SourceVersion};
+use litchi_core::{Position, ReadAt, SourceVersion};
 use litchi_ole_common::object::{Editor as PackageEditor, Limits, Targets};
 use litchi_ole_common::source_backed_overlay::SourceBackedOverlayPublisher;
 use std::collections::BTreeMap;
@@ -233,7 +233,7 @@ pub enum Selector<'a> {
     /// Select a worksheet by case-insensitive developer-visible tab name.
     Name(&'a str),
     /// Select a worksheet by checked zero-based workbook tab position.
-    Position(usize),
+    Position(Position),
 }
 
 impl<'a> From<&'a str> for Selector<'a> {
@@ -242,9 +242,15 @@ impl<'a> From<&'a str> for Selector<'a> {
     }
 }
 
+impl From<Position> for Selector<'_> {
+    fn from(value: Position) -> Self {
+        Self::Position(value)
+    }
+}
+
 impl From<usize> for Selector<'_> {
     fn from(value: usize) -> Self {
-        Self::Position(value)
+        Self::Position(Position::new(value))
     }
 }
 
@@ -1113,7 +1119,7 @@ impl Snapshot {
                 .inner
                 .sheets
                 .iter()
-                .position(|sheet| sheet.workbook_index == position)),
+                .position(|sheet| sheet.workbook_index == position.get())),
             Selector::Name(name) => {
                 let mut matches = self
                     .inner
@@ -2361,14 +2367,18 @@ impl Edit {
             match operation {
                 TransferCell::Insert { reference, value } => {
                     staged.insert_cell_with_style(
-                        Selector::Position(target_position),
+                        Selector::Position(Position::new(target_position)),
                         reference,
                         value,
                         target_style,
                     )?;
                 },
                 TransferCell::SetNumber { reference, value } => {
-                    staged.set_number(Selector::Position(target_position), reference, value)?;
+                    staged.set_number(
+                        Selector::Position(Position::new(target_position)),
+                        reference,
+                        value,
+                    )?;
                 },
             }
         }
@@ -2732,6 +2742,7 @@ impl Edit {
     /// owners and string caches need a dependency-aware rewrite.
     ///
     /// ```
+    /// use litchi_core::Position;
     /// use litchi_xls::cell_values::{Reference, Selector, Snapshot, Storage};
     /// # let mut builder = litchi_xls::Builder::new();
     /// # let sheet = builder.add_worksheet("Data")?;
@@ -2743,7 +2754,7 @@ impl Edit {
     /// let b1 = Reference::new(0, 1)?;
     /// edit.set_formula(Selector::Name("Data"), b1, "A1*3")?;
     /// let target = edit.commit()?.into_parts().0;
-    /// let cell = target.worksheet(Selector::Position(0))?.unwrap().cell(b1)?.unwrap();
+    /// let cell = target.worksheet(Selector::Position(Position::new(0)))?.unwrap().cell(b1)?.unwrap();
     /// assert_eq!(cell.storage(), Storage::Formula);
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
@@ -2764,7 +2775,9 @@ impl Edit {
             .map(|index| self.source.inner.sheets[sheet].entries[index].cell.clone());
         let Some(cell) = current else {
             return self.insert_formula(
-                Selector::Position(self.source.inner.sheets[sheet].workbook_index),
+                Selector::Position(Position::new(
+                    self.source.inner.sheets[sheet].workbook_index,
+                )),
                 reference,
                 expression,
             );
@@ -2958,6 +2971,7 @@ impl Edit {
     /// ineffective change is an exact no-op.
     ///
     /// ```
+    /// use litchi_core::Position;
     /// use litchi_xls::cell_values::{FormatChange, Reference, Selector, Snapshot};
     /// use litchi_xls::HorizontalAlignment;
     /// # let mut builder = litchi_xls::Builder::new();
@@ -2968,7 +2982,7 @@ impl Edit {
     /// let mut edit = source.edit();
     /// let mut change = FormatChange::default();
     /// change.horizontal = Some(HorizontalAlignment::Right);
-    /// edit.set_cell_format(Selector::Position(0), Reference::new(0, 0)?, &change)?;
+    /// edit.set_cell_format(Selector::Position(Position::new(0)), Reference::new(0, 0)?, &change)?;
     /// assert!(edit.commit()?.diagnostics().changed());
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
@@ -3014,12 +3028,16 @@ impl Edit {
         };
         match current {
             Some(_) => staged.set_style(
-                Selector::Position(staged.source.inner.sheets[sheet].workbook_index),
+                Selector::Position(Position::new(
+                    staged.source.inner.sheets[sheet].workbook_index,
+                )),
                 reference,
                 style,
             )?,
             None => staged.insert_cell_with_style(
-                Selector::Position(staged.source.inner.sheets[sheet].workbook_index),
+                Selector::Position(Position::new(
+                    staged.source.inner.sheets[sheet].workbook_index,
+                )),
                 reference,
                 Value::Blank,
                 style,
@@ -3483,12 +3501,13 @@ impl Edit {
     /// axis shift.
     ///
     /// ```
+    /// use litchi_core::Position;
     /// use litchi_xls::cell_values::{Selector, Snapshot};
     /// # let bytes = litchi_xls::Package::new()?.to_bytes()?;
     /// let source = Snapshot::from_bytes(bytes)?;
     /// let mut edit = source.edit();
-    /// edit.set_row_height(Selector::Position(0), 4, 600)?;
-    /// edit.set_row_hidden(Selector::Position(0), 5, true)?;
+    /// edit.set_row_height(Selector::Position(Position::new(0)), 4, 600)?;
+    /// edit.set_row_hidden(Selector::Position(Position::new(0)), 5, true)?;
     /// let committed = edit.commit()?;
     /// assert!(committed.diagnostics().changed());
     /// # Ok::<(), Box<dyn std::error::Error>>(())
@@ -3779,7 +3798,7 @@ impl Edit {
     ///
     /// Returns a typed name, uniqueness, position, protection, macro-project,
     /// dependency-closure, exclusivity or allocation refusal without staging.
-    pub fn insert_sheet(&mut self, position: litchi_core::Position, name: &str) -> Result<()> {
+    pub fn insert_sheet(&mut self, position: Position, name: &str) -> Result<()> {
         self.require_tab_edit(true)?;
         structural::validate_sheet_name(name)?;
         let catalog = tabs::catalog(&self.source.inner.workbook_stream)?;
@@ -4396,7 +4415,7 @@ impl Edit {
 /// Resolves a semantic selector against the complete tab catalog.
 fn resolve_tab(catalog: &[tabs::Tab], selector: Selector<'_>) -> Result<usize> {
     match selector {
-        Selector::Position(position) if position < catalog.len() => Ok(position),
+        Selector::Position(position) if position.get() < catalog.len() => Ok(position.get()),
         Selector::Position(_) => Err(Error::WorksheetNotFound("tab catalog position".into())),
         Selector::Name(name) => {
             let mut matches = catalog
@@ -6359,9 +6378,9 @@ fn apply_semantic_operation(
             verify_semantic_sheet(source, sheet_names, sheet, operation)?;
             let count = parse_count(&operation.value, "row")?;
             if operation.op == "rows.insert" {
-                transaction.insert_rows(Selector::Position(sheet), start, count)
+                transaction.insert_rows(Selector::Position(Position::new(sheet)), start, count)
             } else {
-                transaction.delete_rows(Selector::Position(sheet), start, count)
+                transaction.delete_rows(Selector::Position(Position::new(sheet)), start, count)
             }
         },
         "columns.insert" | "columns.delete" => {
@@ -6372,9 +6391,9 @@ fn apply_semantic_operation(
             let count = u8::try_from(parse_count(&operation.value, "column")?)
                 .map_err(|_error| Error::InvalidData("column patch count exceeds u8".into()))?;
             if operation.op == "columns.insert" {
-                transaction.insert_columns(Selector::Position(sheet), start, count)
+                transaction.insert_columns(Selector::Position(Position::new(sheet)), start, count)
             } else {
-                transaction.delete_columns(Selector::Position(sheet), start, count)
+                transaction.delete_columns(Selector::Position(Position::new(sheet)), start, count)
             }
         },
         "sheet.reorder" | "sheet.insert" | "sheet.remove" | "sheet.restore" => {
@@ -6390,7 +6409,7 @@ fn apply_semantic_operation(
                 .value
                 .as_str()
                 .ok_or_else(|| Error::InvalidData("sheet rename value is not text".into()))?;
-            transaction.rename_sheet(Selector::Position(sheet), name)?;
+            transaction.rename_sheet(Selector::Position(Position::new(sheet)), name)?;
             sheet_names[sheet_index] = name.to_string();
             Ok(())
         },
@@ -6443,7 +6462,7 @@ fn apply_tab_semantic(
                     value
                         .as_u64()
                         .and_then(|value| usize::try_from(value).ok())
-                        .map(Selector::Position)
+                        .map(Selector::from)
                         .ok_or_else(|| Error::InvalidData("tab reorder position is invalid".into()))
                 })
                 .collect::<Result<Vec<_>>>()?;
@@ -6451,7 +6470,7 @@ fn apply_tab_semantic(
         },
         "sheet.insert" => {
             let position = tabs::parse_semantic_tab_target(&operation.target)?;
-            transaction.insert_sheet(litchi_core::Position::new(position), name()?)
+            transaction.insert_sheet(Position::new(position), name()?)
         },
         "sheet.remove" => {
             let position = tabs::parse_semantic_tab_target(&operation.target)?;
@@ -6473,7 +6492,7 @@ fn apply_tab_semantic(
                 }
             } else if operation.preconditions.get("empty") == Some(&serde_json::Value::Bool(true)) {
                 let empty = source
-                    .resolve_sheet(Selector::Position(position))?
+                    .resolve_sheet(Selector::Position(Position::new(position)))?
                     .is_some_and(|sheet| source.inner.sheets[sheet].entries.is_empty());
                 if !empty {
                     return Err(Error::UnsafeEdit(
@@ -6485,7 +6504,7 @@ fn apply_tab_semantic(
                     "tab removal patch has no content precondition".into(),
                 ));
             }
-            transaction.remove_sheet(Selector::Position(position))
+            transaction.remove_sheet(Selector::Position(Position::new(position)))
         },
         _ => Err(Error::UnsupportedFeature(
             "restoring a removed worksheet requires the exact artifact patch".into(),
@@ -6622,7 +6641,7 @@ fn apply_layout_semantic(
         .get("state")
         .ok_or_else(|| Error::InvalidData("layout patch has no state".into()))?;
     let stream = transaction.sheet_stream(sheet)?;
-    let selector = Selector::Position(sheet_position);
+    let selector = Selector::Position(Position::new(sheet_position));
     match (operation.op.as_str(), axis) {
         ("row.layout", Some("row")) => {
             if layout::row_state(stream, index)? != parse_row_state(expected)? {
@@ -6974,7 +6993,11 @@ fn apply_fixed_semantic(
         && storage == Storage::LabelSst
         && matches!(&value, Value::Text(_))
     {
-        return transaction.set_value(Selector::Position(sheet_position), reference, value);
+        return transaction.set_value(
+            Selector::Position(Position::new(sheet_position)),
+            reference,
+            value,
+        );
     }
     let shared_strings = transaction.effective_shared_strings();
     let represented = target_storage(cell.storage, &value, &shared_strings)?;
@@ -6986,7 +7009,11 @@ fn apply_fixed_semantic(
     if matches!(cell.value, Value::FormulaCache(FormulaCache::String(_)))
         || matches!(value, Value::FormulaCache(FormulaCache::String(_)))
     {
-        return transaction.set_value(Selector::Position(sheet_position), reference, value);
+        return transaction.set_value(
+            Selector::Position(Position::new(sheet_position)),
+            reference,
+            value,
+        );
     }
     transaction.stage(sheet_index, entry_index, storage, value)
 }
@@ -7082,15 +7109,21 @@ fn apply_structural_cell_semantic(
                 ));
             }
             transaction.insert_cell_with_style(
-                Selector::Position(sheet_position),
+                Selector::Position(Position::new(sheet_position)),
                 reference,
                 value,
                 style,
             )
         },
-        (Some(_), None) => transaction.remove_cell(Selector::Position(sheet_position), reference),
+        (Some(_), None) => {
+            transaction.remove_cell(Selector::Position(Position::new(sheet_position)), reference)
+        },
         (Some(before), Some(after)) if before.0 == after.0 && values_equal(&before.1, &after.1) => {
-            transaction.set_style(Selector::Position(sheet_position), reference, after.2)
+            transaction.set_style(
+                Selector::Position(Position::new(sheet_position)),
+                reference,
+                after.2,
+            )
         },
         (Some(before), Some(after))
             if before.0 == Storage::Formula && after.0 == Storage::Formula =>
@@ -7156,7 +7189,7 @@ fn verify_semantic_sheet(
     operation: &PatchOperation,
 ) -> Result<usize> {
     let sheet_index = source
-        .resolve_sheet(Selector::Position(sheet_position))?
+        .resolve_sheet(Selector::Position(Position::new(sheet_position)))?
         .ok_or_else(|| Error::UnsafeEdit("semantic patch worksheet is absent".into()))?;
     let expected_name = operation
         .preconditions

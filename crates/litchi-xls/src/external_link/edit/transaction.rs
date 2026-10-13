@@ -12,13 +12,13 @@ use super::{Commit, Patch, Snapshot};
 /// A detached transaction over inert supporting-book, external-name, and
 /// external-cache metadata.
 #[derive(Clone)]
-pub struct Transaction {
+pub struct Edit {
     source: Snapshot,
     candidate: Vec<u8>,
     package: Package,
 }
 
-impl Transaction {
+impl Edit {
     pub(crate) fn new(source: Snapshot) -> Self {
         Self {
             candidate: source.bytes().to_vec(),
@@ -52,12 +52,6 @@ impl Transaction {
         } else {
             Snapshot::parse(&self.candidate)
         }
-    }
-
-    /// Whether a staged edit changes any stream byte.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.candidate.as_slice() != self.source.bytes()
     }
 
     /// Replaces one external or DDE/OLE supporting-book target string.
@@ -214,12 +208,6 @@ impl Transaction {
         replacement[..2].copy_from_slice(&declared.to_le_bytes());
         self.replace_record(cache.record, &replacement)?;
         Ok(self)
-    }
-
-    /// Discards all staged edits and returns the original source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
     }
 
     /// Validates and publishes the candidate with a reversible source-checked

@@ -10,6 +10,7 @@ use std::io::Cursor;
 use std::ops::Deref;
 
 use litchi_core::FileFormat;
+use litchi_core::Position;
 use litchi_core::selector::{Path as SelectorPath, Query, Scope};
 use litchi_ops::capabilities::{Capabilities, Verb};
 use litchi_ops::error::Source;
@@ -174,7 +175,7 @@ fn cell_property(file: &File, path: &str, key: &str) -> Option<String> {
 fn native_cell_value(bytes: &[u8], sheet: usize, row: u32, column: u32) -> Option<XlsValue> {
     let snapshot = Snapshot::from_bytes(bytes.to_vec()).expect("open native XLS snapshot");
     snapshot
-        .worksheet(Selector::Position(sheet))
+        .worksheet(Selector::Position(Position::new(sheet)))
         .expect("resolve native worksheet")
         .and_then(|worksheet| {
             worksheet
@@ -187,7 +188,7 @@ fn native_cell_value(bytes: &[u8], sheet: usize, row: u32, column: u32) -> Optio
 fn native_cell_style(bytes: &[u8], sheet: usize, row: u32, column: u32) -> Option<u16> {
     let snapshot = Snapshot::from_bytes(bytes.to_vec()).expect("open native XLS snapshot");
     snapshot
-        .worksheet(Selector::Position(sheet))
+        .worksheet(Selector::Position(Position::new(sheet)))
         .expect("resolve native worksheet")
         .and_then(|worksheet| {
             worksheet

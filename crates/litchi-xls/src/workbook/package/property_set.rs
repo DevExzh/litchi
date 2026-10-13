@@ -254,12 +254,6 @@ impl Transaction {
         Ok(self.editor.remove(Binding::UserDefinedProperties)?)
     }
 
-    /// Discards the transaction and returns its unchanged source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
-    }
-
     /// Publishes the edited package and its source-checked reversible patch.
     /// # Errors
     ///
