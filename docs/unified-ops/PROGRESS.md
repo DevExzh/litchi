@@ -454,7 +454,13 @@ Cut from `395d0ffa9f`:
   - open +1 µs, set ±1%, 1k batch 1.16–1.39×.
   - Merge: 21 files conflicted with 0277's parallel dispatch arms. Files whose hunks split a block were rebuilt from trunk plus the branch's diff, and each file keeps all `ods`/`odt` cfg uses of both parents.
 - Gate note: the non-encryption capability goldens come only from an all-features-but-`encryption` run; plain `cargo test -p litchi-ops` has no formats (`default = []`).
-- `s23-odp` (0278) was sent back to its agent to merge trunk: its dispatch hunks would not reconcile mechanically with ODS and ODT.
+- Merged `s23-odp` (0278), after its agent merged trunk into the branch:
+  - leaf scene index with checked edits on `Package::edit`;
+  - unified reads over 11 node kinds; `.fodp` opens read-only;
+  - set/add/remove/move/swap, `create`, atomic save and `/metadata`; batches make one leaf commit;
+  - open +1.1%, set +0.3%, 1k batch 1.37×, 10k batch 1.30×.
+  - Open: G-ODP-1 to G-ODP-8 (character formatting, non-text adds, find/merge, the shared master reader, flat writes).
+- All three main ODF formats (ODT/ODS/ODP) now read and write through `File`. Python's `READ_ONLY` set is empty.
 
 Queued next: field/TOC `refresh` (engine 3), DOCX charts (0270a), the other ODF leaves (0268 G1), the performance misses (full queries, DOCX set and cell writes, PPTX add, `Warn` batches) and iWork M6.
 
