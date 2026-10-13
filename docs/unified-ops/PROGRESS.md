@@ -422,6 +422,12 @@ Cut from `395d0ffa9f`:
 - `s21-rtf` (0275): RTF to parity (plan step 21).
 - `s23-odt`, `s23-ods`, `s23-odp` (0276–0278): unified ODF adapters, read and write (plan step 23).
 
+- Merged `s20-merge` (0274):
+  - `File::merge`/`Edit::merge` fill OfficeCLI `{{key}}` placeholders and DOCX `MERGEFIELD`s in DOCX/PPTX/XLSX, keeping formatting across run splits;
+  - CLI `litchi merge` with one output per record; Python `File.merge`;
+  - 1.03–1.04× the leaf.
+  - Open: F1–F10 (other formats, PPTX notes and tables, merge-field pictures, consolidation with find/replace).
+
 Queued next: field/TOC `refresh` (engine 3), DOCX charts (0270a), the other ODF leaves (0268 G1), the performance misses (full queries, DOCX set and cell writes, PPTX add, `Warn` batches) and iWork M6.
 
 Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-pptx-w4` 9474e2b6ce, `uo/m2-l-xlsb-w1` 876588a23c, `uo/m1-r4-perf` 012fd509ff.
