@@ -23,7 +23,7 @@ use super::super::node::{Node, WriteSelection};
 use super::super::spec::Kind;
 use super::{Commit, Selection, Target, TargetKind, WorkEdit, admit_assignments};
 use crate::error::{Code, Error, Result};
-use crate::find::{Piece, Spec, plan};
+use crate::find::{Piece, Scratch, Spec, plan_with};
 use crate::path::navigate::{KindSet, Navigate};
 use crate::target::TargetArg;
 use crate::transaction::SemanticLimits;
@@ -78,6 +78,7 @@ impl Docx {
         let mut matches = 0usize;
         let mut staged = 0usize;
         let mut rewrites = Vec::new();
+        let mut scratch = Scratch::default();
         for scope in &scopes {
             let nodes = both!(&work, |edit| edit
                 .text_nodes(&scope.path)
@@ -97,7 +98,8 @@ impl Docx {
                     }),
                 })
                 .collect();
-            let planned = plan(
+            let planned = plan_with(
+                &mut scratch,
                 &pieces,
                 &matcher,
                 spec.replacement(),
@@ -148,7 +150,7 @@ fn starts_with(path: &ElementPath, prefix: &ElementPath) -> bool {
 fn scopes(nodes: &[Node<'_>]) -> Result<Vec<Scope>> {
     let mut scopes: Vec<Scope> = Vec::new();
     let mut index: HashMap<ElementPath, usize> = HashMap::new();
-    let mut body = None;
+    let mut body_index = None;
     let mut add =
         |path: ElementPath, within: Option<ElementPath>, scopes: &mut Vec<Scope>| match index
             .get(&path)
@@ -168,14 +170,63 @@ fn scopes(nodes: &[Node<'_>]) -> Result<Vec<Scope>> {
         };
     for node in nodes {
         match node.element_kind() {
-            Kind::Document | Kind::Body | Kind::Table | Kind::Row | Kind::Cell | Kind::Sdt => {
+            Kind::Document | Kind::Body => {
+                // Direct body paragraphs come from the body's block index;
+                // only tables and content controls are walked as nodes.
+                let blocks = super::super::nav::load_body(node.docx)?;
+                let mut nested = false;
+                for block in blocks.iter() {
+                    match block.kind() {
+                        litchi_docx::BlockKind::Paragraph => add(
+                            ElementPath::new([ElementStep::Paragraph(
+                                block.transaction_position().map_err(Error::from)?,
+                            )]),
+                            None,
+                            &mut scopes,
+                        ),
+                        litchi_docx::BlockKind::Table | litchi_docx::BlockKind::ContentControl => {
+                            nested = true;
+                        },
+                        _ => {},
+                    }
+                }
+                if nested {
+                    let nav = Nav::new(node.docx);
+                    let body = if node.element_kind() == Kind::Body {
+                        node.clone()
+                    } else {
+                        nav.children(node, KindSet::of(Kind::Body))?
+                            .next()
+                            .transpose()?
+                            .ok_or_else(|| {
+                                Error::new(Code::InternalError, "the DOCX document has no body")
+                            })?
+                    };
+                    let mut paragraphs = Vec::new();
+                    for child in nav.children(&body, KindSet::of(Kind::Table).with(Kind::Sdt))? {
+                        descend(&child?, &mut paragraphs)?;
+                    }
+                    for paragraph in &paragraphs {
+                        add(
+                            paragraph_path(paragraph, &mut body_index)?,
+                            None,
+                            &mut scopes,
+                        );
+                    }
+                }
+            },
+            Kind::Table | Kind::Row | Kind::Cell | Kind::Sdt => {
                 let mut paragraphs = Vec::new();
                 descend(node, &mut paragraphs)?;
                 for paragraph in &paragraphs {
-                    add(paragraph_path(paragraph, &mut body)?, None, &mut scopes);
+                    add(
+                        paragraph_path(paragraph, &mut body_index)?,
+                        None,
+                        &mut scopes,
+                    );
                 }
             },
-            Kind::Paragraph => add(paragraph_path(node, &mut body)?, None, &mut scopes),
+            Kind::Paragraph => add(paragraph_path(node, &mut body_index)?, None, &mut scopes),
             Kind::Run | Kind::Hyperlink => {
                 let path = element::element_path(node)?;
                 let paragraph = path

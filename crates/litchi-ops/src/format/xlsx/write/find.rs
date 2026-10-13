@@ -17,7 +17,7 @@ use super::super::node::Item;
 use super::super::{Nav, Xlsx};
 use super::{Commit, native_error, validate_xml_text};
 use crate::error::{Code, Error, Result};
-use crate::find::{Piece, Spec, plan};
+use crate::find::{Piece, Scratch, Spec, plan_with};
 use crate::target::TargetArg;
 use crate::transaction::SemanticLimits;
 
@@ -72,6 +72,7 @@ impl Xlsx {
         let workbook = source.workbook();
         let matcher = spec.matcher();
         let mut matches = 0usize;
+        let mut scratch = Scratch::default();
         let mut staged = 0usize;
         let mut changes: Vec<(usize, Address, String)> = Vec::new();
         let mut seen: HashSet<(usize, Address)> = HashSet::new();
@@ -102,7 +103,8 @@ impl Xlsx {
                         continue;
                     }
                     // One cell value is one search group of one piece.
-                    let planned = plan(
+                    let planned = plan_with(
+                        &mut scratch,
                         &[Piece {
                             text: text.as_str(),
                             group: 0,

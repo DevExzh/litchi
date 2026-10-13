@@ -165,11 +165,49 @@ admitting the find); the source fence brackets every adapter.
 
 ## 4. Corpus
 
-PLACEHOLDER-CORPUS
+Re-recorded (`LITCHI_BLESS=1 cargo test -p litchi-cli --all-features --test
+officecli_corpus`, `python3 tools/officecli_corpus.py`, `--check`: exit 0).
+Totals before and after are identical: 6,431 lines, 3,803 passed, 1,105
+warned, 891 gap, 168 delta, 464 cascade, 0 bug, 177 resident. The corpus's
+only `--find` calls (`word/revisions.sh` sections 7–8) address paragraphs
+by the `@paraId` paths `add` prints, so they stay D1 cascades (no path), and
+they combine find with `revision.*` (delta F8). Named gap G3 now cites this
+record; it counts 0 lines, as before. The capability delta table
+(`tools/officecli_capability_delta.py`) changes only its input hashes: the
+tool reads element tables, and the keywords are a schema-level member.
 
 ## 5. Performance
 
-PLACEHOLDER-PERF
+`cargo run --release -p litchi-ops --example find_replace_bench --features
+docx,pptx` (pinned with `taskset -c 29`; 2 warm-up rounds, 9 ABBA rounds of
+four samples, medians; build at 683a2d4b06 plus the scope fast path and
+prefilter of the follow-up commit). Evidence:
+[results/0273-find-replace-bench.json](results/0273-find-replace-bench.json)
+(4.6 KB, SHA-256 `8323d0cb8d46a5094eb517ed7993ea9b12aee86f292426b7da5de4bbeb4f62c1`).
+Machine load average was 15–20 (six agents share it).
+
+| Format | Containers | Matches | Leaf ms | Unified ms | Ratio | Unified containers/s |
+|---|---:|---:|---:|---:|---:|---:|
+| DOCX | 10,000 paragraphs | 1 | 14.93 | 16.83 | 1.128 | 594,197 |
+| DOCX | 10,000 paragraphs | 1,000 | 19.61 | 21.51 | 1.097 | 465,006 |
+| PPTX | 1,000 slides | 1 | 21.41 | 22.29 | 1.041 | 44,862 |
+| PPTX | 1,000 slides | 1,000 | 133.54 | 137.99 | 1.033 | 7,247 |
+
+The leaf legs are lower bounds: they use the same leaf primitives but know
+the fixture (no cross-run matching, one run per PPTX body). Both legs'
+outputs are checked equal (published bytes) outside the clock.
+
+- PPTX meets the 10% single-op budget. The PPTX adapter skips a shape whose
+  scene text cannot hold a match (`Matcher::may_match`) before decoding its
+  body; without it the one-match case was 1.145.
+- DOCX misses the 10% budget by 2.8 points at one match (1.9 ms over 10,000
+  paragraphs). Reading direct body paragraphs from the block index instead
+  of node values took it from 1.214 to 1.128, and reusing the planner's
+  buffers to 1.124; the rest is the general matcher and planner per
+  paragraph against the leaf leg's `str::contains`. Follow-up: a leaf-level
+  prefilter over the paragraph bytes.
+- A find over 10,000 DOCX paragraphs is one leaf call and one splice, so
+  1,000 matches cost 5 ms more than one match.
 
 ## 6. Gaps and follow-ups
 
@@ -185,3 +223,11 @@ PLACEHOLDER-PERF
 - Regular expressions wait on an owner-approved dependency (record 0010 Q3).
 - Tracked-change finds (`revision.*`) and paragraph properties on matched
   paragraphs.
+- Consolidation with record 0274 (template merge, on trunk at 3cb803e29c):
+  its leaf `litchi_docx::document::substitute` also rewrites text across
+  runs preserving formatting, in every story (headers, footers, notes,
+  comments), and its PPTX merge module rewrites run by run. This record keeps
+  its own engine (literal options, run scope, isolation for format
+  properties, one splice for body paragraphs); 0274's follow-up F9 and this
+  one should move both onto one leaf primitive, which would also give
+  find/replace the header/footer/note stories (delta F5).

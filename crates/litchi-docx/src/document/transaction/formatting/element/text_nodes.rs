@@ -136,7 +136,12 @@ impl ParagraphRewrite {
 
 impl Edit {
     /// The searchable text nodes of the paragraph at `path`, in document
-    /// order. See the [module documentation](self) for what is listed.
+    /// order: the `w:t` elements of the paragraph's runs and of the runs of
+    /// its inline hyperlinks, content controls, smart tags, custom XML and
+    /// tracked insertions. Tabs, breaks, drawings, field characters and
+    /// container edges start a new group; bookmarks, proofing marks and
+    /// rendered page breaks do not. Complex-field results, deleted text,
+    /// simple fields and math are not listed.
     ///
     /// ```
     /// use litchi_core::Position;

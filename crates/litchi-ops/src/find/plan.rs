@@ -72,6 +72,7 @@ pub(crate) struct Plan {
 ///
 /// `limit_exceeded` when the rewritten texts exceed `max_bytes`, and
 /// `internal_error` on allocation failure.
+#[cfg(test)]
 pub(crate) fn plan(
     pieces: &[Piece<'_>],
     matcher: &Matcher<'_>,
@@ -79,10 +80,44 @@ pub(crate) fn plan(
     marks: bool,
     max_bytes: usize,
 ) -> Result<Plan> {
+    plan_with(
+        &mut Scratch::default(),
+        pieces,
+        matcher,
+        replacement,
+        marks,
+        max_bytes,
+    )
+}
+
+/// Buffers [`plan_with`] reuses across calls, so an adapter planning one
+/// paragraph at a time allocates them once.
+#[derive(Default)]
+pub(crate) struct Scratch {
+    joined: String,
+    starts: Vec<usize>,
+    found: Vec<Range<usize>>,
+}
+
+/// [`plan`] with caller-owned buffers.
+///
+/// # Errors
+///
+/// As [`plan`].
+pub(crate) fn plan_with(
+    scratch: &mut Scratch,
+    pieces: &[Piece<'_>],
+    matcher: &Matcher<'_>,
+    replacement: Option<&str>,
+    marks: bool,
+    max_bytes: usize,
+) -> Result<Plan> {
     let mut result = Plan::default();
-    let mut joined = String::new();
-    let mut starts: Vec<usize> = Vec::new();
-    let mut found: Vec<Range<usize>> = Vec::new();
+    let Scratch {
+        joined,
+        starts,
+        found,
+    } = scratch;
     let mut staged = 0usize;
     let mut first = 0;
     while first < pieces.len() {
@@ -108,7 +143,7 @@ pub(crate) fn plan(
         };
         found.clear();
         for range in matcher.find_iter(&text) {
-            if members.iter().zip(&starts).all(|(piece, &start)| {
+            if members.iter().zip(starts.iter()).all(|(piece, &start)| {
                 let piece_end = start + piece.text.len();
                 piece.scoped
                     || piece.text.is_empty()
@@ -123,9 +158,9 @@ pub(crate) fn plan(
             result.matches = result.matches.saturating_add(found.len());
             rewrite_group(
                 members,
-                &starts,
+                starts,
                 &text,
-                &found,
+                found,
                 replacement,
                 marks,
                 first,

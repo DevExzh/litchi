@@ -15,7 +15,7 @@ use litchi_rtf::edit::{EditOptions, RunTextReplacement, SemanticLimits as Native
 use super::super::{Kind, Nav, Node, Rtf};
 use super::{Commit, patch_snapshot_bytes, snapshot_limit};
 use crate::error::{Code, Error, Result};
-use crate::find::{Piece, Spec, plan};
+use crate::find::{Piece, Scratch, Spec, plan_with};
 use crate::path::navigate::{KindSet, Navigate};
 use crate::target::TargetArg;
 use crate::transaction::{Error as TransactionError, SemanticLimits};
@@ -123,6 +123,7 @@ impl Rtf {
 
         let matcher = spec.matcher();
         let mut matches = 0usize;
+        let mut scratch = Scratch::default();
         let mut staged = 0usize;
         let mut updates: Vec<RunTextReplacement> = Vec::new();
         for (paragraph, scopes) in &paragraphs {
@@ -147,7 +148,8 @@ impl Rtf {
                         .any(|scope| scope.is_none_or(|wanted| run.run_position() == Some(wanted))),
                 })
                 .collect();
-            let planned = plan(
+            let planned = plan_with(
+                &mut scratch,
                 &pieces,
                 &matcher,
                 Some(replacement),

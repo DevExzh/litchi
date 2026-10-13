@@ -52,7 +52,9 @@ mod tests;
 use std::borrow::Cow;
 
 pub(crate) use matcher::Matcher;
-pub(crate) use plan::{Piece, plan};
+#[cfg(test)]
+pub(crate) use plan::plan;
+pub(crate) use plan::{Piece, Scratch, plan_with};
 
 use crate::error::{Code, Error, Result};
 use crate::props::{PropValue, Props};

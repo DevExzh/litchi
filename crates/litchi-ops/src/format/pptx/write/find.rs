@@ -17,7 +17,7 @@ use litchi_pptx::opened::{TextEdit, TextTarget};
 
 use super::text::{TextValues, admit};
 use super::{Commit, Pptx, allocation, error};
-use crate::find::{Piece, Spec, plan};
+use crate::find::{Piece, Scratch, Spec, plan_with};
 use crate::format::pptx::Nav;
 use crate::format::pptx::node::{Item, TreeItem};
 use crate::format::pptx::spec::{Kind, RUN_WRITE_TABLE, TextSetter};
@@ -87,6 +87,7 @@ impl Pptx {
         let mut matches = 0usize;
         let mut staged = 0usize;
         let mut changes: Vec<RunChange> = Vec::new();
+        let mut scratch = Scratch::default();
         for scope in &scopes {
             let mut texts: Vec<(usize, usize)> = Vec::new();
             let mut pieces: Vec<Piece<'_>> = Vec::new();
@@ -111,7 +112,8 @@ impl Pptx {
                     texts.push((index, position));
                 }
             }
-            let planned = plan(
+            let planned = plan_with(
+                &mut scratch,
                 &pieces,
                 &matcher,
                 spec.replacement(),
@@ -274,7 +276,19 @@ fn collect(
             Ok(())
         },
         Item::Tree(tree) => match tree.kind {
-            Kind::Shape | Kind::Placeholder => push(tree, None, None),
+            Kind::Shape | Kind::Placeholder => {
+                // The scene's plain text (runs, fields and breaks joined)
+                // proves the absence of a match without decoding the body.
+                if tree
+                    .handle
+                    .view()
+                    .text()
+                    .is_some_and(|text| !matcher.may_match(text))
+                {
+                    return Ok(());
+                }
+                push(tree, None, None)
+            },
             Kind::Group => {
                 let kinds = KindSet::of(Kind::Shape)
                     .with(Kind::Placeholder)
