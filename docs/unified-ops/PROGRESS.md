@@ -250,6 +250,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
   - D3: tiers stay strict. Phase F (RTF/ODF/iWork) waits until tiers 1–2 reach P0 CRUD; the RTF work already landed is kept.
   - D4: earlier provisional decisions remain provisional.
   - D5: budget misses get engineering first. Explanations come only after a fix attempt.
+- Record 0267 (merged, provisional): an early-stopping query (`first()`, `limit(n)`) on a sheet with a defect past the rows it reads returns the leading matches. Trunk used to refuse the whole sheet. This is in the class of the 2026-09-16 decision 8. The alternative, validating every sheet whole before a cold early query, removes most of the 8–21× gain.
 
 ## Wave R1 (2026-10-13, coordinator restart)
 Branches `uo2/*` cut from `908f9cccdd`; records 0249–0255:
@@ -367,6 +368,52 @@ Cut from `4d1afe92bc`:
 - `s22-odf-w3` (0268): ADR 0034 W3 for ODF (tier 3 starts now that tiers 1–2 have P0 read+write).
 
 Still running: `ppt-scale` (0264, the owner-requested PPT 10k batch fix).
+
+Added later in R3: `corpus-parity` (0269) and `s19-charts` (0270), then follow-ups `chart-series` (0271) and `harness-green` (0272), both cut from `fd49666493`.
+
+- Merged `ppt-scale` bound change (0264 §4, `8de68ed60d`):
+  - `MAX_OPERATIONS` and `MAX_SHAPE_TEXT_CHUNK_SELECTIONS` are now 16384;
+  - a 10k batch publishes once, and 1k→10k per-op cost is 1.09× native and unified;
+  - unified/native at 10k is 1.10 (was 1.25).
+- Merged `corpus-parity` (0269, `4a5f259a18`):
+  - command-channel `batch::Unsupported::Warn` (`apply_with`/`batch_with`, CLI `--unsupported warn`, exit 9); the library default stays strict;
+  - cell `text` is an alias of `value`; PPTX shape formatting on add, fill and geometry, slide transitions;
+  - X1/X2 refusal codes unified.
+  - Misses: `Warn` batches are about 49× (no coalescing, P2); PPTX add 1.4× (existing overhead, P1).
+- Merged `s19-charts` (0270, `33de040170`):
+  - typed chart add/get/set/remove for PPTX and XLSX on a shared deterministic `chart::authoring::Spec`;
+  - PPTX `add_chart` now takes a `Spec` (breaking);
+  - new XLSX `chart::edit` family;
+  - DOCX charts (0270a), chartex types and waterfall are still open.
+- Merged `s18-csv-eval` (0266, `047e8ff775`):
+  - `File::import` for CSV/TSV into XLSX/XLSB/XLS, as one atomic commit, within 2.1% of the leaf;
+  - read-only `File::evaluate`/`recalculate`; new `litchi-ops → litchi-eval` edge;
+  - `litchi-eval` fixes: a non-ASCII criteria panic, Excel coercion, and a depth limit;
+  - 26.3% of the corpus's 12,082 cached formulas reproduce (79.4% of those compared). XLSX, at 70.2%, is limited by the engine's grammar (F7).
+- Merged `stream-cursor` (0267, `48bd7bedc4`):
+  - cell cursors for early-stopping queries; cold first match is 21× faster on XLSX, 17.7× on XLSB and 7.9× on XLS (50k rows);
+  - 396 query digests byte-identical; the XLSB node is now 88 bytes.
+  - Provisional: early queries may return leading matches on a sheet broken past them (see "Awaiting owner confirmation").
+- Merged `s22-odf-w3` (0268, `fd49666493`):
+  - ODT/ODS/ODP each have an immutable `Package` plus read-only projections;
+  - every ODF whole-package save is atomic; typed `SourceLimits`/`SemanticLimits`/`OpenOptions`;
+  - the litchi-oth DTD test was changed to match the shared ingress policy (an ignored DOCTYPE is accepted; an entity-declaring DTD is still refused).
+  - G1–G8 are open (other ODF crates, `Mutable*` writers, scoped names).
+- Combined gate after these merges:
+  - every `litchi-ops` single-feature build except XLSX was broken by two ungated 0269 test files; fixed in the 0271 merge.
+  - XLSX chart add was refused by 0269's kind-first check; fixed in 0271.
+  - Gate scripts now run clippy through `non_iwork_gate.py`, so iWork is excluded; facade tests with `--all-features`; harness tests with `--locked`.
+- Merged `chart-series` (0271):
+  - dotted `series{N}.name/.values/.color` on chart add;
+  - `Error::warnings` names the properties a failed warn-mode call skipped;
+  - corpus now 3,803 passed, 1,105 warned, 891 gap, 0 bugs.
+- Merged `harness-green` (0272):
+  - perf-harness tests are green on trunk:
+    - the producer-scanner tests were re-derived for the intended `5fe77e0bb6` change;
+    - case count set to 633;
+    - lockfiles, formatting and 62 clippy findings fixed;
+  - PPT aggregate routes renamed `_v2` → `_v3`;
+  - the CI smoke job now lints the harness, and its path filters are pinned by policy tests.
 
 Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-pptx-w4` 9474e2b6ce, `uo/m2-l-xlsb-w1` 876588a23c, `uo/m1-r4-perf` 012fd509ff.
 
