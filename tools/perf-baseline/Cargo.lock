@@ -1075,6 +1075,7 @@ dependencies = [
  "signature",
  "soapberry-zip",
  "subtle",
+ "thiserror",
  "x509-cert",
  "xml-minifier",
  "zeroize",

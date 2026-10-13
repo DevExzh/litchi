@@ -631,7 +631,8 @@ fn run_owned_iteration(
     let inputs_and_sink_ready = capture_checkpoint()?;
 
     let source = litchi_pptx::Package::from_reader(std::io::Cursor::new(source_input))?;
-    let mut destination = litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_input))?;
+    let mut destination =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_input))?;
     let source_snapshot = source.opened_presentation()?;
     let destination_snapshot = destination.opened_presentation()?;
     let opened = capture_checkpoint()?;

@@ -498,7 +498,10 @@ fn collect_source_backed(
 }
 
 fn collect_eager(input: Vec<u8>, limits: SourceLimits) -> AnyResult<EagerInventory> {
-    let package = Package::from_reader_with_options(std::io::Cursor::new(input), litchi_pptx::OpenOptions::default().source_limits(limits))?;
+    let package = Package::from_reader_with_options(
+        std::io::Cursor::new(input),
+        litchi_pptx::OpenOptions::default().source_limits(limits),
+    )?;
     let presentation = package.presentation()?;
     let slide_count = presentation.slide_count()?;
     bounded_count(slide_count, MAX_SLIDES, "eager slide")?;

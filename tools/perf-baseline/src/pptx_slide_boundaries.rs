@@ -605,7 +605,8 @@ fn verify_refusal_gates(
         })
     );
 
-    let signed = Package::from_reader(std::io::Cursor::new(add_signature_marker(&corpus.archive)?))?;
+    let signed =
+        Package::from_reader(std::io::Cursor::new(add_signature_marker(&corpus.archive)?))?;
     let signed_verified = matches!(
         signed.opened_presentation()?.plan_slide_removal(0),
         Err(Error::SlideRemovalPlan {

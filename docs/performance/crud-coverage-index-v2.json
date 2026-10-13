@@ -33,7 +33,7 @@
     "registry_format": "case-name-utf8-newline-v1",
     "minimum_selectable_cases": 633,
     "selector_count": 633,
-    "selector_names_sha256": "944299b4e1d87d1fdf166869a6d15c4b4af46d6ee6f403311f89c555920a32e6",
+    "selector_names_sha256": "c1df7e401764ac59b0e3ae8e4f504383eac5c63eea28c1dc2ad7c9f2fa915c5c",
     "selector_names": [
       "zip_index",
       "zip_read_one",
@@ -263,34 +263,34 @@
       "ppt_text_edit_one_edit_save",
       "ppt_semantic_noop_edit_save",
       "ppt_semantic_one_edit_save",
-      "ppt_text_batch_eager_native_1_aggregate_v2",
-      "ppt_text_batch_eager_native_10_aggregate_v2",
-      "ppt_text_batch_eager_native_100_aggregate_v2",
-      "ppt_text_batch_eager_native_256_aggregate_v2",
-      "ppt_text_batch_eager_native_1000_aggregate_v2",
-      "ppt_text_batch_eager_native_4096_aggregate_v2",
-      "ppt_text_batch_eager_native_10000_aggregate_v2",
-      "ppt_text_batch_eager_unified_1_aggregate_v2",
-      "ppt_text_batch_eager_unified_10_aggregate_v2",
-      "ppt_text_batch_eager_unified_100_aggregate_v2",
-      "ppt_text_batch_eager_unified_256_aggregate_v2",
-      "ppt_text_batch_eager_unified_1000_aggregate_v2",
-      "ppt_text_batch_eager_unified_4096_aggregate_v2",
-      "ppt_text_batch_eager_unified_10000_aggregate_v2",
-      "ppt_text_batch_positional_native_1_aggregate_v2",
-      "ppt_text_batch_positional_native_10_aggregate_v2",
-      "ppt_text_batch_positional_native_100_aggregate_v2",
-      "ppt_text_batch_positional_native_256_aggregate_v2",
-      "ppt_text_batch_positional_native_1000_aggregate_v2",
-      "ppt_text_batch_positional_native_4096_aggregate_v2",
-      "ppt_text_batch_positional_native_10000_aggregate_v2",
-      "ppt_text_batch_positional_unified_1_aggregate_v2",
-      "ppt_text_batch_positional_unified_10_aggregate_v2",
-      "ppt_text_batch_positional_unified_100_aggregate_v2",
-      "ppt_text_batch_positional_unified_256_aggregate_v2",
-      "ppt_text_batch_positional_unified_1000_aggregate_v2",
-      "ppt_text_batch_positional_unified_4096_aggregate_v2",
-      "ppt_text_batch_positional_unified_10000_aggregate_v2",
+      "ppt_text_batch_eager_native_1_aggregate_v3",
+      "ppt_text_batch_eager_native_10_aggregate_v3",
+      "ppt_text_batch_eager_native_100_aggregate_v3",
+      "ppt_text_batch_eager_native_256_aggregate_v3",
+      "ppt_text_batch_eager_native_1000_aggregate_v3",
+      "ppt_text_batch_eager_native_4096_aggregate_v3",
+      "ppt_text_batch_eager_native_10000_aggregate_v3",
+      "ppt_text_batch_eager_unified_1_aggregate_v3",
+      "ppt_text_batch_eager_unified_10_aggregate_v3",
+      "ppt_text_batch_eager_unified_100_aggregate_v3",
+      "ppt_text_batch_eager_unified_256_aggregate_v3",
+      "ppt_text_batch_eager_unified_1000_aggregate_v3",
+      "ppt_text_batch_eager_unified_4096_aggregate_v3",
+      "ppt_text_batch_eager_unified_10000_aggregate_v3",
+      "ppt_text_batch_positional_native_1_aggregate_v3",
+      "ppt_text_batch_positional_native_10_aggregate_v3",
+      "ppt_text_batch_positional_native_100_aggregate_v3",
+      "ppt_text_batch_positional_native_256_aggregate_v3",
+      "ppt_text_batch_positional_native_1000_aggregate_v3",
+      "ppt_text_batch_positional_native_4096_aggregate_v3",
+      "ppt_text_batch_positional_native_10000_aggregate_v3",
+      "ppt_text_batch_positional_unified_1_aggregate_v3",
+      "ppt_text_batch_positional_unified_10_aggregate_v3",
+      "ppt_text_batch_positional_unified_100_aggregate_v3",
+      "ppt_text_batch_positional_unified_256_aggregate_v3",
+      "ppt_text_batch_positional_unified_1000_aggregate_v3",
+      "ppt_text_batch_positional_unified_4096_aggregate_v3",
+      "ppt_text_batch_positional_unified_10000_aggregate_v3",
       "ppt_pictures_eager_open",
       "ppt_pictures_source_backed_open",
       "ppt_pictures_eager_first_image",
@@ -2131,115 +2131,115 @@
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "ppt_text_batch_eager_native_10000_aggregate_v2",
+          "selector": "ppt_text_batch_eager_native_10000_aggregate_v3",
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "ppt_text_batch_eager_native_1000_aggregate_v2",
+          "selector": "ppt_text_batch_eager_native_1000_aggregate_v3",
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "ppt_text_batch_eager_native_100_aggregate_v2",
+          "selector": "ppt_text_batch_eager_native_100_aggregate_v3",
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "ppt_text_batch_eager_native_10_aggregate_v2",
+          "selector": "ppt_text_batch_eager_native_10_aggregate_v3",
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "ppt_text_batch_eager_native_1_aggregate_v2",
+          "selector": "ppt_text_batch_eager_native_1_aggregate_v3",
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "ppt_text_batch_eager_native_256_aggregate_v2",
+          "selector": "ppt_text_batch_eager_native_256_aggregate_v3",
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "ppt_text_batch_eager_native_4096_aggregate_v2",
+          "selector": "ppt_text_batch_eager_native_4096_aggregate_v3",
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "ppt_text_batch_eager_unified_10000_aggregate_v2",
+          "selector": "ppt_text_batch_eager_unified_10000_aggregate_v3",
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "ppt_text_batch_eager_unified_1000_aggregate_v2",
+          "selector": "ppt_text_batch_eager_unified_1000_aggregate_v3",
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "ppt_text_batch_eager_unified_100_aggregate_v2",
+          "selector": "ppt_text_batch_eager_unified_100_aggregate_v3",
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "ppt_text_batch_eager_unified_10_aggregate_v2",
+          "selector": "ppt_text_batch_eager_unified_10_aggregate_v3",
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "ppt_text_batch_eager_unified_1_aggregate_v2",
+          "selector": "ppt_text_batch_eager_unified_1_aggregate_v3",
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "ppt_text_batch_eager_unified_256_aggregate_v2",
+          "selector": "ppt_text_batch_eager_unified_256_aggregate_v3",
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "ppt_text_batch_eager_unified_4096_aggregate_v2",
+          "selector": "ppt_text_batch_eager_unified_4096_aggregate_v3",
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "ppt_text_batch_positional_native_10000_aggregate_v2",
+          "selector": "ppt_text_batch_positional_native_10000_aggregate_v3",
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "ppt_text_batch_positional_native_1000_aggregate_v2",
+          "selector": "ppt_text_batch_positional_native_1000_aggregate_v3",
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "ppt_text_batch_positional_native_100_aggregate_v2",
+          "selector": "ppt_text_batch_positional_native_100_aggregate_v3",
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "ppt_text_batch_positional_native_10_aggregate_v2",
+          "selector": "ppt_text_batch_positional_native_10_aggregate_v3",
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "ppt_text_batch_positional_native_1_aggregate_v2",
+          "selector": "ppt_text_batch_positional_native_1_aggregate_v3",
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "ppt_text_batch_positional_native_256_aggregate_v2",
+          "selector": "ppt_text_batch_positional_native_256_aggregate_v3",
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "ppt_text_batch_positional_native_4096_aggregate_v2",
+          "selector": "ppt_text_batch_positional_native_4096_aggregate_v3",
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "ppt_text_batch_positional_unified_10000_aggregate_v2",
+          "selector": "ppt_text_batch_positional_unified_10000_aggregate_v3",
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "ppt_text_batch_positional_unified_1000_aggregate_v2",
+          "selector": "ppt_text_batch_positional_unified_1000_aggregate_v3",
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "ppt_text_batch_positional_unified_100_aggregate_v2",
+          "selector": "ppt_text_batch_positional_unified_100_aggregate_v3",
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "ppt_text_batch_positional_unified_10_aggregate_v2",
+          "selector": "ppt_text_batch_positional_unified_10_aggregate_v3",
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "ppt_text_batch_positional_unified_1_aggregate_v2",
+          "selector": "ppt_text_batch_positional_unified_1_aggregate_v3",
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "ppt_text_batch_positional_unified_256_aggregate_v2",
+          "selector": "ppt_text_batch_positional_unified_256_aggregate_v3",
           "reason": "not-selected-in-representative-matrix"
         },
         {
-          "selector": "ppt_text_batch_positional_unified_4096_aggregate_v2",
+          "selector": "ppt_text_batch_positional_unified_4096_aggregate_v3",
           "reason": "not-selected-in-representative-matrix"
         },
         {

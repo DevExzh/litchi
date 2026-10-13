@@ -368,7 +368,7 @@ pub(super) fn inspect_odp_buffered_archive(
     verify_odp_buffered_default_parts(&styles_xml, &meta_xml)?;
     content_structure::verify_odp_buffered_content_structure(&content_xml, shape)?;
 
-    let presentation = litchi_odp::Package::from_bytes(&bytes)?.presentation()?;
+    let presentation = litchi_odp::Package::from_bytes(bytes)?.presentation()?;
     let slides = presentation.slides()?;
     let expected_slide_count = odp_buffered_slide_count(shape);
     if slides.len() != expected_slide_count {
@@ -720,7 +720,8 @@ mod tests {
                 .unwrap();
         }
         let error = builder.build().unwrap_err();
-        let litchi_odf_common::Error::Core(litchi_core::Error::InvalidFormat(message)) = error else {
+        let litchi_odf_common::Error::Core(litchi_core::Error::InvalidFormat(message)) = error
+        else {
             panic!("unexpected oversized deck refusal: {error}");
         };
         assert!(message.contains("XML publication rejected for 'content.xml'"));

@@ -1614,7 +1614,6 @@ fn leaf_pptx_signature(
     let (width, height) = presentation.slide_size()?;
     let metadata = presentation
         .properties_with_tolerance(&mut litchi_pptx::ToleranceReport::default())?
-        .map(Metadata::from)
         .filter(Metadata::has_data);
     let metadata = serde_json::to_string(&metadata)?;
     let selected = presentation
@@ -1692,11 +1691,7 @@ fn verify_docx(
     let source_sha256 = crate::sha256_hex(&bytes);
     verify_source_identity(&bytes, corpus, allow_page_aligned_source, "DOCX")?;
     let leaf = leaf_docx_eager(bytes.clone())?;
-    let leaf_metadata = leaf
-        .metadata()
-        .cloned()
-        .map(Metadata::from)
-        .unwrap_or_default();
+    let leaf_metadata = leaf.metadata().cloned().unwrap_or_default();
     let leaf_signature = docx_package_signature(&leaf, &leaf_metadata)?;
     let unified_eager = open_unified_docx(Ingress::Eager, source)?;
     let unified_source = open_unified_docx(Ingress::Source, source)?;

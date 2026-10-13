@@ -1513,8 +1513,8 @@ fn verify_producer_xlsx_workbook_calculation_closure(
         return Err("producer XLSX edit changed workbook content outside calcPr".into());
     }
 
-    let source_package = litchi_xlsx::Package::from_bytes(&source)?;
-    let output_package = litchi_xlsx::Package::from_bytes(&output)?;
+    let source_package = litchi_xlsx::Package::from_bytes(source)?;
+    let output_package = litchi_xlsx::Package::from_bytes(output)?;
     let mut expected = source_package
         .calculation_metadata()?
         .properties()

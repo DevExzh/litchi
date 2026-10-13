@@ -1487,7 +1487,6 @@ pub(crate) fn leaf_xlsx_open(source: Arc<dyn ReadAt>) -> Result<LeafXlsx, Box<dy
     let mut repairs = litchi_ooxml_common::leniency::ToleranceReport::default();
     let metadata =
         litchi_ooxml_common::properties::read_source_backed_with_report(&package, &mut repairs)?
-            .map(Metadata::from)
             .unwrap_or_default();
     let workbook = litchi_xlsx::SourceBackedWorkbook::from_source_backed_package(package)?;
     Ok(LeafXlsx { workbook, metadata })
@@ -2148,10 +2147,10 @@ fn run_ppt_text_batch(
         twin: Some(entry.twin.name()),
         timed_calls: match entry.leg {
             PptTextBatchLeg::Native => {
-                "prepared litchi_ppt::Package::edit with one set_shape_text_chunks publication per 4096-operation edit, inner chunks bounded at 256"
+                "prepared litchi_ppt::Package::edit with one set_shape_text_chunks publication per 16384-operation edit, inner chunks bounded at 256"
             },
             PptTextBatchLeg::Unified => {
-                "prepared litchi::File::edit shape text sets from string paths (path parsing included) in one facade transaction with 4096-operation native rollover"
+                "prepared litchi::File::edit shape text sets from string paths (path parsing included) in one facade transaction with 16384-operation native rollover"
             },
         },
         performance_claim: PERFORMANCE_CLAIM,
@@ -3242,7 +3241,12 @@ impl OdpRoot {
                 owned.ok_or("eager ODP route has no owned bytes")?,
             )?),
             (Leg::Unified, Ingress::Source) => Self::Unified(litchi::open(path)?),
-            (Leg::Leaf, Ingress::Eager) => Self::Eager(litchi_odp::Package::from_bytes(&owned.ok_or("eager ODP route has no owned bytes")?)?.presentation()?),
+            (Leg::Leaf, Ingress::Eager) => Self::Eager(
+                litchi_odp::Package::from_bytes(
+                    &owned.ok_or("eager ODP route has no owned bytes")?,
+                )?
+                .presentation()?,
+            ),
             (Leg::Leaf, Ingress::Source) => {
                 Self::Source(litchi_odp::SourceBackedPresentation::open(path)?)
             },
@@ -3348,7 +3352,9 @@ fn run_odp(
         (Leg::Unified, _, true) => {
             "File::presentation()?.slide(middle) on a File prepared outside the timer"
         },
-        (Leg::Leaf, Ingress::Eager, false) => "litchi_odp::Package::from_bytes(&Vec<u8>).map_err(litchi_core::Error::from).and_then(|package| package.presentation())",
+        (Leg::Leaf, Ingress::Eager, false) => {
+            "litchi_odp::Package::from_bytes(&Vec<u8>).map_err(litchi_core::Error::from).and_then(|package| package.presentation())"
+        },
         (Leg::Leaf, Ingress::Source, false) => "litchi_odp::SourceBackedPresentation::from_path",
         (Leg::Leaf, Ingress::Eager, true) => {
             "litchi_odp::Presentation::slide(middle) on a presentation prepared outside the timer"
@@ -3443,7 +3449,9 @@ fn run_ods(
     let timed_calls = match (entry.leg, ingress) {
         (Leg::Unified, Ingress::Eager) => "litchi::open_bytes(Vec<u8>) -> File::Ods",
         (Leg::Unified, Ingress::Source) => "litchi::open(Path) -> File::Ods (source-backed)",
-        (Leg::Leaf, Ingress::Eager) => "litchi_ods::Package::from_bytes(&Vec<u8>).map_err(litchi_core::Error::from).and_then(|package| package.workbook())",
+        (Leg::Leaf, Ingress::Eager) => {
+            "litchi_ods::Package::from_bytes(&Vec<u8>).map_err(litchi_core::Error::from).and_then(|package| package.workbook())"
+        },
         (Leg::Leaf, Ingress::Source) => "litchi_ods::SourceBackedSpreadsheet::from_path",
     };
     let summary = RouteSummary::for_case(entry.case, timed_calls)?.verified(&expected, samples)?;
@@ -3533,6 +3541,11 @@ mod tests {
 
     #[test]
     fn ppt_text_batch_routes_are_named_paired_and_opt_in() {
+        // The `_aggregate_v3` identity is bound to this native operation
+        // bound: it decides the expected publication count and the output
+        // bytes (record 0272). A bound change must retire these names, as
+        // record 0272 retired `_aggregate_v2` for the 4096 bound.
+        assert_eq!(PPT_TEXT_BATCH_NATIVE_OPERATION_LIMIT, 16_384);
         assert_eq!(PPT_TEXT_BATCH_CATALOG.len(), 28);
         for entry in PPT_TEXT_BATCH_CATALOG {
             assert_eq!(crate::parse_case(entry.case.name()), Some(entry.case));
@@ -3556,14 +3569,19 @@ mod tests {
                 entry.count,
                 1 | 10 | 100 | 256 | 1_000 | 4_096 | 10_000
             ));
-            assert!(entry.case.name().ends_with("_aggregate_v2"));
-            let retired = entry.case.name().replace("_aggregate_v2", "_v1");
+            assert!(entry.case.name().ends_with("_aggregate_v3"));
+            let retired = entry.case.name().replace("_aggregate_v3", "_v1");
             assert_eq!(crate::parse_case(&retired), None, "frozen v1 is historical");
+            // Record 0272: the 0220 `_aggregate_v2` selectors qualified the
+            // 4096-operation native bound; their frozen evidence keeps them.
+            let retired = entry.case.name().replace("_aggregate_v3", "_aggregate_v2");
+            assert_eq!(crate::parse_case(&retired), None, "frozen v2 is historical");
         }
         for invalid in [
-            "ppt_text_batch_eager_native_0_aggregate_v2",
+            "ppt_text_batch_eager_native_0_aggregate_v3",
             "ppt_text_batch_eager_native_1",
-            "ppt_text_batch_positional_unified_10001_aggregate_v2",
+            "ppt_text_batch_positional_unified_10001_aggregate_v3",
+            "ppt_text_batch_eager_unified_10000_aggregate_v2",
             "ppt_text_batch_source_native_10_v1",
         ] {
             assert_eq!(crate::parse_case(invalid), None, "{invalid}");

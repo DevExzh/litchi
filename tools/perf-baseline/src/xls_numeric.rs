@@ -1147,10 +1147,16 @@ fn verify_security_refusal(
     };
     let mut edit = snapshot.edit();
     let staged = match storage {
-        Storage::Number => edit.set_number(Selector::Position(Position::new(sheet)), reference, value + 1.0),
-        Storage::Rk | Storage::MulRk => {
-            edit.set_numeric(Selector::Position(Position::new(sheet)), reference, value + 1.0)
-        },
+        Storage::Number => edit.set_number(
+            Selector::Position(Position::new(sheet)),
+            reference,
+            value + 1.0,
+        ),
+        Storage::Rk | Storage::MulRk => edit.set_numeric(
+            Selector::Position(Position::new(sheet)),
+            reference,
+            value + 1.0,
+        ),
         _ => {
             return Err(format!("XLS {label} numeric guard selected an unsupported family").into());
         },
@@ -1492,7 +1498,11 @@ fn verify_real_producer(implementation: Implementation) -> Result<(), Box<dyn st
     let (sheet, reference, replacement) =
         selected.ok_or("XLS real-producer fixture has no representable RK/MulRK replacement")?;
     let mut edit = source.edit();
-    edit.set_numeric(Selector::Position(Position::new(sheet)), reference, replacement)?;
+    edit.set_numeric(
+        Selector::Position(Position::new(sheet)),
+        reference,
+        replacement,
+    )?;
     let commit = commit_source_backed_transaction(edit, implementation)?;
     let mut output = Vec::new();
     commit.write_to(&mut output)?;
