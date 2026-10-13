@@ -157,6 +157,10 @@ fn sample_props(kind: &str, key: &'static str) -> Props<'static> {
             "numId" => Props::new().with(key, "9"),
             "numLevel" => Props::new().with(key, "1"),
             "outlineLvl" => Props::new().with(key, 1),
+            // Record 0251e: both join the paragraph to a new list, visible
+            // through its numId.
+            "listStyle" => Props::new().with(key, "bullet"),
+            "start" => Props::new().with(key, 3),
             _ => panic!("unhandled writable DOCX paragraph property {key}"),
         };
     }

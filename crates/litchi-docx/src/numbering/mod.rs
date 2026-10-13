@@ -5,6 +5,7 @@
 //! Layered `WordprocessingML` numbering model and XML codec.
 
 mod codec;
+mod lists;
 mod model;
 mod package;
 mod transaction;
@@ -14,6 +15,8 @@ mod validation;
 mod tests;
 
 pub use codec::parse_numbering;
+pub use lists::{AddedList, ListKind};
+pub(crate) use lists::{empty_numbering_xml, insert_lists, next_ids};
 pub use model::{
     Collection, Definition, Format, Instance, Level, MultiLevel, Override, Paragraph,
     ParseFormatError, ParseMultiLevelError, PictureBullet, Restart, Suffix,

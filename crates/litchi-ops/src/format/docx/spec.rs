@@ -481,6 +481,23 @@ const fn add_only(
 /// One write-only property declaration.  Text has a dedicated write handler
 /// but is intentionally absent from the read model; the appended registry
 /// row keeps all pre-existing paragraph/run read indices stable.
+/// A property that `set` writes and `get` does not read.
+const fn set_only(
+    name: &'static str,
+    ty: ValueType,
+    setter: Setter,
+    constraint: Constraint,
+) -> crate::registry::Entry<Setter> {
+    let mut spec = PropSpec::new(name, ty);
+    spec.access.get = false;
+    crate::registry::Entry {
+        spec,
+        access: crate::registry::Access::Set(setter),
+        constraint,
+        clear: false,
+    }
+}
+
 const fn write_only(
     name: &'static str,
     ty: ValueType,
@@ -544,6 +561,10 @@ crate::registry::registry! {
     writable("contextualSpacing", ValueType::Bool, Setter::ParagraphContextualSpacing, Constraint::None, true),
     writable("numId", ValueType::Text, Setter::ParagraphNumId, Constraint::NotEmpty, true),
     writable("numLevel", ValueType::Text, Setter::ParagraphNumLevel, Constraint::NotEmpty, true),
+    // Record 0251e: list kinds are written through the numbering part;
+    // reading them back needs that part in the node view (L-DOCX-R6).
+    set_only("listStyle", ValueType::Text, Setter::ParagraphListStyle, Constraint::NotEmpty),
+    set_only("start", ValueType::Int, Setter::ParagraphListStart, Constraint::Int { min: 0, max: 32_767 }),
     writable("outlineLvl", ValueType::Int, Setter::ParagraphOutlineLevel, Constraint::Int { min: 0, max: 9 }, true),
     write_only("text", ValueType::Text, Setter::ParagraphText),
     // A paragraph may carry one initial run.  Its direct run formatting is
@@ -1286,15 +1307,6 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 code: Code::UnsupportedCapability,
                 follow_up: "L-DOCX-R6 (R4x)",
                 reason: "list formats need the numbering part, which the node view does not read yet",
-            },
-            GapSpec {
-                subject: Subject::Property {
-                    element: "paragraph",
-                    key: "listStyle",
-                },
-                code: Code::UnsupportedCapability,
-                follow_up: "L-DOCX-R6 (R4x)",
-                reason: "list kinds need the numbering part, which the node view does not read yet",
             },
             GapSpec {
                 subject: Subject::Property {

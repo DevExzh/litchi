@@ -161,11 +161,11 @@ impl Docx {
         // this makes an empty property list honor the same security policy as
         // a non-empty write.
         let editor = self.edit()?;
-        let targets = self.resolve_targets(&target)?;
+        let nodes = self.resolve_targets(&target)?;
         let props = Props::from_props(props)?;
         let controls = command_text && crate::batch::has_text_controls(&props);
         if controls
-            && targets
+            && nodes
                 .iter()
                 .any(|node| !matches!(node.element_kind(), Kind::Paragraph | Kind::Run))
         {
@@ -175,7 +175,7 @@ impl Docx {
             )
             .with_format(FileFormat::Docx));
         }
-        let targets = admit_targets(targets)?;
+        let targets = admit_targets(&nodes)?;
         let props = if controls && matches!(targets[0].kind, TargetKind::Paragraph) {
             crate::batch::inline_text_props(&props)
         } else {
@@ -186,29 +186,63 @@ impl Docx {
             return WorkEdit::from(editor)?.commit(self);
         }
         let assignments = admit_assignments(targets[0].kind, &props)?;
+        let (request, assignments) = list_request(assignments)?;
         self.owner().check_source()?;
         // A hyperlink target change stages a relationship, which only the
         // owning package publishes.
-        let editor = if assignments.iter().any(|assignment| {
-            matches!(
-                assignment.entry.access,
-                crate::registry::Access::Set(Setter::HyperlinkUrl)
-                    | crate::registry::Access::SetAndAdd(Setter::HyperlinkUrl)
-            )
-        }) {
+        // So does a new list definition (record 0251e).
+        let new_lists = request
+            .is_some_and(|request| !matches!(request.style, Some(super::lists::Style::None)));
+        let editor = if new_lists
+            || assignments.iter().any(|assignment| {
+                matches!(
+                    assignment.entry.access,
+                    crate::registry::Access::Set(Setter::HyperlinkUrl)
+                        | crate::registry::Access::SetAndAdd(Setter::HyperlinkUrl)
+                )
+            }) {
             self.eager_editor(editor)?
         } else {
             editor
         };
 
         let mut editor = WorkEdit::from(editor)?;
-        if editor.bulk_paragraph_text(&targets, &assignments)? {
+        let Some(request) = request else {
+            if editor.bulk_paragraph_text(&targets, &assignments)? {
+                return editor.commit(self);
+            }
+            for target in &targets {
+                for assignment in &assignments {
+                    editor.apply_with_policy(target, assignment, command_text)?;
+                }
+            }
             return editor.commit(self);
-        }
-        for target in &targets {
+        };
+        // `listStyle`: plan each paragraph's list (staging new definitions),
+        // then write its numbering after the other properties.
+        let planned = if new_lists {
+            let WorkEdit::Eager(eager) = &mut editor else {
+                return Err(Error::new(
+                    Code::InternalError,
+                    "a DOCX list edit needs the owning package editor",
+                ));
+            };
+            super::lists::plan(&nodes, request, eager)?
+        } else {
+            vec![None; targets.len()]
+        };
+        let explicit_level = assignments.iter().any(|assignment| {
+            matches!(
+                assignment.entry.access,
+                crate::registry::Access::SetAndAdd(Setter::ParagraphNumLevel)
+                    | crate::registry::Access::Set(Setter::ParagraphNumLevel)
+            )
+        });
+        for (target, planned) in targets.iter().zip(planned) {
             for assignment in &assignments {
                 editor.apply_with_policy(target, assignment, command_text)?;
             }
+            editor.set_numbering(target, planned, explicit_level)?;
         }
         editor.commit(self)
     }
@@ -400,6 +434,44 @@ impl WorkEdit {
     }
 
     /// Apply one admitted assignment to an element reached by its leaf path.
+    /// Join a paragraph to a list, or remove its numbering, in one
+    /// formatting operation (record 0251e). An explicit `level` wins over
+    /// the planned one.
+    fn set_numbering(
+        &mut self,
+        target: &Target,
+        numbering: Option<(u32, u8)>,
+        keep_level: bool,
+    ) -> Result<()> {
+        let apply = |properties: &mut litchi_docx::properties::Paragraph| match numbering {
+            Some((id, level)) => {
+                let numbering = properties.numbering.get_or_insert_default();
+                numbering.id = Some(id);
+                if !keep_level || numbering.level.is_none() {
+                    numbering.level = Some(level);
+                }
+            },
+            None => properties.numbering = None,
+        };
+        match &target.selection {
+            Selection::Body(WriteSelection::Paragraph(position)) => {
+                both!(self, |edit| edit
+                    .format_paragraph(*position, apply)
+                    .map(|_| ())
+                    .map_err(Error::from))
+            },
+            Selection::Element(path) => both!(self, |edit| edit
+                .format_paragraph_at(path, apply)
+                .map(|_| ())
+                .map_err(Error::from)),
+            Selection::Body(WriteSelection::Run { .. }) => Err(Error::new(
+                Code::UnsupportedCapability,
+                "listStyle applies to paragraphs",
+            )
+            .with_property("listStyle")),
+        }
+    }
+
     fn apply_element(
         &mut self,
         path: &litchi_docx::document::ElementPath,
@@ -813,7 +885,7 @@ impl WorkEdit {
     }
 }
 
-fn admit_targets(nodes: Vec<Node<'_>>) -> Result<Vec<Target>> {
+fn admit_targets(nodes: &[Node<'_>]) -> Result<Vec<Target>> {
     let mut targets = Vec::with_capacity(nodes.len());
     // Every node comes from one resolve_targets call on one immutable owner.
     // Cache only within this admission; later operations may have a new body.
@@ -839,13 +911,13 @@ fn admit_targets(nodes: Vec<Node<'_>>) -> Result<Vec<Target>> {
                     // Not a direct-body paragraph or direct run: try the
                     // element path, which proves nested positions itself.
                     Err(error) if error.code() == Code::UnsupportedCapability => {
-                        Selection::Element(element::element_path(&node)?)
+                        Selection::Element(element::element_path(node)?)
                     },
                     Err(error) => return Err(error),
                 }
             },
             TargetKind::Hyperlink | TargetKind::Cell => {
-                Selection::Element(element::element_path(&node)?)
+                Selection::Element(element::element_path(node)?)
             },
         };
         targets.push(Target { selection, kind });
@@ -912,6 +984,60 @@ fn admit_table<'a, const N: usize, const A: usize>(
         });
     }
     Ok(assignments)
+}
+
+/// Split the `listStyle` and `start` assignments (record 0251e) from the
+/// others.
+fn list_request(
+    assignments: Vec<Assignment<'_>>,
+) -> Result<(Option<super::lists::Request>, Vec<Assignment<'_>>)> {
+    let mut request = None::<super::lists::Request>;
+    let mut rest = Vec::with_capacity(assignments.len());
+    for assignment in assignments {
+        match assignment.entry.access {
+            crate::registry::Access::Set(Setter::ParagraphListStyle) => {
+                let style = assignment
+                    .entry
+                    .prepare(Operation::Set, &assignment.value, |_, value| {
+                        Ok(super::lists::style(&text_value(value)?))
+                    })
+                    .map_err(|error| property_error(error, &assignment.key))?;
+                request
+                    .get_or_insert(super::lists::Request {
+                        style: None,
+                        start: None,
+                    })
+                    .style = Some(style);
+            },
+            crate::registry::Access::Set(Setter::ParagraphListStart) => {
+                let start = assignment
+                    .entry
+                    .prepare(Operation::Set, &assignment.value, |_, value| match value {
+                        Some(crate::value::Scalar::Int(start)) => {
+                            u32::try_from(start).map_err(|_| {
+                                Error::new(
+                                    Code::InvalidValue,
+                                    "a list start is a non-negative integer",
+                                )
+                            })
+                        },
+                        _ => Err(Error::new(
+                            Code::InvalidValue,
+                            "a list start is a non-negative integer",
+                        )),
+                    })
+                    .map_err(|error| property_error(error, &assignment.key))?;
+                request
+                    .get_or_insert(super::lists::Request {
+                        style: None,
+                        start: None,
+                    })
+                    .start = Some(start);
+            },
+            _ => rest.push(assignment),
+        }
+    }
+    Ok((request, rest))
 }
 
 fn text_value(value: Option<crate::value::Scalar<'_>>) -> Result<String> {

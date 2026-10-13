@@ -86,16 +86,41 @@ impl Edit<Package> {
         content_type: &str,
         payload: Vec<u8>,
     ) -> Result<(String, String)> {
+        self.stage_related_part(
+            relationship_type,
+            (directory, stem, extension),
+            false,
+            content_type,
+            payload,
+        )
+    }
+
+    /// As [`Self::add_related_part`]; with `unnumbered_first`, the plain
+    /// `{directory}{stem}{extension}` is tried first, as Word names its
+    /// singleton parts (`comments.xml`, `numbering.xml`).
+    pub(super) fn stage_related_part(
+        &mut self,
+        relationship_type: &str,
+        (directory, stem, extension): (&str, &str, &str),
+        unnumbered_first: bool,
+        content_type: &str,
+        payload: Vec<u8>,
+    ) -> Result<(String, String)> {
         let base = self.main_folder()?;
         let used = self.part_names()?;
-        let mut index = 1usize;
-        let (name, target) = loop {
-            let target = format!("{directory}{stem}{index}{extension}");
-            let name = format!("{base}{target}");
-            if !used.contains(&name) {
-                break (name, target);
+        let plain = format!("{directory}{stem}{extension}");
+        let (name, target) = if unnumbered_first && !used.contains(&format!("{base}{plain}")) {
+            (format!("{base}{plain}"), plain)
+        } else {
+            let mut index = 1usize;
+            loop {
+                let target = format!("{directory}{stem}{index}{extension}");
+                let name = format!("{base}{target}");
+                if !used.contains(&name) {
+                    break (name, target);
+                }
+                index += 1;
             }
-            index += 1;
         };
         PackURI::new(name.clone()).map_err(crate::Error::Invalid)?;
         let id = self.next_relationship_id()?;

@@ -164,11 +164,10 @@ impl Edit<Package> {
                     r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:comments xmlns:w="{namespace}"></w:comments>"#
                 );
                 let xml = append_comment(empty.as_bytes(), id, comment)?;
-                self.add_related_part(
+                self.stage_related_part(
                     comments_relationship(strict),
-                    "",
-                    "comments",
-                    ".xml",
+                    ("", "comments", ".xml"),
+                    true,
                     COMMENTS_CONTENT_TYPE,
                     xml,
                 )?;

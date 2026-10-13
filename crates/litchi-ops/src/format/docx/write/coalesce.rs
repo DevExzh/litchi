@@ -44,7 +44,7 @@ impl Docx {
             return Ok(None);
         }
         let result = (|| {
-            let mut targets = admit_targets(self.resolve_targets(target)?)?;
+            let mut targets = admit_targets(&self.resolve_targets(target)?)?;
             let target = targets
                 .pop()
                 .ok_or_else(|| Error::new(Code::InternalError, "direct target is missing"))?;
@@ -59,7 +59,12 @@ fn plan(target: Target, props: &Props<'_>) -> Result<Option<Plan>> {
         if assignment
             .entry
             .prepare(Operation::Set, &assignment.value, |setter, _| {
-                Ok(setter.is_text())
+                // Lists stage numbering definitions: a barrier (0251e).
+                Ok(setter.is_text()
+                    || matches!(
+                        setter,
+                        super::Setter::ParagraphListStyle | super::Setter::ParagraphListStart
+                    ))
             })?
         {
             return Ok(None);

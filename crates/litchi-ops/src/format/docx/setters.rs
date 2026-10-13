@@ -40,6 +40,11 @@ pub(crate) enum Setter {
     TableData,
     /// A new row's cell count.
     RowColumns,
+    /// A paragraph's list kind (record 0251e); applied through the
+    /// numbering part, not the paragraph's properties.
+    ParagraphListStyle,
+    /// A paragraph list's restart value (record 0251e).
+    ParagraphListStart,
     /// A new picture's image source (record 0251d).
     PictureSrc,
     /// A new picture's width.
@@ -304,6 +309,8 @@ impl Setter {
                 Ok(())
             },
             Self::ParagraphContextualSpacing => set_bool(&mut paragraph.contextual_spacing, value),
+            // Planned by `super::lists`; admission only checks the value.
+            Self::ParagraphListStyle | Self::ParagraphListStart => Ok(()),
             Self::ParagraphNumId => {
                 let value = text(value)?;
                 let value = value

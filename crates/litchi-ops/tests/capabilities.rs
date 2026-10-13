@@ -202,6 +202,14 @@ fn ordinary_reports_hide_native_selection_fields() {
                     assert!(!property.get());
                     assert!(property.set());
                     assert!(property.add());
+                } else if element.name() == "paragraph"
+                    && matches!(property.name(), "listStyle" | "start")
+                {
+                    // Record 0251e: list kinds are set through the
+                    // numbering part and not read back yet.
+                    assert!(!property.get(), "{}", property.name());
+                    assert!(property.set(), "{}", property.name());
+                    assert!(!property.add(), "{}", property.name());
                 } else if property.name() != "styleId" {
                     assert!(property.get(), "{}", property.name());
                     assert!(property.set(), "{}", property.name());

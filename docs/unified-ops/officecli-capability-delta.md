@@ -19,8 +19,8 @@ fails while a golden differs from the hash recorded below.
 
 | Input | File | SHA-256 |
 |---|---|---|
-| golden | `crates/litchi-ops/tests/golden/capabilities/docx.json` | `9a2a5f4c4bbbc5eaac032e8534f7bc03970d482a5994b2c1288ae9333b8e7578` |
-| golden | `crates/litchi-ops/tests/golden/capabilities/docx-encryption.json` | `8ca3f1b3db0fa2f29286283707153d129c1d76e141729e608c65a32f928e8118` |
+| golden | `crates/litchi-ops/tests/golden/capabilities/docx.json` | `9ed37ddae85aad953a18e217b63459f13fd50dc3e8ff485ccb8d65fa9b02b824` |
+| golden | `crates/litchi-ops/tests/golden/capabilities/docx-encryption.json` | `fbcf3ad2d2716cba713b403923e51d87ca7d5f320beb21c97d02935a94adb903` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/xlsx.json` | `402174221748379047c6fd6cd6b5b7e89abb558f32f31e174b4ef03934be5549` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/xlsb.json` | `457978593767efb194d16b90d471bc8ced452f7bba01ce44079bbf9edd5d37d9` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/xls.json` | `f3dc9441b5a941b499bd8d3673382c431dd8535a6f67e122395543e7f7f567f5` |
@@ -72,7 +72,7 @@ Property reads:
 
 | Format | supported | gap | element gap | pending | write-only | raw-only | missing | litchi-only |
 |---|---|---|---|---|---|---|---|---|
-| docx | 138 | 4 | 391 | 0 | 112 | 2 | 314 | 28 |
+| docx | 138 | 3 | 391 | 0 | 113 | 2 | 314 | 28 |
 | xlsx | 81 | 16 | 489 | 0 | 26 | 1 | 78 | 62 |
 | xlsb | 54 | 45 | 489 | 0 | 24 | 1 | 78 | 2 |
 | xls | 16 | 17 | 509 | 0 | 24 | 1 | 124 | 0 |
@@ -82,7 +82,7 @@ Property writes:
 
 | Format | supported | partial | gap | pending | litchi-only | — |
 |---|---|---|---|---|---|---|
-| docx | 92 | 28 | 676 | 0 | 12 | 181 |
+| docx | 92 | 30 | 674 | 0 | 12 | 181 |
 | xlsx | 11 | 36 | 497 | 0 | 66 | 143 |
 | xlsb | 2 | 2 | 540 | 0 | 3 | 146 |
 | xls | 0 | 3 | 541 | 0 | 0 | 147 |
@@ -569,10 +569,10 @@ Property writes:
 | paragraph | `spaceAfter` | length | asg | asg | supported | supported |  |
 | paragraph | `spaceBeforeAuto` | boolean | asg | asg | supported | supported |  |
 | paragraph | `spaceAfterAuto` | boolean | asg | asg | supported | supported |  |
-| paragraph | `listStyle` | enum | asg |  | gap | gap | L-DOCX-R6 (R4x) |
+| paragraph | `listStyle` | enum | asg | -s- | write-only | partial |  |
 | paragraph | `numId` | int | asg | asg | supported | supported |  |
 | paragraph | `numLevel` | int | asg | asg | supported | supported |  |
-| paragraph | `start` | int | as- |  | write-only | gap |  |
+| paragraph | `start` | int | as- | -s- | write-only | partial |  |
 | paragraph | `bold` | bool | asg | a-- | write-only | partial |  |
 | paragraph | `italic` | bool | asg | a-- | write-only | partial |  |
 | paragraph | `font` | string | as- |  | write-only | gap |  |

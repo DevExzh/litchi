@@ -10,6 +10,7 @@ use litchi_core::Position;
 
 mod comments;
 mod graph;
+mod numbering;
 mod picture;
 pub use comments::NewComment;
 pub use graph::HyperlinkTarget;

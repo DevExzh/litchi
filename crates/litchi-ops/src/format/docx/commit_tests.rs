@@ -484,7 +484,7 @@ fn fanout_write_proofs_load_one_body_per_admission() {
             assert!(nodes.len() >= 2);
             let count = nodes.len();
             BODY_LOADS.with(|loads| loads.set(0));
-            let targets = super::admit_targets(nodes).unwrap();
+            let targets = super::admit_targets(&nodes).unwrap();
             assert_eq!(targets.len(), count);
             BODY_LOADS.with(|loads| assert_eq!(loads.get(), 1));
         }

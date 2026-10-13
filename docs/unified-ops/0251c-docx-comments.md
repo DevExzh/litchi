@@ -14,7 +14,7 @@ Builds on the package-graph changes of [0251b](0251b-docx-hyperlink-writes.md).
     reference run (`w:commentReference`), staged as an element
     replacement.
   - The comment entry is staged as a graph change. Without a comments part,
-    a new one (`comments1.xml` beside the main part, the first free name)
+    a new one (`comments.xml` beside the main part, or the first free numbered name; 0251e)
     and its relationship are added. Otherwise the existing part is replaced
     exactly.
   - The identifier is one above every identifier used by the part and by

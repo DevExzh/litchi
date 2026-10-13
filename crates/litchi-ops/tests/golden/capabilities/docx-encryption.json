@@ -449,6 +449,18 @@
           "set": true,
           "get": true
         },
+        "listStyle": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "start": {
+          "type": "int",
+          "add": false,
+          "set": true,
+          "get": false
+        },
         "outlineLvl": {
           "type": "int",
           "add": true,
@@ -2879,14 +2891,6 @@
       "code": "unsupported_capability",
       "followUp": "L-DOCX-R6 (R4x)",
       "reason": "list formats need the numbering part, which the node view does not read yet"
-    },
-    {
-      "subject": "property",
-      "element": "paragraph",
-      "key": "listStyle",
-      "code": "unsupported_capability",
-      "followUp": "L-DOCX-R6 (R4x)",
-      "reason": "list kinds need the numbering part, which the node view does not read yet"
     },
     {
       "subject": "property",

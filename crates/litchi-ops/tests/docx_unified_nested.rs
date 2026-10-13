@@ -554,3 +554,84 @@ fn pictures_are_added_and_read_on_both_owners() {
         assert_eq!(error.code(), Code::InvalidValue);
     }
 }
+
+fn numbering_xml(file: &File) -> Option<String> {
+    let bytes = file.to_bytes().expect("publish");
+    let mut archive = zip::ZipArchive::new(Cursor::new(bytes)).expect("open DOCX ZIP");
+    let mut member = archive.by_name("word/numbering.xml").ok()?;
+    let mut contents = String::new();
+    member
+        .read_to_string(&mut contents)
+        .expect("read numbering");
+    Some(contents)
+}
+
+#[test]
+fn list_styles_create_continue_and_remove_lists_on_both_owners() {
+    let paragraphs = |count: usize| {
+        let body: String = (1..=count)
+            .map(|index| format!("<w:p><w:r><w:t>Item {index}</w:t></w:r></w:p>"))
+            .collect();
+        package(&format!(
+            r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>{body}<w:sectPr/></w:body></w:document>"#
+        ))
+    };
+    for eager in [false, true] {
+        let file = open(eager, paragraphs(5));
+        assert!(numbering_xml(&file).is_none());
+        // One write over two adjacent paragraphs: one new list, continued.
+        let file = file
+            .set("/body/p[1]", props! { "listStyle" => "bullet" })
+            .unwrap_or_else(|error| panic!("bullet p1: {error}"));
+        let file = file
+            .set("/body/p[2]", props! { "listStyle" => "ul" })
+            .unwrap_or_else(|error| panic!("bullet p2: {error}"));
+        let first = property(&file, "/body/p[1]", "numId").expect("p1 numId");
+        assert_eq!(property(&file, "/body/p[2]", "numId"), Some(first.clone()));
+        assert_eq!(
+            property(&file, "/body/p[2]", "numLevel").as_deref(),
+            Some("0")
+        );
+        // A numbered list after the bullets starts a new list.
+        let file = file
+            .set("/body/p[3]", props! { "listStyle" => "ordered" })
+            .unwrap_or_else(|error| panic!("ordered p3: {error}"));
+        let ordered = property(&file, "/body/p[3]", "numId").expect("p3 numId");
+        assert_ne!(ordered, first);
+        // `start` forces a fresh list even after a same-kind paragraph.
+        let file = file
+            .set(
+                "/body/p[4]",
+                props! { "listStyle" => "decimal", "start" => 3, "numLevel" => "1" },
+            )
+            .unwrap_or_else(|error| panic!("restart p4: {error}"));
+        let restarted = property(&file, "/body/p[4]", "numId").expect("p4 numId");
+        assert_ne!(restarted, ordered);
+        assert_eq!(
+            property(&file, "/body/p[4]", "numLevel").as_deref(),
+            Some("1")
+        );
+        let numbering = numbering_xml(&file).expect("a numbering part");
+        assert_eq!(
+            numbering.matches("<w:abstractNum ").count(),
+            3,
+            "{numbering}"
+        );
+        assert!(numbering.contains(r#"<w:start w:val="3"/>"#));
+        // `none` removes the numbering.
+        let file = file
+            .set("/body/p[2]", props! { "listStyle" => "none" })
+            .unwrap_or_else(|error| panic!("none p2: {error}"));
+        assert_eq!(property(&file, "/body/p[2]", "numId"), None);
+        let reopened = reopen(&file, eager);
+        assert_eq!(property(&reopened, "/body/p[1]", "numId"), Some(first));
+        assert_eq!(property(&reopened, "/body/p[3]", "numId"), Some(ordered));
+        // A query over adjacent paragraphs joins them into one new list.
+        let joined = open(eager, paragraphs(3))
+            .set("/body > p", props! { "listStyle" => "bullet" })
+            .unwrap_or_else(|error| panic!("query bullets: {error}"));
+        let id = property(&joined, "/body/p[1]", "numId");
+        assert!(id.is_some());
+        assert_eq!(property(&joined, "/body/p[3]", "numId"), id);
+    }
+}

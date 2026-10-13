@@ -178,6 +178,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .into_file())
         },
     )?);
+    cases.push(measure(
+        "list_style_bullet",
+        || {
+            let mut edit = package.edit()?;
+            let list = edit.add_list(litchi_docx::numbering::ListKind::Bullet, None)?;
+            edit.format_paragraph_at(&body_paragraph, |properties| {
+                let mut numbering = litchi_docx::properties::Numbering::default();
+                numbering.id = Some(list.num_id());
+                numbering.level = Some(0);
+                properties.numbering = Some(numbering);
+            })?;
+            Ok(edit.commit()?.into_package())
+        },
+        || {
+            Ok(file.set(
+                "/body/p[151]",
+                litchi_ops::props! { "listStyle" => "bullet" },
+            )?)
+        },
+    )?);
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({

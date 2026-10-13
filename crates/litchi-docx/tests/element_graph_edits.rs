@@ -374,3 +374,92 @@ fn pictures_publish_their_media_part_and_drawing_atomically() {
         .is_err()
     );
 }
+
+#[test]
+fn lists_create_the_numbering_part_and_extend_it_exactly() {
+    use litchi_docx::numbering::{Format, ListKind};
+    use litchi_docx::properties::{Numbering, Paragraph as ParagraphProperties};
+
+    fn joined(num_id: u32) -> impl FnOnce(&mut ParagraphProperties) {
+        move |properties| {
+            let mut numbering = Numbering::default();
+            numbering.id = Some(num_id);
+            numbering.level = Some(0);
+            properties.numbering = Some(numbering);
+        }
+    }
+
+    let base = source();
+    let mut edit = base.edit().unwrap();
+    let bullets = edit.add_list(ListKind::Bullet, None).unwrap();
+    let numbers = edit.add_list(ListKind::Decimal, Some((0, 5))).unwrap();
+    // The builder's template already has a numbering part; new lists take
+    // the next identifiers.
+    assert!(bullets.num_id() > 1);
+    assert_eq!(
+        (numbers.abstract_num_id(), numbers.num_id()),
+        (bullets.abstract_num_id() + 1, bullets.num_id() + 1)
+    );
+    edit.format_paragraph_at(&paragraph(0), joined(bullets.num_id()))
+        .unwrap();
+    edit.format_paragraph_at(&paragraph(1), joined(numbers.num_id()))
+        .unwrap();
+    let (mut changed, patch) = edit.commit().unwrap().into_parts();
+    let reopened = Package::from_bytes(&changed.to_bytes().unwrap()).unwrap();
+    assert!(
+        reopened
+            .opc_package()
+            .get_part(&litchi_opc::PackURI::new("/word/numbering.xml".to_owned()).unwrap())
+            .is_ok()
+    );
+    let document = reopened.document().unwrap();
+    let paragraphs = document.paragraphs().unwrap();
+    assert_eq!(
+        paragraphs[0].numbering().unwrap().unwrap().num_id,
+        bullets.num_id()
+    );
+    assert_eq!(
+        paragraphs[1].numbering().unwrap().unwrap().num_id,
+        numbers.num_id()
+    );
+    let collection = document.numbering().unwrap().unwrap();
+    let level = |num_id: u32| {
+        let instance = collection.get_num(num_id).unwrap();
+        collection
+            .get_abstract_num(instance.abstract_num_id())
+            .unwrap()
+            .level(0)
+            .unwrap()
+            .clone()
+    };
+    assert_eq!(level(bullets.num_id()).format, Format::Bullet);
+    assert_eq!(level(numbers.num_id()).format, Format::Decimal);
+    assert_eq!(level(numbers.num_id()).start, 5);
+    let instances = collection.nums().len();
+
+    // A second edit extends the existing part with the next identifiers.
+    let mut edit = reopened.edit().unwrap();
+    let third = edit.add_list(ListKind::Decimal, None).unwrap();
+    assert_eq!(third.num_id(), numbers.num_id() + 1);
+    let extended = edit.commit().unwrap().into_package();
+    assert_eq!(
+        extended
+            .document()
+            .unwrap()
+            .numbering()
+            .unwrap()
+            .unwrap()
+            .nums()
+            .len(),
+        instances + 1
+    );
+
+    // Replay and exact inverse of the first edit.
+    let mut replayed = base.apply(&patch).unwrap();
+    assert_eq!(replayed.to_bytes().unwrap(), changed.to_bytes().unwrap());
+    let mut restored = changed.apply(&patch.inverse()).unwrap();
+    assert_eq!(
+        restored.to_bytes().unwrap(),
+        base.clone().to_bytes().unwrap()
+    );
+}
