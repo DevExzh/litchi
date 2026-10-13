@@ -166,7 +166,13 @@ fn every_format_has_one_answer_for_its_reads() {
                 && cfg!(feature = "ppt")
                 && matches!(
                     verb,
-                    Verb::Set | Verb::Remove | Verb::Move | Verb::Swap | Verb::Edit | Verb::Batch
+                    Verb::Set
+                        | Verb::Add
+                        | Verb::Remove
+                        | Verb::Move
+                        | Verb::Swap
+                        | Verb::Edit
+                        | Verb::Batch
                 );
             let pptx_edit = format == FileFormat::Pptx
                 && cfg!(feature = "pptx")

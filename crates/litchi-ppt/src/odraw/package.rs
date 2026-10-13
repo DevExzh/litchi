@@ -9,6 +9,8 @@ pub(super) const MAX_HOST_RECORDS: u32 = 1_000_000;
 
 #[derive(Debug, Clone, Copy)]
 pub(super) struct RawRecord<'data> {
+    /// The record version (`recVer`, the low four bits of the header).
+    pub(super) version: u16,
     pub(super) kind: u16,
     pub(super) data: &'data [u8],
 }
@@ -56,6 +58,7 @@ impl<'data> Iterator for RawRecords<'data> {
                 "Host payload ends with a truncated PPT record header",
             )));
         };
+        let version = u16::from_le_bytes([header[0], header[1]]) & 0x000f;
         let kind = u16::from_le_bytes([header[2], header[3]]);
         let Ok(len) = usize::try_from(u32::from_le_bytes([
             header[4], header[5], header[6], header[7],
@@ -76,7 +79,11 @@ impl<'data> Iterator for RawRecords<'data> {
             )));
         };
         self.offset = end;
-        Some(Ok(RawRecord { kind, data }))
+        Some(Ok(RawRecord {
+            version,
+            kind,
+            data,
+        }))
     }
 }
 

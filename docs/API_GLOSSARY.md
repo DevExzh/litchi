@@ -59,6 +59,8 @@ transaction is the bare `Package::edit()`.
 | Rollback | *dropping the `Edit`* | `Transaction::rollback()` (pptx) | ✅ primary PPTX edit (0116); ✅ scoped PPTX families (0252) |
 
 | Rollback | *dropping the `Edit`* | `Transaction::rollback()` (pptx) | ✅ primary PPTX edit (0116); ✅ every DOC transaction, `rollback` banned crate-wide (0258); 🔴 scoped PPTX families (W2) |
+
+| Rollback | *dropping the `Edit`* | `Transaction::rollback()` (pptx) | ✅ primary PPTX edit (0116); ✅ PPT root `slide_order::Transaction` and `text_edit::{Transaction, SourceTransaction}` (0260); 🔴 scoped PPTX families (W2); 🔴 scoped PPT families (W4 residue, 0260) |
 | Mutable writer on a package | *none — `edit()` is the only write path* | `document_mut()` (docx), `presentation_mut()` (pptx) | PPTX `presentation_mut` removed (0127); 🔴 remaining W2 authoring verbs move into `Edit`, direct mutators and `UnsafeEdit` vocabulary still require migration |
 
 Deferred (own tracks, not this glossary): `History`/undo-redo, patch
@@ -93,6 +95,8 @@ and redaction vocabulary remain pending.
 | Configured open | `open_with_options(path, OpenOptions)`, `from_bytes_with_options(bytes, OpenOptions)` | `open_with_limits`, `open_with` (doc), `open_with_options` under other type names | envelope decided in §5 · ✅ DOCX (0038) · ✅ XLSX `OpenOptions` (source limits, leniency, encryption limits; 0250) · ✅ PPTX owning `Package` and positional-source presentation owners (0252) |
 
 | Configured open | `open_with_options(path, OpenOptions)`, `from_bytes_with_options(bytes, OpenOptions)` | `open_with_limits`, `open_with` (doc), `open_with_options` under other type names | envelope decided in §5 · ✅ XLSX `OpenOptions` (source limits, leniency, encryption limits; 0250) · ✅ DOC raw owner and part editors, `open_with_limits*` banned crate-wide (0258) |
+
+| Configured open | `open_with_options(path, OpenOptions)`, `from_bytes_with_options(bytes, OpenOptions)` | `open_with_limits`, `open_with` (doc), `open_with_options` under other type names | envelope decided in §5 · ✅ XLSX `OpenOptions` (source limits, leniency, encryption limits; 0250) · ✅ PPT `text_edit::SourceSnapshot::open_with_options` and `slide_order::Snapshot::from_bytes_with_options` only (0260); 🔴 PPT `raw::Reader` limits-only ingress and scoped-family `*_with_limits` (W4 residue) |
 | Minimal fresh artifact | `Package::new()` | `Workbook::create()` duplicate (xlsx) | ✅ docx; ✅ canonical PPTX constructor (0127); ✅ XLSB (0175); ✅ XLS (0199); ✅ RTF (0225); ✅ XLSX (0250) · all formats gain it |
 | Save to path | `save(path)` — **always atomic** (sibling temp + rename) | non-atomic `Builder::save` (odt/odp) | ✅ OOXML, including lazy DOCX (0041), and RTF (0226) · 🔴 ODF (W3, behavior change with CRUD evidence) |
 | Save with explicit durability | `save_with_durability(path, Durability)` | — | ✅ OOXML and RTF (0226); extended everywhere |
@@ -1423,6 +1427,23 @@ shared post-detachment contract; removal selectors resolve before descending
 native staging. A swap composes at most two native slide moves in one edit.
 Exact self moves/swaps preserve snapshot identity. Slide and shape insertion,
 shape removal, and consecutive-command coalescing remain open.
+
+## PPT P0 read and write surface (0260)
+
+The native leg adds `package::edit::Edit::{insert_slide, set_notes_text}` (and
+the same methods on `slide_order::Transaction`), named after the PPTX
+`Edit::insert_slide` verb; `insert_slide(position)` creates a blank-layout
+slide. Shapes expose `ShapeEnum::{name, description, source_index, id}`
+(L-PPT-R3/R4) and slide-list placeholder text is read and written through
+`OutlineTextBody` (L-PPT-R1). `text_edit::Refusal::NoNotesPage` names the
+missing-notes refusal. The unified PPT adapter reads `/slide[N]/notes`,
+`.../paragraph[N]`, `name`, `alt` and raw `sourceIndex`, sets notes and
+paragraph `text`, and adds slides. Removed and banned in both PPT profiles:
+`text_edit::SourceSnapshot::open_with_limits`, `rollback` on
+`text_edit::{Transaction, SourceTransaction}` and `slide_order::Transaction`,
+and `slide_order::Snapshot::from_bytes_with_limits`. `ppt-full` now also
+bans `Builder::set_property` and checks the `package::metadata` family, as
+`ppt-minimal` already did. See [0260](unified-ops/0260-ppt-p0-surface.md).
 
 ## Unified PPT shape runs (0218)
 

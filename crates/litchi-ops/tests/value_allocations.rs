@@ -565,6 +565,10 @@ fn ppt_selected_reads_add_constant_allocations_over_native_slide_reads() {
             "selected text"
         );
     };
+    // Both legs measure warm reads: the presentation's one-slide shape memo
+    // (record 0260) serves the facade and native handles alike.
+    native(&small_native);
+    native(&large_native);
     let small_base = allocation_measure(|| native(&small_native));
     let large_base = allocation_measure(|| native(&large_native));
     let overhead =

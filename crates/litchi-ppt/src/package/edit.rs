@@ -417,7 +417,9 @@ impl Edit {
         ensure_source_version(&package, expected_source)?;
         let inner = snapshot?.edit();
         ensure_source_version(&package, expected_source)?;
-        let inner = inner?;
+        // The package's own projection was parsed from exactly these bytes;
+        // target resolution reuses its parsed slides (record 0260).
+        let inner = inner?.with_opened_projection(package.presentation().map_err(Error::Package)?);
         Ok(Self {
             package,
             inner,
@@ -453,6 +455,13 @@ impl Edit {
     /// Remove one slide and its order-owned outline records.
     pub fn remove_slide(&mut self, position: Position) -> Result<()> {
         self.stage(1, |inner| inner.remove_slide(position))
+    }
+
+    /// Insert a blank slide at a projected position (`slide_count()`
+    /// appends). It follows the master and color scheme of its preceding
+    /// slide and receives a new drawing and shape-identifier cluster.
+    pub fn insert_slide(&mut self, position: Position) -> Result<()> {
+        self.stage(1, |inner| inner.insert_slide(position))
     }
 
     /// Insert a dependency-checked transfer plan at a projected position.
@@ -504,6 +513,14 @@ impl Edit {
             })
         })?;
         self.stage(charge, |inner| inner.set_shape_text_chunks(chunks))
+    }
+
+    /// Set the speaker-notes text of the slide at a zero-based position.
+    ///
+    /// The slide's notes page must hold exactly one body placeholder. Equal
+    /// text is an exact no-op; a signed source refuses a changed text.
+    pub fn set_notes_text(&mut self, position: Position, value: impl Into<String>) -> Result<()> {
+        self.stage(1, move |inner| inner.set_notes_text(position, value.into()))
     }
 
     /// Set one existing shape's complete checked client anchor.

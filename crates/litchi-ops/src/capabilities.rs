@@ -789,7 +789,13 @@ impl Capabilities {
             #[cfg(feature = "ppt")]
             if matches!(
                 verb,
-                Verb::Set | Verb::Remove | Verb::Move | Verb::Swap | Verb::Edit | Verb::Batch
+                Verb::Set
+                    | Verb::Add
+                    | Verb::Remove
+                    | Verb::Move
+                    | Verb::Swap
+                    | Verb::Edit
+                    | Verb::Batch
             ) && self.adapter() == Some(Adapter::Ppt)
             {
                 if self.retains_source == Some(false) {
@@ -2768,7 +2774,10 @@ impl Element {
         let settable = settable
             || (self.adapter == Adapter::Ppt
                 && self.retains_source != Some(false)
-                && matches!(self.data().canonical, "slide" | "shape" | "placeholder")
+                && matches!(
+                    self.data().canonical,
+                    "slide" | "shape" | "placeholder" | "notes" | "paragraph"
+                )
                 && readable);
         #[cfg(feature = "rtf")]
         let settable = settable
@@ -2817,6 +2826,12 @@ impl Element {
             || (self.adapter == Adapter::Doc
                 && self.retains_source != Some(false)
                 && self.data().canonical == "p"
+                && readable);
+        #[cfg(feature = "ppt")]
+        let add = add
+            || (self.adapter == Adapter::Ppt
+                && self.retains_source != Some(false)
+                && self.data().canonical == "slide"
                 && readable);
         #[cfg(feature = "rtf")]
         let add = add
@@ -2950,6 +2965,8 @@ fn element_data(adapter: Adapter, index: u16) -> Data {
                 "shape" => crate::format::ppt::SHAPE_CAPABILITY_PROPS,
                 "placeholder" => crate::format::ppt::PLACEHOLDER_CAPABILITY_PROPS,
                 "slide" => crate::format::ppt::SLIDE_CAPABILITY_PROPS,
+                "notes" => crate::format::ppt::NOTES_CAPABILITY_PROPS,
+                "paragraph" => crate::format::ppt::PARAGRAPH_CAPABILITY_PROPS,
                 _ => props,
             }
         } else { props };
@@ -3230,7 +3247,7 @@ const PPT_WRITE_GAPS: &[GapSpec] = &[
         },
         code: Code::UnsupportedCapability,
         follow_up: "M2 PPT nested-shape and rich-text edits",
-        reason: "top-level shape text and anchors require native closure admission; nested groups, new text bodies and rich-text formatting remain unsupported",
+        reason: "top-level shape, outline placeholder, paragraph and notes text and shape anchors require native closure admission: a changed text length refuses where interactions, field metacharacters or several formatting or language runs hold character positions; nested groups, new text bodies and rich-text formatting remain unsupported",
     },
     GapSpec {
         subject: Subject::Operation {

@@ -38,6 +38,7 @@ LOCKED = ("ole/doc/PasswordProtected.doc", "ole/xls/password.xls")
 #: The only PPT fixture whose shapes the native PPT editor accepts.
 EDITABLE_PPT = "poi/test-data/slideshow/datetime.ppt"
 SLIDESHOW_PPT = "ole/ppt/SampleShow.ppt"
+NOTES_PPT = "poi/test-data/slideshow/basic_test_ppt_file.ppt"
 #: An RTF body of one contiguous root-level span, which the RTF structural
 #: edits (remove, move, swap) require.
 RTF_INPUT = rb"{\rtf1\ansi First\par Second\par Third\par Fourth}"
@@ -328,9 +329,23 @@ class LegacyVerbTests(WriteAssertions):
         self.assertEqual(order(show.move("/slide[2]", index=0)), titles[::-1])
         self.assertEqual(order(show.swap("/slide[1]", "/slide[2]")), titles[::-1])
         self.assertEqual(order(show.remove("/slide[2]")), titles[:1])
-        # PowerPoint-authored records the native editor does not model.
-        error = raised(lambda: show.set("/slide[1]/shape[1]", {"text": "x"}))
+        # PowerPoint-authored text of another length (record 0260): the
+        # title is slide-list text, the subtitle has paragraphs.
+        retitled = show.set("/slide[1]/shape[1]", {"text": "A longer replacement title"})
+        self.assertEqual(retitled.get("/slide[1]/shape[1]", 0)["text"], "A longer replacement title")
+        self.assertEqual(self.assertReopens(retitled).get("/slide[1]", 0)["preview"], "A longer replacement title")
+        # A body with several formatting runs keeps the same-length contract.
+        error = raised(lambda: show.set("/slide[1]/shape[2]/paragraph[3]", {"text": "x"}))
         self.assertError(error, L.UnsupportedError, "unsupported_capability")
+        # Blank slides, paragraphs and speaker notes.
+        added, path = show.add("/", "slide", index=0)
+        self.assertEqual((path, order(added)), ("/slide[1]", ["(untitled)"] + titles))
+        notes = L.open(fixture(NOTES_PPT))
+        line = notes.set("/slide[1]/shape[2]/paragraph[2]", {"text": "Rewritten line"})
+        self.assertEqual(line.get("/slide[1]/shape[2]/paragraph[2]", 0)["text"], "Rewritten line")
+        noted = notes.set("/slide[1]/notes", {"text": "New notes"})
+        self.assertEqual(noted.get("/slide[1]/notes", 0)["text"], "New notes")
+        self.assertEqual(self.assertReopens(noted).get("/slide[1]/notes", 0)["text"], "New notes")
 
 
 class RtfVerbTests(WriteAssertions):
@@ -383,8 +398,8 @@ class CapabilityAgreementTests(WriteAssertions):
                     error = raised(lambda: call(file))
                     self.assertIsInstance(error, L.UnsupportedError)
                     self.assertEqual(error.code, verbs[verb]["code"])
-        # DOC supports every write verb since record 0258.
-        self.assertTrue({"Odt", "Ods", "Odp", "xls", "ppt"} <= seen, seen)
+        # DOC (record 0258) and PPT (record 0260) support every write verb.
+        self.assertTrue({"Odt", "Ods", "Odp", "xls"} <= seen, seen)
 
     def test_read_only_formats_refuse_every_write(self):
         for relative, name in READ_ONLY:

@@ -243,7 +243,8 @@ impl StyleTextPropAtom {
     }
 
     /// Rewrites only the two coverage counts of a style atom that has one
-    /// paragraph run and one character run.
+    /// paragraph run and one character run (optionally followed by a
+    /// one-character run for the paragraph mark, which stays exact).
     ///
     /// The raw record remains authoritative: exception bytes, reserved bits,
     /// and header spelling are copied exactly. `None` means that distributing
@@ -259,17 +260,28 @@ impl StyleTextPropAtom {
             return Err(corrupted("StyleTextPropAtom has trailing record bytes"));
         }
         let parsed = Self::parse_record(&record, old_text_length)?;
-        let ([paragraph], [character]) = (
+        let old_coverage = u32::try_from(old_text_length)
+            .ok()
+            .and_then(|length| length.checked_add(1))
+            .ok_or_else(|| corrupted("StyleTextPropAtom old text length exceeds u32"))?;
+        // One character run over the text and its paragraph mark, or one run
+        // over the text followed by a one-character run for the mark, which
+        // `PowerPoint` writes when the mark carries other character
+        // properties. The first run is resized; the mark run stays exact.
+        let ([paragraph], character) = (
             parsed.paragraph_runs.as_slice(),
             parsed.character_runs.as_slice(),
         ) else {
             return Ok(None);
         };
-        let old_coverage = u32::try_from(old_text_length)
-            .ok()
-            .and_then(|length| length.checked_add(1))
-            .ok_or_else(|| corrupted("StyleTextPropAtom old text length exceeds u32"))?;
-        if paragraph.count != old_coverage || character.count != old_coverage {
+        let (character, mark) = match character {
+            [character] => (character, 1),
+            [character, mark] if mark.count == 1 && character.count == old_coverage - 1 => {
+                (character, 0)
+            },
+            _ => return Ok(None),
+        };
+        if paragraph.count != old_coverage || character.count + 1 - mark != old_coverage {
             return Err(corrupted(
                 "StyleTextPropAtom single runs do not cover the old text",
             ));
@@ -278,6 +290,10 @@ impl StyleTextPropAtom {
             .ok()
             .and_then(|length| length.checked_add(1))
             .ok_or_else(|| corrupted("StyleTextPropAtom new text length exceeds u32"))?;
+        let new_character_coverage = new_coverage - 1 + mark;
+        if new_character_coverage == 0 {
+            return Ok(None);
+        }
         let character_count_offset = 8usize
             .checked_add(paragraph.to_payload().len())
             .ok_or_else(|| corrupted("StyleTextPropAtom run offset overflows"))?;
@@ -291,7 +307,7 @@ impl StyleTextPropAtom {
         let mut rewritten = record_bytes.to_vec();
         rewritten[8..12].copy_from_slice(&new_coverage.to_le_bytes());
         rewritten[character_count_offset..character_count_end]
-            .copy_from_slice(&new_coverage.to_le_bytes());
+            .copy_from_slice(&new_character_coverage.to_le_bytes());
         Ok(Some(rewritten))
     }
 }
@@ -441,6 +457,32 @@ mod tests {
         expected[8..12].copy_from_slice(&10u32.to_le_bytes());
         expected[18..22].copy_from_slice(&10u32.to_le_bytes());
         assert_eq!(resized, expected);
+    }
+
+    #[test]
+    fn mark_run_stays_exact_when_the_text_run_is_resized() {
+        let mut payload = Vec::new();
+        payload.extend_from_slice(&4u32.to_le_bytes());
+        payload.extend_from_slice(&0u16.to_le_bytes());
+        payload.extend_from_slice(&0u32.to_le_bytes());
+        payload.extend_from_slice(&3u32.to_le_bytes());
+        payload.extend_from_slice(&0u32.to_le_bytes());
+        payload.extend_from_slice(&1u32.to_le_bytes());
+        payload.extend_from_slice(&0u32.to_le_bytes());
+        let source = raw_style_record(&payload);
+        let resized = StyleTextPropAtom::resize_single_run_record(&source, 3, 9)
+            .unwrap()
+            .unwrap();
+        let mut expected = source.clone();
+        expected[8..12].copy_from_slice(&10u32.to_le_bytes());
+        expected[18..22].copy_from_slice(&9u32.to_le_bytes());
+        assert_eq!(resized, expected);
+        // An empty text would leave the text run empty.
+        assert!(
+            StyleTextPropAtom::resize_single_run_record(&source, 3, 0)
+                .unwrap()
+                .is_none()
+        );
     }
 
     #[test]

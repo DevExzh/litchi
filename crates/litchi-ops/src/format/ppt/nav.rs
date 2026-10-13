@@ -14,7 +14,7 @@ use std::fmt;
 
 use super::Ppt;
 use super::children::{Children, physical_kind, source_for};
-use super::node::{Item, Node};
+use super::node::{Item, Node, ShapeItem, has_text_body, paragraph_count, shape_name};
 use super::spec::{Kind, SPEC};
 use crate::Result;
 use crate::node::spec::{FormatSpec, GapSpec};
@@ -52,6 +52,8 @@ impl<'f> Nav<'f> {
 
         match (parent.item(), kind) {
             (Item::Presentation, Kind::Slide) => self.slide(step.select),
+            (Item::Slide(slide), Kind::Notes) => self.notes(slide.position, step.select),
+            (Item::Shape(shape), Kind::Paragraph) => self.paragraph(parent, shape, step.select),
             (Item::Slide(_) | Item::Shape(_), Kind::Shape | Kind::Placeholder)
             | (
                 Item::Slide(_) | Item::Shape(_),
@@ -71,6 +73,44 @@ impl<'f> Nav<'f> {
         };
         Ok(match position {
             Some(position) => Lookup::Found(Node::slide_node(self.file, position)),
+            None => Lookup::Missing,
+        })
+    }
+
+    fn notes(&self, slide: usize, select: Select<'_>) -> Result<Lookup<Node<'f>, GapSpec>> {
+        match select {
+            Select::None | Select::Last => {},
+            Select::Ordinal(position) if position.get() == 0 => {},
+            Select::Ordinal(_) => return Ok(Lookup::Missing),
+            _ => return Ok(Lookup::NotApplicable),
+        }
+        Ok(match slide_notes(self.file, slide)? {
+            Some(text) => Lookup::Found(Node::notes_node(self.file, slide, text)),
+            None => Lookup::Missing,
+        })
+    }
+
+    fn paragraph(
+        &self,
+        parent: &Node<'f>,
+        shape: &ShapeItem,
+        select: Select<'_>,
+    ) -> Result<Lookup<Node<'f>, GapSpec>> {
+        let Some(native) = parent.shape() else {
+            return Ok(Lookup::Missing);
+        };
+        if !has_text_body(native) {
+            return Ok(Lookup::NotApplicable);
+        }
+        let count = paragraph_count(native)?;
+        let index = match select {
+            Select::None => (count > 0).then_some(0),
+            Select::Ordinal(position) => (position.get() < count).then_some(position.get()),
+            Select::Last => count.checked_sub(1),
+            _ => return Ok(Lookup::NotApplicable),
+        };
+        Ok(match index {
+            Some(index) => Lookup::Found(Node::paragraph_node(parent, shape.clone(), index)),
             None => Lookup::Missing,
         })
     }
@@ -163,7 +203,16 @@ impl<'f> Nav<'f> {
             Item::Presentation => {
                 out.kind(Kind::Slide.name(), self.file.reader().slide_count());
             },
+            Item::Notes(_) | Item::Paragraph(_) => {},
+            Item::Shape(_) if parent.shape().is_some_and(has_text_body) => {
+                let count = parent.shape().map_or(Ok(0), paragraph_count)?;
+                out.kind(Kind::Paragraph.name(), count);
+            },
             Item::Slide(_) | Item::Shape(_) => {
+                if let Item::Slide(slide) = parent.item() {
+                    let notes = usize::from(slide_notes(self.file, slide.position)?.is_some());
+                    out.kind(Kind::Notes.name(), notes);
+                }
                 if let Some(source) = source_for(parent)? {
                     let Some(direct) = source.direct() else {
                         return Ok(());
@@ -228,7 +277,7 @@ impl<'f> Navigate<'f> for Nav<'f> {
     }
 
     fn children(&self, parent: &Node<'f>, kinds: KindSet<Kind>) -> Result<Self::Children> {
-        self.finish(|| Ok(Children::of(parent, kinds)))
+        self.finish(|| Ok(Children::walk(parent, kinds)))
     }
 
     fn available(
@@ -283,9 +332,10 @@ impl<'f> Inspect<'f> for Nav<'f> {
         _ordinal: Position,
         out: &mut fmt::Formatter<'_>,
     ) -> fmt::Result {
-        match node.steps().last() {
-            Some(step) => fmt::Display::fmt(step, out),
-            None => fmt::Display::fmt(&PathStep::new("presentation"), out),
+        match (node.item(), node.steps().last()) {
+            (Item::Notes(_), _) => fmt::Display::fmt(&PathStep::new("notes"), out),
+            (_, Some(step)) => fmt::Display::fmt(step, out),
+            (_, None) => fmt::Display::fmt(&PathStep::new("presentation"), out),
         }
     }
 }
@@ -317,11 +367,16 @@ fn shape_id(shape: &ShapeEnum<'static>) -> Option<u32> {
     }
 }
 
-fn shape_name<'a>(shape: &'a ShapeEnum<'static>) -> Option<&'a str> {
-    match shape {
-        ShapeEnum::Picture(picture) => picture.name(),
-        _ => None,
-    }
+/// A slide's speaker-notes text, or `None` when the slide has no notes page.
+pub(crate) fn slide_notes(file: &Ppt, slide: usize) -> Result<Option<std::sync::Arc<str>>> {
+    let selected = file
+        .reader()
+        .slide_at(slide)?
+        .ok_or_else(|| missing_slide(slide))?;
+    Ok(selected
+        .speaker_notes()?
+        .map(|notes| notes.text().map(std::sync::Arc::from))
+        .transpose()?)
 }
 
 fn id_is(id: u32, wanted: &str) -> bool {

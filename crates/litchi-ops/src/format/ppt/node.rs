@@ -42,6 +42,26 @@ pub(crate) enum Item {
     Presentation,
     Slide(SlideItem),
     Shape(ShapeItem),
+    /// A slide's speaker notes: the notes page's text.
+    Notes(NotesItem),
+    /// One paragraph of a text shape: the text between paragraph marks.
+    Paragraph(ParagraphItem),
+}
+
+/// A slide's speaker notes, read once when the node is resolved.
+#[derive(Clone)]
+pub(crate) struct NotesItem {
+    pub(crate) slide: usize,
+    pub(crate) text: Arc<str>,
+}
+
+/// A paragraph of a text shape: the shape it belongs to and its zero-based
+/// index among the shape's paragraphs. Its text is cut from the shape's
+/// aggregate text at the paragraph marks (`\r`) the binary format stores.
+#[derive(Clone)]
+pub(crate) struct ParagraphItem {
+    pub(crate) shape: ShapeItem,
+    pub(crate) index: usize,
 }
 
 /// A catalog position.  Slide positions are zero-based internally and are
@@ -105,6 +125,42 @@ impl<'f> Node<'f> {
         }
     }
 
+    /// Construct a slide's notes node.
+    pub(crate) fn notes_node(file: &'f Ppt, slide: usize, text: Arc<str>) -> Self {
+        Self {
+            file,
+            item: Item::Notes(NotesItem { slide, text }),
+            steps: Arc::from(
+                vec![
+                    PathStep::at("slide", Position::new(slide)),
+                    PathStep::new("notes"),
+                ]
+                .into_boxed_slice(),
+            ),
+        }
+    }
+
+    /// Construct the paragraph at `index` of a text shape node.
+    pub(crate) fn paragraph_node(parent: &Self, shape: ShapeItem, index: usize) -> Self {
+        Self::paragraph_at(parent.file, &parent.steps, shape, index)
+    }
+
+    /// Construct the paragraph at `index` of the text shape at `shape_steps`.
+    pub(crate) fn paragraph_at(
+        file: &'f Ppt,
+        shape_steps: &[PathStep<'static>],
+        shape: ShapeItem,
+        index: usize,
+    ) -> Self {
+        let mut steps = shape_steps.to_vec();
+        steps.push(PathStep::at("paragraph", Position::new(index)));
+        Self {
+            file,
+            item: Item::Paragraph(ParagraphItem { shape, index }),
+            steps: Arc::from(steps.into_boxed_slice()),
+        }
+    }
+
     pub(crate) fn file(&self) -> &'f Ppt {
         self.file
     }
@@ -120,11 +176,7 @@ impl<'f> Node<'f> {
     /// The zero-based slide position containing this node.
     #[must_use]
     pub fn slide(&self) -> Option<Position> {
-        match &self.item {
-            Item::Presentation => None,
-            Item::Slide(slide) => Some(Position::new(slide.position)),
-            Item::Shape(shape) => Some(Position::new(shape.slide)),
-        }
+        self.slide_position().map(Position::new)
     }
 
     pub(crate) fn slide_position(&self) -> Option<usize> {
@@ -132,6 +184,8 @@ impl<'f> Node<'f> {
             Item::Presentation => None,
             Item::Slide(slide) => Some(slide.position),
             Item::Shape(shape) => Some(shape.slide),
+            Item::Notes(notes) => Some(notes.slide),
+            Item::Paragraph(paragraph) => Some(paragraph.shape.slide),
         }
     }
 
@@ -144,9 +198,7 @@ impl<'f> Node<'f> {
     /// returning `None` until the native transaction grows a group-aware
     /// target identity.
     pub(crate) fn native_shape_target(&self) -> Option<litchi_ppt::text_edit::Target> {
-        let Item::Shape(shape) = &self.item else {
-            return None;
-        };
+        let shape = self.shape_item()?;
         let [position] = shape.path.as_ref() else {
             return None;
         };
@@ -211,11 +263,31 @@ impl<'f> Node<'f> {
     pub fn shape(&self) -> Option<&ShapeEnum<'static>> {
         match &self.item {
             Item::Shape(shape) => resolve_shape(&shape.source, &shape.path),
-            Item::Presentation | Item::Slide(_) => None,
+            Item::Paragraph(paragraph) => {
+                resolve_shape(&paragraph.shape.source, &paragraph.shape.path)
+            },
+            Item::Presentation | Item::Slide(_) | Item::Notes(_) => None,
         }
     }
 
-    /// The native picture name, where the leaf exposes one.
+    /// The shape item behind a shape node, or the shape a paragraph belongs to.
+    pub(crate) fn shape_item(&self) -> Option<&ShapeItem> {
+        match &self.item {
+            Item::Shape(shape) => Some(shape),
+            Item::Paragraph(paragraph) => Some(&paragraph.shape),
+            Item::Presentation | Item::Slide(_) | Item::Notes(_) => None,
+        }
+    }
+
+    /// The zero-based paragraph index of a paragraph node.
+    pub(crate) fn paragraph_index(&self) -> Option<usize> {
+        match &self.item {
+            Item::Paragraph(paragraph) => Some(paragraph.index),
+            _ => None,
+        }
+    }
+
+    /// The shape name (`wzName`), or a picture's file name when it has none.
     #[must_use]
     pub fn shape_name(&self) -> Option<&str> {
         self.shape().and_then(shape_name)
@@ -227,14 +299,16 @@ impl<'f> Node<'f> {
             Item::Presentation => Kind::Presentation,
             Item::Slide(_) => Kind::Slide,
             Item::Shape(shape) => shape.kind,
+            Item::Notes(_) => Kind::Notes,
+            Item::Paragraph(_) => Kind::Paragraph,
         }
     }
 
     /// The semantic kind used by query inspection.  Placeholders retain
     /// their physical shape node and path, but are a distinct query subject.
     pub(crate) fn semantic_kind(&self) -> Kind {
-        match self.shape() {
-            Some(ShapeEnum::Placeholder(_)) => Kind::Placeholder,
+        match (&self.item, self.shape()) {
+            (Item::Shape(_), Some(ShapeEnum::Placeholder(_))) => Kind::Placeholder,
             _ => self.element(),
         }
     }
@@ -242,17 +316,18 @@ impl<'f> Node<'f> {
     /// The property table kind.  A placeholder remains physically a shape in
     /// the native tree, but has its own semantic properties.
     pub(crate) fn property_kind(&self) -> Kind {
-        match self.shape() {
-            Some(ShapeEnum::Placeholder(_)) => Kind::Placeholder,
-            _ => self.element(),
-        }
+        self.semantic_kind()
     }
 
     /// The OfficeCLI semantic type name.
     pub(crate) fn type_name(&self) -> &'static str {
-        match self.shape() {
-            Some(ShapeEnum::Placeholder(placeholder)) if placeholder.is_title() => "title",
-            Some(ShapeEnum::Placeholder(_)) => "placeholder",
+        match (&self.item, self.shape()) {
+            (Item::Shape(_), Some(ShapeEnum::Placeholder(placeholder)))
+                if placeholder.is_title() =>
+            {
+                "title"
+            },
+            (Item::Shape(_), Some(ShapeEnum::Placeholder(_))) => "placeholder",
             _ => self.element().name(),
         }
     }
@@ -261,14 +336,31 @@ impl<'f> Node<'f> {
     /// shapes, including the native aggregate table/group text where the
     /// leaf provides it.
     pub(crate) fn text_member(&self) -> Result<Option<Cow<'_, str>>> {
-        match self.shape() {
-            Some(shape) if matches!(self.element(), Kind::Shape | Kind::Table | Kind::Group) => {
-                shape
-                    .text()
-                    .map(|text| Some(Cow::Owned(text)))
-                    .map_err(Error::from)
+        match &self.item {
+            Item::Notes(notes) => Ok(Some(Cow::Borrowed(&notes.text))),
+            Item::Paragraph(paragraph) => {
+                let Some(shape) = self.shape() else {
+                    return Err(vanished());
+                };
+                let text = shape.text().map_err(Error::from)?;
+                Ok(Some(Cow::Owned(
+                    paragraphs(&text)
+                        .nth(paragraph.index)
+                        .ok_or_else(vanished)?
+                        .to_owned(),
+                )))
             },
-            _ => Ok(None),
+            _ => match self.shape() {
+                Some(shape)
+                    if matches!(self.element(), Kind::Shape | Kind::Table | Kind::Group) =>
+                {
+                    shape
+                        .text()
+                        .map(|text| Some(Cow::Owned(text)))
+                        .map_err(Error::from)
+                },
+                _ => Ok(None),
+            },
         }
     }
 
@@ -280,6 +372,8 @@ impl<'f> Node<'f> {
                 slide.position,
             )?)))),
             Item::Shape(shape) => shape_preview(shape),
+            Item::Notes(notes) => Ok(Some(Preview::Prefix(Cow::Borrowed(&notes.text)))),
+            Item::Paragraph(_) => Ok(self.text_member()?.map(Preview::Prefix)),
         }
     }
 
@@ -294,8 +388,10 @@ impl<'f> Node<'f> {
                 .shape_count()?,
             Item::Shape(shape) => match resolve_shape(&shape.source, &shape.path) {
                 Some(ShapeEnum::Group(group)) => group.children().len(),
-                _ => 0,
+                Some(native) => paragraph_count(native)?,
+                None => 0,
             },
+            Item::Notes(_) | Item::Paragraph(_) => 0,
         };
         Ok(Some(u32::try_from(count).unwrap_or(u32::MAX)))
     }
@@ -372,6 +468,10 @@ enum PropKind<'a> {
     Root {
         slide_count: usize,
     },
+    /// Notes, whose only property is their text.
+    Text(Cow<'a, str>),
+    /// A paragraph, whose text is its node text, not a property.
+    Paragraph,
     Slide {
         number: usize,
         slide_id: u32,
@@ -405,11 +505,10 @@ impl<'a> Props<'a> {
             },
             Item::Shape(shape) => PropKind::Shape {
                 kind: node.property_kind(),
-                shape: resolve_shape(&shape.source, &shape.path).ok_or_else(|| {
-                    Error::new(Code::InternalError, "shape vanished from the native scene")
-                        .with_format(FileFormat::Ppt)
-                })?,
+                shape: resolve_shape(&shape.source, &shape.path).ok_or_else(vanished)?,
             },
+            Item::Notes(_) => PropKind::Text(node.text_member()?.ok_or_else(vanished)?),
+            Item::Paragraph(_) => PropKind::Paragraph,
         };
         Ok(Self { kind })
     }
@@ -438,12 +537,46 @@ impl<'a> Props<'a> {
                 _ => None,
             },
             PropKind::Shape { kind, shape } => shape_value(*kind, shape, index),
+            PropKind::Text(text) => (index == 0).then(|| Value::Text(text.clone())),
+            PropKind::Paragraph => None,
         }
     }
 }
 
+/// The paragraphs of a shape's aggregate text, split at the paragraph marks
+/// (`\r`) of the binary text atom. A text shape always has at least one
+/// (possibly empty) paragraph.
+pub(crate) fn paragraphs(text: &str) -> std::str::Split<'_, char> {
+    text.split('\r')
+}
+
+/// The paragraph count of a text-capable shape; zero for other shapes.
+pub(crate) fn paragraph_count(shape: &ShapeEnum<'static>) -> Result<usize> {
+    if !has_text_body(shape) {
+        return Ok(0);
+    }
+    let text = shape.text().map_err(Error::from)?;
+    Ok(paragraphs(&text).count())
+}
+
+/// Whether a native shape holds a text body with paragraphs.
+pub(crate) fn has_text_body(shape: &ShapeEnum<'_>) -> bool {
+    matches!(
+        shape,
+        ShapeEnum::TextBox(_) | ShapeEnum::Placeholder(_) | ShapeEnum::AutoShape(_)
+    )
+}
+
+fn vanished() -> Error {
+    Error::new(Code::InternalError, "shape vanished from the native scene")
+        .with_format(FileFormat::Ppt)
+}
+
 fn shape_value<'a>(kind: Kind, shape: &'a ShapeEnum<'static>, index: usize) -> Option<Value<'a>> {
     let key = kind.spec().props.get(index)?.name;
+    if matches!(key, "name" | "alt" | "sourceIndex") {
+        return identity_value(shape, key);
+    }
     match kind {
         Kind::Placeholder => placeholder_value(shape, key),
         Kind::Picture => picture_value(shape, key),
@@ -451,6 +584,19 @@ fn shape_value<'a>(kind: Kind, shape: &'a ShapeEnum<'static>, index: usize) -> O
         Kind::Group => group_value(shape, key),
         Kind::Connector => connector_value(shape, key),
         Kind::Shape => generic_shape_value(shape, key),
+        _ => None,
+    }
+}
+
+/// The identity properties every shape kind shares: the `wzName` name, the
+/// `wzDescription` alternative text and the stable source index.
+fn identity_value<'a>(shape: &'a ShapeEnum<'static>, key: &str) -> Option<Value<'a>> {
+    match key {
+        "name" => shape_name(shape).map(|name| Value::Text(Cow::Borrowed(name))),
+        "alt" => shape
+            .description()
+            .map(|alt| Value::Text(Cow::Borrowed(alt))),
+        "sourceIndex" => shape.source_index().map(count),
         _ => None,
     }
 }
@@ -499,7 +645,6 @@ fn picture_value<'a>(shape: &'a ShapeEnum<'static>, key: &str) -> Option<Value<'
     };
     match key {
         "id" => Some(Value::Int(i64::from(picture.properties().id))),
-        "name" => picture.name().map(|name| Value::Text(Cow::Borrowed(name))),
         "frameKind" => Some(Value::Text(Cow::Borrowed(match picture.frame_kind() {
             PictureFrameKind::Picture => "Picture",
             PictureFrameKind::OleObject => "OleObject",
@@ -585,10 +730,12 @@ fn shape_id(shape: &ShapeEnum<'static>) -> Option<u32> {
     }
 }
 
-fn shape_name<'a>(shape: &'a ShapeEnum<'static>) -> Option<&'a str> {
+/// The shape name (`wzName`); a picture without one falls back to the
+/// file name its frame was authored with.
+pub(crate) fn shape_name<'a>(shape: &'a ShapeEnum<'static>) -> Option<&'a str> {
     match shape {
-        ShapeEnum::Picture(picture) => picture.name(),
-        _ => None,
+        ShapeEnum::Picture(picture) => shape.name().or_else(|| picture.name()),
+        _ => shape.name(),
     }
 }
 

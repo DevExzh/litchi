@@ -365,8 +365,14 @@ class PptReadTests(unittest.TestCase):
     def test_slides_and_text(self):
         presentation = L.Presentation.open(fixture(self.SHAPES))
         self.assertEqual(presentation.slide_count(), 1)
-        self.assertEqual(slide_texts(presentation), ["Text in a TextBox\nRectangle\nEllipse\nOctagon"])
-        self.assertEqual(presentation.text(), "Text in a TextBox\nRectangle\nEllipse\nOctagon")
+        # The title placeholder's text lives in the slide list (record 0260).
+        self.assertEqual(
+            slide_texts(presentation),
+            ["Title Placeholder\nText in a TextBox\nRectangle\nEllipse\nOctagon"],
+        )
+        self.assertEqual(
+            presentation.text(), "Title Placeholder\nText in a TextBox\nRectangle\nEllipse\nOctagon"
+        )
 
     def test_text_joins_slides_with_a_blank_line(self):
         presentation = L.Presentation.open(fixture(self.SAMPLE))

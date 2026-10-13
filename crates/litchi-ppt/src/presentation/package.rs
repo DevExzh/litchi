@@ -194,6 +194,7 @@ impl Presentation {
             source: None,
             #[cfg(feature = "encryption")]
             encryption: encryption_profile,
+            shape_memo: crate::slide::ShapeMemo::default(),
         }))
     }
 
@@ -380,6 +381,7 @@ impl Presentation {
             source: Some(shared),
             #[cfg(feature = "encryption")]
             encryption: encryption_profile,
+            shape_memo: crate::slide::ShapeMemo::default(),
         }))
     }
 }

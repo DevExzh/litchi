@@ -5,6 +5,9 @@
 # `metadata+html` is `with_metadata(true)` plus `TableStyle::StyledHtml`.
 # An outcome is `<bytes>:<FNV-1a 64 hex>` for Markdown or `!<facade error variant>`
 # for a refusal; `=` repeats the outcome to its left.
+# Record 0260 (reviewed behaviour change): ole/ppt/text_shapes.ppt and
+# poi/test-data/slideshow/41246-1.ppt now include the title/body placeholder text
+# PowerPoint keeps in the slide list (L-PPT-R1), which the facade dropped.
 libreoffice-core/embeddedobj/qa/cppunit/data/insert-file-config.doc	7:8a7794b77af2325b	=	=	=	327:0d7ba21b868a395d	=
 libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx	!Unsupported	=	=	=	=	=
 libreoffice-core/oox/qa/unit/data/import-mce.pptx	14:49ab1e161df49d26	=	=	=	262:cf42b8c202fc3c3a	=
@@ -240,7 +243,7 @@ ole/ppt/empty.ppt	0:cbf29ce484222325	=	=	=	209:56479cb1e966b122	=
 ole/ppt/empty_textbox.ppt	76:3f7b50fe63db0546	=	=	=	323:dc6281d8f6c57365	=
 ole/ppt/ppt_with_png.ppt	32:e3f5d66e7b78df77	=	=	=	266:98e39bbde527a858	=
 ole/ppt/text-margins.ppt	36:fe6b68a75ef91eb6	=	=	=	303:2899311aafa8f03a	=
-ole/ppt/text_shapes.ppt	56:1d07dfb0621f877b	=	=	=	275:d0baf50997593429	=
+ole/ppt/text_shapes.ppt	74:702b6f4b633f51b6	=	=	=	293:d01601e3c4926cb4	=
 ooxml/docx/ComplexNumberedLists.docx	320:5014840cf5fd6518	=	=	=	452:0b909ac2d77428b7	=
 ooxml/docx/FancyFoot.docx	!Unsupported	=	=	=	=	=
 ooxml/docx/Headers.docx	10:df5f962be533f115	=	=	=	179:513162771a4f319c	=
@@ -350,7 +353,7 @@ poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFA
 poi/test-data/openxml4j/OPCCompliance_CoreProperties_SUCCESS.docx	2:08547e07b5084555	=	=	=	234:11190aed9b62ce66	=
 poi/test-data/openxml4j/OPCCompliance_CoreProperties_UnauthorizedXMLLangAttributeFAIL.docx	2:08547e07b5084555	=	=	=	234:11190aed9b62ce66	=
 poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx	!Other	!NotOfficeFile	!Other	!NotOfficeFile	!Other	!NotOfficeFile
-poi/test-data/slideshow/41246-1.ppt	9437:d816d969a2ad8578	=	=	=	9578:d08026e8dc1def6a	=
+poi/test-data/slideshow/41246-1.ppt	9653:db98ad50b9c74e58	=	=	=	9794:d8f5c6cc5819039a	=
 poi/test-data/slideshow/45543.ppt	2477:b45e39a6d37d0795	=	=	=	2821:0f87f1ab1816816d	=
 poi/test-data/slideshow/45545_Comment.pptx	2502:ea9e9e4bf33e1ab2	=	=	=	2839:1ec157eec35ffb58	=
 poi/test-data/slideshow/54880_chinese.ppt	100:fd16c8d6cc983e99	=	=	=	324:89e4dbcfdbb87500	=

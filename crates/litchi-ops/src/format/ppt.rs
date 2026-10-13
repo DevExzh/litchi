@@ -38,7 +38,8 @@ pub(crate) use nav::Nav;
 pub use node::Node;
 pub(crate) use node::Props;
 pub(crate) use spec::{
-    PLACEHOLDER_CAPABILITY_PROPS, SHAPE_CAPABILITY_PROPS, SLIDE_CAPABILITY_PROPS, SPEC,
+    NOTES_CAPABILITY_PROPS, PARAGRAPH_CAPABILITY_PROPS, PLACEHOLDER_CAPABILITY_PROPS,
+    SHAPE_CAPABILITY_PROPS, SLIDE_CAPABILITY_PROPS, SPEC,
 };
 pub(crate) use views::{Json as ViewJson, view_json, view_to};
 pub(crate) use write::WriteCommit;
@@ -281,6 +282,28 @@ impl Ppt {
         self.check_source()?;
         let result = write::coalesce::shape_plan(self, target, props, limits, scene);
         self.check_source().and(result)
+    }
+
+    /// Insert one blank slide under the presentation root.
+    pub(crate) fn add<'p, 'n>(
+        &self,
+        parent: crate::path::PathArg<'p>,
+        node: crate::NewNode<'n>,
+    ) -> Result<(WriteCommit, crate::path::Path<'static>)> {
+        self.add_with_limits(parent, node, &crate::transaction::SemanticLimits::default())
+    }
+
+    /// Insert one blank slide under an explicit semantic budget.
+    pub(crate) fn add_with_limits<'p, 'n>(
+        &self,
+        parent: crate::path::PathArg<'p>,
+        node: crate::NewNode<'n>,
+        limits: &crate::transaction::SemanticLimits,
+    ) -> Result<(WriteCommit, crate::path::Path<'static>)> {
+        self.check_source()?;
+        let result = write::add_with_limits(self, parent, node, limits);
+        self.check_source()?;
+        result
     }
 
     /// Remove slides selected by a path or a scoped query through the native

@@ -79,17 +79,32 @@ impl<'a> TextBox<'a> {
     }
 
     /// Creates an owned text box from a typed, borrowed `OfficeArt` shape.
+    ///
+    /// A text box whose `ClientTextbox` holds an outline reference reads its
+    /// text, runs, and metacharacters from the slide-list body of `outline`
+    /// the reference selects (L-PPT-R1); its own text ruler applies when the
+    /// body has none, as LibreOffice applies it, and
+    /// [`Self::outline_text_refs`] still lists the reference.
     pub(crate) fn from_odraw(
         properties: ShapeProperties,
         shape: &OdrawShape<'_>,
+        outline: &[crate::OutlineTextBody],
         report: &mut crate::leniency::ToleranceReport,
     ) -> super::super::package::Result<TextBox<'static>> {
         let first_defect = report.defects().len();
-        let wrapper = crate::odraw::textbox(shape)?
+        let textbox = crate::odraw::textbox(shape)?;
+        let wrapper = textbox
+            .as_ref()
             .map(|record| {
                 crate::EscherTextboxWrapper::new_with_report(record.data().to_vec(), report)
             })
             .transpose()?;
+        let outline_wrapper = match (&textbox, &wrapper) {
+            (Some(record), Some(inline)) if !inline.outline_text_refs().is_empty() => {
+                Self::outline_wrapper(record.data(), outline, report)?
+            },
+            _ => None,
+        };
         report.locate_from(
             first_defect,
             crate::leniency::DefectLocation {
@@ -98,14 +113,24 @@ impl<'a> TextBox<'a> {
             },
         );
         let (text, runs, paragraph_runs, text_ruler, metachars, outline_text_refs) = match wrapper {
-            Some(textbox_wrapper) => (
-                textbox_wrapper.text().to_owned(),
-                textbox_wrapper.runs().to_vec(),
-                textbox_wrapper.paragraph_runs().to_vec(),
-                textbox_wrapper.text_ruler().cloned(),
-                textbox_wrapper.metachars().to_vec(),
-                textbox_wrapper.outline_text_refs().to_vec(),
-            ),
+            Some(inline) => match outline_wrapper {
+                Some(body) => (
+                    body.text().to_owned(),
+                    body.runs().to_vec(),
+                    body.paragraph_runs().to_vec(),
+                    body.text_ruler().or(inline.text_ruler()).cloned(),
+                    body.metachars().to_vec(),
+                    inline.outline_text_refs().to_vec(),
+                ),
+                None => (
+                    inline.text().to_owned(),
+                    inline.runs().to_vec(),
+                    inline.paragraph_runs().to_vec(),
+                    inline.text_ruler().cloned(),
+                    inline.metachars().to_vec(),
+                    inline.outline_text_refs().to_vec(),
+                ),
+            },
             None => (
                 String::new(),
                 Vec::new(),
@@ -150,6 +175,43 @@ impl<'a> TextBox<'a> {
             italic,
             underline,
         })
+    }
+
+    /// Parses the slide-list body that a `ClientTextbox` payload's outline
+    /// reference selects.
+    ///
+    /// A reference that selects no readable body yields `None` and records
+    /// [`crate::ShapeDefect::UnresolvedOutlineTextRef`] for the caller to
+    /// locate; repairs made while an unreadable body was parsed are
+    /// discarded with it. Resource limits stay fatal.
+    fn outline_wrapper(
+        payload: &[u8],
+        outline: &[crate::OutlineTextBody],
+        report: &mut crate::leniency::ToleranceReport,
+    ) -> super::super::package::Result<Option<crate::EscherTextboxWrapper>> {
+        use crate::odraw::TextRecords;
+
+        let unresolved = match crate::odraw::textbox_text_records(payload, outline)? {
+            TextRecords::Inline(_) => return Ok(None),
+            TextRecords::Outline { index, body } => {
+                let checkpoint = report.checkpoint();
+                match crate::EscherTextboxWrapper::new_with_report(body.records().to_vec(), report)
+                {
+                    Ok(wrapper) => return Ok(Some(wrapper)),
+                    Err(error) if crate::slide::types::is_isolatable_shape_error(&error) => {
+                        report.rollback(checkpoint);
+                        index
+                    },
+                    Err(error) => return Err(error),
+                }
+            },
+            TextRecords::Unresolved(context) => context,
+        };
+        report.record(
+            crate::leniency::ShapeDefect::UnresolvedOutlineTextRef,
+            unresolved,
+        );
+        Ok(None)
     }
 
     /// Create a text box from an existing container.
@@ -461,6 +523,10 @@ impl<'a> TextBox<'a> {
 
     pub(crate) fn mark_source_bound(&mut self) {
         self.container.mark_source_bound();
+    }
+
+    pub(crate) fn apply_source_identity(&mut self, identity: super::shape::SourceIdentity) {
+        self.container.apply_source_identity(identity);
     }
 
     /// Get the font size in points.
@@ -863,6 +929,7 @@ mod tests {
         TextBox::from_odraw(
             properties,
             shape,
+            &[],
             &mut crate::leniency::ToleranceReport::default(),
         )
     }

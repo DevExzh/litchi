@@ -18,10 +18,7 @@
       "supported": true
     },
     "add": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "M2",
-      "reason": "edit verbs arrive with the write kernel in milestone M2"
+      "supported": true
     },
     "remove": {
       "supported": true
@@ -143,7 +140,7 @@
       "element": "slide",
       "parent": "presentation",
       "operations": {
-        "add": false,
+        "add": true,
         "set": true,
         "get": true,
         "query": true,
@@ -298,6 +295,18 @@
         }
       ],
       "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
         "shapeType": {
           "type": "string",
           "add": false,
@@ -387,6 +396,18 @@
         }
       ],
       "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
         "placeholderType": {
           "type": "string",
           "add": false,
@@ -477,6 +498,12 @@
           "set": false,
           "get": true
         },
+        "alt": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
         "frameKind": {
           "type": "string",
           "add": false,
@@ -560,6 +587,18 @@
         }
       ],
       "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
         "rows": {
           "type": "int",
           "add": false,
@@ -777,6 +816,18 @@
         }
       ],
       "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
         "x": {
           "type": "length",
           "add": false,
@@ -835,6 +886,18 @@
         ]
       },
       "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
         "shapeType": {
           "type": "string",
           "add": false,
@@ -929,9 +992,9 @@
       ],
       "operations": {
         "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
+        "set": true,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
@@ -949,11 +1012,20 @@
           "pathSegment": "linebreak"
         }
       ],
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M1-extended",
-        "reason": "legacy PPT exposes aggregate shape text, not paragraph nodes"
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1020,9 +1092,9 @@
       "parent": "slide",
       "operations": {
         "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
+        "set": true,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
@@ -1030,11 +1102,20 @@
           "/slide[N]/notes"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M1-extended",
-        "reason": "speaker notes are outside the initial legacy PPT navigation projection"
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1698,13 +1779,6 @@
     },
     {
       "subject": "element",
-      "element": "paragraph",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended",
-      "reason": "legacy PPT exposes aggregate shape text, not paragraph nodes"
-    },
-    {
-      "subject": "element",
       "element": "run",
       "code": "unsupported_capability",
       "followUp": "M1-extended",
@@ -1716,13 +1790,6 @@
       "code": "unsupported_capability",
       "followUp": "M1-extended",
       "reason": "legacy PPT exposes normalized shape text, not line-break nodes"
-    },
-    {
-      "subject": "element",
-      "element": "notes",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended",
-      "reason": "speaker notes are outside the initial legacy PPT navigation projection"
     },
     {
       "subject": "element",
@@ -1860,14 +1927,6 @@
     {
       "subject": "property",
       "element": "picture",
-      "key": "alt",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended",
-      "reason": "the native PPT picture projection does not expose alternate text"
-    },
-    {
-      "subject": "property",
-      "element": "picture",
       "key": "mediaType",
       "code": "unsupported_capability",
       "followUp": "M1-extended",
@@ -1923,7 +1982,7 @@
       "context": "native-shape-preservation",
       "code": "unsupported_capability",
       "followUp": "M2 PPT nested-shape and rich-text edits",
-      "reason": "top-level shape text and anchors require native closure admission; nested groups, new text bodies and rich-text formatting remain unsupported"
+      "reason": "top-level shape, outline placeholder, paragraph and notes text and shape anchors require native closure admission: a changed text length refuses where interactions, field metacharacters or several formatting or language runs hold character positions; nested groups, new text bodies and rich-text formatting remain unsupported"
     },
     {
       "subject": "operation",
