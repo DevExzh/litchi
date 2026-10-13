@@ -340,7 +340,7 @@ impl<'f> Inspect<'f> for Nav<'f> {
         out: &mut fmt::Formatter<'_>,
     ) -> fmt::Result {
         match node.last_step() {
-            Some(step) => fmt::Display::fmt(step, out),
+            Some(step) => fmt::Display::fmt(&step, out),
             None => fmt::Display::fmt(&PathStep::at(kind.name(), ordinal), out),
         }
     }

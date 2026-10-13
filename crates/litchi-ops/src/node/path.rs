@@ -109,8 +109,11 @@ impl<'a> NodePath<'a> {
 
     /// The path of `first` and, when given, `second`, carried by value.
     #[cfg_attr(
-        not(feature = "xlsx"),
-        allow(dead_code, reason = "the XLSX adapter writes its paths this way")
+        not(any(feature = "xlsx", feature = "xls")),
+        allow(
+            dead_code,
+            reason = "the XLSX and XLS adapters write their paths this way"
+        )
     )]
     pub(crate) fn short(first: PathStep<'a>, second: Option<PathStep<'a>>) -> Self {
         let mut steps = [EMPTY_STEP; INLINE_STEPS];

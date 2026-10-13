@@ -1239,10 +1239,10 @@ pub struct Cells<'a> {
 impl<'a> Cells<'a> {
     /// The same traversal, with each record's position in its grid's
     /// row-major record order, which reads the record again in O(1)
-    /// ([`crate::SourceGrid::record`], [`crate::Worksheet::record`]).
+    /// ([`crate::workbook::source::Grid::record`], [`crate::Worksheet::record`]).
     ///
     /// ```
-    /// # fn demo(grid: &litchi_xlsx::SourceGrid) -> litchi_xlsx::Result<()> {
+    /// # fn demo(grid: &litchi_xlsx::workbook::source::Grid) -> litchi_xlsx::Result<()> {
     /// for (index, at, cell) in grid.cells("A1:C10")?.indexed() {
     ///     assert_eq!(grid.record(index), Some((at, cell)));
     /// }
