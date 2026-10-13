@@ -9,7 +9,9 @@ merges them) with Litchi's golden capability reports
 DOCX, XLSX and PPTX, plus XLS and XLSB against the XLSX vocabulary as a parity
 target (not a claim of OfficeCLI XLS/XLSB file support). DOCX's optional
 ``docx-encryption.json`` baseline contributes feature-gated operation gaps
-that are absent from the default report. It writes
+that are absent from the default report. Each property row carries a read
+status (Litchi's ``get`` against OfficeCLI's) and a write status (Litchi's
+``add``/``set`` against OfficeCLI's). It writes
 ``docs/unified-ops/officecli-capability-delta.md``.
 
 OfficeCLI is not tracked in git, so the script runs locally::
@@ -112,6 +114,19 @@ PROPERTY_STATUSES = (
     "missing",
     "litchi-only",
 )
+WRITE_STATUSES = (
+    "supported",
+    "partial",
+    "gap",
+    "pending",
+    "litchi-only",
+    "—",
+)
+
+# Property row fields: element, key, type, OfficeCLI asg, read status,
+# follow-up, Litchi asg, write status.
+READ_STATUS = 4
+WRITE_STATUS = 7
 
 
 def normalize(name: str) -> str:
@@ -218,13 +233,13 @@ class FormatDelta:
     name: str
     pending: dict | None = None
     elements: list[tuple[str, str, str, str]] = field(default_factory=list)
-    properties: list[tuple[str, str, str, str, str, str]] = field(default_factory=list)
+    properties: list[tuple[str, str, str, str, str, str, str, str]] = field(default_factory=list)
     operation_gaps: list[tuple[str, str, str, str, str]] = field(default_factory=list)
 
-    def counts(self, rows, statuses):
+    def counts(self, rows, statuses, column):
         counts = {status: 0 for status in statuses}
         for row in rows:
-            counts[row[-2]] += 1
+            counts[row[column]] += 1
         return counts
 
 
@@ -298,6 +313,24 @@ def ops_letters(spec: dict) -> str:
     return "".join(
         letter if spec.get(verb) else "-" for letter, verb in (("a", "add"), ("s", "set"), ("g", "get"))
     )
+
+
+def write_status(officecli: dict, litchi: dict | None) -> str:
+    """Litchi's add/set flags against OfficeCLI's for one property.
+
+    ``supported`` when Litchi offers every write verb OfficeCLI offers,
+    ``partial`` when it offers some, ``gap`` when it offers none, and ``—``
+    when OfficeCLI offers no write verb (``litchi-only`` if Litchi does).
+    """
+    wanted = [verb for verb in ("add", "set") if officecli.get(verb)]
+    litchi = litchi or {}
+    offered = [verb for verb in ("add", "set") if litchi.get(verb)]
+    if not wanted:
+        return "litchi-only" if offered else "—"
+    have = [verb for verb in wanted if verb in offered]
+    if len(have) == len(wanted):
+        return "supported"
+    return "partial" if have else "gap"
 
 
 def follow(gap: dict | None) -> str:
@@ -375,8 +408,9 @@ def compare(fmt: str, officecli: list[OcElement], report: dict) -> FormatDelta:
                 (schema.name, "", "pending", delta.pending.get("followUp", ""))
             )
             for key, spec in schema.properties.items():
+                write = "pending" if spec.get("add") or spec.get("set") else "—"
                 delta.properties.append(
-                    (schema.name, key, spec.get("type", ""), ops_letters(spec), "pending", "")
+                    (schema.name, key, spec.get("type", ""), ops_letters(spec), "pending", "", "", write)
                 )
         return delta
 
@@ -413,7 +447,8 @@ def compare(fmt: str, officecli: list[OcElement], report: dict) -> FormatDelta:
             for key, spec in schema.properties.items():
                 status = "missing" if spec.get("get") else "write-only"
                 delta.properties.append(
-                    (schema.name, key, spec.get("type", ""), ops_letters(spec), status, "")
+                    (schema.name, key, spec.get("type", ""), ops_letters(spec), status, "",
+                     "", write_status(spec, None))
                 )
             continue
         else:
@@ -438,29 +473,35 @@ def compare(fmt: str, officecli: list[OcElement], report: dict) -> FormatDelta:
                  if (normalize(target.name), name) in property_gaps),
                 None,
             )
+            litchi_spec = target.properties[hit] if hit is not None else None
             if (reference_format(fmt), schema.name, key) in {("docx", "paragraph", "paraId"), ("docx", "sdt", "id"), ("xlsx", "cell", "numFmtId")}:
                 row_status, row_follow = "raw-only", "ADR 0034: native selection requires explicit raw admission"
             elif target.gap:
                 row_status, row_follow = "element gap", follow(target.gap)
             elif hit is not None:
                 seen_litchi.add(hit)
-                row_status, row_follow = "supported", ""
+                # A property Litchi registers only for add/set is written, not read.
+                row_status = "supported" if litchi_spec.get("get") else "write-only"
+                row_follow = ""
             elif any(name in map(normalize, target.predicate_keys) for name in names):
                 row_status, row_follow = "supported", "the node's text"
             elif gap is not None:
                 row_status, row_follow = "gap", gap["followUp"]
             elif not spec.get("get"):
-                row_status, row_follow = "write-only", "M2"
+                row_status, row_follow = "write-only", ""
             else:
                 row_status, row_follow = "missing", ""
+            write = "gap" if target.gap and (spec.get("add") or spec.get("set")) else write_status(spec, litchi_spec)
             delta.properties.append(
-                (schema.name, key, spec.get("type", ""), ops_letters(spec), row_status, row_follow)
+                (schema.name, key, spec.get("type", ""), ops_letters(spec), row_status, row_follow,
+                 ops_letters(litchi_spec) if litchi_spec else "", write)
             )
         if status != "folded":
             for key, spec in target.properties.items():
                 if key not in seen_litchi:
                     delta.properties.append(
-                        (schema.name, key, spec.get("type", ""), "", "litchi-only", "")
+                        (schema.name, key, spec.get("type", ""), "", "litchi-only", "",
+                         ops_letters(spec), write_status({}, spec))
                     )
 
     for element in litchi:
@@ -483,8 +524,9 @@ def render(
         "Generated by `tools/officecli_capability_delta.py`; do not edit by hand.",
         "It compares OfficeCLI's help schemas with Litchi's golden capability",
         "reports (`Capabilities::of(format)`, record 0010 §7), for the formats",
-        "OfficeCLI describes. M1 is read-only, so a property counts as supported",
-        "when Litchi reads it; OfficeCLI's add/set/get flags are shown as `asg`.",
+        "OfficeCLI describes. Each property has a read status (Litchi's `get`",
+        "against OfficeCLI's) and a write status (Litchi's `add`/`set` against",
+        "OfficeCLI's); both sides' add/set/get flags are shown as `asg`.",
         "XLS and XLSB are compared against the XLSX help vocabulary as Litchi's parity",
         "target; this does not claim OfficeCLI itself supports XLS or XLSB files.",
         "DOCX operation gaps also include the feature-specific encryption baseline",
@@ -508,19 +550,32 @@ def render(
         "",
         "## Statuses",
         "",
+        "Read statuses:",
+        "",
         "| Status | Meaning |",
         "|---|---|",
         "| supported | Litchi reads it (a property, or the node's text for a predicate key such as a cell's `value`) |",
         "| gap | Litchi lists it in `capabilities()` as a gap, with the follow-up shown |",
         "| element gap | a property of an element Litchi lists as a gap |",
         "| folded | an OfficeCLI element Litchi models inside another element (named in the follow-up) |",
-        "| pending | the format's adapter has not landed (the follow-up names its M1 step) |",
-        "| write-only | OfficeCLI cannot read it either (no `get`); M2's write surface decides |",
+        "| pending | the format's adapter has not landed (the follow-up names the step that lands it) |",
+        "| write-only | not read: OfficeCLI has no `get`, or Litchi registers it for add/set only; see the write status |",
         "| raw-only | native selection metadata excluded from ordinary APIs by ADR 0034 |",
         "| operation gap | an element operation refused for a particular selection or leaf context; listed in the contextual gap table |",
         "| missing | OfficeCLI reads it and Litchi neither reads nor lists it: untriaged |",
         "| out of scope | not an element of the unified read surface |",
         "| litchi-only | Litchi reads it and OfficeCLI's schema lacks it |",
+        "",
+        "Write statuses (OfficeCLI's `add`/`set` flags against Litchi's):",
+        "",
+        "| Status | Meaning |",
+        "|---|---|",
+        "| supported | Litchi offers every write verb OfficeCLI offers for it |",
+        "| partial | Litchi offers some of OfficeCLI's write verbs (compare the two `asg` columns) |",
+        "| gap | OfficeCLI writes it and Litchi does not (including properties of gap or missing elements) |",
+        "| pending | the format's adapter has not landed |",
+        "| litchi-only | Litchi writes it and OfficeCLI offers no write verb, or its schema lacks it |",
+        "| — | neither side writes it |",
         "",
         "## Summary",
         "",
@@ -530,18 +585,28 @@ def render(
         "|---|" + "---|" * len(ELEMENT_STATUSES),
     ]
     for delta in deltas:
-        counts = delta.counts(delta.elements, ELEMENT_STATUSES)
+        counts = delta.counts(delta.elements, ELEMENT_STATUSES, 2)
         lines.append(f"| {delta.name} | " + " | ".join(str(counts[s]) for s in ELEMENT_STATUSES) + " |")
     lines += [
         "",
-        "Properties:",
+        "Property reads:",
         "",
         "| Format | " + " | ".join(PROPERTY_STATUSES) + " |",
         "|---|" + "---|" * len(PROPERTY_STATUSES),
     ]
     for delta in deltas:
-        counts = delta.counts(delta.properties, PROPERTY_STATUSES)
+        counts = delta.counts(delta.properties, PROPERTY_STATUSES, READ_STATUS)
         lines.append(f"| {delta.name} | " + " | ".join(str(counts[s]) for s in PROPERTY_STATUSES) + " |")
+    lines += [
+        "",
+        "Property writes:",
+        "",
+        "| Format | " + " | ".join(WRITE_STATUSES) + " |",
+        "|---|" + "---|" * len(WRITE_STATUSES),
+    ]
+    for delta in deltas:
+        counts = delta.counts(delta.properties, WRITE_STATUSES, WRITE_STATUS)
+        lines.append(f"| {delta.name} | " + " | ".join(str(counts[s]) for s in WRITE_STATUSES) + " |")
 
     for delta in deltas:
         lines += ["", f"## {delta.name}", ""]
@@ -570,11 +635,13 @@ def render(
                 "",
                 "### Properties",
                 "",
-                "| Element | Property | Type | OfficeCLI `asg` | Status | Follow-up |",
-                "|---|---|---|---|---|---|",
+                "| Element | Property | Type | OfficeCLI `asg` | Litchi `asg` | Read | Write | Follow-up |",
+                "|---|---|---|---|---|---|---|---|",
             ]
-            for element, key, ty, ops, status, follow_up in delta.properties:
-                lines.append(f"| {element} | `{key}` | {ty} | {ops} | {status} | {follow_up} |")
+            for element, key, ty, ops, status, follow_up, litchi_ops, write in delta.properties:
+                lines.append(
+                    f"| {element} | `{key}` | {ty} | {ops} | {litchi_ops} | {status} | {write} | {follow_up} |"
+                )
         lines += [
             "",
             "### Contextual operation gaps",

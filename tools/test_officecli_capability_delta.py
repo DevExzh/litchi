@@ -95,7 +95,7 @@ class Comparison(unittest.TestCase):
         capability = report([element("table", {"firstCol": {"get": True}}), element("cell", {})])
         compared = delta.compare("xlsb", schemas, capability)
         self.assertEqual(compared.name, "xlsb")
-        self.assertEqual([row[-2] for row in compared.properties], ["supported", "raw-only"])
+        self.assertEqual([row[4] for row in compared.properties], ["supported", "raw-only"])
 
     def test_statuses(self) -> None:
         officecli = self.schemas(
@@ -136,7 +136,7 @@ class Comparison(unittest.TestCase):
         self.assertEqual(properties[("cell", "value")], ("supported", "the node's text"))
         self.assertEqual(properties[("cell", "computedValue")], ("gap", "M4"))
         self.assertEqual(properties[("cell", "image.fileSize")], ("missing", ""))
-        self.assertEqual(properties[("cell", "font")], ("write-only", "M2"))
+        self.assertEqual(properties[("cell", "font")], ("write-only", ""))
         self.assertEqual(properties[("cell", "border.left.color")], ("litchi-only", ""))
         self.assertEqual(properties[("comment", "text")], ("element gap", "L-XLSX-R5"))
         self.assertEqual(properties[("gadget", "size")], ("missing", ""))
@@ -252,6 +252,61 @@ class Comparison(unittest.TestCase):
         self.assertEqual(first, delta.render([result], goldens, ("cd" * 32, 3), "dced0d74"))
         self.assertIn(f"| golden | `{goldens[0][0]}` | `{'ab' * 32}` |", first)
         self.assertIn("| xlsx | 1 | 0 | 0 | 0 | 0 | 0 | 0 |", first)
+
+    def test_write_statuses_compare_add_and_set_flags(self) -> None:
+        officecli = self.schemas(
+            self.oc(
+                "cell",
+                {
+                    "value": {"type": "string", "add": True, "set": True, "get": True},
+                    "font": {"type": "string", "add": True, "set": True, "get": True},
+                    "fill": {"type": "color", "set": True, "get": True},
+                    "width": {"type": "int", "get": True},
+                    "note": {"type": "string", "set": True},
+                },
+            ),
+            self.oc("gadget", {"size": {"type": "int", "set": True}}),
+        )
+        litchi = report(
+            [
+                element(
+                    "cell",
+                    {
+                        "value": {"type": "string", "add": True, "set": True, "get": True},
+                        "font": {"type": "string", "set": True, "get": True},
+                        "width": READ,
+                        "note": {"type": "string", "set": True},
+                        "hidden": {"type": "bool", "set": True, "get": True},
+                    },
+                )
+            ]
+        )
+        rows = {(row[0], row[1]): row for row in delta.compare("xlsx", officecli, litchi).properties}
+        status = {key: (row[4], row[6], row[7]) for key, row in rows.items()}
+        self.assertEqual(status[("cell", "value")], ("supported", "asg", "supported"))
+        self.assertEqual(status[("cell", "font")], ("supported", "-sg", "partial"))
+        self.assertEqual(status[("cell", "fill")], ("missing", "", "gap"))
+        self.assertEqual(status[("cell", "width")], ("supported", "--g", "—"))
+        self.assertEqual(status[("cell", "note")], ("write-only", "-s-", "supported"))
+        self.assertEqual(status[("cell", "hidden")], ("litchi-only", "-sg", "litchi-only"))
+        self.assertEqual(status[("gadget", "size")], ("write-only", "", "gap"))
+
+    def test_a_litchi_write_only_property_is_not_read(self) -> None:
+        officecli = self.schemas(self.oc("cell", {"style": {"type": "string", "set": True, "get": True}}))
+        litchi = report([element("cell", {"style": {"type": "string", "set": True}})])
+        row = delta.compare("xlsx", officecli, litchi).properties[0]
+        self.assertEqual((row[4], row[7]), ("write-only", "supported"))
+
+    def test_element_gaps_are_write_gaps(self) -> None:
+        officecli = self.schemas(self.oc("comment", {"text": {"type": "string", "set": True, "get": True}}))
+        litchi = report([element("comment", {}, gap={"code": "unsupported_capability", "followUp": "F", "reason": "r"})])
+        row = delta.compare("xlsx", officecli, litchi).properties[0]
+        self.assertEqual((row[4], row[7]), ("element gap", "gap"))
+
+    def test_the_header_describes_write_statuses(self) -> None:
+        rendered = delta.render([delta.compare("xlsx", [], report([]))], [], ("cd" * 32, 0), "unknown")
+        self.assertNotIn("read-only", rendered)
+        self.assertIn("Property writes:", rendered)
 
 
 if __name__ == "__main__":
