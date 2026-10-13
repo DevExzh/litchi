@@ -245,10 +245,10 @@ semantic-limit migrations.
 |---|---|---|---|
 | Semantic metadata type | `Metadata` (merged field union; typed `Keywords`; real time types) | `ooxml_common::Props`; the `creator` field name (→ `author`) | 🔴 W2 |
 | Metadata read | `Package::metadata()` | `Package::props()` (docx) | ✅ facade/ODF/iWork reads · 🔴 docx rename (W2) · 🔴 pptx/xlsx typed entry added (W2) |
-| Metadata mutation | `Package::{edit_metadata, apply_metadata}` + `metadata::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` | `put_props()`, `props_mut()`, `clear_props()` | 🔴 W2 |
+| Metadata mutation | `Package::{edit_metadata, apply_metadata}` + `metadata::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` | `put_props()`, `props_mut()`, `clear_props()` | 🔴 W2 · ✅ doc/xls/ppt `package::metadata` (0254) |
 | Custom properties | `custom_props()` / `edit_custom_props()` | — | ✅ name (docx/pptx/xlsx); mutation transactionalized W2 |
 | Application properties (OOXML-only) | `app_props()` | — | format-specific layer, OOXML only |
-| Fresh-authoring metadata | `Builder::set_metadata(Metadata)` | — | ✅ ODF; not an opened-document mutation |
+| Fresh-authoring metadata | `Builder::set_metadata(Metadata)` | `Builder::set_property` (doc/xls/ppt) | ✅ ODF · ✅ doc/xls/ppt (0254); not an opened-document mutation |
 | iWork metadata write | typed unsupported until native gates pass | — | no capability is claimed ahead of evidence |
 
 ## 7. Selectors and coordinates
@@ -1548,3 +1548,23 @@ Wave residue that still exposes a glossary-banned name (owner: record 0248):
 | ooxml-common | `custom_data::Limits` | `SemanticLimits` | Phase B step 6 |
 | core | `Limits`, `Error::ResourceLimit` (execution budgets) | not banned by §4; rename only on an owner decision | owner decision |
 | pptx, xlsb, xlsx, opc, ops | names listed in record 0248 §2 | §2–§4 | Phase B steps 4–5, ops follow-ups |
+
+## Legacy OLE metadata (record 0254)
+
+DOC, XLS and PPT author and edit document properties through the shared
+`litchi_ole_common::property_set::SummaryProperties` model
+(`SummaryInformation`, `DocumentSummaryInformation` and the user-defined
+section). Fresh authoring is `Builder::set_metadata(Metadata)` plus
+`Builder::{summary_properties, summary_properties_mut}` for typed and custom
+properties; the refusing (DOC) or silently dropping (PPT) `set_property` is
+deleted and banned. Opened packages expose `Package::{metadata,
+edit_metadata, apply_metadata}` and the registered
+`package::metadata::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}`
+family; `LimitKind` has no caller-selected dimension yet. The one
+`litchi_core::Metadata` conversion is `SummaryProperties::{from_metadata,
+merge_metadata}`; fields without a property-set slot (`identifier`,
+`hyperlink_base`, unzoned timestamps) are refused with
+`MetadataError::Unsupported`, never dropped. The unified layer accepts
+initial metadata in `create_with` and `set("/metadata", ..)` with
+root-metadata keys and `custom.<name>`. See
+[0254](unified-ops/0254-legacy-ole-metadata.md).

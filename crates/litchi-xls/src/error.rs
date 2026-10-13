@@ -144,6 +144,13 @@ pub enum Error {
     WeakEncryptionRequiresExplicitPolicy,
     /// RC4 authoring requires caller-supplied one-use salt and verifier bytes.
     EncryptionEntropyRequired,
+    /// The metadata given to [`crate::Builder::set_metadata`] cannot be
+    /// stored in the OLE property sets.
+    Metadata(litchi_ole_common::property_set::summary_properties::MetadataError),
+    /// Document properties were combined with `CryptoAPI` RC4 encryption,
+    /// whose encrypted summary stream ([MS-OFFCRYPTO] 2.3.5.4) is not
+    /// produced; the builder refuses rather than store them in plaintext.
+    EncryptedMetadata,
     /// Unexpected record type
     UnexpectedRecordType {
         /// Expected record type
@@ -264,6 +271,11 @@ impl fmt::Display for Error {
             Error::EncryptionEntropyRequired => {
                 write!(f, "BIFF8 RC4 authoring requires one-use EncryptionEntropy")
             },
+            Error::Metadata(error) => write!(f, "XLS metadata error: {error}"),
+            Error::EncryptedMetadata => write!(
+                f,
+                "XLS document properties cannot be written with CryptoAPI RC4 encryption"
+            ),
             Error::UnexpectedRecordType { expected, found } => {
                 write!(
                     f,
@@ -284,6 +296,7 @@ impl std::error::Error for Error {
             Error::Cfb(e) => Some(e),
             Error::Vba(e) => Some(e),
             Error::Graph(e) => Some(e),
+            Error::Metadata(e) => Some(e),
             _ => None,
         }
     }
@@ -298,6 +311,12 @@ impl From<std::io::Error> for Error {
 impl From<litchi_cfb::OleError> for Error {
     fn from(err: litchi_cfb::OleError) -> Self {
         Error::Cfb(err)
+    }
+}
+
+impl From<litchi_ole_common::property_set::summary_properties::MetadataError> for Error {
+    fn from(err: litchi_ole_common::property_set::summary_properties::MetadataError) -> Self {
+        Error::Metadata(err)
     }
 }
 

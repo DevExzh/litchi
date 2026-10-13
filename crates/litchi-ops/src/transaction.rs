@@ -106,13 +106,13 @@ struct Step {
 }
 enum Leaf {
     #[cfg(feature = "doc")]
-    Doc(Box<litchi_doc::Patch>),
+    Doc(Box<crate::format::doc::StepPatch>),
     #[cfg(feature = "xlsb")]
     Xlsb(Box<crate::format::xlsb::write::Patch>),
     #[cfg(feature = "xls")]
-    Xls(Box<litchi_xls::Patch>),
+    Xls(Box<crate::format::xls::write::StepPatch>),
     #[cfg(feature = "ppt")]
-    Ppt(Box<litchi_ppt::Patch>),
+    Ppt(Box<crate::format::ppt::write::StepPatch>),
     #[cfg(feature = "pptx")]
     Pptx {
         source: crate::format::pptx::Editable,
@@ -2143,7 +2143,7 @@ fn changed(steps: &[Step]) -> Result<bool> {
     }
     match (&first.leaf, &last.leaf) {
         #[cfg(feature = "doc")]
-        (Leaf::Doc(first), Leaf::Doc(last)) => Ok(first.before_bytes() != last.after_bytes()),
+        (Leaf::Doc(first), Leaf::Doc(last)) => Ok(first.before() != last.after()),
         #[cfg(feature = "xlsb")]
         (Leaf::Xlsb(first), Leaf::Xlsb(last)) => Ok(first.before() != last.after()),
         #[cfg(feature = "xls")]

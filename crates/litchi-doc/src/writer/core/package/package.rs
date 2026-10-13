@@ -6,6 +6,7 @@ use crate::writer::fib::FibBuilder;
 use crate::writer::font_table::FontTableBuilder;
 use crate::writer::piece_table::{Piece, PieceTableBuilder};
 use litchi_cfb::writer::OleWriter;
+use litchi_ole_common::property_set::summary_properties::Streams;
 use std::io::Cursor;
 
 use super::super::{
@@ -46,7 +47,36 @@ impl Builder {
                 "an attached DOC glossary cannot contain an independent VBA project".to_string(),
             ));
         }
+        if !self.properties.is_empty() {
+            return Err(WriteError::InvalidData(
+                "an attached DOC glossary cannot have independent document properties".to_string(),
+            ));
+        }
         Ok(())
+    }
+
+    /// Serializes the document-property streams, or `None` when no property
+    /// is set (the builder then emits no property stream, as it always did).
+    ///
+    /// The `CryptoAPI` RC4 header this builder emits declares the properties
+    /// encrypted (`fDocProps` clear), and protecting them needs the encrypted
+    /// summary stream ([MS-OFFCRYPTO] 2.3.5.4), which is not produced, so that
+    /// combination is refused instead of storing the properties in plaintext.
+    /// XOR obfuscation and Office binary RC4 have no encrypted form for the
+    /// property streams; there they are written in plaintext.
+    fn property_streams(&self) -> Result<Option<Streams>, WriteError> {
+        if self.properties.is_empty() {
+            return Ok(None);
+        }
+        if self.encryption.as_ref().is_some_and(|encryption| {
+            matches!(
+                encryption.profile,
+                crate::encryption::EncryptionProfile::CryptoApiRc4 { .. }
+            )
+        }) {
+            return Err(WriteError::EncryptedMetadata);
+        }
+        Ok(self.properties.to_streams()?)
     }
 
     fn encryption_table_header_len(&self) -> Result<usize, WriteError> {
@@ -83,6 +113,7 @@ impl Builder {
         &self,
         ole_writer: &mut OleWriter,
         streams: DocOutputStreams,
+        properties: Option<Streams>,
     ) -> Result<(), WriteError> {
         ole_writer.set_root_clsid(WORD_DOCUMENT_CLSID);
 
@@ -101,6 +132,9 @@ impl Builder {
         let ole_data = crate::writer::ole_metadata::generate_ole_stream();
         ole_writer.create_stream_owned(&["\x01CompObj"], compobj_data)?;
         ole_writer.create_stream_owned(&["\x01Ole"], ole_data)?;
+        if let Some(properties) = properties {
+            properties.write_into(ole_writer)?;
+        }
 
         if let Some(project) = &self.vba_project {
             ole_writer.create_storage(&[VBA_PROJECT_STORAGE_NAME])?;
@@ -1141,9 +1175,10 @@ impl Builder {
 
     /// Build the complete compound document after validating every staged structure.
     fn build_ole_writer(&mut self) -> Result<OleWriter, WriteError> {
+        let properties = self.property_streams()?;
         let streams = self.build_output_streams()?;
         let mut ole_writer = OleWriter::new();
-        self.populate_compound_document(&mut ole_writer, streams)?;
+        self.populate_compound_document(&mut ole_writer, streams, properties)?;
         Ok(ole_writer)
     }
 

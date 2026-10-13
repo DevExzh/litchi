@@ -23,6 +23,8 @@ pub mod odp;
 pub mod ods;
 #[cfg(feature = "odt")]
 pub mod odt;
+#[cfg(any(feature = "doc", feature = "xls", feature = "ppt"))]
+pub(crate) mod ole_metadata;
 #[cfg(feature = "ppt")]
 pub mod ppt;
 #[cfg(feature = "pptx")]

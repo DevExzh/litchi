@@ -21,8 +21,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("Creating PPT animation showcase...");
 
     let mut writer = Builder::new_widescreen();
-    writer.set_property("Title", "Animation Effects Showcase");
-    writer.set_property("Author", "Litchi PPT Demo");
+    writer.set_metadata(litchi_core::Metadata {
+        title: Some("Animation Effects Showcase".to_owned()),
+        author: Some("Litchi PPT Demo".to_owned()),
+        ..litchi_core::Metadata::default()
+    })?;
 
     // Slide 1: Basic entrance animations
     println!("Creating slide: Entrance Animations");

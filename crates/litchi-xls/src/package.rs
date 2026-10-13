@@ -33,6 +33,8 @@ type RawReader = crate::raw::Reader<Cursor<Vec<u8>>>;
 /// The canonical primary transaction for an immutable XLS package.
 #[path = "package/edit.rs"]
 pub mod edit;
+#[path = "package/metadata.rs"]
+pub mod metadata;
 pub use edit::{Commit, Diagnostics, Edit, EditOptions, LimitKind, Patch};
 
 /// Errors returned by the canonical XLS package and projection APIs.
