@@ -12,7 +12,7 @@ mod validation;
 #[cfg(test)]
 mod tests;
 
-pub use edit::{Commit, Patch, Snapshot, Transaction};
+pub use edit::{Commit, Edit, Patch, Snapshot};
 pub use litchi_ole_common::object::Limits;
 pub use package::Editor;
 pub use semantic::*;

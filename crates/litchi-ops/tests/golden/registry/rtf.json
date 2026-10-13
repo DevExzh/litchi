@@ -1,0 +1,529 @@
+{
+  "format": "rtf",
+  "elements": [
+    {
+      "format": "rtf",
+      "element": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/"
+        ]
+      },
+      "children": [
+        {
+          "element": "body",
+          "pathSegment": "body"
+        }
+      ],
+      "properties": {}
+    },
+    {
+      "format": "rtf",
+      "element": "body",
+      "parent": "document",
+      "operations": {
+        "add": true,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/body"
+        ]
+      },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "p"
+        }
+      ],
+      "properties": {},
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "rtf",
+      "element": "paragraph",
+      "parent": "body",
+      "elementAliases": [
+        "p"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "run",
+          "pathSegment": "r"
+        }
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "align": {
+          "type": "enum",
+          "values": [
+            "left",
+            "right",
+            "center",
+            "justify"
+          ],
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "spaceBefore": {
+          "type": "length",
+          "unit": "twip",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "spaceAfter": {
+          "type": "length",
+          "unit": "twip",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "indent": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "rightIndent": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "firstLineIndent": {
+          "type": "length",
+          "unit": "emu",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "keepNext": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "keepLines": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "pageBreakBefore": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "rtf",
+      "element": "run",
+      "parent": "paragraph",
+      "elementAliases": [
+        "r"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]/r[N]"
+        ]
+      },
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "unit": "pt",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "bold": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "colorContext": "word",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "underline": {
+          "type": "enum",
+          "values": [
+            "none",
+            "single",
+            "double",
+            "dotted",
+            "dashed",
+            "dashDot",
+            "dashDotDot",
+            "words",
+            "thick",
+            "wave",
+            "hairline",
+            "thickDotted",
+            "thickDashed",
+            "thickDashDot",
+            "thickDashDotDot",
+            "thickLongDash",
+            "longDash",
+            "heavyWave",
+            "doubleWave"
+          ],
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "strike": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "dstrike": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "vanish": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "caps": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "smallcaps": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "outline": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    }
+  ],
+  "gaps": [
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "document",
+      "context": "template",
+      "code": "unsupported_capability",
+      "followUp": "use Flavor::Document",
+      "reason": "RTF template creation is not supported"
+    },
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "document",
+      "context": "strict-conformance",
+      "code": "unsupported_capability",
+      "followUp": "use Conformance::Transitional",
+      "reason": "RTF does not support OOXML Strict conformance"
+    },
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "document",
+      "context": "initial-metadata",
+      "code": "unsupported_capability",
+      "followUp": "RTF typed metadata creation",
+      "reason": "initial RTF metadata authoring is not integrated"
+    },
+    {
+      "subject": "element",
+      "element": "table",
+      "code": "unsupported_capability",
+      "followUp": "unified RTF retained-node projection",
+      "reason": "this native RTF concept is not yet integrated into generic paths and queries"
+    },
+    {
+      "subject": "element",
+      "element": "row",
+      "code": "unsupported_capability",
+      "followUp": "unified RTF retained-node projection",
+      "reason": "this native RTF concept is not yet integrated into generic paths and queries"
+    },
+    {
+      "subject": "element",
+      "element": "cell",
+      "code": "unsupported_capability",
+      "followUp": "unified RTF retained-node projection",
+      "reason": "this native RTF concept is not yet integrated into generic paths and queries"
+    },
+    {
+      "subject": "element",
+      "element": "header",
+      "code": "unsupported_capability",
+      "followUp": "unified RTF retained-node projection",
+      "reason": "this native RTF concept is not yet integrated into generic paths and queries"
+    },
+    {
+      "subject": "element",
+      "element": "footer",
+      "code": "unsupported_capability",
+      "followUp": "unified RTF retained-node projection",
+      "reason": "this native RTF concept is not yet integrated into generic paths and queries"
+    },
+    {
+      "subject": "element",
+      "element": "footnote",
+      "code": "unsupported_capability",
+      "followUp": "unified RTF retained-node projection",
+      "reason": "this native RTF concept is not yet integrated into generic paths and queries"
+    },
+    {
+      "subject": "element",
+      "element": "endnote",
+      "code": "unsupported_capability",
+      "followUp": "unified RTF retained-node projection",
+      "reason": "this native RTF concept is not yet integrated into generic paths and queries"
+    },
+    {
+      "subject": "element",
+      "element": "comment",
+      "code": "unsupported_capability",
+      "followUp": "unified RTF retained-node projection",
+      "reason": "this native RTF concept is not yet integrated into generic paths and queries"
+    },
+    {
+      "subject": "element",
+      "element": "picture",
+      "code": "unsupported_capability",
+      "followUp": "unified RTF retained-node projection",
+      "reason": "this native RTF concept is not yet integrated into generic paths and queries"
+    },
+    {
+      "subject": "element",
+      "element": "shape",
+      "code": "unsupported_capability",
+      "followUp": "unified RTF retained-node projection",
+      "reason": "this native RTF concept is not yet integrated into generic paths and queries"
+    },
+    {
+      "subject": "element",
+      "element": "hyperlink",
+      "code": "unsupported_capability",
+      "followUp": "unified RTF retained-node projection",
+      "reason": "this native RTF concept is not yet integrated into generic paths and queries"
+    },
+    {
+      "subject": "element",
+      "element": "style",
+      "code": "unsupported_capability",
+      "followUp": "unified RTF retained-node projection",
+      "reason": "this native RTF concept is not yet integrated into generic paths and queries"
+    },
+    {
+      "subject": "element",
+      "element": "numbering",
+      "code": "unsupported_capability",
+      "followUp": "unified RTF retained-node projection",
+      "reason": "this native RTF concept is not yet integrated into generic paths and queries"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "run",
+      "context": "native-source-closure",
+      "code": "unsupported_capability",
+      "followUp": "M6 RTF rich run preservation",
+      "reason": "changed run text/formatting requires an ordinary uncompressed body without dependent destinations, review content, inline line breaks or paragraph style/list references; run text containing paragraph/line-break controls, native mixed-operation composition and durable replay remain unsupported; opaque body syntax is preserved when outside changed source spans with projectable UTF-8 anchors"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "paragraph",
+      "context": "native-source-closure",
+      "code": "unsupported_capability",
+      "followUp": "M6 RTF rich paragraph preservation",
+      "reason": "paragraph text, alignment and layout updates require the native editor to prove the source formatting and destination closure"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "paragraph",
+      "context": "native-source-closure",
+      "code": "unsupported_capability",
+      "followUp": "M6 RTF rich paragraph preservation",
+      "reason": "paragraph removal requires the native editor to prove an ordinary literal body and retain every unselected source boundary"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "paragraph",
+      "context": "native-source-closure",
+      "code": "unsupported_capability",
+      "followUp": "M6 RTF rich paragraph preservation",
+      "reason": "paragraph insertion requires the native editor to prove the ordinary literal body and preserve every unselected source boundary"
+    },
+    {
+      "subject": "operation",
+      "verb": "swap",
+      "element": "body",
+      "context": "native-source-closure",
+      "code": "unsupported_capability",
+      "followUp": "M6 RTF rich paragraph preservation",
+      "reason": "paragraph swapping requires the native editor to prove an ordinary plain body and preserve paragraph order and boundaries"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "run",
+      "context": "native-source-closure",
+      "code": "unsupported_capability",
+      "followUp": "M6 RTF rich run preservation",
+      "reason": "run removal preserves containing paragraphs through native empty text replacement; dependent destinations, compressed transport, inline line breaks, paragraph style/list references and opaque syntax overlapping changed source spans remain unsupported; opaque boundary anchors are projected through text edits"
+    },
+    {
+      "subject": "operation",
+      "verb": "move",
+      "element": "run",
+      "context": "native-run-edit",
+      "code": "unsupported_capability",
+      "followUp": "M6 RTF atomic native run edits",
+      "reason": "run reordering requires an atomic native character-run editor that preserves paragraph boundaries and formatting controls"
+    },
+    {
+      "subject": "operation",
+      "verb": "swap",
+      "element": "run",
+      "context": "native-run-edit",
+      "code": "unsupported_capability",
+      "followUp": "M6 RTF atomic native run edits",
+      "reason": "run swapping requires an atomic native character-run editor that preserves paragraph boundaries and formatting controls"
+    },
+    {
+      "subject": "view",
+      "mode": "issues",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "forms",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "html",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "svg",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "screenshot",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "pdf",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    }
+  ]
+}

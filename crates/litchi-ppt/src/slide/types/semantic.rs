@@ -36,6 +36,10 @@ impl Slide<'_> {
 
     /// Get shapes on this slide (lazy-loaded).
     ///
+    /// A shape whose text box references slide-list text (an
+    /// `OutlineTextRefAtom`, MS-PPT 2.9.78) carries the text of the body the
+    /// reference selects (L-PPT-R1); see [`Self::outline_text_bodies`].
+    ///
     /// Non-structural text-style defects repaired while the shapes are parsed
     /// (see [`crate::TextPropDefect`]) are recorded alongside the cached
     /// shapes; enumerate them with [`Self::tolerance_report`] or thread a
@@ -118,9 +122,40 @@ impl Slide<'_> {
         &self,
     ) -> Result<&(Arc<[ShapeEnum<'static>]>, crate::leniency::ToleranceReport)> {
         self.shapes.get_or_try_init(|| {
+            if let Some(hit) = self.shape_memo.and_then(|memo| memo.get(self.persist_id)) {
+                return Ok(hit);
+            }
             let (shapes, report) = self.parse_shapes()?;
-            Ok((Arc::from(shapes), report))
+            let parsed = (Arc::from(shapes), report);
+            if let Some(memo) = self.shape_memo {
+                memo.put(self.persist_id, &parsed);
+            }
+            Ok(parsed)
         })
+    }
+
+    /// Find a shape by its `OfficeArt` shape identifier (`spid`, see
+    /// [`ShapeEnum::id`]), searching group children depth-first in drawing
+    /// order (L-PPT-R4).
+    ///
+    /// MS-ODRAW requires identifiers to be unique within a drawing; when a
+    /// file repeats one, the first shape in drawing order is returned. `None`
+    /// when no returned shape has the identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the shapes cannot be parsed.
+    pub fn shape_by_id(&self, id: u32) -> Result<Option<&ShapeEnum<'static>>> {
+        let mut pending = self.shapes()?.iter().rev().collect::<Vec<_>>();
+        while let Some(shape) = pending.pop() {
+            if shape.id() == id {
+                return Ok(Some(shape));
+            }
+            if let ShapeEnum::Group(group) = shape {
+                pending.extend(group.children().iter().rev());
+            }
+        }
+        Ok(None)
     }
 
     /// Get the number of shapes (triggers parsing if not yet loaded).
@@ -212,9 +247,27 @@ impl Slide<'_> {
     }
 
     /// Validated outline text references (`OutlineTextRefAtom`, MS-PPT 2.9.78)
-    /// tying this slide's shapes to outline text bodies.
+    /// found among this slide's slide-list records.
+    ///
+    /// Conforming files keep these references in the shapes' text boxes,
+    /// not in the slide list, so this is normally empty; the slide reader
+    /// resolves the references the shapes hold (see
+    /// [`Self::outline_text_bodies`]).
     pub fn outline_text_refs(&self) -> &[crate::OutlineTextRef] {
         &self.outline_text_refs
+    }
+
+    /// This slide's slide-list text bodies, in slide-list order (MS-PPT
+    /// 2.4.14.3; L-PPT-R1).
+    ///
+    /// `PowerPoint` keeps the text of title and body placeholders here: the
+    /// placeholder's text box holds an `OutlineTextRefAtom` whose index
+    /// selects one of these bodies. [`Self::shapes`] and [`Self::text`]
+    /// already read such placeholders from the body they select. Empty when
+    /// the slide has no slide-list text or it could not be read
+    /// ([`crate::SlideListDefect::UnreadableSlideListText`]).
+    pub fn outline_text_bodies(&self) -> &[crate::OutlineTextBody] {
+        self.outline_text_bodies
     }
 
     /// Return every shape-scoped programmable-tag container on this slide.
@@ -426,12 +479,18 @@ impl Slide<'_> {
 
     /// Extract all text from this slide (lazy-loaded).
     ///
+    /// The text is the slide's direct text records, then the text of every
+    /// text box in drawing order. A text box that references slide-list
+    /// text (an `OutlineTextRefAtom`, as title and body placeholders do)
+    /// contributes the body it selects (L-PPT-R1). When none of that yields
+    /// text, the slide's slide-list text is returned instead.
+    ///
     /// # Performance
     ///
     /// - Text is extracted and cached on first call
     /// - Includes text from:
     ///   * Direct text records in the slide
-    ///   * Shapes (via PPDrawing/Escher)
+    ///   * Shapes (via PPDrawing/Escher), with outline references resolved
     ///
     /// # Errors
     ///

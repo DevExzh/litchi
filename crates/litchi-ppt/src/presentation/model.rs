@@ -168,6 +168,8 @@ pub(crate) struct PresentationData {
     /// Validated password-to-open profile, when the document was encrypted.
     #[cfg(feature = "encryption")]
     pub(crate) encryption: Option<EncryptionProfile>,
+    /// The most recently parsed slide's shapes (record 0260).
+    pub(crate) shape_memo: crate::slide::ShapeMemo,
 }
 
 impl Presentation {
@@ -312,7 +314,10 @@ impl Presentation {
             .slides()
             .enumerate()
             .map(|(idx, slide_result)| {
-                slide_result.map(|slide_data| Slide::from_slide_data(slide_data, idx + 1))
+                slide_result.map(|slide_data| {
+                    Slide::from_slide_data(slide_data, idx + 1)
+                        .with_shape_memo(&self.inner.shape_memo)
+                })
             })
             .collect()
     }
@@ -334,7 +339,10 @@ impl Presentation {
             self.inner.source_limits,
         );
         let slide_data = factory.parse_slide(entry.persist_id())?;
-        Ok(Some(Slide::from_slide_data(slide_data, position + 1)))
+        Ok(Some(
+            Slide::from_slide_data(slide_data, position + 1)
+                .with_shape_memo(&self.inner.shape_memo),
+        ))
     }
 
     /// Get the number of slides (actual Slide records only).
@@ -904,6 +912,27 @@ impl Presentation {
         Ok(record)
     }
 
+    /// The exact encoded bytes of the live `DocumentContainer` record.
+    pub(crate) fn live_document_bytes(&self) -> Result<Vec<u8>> {
+        self.check_source()?;
+        let offset = self.inner.slide_directory.document_offset();
+        let (record, consumed) = Record::parse_with_limits(
+            &self.inner.powerpoint_document,
+            offset,
+            self.inner.source_limits,
+        )?;
+        if record.record_type != RecordType::Document {
+            return Err(Error::Corrupted(
+                "document persist ID does not resolve to a DocumentContainer".to_string(),
+            ));
+        }
+        offset
+            .checked_add(consumed)
+            .and_then(|end| self.inner.powerpoint_document.get(offset..end))
+            .map(<[u8]>::to_vec)
+            .ok_or_else(|| Error::Corrupted("live DocumentContainer exceeds its stream".into()))
+    }
+
     pub(crate) fn document_stream(&self) -> &[u8] {
         &self.inner.powerpoint_document
     }
@@ -1447,9 +1476,13 @@ impl Presentation {
                 text.push_str(trimmed);
             }
 
-            // Extract text from Escher/PPDrawing using the optimized path
+            // Extract text from Escher/PPDrawing using the optimized path,
+            // resolving outline references as `Slide::text` does (L-PPT-R1)
             if let Some(ppdrawing) = slide_data.record.find_child(RecordType::PPDrawing) {
-                let escher_text = crate::odraw::text_from_drawing(&ppdrawing.data)?;
+                let escher_text = crate::odraw::text_from_slide_drawing(
+                    &ppdrawing.data,
+                    slide_data.outline_text_bodies,
+                )?;
                 let escher_trimmed = escher_text.trim();
                 if !escher_trimmed.is_empty() {
                     if !text.is_empty() {

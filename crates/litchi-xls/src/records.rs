@@ -301,7 +301,7 @@ pub(crate) fn check_duplicate_sheet_names<'a>(
         .try_reserve(names.len())
         .map_err(|_error| Error::Allocation("BoundSheet8 names"))?;
     for (index, name) in (0_u32..).zip(names) {
-        match first_index.entry(name.to_lowercase()) {
+        match first_index.entry(crate::sheet_name::key(name)) {
             std::collections::hash_map::Entry::Vacant(slot) => {
                 slot.insert(index);
             },

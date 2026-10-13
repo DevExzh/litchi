@@ -501,6 +501,7 @@ macro_rules! pptx_prop {
             ty: $ty,
             access: crate::node::spec::Access::READ,
             raw: true,
+            admission: crate::registry::Admission::NONE,
         }
     };
 }

@@ -31,7 +31,9 @@ use crate::parts::saved_selection::{
     FIB_INDEX_WSS, SavedSelection, SavedSelectionPatch, SavedSelectionSpliceError,
     SavedSelectionTransaction,
 };
-use crate::tracked_revision::{Limits, Revision, RevisionEditor, RevisionKind, RevisionMetadata};
+use crate::tracked_revision::{
+    Limits, ParagraphCopy, Revision, RevisionEditor, RevisionKind, RevisionMetadata,
+};
 use litchi_cfb::OleFile;
 use litchi_core::Position;
 use litchi_core::patch::{
@@ -214,6 +216,10 @@ pub enum Projection {
 }
 
 /// One of the seven text stories represented by `FibRgLw97` character counts.
+///
+/// The same values name a story to the readers
+/// ([`crate::Document::story_blocks`]) and to the editors here, so a read
+/// position maps onto the story an edit addresses.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Story {
     Main,
@@ -226,6 +232,31 @@ pub enum Story {
 }
 
 impl Story {
+    /// Every story, in the order the FIB lays their text out.
+    pub const ALL: [Self; 7] = [
+        Self::Main,
+        Self::Footnote,
+        Self::Header,
+        Self::Comment,
+        Self::Endnote,
+        Self::Textbox,
+        Self::HeaderTextbox,
+    ];
+
+    /// The story's `FibRgLw97` character-count slot (`ccpText` is 0); slot 3,
+    /// the retired macro story, still offsets the stories after it.
+    pub(crate) const fn character_count_slot(self) -> usize {
+        match self {
+            Self::Main => 0,
+            Self::Footnote => 1,
+            Self::Header => 2,
+            Self::Comment => 4,
+            Self::Endnote => 5,
+            Self::Textbox => 6,
+            Self::HeaderTextbox => 7,
+        }
+    }
+
     const fn index(self) -> usize {
         match self {
             Self::Main => 0,
@@ -260,6 +291,13 @@ pub enum TextTarget {
     TableCell(Position),
     /// Cached result of one simple, non-nested main-story field.
     FieldResult(Position),
+    /// A non-empty UTF-16 range of one ordinary main-story paragraph's text,
+    /// counted from the paragraph's first character: one character run.
+    BodySpan {
+        paragraph: Position,
+        start: u32,
+        end: u32,
+    },
 }
 
 impl TextTarget {
@@ -299,6 +337,93 @@ pub enum CharacterProperty {
     Italic,
     Underline,
 }
+
+/// Valued direct character formatting set without creating or rewriting
+/// style-table or font-table resources.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum CharacterValue<'a> {
+    /// Font size in half-points (`sprmCHps`), from 2 through 3276.
+    Size(u16),
+    /// Direct RGB text color (`sprmCCv`, plus `sprmCIco` when the color is
+    /// one of the sixteen Word 97 palette colors); `None` clears the direct
+    /// color so the text is automatic again.
+    Color(Option<[u8; 3]>),
+    /// The ASCII font (`sprmCRgFtc0`), named exactly as the document's font
+    /// table (`SttbfFfn`) names it. An absent name is refused, since adding a
+    /// font-table entry is a resource change.
+    Font(&'a str),
+}
+
+impl CharacterValue<'_> {
+    /// The property this value sets.
+    #[must_use]
+    pub const fn property(&self) -> CharacterValueProperty {
+        match self {
+            Self::Size(_) => CharacterValueProperty::Size,
+            Self::Color(_) => CharacterValueProperty::Color,
+            Self::Font(_) => CharacterValueProperty::Font,
+        }
+    }
+}
+
+/// The valued character property a [`CharacterValue`] sets.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
+pub enum CharacterValueProperty {
+    /// Font size.
+    Size,
+    /// Text color.
+    Color,
+    /// ASCII font.
+    Font,
+}
+
+impl CharacterValueProperty {
+    const fn wire_name(self) -> &'static str {
+        match self {
+            Self::Size => "size",
+            Self::Color => "color",
+            Self::Font => "font",
+        }
+    }
+
+    /// Every direct SPRM opcode the property owns.
+    const fn opcodes(self) -> &'static [u16] {
+        match self {
+            Self::Size => &[SPRM_C_HPS],
+            Self::Color => &[SPRM_C_ICO, SPRM_C_CV],
+            Self::Font => &[SPRM_C_RG_FTC0],
+        }
+    }
+}
+
+const SPRM_C_HPS: u16 = 0x4A43;
+const SPRM_C_ICO: u16 = 0x2A42;
+const SPRM_C_CV: u16 = 0x6870;
+const SPRM_C_RG_FTC0: u16 = 0x4A4F;
+/// `FibRgFcLcb97` index of the font table, `SttbfFfn`.
+const FIB_INDEX_STTBF_FFN: usize = 15;
+
+/// The sixteen Word 97 palette colors, by `sprmCIco` index.
+const ICO_PALETTE: [[u8; 3]; 16] = [
+    [0, 0, 0],
+    [0, 0, 255],
+    [0, 255, 255],
+    [0, 255, 0],
+    [255, 0, 255],
+    [255, 0, 0],
+    [255, 255, 0],
+    [255, 255, 255],
+    [0, 0, 128],
+    [0, 128, 128],
+    [0, 128, 0],
+    [128, 0, 128],
+    [128, 0, 0],
+    [128, 128, 0],
+    [128, 128, 128],
+    [192, 192, 192],
+];
 
 /// Non-destructive tracked-mark disposition supported by the root transaction.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -440,6 +565,22 @@ pub enum Refusal {
     OperationLimit { observed: usize, limit: usize },
     /// One or all replacement payloads exceed the configured UTF-16 bound.
     ReplacementLimit { observed: usize, limit: usize },
+    /// The document's font table does not name the requested font.
+    FontNotFound,
+    /// The requested font size is outside 1 through 1638 points.
+    InvalidFontSize,
+    /// Removing the main story's only ordinary paragraph would leave no body.
+    SoleParagraph,
+    /// The structural edit would join two tables or end the main story in a
+    /// table.
+    TableBoundary,
+    /// The paragraph carries a field, bookmark, note, comment, drawing or
+    /// proofing anchor, or a section boundary, that the structural edit
+    /// would collapse.
+    AnchoredContent,
+    /// The package is encrypted or obfuscated; the body editor never
+    /// rewrites protected streams.
+    Encrypted,
 }
 
 impl std::fmt::Display for Refusal {
@@ -533,6 +674,24 @@ impl std::fmt::Display for Refusal {
                 formatter,
                 "body transaction requested {observed} UTF-16 replacement units; limit is {limit}"
             ),
+            Self::FontNotFound => {
+                formatter.write_str("the DOC font table does not name the requested font")
+            },
+            Self::InvalidFontSize => {
+                formatter.write_str("DOC font size must be 1 through 1638 points in half points")
+            },
+            Self::SoleParagraph => {
+                formatter.write_str("the only ordinary body paragraph cannot be removed")
+            },
+            Self::TableBoundary => formatter.write_str(
+                "the structural edit would join two tables or end the main story in a table",
+            ),
+            Self::AnchoredContent => formatter.write_str(
+                "the paragraph carries an anchored range or section boundary that the edit would collapse",
+            ),
+            Self::Encrypted => {
+                formatter.write_str("encrypted or obfuscated DOC packages cannot be edited")
+            },
         }
     }
 }
@@ -1982,6 +2141,315 @@ impl Edit {
         self.set_character_property_override(target, property, Some(enabled))
     }
 
+    /// Sets a valued direct character property (size, color or font) on one
+    /// semantic text target without creating or rewriting style-table or
+    /// font-table resources. Setting the value the target already carries
+    /// directly is an exact no-op.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed refusal when the target is absent, empty, structural
+    /// or tracked, when its direct value is not uniform, when the size is out
+    /// of range, or when the font table does not name the font.
+    pub fn set_character_value(
+        &mut self,
+        target: TextTarget,
+        value: CharacterValue<'_>,
+    ) -> Result<()> {
+        let fragment = self.character_value_fragment(value)?;
+        self.set_character_fragment(target, value.property(), fragment)
+    }
+
+    fn character_value_fragment(&self, value: CharacterValue<'_>) -> Result<Vec<u8>> {
+        let mut fragment = Vec::new();
+        match value {
+            CharacterValue::Size(half_points) => {
+                if !(2..=3276).contains(&half_points) {
+                    return Err(Error::Refused(Refusal::InvalidFontSize));
+                }
+                fragment.extend_from_slice(&SPRM_C_HPS.to_le_bytes());
+                fragment.extend_from_slice(&half_points.to_le_bytes());
+            },
+            CharacterValue::Color(None) => {},
+            CharacterValue::Color(Some(rgb)) => {
+                if let Some(index) = ICO_PALETTE.iter().position(|color| *color == rgb) {
+                    fragment.extend_from_slice(&SPRM_C_ICO.to_le_bytes());
+                    fragment.push(u8::try_from(index + 1).unwrap_or(0));
+                }
+                fragment.extend_from_slice(&SPRM_C_CV.to_le_bytes());
+                fragment.extend_from_slice(&[rgb[0], rgb[1], rgb[2], 0]);
+            },
+            CharacterValue::Font(name) => {
+                let ftc = self.font_index(name)?;
+                fragment.extend_from_slice(&SPRM_C_RG_FTC0.to_le_bytes());
+                fragment.extend_from_slice(&ftc.to_le_bytes());
+            },
+        }
+        Ok(fragment)
+    }
+
+    /// The font-table index of the font named exactly `name`.
+    fn font_index(&self, name: &str) -> Result<u16> {
+        let fonts = self
+            .editor
+            .table_slice(FIB_INDEX_STTBF_FFN)
+            .map_err(Error::Invalid)?
+            .filter(|bytes| !bytes.is_empty())
+            .map(crate::parts::fonts::FontTable::parse)
+            .transpose()
+            .map_err(Error::Invalid)?
+            .ok_or(Error::Refused(Refusal::FontNotFound))?;
+        fonts
+            .iter()
+            .position(|font| font.name() == name)
+            .and_then(|index| u16::try_from(index).ok())
+            .ok_or(Error::Refused(Refusal::FontNotFound))
+    }
+
+    fn set_character_fragment(
+        &mut self,
+        target: TextTarget,
+        property: CharacterValueProperty,
+        fragment: Vec<u8>,
+    ) -> Result<()> {
+        let span = resolve_target(&self.editor, target)?;
+        if span.start_cp == span.end_cp {
+            return Err(Error::Refused(Refusal::EmptyParagraph));
+        }
+        if let Some(dependency) = drawing_dependency(&span.text) {
+            return Err(Error::Refused(Refusal::DrawingDependency { dependency }));
+        }
+        if has_structural_content(&span.text) {
+            return Err(Error::Refused(Refusal::StructuralContent));
+        }
+        if text_revision_intersects(&self.editor, span.start_cp, span.end_cp)? {
+            return Err(Error::Refused(Refusal::TrackedText));
+        }
+        let before = self
+            .editor
+            .uniform_character_sprms(span.start_cp, span.end_cp, property.opcodes())
+            .map_err(Error::Invalid)?
+            .ok_or(Error::Refused(Refusal::FormattingDependency))?;
+        if before == fragment {
+            return Ok(());
+        }
+        self.ensure_operation_capacity()?;
+        self.editor
+            .set_character_sprms(span.start_cp, span.end_cp, property.opcodes(), &fragment)
+            .map_err(Error::Invalid)?;
+        self.changes.push(Change::CharacterValue {
+            target,
+            property,
+            before,
+            after: fragment,
+        });
+        Ok(())
+    }
+
+    /// Inserts one ordinary main-story paragraph holding `text` before the
+    /// paragraph at `position`, or after the last one when `position` is the
+    /// paragraph count. The new paragraph copies the paragraph formatting of
+    /// that neighbour and the character formatting of its paragraph mark.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed refusal for a position past the end, structural text,
+    /// a tracked neighbour mark, unmodeled CP-indexed tables, or a limit.
+    pub fn insert_paragraph(&mut self, position: Position, text: &str) -> Result<()> {
+        if has_structural_content(text) {
+            return Err(Error::Refused(
+                Refusal::ReplacementContainsStructuralContent,
+            ));
+        }
+        let paragraphs = source_paragraphs(&self.editor)?;
+        let template = paragraphs
+            .get(position.get())
+            .or_else(|| {
+                (position.get() == paragraphs.len())
+                    .then(|| paragraphs.last())
+                    .flatten()
+            })
+            .ok_or(Error::Refused(Refusal::ParagraphNotFound))?;
+        let mut units = text.encode_utf16().collect::<Vec<_>>();
+        self.ensure_replacement_capacity(units.len())?;
+        self.ensure_structural_capacity()?;
+        let mark = template.end_cp;
+        let mark_end = mark.checked_add(1).ok_or_else(cp_overflow)?;
+        if text_revision_intersects(&self.editor, mark, mark_end)? {
+            return Err(Error::Refused(Refusal::TrackedText));
+        }
+        units.push(0x000D);
+        let copy = self
+            .editor
+            .template_paragraph(mark, units)
+            .map_err(Error::Invalid)?;
+        let at = match paragraphs.get(position.get()) {
+            Some(paragraph) => paragraph.start_cp,
+            None => mark_end,
+        };
+        self.editor
+            .insert_paragraph_copy(at, &copy)
+            .map_err(Error::Invalid)?;
+        self.replacement_units = self.replacement_units.saturating_add(copy.len());
+        self.changes.push(Change::Paragraph {
+            position,
+            before: None,
+            after: Some(copy),
+        });
+        Ok(())
+    }
+
+    /// Removes the ordinary main-story paragraph at `position`, its mark
+    /// included.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed refusal when the paragraph is absent or the only one,
+    /// holds structural or tracked content or an anchored range, or when its
+    /// removal would join two tables or end the story in a table.
+    pub fn remove_paragraph(&mut self, position: Position) -> Result<()> {
+        let paragraphs = source_paragraphs(&self.editor)?;
+        if paragraphs.get(position.get()).is_none() {
+            return Err(Error::Refused(Refusal::ParagraphNotFound));
+        }
+        if paragraphs.len() < 2 {
+            return Err(Error::Refused(Refusal::SoleParagraph));
+        }
+        self.ensure_structural_capacity()?;
+        let copy = self.detach_paragraph(&paragraphs, position)?;
+        self.changes.push(Change::Paragraph {
+            position,
+            before: Some(copy),
+            after: None,
+        });
+        Ok(())
+    }
+
+    /// Moves the ordinary main-story paragraph at `from` so that it ends at
+    /// position `to`, counted after it is detached, with its exact text,
+    /// character runs and paragraph formatting.
+    ///
+    /// # Errors
+    ///
+    /// Returns the refusals of [`Self::remove_paragraph`] for the moved
+    /// paragraph, and [`Refusal::ParagraphNotFound`] for a destination past
+    /// the end.
+    pub fn move_paragraph(&mut self, from: Position, to: Position) -> Result<()> {
+        let paragraphs = source_paragraphs(&self.editor)?;
+        if from.get() >= paragraphs.len() || to.get() >= paragraphs.len() {
+            return Err(Error::Refused(Refusal::ParagraphNotFound));
+        }
+        if from == to {
+            return Ok(());
+        }
+        self.ensure_structural_capacity()?;
+        let candidate = self.editor.clone();
+        let copy = self.detach_paragraph(&paragraphs, from)?;
+        let result = (|| {
+            let remaining = source_paragraphs(&self.editor)?;
+            let at = match remaining.get(to.get()) {
+                Some(paragraph) => paragraph.start_cp,
+                None => remaining
+                    .last()
+                    .ok_or(Error::Refused(Refusal::ParagraphNotFound))?
+                    .end_cp
+                    .checked_add(1)
+                    .ok_or_else(cp_overflow)?,
+            };
+            self.editor
+                .insert_paragraph_copy(at, &copy)
+                .map_err(Error::Invalid)
+        })();
+        if let Err(error) = result {
+            self.editor = candidate;
+            return Err(error);
+        }
+        self.changes.push(Change::ParagraphMove { from, to });
+        Ok(())
+    }
+
+    /// Capture and delete one ordinary paragraph after the structural
+    /// admission checks.
+    fn detach_paragraph(
+        &mut self,
+        paragraphs: &[SourceParagraph],
+        position: Position,
+    ) -> Result<ParagraphCopy> {
+        let paragraph = paragraphs
+            .get(position.get())
+            .ok_or(Error::Refused(Refusal::ParagraphNotFound))?;
+        if let Some(dependency) = drawing_dependency(&paragraph.text) {
+            return Err(Error::Refused(Refusal::DrawingDependency { dependency }));
+        }
+        if has_structural_content(&paragraph.text) {
+            return Err(Error::Refused(Refusal::StructuralContent));
+        }
+        let start = paragraph.start_cp;
+        let end = paragraph.end_cp.checked_add(1).ok_or_else(cp_overflow)?;
+        if text_revision_intersects(&self.editor, start, end)? {
+            return Err(Error::Refused(Refusal::TrackedText));
+        }
+        if let Some(&fib_index) = self.editor.unmodeled_length_dependencies().first() {
+            return Err(Error::Refused(Refusal::PositionDependency { fib_index }));
+        }
+        if self.editor.has_cp_dependency_inside(start, end) {
+            return Err(Error::Refused(Refusal::AnchoredContent));
+        }
+        let story_end = self.editor.main_story_cp_len();
+        let after_table = match start.checked_sub(1) {
+            Some(previous) => self
+                .editor
+                .is_in_table_at_cp(previous)
+                .map_err(Error::Invalid)?,
+            None => false,
+        };
+        let before_table =
+            end < story_end && self.editor.is_in_table_at_cp(end).map_err(Error::Invalid)?;
+        if after_table && (before_table || end >= story_end) {
+            return Err(Error::Refused(Refusal::TableBoundary));
+        }
+        let copy = self
+            .editor
+            .capture_paragraph(start, end)
+            .map_err(|_error| Error::Refused(Refusal::FormattingDependency))?;
+        self.editor
+            .delete_paragraph_range(start, end)
+            .map_err(|_error| Error::Refused(Refusal::AnchoredContent))?;
+        Ok(copy)
+    }
+
+    /// Re-insert an exact captured paragraph at `position` (replay).
+    fn insert_paragraph_copy(&mut self, position: Position, copy: &ParagraphCopy) -> Result<()> {
+        self.ensure_structural_capacity()?;
+        let paragraphs = source_paragraphs(&self.editor)?;
+        let at = match paragraphs.get(position.get()) {
+            Some(paragraph) => paragraph.start_cp,
+            None if position.get() == paragraphs.len() => paragraphs
+                .last()
+                .ok_or(Error::Refused(Refusal::ParagraphNotFound))?
+                .end_cp
+                .checked_add(1)
+                .ok_or_else(cp_overflow)?,
+            None => return Err(Error::Refused(Refusal::ParagraphNotFound)),
+        };
+        self.editor
+            .insert_paragraph_copy(at, copy)
+            .map_err(Error::Invalid)?;
+        self.changes.push(Change::Paragraph {
+            position,
+            before: None,
+            after: Some(copy.clone()),
+        });
+        Ok(())
+    }
+
+    fn ensure_structural_capacity(&self) -> Result<()> {
+        if let Some(&fib_index) = self.editor.unmodeled_length_dependencies().first() {
+            return Err(Error::Refused(Refusal::PositionDependency { fib_index }));
+        }
+        self.ensure_operation_capacity()
+    }
+
     /// Applies a dependency-checked text transfer prepared for this exact
     /// receiving artifact.
     pub fn apply_transfer(&mut self, plan: &TransferPlan) -> Result<()> {
@@ -2286,12 +2754,6 @@ impl Edit {
             after: enabled,
         });
         Ok(())
-    }
-
-    /// Discards staged changes and returns the original immutable snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
     }
 
     /// Publishes a validated snapshot and its reversible source-checked patch.
@@ -2867,6 +3329,24 @@ pub enum ChangeRef<'a> {
         before_present: bool,
         after_present: bool,
     },
+    /// One valued direct character-property mutation, as the property's
+    /// direct SPRMs before and after (empty when it had none).
+    CharacterValue {
+        target: TextTarget,
+        property: CharacterValueProperty,
+        before: &'a [u8],
+        after: &'a [u8],
+    },
+    /// One ordinary main-story paragraph insertion (`before_units` is
+    /// `None`) or removal (`after_units` is `None`), with UTF-16 lengths that
+    /// include the paragraph mark.
+    Paragraph {
+        position: Position,
+        before_units: Option<usize>,
+        after_units: Option<usize>,
+    },
+    /// One ordinary main-story paragraph moved from `from` to `to`.
+    ParagraphMove { from: Position, to: Position },
 }
 
 impl std::fmt::Debug for ChangeRef<'_> {
@@ -2937,6 +3417,33 @@ impl std::fmt::Debug for ChangeRef<'_> {
                 .field("target", target)
                 .field("before_present", before_present)
                 .field("after_present", after_present)
+                .finish(),
+            Self::CharacterValue {
+                target,
+                property,
+                before,
+                after,
+            } => formatter
+                .debug_struct("CharacterValue")
+                .field("target", target)
+                .field("property", property)
+                .field("before_bytes", &before.len())
+                .field("after_bytes", &after.len())
+                .finish(),
+            Self::Paragraph {
+                position,
+                before_units,
+                after_units,
+            } => formatter
+                .debug_struct("Paragraph")
+                .field("position", position)
+                .field("before_units", before_units)
+                .field("after_units", after_units)
+                .finish(),
+            Self::ParagraphMove { from, to } => formatter
+                .debug_struct("ParagraphMove")
+                .field("from", from)
+                .field("to", to)
                 .finish(),
         }
     }
@@ -3020,6 +3527,21 @@ enum Change {
         before: PictureSlot,
         after: PictureSlot,
     },
+    CharacterValue {
+        target: TextTarget,
+        property: CharacterValueProperty,
+        before: Vec<u8>,
+        after: Vec<u8>,
+    },
+    Paragraph {
+        position: Position,
+        before: Option<ParagraphCopy>,
+        after: Option<ParagraphCopy>,
+    },
+    ParagraphMove {
+        from: Position,
+        to: Position,
+    },
 }
 
 impl Change {
@@ -3037,6 +3559,12 @@ impl Change {
                 format!("resource/embedded:{storage_id}")
             },
             Self::Picture { target, .. } => format!("{}/text", durable_target(*target)),
+            Self::CharacterValue {
+                target, property, ..
+            } => format!("{}/{}", durable_target(*target), property.wire_name()),
+            Self::Paragraph { .. } | Self::ParagraphMove { .. } => {
+                "story/main/structure".to_string()
+            },
         }
     }
 
@@ -3120,6 +3648,25 @@ impl Change {
                     ..
                 },
             ) => left_target == right_target && left_after == right_after,
+            (
+                Self::CharacterValue {
+                    target: left_target,
+                    property: left_property,
+                    after: left_after,
+                    ..
+                },
+                Self::CharacterValue {
+                    target: right_target,
+                    property: right_property,
+                    after: right_after,
+                    ..
+                },
+            ) => {
+                left_target == right_target
+                    && left_property == right_property
+                    && left_after == right_after
+            },
+            (left @ (Self::Paragraph { .. } | Self::ParagraphMove { .. }), right) => left == right,
             _ => false,
         }
     }
@@ -3189,6 +3736,30 @@ impl Change {
                 before_present: before.is_graph(),
                 after_present: after.is_graph(),
             },
+            Self::CharacterValue {
+                target,
+                property,
+                before,
+                after,
+            } => ChangeRef::CharacterValue {
+                target: *target,
+                property: *property,
+                before,
+                after,
+            },
+            Self::Paragraph {
+                position,
+                before,
+                after,
+            } => ChangeRef::Paragraph {
+                position: *position,
+                before_units: before.as_ref().map(ParagraphCopy::len),
+                after_units: after.as_ref().map(ParagraphCopy::len),
+            },
+            Self::ParagraphMove { from, to } => ChangeRef::ParagraphMove {
+                from: *from,
+                to: *to,
+            },
         }
     }
 
@@ -3249,6 +3820,30 @@ impl Change {
                 target: *target,
                 before: after.clone(),
                 after: before.clone(),
+            },
+            Self::CharacterValue {
+                target,
+                property,
+                before,
+                after,
+            } => Self::CharacterValue {
+                target: *target,
+                property: *property,
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::Paragraph {
+                position,
+                before,
+                after,
+            } => Self::Paragraph {
+                position: *position,
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::ParagraphMove { from, to } => Self::ParagraphMove {
+                from: *to,
+                to: *from,
             },
         }
     }
@@ -3694,6 +4289,16 @@ fn durable_operation(
                 durable_target(*target),
                 picture_slot_value(after, blobs)?,
             )
+        },
+        Change::CharacterValue { .. } => {
+            return Err(PatchError::InvalidText {
+                field: "DOC valued character-format durable patch",
+            });
+        },
+        Change::Paragraph { .. } | Change::ParagraphMove { .. } => {
+            return Err(PatchError::InvalidText {
+                field: "DOC paragraph-structure durable patch",
+            });
         },
     };
     PatchOperation::new(limits, op, target, preconditions, value)
@@ -4223,6 +4828,24 @@ fn set_property_override(
 
 fn apply_change_after(edit: &mut Edit, change: &Change) -> Result<()> {
     match change {
+        Change::CharacterValue {
+            target,
+            property,
+            after,
+            ..
+        } => edit.set_character_fragment(*target, *property, after.clone()),
+        Change::Paragraph {
+            position,
+            before: None,
+            after: Some(copy),
+        } => edit.insert_paragraph_copy(*position, copy),
+        Change::Paragraph {
+            position,
+            before: Some(_),
+            after: None,
+        } => edit.remove_paragraph(*position),
+        Change::Paragraph { .. } => Err(invalid_durable_patch("invalid paragraph transition")),
+        Change::ParagraphMove { from, to } => edit.move_paragraph(*from, *to),
         Change::Text { target, after, .. } => edit.replace_text(*target, after),
         Change::Format {
             target,
@@ -4412,6 +5035,14 @@ fn durable_target(target: TextTarget) -> String {
         },
         TextTarget::TableCell(position) => format!("body/table-cell:{}", position.get()),
         TextTarget::FieldResult(position) => format!("body/field-result:{}", position.get()),
+        TextTarget::BodySpan {
+            paragraph,
+            start,
+            end,
+        } => format!(
+            "story/main/paragraph:{}/span:{start}-{end}",
+            paragraph.get()
+        ),
     }
 }
 
@@ -4424,6 +5055,24 @@ fn parse_durable_target(target: &str) -> Result<TextTarget> {
     }
     if let Some(position) = target.strip_prefix("body/paragraph:") {
         return parse_position(position).map(TextTarget::body_paragraph);
+    }
+    if let Some(remainder) = target.strip_prefix("story/main/paragraph:")
+        && let Some((paragraph, span)) = remainder.split_once("/span:")
+    {
+        let (start, end) = span
+            .split_once('-')
+            .ok_or_else(|| invalid_durable_patch("invalid DOC span target"))?;
+        let unit = |value: &str| {
+            parse_position(value).and_then(|value| {
+                u32::try_from(value.get())
+                    .map_err(|_error| invalid_durable_patch("DOC span offset exceeds u32"))
+            })
+        };
+        return Ok(TextTarget::BodySpan {
+            paragraph: parse_position(paragraph)?,
+            start: unit(start)?,
+            end: unit(end)?,
+        });
     }
     let remainder = target
         .strip_prefix("story/")
@@ -4489,27 +5138,83 @@ enum TargetCollection {
 fn target_story(target: TextTarget) -> Story {
     match target {
         TextTarget::StoryParagraph { story, .. } => story,
-        TextTarget::TableCell(_) | TextTarget::FieldResult(_) => Story::Main,
+        TextTarget::TableCell(_) | TextTarget::FieldResult(_) | TextTarget::BodySpan { .. } => {
+            Story::Main
+        },
     }
 }
 
 fn resolve_target(editor: &RevisionEditor, target: TextTarget) -> Result<SourceSpan> {
+    if let TextTarget::BodySpan {
+        paragraph,
+        start,
+        end,
+    } = target
+    {
+        return resolve_body_span(editor, target, paragraph, start, end);
+    }
     let spans = match target {
         TextTarget::StoryParagraph { story, .. } => {
             target_spans(editor, TargetCollection::Story(story))?
         },
         TextTarget::TableCell(_) => target_spans(editor, TargetCollection::TableCells)?,
         TextTarget::FieldResult(_) => target_spans(editor, TargetCollection::FieldResults)?,
+        TextTarget::BodySpan { .. } => return Err(Error::Refused(Refusal::TargetNotFound)),
     };
     let position = match target {
         TextTarget::StoryParagraph { position, .. }
         | TextTarget::TableCell(position)
         | TextTarget::FieldResult(position) => position,
+        TextTarget::BodySpan { paragraph, .. } => paragraph,
     };
     spans
         .get(position.get())
         .cloned()
         .ok_or(Error::Refused(Refusal::TargetNotFound))
+}
+
+/// Resolve a UTF-16 range of one ordinary main-story paragraph. The range
+/// must be non-empty and lie on character boundaries of the paragraph text.
+fn resolve_body_span(
+    editor: &RevisionEditor,
+    target: TextTarget,
+    paragraph: Position,
+    start: u32,
+    end: u32,
+) -> Result<SourceSpan> {
+    let paragraphs = source_paragraphs(editor)?;
+    let source = paragraphs
+        .get(paragraph.get())
+        .ok_or(Error::Refused(Refusal::TargetNotFound))?;
+    if start >= end {
+        return Err(Error::Refused(Refusal::TargetNotFound));
+    }
+    let mut units = 0u32;
+    let mut start_byte = None;
+    let mut end_byte = None;
+    for (byte, character) in source.text.char_indices() {
+        if units == start {
+            start_byte = Some(byte);
+        }
+        if units == end {
+            end_byte = Some(byte);
+        }
+        units = units
+            .checked_add(u32::try_from(character.len_utf16()).unwrap_or(2))
+            .ok_or_else(cp_overflow)?;
+    }
+    if units == end {
+        end_byte = Some(source.text.len());
+    }
+    let (Some(start_byte), Some(end_byte)) = (start_byte, end_byte) else {
+        return Err(Error::Refused(Refusal::TargetNotFound));
+    };
+    Ok(SourceSpan {
+        target,
+        start_cp: source.start_cp.checked_add(start).ok_or_else(cp_overflow)?,
+        end_cp: source.start_cp.checked_add(end).ok_or_else(cp_overflow)?,
+        text: source.text[start_byte..end_byte].to_string(),
+    })
 }
 
 fn target_spans(editor: &RevisionEditor, collection: TargetCollection) -> Result<Vec<SourceSpan>> {

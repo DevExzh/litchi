@@ -451,7 +451,7 @@ props! {
 
 props! {
     /// A defined name (`/namedrange[N]`).
-    #[cfg(feature = "xlsx")]
+    #[cfg(any(feature = "xlsx", feature = "xls"))]
     NamedRangeKey in NAMED_RANGE_PROPS {
         Name => "name": ValueType::Text,
         Ref => "ref": ValueType::Text,

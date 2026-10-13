@@ -7,6 +7,7 @@
     reason = "test assertions panic on failure by design"
 )]
 
+use litchi_core::Position;
 use std::io::Cursor;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -95,7 +96,7 @@ fn every_source_backed_overlay_level_publishes_the_default_save_bytes() {
     builder().build().unwrap().write_to(&mut source).unwrap();
     let mut edit = Snapshot::from_bytes(source.into_inner()).unwrap().edit();
     edit.replace(
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         Reference::new(0, 1).unwrap(),
         Value::new("Author", "edit").unwrap(),
     )

@@ -39,12 +39,12 @@ impl Patch {
 
 /// Detached editor; the source snapshot is never modified.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Edit {
     base: Snapshot,
     working: Snapshot,
 }
 
-impl Transaction {
+impl Edit {
     pub(crate) fn new(snapshot: Snapshot) -> Self {
         Self {
             base: snapshot.clone(),

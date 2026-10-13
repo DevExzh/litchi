@@ -18,11 +18,14 @@ use super::signature::{self, Opened, Signature};
 use crate::{OpenOptions, Result};
 
 mod children;
+mod layout;
 mod metadata;
 mod nav;
 mod node;
 pub(crate) mod owner;
 mod spec;
+mod structure;
+mod style;
 pub(crate) mod views;
 pub(crate) mod write;
 
@@ -30,7 +33,7 @@ pub(crate) use children::Children;
 pub(crate) use nav::Nav;
 pub use node::Node;
 pub(crate) use node::Props;
-pub(crate) use spec::{CELL_CAPABILITY_PROPS, SHEET_CAPABILITY_PROPS, SPEC};
+pub(crate) use spec::{ADDABLE, REMOVABLE, SETTABLE, SPEC, WRITE_GAPS, capability_props};
 pub(crate) use views::{Json as ViewJson, view_json, view_to};
 pub(crate) use write::WriteCommit;
 
@@ -261,13 +264,13 @@ impl Xls {
 
     /// Run one read against the retained native owner, fencing both the
     /// source-backed and eager routes.  The native source owner itself keeps
-    /// the payload scan lazy; this wrapper only checks the captured source
-    /// version before and after the operation.
+    /// the payload scan lazy; this wrapper checks the captured source version
+    /// once, after the operation.  Source versions only advance, so one
+    /// probe after the read detects a change made before or during it, and a
+    /// freshness failure takes precedence over the operation's own result.
     pub(crate) fn finish<T>(&self, operation: impl FnOnce() -> Result<T>) -> Result<T> {
-        self.check_source()?;
         let value = operation();
-        let freshness = self.check_source();
-        match freshness {
+        match self.check_source() {
             Err(error) => Err(error),
             Ok(()) => value,
         }

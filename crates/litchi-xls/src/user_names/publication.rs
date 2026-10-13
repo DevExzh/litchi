@@ -13,9 +13,7 @@ use std::sync::Arc;
 use litchi_cfb::OleFile;
 use litchi_ole_common::object::{Editor as PackageEditor, Limits as PackageLimits, Targets};
 
-use super::{
-    Limits as UserNamesLimits, Snapshot as UserNamesSnapshot, Transaction as UserNamesTransaction,
-};
+use super::{Edit as UserNamesEdit, Limits as UserNamesLimits, Snapshot as UserNamesSnapshot};
 use crate::{Error, Result};
 
 /// An immutable, cheaply cloned source-bound XLS package snapshot.
@@ -107,14 +105,14 @@ impl Snapshot {
 
     /// Start a detached source-bound User Names transaction.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
+    pub fn edit(&self) -> Edit {
         self.edit_user_names()
     }
 
     /// Start a detached source-bound User Names transaction.
     #[must_use]
-    pub fn edit_user_names(&self) -> Transaction {
-        Transaction {
+    pub fn edit_user_names(&self) -> Edit {
+        Edit {
             source: self.clone(),
             user_names: self.inner.user_names.edit(),
         }
@@ -147,12 +145,12 @@ impl Eq for Snapshot {}
 
 /// A detached source-bound transaction over one complete XLS package.
 #[derive(Clone)]
-pub struct Transaction {
+pub struct Edit {
     source: Snapshot,
-    user_names: UserNamesTransaction,
+    user_names: UserNamesEdit,
 }
 
-impl Transaction {
+impl Edit {
     /// The immutable package snapshot used as the publication source.
     #[must_use]
     pub const fn source(&self) -> &Snapshot {
@@ -175,12 +173,6 @@ impl Transaction {
     #[must_use]
     pub fn model(&self) -> &super::UserNames {
         self.user_names.model()
-    }
-
-    /// Whether the staged User Names stream differs from its source bytes.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.user_names.is_changed()
     }
 
     /// Stage a User Names display-name change.
@@ -265,12 +257,6 @@ impl Transaction {
         self.user_names.remove(index)
     }
 
-    /// Return the source package and discard staged changes.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
-    }
-
     /// Reparse the staged User Names stream as a complete package snapshot.
     ///
     /// This renders and reopens the candidate through the common CFB owner;
@@ -319,13 +305,12 @@ impl Transaction {
     }
 }
 
-impl fmt::Debug for Transaction {
+impl fmt::Debug for Edit {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("UserNamesPackageTransaction")
+            .debug_struct("UserNamesPackageEdit")
             .field("source", &self.source)
-            .field("changed", &self.is_changed())
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -408,12 +393,6 @@ impl Patch {
     #[must_use]
     pub fn is_noop(&self) -> bool {
         self.before == self.after
-    }
-
-    /// Alias for [`Self::is_noop`].
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.is_noop()
     }
 
     /// Apply this patch only to its exact source package snapshot.

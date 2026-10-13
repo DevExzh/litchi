@@ -459,6 +459,11 @@ impl Edit {
         package: Package,
         options: EditOptions,
     ) -> Result<Self> {
+        if package.document().fib().is_encrypted() {
+            return Err(Error::Body(body_text::Error::Refused(
+                body_text::Refusal::Encrypted,
+            )));
+        }
         let bytes = package.to_bytes().map_err(Error::Package)?;
         let source = body_text::Snapshot::from_bytes_with_options(
             bytes,
@@ -560,6 +565,36 @@ impl Edit {
         self.inner
             .set_character_property(target, property, enabled)
             .map_err(Error::from)
+    }
+
+    /// Set one valued direct character property (size, color or font).
+    pub fn set_character_value(
+        &mut self,
+        target: body_text::TextTarget,
+        value: body_text::CharacterValue<'_>,
+    ) -> Result<()> {
+        self.inner
+            .set_character_value(target, value)
+            .map_err(Error::from)
+    }
+
+    /// Insert one ordinary main-story paragraph before `position`, or after
+    /// the last one when `position` is the paragraph count.
+    pub fn insert_paragraph(&mut self, position: Position, text: &str) -> Result<()> {
+        self.inner
+            .insert_paragraph(position, text)
+            .map_err(Error::from)
+    }
+
+    /// Remove one ordinary main-story paragraph.
+    pub fn remove_paragraph(&mut self, position: Position) -> Result<()> {
+        self.inner.remove_paragraph(position).map_err(Error::from)
+    }
+
+    /// Move one ordinary main-story paragraph so that it ends at `to`,
+    /// counted after it is detached.
+    pub fn move_paragraph(&mut self, from: Position, to: Position) -> Result<()> {
+        self.inner.move_paragraph(from, to).map_err(Error::from)
     }
 
     /// Apply a dependency-checked text transfer.

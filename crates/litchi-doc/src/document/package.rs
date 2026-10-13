@@ -183,6 +183,13 @@ impl Document {
             crate::parts::annotation_bookmarks::MAX_TABLE_BYTES,
             "SttbfAtnBkmk",
         );
+        let font_table_source = capture_optional_table_range(
+            &fib,
+            &table_stream,
+            crate::parts::fonts::FIB_INDEX,
+            crate::parts::fonts::MAX_TABLE_BYTES,
+            "SttbfFfn",
+        );
         let document_properties = DocumentProperties::parse(&fib, &table_stream);
         let bookmarks_table = auxiliary_recorded(
             BookmarksTable::parse_recording(&fib, &table_stream),
@@ -517,6 +524,9 @@ impl Document {
             tolerance,
             mtef_data,
             parsed_mtef,
+            font_table_source,
+            font_table: std::sync::OnceLock::new(),
+            story_indexes: super::model::StoryIndexCache::new(),
         }))
     }
 }

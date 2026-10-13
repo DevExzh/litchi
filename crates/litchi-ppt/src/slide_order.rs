@@ -581,6 +581,8 @@ mod artifact {
 
 use artifact::Artifact;
 
+mod blank;
+
 // Snapshots memoize their artifact digest through interior mutability
 // (`OnceLock`). Keep every shareable slide-order value `Send + Sync`; this
 // fails to compile if a future field breaks that.
@@ -622,17 +624,7 @@ impl Snapshot {
     ///
     /// Returns an error when the complete package cannot be reopened.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, SourceLimits::default())
-    }
-
-    /// Captures an owned exact PPT artifact under explicit finite limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the artifact exceeds the limits or its live
-    /// presentation structure is malformed.
-    pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: SourceLimits) -> Result<Self> {
-        Self::from_bytes_with_options(bytes, OpenOptions::new().source_limits(limits))
+        Self::from_bytes_with_options(bytes, OpenOptions::new())
     }
 
     /// Captures an owned exact PPT artifact under explicit source limits and
@@ -776,6 +768,46 @@ impl Snapshot {
         })
     }
 
+    fn adopt_notes_publication(
+        &self,
+        publication: crate::text_edit::RootNotesPublication,
+    ) -> Result<Self> {
+        if publication.source() != self.bytes() {
+            return Err(PackageError::Corrupted(
+                "PPT notes text publication source changed before adoption".into(),
+            )
+            .into());
+        }
+        if publication.notes_persist_id() == self.document_persist_id {
+            return Err(PackageError::Corrupted(
+                "PPT notes text publication targeted the live document record".into(),
+            )
+            .into());
+        }
+        let bytes = publication.into_output();
+        if self.limits != SourceLimits::default() {
+            return Self::from_bytes_with_options(bytes.to_vec(), self.open_options());
+        }
+        if bytes.len() > self.limits.max_package_bytes {
+            return Err(PackageError::Limit {
+                kind: crate::SourceLimitKind::InputBytes,
+                observed: bytes.len(),
+                maximum: self.limits.max_package_bytes,
+            }
+            .into());
+        }
+        Ok(Self {
+            artifact: Artifact::new(bytes),
+            document: self.document.clone(),
+            document_persist_id: self.document_persist_id,
+            limits: self.limits,
+            leniency: self.leniency,
+            chain_repaired: self.chain_repaired,
+            has_review_history: self.has_review_history,
+            has_signature: self.has_signature,
+        })
+    }
+
     fn adopt_text_edit_batch_publication(
         &self,
         publication: crate::text_edit::RootBatchPublication,
@@ -803,7 +835,20 @@ impl Snapshot {
             .into());
         }
 
+        let document_changed = publication.document_changed();
         let (bytes, changes) = publication.into_parts();
+        if document_changed {
+            // Outline-backed text lives in the live document: reopen so the
+            // retained document structure is the published one.
+            let reopened = Self::from_bytes_with_options(bytes.to_vec(), self.open_options())?;
+            if reopened.document.slides() != self.document.slides() {
+                return Err(PackageError::Corrupted(
+                    "PPT outline text publication changed slide structure".into(),
+                )
+                .into());
+            }
+            return Ok((reopened, changes));
+        }
         if self.limits != SourceLimits::default() {
             let reopened = Self::from_bytes_with_options(bytes.to_vec(), self.open_options())?;
             return Ok((reopened, changes));
@@ -970,6 +1015,8 @@ impl Snapshot {
             formatting: Vec::new(),
             inserted_records: BTreeMap::new(),
             inserted_pictures: BTreeMap::new(),
+            live_document_changed: false,
+            opened: None,
         })
     }
 
@@ -1103,6 +1150,9 @@ impl Snapshot {
                 current = match operations[index].op.as_str() {
                     "presentation.shape-text.set" => {
                         apply_durable_text(&current, &operations[index])?
+                    },
+                    "presentation.notes-text.set" => {
+                        apply_durable_notes_text(&current, &operations[index])?
                     },
                     "presentation.shape-anchor.set" => {
                         apply_durable_anchor(&current, &operations[index])?
@@ -1242,6 +1292,35 @@ pub struct ShapeTextChange {
     target: crate::text_edit::Target,
     before: String,
     after: String,
+}
+
+/// One checked speaker-notes text replacement on the slide at a source
+/// position.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NotesTextChange {
+    slide: Position,
+    before: String,
+    after: String,
+}
+
+impl NotesTextChange {
+    /// The slide whose notes changed, in the source slide order.
+    #[must_use]
+    pub const fn slide(&self) -> Position {
+        self.slide
+    }
+
+    /// The notes text before the change.
+    #[must_use]
+    pub fn before(&self) -> &str {
+        &self.before
+    }
+
+    /// The notes text after the change.
+    #[must_use]
+    pub fn after(&self) -> &str {
+        &self.after
+    }
 }
 
 /// One contextual shape-text replacement for [`Transaction::set_shape_texts`].
@@ -1534,6 +1613,7 @@ impl ShapeAnchorChange {
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum FormattingChange {
     Text(ShapeTextChange),
+    NotesText(NotesTextChange),
     Anchor(ShapeAnchorChange),
     SlideVisibility(SlideVisibilityChange),
     SlideAdvance(SlideAdvanceChange),
@@ -1705,9 +1785,43 @@ pub struct Transaction {
     formatting: Vec<FormattingChange>,
     inserted_records: BTreeMap<u32, Vec<u8>>,
     inserted_pictures: BTreeMap<u32, Vec<u8>>,
+    /// Whether a staged text edit republished the live document (outline
+    /// text), so staged structure must be rebased over it at commit.
+    live_document_changed: bool,
+    /// The opened projection of exactly the source bytes, when the root
+    /// edit was started from an immutable package (record 0260).
+    opened: Option<OpenedProjection>,
+}
+
+/// An opened projection of a transaction's exact source bytes. It is used
+/// only while the working artifact is still the source allocation, so a
+/// target resolves against the parse the caller already holds.
+#[derive(Clone)]
+struct OpenedProjection(crate::Presentation);
+
+impl fmt::Debug for OpenedProjection {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("OpenedProjection")
+    }
 }
 
 impl Transaction {
+    /// Attach the opened projection of exactly this transaction's source
+    /// bytes, which target resolution reuses while nothing has been staged.
+    pub(crate) fn with_opened_projection(mut self, presentation: crate::Presentation) -> Self {
+        self.opened = Some(OpenedProjection(presentation));
+        self
+    }
+
+    /// The opened source projection, while the working artifact is still the
+    /// exact source allocation.
+    fn opened_source(&self) -> Option<&crate::Presentation> {
+        self.opened
+            .as_ref()
+            .filter(|_| Arc::ptr_eq(&self.working.shared_bytes(), &self.source.shared_bytes()))
+            .map(|opened| &opened.0)
+    }
+
     /// Immutable source snapshot.
     #[must_use]
     pub const fn source(&self) -> &Snapshot {
@@ -1965,7 +2079,17 @@ impl Transaction {
         }
         let text_snapshot =
             crate::text_edit::Snapshot::from_shared_bytes(self.working.shared_bytes())?;
-        let mut text_edit = text_snapshot.edit_text(source_target)?;
+        let mut text_edit = match text_snapshot.edit_text_in(source_target, self.opened_source()) {
+            Ok(text_edit) => text_edit,
+            Err(crate::text_edit::Error::Refused(crate::text_edit::Refusal::NoTextAtom)) => {
+                // Outline-backed placeholder text is owned by the live
+                // document; the batch owner publishes that body.
+                return self
+                    .set_shape_texts_mapped(&[(target, after.as_str())])
+                    .map(drop);
+            },
+            Err(error) => return Err(error.into()),
+        };
         let before = text_edit.text().to_string();
         text_edit.set_text(after.clone())?;
         let commit = text_edit.commit()?;
@@ -1985,6 +2109,63 @@ impl Transaction {
         };
         self.text_changes.push(change.clone());
         self.formatting.push(FormattingChange::Text(change));
+        Ok(())
+    }
+
+    /// Replaces the speaker-notes text of the slide at a projected position.
+    ///
+    /// The slide's notes page must hold exactly one body placeholder; its
+    /// text body follows the shape-text dependency-closure rules. Equal text
+    /// is an exact no-op. The change publishes the notes persist object in
+    /// one append-only user edit and reopens the candidate for readback.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed refusal for a missing slide or notes page, a notes
+    /// page without one body placeholder, an unrepresentable or
+    /// position-dependent text change, a changed signed source, or a slide
+    /// inserted by this transaction.
+    pub fn set_notes_text(&mut self, position: Position, value: impl Into<String>) -> Result<()> {
+        self.require_position(position)?;
+        let projected = self.document.slides()?;
+        let persist_id = projected[position.get()].persist_id();
+        let source_position = self
+            .source
+            .document
+            .slides()
+            .iter()
+            .position(|slide| slide.persist_id() == persist_id)
+            .map(Position::new)
+            .ok_or(Error::Refused(Refusal::UncommittedSlideDependency))?;
+        let after = value.into();
+        if self.source.has_signature {
+            let before = crate::text_edit::inspect_notes_text_readonly(
+                self.working.bytes(),
+                source_position,
+                self.source.open_options(),
+            )?;
+            if before == after {
+                return Ok(());
+            }
+            return Err(Error::Refused(Refusal::Signed));
+        }
+        let Some(publication) = crate::text_edit::replace_notes_text(
+            self.working.shared_bytes(),
+            source_position,
+            &after,
+            self.source.limits.max_package_bytes,
+        )?
+        else {
+            return Ok(());
+        };
+        let before = publication.before().to_owned();
+        self.working = self.working.adopt_notes_publication(publication)?;
+        let change = NotesTextChange {
+            slide: source_position,
+            before,
+            after,
+        };
+        self.formatting.push(FormattingChange::NotesText(change));
         Ok(())
     }
 
@@ -2082,6 +2263,7 @@ impl Transaction {
             self.working.shared_bytes(),
             &mapped,
             self.source.limits.max_package_bytes,
+            self.opened_source(),
         )?
         else {
             return Ok(0);
@@ -2099,9 +2281,11 @@ impl Transaction {
             }
         }
 
+        let document_changed = publication.document_changed();
         let (working, published_changes) = self
             .working
             .adopt_text_edit_batch_publication(publication)?;
+        self.live_document_changed |= document_changed;
         let changes = published_changes
             .into_iter()
             .map(|change| ShapeTextChange {
@@ -2331,6 +2515,64 @@ impl Transaction {
         Ok(())
     }
 
+    /// Inserts a blank slide at a projected position; `position ==
+    /// slide_count()` appends.
+    ///
+    /// The slide uses the blank layout and follows the master, color scheme
+    /// and background of its preceding slide (or the following slide when it
+    /// becomes the first, or the first main master of an empty deck). Its
+    /// drawing receives a new drawing identifier and shape-identifier
+    /// cluster, registered in the drawing group at commit.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed position or signed-source refusal, or a resource
+    /// error when the persist, slide, drawing or shape identifier space is
+    /// exhausted.
+    pub fn insert_slide(&mut self, position: Position) -> Result<()> {
+        self.require_change_allowed()?;
+        let count = self.slide_count();
+        if position.get() > count {
+            return Err(Error::Refused(Refusal::SlideNotFound { position }));
+        }
+        let slides = self.document.slides()?;
+        let neighbor = position
+            .get()
+            .checked_sub(1)
+            .or_else(|| (count > 0).then_some(0))
+            .map(|index| slides[index].persist_id());
+        let (master_id, color_scheme) = match neighbor {
+            Some(persist_id) => {
+                let record = match self.inserted_records.get(&persist_id) {
+                    Some(record) => record.clone(),
+                    None => persisted_record(&self.working, persist_id)?,
+                };
+                blank::master_and_scheme(&record)?
+            },
+            None => {
+                let master = self
+                    .document
+                    .masters()?
+                    .first()
+                    .copied()
+                    .ok_or(Error::Refused(Refusal::MissingMasterDependency {
+                        master_id: 0,
+                    }))?;
+                (master.master_id(), None)
+            },
+        };
+        require_master(&self.document, master_id)?;
+        let allocation = blank::allocate(self.working.document.bytes(), &self.inserted_records)?;
+        let record = blank::slide_record(master_id, color_scheme, allocation)?;
+        let payload = SlidePayload {
+            group: blank::slide_list_group(),
+            record,
+            master_id,
+            pictures: Vec::new(),
+        };
+        self.insert_payload(position, payload)
+    }
+
     /// Inserts a dependency-checked cross-presentation transfer plan.
     /// `position == slide_count()` appends the transferred slide.
     ///
@@ -2373,25 +2615,31 @@ impl Transaction {
                 },
             }
         }
+        self.insert_payload(position, plan.payload.clone())
+    }
+
+    /// Allocates the persist and slide identifiers of an inserted slide and
+    /// stages its slide-list group and persisted record.
+    fn insert_payload(&mut self, position: Position, payload: SlidePayload) -> Result<()> {
         let persist_id = next_persist_id(&self.source, &self.inserted_records)?;
         let slide_id = next_slide_id(&self.document)?;
-        let mut group = plan.payload.group.clone();
+        let mut group = payload.group;
         rewrite_slide_persist(&mut group, persist_id, slide_id)?;
         let before_order = order_digest(&self.document)?;
         self.document
             .insert_slide_group(position.get(), group.clone())?;
         let after_order = order_digest(&self.document)?;
         self.inserted_records
-            .insert(persist_id, plan.payload.record.clone());
+            .insert(persist_id, payload.record.clone());
         self.structural.push(StructuralChange::Insert(ListChange {
             position,
             before_order,
             after_order,
             payload: SlidePayload {
                 group,
-                record: plan.payload.record.clone(),
-                master_id: plan.payload.master_id,
-                pictures: plan.payload.pictures.clone(),
+                record: payload.record,
+                master_id: payload.master_id,
+                pictures: payload.pictures,
             },
         }));
         Ok(())
@@ -2409,7 +2657,9 @@ impl Transaction {
             return Err(Error::Refused(Refusal::Signed));
         }
         let document_commit = if self.structural.is_empty()
-            || (self.media_path_changes.is_empty() && self.media_playback_changes.is_empty())
+            || (self.media_path_changes.is_empty()
+                && self.media_playback_changes.is_empty()
+                && !self.live_document_changed)
         {
             self.document.commit()?
         } else {
@@ -2467,7 +2717,10 @@ impl Transaction {
         for (persist_id, record) in &self.inserted_records {
             editor.insert_persisted_record(*persist_id, record.clone())?;
         }
-        let mut document_bytes = document_commit.snapshot().bytes().to_vec();
+        let mut document_bytes = blank::register_inserted_drawings(
+            document_commit.snapshot().bytes(),
+            &self.inserted_records,
+        )?;
         let picture_stream = if self.inserted_pictures.is_empty() {
             None
         } else {
@@ -2546,7 +2799,9 @@ impl Transaction {
             return Err(Error::Refused(Refusal::Signed));
         }
         let document_commit = if self.structural.is_empty()
-            || (self.media_path_changes.is_empty() && self.media_playback_changes.is_empty())
+            || (self.media_path_changes.is_empty()
+                && self.media_playback_changes.is_empty()
+                && !self.live_document_changed)
         {
             observe_phase(&mut observer, DiagnosticPhase::DocumentCommit, || {
                 Ok(self.document.commit()?)
@@ -2616,7 +2871,10 @@ impl Transaction {
         for (persist_id, record) in &self.inserted_records {
             editor.insert_persisted_record(*persist_id, record.clone())?;
         }
-        let mut document_bytes = document_commit.snapshot().bytes().to_vec();
+        let mut document_bytes = blank::register_inserted_drawings(
+            document_commit.snapshot().bytes(),
+            &self.inserted_records,
+        )?;
         let picture_stream = if self.inserted_pictures.is_empty() {
             None
         } else {
@@ -2697,12 +2955,6 @@ impl Transaction {
             structural_after: StructuralArtifact::After,
         };
         Ok(Commit { snapshot, patch })
-    }
-
-    /// Discards the candidate and recovers the exact source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
     }
 
     fn require_position(&self, position: Position) -> Result<()> {
@@ -2846,6 +3098,15 @@ impl Patch {
     #[must_use]
     pub fn slide_transition_visual_changes(&self) -> &[SlideTransitionVisualChange] {
         &self.transition_visual_changes
+    }
+
+    /// Speaker-notes text replacements composed into this root patch, in
+    /// operation order.
+    pub fn notes_text_changes(&self) -> impl Iterator<Item = &NotesTextChange> {
+        self.formatting.iter().filter_map(|change| match change {
+            FormattingChange::NotesText(change) => Some(change),
+            _ => None,
+        })
     }
 
     /// Shape-text replacements composed into this root patch.
@@ -3010,6 +3271,13 @@ impl Patch {
                             after: text_change.before.clone(),
                         })
                     },
+                    FormattingChange::NotesText(notes_change) => {
+                        FormattingChange::NotesText(NotesTextChange {
+                            slide: notes_change.slide,
+                            before: notes_change.after.clone(),
+                            after: notes_change.before.clone(),
+                        })
+                    },
                     FormattingChange::Anchor(anchor_change) => {
                         FormattingChange::Anchor(ShapeAnchorChange {
                             target: anchor_change.target,
@@ -3104,6 +3372,20 @@ impl Patch {
         let mut formatting_operations = Vec::new();
         for change in &self.formatting {
             let pair = match change {
+                FormattingChange::NotesText(notes_change) => ReversibleOperation::new(
+                    durable_notes_text_operation(
+                        limits,
+                        notes_change.slide,
+                        &notes_change.before,
+                        &notes_change.after,
+                    )?,
+                    durable_notes_text_operation(
+                        limits,
+                        notes_change.slide,
+                        &notes_change.after,
+                        &notes_change.before,
+                    )?,
+                ),
                 FormattingChange::Text(text_change) => ReversibleOperation::new(
                     durable_text_operation(
                         limits,
@@ -3519,6 +3801,26 @@ fn durable_text_operation(
     )
 }
 
+fn durable_notes_text_operation(
+    limits: litchi_core::patch::PatchLimits,
+    slide: Position,
+    before: &str,
+    after: &str,
+) -> std::result::Result<litchi_core::patch::PatchOperation, litchi_core::patch::PatchError> {
+    let mut preconditions = BTreeMap::new();
+    preconditions.insert(
+        "text_sha256".to_string(),
+        serde_json::Value::String(artifact_hash(before.as_bytes())),
+    );
+    litchi_core::patch::PatchOperation::new(
+        limits,
+        "presentation.notes-text.set",
+        format!("slide:{}", slide.get()),
+        preconditions,
+        serde_json::Value::String(after.to_string()),
+    )
+}
+
 fn durable_anchor_operation(
     limits: litchi_core::patch::PatchLimits,
     target: crate::text_edit::Target,
@@ -3797,7 +4099,28 @@ fn apply_durable_text(
         return Err(Error::Refused(Refusal::Signed));
     }
     let text_snapshot = crate::text_edit::Snapshot::from_bytes(snapshot.bytes().to_vec())?;
-    let mut edit = text_snapshot.edit_text(target)?;
+    let mut edit = match text_snapshot.edit_text(target) {
+        Ok(edit) => edit,
+        Err(crate::text_edit::Error::Refused(crate::text_edit::Refusal::NoTextAtom)) => {
+            // Outline-backed placeholder text lives in the live document;
+            // the root transaction owns that publication.
+            let current = crate::text_edit::inspect_shape_text_readonly(
+                snapshot.bytes(),
+                target,
+                snapshot.open_options(),
+            )?;
+            if artifact_hash(current.as_bytes()) != expected {
+                return Err(PackageError::InvalidFormat(
+                    "PPT durable shape-text semantic precondition does not match".into(),
+                )
+                .into());
+            }
+            let mut transaction = snapshot.edit()?;
+            transaction.set_shape_text(target, replacement)?;
+            return Ok(transaction.commit()?.snapshot);
+        },
+        Err(error) => return Err(error.into()),
+    };
     if artifact_hash(edit.text().as_bytes()) != expected {
         return Err(PackageError::InvalidFormat(
             "PPT durable shape-text semantic precondition does not match".into(),
@@ -3812,10 +4135,46 @@ fn apply_durable_text(
     )
 }
 
+fn apply_durable_notes_text(
+    snapshot: &Snapshot,
+    operation: &litchi_core::patch::PatchOperation,
+) -> Result<Snapshot> {
+    if operation.preconditions.len() != 1 {
+        return Err(invalid_durable_patch(
+            "notes-text operation has unexpected preconditions",
+        ));
+    }
+    let slide = parse_target(&operation.target)?;
+    let replacement = operation
+        .value
+        .as_str()
+        .ok_or_else(|| invalid_durable_patch("notes-text value must be a string"))?;
+    let expected = operation
+        .preconditions
+        .get("text_sha256")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| invalid_durable_patch("missing notes-text precondition"))?;
+    let current = crate::text_edit::inspect_notes_text_readonly(
+        snapshot.bytes(),
+        slide,
+        snapshot.open_options(),
+    )?;
+    if artifact_hash(current.as_bytes()) != expected {
+        return Err(PackageError::InvalidFormat(
+            "PPT durable notes-text semantic precondition does not match".into(),
+        )
+        .into());
+    }
+    let mut transaction = snapshot.edit()?;
+    transaction.set_notes_text(slide, replacement)?;
+    Ok(transaction.commit()?.snapshot)
+}
+
 fn is_formatting_operation(operation: &str) -> bool {
     matches!(
         operation,
         "presentation.shape-text.set"
+            | "presentation.notes-text.set"
             | "presentation.shape-anchor.set"
             | "presentation.slide-hidden.set"
             | "presentation.slide-advance.set"
@@ -7375,14 +7734,19 @@ mod tests {
         let bytes = authored_fixture();
         let mut limits = SourceLimits::default();
         limits.max_records -= 1;
-        let source = Snapshot::from_bytes_with_limits(bytes, limits).unwrap();
+        let source =
+            Snapshot::from_bytes_with_options(bytes, OpenOptions::new().source_limits(limits))
+                .unwrap();
         let target = crate::text_edit::Target::new(Position::new(0), Position::new(0));
         let mut edit = source.edit().unwrap();
         edit.set_shape_text(target, "custom limits root text")
             .unwrap();
         let committed = edit.commit().unwrap().snapshot().clone();
-        let reopened =
-            Snapshot::from_bytes_with_limits(committed.bytes().to_vec(), limits).unwrap();
+        let reopened = Snapshot::from_bytes_with_options(
+            committed.bytes().to_vec(),
+            OpenOptions::new().source_limits(limits),
+        )
+        .unwrap();
 
         assert_eq!(committed, reopened);
         assert_eq!(committed.limits(), limits);
@@ -7643,7 +8007,9 @@ mod tests {
             max_package_bytes: bytes.len(),
             ..Default::default()
         };
-        let source = Snapshot::from_bytes_with_limits(bytes, limits).unwrap();
+        let source =
+            Snapshot::from_bytes_with_options(bytes, OpenOptions::new().source_limits(limits))
+                .unwrap();
         let first = crate::text_edit::Target::new(Position::new(0), Position::new(0));
         let second = crate::text_edit::Target::new(Position::new(0), Position::new(1));
         let oversized = "x".repeat(limits.max_package_bytes);
@@ -7707,7 +8073,9 @@ mod tests {
 
         let mut limits = SourceLimits::default();
         limits.max_records -= 1;
-        let limited = Snapshot::from_bytes_with_limits(bytes, limits).unwrap();
+        let limited =
+            Snapshot::from_bytes_with_options(bytes, OpenOptions::new().source_limits(limits))
+                .unwrap();
         let mut limited_edit = limited.edit().unwrap();
         limited_edit
             .set_shape_texts(&[
@@ -7719,9 +8087,11 @@ mod tests {
             ])
             .unwrap();
         let limited_commit = limited_edit.commit().unwrap();
-        let fully_reopened =
-            Snapshot::from_bytes_with_limits(limited_commit.snapshot().bytes().to_vec(), limits)
-                .unwrap();
+        let fully_reopened = Snapshot::from_bytes_with_options(
+            limited_commit.snapshot().bytes().to_vec(),
+            OpenOptions::new().source_limits(limits),
+        )
+        .unwrap();
         assert_eq!(limited_commit.snapshot(), &fully_reopened);
         assert_eq!(limited_commit.snapshot().limits(), limits);
     }

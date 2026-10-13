@@ -5,6 +5,9 @@
 # `metadata+html` is `with_metadata(true)` plus `TableStyle::StyledHtml`.
 # An outcome is `<bytes>:<FNV-1a 64 hex>` for Markdown or `!<facade error variant>`
 # for a refusal; `=` repeats the outcome to its left.
+# Record 0260 (reviewed behaviour change): ole/ppt/text_shapes.ppt and
+# poi/test-data/slideshow/41246-1.ppt now include the title/body placeholder text
+# PowerPoint keeps in the slide list (L-PPT-R1), which the facade dropped.
 libreoffice-core/embeddedobj/qa/cppunit/data/insert-file-config.doc	7:8a7794b77af2325b	=	=	=	327:0d7ba21b868a395d	=
 libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx	!Unsupported	=	=	=	=	=
 libreoffice-core/oox/qa/unit/data/import-mce.pptx	14:49ab1e161df49d26	=	=	=	262:cf42b8c202fc3c3a	=
@@ -197,11 +200,11 @@ office-interop/litchi-changed/document-properties-litchi.docx	35:03e5b3f62a9abab
 office-interop/litchi-changed/noheadfoot-litchi.doc	153:df28368ddec51d0f	=	149:b64e9185512d8e9b	=	482:d5c392cef8cd68c0	=
 office-interop/litchi-changed/relsize-litchi.rtf	59:4c445d466211ecd1	=	=	=	=	=
 office-interop/litchi-changed/shapes-litchi.pptx	454:c9a0295ae9cd744f	=	=	=	696:d4612ace97dd31bf	=
-ole/doc/3endnotes.doc	8837:3dac476ba3b97acc	=	8740:1a57cbfb311a273f	=	9188:c67d64f7b305af14	=
+ole/doc/3endnotes.doc	8865:bdecc0a9803cc007	=	8768:b5c62df23e4f8dc0	=	9216:f58fd061c61d522f	=
 ole/doc/DiffFirstPageHeadFoot.doc	486:f6778906a4aa243b	=	482:9f87a8fb1e9fdb8f	=	815:421e6cd354ec9288	=
 ole/doc/FancyFoot.doc	352:78df83d4efe76464	=	348:329872ceea5ccc50	=	681:55ecd8e4e99e9a7d	=
 ole/doc/FloatingPictures.doc	!Unsupported	=	=	=	=	=
-ole/doc/HeaderFooterProblematic.doc	6:359f604bc5f8ec35	=	=	=	370:fc9a2fff73a86dca	=
+ole/doc/HeaderFooterProblematic.doc	16068:fd3e67be13b71c43	=	=	=	20474:d42a31f1330e54de	=
 ole/doc/HeaderFooterUnicode.doc	587:56f2cd5319945e4c	=	581:337b055448dacf22	=	916:bcd9908c7f43a0c0	=
 ole/doc/Lists.doc	!Unsupported	=	=	=	=	=
 ole/doc/NoHeadFoot.doc	196:11cb299db325f89c	=	192:6ae5457ea9b8d648	=	525:da03ef370ae48149	=
@@ -240,7 +243,7 @@ ole/ppt/empty.ppt	0:cbf29ce484222325	=	=	=	209:56479cb1e966b122	=
 ole/ppt/empty_textbox.ppt	76:3f7b50fe63db0546	=	=	=	323:dc6281d8f6c57365	=
 ole/ppt/ppt_with_png.ppt	32:e3f5d66e7b78df77	=	=	=	266:98e39bbde527a858	=
 ole/ppt/text-margins.ppt	36:fe6b68a75ef91eb6	=	=	=	303:2899311aafa8f03a	=
-ole/ppt/text_shapes.ppt	56:1d07dfb0621f877b	=	=	=	275:d0baf50997593429	=
+ole/ppt/text_shapes.ppt	74:702b6f4b633f51b6	=	=	=	293:d01601e3c4926cb4	=
 ooxml/docx/ComplexNumberedLists.docx	320:5014840cf5fd6518	=	=	=	452:0b909ac2d77428b7	=
 ooxml/docx/FancyFoot.docx	!Unsupported	=	=	=	=	=
 ooxml/docx/Headers.docx	10:df5f962be533f115	=	=	=	179:513162771a4f319c	=
@@ -332,7 +335,7 @@ poi/test-data/document/heading123.docx	!Unsupported	=	=	=	=	=
 poi/test-data/document/password_password_cryptoapi.doc	!InvalidFormat	=	=	=	=	=
 poi/test-data/document/password_tika_binaryrc4.doc	!InvalidFormat	=	=	=	=	=
 poi/test-data/document/saut_page.docx	!Unsupported	=	=	=	=	=
-poi/test-data/document/saved-by-table.doc	28422:2567f51517b70ce2	=	28030:9d5bfa50b82cadf0	=	28850:c4aac737dce1b015	=
+poi/test-data/document/saved-by-table.doc	28434:f080393c2d478c19	=	28042:0e278b6915c6416f	=	28862:becbe6fb365a9736	=
 poi/test-data/document/test.doc	564:5e883ba0dd103b94	=	521:3e537dee9e1f5913	=	564:5e883ba0dd103b94	=
 poi/test-data/document/testComment.docx	!Unsupported	=	=	=	=	=
 poi/test-data/document/word_with_embeded.doc	!Unsupported	=	=	=	=	=
@@ -350,7 +353,7 @@ poi/test-data/openxml4j/OPCCompliance_CoreProperties_OnlyOneCorePropertiesPartFA
 poi/test-data/openxml4j/OPCCompliance_CoreProperties_SUCCESS.docx	2:08547e07b5084555	=	=	=	234:11190aed9b62ce66	=
 poi/test-data/openxml4j/OPCCompliance_CoreProperties_UnauthorizedXMLLangAttributeFAIL.docx	2:08547e07b5084555	=	=	=	234:11190aed9b62ce66	=
 poi/test-data/openxml4j/OPCCompliance_DerivedPartNameFAIL.docx	!Other	!NotOfficeFile	!Other	!NotOfficeFile	!Other	!NotOfficeFile
-poi/test-data/slideshow/41246-1.ppt	9437:d816d969a2ad8578	=	=	=	9578:d08026e8dc1def6a	=
+poi/test-data/slideshow/41246-1.ppt	9653:db98ad50b9c74e58	=	=	=	9794:d8f5c6cc5819039a	=
 poi/test-data/slideshow/45543.ppt	2477:b45e39a6d37d0795	=	=	=	2821:0f87f1ab1816816d	=
 poi/test-data/slideshow/45545_Comment.pptx	2502:ea9e9e4bf33e1ab2	=	=	=	2839:1ec157eec35ffb58	=
 poi/test-data/slideshow/54880_chinese.ppt	100:fd16c8d6cc983e99	=	=	=	324:89e4dbcfdbb87500	=

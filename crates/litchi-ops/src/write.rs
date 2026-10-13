@@ -22,6 +22,10 @@ impl File {
     ///
     /// Placement defaults to the end of the parent. Properties are admitted
     /// before the isolated leaf transaction is committed.
+    /// Legacy PPT inserts blank slides (`layout` may be `"blank"`) under the
+    /// presentation root, at any placement.
+    /// XLS adds an empty worksheet tab under the workbook (optional `name`), or
+    /// inserts one empty row or column under a sheet at an explicit position.
     /// PPTX slide insertion requires an exact `layout` property and an eager
     /// native owner (created presentations or `SourceMode::Eager` opens). The
     /// inserted slide is empty and shares the selected layout.
@@ -88,6 +92,34 @@ impl File {
                     path,
                 })
             },
+            #[cfg(feature = "doc")]
+            Self::Doc(handle) => {
+                let (commit, path) = handle.add(_parent.into_path()?, _node.into_node()?)?;
+                Ok(Added {
+                    file: Self::Doc(commit.after),
+                    path,
+                })
+            },
+            #[cfg(feature = "ppt")]
+            Self::Ppt(handle) => {
+                let (commit, path) = handle.add(_parent.into_path()?, _node.into_node()?)?;
+                Ok(Added {
+                    file: Self::Ppt(commit.after),
+                    path,
+                })
+            },
+            #[cfg(feature = "xls")]
+            Self::Xls(handle) => {
+                let (commit, path) = handle.add_with_limits(
+                    _parent.into_path()?,
+                    _node.into_node()?,
+                    &crate::transaction::SemanticLimits::default(),
+                )?;
+                Ok(Added {
+                    file: Self::Xls(commit.after),
+                    path,
+                })
+            },
             Self::Signed(_) => Err(protected(self)),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -97,7 +129,8 @@ impl File {
 
     /// Move an element to a sibling position or another supported parent.
     ///
-    /// Legacy PPT supports slide ordering through the native package edit.
+    /// Legacy PPT supports slide ordering and XLS complete-catalog tab
+    /// ordering through their native package edits.
     /// Positional destinations are measured after detaching the element.
     /// The original snapshot stays unchanged on success and failure.
     ///
@@ -135,6 +168,14 @@ impl File {
             Self::Ppt(handle) => handle
                 .move_to(_path.into_path()?, _to.into_placement()?)
                 .map(|commit| Self::Ppt(commit.after)),
+            #[cfg(feature = "xls")]
+            Self::Xls(handle) => handle
+                .move_to_with_limits(
+                    _path.into_path()?,
+                    _to.into_placement()?,
+                    &crate::transaction::SemanticLimits::default(),
+                )
+                .map(|commit| Self::Xls(commit.after)),
             #[cfg(feature = "pptx")]
             Self::Pptx(handle) => handle
                 .move_to(_path.into_path()?, _to.into_placement()?)
@@ -143,6 +184,10 @@ impl File {
             Self::Rtf(handle) => handle
                 .move_to(_path.into_path()?, _to.into_placement()?)
                 .map(|commit| Self::Rtf(commit.after)),
+            #[cfg(feature = "doc")]
+            Self::Doc(handle) => handle
+                .move_to(_path.into_path()?, _to.into_placement()?)
+                .map(|commit| Self::Doc(commit.after)),
             Self::Signed(_) => Err(protected(self)),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -161,8 +206,10 @@ impl File {
     /// neighboring cells never shift.  A sheet query must be homogeneous, and
     /// complete-tab removal retains at least one visible tab.
     /// Legacy PPT supports slide removal subject to native dependency admission.
-    /// XLS removes stored cell records from cells, ranges, and cell queries;
-    /// virtual cells are exact no-ops and worksheet neighbors never shift.
+    /// XLS removes one worksheet tab (dependency-checked; a visible tab must
+    /// remain), one empty row or column, or stored cell records from cells,
+    /// ranges, and cell queries; virtual cells are exact no-ops and worksheet
+    /// neighbors never shift.
     ///
     /// # Errors
     /// Returns target, protection, source, dependency or capability errors.
@@ -205,6 +252,10 @@ impl File {
             Self::Rtf(handle) => handle
                 .remove(_target.into_target()?)
                 .map(|commit| Self::Rtf(commit.after)),
+            #[cfg(feature = "doc")]
+            Self::Doc(handle) => handle
+                .remove(_target.into_target()?)
+                .map(|commit| Self::Doc(commit.after)),
             Self::Signed(_) => Err(protected(self)),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -216,8 +267,8 @@ impl File {
     ///
     /// PPTX supports slides in created or eagerly opened presentations.
     /// Legacy PPT supports slide swaps on retained native owners.
-    /// XLSB supports complete-catalog tab ordering, including chart tabs, in
-    /// retained source and eager owners.
+    /// XLSB and XLS support complete-catalog tab ordering, including chart
+    /// tabs, in retained source and eager owners.
     /// RTF supports ordinary main-story paragraph swaps through its native
     /// lifecycle editor.
     ///
@@ -253,6 +304,14 @@ impl File {
             Self::Ppt(handle) => handle
                 .swap(_a.into_path()?, _b.into_path()?)
                 .map(|commit| Self::Ppt(commit.after)),
+            #[cfg(feature = "xls")]
+            Self::Xls(handle) => handle
+                .swap_with_limits(
+                    _a.into_path()?,
+                    _b.into_path()?,
+                    &crate::transaction::SemanticLimits::default(),
+                )
+                .map(|commit| Self::Xls(commit.after)),
             #[cfg(feature = "pptx")]
             Self::Pptx(handle) => handle
                 .swap(_a.into_path()?, _b.into_path()?)
@@ -261,6 +320,10 @@ impl File {
             Self::Rtf(handle) => handle
                 .swap(_a.into_path()?, _b.into_path()?)
                 .map(|commit| Self::Rtf(commit.after)),
+            #[cfg(feature = "doc")]
+            Self::Doc(handle) => handle
+                .swap(_a.into_path()?, _b.into_path()?)
+                .map(|commit| Self::Doc(commit.after)),
             Self::Signed(_) => Err(protected(self)),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]

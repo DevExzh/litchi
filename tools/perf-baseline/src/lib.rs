@@ -29843,7 +29843,7 @@ fn xls_visibility_case_parameters(case: Case) -> Result<(bool, usize), Box<dyn E
 }
 
 fn stage_xls_visibility_updates(
-    transaction: &mut litchi_xls::sheet_visibility::Transaction,
+    transaction: &mut litchi_xls::sheet_visibility::Edit,
     update_count: usize,
 ) -> Result<(), Box<dyn Error>> {
     if update_count == 1 {
@@ -29952,7 +29952,7 @@ fn prepare_xls_visibility_publication(
 ) -> Result<XlsVisibilityPublication, Box<dyn Error>> {
     let source_bytes = u64::try_from(source.bytes().len())?;
     let source_workbook_bytes = u64::try_from(source.workbook_stream().len())?;
-    let mut transaction = source.transaction();
+    let mut transaction = source.edit();
     stage_xls_visibility_updates(&mut transaction, update_count)?;
     if source_backed {
         Ok(XlsVisibilityPublication::SourceBacked(
@@ -30090,7 +30090,7 @@ fn verify_xls_visibility_static_guards(source: &[u8]) -> Result<(), Box<dyn Erro
     if snapshot.worksheet_count() != XLS_VISIBILITY_SHEET_COUNT {
         return Err("XLS visibility source worksheet count differs from specification".into());
     }
-    let noop = snapshot.transaction().commit_source_backed()?;
+    let noop = snapshot.edit().commit_source_backed()?;
     if !noop.is_noop() || noop.diagnostics().changed_worksheets() != 0 {
         return Err("XLS visibility source-backed no-op was not exact".into());
     }
@@ -30100,7 +30100,7 @@ fn verify_xls_visibility_static_guards(source: &[u8]) -> Result<(), Box<dyn Erro
         return Err("XLS visibility source-backed no-op changed source bytes".into());
     }
 
-    let mut capped = snapshot.transaction();
+    let mut capped = snapshot.edit();
     stage_xls_visibility_updates(&mut capped, XLS_VISIBILITY_BATCH_COUNT)?;
     let capped = capped.commit_source_backed()?;
     if capped.diagnostics().changed_worksheets() != XLS_VISIBILITY_BATCH_COUNT
@@ -30142,7 +30142,7 @@ fn verify_xls_visibility_static_guards(source: &[u8]) -> Result<(), Box<dyn Erro
         XLS_VISIBILITY_BATCH_COUNT,
     )?;
 
-    let mut over_cap = snapshot.transaction();
+    let mut over_cap = snapshot.edit();
     if over_cap
         .set_visibility_batch(
             (1..=XLS_VISIBILITY_BATCH_COUNT + 1)
@@ -30357,7 +30357,7 @@ fn stage_xls_comment_updates(
     if update_count == 1 {
         let index = XLS_COMMENTS_SOURCE_COUNT / 2;
         edit.replace(
-            Selector::Position(0),
+            Selector::Position(Position::new(0)),
             Reference::new(u32::try_from(index)?, 1)?,
             xls_comment_value(index, true)?,
         )?;
@@ -30374,7 +30374,7 @@ fn stage_xls_comment_updates(
             ))
         })
         .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
-    edit.replace_many(Selector::Position(0), updates)?;
+    edit.replace_many(Selector::Position(Position::new(0)), updates)?;
     Ok(())
 }
 
@@ -30663,7 +30663,7 @@ fn verify_xls_comments_static_guards(source: &[u8]) -> Result<(), Box<dyn Error>
     let snapshot = litchi_xls::comments::Snapshot::from_bytes(source.to_vec())?;
     let mut rejected = snapshot.edit();
     rejected.replace(
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         Reference::new(0, 1)?,
         Value::new("Target 000", "comment target 000!")?,
     )?;
@@ -30673,7 +30673,7 @@ fn verify_xls_comments_static_guards(source: &[u8]) -> Result<(), Box<dyn Error>
 
     let mut rejected_width = snapshot.edit();
     rejected_width.replace(
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         Reference::new(0, 1)?,
         Value::new("Target 000", "作者作者作者作者作")?,
     )?;
@@ -30683,7 +30683,7 @@ fn verify_xls_comments_static_guards(source: &[u8]) -> Result<(), Box<dyn Error>
 
     let mut fallback = snapshot.edit();
     fallback.replace(
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         Reference::new(0, 1)?,
         Value::new("Target 000", "comment target 000!")?,
     )?;
@@ -30691,7 +30691,7 @@ fn verify_xls_comments_static_guards(source: &[u8]) -> Result<(), Box<dyn Error>
     verify_xls_untouched_streams(source, fallback.snapshot().bytes(), false)?;
     let changed = fallback
         .snapshot()
-        .worksheet(Selector::Position(0))?
+        .worksheet(Selector::Position(Position::new(0)))?
         .ok_or("XLS eager fallback lost its worksheet")?
         .comment(Reference::new(0, 1)?)?
         .ok_or("XLS eager fallback lost its comment")?;
@@ -30709,7 +30709,7 @@ fn verify_xls_comments_static_guards(source: &[u8]) -> Result<(), Box<dyn Error>
     let mut edit = protected.edit();
     if edit
         .replace(
-            Selector::Position(0),
+            Selector::Position(Position::new(0)),
             Reference::new(0, 0)?,
             Value::new("Target", "target")?,
         )

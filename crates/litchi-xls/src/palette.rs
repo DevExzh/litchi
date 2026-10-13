@@ -17,7 +17,14 @@ pub struct Color {
 }
 
 impl Color {
-    const fn new(red: u8, green: u8, blue: u8) -> Self {
+    /// An RGB color.
+    ///
+    /// ```
+    /// let red = litchi_xls::Color::new(0xff, 0, 0);
+    /// assert_eq!((red.red(), red.green(), red.blue()), (0xff, 0, 0));
+    /// ```
+    #[must_use]
+    pub const fn new(red: u8, green: u8, blue: u8) -> Self {
         Self { red, green, blue }
     }
 

@@ -347,6 +347,10 @@ fn doc_capabilities_and_source_retention_are_narrow_and_explicit() {
         Verb::Query,
         Verb::View,
         Verb::Set,
+        Verb::Add,
+        Verb::Remove,
+        Verb::Move,
+        Verb::Swap,
         Verb::Edit,
         Verb::Batch,
         Verb::Save,
@@ -354,24 +358,30 @@ fn doc_capabilities_and_source_retention_are_narrow_and_explicit() {
     ] {
         assert!(capabilities.verb(verb).is_supported(), "{verb:?}");
     }
-    for verb in [Verb::Add, Verb::Remove, Verb::Move, Verb::Swap] {
-        assert_eq!(
-            capabilities.verb(verb).code(),
-            Some(Code::UnsupportedCapability),
-            "{verb:?}"
-        );
-    }
     let paragraph = capabilities
         .element("paragraph")
         .expect("DOC paragraph capability");
     assert!(paragraph.operations().get);
     assert!(paragraph.operations().set);
-    assert!(!paragraph.operations().add);
-    assert!(!paragraph.operations().remove);
+    assert!(paragraph.operations().add);
+    assert!(paragraph.operations().remove);
     let text = paragraph.property("text").expect("DOC text property");
     assert!(text.get());
     assert!(text.set());
-    assert!(!text.add());
+    assert!(text.add());
+    let run = capabilities.element("run").expect("DOC run capability");
+    assert!(run.operations().get && run.operations().set && run.operations().remove);
+    assert!(!run.operations().add);
+    for key in ["bold", "italic", "underline", "size", "color", "font"] {
+        let property = run.property(key).expect("DOC run property");
+        assert!(property.get() && property.set(), "{key}");
+    }
+    for element in [
+        "table", "row", "cell", "header", "footer", "footnote", "endnote", "comment",
+    ] {
+        let element = capabilities.element(element).expect("DOC read element");
+        assert!(element.operations().get && !element.operations().set);
+    }
     assert!(capabilities.gaps().any(|gap| {
         gap.subject()
             == Subject::Operation {
@@ -523,7 +533,7 @@ fn doc_owned_ingress_is_detached_from_later_path_changes() {
         .unwrap();
     std::fs::write(&path, b"changed source").unwrap();
     assert!(file.metadata().unwrap().is_some());
-    assert_eq!(native.paragraph_text().unwrap(), Some(""));
+    assert_eq!(native.paragraph_text().unwrap().as_deref(), Some(""));
     let edited = file
         .set("/body/p[1]", props! { "text" => "owned" })
         .unwrap();

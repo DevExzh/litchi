@@ -303,6 +303,31 @@ Cut from `e467bcf4e8`:
 - Known pre-existing failure on trunk, not from this wave: `litchi-oth` `semantic_api::raw_zip_negatives_are_rejected_by_the_open_boundary` (a DTD package is accepted). Tier 3 ODF follow-up.
 - The `ods_formula_conditional_native` test target cannot compile: its 5.5 MB fixture was purged on 2026-10-05. It needs a reduced fixture.
 
+- Merged `p11-doc` (0258):
+  - DOC reads: runs, tables, stories, notes and comments (element gaps 22 → 13).
+  - DOC writes: run and paragraph formatting; paragraph add, remove, move and swap.
+  - Writes cost 0–8.5% over the leaf. The 0190 13.6% read miss no longer reproduces.
+  - W4: `open_with_limits*` and `rollback` removed and banned.
+  - Golden rows merged by hand: 3 DOC rows carry both 0258's text and 0253's metadata front-matter.
+
+- Merged `p13-ppt` (0260):
+  - PPT readers ported; shape text can change length on 129 of 214 corpus shapes (was 0).
+  - Notes text set, blank slide insert, name/alt reads.
+  - Single-set overhead 1.39× → 1.00×.
+  - 10k batches still scale 35×. The owner asked for a fix: commit verification without a full re-parse, step 0264.
+  - DOC and PPT `add` arms were unioned in the ops dispatch.
+  - `test_threads.test_long_writes_release_the_gil` flaked once under load (3/3 reruns pass).
+
+- Merged `p16-schema` (0263, `3973a88a7e`):
+  - `litchi_ops::schema(format)` with registry goldens;
+  - the delta table now reads the registry and covers DOC, PPT and RTF;
+  - exposed through the CLI and Python.
+- Merged `p12-xls` (0259):
+  - XLS sheet lifecycle, formula writes, row/column layout, XF formatting writes, read-only named ranges;
+  - writes cost 1.00–1.07× (file-backed layout ~1.10×).
+  - Read overhead of 1.6–7× is traced to the shared resolver and walker and handed to the p8 perf stream.
+  - Feature-subset build fixes made at the merge: signature-test imports, an encryption-gated test, and the `round_trip` dead code in pptx-less builds.
+
 Still running from R1: `p7a-docx` (0251), `p7c-pptx` (0252), `p6-ooxml-meta` (0253).
 
 Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-pptx-w4` 9474e2b6ce, `uo/m2-l-xlsb-w1` 876588a23c, `uo/m1-r4-perf` 012fd509ff.

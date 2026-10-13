@@ -524,24 +524,6 @@ impl SourceSnapshot {
         )
     }
 
-    /// Opens a positional DOC source under explicit finite limits.
-    pub fn open_with_limits(source: Arc<dyn ReadAt>, limits: SourceLimits) -> Result<Self> {
-        Self::open_with_options(source, SourceBackedOptions::new(limits))
-    }
-
-    /// Opens a positional DOC source under explicit limits and protection policy.
-    pub fn open_with_limits_and_policy(
-        source: Arc<dyn ReadAt>,
-        limits: SourceLimits,
-        protection_policy: ProtectionPolicy,
-    ) -> Result<Self> {
-        Self::open_with_options_and_policy(
-            source,
-            SourceBackedOptions::new(limits),
-            protection_policy,
-        )
-    }
-
     /// Opens a positional DOC source under explicit options.
     pub fn open_with_options(
         source: Arc<dyn ReadAt>,
@@ -1117,12 +1099,6 @@ impl Transaction {
     pub fn commit_source_backed(self) -> Result<Commit> {
         self.commit()
     }
-
-    /// Discards staged state and returns the immutable source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> SourceSnapshot {
-        self.source
-    }
 }
 
 /// Content-free evidence for one source-backed paragraph publication.
@@ -1494,9 +1470,9 @@ fn publish_operation(source: SourceSnapshot, operation: Operation) -> Result<Com
             source.inner.limits.splice_limits,
             |composed| {
                 let candidate_source: Arc<dyn ReadAt> = Arc::new(composed.clone());
-                let candidate = SourceSnapshot::open_with_limits_and_policy(
+                let candidate = SourceSnapshot::open_with_options_and_policy(
                     Arc::clone(&candidate_source),
-                    source.inner.limits,
+                    SourceBackedOptions::new(source.inner.limits),
                     source.inner.protection_policy.clone(),
                 )?;
                 let candidate_paragraph = candidate.resolve(operation.position)?;
@@ -3016,7 +2992,10 @@ mod tests {
         let bytes = fixture("documentProperties.doc");
         let limits = SourceLimits::default().with_max_fib_bytes(FIB_BASE_PREFIX - 1);
         assert!(matches!(
-            SourceSnapshot::open_with_limits(Arc::new(OwnedSource::new(bytes)), limits),
+            SourceSnapshot::open_with_options(
+                Arc::new(OwnedSource::new(bytes)),
+                SourceBackedOptions::new(limits),
+            ),
             Err(Error::Limit(_))
         ));
     }
@@ -3025,9 +3004,9 @@ mod tests {
     fn zero_builder_limits_are_rejected_before_open() {
         let limits = SourceLimits::default().with_max_prefix_units(0);
         assert!(matches!(
-            SourceSnapshot::open_with_limits(
+            SourceSnapshot::open_with_options(
                 Arc::new(OwnedSource::new(Vec::new())),
-                limits,
+                SourceBackedOptions::new(limits),
             ),
             Err(Error::Limit(message)) if message.contains("non-zero")
         ));

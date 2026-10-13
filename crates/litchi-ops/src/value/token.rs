@@ -91,6 +91,12 @@ impl Tokens {
         self.values
     }
 
+    /// The accepted input spellings besides the canonical values, each with
+    /// the index of the value it means, sorted by spelling.
+    pub(crate) const fn alias_pairs(&self) -> &'static [(&'static str, u16)] {
+        self.aliases
+    }
+
     /// The canonical value `text` means, if any.
     #[must_use]
     pub fn get(&self, text: &str) -> Option<&'static str> {

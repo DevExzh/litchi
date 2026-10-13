@@ -7,6 +7,7 @@
 
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_core::OwnedSource;
+use litchi_core::Position;
 use litchi_xls::cell_values::{FormulaCache, Reference, Selector, Snapshot, Value};
 use litchi_xls::{Builder, Error, SourceBackedWorkbook, raw::Reader};
 use std::io::Cursor;
@@ -265,7 +266,7 @@ fn native_noop_is_byte_exact_and_source_backed_numeric_edit_keeps_formula_frames
     let mut source_backed_noop = source.edit();
     source_backed_noop
         .set_number(
-            Selector::Position(sheet_position),
+            Selector::Position(Position::new(sheet_position)),
             number.reference(),
             number.value(),
         )
@@ -288,7 +289,7 @@ fn native_noop_is_byte_exact_and_source_backed_numeric_edit_keeps_formula_frames
 
     let mut edit = source.edit();
     edit.set_number(
-        Selector::Position(sheet_position),
+        Selector::Position(Position::new(sheet_position)),
         number.reference(),
         replacement,
     )
@@ -333,7 +334,7 @@ fn formula_cache_and_style_edits_preserve_the_untouched_rgb_extra() {
     let reference = Reference::new(0, 0).expect("synthetic reference");
 
     let old_cache = source
-        .worksheet(Selector::Position(0))
+        .worksheet(Selector::Position(Position::new(0)))
         .expect("resolve worksheet")
         .expect("worksheet exists")
         .cell(reference)
@@ -348,7 +349,7 @@ fn formula_cache_and_style_edits_preserve_the_untouched_rgb_extra() {
     let mut cache_edit = source.edit();
     cache_edit
         .set_value(
-            Selector::Position(0),
+            Selector::Position(Position::new(0)),
             reference,
             Value::FormulaCache(replacement_cache),
         )
@@ -370,7 +371,7 @@ fn formula_cache_and_style_edits_preserve_the_untouched_rgb_extra() {
     );
 
     let style = source
-        .worksheet(Selector::Position(0))
+        .worksheet(Selector::Position(Position::new(0)))
         .expect("resolve worksheet")
         .expect("worksheet exists")
         .cell(reference)
@@ -382,7 +383,11 @@ fn formula_cache_and_style_edits_preserve_the_untouched_rgb_extra() {
         .duplicate_style(style)
         .expect("duplicate existing XF resource");
     style_edit
-        .set_style(Selector::Position(0), reference, replacement_style)
+        .set_style(
+            Selector::Position(Position::new(0)),
+            reference,
+            replacement_style,
+        )
         .expect("stage Formula style edit");
     let style_commit = style_edit.commit().expect("commit Formula style edit");
     assert_eq!(
@@ -475,13 +480,13 @@ fn row_and_column_shift_refuse_rgb_extra_atomically() {
 
     let mut rows = source.edit();
     assert!(matches!(
-        rows.insert_rows(Selector::Position(0), 0, 1),
+        rows.insert_rows(Selector::Position(Position::new(0)), 0, 1),
         Err(Error::UnsafeEdit(_))
     ));
 
     let mut columns = source.edit();
     assert!(matches!(
-        columns.insert_columns(Selector::Position(0), 0, 1),
+        columns.insert_columns(Selector::Position(Position::new(0)), 0, 1),
         Err(Error::UnsafeEdit(_))
     ));
     assert_eq!(source.bytes(), before.as_slice());

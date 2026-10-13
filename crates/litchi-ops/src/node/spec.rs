@@ -58,6 +58,10 @@ pub(crate) struct PropSpec {
     pub(crate) access: Access,
     /// Native metadata available only through explicit raw operations.
     pub(crate) raw: bool,
+    /// The registry's write declaration (constraint, clearing, pending
+    /// setter), which [`crate::registry::Entry::readable`] copies; the
+    /// capability report and the schema export read it from here.
+    pub(crate) admission: crate::registry::Admission,
 }
 
 impl PropSpec {
@@ -75,6 +79,7 @@ impl PropSpec {
             ty,
             access: Access::READ,
             raw: false,
+            admission: crate::registry::Admission::NONE,
         }
     }
 }

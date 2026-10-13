@@ -225,10 +225,35 @@ pub fn anchor(shape: &Shape<'_>) -> Result<Option<Anchor>> {
 
 /// Extract all PPT textbox text from an `OfficeArt` drawing.
 ///
+/// Each `ClientTextbox` contributes the text records it holds inline. A
+/// text box that only references slide-list text (an `OutlineTextRefAtom`,
+/// MS-PPT 2.9.78) contributes nothing here, because this function has no
+/// slide to resolve the reference against; [`crate::Slide::text`] resolves
+/// it.
+///
 /// # Errors
 ///
 /// Returns an error if the operation fails.
 pub fn text_from_drawing(data: &[u8]) -> Result<String> {
+    drawing_text(data, None)
+}
+
+/// Extract a presentation slide drawing's text, reading each text box that
+/// references slide-list text (an `OutlineTextRefAtom`, MS-PPT 2.9.78) from
+/// the body of `outline` it selects (L-PPT-R1).
+///
+/// Text boxes appear in drawing order. A reference that selects no readable
+/// body contributes no text, as POI and LibreOffice show none.
+pub(crate) fn text_from_slide_drawing(
+    data: &[u8],
+    outline: &[crate::OutlineTextBody],
+) -> Result<String> {
+    drawing_text(data, Some(outline))
+}
+
+/// `outline` is `None` when no slide context exists: every text box is then
+/// read from its inline records, as before outline resolution existed.
+fn drawing_text(data: &[u8], outline: Option<&[crate::OutlineTextBody]>) -> Result<String> {
     let mut offset = 0usize;
     let mut records = 0u32;
     let mut text = String::with_capacity(1024);
@@ -236,7 +261,7 @@ pub fn text_from_drawing(data: &[u8]) -> Result<String> {
         visit_host_record(&mut records)?;
         let (record, consumed) = Record::parse(data, offset)?;
         let container = Container::try_new(record)?;
-        text_from_container(&container, &mut text)?;
+        text_from_container(&container, outline, &mut text)?;
         offset = advance(offset, consumed, "PowerPoint OfficeArt drawing stream")?;
     }
     Ok(text)
@@ -249,14 +274,134 @@ pub fn text_from_drawing(data: &[u8]) -> Result<String> {
 /// Returns an error if the operation fails.
 pub fn text_from_textbox(textbox: &Record<'_>) -> Result<Option<String>> {
     validate_host_record(textbox, CLIENT_TEXTBOX_RAW_KIND, "ClientTextbox")?;
-    if textbox.data().is_empty() {
+    text_from_textbox_payload(textbox.data())
+}
+
+/// Decode the text of a `ClientTextbox` payload, or of a slide-list text
+/// body framed as one: every character atom's text, trimmed and joined with
+/// `\n`, then trimmed at the end; `None` when nothing remains.
+pub(crate) fn text_from_textbox_payload(payload: &[u8]) -> Result<Option<String>> {
+    if payload.is_empty() {
         return Ok(None);
     }
     let mut text = String::with_capacity(256);
-    text_from_ppt_records(textbox.data(), &mut text)?;
+    text_from_ppt_records(payload, &mut text)?;
     let trimmed = text.trim_end().len();
     text.truncate(trimmed);
     Ok((!text.is_empty()).then_some(text))
+}
+
+/// Where a shape's text records live (MS-PPT 2.9.76
+/// `OfficeArtClientTextBoxAtoms`).
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum TextRecords<'a> {
+    /// The `ClientTextbox` holds the text records itself.
+    Inline(&'a [u8]),
+    /// The `ClientTextbox` holds an `OutlineTextRefAtom` that selects this
+    /// slide-list text body.
+    Outline {
+        /// The reference's zero-based body index.
+        index: u32,
+        /// The selected body.
+        body: &'a crate::OutlineTextBody,
+    },
+    /// The `ClientTextbox` holds an `OutlineTextRefAtom` that selects no
+    /// body: its index is negative or past the slide's last body, or the
+    /// atom is not four bytes. The value is the index field reinterpreted as
+    /// unsigned, or `u32::MAX` for a malformed atom; it is the context of
+    /// [`crate::ShapeDefect::UnresolvedOutlineTextRef`].
+    Unresolved(u32),
+}
+
+/// Classifies a `ClientTextbox` payload against a slide's slide-list text
+/// bodies.
+///
+/// The first `OutlineTextRefAtom` decides, and inline text records beside it
+/// are ignored, as POI (`HSLFTextParagraph.findTextParagraphs`) and
+/// LibreOffice (`PPTTextObj`) ignore them; MS-PPT allows either an outline
+/// reference or inline text, never both. Without a reference the payload is
+/// read inline.
+///
+/// # Errors
+///
+/// Returns an error when the payload's record framing is broken, exactly as
+/// decoding its inline text would.
+pub(crate) fn textbox_text_records<'a>(
+    payload: &'a [u8],
+    outline: &'a [crate::OutlineTextBody],
+) -> Result<TextRecords<'a>> {
+    const OUTLINE_TEXT_REF_ATOM: u16 = 0x0f9e;
+
+    for raw in RawRecords::new(payload) {
+        let record = raw?;
+        if record.kind != OUTLINE_TEXT_REF_ATOM {
+            continue;
+        }
+        let Ok(bytes) = <[u8; 4]>::try_from(record.data) else {
+            return Ok(TextRecords::Unresolved(u32::MAX));
+        };
+        if record.version != 0 {
+            return Ok(TextRecords::Unresolved(u32::MAX));
+        }
+        let raw_index = u32::from_le_bytes(bytes);
+        // A negative signed index selects nothing.
+        if i32::from_le_bytes(bytes) < 0 {
+            return Ok(TextRecords::Unresolved(raw_index));
+        }
+        return Ok(usize::try_from(raw_index)
+            .ok()
+            .and_then(|index| outline.get(index))
+            .map_or(TextRecords::Unresolved(raw_index), |body| {
+                TextRecords::Outline {
+                    index: raw_index,
+                    body,
+                }
+            }));
+    }
+    Ok(TextRecords::Inline(payload))
+}
+
+/// The shape's name and alternative text (L-PPT-R3): the `wzName` (0x0380,
+/// MS-ODRAW 2.3.4.1) and `wzDescription` (0x0381, MS-ODRAW 2.3.4.3)
+/// properties of its primary property table, where POI
+/// (`HSLFShape.getShapeName`) and LibreOffice (`SvxMSDffManager::ImportObj`)
+/// read them.
+///
+/// Each is `None` when the property is absent, not complex, or empty. The
+/// table is walked once; the property parser already refuses a repeated
+/// property identifier.
+pub(crate) fn shape_labels(shape: &Shape<'_>) -> (Option<String>, Option<String>) {
+    use litchi_odraw::prop::{Id, Value};
+
+    let mut name = None;
+    let mut description = None;
+    for prop in shape.props().iter() {
+        let slot = match prop.id() {
+            Id::GroupName => &mut name,
+            Id::GroupDescription => &mut description,
+            _ => continue,
+        };
+        if let Value::Complex(data) = prop.value() {
+            *slot = utf16z_string(data);
+        }
+    }
+    (name, description)
+}
+
+/// Decodes a null-terminated UTF-16LE complex property, as POI's
+/// `StringUtil.getFromUnicodeLE0Terminated` does: characters stop at the
+/// first NUL, a trailing odd byte is ignored, and unpaired surrogates read as
+/// U+FFFD. `None` when no character remains.
+fn utf16z_string(data: &[u8]) -> Option<String> {
+    let units = data
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|pair| u16::from_le_bytes(*pair))
+        .take_while(|&unit| unit != 0);
+    let mut text = String::with_capacity(data.len() / 2);
+    text.extend(char::decode_utf16(units).map(|unit| unit.unwrap_or(char::REPLACEMENT_CHARACTER)));
+    (!text.is_empty()).then_some(text)
 }
 
 /// Checks the record framing of a shape's `PowerPoint` host records: the
@@ -401,7 +546,11 @@ fn frame(shape: &Shape<'_>) -> Result<Frame> {
     Ok(frame)
 }
 
-fn text_from_container(container: &Container<'_>, text: &mut String) -> Result<()> {
+fn text_from_container(
+    container: &Container<'_>,
+    outline: Option<&[crate::OutlineTextBody]>,
+    text: &mut String,
+) -> Result<()> {
     const MAX_RECORDS: usize = 1_000_000;
     const MAX_DEPTH: usize = 256;
 
@@ -419,7 +568,16 @@ fn text_from_container(container: &Container<'_>, text: &mut String) -> Result<(
 
         if record.kind() == RecordKind::ClientTextbox {
             let before = text.len();
-            text_from_ppt_records(record.data(), text)?;
+            match outline {
+                None => text_from_ppt_records(record.data(), text)?,
+                Some(bodies) => match textbox_text_records(record.data(), bodies)? {
+                    TextRecords::Inline(payload) => text_from_ppt_records(payload, text)?,
+                    TextRecords::Outline { body, .. } => {
+                        outline_text_into(body, text)?;
+                    },
+                    TextRecords::Unresolved(_) => {},
+                },
+            }
             let trimmed = text.trim_end().len();
             text.truncate(trimmed);
             if text.len() > before && !text.ends_with('\n') {
@@ -437,6 +595,25 @@ fn text_from_container(container: &Container<'_>, text: &mut String) -> Result<(
         }
     }
     Ok(())
+}
+
+/// Appends the text of a slide-list body that a text box references, joined
+/// as the text box's own records would be.
+///
+/// A body whose records cannot be traversed contributes no text, as a shape
+/// that references it shows none (the shape reader records it as
+/// [`crate::ShapeDefect::UnresolvedOutlineTextRef`]); resource limits stay
+/// fatal.
+fn outline_text_into(body: &crate::OutlineTextBody, text: &mut String) -> Result<()> {
+    let mark = text.len();
+    match text_from_ppt_records(body.records(), text) {
+        Ok(()) => Ok(()),
+        Err(error) if crate::slide::types::is_isolatable_shape_error(&error) => {
+            text.truncate(mark);
+            Ok(())
+        },
+        Err(error) => Err(error),
+    }
 }
 
 fn push_children<'data>(

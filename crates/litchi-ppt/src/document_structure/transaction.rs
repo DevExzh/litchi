@@ -489,9 +489,19 @@ impl Transaction {
     /// resulting document violates identifier and outline-text invariants.
     pub fn insert_slide_group(&mut self, position: usize, group: Vec<Record>) -> Result<()> {
         validate_slide_group(&group)?;
-        let list_index = validation::list_index(&self.candidate, 0)?
-            .ok_or_else(|| Error::InvalidFormat("the presentation slide list is absent".into()))?;
         let mut candidate = self.candidate.clone();
+        let list_index = match validation::list_index(&candidate, 0)? {
+            Some(index) => index,
+            // A presentation without slides may have no slide list at all
+            // (POI's `createSlide` adds one); the first inserted slide
+            // creates it.
+            None if position == 0 => insert_empty_slide_list(&mut candidate),
+            None => {
+                return Err(Error::InvalidFormat(
+                    "the presentation slide list is absent".into(),
+                ));
+            },
+        };
         let groups = grouped_children_allow_empty(&candidate.children[list_index])?;
         if position > groups.groups.len() {
             return invalid("slide insertion position is out of range");
@@ -830,7 +840,42 @@ impl Transaction {
     }
 }
 
-/// Successful immutable target and its source-checked patch.
+/// Inserts an empty slide `SlideListWithTextContainer` (instance 0) where
+/// MS-PPT 2.4.1 orders it: after every record that precedes the slide list
+/// and before the notes list and the records that follow it. Returns its
+/// index.
+fn insert_empty_slide_list(document: &mut Record) -> usize {
+    // The notes list, SlideShowDocInfoAtom, NamedShows, SummaryContainer,
+    // DocRoutingSlipAtom, PrintOptionsAtom, RoundTripCustomTableStyles12Atom
+    // and EndDocumentAtom follow the slide list.
+    let follows = |record: &Record| {
+        (record.record_type == RecordType::SlideListWithText && record.instance == 2)
+            || matches!(
+                record.record_type_raw,
+                0x0401 | 0x0410 | 0x0402 | 0x0406 | 0x1770 | 0x0428 | 0x03EA
+            )
+    };
+    let index = document
+        .children
+        .iter()
+        .position(follows)
+        .unwrap_or(document.children.len());
+    document.children.insert(
+        index,
+        Record {
+            record_type: RecordType::SlideListWithText,
+            record_type_raw: RecordType::SlideListWithText as u16,
+            version: 0x0F,
+            instance: 0,
+            data_length: 0,
+            data: Vec::new().into(),
+            children: Vec::new(),
+        },
+    );
+    index
+}
+
+/// Successful immutable target and its source-checked patch./// Successful immutable target and its source-checked patch.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Commit {
     snapshot: Snapshot,

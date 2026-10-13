@@ -24,14 +24,106 @@ pub(crate) enum Access<S> {
     Gap(&'static GapSpec),
 }
 
-#[derive(Clone, Copy)]
-pub(crate) enum Constraint {
+/// The domain a property's value must lie in, beyond its [`ValueType`]:
+/// the registry checks it after coercion, before a setter runs, and the
+/// schema export ([`crate::schema()`]) reports it.
+///
+/// ```
+/// use litchi_core::FileFormat;
+/// use litchi_ops::capabilities::Constraint;
+///
+/// let schema = litchi_ops::schema(FileFormat::Xlsx);
+/// # #[cfg(feature = "xlsx")] {
+/// let row = schema.elements().find(|element| element.name() == "row").unwrap();
+/// let level = row.property("outline").unwrap();
+/// assert_eq!(level.constraint(), Constraint::Int { min: 0, max: 7 });
+/// # }
+/// ```
+#[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
+pub enum Constraint {
+    /// No constraint beyond the value type.
     None,
-    Int { min: i64, max: i64 },
-    Number { min: f64, max: f64 },
-    Length { min: Length, max: Length },
-    Chars { max: u32 },
+    /// An integer in `min..=max`.
+    Int {
+        /// The smallest admitted value.
+        min: i64,
+        /// The largest admitted value.
+        max: i64,
+    },
+    /// A finite number in `min..=max`.
+    Number {
+        /// The smallest admitted value.
+        min: f64,
+        /// The largest admitted value.
+        max: f64,
+    },
+    /// A length in `min..=max`.
+    Length {
+        /// The shortest admitted length.
+        min: Length,
+        /// The longest admitted length.
+        max: Length,
+    },
+    /// Text of at most `max` characters (Unicode scalar values).
+    Chars {
+        /// The longest admitted text, in characters.
+        max: u32,
+    },
+    /// Text that is not empty.
     NotEmpty,
+}
+
+/// Bounds compare by bit pattern, so equality is total; constructors reject
+/// non-finite number bounds.
+impl PartialEq for Constraint {
+    fn eq(&self, other: &Self) -> bool {
+        match (*self, *other) {
+            (Self::None, Self::None) | (Self::NotEmpty, Self::NotEmpty) => true,
+            (Self::Int { min, max }, Self::Int { min: a, max: b }) => min == a && max == b,
+            (Self::Number { min, max }, Self::Number { min: a, max: b }) => {
+                min.to_bits() == a.to_bits() && max.to_bits() == b.to_bits()
+            },
+            (Self::Length { min, max }, Self::Length { min: a, max: b }) => min == a && max == b,
+            (Self::Chars { max }, Self::Chars { max: b }) => max == b,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for Constraint {}
+
+/// What the registry declares about a property's write admission beyond its
+/// access flags: carried by every [`PropSpec`] a table projects, so the
+/// capability report and the schema export read the same declaration the
+/// write path checks.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Admission {
+    /// The value domain checked after coercion.
+    pub(crate) constraint: Constraint,
+    /// Whether `null` clears the property.
+    pub(crate) clear: bool,
+    /// The gap a write of the property reports, when the registry declares
+    /// the property but its setter is pending.
+    pub(crate) gap: Option<&'static GapSpec>,
+}
+
+impl Admission {
+    /// No declaration: a read-only property or one outside any table.
+    pub(crate) const NONE: Self = Self {
+        constraint: Constraint::None,
+        clear: false,
+        gap: None,
+    };
+}
+
+/// A registry alias with the canonical property name it resolves to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct PropAlias {
+    /// The accepted spelling (`font.strike`).
+    pub(crate) alias: &'static str,
+    /// The canonical property it names (`strike`).
+    pub(crate) name: &'static str,
 }
 
 #[derive(Clone, Copy)]
@@ -70,6 +162,14 @@ impl<S: Copy> Entry<S> {
                 get: self.spec.access.get,
                 set,
                 add,
+            },
+            admission: Admission {
+                constraint: self.constraint,
+                clear: self.clear,
+                gap: match self.access {
+                    Access::Gap(gap) => Some(gap),
+                    _ => None,
+                },
             },
             ..self.spec
         }
@@ -224,6 +324,28 @@ impl<S: Copy + 'static, const N: usize, const A: usize> Table<S, N, A> {
             i += 1;
         }
         props
+    }
+
+    /// Every alias with the canonical name it resolves to, in declaration
+    /// order: the schema export's per-property `aliases`.
+    #[cfg_attr(
+        not(feature = "xlsx"),
+        allow(dead_code, reason = "only the XLSX tables declare aliases")
+    )]
+    pub(crate) const fn prop_aliases(&self) -> [PropAlias; A] {
+        let mut aliases = [PropAlias {
+            alias: "",
+            name: "",
+        }; A];
+        let mut i = 0;
+        while i < A {
+            aliases[i] = PropAlias {
+                alias: self.aliases[i].name,
+                name: self.entries[self.aliases[i].entry].spec.name,
+            };
+            i += 1;
+        }
+        aliases
     }
 
     pub(crate) fn lookup(&self, key: &str) -> Option<(usize, &Entry<S>)> {

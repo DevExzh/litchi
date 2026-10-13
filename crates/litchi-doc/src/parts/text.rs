@@ -544,8 +544,8 @@ const fn windows_1252_to_char(byte: u8) -> char {
         0x8E => 'Ž',
         0x91 => '\u{2018}', // Left single quotation mark
         0x92 => '\u{2019}', // Right single quotation mark
-        0x93 => '"',
-        0x94 => '"',
+        0x93 => '\u{201C}', // Left double quotation mark
+        0x94 => '\u{201D}', // Right double quotation mark
         0x95 => '•',
         0x96 => '–',
         0x97 => '—',
@@ -568,8 +568,24 @@ mod tests {
     fn test_windows_1252_conversion() {
         assert_eq!(windows_1252_to_char(0x41), 'A');
         assert_eq!(windows_1252_to_char(0x80), '€');
-        assert_eq!(windows_1252_to_char(0x93), '"');
-        assert_eq!(windows_1252_to_char(0x94), '"');
+        assert_eq!(windows_1252_to_char(0x93), '\u{201C}');
+        assert_eq!(windows_1252_to_char(0x94), '\u{201D}');
+    }
+
+    /// The reader decodes compressed text exactly as the text editors do
+    /// (`encoding_rs`'s Windows-1252), which agrees with the [MS-DOC]
+    /// §2.9.73 `FcCompressed` table on every byte that table lists.
+    #[test]
+    fn windows_1252_table_matches_the_editor_decoder() {
+        for byte in 0..=255u8 {
+            let encoded = [byte];
+            let (decoded, _, _) = encoding_rs::WINDOWS_1252.decode(&encoded);
+            assert_eq!(
+                decoded.chars().next(),
+                Some(windows_1252_to_char(byte)),
+                "Windows-1252 byte 0x{byte:02X}"
+            );
+        }
     }
 
     #[test]

@@ -172,6 +172,7 @@ const fn raw(name: &'static str, ty: ValueType) -> PropSpec {
         ty,
         access: Access::READ,
         raw: true,
+        admission: crate::registry::Admission::NONE,
     }
 }
 
@@ -190,6 +191,9 @@ const SLIDE_PROPS: &[PropSpec] = &[
 
 const SHAPE_PROPS: &[PropSpec] = &[
     raw("id", ValueType::Int),
+    PropSpec::new("name", ValueType::Text),
+    PropSpec::new("alt", ValueType::Text),
+    raw("sourceIndex", ValueType::Int),
     PropSpec::new("shapeType", ValueType::Text),
     length("x", LengthSpec::POSITION),
     length("y", LengthSpec::POSITION),
@@ -201,6 +205,9 @@ const SHAPE_PROPS: &[PropSpec] = &[
 
 const PLACEHOLDER_PROPS: &[PropSpec] = &[
     raw("id", ValueType::Int),
+    PropSpec::new("name", ValueType::Text),
+    PropSpec::new("alt", ValueType::Text),
+    raw("sourceIndex", ValueType::Int),
     PropSpec::new("placeholderType", ValueType::Text),
     raw("placeholderIndex", ValueType::Int),
     length("x", LengthSpec::POSITION),
@@ -214,6 +221,8 @@ const PLACEHOLDER_PROPS: &[PropSpec] = &[
 const PICTURE_PROPS: &[PropSpec] = &[
     raw("id", ValueType::Int),
     PropSpec::new("name", ValueType::Text),
+    PropSpec::new("alt", ValueType::Text),
+    raw("sourceIndex", ValueType::Int),
     PropSpec::new("frameKind", ValueType::Text),
     length("x", LengthSpec::POSITION),
     length("y", LengthSpec::POSITION),
@@ -225,6 +234,9 @@ const PICTURE_PROPS: &[PropSpec] = &[
 
 const TABLE_PROPS: &[PropSpec] = &[
     raw("id", ValueType::Int),
+    PropSpec::new("name", ValueType::Text),
+    PropSpec::new("alt", ValueType::Text),
+    raw("sourceIndex", ValueType::Int),
     PropSpec::new("rows", ValueType::Int),
     PropSpec::new("columns", ValueType::Int),
     length("x", LengthSpec::POSITION),
@@ -235,6 +247,9 @@ const TABLE_PROPS: &[PropSpec] = &[
 
 const GROUP_PROPS: &[PropSpec] = &[
     raw("id", ValueType::Int),
+    PropSpec::new("name", ValueType::Text),
+    PropSpec::new("alt", ValueType::Text),
+    raw("sourceIndex", ValueType::Int),
     length("x", LengthSpec::POSITION),
     length("y", LengthSpec::POSITION),
     length("width", LengthSpec::EXTENT),
@@ -243,6 +258,9 @@ const GROUP_PROPS: &[PropSpec] = &[
 
 const CONNECTOR_PROPS: &[PropSpec] = &[
     raw("id", ValueType::Int),
+    PropSpec::new("name", ValueType::Text),
+    PropSpec::new("alt", ValueType::Text),
+    raw("sourceIndex", ValueType::Int),
     PropSpec::new("shapeType", ValueType::Text),
     PropSpec::new("length", ValueType::Number),
 ];
@@ -269,7 +287,15 @@ const TREE_PARENTS: &[Kind] = &[
     Kind::SlideLayout,
 ];
 
-const SHAPE_IDS: &[&str] = &["id"];
+const SHAPE_IDS: &[&str] = &["id", "name"];
+
+/// Speaker notes: the text of the notes page's body placeholder.
+const NOTES_PROPS: &[PropSpec] = &[PropSpec::new("text", ValueType::Text)];
+
+/// A paragraph of a shape's text body: the text between paragraph marks. Its
+/// text is the node's text member, as for PPTX paragraphs; `text` is a
+/// write-only registry key.
+const PARAGRAPH_PROPS: &[PropSpec] = &[];
 
 const fn element(
     kind: Kind,
@@ -368,11 +394,6 @@ static OLE_GAP: GapSpec = element_gap(
     "M1-extended",
     "legacy PPT object frames are retained as picture metadata only",
 );
-static PARAGRAPH_GAP: GapSpec = element_gap(
-    "paragraph",
-    "M1-extended",
-    "legacy PPT exposes aggregate shape text, not paragraph nodes",
-);
 static RUN_GAP: GapSpec = element_gap(
     "run",
     "M1-extended",
@@ -382,11 +403,6 @@ static LINEBREAK_GAP: GapSpec = element_gap(
     "linebreak",
     "M1-extended",
     "legacy PPT exposes normalized shape text, not line-break nodes",
-);
-static NOTES_GAP: GapSpec = element_gap(
-    "notes",
-    "M1-extended",
-    "speaker notes are outside the initial legacy PPT navigation projection",
 );
 static COMMENT_GAP: GapSpec = element_gap(
     "comment",
@@ -484,12 +500,6 @@ static NOTES_MASTER_GAP: GapSpec = element_gap(
     "legacy PPT notes masters are not exposed as navigable nodes",
 );
 
-static PICTURE_ALT_GAP: GapSpec = property_gap(
-    "picture",
-    "alt",
-    "M1-extended",
-    "the native PPT picture projection does not expose alternate text",
-);
 static PICTURE_MEDIA_GAP: GapSpec = property_gap(
     "picture",
     "mediaType",
@@ -513,12 +523,6 @@ static STATS_CHART_GAP: GapSpec = GapSpec {
     code: Code::UnsupportedCapability,
     follow_up: "M1-extended",
     reason: "legacy PPT has no chart-part model from which the stats view can count charts",
-};
-static STATS_PICTURE_ALT_GAP: GapSpec = GapSpec {
-    subject: Subject::View("stats.picturesWithoutAlt"),
-    code: Code::UnsupportedCapability,
-    follow_up: "M1-extended",
-    reason: "legacy PPT picture frames have no alternate-text field for a picturesWithoutAlt count",
 };
 
 /// The complete shared presentation vocabulary with native PPT read support
@@ -592,7 +596,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["ph", "placeholder"],
             TREE_PARENTS,
             &[Kind::Paragraph],
-            &["type", "idx", "id"],
+            &["type", "idx", "id", "name"],
             &["/slide[N]/placeholder[N]", "/slide[N]/placeholder[TYPE]"],
             PLACEHOLDER_PROPS,
         ),
@@ -602,7 +606,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["image", "img", "pic", "picture"],
             TREE_PARENTS,
             &[],
-            &["id", "name"],
+            SHAPE_IDS,
             &["/slide[N]/picture[N]"],
             PICTURE_PROPS,
         ),
@@ -681,14 +685,15 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["/slide[N]/ole[N]"],
             &OLE_GAP,
         ),
-        gap(
+        element(
             Kind::Paragraph,
             "paragraph",
             &["p", "paragraph"],
             &[Kind::Shape, Kind::Placeholder],
             &[Kind::Run, Kind::LineBreak],
+            &[],
             &["/slide[N]/shape[N]/paragraph[N]"],
-            &PARAGRAPH_GAP,
+            PARAGRAPH_PROPS,
         ),
         gap(
             Kind::Run,
@@ -708,14 +713,15 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["/slide[N]/shape[N]/linebreak[N]"],
             &LINEBREAK_GAP,
         ),
-        gap(
+        element(
             Kind::Notes,
             "notes",
             &["notes"],
             &[Kind::Slide],
             &[],
+            &[],
             &["/slide[N]/notes"],
-            &NOTES_GAP,
+            NOTES_PROPS,
         ),
         gap(
             Kind::Comment,
@@ -895,12 +901,10 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
         ),
     ],
     gaps: &[
-        PICTURE_ALT_GAP,
         PICTURE_MEDIA_GAP,
         CHART_TYPE_GAP,
         SHAPE_FILL_GAP,
         STATS_CHART_GAP,
-        STATS_PICTURE_ALT_GAP,
     ],
 };
 
@@ -1019,3 +1023,34 @@ const fn slide_write_entries() -> [crate::registry::Entry<SlideSetter>; SLIDE_WR
 pub(super) const SLIDE_WRITE_TABLE: crate::registry::Table<SlideSetter, SLIDE_WRITE_COUNT, 0> =
     crate::registry::Table::new(slide_write_entries(), []);
 pub(crate) const SLIDE_CAPABILITY_PROPS: &[PropSpec] = &SLIDE_WRITE_TABLE.readable();
+
+/// Setter key of the text-only notes and paragraph registries.
+#[derive(Clone, Copy)]
+pub(super) enum TextSetter {
+    Text,
+}
+
+/// The one settable `text` entry of a notes or paragraph registry; `get`
+/// follows whether the element's `format` lists the text.
+const fn text_write_entries(readable: bool) -> [crate::registry::Entry<TextSetter>; 1] {
+    use crate::registry::{Access as WriteAccess, Constraint, Entry};
+
+    let mut spec = PropSpec::new("text", ValueType::Text);
+    spec.access.get = readable;
+    [Entry {
+        spec,
+        access: WriteAccess::Set(TextSetter::Text),
+        constraint: Constraint::None,
+        clear: true,
+    }]
+}
+
+const _: () = assert!(NOTES_PROPS.len() == 1 && same_name(NOTES_PROPS[0].name, "text"));
+
+pub(super) const NOTES_WRITE_TABLE: crate::registry::Table<TextSetter, 1, 0> =
+    crate::registry::Table::new(text_write_entries(true), []);
+pub(crate) const NOTES_CAPABILITY_PROPS: &[PropSpec] = &NOTES_WRITE_TABLE.readable();
+
+pub(super) const PARAGRAPH_WRITE_TABLE: crate::registry::Table<TextSetter, 1, 0> =
+    crate::registry::Table::new(text_write_entries(false), []);
+pub(crate) const PARAGRAPH_CAPABILITY_PROPS: &[PropSpec] = &PARAGRAPH_WRITE_TABLE.readable();

@@ -784,7 +784,7 @@ pub use litchi_ops::{
     ItemResult, Key, Locked, NewNode, OpenOptions, Overwrite, Placement, PropValue, Props, Result,
     SaveOptions, SaveTo, Saved, SignatureOrigin, Signed, SourceMode, TargetArg, batch,
     capabilities, compat, create, create_with, error, format, new_node, node, path, placement,
-    props, query, target, transaction, view,
+    props, query, schema, target, transaction, view,
 };
 #[cfg(all(
     any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),

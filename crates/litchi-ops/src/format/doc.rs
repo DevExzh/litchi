@@ -14,8 +14,8 @@ use litchi_doc::body_text::source::SourceSnapshot;
 
 use super::LegacyOpen;
 use super::signature::{self, Opened, Signature};
-use crate::transaction::{Error as TransactionError, LimitKind, SemanticLimits};
-use crate::{IntoProps, OpenOptions, Props, Result, TargetArg};
+use crate::transaction::SemanticLimits;
+use crate::{IntoProps, OpenOptions, Result, TargetArg};
 
 // The DOC adapter deliberately starts with the smallest complete document
 // vocabulary: root, main body and ordinary main-story paragraphs.  Keeping
@@ -23,6 +23,7 @@ use crate::{IntoProps, OpenOptions, Props, Result, TargetArg};
 // manufacture a Pending value for an element that the binary reader already
 // knows how to answer.
 pub(crate) mod children;
+mod edit;
 mod metadata;
 mod nav;
 mod node;
@@ -32,6 +33,7 @@ pub(crate) mod write;
 
 pub(crate) use nav::Nav;
 pub use node::Node;
+pub(crate) use node::NodeProps;
 pub(crate) use spec::SPEC;
 
 /// An opened legacy Word (`.doc`) document.
@@ -256,10 +258,27 @@ impl Doc {
     /// Read one ordinary main-story paragraph without crossing into any DOC
     /// subdocument.  This is the identity boundary shared by read and write.
     pub(crate) fn body_paragraph_at(&self, position: Position) -> Result<Option<&str>> {
-        let result =
-            (|| -> Result<Option<&str>> { Ok(self.reader()?.body_paragraph_text(position)?) })();
+        let result = (|| -> Result<Option<&str>> {
+            let reader = self.reader()?;
+            // The memoized story index answers in constant time; a paragraph
+            // it cannot vouch for (a trailing fragment, an empty story) falls
+            // back to the borrowed body scan.
+            if let Some(text) = reader.body_blocks()?.paragraph_text(position) {
+                return Ok(Some(text));
+            }
+            Ok(reader.body_paragraph_text(position)?)
+        })();
         self.check_source()?;
         result
+    }
+
+    /// The body's children: its ordinary paragraphs and top-level tables.
+    pub(crate) fn body_child_count(&self) -> Result<usize> {
+        let tables = self
+            .reader()?
+            .body_blocks()?
+            .count(litchi_doc::StoryBlockKind::Table);
+        Ok(self.body_paragraph_count()?.saturating_add(tables))
     }
 
     pub(crate) fn body_paragraph_count(&self) -> Result<usize> {
@@ -331,86 +350,14 @@ impl Doc {
         Ok(Some(package.clone()))
     }
 
-    /// Apply text to one paragraph or every paragraph matched by a scoped
-    /// query.  Resolution happens against this immutable handle; all selected
-    /// replacements then commit through one native body-text transaction.
+    /// Apply properties to one target or every match of a scoped query in
+    /// one native body transaction (see [`edit`]).
     pub(crate) fn set<'p, 'v>(
         &self,
         target: TargetArg<'p>,
         props: impl IntoProps<'v>,
     ) -> Result<WriteCommit> {
         self.set_with_limits(target, props, &SemanticLimits::default())
-    }
-
-    /// Apply a DOC paragraph text assignment under one unified semantic
-    /// resource profile. Query expansion and the native body transaction use
-    /// the same profile, so a large selector cannot bypass the facade limit.
-    pub(crate) fn set_with_limits<'p, 'v>(
-        &self,
-        target: TargetArg<'p>,
-        props: impl IntoProps<'v>,
-        limits: &SemanticLimits,
-    ) -> Result<WriteCommit> {
-        self.check_source()?;
-        let result = (|| -> Result<WriteCommit> {
-            let props = Props::from_props(props)?;
-            if crate::format::ole_metadata::is_target(&target) {
-                return self.set_metadata(&props, limits);
-            }
-            let text = paragraph_text_assignment(&props)?;
-            let positions =
-                resolve_paragraph_targets(self, &target, limits.max_expanded_targets())?;
-            if positions.len() > limits.max_operations() {
-                return Err(TransactionError::Limit {
-                    kind: LimitKind::Operations,
-                    observed: positions.len(),
-                    maximum: limits.max_operations(),
-                }
-                .into());
-            }
-            let Some(package) = self.editable_package()? else {
-                return Err(crate::Error::new(
-                    crate::Code::UnsupportedCapability,
-                    "the DOC document was opened without retaining its source for editing",
-                )
-                .with_format(FileFormat::Doc)
-                .with_suggestion(
-                    "reopen the document without `OpenOptions::retain_source(false)`",
-                ));
-            };
-            let mut edit =
-                package.edit_with_options(edit_options(body_transaction_limits(*limits)))?;
-            let operations = positions.len();
-            for position in positions {
-                edit.replace_paragraph(position, &text)?;
-            }
-            let commit = edit.commit()?;
-            let changed = commit.diagnostics().changed();
-            let (package, patch) = commit.into_parts();
-            let snapshot_bytes = patch_snapshot_bytes(&patch);
-            if snapshot_bytes > limits.max_snapshot_bytes() {
-                return Err(TransactionError::Limit {
-                    kind: LimitKind::SnapshotBytes,
-                    observed: snapshot_bytes,
-                    maximum: limits.max_snapshot_bytes(),
-                }
-                .into());
-            }
-            let after = if changed {
-                self.with_package(package)
-            } else {
-                self.clone()
-            };
-            Ok(WriteCommit {
-                before: self.clone(),
-                after,
-                patch: StepPatch::Primary(patch),
-                operations,
-                snapshot_bytes,
-            })
-        })();
-        self.check_source()?;
-        result
     }
 
     /// Publish the exact compound source, preserving signatures until an
@@ -462,35 +409,6 @@ pub(crate) struct WriteCommit {
     pub(crate) snapshot_bytes: usize,
 }
 
-fn paragraph_text_assignment(props: &Props<'_>) -> Result<String> {
-    if props.len() != 1 {
-        return Err(crate::Error::new(
-            crate::Code::UnsupportedCapability,
-            "DOC paragraph writes accept exactly one `text` property",
-        )
-        .with_format(FileFormat::Doc));
-    }
-    let Some((key, value)) = props.iter().next() else {
-        unreachable!("the length check above admits one property")
-    };
-    if !key.eq_ignore_ascii_case("text") {
-        return Err(crate::Error::new(
-            crate::Code::UnsupportedCapability,
-            "the requested DOC property is not writable",
-        )
-        .with_property(key.as_str().to_owned())
-        .with_format(FileFormat::Doc));
-    }
-    value.as_text().map(str::to_owned).ok_or_else(|| {
-        crate::Error::new(
-            crate::Code::InvalidValue,
-            "DOC paragraph text requires a text property value",
-        )
-        .with_property(key.as_str().to_owned())
-        .with_format(FileFormat::Doc)
-    })
-}
-
 fn edit_options(transaction_limits: BodyTransactionLimits) -> litchi_doc::EditOptions {
     litchi_doc::EditOptions::default().with_transaction_limits(transaction_limits)
 }
@@ -498,69 +416,6 @@ fn edit_options(transaction_limits: BodyTransactionLimits) -> litchi_doc::EditOp
 fn body_transaction_limits(limits: SemanticLimits) -> BodyTransactionLimits {
     BodyTransactionLimits::new(limits.max_operations(), usize::MAX, usize::MAX)
         .with_max_retained_render_bytes(limits.max_snapshot_bytes())
-}
-
-fn resolve_paragraph_targets(
-    doc: &Doc,
-    target: &TargetArg<'_>,
-    maximum: usize,
-) -> Result<Vec<Position>> {
-    let mut positions = Vec::new();
-    if let Some(path) = target.path() {
-        let node = crate::path::resolve::get(&Nav::new(doc), path)?;
-        let Some(position) = node.paragraph_position() else {
-            return Err(crate::Error::new(
-                crate::Code::UnsupportedCapability,
-                "DOC text writes target paragraph nodes",
-            )
-            .with_format(FileFormat::Doc));
-        };
-        push_position(&mut positions, position, maximum)?;
-    } else if let Some(query) = target.query() {
-        let walk = crate::query::run(Nav::new(doc), query.clone())?;
-        if !walk.plan().diagnostics().is_empty() {
-            return Err(crate::Error::new(
-                crate::Code::InvalidSelector,
-                "the DOC mutation selector contains an unsupported predicate",
-            )
-            .with_format(FileFormat::Doc));
-        }
-        for node in walk {
-            let node = node?;
-            let Some(position) = node.paragraph_position() else {
-                return Err(crate::Error::new(
-                    crate::Code::UnsupportedCapability,
-                    "DOC text writes target paragraph nodes",
-                )
-                .with_format(FileFormat::Doc));
-            };
-            push_position(&mut positions, position, maximum)?;
-        }
-    }
-    if positions.is_empty() {
-        return Err(crate::Error::new(
-            crate::Code::ZeroMatches,
-            "the DOC mutation selector matched no paragraph",
-        )
-        .with_format(FileFormat::Doc));
-    }
-    Ok(positions)
-}
-
-fn push_position(positions: &mut Vec<Position>, position: Position, maximum: usize) -> Result<()> {
-    if positions.len() >= maximum {
-        return Err(TransactionError::Limit {
-            kind: LimitKind::ExpandedTargets,
-            observed: positions.len().saturating_add(1),
-            maximum,
-        }
-        .into());
-    }
-    positions
-        .try_reserve(1)
-        .map_err(|source| TransactionError::Allocation { source })?;
-    positions.push(position);
-    Ok(())
 }
 
 impl std::fmt::Debug for Doc {

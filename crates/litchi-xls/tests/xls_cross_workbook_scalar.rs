@@ -7,6 +7,7 @@
 )]
 
 use litchi_cfb::{OleFile, OleWriter};
+use litchi_core::Position;
 use litchi_xls::Builder;
 use litchi_xls::cell_values::{
     CellRange, Reference, Selector, Snapshot, Storage, StyleIndex, Value,
@@ -26,7 +27,7 @@ fn workbook_bytes(numbers: &[(u32, u16, f64)], blanks: &[(u32, u16)]) -> Vec<u8>
         let mut edit = snapshot.edit();
         for &(row, column) in blanks {
             edit.insert_cell_with_style(
-                Selector::Position(0),
+                Selector::Position(Position::new(0)),
                 Reference::new(row, u32::from(column)).unwrap(),
                 Value::Blank,
                 style,
@@ -247,13 +248,16 @@ fn copies_numbers_and_blanks_in_source_order_and_preserves_foreign_streams() {
         &donor,
         Selector::Name("Sheet1"),
         range,
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         Reference::new(5, 4).unwrap(),
     )
     .unwrap();
     let commit = edit.commit().unwrap();
     let copied = commit.snapshot();
-    let sheet = copied.worksheet(Selector::Position(0)).unwrap().unwrap();
+    let sheet = copied
+        .worksheet(Selector::Position(Position::new(0)))
+        .unwrap()
+        .unwrap();
     assert_eq!(
         sheet
             .cell(Reference::new(5, 4).unwrap())
@@ -299,9 +303,9 @@ fn same_width_existing_targets_are_supported_but_occupied_mismatches_are_atomic(
     let mut edit = target.edit();
     edit.copy_scalar_cell_from(
         &donor,
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         Reference::new(0, 0).unwrap(),
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         Reference::new(5, 4).unwrap(),
     )
     .unwrap();
@@ -309,7 +313,7 @@ fn same_width_existing_targets_are_supported_but_occupied_mismatches_are_atomic(
     assert_eq!(
         commit
             .snapshot()
-            .worksheet(Selector::Position(0))
+            .worksheet(Selector::Position(Position::new(0)))
             .unwrap()
             .unwrap()
             .number(Reference::new(5, 4).unwrap())
@@ -324,9 +328,9 @@ fn same_width_existing_targets_are_supported_but_occupied_mismatches_are_atomic(
     let error = refused
         .copy_scalar_cell_from(
             &donor,
-            Selector::Position(0),
+            Selector::Position(Position::new(0)),
             Reference::new(1, 1).unwrap(),
-            Selector::Position(0),
+            Selector::Position(Position::new(0)),
             Reference::new(5, 4).unwrap(),
         )
         .unwrap_err();
@@ -360,9 +364,9 @@ fn strings_formulas_and_unrelated_owners_are_refused_before_staging() {
     assert!(
         edit.copy_scalar_cells_from(
             &string_donor,
-            Selector::Position(0),
+            Selector::Position(Position::new(0)),
             range,
-            Selector::Position(0),
+            Selector::Position(Position::new(0)),
             Reference::new(2, 2).unwrap(),
         )
         .is_err()
@@ -386,9 +390,9 @@ fn strings_formulas_and_unrelated_owners_are_refused_before_staging() {
         formula_edit
             .copy_scalar_cell_from(
                 &formula_donor,
-                Selector::Position(0),
+                Selector::Position(Position::new(0)),
                 Reference::new(0, 0).unwrap(),
-                Selector::Position(0),
+                Selector::Position(Position::new(0)),
                 Reference::new(2, 2).unwrap(),
             )
             .is_err()
@@ -401,9 +405,9 @@ fn assert_scalar_transfer_refused(target: &Snapshot, donor: &Snapshot) {
     assert!(
         edit.copy_scalar_cell_from(
             donor,
-            Selector::Position(0),
+            Selector::Position(Position::new(0)),
             Reference::new(0, 0).unwrap(),
-            Selector::Position(0),
+            Selector::Position(Position::new(0)),
             Reference::new(4, 4).unwrap(),
         )
         .is_err()
@@ -500,9 +504,9 @@ fn hostile_duplicate_unknown_and_dependency_records_are_refused_atomically() {
         duplicate_target_edit
             .copy_scalar_cells_from(
                 &scalar_source(),
-                Selector::Position(0),
+                Selector::Position(Position::new(0)),
                 range,
-                Selector::Position(0),
+                Selector::Position(Position::new(0)),
                 Reference::new(4, 4).unwrap(),
             )
             .is_err()
@@ -529,9 +533,9 @@ fn bounds_noop_and_stale_or_foreign_artifacts_are_checked() {
     assert!(
         over.copy_scalar_cells_from(
             &donor,
-            Selector::Position(0),
+            Selector::Position(Position::new(0)),
             too_large,
-            Selector::Position(0),
+            Selector::Position(Position::new(0)),
             Reference::new(0, 0).unwrap(),
         )
         .is_err()
@@ -546,9 +550,9 @@ fn bounds_noop_and_stale_or_foreign_artifacts_are_checked() {
     let mut noop = target.edit();
     noop.copy_scalar_cells_from(
         &donor,
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         empty_range,
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         Reference::new(20, 20).unwrap(),
     )
     .unwrap();
@@ -558,9 +562,9 @@ fn bounds_noop_and_stale_or_foreign_artifacts_are_checked() {
     let mut copy = target.edit();
     copy.copy_scalar_cell_from(
         &donor,
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         Reference::new(0, 0).unwrap(),
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         Reference::new(4, 4).unwrap(),
     )
     .unwrap();

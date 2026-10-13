@@ -69,6 +69,7 @@ fn presentation_with_vba_storage() -> Presentation {
         source: None,
         #[cfg(feature = "encryption")]
         encryption,
+        shape_memo: crate::slide::ShapeMemo::default(),
     })
 }
 
@@ -94,6 +95,7 @@ fn lazy_live_document_reuses_presentation_source_limits() {
         source: None,
         #[cfg(feature = "encryption")]
         encryption,
+        shape_memo: crate::slide::ShapeMemo::default(),
     });
 
     assert!(matches!(
@@ -418,4 +420,128 @@ fn editing_a_shared_slide_payload_leaves_the_document_stream_intact() {
         return;
     }
     panic!("no fixture produced a slide to edit");
+}
+
+/// L-PPT-R2: the notes index is built once per presentation, at open, from
+/// the `DocumentContainer` the slide directory parsed. Selecting a slide
+/// parses that slide only: a factory over a stream whose `DocumentContainer`
+/// header no longer reads still finds every slide's notes page, which a
+/// factory that re-parsed the document for its own notes index could not.
+#[test]
+fn slide_selection_reads_notes_from_the_index_built_at_open() {
+    use crate::slide::{Slide, SlideFactory};
+
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/poi/test-data/slideshow/basic_test_ppt_file.ppt");
+    let package = crate::Package::open(path).unwrap();
+    let presentation = package.presentation().unwrap();
+    let expected = [
+        "These are the notes for page 1",
+        "These are the notes on page two, again lacking formatting",
+    ];
+
+    let mut document = presentation.inner.powerpoint_document.as_ref().clone();
+    let offset = presentation.inner.slide_directory.document_offset();
+    document[offset + 2..offset + 4].copy_from_slice(&0xffffu16.to_le_bytes());
+    let factory = SlideFactory::new(
+        &document,
+        &presentation.inner.persist_mapping,
+        &presentation.inner.slide_directory,
+    );
+    for (index, slide_data) in factory.slides().enumerate() {
+        let slide = Slide::from_slide_data(slide_data.unwrap(), index + 1);
+        let notes = slide.speaker_notes().unwrap().expect("notes page");
+        assert_eq!(notes.text().unwrap(), expected[index]);
+    }
+
+    // Each `slide_at` builds its own factory and shares the same index.
+    for (position, text) in expected.iter().enumerate() {
+        let slide = presentation.slide_at(position).unwrap().expect("slide");
+        let notes = slide.speaker_notes().unwrap().expect("notes page");
+        assert_eq!(notes.text().unwrap(), *text);
+    }
+}
+
+/// Record 0260: the presentation's one-slide memo shares the most recently
+/// parsed slide's shape array between handles, and is invisible otherwise.
+#[test]
+fn slide_handles_share_the_memoized_shape_array() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/ole/ppt/SampleShow.ppt");
+    let package = crate::Package::open(path).unwrap();
+    let presentation = package.presentation().unwrap();
+    let texts = |shapes: &[crate::shapes::ShapeEnum<'static>]| {
+        shapes
+            .iter()
+            .map(|shape| shape.text().unwrap())
+            .collect::<Vec<_>>()
+    };
+
+    let first = presentation
+        .slide_at(0)
+        .unwrap()
+        .unwrap()
+        .shared_shapes()
+        .unwrap();
+    let again = presentation
+        .slide_at(0)
+        .unwrap()
+        .unwrap()
+        .shared_shapes()
+        .unwrap();
+    assert!(std::sync::Arc::ptr_eq(&first, &again));
+    // A clone of the projection shares the memo.
+    let cloned = package.presentation().unwrap();
+    let shared = cloned
+        .slide_at(0)
+        .unwrap()
+        .unwrap()
+        .shared_shapes()
+        .unwrap();
+    assert!(std::sync::Arc::ptr_eq(&first, &shared));
+
+    // Another slide replaces the entry; the first slide is parsed again and
+    // reads exactly as before.
+    let second = presentation
+        .slide_at(1)
+        .unwrap()
+        .unwrap()
+        .shared_shapes()
+        .unwrap();
+    assert!(!std::sync::Arc::ptr_eq(&first, &second));
+    let reparsed = presentation
+        .slide_at(0)
+        .unwrap()
+        .unwrap()
+        .shared_shapes()
+        .unwrap();
+    assert!(!std::sync::Arc::ptr_eq(&first, &reparsed));
+    assert_eq!(texts(&first), texts(&reparsed));
+
+    // `slides()` handles consult the same memo, and the repairs a slide
+    // reports do not depend on which handle parsed it.
+    let slides = presentation.slides().unwrap();
+    assert!(std::sync::Arc::ptr_eq(
+        &slides[0].shared_shapes().unwrap(),
+        &reparsed
+    ));
+    let fresh = crate::Package::open(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/ole/ppt/SampleShow.ppt"),
+    )
+    .unwrap()
+    .presentation()
+    .unwrap();
+    for position in 0..presentation.slide_count() {
+        let memoized = presentation.slide_at(position).unwrap().unwrap();
+        let independent = fresh.slide_at(position).unwrap().unwrap();
+        assert_eq!(
+            memoized.tolerance_report().unwrap(),
+            independent.tolerance_report().unwrap()
+        );
+        assert_eq!(
+            texts(memoized.shapes().unwrap()),
+            texts(independent.shapes().unwrap())
+        );
+    }
 }

@@ -254,7 +254,11 @@ impl PictureShape {
         self.blip_id
     }
 
-    /// Get picture name
+    /// Get the picture's file name, as assigned with [`Self::set_name`].
+    ///
+    /// This is not the shape's name: a picture read from a presentation
+    /// reports its `wzName` in [`ShapeProperties::name`] (through
+    /// [`Self::properties`] or [`crate::shapes::ShapeEnum::name`]).
     #[must_use]
     pub fn name(&self) -> Option<&str> {
         self.name.as_deref()
@@ -280,6 +284,10 @@ impl PictureShape {
 
     pub(crate) fn mark_source_bound(&mut self) {
         self.source_bound = true;
+    }
+
+    pub(crate) fn apply_source_identity(&mut self, identity: super::shape::SourceIdentity) {
+        self.properties.apply_source_identity(identity);
     }
 
     pub(crate) fn ensure_mutable(

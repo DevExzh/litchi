@@ -99,8 +99,8 @@ impl Snapshot {
 
     /// Start a detached, failure-atomic transaction.
     #[must_use]
-    pub fn edit(&self) -> super::Transaction {
-        super::Transaction::new(self.clone())
+    pub fn edit(&self) -> super::Edit {
+        super::Edit::new(self.clone())
     }
 
     /// Publish the exact validated source stream.
@@ -186,12 +186,6 @@ impl Patch {
     #[must_use]
     pub fn is_noop(&self) -> bool {
         self.before == self.after
-    }
-
-    /// Alias for [`Self::is_noop`].
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.is_noop()
     }
 
     /// Apply this patch only to its exact source snapshot.

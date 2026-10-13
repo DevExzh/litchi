@@ -18,28 +18,16 @@
       "supported": true
     },
     "add": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "M2",
-      "reason": "edit verbs arrive with the write kernel in milestone M2"
+      "supported": true
     },
     "remove": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "M2",
-      "reason": "edit verbs arrive with the write kernel in milestone M2"
+      "supported": true
     },
     "move": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "M2",
-      "reason": "edit verbs arrive with the write kernel in milestone M2"
+      "supported": true
     },
     "swap": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "M2",
-      "reason": "edit verbs arrive with the write kernel in milestone M2"
+      "supported": true
     },
     "edit": {
       "supported": true
@@ -124,6 +112,26 @@
         {
           "element": "body",
           "pathSegment": "body"
+        },
+        {
+          "element": "header",
+          "pathSegment": "header"
+        },
+        {
+          "element": "footer",
+          "pathSegment": "footer"
+        },
+        {
+          "element": "footnote",
+          "pathSegment": "footnote"
+        },
+        {
+          "element": "endnote",
+          "pathSegment": "endnote"
+        },
+        {
+          "element": "comments",
+          "pathSegment": "comments"
         }
       ],
       "properties": {}
@@ -148,6 +156,10 @@
         {
           "element": "paragraph",
           "pathSegment": "p"
+        },
+        {
+          "element": "table",
+          "pathSegment": "tbl"
         }
       ],
       "properties": {},
@@ -162,20 +174,189 @@
     {
       "format": "doc",
       "element": "paragraph",
-      "parent": "body",
+      "parent": [
+        "body",
+        "cell",
+        "header",
+        "footer",
+        "footnote",
+        "endnote",
+        "comment"
+      ],
       "elementAliases": [
         "p"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]",
+          "/body/tbl[N]/tr[N]/tc[N]/p[N]",
+          "/header[N]/p[N]",
+          "/footer[N]/p[N]",
+          "/footnote[N]/p[N]",
+          "/endnote[N]/p[N]",
+          "/comments/comment[N]/p[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "run",
+          "pathSegment": "r"
+        }
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "align": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "justify",
+            "distribute",
+            "mediumKashida",
+            "indented",
+            "highKashida",
+            "lowKashida",
+            "thaiDistribute"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "spaceBefore": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "spaceAfter": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "indent": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "rightIndent": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "firstLineIndent": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "keepNext": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "keepLines": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "pageBreakBefore": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "bold": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "italic": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "underline": {
+          "type": "enum",
+          "values": [
+            "none",
+            "single",
+            "double",
+            "dotted",
+            "dash",
+            "wave",
+            "thick",
+            "words",
+            "dotDash",
+            "dotDotDash"
+          ],
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "size": {
+          "type": "font-size",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "color": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "doc",
+      "element": "run",
+      "parent": "paragraph",
+      "elementAliases": [
+        "r"
       ],
       "operations": {
         "add": false,
         "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
-          "/body/p[N]"
+          "/body/p[N]/r[N]"
         ]
       },
       "properties": {
@@ -183,6 +364,486 @@
           "type": "string",
           "add": false,
           "set": true,
+          "get": true
+        },
+        "font": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "size": {
+          "type": "font-size",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "bold": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "italic": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "color": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "underline": {
+          "type": "enum",
+          "values": [
+            "none",
+            "single",
+            "double",
+            "dotted",
+            "dash",
+            "wave",
+            "thick",
+            "words",
+            "dotDash",
+            "dotDotDash"
+          ],
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "strike": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "caps": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "smallcaps": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "superscript": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "subscript": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "doc",
+      "element": "table",
+      "parent": "body",
+      "elementAliases": [
+        "tbl"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/tbl[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "row",
+          "pathSegment": "tr"
+        }
+      ],
+      "properties": {
+        "rows": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "cols": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "doc",
+      "element": "row",
+      "parent": "table",
+      "elementAliases": [
+        "tr"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/tbl[N]/tr[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "cell",
+          "pathSegment": "tc"
+        }
+      ],
+      "properties": {
+        "header": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "doc",
+      "element": "cell",
+      "parent": "row",
+      "elementAliases": [
+        "tc"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/tbl[N]/tr[N]/tc[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "p"
+        }
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "fill": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "doc",
+      "element": "header",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/header[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "p"
+        }
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "type": {
+          "type": "enum",
+          "values": [
+            "default",
+            "even",
+            "first"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "doc",
+      "element": "footer",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/footer[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "p"
+        }
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "type": {
+          "type": "enum",
+          "values": [
+            "default",
+            "even",
+            "first"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "doc",
+      "element": "footnote",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/footnote[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "p"
+        }
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "number": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "doc",
+      "element": "endnote",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/endnote[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "p"
+        }
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "number": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "doc",
+      "element": "comments",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/comments"
+        ]
+      },
+      "children": [
+        {
+          "element": "comment",
+          "pathSegment": "comment"
+        }
+      ],
+      "properties": {},
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "doc",
+      "element": "comment",
+      "parent": "comments",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/comments/comment[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "p"
+        }
+      ],
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "author": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "initials": {
+          "type": "string",
+          "add": false,
+          "set": false,
           "get": true
         }
       },
@@ -198,156 +859,93 @@
   "gaps": [
     {
       "subject": "element",
-      "element": "run",
-      "code": "unsupported_capability",
-      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
-      "reason": "this native DOC concept is not yet projected into generic paths and queries"
-    },
-    {
-      "subject": "element",
       "element": "hyperlink",
       "code": "unsupported_capability",
-      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
-      "reason": "this native DOC concept is not yet projected into generic paths and queries"
-    },
-    {
-      "subject": "element",
-      "element": "table",
-      "code": "unsupported_capability",
-      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
-      "reason": "this native DOC concept is not yet projected into generic paths and queries"
-    },
-    {
-      "subject": "element",
-      "element": "row",
-      "code": "unsupported_capability",
-      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
-      "reason": "this native DOC concept is not yet projected into generic paths and queries"
-    },
-    {
-      "subject": "element",
-      "element": "cell",
-      "code": "unsupported_capability",
-      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
+      "followUp": "record 0258 follow-up (DOC read+write loop beyond the P0 surface)",
       "reason": "this native DOC concept is not yet projected into generic paths and queries"
     },
     {
       "subject": "element",
       "element": "equation",
       "code": "unsupported_capability",
-      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
+      "followUp": "record 0258 follow-up (DOC read+write loop beyond the P0 surface)",
       "reason": "this native DOC concept is not yet projected into generic paths and queries"
     },
     {
       "subject": "element",
       "element": "section",
       "code": "unsupported_capability",
-      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
-      "reason": "this native DOC concept is not yet projected into generic paths and queries"
-    },
-    {
-      "subject": "element",
-      "element": "header",
-      "code": "unsupported_capability",
-      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
-      "reason": "this native DOC concept is not yet projected into generic paths and queries"
-    },
-    {
-      "subject": "element",
-      "element": "footer",
-      "code": "unsupported_capability",
-      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
-      "reason": "this native DOC concept is not yet projected into generic paths and queries"
-    },
-    {
-      "subject": "element",
-      "element": "footnote",
-      "code": "unsupported_capability",
-      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
-      "reason": "this native DOC concept is not yet projected into generic paths and queries"
-    },
-    {
-      "subject": "element",
-      "element": "endnote",
-      "code": "unsupported_capability",
-      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
-      "reason": "this native DOC concept is not yet projected into generic paths and queries"
-    },
-    {
-      "subject": "element",
-      "element": "comment",
-      "code": "unsupported_capability",
-      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
+      "followUp": "record 0258 follow-up (DOC read+write loop beyond the P0 surface)",
       "reason": "this native DOC concept is not yet projected into generic paths and queries"
     },
     {
       "subject": "element",
       "element": "style",
       "code": "unsupported_capability",
-      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
+      "followUp": "record 0258 follow-up (DOC read+write loop beyond the P0 surface)",
       "reason": "this native DOC concept is not yet projected into generic paths and queries"
     },
     {
       "subject": "element",
       "element": "numbering",
       "code": "unsupported_capability",
-      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
+      "followUp": "record 0258 follow-up (DOC read+write loop beyond the P0 surface)",
       "reason": "this native DOC concept is not yet projected into generic paths and queries"
     },
     {
       "subject": "element",
       "element": "bookmark",
       "code": "unsupported_capability",
-      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
+      "followUp": "record 0258 follow-up (DOC read+write loop beyond the P0 surface)",
       "reason": "this native DOC concept is not yet projected into generic paths and queries"
     },
     {
       "subject": "element",
       "element": "field",
       "code": "unsupported_capability",
-      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
+      "followUp": "record 0258 follow-up (DOC read+write loop beyond the P0 surface)",
       "reason": "this native DOC concept is not yet projected into generic paths and queries"
     },
     {
       "subject": "element",
       "element": "formfield",
       "code": "unsupported_capability",
-      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
+      "followUp": "record 0258 follow-up (DOC read+write loop beyond the P0 surface)",
       "reason": "this native DOC concept is not yet projected into generic paths and queries"
     },
     {
       "subject": "element",
       "element": "picture",
       "code": "unsupported_capability",
-      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
+      "followUp": "record 0258 follow-up (DOC read+write loop beyond the P0 surface)",
       "reason": "this native DOC concept is not yet projected into generic paths and queries"
     },
     {
       "subject": "element",
       "element": "ole",
       "code": "unsupported_capability",
-      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
+      "followUp": "record 0258 follow-up (DOC read+write loop beyond the P0 surface)",
       "reason": "this native DOC concept is not yet projected into generic paths and queries"
     },
     {
       "subject": "element",
       "element": "revision",
       "code": "unsupported_capability",
-      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
+      "followUp": "record 0258 follow-up (DOC read+write loop beyond the P0 surface)",
       "reason": "this native DOC concept is not yet projected into generic paths and queries"
     },
     {
       "subject": "element",
       "element": "textbox",
       "code": "unsupported_capability",
-      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
+      "followUp": "record 0258 follow-up (DOC read+write loop beyond the P0 surface)",
       "reason": "this native DOC concept is not yet projected into generic paths and queries"
     },
     {
       "subject": "element",
       "element": "shape",
       "code": "unsupported_capability",
-      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
+      "followUp": "record 0258 follow-up (DOC read+write loop beyond the P0 surface)",
       "reason": "this native DOC concept is not yet projected into generic paths and queries"
     },
     {

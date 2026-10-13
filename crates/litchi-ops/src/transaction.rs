@@ -525,13 +525,26 @@ impl Edit {
         _parent: impl IntoPath<'p>,
         _node: impl IntoNode<'n>,
     ) -> Result<Path<'static>> {
-        #[cfg(any(feature = "pptx", feature = "xlsb", feature = "rtf"))]
+        #[cfg(any(
+            feature = "doc",
+            feature = "pptx",
+            feature = "xlsb",
+            feature = "rtf",
+            feature = "ppt",
+            feature = "xls"
+        ))]
         let limits = self.limits;
         self.execute(|file| match file {
             #[cfg(feature = "docx")]
             File::Docx(handle) => {
                 let (commit, path) = handle.add(_parent.into_path()?, _node.into_node()?)?;
                 wrap(handle, commit, path)
+            },
+            #[cfg(feature = "xls")]
+            File::Xls(handle) => {
+                let (commit, path) =
+                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                wrap_xls(handle, commit, path)
             },
             #[cfg(feature = "xlsx")]
             File::Xlsx(handle) => {
@@ -555,6 +568,18 @@ impl Edit {
                 let (commit, path) =
                     handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
                 wrap_rtf(handle, commit, path)
+            },
+            #[cfg(feature = "doc")]
+            File::Doc(handle) => {
+                let (commit, path) =
+                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                wrap_doc(handle, commit, path)
+            },
+            #[cfg(feature = "ppt")]
+            File::Ppt(handle) => {
+                let (commit, path) =
+                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                wrap_ppt(handle, commit, path)
             },
             #[allow(unreachable_patterns)]
             _ => Err(pending()),
@@ -565,7 +590,14 @@ impl Edit {
         _parent: impl IntoPath<'p>,
         _node: impl IntoNode<'n>,
     ) -> Result<Path<'static>> {
-        #[cfg(any(feature = "pptx", feature = "xlsb", feature = "rtf"))]
+        #[cfg(any(
+            feature = "doc",
+            feature = "pptx",
+            feature = "xlsb",
+            feature = "rtf",
+            feature = "ppt",
+            feature = "xls"
+        ))]
         let limits = self.limits;
         self.execute(|file| match file {
             #[cfg(feature = "docx")]
@@ -573,6 +605,12 @@ impl Edit {
                 let (commit, path) =
                     handle.add_command(_parent.into_path()?, _node.into_node()?)?;
                 wrap(handle, commit, path)
+            },
+            #[cfg(feature = "xls")]
+            File::Xls(handle) => {
+                let (commit, path) =
+                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                wrap_xls(handle, commit, path)
             },
             #[cfg(feature = "xlsx")]
             File::Xlsx(handle) => {
@@ -596,6 +634,18 @@ impl Edit {
                 let (commit, path) =
                     handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
                 wrap_rtf(handle, commit, path)
+            },
+            #[cfg(feature = "doc")]
+            File::Doc(handle) => {
+                let (commit, path) =
+                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                wrap_doc(handle, commit, path)
+            },
+            #[cfg(feature = "ppt")]
+            File::Ppt(handle) => {
+                let (commit, path) =
+                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                wrap_ppt(handle, commit, path)
             },
             #[allow(unreachable_patterns)]
             _ => Err(pending()),
@@ -638,6 +688,7 @@ impl Edit {
                 return Ok(());
             }
             #[cfg(any(
+                feature = "doc",
                 feature = "xlsx",
                 feature = "xlsb",
                 feature = "xls",
@@ -681,6 +732,12 @@ impl Edit {
                 ),
                 #[cfg(feature = "rtf")]
                 File::Rtf(handle) => wrap_rtf(
+                    handle,
+                    handle.remove_with_limits(target.clone(), &limits)?,
+                    (),
+                ),
+                #[cfg(feature = "doc")]
+                File::Doc(handle) => wrap_doc(
                     handle,
                     handle.remove_with_limits(target.clone(), &limits)?,
                     (),
@@ -836,13 +893,26 @@ impl Edit {
         _path: impl IntoPath<'p>,
         _to: impl IntoPlacement<'q>,
     ) -> Result<()> {
-        #[cfg(any(feature = "pptx", feature = "xlsb", feature = "ppt", feature = "rtf"))]
+        #[cfg(any(
+            feature = "doc",
+            feature = "pptx",
+            feature = "xlsb",
+            feature = "xls",
+            feature = "ppt",
+            feature = "rtf"
+        ))]
         let limits = self.limits;
         self.execute(|file| match file {
             #[cfg(feature = "docx")]
             File::Docx(handle) => wrap(
                 handle,
                 handle.move_to(_path.into_path()?, _to.into_placement()?)?,
+                (),
+            ),
+            #[cfg(feature = "xls")]
+            File::Xls(handle) => wrap_xls(
+                handle,
+                handle.move_to_with_limits(_path.into_path()?, _to.into_placement()?, &limits)?,
                 (),
             ),
             #[cfg(feature = "xlsx")]
@@ -875,6 +945,12 @@ impl Edit {
                 handle.move_to_with_limits(_path.into_path()?, _to.into_placement()?, &limits)?,
                 (),
             ),
+            #[cfg(feature = "doc")]
+            File::Doc(handle) => wrap_doc(
+                handle,
+                handle.move_to_with_limits(_path.into_path()?, _to.into_placement()?, &limits)?,
+                (),
+            ),
             #[allow(unreachable_patterns)]
             _ => Err(pending()),
         })
@@ -884,11 +960,24 @@ impl Edit {
     /// # Errors
     /// As [`File::swap`], with the mutation's item index and transaction limits.
     pub fn swap<'p, 'q>(&mut self, _a: impl IntoPath<'p>, _b: impl IntoPath<'q>) -> Result<()> {
-        #[cfg(any(feature = "pptx", feature = "xlsb", feature = "ppt", feature = "rtf"))]
+        #[cfg(any(
+            feature = "doc",
+            feature = "pptx",
+            feature = "xlsb",
+            feature = "xls",
+            feature = "ppt",
+            feature = "rtf"
+        ))]
         let limits = self.limits;
         self.execute(|file| match file {
             #[cfg(feature = "docx")]
             File::Docx(handle) => wrap(handle, handle.swap(_a.into_path()?, _b.into_path()?)?, ()),
+            #[cfg(feature = "xls")]
+            File::Xls(handle) => wrap_xls(
+                handle,
+                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &limits)?,
+                (),
+            ),
             #[cfg(feature = "xlsx")]
             File::Xlsx(handle) => {
                 wrap_xlsx(handle, handle.swap(_a.into_path()?, _b.into_path()?)?, ())
@@ -913,6 +1002,12 @@ impl Edit {
             ),
             #[cfg(feature = "rtf")]
             File::Rtf(handle) => wrap_rtf(
+                handle,
+                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &limits)?,
+                (),
+            ),
+            #[cfg(feature = "doc")]
+            File::Doc(handle) => wrap_doc(
                 handle,
                 handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &limits)?,
                 (),

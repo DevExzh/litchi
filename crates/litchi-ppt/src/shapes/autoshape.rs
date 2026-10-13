@@ -461,6 +461,10 @@ impl<'a> AutoShape<'a> {
         self.container.mark_source_bound();
     }
 
+    pub(crate) fn apply_source_identity(&mut self, identity: super::shape::SourceIdentity) {
+        self.container.apply_source_identity(identity);
+    }
+
     /// Return explicit custom/freeform geometry, when the shape defines it.
     #[must_use]
     pub fn geometry(&self) -> Option<&AutoShapeGeometry> {
