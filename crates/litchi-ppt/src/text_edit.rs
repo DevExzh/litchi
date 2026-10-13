@@ -410,20 +410,6 @@ impl SourceSnapshot {
         Self::open_with_options(source, SourceBackedOptions::default())
     }
 
-    /// Opens a positional source with explicit finite limits.
-    pub fn open_with_limits(
-        source: Arc<dyn ReadAt>,
-        source_limits: crate::SourceLimits,
-    ) -> Result<Self> {
-        Self::open_with_options(
-            source,
-            SourceBackedOptions {
-                source_limits,
-                ..SourceBackedOptions::default()
-            },
-        )
-    }
-
     /// Opens a positional source with explicit semantic and splice limits.
     pub fn open_with_options(
         source: Arc<dyn ReadAt>,
@@ -662,12 +648,6 @@ impl SourceTransaction {
             .replacement
             .unwrap_or_else(|| self.resolved.text.clone());
         publish_source_text(self.source, self.resolved, replacement)
-    }
-
-    /// Discards this transaction and returns its immutable source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> SourceSnapshot {
-        self.source
     }
 }
 
@@ -1994,12 +1974,6 @@ impl Transaction {
             patch,
             replaced_slide_persist_id: Some(self.resolved.slide_persist_id),
         })
-    }
-
-    /// Discards this candidate without changing the source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
     }
 }
 

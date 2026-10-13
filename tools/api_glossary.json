@@ -3971,6 +3971,31 @@
           "name": "set_property",
           "scope": "litchi_ppt::Builder",
           "replacement": "Builder::set_metadata(Metadata) plus summary_properties_mut() for custom properties (ADR 0034 §7, record 0254)"
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_ppt::text_edit::SourceSnapshot",
+          "replacement": "use open_with_options(SourceBackedOptions)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::text_edit::SourceTransaction",
+          "replacement": "drop the owned transaction"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::text_edit::Transaction",
+          "replacement": "drop the owned transaction"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::slide_order::Transaction",
+          "replacement": "drop the owned transaction"
+        },
+        {
+          "name": "from_bytes_with_limits",
+          "scope": "litchi_ppt::slide_order::Snapshot",
+          "replacement": "use from_bytes_with_options(OpenOptions)"
         }
       ],
       "families": [
@@ -4165,10 +4190,41 @@
           "name": "to_bytes",
           "scope": "litchi_ppt::Builder",
           "replacement": "publish the built Package"
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_ppt::text_edit::SourceSnapshot",
+          "replacement": "use open_with_options(SourceBackedOptions)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::text_edit::SourceTransaction",
+          "replacement": "drop the owned transaction"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::text_edit::Transaction",
+          "replacement": "drop the owned transaction"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::slide_order::Transaction",
+          "replacement": "drop the owned transaction"
+        },
+        {
+          "name": "from_bytes_with_limits",
+          "scope": "litchi_ppt::slide_order::Snapshot",
+          "replacement": "use from_bytes_with_options(OpenOptions)"
+        },
+        {
+          "name": "set_property",
+          "scope": "litchi_ppt::Builder",
+          "replacement": "Builder::set_metadata(Metadata) plus summary_properties_mut() for custom properties (ADR 0034 §7, record 0254)"
         }
       ],
       "families": [
-        "litchi_ppt::package::edit"
+        "litchi_ppt::package::edit",
+        "litchi_ppt::package::metadata"
       ]
     },
     {

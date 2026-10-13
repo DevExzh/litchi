@@ -624,17 +624,7 @@ impl Snapshot {
     ///
     /// Returns an error when the complete package cannot be reopened.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, SourceLimits::default())
-    }
-
-    /// Captures an owned exact PPT artifact under explicit finite limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the artifact exceeds the limits or its live
-    /// presentation structure is malformed.
-    pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: SourceLimits) -> Result<Self> {
-        Self::from_bytes_with_options(bytes, OpenOptions::new().source_limits(limits))
+        Self::from_bytes_with_options(bytes, OpenOptions::new())
     }
 
     /// Captures an owned exact PPT artifact under explicit source limits and
@@ -2965,12 +2955,6 @@ impl Transaction {
             structural_after: StructuralArtifact::After,
         };
         Ok(Commit { snapshot, patch })
-    }
-
-    /// Discards the candidate and recovers the exact source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
     }
 
     fn require_position(&self, position: Position) -> Result<()> {
@@ -7750,14 +7734,19 @@ mod tests {
         let bytes = authored_fixture();
         let mut limits = SourceLimits::default();
         limits.max_records -= 1;
-        let source = Snapshot::from_bytes_with_limits(bytes, limits).unwrap();
+        let source =
+            Snapshot::from_bytes_with_options(bytes, OpenOptions::new().source_limits(limits))
+                .unwrap();
         let target = crate::text_edit::Target::new(Position::new(0), Position::new(0));
         let mut edit = source.edit().unwrap();
         edit.set_shape_text(target, "custom limits root text")
             .unwrap();
         let committed = edit.commit().unwrap().snapshot().clone();
-        let reopened =
-            Snapshot::from_bytes_with_limits(committed.bytes().to_vec(), limits).unwrap();
+        let reopened = Snapshot::from_bytes_with_options(
+            committed.bytes().to_vec(),
+            OpenOptions::new().source_limits(limits),
+        )
+        .unwrap();
 
         assert_eq!(committed, reopened);
         assert_eq!(committed.limits(), limits);
@@ -8018,7 +8007,9 @@ mod tests {
             max_package_bytes: bytes.len(),
             ..Default::default()
         };
-        let source = Snapshot::from_bytes_with_limits(bytes, limits).unwrap();
+        let source =
+            Snapshot::from_bytes_with_options(bytes, OpenOptions::new().source_limits(limits))
+                .unwrap();
         let first = crate::text_edit::Target::new(Position::new(0), Position::new(0));
         let second = crate::text_edit::Target::new(Position::new(0), Position::new(1));
         let oversized = "x".repeat(limits.max_package_bytes);
@@ -8082,7 +8073,9 @@ mod tests {
 
         let mut limits = SourceLimits::default();
         limits.max_records -= 1;
-        let limited = Snapshot::from_bytes_with_limits(bytes, limits).unwrap();
+        let limited =
+            Snapshot::from_bytes_with_options(bytes, OpenOptions::new().source_limits(limits))
+                .unwrap();
         let mut limited_edit = limited.edit().unwrap();
         limited_edit
             .set_shape_texts(&[
@@ -8094,9 +8087,11 @@ mod tests {
             ])
             .unwrap();
         let limited_commit = limited_edit.commit().unwrap();
-        let fully_reopened =
-            Snapshot::from_bytes_with_limits(limited_commit.snapshot().bytes().to_vec(), limits)
-                .unwrap();
+        let fully_reopened = Snapshot::from_bytes_with_options(
+            limited_commit.snapshot().bytes().to_vec(),
+            OpenOptions::new().source_limits(limits),
+        )
+        .unwrap();
         assert_eq!(limited_commit.snapshot(), &fully_reopened);
         assert_eq!(limited_commit.snapshot().limits(), limits);
     }
