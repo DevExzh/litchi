@@ -15,12 +15,15 @@
 //!   columns, then its rows and cells in row-major order, then its tables;
 //!   the cells of a row, column or range used as a query scope.
 //!
-//! Cells are listed from the worksheet's pinned grid through a cursor that
-//! copies at most [`BATCH`] coordinates at a time out of one borrowed range
-//! scan, so the iterator owns no borrow, a cell costs one reference-count
-//! increment, and a walk that stops early has scanned at most one batch past
-//! its last match. Row numbers are collected once per worksheet walk that
-//! lists rows, because the leaf's row traversal cannot resume mid-way.
+//! Cells are listed from the worksheet's pinned grid: a worksheet's cells by
+//! walking its records in order, the cells of a row, column or range through
+//! a cursor that copies at most [`BATCH`] coordinates, each with its
+//! record's position, at a time out of one borrowed range scan. So the
+//! iterator owns no borrow, a cell costs one reference-count increment, its
+//! node reads its record again in O(1) (record 0262), and a walk that stops
+//! early has scanned at most one batch past its last match. Row numbers are
+//! collected once per worksheet walk that lists rows, because the leaf's row
+//! traversal cannot resume mid-way.
 
 use litchi_xlsx::workbook::worksheet::TablePart;
 use litchi_xlsx::{self as xlsx, Address, Rect};
@@ -86,6 +89,11 @@ struct SheetItems {
     phase: Phase,
 }
 
+#[allow(
+    clippy::large_enum_variant,
+    reason = "the phases live in the boxed items of one worksheet walk; a row's cell cursor keeps \
+              its batch inline so listing allocates nothing per row"
+)]
 enum Phase {
     Start,
     Columns {
@@ -98,7 +106,11 @@ enum Phase {
         next: usize,
         cells: Option<Cursor>,
     },
-    Cells(Cursor),
+    /// Every stored record, in the grid's record order, which is row-major:
+    /// the whole sheet's cells without a range scan.
+    Records {
+        next: usize,
+    },
     Tables {
         parts: std::vec::IntoIter<TablePart>,
         index: usize,
@@ -266,9 +278,9 @@ impl<'f> Children<'f> {
                     grid,
                     cursor,
                 } => {
-                    return Ok(cursor.next(grid)?.map(|at| {
-                        Node::new_cell(file, *sheet, at, CellSource::Grid(grid.clone()))
-                    }));
+                    return Ok(cursor
+                        .next(grid)?
+                        .map(|(at, index)| listed_cell(file, *sheet, grid, at, index)));
                 },
                 State::Dense {
                     sheet,
@@ -373,13 +385,8 @@ impl SheetItems {
                 },
                 Phase::Rows { rows, next, cells } => {
                     if let Some(cursor) = cells {
-                        if let Some(at) = cursor.next(grid)? {
-                            return Ok(Some(Node::new_cell(
-                                file,
-                                *sheet,
-                                at,
-                                CellSource::Grid(grid.clone()),
-                            )));
+                        if let Some((at, index)) = cursor.next(grid)? {
+                            return Ok(Some(listed_cell(file, *sheet, grid, at, index)));
                         }
                         *cells = None;
                     }
@@ -403,14 +410,11 @@ impl SheetItems {
                         }));
                     }
                 },
-                Phase::Cells(cursor) => {
-                    if let Some(at) = cursor.next(grid)? {
-                        return Ok(Some(Node::new_cell(
-                            file,
-                            *sheet,
-                            at,
-                            CellSource::Grid(grid.clone()),
-                        )));
+                Phase::Records { next } => {
+                    let index = xlsx::RecordIndex::new(*next);
+                    if let Some((at, _)) = grid.record_at(index)? {
+                        *next += 1;
+                        return Ok(Some(listed_cell(file, *sheet, grid, at, index)));
                     }
                     *phase = tables_phase(handle, *want)?;
                 },
@@ -440,12 +444,29 @@ fn rows_phase(grid: &Grid, handle: &SheetHandle, want: Want) -> Result<Phase> {
             cells: None,
         });
     }
-    if want.cells {
-        if let Some(extent) = grid.extents()?.stored() {
-            return Ok(Phase::Cells(Cursor::new(extent, false)));
-        }
+    if want.cells && grid.extents()?.stored().is_some() {
+        // The stored extent holds every record, so the cells are the records
+        // in order.
+        return Ok(Phase::Records { next: 0 });
     }
     tables_phase(handle, want)
+}
+
+/// The node of a cell a cursor listed: its record, read again by its
+/// position when that fits a node's index, else by its coordinate.
+fn listed_cell<'f>(
+    file: &'f Xlsx,
+    sheet: usize,
+    grid: &Grid,
+    at: Address,
+    index: xlsx::RecordIndex,
+) -> Node<'f> {
+    let grid = grid.clone();
+    let source = match u32::try_from(index.get()) {
+        Ok(index) => CellSource::Record { grid, index },
+        Err(_) => CellSource::Grid(grid),
+    };
+    Node::new_cell(file, sheet, at, source)
 }
 
 /// The tables phase, or done.
@@ -526,12 +547,13 @@ fn successor(rect: Rect, at: Address) -> Result<Option<Address>> {
 /// A row-major cursor over the stored records of one rectangle.
 ///
 /// Each refill runs one borrowed range scan of the grid from where the last
-/// one stopped and copies up to [`BATCH`] coordinates out of it.
+/// one stopped and copies up to [`BATCH`] coordinates, with their records'
+/// positions, out of it.
 pub(super) struct Cursor {
     rect: Rect,
     /// Where the next refill starts; `None` once the rectangle is exhausted.
     resume: Option<Address>,
-    buffer: [Address; BATCH],
+    buffer: [(Address, xlsx::RecordIndex); BATCH],
     len: usize,
     pos: usize,
     /// Skip records without content (the node view's row listing).
@@ -543,24 +565,24 @@ impl Cursor {
         Self {
             rect,
             resume: Some(rect.start()),
-            buffer: [rect.start(); BATCH],
+            buffer: [(rect.start(), xlsx::RecordIndex::new(0)); BATCH],
             len: 0,
             pos: 0,
             content_only,
         }
     }
 
-    /// The next stored coordinate, row-major.
-    pub(super) fn next(&mut self, grid: &Grid) -> Result<Option<Address>> {
+    /// The next stored coordinate, row-major, with its record's position.
+    pub(super) fn next(&mut self, grid: &Grid) -> Result<Option<(Address, xlsx::RecordIndex)>> {
         if self.pos == self.len {
             self.refill(grid)?;
             if self.len == 0 {
                 return Ok(None);
             }
         }
-        let at = self.buffer[self.pos];
+        let entry = self.buffer[self.pos];
         self.pos += 1;
-        Ok(Some(at))
+        Ok(Some(entry))
     }
 
     fn refill(&mut self, grid: &Grid) -> Result<()> {
@@ -592,7 +614,7 @@ impl Cursor {
             ]
         };
         for span in spans.into_iter().flatten() {
-            for (at, cell) in grid.cells(span)? {
+            for (index, at, cell) in grid.cells(span)?.indexed() {
                 if self.content_only && !has_content(cell) {
                     continue;
                 }
@@ -600,7 +622,7 @@ impl Cursor {
                     self.resume = Some(at);
                     return Ok(());
                 }
-                self.buffer[self.len] = at;
+                self.buffer[self.len] = (at, index);
                 self.len += 1;
             }
         }

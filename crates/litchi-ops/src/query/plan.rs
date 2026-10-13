@@ -195,6 +195,25 @@ pub(crate) struct Chain {
     /// A positional predicate on the subject of a top-level alternative:
     /// the Nth or last match overall (OfficeCLI's `SelectorPositionalIndex`).
     pub(crate) position: Option<Positional>,
+    /// How a node of one of `kinds` is tested against the chain.
+    pub(crate) shortcut: Shortcut,
+}
+
+/// A cheaper test of a one-compound chain on a node of one of its kinds
+/// (record 0262); each gives the result of the full test.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Shortcut {
+    /// Test the chain in full.
+    None,
+    /// The compound tests the element kind only (`cell`, `shape`): every
+    /// node of its kinds matches.
+    KindOnly,
+    /// The compound tests the kind and one filter expression
+    /// (`cell[value>1000]`, `shape[width>=10cm]`): the expression decides.
+    Expr(u32),
+    /// The compound (by id) tests the kind and the node's content only
+    /// (`shape:contains(Revenue)`): its content tests decide.
+    Content(u32),
 }
 
 /// A subject-level positional selection.
@@ -245,6 +264,25 @@ pub(crate) struct CompoundPlan<'q> {
     pub(crate) has: Vec<(u32, u32)>,
 }
 
+impl CompoundPlan<'_> {
+    /// The cheaper test of the compound `id` as a one-compound chain.
+    pub(crate) fn shortcut(&self, id: u32) -> Shortcut {
+        // Kind tests aside, nothing about the node's place.
+        let unplaced = !self.any && self.tests.is_empty() && self.header.is_none();
+        let only_expr = self.contains.is_empty()
+            && !self.empty
+            && self.no_alt.is_none()
+            && self.not.is_empty()
+            && self.has.is_empty();
+        match (unplaced, only_expr, self.expr) {
+            (false, ..) => Shortcut::None,
+            (true, true, None) => Shortcut::KindOnly,
+            (true, true, Some(expr)) => Shortcut::Expr(expr),
+            (true, false, _) => Shortcut::Content(id),
+        }
+    }
+}
+
 /// A structural test of a compound.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Structural {
@@ -292,6 +330,20 @@ pub(crate) struct CondPlan<'q> {
     pub(crate) by_kind: Vec<u8>,
     /// The distinct targets; target 0 evaluates the key as absent.
     pub(crate) targets: Vec<Target>,
+    /// The condition is the only one of its compound that reads properties
+    /// (and the compound has no `:no-alt`): a property target reads its one
+    /// value ([`Inspect::prop`](super::inspect::Inspect::prop)) instead of
+    /// the node's whole property set.
+    pub(crate) direct: bool,
+}
+
+impl CondPlan<'_> {
+    /// Whether a target reads the node's property set.
+    pub(crate) fn reads_properties(&self) -> bool {
+        self.targets
+            .iter()
+            .any(|target| matches!(target, Target::Prop { .. } | Target::Style { .. }))
+    }
 }
 
 /// What a condition reads for one kind, and its test typed by that read.

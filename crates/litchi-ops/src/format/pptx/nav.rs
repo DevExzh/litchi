@@ -38,7 +38,7 @@ use super::spec::{CELL_TEXT_GAP, Kind, NOTES_TEXT_GAP, PLACEHOLDER_TYPE, SPEC};
 use super::{steps, text};
 use crate::Result;
 use crate::node::spec::{FormatSpec, GapSpec};
-use crate::node::{Format, PathStep};
+use crate::node::{Format, PathStep, Value};
 use crate::path::navigate::{Available, ElementKind, KindSet, Lookup, Navigate, Resolved, Select};
 use crate::path::vocabulary::{Case, Identity};
 use crate::query::inspect::Inspect;
@@ -663,6 +663,14 @@ impl<'f> Navigate<'f> for Nav<'f> {
 
     const FORMAT: FileFormat = FileFormat::Pptx;
 
+    fn check_source(&self) -> Result<()> {
+        self.file.check_source_now()
+    }
+
+    fn fence_key(&self) -> usize {
+        self.file.fence_key()
+    }
+
     fn root(&self) -> Result<Node<'f>> {
         self.file.check_owner()?;
         Ok(self.root_node())
@@ -807,6 +815,10 @@ impl<'f> Inspect<'f> for Nav<'f> {
 
     fn format<'n>(&'n self, node: &'n Node<'f>) -> Result<Format<'n>> {
         self.file.finish(|| node.format_member())
+    }
+
+    fn prop<'n>(&'n self, node: &'n Node<'f>, index: usize) -> Result<Option<Value<'n>>> {
+        self.file.finish(|| node.prop_member(index))
     }
 
     fn write_step(

@@ -27,7 +27,7 @@ use super::Xlsx;
 use super::children::{Children, column_rect, coordinate, range};
 use super::header;
 use super::node::{
-    CellSource, Item, Node, Sheet, SheetHandle, defined_names, display_text, raw_value,
+    CellSource, Item, Node, Sheet, SheetHandle, ViewSource, defined_names, display_text, raw_value,
 };
 use super::spec::{Kind, SPEC};
 use crate::Result;
@@ -162,10 +162,10 @@ impl<'f> Nav<'f> {
                 let source = if stored_follower {
                     CellSource::Grid(sheet.grid()?.clone())
                 } else {
-                    CellSource::View {
+                    CellSource::View(Box::new(ViewSource {
                         handle: sheet.handle.clone(),
-                        view: Box::new(view),
-                    }
+                        view,
+                    }))
                 };
                 Self::found(Node::new_cell(file, position, at, source))
             },
@@ -334,6 +334,14 @@ impl<'f> Navigate<'f> for Nav<'f> {
 
     const FORMAT: FileFormat = FileFormat::Xlsx;
 
+    fn check_source(&self) -> Result<()> {
+        self.file.0.owner.ensure_current()
+    }
+
+    fn fence_key(&self) -> usize {
+        self.file.0.owner.fence_key()
+    }
+
     fn root(&self) -> Result<Node<'f>> {
         self.file
             .0
@@ -447,6 +455,13 @@ impl<'f> Inspect<'f> for Nav<'f> {
         node.cell_ref()
     }
 
+    fn cell_at(&self, node: &Node<'f>) -> Option<(u32, u32)> {
+        // What `cell_ref` parses back from the A1 label, which every
+        // coordinate inside the sheet grid does.
+        node.cell()
+            .filter(|&(column, row)| column < 16_384 && row < 1_048_576)
+    }
+
     fn write_step(
         &self,
         node: &Node<'f>,
@@ -455,7 +470,7 @@ impl<'f> Inspect<'f> for Nav<'f> {
         out: &mut fmt::Formatter<'_>,
     ) -> fmt::Result {
         match node.last_step() {
-            Some(step) => fmt::Display::fmt(step, out),
+            Some(step) => fmt::Display::fmt(&step, out),
             None => fmt::Display::fmt(&crate::node::PathStep::at(kind.spec().name, ordinal), out),
         }
     }

@@ -28,8 +28,9 @@ use crate::node::{
 pub struct Node<'f> {
     file: &'f Xls,
     item: Item<'f>,
-    steps: [PathStep<'f>; 2],
-    depth: u8,
+    /// The position of the node's worksheet; its path is written from it
+    /// and the item when asked for (record 0262), so walks move a smaller
+    /// node.
     sheet: usize,
 }
 
@@ -117,15 +118,11 @@ pub(super) struct ColumnItem {
 /// Inclusive zero-based rectangle used by the sparse grid bridge.
 pub(super) type Rect = (u32, u32, u32, u32);
 
-const NO_STEP: PathStep<'static> = PathStep::new("");
-
 impl<'f> Node<'f> {
     pub(super) fn new_workbook(file: &'f Xls) -> Self {
         Self {
             file,
             item: Item::Workbook,
-            steps: [NO_STEP; 2],
-            depth: 0,
             sheet: 0,
         }
     }
@@ -135,20 +132,12 @@ impl<'f> Node<'f> {
         Self {
             file,
             item: Item::Sheet(sheet),
-            steps: [PathStep::at("sheet", Position::new(position)), NO_STEP],
-            depth: 1,
             sheet: position,
         }
     }
 
-    fn in_sheet(file: &'f Xls, sheet: usize, item: Item<'f>, tail: PathStep<'f>) -> Self {
-        Self {
-            file,
-            item,
-            steps: [PathStep::at("sheet", Position::new(sheet)), tail],
-            depth: 2,
-            sheet,
-        }
+    fn in_sheet(file: &'f Xls, sheet: usize, item: Item<'f>) -> Self {
+        Self { file, item, sheet }
     }
 
     pub(super) fn new_cell(
@@ -166,7 +155,6 @@ impl<'f> Node<'f> {
                 source,
                 label: Label::cell(column, row),
             }),
-            PathStep::cell(column, row),
         )
     }
 
@@ -180,7 +168,6 @@ impl<'f> Node<'f> {
                 rect,
                 label: Label::range((first_column, first_row), (last_column, last_row)),
             }),
-            PathStep::range((first_column, first_row), (last_column, last_row)),
         )
     }
 
@@ -188,8 +175,6 @@ impl<'f> Node<'f> {
         Self {
             file,
             item: Item::NamedRange(index),
-            steps: [PathStep::at("namedrange", Position::new(index)), NO_STEP],
-            depth: 1,
             sheet: 0,
         }
     }
@@ -220,7 +205,6 @@ impl<'f> Node<'f> {
                 index,
                 label: Label::row(index),
             }),
-            PathStep::at("row", Position::new(index as usize)),
         )
     }
 
@@ -233,7 +217,6 @@ impl<'f> Node<'f> {
                 index,
                 label: Label::column(index),
             }),
-            PathStep::column("col", index),
         )
     }
 
@@ -249,10 +232,23 @@ impl<'f> Node<'f> {
         self.sheet
     }
 
-    pub(super) fn last_step(&self) -> Option<&PathStep<'f>> {
-        usize::from(self.depth)
-            .checked_sub(1)
-            .and_then(|index| self.steps.get(index))
+    /// The node's own path step under its parent, written from the item.
+    pub(super) fn last_step(&self) -> Option<PathStep<'static>> {
+        Some(match &self.item {
+            Item::Workbook => return None,
+            Item::Sheet(_) => PathStep::at("sheet", Position::new(self.sheet)),
+            Item::Cell(cell) => {
+                let (row, column) = cell.at;
+                PathStep::cell(column, row)
+            },
+            Item::Range(range) => {
+                let (first_row, first_column, last_row, last_column) = range.rect;
+                PathStep::range((first_column, first_row), (last_column, last_row))
+            },
+            Item::Row(row) => PathStep::at("row", Position::new(row.index as usize)),
+            Item::Column(column) => PathStep::column("col", column.index),
+            Item::NamedRange(index) => PathStep::at("namedrange", Position::new(*index)),
+        })
     }
 
     pub(super) fn element(&self) -> Kind {
@@ -648,7 +644,13 @@ impl<'f> Project<'f> for Node<'f> {
     }
 
     fn path(&self) -> NodePath<'_> {
-        NodePath::new(&self.steps[..usize::from(self.depth)])
+        match (&self.item, self.last_step()) {
+            (_, None) => NodePath::ROOT,
+            (Item::Sheet(_) | Item::NamedRange(_), Some(step)) => NodePath::short(step, None),
+            (_, Some(step)) => {
+                NodePath::short(PathStep::at("sheet", Position::new(self.sheet)), Some(step))
+            },
+        }
     }
 
     fn text(&self) -> Result<Option<Cow<'_, str>>> {

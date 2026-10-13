@@ -56,6 +56,14 @@ pub(crate) trait Inspect<'f>: Navigate<'f> {
     /// table. Read once per candidate that reaches a property predicate.
     fn format<'n>(&'n self, node: &'n Self::Node) -> Result<Format<'n>>;
 
+    /// The value of the property at `index` of the node's property table:
+    /// what [`Inspect::format`] gives there, read without the rest of the
+    /// set when the adapter can. The walker reads a condition's one property
+    /// this way when no other test of the compound reads properties.
+    fn prop<'n>(&'n self, node: &'n Self::Node, index: usize) -> Result<Option<Value<'n>>> {
+        Ok(self.format(node)?.get(index))
+    }
+
     /// The number a number-indexed element carries: a worksheet row or
     /// column number (1-based), a numbering level, a note id. Selectors
     /// compare `row[N]`, `col[B]` and `level[L]` with it (record 0010 §5.2).
@@ -69,6 +77,12 @@ pub(crate) trait Inspect<'f>: Navigate<'f> {
     fn cell(&self, node: &Self::Node) -> Option<CellRef> {
         let _ = node;
         None
+    }
+
+    /// The zero-based `(column, row)` of [`Inspect::cell`], which an adapter
+    /// that holds the coordinate gives without spelling it out.
+    fn cell_at(&self, node: &Self::Node) -> Option<(u32, u32)> {
+        self.cell(node).map(|cell| (cell.column(), cell.row()))
     }
 
     /// Writes the path step of `node`, the child at `ordinal` among its
@@ -169,12 +183,20 @@ impl<'f, N: Inspect<'f>> Inspect<'f> for &N {
         (**self).format(node)
     }
 
+    fn prop<'n>(&'n self, node: &'n Self::Node, index: usize) -> Result<Option<Value<'n>>> {
+        (**self).prop(node, index)
+    }
+
     fn number(&self, node: &Self::Node) -> Option<usize> {
         (**self).number(node)
     }
 
     fn cell(&self, node: &Self::Node) -> Option<CellRef> {
         (**self).cell(node)
+    }
+
+    fn cell_at(&self, node: &Self::Node) -> Option<(u32, u32)> {
+        (**self).cell_at(node)
     }
 
     fn write_step(

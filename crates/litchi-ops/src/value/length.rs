@@ -384,7 +384,9 @@ fn exact(emu: i64, unit: Unit) -> Option<Form> {
     if emu == 0 || emu % hundredth != 0 {
         return None;
     }
-    let value = rounded(emu, unit);
+    // `rounded` without its division: the value is a whole number of
+    // hundredths, so rounding changes nothing.
+    let value = Decimal::normalized(emu < 0, u128::from((emu / hundredth).unsigned_abs()), 2);
     // Below 2^50 EMU the double re-read is off by less than half an EMU, so
     // it always lands on `emu`; only larger values need the check.
     if emu.unsigned_abs() < 1 << 50 {
@@ -410,6 +412,110 @@ impl fmt::Display for LengthDisplay {
                 formatter.write_str(unit.suffix())
             },
             Form::Emu(emu) => write!(formatter, "{emu}emu"),
+        }
+    }
+}
+
+/// What query comparison reads from a length's canonical text, known without
+/// writing the text (`value::compare`, record 0262): OfficeCLI's
+/// `ExtractNumber`, `ExtractUnit` and `TryParseEmu` of the text.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(super) struct DisplayFacts {
+    /// The number before the unit suffix; `None` for the `<n>emu` form,
+    /// which `ExtractNumber` cannot read.
+    pub(super) number: Option<f64>,
+    /// The unit suffix (`cm`, `pt`, `in`); `None` for `<n>emu`, which
+    /// `ExtractUnit` does not recognize.
+    pub(super) unit: Option<DisplayUnit>,
+    /// The EMU value `ParseEmu` reads the text back as.
+    pub(super) emu: Option<i64>,
+}
+
+/// The unit suffix of a length's canonical text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum DisplayUnit {
+    Cm,
+    Pt,
+    In,
+}
+
+impl Length {
+    /// The comparison facts of this length's canonical text in `style`
+    /// ([`LengthDisplay::facts`]). A length below 2^50 EMU that is a whole
+    /// number of hundredths of the style's first such unit reads back as
+    /// itself, so its facts need no rounding: the number is those
+    /// hundredths over 100 (one correctly rounded division) and the EMU
+    /// value is the length.
+    pub(super) fn display_facts(self, style: LengthStyle) -> Option<DisplayFacts> {
+        let emu = self.0;
+        let exact = |unit: DisplayUnit, hundredth: i64| {
+            #[allow(
+                clippy::cast_precision_loss,
+                reason = "below 2^50 EMU the hundredths are below 2^53, exact as a double"
+            )]
+            let number = (emu / hundredth) as f64 / 100.0;
+            (emu % hundredth == 0).then_some(DisplayFacts {
+                number: Some(number),
+                unit: Some(unit),
+                emu: Some(emu),
+            })
+        };
+        if emu != 0 && emu.unsigned_abs() < 1 << 50 {
+            let cm = || exact(DisplayUnit::Cm, EMU_PER_CM / 100);
+            let pt = || exact(DisplayUnit::Pt, EMU_PER_POINT / 100);
+            let inch = || exact(DisplayUnit::In, EMU_PER_INCH / 100);
+            let found = match style {
+                LengthStyle::Auto | LengthStyle::Lossy => cm().or_else(pt).or_else(inch),
+                LengthStyle::PointsFirst => pt().or_else(cm).or_else(inch),
+                _ => None,
+            };
+            match (found, style) {
+                (Some(facts), _) => return Some(facts),
+                (None, LengthStyle::Auto | LengthStyle::PointsFirst) => {
+                    return Some(DisplayFacts {
+                        number: None,
+                        unit: None,
+                        emu: Some(emu),
+                    });
+                },
+                _ => {},
+            }
+        }
+        self.display(style).facts()
+    }
+}
+
+impl LengthDisplay {
+    /// The comparison facts of this text, or `None` when they are only
+    /// known by writing the text and reading it back (a number of more
+    /// than 2^53 hundredths of a unit).
+    pub(super) fn facts(self) -> Option<DisplayFacts> {
+        match self.0 {
+            Form::Emu(emu) => Some(DisplayFacts {
+                number: None,
+                unit: None,
+                emu: Some(emu),
+            }),
+            Form::Unit(value, unit) => {
+                // `ParseEmu` reads the number with the same correctly rounded
+                // parse `ExtractNumber` does, then scales it by the unit's
+                // size (the `UNITS` factors) and rounds to even.
+                let number = value.to_f64_exact()?;
+                #[allow(
+                    clippy::cast_precision_loss,
+                    reason = "the unit sizes are small integers, exact as doubles"
+                )]
+                let factor = unit.per_unit() as f64;
+                Some(DisplayFacts {
+                    number: Some(number),
+                    unit: Some(match unit {
+                        Unit::Cm => DisplayUnit::Cm,
+                        Unit::Pt => DisplayUnit::Pt,
+                        Unit::In => DisplayUnit::In,
+                    }),
+                    emu: round_emu(number * factor),
+                })
+            },
         }
     }
 }

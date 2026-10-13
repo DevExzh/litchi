@@ -45,11 +45,18 @@ fn commit(
 impl Pptx {
     /// The eager package an [`Editable`] commits metadata on. An unrevised
     /// source owner adopts its source graph without re-serializing; a
-    /// revised one publishes its revision first.
+    /// revised one publishes its revision first. A source-backed handle
+    /// keeps that package once built (record 0262): the handle is
+    /// immutable, so every later metadata set on it commits on the same
+    /// before state, and the leaf's source graph adoption, not the edit,
+    /// was most of a set's cost (record 0253 §7).
     fn metadata_owner(&self, source: &Editable) -> Result<Arc<pptx::Package>> {
         match source {
             Editable::Eager(package) => Ok(Arc::clone(package)),
             Editable::Source(package) => {
+                if let Some(cached) = self.0.metadata_package.get() {
+                    return Ok(Arc::clone(cached));
+                }
                 let graph = match (&self.0.revision, &self.0.owner) {
                     (None, PptxOwner::Source(presentation)) => presentation
                         .source_backed_package()
@@ -60,7 +67,8 @@ impl Pptx {
                         opc::OpcPackage::from_bytes(&bytes)?
                     },
                 };
-                Ok(Arc::new(pptx::Package::from_opc_package(graph)?))
+                let built = Arc::new(pptx::Package::from_opc_package(graph)?);
+                Ok(Arc::clone(self.0.metadata_package.get_or_init(|| built)))
             },
         }
     }
@@ -121,6 +129,9 @@ impl Pptx {
             retain_source: self.0.retain_source,
             ooxml_limits: self.0.ooxml_limits,
             eager_catalog: OnceLock::new(),
+            masters: OnceLock::new(),
+            scenes: Arc::clone(&self.0.scenes),
+            metadata_package: OnceLock::new(),
             promotion: OnceLock::new(),
             revision: None,
             unsigned_promotion: OnceLock::new(),
