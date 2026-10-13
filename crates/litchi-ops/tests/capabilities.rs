@@ -730,14 +730,20 @@ fn ppt_reports_unified_reads_and_keeps_writes_granular() {
     }
     assert!(format.verb(Verb::Save).is_supported());
     assert!(format.verb(Verb::Create).is_supported());
-    for verb in [Verb::Remove, Verb::Move, Verb::Swap] {
-        assert!(format.verb(verb).is_supported());
+    for verb in [Verb::Add, Verb::Remove, Verb::Move, Verb::Swap] {
+        assert!(format.verb(verb).is_supported(), "PPT {verb:?}");
     }
-    assert_eq!(
-        format.verb(Verb::Add).code(),
-        Some(Code::UnsupportedCapability),
-        "PPT insertion remains a write gap"
-    );
+    for name in ["notes", "paragraph"] {
+        let element = format.element(name).expect("text element");
+        assert!(
+            element.operations().get && element.operations().set,
+            "PPT {name}"
+        );
+        assert!(
+            element.property("text").expect("text").set(),
+            "PPT {name}.text"
+        );
+    }
     for name in ["shape", "placeholder"] {
         let element = format.element(name).expect("shape element");
         for key in ["text", "x", "y", "width", "height"] {
@@ -768,7 +774,7 @@ fn ppt_reports_unified_reads_and_keeps_writes_granular() {
         let operations = element.operations();
         assert!(operations.get, "PPT {name} is readable");
         assert_eq!(operations.set, name != "presentation", "PPT {name} setter");
-        assert!(!operations.add, "PPT {name} is not addable");
+        assert_eq!(operations.add, name == "slide", "PPT {name} insertion");
         assert_eq!(operations.remove, name == "slide", "PPT {name} removal");
     }
 
@@ -795,6 +801,7 @@ fn ppt_reports_unified_reads_and_keeps_writes_granular() {
     );
     for verb in [
         Verb::Set,
+        Verb::Add,
         Verb::Remove,
         Verb::Move,
         Verb::Swap,

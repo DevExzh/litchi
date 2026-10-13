@@ -781,7 +781,13 @@ impl Capabilities {
             #[cfg(feature = "ppt")]
             if matches!(
                 verb,
-                Verb::Set | Verb::Remove | Verb::Move | Verb::Swap | Verb::Edit | Verb::Batch
+                Verb::Set
+                    | Verb::Add
+                    | Verb::Remove
+                    | Verb::Move
+                    | Verb::Swap
+                    | Verb::Edit
+                    | Verb::Batch
             ) && self.adapter() == Some(Adapter::Ppt)
             {
                 if self.retains_source == Some(false) {
@@ -2786,6 +2792,12 @@ impl Element {
             || (self.adapter == Adapter::Xlsb
                 && self.retains_source != Some(false)
                 && self.data().canonical == "sheet"
+                && readable);
+        #[cfg(feature = "ppt")]
+        let add = add
+            || (self.adapter == Adapter::Ppt
+                && self.retains_source != Some(false)
+                && self.data().canonical == "slide"
                 && readable);
         #[cfg(feature = "rtf")]
         let add = add

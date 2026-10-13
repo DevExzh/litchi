@@ -22,6 +22,8 @@ impl File {
     ///
     /// Placement defaults to the end of the parent. Properties are admitted
     /// before the isolated leaf transaction is committed.
+    /// Legacy PPT inserts blank slides (`layout` may be `"blank"`) under the
+    /// presentation root, at any placement.
     /// PPTX slide insertion requires an exact `layout` property and an eager
     /// native owner (created presentations or `SourceMode::Eager` opens). The
     /// inserted slide is empty and shares the selected layout.
@@ -85,6 +87,14 @@ impl File {
                 let (commit, path) = handle.add(_parent.into_path()?, _node.into_node()?)?;
                 Ok(Added {
                     file: Self::Rtf(commit.after),
+                    path,
+                })
+            },
+            #[cfg(feature = "ppt")]
+            Self::Ppt(handle) => {
+                let (commit, path) = handle.add(_parent.into_path()?, _node.into_node()?)?;
+                Ok(Added {
+                    file: Self::Ppt(commit.after),
                     path,
                 })
             },

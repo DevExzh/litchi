@@ -284,6 +284,28 @@ impl Ppt {
         self.check_source().and(result)
     }
 
+    /// Insert one blank slide under the presentation root.
+    pub(crate) fn add<'p, 'n>(
+        &self,
+        parent: crate::path::PathArg<'p>,
+        node: crate::NewNode<'n>,
+    ) -> Result<(WriteCommit, crate::path::Path<'static>)> {
+        self.add_with_limits(parent, node, &crate::transaction::SemanticLimits::default())
+    }
+
+    /// Insert one blank slide under an explicit semantic budget.
+    pub(crate) fn add_with_limits<'p, 'n>(
+        &self,
+        parent: crate::path::PathArg<'p>,
+        node: crate::NewNode<'n>,
+        limits: &crate::transaction::SemanticLimits,
+    ) -> Result<(WriteCommit, crate::path::Path<'static>)> {
+        self.check_source()?;
+        let result = write::add_with_limits(self, parent, node, limits);
+        self.check_source()?;
+        result
+    }
+
     /// Remove slides selected by a path or a scoped query through the native
     /// primary PPT transaction.
     pub(crate) fn remove<'p>(&self, target: crate::target::TargetArg<'p>) -> Result<WriteCommit> {

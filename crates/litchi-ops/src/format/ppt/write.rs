@@ -184,6 +184,98 @@ pub(crate) fn remove_with_limits(
     finish_commit(file, native, limits)
 }
 
+/// Insert one blank slide under the presentation root.
+///
+/// The only node kind is `slide`; its one optional property is
+/// `layout = "blank"`, the layout the binary format can create without
+/// authoring placeholder shapes and slide-list text. Placement follows the
+/// common contract (end by default; start, a final position, before or after
+/// a slide, or into the root). The native transaction allocates the slide's
+/// persist, slide, drawing and shape identifiers.
+pub(crate) fn add_with_limits(
+    file: &Ppt,
+    parent: PathArg<'_>,
+    node: crate::NewNode<'_>,
+    limits: &SemanticLimits,
+) -> Result<(WriteCommit, crate::path::Path<'static>)> {
+    file.admit_edit()?;
+    let parent = crate::path::resolve::get(&Nav::new(file), &parent)?;
+    if parent.element() != Kind::Presentation {
+        return Err(Error::new(
+            Code::UnsupportedType,
+            "PPT slides can only be added under the presentation root",
+        )
+        .with_format(FileFormat::Ppt));
+    }
+    if !node.kind().eq_ignore_ascii_case("slide") {
+        return Err(Error::new(
+            Code::UnsupportedElement,
+            "the PPT add verb supports slide nodes only",
+        )
+        .with_format(FileFormat::Ppt)
+        .with_suggestion("add a slide under \"/\""));
+    }
+    for (key, value) in node.props().iter() {
+        if !key.as_str().eq_ignore_ascii_case("layout") {
+            return Err(Error::new(
+                Code::UnsupportedProperty,
+                "a new PPT slide accepts only the `layout` property",
+            )
+            .with_format(FileFormat::Ppt)
+            .with_property(key.as_str().to_owned()));
+        }
+        if !value
+            .as_text()
+            .is_some_and(|layout| layout.eq_ignore_ascii_case("blank"))
+        {
+            return Err(Error::new(
+                Code::UnsupportedCapability,
+                "PPT slide insertion creates blank-layout slides only",
+            )
+            .with_format(FileFormat::Ppt)
+            .with_property("layout")
+            .with_suggestion("use layout \"blank\" and add content with later edits"));
+        }
+    }
+    let count = file.slide_count()?;
+    let position = match node.placement() {
+        None | Some(Placement::End) => count,
+        Some(Placement::Start) => 0,
+        Some(Placement::Position(position)) => position.get(),
+        Some(Placement::Before(path)) => resolve_slide_path(file, path)?,
+        Some(Placement::After(path)) => resolve_slide_path(file, path)?
+            .checked_add(1)
+            .ok_or_else(|| out_of_range("PPT slide position overflow"))?,
+        Some(Placement::Into(path, position)) => {
+            let parent = crate::path::resolve::get(&Nav::new(file), path)?;
+            if parent.element() != Kind::Presentation {
+                return Err(Error::new(
+                    Code::UnsupportedType,
+                    "PPT slides can only be added within the presentation root",
+                )
+                .with_format(FileFormat::Ppt));
+            }
+            position.map_or(count, Position::get)
+        },
+    };
+    if position > count {
+        return Err(out_of_range(
+            "the PPT slide insertion position is outside the presentation",
+        ));
+    }
+    admit_structural_targets(1, limits)?;
+    let native = stage_structural(file, 1, limits, move |edit| {
+        edit.insert_slide(Position::new(position))
+    })?;
+    file.check_source()?;
+    let commit = finish_commit(file, native, limits)?;
+    Ok((
+        commit,
+        crate::path::Path::from_steps([crate::path::Step::new("slide")
+            .with(crate::path::Predicate::Index(Position::new(position)))]),
+    ))
+}
+
 /// Move one slide to a final sibling position or relative to another slide.
 ///
 /// Positional destinations are interpreted after detaching the moving slide,
