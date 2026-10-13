@@ -349,6 +349,16 @@ Cut from `e467bcf4e8`:
 
 Still running from R1: `p7a-docx` (0251), `p7c-pptx` (0252), `p6-ooxml-meta` (0253).
 
+- Merged `ppt-scale` (0264, `4bcc2668b7`):
+  - incremental commit verification, with the full re-parse as fallback and oracle (~10.9k differential cases);
+  - the slide memo is seeded across chunked edits;
+  - native 10k batch 108.6 → 50.6 ms; 1k→10k per-op cost 3.30× → 1.67×.
+  - **Owner decision (2026-10-14):** raise the PPT primary-edit and aggregate-selection bounds from 4096 to 16384 (measured 1.07×). Being applied on `uo2/ppt-scale`.
+- Merged `s17-corpus` (0265):
+  - all 96 OfficeCLI example scripts replay in CI through the `litchi` CLI;
+  - 6,431 calls: 2,003 pass, 3,616 gap, 139 delta, 673 cascade, 0 bugs; no panic or `internal_error`.
+  - Top gaps: xlsx cell `text` alias (906), pptx shape `size` on add (461), chart add (763), shape fill/geometry (255), transition (161), apply-the-rest-and-warn (2,172).
+
 ## Wave R3 (2026-10-14)
 Cut from `4d1afe92bc`:
 - `s17-corpus` (0265): the OfficeCLI example-corpus harness.
