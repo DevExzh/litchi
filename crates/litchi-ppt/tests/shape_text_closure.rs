@@ -292,3 +292,68 @@ fn durable_outline_text_patch_replays_and_reverts() {
     let reverted = replayed.apply_durable(&durable.inverse()).unwrap();
     assert_eq!(texts_of(&reverted), texts_of(&source));
 }
+
+/// Corpus coverage of a length-changing replacement (record 0260): every
+/// top-level shape of every readable, unencrypted PPT fixture under
+/// `test-data`, one edit per shape. Before record 0260 no target accepted a
+/// changed length; the remaining refusals are shapes without a text body
+/// and the position-dependent records the closure keeps.
+#[test]
+fn corpus_length_change_coverage_is_pinned() {
+    const DECKS: &[&str] = &[
+        "ole/ppt/SampleShow.ppt",
+        "ole/ppt/empty.ppt",
+        "ole/ppt/empty_textbox.ppt",
+        "ole/ppt/ppt_with_png.ppt",
+        "ole/ppt/text-margins.ppt",
+        "ole/ppt/text_shapes.ppt",
+        "poi/test-data/slideshow/41246-1.ppt",
+        "poi/test-data/slideshow/45543.ppt",
+        "poi/test-data/slideshow/54880_chinese.ppt",
+        "poi/test-data/slideshow/WithComments.ppt",
+        "poi/test-data/slideshow/WithLinks.ppt",
+        "poi/test-data/slideshow/basic_test_ppt_file.ppt",
+        "poi/test-data/slideshow/bug58144-headers-footers-2003.ppt",
+        "poi/test-data/slideshow/bug58144-headers-footers-2007.ppt",
+        "poi/test-data/slideshow/datetime.ppt",
+        "poi/test-data/slideshow/headers_footers.ppt",
+        "poi/test-data/slideshow/headers_footers_2007.ppt",
+        "poi/test-data/slideshow/incorrect_slide_order.ppt",
+        "poi/test-data/slideshow/ole2-embedding-2003.ppt",
+        "poi/test-data/slideshow/ppt_with_embeded.ppt",
+        "poi/test-data/slideshow/sound.ppt",
+        "poi/test-data/slideshow/testPPT_oleWorkbook.ppt",
+        "poi/test-data/slideshow/text-margins.ppt",
+    ];
+    let (mut changed, mut closure, mut no_text_atom, mut no_textbox) = (0, 0, 0, 0);
+    for deck in DECKS {
+        let package = Package::from_bytes(&fixture(deck)).unwrap();
+        let shapes = texts(&package);
+        for (slide, shapes) in shapes.iter().enumerate() {
+            for shape in 0..shapes.len() {
+                let mut edit = package.edit().unwrap();
+                match edit.set_shape_text(target(slide, shape), "Changed text of another length!") {
+                    Ok(()) => {
+                        let commit = edit.commit().unwrap();
+                        assert_eq!(
+                            texts(commit.package())[slide][shape],
+                            "Changed text of another length!",
+                            "{deck} {slide}/{shape}"
+                        );
+                        changed += 1;
+                    },
+                    Err(error) => match refusal(&error) {
+                        Some(Refusal::DependencyClosure) => closure += 1,
+                        Some(Refusal::NoTextAtom) => no_text_atom += 1,
+                        Some(Refusal::NoTextbox) => no_textbox += 1,
+                        other => panic!("{deck} {slide}/{shape}: unexpected {other:?}"),
+                    },
+                }
+            }
+        }
+    }
+    assert_eq!(
+        (changed, closure, no_text_atom, no_textbox),
+        (129, 47, 13, 25)
+    );
+}
