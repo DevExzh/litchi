@@ -1,7 +1,7 @@
 //! The small, source-backed DOC vocabulary currently exposed by the unified
 //! adapter.
 
-use crate::node::spec::{ElementSpec, FormatSpec, PropSpec, check_format_spec};
+use crate::node::spec::{ElementSpec, FormatSpec, GapSpec, PropSpec, Subject, check_format_spec};
 use crate::path::navigate::ElementKind;
 use crate::path::vocabulary::{self, Vocabulary};
 
@@ -102,7 +102,32 @@ const fn writable_text() -> PropSpec {
 pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
     root: Kind::Document,
     elements: &[DOCUMENT, BODY, PARAGRAPH],
-    gaps: &[],
+    // Concepts the native `litchi-doc` reader models but the unified adapter
+    // does not yet project, under their OfficeCLI DOCX type names.
+    gaps: &[
+        element_gap("run"),
+        element_gap("hyperlink"),
+        element_gap("table"),
+        element_gap("row"),
+        element_gap("cell"),
+        element_gap("equation"),
+        element_gap("section"),
+        element_gap("header"),
+        element_gap("footer"),
+        element_gap("footnote"),
+        element_gap("endnote"),
+        element_gap("comment"),
+        element_gap("style"),
+        element_gap("numbering"),
+        element_gap("bookmark"),
+        element_gap("field"),
+        element_gap("formfield"),
+        element_gap("picture"),
+        element_gap("ole"),
+        element_gap("revision"),
+        element_gap("textbox"),
+        element_gap("shape"),
+    ],
 };
 
 check_format_spec!(SPEC);
@@ -111,3 +136,12 @@ const _: () = assert!(
     SPEC.elements.len() <= 128,
     "a query kind set holds 128 kinds"
 );
+
+const fn element_gap(element: &'static str) -> GapSpec {
+    GapSpec {
+        subject: Subject::Element(element),
+        code: crate::Code::UnsupportedCapability,
+        follow_up: "record 0248 Phase C step 11 (DOC read+write loop)",
+        reason: "this native DOC concept is not yet projected into generic paths and queries",
+    }
+}

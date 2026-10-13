@@ -433,7 +433,7 @@ impl Slot {
     /// A failed flush leaves the slot dirty so the caller can repair the value
     /// and retry. A byte-identical write is a true no-op, which keeps a signed
     /// package's signature; a change to a signed package is refused (see
-    /// [`write`] and [`clear`]).
+    /// [`write()`] and [`clear()`]).
     /// # Errors
     ///
     /// Returns [`crate::Error::Opc`] with

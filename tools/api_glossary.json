@@ -6,7 +6,63 @@
       "package": "litchi-core",
       "default_features": false,
       "features": [],
-      "banned_names": [],
+      "banned_names": [
+        {
+          "name": "ReadLimits",
+          "scope": "litchi_core",
+          "replacement": "use SourceLimits"
+        },
+        {
+          "name": "ReadLimitsBuilder",
+          "scope": "litchi_core",
+          "replacement": "use SourceLimitsBuilder"
+        },
+        {
+          "name": "ReadResource",
+          "scope": "litchi_core",
+          "replacement": "use SourceLimitKind"
+        },
+        {
+          "name": "SourcePackageLimits",
+          "scope": "litchi_core",
+          "replacement": "use SourceLimits"
+        },
+        {
+          "name": "RecordLimits",
+          "scope": "litchi_core",
+          "replacement": "use SourceLimits"
+        },
+        {
+          "name": "DocumentSourceLimits",
+          "scope": "litchi_core",
+          "replacement": "use SourceLimits"
+        },
+        {
+          "name": "DocumentLimits",
+          "scope": "litchi_core",
+          "replacement": "use SemanticLimits"
+        },
+        {
+          "name": "DocumentSemanticLimits",
+          "scope": "litchi_core",
+          "replacement": "use SemanticLimits"
+        },
+        {
+          "name": "PackageOpenOptions",
+          "scope": "litchi_core",
+          "replacement": "use OpenOptions"
+        },
+        {
+          "name": "ReadOptions",
+          "scope": "litchi_core",
+          "replacement": "use OpenOptions"
+        },
+        {
+          "name": "LimitsError",
+          "scope": "litchi_core",
+          "replacement": "use Error::InvalidLimit"
+        }
+      ],
       "families": []
     },
     {
@@ -216,7 +272,9 @@
           "replacement": "use write_to"
         }
       ],
-      "families": []
+      "families": [
+        "litchi_docx::document"
+      ]
     },
     {
       "id": "docx-full",
@@ -430,7 +488,9 @@
           "replacement": "use write_to"
         }
       ],
-      "families": []
+      "families": [
+        "litchi_docx::document"
+      ]
     },
     {
       "id": "opc-minimal",
@@ -679,6 +739,247 @@
           "name": "XmlEvents",
           "scope": "litchi_opc::SourceLimitKind",
           "replacement": "use Events"
+        }
+      ],
+      "families": []
+    },
+    {
+      "id": "ooxml-common-minimal",
+      "package": "litchi-ooxml-common",
+      "default_features": false,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "ReadLimits",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use SourceLimits"
+        },
+        {
+          "name": "ReadLimitsBuilder",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use SourceLimitsBuilder"
+        },
+        {
+          "name": "ReadResource",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use SourceLimitKind"
+        },
+        {
+          "name": "SourcePackageLimits",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use SourceLimits"
+        },
+        {
+          "name": "PackageOpenOptions",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use OpenOptions"
+        },
+        {
+          "name": "LimitsError",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use Error::InvalidLimit"
+        },
+        {
+          "name": "TransactionError",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use the family module's Error"
+        },
+        {
+          "name": "TransactionResult",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use the family module's Result"
+        },
+        {
+          "name": "edit_document",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use Package::edit()"
+        },
+        {
+          "name": "publish_document_edit",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use Package::edit()?.commit()?.into_package()"
+        },
+        {
+          "name": "publish_document_commit",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use Commit::into_package()"
+        },
+        {
+          "name": "apply_document_patch",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use immutable Package::apply(&patch)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ooxml_common",
+          "replacement": "drop the detached Edit to discard staged changes"
+        },
+        {
+          "name": "document_mut",
+          "scope": "litchi_ooxml_common",
+          "replacement": "stage writes through an Edit"
+        },
+        {
+          "name": "presentation_mut",
+          "scope": "litchi_ooxml_common",
+          "replacement": "stage writes through an Edit"
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_ooxml_common",
+          "replacement": "stage writes through an Edit"
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use open_with_options(path, OpenOptions)"
+        },
+        {
+          "name": "open_with",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use open_with_options(path, OpenOptions)"
+        },
+        {
+          "name": "from_slice",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use from_bytes(&[u8])"
+        },
+        {
+          "name": "from_vec",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use from_bytes(&[u8])"
+        },
+        {
+          "name": "to_stream",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use write_to(impl Write)"
+        },
+        {
+          "name": "write_to_stream",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use write_to(impl Write)"
+        }
+      ],
+      "families": []
+    },
+    {
+      "id": "ooxml-common-full",
+      "package": "litchi-ooxml-common",
+      "default_features": false,
+      "features": [
+        "encryption",
+        "vba-inspection"
+      ],
+      "banned_names": [
+        {
+          "name": "ReadLimits",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use SourceLimits"
+        },
+        {
+          "name": "ReadLimitsBuilder",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use SourceLimitsBuilder"
+        },
+        {
+          "name": "ReadResource",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use SourceLimitKind"
+        },
+        {
+          "name": "SourcePackageLimits",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use SourceLimits"
+        },
+        {
+          "name": "PackageOpenOptions",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use OpenOptions"
+        },
+        {
+          "name": "LimitsError",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use Error::InvalidLimit"
+        },
+        {
+          "name": "TransactionError",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use the family module's Error"
+        },
+        {
+          "name": "TransactionResult",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use the family module's Result"
+        },
+        {
+          "name": "edit_document",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use Package::edit()"
+        },
+        {
+          "name": "publish_document_edit",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use Package::edit()?.commit()?.into_package()"
+        },
+        {
+          "name": "publish_document_commit",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use Commit::into_package()"
+        },
+        {
+          "name": "apply_document_patch",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use immutable Package::apply(&patch)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ooxml_common",
+          "replacement": "drop the detached Edit to discard staged changes"
+        },
+        {
+          "name": "document_mut",
+          "scope": "litchi_ooxml_common",
+          "replacement": "stage writes through an Edit"
+        },
+        {
+          "name": "presentation_mut",
+          "scope": "litchi_ooxml_common",
+          "replacement": "stage writes through an Edit"
+        },
+        {
+          "name": "UnsafeEdit",
+          "scope": "litchi_ooxml_common",
+          "replacement": "stage writes through an Edit"
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use open_with_options(path, OpenOptions)"
+        },
+        {
+          "name": "open_with",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use open_with_options(path, OpenOptions)"
+        },
+        {
+          "name": "from_slice",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use from_bytes(&[u8])"
+        },
+        {
+          "name": "from_vec",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use from_bytes(&[u8])"
+        },
+        {
+          "name": "to_stream",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use write_to(impl Write)"
+        },
+        {
+          "name": "write_to_stream",
+          "scope": "litchi_ooxml_common",
+          "replacement": "use write_to(impl Write)"
         }
       ],
       "families": []
@@ -1456,6 +1757,51 @@
           "scope": "litchi_pptx::slide::model",
           "replacement": "use slide::Selector with semantic names or Position",
           "recursive": false
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_pptx::opened",
+          "replacement": "use opened::Edit"
+        },
+        {
+          "name": "opened_presentation_transaction",
+          "scope": "litchi_pptx::Package",
+          "replacement": "use Package::edit()"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_pptx::opened::Edit",
+          "replacement": "drop the detached Edit to discard staged changes"
+        },
+        {
+          "name": "apply_opened_presentation_commit",
+          "scope": "litchi_pptx::Package",
+          "replacement": "consume Commit::into_package()"
+        },
+        {
+          "name": "apply_opened_presentation_patch",
+          "scope": "litchi_pptx::Package",
+          "replacement": "use immutable Package::apply(&patch)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_pptx::opened::Commit",
+          "replacement": "use Commit::package()"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_pptx::opened::Commit",
+          "replacement": "use Commit::diagnostics().changed()"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_pptx::opened::Edit",
+          "replacement": "commit and inspect diagnostics().changed()"
+        },
+        {
+          "name": "is_empty",
+          "scope": "litchi_pptx::opened::Patch",
+          "replacement": "use Patch::is_noop()"
         }
       ],
       "families": []
@@ -2471,6 +2817,199 @@
       "package": "litchi-ppt",
       "default_features": false,
       "features": [],
+      "banned_names": [
+        {
+          "name": "RecordLimits",
+          "scope": "litchi_ppt",
+          "replacement": "use checked SourceLimits"
+        },
+        {
+          "name": "RecordLimits",
+          "scope": "litchi_ppt::package",
+          "replacement": "use checked SourceLimits"
+        },
+        {
+          "name": "with_password",
+          "scope": "litchi_ppt::OpenOptions",
+          "replacement": "use canonical consuming password/leniency setters"
+        },
+        {
+          "name": "with_leniency",
+          "scope": "litchi_ppt::OpenOptions",
+          "replacement": "use canonical consuming password/leniency setters"
+        },
+        {
+          "name": "max_package_bytes",
+          "scope": "litchi_ppt::SourceLimits",
+          "replacement": "use canonical input_bytes/aggregate_bytes/events/aggregate_payload_bytes dimensions"
+        },
+        {
+          "name": "max_aggregate_input_bytes",
+          "scope": "litchi_ppt::SourceLimits",
+          "replacement": "use canonical input_bytes/aggregate_bytes/events/aggregate_payload_bytes dimensions"
+        },
+        {
+          "name": "max_records",
+          "scope": "litchi_ppt::SourceLimits",
+          "replacement": "use canonical input_bytes/aggregate_bytes/events/aggregate_payload_bytes dimensions"
+        },
+        {
+          "name": "max_copied_payload_bytes",
+          "scope": "litchi_ppt::SourceLimits",
+          "replacement": "use canonical input_bytes/aggregate_bytes/events/aggregate_payload_bytes dimensions"
+        },
+        {
+          "name": "max_package_bytes",
+          "scope": "litchi_ppt::SourceLimitsBuilder",
+          "replacement": "use canonical input_bytes/aggregate_bytes/events/aggregate_payload_bytes dimensions"
+        },
+        {
+          "name": "max_aggregate_input_bytes",
+          "scope": "litchi_ppt::SourceLimitsBuilder",
+          "replacement": "use canonical input_bytes/aggregate_bytes/events/aggregate_payload_bytes dimensions"
+        },
+        {
+          "name": "max_records",
+          "scope": "litchi_ppt::SourceLimitsBuilder",
+          "replacement": "use canonical input_bytes/aggregate_bytes/events/aggregate_payload_bytes dimensions"
+        },
+        {
+          "name": "max_copied_payload_bytes",
+          "scope": "litchi_ppt::SourceLimitsBuilder",
+          "replacement": "use canonical input_bytes/aggregate_bytes/events/aggregate_payload_bytes dimensions"
+        },
+        {
+          "name": "record_limits",
+          "scope": "litchi_ppt::Package",
+          "replacement": "use source_limits()"
+        },
+        {
+          "name": "record_limits",
+          "scope": "litchi_ppt::SourceBackedPackage",
+          "replacement": "use source_limits()"
+        },
+        {
+          "name": "ole_file",
+          "scope": "litchi_ppt::Package",
+          "replacement": "use immutable Package configured ingress; cursor access belongs to raw::Reader"
+        },
+        {
+          "name": "into_ole_file",
+          "scope": "litchi_ppt::Package",
+          "replacement": "use immutable Package configured ingress; cursor access belongs to raw::Reader"
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_ppt::Package",
+          "replacement": "use immutable Package configured ingress; cursor access belongs to raw::Reader"
+        },
+        {
+          "name": "from_reader_with_limits",
+          "scope": "litchi_ppt::Package",
+          "replacement": "use immutable Package configured ingress; cursor access belongs to raw::Reader"
+        },
+        {
+          "name": "from_ole_file_with_limits",
+          "scope": "litchi_ppt::Package",
+          "replacement": "use immutable Package configured ingress; cursor access belongs to raw::Reader"
+        },
+        {
+          "name": "presentation_with_limits",
+          "scope": "litchi_ppt::Package",
+          "replacement": "use immutable Package configured ingress; cursor access belongs to raw::Reader"
+        },
+        {
+          "name": "presentation_with_options",
+          "scope": "litchi_ppt::Package",
+          "replacement": "use immutable Package configured ingress; cursor access belongs to raw::Reader"
+        },
+        {
+          "name": "presentation_with_options_and_limits",
+          "scope": "litchi_ppt::Package",
+          "replacement": "use immutable Package configured ingress; cursor access belongs to raw::Reader"
+        },
+        {
+          "name": "Package",
+          "scope": "litchi_ppt::raw",
+          "replacement": "use raw::Reader for the cursor-based reader"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::package::edit",
+          "replacement": "use Edit"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::package::edit::Edit",
+          "replacement": "drop the owned edit"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::package::edit::Commit",
+          "replacement": "use package()"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_ppt::package::edit::Commit",
+          "replacement": "use into_package()"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::package::edit::Commit",
+          "replacement": "use diagnostics().changed()"
+        },
+        {
+          "name": "is_empty",
+          "scope": "litchi_ppt::package::edit::Patch",
+          "replacement": "use is_noop()"
+        },
+        {
+          "name": "Writer",
+          "scope": "litchi_ppt",
+          "replacement": "use Builder::build returning Package"
+        },
+        {
+          "name": "Writer",
+          "scope": "litchi_ppt::writer",
+          "replacement": "use Builder::build returning Package"
+        },
+        {
+          "name": "save",
+          "scope": "litchi_ppt::Builder",
+          "replacement": "publish the built Package"
+        },
+        {
+          "name": "save_with_durability",
+          "scope": "litchi_ppt::Builder",
+          "replacement": "publish the built Package"
+        },
+        {
+          "name": "write_to",
+          "scope": "litchi_ppt::Builder",
+          "replacement": "publish the built Package"
+        },
+        {
+          "name": "to_bytes",
+          "scope": "litchi_ppt::Builder",
+          "replacement": "publish the built Package"
+        }
+      ],
+      "families": [
+        "litchi_ppt::package::edit"
+      ]
+    },
+    {
+      "id": "ppt-full",
+      "package": "litchi-ppt",
+      "default_features": false,
+      "features": [
+        "automatic-fonts",
+        "encryption",
+        "formula",
+        "performance-diagnostics",
+        "sign",
+        "vba-inspection"
+      ],
       "banned_names": [
         {
           "name": "RecordLimits",

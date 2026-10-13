@@ -1503,3 +1503,48 @@ editable document model is introduced. Temporary source indexes are bounded;
 staging windows close at their limits, while scalar admission stays available
 when the optimization index cannot fit. Source-changing boundaries publish
 before resolving later positional paths.
+
+## Gate hardening (record 0249)
+
+Record 0249 extends the registered gate without changing any public API. Every
+added rule matches code that is already conformant; banned names that still
+exist are listed below as wave residue, not as failing rules.
+
+- **Families.** `litchi_docx::document` is registered in `docx-minimal` and
+  `docx-full`; it is the only OOXML module exporting all six family types.
+  **Pending, not registered:** pptx `opened`, `source` and `change_tracking`
+  (no `Error`, `LimitKind`); xlsb `cell_values` (no `LimitKind`) and its
+  structure/worksheet families; xlsx `workbook::edit` and the scoped xlsx
+  families (no `Diagnostics`, `Error`, `LimitKind`, or no `Edit`); docx
+  `content_control`, `ink`, `section::layout`, `revision::conflict` and the
+  `source_backed::*` edit modules. Each registers in the change that completes it.
+- **pptx-full** now carries the nine primary-transaction bans `pptx-minimal`
+  already had (`opened::Transaction`, `opened_presentation_transaction`,
+  `apply_opened_presentation_{commit,patch}`, `opened::Edit::{rollback,
+  is_changed}`, `opened::Commit::{snapshot, is_changed}`,
+  `opened::Patch::is_empty`).
+- **ppt-full** builds every PPT feature with the `ppt-minimal` rules. XLS, RTF
+  and core declare no Cargo features, so their single profile is already the
+  full surface; no duplicate profile is added.
+- **core-minimal** bans the §4 configuration names that `litchi-core` must not
+  grow (`ReadLimits`, `ReadLimitsBuilder`, `ReadResource`,
+  `SourcePackageLimits`, `RecordLimits`, `DocumentSourceLimits`,
+  `DocumentLimits`, `DocumentSemanticLimits`, `PackageOpenOptions`,
+  `ReadOptions`, `LimitsError`). §4 bans `Limits` only as DOC's
+  `package::Limits` (already banned in the DOC profiles); core's execution
+  budget `litchi_core::Limits` is not a banned name.
+- **ooxml-common-minimal/full** register the transaction, open/output and
+  configuration names banned in §2–§4 that `litchi-ooxml-common` does not expose.
+- **Facade.** A `litchi` profile cannot be activated: even the featureless
+  facade re-exports dependency crates through public globs
+  (`common::*` → `litchi_core::*`), whose children rustdoc JSON omits, so the
+  checker refuses the profile (record 0017). It needs dependency export data.
+
+Wave residue that still exposes a glossary-banned name (owner: record 0248):
+
+| Crate | Public name | Canonical | Owner |
+|---|---|---|---|
+| ooxml-common | `custom_xml::Transaction`, `Transaction::is_changed`, `Commit::snapshot` | `Edit`, `diagnostics().changed()`, `Commit::package()` | Phase B step 6 (owns `litchi-ooxml-common`) |
+| ooxml-common | `custom_data::Limits` | `SemanticLimits` | Phase B step 6 |
+| core | `Limits`, `Error::ResourceLimit` (execution budgets) | not banned by §4; rename only on an owner decision | owner decision |
+| pptx, xlsb, xlsx, opc, ops | names listed in record 0248 §2 | §2–§4 | Phase B steps 4–5, ops follow-ups |
