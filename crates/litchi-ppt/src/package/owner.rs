@@ -287,6 +287,20 @@ impl Package {
         }
     }
 
+    /// Seed the presentation's one-slide shape memo with shapes proven equal
+    /// to a parse of slide `persist_id` of this package (record 0264).
+    pub(crate) fn seed_slide_shapes(
+        &self,
+        persist_id: u32,
+        shapes: Arc<[crate::shapes::ShapeEnum<'static>]>,
+    ) {
+        self.inner
+            .presentation
+            .inner
+            .shape_memo
+            .seed(persist_id, shapes);
+    }
+
     /// Return a cloned read projection after checking positional freshness.
     pub fn presentation(&self) -> Result<Presentation> {
         let expected = self.inner.shared.source_version()?;

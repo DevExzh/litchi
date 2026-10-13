@@ -506,6 +506,34 @@ fn main() -> Result<()> {
             }
             Vec::new()
         },
+        "profile-batch-unified" => {
+            // A long unified-only 10k loop for sampling profilers (record 0264).
+            let bytes = deck(10_000)?;
+            let unified = litchi::open_bytes(bytes)?;
+            let paths = (0..10_000)
+                .map(|index| {
+                    litchi_ops::path::Path::parse(&format!("/slide[1]/shape[{}]", index + 1))
+                        .map(litchi_ops::path::Path::into_owned)
+                })
+                .collect::<std::result::Result<Vec<_>, _>>()?;
+            let texts = (0..10_000).map(updated_text).collect::<Vec<_>>();
+            let limits = SemanticLimits::builder()
+                .max_snapshot_bytes(1 << 30)?
+                .max_staged_bytes(1 << 30)?
+                .max_operations(1 << 20)?
+                .max_expanded_targets(1 << 20)?
+                .build()?;
+            for _ in 0..rounds {
+                let commit = unified.edit_with_limits(&limits, |edit| {
+                    for (path, text) in paths.iter().zip(&texts) {
+                        edit.set(path, litchi_ops::props! { "text" => text.as_str() })?;
+                    }
+                    Ok(())
+                })?;
+                drop(commit);
+            }
+            Vec::new()
+        },
         "profile-single" => {
             let bytes = deck(1000)?;
             let unified = litchi::open_bytes(bytes)?;

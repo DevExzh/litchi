@@ -118,6 +118,14 @@ impl Slide<'_> {
         self.parsed_shapes().map(|(_, tolerance)| tolerance)
     }
 
+    /// The payload of this slide's first `PPDrawing` child, exactly the
+    /// bytes [`Self::shapes`] parses (record 0264 incremental readback).
+    pub(crate) fn drawing_payload(&self) -> Option<&[u8]> {
+        self.record
+            .find_child(RecordType::PPDrawing)
+            .map(|drawing| drawing.data.as_slice())
+    }
+
     fn parsed_shapes(
         &self,
     ) -> Result<&(Arc<[ShapeEnum<'static>]>, crate::leniency::ToleranceReport)> {

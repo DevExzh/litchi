@@ -105,6 +105,18 @@ impl ShapeMemo {
             .map(|(_, value)| (Arc::clone(&value.0), value.1.clone()))
     }
 
+    /// Seed the memo with a slide's shapes that were proven equal to what
+    /// parsing this presentation's slide `persist_id` returns (record 0264:
+    /// a committed text edit hands its incrementally verified shapes to the
+    /// published package, so the next chunked edit does not parse them
+    /// again). Callers must hold that proof; the memo cannot check it.
+    pub(crate) fn seed(&self, persist_id: u32, shapes: Arc<[ShapeEnum<'static>]>) {
+        self.put(
+            persist_id,
+            &(shapes, crate::leniency::ToleranceReport::default()),
+        );
+    }
+
     fn put(&self, persist_id: u32, value: &ParsedShapes) {
         if let Ok(mut entry) = self.0.lock() {
             *entry = Some((persist_id, (Arc::clone(&value.0), value.1.clone())));
