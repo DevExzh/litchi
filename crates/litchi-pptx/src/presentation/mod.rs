@@ -11,7 +11,7 @@ mod package;
 pub(crate) mod source;
 mod source_cross_copy;
 mod source_removal;
-mod transition;
+pub(crate) mod transition;
 
 #[cfg(test)]
 mod tests;

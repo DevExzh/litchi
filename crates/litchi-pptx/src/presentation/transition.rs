@@ -89,7 +89,7 @@ fn has_mce_markup(xml: &[u8]) -> Result<bool> {
     }
 }
 
-pub(super) fn read_direct(xml: &[u8]) -> Result<Option<Transition>> {
+pub(crate) fn read_direct(xml: &[u8]) -> Result<Option<Transition>> {
     let layout = locate(xml, "read_transition")?;
     if layout.transition.is_none() {
         return Ok(None);
@@ -97,7 +97,7 @@ pub(super) fn read_direct(xml: &[u8]) -> Result<Option<Transition>> {
     validate_owner_for_read(xml, &layout)
 }
 
-pub(super) fn stage(
+pub(crate) fn stage(
     xml: &[u8],
     presentation_xml: &[u8],
     target: Option<&Transition>,

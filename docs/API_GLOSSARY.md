@@ -1859,3 +1859,35 @@ the eager `Document::comments`.
 | `Edit::insert_picture_at` | adopted (0251d) |
 | `numbering::{ListKind, AddedList}` | adopted (0251e) |
 | `Edit::{add_list, list_kind}` | adopted (0251e) |
+
+## Command-channel property policy, PPTX shape fill and slide transitions (record 0269)
+
+`batch::Unsupported::{Refuse, Warn}` names what a command does with a property
+its target refuses with `unsupported_property`. `Refuse` is the default
+everywhere and the only behaviour of the library verbs (`set`, `add`, `edit`
+closures); `Warn` is OfficeCLI's "apply the rest and warn" and exists only on
+the command channel. `batch::Options` is the command-channel envelope (batch
+mode, unsupported-property policy, `SemanticLimits`) with consuming setters
+`mode`, `unsupported` and `limits`; `File::apply_with` and `File::batch_with`
+take it, and `File::batch_with_limits` delegates to `batch_with`. Skipped
+properties are reported per item in `Applied::warnings`, each the refusing
+`Error` with its property and item index; no second diagnostics type is
+introduced and `transaction::Diagnostics` is unchanged.
+
+PPTX leaf: `opened::ShapeFill::{Solid, None}` is a shape's own `p:spPr` fill;
+`TextProperties::{with_shape_fill, with_geometry}` assign it and a preset
+geometry (`litchi_drawingml::geom::Preset`) on a `TextTarget::Shape` edit, so
+both owners reuse `set_text_properties`. `opened::Edit::set_slide_transition`
+and the source-backed primary `Edit::set_slide_transition` set (`Some`) or
+clear (`None`) a slide's direct transition, mirroring
+`SourceBackedSlideEdit::{set_transition, clear_transition}`.
+
+| Name | Status |
+|---|---|
+| `batch::Unsupported::{Refuse, Warn}` | adopted (0269) |
+| `batch::Options` (`mode`, `unsupported`, `limits`) | adopted (0269) |
+| `File::{apply_with, batch_with}` | adopted (0269) |
+| `Applied::warnings` | adopted (0269) |
+| `litchi_pptx::opened::ShapeFill` | adopted (0269) |
+| `TextProperties::{with_shape_fill, with_geometry}` | adopted (0269) |
+| `opened::Edit::set_slide_transition`, `source::Edit::set_slide_transition` | adopted (0269) |

@@ -486,6 +486,63 @@ impl Edit {
         Ok(true)
     }
 
+    /// Set (`Some`) or clear (`None`) the selected slide's direct
+    /// transition (`p:transition`, or its markup-compatibility owner for the
+    /// PowerPoint 2010+ effects and Morph).
+    ///
+    /// The value may use the supported PowerPoint extension vocabulary and a
+    /// custom duration; unknown effects are refused. An equal modeled value,
+    /// or clearing an absent transition, is an exact byte no-op. Inherited
+    /// layout or master transitions are never touched. Returns whether the
+    /// slide changed.
+    ///
+    /// ```
+    /// # fn main() -> litchi_pptx::Result<()> {
+    /// use litchi_pptx::transition::{Kind, Side, Transition};
+    /// let source = litchi_pptx::Package::new()?;
+    /// let mut edit = source.edit()?;
+    /// edit.insert_slide(litchi_core::Position::new(0), "Blank")?;
+    /// let push = Transition::new(Kind::Push(Side::Left));
+    /// assert!(edit.set_slide_transition(0_usize, Some(&push))?);
+    /// assert!(!edit.set_slide_transition(0_usize, Some(&push))?);
+    /// let _package = edit.commit()?.into_package();
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an out-of-range slide, an unsupported or invalid
+    /// transition, a modification-protected presentation, malformed slide
+    /// XML, or an exhausted output limit. A failure leaves the edit unchanged.
+    pub fn set_slide_transition<'s>(
+        &mut self,
+        slide: impl Into<crate::slide::Selector<'s>>,
+        value: Option<&crate::transition::Transition>,
+    ) -> Result<bool> {
+        let selected_slide = self.resolve_slide(slide.into())?;
+        let owner = self.working.get_part(&selected_slide.part_name)?;
+        crate::parts::validate_content_type(owner, litchi_opc::constants::content_type::PML_SLIDE)?;
+        let main = self.working.get_part(&self.source.presentation_name)?;
+        let (xml, changed) = crate::presentation::transition::stage(
+            owner.blob(),
+            main.blob(),
+            value,
+            crate::shape::Limits::DEFAULT.output_bytes(),
+            if value.is_some() {
+                "set_slide_transition"
+            } else {
+                "clear_slide_transition"
+            },
+        )?;
+        if let Some(xml) = xml {
+            self.working
+                .get_part_mut(&selected_slide.part_name)?
+                .set_blob(xml);
+        }
+        Ok(changed)
+    }
+
     /// Atomically replace visible text in a bounded set of shapes on one slide.
     ///
     /// Every selector is resolved against the same immutable staged slide.

@@ -407,24 +407,37 @@
         },
         "font.bold": {
           "type": "bool",
+          "aliases": [
+            "bold"
+          ],
           "add": false,
           "set": true,
           "get": true
         },
         "font.italic": {
           "type": "bool",
+          "aliases": [
+            "italic"
+          ],
           "add": false,
           "set": true,
           "get": true
         },
         "strike": {
           "type": "bool",
+          "aliases": [
+            "font.strike",
+            "strikethrough"
+          ],
           "add": false,
           "set": true,
           "get": true
         },
         "underline": {
           "type": "enum",
+          "aliases": [
+            "font.underline"
+          ],
           "values": [
             "single",
             "none"
@@ -439,6 +452,9 @@
         },
         "font.color": {
           "type": "color",
+          "aliases": [
+            "color"
+          ],
           "colorContext": "spreadsheet",
           "clearable": true,
           "add": false,
@@ -447,6 +463,10 @@
         },
         "font.size": {
           "type": "font-size",
+          "aliases": [
+            "size",
+            "fontsize"
+          ],
           "unit": "pt",
           "constraint": {
             "minEmu": 12700,
@@ -458,6 +478,10 @@
         },
         "font.name": {
           "type": "string",
+          "aliases": [
+            "font",
+            "fontname"
+          ],
           "constraint": {
             "notEmpty": true
           },
@@ -467,6 +491,10 @@
         },
         "fill": {
           "type": "color",
+          "aliases": [
+            "bgcolor",
+            "bg"
+          ],
           "colorContext": "spreadsheet",
           "clearable": true,
           "add": false,
@@ -591,12 +619,20 @@
         },
         "alignment.wrapText": {
           "type": "bool",
+          "aliases": [
+            "wrap",
+            "wraptext"
+          ],
           "add": false,
           "set": true,
           "get": true
         },
         "alignment.horizontal": {
           "type": "enum",
+          "aliases": [
+            "halign",
+            "align"
+          ],
           "values": [
             "general",
             "left",
@@ -616,6 +652,9 @@
         },
         "alignment.vertical": {
           "type": "enum",
+          "aliases": [
+            "valign"
+          ],
           "values": [
             "top",
             "center",
@@ -629,6 +668,9 @@
         },
         "alignment.textRotation": {
           "type": "int",
+          "aliases": [
+            "rotation"
+          ],
           "constraint": {
             "min": 0,
             "max": 255
@@ -639,6 +681,9 @@
         },
         "alignment.indent": {
           "type": "int",
+          "aliases": [
+            "indent"
+          ],
           "constraint": {
             "min": 0,
             "max": 250
@@ -655,6 +700,9 @@
         },
         "alignment.readingOrder": {
           "type": "enum",
+          "aliases": [
+            "readingorder"
+          ],
           "values": [
             "context",
             "ltr",
@@ -674,6 +722,10 @@
         },
         "numberformat": {
           "type": "string",
+          "aliases": [
+            "numfmt",
+            "format"
+          ],
           "constraint": {
             "notEmpty": true
           },
@@ -695,6 +747,9 @@
         },
         "value": {
           "type": "scalar",
+          "aliases": [
+            "text"
+          ],
           "clearable": true,
           "add": false,
           "set": true,
@@ -708,6 +763,9 @@
         },
         "border.all": {
           "type": "enum",
+          "aliases": [
+            "border"
+          ],
           "values": [
             "thin",
             "medium",
@@ -731,6 +789,9 @@
         },
         "border.all.color": {
           "type": "color",
+          "aliases": [
+            "border.color"
+          ],
           "colorContext": "spreadsheet",
           "add": false,
           "set": true,
@@ -920,6 +981,9 @@
       "properties": {
         "value": {
           "type": "scalar",
+          "aliases": [
+            "text"
+          ],
           "clearable": true,
           "add": false,
           "set": true,
@@ -942,24 +1006,37 @@
         },
         "font.bold": {
           "type": "bool",
+          "aliases": [
+            "bold"
+          ],
           "add": false,
           "set": true,
           "get": false
         },
         "font.italic": {
           "type": "bool",
+          "aliases": [
+            "italic"
+          ],
           "add": false,
           "set": true,
           "get": false
         },
         "strike": {
           "type": "bool",
+          "aliases": [
+            "font.strike",
+            "strikethrough"
+          ],
           "add": false,
           "set": true,
           "get": false
         },
         "underline": {
           "type": "enum",
+          "aliases": [
+            "font.underline"
+          ],
           "values": [
             "single",
             "none"
@@ -974,6 +1051,10 @@
         },
         "font.name": {
           "type": "string",
+          "aliases": [
+            "font",
+            "fontname"
+          ],
           "constraint": {
             "notEmpty": true
           },
@@ -983,6 +1064,10 @@
         },
         "font.size": {
           "type": "font-size",
+          "aliases": [
+            "size",
+            "fontsize"
+          ],
           "unit": "pt",
           "constraint": {
             "minEmu": 12700,
@@ -994,6 +1079,9 @@
         },
         "font.color": {
           "type": "color",
+          "aliases": [
+            "color"
+          ],
           "colorContext": "spreadsheet",
           "clearable": true,
           "add": false,
@@ -1002,6 +1090,10 @@
         },
         "fill": {
           "type": "color",
+          "aliases": [
+            "bgcolor",
+            "bg"
+          ],
           "colorContext": "spreadsheet",
           "clearable": true,
           "add": false,
@@ -1010,6 +1102,9 @@
         },
         "border.all": {
           "type": "enum",
+          "aliases": [
+            "border"
+          ],
           "values": [
             "thin",
             "medium",
@@ -1033,6 +1128,9 @@
         },
         "border.all.color": {
           "type": "color",
+          "aliases": [
+            "border.color"
+          ],
           "colorContext": "spreadsheet",
           "add": false,
           "set": true,
@@ -1160,6 +1258,10 @@
         },
         "numberformat": {
           "type": "string",
+          "aliases": [
+            "numfmt",
+            "format"
+          ],
           "constraint": {
             "notEmpty": true
           },
@@ -1169,6 +1271,10 @@
         },
         "alignment.horizontal": {
           "type": "enum",
+          "aliases": [
+            "halign",
+            "align"
+          ],
           "values": [
             "general",
             "left",
@@ -1188,6 +1294,9 @@
         },
         "alignment.vertical": {
           "type": "enum",
+          "aliases": [
+            "valign"
+          ],
           "values": [
             "top",
             "center",
@@ -1201,12 +1310,19 @@
         },
         "alignment.wrapText": {
           "type": "bool",
+          "aliases": [
+            "wrap",
+            "wraptext"
+          ],
           "add": false,
           "set": true,
           "get": false
         },
         "alignment.textRotation": {
           "type": "int",
+          "aliases": [
+            "rotation"
+          ],
           "constraint": {
             "min": 0,
             "max": 255
@@ -1217,6 +1333,9 @@
         },
         "alignment.indent": {
           "type": "int",
+          "aliases": [
+            "indent"
+          ],
           "constraint": {
             "min": 0,
             "max": 250
@@ -1233,6 +1352,9 @@
         },
         "alignment.readingOrder": {
           "type": "enum",
+          "aliases": [
+            "readingorder"
+          ],
           "values": [
             "context",
             "ltr",

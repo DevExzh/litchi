@@ -46,13 +46,18 @@ impl Xlsx {
         // encryption policy ahead of authored property conversion, matching
         // the cell and DOCX write adapters.
         let source = self.editor()?;
+        // The element kind first (record 0269, finding X1): a kind the
+        // workbook cannot add is `unsupported_element` whatever its parent;
+        // an addable kind under the wrong parent is `unsupported_type`.
+        new_kind(node.kind())?;
         let parent = resolve_path(self, &parent)?;
         if parent.element() != Kind::Workbook {
-            return Err(refusal(
+            return Err(Error::new(
+                Code::UnsupportedType,
                 "an XLSX sheet can only be added directly under the workbook",
-            ));
+            )
+            .with_format(FileFormat::Xlsx));
         }
-        new_kind(node.kind())?;
         let placement = node.placement().cloned();
         let properties = super::sheet_write::admit_sheet_properties(Operation::Add, node.props())?;
         let name = match properties.name {
@@ -202,9 +207,10 @@ fn new_kind(name: &str) -> Result<NewKind> {
     } else {
         Err(Error::new(
             Code::UnsupportedElement,
-            "the XLSX structural verb supports worksheet sheets only",
+            "this element kind cannot be added to an XLSX workbook yet; only sheets can",
         )
-        .with_format(FileFormat::Xlsx))
+        .with_format(FileFormat::Xlsx)
+        .with_suggestion("capabilities() lists the addable elements and the gaps"))
     }
 }
 

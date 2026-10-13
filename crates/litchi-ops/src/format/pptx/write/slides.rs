@@ -32,6 +32,8 @@ impl Pptx {
     ) -> Result<Commit> {
         let mut name = None;
         let mut hidden = None;
+        // `Some(None)` removes the slide's direct transition.
+        let mut transition: Option<Option<litchi_pptx::transition::Transition>> = None;
         let mut properties = 0_u8;
         for (key, value) in props.iter() {
             let (index, entry) = SLIDE_WRITE_TABLE
@@ -71,6 +73,13 @@ impl Pptx {
                         };
                         hidden = Some(value);
                     },
+                    SlideProperty::Transition => {
+                        transition = Some(match value {
+                            Some(Scalar::Text(value)) => super::transition::parse(value)?,
+                            None => None,
+                            _ => unreachable!("slide transition coercion"),
+                        });
+                    },
                     SlideProperty::Layout => unreachable!("read-only slide layout setter"),
                     SlideProperty::Notes => unreachable!("notes are routed before slide metadata"),
                 }
@@ -82,7 +91,9 @@ impl Pptx {
         let charge = name
             .as_ref()
             .map_or(0, String::len)
-            .saturating_add(size_of::<usize>() + size_of::<Option<bool>>());
+            .saturating_add(size_of::<usize>() + size_of::<Option<bool>>())
+            .saturating_add(if transition.is_some() { 64 } else { 0 });
+        let metadata = name.is_some() || hidden.is_some();
         let mut append = |node: crate::format::pptx::Node<'_>| -> Result<()> {
             let Item::Slide(slide) = node.item() else {
                 return Err(error(
@@ -138,7 +149,12 @@ impl Pptx {
             Editable::Source(package) => {
                 let mut edit = package.edit()?;
                 for position in &targets {
-                    edit.set_slide_properties(*position, name.as_deref(), hidden)?;
+                    if metadata {
+                        edit.set_slide_properties(*position, name.as_deref(), hidden)?;
+                    }
+                    if let Some(value) = &transition {
+                        edit.set_slide_transition(*position, value.as_ref())?;
+                    }
                 }
                 let (target, patch) = edit.commit()?.into_parts();
                 let changed = !patch.is_noop();
@@ -147,7 +163,12 @@ impl Pptx {
             Editable::Eager(package) => {
                 let mut edit = package.edit()?;
                 for position in &targets {
-                    edit.set_slide_properties(*position, name.as_deref(), hidden)?;
+                    if metadata {
+                        edit.set_slide_properties(*position, name.as_deref(), hidden)?;
+                    }
+                    if let Some(value) = &transition {
+                        edit.set_slide_transition(*position, value.as_ref())?;
+                    }
                 }
                 let (target, patch) = edit.commit()?.into_parts();
                 let changed = !patch.is_noop();

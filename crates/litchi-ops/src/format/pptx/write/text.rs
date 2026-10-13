@@ -12,8 +12,9 @@ use crate::transaction::{LimitKind, SemanticLimits};
 use crate::value::{Base, Scalar};
 use crate::{Code, Props, Result};
 use litchi_core::Position;
+use litchi_drawingml::geom::Preset;
 use litchi_drawingml::text::Alignment;
-use litchi_pptx::opened::{Rgb, TextEdit, TextProperties, TextTarget};
+use litchi_pptx::opened::{Rgb, ShapeFill, TextEdit, TextProperties, TextTarget};
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -75,10 +76,12 @@ pub(in crate::format::pptx) struct TextValues {
     latin: Option<Option<String>>,
     align: Option<Option<Alignment>>,
     fill: Option<Option<Rgb>>,
+    shape_fill: Option<Option<ShapeFill>>,
+    geometry: Option<Preset>,
 }
 
 impl TextValues {
-    pub(super) fn is_empty(&self) -> bool {
+    pub(in crate::format::pptx) fn is_empty(&self) -> bool {
         self.text.is_none()
             && self.bold.is_none()
             && self.italic.is_none()
@@ -88,6 +91,8 @@ impl TextValues {
             && self.latin.is_none()
             && self.align.is_none()
             && self.fill.is_none()
+            && self.shape_fill.is_none()
+            && self.geometry.is_none()
     }
 
     pub(super) fn charge(&self) -> usize {
@@ -105,7 +110,7 @@ impl TextValues {
             .saturating_add(64)
     }
 
-    pub(super) fn properties(&self) -> TextProperties<'_> {
+    pub(in crate::format::pptx) fn properties(&self) -> TextProperties<'_> {
         let mut properties = TextProperties::default();
         if let Some(text) = &self.text {
             properties = properties.with_text(text);
@@ -134,11 +139,34 @@ impl TextValues {
         if let Some(value) = self.fill {
             properties = properties.with_fill(value);
         }
+        if let Some(value) = self.shape_fill {
+            properties = properties.with_shape_fill(value);
+        }
+        if let Some(value) = self.geometry {
+            properties = properties.with_geometry(value);
+        }
         properties
     }
 
+    /// Whether `setter` already has an assignment.
+    pub(in crate::format::pptx) const fn has(&self, setter: TextSetter) -> bool {
+        match setter {
+            TextSetter::Text => self.text.is_some(),
+            TextSetter::Bold => self.bold.is_some(),
+            TextSetter::Italic => self.italic.is_some(),
+            TextSetter::Size => self.size.is_some(),
+            TextSetter::Color => self.color.is_some(),
+            TextSetter::Font => self.font.is_some(),
+            TextSetter::FontLatin => self.latin.is_some(),
+            TextSetter::Align => self.align.is_some(),
+            TextSetter::Fill => self.fill.is_some(),
+            TextSetter::ShapeFill => self.shape_fill.is_some(),
+            TextSetter::Geometry => self.geometry.is_some(),
+        }
+    }
+
     /// Record one coerced assignment.
-    pub(super) fn stage(
+    pub(in crate::format::pptx) fn stage(
         &mut self,
         setter: TextSetter,
         value: Option<Scalar<'_>>,
@@ -208,6 +236,19 @@ impl TextValues {
                     self.latin = Some(face);
                 }
             },
+            TextSetter::ShapeFill => {
+                self.shape_fill = Some(match value {
+                    Some(Scalar::Text(text)) => Some(shape_fill(text)?),
+                    None => None,
+                    _ => unreachable!("shape fill coercion"),
+                });
+            },
+            TextSetter::Geometry => {
+                let Some(Scalar::Text(token)) = value else {
+                    unreachable!("geometry coercion admits no clear")
+                };
+                self.geometry = Some(geometry(token)?);
+            },
             TextSetter::Align => {
                 self.align = Some(match value {
                     Some(Scalar::Token(token)) => Some(alignment(token)?),
@@ -218,6 +259,50 @@ impl TextValues {
         }
         Ok(())
     }
+}
+
+/// A shape fill: `none`, or a colour in the drawing vocabulary that the
+/// native writer can store (opaque RGB).
+fn shape_fill(text: &str) -> Result<ShapeFill> {
+    if text.trim().eq_ignore_ascii_case("none") {
+        return Ok(ShapeFill::None);
+    }
+    let color =
+        crate::value::Color::parse(text, crate::value::ColorContext::Drawing).map_err(|_| {
+            error(Code::InvalidValue, "a shape fill is `none` or a colour")
+                .with_property("fill")
+                .with_suggestion("use none, a hex colour such as 1F4E79, or a colour name")
+        })?;
+    Ok(ShapeFill::Solid(
+        rgb(&color).map_err(|error| error.with_property("fill"))?,
+    ))
+}
+
+/// A preset geometry token (`ST_ShapeType`), matched as OfficeCLI matches
+/// it: exactly, then ignoring ASCII case.
+fn geometry(token: &str) -> Result<Preset> {
+    let token = token.trim();
+    token
+        .parse::<Preset>()
+        .ok()
+        .or_else(|| {
+            Preset::ALL
+                .into_iter()
+                .find(|preset| preset.token().eq_ignore_ascii_case(token))
+        })
+        .ok_or_else(|| {
+            let error =
+                error(Code::InvalidValue, "unknown preset geometry").with_property("geometry");
+            match crate::value::suggest::nearest_keyed(
+                token,
+                Preset::ALL
+                    .into_iter()
+                    .map(|preset| (preset.token(), preset.token())),
+            ) {
+                Some(name) => error.with_suggestion(format!("did you mean '{name}'?")),
+                None => error,
+            }
+        })
 }
 
 fn font_size(points: f64) -> Result<u32> {
@@ -266,8 +351,8 @@ fn alignment(token: &str) -> Result<Alignment> {
     })
 }
 
-fn admit<const N: usize>(
-    table: &Table<TextSetter, N, 0>,
+fn admit<const N: usize, const A: usize>(
+    table: &Table<TextSetter, N, A>,
     props: &Props<'_>,
     limits: &SemanticLimits,
 ) -> Result<TextValues> {

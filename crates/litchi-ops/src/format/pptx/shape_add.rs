@@ -2,6 +2,7 @@
 use super::node::Item;
 use super::spec::{Kind, SHAPE_WRITE_TABLE, ShapeSetter};
 use super::structure::{bound, error};
+use super::write::text::TextValues;
 use super::write::{Commit, Proof, validate_text};
 use super::{Editable, Nav, Pptx, steps};
 use crate::path::PathArg;
@@ -44,6 +45,8 @@ impl Pptx {
         )?;
         let mut text = None;
         let mut geometry = [None; 4];
+        // Run and paragraph formatting of the new body (`size`, `bold`, ...).
+        let mut format = TextValues::default();
         for (key, value) in node.props().iter() {
             let (_, entry) = SHAPE_WRITE_TABLE
                 .resolve(key.as_str())
@@ -76,6 +79,16 @@ impl Pptx {
                         owned.push_str(value);
                         text = Some(owned);
                     },
+                    ShapeSetter::Format(setter) => {
+                        if format.has(setter) {
+                            return Err(error(
+                                Code::InvalidArgument,
+                                "a text property was assigned more than once",
+                            )
+                            .with_property(key.as_str().to_owned()));
+                        }
+                        format.stage(setter, scalar, limits)?;
+                    },
                     setter => {
                         let (index, name) = match setter {
                             ShapeSetter::X => (0, "x"),
@@ -83,7 +96,7 @@ impl Pptx {
                             ShapeSetter::Width => (2, "width"),
                             ShapeSetter::Height => (3, "height"),
                             ShapeSetter::Text | ShapeSetter::Format(_) => {
-                                unreachable!("text and formatting are not add setters")
+                                unreachable!("text and formatting are matched above")
                             },
                         };
                         if geometry[index].is_some() {
@@ -127,6 +140,16 @@ impl Pptx {
             .roots()
             .filter(|shape| steps::tree_kind(shape) == Some(Kind::Shape))
             .count();
+        // The native text target counts every shape in pre-order; the new
+        // box is appended after all of them.
+        let scene_index = Position::new(scene.len());
+        let properties = format.properties();
+        let body = [litchi_pptx::opened::TextEdit::new(
+            litchi_pptx::opened::TextTarget::Shape { shape: scene_index },
+            properties,
+        )];
+        let body: &[litchi_pptx::opened::TextEdit<'_>] =
+            if format.is_empty() { &[] } else { &body };
         let (target, proof, after) = match &source {
             Editable::Source(package) => {
                 let mut edit = package.edit()?;
@@ -135,6 +158,9 @@ impl Pptx {
                 // supplies the stable direct-shape position independently.
                 let _ =
                     edit.add_text_box(Position::new(slide), text.as_deref().unwrap_or(""), bounds)?;
+                if !body.is_empty() {
+                    let _ = edit.set_text_properties(Position::new(slide), body)?;
+                }
                 let (target, patch) = edit.commit()?.into_parts();
                 let after = self.adopt_source(target.clone())?;
                 (Editable::Source(target), Proof::Source(patch), after)
@@ -143,6 +169,9 @@ impl Pptx {
                 let mut edit = package.edit()?;
                 let _ =
                     edit.add_text_box(Position::new(slide), text.as_deref().unwrap_or(""), bounds)?;
+                if !body.is_empty() {
+                    let _ = edit.set_text_properties(Position::new(slide), body)?;
+                }
                 let (target, patch) = edit.commit()?.into_parts();
                 let target = Arc::new(target);
                 let after = self.adopt_eager(Arc::clone(&target));
@@ -159,7 +188,7 @@ impl Pptx {
                 source,
                 target,
                 proof,
-                operations: 1,
+                operations: 1 + usize::from(!body.is_empty()),
             },
             path,
         ))

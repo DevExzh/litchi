@@ -60,6 +60,21 @@ impl Pptx {
         node: NewNode<'_>,
         limits: &SemanticLimits,
     ) -> Result<(Commit, Path<'static>)> {
+        // The element kind first (record 0269, finding X2): a kind the deck
+        // cannot add is `unsupported_element` whatever its parent; an
+        // addable kind under the wrong parent is `unsupported_type`.
+        if !ADDABLE
+            .iter()
+            .any(|kind| node.kind().eq_ignore_ascii_case(kind))
+        {
+            return Err(error(
+                Code::UnsupportedElement,
+                "this element kind cannot be added to a PPTX presentation yet",
+            )
+            .with_suggestion(
+                "addable: slide, shape (textbox), picture and comment; capabilities() lists the gaps",
+            ));
+        }
         if ["picture", "image", "img"]
             .iter()
             .any(|kind| node.kind().eq_ignore_ascii_case(kind))
@@ -84,12 +99,7 @@ impl Pptx {
                 "slides require the presentation root as parent",
             ));
         }
-        if !node.kind().eq_ignore_ascii_case("slide") {
-            return Err(error(
-                Code::UnsupportedElement,
-                "PPTX insertion currently supports slides, text-box shapes, pictures and comments",
-            ));
-        }
+        debug_assert!(node.kind().eq_ignore_ascii_case("slide"));
         let mut layout = None;
         let mut name = None;
         let mut hidden = None;
@@ -134,12 +144,15 @@ impl Pptx {
                         match property {
                             SlideProperty::Layout => layout = Some(owned),
                             SlideProperty::Name => name = Some(owned),
-                            SlideProperty::Hidden | SlideProperty::Notes => {
+                            SlideProperty::Hidden
+                            | SlideProperty::Notes
+                            | SlideProperty::Transition => {
                                 unreachable!("text property")
                             },
                         }
                     },
                     SlideProperty::Notes => unreachable!("notes are not an add setter"),
+                    SlideProperty::Transition => unreachable!("transitions are not an add setter"),
                     SlideProperty::Hidden => {
                         let Some(Scalar::Bool(value)) = value else {
                             unreachable!("slide visibility coercion")
@@ -230,6 +243,11 @@ impl Pptx {
         ))
     }
 }
+/// The element kinds a PPTX `add` creates (with their aliases).
+const ADDABLE: &[&str] = &[
+    "slide", "shape", "textbox", "picture", "image", "img", "comment",
+];
+
 pub(super) fn bound(kind: LimitKind, observed: usize, maximum: usize) -> Result<()> {
     if observed > maximum {
         return Err(TxError::Limit {

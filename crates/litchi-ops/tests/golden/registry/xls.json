@@ -551,6 +551,9 @@
         },
         "value": {
           "type": "scalar",
+          "aliases": [
+            "text"
+          ],
           "clearable": true,
           "add": false,
           "set": true,

@@ -2,7 +2,8 @@
 pub(crate) mod coalesce;
 mod notes;
 mod slides;
-mod text;
+pub(super) mod text;
+mod transition;
 use super::node::Item;
 use super::spec::{Kind, SHAPE_WRITE_TABLE, ShapeSetter};
 use super::{Editable, Nav, Pptx};

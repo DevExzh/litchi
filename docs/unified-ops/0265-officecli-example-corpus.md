@@ -75,6 +75,7 @@ The stand-in passes every call through unchanged except these:
 | `batch FILE` reading stdin | `batch FILE --input -` | Litchi needs the input named |
 | `add F / --type slide` without `layout` | `... --prop "layout=Title Slide"` | OfficeCLI picks the deck's first layout. Litchi requires an exact name (record 0256 D4), and `Title Slide` is the first layout of Litchi's blank deck. Rows are tagged `translated:D4`. |
 | `--prop layout=blank` / `layout=title` on a slide | `layout=Blank` / `layout=Title Slide` | OfficeCLI also matches layout types; tagged D4 |
+| `set`, `add`, `batch` | `... --unsupported warn` (added by record 0269) | OfficeCLI applies the supported properties of a command and warns about the rest by default; Litchi refuses unless asked (record 0015 Q2/Δ1). A call that skipped properties exits 9 and is recorded as `warned` with the skipped properties as detail; the delta table lists each skipped property in its gap table with refusal `warned`. |
 
 Without the D4 translation every PPTX script stopped at its first slide:
 342 refusals, with almost every later PPTX line a cascade. With it, 344

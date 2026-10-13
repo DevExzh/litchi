@@ -263,6 +263,14 @@ impl<'a> Scene<'a> {
             });
         }
 
+        // Markup compatibility that only follows the shape tree's `cSld`
+        // owner (a slide transition's `mc:AlternateContent`, record 0269)
+        // cannot change the scene: keep the source bytes, so spans stay
+        // source offsets and byte-splicing editors remain exact.
+        let output = match output {
+            Cow::Owned(processed) if scene_prefix_unchanged(xml, &processed) => Cow::Borrowed(xml),
+            other => other,
+        };
         let (records, strings, tolerance) = Scanner::new(output.as_ref(), limits).scan()?;
         Ok(Self {
             xml: output,
@@ -2260,4 +2268,44 @@ fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
     origin
         .offset(reader.buffer_position())
         .ok_or_else(|| Error::Invalid("shape XML position does not fit usize".into()))
+}
+
+/// Whether the source has no markup compatibility through the end of its
+/// `cSld` element, the owner of the shape tree: the markup-compatibility
+/// namespace must be declared before any use, so a prefix that never names
+/// it (directly or through character references) cannot select a branch,
+/// ignore content or require understanding inside the scene.
+fn scene_prefix_unchanged(source: &[u8], _processed: &[u8]) -> bool {
+    const MCE: &[u8] = b"schemas.openxmlformats.org/markup-compatibility/2006";
+    let Some(end) = csld_end(source) else {
+        return false;
+    };
+    let prefix = &source[..end];
+    !prefix.windows(MCE.len()).any(|window| window == MCE)
+        && !litchi_ooxml_common::mce::binds_namespace_by_reference(prefix)
+}
+
+/// The offset just past the last `</cSld>` or `</prefix:cSld>` end tag.
+fn csld_end(xml: &[u8]) -> Option<usize> {
+    const LOCAL: &[u8] = b"cSld>";
+    let mut search = xml.len();
+    while let Some(at) = xml[..search]
+        .windows(LOCAL.len())
+        .rposition(|window| window == LOCAL)
+    {
+        let open = xml[..at].iter().rposition(|byte| *byte == b'<')?;
+        let name = &xml[open + 1..at];
+        if let Some(prefix) = name.strip_prefix(b"/") {
+            let qualified = prefix.is_empty()
+                || (prefix.ends_with(b":")
+                    && prefix[..prefix.len() - 1].iter().all(|byte| {
+                        byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.')
+                    }));
+            if qualified {
+                return Some(at + LOCAL.len());
+            }
+        }
+        search = at;
+    }
+    None
 }

@@ -158,7 +158,7 @@ fn shape_addition_has_strict_properties_placement_and_atomic_limits() {
         ),
         (shape().prop("text", "bad\u{0}"), Code::InvalidValue),
         (shape().prop("name", "ignored?"), Code::UnsupportedProperty),
-        (shape().prop("fill", "red"), Code::UnsupportedProperty),
+        (shape().prop("opacity", "0.5"), Code::UnsupportedProperty),
         (shape().prop("x", 1).prop("x", 2), Code::InvalidArgument),
         (shape().at(Placement::Start), Code::UnsupportedCapability),
     ] {
@@ -260,7 +260,7 @@ fn shape_batches_preserve_atomic_and_best_effort_boundaries() {
                 .with("width", "1in")
                 .with("height", "1in");
             item.props = Some(if invalid {
-                props.with("fill", "red")
+                props.with("opacity", "0.5")
             } else {
                 props
             });

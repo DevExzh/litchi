@@ -11,7 +11,7 @@ use crate::format::workbook::spec as workbook;
 use crate::node::spec::{
     Access as ReadAccess, ElementSpec, FormatSpec, GapSpec, PropSpec, Subject, check_format_spec,
 };
-use crate::registry::{Access, Constraint, Entry, Table};
+use crate::registry::{Access, Alias, Constraint, Entry, Table};
 use crate::value::ValueType;
 pub(crate) use workbook::{
     CELL_PROPS as SHARED_CELL_PROPS, ColumnKey, Kind, NAMED_RANGE_PROPS, NamedRangeKey, RowKey,
@@ -162,7 +162,7 @@ const fn write_only(name: &'static str, ty: ValueType) -> PropSpec {
     spec
 }
 
-pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 15, 0> = Table::new(
+pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 15, 1> = Table::new(
     [
         Entry {
             spec: write_only("value", ValueType::Scalar),
@@ -200,7 +200,11 @@ pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 15, 0> = Table::new(
         format_entry("fill", CellSetter::Fill, false),
         format_entry("fillBg", CellSetter::FillBg, false),
     ],
-    [],
+    // `text` names `value`, as in the XLSX cell registry (record 0269).
+    [Alias {
+        name: "text",
+        entry: 0,
+    }],
 );
 
 /// Read-schema projection of the cell write registry.  The native node keeps

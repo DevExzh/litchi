@@ -1,0 +1,15 @@
+{"scenario":"xlsx_apply_refuse_vs_warn","size":1,"samples":30,"leaf_or_a_median_ns":23431,"unified_or_b_median_ns":23560,"ratio":1.006}
+{"scenario":"xlsx_batch_100_refuse_vs_warn","size":100,"samples":30,"leaf_or_a_median_ns":363172,"unified_or_b_median_ns":17599495,"ratio":48.460}
+{"scenario":"xlsx_apply_subset_vs_warn_one_refused","size":1,"samples":30,"leaf_or_a_median_ns":22990,"unified_or_b_median_ns":31580,"ratio":1.374}
+{"scenario":"pptx_add_formatted_text_box","size":1,"samples":30,"leaf_or_a_median_ns":329131,"unified_or_b_median_ns":457522,"ratio":1.390}
+{"scenario":"pptx_add_plain_text_box","size":1,"samples":30,"leaf_or_a_median_ns":303202,"unified_or_b_median_ns":429062,"ratio":1.415}
+{"scenario":"pptx_set_shape_fill_geometry","size":1,"samples":30,"leaf_or_a_median_ns":277342,"unified_or_b_median_ns":279792,"ratio":1.009}
+{"scenario":"pptx_set_slide_transition","size":1,"samples":30,"leaf_or_a_median_ns":279352,"unified_or_b_median_ns":280832,"ratio":1.005}
+{"scenario":"pptx_add_formatted_text_box","size":100,"samples":30,"leaf_or_a_median_ns":2519573,"unified_or_b_median_ns":2794425,"ratio":1.109}
+{"scenario":"pptx_add_plain_text_box","size":100,"samples":30,"leaf_or_a_median_ns":2108301,"unified_or_b_median_ns":2375263,"ratio":1.127}
+{"scenario":"pptx_set_shape_fill_geometry","size":100,"samples":30,"leaf_or_a_median_ns":1310497,"unified_or_b_median_ns":1315738,"ratio":1.004}
+{"scenario":"pptx_set_slide_transition","size":100,"samples":30,"leaf_or_a_median_ns":1334107,"unified_or_b_median_ns":1335527,"ratio":1.001}
+{"scenario":"pptx_add_formatted_text_box","size":1000,"samples":30,"leaf_or_a_median_ns":24166900,"unified_or_b_median_ns":25662448,"ratio":1.062}
+{"scenario":"pptx_add_plain_text_box","size":1000,"samples":30,"leaf_or_a_median_ns":19694657,"unified_or_b_median_ns":21182434,"ratio":1.076}
+{"scenario":"pptx_set_shape_fill_geometry","size":1000,"samples":30,"leaf_or_a_median_ns":10409806,"unified_or_b_median_ns":10392356,"ratio":0.998}
+{"scenario":"pptx_set_slide_transition","size":1000,"samples":30,"leaf_or_a_median_ns":10550947,"unified_or_b_median_ns":10502797,"ratio":0.995}

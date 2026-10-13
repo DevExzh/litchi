@@ -68,7 +68,7 @@ pub(crate) use children::Children;
 pub(crate) use nav::Nav;
 pub use node::Node;
 pub(crate) use node::Props;
-pub(crate) use spec::SPEC;
+pub(crate) use spec::{CELL_WRITE_TABLE, SPEC};
 pub(crate) use views::{Json as ViewJson, view_json, view_to};
 
 use source::{SourceWorkbook, SourceWorksheets, internal};

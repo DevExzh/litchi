@@ -1442,6 +1442,37 @@ impl Edit {
         )
     }
 
+    /// Set (`Some`) or clear (`None`) one effective slide's direct
+    /// transition, with the semantics of
+    /// [`super::SourceBackedSlideEdit::set_transition`] and
+    /// [`super::SourceBackedSlideEdit::clear_transition`]; it composes with
+    /// earlier staged changes and participates in source-local replay.
+    /// Returns whether the slide changed.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an out-of-range slide, an unsupported or invalid
+    /// transition, a modification-protected presentation, or an exhausted
+    /// limit. A failure leaves this edit unchanged.
+    pub fn set_slide_transition(
+        &mut self,
+        slide: impl Into<Position>,
+        value: Option<&crate::transition::Transition>,
+    ) -> Result<bool> {
+        self.stage_slide_edit(
+            slide.into(),
+            |_package, _snapshot| Ok(None),
+            |edit| {
+                let changed = match value {
+                    Some(value) => edit.set_transition(value)?,
+                    None => edit.clear_transition()?,
+                };
+                Ok(usize::from(changed))
+            },
+        )
+        .map(|changed| changed != 0)
+    }
+
     fn stage_slide_edit(
         &mut self,
         logical: Position,

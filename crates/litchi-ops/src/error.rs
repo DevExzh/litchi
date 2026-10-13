@@ -37,6 +37,20 @@
 //! Leaf enums that are `#[non_exhaustive]` end in a wildcard arm that reports
 //! [`Code::CorruptFile`]: a variant the classifier does not name is treated as
 //! a malformed input until it is classified explicitly.
+//!
+//! # Refused additions
+//!
+//! Every format answers an `add` it cannot perform the same way (record
+//! 0269):
+//!
+//! | Refusal | Code |
+//! |---|---|
+//! | The element kind cannot be added in this format (yet), whatever the parent | [`Code::UnsupportedElement`] |
+//! | The element kind is addable, but not under this parent | [`Code::UnsupportedType`] |
+//! | The kind is addable here, but a declared gap (a placement, a copy source, a property family) is pending | [`Code::UnsupportedCapability`], with the follow-up as suggestion |
+//!
+//! The kind is checked before the parent, so the message names what is
+//! missing rather than a parent rule of another kind.
 
 use std::borrow::Cow;
 use std::fmt;
