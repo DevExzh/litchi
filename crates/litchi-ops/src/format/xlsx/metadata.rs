@@ -23,24 +23,30 @@ fn native(error: xlsx::metadata::Error) -> crate::Error {
 pub(super) fn commit(
     workbook: &xlsx::Workbook,
     update: impl FnOnce(&mut Metadata),
+    custom: Option<&Assignments>,
 ) -> Result<(xlsx::Workbook, Metadata, bool)> {
     let mut edit = workbook.edit_metadata().map_err(native)?;
     edit.update(update).map_err(native)?;
+    if let Some(assignments) = custom.filter(|assignments| assignments.has_custom()) {
+        let props = assignments.apply_custom(edit.custom_props(), FileFormat::Xlsx)?;
+        edit.set_custom_props(props);
+    }
+    // The staged value is the committed one; no second read of the parts.
+    let metadata = edit.metadata().map_err(native)?;
     let commit = edit.commit().map_err(native)?;
     let changed = commit.diagnostics().changed();
     let after = commit.into_package();
-    let metadata = after.metadata().map_err(native)?;
     Ok((after, metadata, changed))
 }
 
 impl Xlsx {
-    /// Set document properties on the root path; `None` for other targets.
+    /// Set document properties on `/metadata`; `None` for other targets.
     pub(super) fn try_set_metadata(
         &self,
         target: &TargetArg<'_>,
         props: &Props<'_>,
     ) -> Result<Option<Commit>> {
-        if !metadata::is_root(target) {
+        if !metadata::is_target(target) {
             return Ok(None);
         }
         let assignments = metadata::admit(props, FileFormat::Xlsx)?;
@@ -49,7 +55,8 @@ impl Xlsx {
 
     fn set_metadata(&self, assignments: &Assignments) -> Result<Commit> {
         let source = self.editor()?;
-        let (target, metadata, changed) = commit(&source, |value| assignments.apply(value))?;
+        let (target, metadata, changed) =
+            commit(&source, |value| assignments.apply(value), Some(assignments))?;
         let after = if changed {
             self.adopt_metadata(target.clone(), metadata)
         } else {
@@ -80,7 +87,7 @@ impl Xlsx {
 
 /// Create-time metadata: commit `metadata` to a fresh workbook.
 pub(super) fn create(workbook: xlsx::Workbook, metadata: &Metadata) -> Result<Xlsx> {
-    let (workbook, metadata, _) = commit(&workbook, |value| *value = metadata.clone())?;
+    let (workbook, metadata, _) = commit(&workbook, |value| *value = metadata.clone(), None)?;
     Ok(Xlsx::from_workbook(workbook, &OpenOptions::new())?.with_metadata(metadata))
 }
 

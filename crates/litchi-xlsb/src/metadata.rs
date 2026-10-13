@@ -78,6 +78,12 @@ impl Edit<'_> {
         self
     }
 
+    /// The staged custom properties.
+    #[must_use]
+    pub fn custom_props(&self) -> &custom::Props {
+        self.inner.custom_props()
+    }
+
     /// Stage the complete custom properties; an empty collection removes the
     /// part.
     pub fn set_custom_props(&mut self, props: custom::Props) -> &mut Self {
@@ -197,7 +203,7 @@ impl Package {
         }
         let mut candidate = self.opc_package().clone();
         patch.apply(&mut candidate)?;
-        self.reparse_candidate(candidate)
+        self.reparse_candidate_retaining_projection(candidate)
             .map_err(|error| Error::Invalid(error.to_string()))
     }
 }

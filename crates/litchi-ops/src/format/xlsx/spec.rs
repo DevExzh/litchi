@@ -895,10 +895,6 @@ const fn sheet_capability_array() -> [PropSpec; SHEET_PROPS.len() + 1] {
 
 pub(crate) static SHEET_CAPABILITY_PROPS: &[PropSpec] = &sheet_capability_array();
 
-/// The workbook root with its settable document-property keys (record 0253).
-pub(crate) static WORKBOOK_CAPABILITY_PROPS: &[PropSpec] =
-    &crate::format::metadata::root_capabilities::<{ WORKBOOK_PROPS.len() }>(WORKBOOK_PROPS);
-
 /// Row assignments supported by the native worksheet layout editor.
 ///
 /// The wire-facing read property remains `outlineLevel`, while OfficeCLI's

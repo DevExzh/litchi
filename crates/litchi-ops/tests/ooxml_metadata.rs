@@ -28,10 +28,10 @@ fn root_sets_write_core_and_app_properties_and_survive_reopen() {
         let before = file.to_bytes().expect("original bytes");
         let edited = file
             .set(
-                "/",
+                "/metadata",
                 props! {
                     "title" => "Quarterly",
-                    "creator" => "Ada",
+                    "Author" => "Ada",
                     "keywords" => "plan, review",
                     "category" => "Finance",
                     "lastModifiedBy" => "Lin",
@@ -69,7 +69,7 @@ fn root_sets_write_core_and_app_properties_and_survive_reopen() {
         }
 
         let cleared = edited
-            .set("/", props! { "title" => PropValue::Null })
+            .set("/metadata", props! { "title" => PropValue::Null })
             .expect("clear title");
         assert_eq!(metadata(&cleared).title, None);
         assert_eq!(metadata(&cleared).author.as_deref(), Some("Ada"));
@@ -80,10 +80,15 @@ fn root_sets_write_core_and_app_properties_and_survive_reopen() {
 fn unknown_and_duplicate_root_keys_are_typed_refusals() {
     for format in FORMATS {
         let file = create(format).expect("create");
-        let error = file.set("/", props! { "titel" => "x" }).unwrap_err();
+        let error = file
+            .set("/metadata", props! { "titel" => "x" })
+            .unwrap_err();
         assert_eq!(error.code(), Code::UnsupportedProperty, "{format:?}");
         let error = file
-            .set("/", props! { "author" => "a", "creator" => "b" })
+            .set(
+                "/metadata",
+                props! { "company" => "a", "extended.company" => "b" },
+            )
             .unwrap_err();
         assert_eq!(error.code(), Code::InvalidArgument, "{format:?}");
     }
@@ -93,10 +98,12 @@ fn unknown_and_duplicate_root_keys_are_typed_refusals() {
 fn equal_values_keep_the_snapshot() {
     for format in FORMATS {
         let file = create(format).expect("create");
-        let titled = file.set("/", props! { "title" => "Same" }).expect("set");
+        let titled = file
+            .set("/metadata", props! { "title" => "Same" })
+            .expect("set");
         let bytes = titled.to_bytes().expect("bytes");
         let again = titled
-            .set("/", props! { "title" => "Same" })
+            .set("/metadata", props! { "title" => "Same" })
             .expect("no-op");
         assert_eq!(again.to_bytes().expect("bytes"), bytes, "{format:?}");
     }
@@ -108,7 +115,7 @@ fn transactions_replay_and_invert_metadata_sets() {
         let file = create(format).expect("create");
         let commit = file
             .edit(|edit| {
-                edit.set("/", props! { "title" => "In a transaction" })?;
+                edit.set("/metadata", props! { "title" => "In a transaction" })?;
                 Ok(())
             })
             .expect("transaction");
@@ -156,23 +163,62 @@ fn create_time_metadata_is_authored_and_unstorable_fields_are_refused() {
 }
 
 #[test]
-fn root_capabilities_advertise_the_settable_keys() {
+fn capabilities_name_the_set_only_metadata_path_and_the_root_reads() {
     for format in FORMATS {
         let report = Capabilities::of(format);
+        assert!(
+            report
+                .gaps()
+                .any(|gap| format!("{gap:?}").contains("path-read")),
+            "{format:?}"
+        );
         let root = report
             .elements()
-            .find(|element| {
-                element.path_segment().is_none()
-                    || element.name() == "workbook"
-                    || element.name() == "presentation"
-            })
+            .find(|element| matches!(element.name(), "workbook" | "presentation"))
             .expect("root element");
-        for key in ["title", "author", "extended.company"] {
+        for key in ["title", "author", "category", "extended.company"] {
             let property = root
                 .property(key)
                 .unwrap_or_else(|| panic!("{format:?} {key}"));
-            assert!(property.set(), "{format:?} {key}");
+            assert!(property.get() && !property.set(), "{format:?} {key}");
         }
-        assert!(!root.property("created").expect("created").set());
+    }
+}
+
+#[test]
+fn custom_properties_and_timestamps_are_set_and_removed() {
+    for format in FORMATS {
+        let file = create(format).expect("create");
+        let edited = file
+            .set(
+                "/metadata",
+                props! {
+                    "custom.Reviewed" => true,
+                    "custom.Owner" => "Ada",
+                    "created" => "2024-01-02T03:04:05Z",
+                },
+            )
+            .unwrap_or_else(|error| panic!("{format:?}: {error}"));
+        let reopened = litchi_ops::open_bytes(edited.to_bytes().expect("bytes")).expect("reopen");
+        assert_eq!(
+            metadata(&reopened)
+                .created
+                .map(|at| at.to_string())
+                .as_deref(),
+            Some("2024-01-02T03:04:05Z"),
+            "{format:?}"
+        );
+        let removed = reopened
+            .set(
+                "/metadata",
+                props! { "custom.Owner" => PropValue::Null, "created" => PropValue::Null },
+            )
+            .expect("remove");
+        assert!(metadata(&removed).created.is_none());
+        let error = file
+            .set("/metadata", props! { "contentType" => "x" })
+            .unwrap_err();
+        assert_eq!(error.code(), Code::UnsupportedProperty, "{format:?}");
+        assert_eq!(error.property(), Some("content_type"));
     }
 }

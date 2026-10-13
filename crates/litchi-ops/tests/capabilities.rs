@@ -1,26 +1,5 @@
 //! Reports are generated from the same tables as production reads.
 use litchi_core::FileFormat;
-
-/// The OfficeCLI document-property keys the OOXML roots set (record 0253).
-#[cfg(any(feature = "xlsx", feature = "pptx", feature = "xlsb"))]
-fn metadata_write(element: &str, property: &str) -> bool {
-    matches!(element, "workbook" | "presentation")
-        && matches!(
-            property,
-            "title"
-                | "author"
-                | "subject"
-                | "keywords"
-                | "description"
-                | "category"
-                | "lastModifiedBy"
-                | "revisionNumber"
-                | "extended.template"
-                | "extended.manager"
-                | "extended.company"
-        )
-}
-
 #[cfg(any(feature = "docx", feature = "ppt", feature = "pptx", feature = "xls"))]
 use litchi_ops::Code;
 use litchi_ops::capabilities::Capabilities;
@@ -502,8 +481,7 @@ fn xlsx_reports_keep_selection_semantic_and_declare_cell_and_sheet_writes() {
                 cell_write
                     || sheet_write
                     || dimension_write
-                    || (element.name() == "sheet" && property.name() == "merge")
-                    || metadata_write(element.name(), property.name()),
+                    || (element.name() == "sheet" && property.name() == "merge"),
                 "{}",
                 property.name()
             );
@@ -538,8 +516,7 @@ fn pptx_reports_selection_and_structural_writes() {
                 property.set(),
                 text_write
                     || shape_geometry_write
-                    || (element.name() == "slide" && matches!(property.name(), "name" | "hidden"))
-                    || metadata_write(element.name(), property.name()),
+                    || (element.name() == "slide" && matches!(property.name(), "name" | "hidden")),
                 "{}",
                 property.name()
             );
@@ -1169,8 +1146,7 @@ fn xlsb_reports_keep_selection_semantic_and_declare_sheet_and_cell_writes() {
                 property.set(),
                 (element.name() == "sheet"
                     && matches!(property.name(), "name" | "hidden" | "visibility"))
-                    || payload
-                    || metadata_write(element.name(), property.name()),
+                    || payload,
                 "{}.{}",
                 element.name(),
                 property.name()

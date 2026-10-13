@@ -1546,8 +1546,3 @@ pub(super) const SLIDE_WRITE_TABLE: crate::registry::Table<
     0,
 > = crate::registry::Table::new(slide_write_entries(), []);
 pub(crate) const SLIDE_CAPABILITY_PROPS: &[PropSpec] = &SLIDE_WRITE_TABLE.readable();
-
-/// The presentation root with its settable document-property keys (record
-/// 0253).
-pub(crate) const PRESENTATION_CAPABILITY_PROPS: &[PropSpec] =
-    &crate::format::metadata::root_capabilities::<{ PRESENTATION_PROPS.len() }>(PRESENTATION_PROPS);

@@ -82,6 +82,12 @@ impl Edit<'_> {
         self
     }
 
+    /// The staged custom properties.
+    #[must_use]
+    pub fn custom_props(&self) -> &custom::Props {
+        self.inner.custom_props()
+    }
+
     /// Stage the complete custom properties; an empty collection removes the
     /// part.
     pub fn set_custom_props(&mut self, props: custom::Props) -> &mut Self {

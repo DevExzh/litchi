@@ -28,35 +28,52 @@ fn native(error: pptx::metadata::Error) -> crate::Error {
 fn commit(
     package: &pptx::Package,
     update: impl FnOnce(&mut Metadata),
+    custom: Option<&Assignments>,
 ) -> Result<(pptx::Package, pptx::metadata::Patch, Metadata)> {
     let mut edit = package.edit_metadata().map_err(native)?;
     edit.update(update).map_err(native)?;
+    if let Some(assignments) = custom.filter(|assignments| assignments.has_custom()) {
+        let props = assignments.apply_custom(edit.custom_props(), FileFormat::Pptx)?;
+        edit.set_custom_props(props);
+    }
+    // The staged value is the committed one; no second read of the parts.
+    let metadata = edit.metadata().map_err(native)?;
     let (after, patch) = edit.commit().map_err(native)?.into_parts();
-    let metadata = after.metadata().map_err(native)?;
     Ok((after, patch, metadata))
 }
 
-/// The eager package an [`Editable`] commits metadata on.
-fn eager(source: &Editable) -> Result<Arc<pptx::Package>> {
-    match source {
-        Editable::Eager(package) => Ok(Arc::clone(package)),
-        Editable::Source(package) => {
-            let mut bytes = Vec::new();
-            package.write_to(&mut bytes)?;
-            let graph = opc::OpcPackage::from_bytes(&bytes)?;
-            Ok(Arc::new(pptx::Package::from_opc_package(graph)?))
-        },
+impl Pptx {
+    /// The eager package an [`Editable`] commits metadata on. An unrevised
+    /// source owner adopts its source graph without re-serializing; a
+    /// revised one publishes its revision first.
+    fn metadata_owner(&self, source: &Editable) -> Result<Arc<pptx::Package>> {
+        match source {
+            Editable::Eager(package) => Ok(Arc::clone(package)),
+            Editable::Source(package) => {
+                let graph = match (&self.0.revision, &self.0.owner) {
+                    (None, PptxOwner::Source(presentation)) => presentation
+                        .source_backed_package()
+                        .to_opc_package_preserving_source()?,
+                    _ => {
+                        let mut bytes = Vec::new();
+                        package.write_to(&mut bytes)?;
+                        opc::OpcPackage::from_bytes(&bytes)?
+                    },
+                };
+                Ok(Arc::new(pptx::Package::from_opc_package(graph)?))
+            },
+        }
     }
 }
 
 impl Pptx {
-    /// Set document properties on the root path; `None` for other targets.
+    /// Set document properties on `/metadata`; `None` for other targets.
     pub(super) fn try_set_metadata(
         &self,
         target: &TargetArg<'_>,
         props: &Props<'_>,
     ) -> Result<Option<Commit>> {
-        if !metadata::is_root(target) {
+        if !metadata::is_target(target) {
             return Ok(None);
         }
         let assignments = metadata::admit(props, FileFormat::Pptx)?;
@@ -65,8 +82,12 @@ impl Pptx {
 
     fn set_metadata(&self, assignments: &Assignments) -> Result<Commit> {
         let source = self.editable_owner()?;
-        let package = eager(&source)?;
-        let (after_package, patch, metadata) = commit(&package, |value| assignments.apply(value))?;
+        let package = self.metadata_owner(&source)?;
+        let (after_package, patch, metadata) = commit(
+            &package,
+            |value| assignments.apply(value),
+            Some(assignments),
+        )?;
         if patch.is_noop() {
             return Ok(Commit {
                 after: self.clone(),
@@ -110,6 +131,6 @@ impl Pptx {
 
 /// Create-time metadata: commit `metadata` to a fresh presentation.
 pub(super) fn create(package: pptx::Package, metadata: &Metadata) -> Result<Pptx> {
-    let (package, _, _) = commit(&package, |value| *value = metadata.clone())?;
+    let (package, _, _) = commit(&package, |value| *value = metadata.clone(), None)?;
     Pptx::from_package(package, &OpenOptions::new())
 }

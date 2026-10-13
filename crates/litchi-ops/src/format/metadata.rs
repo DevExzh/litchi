@@ -1,214 +1,336 @@
-//! Document metadata on the document root (`/`), shared by the OOXML
-//! adapters (record 0253).
+//! The `/metadata` set path of the OOXML formats (XLSX, PPTX, XLSB), record
+//! 0253.
 //!
-//! OfficeCLI reads and sets document properties on the root path: the core
-//! keys `title`, `author` (alias `creator`), `subject`, `keywords`,
-//! `description`, `category`, `lastModifiedBy` and `revisionNumber`, and the
-//! application keys `extended.template`, `extended.manager` and
-//! `extended.company` (`ExtendedPropertiesHandler.TrySetExtendedProperty`).
-//! This module admits those keys into a [`Metadata`] change; each format
-//! adapter commits it through its leaf `metadata` transaction. Setting `null`
-//! clears a field. Unlike OfficeCLI, a set never stamps `modified`
-//! (ADR 0006, determinism).
+//! `set("/metadata", props)` stages document properties through each
+//! format's leaf `metadata` transaction. The keys are the 22 OfficeCLI
+//! root-metadata spellings the legacy OLE formats accept on the same path
+//! (record 0254; matched ASCII case-insensitively), plus `custom.<name>` for
+//! custom properties. `null` removes a property. A key no OOXML part stores
+//! (`contentType`) is refused by the leaf with a typed error naming the
+//! field. Unlike OfficeCLI, a set never stamps `modified` (ADR 0006,
+//! determinism). The path is set-only; reads go through `File::metadata()`
+//! and the root node's properties.
 
-use litchi_core::{FileFormat, Metadata};
+use litchi_core::FileFormat;
+use litchi_core::metadata::{Metadata, Timestamp};
+use litchi_ooxml_common::custom;
 use litchi_ooxml_common::properties;
 
 use crate::error::{Code, Error, Result};
-use crate::node::spec::PropSpec;
-use crate::props::Props;
-use crate::registry::{Access, Alias, Constraint, Entry, Operation, Table};
+use crate::props::{PropValue, Props};
 use crate::target::TargetArg;
-use crate::value::{Scalar, ValueType};
 
-/// One settable root metadata key.
+/// The path segment of the metadata node.
+const SEGMENT: &str = "metadata";
+
+/// The prefix of custom property keys.
+const CUSTOM_PREFIX: &str = "custom.";
+
+/// One [`Metadata`] field a key writes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Key {
-    Title,
+enum Field {
+    Application,
     Author,
-    Subject,
-    Keywords,
-    Description,
     Category,
-    LastModifiedBy,
-    RevisionNumber,
-    Template,
-    Manager,
     Company,
+    ContentStatus,
+    ContentType,
+    Created,
+    Description,
+    Keywords,
+    Language,
+    LastModifiedBy,
+    LastPrinted,
+    Manager,
+    Modified,
+    Revision,
+    Subject,
+    Template,
+    Title,
+    Version,
 }
 
-const fn text(name: &'static str, key: Key) -> Entry<Key> {
-    Entry {
-        spec: PropSpec::new(name, ValueType::Text),
-        access: Access::Set(key),
-        constraint: Constraint::None,
-        clear: true,
-    }
-}
+/// Every key, sorted by ASCII-lowercase name for binary search; the same
+/// spellings as record 0254's OLE table.
+static KEYS: [(&str, Field); 22] = [
+    ("application", Field::Application),
+    ("author", Field::Author),
+    ("category", Field::Category),
+    ("company", Field::Company),
+    ("contentStatus", Field::ContentStatus),
+    ("contentType", Field::ContentType),
+    ("created", Field::Created),
+    ("description", Field::Description),
+    ("extended.company", Field::Company),
+    ("extended.manager", Field::Manager),
+    ("extended.template", Field::Template),
+    ("keywords", Field::Keywords),
+    ("language", Field::Language),
+    ("lastModifiedBy", Field::LastModifiedBy),
+    ("lastPrinted", Field::LastPrinted),
+    ("manager", Field::Manager),
+    ("modified", Field::Modified),
+    ("revisionNumber", Field::Revision),
+    ("subject", Field::Subject),
+    ("template", Field::Template),
+    ("title", Field::Title),
+    ("version", Field::Version),
+];
 
-/// The settable root keys, with OfficeCLI's names.
-pub(crate) const WRITE_TABLE: Table<Key, 11, 1> = Table::new(
-    [
-        text("title", Key::Title),
-        text("author", Key::Author),
-        text("subject", Key::Subject),
-        text("keywords", Key::Keywords),
-        text("description", Key::Description),
-        text("category", Key::Category),
-        text("lastModifiedBy", Key::LastModifiedBy),
-        text("revisionNumber", Key::RevisionNumber),
-        text("extended.template", Key::Template),
-        text("extended.manager", Key::Manager),
-        text("extended.company", Key::Company),
-    ],
-    [Alias {
-        name: "creator",
-        entry: 1,
-    }],
-);
-
-/// Whether a root-key name is one of [`WRITE_TABLE`]'s, so a root spec can
-/// mark it settable.
-pub(crate) const fn settable(name: &str) -> bool {
-    let entries = [
-        "title",
-        "author",
-        "subject",
-        "keywords",
-        "description",
-        "category",
-        "lastModifiedBy",
-        "revisionNumber",
-        "extended.template",
-        "extended.manager",
-        "extended.company",
-    ];
-    let mut index = 0;
-    while index < entries.len() {
-        if eq(entries[index], name) {
-            return true;
-        }
+const _: () = {
+    let mut index = 1;
+    while index < KEYS.len() {
+        assert!(
+            ascii_lower_cmp(KEYS[index - 1].0, KEYS[index].0).is_lt(),
+            "metadata keys must be sorted"
+        );
         index += 1;
     }
-    false
-}
+};
 
-const fn eq(left: &str, right: &str) -> bool {
+const fn ascii_lower_cmp(left: &str, right: &str) -> std::cmp::Ordering {
     let (left, right) = (left.as_bytes(), right.as_bytes());
-    if left.len() != right.len() {
-        return false;
-    }
     let mut index = 0;
-    while index < left.len() {
-        if left[index] != right[index] {
-            return false;
+    while index < left.len() && index < right.len() {
+        let (a, b) = (
+            left[index].to_ascii_lowercase(),
+            right[index].to_ascii_lowercase(),
+        );
+        if a < b {
+            return std::cmp::Ordering::Less;
+        }
+        if a > b {
+            return std::cmp::Ordering::Greater;
         }
         index += 1;
     }
-    true
-}
-
-/// Mark the [`WRITE_TABLE`] keys of a root property table settable.
-pub(crate) const fn root_capabilities<const N: usize>(props: &[PropSpec]) -> [PropSpec; N] {
-    let mut result = [PropSpec::new("", ValueType::Text); N];
-    let mut index = 0;
-    while index < N {
-        result[index] = props[index];
-        if settable(props[index].name) {
-            result[index].access.set = true;
-        }
-        index += 1;
+    if left.len() < right.len() {
+        std::cmp::Ordering::Less
+    } else if left.len() > right.len() {
+        std::cmp::Ordering::Greater
+    } else {
+        std::cmp::Ordering::Equal
     }
-    result
 }
 
-/// A timestamp in .NET's round-trip form (`"o"`), as OfficeCLI prints
-/// core-properties times: seven fraction digits, and `Z` for an instant.
-pub(crate) fn round_trip(timestamp: litchi_core::metadata::Timestamp) -> String {
-    let naive = timestamp.naive();
-    format!(
-        "{}.{:07}{}",
-        naive.format("%Y-%m-%dT%H:%M:%S"),
-        naive.and_utc().timestamp_subsec_nanos() / 100,
-        if timestamp.utc().is_some() { "Z" } else { "" }
-    )
+fn lookup(name: &str) -> Option<Field> {
+    KEYS.binary_search_by(|(key, _)| ascii_lower_cmp(key, name))
+        .ok()
+        .map(|index| KEYS[index].1)
 }
 
-/// Admitted root metadata assignments; `None` clears a field.
+/// Whether `target` is exactly the `/metadata` node: one absolute step named
+/// `metadata`, without predicates.
+pub(crate) fn is_target(target: &TargetArg<'_>) -> bool {
+    target.path().is_some_and(|path| {
+        let path = path.path();
+        path.is_absolute()
+            && matches!(path.steps(), [step]
+                if step.predicates().is_empty() && step.name().eq_ignore_ascii_case(SEGMENT))
+    })
+}
+
+/// One admitted value.
+#[derive(Debug, Clone)]
+enum Assigned {
+    Text(Option<String>),
+    Time(Option<Timestamp>),
+}
+
+/// Admitted `/metadata` assignments; `None` removes.
 #[derive(Debug, Default)]
-pub(crate) struct Assignments(Vec<(Key, Option<String>)>);
+pub(crate) struct Assignments {
+    fields: Vec<(Field, Assigned)>,
+    custom: Vec<(String, Option<custom::Value>)>,
+}
 
 impl Assignments {
-    /// Apply the assignments to `metadata`.
+    /// Apply the field assignments to `metadata`.
     pub(crate) fn apply(&self, metadata: &mut Metadata) {
-        for (key, value) in &self.0 {
-            let slot = match key {
-                Key::Title => &mut metadata.title,
-                Key::Author => &mut metadata.author,
-                Key::Subject => &mut metadata.subject,
-                Key::Keywords => &mut metadata.keywords,
-                Key::Description => &mut metadata.description,
-                Key::Category => &mut metadata.category,
-                Key::LastModifiedBy => &mut metadata.last_modified_by,
-                Key::RevisionNumber => &mut metadata.revision,
-                Key::Template => &mut metadata.template,
-                Key::Manager => &mut metadata.manager,
-                Key::Company => &mut metadata.company,
-            };
-            slot.clone_from(value);
+        for (field, value) in &self.fields {
+            match value {
+                Assigned::Text(text) => {
+                    let slot = match field {
+                        Field::Application => &mut metadata.application,
+                        Field::Author => &mut metadata.author,
+                        Field::Category => &mut metadata.category,
+                        Field::Company => &mut metadata.company,
+                        Field::ContentStatus => &mut metadata.content_status,
+                        Field::ContentType => &mut metadata.content_type,
+                        Field::Description => &mut metadata.description,
+                        Field::Keywords => &mut metadata.keywords,
+                        Field::Language => &mut metadata.language,
+                        Field::LastModifiedBy => &mut metadata.last_modified_by,
+                        Field::Manager => &mut metadata.manager,
+                        Field::Revision => &mut metadata.revision,
+                        Field::Subject => &mut metadata.subject,
+                        Field::Template => &mut metadata.template,
+                        Field::Title => &mut metadata.title,
+                        Field::Version => &mut metadata.version,
+                        Field::Created | Field::Modified | Field::LastPrinted => continue,
+                    };
+                    slot.clone_from(text);
+                },
+                Assigned::Time(time) => {
+                    let slot = match field {
+                        Field::Created => &mut metadata.created,
+                        Field::Modified => &mut metadata.modified,
+                        Field::LastPrinted => &mut metadata.last_printed,
+                        _ => continue,
+                    };
+                    *slot = *time;
+                },
+            }
         }
+    }
+
+    /// Whether any custom property is assigned.
+    pub(crate) fn has_custom(&self) -> bool {
+        !self.custom.is_empty()
+    }
+
+    /// Apply the custom assignments to a copy of the staged custom
+    /// properties.
+    ///
+    /// # Errors
+    ///
+    /// `invalid_value` for a name or value the custom part refuses.
+    pub(crate) fn apply_custom(
+        &self,
+        props: &custom::Props,
+        format: FileFormat,
+    ) -> Result<custom::Props> {
+        let mut props = props.clone();
+        for (name, value) in &self.custom {
+            match value {
+                Some(value) => {
+                    props
+                        .insert(name.clone(), value.clone())
+                        .map_err(|_| invalid(&format!("{CUSTOM_PREFIX}{name}"), format))?;
+                },
+                None => {
+                    props.remove(name);
+                },
+            }
+        }
+        Ok(props)
     }
 }
 
-/// Whether a mutation targets the document root, where metadata lives.
-pub(crate) fn is_root(target: &TargetArg<'_>) -> bool {
-    target.path().is_some_and(|path| path.path().is_root())
-}
-
-/// Admit root property assignments.
+/// Admit `/metadata` property assignments.
 ///
 /// # Errors
 ///
-/// Returns [`Code::UnsupportedProperty`] for a key that is not a settable
-/// metadata key (with a suggestion), [`Code::InvalidArgument`] for a key set
-/// twice, and the coercion errors of the registry.
+/// `invalid_argument` for an empty or repeated assignment,
+/// `unsupported_property` for an unknown key (with a suggestion), and
+/// `invalid_value` for a value of the wrong kind.
 pub(crate) fn admit(props: &Props<'_>, format: FileFormat) -> Result<Assignments> {
-    let mut assignments = Vec::new();
-    let mut seen = 0_u16;
-    for (key, value) in props.iter() {
-        let (index, entry) = WRITE_TABLE.resolve(key.as_str()).map_err(|error| {
-            error
-                .with_property(key.as_str().to_owned())
-                .with_format(format)
-        })?;
-        let bit = 1_u16 << index;
-        if seen & bit != 0 {
-            return Err(Error::new(
-                Code::InvalidArgument,
-                "a metadata property was assigned more than once",
-            )
-            .with_property(entry.spec.name)
-            .with_format(format));
-        }
-        seen |= bit;
-        let assignment = entry.prepare(Operation::Set, value, |key, value| {
-            Ok((
-                key,
-                match value {
-                    Some(Scalar::Text(text)) => Some(text.to_owned()),
-                    None => None,
-                    Some(_) => {
-                        return Err(Error::new(
-                            Code::InternalError,
-                            "metadata text coercion returned another type",
-                        ));
-                    },
-                },
-            ))
-        })?;
-        assignments.push(assignment);
+    if props.is_empty() {
+        return Err(Error::new(
+            Code::InvalidArgument,
+            "a metadata set needs at least one property",
+        )
+        .with_format(format));
     }
-    Ok(Assignments(assignments))
+    let mut assignments = Assignments::default();
+    for (key, value) in props.iter() {
+        let name = key.as_str();
+        if let Some(custom) = strip_custom(name) {
+            if assignments
+                .custom
+                .iter()
+                .any(|(seen, _)| seen.eq_ignore_ascii_case(custom))
+            {
+                return Err(repeated(name, format));
+            }
+            assignments
+                .custom
+                .push((custom.to_owned(), custom_value(name, value, format)?));
+            continue;
+        }
+        let Some(field) = lookup(name) else {
+            return Err(Error::new(
+                Code::UnsupportedProperty,
+                "the metadata key is not a document property",
+            )
+            .with_property(name.to_owned())
+            .with_format(format)
+            .with_suggestion("use a root-metadata key such as `title`, or `custom.<name>`"));
+        };
+        if assignments.fields.iter().any(|(seen, _)| *seen == field) {
+            return Err(repeated(name, format));
+        }
+        let assigned = match field {
+            Field::Created | Field::Modified | Field::LastPrinted => Assigned::Time(match value {
+                PropValue::Null => None,
+                PropValue::Text(text) => {
+                    Some(Timestamp::parse(text).map_err(|_| invalid(name, format))?)
+                },
+                _ => return Err(wrong_kind(name, format)),
+            }),
+            _ => Assigned::Text(match value {
+                PropValue::Null => None,
+                PropValue::Text(text) => Some(text.to_string()),
+                PropValue::Int(_) | PropValue::Unsigned(_) => Some(value.to_string()),
+                _ => return Err(wrong_kind(name, format)),
+            }),
+        };
+        assignments.fields.push((field, assigned));
+    }
+    Ok(assignments)
+}
+
+fn strip_custom(name: &str) -> Option<&str> {
+    let prefix = name.get(..CUSTOM_PREFIX.len())?;
+    prefix
+        .eq_ignore_ascii_case(CUSTOM_PREFIX)
+        .then(|| &name[CUSTOM_PREFIX.len()..])
+        .filter(|custom| !custom.is_empty())
+}
+
+fn custom_value(
+    key: &str,
+    value: &PropValue<'_>,
+    format: FileFormat,
+) -> Result<Option<custom::Value>> {
+    Ok(Some(match value {
+        PropValue::Null => return Ok(None),
+        PropValue::Bool(value) => custom::Value::Bool(*value),
+        PropValue::Int(value) => match i32::try_from(*value) {
+            Ok(value) => custom::Value::I32(value),
+            Err(_) => custom::Value::I64(*value),
+        },
+        PropValue::Number(value) if value.is_finite() => custom::Value::F64(*value),
+        PropValue::Text(text) => custom::Value::Text(text.to_string()),
+        _ => return Err(wrong_kind(key, format)),
+    }))
+}
+
+fn repeated(key: &str, format: FileFormat) -> Error {
+    Error::new(
+        Code::InvalidArgument,
+        "a metadata property was assigned more than once",
+    )
+    .with_property(key.to_owned())
+    .with_format(format)
+}
+
+fn wrong_kind(key: &str, format: FileFormat) -> Error {
+    Error::new(
+        Code::InvalidValue,
+        "the metadata property requires text (RFC 3339 for timestamps)",
+    )
+    .with_property(key.to_owned())
+    .with_format(format)
+}
+
+fn invalid(key: &str, format: FileFormat) -> Error {
+    Error::new(
+        Code::InvalidValue,
+        "the metadata value is not representable in OOXML document properties",
+    )
+    .with_property(key.to_owned())
+    .with_format(format)
 }
 
 /// Map a leaf metadata error onto the unified taxonomy.
@@ -233,6 +355,18 @@ pub(crate) fn native_error(error: properties::Error, format: FileFormat) -> Erro
         other => Error::new(Code::CorruptFile, other.to_string()),
     };
     error.with_format(format)
+}
+
+/// A timestamp in .NET's round-trip form (`"o"`), as OfficeCLI prints
+/// core-properties times: seven fraction digits, and `Z` for an instant.
+pub(crate) fn round_trip(timestamp: Timestamp) -> String {
+    let naive = timestamp.naive();
+    format!(
+        "{}.{:07}{}",
+        naive.format("%Y-%m-%dT%H:%M:%S"),
+        naive.and_utc().timestamp_subsec_nanos() / 100,
+        if timestamp.utc().is_some() { "Z" } else { "" }
+    )
 }
 
 /// Fold the application properties of an eagerly opened package into
@@ -263,9 +397,11 @@ mod tests {
     #[test]
     fn admission_uses_officecli_names_and_clears_with_null() {
         let props = Props::new()
-            .with("creator", "Ada")
+            .with("Author", "Ada")
             .with("extended.company", "Litchi")
-            .with("title", crate::props::PropValue::Null);
+            .with("created", "2024-01-02T03:04:05Z")
+            .with("custom.Reviewed", true)
+            .with("title", PropValue::Null);
         let assignments = admit(&props, FileFormat::Xlsx).unwrap();
         let mut metadata = Metadata {
             title: Some("Old".to_owned()),
@@ -275,16 +411,27 @@ mod tests {
         assert_eq!(metadata.author.as_deref(), Some("Ada"));
         assert_eq!(metadata.company.as_deref(), Some("Litchi"));
         assert_eq!(metadata.title, None);
+        assert_eq!(
+            metadata.created,
+            Some(Timestamp::parse("2024-01-02T03:04:05Z").unwrap())
+        );
+        let custom = assignments
+            .apply_custom(&custom::Props::new(), FileFormat::Xlsx)
+            .unwrap();
+        assert_eq!(custom.get("Reviewed"), Some(&custom::Value::Bool(true)));
 
         let error = admit(&Props::new().with("titel", "x"), FileFormat::Xlsx).unwrap_err();
         assert_eq!(error.code(), Code::UnsupportedProperty);
         let error = admit(
-            &Props::new().with("author", "a").with("creator", "b"),
+            &Props::new()
+                .with("company", "a")
+                .with("extended.company", "b"),
             FileFormat::Pptx,
         )
         .unwrap_err();
         assert_eq!(error.code(), Code::InvalidArgument);
-        assert!(settable("extended.manager"));
-        assert!(!settable("created"));
+        let error =
+            admit(&Props::new().with("created", "yesterday"), FileFormat::Xlsb).unwrap_err();
+        assert_eq!(error.code(), Code::InvalidValue);
     }
 }

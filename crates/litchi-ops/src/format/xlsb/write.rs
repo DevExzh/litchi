@@ -61,7 +61,7 @@ impl Patch {
                 .first()
                 .expect("cell patch invariant: at least one worksheet")
                 .before(),
-            Self::Metadata(images) => &images.before,
+            Self::Metadata(images) => images.before(),
         }
     }
 
@@ -72,7 +72,7 @@ impl Patch {
                 .last()
                 .expect("cell patch invariant: at least one worksheet")
                 .after(),
-            Self::Metadata(images) => &images.after,
+            Self::Metadata(images) => images.after(),
         }
     }
 
@@ -109,7 +109,10 @@ impl Patch {
     }
 
     pub(crate) fn is_noop(&self) -> bool {
-        self.before() == self.after()
+        match self {
+            Self::Metadata(images) => images.patch.is_noop(),
+            _ => self.before() == self.after(),
+        }
     }
 
     pub(crate) fn operation_count(&self) -> usize {
