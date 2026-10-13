@@ -25,8 +25,8 @@ Kinds:
 
 | Family | Lines | Passed | of which translated | Gap | Delta | Cascade | Bug | Resident (not run) | Read-back |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| excel | 1633 | 869 | 0 | 749 | 4 | 11 | 0 | 20 | 20/20 |
-| excel/charts | 743 | 103 | 0 | 635 | 5 | 0 | 0 | 32 | 32/32 |
+| excel | 1633 | 1470 | 0 | 148 | 4 | 11 | 0 | 20 | 20/20 |
+| excel/charts | 743 | 408 | 0 | 330 | 5 | 0 | 0 | 32 | 32/32 |
 | ppt | 310 | 43 | 32 | 139 | 0 | 128 | 0 | 10 | 12/12 |
 | ppt/charts | 735 | 127 | 113 | 605 | 0 | 3 | 0 | 28 | 28/28 |
 | ppt/ole | 26 | 13 | 2 | 11 | 0 | 2 | 0 | 6 | 6/6 |
@@ -37,7 +37,7 @@ Kinds:
 | ppt/textboxes | 132 | 12 | 10 | 105 | 0 | 15 | 0 | 4 | 4/4 |
 | ppt/transitions | 522 | 136 | 127 | 386 | 0 | 0 | 0 | 18 | 18/18 |
 | word | 1133 | 614 | 3 | 415 | 6 | 98 | 0 | 24 | 32/32 |
-| **total** | **6431** | **2003** | **344** | **3616** | **139** | **673** | **0** | **177** | **200/200** |
+| **total** | **6431** | **2909** | **344** | **2710** | **139** | **673** | **0** | **177** | **200/200** |
 
 ## Summary by format
 
@@ -47,8 +47,8 @@ The format is the extension of the document each call names.
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | docx | 949 | 466 | 0 | 379 | 6 | 98 | 0 | 22 | 30/30 |
 | pptx | 2959 | 418 | 344 | 1853 | 124 | 564 | 0 | 99 | 114/114 |
-| xlsx | 2523 | 1119 | 0 | 1384 | 9 | 11 | 0 | 56 | 56/56 |
-| **total** | **6431** | **2003** | **344** | **3616** | **139** | **673** | **0** | **177** | **200/200** |
+| xlsx | 2523 | 2025 | 0 | 478 | 9 | 11 | 0 | 56 | 56/56 |
+| **total** | **6431** | **2909** | **344** | **2710** | **139** | **673** | **0** | **177** | **200/200** |
 
 ## Deltas
 
@@ -73,7 +73,7 @@ The format is the extension of the document each call names.
 | G4 | Revision-tracked removal (`remove --prop`) | `remove` takes `--prop revision.author=...` to record a tracked deletion | the CLI passes the props (record 0265); `remove` admits no props (invalid_argument) | 2 | `word/revisions.sh:123`, `word/revisions.sh:202` |
 | G5 | Path grammar: OfficeCLI-only steps | `cell[R,C]` table-cell steps, `@id`/`@author` revision identities and other OfficeCLI path forms | `invalid_path`: the selector grammar (record 0005) has no such step or identity yet | 33 | `word/revisions.sh:219`, `word/revisions.sh:382`, `word/revisions.sh:394` |
 | G6 | Value vocabulary | documented value forms such as table-cell `fill=none` and gradient fills `COLOR1-COLOR2[-ANGLE]` (pptx table-cell.json) | `invalid_value`: the property's coercion accepts colors only | 2 | `ppt/tables/tables-basic.sh:83`, `ppt/tables/tables-basic.sh:93` |
-| G7 | Undocumented OfficeCLI alias: cell `text` | the cell handler takes `text` as another name of `value` (`ExcelHandler.Set.Cells.cs`, `case "value" or "text"`); the help schema lists only `value` | `unsupported_property`: the registry follows the help schema; follow-up: add `text` as an alias of the XLSX cell `value` in the `litchi-ops` registry | 906 | `excel/charts/charts-area.sh:24`, `excel/charts/charts-area.sh:25`, `excel/charts/charts-area.sh:26` |
+| G7 | Undocumented OfficeCLI alias: cell `text` | the cell handler takes `text` as another name of `value` (`ExcelHandler.Set.Cells.cs`, `case "value" or "text"`); the help schema lists only `value` | closed by record 0269: `text` is a registry alias of the cell `value` (XLSX, XLSB, XLS); a refusal here would be a regression | 0 |  |
 | C1 | Numbering definitions refused | `add --type num`/`abstractNum` creates the numbering that `numId` names | numbering is a registry gap, so the later `numId` is `invalid_value` | 27 | `word/numbering.sh:76`, `word/numbering.sh:79`, `word/numbering.sh:82` |
 
 ## Element and property gaps: docx
@@ -286,7 +286,7 @@ None.
 
 | Follow-up | What | Lines |
 |---|---|---:|
-| F3 | property-granularity "apply the rest and warn": calls refused for one unsupported property (OfficeCLI applies the others and exits 2) | 2172 |
+| F3 | property-granularity "apply the rest and warn": calls refused for one unsupported property (OfficeCLI applies the others and exits 2) | 1266 |
 | F4 | view options (`--start`, `--end`, `--max-lines`, ...) | 0 |
 | F6 | `add --from`, find/replace on `set`, `remove --shift`, `get --save` | 40 |
 | D6 | missing verbs (`validate`, `raw-set`, `add-part`, `dump`) | 138 |
@@ -298,16 +298,16 @@ None.
 | `excel/cell-formatting.sh` | 109 | 94 | 0 | 15 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/charts.sh` | 320 | 309 | 0 | 11 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/charts/charts-advanced.sh` | 17 | 4 | 0 | 13 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-area.sh` | 92 | 6 | 0 | 86 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-bar.sh` | 82 | 8 | 0 | 70 | 4 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-basic.sh` | 102 | 8 | 0 | 94 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-area.sh` | 92 | 71 | 0 | 21 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-bar.sh` | 82 | 53 | 0 | 25 | 4 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-basic.sh` | 102 | 73 | 0 | 29 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/charts/charts-boxwhisker.sh` | 13 | 4 | 0 | 9 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/charts/charts-bubble.sh` | 24 | 6 | 0 | 18 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-column.sh` | 102 | 8 | 0 | 94 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-column.sh` | 102 | 73 | 0 | 29 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/charts/charts-combo.sh` | 23 | 6 | 0 | 17 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/charts/charts-extended.sh` | 28 | 7 | 0 | 21 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/charts/charts-histogram.sh` | 37 | 7 | 0 | 30 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-line.sh` | 108 | 9 | 0 | 99 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-line.sh` | 108 | 74 | 0 | 34 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/charts/charts-pie.sh` | 18 | 5 | 0 | 12 | 1 | 0 | 0 | 2 | 2/2 |
 | `excel/charts/charts-radar.sh` | 23 | 6 | 0 | 17 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/charts/charts-scatter.sh` | 33 | 8 | 0 | 25 | 0 | 0 | 0 | 2 | 2/2 |
@@ -315,10 +315,10 @@ None.
 | `excel/charts/charts-waterfall.sh` | 23 | 6 | 0 | 17 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/conditional-formatting.sh` | 165 | 139 | 0 | 26 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/data-validation.sh` | 88 | 65 | 0 | 23 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/pivot-tables.sh` | 586 | 19 | 0 | 567 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/pivot-tables.sh` | 586 | 568 | 0 | 18 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/shapes.sh` | 62 | 35 | 0 | 27 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/sheet-settings.sh` | 104 | 86 | 0 | 7 | 0 | 11 | 0 | 2 | 2/2 |
-| `excel/slicers.sh` | 60 | 2 | 0 | 58 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/slicers.sh` | 60 | 54 | 0 | 6 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/sparklines.sh` | 114 | 106 | 0 | 8 | 0 | 0 | 0 | 2 | 2/2 |
 | `excel/workbook-settings.sh` | 25 | 14 | 0 | 7 | 4 | 0 | 0 | 2 | 2/2 |
 | `ppt/3d-model.sh` | 35 | 1 | 0 | 9 | 0 | 25 | 0 | 2 | 2/2 |
@@ -391,4 +391,4 @@ None.
 | `word/sections.sh` | 33 | 24 | 0 | 9 | 0 | 0 | 0 | 2 | 2/2 |
 | `word/tables.sh` | 357 | 201 | 3 | 128 | 0 | 28 | 0 | 6 | 6/6 |
 | `word/textbox.sh` | 67 | 14 | 0 | 14 | 0 | 39 | 0 | 1 | 2/2 |
-| **total** | **6431** | **2003** | **344** | **3616** | **139** | **673** | **0** | **177** | **200/200** |
+| **total** | **6431** | **2909** | **344** | **2710** | **139** | **673** | **0** | **177** | **200/200** |

@@ -171,7 +171,7 @@ const fn write_only_entry(
     }
 }
 
-pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 29, 24> = Table::new(
+pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 29, 25> = Table::new(
     [
         write_only_entry("value", ValueType::Scalar, CellSetter::Value, true),
         constrained(
@@ -307,6 +307,11 @@ pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 29, 24> = Table::new(
         ),
     ],
     [
+        // `text` names `value`, as in the XLSX cell registry (record 0269).
+        Alias {
+            name: "text",
+            entry: 0,
+        },
         Alias {
             name: "bold",
             entry: 3,

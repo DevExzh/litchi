@@ -33,7 +33,9 @@ pub(crate) use children::Children;
 pub(crate) use nav::Nav;
 pub use node::Node;
 pub(crate) use node::Props;
-pub(crate) use spec::{ADDABLE, REMOVABLE, SETTABLE, SPEC, WRITE_GAPS, capability_props};
+pub(crate) use spec::{
+    ADDABLE, CELL_WRITE_TABLE, REMOVABLE, SETTABLE, SPEC, WRITE_GAPS, capability_props,
+};
 pub(crate) use views::{Json as ViewJson, view_json, view_to};
 pub(crate) use write::WriteCommit;
 

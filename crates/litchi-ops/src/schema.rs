@@ -169,9 +169,28 @@ pub(crate) fn prop_aliases(adapter: Adapter, canonical: &str) -> &'static [PropA
             _ => &[],
         };
     }
+    #[cfg(feature = "xlsb")]
+    if adapter == Adapter::Xlsb {
+        return match canonical {
+            "cell" | "range" => XLSB_CELL_ALIASES,
+            _ => &[],
+        };
+    }
+    #[cfg(feature = "xls")]
+    if adapter == Adapter::Xls {
+        return match canonical {
+            "cell" => XLS_CELL_ALIASES,
+            _ => &[],
+        };
+    }
     let _ = (adapter, canonical);
     &[]
 }
+
+#[cfg(feature = "xlsb")]
+const XLSB_CELL_ALIASES: &[PropAlias] = &crate::format::xlsb::CELL_WRITE_TABLE.prop_aliases();
+#[cfg(feature = "xls")]
+const XLS_CELL_ALIASES: &[PropAlias] = &crate::format::xls::CELL_WRITE_TABLE.prop_aliases();
 
 #[cfg(feature = "xlsx")]
 const XLSX_CELL_ALIASES: &[PropAlias] = &crate::format::xlsx::CELL_WRITE_TABLE.prop_aliases();

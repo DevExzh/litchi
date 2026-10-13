@@ -412,6 +412,9 @@
         },
         "font.bold": {
           "type": "bool",
+          "aliases": [
+            "bold"
+          ],
           "clearable": true,
           "add": false,
           "set": true,
@@ -419,6 +422,9 @@
         },
         "font.italic": {
           "type": "bool",
+          "aliases": [
+            "italic"
+          ],
           "clearable": true,
           "add": false,
           "set": true,
@@ -999,6 +1005,9 @@
         },
         "value": {
           "type": "scalar",
+          "aliases": [
+            "text"
+          ],
           "clearable": true,
           "add": false,
           "set": true,
@@ -1161,6 +1170,9 @@
         },
         "value": {
           "type": "scalar",
+          "aliases": [
+            "text"
+          ],
           "clearable": true,
           "add": false,
           "set": true,
@@ -1181,6 +1193,9 @@
         },
         "font.bold": {
           "type": "bool",
+          "aliases": [
+            "bold"
+          ],
           "clearable": true,
           "add": false,
           "set": true,
@@ -1188,6 +1203,9 @@
         },
         "font.italic": {
           "type": "bool",
+          "aliases": [
+            "italic"
+          ],
           "clearable": true,
           "add": false,
           "set": true,

@@ -367,8 +367,8 @@ RULES: list[Rule] = [
         "the cell handler takes `text` as another name of `value` "
         "(`ExcelHandler.Set.Cells.cs`, `case \"value\" or \"text\"`); the help schema "
         "lists only `value`",
-        "`unsupported_property`: the registry follows the help schema; follow-up: add "
-        "`text` as an alias of the XLSX cell `value` in the `litchi-ops` registry",
+        "closed by record 0269: `text` is a registry alias of the cell `value` "
+        "(XLSX, XLSB, XLS); a refusal here would be a regression",
         lambda c, e: c.fmt == "xlsx" and c.verb == "set" and c.detail == "text"
         and c.result == "unsupported_property",
     ),

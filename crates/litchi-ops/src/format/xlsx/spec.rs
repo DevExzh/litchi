@@ -275,7 +275,7 @@ pub(crate) enum CellSetter {
     BorderDiagonalDown,
 }
 
-pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 51, 38> = Table::new(
+pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 51, 41> = Table::new(
     [
         Entry {
             spec: write_only("value", ValueType::Scalar),
@@ -617,6 +617,22 @@ pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 51, 38> = Table::new(
         },
     ],
     [
+        // OfficeCLI's cell handler takes `text` as another name of `value`
+        // (`ExcelHandler.Set.Cells.cs`, `case "value" or "text"`), although
+        // its help schema lists only `value` (record 0269).
+        Alias {
+            name: "text",
+            entry: 0,
+        },
+        // OfficeCLI's documented aliases (`cell.json`).
+        Alias {
+            name: "bold",
+            entry: 3,
+        },
+        Alias {
+            name: "italic",
+            entry: 4,
+        },
         Alias {
             name: "font.strike",
             entry: 5,

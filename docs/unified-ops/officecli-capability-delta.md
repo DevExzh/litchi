@@ -25,10 +25,10 @@ differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `3a1cc3f959c8f9e4f42414bed26990ce7b8392ca9678ce0d79a39f8256218140` |
 | golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `058012097bee2177a9b74042591068db0216f738ba762b0747ffdf5d99915764` |
 | golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `b80c09f5723f4a3da889e473913cb9abfb9bf4cf31aecd4e2deafb79859b9b7f` |
-| golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `4e7b212643def7f109a5c16da8f19abd855a0331adb9a527524a0f0e4bc14d4a` |
-| golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `5dc72bbb9ec23999d9cb2d8efe02e2d61f0cb1ff737130ecfd9863615635c18d` |
-| golden | `crates/litchi-ops/tests/golden/registry/xlsb.json` | `a86c4a171a866a03e0033b2a8142404a06a4b289500d15089b9fd35b3a723089` |
-| golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `b7398c8669b21634506424ba4d2acc637d9840f9fd2887c114083f07c1776f3e` |
+| golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `bdc63b71e9c775623edbadff8281f69512c7b15ebdc58fdc09dcc6e76d48fb01` |
+| golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `eab5b5ad46b63cc2432bf4f906be60e1d8c84a1f4ea088659332115f7b2feb0a` |
+| golden | `crates/litchi-ops/tests/golden/registry/xlsb.json` | `a45259be3065199bd20962966844e004542e747b8ab6a9cb76bd02900bfa3482` |
+| golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `b79c62d11b084a6d64eab2536ad000a17ebb8bedf67380dbf46557265eb55b5e` |
 | golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `51624cb2c23fd6fc8fa5b4b22fe4b896ebd8d38a375ce7750a757500e66dd0ab` |
 | golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `e5ce90bdf0f83b73b5d7a306bee39269cc4f07f3896861578948eebfc37b9cde` |
 | officecli | `schemas/help` (152 files, OfficeCLI commit `dced0d74`) | `0bcd8cae45fabc0c5e45ff99d1994465fb213ac1b8db3f7eadd87339fb40ced4` |
