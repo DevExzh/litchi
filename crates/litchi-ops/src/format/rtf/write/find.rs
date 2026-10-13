@@ -76,6 +76,15 @@ impl Rtf {
                     })?;
                     wanted.push((paragraph, node.run_position()));
                 },
+                // Record 0275 added tables, stories, links, pictures, styles
+                // and lists; RTF find still searches body paragraphs only.
+                _ => {
+                    return Err(Error::new(
+                        Code::UnsupportedType,
+                        "an RTF find searches the body's paragraphs and runs",
+                    )
+                    .with_suggestion("target the document, the body, or a body paragraph or run"));
+                },
             }
             Ok(())
         };

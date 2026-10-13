@@ -7,13 +7,15 @@ pub(crate) mod children;
 mod nav;
 mod node;
 mod spec;
+mod stories;
 pub(crate) mod views;
 pub(crate) mod write;
 
 pub(crate) use nav::Nav;
 pub use node::Node;
+pub(crate) use node::Props;
 pub use spec::Kind;
-pub(crate) use spec::SPEC;
+pub(crate) use spec::{ADDABLE, REMOVABLE, SETTABLE, SPEC, WRITE_GAPS};
 pub(crate) use spec::{alignment_name, underline_name};
 
 use std::fmt;

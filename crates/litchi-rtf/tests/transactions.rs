@@ -2285,7 +2285,7 @@ fn note_and_annotation_text_are_durable_historical_mergeable_and_reopen() {
 }
 
 #[test]
-fn note_and_annotation_edits_refuse_positioned_or_opaque_dependencies() {
+fn note_and_annotation_edits_refuse_positioned_and_splice_around_opaque_dependencies() {
     let active_note = Package::parse(
         r"{\rtf1 A{\footnote\chftn before{\field{\*\fldinst INCLUDETEXT external}{\fldrslt cached}}after}B}",
     )
@@ -2303,7 +2303,14 @@ fn note_and_annotation_edits_refuse_positioned_or_opaque_dependencies() {
     let exact = opaque_annotation.to_bytes().unwrap();
     let mut edit = opaque_annotation.edit();
     edit.set_annotation_text(0, "replacement").unwrap();
-    assert!(matches!(edit.commit(), Err(Error::UnsupportedSource(_))));
+    // Exact-source destination publication splices only the comment body, so
+    // the unknown destination survives byte-for-byte.
+    let commit = edit.commit().unwrap();
+    assert_eq!(
+        commit.package().to_bytes().unwrap(),
+        br"{\rtf1{\*\vendor retained}A{\*\atnid AM}{\*\atnauthor Ada}\chatn{\*\annotation replacement}B}"
+    );
+    assert_eq!(commit.package().annotations()[0].text, "replacement");
     assert_eq!(opaque_annotation.to_bytes().unwrap(), exact);
 }
 
@@ -2405,7 +2412,7 @@ fn shape_text_edit_and_transfer_refuse_active_links() {
 }
 
 #[test]
-fn destination_edit_refuses_unknown_syntax_without_mutating_source() {
+fn destination_edit_preserves_unknown_syntax_without_mutating_source() {
     let source =
         Package::parse(r"{\rtf1\ansi{\*\vendor retained}\trowd\cellx1000\intbl A\cell\row}")
             .unwrap();
@@ -2414,7 +2421,13 @@ fn destination_edit_refuses_unknown_syntax_without_mutating_source() {
     edit.set_table_cell_text(TableCellPath::outer(0, 0, 0), "Changed")
         .unwrap();
 
-    assert!(matches!(edit.commit(), Err(Error::UnsupportedSource(_))));
+    // The cell text is spliced into the retained source; the unknown
+    // destination and every other byte are copied verbatim.
+    let commit = edit.commit().unwrap();
+    assert_eq!(
+        commit.package().to_bytes().unwrap(),
+        br"{\rtf1\ansi{\*\vendor retained}\trowd\cellx1000\intbl Changed\cell\row}"
+    );
     assert_eq!(source.to_bytes().unwrap(), exact);
     assert_eq!(source.tables()[0].rows()[0].cells()[0].text(), "A");
 }

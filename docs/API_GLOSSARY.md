@@ -1559,6 +1559,31 @@ staging windows close at their limits, while scalar admission stays available
 when the optimization index cannot fit. Source-changing boundaries publish
 before resolving later positional paths.
 
+### RTF destination stories (0275)
+
+Native retained-destination text edits (`set_table_cell_text`,
+`set_header_footer_text`, `set_note_text`, `set_annotation_text`) keep their
+names and the canonical `Edit`/`Commit`/`Patch` family; publication now splices
+the replacement into recorded source provenance instead of reserializing the
+document. New read accessors follow existing vocabulary: `text::Paragraph::
+text_range`, `ParagraphFormat::{style, list_override, list_level}`,
+`Format::character_style`, and `Package`/`Document::picture_body_offset`
+(a UTF-8 text offset, not a `Position` selector). No alias is introduced.
+
+### Unified RTF stories (0275)
+
+The RTF adapter projects `/body/tbl[N]/tr[M]/tc[K]`, `/header[N]` and
+`/footer[N]` (with `p[M]` and `[@type=default|first|even|odd]`),
+`/footnote[N]`, `/endnote[N]`, `/comments/comment[N]`,
+`/body/p[N]/hyperlink[M]`, `/body/p[N]/picture[M]`, `/styles/<name>` and
+`/numbering/{abstractNum,num}[N]` (with `level[N]`) through the canonical Word
+vocabulary; native identities (`commentId`, list `id`, `ilvl`) stay raw-path
+only. Paragraphs read `style`, `numId`, `numLevel`; runs read `rStyle`. Cell,
+header/footer, note and comment `text` is writable through the native
+destination editor, pictures are removable; every other new element or
+property is a typed capability gap. Unscoped `p` queries stay in the main
+story. No public alias or second document model is introduced.
+
 ## Gate hardening (record 0249)
 
 Record 0249 extends the registered gate without changing any public API. Every
