@@ -15,7 +15,6 @@ use litchi_core::sheet::{CellValue, Result, WorkbookTrait};
 use parking_lot::{Mutex, RwLock};
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
-#[cfg(feature = "web_functions")]
 use std::error::Error;
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq)]
@@ -34,12 +33,47 @@ struct EvalSession {
     visiting: Mutex<HashSet<CellRef>>,
 }
 
+/// The chain of formula cells one evaluation follows exceeded the bound set
+/// with [`FormulaEvaluator::with_max_depth`].
+///
+/// Evaluation recurses through referenced formula cells, so the bound keeps
+/// a long dependency chain from exhausting the stack.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DepthLimit {
+    depth: usize,
+}
+
+impl DepthLimit {
+    /// The chain length that was refused.
+    #[must_use]
+    pub const fn depth(self) -> usize {
+        self.depth
+    }
+}
+
+impl std::fmt::Display for DepthLimit {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            formatter,
+            "formula evaluation depth {} exceeds its bound",
+            self.depth
+        )
+    }
+}
+
+impl Error for DepthLimit {}
+
 struct Visit<'a> {
     session: &'a Mutex<HashSet<CellRef>>,
     key: CellRef,
 }
 
 impl EvalSession {
+    /// The number of formula cells on the current evaluation chain.
+    fn depth(&self) -> usize {
+        self.visiting.lock().len()
+    }
+
     fn enter(&self, key: CellRef) -> Option<Visit<'_>> {
         let inserted = {
             let mut visiting = self.visiting.lock();
@@ -164,6 +198,7 @@ pub struct FormulaEvaluator<'a, W: WorkbookTrait + ?Sized> {
     names: HashMap<String, String>,
     local_names: HashMap<(String, String), String>,
     tables: HashMap<String, NamedTable>,
+    max_depth: usize,
     #[cfg(feature = "web_functions")]
     fetch: Option<&'a dyn Fetch>,
 }
@@ -290,9 +325,18 @@ impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
             names: HashMap::new(),
             local_names: HashMap::new(),
             tables: HashMap::new(),
+            max_depth: usize::MAX,
             #[cfg(feature = "web_functions")]
             fetch: None,
         }
+    }
+
+    /// Bound the chain of formula cells one evaluation follows; a longer
+    /// chain fails with [`DepthLimit`]. Unbounded by default.
+    #[must_use]
+    pub fn with_max_depth(mut self, depth: usize) -> Self {
+        self.max_depth = depth;
+        self
     }
 
     /// Attach the transport used by functions such as `WEBSERVICE`.
@@ -329,6 +373,10 @@ impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
                 return Ok(value.clone());
             }
 
+            let depth = session.depth();
+            if depth >= self.max_depth {
+                return Err(DepthLimit { depth: depth + 1 }.into());
+            }
             let Some(_visit) = session.enter(key) else {
                 return Ok(CellValue::Error("Circular reference detected".to_string()));
             };
