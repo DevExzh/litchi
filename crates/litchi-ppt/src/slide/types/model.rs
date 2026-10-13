@@ -7,6 +7,12 @@ use once_cell::unsync::OnceCell;
 impl<'doc> Slide<'doc> {
     /// Create a slide from parsed slide data.
     #[must_use]
+    /// Consult and update a presentation's one-slide shape memo.
+    pub(crate) const fn with_shape_memo(mut self, memo: &'doc super::ShapeMemo) -> Self {
+        self.shape_memo = Some(memo);
+        self
+    }
+
     pub fn from_slide_data(data: SlideData<'doc>, slide_number: usize) -> Self {
         let source = data.source();
         Self {
@@ -20,6 +26,7 @@ impl<'doc> Slide<'doc> {
             source,
             record: data.record,
             shapes: OnceCell::new(),
+            shape_memo: None,
             text_cache: OnceCell::new(),
             animations: OnceCell::new(),
             animation_extension: OnceCell::new(),

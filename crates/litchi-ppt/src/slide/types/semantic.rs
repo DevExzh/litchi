@@ -122,8 +122,15 @@ impl Slide<'_> {
         &self,
     ) -> Result<&(Arc<[ShapeEnum<'static>]>, crate::leniency::ToleranceReport)> {
         self.shapes.get_or_try_init(|| {
+            if let Some(hit) = self.shape_memo.and_then(|memo| memo.get(self.persist_id)) {
+                return Ok(hit);
+            }
             let (shapes, report) = self.parse_shapes()?;
-            Ok((Arc::from(shapes), report))
+            let parsed = (Arc::from(shapes), report);
+            if let Some(memo) = self.shape_memo {
+                memo.put(self.persist_id, &parsed);
+            }
+            Ok(parsed)
         })
     }
 

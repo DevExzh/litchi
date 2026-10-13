@@ -260,10 +260,23 @@ impl Snapshot {
     /// Returns a typed refusal when the target cannot be resolved to one safe
     /// text atom.
     pub fn edit_text(&self, target: Target) -> Result<Transaction> {
+        self.edit_text_in(target, None)
+    }
+
+    /// [`Self::edit_text`], resolving the target through `presentation`, the
+    /// already opened projection of exactly these bytes, when one is given.
+    pub(crate) fn edit_text_in(
+        &self,
+        target: Target,
+        presentation: Option<&Presentation>,
+    ) -> Result<Transaction> {
         // Resolve the semantic selector without surfacing its result yet. The
         // editor preflight below remains the first observable failure, while
         // keeping the two allocation-heavy owners sequential.
-        let shape_target = resolve_shape_target(&self.bytes, target);
+        let shape_target = match presentation {
+            Some(presentation) => resolve_shape_target_at(presentation, target),
+            None => resolve_shape_target(&self.bytes, target),
+        };
         // The shared incremental owner rejects signed and encrypted CFB
         // envelopes before any candidate is staged. Surface that capability
         // boundary as a typed refusal instead of trying to normalize it.
@@ -2439,6 +2452,22 @@ fn resolve_shape_target(bytes: &[u8], target: Target) -> Result<(u32, u32)> {
     resolve_shape_target_in_presentation(&presentation, target)
 }
 
+/// Resolves one target through a single selected slide of an opened
+/// projection, with the same refusals as
+/// [`resolve_shape_target_in_presentation`].
+fn resolve_shape_target_at(presentation: &Presentation, target: Target) -> Result<(u32, u32)> {
+    let slide = presentation
+        .slide_at(target.slide.get())?
+        .ok_or(Error::Refused(Refusal::SlideNotFound {
+            position: target.slide,
+        }))?;
+    let shape = slide
+        .shapes()?
+        .get(target.shape.get())
+        .ok_or(Error::Refused(Refusal::ShapeNotFound))?;
+    Ok((slide.persist_id(), native_shape_id(shape)))
+}
+
 fn resolve_shape_target_in_presentation(
     presentation: &Presentation,
     target: Target,
@@ -2487,6 +2516,7 @@ pub(crate) fn replace_shape_texts_batch(
     source: Arc<[u8]>,
     replacements: &[(Target, &str)],
     max_output_bytes: usize,
+    opened: Option<&Presentation>,
 ) -> Result<Option<RootBatchPublication>> {
     let replacement_bytes =
         replacements
@@ -2504,7 +2534,12 @@ pub(crate) fn replace_shape_texts_batch(
         source.clone(),
         max_output_bytes,
     )?;
-    let presentation = presentation_shared(source.clone())?;
+    // An already opened projection of exactly `source` (the root edit's
+    // untouched package) shares its parsed shapes; otherwise open one.
+    let presentation = match opened {
+        Some(presentation) => presentation.clone(),
+        None => presentation_shared(source.clone())?,
+    };
     let document_persist_id = presentation.slide_directory().document_persist_id();
     let slides = presentation.slides()?;
     let mut targets = Vec::with_capacity(replacements.len());
@@ -5172,6 +5207,7 @@ mod tests {
             source,
             &[(target(), "\0"), (missing_shape, "replacement")],
             usize::MAX,
+            None,
         )
         .err()
         .expect("a missing later shape must leave the earlier text error observable");

@@ -417,7 +417,9 @@ impl Edit {
         ensure_source_version(&package, expected_source)?;
         let inner = snapshot?.edit();
         ensure_source_version(&package, expected_source)?;
-        let inner = inner?;
+        // The package's own projection was parsed from exactly these bytes;
+        // target resolution reuses its parsed slides (record 0260).
+        let inner = inner?.with_opened_projection(package.presentation().map_err(Error::Package)?);
         Ok(Self {
             package,
             inner,

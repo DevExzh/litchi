@@ -56,6 +56,9 @@ pub struct Slide<'doc> {
     /// Lazily-loaded shapes stored as owned values, together with the
     /// non-structural defects repaired while they were parsed.
     shapes: OnceCell<(Arc<[ShapeEnum<'static>]>, crate::leniency::ToleranceReport)>,
+    /// The owning presentation's one-slide memo, when the slide was selected
+    /// through a presentation (record 0260).
+    shape_memo: Option<&'doc ShapeMemo>,
     /// Cached text content.
     text_cache: OnceCell<String>,
     /// Lazily parsed, inert shape animation metadata.
@@ -71,4 +74,46 @@ pub struct Slide<'doc> {
     notes_descriptor: Result<Option<NoteDescriptor>, String>,
     speaker_notes: OnceCell<Option<SpeakerNotes>>,
     source_limits: crate::SourceLimits,
+}
+
+/// Parsed shapes of one slide.
+type ParsedShapes = (Arc<[ShapeEnum<'static>]>, crate::leniency::ToleranceReport);
+
+/// A presentation-scoped memo of the most recently parsed slide's shapes
+/// (record 0260).
+///
+/// Every [`crate::Presentation::slide_at`] or [`crate::Presentation::slides`]
+/// call returns new [`Slide`] handles, each with its own lazily parsed shape
+/// array. A unified write resolves its path through one handle and the
+/// native edit then resolves the same target through another handle of the
+/// same immutable presentation, so the slide was parsed twice. The memo
+/// keeps the one most recently parsed slide's shape array (an `Arc` shared
+/// with the handle that parsed it) and its repairs, keyed by the slide's
+/// persist identifier within this immutable presentation, whose bytes never
+/// change. A hit returns exactly what parsing would; a miss parses and
+/// replaces the entry; a parse failure is never stored. The resident cost is
+/// one slide's shapes. A poisoned lock is treated as a miss.
+#[derive(Default)]
+pub(crate) struct ShapeMemo(std::sync::Mutex<Option<(u32, ParsedShapes)>>);
+
+impl ShapeMemo {
+    fn get(&self, persist_id: u32) -> Option<ParsedShapes> {
+        let entry = self.0.lock().ok()?;
+        entry
+            .as_ref()
+            .filter(|(key, _)| *key == persist_id)
+            .map(|(_, value)| (Arc::clone(&value.0), value.1.clone()))
+    }
+
+    fn put(&self, persist_id: u32, value: &ParsedShapes) {
+        if let Ok(mut entry) = self.0.lock() {
+            *entry = Some((persist_id, (Arc::clone(&value.0), value.1.clone())));
+        }
+    }
+}
+
+impl std::fmt::Debug for ShapeMemo {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str("ShapeMemo")
+    }
 }

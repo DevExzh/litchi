@@ -1026,6 +1026,7 @@ impl Snapshot {
             inserted_records: BTreeMap::new(),
             inserted_pictures: BTreeMap::new(),
             live_document_changed: false,
+            opened: None,
         })
     }
 
@@ -1797,9 +1798,40 @@ pub struct Transaction {
     /// Whether a staged text edit republished the live document (outline
     /// text), so staged structure must be rebased over it at commit.
     live_document_changed: bool,
+    /// The opened projection of exactly the source bytes, when the root
+    /// edit was started from an immutable package (record 0260).
+    opened: Option<OpenedProjection>,
+}
+
+/// An opened projection of a transaction's exact source bytes. It is used
+/// only while the working artifact is still the source allocation, so a
+/// target resolves against the parse the caller already holds.
+#[derive(Clone)]
+struct OpenedProjection(crate::Presentation);
+
+impl fmt::Debug for OpenedProjection {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("OpenedProjection")
+    }
 }
 
 impl Transaction {
+    /// Attach the opened projection of exactly this transaction's source
+    /// bytes, which target resolution reuses while nothing has been staged.
+    pub(crate) fn with_opened_projection(mut self, presentation: crate::Presentation) -> Self {
+        self.opened = Some(OpenedProjection(presentation));
+        self
+    }
+
+    /// The opened source projection, while the working artifact is still the
+    /// exact source allocation.
+    fn opened_source(&self) -> Option<&crate::Presentation> {
+        self.opened
+            .as_ref()
+            .filter(|_| Arc::ptr_eq(&self.working.shared_bytes(), &self.source.shared_bytes()))
+            .map(|opened| &opened.0)
+    }
+
     /// Immutable source snapshot.
     #[must_use]
     pub const fn source(&self) -> &Snapshot {
@@ -2057,7 +2089,7 @@ impl Transaction {
         }
         let text_snapshot =
             crate::text_edit::Snapshot::from_shared_bytes(self.working.shared_bytes())?;
-        let mut text_edit = match text_snapshot.edit_text(source_target) {
+        let mut text_edit = match text_snapshot.edit_text_in(source_target, self.opened_source()) {
             Ok(text_edit) => text_edit,
             Err(crate::text_edit::Error::Refused(crate::text_edit::Refusal::NoTextAtom)) => {
                 // Outline-backed placeholder text is owned by the live
@@ -2241,6 +2273,7 @@ impl Transaction {
             self.working.shared_bytes(),
             &mapped,
             self.source.limits.max_package_bytes,
+            self.opened_source(),
         )?
         else {
             return Ok(0);

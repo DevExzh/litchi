@@ -168,6 +168,8 @@ pub(crate) struct PresentationData {
     /// Validated password-to-open profile, when the document was encrypted.
     #[cfg(feature = "encryption")]
     pub(crate) encryption: Option<EncryptionProfile>,
+    /// The most recently parsed slide's shapes (record 0260).
+    pub(crate) shape_memo: crate::slide::ShapeMemo,
 }
 
 impl Presentation {
@@ -312,7 +314,10 @@ impl Presentation {
             .slides()
             .enumerate()
             .map(|(idx, slide_result)| {
-                slide_result.map(|slide_data| Slide::from_slide_data(slide_data, idx + 1))
+                slide_result.map(|slide_data| {
+                    Slide::from_slide_data(slide_data, idx + 1)
+                        .with_shape_memo(&self.inner.shape_memo)
+                })
             })
             .collect()
     }
@@ -334,7 +339,10 @@ impl Presentation {
             self.inner.source_limits,
         );
         let slide_data = factory.parse_slide(entry.persist_id())?;
-        Ok(Some(Slide::from_slide_data(slide_data, position + 1)))
+        Ok(Some(
+            Slide::from_slide_data(slide_data, position + 1)
+                .with_shape_memo(&self.inner.shape_memo),
+        ))
     }
 
     /// Get the number of slides (actual Slide records only).
