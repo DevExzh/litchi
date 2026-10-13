@@ -261,6 +261,12 @@ Branches `uo2/*` cut from `908f9cccdd`; records 0249–0255:
 - `p10-ole-meta`: legacy metadata.
 - `p14-python`: the Python surface.
 
+- Merged `a23-gate` (0249, `47a44b5506`):
+  - The glossary gate now checks 21 profiles, 673 bans and 8 families.
+  - DOC `capabilities()` lists 22 element gaps.
+  - The delta table shows read and write status per property; 48 write-only properties are no longer counted as read-supported.
+  - Not done: facade profile (unresolvable glob re-exports), core `Limits` ban (owner decision).
+
 Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-pptx-w4` 9474e2b6ce, `uo/m2-l-xlsb-w1` 876588a23c, `uo/m1-r4-perf` 012fd509ff.
 
 - M0a S10 (`docs/unified-ops/s10-measurement.md` §9). M0a landed on the strength of two explanations. If either is rejected, the chosen alternative becomes a harness follow-up; M0a is not reverted.
