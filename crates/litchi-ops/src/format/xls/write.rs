@@ -1065,6 +1065,9 @@ fn invalid_query() -> Error {
 /// coordinate is a barrier: the following command is re-resolved only after
 /// the preceding native edit has been published, which preserves insert,
 /// remove, and missing-cell semantics.
+/// CSV/TSV import through one native edit (record 0266).
+pub(crate) mod import;
+
 pub(crate) mod coalesce {
     use super::{
         CellAssignment, CellTarget, FileFormat, Kind, NativeValue, Result, TargetArg,

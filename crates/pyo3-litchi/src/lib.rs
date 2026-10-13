@@ -10,6 +10,7 @@ mod document;
 mod errors;
 mod file;
 mod iwork;
+mod m4;
 mod nodes;
 mod presentation;
 mod props;

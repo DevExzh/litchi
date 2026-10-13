@@ -312,6 +312,14 @@ pub enum Source {
     None,
     /// A bounded batch JSON ingress error.
     Batch(crate::batch::Error),
+    /// A CSV/TSV import decoding or parsing error (record 0266).
+    Import(crate::import::Error),
+    /// A formula evaluation refusal or bound (record 0266).
+    #[cfg(all(
+        feature = "eval",
+        any(feature = "xlsx", feature = "xlsb", feature = "xls")
+    ))]
+    Calc(crate::calc::Error),
     /// An explicit transaction admission or replay error.
     Transaction(crate::transaction::Error),
     /// An I/O error.
@@ -436,6 +444,12 @@ impl Source {
             Self::Publication(error) => Some(error),
             Self::None => None,
             Self::Batch(error) => Some(error),
+            Self::Import(error) => Some(error),
+            #[cfg(all(
+                feature = "eval",
+                any(feature = "xlsx", feature = "xlsb", feature = "xls")
+            ))]
+            Self::Calc(error) => Some(error),
             Self::Transaction(error) => Some(error),
             Self::Io(error) => Some(error),
             Self::Core(error) => Some(error),
@@ -871,6 +885,33 @@ impl Classify for crate::batch::Error {
             Self::Limit { .. } => Code::LimitExceeded,
             Self::Malformed { .. } => Code::CorruptBatch,
             Self::Allocation { .. } => Code::InternalError,
+        })
+    }
+}
+
+impl Classify for crate::import::Error {
+    fn classify(&self) -> Class {
+        Class::of(match self {
+            Self::InvalidOption { .. } => Code::InvalidArgument,
+            Self::FieldTooLong { .. } => Code::InvalidValue,
+            Self::Encoding { .. }
+            | Self::UnterminatedQuote { .. }
+            | Self::InvalidCharacter { .. } => Code::InvalidInput,
+        })
+    }
+}
+
+#[cfg(all(
+    feature = "eval",
+    any(feature = "xlsx", feature = "xlsb", feature = "xls")
+))]
+impl Classify for crate::calc::Error {
+    fn classify(&self) -> Class {
+        Class::of(match self {
+            Self::NotACell => Code::InvalidArgument,
+            Self::Unsupported | Self::Volatile => Code::UnsupportedCapability,
+            Self::Limit { .. } => Code::LimitExceeded,
+            Self::Suspended => Code::InternalError,
         })
     }
 }
@@ -1870,6 +1911,8 @@ macro_rules! from_leaf {
 
 from_leaf!(io::Error => Io, None);
 from_leaf!(crate::batch::Error => Batch, None);
+from_leaf!(crate::import::Error => Import, None);
+from_leaf!(#[cfg(all(feature = "eval", any(feature = "xlsx", feature = "xlsb", feature = "xls")))] crate::calc::Error => Calc, None);
 from_leaf!(crate::transaction::Error => Transaction, None);
 from_leaf!(litchi_core::Error => Core, None);
 from_leaf!(ExecutionError => Execution, None);

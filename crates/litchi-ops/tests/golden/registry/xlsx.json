@@ -1088,8 +1088,8 @@
       "propertyGaps": {
         "computedValue": {
           "code": "unsupported_capability",
-          "followUp": "M4 (formula evaluation)",
-          "reason": "the read path has no formula evaluator; `evaluated` reports the cached value only"
+          "followUp": "M4 follow-up: project computed values in cell views",
+          "reason": "node views do not evaluate; `File::evaluate` and `File::recalculate` compute formula results (record 0266)"
         },
         "link": {
           "code": "unsupported_capability",

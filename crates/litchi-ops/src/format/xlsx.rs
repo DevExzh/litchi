@@ -58,6 +58,8 @@ use crate::options::{OpenOptions, SourceMode};
 #[doc(hidden)]
 #[path = "xlsx/support.rs"]
 pub mod __unified;
+#[cfg(feature = "eval")]
+pub(crate) mod calc;
 mod chart;
 mod children;
 pub(crate) mod create;

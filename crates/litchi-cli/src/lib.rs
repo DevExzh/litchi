@@ -93,6 +93,7 @@
 mod cli;
 mod exit;
 mod formats;
+mod m4;
 mod render;
 mod run;
 

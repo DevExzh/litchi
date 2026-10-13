@@ -14,6 +14,9 @@
     "view": {
       "supported": true
     },
+    "evaluate": {
+      "supported": true
+    },
     "set": {
       "supported": true
     },
@@ -33,6 +36,9 @@
       "supported": true
     },
     "batch": {
+      "supported": true
+    },
+    "import": {
       "supported": true
     },
     "save": {

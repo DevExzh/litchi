@@ -1250,8 +1250,14 @@ fn xlsb_reports_keep_selection_semantic_and_declare_sheet_and_cell_writes() {
                 }
             )
         })
-        .expect("formula evaluation remains an explicit XLSB capability gap");
-    assert_eq!(computed_value.follow_up(), "M4 (formula evaluation)");
+        .expect("computed values in cell views remain an explicit XLSB capability gap");
+    assert_eq!(
+        computed_value.follow_up(),
+        "M4 follow-up: project computed values in cell views"
+    );
+    // Record 0266: import and evaluation are worksheet verbs.
+    assert!(caps.verb(Verb::Import).is_supported());
+    assert!(caps.verb(Verb::Evaluate).is_supported());
     for context in [
         "order-opaque-dependencies",
         "removed-scoped-names",

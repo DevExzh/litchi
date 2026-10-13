@@ -10,6 +10,7 @@ use std::sync::Arc;
 use crate::path::{IntoPath, Path};
 use crate::{Code, File, IntoNode, IntoPlacement, IntoProps, IntoTarget, Result};
 
+mod import;
 mod limits;
 pub use limits::{Error, LimitKind, SemanticLimits, SemanticLimitsBuilder};
 

@@ -25,9 +25,9 @@ differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `3a1cc3f959c8f9e4f42414bed26990ce7b8392ca9678ce0d79a39f8256218140` |
 | golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `058012097bee2177a9b74042591068db0216f738ba762b0747ffdf5d99915764` |
 | golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `b80c09f5723f4a3da889e473913cb9abfb9bf4cf31aecd4e2deafb79859b9b7f` |
-| golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `b079caade01e5e625135e2fad0c8cf4475360fa93d0effcd2b17780333efa054` |
-| golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `3f528e5d6b788232ade10bde3fb85b581456d1c1f7bf4614ff9346993f4429a0` |
-| golden | `crates/litchi-ops/tests/golden/registry/xlsb.json` | `a45259be3065199bd20962966844e004542e747b8ab6a9cb76bd02900bfa3482` |
+| golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `9d1f190710517b4b8a5915b6629946f6e70dacf746ee7e87c917bc010249ed80` |
+| golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `f81240b1cb42f91365e8cbb259cc42f6a0b172a5d0911dc864cb50342a58a73d` |
+| golden | `crates/litchi-ops/tests/golden/registry/xlsb.json` | `12690d951e7900bead6edaedb44e44154a94f73bfc3fee9a3f7f4e2d797bdfa3` |
 | golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `b79c62d11b084a6d64eab2536ad000a17ebb8bedf67380dbf46557265eb55b5e` |
 | golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `5a18a065f62c8e115f2991c0a0f61d3d96aa6ec8f21b53412b1294e97cb37a93` |
 | golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `e5ce90bdf0f83b73b5d7a306bee39269cc4f07f3896861578948eebfc37b9cde` |
@@ -3446,7 +3446,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | cell | `shift` | string | a-- |  | write-only | gap |  |
 | cell | `arrayformula` | string | as- | --g | supported | gap |  |
 | cell | `cachedValue` | string | --g | --g | supported | — |  |
-| cell | `computedValue` | string | --g |  | gap | — | M4 (formula evaluation) |
+| cell | `computedValue` | string | --g |  | gap | — | M4 follow-up: project computed values in cell views |
 | cell | `evaluated` | bool | --g | --g | supported | — |  |
 | cell | `alignment.indent` | number | asg | -sg | supported | partial |  |
 | cell | `alignment.shrinkToFit` | bool | asg | -sg | supported | partial |  |
@@ -4308,7 +4308,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | cell | `shift` | string | a-- |  | write-only | gap |  |
 | cell | `arrayformula` | string | as- | --g | supported | gap |  |
 | cell | `cachedValue` | string | --g | --g | supported | — |  |
-| cell | `computedValue` | string | --g |  | gap | — | M4 (formula evaluation) |
+| cell | `computedValue` | string | --g |  | gap | — | M4 follow-up: project computed values in cell views |
 | cell | `evaluated` | bool | --g | --g | supported | — |  |
 | cell | `alignment.indent` | number | asg | -sg | supported | partial |  |
 | cell | `alignment.shrinkToFit` | bool | asg | -sg | supported | partial |  |

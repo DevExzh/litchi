@@ -64,6 +64,14 @@ pub(crate) enum Command {
     /// Print a format's property registry: every element's properties with
     /// type, unit, values, aliases, constraint and get/set/add flags.
     Schema(Schema),
+    /// Import CSV/TSV data into a worksheet (record 0266).
+    Import(crate::m4::Import),
+    /// Evaluate one cell: its value, cached formula result or computed
+    /// result (record 0266).
+    Evaluate(crate::m4::Evaluate),
+    /// Recalculate every formula and compare it with its cached value
+    /// (record 0266).
+    Recalculate(crate::m4::Recalculate),
 }
 
 /// What `set`, `add` and `batch` do with a property the target does not

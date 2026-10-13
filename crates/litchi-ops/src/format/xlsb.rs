@@ -48,6 +48,8 @@ use crate::detect::workbook_metadata::{MetadataRepairs, read_source_backed_metad
 use crate::error::{Code, Error, Result};
 use crate::options::{OpenOptions, SourceMode};
 
+#[cfg(feature = "eval")]
+pub(crate) mod calc;
 mod children;
 pub(crate) mod create;
 mod header;
