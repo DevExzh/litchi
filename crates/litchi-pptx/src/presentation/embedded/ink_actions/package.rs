@@ -777,7 +777,7 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
     let slide = package.get_part(&before.slide_part_name)?;
     let current = load_snapshot(package, before.slide_index, slide, &before.limits())?;
     if !current.same_source(before) {
-        return Err(Error::StaleSource);
+        return Err(Error::PatchConflict);
     }
     if patch.is_empty() {
         return Ok(current);

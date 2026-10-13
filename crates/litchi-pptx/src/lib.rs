@@ -96,6 +96,7 @@ pub mod modern_comments;
 pub mod master_layout;
 pub(crate) mod namespace;
 pub mod notes;
+mod open_options;
 pub mod opened;
 pub mod package;
 pub mod parts;
@@ -181,6 +182,7 @@ pub use media_parts::{
     load_slide_media, parse_slide_media, store_slide_media, write_slide_media_pictures,
 };
 pub use modern_comments::*;
+pub use open_options::{OpenOptions, OpenPolicy};
 pub use opened::{
     CrossSlideCopyPatch, CrossSlideCopyPlan, MAX_SHAPE_PROPERTIES_REPLACEMENTS,
     MAX_SHAPE_TEXT_REPLACEMENTS, ShapePropertiesReplacement, ShapeTextReplacement, SlideCopyPart,

@@ -1322,68 +1322,36 @@ impl SourceBackedPresentation {
         Self::from_path(path)
     }
 
-    /// Open a filesystem-backed PPTX with explicit OPC resource limits.
+    /// Open a filesystem-backed PPTX with explicit ingress options.
+    ///
+    /// Source limits bound the physical archive; optional cache limits and an
+    /// execution context select the finite payload cache and the
+    /// hierarchical budget charged by deferred reads.
     #[cfg(any(unix, windows))]
-    pub fn open_with_limits(path: impl AsRef<Path>, limits: SourceLimits) -> Result<Self> {
-        Self::from_path_with_limits(path, limits)
-    }
-
-    /// Open a filesystem-backed PPTX with an explicit finite payload cache.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_cache_limits(
-        path: impl AsRef<Path>,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_path_with_cache_limits(path, cache_limits)
-    }
-
-    /// Open a filesystem-backed PPTX with explicit read and cache policies.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits_and_cache_limits(
-        path: impl AsRef<Path>,
-        limits: SourceLimits,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_path_with_limits_and_cache_limits(path, limits, cache_limits)
-    }
-
-    /// Open a filesystem-backed PPTX with explicit read and execution
-    /// policies while retaining the default finite source cache.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_execution_context(
-        path: impl AsRef<Path>,
-        limits: SourceLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_path_with_execution_context(path, limits, context)
-    }
-
-    /// Open a filesystem-backed PPTX with explicit read and execution
-    /// policies while retaining the default finite source cache.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits_and_execution_context(
-        path: impl AsRef<Path>,
-        limits: SourceLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_path_with_limits_and_execution_context(path, limits, context)
-    }
-
-    /// Open a filesystem-backed PPTX with explicit read, cache, and
-    /// hierarchical execution policies.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits_and_cache_limits_and_execution_context(
-        path: impl AsRef<Path>,
-        limits: SourceLimits,
-        cache_limits: SourceCacheLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_path_with_limits_and_cache_limits_and_execution_context(
-            path,
-            limits,
+    pub fn open_with_options(path: impl AsRef<Path>, options: crate::OpenOptions) -> Result<Self> {
+        let crate::OpenOptions {
+            source_limits,
             cache_limits,
-            context,
-        )
+            execution_context,
+            ..
+        } = options;
+        match (cache_limits, execution_context) {
+            (None, None) => Self::from_path_with_limits(path, source_limits),
+            (Some(cache), None) => {
+                Self::from_path_with_limits_and_cache_limits(path, source_limits, cache)
+            },
+            (None, Some(context)) => {
+                Self::from_path_with_limits_and_execution_context(path, source_limits, context)
+            },
+            (Some(cache), Some(context)) => {
+                Self::from_path_with_limits_and_cache_limits_and_execution_context(
+                    path,
+                    source_limits,
+                    cache,
+                    context,
+                )
+            },
+        }
     }
 
     /// Open an ordinary PPTX package from a caller-provided positional source.
@@ -2015,68 +1983,36 @@ impl SourceBackedPresentationEditor {
         Self::from_path(path)
     }
 
-    /// Open a filesystem-backed PPTX with explicit OPC resource limits.
+    /// Open a filesystem-backed PPTX with explicit ingress options.
+    ///
+    /// Source limits bound the physical archive; optional cache limits and an
+    /// execution context select the finite payload cache and the
+    /// hierarchical budget charged by deferred reads.
     #[cfg(any(unix, windows))]
-    pub fn open_with_limits(path: impl AsRef<Path>, limits: SourceLimits) -> Result<Self> {
-        Self::from_path_with_limits(path, limits)
-    }
-
-    /// Open a filesystem-backed PPTX with an explicit finite payload cache.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_cache_limits(
-        path: impl AsRef<Path>,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_path_with_cache_limits(path, cache_limits)
-    }
-
-    /// Open a filesystem-backed PPTX with explicit read and cache policies.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits_and_cache_limits(
-        path: impl AsRef<Path>,
-        limits: SourceLimits,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_path_with_limits_and_cache_limits(path, limits, cache_limits)
-    }
-
-    /// Open a filesystem-backed PPTX with explicit read and execution
-    /// policies while retaining the default finite source cache.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_execution_context(
-        path: impl AsRef<Path>,
-        limits: SourceLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_path_with_execution_context(path, limits, context)
-    }
-
-    /// Open a filesystem-backed PPTX with explicit read and execution
-    /// policies while retaining the default finite source cache.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits_and_execution_context(
-        path: impl AsRef<Path>,
-        limits: SourceLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_path_with_limits_and_execution_context(path, limits, context)
-    }
-
-    /// Open a filesystem-backed PPTX with explicit read, cache, and
-    /// hierarchical execution policies.
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits_and_cache_limits_and_execution_context(
-        path: impl AsRef<Path>,
-        limits: SourceLimits,
-        cache_limits: SourceCacheLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_path_with_limits_and_cache_limits_and_execution_context(
-            path,
-            limits,
+    pub fn open_with_options(path: impl AsRef<Path>, options: crate::OpenOptions) -> Result<Self> {
+        let crate::OpenOptions {
+            source_limits,
             cache_limits,
-            context,
-        )
+            execution_context,
+            ..
+        } = options;
+        match (cache_limits, execution_context) {
+            (None, None) => Self::from_path_with_limits(path, source_limits),
+            (Some(cache), None) => {
+                Self::from_path_with_limits_and_cache_limits(path, source_limits, cache)
+            },
+            (None, Some(context)) => {
+                Self::from_path_with_limits_and_execution_context(path, source_limits, context)
+            },
+            (Some(cache), Some(context)) => {
+                Self::from_path_with_limits_and_cache_limits_and_execution_context(
+                    path,
+                    source_limits,
+                    cache,
+                    context,
+                )
+            },
+        }
     }
 
     /// Open an ordinary PPTX source for a bounded one-slide edit.
@@ -2352,7 +2288,7 @@ impl SourceBackedPresentationEditor {
             "publish_svg_commit_to_stream",
         )?;
         if !current.same_source(&commit.patch.before) {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         let target = commit.patch.apply(&current)?;
         if target.same_source(&current) {
@@ -3367,7 +3303,7 @@ impl SourceBackedSlidePatch {
         self.before.check_execution()?;
         source.check_execution()?;
         if !source.same_source(&self.before) {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         Ok(if self.is_changed() {
             self.after.clone()
@@ -3608,7 +3544,7 @@ impl SourceBackedSvgPatch {
         self.before.slide.check_execution()?;
         source.slide.check_execution()?;
         if !source.same_source(&self.before) {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         Ok(if self.is_changed() {
             self.after.clone()
@@ -3835,7 +3771,7 @@ impl SourceBackedSlideBatchPatch {
         self.before.check_execution()?;
         source.check_execution()?;
         if !source.same_source(&self.before) {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         Ok(if self.is_changed() {
             self.after.clone()
@@ -3917,7 +3853,7 @@ fn build_svg_topology_plan(
         || target.raster_relationship_id != current.raster_relationship_id
         || target.raster_relationship_type != current.raster_relationship_type
     {
-        return Err(Error::StaleSource);
+        return Err(Error::PatchConflict);
     }
     let owner = current.slide.part_uri.clone();
     let mut plan = SourceTopologyPlan::new();
@@ -6863,7 +6799,7 @@ mod tests {
         let mut output = Vec::new();
         assert!(matches!(
             foreign.publish_slide_commit_to_stream(&mut output, &commit),
-            Err(Error::StaleSource)
+            Err(Error::PatchConflict)
         ));
         assert_eq!(test_semantic_scene_reads(), 1);
         assert_eq!(test_semantic_slide_part_reads(), 1);
@@ -7080,7 +7016,7 @@ mod tests {
         let patch = edit.commit_checked().unwrap().patch().clone();
         let foreign = second.slide_snapshot(0).unwrap();
 
-        assert!(matches!(patch.apply(&foreign), Err(Error::StaleSource)));
+        assert!(matches!(patch.apply(&foreign), Err(Error::PatchConflict)));
     }
 
     #[test]
@@ -7860,10 +7796,11 @@ mod tests {
             2
         );
         assert_eq!(
-            SourceBackedPresentation::open_with_limits_and_cache_limits(
+            SourceBackedPresentation::open_with_options(
                 file.path(),
-                SourceLimits::default(),
-                cache,
+                crate::OpenOptions::default()
+                    .source_limits(SourceLimits::default())
+                    .cache_limits(cache)
             )
             .unwrap()
             .slide_count(),
@@ -7896,11 +7833,12 @@ mod tests {
 
         let (_budget, _cancellation_source, context) = source_backed_context(u64::MAX);
         assert_eq!(
-            SourceBackedPresentation::open_with_limits_and_cache_limits_and_execution_context(
+            SourceBackedPresentation::open_with_options(
                 file.path(),
-                SourceLimits::default(),
-                cache,
-                context,
+                crate::OpenOptions::default()
+                    .source_limits(SourceLimits::default())
+                    .cache_limits(cache)
+                    .execution_context(context)
             )
             .unwrap()
             .slide_count(),
@@ -7931,11 +7869,12 @@ mod tests {
         );
         let (_budget, _cancellation_source, context) = source_backed_context(u64::MAX);
         assert_eq!(
-            SourceBackedPresentationEditor::open_with_limits_and_cache_limits_and_execution_context(
+            SourceBackedPresentationEditor::open_with_options(
                 file.path(),
-                SourceLimits::default(),
-                cache,
-                context,
+                crate::OpenOptions::default()
+                    .source_limits(SourceLimits::default())
+                    .cache_limits(cache)
+                    .execution_context(context)
             )
             .unwrap()
             .slide_count(),

@@ -441,7 +441,7 @@ impl SourceBackedSlideOrderPatch {
         self.before.check_execution()?;
         source.check_execution()?;
         if !source.same_source(&self.before) {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         let target = if self.is_changed() {
             self.after.clone()
@@ -492,7 +492,7 @@ fn capture(editor: &SourceBackedPresentationEditor) -> Result<SourceBackedSlideO
     let raw = editor._presentation.source_data().clone();
     editor.package.check_execution()?;
     if view.partname() != editor._presentation.source_partname() {
-        return Err(Error::StaleSource);
+        return Err(Error::PatchConflict);
     }
 
     let bindings = slide_order_bindings(editor)?;
@@ -500,7 +500,7 @@ fn capture(editor: &SourceBackedPresentationEditor) -> Result<SourceBackedSlideO
     let pinned_relationships =
         root_relationship_bindings(editor._presentation.source_relationships())?;
     if relationships != pinned_relationships {
-        return Err(Error::StaleSource);
+        return Err(Error::PatchConflict);
     }
     editor.package.source_version()?;
     let lineage = editor.package.source_lineage();

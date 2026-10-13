@@ -188,7 +188,7 @@ fn malformed_orphan_theme_source() -> Vec<u8> {
 #[test]
 fn deferred_theme_fallback_is_forced_before_master_authoring() {
     let source = malformed_orphan_theme_source();
-    let mut package = Package::from_vec(source.clone()).unwrap();
+    let mut package = Package::from_reader(Cursor::new(source.clone())).unwrap();
     assert!(package.add_slide_master().is_err());
     assert_eq!(
         PackageWriter::to_bytes(package.opc().unwrap()).unwrap(),
@@ -199,14 +199,14 @@ fn deferred_theme_fallback_is_forced_before_master_authoring() {
 #[test]
 fn deferred_graph_failure_rolls_back_master_and_layout_authoring() {
     let source = malformed_layout_source();
-    let mut master_package = Package::from_vec(source.clone()).unwrap();
+    let mut master_package = Package::from_reader(Cursor::new(source.clone())).unwrap();
     assert!(master_package.add_slide_master().is_err());
     assert_eq!(
         PackageWriter::to_bytes(master_package.opc().unwrap()).unwrap(),
         source
     );
 
-    let mut layout_package = Package::from_vec(source.clone()).unwrap();
+    let mut layout_package = Package::from_reader(Cursor::new(source.clone())).unwrap();
     assert!(
         layout_package
             .add_slide_layout(
@@ -841,7 +841,7 @@ fn p232_patch_rejects_stale_source_and_growth_before_staging() {
         .to_vec();
     assert!(matches!(
         package.apply_placeholder_type_extension_patch(&patch),
-        Err(crate::Error::StaleSource)
+        Err(crate::Error::PatchConflict)
     ));
     assert_eq!(
         package

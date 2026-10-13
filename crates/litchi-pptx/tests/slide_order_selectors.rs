@@ -68,7 +68,7 @@ fn semantic_order_edits_compose_replay_invert_and_preserve_the_source() {
     assert_eq!(replayed.to_bytes().unwrap(), changed.to_bytes().unwrap());
     let mut restored = replayed.apply(&wire.inverse()).unwrap();
     assert_eq!(restored.to_bytes().unwrap(), source);
-    let reopened = Package::from_vec(changed.to_bytes().unwrap()).unwrap();
+    let reopened = Package::from_reader(std::io::Cursor::new(changed.to_bytes().unwrap())).unwrap();
     assert_eq!(names(&reopened), names(&changed));
 }
 

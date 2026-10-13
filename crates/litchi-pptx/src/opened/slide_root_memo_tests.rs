@@ -58,7 +58,7 @@ fn text_box_package(slides: usize, boxes: usize) -> Result<Package> {
         }
     }
     let mut package = builder.build()?;
-    Package::from_vec(package.to_bytes()?)
+    Package::from_reader(std::io::Cursor::new(package.to_bytes()?))
 }
 
 /// Recapture `candidate` the way a commit does, with or without the source
@@ -665,7 +665,7 @@ fn the_notes_owning_deck_reuses_proofs_and_keeps_its_notes_graph() -> Result<()>
         slide.set_notes(&format!("speaker notes {index}"));
     }
     let mut package = builder.build()?;
-    let package = Package::from_vec(package.to_bytes()?)?;
+    let package = Package::from_reader(std::io::Cursor::new(package.to_bytes()?))?;
     let source = package.opened_presentation()?;
     let mut edit = source.edit();
     assert!(edit.set_notes_text(1, "rewritten notes")?);

@@ -380,7 +380,7 @@ pub fn apply_patch_with_policy(
     validate_owner(part)?;
     patch.before.limits.check_source(part.blob().len())?;
     if part.blob() != patch.before.source.as_slice() {
-        return Err(Error::StaleSource);
+        return Err(Error::PatchConflict);
     }
     if patch.is_noop() {
         return Ok(patch.before.clone());
@@ -951,7 +951,7 @@ pub fn apply_slot_patch_with_policy(
     validate_owner(part)?;
     patch.before.limits.check_source(part.blob().len())?;
     if part.blob() != patch.before.source.as_slice() {
-        return Err(Error::StaleSource);
+        return Err(Error::PatchConflict);
     }
     if patch.is_noop() {
         return Ok(patch.before.clone());

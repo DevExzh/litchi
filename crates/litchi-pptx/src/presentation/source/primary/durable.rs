@@ -345,12 +345,12 @@ pub(super) fn apply(package: &Package, data: &Data, shape_removals: bool) -> Res
         || package.root.as_bytes() != data.before_root.as_slice()
         || package.order.as_ref() != data.before_order.as_ref()
     {
-        return Err(Error::StaleSource);
+        return Err(Error::PatchConflict);
     }
     let root_changed = data.before_root.as_slice() != data.after_root.as_slice();
     let order_changed = data.before_order.as_ref() != data.after_order.as_ref();
     if root_changed != order_changed {
-        return Err(Error::StaleSource);
+        return Err(Error::PatchConflict);
     }
     if order_changed {
         validate_source_order_root(
@@ -381,7 +381,7 @@ pub(super) fn apply(package: &Package, data: &Data, shape_removals: bool) -> Res
         let physical = package.physical_position(&change.key)?;
         let current = package.snapshot(physical)?;
         if current.xml.as_bytes() != change.before.as_slice() {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         if change.after.len() > current.max_output_bytes {
             return Err(limit(
@@ -429,7 +429,7 @@ pub(super) fn apply(package: &Package, data: &Data, shape_removals: bool) -> Res
             package.owner.package.execution_context().as_ref(),
         )?;
         if expected.as_slice() != data.after_root.as_slice() {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
     }
     let root = if let Some(reservation) = &reservation {

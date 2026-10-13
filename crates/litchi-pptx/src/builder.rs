@@ -98,7 +98,7 @@ mod tests {
         assert_eq!(original, unchanged);
         let mut output = Vec::new();
         changed.write_to(&mut output)?;
-        let reopened = Package::from_vec(output)?;
+        let reopened = Package::from_reader(std::io::Cursor::new(output))?;
         assert!(changed.same_content(&reopened)?);
         Ok(())
     }

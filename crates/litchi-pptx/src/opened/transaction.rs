@@ -2683,7 +2683,7 @@ impl Diagnostics {
 /// builder.presentation()?.add_slide()?
 ///     .add_text_box("before", 0, 0, 914_400, 914_400);
 /// let bytes = builder.build()?.to_bytes()?;
-/// let source = Package::from_vec(bytes.clone())?;
+/// let source = Package::from_reader(std::io::Cursor::new(bytes.clone()))?;
 /// let mut edit = source.edit()?;
 /// edit.set_shape_text(0_usize, 0_usize, "after")?;
 /// let commit = edit.commit()?;
@@ -2799,7 +2799,7 @@ mod compaction_tests {
             slide.add_text_box(&format!("compaction {index}"), 10, 20, 300, 400);
         }
         let mut package = builder.build()?;
-        Package::from_vec(package.to_bytes()?)?.opened_presentation()
+        Package::from_reader(std::io::Cursor::new(package.to_bytes()?))?.opened_presentation()
     }
 
     fn three_slide_snapshot_with_outer_crlf() -> Result<super::Snapshot> {
@@ -2809,7 +2809,7 @@ mod compaction_tests {
             slide.add_text_box(&format!("compaction {index}"), 10, 20, 300, 400);
         }
         let mut package = builder.build()?;
-        let mut package = Package::from_vec(package.to_bytes()?)?;
+        let mut package = Package::from_reader(std::io::Cursor::new(package.to_bytes()?))?;
         let part_name = litchi_opc::PackURI::new("/ppt/slides/slide1.xml").unwrap();
         let original = package.opc.get_part(&part_name)?.blob().to_vec();
         let declaration_end = original
@@ -2822,7 +2822,7 @@ mod compaction_tests {
         changed.extend_from_slice(b"\r\n");
         changed.extend_from_slice(&original[declaration_end..]);
         package.opc.get_part_mut(&part_name)?.set_blob(changed);
-        Package::from_vec(package.to_bytes()?)?.opened_presentation()
+        Package::from_reader(std::io::Cursor::new(package.to_bytes()?))?.opened_presentation()
     }
 
     fn blob(package: &litchi_opc::OpcPackage, slide: &super::Slide) -> Arc<Vec<u8>> {
@@ -3004,7 +3004,7 @@ mod compaction_tests {
     #[test]
     fn admitted_real_fixture_root_witness_has_a_scene_differential_oracle() -> Result<()> {
         let bytes = std::fs::read("../../test-data/ooxml/pptx/shapes.pptx").unwrap();
-        let package = Package::from_vec(bytes)?;
+        let package = Package::from_reader(std::io::Cursor::new(bytes))?;
         let snapshot = package.opened_presentation()?;
         let mut witnessed = 0usize;
         for slide in &snapshot.slides {
@@ -3024,7 +3024,7 @@ mod compaction_tests {
     #[test]
     fn admitted_real_fixture_crlf_after_declaration_skips_two_readbacks() -> Result<()> {
         let bytes = std::fs::read("../../test-data/ooxml/pptx/shapes.pptx").unwrap();
-        let package = Package::from_vec(bytes)?;
+        let package = Package::from_reader(std::io::Cursor::new(bytes))?;
         let snapshot = package.opened_presentation()?;
         let source = snapshot
             .package
@@ -3056,7 +3056,8 @@ mod compaction_tests {
         slide.add_text_box("first", 10, 20, 300, 400);
         slide.add_text_box("second", 10, 500, 300, 400);
         let mut package = builder.build()?;
-        let snapshot = Package::from_vec(package.to_bytes()?)?.opened_presentation()?;
+        let snapshot = Package::from_reader(std::io::Cursor::new(package.to_bytes()?))?
+            .opened_presentation()?;
         let mut edit = snapshot.edit();
         assert!(edit.set_shape_text(0, 0, "recorded")?);
         // Removing a shape stages new bytes without recording a scene read.

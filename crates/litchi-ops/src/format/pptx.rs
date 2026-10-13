@@ -313,7 +313,7 @@ impl Pptx {
             )));
         };
         if !current.same_source_owner(&revision) {
-            return Err(Error::from(pptx::Error::StaleSource));
+            return Err(Error::from(pptx::Error::PatchConflict));
         }
         // Check the candidate's own freshness and execution fence before adoption.
         revision.presentation()?;
@@ -504,7 +504,7 @@ impl Pptx {
                 return (0..self.slide_count()?)
                     .map(|position| {
                         self.slide(position)?
-                            .ok_or_else(|| Error::from(pptx::Error::StaleSource))
+                            .ok_or_else(|| Error::from(pptx::Error::PatchConflict))
                     })
                     .collect();
             }

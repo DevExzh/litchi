@@ -69,7 +69,7 @@ fn minimal_package_is_directly_editable_and_replayable() {
     let mut bytes = Vec::new();
     changed.write_to(&mut bytes).unwrap();
     assert!(
-        Package::from_vec(bytes)
+        Package::from_reader(std::io::Cursor::new(bytes))
             .unwrap()
             .same_content(&changed)
             .unwrap()

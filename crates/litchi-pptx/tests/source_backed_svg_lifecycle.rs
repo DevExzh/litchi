@@ -1230,7 +1230,7 @@ fn stale_and_signed_lifecycle_publication_refuse_before_writer_bytes() {
     let result = editor.publish_svg_attachment_commit_to_stream(&mut output, &commit);
     assert!(matches!(
         result,
-        Err(Error::StaleSource) | Err(Error::Opc(OpcError::SourceChanged { .. }))
+        Err(Error::PatchConflict) | Err(Error::Opc(OpcError::SourceChanged { .. }))
     ));
     assert!(output.is_empty());
 

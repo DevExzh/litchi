@@ -91,7 +91,7 @@ pub(super) fn plan(
                     })?;
                 },
                 (true, false) => {
-                    effective_parts = effective_parts.checked_sub(1).ok_or(Error::StaleSource)?;
+                    effective_parts = effective_parts.checked_sub(1).ok_or(Error::PatchConflict)?;
                 },
                 _ => {},
             }
@@ -241,7 +241,7 @@ fn metadata_bytes(
 ) -> Result<usize> {
     let relationships = source
         .relationships_data_for_with_limit(presentation_uri, limits.max_relationship_xml_bytes())?
-        .ok_or(Error::StaleSource)?;
+        .ok_or(Error::PatchConflict)?;
     let content_types = source.content_types_data_with_limit(limits.max_content_types_bytes())?;
     relationships
         .as_bytes()

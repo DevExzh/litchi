@@ -753,7 +753,7 @@ impl Snapshot {
     /// dependencies are copied through the existing strict owned-role closure;
     /// external allowlisted targets remain inert and are never fetched.
     /// Both snapshots must come from source-preserving ingress such as
-    /// [`crate::Package::from_vec`], [`crate::Package::open`], or
+    /// [`crate::Package::open`] or
     /// [`crate::Package::from_reader`]; borrowed graph-only ingress is refused
     /// because it cannot authorize discarded ZIP ordering and extras.
     ///
@@ -1249,7 +1249,7 @@ fn prepare_cross_slide_copy_for_slides(
     if !source.physical_source_provenance || !destination.physical_source_provenance {
         return refusal(
             SlideCopyRefusal::UnknownPhysicalMember,
-            "cross-slide physical authorization requires source-preserving package ingress (use Package::from_vec, open, or from_reader)",
+            "cross-slide physical authorization requires source-preserving package ingress (use Package::open, from_reader, or their *_with_options forms)",
         );
     }
     if has_signature_infrastructure(source.package.as_ref())

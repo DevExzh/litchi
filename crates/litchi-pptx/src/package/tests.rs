@@ -31,7 +31,8 @@ fn owned_presentation_noop_output_preserves_exact_archive() {
             .expect("serialize presentation"),
         b"pptx exact source",
     );
-    let mut package = Package::from_vec(source.clone()).expect("open owned presentation");
+    let mut package = Package::from_reader(std::io::Cursor::new(source.clone()))
+        .expect("open owned presentation");
 
     assert_eq!(package.to_bytes().expect("serialize no-op package"), source);
 }

@@ -789,7 +789,7 @@ fn multi_slide_batch_rejects_empty_duplicate_over_bound_and_stale_sets() {
     let mut output = Vec::new();
     assert!(matches!(
         foreign.publish_slide_batch_commit_to_stream(&mut output, &commit),
-        Err(Error::StaleSource)
+        Err(Error::PatchConflict)
     ));
     assert!(output.is_empty());
 
@@ -1041,7 +1041,7 @@ fn stale_foreign_closure_and_changed_source_refuse_before_output() {
     let mut output = Vec::new();
     assert!(matches!(
         foreign_editor.publish_slide_commit_to_stream(&mut output, &commit),
-        Err(Error::StaleSource)
+        Err(Error::PatchConflict)
     ));
     assert!(output.is_empty());
 
@@ -1881,7 +1881,7 @@ fn direct_transition_rejects_malformed_dtd_limits_stale_source_and_partial_sink(
     let mut output = Vec::new();
     assert!(matches!(
         foreign.publish_slide_commit_to_stream(&mut output, &commit),
-        Err(Error::StaleSource)
+        Err(Error::PatchConflict)
     ));
     assert!(output.is_empty());
 
@@ -2181,7 +2181,7 @@ fn source_slide_order_refuses_stale_foreign_signed_cancelled_and_partial_output(
     let mut output = Vec::new();
     assert!(matches!(
         foreign.publish_slide_order_commit_to_stream(&mut output, &commit),
-        Err(Error::StaleSource)
+        Err(Error::PatchConflict)
     ));
     assert!(output.is_empty());
 

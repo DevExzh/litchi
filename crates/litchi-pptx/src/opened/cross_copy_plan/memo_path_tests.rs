@@ -135,8 +135,8 @@ fn hashed(entries: &[Entry]) -> Vec<usize> {
 #[test]
 fn planning_hashes_only_payloads_no_snapshot_holds() -> Result<()> {
     let (source_bytes, destination_bytes) = media_pair()?;
-    let source = Package::from_vec(source_bytes)?;
-    let destination = Package::from_vec(destination_bytes)?;
+    let source = Package::from_reader(std::io::Cursor::new(source_bytes))?;
+    let destination = Package::from_reader(std::io::Cursor::new(destination_bytes))?;
     let source_snapshot = source.opened_presentation()?;
     let destination_snapshot = destination.opened_presentation()?;
     let _cold = fingerprint_log::take();
@@ -164,8 +164,8 @@ fn planning_hashes_only_payloads_no_snapshot_holds() -> Result<()> {
 #[test]
 fn an_application_hashes_only_payloads_no_memo_names() -> Result<()> {
     let (source_bytes, destination_bytes) = media_pair()?;
-    let source = Package::from_vec(source_bytes)?;
-    let mut destination = Package::from_vec(destination_bytes)?;
+    let source = Package::from_reader(std::io::Cursor::new(source_bytes))?;
+    let mut destination = Package::from_reader(std::io::Cursor::new(destination_bytes))?;
     let plan = plan_copy(&source, &destination)?;
     assert!(plan.retained_candidate_bytes().is_some());
     assert!(
@@ -202,12 +202,12 @@ fn an_application_hashes_only_payloads_no_memo_names() -> Result<()> {
 fn an_application_without_facade_memos_hashes_the_live_packages_once() -> Result<()> {
     let (source_bytes, destination_bytes) = media_pair()?;
     let plan = {
-        let source = Package::from_vec(source_bytes.clone())?;
-        let destination = Package::from_vec(destination_bytes.clone())?;
+        let source = Package::from_reader(std::io::Cursor::new(source_bytes.clone()))?;
+        let destination = Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
         plan_copy(&source, &destination)?
     };
-    let source = Package::from_vec(source_bytes)?;
-    let mut destination = Package::from_vec(destination_bytes)?;
+    let source = Package::from_reader(std::io::Cursor::new(source_bytes))?;
+    let mut destination = Package::from_reader(std::io::Cursor::new(destination_bytes))?;
     assert!(source.part_digest_memo().is_none());
     assert!(destination.part_digest_memo().is_none());
     let _setup = fingerprint_log::take();
@@ -242,8 +242,8 @@ fn an_application_without_facade_memos_hashes_the_live_packages_once() -> Result
 #[test]
 fn durable_patch_routes_consult_the_memos() -> Result<()> {
     let (source_bytes, destination_bytes) = media_pair()?;
-    let source = Package::from_vec(source_bytes)?;
-    let mut destination = Package::from_vec(destination_bytes.clone())?;
+    let source = Package::from_reader(std::io::Cursor::new(source_bytes))?;
+    let mut destination = Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
     let plan = plan_copy(&source, &destination)?;
     let forward = CrossSlideCopyPatch::from_bytes(&plan.patch().to_bytes()?)?;
     let _planning = fingerprint_log::take();
@@ -278,7 +278,7 @@ fn durable_patch_routes_consult_the_memos() -> Result<()> {
 #[test]
 fn a_capture_fills_the_facade_memo_and_the_next_capture_reuses_it() -> Result<()> {
     let (source_bytes, _destination) = media_pair()?;
-    let package = Package::from_vec(source_bytes)?;
+    let package = Package::from_reader(std::io::Cursor::new(source_bytes))?;
     assert!(package.part_digest_memo().is_none());
     let first = package.opened_presentation()?;
     let memo = package
@@ -302,7 +302,7 @@ fn a_capture_fills_the_facade_memo_and_the_next_capture_reuses_it() -> Result<()
 #[test]
 fn a_capture_memo_is_projected_onto_the_facade_allocations() -> Result<()> {
     let (source_bytes, _destination) = media_pair()?;
-    let mut package = Package::from_vec(source_bytes)?;
+    let mut package = Package::from_reader(std::io::Cursor::new(source_bytes))?;
     let custom = PackURI::new("/custom/copying.bin").expect("URI");
     package.opc.try_add_part(Box::new(CopyingPart::new(
         custom.clone(),

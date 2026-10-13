@@ -196,7 +196,11 @@ impl Package {
                 index: logical,
                 len: self.order.len(),
             })?;
-        let physical = self.physical.get(key).copied().ok_or(Error::StaleSource)?;
+        let physical = self
+            .physical
+            .get(key)
+            .copied()
+            .ok_or(Error::PatchConflict)?;
         self.check()?;
         Ok(Position::new(physical))
     }
@@ -288,7 +292,7 @@ impl Package {
             || self.root.as_bytes() != before_root.as_bytes()
             || self.order.as_ref() != before_order.as_ref()
         {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         // Validate the complete write set before constructing a candidate.
         for change in changes.iter() {
@@ -378,16 +382,16 @@ impl Package {
             if self.order.as_ref() != revision.data.after.order.as_ref()
                 || self.root.as_bytes() != revision.data.after.root.as_slice()
             {
-                return Err(Error::StaleSource);
+                return Err(Error::PatchConflict);
             }
         } else if self.order.len() != self.owner.slides.len() {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         Ok(())
     }
 
     fn physical_position(&self, key: &StableSlideKey) -> Result<usize> {
-        self.physical.get(key).copied().ok_or(Error::StaleSource)
+        self.physical.get(key).copied().ok_or(Error::PatchConflict)
     }
 
     fn source_slide_for_key(&self, key: &StableSlideKey) -> Option<super::SourceSlide> {
@@ -453,7 +457,7 @@ impl Package {
                     .order
                     .iter()
                     .position(|candidate| candidate == &key)
-                    .ok_or(Error::StaleSource)?;
+                    .ok_or(Error::PatchConflict)?;
                 return revision.snapshot_for_key(self, &key, logical);
             }
         }
@@ -507,7 +511,7 @@ impl Package {
             // A replay target may retain an original payload of another
             // logical revision. Every physical-source difference is an overlay.
             if let SourcePayload::Original(_) = snapshot.xml {
-                return Err(Error::StaleSource);
+                return Err(Error::PatchConflict);
             }
         } else {
             snapshot = original;
@@ -548,11 +552,11 @@ impl Package {
     fn with_order(&self, root: RootPayload, order: Arc<[StableSlideKey]>) -> Result<Self> {
         self.check()?;
         if self.topology.is_some() {
-            let bytes = root.edited_bytes().ok_or(Error::StaleSource)?;
+            let bytes = root.edited_bytes().ok_or(Error::PatchConflict)?;
             return topology::reorder(self, bytes, order);
         }
         if order.len() != self.owner.slides.len() {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         let changed = root.as_bytes() != self.root.as_bytes() || order != self.order;
         if !changed {
@@ -1678,7 +1682,7 @@ fn source_order(owner: &SourceBackedPresentationEditor) -> Result<Box<[StableSli
     for slide in owner.slides.iter() {
         let key = slide_key(slide);
         if !seen.insert(key.clone()) {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         order.push(key);
     }
@@ -1694,7 +1698,7 @@ fn source_physical_index(
         .map_err(allocation)?;
     for (position, slide) in owner.slides.iter().enumerate() {
         if physical.insert(slide_key(slide), position).is_some() {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
     }
     Ok(physical)

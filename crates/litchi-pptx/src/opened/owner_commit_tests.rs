@@ -12,7 +12,7 @@ fn opened() -> Result<Package> {
             .add_text_box(text, 0, 0, 914_400, 914_400);
     }
     let mut authored = builder.build()?;
-    Package::from_vec(authored.to_bytes()?)
+    Package::from_reader(std::io::Cursor::new(authored.to_bytes()?))
 }
 
 #[test]
@@ -121,7 +121,8 @@ fn encryption_provenance_survives_commits_clones_replay_and_reencryption() -> Re
     use litchi_crypto::ooxml::Mode;
     let mut source = opened()?;
     let encrypted = source.to_encrypted("test password", Mode::Standard)?;
-    let source = Package::from_vec_with_password(encrypted, "test password")?;
+    let source =
+        Package::from_reader_with_password(std::io::Cursor::new(encrypted), "test password")?;
     let noop = source.edit()?.commit()?;
     let mut replayed_noop = source.apply(noop.patch())?;
     assert_eq!(replayed_noop.encryption(), Some(Mode::Standard));
@@ -140,7 +141,7 @@ fn encryption_provenance_survives_commits_clones_replay_and_reencryption() -> Re
     assert_eq!(replayed.encryption(), Some(Mode::Standard));
     assert!(replayed.to_bytes().is_err());
     let bytes = changed.to_reencrypted("new password")?;
-    let reopened = Package::from_vec_with_password(bytes, "new password")?;
+    let reopened = Package::from_reader_with_password(std::io::Cursor::new(bytes), "new password")?;
     assert_eq!(reopened.encryption(), Some(Mode::Standard));
     assert!(
         reopened.presentation()?.slides()?[0]
@@ -153,12 +154,12 @@ fn encryption_provenance_survives_commits_clones_replay_and_reencryption() -> Re
 #[test]
 fn signed_replay_refuses_changed_sources_and_signature_injection() -> Result<()> {
     let bytes = std::fs::read("../../test-data/poi/test-data/xmldsign/hello-world-signed.pptx")?;
-    let mut signed = Package::from_vec(bytes.clone())?;
+    let mut signed = Package::from_reader(std::io::Cursor::new(bytes.clone()))?;
     let noop = signed.edit()?.commit()?;
     assert!(!noop.diagnostics().changed());
     assert_eq!(noop.clone().into_package().to_bytes()?, bytes);
     assert_eq!(signed.apply(noop.patch())?.to_bytes()?, bytes);
-    let mut unsigned = Package::from_vec(bytes.clone())?;
+    let mut unsigned = Package::from_reader(std::io::Cursor::new(bytes.clone()))?;
     unsigned.unsign()?;
     let mut edit = unsigned.edit()?;
     edit.add_text_box(0_usize, "changed", (0, 0, 914_400, 914_400))?;

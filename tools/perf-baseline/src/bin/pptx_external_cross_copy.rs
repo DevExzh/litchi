@@ -197,7 +197,7 @@ fn check_output(
             return Err("copied semantic readback mismatch".into());
         }
     }
-    let eager = litchi_pptx::Package::from_vec(output.to_vec())?;
+    let eager = litchi_pptx::Package::from_reader(std::io::Cursor::new(output.to_vec()))?;
     let opened = eager.opened_presentation()?;
     if opened.slides().len() != 2 || opened.slides().iter().any(|slide| !slide.name().is_empty()) {
         return Err("eager slide catalog mismatch".into());

@@ -452,7 +452,7 @@ impl SourceBackedSvgAttachmentPatch {
         self.before.slide.check_execution()?;
         source.slide.check_execution()?;
         if !source.same_source(&self.before) {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         Ok(if self.is_changed() {
             self.after.clone()
@@ -514,7 +514,7 @@ impl SourceBackedPresentationEditor {
             "publish_svg_attachment_commit_to_stream",
         )?;
         if !current.same_source(&commit.patch.before) {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         let target = commit.patch.apply(&current)?;
         if !target.is_changed_from(&current) {
@@ -1395,7 +1395,7 @@ fn build_attachment_topology_plan(
         || current.raster_relationship_type != target.raster_relationship_type
         || current.raster_part_uri != target.raster_part_uri
     {
-        return Err(Error::StaleSource);
+        return Err(Error::PatchConflict);
     }
     let owner = current.slide.part_uri.clone();
     let mut plan = SourceTopologyPlan::new();

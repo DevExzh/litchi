@@ -117,7 +117,7 @@ fn eager_and_source_slide_properties_escape_names_and_use_producer_bool_spelling
     let name = "A<&>\"'\nB\tC\rD";
     let expected_name = "A&lt;&amp;&gt;&quot;&apos;&#10;B&#9;C&#13;D";
 
-    let mut eager = Package::from_vec(before.clone()).unwrap();
+    let mut eager = Package::from_reader(std::io::Cursor::new(before.clone())).unwrap();
     let mut eager_edit = eager.edit().unwrap();
     assert!(eager_edit.set_slide_name(0_usize, name).unwrap());
     assert!(eager_edit.set_slide_hidden(0_usize, true).unwrap());
@@ -174,7 +174,7 @@ fn eager_and_source_slide_properties_escape_names_and_use_producer_bool_spelling
 fn source_and_eager_slide_property_noops_preserve_exact_bytes() {
     let before = fixture(1, 1);
 
-    let mut eager = Package::from_vec(before.clone()).unwrap();
+    let mut eager = Package::from_reader(std::io::Cursor::new(before.clone())).unwrap();
     let mut eager_edit = eager.edit().unwrap();
     assert!(!eager_edit.set_slide_hidden(0_usize, false).unwrap());
     eager = eager_edit.commit().unwrap().into_package();
@@ -273,7 +273,7 @@ fn malformed_slide_name_is_atomic_for_eager_and_source_edits() {
     let before = fixture(1, 1);
     let invalid = "accepted first\u{0}rejected";
 
-    let mut eager = Package::from_vec(before.clone()).unwrap();
+    let mut eager = Package::from_reader(std::io::Cursor::new(before.clone())).unwrap();
     let mut eager_edit = eager.edit().unwrap();
     assert!(eager_edit.set_slide_name(0_usize, invalid).is_err());
     eager = eager_edit.commit().unwrap().into_package();
@@ -479,7 +479,7 @@ fn combined_primary_properties_match_sequential_edits_and_preserve_prior_staging
         before
     );
 
-    let eager = Package::from_vec(before).unwrap();
+    let eager = Package::from_reader(std::io::Cursor::new(before)).unwrap();
     let mut edit = eager.edit().unwrap();
     edit.set_slide_properties(0, Some("Roadmap\tQ4"), Some(true))
         .unwrap();

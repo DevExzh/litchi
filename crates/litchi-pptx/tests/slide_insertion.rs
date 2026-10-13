@@ -55,7 +55,7 @@ fn source(strict: bool) -> Package {
         }
         writer.write_stored(name, xml.as_bytes()).unwrap();
     }
-    Package::from_vec(writer.finish().unwrap().into_inner()).unwrap()
+    Package::from_reader(std::io::Cursor::new(writer.finish().unwrap().into_inner())).unwrap()
 }
 fn names(package: &Package) -> Vec<String> {
     package
@@ -87,7 +87,8 @@ fn insertions_into_empty_and_populated_lists_compose_and_invert_losslessly() {
         let wire = Patch::from_bytes(&patch.to_bytes().unwrap()).unwrap();
         let mut replay = original.apply(&wire).unwrap();
         assert_eq!(replay.to_bytes().unwrap(), changed.to_bytes().unwrap());
-        let reopened = Package::from_vec(replay.to_bytes().unwrap()).unwrap();
+        let reopened =
+            Package::from_reader(std::io::Cursor::new(replay.to_bytes().unwrap())).unwrap();
         assert_eq!(names(&reopened), names(&changed));
         let mut restored = replay
             .apply(&Patch::from_bytes(&wire.inverse().to_bytes().unwrap()).unwrap())
@@ -167,8 +168,10 @@ fn inverse_refuses_a_new_incoming_owner_atomically() {
     edit.insert_slide(Position::new(0), &layout(&original))
         .unwrap();
     let (mut changed, patch) = edit.commit().unwrap().into_parts();
-    let mut dependent =
-        Package::from_vec(with_incoming_reference(&changed.to_bytes().unwrap())).unwrap();
+    let mut dependent = Package::from_reader(std::io::Cursor::new(with_incoming_reference(
+        &changed.to_bytes().unwrap(),
+    )))
+    .unwrap();
     let before = dependent.to_bytes().unwrap();
     assert!(
         dependent.apply(&patch.inverse()).is_err(),
@@ -179,8 +182,10 @@ fn inverse_refuses_a_new_incoming_owner_atomically() {
 #[test]
 fn insertion_does_not_activate_an_existing_dangling_target() {
     let mut original = source(false);
-    let original =
-        Package::from_vec(with_incoming_reference(&original.to_bytes().unwrap())).unwrap();
+    let original = Package::from_reader(std::io::Cursor::new(with_incoming_reference(
+        &original.to_bytes().unwrap(),
+    )))
+    .unwrap();
     let mut edit = original.edit().unwrap();
     edit.insert_slide(Position::new(0), &layout(&original))
         .unwrap();
@@ -229,7 +234,8 @@ fn duplicate_layout_names_are_a_typed_atomic_refusal() {
         }
         writer.write_stored(name, &bytes).unwrap();
     }
-    let original = Package::from_vec(writer.finish().unwrap().into_inner()).unwrap();
+    let original =
+        Package::from_reader(std::io::Cursor::new(writer.finish().unwrap().into_inner())).unwrap();
     let mut edit = original.edit().unwrap();
     assert!(matches!(
         edit.insert_slide(Position::new(0), &blank),
@@ -259,7 +265,8 @@ fn insertion_and_inverse_preserve_unrelated_destination_metadata() {
         }
         writer.write_stored(name, &bytes).unwrap();
     }
-    let overlay = Package::from_vec(writer.finish().unwrap().into_inner()).unwrap();
+    let overlay =
+        Package::from_reader(std::io::Cursor::new(writer.finish().unwrap().into_inner())).unwrap();
     let wire = Patch::from_bytes(&patch.to_bytes().unwrap()).unwrap();
     let mut changed = overlay.apply(&wire).unwrap();
     let bytes = changed.to_bytes().unwrap();
@@ -307,7 +314,9 @@ fn inverse_checks_root_dependencies_but_allows_external_references() {
             }
             writer.write_stored(name, &bytes).unwrap();
         }
-        let mut overlay = Package::from_vec(writer.finish().unwrap().into_inner()).unwrap();
+        let mut overlay =
+            Package::from_reader(std::io::Cursor::new(writer.finish().unwrap().into_inner()))
+                .unwrap();
         let before = overlay.to_bytes().unwrap();
         let result = overlay.apply(&patch.inverse());
         if external {
@@ -354,8 +363,10 @@ fn forward_replay_refuses_to_activate_a_destination_dangling_reference() {
         .unwrap();
     let patch =
         Patch::from_bytes(&edit.commit().unwrap().into_patch().to_bytes().unwrap()).unwrap();
-    let mut destination =
-        Package::from_vec(with_incoming_reference(&original.to_bytes().unwrap())).unwrap();
+    let mut destination = Package::from_reader(std::io::Cursor::new(with_incoming_reference(
+        &original.to_bytes().unwrap(),
+    )))
+    .unwrap();
     let before = destination.to_bytes().unwrap();
     assert!(destination.apply(&patch).is_err());
     assert_eq!(destination.to_bytes().unwrap(), before);
@@ -390,7 +401,9 @@ fn insertion_refuses_dangling_xml_bindings_ranges_and_unknown_extensions() {
                 }
                 writer.write_stored(name, &payload).unwrap();
             }
-            let mut source = Package::from_vec(writer.finish().unwrap().into_inner()).unwrap();
+            let mut source =
+                Package::from_reader(std::io::Cursor::new(writer.finish().unwrap().into_inner()))
+                    .unwrap();
             let before = source.to_bytes().unwrap();
             let mut edit = source.edit().unwrap();
             assert!(matches!(

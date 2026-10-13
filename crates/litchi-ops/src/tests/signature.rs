@@ -569,7 +569,7 @@ fn assert_exact_noop(input: &Input) {
                 .unwrap();
             assert_eq!(&output, bytes, "{label}: source-backed no-op");
 
-            let mut package = litchi_pptx::Package::from_vec(bytes.clone()).unwrap();
+            let mut package = litchi_pptx::Package::from_reader(&bytes[..]).unwrap();
             let commit = package.edit().unwrap().commit().unwrap();
             assert!(!commit.diagnostics().changed(), "{label}");
             package = commit.into_package();

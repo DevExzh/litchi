@@ -80,13 +80,13 @@ impl SourceBackedSlideRemovalPlan {
     pub fn raw(&self) -> Result<PreparedTopology> {
         self.package.check_execution()?;
         if self.package.source_version()? != self.source_version {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         let topology = self.rebuild_topology()?;
         let prepared = self.package.clone().prepare_topology(topology)?;
         self.package.check_execution()?;
         if self.package.source_version()? != self.source_version {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         Ok(prepared)
     }
@@ -190,12 +190,12 @@ impl SourceBackedPresentationEditor {
             .partname()
             .is_equivalent_to(self._presentation.source_partname())
         {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         validate_view_content_type(&presentation, ct::PML_PRESENTATION_MAIN)?;
         let presentation_xml = self._presentation.source_data().as_bytes();
         if presentation.data()?.as_bytes() != presentation_xml {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         // The root bytes are already retained by the source facade, but apply
         // the physical source limit before any semantic or protection parser.
@@ -294,7 +294,7 @@ impl SourceBackedPresentationEditor {
         drop(self.package.clone().prepare_topology(topology)?);
         self.package.check_execution()?;
         if self.package.source_version()? != source_version {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         Ok(SourceBackedSlideRemovalPlan {
             package: self.package.clone(),
@@ -367,7 +367,7 @@ fn stage_presentation_replacement(
 
     let source_xml = presentation.source_xml()?;
     if source_xml.bytes() != source_bytes {
-        return Err(Error::StaleSource);
+        return Err(Error::PatchConflict);
     }
     let (start, end) = deletion_range(source_bytes, candidate_bytes.as_slice())?;
     let expected = source_bytes

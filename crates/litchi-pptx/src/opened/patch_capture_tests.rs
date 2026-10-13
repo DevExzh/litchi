@@ -293,7 +293,7 @@ fn captured_foreign_payload_publishes_and_inverts_on_a_real_presentation() -> Re
         .add_slide()?
         .add_text_box("original", 0, 0, 100, 100);
     let mut authored = builder.build()?;
-    let opened = crate::Package::from_vec(authored.to_bytes()?)?;
+    let opened = crate::Package::from_reader(std::io::Cursor::new(authored.to_bytes()?))?;
     let source = opened.opc()?.clone();
     let mut target = source.clone();
     let calls = Arc::new(AtomicUsize::new(0));

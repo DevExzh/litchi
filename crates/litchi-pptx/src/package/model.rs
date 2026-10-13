@@ -338,7 +338,7 @@ impl Package {
     /// builder.presentation()?.add_slide()?
     ///     .add_text_box("original", 0, 0, 914_400, 914_400);
     /// let bytes = builder.build()?.to_bytes()?;
-    /// let mut package = Package::from_vec(bytes.clone())?;
+    /// let mut package = Package::from_reader(std::io::Cursor::new(bytes.clone()))?;
     /// let mut edit: Edit = package.edit()?;
     /// edit.set_shape_text(0_usize, 0_usize, "staged")?;
     /// drop(edit);
@@ -404,7 +404,7 @@ impl Package {
     /// never copied: the plan has already proved its inheritance equivalent to
     /// the selected destination layout.
     /// Source and destination must have been opened through source-preserving
-    /// ingress (`from_vec`, `open`, or `from_reader`) so discarded ZIP
+    /// ingress (`open` or `from_reader`) so discarded ZIP
     /// ordering and extra fields cannot alias the authorization revision.
     ///
     /// A plan whose candidate transfers source-compressed media
@@ -445,7 +445,7 @@ impl Package {
         if !source.physical_source_provenance || !self.physical_source_provenance {
             return Err(Error::SlideCopyPlan {
                 kind: crate::SlideCopyRefusal::UnknownPhysicalMember,
-                detail: "cross-slide physical authorization requires source-preserving package ingress (use Package::from_vec, open, or from_reader)".to_owned(),
+                detail: "cross-slide physical authorization requires source-preserving package ingress (use Package::open, from_reader, or their *_with_options forms)".to_owned(),
             });
         }
         source.ensure_plain_mutation("apply_cross_slide_copy_plan")?;
@@ -511,7 +511,7 @@ impl Package {
         if !source.physical_source_provenance || !self.physical_source_provenance {
             return Err(Error::SlideCopyPlan {
                 kind: crate::SlideCopyRefusal::UnknownPhysicalMember,
-                detail: "cross-slide physical authorization requires source-preserving package ingress (use Package::from_vec, open, or from_reader)".to_owned(),
+                detail: "cross-slide physical authorization requires source-preserving package ingress (use Package::open, from_reader, or their *_with_options forms)".to_owned(),
             });
         }
         source.ensure_plain_mutation("apply_cross_slide_copy_patch")?;
@@ -2186,7 +2186,7 @@ impl Package {
     /// ```
     /// use litchi_pptx::Package;
     ///
-    /// let mut package = Package::from_vec(Package::new()?.to_bytes()?)?;
+    /// let mut package = Package::from_reader(std::io::Cursor::new(Package::new()?.to_bytes()?))?;
     /// package.unsign()?;
     /// assert!(!package.opc()?.is_signed());
     /// # Ok::<(), litchi_pptx::Error>(())

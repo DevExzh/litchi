@@ -85,10 +85,10 @@ and redaction vocabulary remain pending.
 | Concept | Canonical | Banned | Notes / status |
 |---|---|---|---|
 | Open from path | `open(path)` | — | ✅ everywhere |
-| Open from bytes (copy allowed) | `from_bytes(&[u8])` | `from_bytes(Vec<u8>)` signatures (xlsx/odt/odp), `from_slice` (xlsx) | ✅ DOCX owning/lazy Package (0038/0040); 🔴 W2/W3 |
+| Open from bytes (copy allowed) | `from_bytes(&[u8])` | `from_bytes(Vec<u8>)` signatures (xlsx/odt/odp), `from_slice` (xlsx), `from_vec` (pptx, removed 0252) | ✅ DOCX owning/lazy Package (0038/0040); ✅ PPTX (0252); 🔴 W2/W3 |
 | Open from shared bytes (zero-copy) | `from_shared_bytes(Arc<[u8]>)` | — | ✅ numbers; offered only where zero-copy is real |
 | Open from reader | `from_reader(R)` | — | ✅ docx/xlsx; extended per wave |
-| Configured open | `open_with_options(path, OpenOptions)`, `from_bytes_with_options(bytes, OpenOptions)` | `open_with_limits`, `open_with` (doc), `open_with_options` under other type names | envelope decided in §5 |
+| Configured open | `open_with_options(path, OpenOptions)`, `from_bytes_with_options(bytes, OpenOptions)` | `open_with_limits`, `open_with` (doc), `open_with_options` under other type names | envelope decided in §5 · ✅ DOCX (0038) · ✅ PPTX owning `Package` and positional-source presentation owners (0252) |
 | Minimal fresh artifact | `Package::new()` | `Workbook::create()` duplicate (xlsx) | ✅ docx; ✅ canonical PPTX constructor (0127); ✅ XLSB (0175); ✅ XLS (0199); ✅ RTF (0225) · 🔴 xlsx (W2); all formats gain it |
 | Save to path | `save(path)` — **always atomic** (sibling temp + rename) | non-atomic `Builder::save` (odt/odp) | ✅ OOXML, including lazy DOCX (0041), and RTF (0226) · 🔴 ODF (W3, behavior change with CRUD evidence) |
 | Save with explicit durability | `save_with_durability(path, Durability)` | — | ✅ OOXML and RTF (0226); extended everywhere |
@@ -224,7 +224,7 @@ semantic-limit migrations.
 | Recognized but wrong family | `UnexpectedFormat { detected: FileFormat }` | `NotPages` / `NotKeynote` / `NotNumbers`, string messages (`"Not an ODT file: …"`) |
 | Unrecognized input | `NotOfficeFile` | — |
 | Source file changed after open | `SourceChanged { expected, observed }` | — |
-| Patch base mismatch | `PatchConflict { .. }` | `StaleSource` (merges; the two concepts stay distinct) |
+| Patch base mismatch | `PatchConflict { .. }` | `StaleSource` (merges; the two concepts stay distinct; ✅ PPTX 0252, 🔴 docx) |
 | Limit exceeded | `Limit { kind, observed, maximum }` | per-crate duplicates |
 | Allocation failure | `Allocation { resource, .. }` | `CollectionAllocation` |
 | Unexpected internal failure | `Other(String)` (narrowed) | `ParseError(String)` / `InvalidFormat(String)` for expected failures |
@@ -1503,3 +1503,22 @@ editable document model is introduced. Temporary source indexes are bounded;
 staging windows close at their limits, while scalar admission stays available
 when the optimization index cannot fit. Source-changing boundaries publish
 before resolving later positional paths.
+
+## PPTX ingress options and patch conflict (0252)
+
+`litchi_pptx::OpenOptions` is the one ingress envelope: `source_limits`,
+`cache_limits`, `execution_context` and, with `encryption`,
+`encryption_limits`. The owning `Package` gains `open_with_options`,
+`from_reader_with_options`, `from_bytes_with_options` and the
+`*_with_password_and_options` routes; it refuses cache and execution policies
+with the typed `Error::UnsupportedOpenPolicy { policy: OpenPolicy }` before
+reading input. `Package::{open_with_limits, from_reader_with_limits,
+from_bytes_with_limits, from_vec, from_vec_with_limits,
+from_vec_with_password, from_vec_with_password_and_limits,
+*_with_password_and_limits}` are deleted. `SourceBackedPresentation` and
+`SourceBackedPresentationEditor` replace their six `open_with_*` combinations
+with `open_with_options`; their positional `from_path_*`/`from_read_at_*`
+constructors remain a pending migration. `Error::StaleSource` is renamed
+`Error::PatchConflict`. Both PPTX profiles ban the removed names, and
+pptx-full now carries the primary-transaction bans pptx-minimal had.
+See [record 0252](unified-ops/0252-pptx-w2-residue-and-p0-writes.md).

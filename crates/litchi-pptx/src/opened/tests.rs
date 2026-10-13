@@ -570,7 +570,7 @@ fn notes_capture_matrix_keeps_the_16m_notes_root_limit_distinct_from_the_64m_par
 fn notes_capture_matrix_does_not_cross_contaminate_immutable_package_sources() -> Result<()> {
     let mut first = opened_two_slide_package()?;
     let bytes = first.to_bytes()?;
-    let mut second = Package::from_vec(bytes)?;
+    let mut second = Package::from_reader(std::io::Cursor::new(bytes))?;
 
     let first_snapshot = first.opened_presentation()?;
     set_slide_name_attribute(&mut second, 0, r#" name="Second source""#)?;
@@ -583,7 +583,7 @@ fn notes_capture_matrix_does_not_cross_contaminate_immutable_package_sources() -
 
     // A second package with an equal URI and a separate allocation must not
     // inherit a capture-local processed result from the first source.
-    let mut third = Package::from_vec(first.to_bytes()?)?;
+    let mut third = Package::from_reader(std::io::Cursor::new(first.to_bytes()?))?;
     set_slide_name_attribute(&mut third, 0, r#" name="Third source""#)?;
     let third_snapshot = third.opened_presentation()?;
     assert_eq!(third_snapshot.slides()[0].name(), "Third source");
@@ -647,7 +647,7 @@ fn opened_two_slide_package() -> Result<Package> {
     }
     let mut package = builder.build()?;
     let bytes = package.to_bytes()?;
-    Package::from_vec(bytes)
+    Package::from_reader(std::io::Cursor::new(bytes))
 }
 
 fn opened_plain_slide_package() -> Result<Package> {
@@ -658,7 +658,7 @@ fn opened_plain_slide_package() -> Result<Package> {
         .set_title("Copy source");
     let mut package = builder.build()?;
     let bytes = package.to_bytes()?;
-    Package::from_vec(bytes)
+    Package::from_reader(std::io::Cursor::new(bytes))
 }
 
 fn borrowed_plain_slide_package() -> Result<Package> {
@@ -674,7 +674,7 @@ fn opened_plain_slides_package(count: usize) -> Result<Package> {
     }
     let mut package = builder.build()?;
     let bytes = package.to_bytes()?;
-    Package::from_vec(bytes)
+    Package::from_reader(std::io::Cursor::new(bytes))
 }
 
 #[test]
@@ -743,13 +743,13 @@ fn cross_slide_copy_is_source_exact_reversible_and_reopens() -> Result<()> {
     let mut source = Package::from_bytes(&authored_source.to_bytes()?)?;
     rename_slide(&mut source, 0, "cross-source")?;
     let source_bytes = source.to_bytes()?;
-    let mut source = Package::from_vec(source_bytes.clone())?;
+    let mut source = Package::from_reader(std::io::Cursor::new(source_bytes.clone()))?;
 
     let mut destination = opened_plain_slides_package(2)?;
     rename_slide(&mut destination, 0, "destination-first")?;
     rename_slide(&mut destination, 1, "destination-second")?;
     let destination_before = destination.to_bytes()?;
-    let mut destination = Package::from_vec(destination_before.clone())?;
+    let mut destination = Package::from_reader(std::io::Cursor::new(destination_before.clone()))?;
     let source_snapshot = source.opened_presentation()?;
     let destination_snapshot = destination.opened_presentation()?;
     let plan = destination_snapshot.plan_cross_slide_copy(&source_snapshot, 0, 1, 1)?;
@@ -789,7 +789,7 @@ fn cross_slide_copy_is_source_exact_reversible_and_reopens() -> Result<()> {
     assert_eq!(published.slides()[1].name(), "cross-source");
 
     let published_bytes = destination.to_bytes()?;
-    let mut reopened = Package::from_vec(published_bytes)?;
+    let mut reopened = Package::from_reader(std::io::Cursor::new(published_bytes))?;
     reopened.apply_cross_slide_copy_patch(&source, &decoded.inverse())?;
     assert_eq!(reopened.to_bytes()?, destination_before);
     Ok(())
@@ -829,7 +829,7 @@ fn cross_slide_copy_refuses_slide_name_and_unknown_physical_collisions() -> Resu
     rename_slide(&mut source, 0, "same-name")?;
     attach_copy_ole(&mut source)?;
     let source_bytes = source.to_bytes()?;
-    let source = Package::from_vec(source_bytes.clone())?;
+    let source = Package::from_reader(std::io::Cursor::new(source_bytes.clone()))?;
     let mut destination = opened_plain_slides_package(2)?;
     rename_slide(&mut destination, 0, "same-name")?;
     rename_slide(&mut destination, 1, "destination-second")?;
@@ -846,7 +846,7 @@ fn cross_slide_copy_refuses_slide_name_and_unknown_physical_collisions() -> Resu
     assert_eq!(part_states(&destination), destination_before);
 
     let unknown_source_bytes = add_unknown_member(&source_bytes, "scratch.bin")?;
-    let unknown_source = Package::from_vec(unknown_source_bytes)?;
+    let unknown_source = Package::from_reader(std::io::Cursor::new(unknown_source_bytes))?;
     let mut ordinary_destination = opened_plain_slides_package(2)?;
     rename_slide(&mut ordinary_destination, 0, "destination-first")?;
     rename_slide(&mut ordinary_destination, 1, "destination-second")?;
@@ -862,7 +862,8 @@ fn cross_slide_copy_refuses_slide_name_and_unknown_physical_collisions() -> Resu
 
     let unknown_destination_bytes =
         add_unknown_member(&ordinary_destination.to_bytes()?, "scratch.bin")?;
-    let unknown_destination = Package::from_vec(unknown_destination_bytes)?;
+    let unknown_destination =
+        Package::from_reader(std::io::Cursor::new(unknown_destination_bytes))?;
     assert!(matches!(
         unknown_destination
             .opened_presentation()?
@@ -883,7 +884,8 @@ fn cross_slide_copy_refuses_slide_name_and_unknown_physical_collisions() -> Resu
         &ordinary_destination.to_bytes()?,
         "ppt/embeddings/COPY-SOURCE-COPY1.BIN",
     )?;
-    let colliding_unknown_destination = Package::from_vec(colliding_unknown_destination_bytes)?;
+    let colliding_unknown_destination =
+        Package::from_reader(std::io::Cursor::new(colliding_unknown_destination_bytes))?;
     assert!(matches!(
         colliding_unknown_destination
             .opened_presentation()?
@@ -893,10 +895,10 @@ fn cross_slide_copy_refuses_slide_name_and_unknown_physical_collisions() -> Resu
             ..
         })
     ));
-    let unknown_removal = Package::from_vec(add_unknown_member(
+    let unknown_removal = Package::from_reader(std::io::Cursor::new(add_unknown_member(
         &ordinary_destination.to_bytes()?,
         "removal-junk.bin",
-    )?)?;
+    )?))?;
     assert!(matches!(
         unknown_removal.opened_presentation()?.plan_slide_removal(0),
         Err(Error::SlideRemovalPlan {
@@ -912,12 +914,13 @@ fn cross_slide_copy_authorizes_known_noncanonical_source_archives() -> Result<()
     let mut authored_source = opened_plain_slide_package()?;
     let canonical_source_bytes = authored_source.to_bytes()?;
     let source_bytes = with_eocd_comment(canonical_source_bytes.clone(), b"cross raw source")?;
-    let canonical_source = Package::from_vec(canonical_source_bytes.clone())?;
-    let mut source = Package::from_vec(source_bytes.clone())?;
+    let canonical_source =
+        Package::from_reader(std::io::Cursor::new(canonical_source_bytes.clone()))?;
+    let mut source = Package::from_reader(std::io::Cursor::new(source_bytes.clone()))?;
     let mut destination = opened_plain_slides_package(2)?;
     rename_slide(&mut destination, 0, "destination-first")?;
     rename_slide(&mut destination, 1, "destination-second")?;
-    let mut destination = Package::from_vec(destination.to_bytes()?)?;
+    let mut destination = Package::from_reader(std::io::Cursor::new(destination.to_bytes()?))?;
     let source_snapshot = source.opened_presentation()?;
     let destination_snapshot = destination.opened_presentation()?;
     let plan = destination_snapshot.plan_cross_slide_copy(&source_snapshot, 0, 0, 1)?;
@@ -951,7 +954,7 @@ fn cross_slide_copy_authorizes_known_noncanonical_source_archives() -> Result<()
 fn cross_slide_copy_preserves_noncanonical_destination_members_and_live_inverse() -> Result<()> {
     let mut authored_source = opened_plain_slide_package()?;
     let source_bytes = authored_source.to_bytes()?;
-    let mut source = Package::from_vec(source_bytes.clone())?;
+    let mut source = Package::from_reader(std::io::Cursor::new(source_bytes.clone()))?;
     let source_states_before = part_states(&source);
 
     let mut authored_destination = opened_plain_slides_package(2)?;
@@ -960,7 +963,7 @@ fn cross_slide_copy_preserves_noncanonical_destination_members_and_live_inverse(
     let canonical_destination = authored_destination.to_bytes()?;
     let destination_before = with_eocd_comment(canonical_destination, b"cross raw destination")?;
     let before_archive = raw_zip_archive(&destination_before)?;
-    let mut destination = Package::from_vec(destination_before.clone())?;
+    let mut destination = Package::from_reader(std::io::Cursor::new(destination_before.clone()))?;
 
     let source_snapshot = source.opened_presentation()?;
     let destination_snapshot = destination.opened_presentation()?;
@@ -1041,7 +1044,7 @@ fn cross_slide_copy_preserves_noncanonical_destination_members_and_live_inverse(
         cross_physical_revision(&published_bytes),
         plan.target_physical_revision()
     );
-    let reopened = Package::from_vec(published_bytes.clone())?;
+    let reopened = Package::from_reader(std::io::Cursor::new(published_bytes.clone()))?;
     assert_eq!(reopened.opened_presentation()?.slides().len(), 3);
     assert_eq!(
         reopened.opened_presentation()?.slides()[1].name(),
@@ -1055,7 +1058,7 @@ fn cross_slide_copy_preserves_noncanonical_destination_members_and_live_inverse(
     destination.apply_cross_slide_copy_patch(&source, &inverse)?;
     assert_eq!(destination.to_bytes()?, destination_before);
 
-    let mut reopened_candidate = Package::from_vec(published_bytes)?;
+    let mut reopened_candidate = Package::from_reader(std::io::Cursor::new(published_bytes))?;
     reopened_candidate.apply_cross_slide_copy_patch(&source, &inverse)?;
     assert_eq!(reopened_candidate.to_bytes()?, destination_before);
     Ok(())
@@ -1067,7 +1070,7 @@ fn cross_slide_copy_preserves_private_closure_and_inert_external_targets() -> Re
     attach_copy_ole(&mut source)?;
     attach_external_link(&mut source)?;
     let source_bytes = source.to_bytes()?;
-    let mut source = Package::from_vec(source_bytes.clone())?;
+    let mut source = Package::from_reader(std::io::Cursor::new(source_bytes.clone()))?;
     let mut destination = opened_plain_slides_package(2)?;
     rename_slide(&mut destination, 0, "destination-first")?;
     rename_slide(&mut destination, 1, "destination-second")?;
@@ -1087,7 +1090,7 @@ fn cross_slide_copy_preserves_private_closure_and_inert_external_targets() -> Re
 #[test]
 fn cross_slide_copy_rejects_layout_mismatch_and_stale_or_forged_publication() -> Result<()> {
     let mut source = opened_plain_slide_package()?;
-    let source = Package::from_vec(source.to_bytes()?)?;
+    let source = Package::from_reader(std::io::Cursor::new(source.to_bytes()?))?;
     let mut mismatched_destination = opened_plain_slides_package(2)?;
     rename_slide(&mut mismatched_destination, 0, "destination-first")?;
     rename_slide(&mut mismatched_destination, 1, "destination-second")?;
@@ -1177,7 +1180,8 @@ fn cross_slide_copy_rejects_layout_mismatch_and_stale_or_forged_publication() ->
         relationship_id,
         relationship_mode,
     )?;
-    let mut destination = Package::from_vec(mismatched_destination.to_bytes()?)?;
+    let mut destination =
+        Package::from_reader(std::io::Cursor::new(mismatched_destination.to_bytes()?))?;
     let destination_snapshot = destination.opened_presentation()?;
     let plan = destination_snapshot.plan_cross_slide_copy(&source_snapshot, 0, 0, 1)?;
     let before = part_states(&destination);
@@ -1213,7 +1217,8 @@ fn cross_slide_copy_rejects_layout_mismatch_and_stale_or_forged_publication() ->
     let revision_offset = 8;
     forged_bytes[revision_offset] ^= 1;
     let forged = CrossSlideCopyPatch::from_bytes(&forged_bytes)?;
-    let mut forged_destination = Package::from_vec(clean_destination_bytes)?;
+    let mut forged_destination =
+        Package::from_reader(std::io::Cursor::new(clean_destination_bytes))?;
     assert!(matches!(
         forged_destination.apply_cross_slide_copy_patch(&source, &forged),
         Err(Error::UnsafeEdit { .. })
@@ -1226,9 +1231,10 @@ fn cross_slide_copy_refuses_mixed_strict_and_transitional_packages_both_directio
     let transitional_source = opened_plain_slide_package()?;
     let mut strict_source = borrowed_plain_slide_package()?;
     make_package_strict(&mut strict_source)?;
-    let mut strict_source = Package::from_vec(strict_source.to_bytes()?)?;
+    let mut strict_source = Package::from_reader(std::io::Cursor::new(strict_source.to_bytes()?))?;
 
-    let mut mixed_strict_source = Package::from_vec(strict_source.to_bytes()?)?;
+    let mut mixed_strict_source =
+        Package::from_reader(std::io::Cursor::new(strict_source.to_bytes()?))?;
     let presentation = PackURI::new("/ppt/presentation.xml").map_err(Error::Invalid)?;
     let mixed_xml = std::str::from_utf8(mixed_strict_source.opc.get_part(&presentation)?.blob())
         .map_err(|error| Error::Xml(error.to_string()))?
@@ -1245,7 +1251,8 @@ fn cross_slide_copy_refuses_mixed_strict_and_transitional_packages_both_directio
     let transitional_destination = opened_plain_slides_package(2)?;
     let mut strict_destination = borrowed_plain_slides_package(2)?;
     make_package_strict(&mut strict_destination)?;
-    let strict_destination = Package::from_vec(strict_destination.to_bytes()?)?;
+    let strict_destination =
+        Package::from_reader(std::io::Cursor::new(strict_destination.to_bytes()?))?;
 
     assert!(matches!(
         transitional_destination
@@ -5436,13 +5443,13 @@ fn a_superseded_cross_slide_copy_patch_is_refused_by_name() -> Result<()> {
         .add_slide()?
         .set_title("cross-source");
     let mut authored_source = builder.build()?;
-    let mut source = Package::from_vec(authored_source.to_bytes()?)?;
+    let mut source = Package::from_reader(std::io::Cursor::new(authored_source.to_bytes()?))?;
     rename_slide(&mut source, 0, "cross-source")?;
     let mut destination = opened_plain_slides_package(2)?;
     rename_slide(&mut destination, 0, "destination-first")?;
     rename_slide(&mut destination, 1, "destination-second")?;
-    let source = Package::from_vec(source.to_bytes()?)?;
-    let destination = Package::from_vec(destination.to_bytes()?)?;
+    let source = Package::from_reader(std::io::Cursor::new(source.to_bytes()?))?;
+    let destination = Package::from_reader(std::io::Cursor::new(destination.to_bytes()?))?;
     let source_snapshot = source.opened_presentation()?;
     let destination_snapshot = destination.opened_presentation()?;
     let plan = destination_snapshot.plan_cross_slide_copy(&source_snapshot, 0, 1, 1)?;
@@ -5588,12 +5595,12 @@ fn the_facade_memo_never_outlives_the_graph_it_describes() -> Result<()> {
     let mut authored = builder.build()?;
     let mut source = Package::from_bytes(&authored.to_bytes()?)?;
     rename_slide(&mut source, 0, "memo-cross-source")?;
-    let source = Package::from_vec(source.to_bytes()?)?;
+    let source = Package::from_reader(std::io::Cursor::new(source.to_bytes()?))?;
     let mut destination = opened_plain_slides_package(2)?;
     rename_slide(&mut destination, 0, "memo-destination-first")?;
     rename_slide(&mut destination, 1, "memo-destination-second")?;
     let destination_bytes = destination.to_bytes()?;
-    let mut by_plan = Package::from_vec(destination_bytes.clone())?;
+    let mut by_plan = Package::from_reader(std::io::Cursor::new(destination_bytes.clone()))?;
     let custom = with_copying_part(&mut by_plan)?;
     let plan = by_plan.opened_presentation()?.plan_cross_slide_copy(
         &source.opened_presentation()?,
@@ -5606,7 +5613,7 @@ fn the_facade_memo_never_outlives_the_graph_it_describes() -> Result<()> {
     assert_publication_keeps_no_copy("cross-copy plan", &mut by_plan, &custom, |package| {
         package.apply_cross_slide_copy_plan(&source, &plan)
     })?;
-    let mut by_patch = Package::from_vec(destination_bytes)?;
+    let mut by_patch = Package::from_reader(std::io::Cursor::new(destination_bytes))?;
     let custom = with_copying_part(&mut by_patch)?;
     assert_publication_keeps_no_copy("cross-copy patch", &mut by_patch, &custom, |package| {
         package.apply_cross_slide_copy_patch(&source, &durable)

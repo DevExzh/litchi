@@ -232,7 +232,7 @@ fn text_patch_authored_after_order_refuses_the_original_revision() {
     assert!(text_edit.set_shape_text(0, 0_usize, "B*").unwrap());
     let text_patch = text_edit.commit().unwrap().patch().clone();
     let durable = litchi_pptx::source::Patch::from_bytes(&text_patch.to_bytes().unwrap()).unwrap();
-    assert!(matches!(source.apply(&durable), Err(Error::StaleSource)));
+    assert!(matches!(source.apply(&durable), Err(Error::PatchConflict)));
 
     let reopened_ordered = fresh(&ordered.to_bytes().unwrap());
     let accepted = reopened_ordered.apply(&durable).unwrap();
