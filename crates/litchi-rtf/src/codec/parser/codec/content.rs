@@ -215,7 +215,21 @@ impl<'a> Parser<'a> {
             ControlWord::Tab => {
                 self.finalize_table_before_non_table_body_content(true)?;
                 self.pos += 1;
-                text_buffer.push(b'\t');
+                let table_level = self.current_state().ok().and_then(|state| {
+                    (state.destination == Destination::DocumentBody
+                        && (state.in_table || state.table_nesting_level >= 2))
+                        .then_some(state.table_nesting_level)
+                });
+                if let Some(table_level) = table_level {
+                    // A tab inside a cell belongs to the cell story, not to
+                    // the main body text.
+                    if !text_buffer.is_empty() {
+                        self.flush_text_buffer(text_buffer)?;
+                    }
+                    self.append_table_text(b"\t", table_level)?;
+                } else {
+                    text_buffer.push(b'\t');
+                }
             },
             ControlWord::Unicode(code) => {
                 self.finalize_table_before_non_table_body_content(true)?;
@@ -429,6 +443,7 @@ impl<'a> Parser<'a> {
         let mut text_buffer = SmallVec::<[u8; 256]>::new();
 
         while let Some(token) = self.tokens.get(self.pos) {
+            self.text_origin = self.pos;
             match token {
                 Token::CloseBrace => {
                     // Flush any buffered text

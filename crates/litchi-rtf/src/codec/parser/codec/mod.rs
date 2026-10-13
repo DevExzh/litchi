@@ -1817,6 +1817,20 @@ pub(crate) struct Parser<'a> {
     current_hf_story_offset: usize,
     /// Current header/footer type being parsed
     current_hf_type: Option<super::super::section::HeaderFooterType>,
+    /// Token index where the text-producing construct being dispatched by a
+    /// story loop began; destination text provenance extends from it.
+    text_origin: usize,
+    /// Token range of the active top-level table cell's text.
+    current_cell_text_tokens: Option<Range<usize>>,
+    /// Token range of the active header/footer paragraph's text.
+    current_hf_text_tokens: Option<Range<usize>>,
+    /// Source provenance of the active header/footer paragraphs, aligned
+    /// with the paragraphs added to the story being parsed.
+    current_hf_paragraph_sources: Vec<crate::model::provenance::StorySource>,
+    /// Token range of the active footnote/endnote body text.
+    current_note_text_tokens: Option<Range<usize>>,
+    /// Source provenance of retained destination text stories.
+    text_provenance: crate::model::provenance::TextProvenance,
 }
 
 #[derive(Default)]
@@ -2171,6 +2185,8 @@ pub(crate) struct ParsedDocument<'a> {
     pub unknown_syntax_markers: usize,
     /// Extracted tables
     pub tables: Vec<super::super::table::Table<'a>>,
+    /// Source provenance of destination text stories.
+    pub text_provenance: crate::model::provenance::TextProvenance,
     /// Extracted pictures
     pub pictures: Vec<super::super::picture::Picture<'a>>,
     /// Positional body picture-wrapper records referencing `pictures`.
@@ -2318,6 +2334,7 @@ mod objects;
 mod pictures;
 mod properties;
 mod protection;
+mod provenance;
 mod resources;
 mod section;
 mod shapes;

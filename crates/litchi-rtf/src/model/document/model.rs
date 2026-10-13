@@ -190,6 +190,8 @@ pub struct RtfDocument<'a> {
     ordinary_body_source_span: u64,
     /// Extracted tables
     tables: Vec<super::super::table::Table<'a>>,
+    /// Source provenance of destination text stories.
+    text_provenance: crate::model::provenance::TextProvenance,
     /// Extracted pictures
     pictures: Vec<super::super::picture::Picture<'a>>,
     /// Positional body picture wrappers referencing `pictures`.
@@ -756,6 +758,7 @@ impl<'a> RtfDocument<'a> {
             unknown_syntax_markers: parsed.unknown_syntax_markers,
             ordinary_body_source_span,
             tables: owned_tables,
+            text_provenance: parsed.text_provenance,
             pictures: owned_pictures,
             picture_compatibility_records: parsed.picture_compatibility_records,
             fields: owned_fields,
@@ -1126,6 +1129,11 @@ impl<'a> RtfDocument<'a> {
             .iter()
             .map(|block| Run::new(block.text.clone(), block.formatting))
             .collect()
+    }
+
+    /// Source provenance of destination text stories.
+    pub(crate) fn text_provenance(&self) -> &crate::model::provenance::TextProvenance {
+        &self.text_provenance
     }
 
     /// Get all tables in the document.

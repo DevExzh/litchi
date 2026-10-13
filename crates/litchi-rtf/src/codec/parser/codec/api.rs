@@ -269,6 +269,12 @@ impl<'a> Parser<'a> {
             current_hf_story_events: Vec::new(),
             current_hf_story_offset: 0,
             current_hf_type: None,
+            text_origin: 0,
+            current_cell_text_tokens: None,
+            current_hf_text_tokens: None,
+            current_hf_paragraph_sources: Vec::new(),
+            current_note_text_tokens: None,
+            text_provenance: crate::model::provenance::TextProvenance::default(),
         }
     }
 
@@ -638,6 +644,7 @@ impl<'a> Parser<'a> {
             opaque_nodes: self.opaque_nodes,
             unknown_syntax_markers: self.unknown_syntax_markers,
             tables: self.tables,
+            text_provenance: self.text_provenance,
             pictures: self.pictures,
             picture_compatibility_records: self.picture_compatibility_records,
             fields: self.fields,

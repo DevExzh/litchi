@@ -27,6 +27,7 @@ use std::num::NonZeroU16;
 use std::ops::Range;
 
 mod composition;
+mod destination_splice;
 mod picture_payload;
 mod transfer;
 pub use composition::{
@@ -4541,8 +4542,14 @@ impl Edit {
     ///
     /// The complete cell path is resolved against the immutable base. Cell
     /// drawings, fields, nested tables, and positional events remain retained;
-    /// their positions must still validate against the replacement. Canonical
-    /// publication refuses every snapshot containing unknown destinations.
+    /// their positions must still validate against the replacement.
+    ///
+    /// Outer cells publish by splicing the replacement into the retained
+    /// source at the cell's recorded text range, so every other byte —
+    /// including the table's position in the body and unknown destinations —
+    /// is preserved.  A cell whose text range contains state-changing or
+    /// destination controls is refused at commit.  Nested cells use the
+    /// canonical writer only in documents without body tables.
     ///
     /// # Errors
     /// Returns an error for an invalid path, dependent story geometry,
@@ -4575,7 +4582,9 @@ impl Edit {
     ///
     /// The paragraph's formatting is preserved. Destinations with drawings,
     /// fields, or other positional story events are refused because changing
-    /// text could stale dependent offsets.
+    /// text could stale dependent offsets.  Publication splices the
+    /// replacement into the paragraph's recorded source range (see
+    /// [`Self::set_table_cell_text`]).
     ///
     /// # Errors
     /// Returns an error for an invalid selector, dependent story content,
@@ -7385,6 +7394,26 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
         ));
     }
     ensure_changed_publication_allowed(&edit.source)?;
+    if destination_splice::supports(&edit.operations) {
+        match destination_splice::publish(&edit.source, &edit.operations) {
+            Ok(snapshot) => {
+                return Ok(Commit::new(
+                    edit.source,
+                    snapshot,
+                    operation_count,
+                    semantic_delta,
+                ));
+            },
+            // Without body tables the canonical writer below retains story
+            // order; with tables it would relocate them after the body.
+            Err(error) if !edit.source.tables().is_empty() => return Err(error),
+            Err(_) => {},
+        }
+    } else if !edit.source.tables().is_empty() {
+        return Err(Error::UnsupportedSource(
+            "canonical destination publication would relocate body tables",
+        ));
+    }
     let source_bytes = edit
         .source
         .source_bytes()
