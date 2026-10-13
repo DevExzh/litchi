@@ -8,13 +8,15 @@
 # Record 0260 (reviewed behaviour change): ole/ppt/text_shapes.ppt and
 # poi/test-data/slideshow/41246-1.ppt now include the title/body placeholder text
 # PowerPoint keeps in the slide list (L-PPT-R1), which the facade dropped.
+# Record 0278 (reviewed behaviour change): ODP Markdown with metadata now carries
+# the document properties projected from meta.xml; the facade reported none.
 libreoffice-core/embeddedobj/qa/cppunit/data/insert-file-config.doc	7:8a7794b77af2325b	=	=	=	327:0d7ba21b868a395d	=
 libreoffice-core/oox/qa/unit/data/chart-data-label-char-color.docx	!Unsupported	=	=	=	=	=
 libreoffice-core/oox/qa/unit/data/import-mce.pptx	14:49ab1e161df49d26	=	=	=	262:cf42b8c202fc3c3a	=
 libreoffice-core/oox/qa/unit/data/shape-text-alignment.pptx	74:a952dd971e921690	=	=	=	278:2d55642347b1473f	=
 libreoffice-core/oox/qa/unit/data/tdf131082.pptx	19:f12c3ba3ff780ecd	=	=	=	371:561a702598d9a7d9	=
 libreoffice-core/sd/qa/unit/data/BoldonseFontEmbedded.pptx	16:7d11cfbe8dea6ce0	=	=	=	241:1f85a3d9085aaa70	=
-libreoffice-core/sd/qa/unit/data/odp/ole_icon.odp	11:519e87d1cc6f685c	=	=	=	=	=
+libreoffice-core/sd/qa/unit/data/odp/ole_icon.odp	11:519e87d1cc6f685c	=	=	=	229:c270322a21ecae4e	=
 libreoffice-core/sd/qa/unit/data/pptx/ole.pptx	11:519e87d1cc6f685c	=	=	=	228:a8f9f65611ed6baa	=
 libreoffice-core/sd/qa/unit/data/pptx/slide-section-test.pptx	248:325b232e66e975c3	=	=	=	1436:b3f4f53c061a734f	=
 libreoffice-core/sd/qa/unit/data/pptx/slide-sections.pptx	2423:a4fa860ccc2f5d56	=	=	=	2860:e605edb5db75ed93	=
@@ -165,9 +167,9 @@ libreoffice-core/xmloff/qa/unit/data/tdf156707_text_form_control_borders.odt	84:
 libreoffice-core/xmloff/qa/unit/data/tdf167358_label_form_control_borders.odt	94:9b5a934736c0ba9b	=	=	=	372:7899a55465f1279e	=
 libreoffice-core/xmlsecurity/qa/unit/signing/data/macro.odt	7:8a7794b77af2325b	=	=	=	335:f0a86861c0c3d82c	=
 libreoffice-core/xmlsecurity/qa/unit/signing/data/signed_with_x509certificate_chain.odt	2:08547e07b5084555	=	=	=	277:8b9714b4132419a2	=
-odf/corpus/impress-basic.odp	91:f42eedfa502120a9	=	=	=	=	=
-odf/corpus/impress-embedded-spreadsheet.odp	32:ea08391909c7a424	=	=	=	=	=
-odf/corpus/impress-master-layouts.odp	93:b5e7a194b60d2b0b	=	=	=	=	=
+odf/corpus/impress-basic.odp	91:f42eedfa502120a9	=	=	=	292:02ebd90e1c695fbc	=
+odf/corpus/impress-embedded-spreadsheet.odp	32:ea08391909c7a424	=	=	=	259:117d51e2339ce7f5	=
+odf/corpus/impress-master-layouts.odp	93:b5e7a194b60d2b0b	=	=	=	242:ba10f9cf7d88bf15	=
 odf/corpus/writer-definition-lists.odt	!Unsupported	=	=	=	=	=
 odf/corpus/writer-header-footer.odt	17:a4e048ef36f836a1	=	=	=	277:04e604c82e0ea28e	=
 odf/corpus/writer-images-frames.odt	!Unsupported	=	=	=	=	=
@@ -176,15 +178,15 @@ odf/corpus/writer-paragraph-styles.odt	146:5743c0dc647cc24d	=	=	=	408:c20e5b0124
 odf/corpus/writer-table-of-contents.odt	!Unsupported	=	=	=	=	=
 odf/corpus/writer-table.odt	84:964204b84fabb128	=	=	=	407:fe855b702c42b9dd	=
 odf/corpus/writer-user-fields.odt	62:dd15eb78cc3aa2d1	=	=	=	322:72651d3d0b03fd85	=
-odf/native-resave/libreoffice-resaved/tdf169979-litchi.odp	129:c553bdbcad7f45dd	=	=	=	=	=
+odf/native-resave/libreoffice-resaved/tdf169979-litchi.odp	129:c553bdbcad7f45dd	=	=	=	372:4d67cfd6e09affa2	=
 odf/native-resave/libreoffice-resaved/writer-header-footer-litchi.odt	50:e66393e267026528	=	=	=	348:3f38a32ded5c68aa	=
-odf/native-resave/litchi-changed/tdf169979-litchi.odp	129:c553bdbcad7f45dd	=	=	=	=	=
+odf/native-resave/litchi-changed/tdf169979-litchi.odp	129:c553bdbcad7f45dd	=	=	=	321:cf8caeca88945894	=
 odf/native-resave/litchi-changed/writer-header-footer-litchi.odt	50:e66393e267026528	=	=	=	310:7bbeb71a34ef4fa9	=
-odf/odp/cellspan.odp	60:747e69c0bd0f446c	=	=	=	=	=
-odf/odp/tdf102223.odp	60:e4ed07bfbbb355cf	=	=	=	=	=
-odf/odp/tdf105502.odp	24:467f52be90b1d5aa	=	=	=	=	=
-odf/odp/tdf169979.odp	94:80afd2659f3d5542	=	=	=	=	=
-odf/odp/text-in-image.odp	16:5d1eeb94ded24c97	=	=	=	=	=
+odf/odp/cellspan.odp	60:747e69c0bd0f446c	=	=	=	278:b676d64b68b36ed8	=
+odf/odp/tdf102223.odp	60:e4ed07bfbbb355cf	=	=	=	288:a7aa61b86e35f3df	=
+odf/odp/tdf105502.odp	24:467f52be90b1d5aa	=	=	=	273:5e5fe577f52b74b7	=
+odf/odp/tdf169979.odp	94:80afd2659f3d5542	=	=	=	286:d821d451d756e1e1	=
+odf/odp/text-in-image.odp	16:5d1eeb94ded24c97	=	=	=	245:b00433ef99978fe5	=
 odf/odt/shape-text-in-paragraph.odt	29:607446457855a308	=	=	=	304:a26f6875c596782c	=
 odf/odt/table-cell-column-span.odt	190:6179ead85811231e	=	=	=	535:774dc1c481271838	=
 odfdo/tests/samples/forms.odt	33:83a24e705c2c0edf	=	=	=	190:646b0fedc1087a2e	=

@@ -245,6 +245,69 @@ impl AuthoredXmlFragment {
     pub const fn deletion() -> Self {
         Self { bytes: Vec::new() }
     }
+
+    /// Bytes relocated from a balanced range of the same source part.
+    ///
+    /// The bytes were accepted with the source part, so they keep the
+    /// producer's lexical form (whitespace before a tag close, attribute
+    /// spacing) and are not held to the compact authored-XML contract; they
+    /// must be one or more balanced markup nodes. Every publication still
+    /// verifies the assembled part as a whole. Added for reordering whole
+    /// elements, such as presentation pages (record 0278).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the range is outside the part, does not start
+    /// with markup, or is not balanced.
+    pub fn relocated(source: &XmlSourcePart, range: Range<usize>) -> Result<Self> {
+        let bytes = source
+            .bytes
+            .get(range)
+            .ok_or_else(|| invalid_error("relocated XML range is outside the source part"))?;
+        if bytes.first() != Some(&b'<') {
+            return invalid("relocated XML fragment is not markup");
+        }
+        verify_balanced(bytes)?;
+        Ok(Self {
+            bytes: bytes.to_vec(),
+        })
+    }
+}
+
+/// Whether `bytes` are balanced markup nodes: every start tag closed, no end
+/// tag without its start.
+fn verify_balanced(bytes: &[u8]) -> Result<()> {
+    let mut reader = Reader::from_reader(bytes);
+    reader.config_mut().check_end_names = true;
+    let mut depth = 0usize;
+    let mut buffer = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buffer) {
+            Ok(Event::Start(_)) => {
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid_error("relocated XML fragment depth overflow"))?;
+                if depth > MAX_SOURCE_DEPTH {
+                    return invalid("relocated XML fragment exceeds the depth limit");
+                }
+            },
+            Ok(Event::End(_)) => {
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    invalid_error("relocated XML fragment has an unmatched end tag")
+                })?;
+            },
+            Ok(Event::Eof) => break,
+            Ok(_) => {},
+            Err(error) => {
+                return invalid(format!("relocated XML fragment is malformed: {error}"));
+            },
+        }
+        buffer.clear();
+    }
+    if depth != 0 {
+        return invalid("relocated XML fragment is not balanced");
+    }
+    Ok(())
 }
 
 impl XmlSplicePublication {

@@ -18,7 +18,8 @@ use litchi_core::FileFormat;
         feature = "xls",
         feature = "rtf",
         feature = "ods",
-        feature = "odt"
+        feature = "odt",
+        feature = "odp"
     )),
     allow(
         clippy::only_used_in_recursion,
@@ -129,6 +130,12 @@ impl File {
                 crate::path::resolve::get(&crate::format::odt::Nav::new(handle), &path)
                     .map(Node::Odt)
             },
+            #[cfg(feature = "odp")]
+            Self::Odp(handle) => {
+                let path = path.into_path()?;
+                crate::path::resolve::get(&crate::format::odp::Nav::new(handle), &path)
+                    .map(Node::Odp)
+            },
             Self::Signed(signed) => signed.file().get(path),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -202,6 +209,12 @@ impl File {
                 crate::path::resolve::find(&crate::format::odt::Nav::new(handle), &path)
                     .map(|node| node.map(Node::Odt))
             },
+            #[cfg(feature = "odp")]
+            Self::Odp(handle) => {
+                let path = path.into_path()?;
+                crate::path::resolve::find(&crate::format::odp::Nav::new(handle), &path)
+                    .map(|node| node.map(Node::Odp))
+            },
             Self::Signed(signed) => signed.file().find(path),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -270,6 +283,10 @@ impl File {
             #[cfg(feature = "odt")]
             Self::Odt(handle) => {
                 crate::query::run(crate::format::odt::Nav::new(handle), selector).map(Matches::odt)
+            },
+            #[cfg(feature = "odp")]
+            Self::Odp(handle) => {
+                crate::query::run(crate::format::odp::Nav::new(handle), selector).map(Matches::odp)
             },
             Self::Signed(signed) => signed.file().query(selector),
             Self::Locked(locked) => Err(locked.read_error()),
@@ -344,6 +361,13 @@ impl File {
             Self::Odt(handle) => {
                 crate::format::odt::views::view_json(handle, mode).map(crate::view::Json::odt)
             },
+            #[cfg(feature = "odp")]
+            Self::Odp(handle) => crate::format::odp::views::view_json(
+                handle,
+                mode,
+                &crate::view::mode::Options::default(),
+            )
+            .map(crate::view::Json::odp),
             Self::Signed(signed) => signed.file().view_json(mode),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -412,6 +436,13 @@ impl File {
                 &crate::view::mode::Options::default(),
                 output,
             ),
+            #[cfg(feature = "odp")]
+            Self::Odp(handle) => crate::format::odp::views::view_to(
+                handle,
+                mode,
+                &crate::view::mode::Options::default(),
+                output,
+            ),
             Self::Signed(signed) => signed.file().view_to(mode, output),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -456,6 +487,9 @@ pub(crate) enum Adapter {
     /// OpenDocument Spreadsheet (`.ods`, tier-3 adapter, record 0277).
     #[cfg(feature = "ods")]
     Ods,
+    /// OpenDocument Presentation (`.odp`, record 0278).
+    #[cfg(feature = "odp")]
+    Odp,
 }
 
 impl Adapter {
@@ -483,6 +517,8 @@ impl Adapter {
             FileFormat::Rtf => Some(Self::Rtf),
             #[cfg(feature = "ods")]
             FileFormat::Ods => Some(Self::Ods),
+            #[cfg(feature = "odp")]
+            FileFormat::Odp => Some(Self::Odp),
             _ => None,
         }
     }
@@ -510,6 +546,8 @@ impl Adapter {
             Self::Rtf => FileFormat::Rtf,
             #[cfg(feature = "ods")]
             Self::Ods => FileFormat::Ods,
+            #[cfg(feature = "odp")]
+            Self::Odp => FileFormat::Odp,
         }
     }
 
@@ -574,6 +612,11 @@ macro_rules! with_spec {
             #[cfg(feature = "odt")]
             $crate::read::Adapter::Odt => {
                 let $spec = &$crate::format::odt::SPEC;
+                $body
+            },
+            #[cfg(feature = "odp")]
+            $crate::read::Adapter::Odp => {
+                let $spec = &$crate::format::odp::SPEC;
                 $body
             },
         }

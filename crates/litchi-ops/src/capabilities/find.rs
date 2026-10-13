@@ -40,6 +40,10 @@ impl Capabilities {
             Some(Adapter::Rtf) => {
                 "RTF find/replace is not integrated; the leaf's run text edits can carry it"
             },
+            #[cfg(feature = "odp")]
+            Some(Adapter::Odp) => {
+                "ODP find/replace is not integrated; the leaf's scene run text changes can carry it"
+            },
             _ => "find/replace is not integrated for this format",
         };
         Refusal {

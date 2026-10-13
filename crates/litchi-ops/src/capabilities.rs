@@ -98,7 +98,8 @@
         feature = "pptx",
         feature = "xlsb",
         feature = "xls",
-        feature = "rtf"
+        feature = "rtf",
+        feature = "odp"
     )),
     allow(
         dead_code,
@@ -491,6 +492,15 @@ const PPTX_SHAPE_ADD: Refusal = Refusal {
     reason: "this PPTX owner cannot add a slide or top-level text-box shape",
 };
 
+/// The refusal of edits on a flat (single-XML) OpenDocument presentation,
+/// which the unified API reads but does not edit.
+#[cfg(feature = "odp")]
+const ODP_FLAT: Refusal = Refusal {
+    code: Code::UnsupportedCapability,
+    follow_up: "M6 flat ODF writes; convert to a packaged .odp to edit",
+    reason: "flat OpenDocument presentations (.fodp) are read-only in the unified API",
+};
+
 /// The refusal of a locked OOXML package whose format its name does not
 /// tell.
 const UNKNOWN: Refusal = Refusal {
@@ -630,7 +640,8 @@ impl Capabilities {
     /// Whether the handle retained what an editor is built from
     /// ([`OpenOptions::retain_source`](crate::OpenOptions::retain_source)):
     /// `None` for formats without retention reporting (RTF and OpenDocument), a locked
-    /// file, and a report made by [`Capabilities::of`].
+    /// file, and a report made by [`Capabilities::of`]. A flat OpenDocument
+    /// presentation reports `Some(false)`: it has no editable package.
     #[must_use]
     pub const fn retains_source(&self) -> Option<bool> {
         self.retains_source
@@ -896,6 +907,25 @@ impl Capabilities {
             {
                 return Support::Supported;
             }
+            #[cfg(feature = "odp")]
+            if matches!(
+                verb,
+                Verb::Set
+                    | Verb::Add
+                    | Verb::Remove
+                    | Verb::Move
+                    | Verb::Swap
+                    | Verb::Edit
+                    | Verb::Batch
+            ) && self.adapter() == Some(Adapter::Odp)
+            {
+                // A flat (single-XML) document reports that it retained no
+                // editable package.
+                if self.retains_source == Some(false) {
+                    return ODP_FLAT.support();
+                }
+                return Support::Supported;
+            }
             return EDITS.support();
         }
         match verb {
@@ -934,6 +964,9 @@ impl Capabilities {
             return Support::Supported;
         }
         if self.format == Some(FileFormat::Odt) && cfg!(feature = "odt") {
+            return Support::Supported;
+        }
+        if self.format == Some(FileFormat::Odp) && cfg!(feature = "odp") {
             return Support::Supported;
         }
         #[cfg(feature = "ppt")]
@@ -975,6 +1008,9 @@ impl Capabilities {
             return Support::Supported;
         }
         if self.format == Some(FileFormat::Odt) && cfg!(feature = "odt") {
+            return Support::Supported;
+        }
+        if self.format == Some(FileFormat::Odp) && cfg!(feature = "odp") {
             return Support::Supported;
         }
 
@@ -1160,6 +1196,8 @@ fn retains_source(file: &File) -> Option<bool> {
         File::Xls(handle) => Some(handle.retains_source()),
         #[cfg(feature = "ppt")]
         File::Ppt(handle) => Some(handle.retains_source()),
+        #[cfg(feature = "odp")]
+        File::Odp(handle) if handle.is_flat() => Some(false),
         File::Signed(signed) => retains_source(signed.file()),
         _ => None,
     }
@@ -2248,6 +2286,8 @@ const fn view_gap(adapter: Adapter, mode: Mode) -> Option<&'static GapSpec> {
         Adapter::Ods => m1_view_gap(mode),
         #[cfg(feature = "odt")]
         Adapter::Odt => m1_view_gap(mode),
+        #[cfg(feature = "odp")]
+        Adapter::Odp => m1_view_gap(mode),
     }
 }
 
@@ -2388,6 +2428,8 @@ check_capabilities!(crate::format::rtf::SPEC);
 check_capabilities!(crate::format::ods::SPEC);
 #[cfg(feature = "odt")]
 check_capabilities!(crate::format::odt::SPEC);
+#[cfg(feature = "odp")]
+check_capabilities!(crate::format::odp::SPEC);
 
 /// Byte equality usable in constant evaluation.
 const fn same(a: &str, b: &str) -> bool {
@@ -2677,6 +2719,12 @@ impl Element {
             || (self.adapter == Adapter::Odt
                 && crate::format::odt::SETTABLE.contains(&self.data().canonical)
                 && readable);
+        #[cfg(feature = "odp")]
+        let settable = settable
+            || (self.adapter == Adapter::Odp
+                && self.retains_source != Some(false)
+                && crate::format::odp::SETTABLE.contains(&self.data().canonical)
+                && readable);
         let structural = {
             #[cfg(feature = "docx")]
             {
@@ -2757,6 +2805,12 @@ impl Element {
             || (self.adapter == Adapter::Odt
                 && crate::format::odt::ADDABLE.contains(&self.data().canonical)
                 && readable);
+        #[cfg(feature = "odp")]
+        let add = add
+            || (self.adapter == Adapter::Odp
+                && self.retains_source != Some(false)
+                && crate::format::odp::ADDABLE.contains(&self.data().canonical)
+                && readable);
         #[cfg(feature = "pptx")]
         let remove = structural
             || (self.adapter == Adapter::Pptx
@@ -2823,6 +2877,12 @@ impl Element {
         let remove = remove
             || (self.adapter == Adapter::Odt
                 && crate::format::odt::REMOVABLE.contains(&self.data().canonical)
+                && readable);
+        #[cfg(feature = "odp")]
+        let remove = remove
+            || (self.adapter == Adapter::Odp
+                && self.retains_source != Some(false)
+                && crate::format::odp::REMOVABLE.contains(&self.data().canonical)
                 && readable);
         Operations {
             add,
@@ -2938,6 +2998,15 @@ fn element_data(adapter: Adapter, index: u16) -> Data {
         #[cfg(feature = "xls")]
         let props = if adapter == Adapter::Xls {
             crate::format::xls::capability_props(crate::path::navigate::ElementKind::name(
+                element.kind,
+            ))
+            .unwrap_or(props)
+        } else {
+            props
+        };
+        #[cfg(feature = "odp")]
+        let props = if adapter == Adapter::Odp {
+            crate::format::odp::capability_props(crate::path::navigate::ElementKind::name(
                 element.kind,
             ))
             .unwrap_or(props)
@@ -3299,6 +3368,10 @@ fn option_gap(adapter: Adapter, index: usize) -> Option<Option<&'static GapSpec>
     #[cfg(feature = "odt")]
     if adapter == Adapter::Odt {
         return crate::format::odt::WRITE_GAPS.get(index).map(Some);
+    }
+    #[cfg(feature = "odp")]
+    if adapter == Adapter::Odp {
+        return crate::format::odp::WRITE_GAPS.get(index).map(Some);
     }
     let _ = (adapter, index);
     None

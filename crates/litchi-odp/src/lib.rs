@@ -16,6 +16,7 @@ pub mod facade;
 pub mod handout_master;
 pub mod model;
 pub mod package;
+pub mod scene;
 pub mod streaming;
 
 pub use authoring::edit::Package;

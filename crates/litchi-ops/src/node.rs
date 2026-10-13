@@ -142,7 +142,8 @@ pub(crate) use view::Project;
     feature = "xlsb",
     feature = "xls",
     feature = "ods",
-    feature = "odt"
+    feature = "odt",
+    feature = "odp"
 ))]
 pub(crate) use view::Source;
 pub use view::{
@@ -203,9 +204,9 @@ pub enum Node<'f> {
     /// An OpenDocument spreadsheet node (tier-3 adapter, record 0277).
     #[cfg(feature = "ods")]
     Ods(crate::format::ods::Node<'f>),
-    /// An OpenDocument presentation node (tier-3 adapter, step R7).
+    /// An OpenDocument presentation node (tier-3 adapter, record 0278).
     #[cfg(feature = "odp")]
-    Odp(Pending<'f, crate::format::odp::Odp>),
+    Odp(crate::format::odp::Node<'f>),
     /// A node of the test-only fake format.
     #[cfg(any(test, feature = "test-support"))]
     #[doc(hidden)]
@@ -390,6 +391,17 @@ impl<'f> Node<'f> {
     pub fn as_odt(&self) -> Option<&crate::format::odt::Node<'f>> {
         match self {
             Self::Odt(node) => Some(node),
+            #[allow(unreachable_patterns, reason = "format variants depend on features")]
+            _ => None,
+        }
+    }
+
+    /// Borrow the typed OpenDocument presentation node.
+    #[cfg(feature = "odp")]
+    #[must_use]
+    pub fn as_odp(&self) -> Option<&crate::format::odp::Node<'f>> {
+        match self {
+            Self::Odp(node) => Some(node),
             #[allow(unreachable_patterns, reason = "format variants depend on features")]
             _ => None,
         }

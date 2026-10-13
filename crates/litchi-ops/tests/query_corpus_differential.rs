@@ -11,8 +11,9 @@
 //! were added by record 0267, printed by trunk `4d1afe92bc` before its
 //! changes. The ODS and flat ODS digests were added by record 0277, printed
 //! by its read adapter before the ODS writers landed; the ODT digests were
-//! added by record 0276 the same way. Each digest covers,
-//! file by file, every match's kind,
+//! added by record 0276 the same way, and the ODP and flat ODP digests by
+//! record 0278, printed by its read adapter before the ODP write handlers
+//! landed. Each digest covers, file by file, every match's kind,
 //! path, positional path and text, and every error, so a changed result set
 //! on any file changes it. Set `LITCHI_BLESS_GOLDEN=1` to write the current
 //! build's digests instead, after showing that a change of results is
@@ -68,7 +69,7 @@ fn corpus_queries_return_what_they_returned_before() {
         golden.len(),
         differences.join("\n")
     );
-    // The selectors cover the three formats and find matches.
+    // The selectors cover the formats and find matches.
     for (extension, selectors) in [
         ("xlsx", query_corpus::XLSX),
         ("docx", query_corpus::DOCX),
@@ -77,7 +78,10 @@ fn corpus_queries_return_what_they_returned_before() {
         ("xlsb", query_corpus::XLSB),
         ("ods", query_corpus::ODS),
         ("fods", query_corpus::ODS),
+        #[cfg(feature = "odt")]
         ("odt", query_corpus::ODT),
+        #[cfg(feature = "odp")]
+        ("odp", query_corpus::ODP),
     ] {
         let matched = selectors
             .iter()

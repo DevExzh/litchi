@@ -185,6 +185,49 @@ pub(crate) const ODT: &[&str] = &[
     "/body/r[bold=true]",
 ];
 
+/// OpenDocument presentation selectors (record 0278), recorded from the
+/// read adapter before its write handlers landed.
+#[cfg(feature = "odp")]
+pub(crate) const ODP: &[&str] = &[
+    "shape",
+    "shape[width>=10cm]",
+    "shape[x<2cm]",
+    "shape[y!=0]",
+    "shape:contains(a)",
+    "shape:empty",
+    "shape[name~=Title]",
+    "shape[isTitle=true]",
+    "title",
+    "textbox",
+    "picture",
+    "table",
+    "tr",
+    "tc",
+    "tc:contains(a)",
+    "paragraph",
+    "paragraph[level>=1]",
+    "p:contains(the)",
+    "run",
+    "run[style]",
+    "slide",
+    "slide[name~=page]",
+    "shape[1]",
+    "shape[last()]",
+    "slide > shape",
+    "notes",
+    "notes paragraph",
+    "comment",
+    "ole",
+    "chart",
+    "group",
+    "connector",
+    "slide:has(picture)",
+    "paragraph:not(:empty)",
+    "shape[width>=10cm and height<2cm]",
+    "slideMaster",
+    "slideLayout",
+];
+
 /// FNV-1a over two 64-bit lanes with different offsets.
 struct Fnv([u64; 2]);
 
@@ -360,6 +403,10 @@ pub(crate) fn digests(root: &Path) -> BTreeMap<String, String> {
         ("fods", FileFormat::Ods, ODS),
         #[cfg(feature = "odt")]
         ("odt", FileFormat::Odt, ODT),
+        #[cfg(feature = "odp")]
+        ("odp", FileFormat::Odp, ODP),
+        #[cfg(feature = "odp")]
+        ("fodp", FileFormat::Odp, ODP),
     ] {
         let mut hashers: Vec<Fnv> = selectors.iter().map(|_| Fnv::new()).collect();
         let mut counts = vec![0_usize; selectors.len()];

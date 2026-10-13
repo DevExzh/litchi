@@ -138,7 +138,7 @@ impl CreateOptions {
 
 /// Create a new package with the default options.
 ///
-/// DOC, DOCX, PPT, RTF, XLS, XLSX, XLSB and PPTX have native-backed unified creators.
+/// DOC, DOCX, PPT, RTF, XLS, XLSX, XLSB, PPTX, ODS, ODT and ODP have native-backed unified creators.
 /// The DOC creator emits one ordinary blank document paragraph; template and
 /// Strict options are refused explicitly. Other formats
 /// return a typed capability or format refusal according to the features and
@@ -217,6 +217,11 @@ pub fn create_with(format: FileFormat, options: &CreateOptions) -> Result<File> 
     #[cfg(feature = "odt")]
     if format == FileFormat::Odt {
         return crate::format::odt::Odt::create(options).map(File::Odt);
+    }
+
+    #[cfg(feature = "odp")]
+    if format == FileFormat::Odp {
+        return crate::format::odp::Odp::create(options).map(File::Odp);
     }
 
     let _ = options;

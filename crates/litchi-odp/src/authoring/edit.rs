@@ -1746,6 +1746,90 @@ impl Edit {
         self.stage_text_box_models(owned)
     }
 
+    /// The page index of this transaction's current `content.xml`.
+    ///
+    /// The index is built from the staged content, so it observes every
+    /// change staged so far, including earlier [`Self::splice_scene`] calls.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the staged content cannot be read or indexed.
+    pub fn scene(&mut self) -> Result<crate::scene::Scene> {
+        let package = self.content_package()?;
+        let content = String::from_utf8(package.get_file("content.xml")?)
+            .map_err(|source| invalid_error(format!("ODP content.xml is not UTF-8: {source}")))?;
+        crate::scene::Scene::parse(&content)
+    }
+
+    /// Stage scene changes as checked byte splices of `content.xml`.
+    ///
+    /// Every change is resolved against the scene of the content staged
+    /// before this call ([`Self::scene`]); changes of one call must not
+    /// touch the same markup. Only the changed byte ranges are rewritten:
+    /// every other byte of `content.xml`, and every other package member,
+    /// keeps its source provenance. Returns whether anything changed; a call
+    /// whose changes are all exact no-ops stages nothing.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an address the scene does not have, overlapping
+    /// changes, text with XML-illegal characters, a page or object that
+    /// other markup references (removal and page renaming), markup the
+    /// authored-XML audit refuses, or a result the presentation parser
+    /// rejects. A refusal leaves the transaction unchanged.
+    pub fn splice_scene(&mut self, changes: &[crate::scene::Change]) -> Result<bool> {
+        if changes.is_empty() {
+            return Ok(false);
+        }
+        self.check_no_slide_order_change("scene")?;
+        let package = self.content_package()?;
+        let Some(bytes) = crate::scene::apply_changes(&package, changes)? else {
+            return Ok(false);
+        };
+        self.publish_content(
+            bytes,
+            crate::content::Operation::SpliceScene {
+                changes: changes.to_vec(),
+            },
+        )?;
+        Ok(true)
+    }
+
+    /// Replace the package metadata projected from `meta.xml`.
+    ///
+    /// Title, author (`dc:creator`), subject, description and keywords are
+    /// written into the retained `meta.xml`; every other element keeps its
+    /// bytes. Returns whether anything changed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Unsupported`] when `metadata` changes any other
+    /// field, and an error when the source metadata cannot be read.
+    pub fn set_metadata(&mut self, metadata: &litchi_core::Metadata) -> Result<bool> {
+        self.check_no_slide_order_change("metadata")?;
+        let package = self.content_package()?;
+        let Some(bytes) = crate::authoring::metadata::apply(&package, metadata)? else {
+            return Ok(false);
+        };
+        self.publish_content(
+            bytes,
+            crate::content::Operation::SetMetadata {
+                metadata: Box::new(metadata.clone()),
+            },
+        )?;
+        Ok(true)
+    }
+
+    /// The metadata of the content staged so far.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the staged metadata cannot be read.
+    pub fn metadata(&mut self) -> Result<litchi_core::Metadata> {
+        let package = self.content_package()?;
+        crate::authoring::metadata::read(&package)
+    }
+
     /// Remove a named rich-text box.
     ///
     /// # Errors
@@ -2900,7 +2984,36 @@ impl Edit {
         #[cfg(test)]
         let publication_audit_hit = proof_covers;
         if !proof_covers {
-            validate_compact_xml_parts(&reopened, &source_package)?;
+            // Scene splices publish `content.xml` through checked source
+            // ranges: every authored fragment was audited and every other
+            // byte is proven source-identical, so the part is not re-audited
+            // as a whole (producer formatting outside the splices stays as
+            // the producer wrote it). Other domains keep the full audit.
+            let scene_only = content_changed
+                && !self.changed
+                && !design_changed
+                && !annotations_changed
+                && !rdf_changed
+                && !charts_changed
+                && !layer_changed
+                && self.content.as_ref().is_some_and(|draft| {
+                    draft.operations.iter().all(|operation| {
+                        matches!(
+                            operation,
+                            crate::content::Operation::SpliceScene { .. }
+                                | crate::content::Operation::SetMetadata { .. }
+                        )
+                    })
+                });
+            if scene_only {
+                validate_compact_xml_parts_except(
+                    &reopened,
+                    &source_package,
+                    &["content.xml", "meta.xml"],
+                )?;
+            } else {
+                validate_compact_xml_parts(&reopened, &source_package)?;
+            }
         }
         self.draft.verify_embedded_media(&reopened)?;
         self.draft.verify_removed_media(&reopened)?;
@@ -3274,6 +3387,26 @@ impl Edit {
         self.check_no_slide_order_change("rich-content")?;
         let package = self.content_package()?;
         let bytes = crate::content::apply(&package, &operation)?;
+        if bytes.len() > MAX_PACKAGE_BYTES {
+            return invalid("ODP semantic-content transaction exceeds the 128 MiB package limit");
+        }
+        let package = OwnedPackage::from_bytes(bytes)?;
+        Presentation::from_owned_package(package.clone())?;
+        let draft = self
+            .content
+            .as_mut()
+            .ok_or_else(|| invalid_error("ODP semantic-content draft initialization failed"))?;
+        draft.bytes = package.shared_bytes();
+        draft.package = package;
+        draft.operations.push(operation);
+        Ok(())
+    }
+
+    fn publish_content(
+        &mut self,
+        bytes: Vec<u8>,
+        operation: crate::content::Operation,
+    ) -> Result<()> {
         if bytes.len() > MAX_PACKAGE_BYTES {
             return invalid("ODP semantic-content transaction exceeds the 128 MiB package limit");
         }
@@ -4522,31 +4655,45 @@ fn shape_resource(root: &Shape) -> Result<usize> {
 }
 
 fn validate_compact_xml_parts(package: &OwnedPackage, source: &OwnedPackage) -> Result<()> {
-    validate_compact_xml_parts_against(package, Some(source), true)
+    validate_compact_xml_parts_against(package, Some(source), true, &[])
+}
+
+/// [`validate_compact_xml_parts`] for a commit whose `skip` parts were
+/// published only through checked source splices.
+fn validate_compact_xml_parts_except(
+    package: &OwnedPackage,
+    source: &OwnedPackage,
+    skip: &[&str],
+) -> Result<()> {
+    validate_compact_xml_parts_against(package, Some(source), true, skip)
 }
 
 pub(crate) fn validate_raw_preserved_xml_parts(
     package: &OwnedPackage,
     source: &OwnedPackage,
 ) -> Result<()> {
-    validate_compact_xml_parts_against(package, Some(source), true)
+    validate_compact_xml_parts_against(package, Some(source), true, &[])
 }
 
 pub(crate) fn validate_raw_preserved_referenced_xml_parts(
     package: &OwnedPackage,
     source: &OwnedPackage,
 ) -> Result<()> {
-    validate_compact_xml_parts_against(package, Some(source), false)
+    validate_compact_xml_parts_against(package, Some(source), false, &[])
 }
 
 fn validate_compact_xml_parts_against(
     package: &OwnedPackage,
     source: Option<&OwnedPackage>,
     audit_core_parts: bool,
+    skip: &[&str],
 ) -> Result<()> {
     let mut part_count = 0usize;
     let mut aggregate_bytes = 0usize;
     for path in package.files()? {
+        if skip.contains(&path.as_str()) {
+            continue;
+        }
         if !path.rsplit_once('.').is_some_and(|(_, extension)| {
             extension.eq_ignore_ascii_case("xml") || extension.eq_ignore_ascii_case("rdf")
         }) {
