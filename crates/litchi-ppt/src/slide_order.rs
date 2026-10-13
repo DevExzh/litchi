@@ -776,6 +776,46 @@ impl Snapshot {
         })
     }
 
+    fn adopt_notes_publication(
+        &self,
+        publication: crate::text_edit::RootNotesPublication,
+    ) -> Result<Self> {
+        if publication.source() != self.bytes() {
+            return Err(PackageError::Corrupted(
+                "PPT notes text publication source changed before adoption".into(),
+            )
+            .into());
+        }
+        if publication.notes_persist_id() == self.document_persist_id {
+            return Err(PackageError::Corrupted(
+                "PPT notes text publication targeted the live document record".into(),
+            )
+            .into());
+        }
+        let bytes = publication.into_output();
+        if self.limits != SourceLimits::default() {
+            return Self::from_bytes_with_options(bytes.to_vec(), self.open_options());
+        }
+        if bytes.len() > self.limits.max_package_bytes {
+            return Err(PackageError::Limit {
+                kind: crate::SourceLimitKind::InputBytes,
+                observed: bytes.len(),
+                maximum: self.limits.max_package_bytes,
+            }
+            .into());
+        }
+        Ok(Self {
+            artifact: Artifact::new(bytes),
+            document: self.document.clone(),
+            document_persist_id: self.document_persist_id,
+            limits: self.limits,
+            leniency: self.leniency,
+            chain_repaired: self.chain_repaired,
+            has_review_history: self.has_review_history,
+            has_signature: self.has_signature,
+        })
+    }
+
     fn adopt_text_edit_batch_publication(
         &self,
         publication: crate::text_edit::RootBatchPublication,
@@ -1118,6 +1158,9 @@ impl Snapshot {
                     "presentation.shape-text.set" => {
                         apply_durable_text(&current, &operations[index])?
                     },
+                    "presentation.notes-text.set" => {
+                        apply_durable_notes_text(&current, &operations[index])?
+                    },
                     "presentation.shape-anchor.set" => {
                         apply_durable_anchor(&current, &operations[index])?
                     },
@@ -1256,6 +1299,35 @@ pub struct ShapeTextChange {
     target: crate::text_edit::Target,
     before: String,
     after: String,
+}
+
+/// One checked speaker-notes text replacement on the slide at a source
+/// position.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NotesTextChange {
+    slide: Position,
+    before: String,
+    after: String,
+}
+
+impl NotesTextChange {
+    /// The slide whose notes changed, in the source slide order.
+    #[must_use]
+    pub const fn slide(&self) -> Position {
+        self.slide
+    }
+
+    /// The notes text before the change.
+    #[must_use]
+    pub fn before(&self) -> &str {
+        &self.before
+    }
+
+    /// The notes text after the change.
+    #[must_use]
+    pub fn after(&self) -> &str {
+        &self.after
+    }
 }
 
 /// One contextual shape-text replacement for [`Transaction::set_shape_texts`].
@@ -1548,6 +1620,7 @@ impl ShapeAnchorChange {
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum FormattingChange {
     Text(ShapeTextChange),
+    NotesText(NotesTextChange),
     Anchor(ShapeAnchorChange),
     SlideVisibility(SlideVisibilityChange),
     SlideAdvance(SlideAdvanceChange),
@@ -2012,6 +2085,63 @@ impl Transaction {
         };
         self.text_changes.push(change.clone());
         self.formatting.push(FormattingChange::Text(change));
+        Ok(())
+    }
+
+    /// Replaces the speaker-notes text of the slide at a projected position.
+    ///
+    /// The slide's notes page must hold exactly one body placeholder; its
+    /// text body follows the shape-text dependency-closure rules. Equal text
+    /// is an exact no-op. The change publishes the notes persist object in
+    /// one append-only user edit and reopens the candidate for readback.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed refusal for a missing slide or notes page, a notes
+    /// page without one body placeholder, an unrepresentable or
+    /// position-dependent text change, a changed signed source, or a slide
+    /// inserted by this transaction.
+    pub fn set_notes_text(&mut self, position: Position, value: impl Into<String>) -> Result<()> {
+        self.require_position(position)?;
+        let projected = self.document.slides()?;
+        let persist_id = projected[position.get()].persist_id();
+        let source_position = self
+            .source
+            .document
+            .slides()
+            .iter()
+            .position(|slide| slide.persist_id() == persist_id)
+            .map(Position::new)
+            .ok_or(Error::Refused(Refusal::UncommittedSlideDependency))?;
+        let after = value.into();
+        if self.source.has_signature {
+            let before = crate::text_edit::inspect_notes_text_readonly(
+                self.working.bytes(),
+                source_position,
+                self.source.open_options(),
+            )?;
+            if before == after {
+                return Ok(());
+            }
+            return Err(Error::Refused(Refusal::Signed));
+        }
+        let Some(publication) = crate::text_edit::replace_notes_text(
+            self.working.shared_bytes(),
+            source_position,
+            &after,
+            self.source.limits.max_package_bytes,
+        )?
+        else {
+            return Ok(());
+        };
+        let before = publication.before().to_owned();
+        self.working = self.working.adopt_notes_publication(publication)?;
+        let change = NotesTextChange {
+            slide: source_position,
+            before,
+            after,
+        };
+        self.formatting.push(FormattingChange::NotesText(change));
         Ok(())
     }
 
@@ -2881,6 +3011,15 @@ impl Patch {
         &self.transition_visual_changes
     }
 
+    /// Speaker-notes text replacements composed into this root patch, in
+    /// operation order.
+    pub fn notes_text_changes(&self) -> impl Iterator<Item = &NotesTextChange> {
+        self.formatting.iter().filter_map(|change| match change {
+            FormattingChange::NotesText(change) => Some(change),
+            _ => None,
+        })
+    }
+
     /// Shape-text replacements composed into this root patch.
     #[must_use]
     pub fn shape_text_changes(&self) -> &[ShapeTextChange] {
@@ -3043,6 +3182,13 @@ impl Patch {
                             after: text_change.before.clone(),
                         })
                     },
+                    FormattingChange::NotesText(notes_change) => {
+                        FormattingChange::NotesText(NotesTextChange {
+                            slide: notes_change.slide,
+                            before: notes_change.after.clone(),
+                            after: notes_change.before.clone(),
+                        })
+                    },
                     FormattingChange::Anchor(anchor_change) => {
                         FormattingChange::Anchor(ShapeAnchorChange {
                             target: anchor_change.target,
@@ -3137,6 +3283,20 @@ impl Patch {
         let mut formatting_operations = Vec::new();
         for change in &self.formatting {
             let pair = match change {
+                FormattingChange::NotesText(notes_change) => ReversibleOperation::new(
+                    durable_notes_text_operation(
+                        limits,
+                        notes_change.slide,
+                        &notes_change.before,
+                        &notes_change.after,
+                    )?,
+                    durable_notes_text_operation(
+                        limits,
+                        notes_change.slide,
+                        &notes_change.after,
+                        &notes_change.before,
+                    )?,
+                ),
                 FormattingChange::Text(text_change) => ReversibleOperation::new(
                     durable_text_operation(
                         limits,
@@ -3552,6 +3712,26 @@ fn durable_text_operation(
     )
 }
 
+fn durable_notes_text_operation(
+    limits: litchi_core::patch::PatchLimits,
+    slide: Position,
+    before: &str,
+    after: &str,
+) -> std::result::Result<litchi_core::patch::PatchOperation, litchi_core::patch::PatchError> {
+    let mut preconditions = BTreeMap::new();
+    preconditions.insert(
+        "text_sha256".to_string(),
+        serde_json::Value::String(artifact_hash(before.as_bytes())),
+    );
+    litchi_core::patch::PatchOperation::new(
+        limits,
+        "presentation.notes-text.set",
+        format!("slide:{}", slide.get()),
+        preconditions,
+        serde_json::Value::String(after.to_string()),
+    )
+}
+
 fn durable_anchor_operation(
     limits: litchi_core::patch::PatchLimits,
     target: crate::text_edit::Target,
@@ -3830,7 +4010,28 @@ fn apply_durable_text(
         return Err(Error::Refused(Refusal::Signed));
     }
     let text_snapshot = crate::text_edit::Snapshot::from_bytes(snapshot.bytes().to_vec())?;
-    let mut edit = text_snapshot.edit_text(target)?;
+    let mut edit = match text_snapshot.edit_text(target) {
+        Ok(edit) => edit,
+        Err(crate::text_edit::Error::Refused(crate::text_edit::Refusal::NoTextAtom)) => {
+            // Outline-backed placeholder text lives in the live document;
+            // the root transaction owns that publication.
+            let current = crate::text_edit::inspect_shape_text_readonly(
+                snapshot.bytes(),
+                target,
+                snapshot.open_options(),
+            )?;
+            if artifact_hash(current.as_bytes()) != expected {
+                return Err(PackageError::InvalidFormat(
+                    "PPT durable shape-text semantic precondition does not match".into(),
+                )
+                .into());
+            }
+            let mut transaction = snapshot.edit()?;
+            transaction.set_shape_text(target, replacement)?;
+            return Ok(transaction.commit()?.snapshot);
+        },
+        Err(error) => return Err(error.into()),
+    };
     if artifact_hash(edit.text().as_bytes()) != expected {
         return Err(PackageError::InvalidFormat(
             "PPT durable shape-text semantic precondition does not match".into(),
@@ -3845,10 +4046,46 @@ fn apply_durable_text(
     )
 }
 
+fn apply_durable_notes_text(
+    snapshot: &Snapshot,
+    operation: &litchi_core::patch::PatchOperation,
+) -> Result<Snapshot> {
+    if operation.preconditions.len() != 1 {
+        return Err(invalid_durable_patch(
+            "notes-text operation has unexpected preconditions",
+        ));
+    }
+    let slide = parse_target(&operation.target)?;
+    let replacement = operation
+        .value
+        .as_str()
+        .ok_or_else(|| invalid_durable_patch("notes-text value must be a string"))?;
+    let expected = operation
+        .preconditions
+        .get("text_sha256")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| invalid_durable_patch("missing notes-text precondition"))?;
+    let current = crate::text_edit::inspect_notes_text_readonly(
+        snapshot.bytes(),
+        slide,
+        snapshot.open_options(),
+    )?;
+    if artifact_hash(current.as_bytes()) != expected {
+        return Err(PackageError::InvalidFormat(
+            "PPT durable notes-text semantic precondition does not match".into(),
+        )
+        .into());
+    }
+    let mut transaction = snapshot.edit()?;
+    transaction.set_notes_text(slide, replacement)?;
+    Ok(transaction.commit()?.snapshot)
+}
+
 fn is_formatting_operation(operation: &str) -> bool {
     matches!(
         operation,
         "presentation.shape-text.set"
+            | "presentation.notes-text.set"
             | "presentation.shape-anchor.set"
             | "presentation.slide-hidden.set"
             | "presentation.slide-advance.set"

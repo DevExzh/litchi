@@ -377,10 +377,15 @@ impl TextSpecialInfoRuns {
     /// The first run then covers the new text the same way; the mark run,
     /// every exception byte and the record header are copied exactly.
     ///
+    /// Runs that split the text but differ only in their spell-check state
+    /// are merged into one run whose spelling is marked unchecked (see
+    /// [`Self::merge_spelling_runs`]).
+    ///
     /// `Ok(None)` means the change cannot be modeled losslessly: the runs
-    /// split the text (distributing a new length across them would need a
-    /// semantic choice), they cover neither layout, or the resized first run
-    /// would be empty, which MS-PPT forbids.
+    /// split the text by language or other text properties (distributing a
+    /// new length across them would need a semantic choice), they cover
+    /// neither layout, or the resized run would be empty, which MS-PPT
+    /// forbids.
     ///
     /// # Errors
     ///
@@ -410,7 +415,7 @@ impl TextSpecialInfoRuns {
                 excess
             },
             [text, mark] if mark.count == 1 && to_usize(text.count)? == old_text_length => 0,
-            _ => return Ok(None),
+            runs => return Self::merge_spelling_runs(runs, old_text_length, new_text_length),
         };
         let Some(new_count) = new_text_length
             .checked_add(excess)
@@ -427,6 +432,71 @@ impl TextSpecialInfoRuns {
         let mut rewritten = record_bytes.to_vec();
         rewritten[8..12].copy_from_slice(&new_count.to_le_bytes());
         Ok(Some(rewritten))
+    }
+
+    /// Merges runs that differ only in their spell-check state into one run
+    /// over the replacement text.
+    ///
+    /// Spelling and grammar flags are a proofing cache that `PowerPoint`
+    /// recomputes; the merged run keeps the shared language, alternate
+    /// language, bidi, extension run identifier and smart-tag data, and marks
+    /// its spelling as unchecked (neither `error` nor `clean`), so the
+    /// application checks the new text again. Runs that differ in anything
+    /// else describe the text itself and keep the same-length contract.
+    fn merge_spelling_runs(
+        runs: &[TextSIRun],
+        old_text_length: usize,
+        new_text_length: usize,
+    ) -> Result<Option<Vec<u8>>> {
+        let Some((first, rest)) = runs.split_first() else {
+            return Ok(None);
+        };
+        let without_proofing = |exception: &TextSIException| {
+            let mut exception = exception.clone();
+            exception.spelling = None;
+            exception.grammar_error = exception.grammar_error.map(|_| false);
+            exception
+        };
+        let mut merged = without_proofing(&first.special_info);
+        if rest
+            .iter()
+            .any(|run| without_proofing(&run.special_info) != merged)
+        {
+            return Ok(None);
+        }
+        if runs.iter().any(|run| run.special_info.spelling.is_some()) {
+            merged.spelling = Some(SpellingFlags::from_bits(false, false));
+        }
+        let total = runs
+            .iter()
+            .try_fold(0usize, |total, run| {
+                usize::try_from(run.count)
+                    .ok()
+                    .and_then(|count| total.checked_add(count))
+            })
+            .ok_or_else(|| corrupted("TextSIRun counts overflow"))?;
+        let Some(excess) = total
+            .checked_sub(old_text_length)
+            .filter(|excess| *excess <= 1)
+        else {
+            return Ok(None);
+        };
+        let Some(count) = new_text_length
+            .checked_add(excess)
+            .filter(|count| *count != 0)
+            .and_then(|count| u32::try_from(count).ok())
+        else {
+            return Ok(None);
+        };
+        Ok(Some(
+            Self {
+                runs: vec![TextSIRun {
+                    count,
+                    special_info: merged,
+                }],
+            }
+            .to_bytes(),
+        ))
     }
 
     /// Serialize the complete record, including its header.
@@ -667,12 +737,48 @@ mod tests {
         assert_eq!(resize(&[6], 5, 0), Some(vec![1]));
         // A text run plus a one-character mark run.
         assert_eq!(resize(&[5, 1], 5, 2), Some(vec![2, 1]));
-        // Not modeled: a split text, a mismatched cover, an empty run.
-        assert_eq!(resize(&[3, 2], 5, 9), None);
-        assert_eq!(resize(&[2, 3, 1], 5, 9), None);
+        // Identical runs that split the text merge into one run.
+        assert_eq!(resize(&[3, 2], 5, 9), Some(vec![9]));
+        assert_eq!(resize(&[2, 3, 1], 5, 9), Some(vec![10]));
+        // Not modeled: a mismatched cover, an empty run.
+        assert_eq!(resize(&[2, 2], 5, 9), None);
         assert_eq!(resize(&[8], 5, 9), None);
         assert_eq!(resize(&[5], 5, 0), None);
         assert_eq!(resize(&[5, 1], 5, 0), None);
+        // Runs that differ only in spell-check state merge into one
+        // unchecked run; runs that differ in language do not.
+        let mut payload = Vec::new();
+        payload.extend_from_slice(&3u32.to_le_bytes());
+        payload.extend_from_slice(&0x0002u32.to_le_bytes());
+        payload.extend_from_slice(&0x0409u16.to_le_bytes());
+        payload.extend_from_slice(&3u32.to_le_bytes());
+        payload.extend_from_slice(&0x0003u32.to_le_bytes());
+        payload.extend_from_slice(&0x0003u16.to_le_bytes()); // error | clean
+        payload.extend_from_slice(&0x0409u16.to_le_bytes());
+        let proofed = TextSpecialInfoRuns::parse(&payload).unwrap().to_bytes();
+        let merged = TextSpecialInfoRuns::resize_single_run_record(&proofed, 5, 8)
+            .unwrap()
+            .unwrap();
+        let (merged, _) = Record::parse_strict(&merged, 0).unwrap();
+        let merged = TextSpecialInfoRuns::parse_record(&merged).unwrap();
+        assert_eq!(merged.runs().len(), 1);
+        assert_eq!(merged.runs()[0].count(), 9);
+        let exception = merged.runs()[0].special_info();
+        assert_eq!(exception.language(), Some(0x0409));
+        let spelling = exception.spelling().unwrap();
+        assert!(!spelling.error() && !spelling.clean());
+        let mut languages = Vec::new();
+        for (count, language) in [(3u32, 0x0409u16), (3, 0x0407)] {
+            languages.extend_from_slice(&count.to_le_bytes());
+            languages.extend_from_slice(&0x0002u32.to_le_bytes());
+            languages.extend_from_slice(&language.to_le_bytes());
+        }
+        let languages = TextSpecialInfoRuns::parse(&languages).unwrap().to_bytes();
+        assert!(
+            TextSpecialInfoRuns::resize_single_run_record(&languages, 5, 8)
+                .unwrap()
+                .is_none()
+        );
         // The exception bytes are copied exactly.
         let source = language_runs(&[5, 1]);
         let resized = TextSpecialInfoRuns::resize_single_run_record(&source, 5, 7)

@@ -506,6 +506,14 @@ impl Edit {
         self.stage(charge, |inner| inner.set_shape_text_chunks(chunks))
     }
 
+    /// Set the speaker-notes text of the slide at a zero-based position.
+    ///
+    /// The slide's notes page must hold exactly one body placeholder. Equal
+    /// text is an exact no-op; a signed source refuses a changed text.
+    pub fn set_notes_text(&mut self, position: Position, value: impl Into<String>) -> Result<()> {
+        self.stage(1, move |inner| inner.set_notes_text(position, value.into()))
+    }
+
     /// Set one existing shape's complete checked client anchor.
     pub fn set_shape_anchor(&mut self, target: Target, anchor: crate::Anchor) -> Result<()> {
         self.stage(1, |inner| inner.set_shape_anchor(target, anchor))

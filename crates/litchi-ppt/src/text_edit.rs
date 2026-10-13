@@ -116,6 +116,8 @@ pub enum Refusal {
     /// The selected textbox contains a record whose relationship to the text
     /// atom is not modeled by the source-backed splice owner.
     UnsupportedDependency,
+    /// The selected slide has no notes page to hold speaker-notes text.
+    NoNotesPage,
 }
 
 impl fmt::Display for Refusal {
@@ -156,6 +158,7 @@ impl fmt::Display for Refusal {
                 formatter,
                 "source-backed PPT shape-text replacement must preserve encoded atom length"
             ),
+            Self::NoNotesPage => write!(formatter, "PPT slide has no notes page"),
             Self::UnsupportedDependency => write!(
                 formatter,
                 "selected PPT shape text has an unsupported dependency record"
@@ -2819,6 +2822,135 @@ pub(crate) fn replace_shape_texts_batch(
         output,
         changes,
         document_changed,
+    }))
+}
+
+/// One published speaker-notes text replacement.
+pub(crate) struct RootNotesPublication {
+    source: Arc<[u8]>,
+    output: Arc<[u8]>,
+    notes_persist_id: u32,
+    before: String,
+}
+
+impl RootNotesPublication {
+    pub(crate) fn source(&self) -> &[u8] {
+        &self.source
+    }
+
+    pub(crate) const fn notes_persist_id(&self) -> u32 {
+        self.notes_persist_id
+    }
+
+    pub(crate) fn before(&self) -> &str {
+        &self.before
+    }
+
+    pub(crate) fn into_output(self) -> Arc<[u8]> {
+        self.output
+    }
+}
+
+/// Reads the speaker-notes text of the slide at a source position.
+pub(crate) fn inspect_notes_text_readonly(
+    bytes: &[u8],
+    slide: Position,
+    options: crate::package::OpenOptions<'_>,
+) -> Result<String> {
+    let presentation = presentation_with_options(bytes, options)?;
+    let selected = presentation
+        .slide_at(slide.get())?
+        .ok_or(Error::Refused(Refusal::SlideNotFound { position: slide }))?;
+    let notes = selected
+        .speaker_notes()?
+        .ok_or(Error::Refused(Refusal::NoNotesPage))?;
+    Ok(notes.text()?.to_owned())
+}
+
+/// Replaces the speaker-notes text of the slide at a source position.
+///
+/// The notes page must hold exactly one body placeholder
+/// (`PlaceholderKind::NotesBody`), whose text body is rewritten under the
+/// same dependency-closure rules as slide shape text; every other record of
+/// the notes page and every other persist object is copied exactly. Equal
+/// text returns `Ok(None)` without publishing.
+pub(crate) fn replace_notes_text(
+    source: Arc<[u8]>,
+    slide: Position,
+    replacement: &str,
+    max_output_bytes: usize,
+) -> Result<Option<RootNotesPublication>> {
+    require_batch_text_budget(replacement.len(), 0, max_output_bytes)?;
+    let presentation = presentation_shared(source.clone())?;
+    let selected = presentation
+        .slide_at(slide.get())?
+        .ok_or(Error::Refused(Refusal::SlideNotFound { position: slide }))?;
+    let notes = selected
+        .speaker_notes()?
+        .ok_or(Error::Refused(Refusal::NoNotesPage))?;
+    let before = notes.text()?.to_owned();
+    if before == replacement {
+        return Ok(None);
+    }
+    let notes_persist_id = notes.persist_id();
+    let shape_id = match notes.body_shape_ids()?.as_slice() {
+        [] => return Err(Error::Refused(Refusal::NoTextbox)),
+        [shape_id] => *shape_id,
+        _ => return Err(Error::Refused(Refusal::AmbiguousTextbox)),
+    };
+    drop(selected);
+    drop(presentation);
+
+    let mut editor = crate::embedded::object::Editor::open_records_arc_with_limit(
+        source.clone(),
+        max_output_bytes,
+    )?;
+    let original = editor.persisted_record(notes_persist_id)?;
+    if record_type(&original)? != RecordType::Notes as u16 {
+        return Err(PackageError::Corrupted(
+            "PPT notes persist object is not a NotesContainer".into(),
+        )
+        .into());
+    }
+    let atom = inspect_slide(&original, shape_id)?;
+    let encoded_len = encoded_replacement_len(replacement, atom.kind)?;
+    require_batch_text_budget(replacement.len(), encoded_len, max_output_bytes)?;
+    let encoded = encode_replacement(replacement, atom.kind)?;
+    if encoded.len() != atom.payload.len() && !atom.can_resize {
+        return Err(Error::Refused(Refusal::DependencyClosure));
+    }
+    let staged = rewrite_slide_grouped(
+        &original,
+        &[ShapeTextRewrite {
+            shape_id,
+            kind: atom.kind,
+            before: &atom.payload,
+            after: &encoded,
+        }],
+    )?;
+    editor.replace_persisted_record(notes_persist_id, staged)?;
+    let candidate = editor.finish()?;
+    crate::font::validate_unrelated_streams(&source, &candidate)?;
+    let output: Arc<[u8]> = Arc::from(candidate.into_boxed_slice());
+
+    let reopened = presentation_shared(output.clone())?;
+    let readback = reopened
+        .slide_at(slide.get())?
+        .ok_or(Error::Refused(Refusal::SlideNotFound { position: slide }))?;
+    let notes = readback
+        .speaker_notes()?
+        .ok_or(Error::Refused(Refusal::NoNotesPage))?;
+    if notes.persist_id() != notes_persist_id || notes.text()? != replacement {
+        return Err(PackageError::Corrupted(
+            "published PPT notes text did not round-trip through its notes page".into(),
+        )
+        .into());
+    }
+    Ok(Some(RootNotesPublication {
+        source,
+        output,
+        notes_persist_id,
+        before,
     }))
 }
 

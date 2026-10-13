@@ -378,6 +378,39 @@ impl SpeakerNotes {
         Ok((shapes, report))
     }
 
+    /// The `OfficeArt` shape identifiers of this notes page's body
+    /// placeholders (`PlaceholderKind::NotesBody`), in drawing order: the
+    /// shapes whose text [`Self::text`] joins.
+    pub(crate) fn body_shape_ids(&self) -> Result<Vec<u32>> {
+        const MAX_SHAPES: usize = 1_000_000;
+
+        let Some(drawing) = self.record.find_child(RecordType::PPDrawing) else {
+            return Ok(Vec::new());
+        };
+        let shapes = crate::odraw::parse(&drawing.data)?;
+        let mut ids = Vec::new();
+        let mut pending = shapes.iter().rev().collect::<Vec<_>>();
+        let mut visited = 0usize;
+        while let Some(current) = pending.pop() {
+            visited = visited
+                .checked_add(1)
+                .ok_or_else(|| Error::Corrupted("Notes shape count overflow".to_string()))?;
+            if visited > MAX_SHAPES {
+                return Err(Error::Corrupted(
+                    "Notes page exceeds the PPT shape limit".to_string(),
+                ));
+            }
+            if current
+                .placeholder()?
+                .is_some_and(|placeholder| placeholder.kind == crate::PlaceholderKind::NotesBody)
+            {
+                ids.push(current.id());
+            }
+            pending.extend(current.children().iter().rev());
+        }
+        Ok(ids)
+    }
+
     fn extract_notes_body_text(&self) -> Result<String> {
         let Some(drawing) = self.record.find_child(RecordType::PPDrawing) else {
             return Ok(String::new());
