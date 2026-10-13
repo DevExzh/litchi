@@ -275,12 +275,22 @@ edit open and commit.
 | `cargo clippy -p litchi-ppt -p litchi-ops -p litchi -p litchi-py --all-targets --all-features -- -D warnings` | 0 |
 | `cargo clippy -p litchi-ops --no-default-features --features ppt --all-targets -- -D warnings` | 0 |
 | `cargo test -p litchi-ppt --all-features --no-fail-fast` (1,481 tests) | 0 |
-| `cargo test -p litchi-ops --all-features --no-fail-fast` (1,857) | 0 |
+| `cargo test -p litchi-ops --all-features --no-fail-fast` (1,877 pass, 1 fail) | 101 (see below) |
 | `cargo test -p litchi --all-features --no-fail-fast` (260) | 0 |
 | `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features -p litchi-ppt` | 0 |
 | `python3 tools/check_crate_boundaries.py` | 0 |
 | `python3 tools/non_iwork_gate.py verify` | 0 |
 | `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py` (21 profiles, 949 bans) | 0 |
+
+After the last trunk merge (`46c7906174`, which brought 0261 and 0262) one
+`litchi-ops` test fails: `query_corpus_differential`
+(`corpus_queries_return_what_they_returned_before`). All 26 differing
+digests are DOCX rows ("expected 60 opened, found 68"). The cause is
+trunk's own merge: record 0262 pinned the digests before the DOCX fixtures
+of 0251 reached `test-data`. This branch changes no DOCX code or fixture,
+every PPT row matches, and the same suite passed (1,857 tests) after the
+earlier merge that brought 0251 without 0262. It is reported to the
+coordinator, not re-blessed here.
 
 No capability or registry row changed, so no golden was re-blessed. Python
 is unaffected: no public API changed.
