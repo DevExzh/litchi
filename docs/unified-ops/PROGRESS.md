@@ -267,6 +267,25 @@ Branches `uo2/*` cut from `908f9cccdd`; records 0249–0255:
   - The delta table shows read and write status per property; 48 write-only properties are no longer counted as read-supported.
   - Not done: facade profile (unresolvable glob re-exports), core `Limits` ban (owner decision).
 
+- Merged `p10-ole-meta` (0254, `3f0df8f7e4`):
+  - DOC/XLS/PPT `Builder::set_metadata` and the `package::metadata` family;
+  - create-time metadata, and a set-only `/metadata` path;
+  - unified overhead +0.7–6.3%.
+- Merged `p15-cli` (0256, `8288737b90`): new `litchi-cli` crate, the `litchi` binary.
+- Merged `p14-python` (0255, `8def70fbcf`): the Python read and write surface; 242 tests.
+- Merged `p4-xlsx-w2` (0250, `b3e04abd1b`):
+  - xlsx `Package` owner, with `Workbook` as its projection; `workbook::edit` registered;
+  - 81 new bans;
+  - no regression above 5%.
+- New owner rule (2026-10-13, AGENTS.md `e467bcf4e8`): code never references `3rdparty/`; fixtures are copied into `test-data/`. The trunk worktree's untracked partial `3rdparty/` directory, left by the Codex session, was moved aside to the session scratchpad.
+
+## Wave R2 (2026-10-13)
+Cut from `e467bcf4e8`:
+- `fix-3rdparty` (0257): vendor the fixtures into `test-data/`, plus a guard.
+- `p11-doc` (0258), `p12-xls` (0259), `p13-ppt` (0260): tier 2 P0.
+
+Still running from R1: `p7a-docx` (0251), `p7c-pptx` (0252), `p6-ooxml-meta` (0253).
+
 Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-pptx-w4` 9474e2b6ce, `uo/m2-l-xlsb-w1` 876588a23c, `uo/m1-r4-perf` 012fd509ff.
 
 - M0a S10 (`docs/unified-ops/s10-measurement.md` §9). M0a landed on the strength of two explanations. If either is rejected, the chosen alternative becomes a harness follow-up; M0a is not reverted.
