@@ -305,11 +305,11 @@ impl<W: Write> RtfWriter<W> {
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error.to_string()))?;
         self.write_str("{")?;
 
-        // Write note type control word
-        if note.is_footnote {
-            self.write_control_word("footnote", None)?;
-        } else {
-            self.write_control_word("endnote", None)?;
+        // Write note type control word; RTF marks an endnote as a
+        // `\footnote` destination carrying `\ftnalt`.
+        self.write_control_word("footnote", None)?;
+        if !note.is_footnote {
+            self.write_control_word("ftnalt", None)?;
         }
 
         // Write reference number/marker

@@ -1605,6 +1605,9 @@ pub struct Edit {
     operations: Vec<Operation>,
     replacement_bytes: usize,
     paragraph_batch_len: Option<usize>,
+    /// Effect keys of the staged destination operations, so a large
+    /// destination batch checks uniqueness in constant time per operation.
+    destination_effects: std::collections::HashSet<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -2101,6 +2104,7 @@ impl Edit {
             operations: Vec::new(),
             replacement_bytes: 0,
             paragraph_batch_len: None,
+            destination_effects: std::collections::HashSet::new(),
         }
     }
 
@@ -4575,6 +4579,7 @@ impl Edit {
             before,
             after,
         });
+        self.record_destination(effect)?;
         Ok(self)
     }
 
@@ -4625,6 +4630,7 @@ impl Edit {
             before,
             after,
         });
+        self.record_destination(effect)?;
         Ok(self)
     }
 
@@ -4666,6 +4672,7 @@ impl Edit {
             before,
             after,
         });
+        self.record_destination(effect)?;
         Ok(self)
     }
 
@@ -4705,6 +4712,7 @@ impl Edit {
             before,
             after,
         });
+        self.record_destination(effect)?;
         Ok(self)
     }
 
@@ -4759,6 +4767,7 @@ impl Edit {
             before,
             after,
         });
+        self.record_destination(effect)?;
         Ok(self)
     }
 
@@ -4799,6 +4808,7 @@ impl Edit {
             before,
             after,
         });
+        self.record_destination(effect)?;
         Ok(self)
     }
 
@@ -4839,6 +4849,7 @@ impl Edit {
             before,
             after,
         });
+        self.record_destination(effect)?;
         Ok(self)
     }
 
@@ -4867,16 +4878,42 @@ impl Edit {
     }
 
     fn ensure_unique_destination(&self, effect: &str) -> Result<(), Error> {
-        let incoming = self.operations.len();
-        if let Some(existing) = self.operations.iter().position(|operation| {
-            operation
-                .effect_keys()
-                .iter()
-                .any(|candidate| candidate == effect)
-        }) {
-            return Err(Error::Conflict { existing, incoming });
+        if !self.destination_effects.contains(effect) {
+            return Ok(());
         }
+        // Locate the earlier operation for the typed conflict only on the
+        // error path.
+        let incoming = self.operations.len();
+        let existing = self
+            .operations
+            .iter()
+            .position(|operation| {
+                operation
+                    .effect_keys()
+                    .iter()
+                    .any(|candidate| candidate == effect)
+            })
+            .unwrap_or(0);
+        Err(Error::Conflict { existing, incoming })
+    }
+
+    /// Record a staged destination operation's effect key.
+    fn record_destination(&mut self, effect: String) -> Result<(), Error> {
+        self.destination_effects
+            .try_reserve(1)
+            .map_err(|_error| Error::Write("could not reserve destination effects".to_string()))?;
+        self.destination_effects.insert(effect);
         Ok(())
+    }
+
+    /// Effect keys of every staged destination operation, for an edit whose
+    /// operations were assembled elsewhere.
+    fn destination_effects_of(operations: &[Operation]) -> std::collections::HashSet<String> {
+        operations
+            .iter()
+            .filter(|operation| operation.is_destination())
+            .flat_map(Operation::effect_keys)
+            .collect()
     }
 
     fn ensure_character_property_span(

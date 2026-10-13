@@ -44,3 +44,33 @@ fn paragraphs_and_runs_expose_style_and_list_references() {
     assert_eq!(runs.last().unwrap().format().character_style(), Some(10));
     assert_eq!(runs[0].format().character_style(), None);
 }
+
+#[test]
+fn ftnalt_marks_an_endnote_and_round_trips() {
+    let source =
+        Package::parse(r"{\rtf1\ansi A{\footnote\chftn Foot}B{\footnote\ftnalt\chftn End}C{\footnote\ftnalt Plain}\par}")
+            .unwrap();
+    let kinds = source
+        .notes()
+        .iter()
+        .map(|note| {
+            (
+                note.is_footnote,
+                note.content.as_ref(),
+                note.reference.as_ref(),
+            )
+        })
+        .collect::<Vec<_>>();
+    // `\chftn` carries an explicit reference; an unmarked endnote keeps the
+    // endnote default.
+    assert_eq!(
+        kinds,
+        [
+            (true, "Foot", "1"),
+            (false, "End", "1"),
+            (false, "Plain", "i")
+        ]
+    );
+    assert!(source.opaque().is_empty());
+    assert_eq!(source.endnotes().count(), 2);
+}

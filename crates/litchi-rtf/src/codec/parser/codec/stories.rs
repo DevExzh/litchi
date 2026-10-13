@@ -626,6 +626,7 @@ impl<'a> Parser<'a> {
 
     /// Parse footnote or endnote content.
     pub(super) fn parse_note(&mut self, is_footnote: bool) -> RtfResult<()> {
+        let mut is_footnote = is_footnote;
         if self.notes.len() >= super::super::super::section::MAX_NOTES {
             return Err(RtfError::MalformedDocument(
                 "RTF note count exceeds the safety limit".to_string(),
@@ -638,6 +639,7 @@ impl<'a> Parser<'a> {
         self.current_note_story_events.clear();
         let mut note_baseline = None;
         let mut reference = String::from(if is_footnote { "1" } else { "i" });
+        let mut explicit_reference = false;
         self.current_note_text_tokens = None;
         let mut close_token = None;
 
@@ -656,6 +658,7 @@ impl<'a> Parser<'a> {
                 Token::Control(ControlWord::FootnoteNumber(n)) => {
                     self.pos += 1;
                     reference = n.to_string();
+                    explicit_reference = true;
                 },
                 Token::Control(ControlWord::Tab) => {
                     self.pos += 1;
@@ -703,6 +706,11 @@ impl<'a> Parser<'a> {
                     }
                     self.current_note_buffer.extend_from_slice(value.as_bytes());
                 },
+                // `\ftnalt` turns a `\footnote` destination into an endnote.
+                Token::Control(ControlWord::Unknown("ftnalt", None)) => {
+                    self.pos += 1;
+                    is_footnote = false;
+                },
                 Token::Control(ControlWord::Unknown(_, _)) => {
                     let token = self.pos;
                     self.pos += 1;
@@ -739,6 +747,9 @@ impl<'a> Parser<'a> {
             }
         }
 
+        if !is_footnote && !explicit_reference {
+            reference = String::from("i");
+        }
         let content = std::str::from_utf8(&self.current_note_buffer)
             .map_err(|error| RtfError::InvalidUnicode(format!("invalid note Unicode: {error}")))?;
         let content_alloc = self.arena.alloc_str(content);

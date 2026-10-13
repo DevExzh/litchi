@@ -18,6 +18,7 @@ use crate::RtfError;
 use crate::lexer::{Lexer, Token};
 use crate::model::provenance::StorySource;
 use bumpalo::Bump;
+use std::collections::HashMap;
 use std::ops::Range;
 
 /// One located source replacement.
@@ -446,9 +447,62 @@ fn encode_text(text: &str, paragraphs: bool, output: &mut Vec<u8>) -> Result<(),
     Ok(())
 }
 
+/// The replacement text of every target, keyed for constant-time lookups.
+#[derive(Default)]
+struct Overrides<'a> {
+    cells: HashMap<(usize, usize, usize), &'a str>,
+    stories: HashMap<(usize, usize, usize), &'a str>,
+    notes: HashMap<usize, &'a str>,
+    comments: HashMap<usize, &'a str>,
+}
+
+impl<'a> Overrides<'a> {
+    fn of(source: &Package, operations: &'a [Operation]) -> Self {
+        let mut overrides = Self::default();
+        for operation in operations {
+            match operation {
+                Operation::TableCellText { path, after, .. } if path.nested.is_empty() => {
+                    overrides.cells.insert(
+                        (
+                            path.root.table_index,
+                            path.root.row_index,
+                            path.root.cell_index,
+                        ),
+                        after.as_str(),
+                    );
+                },
+                Operation::HeaderFooterText { target, after, .. } => {
+                    if let Some(story) =
+                        source.sections().get(target.section()).and_then(|section| {
+                            section
+                                .headers_footers
+                                .iter()
+                                .position(|story| story.header_type == target.kind())
+                        })
+                    {
+                        overrides.stories.insert(
+                            (target.section(), story, target.paragraph()),
+                            after.as_str(),
+                        );
+                    }
+                },
+                Operation::NoteText { index, after, .. } => {
+                    overrides.notes.insert(*index, after.as_str());
+                },
+                Operation::AnnotationText { index, after, .. } => {
+                    overrides.comments.insert(*index, after.as_str());
+                },
+                _ => {},
+            }
+        }
+        overrides
+    }
+}
+
 /// Compare the reparsed candidate with the source on every retained story.
 fn verify(source: &Package, candidate: &Package, operations: &[Operation]) -> Result<(), Error> {
     let changed = |reason: &'static str| Error::UnsupportedSource(reason);
+    let overrides = Overrides::of(source, operations);
     if source.text() != candidate.text() || source.paragraph_count() != candidate.paragraph_count()
     {
         return Err(changed("destination edit changed the body story"));
@@ -468,19 +522,10 @@ fn verify(source: &Package, candidate: &Package, operations: &[Operation]) -> Re
                 return Err(changed("destination edit changed the table structure"));
             }
             for (cell_index, (left, right)) in left.cells().iter().zip(right.cells()).enumerate() {
-                let expected = operations
-                    .iter()
-                    .find_map(|operation| match operation {
-                        Operation::TableCellText { path, after, .. }
-                            if path.nested.is_empty()
-                                && path.root.table_index == table_index
-                                && path.root.row_index == row_index
-                                && path.root.cell_index == cell_index =>
-                        {
-                            Some(after.as_str())
-                        },
-                        _ => None,
-                    })
+                let expected = overrides
+                    .cells
+                    .get(&(table_index, row_index, cell_index))
+                    .copied()
                     .unwrap_or_else(|| left.text());
                 if right.text() != expected
                     || left.nested_tables().len() != right.nested_tables().len()
@@ -507,7 +552,12 @@ fn verify(source: &Package, candidate: &Package, operations: &[Operation]) -> Re
                 "destination edit changed the header/footer structure",
             ));
         }
-        for (left, right) in left.headers_footers.iter().zip(&right.headers_footers) {
+        for (story_index, (left, right)) in left
+            .headers_footers
+            .iter()
+            .zip(&right.headers_footers)
+            .enumerate()
+        {
             if left.header_type != right.header_type
                 || left.paragraphs.len() != right.paragraphs.len()
             {
@@ -518,18 +568,10 @@ fn verify(source: &Package, candidate: &Package, operations: &[Operation]) -> Re
             for (paragraph_index, (left_paragraph, right_paragraph)) in
                 left.paragraphs.iter().zip(&right.paragraphs).enumerate()
             {
-                let expected = operations
-                    .iter()
-                    .find_map(|operation| match operation {
-                        Operation::HeaderFooterText { target, after, .. }
-                            if target.section() == section_index
-                                && target.kind() == left.header_type
-                                && target.paragraph() == paragraph_index =>
-                        {
-                            Some(after.as_str())
-                        },
-                        _ => None,
-                    })
+                let expected = overrides
+                    .stories
+                    .get(&(section_index, story_index, paragraph_index))
+                    .copied()
                     .unwrap_or_else(|| left_paragraph.text.as_ref());
                 if right_paragraph.text != expected
                     || left_paragraph.paragraph != right_paragraph.paragraph
@@ -548,16 +590,10 @@ fn verify(source: &Package, candidate: &Package, operations: &[Operation]) -> Re
         return Err(changed("destination edit changed the note structure"));
     }
     for (index, (left, right)) in source_notes.iter().zip(candidate_notes).enumerate() {
-        let expected = operations
-            .iter()
-            .find_map(|operation| match operation {
-                Operation::NoteText {
-                    index: target,
-                    after,
-                    ..
-                } if *target == index => Some(after.as_str()),
-                _ => None,
-            })
+        let expected = overrides
+            .notes
+            .get(&index)
+            .copied()
             .unwrap_or_else(|| left.content.as_ref());
         if right.content != expected
             || left.is_footnote != right.is_footnote
@@ -577,16 +613,10 @@ fn verify(source: &Package, candidate: &Package, operations: &[Operation]) -> Re
             .zip(candidate.annotations())
             .enumerate()
             .all(|(index, (left, right))| {
-                let expected = operations
-                    .iter()
-                    .find_map(|operation| match operation {
-                        Operation::AnnotationText {
-                            index: target,
-                            after,
-                            ..
-                        } if *target == index => Some(after.as_str()),
-                        _ => None,
-                    })
+                let expected = overrides
+                    .comments
+                    .get(&index)
+                    .copied()
                     .unwrap_or_else(|| left.text.as_ref());
                 right.text == expected
                     && left.position == right.position
