@@ -125,7 +125,7 @@ fn package_semantics_have_compact_golden_markdown() {
     std::fs::write(temporary.path(), bytes).unwrap();
     let source_document = litchi::open(temporary.path()).unwrap();
 
-    let expected = "Before [**site \\[x\\]**](<https://example.test/a%20b> \"tip \\\"q\\\"\") after\n\n![alt \\[image\\]](<data:image/png;base64,iVBORw0KGgo=> \"Picture &quot;one&quot;\")\n\nWith note[^fn-1] and end[^en-2]\n\n[^fn-1]: note \\& \\*body\\*\n[^en-2]: end note\n";
+    let expected = "Before [**site \\[x\\]**](<https://example.test/a%20b> \"tip \\\"q\\\"\") after\n\n![alt \\[image\\]](<data:image/png;base64,iVBORw0KGgo=> \"Picture \\\"one\\\"\")\n\nWith note[^fn-1] and end[^en-2]\n\n[^fn-1]: note \\& \\*body\\*\n[^en-2]: end note\n";
     assert_eq!(document.to_markdown().unwrap(), expected);
     assert_eq!(source_document.to_markdown().unwrap(), expected);
 

@@ -55,7 +55,14 @@ const UTF8_BYTE_ORDER_MARK: &[u8] = b"\xEF\xBB\xBF";
 const UTF8_BYTE_ORDER_MARK_TEXT: &str = "\u{feff}";
 const MAX_DOCUMENT_DEPTH: usize = 256;
 const MAX_DOCUMENT_NODES: usize = 1_000_000;
-const MAX_OPERATIONS: usize = 4_096;
+/// Semantic operations one edit may stage (record 0251f raised it from
+/// 4,096 so a 10,000-paragraph fanout is one transaction; it matches the
+/// unified layer's expanded-target bound).
+const MAX_OPERATIONS: usize = 65_536;
+/// Runs a field-result scan visits in one paragraph.
+const MAX_FIELD_RUNS: usize = 4_096;
+/// Steps of one nested element path (content controls, tables).
+const MAX_PATH_STEPS: usize = 4_096;
 const MAX_REPLACEMENT_TEXT_BYTES: usize = 16 * 1024 * 1024;
 // The managed layout scanner owns each quick-xml event and grows bounded
 // layout indexes. `scan_text_owner` additionally retains one `TextSlot` for
@@ -7631,7 +7638,7 @@ fn scan_cached_field_runs(
                         has_direct_text,
                         marker,
                     });
-                    if runs.len() > MAX_OPERATIONS {
+                    if runs.len() > MAX_FIELD_RUNS {
                         return Err(Refusal::ComplexContent);
                     }
                 }
@@ -7660,7 +7667,7 @@ fn scan_cached_field_runs(
                         has_direct_text,
                         marker,
                     });
-                    if runs.len() > MAX_OPERATIONS {
+                    if runs.len() > MAX_FIELD_RUNS {
                         return Err(Refusal::ComplexContent);
                     }
                     run_capture = None;
@@ -10728,7 +10735,7 @@ fn select_complex_field_result(
 ) -> std::result::Result<Range, Refusal> {
     let mut active = Vec::<(usize, Option<usize>)>::new();
     let mut field_index = 0usize;
-    for run_index in 0..MAX_OPERATIONS {
+    for run_index in 0..MAX_FIELD_RUNS {
         let Ok(run) = select_direct_child(
             xml,
             b"p",
@@ -12026,10 +12033,10 @@ fn validate_path_length(length: usize, kind: super::LimitKind) -> Result<()> {
             reason: Refusal::ComplexContent,
         });
     }
-    if length > MAX_OPERATIONS {
+    if length > MAX_PATH_STEPS {
         return Err(Error::Limit {
             kind,
-            maximum: MAX_OPERATIONS,
+            maximum: MAX_PATH_STEPS,
             observed: length,
         });
     }

@@ -418,7 +418,13 @@ impl<'f> Node<'f> {
             ));
         }
         if cached.is_none() {
-            *cached = Some(super::nav::load_body(self.docx)?);
+            // A direct body paragraph was resolved from the body index of
+            // this owner's generation; reuse it rather than reading it again
+            // (record 0251f).
+            *cached = Some(match (&self.value, steps) {
+                (Value::Paragraph { block, .. }, [_, _]) => block.container.clone(),
+                _ => super::nav::load_body(self.docx)?,
+            });
         }
         let body = cached
             .as_ref()
