@@ -259,11 +259,7 @@ impl Docx {
                         "a source editor came from an eager DOCX owner",
                     ));
                 };
-                let owned = self.owner().finish(
-                    package
-                        .to_owned_package_preserving_source()
-                        .map_err(Error::from),
-                )?;
+                let owned = self.promoted(package)?;
                 Ok(DocxEditor::Edit(Box::new(owned.edit()?)))
             },
             editor => Ok(editor),

@@ -72,6 +72,10 @@ pub(crate) enum Command {
     /// Recalculate every formula and compare it with its cached value
     /// (record 0266).
     Recalculate(crate::m4::Recalculate),
+    /// Fill a DOCX, PPTX or XLSX template's `{{key}}` placeholders and Word
+    /// merge fields from JSON or CSV data, one output per record
+    /// (record 0274).
+    Merge(crate::merge::Merge),
 }
 
 /// What `set`, `add` and `batch` do with a property the target does not

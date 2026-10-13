@@ -1990,3 +1990,40 @@ names. No second grid type or alias is introduced.
 | `litchi_xls::CellCursor`, `SourceBackedWorksheet::cell_cursor() -> Result<Option<CellCursor>>` (items `SourceBackedCell`; `CellCursor::needs_formula_context`) | adopted (0267) |
 
 See [0267](unified-ops/0267-streaming-cell-cursors.md).
+
+## Unified template merge (record 0274)
+
+`File::merge(&merge::Record, &merge::Options)` and `File::merge_with_limits`
+fill a DOCX, PPTX or XLSX template's `{{key}}` placeholders (OfficeCLI's
+grammar) and, for DOCX, its `MERGEFIELD` fields from one record, as one
+mutation and at most one native commit, returning
+`transaction::Commit<merge::Summary>`; `transaction::Edit::merge` is the same
+mutation inside a closure transaction. `merge` is the design §13 verb name
+and always means template (mail) merge; document merging is a separate P2
+concern. Data sources are `merge::Data::{from_json, from_json_with_limits,
+from_csv, from_csv_with}` (records in source order); `merge::Record` is one
+record of text values. Options are one `merge::Options` (`missing`,
+`fields`) with `merge::Missing::{Keep, Empty}`; limits are the transaction's
+`SemanticLimits` (`max_expanded_targets` bounds replacements,
+`max_staged_bytes` bounds their payload and the data source), not a second
+limits type. Data failures are the focused, content-free `merge::Error`
+(`Json`, `TooDeep`, `NotAnObject`, `NotARecord`), classified `invalid_json`
+or `limit_exceeded`.
+
+The DOCX leaf gains a formatting-preserving story substitution beside the
+main-document edit: `document::Edit::{story, substitute}` for the main
+document and `document::Edit<Package>::{story_parts, part_story,
+substitute_part}` for headers, footers, notes and comments, over the types of
+the `document::substitute` module. A source-backed handle materializes its
+owning package once for these writes (`Docx` keeps the promotion).
+
+| Name | Status |
+|---|---|
+| `File::{merge, merge_with_limits}`, `transaction::Edit::merge` | adopted (0274) |
+| `merge::{Record, Data, Options, Missing, Summary, Error}` | adopted (0274) |
+| `capabilities::Verb::Merge` | adopted (0274) |
+| `litchi_docx::document::Edit::{story, substitute}`; `Edit<Package>::{story_parts, part_story, substitute_part}` | adopted (0274) |
+| `litchi_docx::document::substitute::{Story, Paragraph, Field, FieldKind, Replacement, Outcome, OBJECT}` | adopted (0274) |
+| CLI `litchi merge`, Python `File.merge` | adopted (0274) |
+
+See [0274](unified-ops/0274-template-merge.md).

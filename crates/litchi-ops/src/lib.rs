@@ -111,6 +111,7 @@ pub mod import;
 mod locked;
 #[cfg(feature = "markdown")]
 mod markdown;
+pub mod merge;
 pub mod new_node;
 pub mod node;
 #[cfg(any(

@@ -47,6 +47,12 @@
       "followUp": "none: import and evaluation are worksheet operations",
       "reason": "this format has no worksheets"
     },
+    "merge": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "template merge for XLSB and the legacy, RTF and ODF formats (record 0274 F1)",
+      "reason": "template merge fills DOCX, PPTX and XLSX templates"
+    },
     "save": {
       "supported": true
     },

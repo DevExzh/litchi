@@ -2635,6 +2635,7 @@ fn property_error(error: Error, key: &crate::props::Key<'_>) -> Error {
 /// pair.
 /// CSV/TSV import through one native edit (record 0266).
 pub(crate) mod import;
+pub(crate) mod merge;
 
 pub(crate) mod coalesce {
     use super::{CellOperation, CellTarget, Xlsx, admit_properties_with_limits, native_error};
