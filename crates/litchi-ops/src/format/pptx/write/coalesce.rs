@@ -233,7 +233,7 @@ fn shape_plan(
         return Ok(None);
     };
     let values = admit_shape_props(props, limits)?;
-    if values.text.is_none() && !values.has_geometry() {
+    if !values.format.is_empty() || values.text.is_none() && !values.has_geometry() {
         return Ok(None);
     }
     bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;

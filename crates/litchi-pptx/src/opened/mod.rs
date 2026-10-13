@@ -12,12 +12,14 @@ mod copy_plan;
 pub(crate) mod cross_copy_plan;
 mod geometry;
 mod insert;
+mod limit;
 mod model;
 mod patch;
 mod properties;
 mod removal_proof;
 mod remove_plan;
 mod slide_properties;
+mod text_format;
 mod transaction;
 mod xml;
 
@@ -28,16 +30,30 @@ mod slide_root_memo_tests;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
+mod text_format_tests;
+#[cfg(test)]
 mod text_run_tests;
 
+/// The failure type of this transaction family.
+///
+/// The family reports the crate's [`crate::Error`]; resource refusals of the
+/// family's own [`Limits`] use [`crate::Error::EditLimit`] with a
+/// [`LimitKind`]. Splitting a focused error out of the crate error is
+/// deferred (record 0252).
+pub use crate::Error;
 pub use copy_plan::{SlideCopyPart, SlideCopyPlan};
 pub use cross_copy_plan::{CrossSlideCopyPatch, CrossSlideCopyPlan};
+pub use limit::LimitKind;
 pub use model::{
     Limits, MAX_SHAPE_PROPERTIES_REPLACEMENTS, MAX_SHAPE_TEXT_REPLACEMENTS,
     ShapePropertiesReplacement, ShapeTextReplacement, Slide, Snapshot,
 };
 pub use patch::{Conflict, History, Patch, Resolution, ThreeWayPlan};
 pub use remove_plan::{SlideRemovalPatch, SlideRemovalPlan};
+pub(crate) use text_format::stage_text_properties;
+pub use text_format::{
+    MAX_FONT_SIZE, MAX_TYPEFACE_BYTES, MIN_FONT_SIZE, Rgb, TextEdit, TextProperties, TextTarget,
+};
 pub use transaction::{Commit, Diagnostics, Edit};
 
 pub(crate) use chunks::{

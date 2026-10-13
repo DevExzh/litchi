@@ -23,7 +23,7 @@ fails while a golden differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/capabilities/xlsx.json` | `402174221748379047c6fd6cd6b5b7e89abb558f32f31e174b4ef03934be5549` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/xlsb.json` | `457978593767efb194d16b90d471bc8ced452f7bba01ce44079bbf9edd5d37d9` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/xls.json` | `0c1d087c21028c60fd6ef79c2d6df73b31826f95b48cc12cbf6f8d57193d56df` |
-| golden | `crates/litchi-ops/tests/golden/capabilities/pptx.json` | `84c920422d0df779f7e7a1b96ea8c63a4187c45197121f402fbdc390b8bf1c5c` |
+| golden | `crates/litchi-ops/tests/golden/capabilities/pptx.json` | `58f45996cc67524648c3a73cebd9d0a468201af3e1e820ee83c7d559a5aa42f6` |
 | officecli | `schemas/help` (152 files, OfficeCLI commit `dced0d74`) | `0bcd8cae45fabc0c5e45ff99d1994465fb213ac1b8db3f7eadd87339fb40ced4` |
 
 ## Statuses
@@ -62,7 +62,7 @@ Properties:
 | xlsx | 89 | 16 | 489 | 0 | 18 | 1 | 78 | 62 |
 | xlsb | 56 | 45 | 489 | 0 | 22 | 1 | 78 | 2 |
 | xls | 18 | 17 | 509 | 0 | 22 | 1 | 124 | 0 |
-| pptx | 153 | 31 | 113 | 0 | 110 | 0 | 280 | 156 |
+| pptx | 164 | 30 | 113 | 0 | 109 | 0 | 271 | 157 |
 
 ## docx
 
@@ -3899,19 +3899,20 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | paragraph | `marginLeft` | length | asg | supported |  |
 | paragraph | `marginRight` | length | asg | supported |  |
 | paragraph | `lineRule` | enum | --- | write-only | M2 |
-| paragraph | `bold` | bool | asg | missing |  |
-| paragraph | `italic` | bool | asg | missing |  |
-| paragraph | `color` | color | asg | missing |  |
+| paragraph | `bold` | bool | asg | supported |  |
+| paragraph | `italic` | bool | asg | supported |  |
+| paragraph | `color` | color | asg | supported |  |
 | paragraph | `size` | length | asg | supported |  |
 | paragraph | `lang` | string | asg | missing |  |
 | paragraph | `list` | string | asg | gap | M1-extended |
 | paragraph | `tabs` | string | asg | missing |  |
 | paragraph | `indent` | length | asg | supported |  |
 | paragraph | `lineSpacing` | string | asg | supported |  |
-| paragraph | `text` | string | asg | supported | the node's text |
+| paragraph | `text` | string | asg | supported |  |
 | paragraph | `direction` | enum |  | litchi-only |  |
 | paragraph | `spaceBefore` | length |  | litchi-only |  |
 | paragraph | `spaceAfter` | length |  | litchi-only |  |
+| paragraph | `font` | string |  | litchi-only |  |
 | picture | `id` | number | a-g | missing |  |
 | picture | `mediaType` | string | --g | gap | L-PPTX-R11 |
 | picture | `x` | length | asg | supported |  |
@@ -4042,7 +4043,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | presentation | `theme.fontScheme` | string | --g | missing |  |
 | presentation | `theme.formatScheme` | string | --g | missing |  |
 | presentation | `theme.name` | string | --g | missing |  |
-| run | `font` | string | as- | write-only | M2 |
+| run | `font` | string | as- | supported |  |
 | run | `baseline` | string | asg | supported |  |
 | run | `highlight` | color | asg | supported |  |
 | run | `kern` | int | asg | supported |  |
@@ -4063,7 +4064,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | run | `color` | color | asg | supported |  |
 | run | `italic` | bool | asg | supported |  |
 | run | `size` | font-size | asg | supported |  |
-| run | `text` | string | asg | supported | the node's text |
+| run | `text` | string | asg | supported |  |
 | run | `font.latin` | string |  | litchi-only |  |
 | run | `font.ea` | string |  | litchi-only |  |
 | run | `font.cs` | string |  | litchi-only |  |
@@ -4281,7 +4282,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | slidemaster | `marginLeft` | length |  | litchi-only |  |
 | slidemaster | `marginRight` | length |  | litchi-only |  |
 | slidemaster | `text` | string |  | litchi-only |  |
-| cell | `text` | string | -sg | supported | the node's text |
+| cell | `text` | string | -sg | supported |  |
 | cell | `colspan` | number | -sg | gap | L-PPTX-R8 |
 | cell | `rowspan` | number | -sg | gap | L-PPTX-R8 |
 | cell | `padding.left` | string | --g | missing |  |
@@ -4301,15 +4302,15 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | cell | `linespacing` | string | -sg | missing |  |
 | cell | `spacebefore` | string | -sg | missing |  |
 | cell | `spaceafter` | string | -sg | missing |  |
-| cell | `align` | string | -sg | missing |  |
-| cell | `font` | string | -sg | missing |  |
-| cell | `size` | string | -sg | missing |  |
-| cell | `bold` | bool | -sg | missing |  |
-| cell | `italic` | bool | -sg | missing |  |
+| cell | `align` | string | -sg | supported |  |
+| cell | `font` | string | -sg | supported |  |
+| cell | `size` | string | -sg | supported |  |
+| cell | `bold` | bool | -sg | supported |  |
+| cell | `italic` | bool | -sg | supported |  |
 | cell | `underline` | string | -sg | missing |  |
 | cell | `strike` | string | -sg | missing |  |
-| cell | `color` | color | -sg | missing |  |
-| cell | `fill` | color | asg | gap | L-PPTX-R8 |
+| cell | `color` | color | -sg | supported |  |
+| cell | `fill` | color | asg | supported |  |
 | cell | `baseline` | number | --g | missing |  |
 | cell | `hmerge` | bool | --g | missing |  |
 | cell | `vmerge` | bool | --g | missing |  |

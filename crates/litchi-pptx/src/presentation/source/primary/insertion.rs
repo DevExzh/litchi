@@ -98,9 +98,9 @@ pub(super) fn plan(
         }
     }
     if effective_parts >= package.owner.limits.max_parts() {
-        return Err(Error::Limit {
-            resource: "source-backed primary insertion package parts",
-            limit: package.owner.limits.max_parts(),
+        return Err(Error::EditLimit {
+            kind: crate::opened::LimitKind::Parts,
+            maximum: package.owner.limits.max_parts(),
         });
     }
 

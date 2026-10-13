@@ -1180,7 +1180,9 @@
           "replacement": "Error::PatchConflict (ADR 0034 §6; record 0252)"
         }
       ],
-      "families": []
+      "families": [
+        "litchi_pptx::opened"
+      ]
     },
     {
       "id": "pptx-full",
@@ -1708,7 +1710,9 @@
           "replacement": "Error::PatchConflict (ADR 0034 §6; record 0252)"
         }
       ],
-      "families": []
+      "families": [
+        "litchi_pptx::opened"
+      ]
     },
     {
       "id": "xlsx-minimal",

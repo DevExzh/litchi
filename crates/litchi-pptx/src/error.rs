@@ -305,6 +305,16 @@ pub enum Error {
         limit: usize,
     },
 
+    /// A primary presentation transaction exceeded one dimension of its
+    /// [`crate::opened::Limits`].
+    #[error("PresentationML edit exceeds its {kind} limit of {maximum}")]
+    EditLimit {
+        /// The refused dimension.
+        kind: crate::opened::LimitKind,
+        /// Active upper bound.
+        maximum: usize,
+    },
+
     /// A bounded `PresentationML` operation could not reserve required memory.
     #[error("could not reserve memory for PresentationML {resource}: {source}")]
     Allocation {

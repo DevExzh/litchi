@@ -1425,6 +1425,23 @@ impl Edit {
         )
     }
 
+    /// Apply a bounded batch of rich text edits to one effective slide.
+    ///
+    /// The edits have the semantics of
+    /// [`crate::opened::Edit::set_text_properties`]; they compose with
+    /// earlier staged changes and participate in source-local replay.
+    pub fn set_text_properties(
+        &mut self,
+        slide: impl Into<Position>,
+        edits: &[crate::opened::TextEdit<'_>],
+    ) -> Result<usize> {
+        self.stage_slide_edit(
+            slide.into(),
+            |_package, _snapshot| Ok(None),
+            |edit| edit.set_text_properties(edits),
+        )
+    }
+
     fn stage_slide_edit(
         &mut self,
         logical: Position,

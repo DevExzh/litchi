@@ -82,7 +82,9 @@ impl Pptx {
                             ShapeSetter::Y => (1, "y"),
                             ShapeSetter::Width => (2, "width"),
                             ShapeSetter::Height => (3, "height"),
-                            ShapeSetter::Text => unreachable!("handled text"),
+                            ShapeSetter::Text | ShapeSetter::Format(_) => {
+                                unreachable!("text and formatting are not add setters")
+                            },
                         };
                         if geometry[index].is_some() {
                             return Err(error(

@@ -2321,9 +2321,9 @@ fn slide_copy_plan_refuses_global_tables_and_enforces_closure_limits() -> Result
         limited
             .opened_presentation_with_limits(limits)?
             .plan_slide_copy(0_usize, 1),
-        Err(Error::Limit {
-            resource: "slide-copy dependency parts",
-            limit: 1,
+        Err(Error::EditLimit {
+            kind: crate::opened::LimitKind::Parts,
+            ..
         })
     ));
     Ok(())
@@ -2689,8 +2689,8 @@ fn slide_copy_application_refuses_result_limit_and_nonempty_slide_id() -> Result
         package
             .opened_presentation_with_limits(limits)?
             .plan_slide_copy(0_usize, 1),
-        Err(Error::Limit {
-            resource: "slide-copy resulting package parts",
+        Err(Error::EditLimit {
+            kind: crate::opened::LimitKind::Parts,
             ..
         })
     ));
@@ -3220,9 +3220,9 @@ fn slide_removal_plan_refuses_policy_surfaces_bounds_and_stale_graphs() -> Resul
         limited
             .opened_presentation_with_limits(limits)?
             .plan_slide_removal(0_usize),
-        Err(Error::Limit {
-            resource: "slide-removal planned bytes",
-            limit: 1,
+        Err(Error::EditLimit {
+            kind: crate::opened::LimitKind::PatchBytes,
+            ..
         })
     ));
 

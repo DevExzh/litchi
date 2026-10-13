@@ -142,7 +142,7 @@ fn failed_insertion_preserves_prior_staged_edits() {
     let mut bounded = root.edit();
     assert!(matches!(
         bounded.insert_slide(Position::new(0), &layout),
-        Err(Error::Limit { .. }) | Err(Error::Opc(_))
+        Err(Error::Limit { .. } | Error::EditLimit { .. } | Error::Opc(_))
     ));
     assert!(bounded.commit().unwrap().patch().is_noop());
 }

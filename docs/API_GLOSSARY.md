@@ -1522,3 +1522,22 @@ constructors remain a pending migration. `Error::StaleSource` is renamed
 `Error::PatchConflict`. Both PPTX profiles ban the removed names, and
 pptx-full now carries the primary-transaction bans pptx-minimal had.
 See [record 0252](unified-ops/0252-pptx-w2-residue-and-p0-writes.md).
+
+## PPTX primary family completion and rich text edits (0252)
+
+`litchi_pptx::opened` now exports the complete family
+`{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` and is registered in
+both PPTX glossary profiles. `opened::Error` is the crate `Error` re-exported
+(a focused split of the PPTX god-enum is deferred); the family's own resource
+refusals use the typed `Error::EditLimit { kind: opened::LimitKind, maximum }`
+instead of a resource string, and `Limits::maximum(LimitKind)` reads one bound.
+
+Rich formatting of existing text bodies uses one verb on every primary edit:
+`opened::Edit::set_text_properties(slide, &[TextEdit])`,
+`source::Edit::set_text_properties(slide, &[TextEdit])` and the focused
+`SourceBackedSlideEdit::set_text_properties(&[TextEdit])`. A `TextEdit`
+pairs a `TextTarget` (`Shape`, `Paragraph`, `Run`, `Cell`, all checked
+`Position`s) with `TextProperties` built by `with_*` setters whose
+`Option<Option<_>>` arguments distinguish omission, removal and replacement.
+`table::Cell::fill()` reads a cell's local RGB fill. No parallel transaction
+type or mutable writer is introduced.

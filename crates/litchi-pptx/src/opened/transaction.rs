@@ -565,6 +565,46 @@ impl Edit {
         Ok(changed)
     }
 
+    /// Apply a bounded batch of rich text edits to one slide, in order.
+    ///
+    /// Targets are a shape's whole text body, one paragraph, one run, or one
+    /// table cell (see [`super::TextTarget`]); properties are run formatting
+    /// (bold, italic, size, colour, typefaces), paragraph alignment,
+    /// paragraph/run/cell text and cell fill. Untouched markup keeps its
+    /// exact bytes. The candidate slide is read back as a complete scene
+    /// with unchanged shape identities before the transaction changes. The
+    /// return value is the number of edits that changed bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an out-of-range shape, paragraph, run, row or
+    /// cell, a target without a text body, a property that does not apply
+    /// to the target, an invalid value, markup-compatibility branch
+    /// selection on the slide, or an exhausted limit. A failed batch leaves
+    /// the transaction unchanged.
+    pub fn set_text_properties<'s>(
+        &mut self,
+        slide: impl Into<crate::slide::Selector<'s>>,
+        edits: &[super::TextEdit<'_>],
+    ) -> Result<usize> {
+        let selected_slide = self.resolve_slide(slide.into())?;
+        let owner = self.working.get_part(&selected_slide.part_name)?;
+        crate::parts::validate_content_type(owner, litchi_opc::constants::content_type::PML_SLIDE)?;
+        let (xml, changed) = super::stage_text_properties(
+            owner.blob(),
+            edits,
+            self.source.limits.max_text_bytes(),
+            crate::shape::Limits::DEFAULT.output_bytes(),
+        )?;
+        if let Some(xml) = xml {
+            self.working
+                .get_part_mut(&selected_slide.part_name)?
+                .set_blob(xml);
+            self.note_scene_read(&selected_slide.part_name);
+        }
+        Ok(changed)
+    }
+
     /// Atomically replace text and/or bounds from several already bounded
     /// same-slide property batches in one scene read, rewrite, and read-back.
     /// Each inner slice retains the ordinary per-call property limits.
@@ -676,9 +716,9 @@ impl Edit {
             ));
         }
         if resource.data.len() > self.source.limits.max_patch_bytes() {
-            return Err(Error::Limit {
-                resource: "opened-presentation picture bytes",
-                limit: self.source.limits.max_patch_bytes(),
+            return Err(Error::EditLimit {
+                kind: crate::opened::LimitKind::PatchBytes,
+                maximum: self.source.limits.max_patch_bytes(),
             });
         }
         if !resource.content_type.starts_with("image/") {
@@ -840,9 +880,9 @@ impl Edit {
                 continue;
             }
             if included_roots.len() > self.source.limits.max_parts() {
-                return Err(Error::Limit {
-                    resource: "opened-presentation transferred shape roots",
-                    limit: self.source.limits.max_parts(),
+                return Err(Error::EditLimit {
+                    kind: crate::opened::LimitKind::Parts,
+                    maximum: self.source.limits.max_parts(),
                 });
             }
             let root = source_roots
@@ -977,9 +1017,9 @@ impl Edit {
             return Ok(false);
         }
         if text.len() > self.source.limits.max_text_bytes() {
-            return Err(Error::Limit {
-                resource: "opened-presentation notes text bytes",
-                limit: self.source.limits.max_text_bytes(),
+            return Err(Error::EditLimit {
+                kind: crate::opened::LimitKind::TextBytes,
+                maximum: self.source.limits.max_text_bytes(),
             });
         }
         let part_name = PackURI::new(note.part())
@@ -2298,9 +2338,9 @@ pub(crate) fn validate_text_box_input(text: &str, bounds: (i64, i64, i64, i64)) 
 
 fn validate_shape_text(text: &str, limits: super::Limits, label: &str) -> Result<()> {
     if text.len() > limits.max_text_bytes() {
-        return Err(Error::Limit {
-            resource: "opened-presentation shape text bytes",
-            limit: limits.max_text_bytes(),
+        return Err(Error::EditLimit {
+            kind: crate::opened::LimitKind::TextBytes,
+            maximum: limits.max_text_bytes(),
         });
     }
     if !text.chars().all(is_xml_char) {
@@ -2483,9 +2523,9 @@ fn table_fragment(
         .try_fold(0usize, |total, cell| total.checked_add(cell.len()))
         .ok_or_else(|| invalid("opened-presentation table text size overflow"))?;
     if text_bytes > limits.max_text_bytes() {
-        return Err(Error::Limit {
-            resource: "opened-presentation table text bytes",
-            limit: limits.max_text_bytes(),
+        return Err(Error::EditLimit {
+            kind: crate::opened::LimitKind::TextBytes,
+            maximum: limits.max_text_bytes(),
         });
     }
     if !cells

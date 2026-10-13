@@ -491,6 +491,41 @@ fn xlsx_reports_keep_selection_semantic_and_declare_cell_and_sheet_writes() {
 }
 
 #[cfg(feature = "pptx")]
+/// Rich text setters of record 0252.
+fn pptx_text_format_set(element: &str, property: &str) -> bool {
+    match element {
+        "shape" | "placeholder" => matches!(
+            property,
+            "bold" | "italic" | "size" | "color" | "font" | "font.latin" | "align"
+        ),
+        "paragraph" => matches!(
+            property,
+            "align" | "size" | "text" | "bold" | "italic" | "color" | "font"
+        ),
+        "run" => matches!(
+            property,
+            "font.latin" | "size" | "bold" | "italic" | "color" | "text" | "font"
+        ),
+        "tc" => matches!(
+            property,
+            "fill" | "text" | "bold" | "italic" | "size" | "color" | "font" | "align"
+        ),
+        _ => false,
+    }
+}
+
+#[cfg(feature = "pptx")]
+/// Write-only rich text entries (no ordinary read of the same key).
+fn pptx_write_only(element: &str, property: &str) -> bool {
+    match element {
+        "paragraph" => matches!(property, "text" | "bold" | "italic" | "color" | "font"),
+        "run" => matches!(property, "text" | "font"),
+        "tc" => property != "fill",
+        _ => false,
+    }
+}
+
+#[cfg(feature = "pptx")]
 #[test]
 fn pptx_reports_selection_and_structural_writes() {
     let caps = Capabilities::of(FileFormat::Pptx);
@@ -509,13 +544,19 @@ fn pptx_reports_selection_and_structural_writes() {
         for property in element.properties() {
             let text_write =
                 matches!(element.name(), "shape" | "placeholder") && property.name() == "text";
-            assert_eq!(property.get(), !text_write, "{}", property.name());
+            assert_eq!(
+                property.get(),
+                !text_write && !pptx_write_only(element.name(), property.name()),
+                "{}",
+                property.name()
+            );
             let shape_geometry_write = matches!(element.name(), "shape" | "placeholder")
                 && matches!(property.name(), "x" | "y" | "width" | "height");
             assert_eq!(
                 property.set(),
                 text_write
                     || shape_geometry_write
+                    || pptx_text_format_set(element.name(), property.name())
                     || (element.name() == "slide" && matches!(property.name(), "name" | "hidden")),
                 "{}",
                 property.name()
@@ -573,7 +614,8 @@ fn pptx_reports_selection_and_structural_writes() {
         assert!(!property.add(), "{}", property.name());
         assert_eq!(
             property.set(),
-            matches!(property.name(), "text" | "x" | "y" | "width" | "height"),
+            matches!(property.name(), "text" | "x" | "y" | "width" | "height")
+                || pptx_text_format_set("placeholder", property.name()),
             "{}",
             property.name()
         );
@@ -872,7 +914,8 @@ fn pptx_structural_capabilities_follow_owner_and_retention_policy() {
     for property in source_caps.element("shape").unwrap().properties() {
         let add = matches!(property.name(), "text" | "x" | "y" | "width" | "height");
         assert_eq!(property.add(), add, "{}", property.name());
-        let set = matches!(property.name(), "text" | "x" | "y" | "width" | "height");
+        let set = matches!(property.name(), "text" | "x" | "y" | "width" | "height")
+            || pptx_text_format_set("shape", property.name());
         assert_eq!(property.set(), set, "{}", property.name());
     }
     assert!(!source_caps.element("placeholder").unwrap().operations().add);
@@ -887,7 +930,8 @@ fn pptx_structural_capabilities_follow_owner_and_retention_policy() {
         assert!(!property.add(), "{}", property.name());
         assert_eq!(
             property.set(),
-            matches!(property.name(), "text" | "x" | "y" | "width" | "height"),
+            matches!(property.name(), "text" | "x" | "y" | "width" | "height")
+                || pptx_text_format_set("placeholder", property.name()),
             "{}",
             property.name()
         );
@@ -957,7 +1001,8 @@ fn pptx_structural_capabilities_follow_owner_and_retention_policy() {
     for property in eager_caps.element("shape").unwrap().properties() {
         let add = matches!(property.name(), "text" | "x" | "y" | "width" | "height");
         assert_eq!(property.add(), add, "{}", property.name());
-        let set = matches!(property.name(), "text" | "x" | "y" | "width" | "height");
+        let set = matches!(property.name(), "text" | "x" | "y" | "width" | "height")
+            || pptx_text_format_set("shape", property.name());
         assert_eq!(property.set(), set, "{}", property.name());
     }
     assert!(eager_caps.element("shape").unwrap().operations().remove);
@@ -973,7 +1018,8 @@ fn pptx_structural_capabilities_follow_owner_and_retention_policy() {
         assert!(!property.add(), "{}", property.name());
         assert_eq!(
             property.set(),
-            matches!(property.name(), "text" | "x" | "y" | "width" | "height"),
+            matches!(property.name(), "text" | "x" | "y" | "width" | "height")
+                || pptx_text_format_set("placeholder", property.name()),
             "{}",
             property.name()
         );

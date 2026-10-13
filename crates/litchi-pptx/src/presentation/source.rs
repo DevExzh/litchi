@@ -3180,6 +3180,35 @@ impl SourceBackedSlideEdit {
         Ok(changed)
     }
 
+    /// Apply a bounded batch of rich text edits to this exact source slide.
+    ///
+    /// See [`crate::opened::Edit::set_text_properties`]. Only the selected
+    /// slide payload changes, so the source-backed proof path still applies.
+    pub fn set_text_properties(&mut self, edits: &[crate::opened::TextEdit<'_>]) -> Result<usize> {
+        self.check_execution()?;
+        if edits.is_empty() {
+            return Ok(0);
+        }
+        if self.operation_used {
+            return Err(Error::UnsafeEdit {
+                operation: "set_text_properties",
+                reason: "source-backed slide edits support one atomic semantic operation",
+            });
+        }
+        let (xml, changed) = crate::opened::stage_text_properties(
+            self.working.as_bytes(),
+            edits,
+            crate::opened::Limits::default().max_text_bytes(),
+            self.source.max_output_bytes,
+        )?;
+        self.check_execution()?;
+        if let Some(xml) = xml {
+            self.working = SourcePayload::Edited(Arc::new(xml));
+        }
+        self.operation_used = true;
+        Ok(changed)
+    }
+
     /// Add one plain DrawingML text box to this exact source slide.
     ///
     /// The operation is staged against the retained slide bytes and then
@@ -3616,22 +3645,22 @@ impl SourceBackedSlideBatchEdit<'_> {
             .try_fold(0_usize, |total, replacement| {
                 total
                     .checked_add(replacement.text().len())
-                    .ok_or(Error::Limit {
-                        resource: "source-backed slide batch replacement text",
-                        limit: crate::opened::Limits::default().max_text_bytes(),
+                    .ok_or(Error::EditLimit {
+                        kind: crate::opened::LimitKind::TextBytes,
+                        maximum: crate::opened::Limits::default().max_text_bytes(),
                     })
             })?;
         let text_bytes = self
             .text_bytes
             .checked_add(added_text_bytes)
-            .ok_or(Error::Limit {
-                resource: "source-backed slide batch replacement text",
-                limit: crate::opened::Limits::default().max_text_bytes(),
+            .ok_or(Error::EditLimit {
+                kind: crate::opened::LimitKind::TextBytes,
+                maximum: crate::opened::Limits::default().max_text_bytes(),
             })?;
         if text_bytes > crate::opened::Limits::default().max_text_bytes() {
-            return Err(Error::Limit {
-                resource: "source-backed slide batch replacement text",
-                limit: crate::opened::Limits::default().max_text_bytes(),
+            return Err(Error::EditLimit {
+                kind: crate::opened::LimitKind::TextBytes,
+                maximum: crate::opened::Limits::default().max_text_bytes(),
             });
         }
 

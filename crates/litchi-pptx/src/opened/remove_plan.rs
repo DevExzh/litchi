@@ -296,9 +296,9 @@ impl Snapshot {
             );
         }
         if self.package.part_count() > self.limits.max_parts() {
-            return Err(Error::Limit {
-                resource: "slide-removal package parts",
-                limit: self.limits.max_parts(),
+            return Err(Error::EditLimit {
+                kind: crate::opened::LimitKind::Parts,
+                maximum: self.limits.max_parts(),
             });
         }
         map_copy_refusal(reject_unknown_non_part_members(
@@ -365,9 +365,9 @@ impl Snapshot {
             .and_then(|bytes| bytes.checked_add(selected.part_name.as_str().len()))
             .ok_or_else(|| invalid("slide-removal planned byte count overflow"))?;
         if planned_bytes > self.limits.max_patch_bytes() {
-            return Err(Error::Limit {
-                resource: "slide-removal planned bytes",
-                limit: self.limits.max_patch_bytes(),
+            return Err(Error::EditLimit {
+                kind: crate::opened::LimitKind::PatchBytes,
+                maximum: self.limits.max_patch_bytes(),
             });
         }
 

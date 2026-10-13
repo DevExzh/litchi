@@ -445,13 +445,13 @@
         "font": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "font.latin": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "font.ea": {
@@ -469,19 +469,19 @@
         "size": {
           "type": "font-size",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "bold": {
           "type": "bool",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "italic": {
           "type": "bool",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "cap": {
@@ -547,7 +547,7 @@
         "color": {
           "type": "color",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "flipH": {
@@ -586,7 +586,7 @@
             "thaiDist"
           ],
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "lineSpacing": {
@@ -753,13 +753,13 @@
         "font": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "font.latin": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "font.ea": {
@@ -777,19 +777,19 @@
         "size": {
           "type": "font-size",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "bold": {
           "type": "bool",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "italic": {
           "type": "bool",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "cap": {
@@ -855,7 +855,7 @@
         "color": {
           "type": "color",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "flipH": {
@@ -894,7 +894,7 @@
             "thaiDist"
           ],
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "lineSpacing": {
@@ -1238,7 +1238,65 @@
           "/slide[N]/table[N]/tr[N]/tc[N]"
         ]
       },
-      "properties": {},
+      "properties": {
+        "fill": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "bold": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "italic": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "size": {
+          "type": "font-size",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "color": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "align": {
+          "type": "enum",
+          "values": [
+            "left",
+            "center",
+            "right",
+            "justify",
+            "justLow",
+            "dist",
+            "thaiDist"
+          ],
+          "add": false,
+          "set": true,
+          "get": false
+        }
+      },
       "predicates": {
         "keys": [
           "style",
@@ -1789,7 +1847,7 @@
             "thaiDist"
           ],
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "level": {
@@ -1847,8 +1905,38 @@
         "size": {
           "type": "font-size",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "bold": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "italic": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "color": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
         }
       },
       "predicates": {
@@ -1884,7 +1972,7 @@
         "font.latin": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "font.ea": {
@@ -1902,19 +1990,19 @@
         "size": {
           "type": "font-size",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "bold": {
           "type": "bool",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "italic": {
           "type": "bool",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "underline": {
@@ -1969,7 +2057,7 @@
         "color": {
           "type": "color",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "highlight": {
@@ -2000,6 +2088,18 @@
           "add": false,
           "set": false,
           "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
         }
       },
       "predicates": {
@@ -3182,14 +3282,6 @@
       "subject": "property",
       "element": "tc",
       "key": "rowspan",
-      "code": "unsupported_capability",
-      "followUp": "L-PPTX-R8",
-      "reason": "the table reader does not read cell properties yet"
-    },
-    {
-      "subject": "property",
-      "element": "tc",
-      "key": "fill",
       "code": "unsupported_capability",
       "followUp": "L-PPTX-R8",
       "reason": "the table reader does not read cell properties yet"

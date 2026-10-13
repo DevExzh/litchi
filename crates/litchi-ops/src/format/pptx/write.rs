@@ -1,6 +1,7 @@
 //! Immutable native shape writes; no XML editing in the facade.
 pub(crate) mod coalesce;
 mod slides;
+mod text;
 use super::node::Item;
 use super::spec::{Kind, SHAPE_WRITE_TABLE, ShapeSetter};
 use super::{Editable, Nav, Pptx};
@@ -55,6 +56,8 @@ impl Editable {
 pub(super) struct ShapeValues {
     pub(super) text: Option<String>,
     pub(super) geometry: [Option<i64>; 4],
+    /// Rich formatting for every paragraph and run of the text body.
+    pub(super) format: text::TextValues,
 }
 
 impl ShapeValues {
@@ -72,6 +75,11 @@ impl ShapeValues {
                 0
             })
             .saturating_add(2 * size_of::<usize>())
+            .saturating_add(if self.format.is_empty() {
+                0
+            } else {
+                self.format.charge()
+            })
     }
 }
 
@@ -83,6 +91,7 @@ pub(super) fn admit_shape_props(props: &Props<'_>, limits: &SemanticLimits) -> R
     let mut values = ShapeValues {
         text: None,
         geometry: [None; 4],
+        format: text::TextValues::default(),
     };
     // The PPTX table currently has fewer than 64 canonical entries.  A bit
     // set keeps duplicate aliases allocation-free on the successful path
@@ -119,7 +128,9 @@ pub(super) fn admit_shape_props(props: &Props<'_>, limits: &SemanticLimits) -> R
                         ShapeSetter::Y => 1,
                         ShapeSetter::Width => 2,
                         ShapeSetter::Height => 3,
-                        ShapeSetter::Text => unreachable!("shape text setter"),
+                        ShapeSetter::Text | ShapeSetter::Format(_) => {
+                            unreachable!("shape text setter")
+                        },
                     };
                     values.geometry[index] = Some(value.emu());
                 },
@@ -140,6 +151,7 @@ pub(super) fn admit_shape_props(props: &Props<'_>, limits: &SemanticLimits) -> R
                     owned.push_str(value);
                     values.text = Some(owned);
                 },
+                ShapeSetter::Format(setter) => values.format.stage(setter, value, limits)?,
             }
             Ok(())
         })?;
@@ -173,6 +185,9 @@ impl Pptx {
         props: Props<'_>,
         limits: &SemanticLimits,
     ) -> Result<Commit> {
+        if let Some(kind) = text::classify(&target) {
+            return self.set_text(target, kind, &props, limits);
+        }
         if slides::accepts(&target, &props) {
             return self.set_slide_properties(target, &props, limits);
         }
@@ -315,6 +330,26 @@ impl Pptx {
                         Ok(())
                     })?;
                 }
+                if !values.format.is_empty() {
+                    let properties = values.format.properties();
+                    for group in targets.chunk_by(|left, right| left.slide == right.slide) {
+                        let mut edits = Vec::new();
+                        edits.try_reserve_exact(group.len()).map_err(allocation)?;
+                        edits.extend(group.iter().map(|target| {
+                            litchi_pptx::opened::TextEdit::new(
+                                litchi_pptx::opened::TextTarget::Shape {
+                                    shape: litchi_core::Position::new(target.position),
+                                },
+                                properties,
+                            )
+                        }));
+                        for chunk in
+                            edits.chunks(litchi_pptx::opened::MAX_SHAPE_PROPERTIES_REPLACEMENTS)
+                        {
+                            operations += edit.set_text_properties(group[0].slide, chunk)?;
+                        }
+                    }
+                }
                 let (target, patch) = edit.commit()?.into_parts();
                 let changed = !patch.is_noop();
                 (Editable::Source(target), Proof::Source(patch), changed)
@@ -339,6 +374,26 @@ impl Pptx {
                         };
                         Ok(())
                     })?;
+                }
+                if !values.format.is_empty() {
+                    let properties = values.format.properties();
+                    for group in targets.chunk_by(|left, right| left.slide == right.slide) {
+                        let mut edits = Vec::new();
+                        edits.try_reserve_exact(group.len()).map_err(allocation)?;
+                        edits.extend(group.iter().map(|target| {
+                            litchi_pptx::opened::TextEdit::new(
+                                litchi_pptx::opened::TextTarget::Shape {
+                                    shape: litchi_core::Position::new(target.position),
+                                },
+                                properties,
+                            )
+                        }));
+                        for chunk in
+                            edits.chunks(litchi_pptx::opened::MAX_SHAPE_PROPERTIES_REPLACEMENTS)
+                        {
+                            operations += edit.set_text_properties(group[0].slide, chunk)?;
+                        }
+                    }
                 }
                 let (target, patch) = edit.commit()?.into_parts();
                 let changed = !patch.is_noop();

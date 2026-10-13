@@ -704,9 +704,9 @@ impl CrossSlideCopyPatch {
         let copied_media = CopiedMedia::from_wire(input.u8()?)?;
         let payload_len = input.usize64("patch payload")?;
         if payload_len > limits.max_patch_bytes() {
-            return Err(Error::Limit {
-                resource: "cross-slide durable patch payload",
-                limit: limits.max_patch_bytes(),
+            return Err(Error::EditLimit {
+                kind: crate::opened::LimitKind::PatchBytes,
+                maximum: limits.max_patch_bytes(),
             });
         }
         let payload = input.take(payload_len)?;
@@ -1307,15 +1307,15 @@ fn prepare_cross_slide_copy_for_slides(
     validate_slide_ids(&destination.slides)?;
     let limits = intersect_limits(source.limits, destination.limits)?;
     if source.package.part_count() > limits.max_parts() {
-        return Err(Error::Limit {
-            resource: "cross-slide copy source package parts",
-            limit: limits.max_parts(),
+        return Err(Error::EditLimit {
+            kind: crate::opened::LimitKind::Parts,
+            maximum: limits.max_parts(),
         });
     }
     if destination.package.part_count() > limits.max_parts() {
-        return Err(Error::Limit {
-            resource: "cross-slide copy destination package parts",
-            limit: limits.max_parts(),
+        return Err(Error::EditLimit {
+            kind: crate::opened::LimitKind::Parts,
+            maximum: limits.max_parts(),
         });
     }
     crate::master_layout::validate_master_layout_graph(source.package.as_ref())?;
@@ -1391,15 +1391,15 @@ fn prepare_cross_slide_copy_for_slides(
         .checked_add(parts.len())
         .ok_or_else(|| invalid("cross-slide resulting part count overflow"))?;
     if resulting_parts > limits.max_parts() {
-        return Err(Error::Limit {
-            resource: "cross-slide resulting package parts",
-            limit: limits.max_parts(),
+        return Err(Error::EditLimit {
+            kind: crate::opened::LimitKind::Parts,
+            maximum: limits.max_parts(),
         });
     }
     if planned_bytes > limits.max_patch_bytes() {
-        return Err(Error::Limit {
-            resource: "cross-slide planned closure bytes",
-            limit: limits.max_patch_bytes(),
+        return Err(Error::EditLimit {
+            kind: crate::opened::LimitKind::PatchBytes,
+            maximum: limits.max_patch_bytes(),
         });
     }
     let slide_id = next_slide_id(&destination.slides)?;
@@ -2115,9 +2115,9 @@ fn preflight_parts(
     estimate: usize,
 ) -> Result<()> {
     if estimate > destination.limits.max_patch_bytes() {
-        return Err(Error::Limit {
-            resource: "cross-slide candidate patch bytes",
-            limit: destination.limits.max_patch_bytes(),
+        return Err(Error::EditLimit {
+            kind: crate::opened::LimitKind::PatchBytes,
+            maximum: destination.limits.max_patch_bytes(),
         });
     }
     let mut targets = HashSet::new();
@@ -2895,9 +2895,9 @@ fn physical_package_fingerprint(package: &OpcPackage, limits: Limits) -> Result<
     reject_unknown_non_part_members(package, "cross-slide physical authorization")?;
     if let Some(length) = package.exact_source_len() {
         if length > limits.max_patch_bytes() {
-            return Err(Error::Limit {
-                resource: "cross-slide serialized archive bytes",
-                limit: limits.max_patch_bytes(),
+            return Err(Error::EditLimit {
+                kind: crate::opened::LimitKind::PatchBytes,
+                maximum: limits.max_patch_bytes(),
             });
         }
         if let Some(digest) = package.exact_source_sha256() {
@@ -2920,9 +2920,9 @@ fn streamed_physical_revision(package: &OpcPackage, limits: Limits) -> Result<[u
     let mut sink = ArchiveHashWriter::new(limits.max_patch_bytes());
     let result = package.to_stream(&mut sink);
     if sink.exceeded {
-        return Err(Error::Limit {
-            resource: "cross-slide serialized archive bytes",
-            limit: limits.max_patch_bytes(),
+        return Err(Error::EditLimit {
+            kind: crate::opened::LimitKind::PatchBytes,
+            maximum: limits.max_patch_bytes(),
         });
     }
     result?;

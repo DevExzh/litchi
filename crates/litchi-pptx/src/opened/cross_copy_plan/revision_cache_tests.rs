@@ -144,8 +144,8 @@ fn snapshot_physical_revision_is_keyed_by_the_archive_bound() -> Result<()> {
     .ok_or_else(|| Error::Invalid("test limits are invalid".into()))?;
     assert!(matches!(
         snapshot_physical_revision(&snapshot, tiny),
-        Err(Error::Limit {
-            resource: "cross-slide serialized archive bytes",
+        Err(Error::EditLimit {
+            kind: crate::opened::LimitKind::PatchBytes,
             ..
         })
     ));

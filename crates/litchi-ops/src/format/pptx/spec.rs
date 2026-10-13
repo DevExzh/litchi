@@ -671,6 +671,13 @@ props! {
 }
 
 props! {
+    /// A table cell (`TableCellToNode`): its local solid fill.
+    CELL_PROPS, CellKey {
+        Fill = "fill": DRAWING_COLOR,
+    }
+}
+
+props! {
     /// Speaker notes (`PowerPointHandler.Query.cs` notes branch).
     NOTES_PROPS, NotesKey {
         Text = "text": ValueType::Text,
@@ -1054,7 +1061,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &[],
             &[],
             &["/slide[N]/table[N]/tr[N]/tc[N]"],
-            &[],
+            CELL_PROPS,
         ),
         element(
             Chart,
@@ -1419,12 +1426,6 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             "the table reader does not read cell properties yet",
         ),
         property_gap(
-            "tc",
-            "fill",
-            "L-PPTX-R8",
-            "the table reader does not read cell properties yet",
-        ),
-        property_gap(
             "chart",
             "chartType",
             "L-PPTX-R8",
@@ -1448,7 +1449,128 @@ pub(super) enum ShapeSetter {
     Y,
     Width,
     Height,
+    /// Rich formatting applied to every paragraph and run of the text body.
+    Format(TextSetter),
 }
+
+/// Rich text assignments for shapes, paragraphs, runs and table cells
+/// (`litchi_pptx::opened::TextProperties`).
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum TextSetter {
+    Text,
+    Bold,
+    Italic,
+    Size,
+    Color,
+    Font,
+    FontLatin,
+    Align,
+    Fill,
+}
+
+/// A write entry for `spec` with a text setter; `get` keeps the spec's
+/// read flag (write-only entries have none).
+const fn text_entry(spec: PropSpec, setter: TextSetter) -> crate::registry::Entry<TextSetter> {
+    use crate::registry::{Access, Constraint, Entry};
+    Entry {
+        spec,
+        access: Access::Set(setter),
+        constraint: if matches!(setter, TextSetter::Font | TextSetter::FontLatin) {
+            Constraint::NotEmpty
+        } else {
+            Constraint::None
+        },
+        clear: !matches!(setter, TextSetter::Text),
+    }
+}
+
+const fn write_only(name: &'static str, ty: ValueType) -> PropSpec {
+    let mut spec = PropSpec::new(name, ty);
+    spec.access.get = false;
+    spec
+}
+
+const RUN_WRITE_COUNT: usize = RUN_PROPS.len() + 2;
+const fn run_write_entries() -> [crate::registry::Entry<TextSetter>; RUN_WRITE_COUNT] {
+    use crate::registry::Entry;
+    let mut entries = [Entry::read(RUN_PROPS[0]); RUN_WRITE_COUNT];
+    let mut index = 0;
+    while index < RUN_PROPS.len() {
+        let spec = RUN_PROPS[index];
+        entries[index] = if index == RunKey::FontLatin as usize {
+            text_entry(spec, TextSetter::FontLatin)
+        } else if index == RunKey::Size as usize {
+            text_entry(spec, TextSetter::Size)
+        } else if index == RunKey::Bold as usize {
+            text_entry(spec, TextSetter::Bold)
+        } else if index == RunKey::Italic as usize {
+            text_entry(spec, TextSetter::Italic)
+        } else if index == RunKey::Color as usize {
+            text_entry(spec, TextSetter::Color)
+        } else {
+            Entry::read(spec)
+        };
+        index += 1;
+    }
+    entries[RUN_PROPS.len()] = text_entry(write_only("text", ValueType::Text), TextSetter::Text);
+    entries[RUN_PROPS.len() + 1] =
+        text_entry(write_only("font", ValueType::Text), TextSetter::Font);
+    entries
+}
+pub(super) const RUN_WRITE_TABLE: crate::registry::Table<TextSetter, RUN_WRITE_COUNT, 0> =
+    crate::registry::Table::new(run_write_entries(), []);
+pub(crate) const RUN_CAPABILITY_PROPS: &[PropSpec] = &RUN_WRITE_TABLE.readable();
+
+const PARAGRAPH_WRITE_COUNT: usize = PARAGRAPH_PROPS.len() + 5;
+const fn paragraph_write_entries() -> [crate::registry::Entry<TextSetter>; PARAGRAPH_WRITE_COUNT] {
+    use crate::registry::Entry;
+    let mut entries = [Entry::read(PARAGRAPH_PROPS[0]); PARAGRAPH_WRITE_COUNT];
+    let mut index = 0;
+    while index < PARAGRAPH_PROPS.len() {
+        let spec = PARAGRAPH_PROPS[index];
+        entries[index] = if index == ParagraphKey::Align as usize {
+            text_entry(spec, TextSetter::Align)
+        } else if index == ParagraphKey::Size as usize {
+            text_entry(spec, TextSetter::Size)
+        } else {
+            Entry::read(spec)
+        };
+        index += 1;
+    }
+    let base = PARAGRAPH_PROPS.len();
+    entries[base] = text_entry(write_only("text", ValueType::Text), TextSetter::Text);
+    entries[base + 1] = text_entry(write_only("bold", ValueType::Bool), TextSetter::Bold);
+    entries[base + 2] = text_entry(write_only("italic", ValueType::Bool), TextSetter::Italic);
+    entries[base + 3] = text_entry(write_only("color", DRAWING_COLOR), TextSetter::Color);
+    entries[base + 4] = text_entry(write_only("font", ValueType::Text), TextSetter::Font);
+    entries
+}
+pub(super) const PARAGRAPH_WRITE_TABLE: crate::registry::Table<
+    TextSetter,
+    PARAGRAPH_WRITE_COUNT,
+    0,
+> = crate::registry::Table::new(paragraph_write_entries(), []);
+pub(crate) const PARAGRAPH_CAPABILITY_PROPS: &[PropSpec] = &PARAGRAPH_WRITE_TABLE.readable();
+
+const CELL_WRITE_COUNT: usize = CELL_PROPS.len() + 7;
+const fn cell_write_entries() -> [crate::registry::Entry<TextSetter>; CELL_WRITE_COUNT] {
+    let mut entries = [text_entry(CELL_PROPS[0], TextSetter::Fill); CELL_WRITE_COUNT];
+    let base = CELL_PROPS.len();
+    entries[base] = text_entry(write_only("text", ValueType::Text), TextSetter::Text);
+    entries[base + 1] = text_entry(write_only("bold", ValueType::Bool), TextSetter::Bold);
+    entries[base + 2] = text_entry(write_only("italic", ValueType::Bool), TextSetter::Italic);
+    entries[base + 3] = text_entry(write_only("size", FONT_SIZE), TextSetter::Size);
+    entries[base + 4] = text_entry(write_only("color", DRAWING_COLOR), TextSetter::Color);
+    entries[base + 5] = text_entry(write_only("font", ValueType::Text), TextSetter::Font);
+    entries[base + 6] = text_entry(
+        write_only("align", ValueType::Token(&ALIGN)),
+        TextSetter::Align,
+    );
+    entries
+}
+pub(super) const CELL_WRITE_TABLE: crate::registry::Table<TextSetter, CELL_WRITE_COUNT, 0> =
+    crate::registry::Table::new(cell_write_entries(), []);
+pub(crate) const CELL_CAPABILITY_PROPS: &[PropSpec] = &CELL_WRITE_TABLE.readable();
 const SHAPE_WRITE_COUNT: usize = SHAPE_PROPS.len() + 1;
 const fn shape_write_entries() -> [crate::registry::Entry<ShapeSetter>; SHAPE_WRITE_COUNT] {
     use crate::registry::{Access, Constraint, Entry};
@@ -1472,11 +1594,35 @@ const fn shape_write_entries() -> [crate::registry::Entry<ShapeSetter>; SHAPE_WR
             Some(ShapeSetter::Width)
         } else if index == ShapeKey::Height as usize {
             Some(ShapeSetter::Height)
+        } else if index == ShapeKey::Font as usize {
+            Some(ShapeSetter::Format(TextSetter::Font))
+        } else if index == ShapeKey::FontLatin as usize {
+            Some(ShapeSetter::Format(TextSetter::FontLatin))
+        } else if index == ShapeKey::Size as usize {
+            Some(ShapeSetter::Format(TextSetter::Size))
+        } else if index == ShapeKey::Bold as usize {
+            Some(ShapeSetter::Format(TextSetter::Bold))
+        } else if index == ShapeKey::Italic as usize {
+            Some(ShapeSetter::Format(TextSetter::Italic))
+        } else if index == ShapeKey::Color as usize {
+            Some(ShapeSetter::Format(TextSetter::Color))
+        } else if index == ShapeKey::Align as usize {
+            Some(ShapeSetter::Format(TextSetter::Align))
         } else {
             None
         };
         if let Some(setter) = setter {
-            entries[index].access = Access::SetAndAdd(setter);
+            entries[index].access = if matches!(setter, ShapeSetter::Format(_)) {
+                Access::Set(setter)
+            } else {
+                Access::SetAndAdd(setter)
+            };
+            if matches!(setter, ShapeSetter::Format(_)) {
+                entries[index].clear = true;
+                if index == ShapeKey::Font as usize || index == ShapeKey::FontLatin as usize {
+                    entries[index].constraint = Constraint::NotEmpty;
+                }
+            }
             if index == ShapeKey::Width as usize || index == ShapeKey::Height as usize {
                 entries[index].constraint = Constraint::Length {
                     min: crate::value::Length::from_emu(1),
