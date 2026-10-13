@@ -349,6 +349,15 @@ Cut from `e467bcf4e8`:
 
 Still running from R1: `p7a-docx` (0251), `p7c-pptx` (0252), `p6-ooxml-meta` (0253).
 
+## Wave R3 (2026-10-14)
+Cut from `4d1afe92bc`:
+- `s17-corpus` (0265): the OfficeCLI example-corpus harness.
+- `s18-csv-eval` (0266): CSV/TSV import and formula evaluation (M4).
+- `stream-cursor` (0267): streaming cell cursors and the remaining query cost.
+- `s22-odf-w3` (0268): ADR 0034 W3 for ODF (tier 3 starts now that tiers 1–2 have P0 read+write).
+
+Still running: `ppt-scale` (0264, the owner-requested PPT 10k batch fix).
+
 Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-pptx-w4` 9474e2b6ce, `uo/m2-l-xlsb-w1` 876588a23c, `uo/m1-r4-perf` 012fd509ff.
 
 - M0a S10 (`docs/unified-ops/s10-measurement.md` §9). M0a landed on the strength of two explanations. If either is rejected, the chosen alternative becomes a harness follow-up; M0a is not reverted.
