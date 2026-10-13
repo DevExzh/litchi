@@ -103,6 +103,85 @@ impl FileFormat {
     }
 }
 
+impl FileFormat {
+    /// Every value, for parsing a format name.
+    const ALL: [Self; 21] = [
+        Self::Doc,
+        Self::Docx,
+        Self::Ppt,
+        Self::Pptx,
+        Self::Xls,
+        Self::Xlsx,
+        Self::Xlsb,
+        Self::Odt,
+        Self::Ods,
+        Self::Odp,
+        Self::Odg,
+        Self::Odc,
+        Self::Odf,
+        Self::Odi,
+        Self::Odm,
+        Self::Oth,
+        Self::Pages,
+        Self::Keynote,
+        Self::Numbers,
+        Self::Rtf,
+        Self::Odb,
+    ];
+
+    /// The core format of this value.
+    pub(crate) fn to_core(self) -> litchi::FileFormat {
+        match self {
+            FileFormat::Doc => litchi::FileFormat::Doc,
+            FileFormat::Docx => litchi::FileFormat::Docx,
+            FileFormat::Ppt => litchi::FileFormat::Ppt,
+            FileFormat::Pptx => litchi::FileFormat::Pptx,
+            FileFormat::Xls => litchi::FileFormat::Xls,
+            FileFormat::Xlsx => litchi::FileFormat::Xlsx,
+            FileFormat::Xlsb => litchi::FileFormat::Xlsb,
+            FileFormat::Odt => litchi::FileFormat::Odt,
+            FileFormat::Ods => litchi::FileFormat::Ods,
+            FileFormat::Odp => litchi::FileFormat::Odp,
+            FileFormat::Odg => litchi::FileFormat::Odg,
+            FileFormat::Odc => litchi::FileFormat::Odc,
+            FileFormat::Odf => litchi::FileFormat::Odf,
+            FileFormat::Odi => litchi::FileFormat::Odi,
+            FileFormat::Odm => litchi::FileFormat::Odm,
+            FileFormat::Oth => litchi::FileFormat::Oth,
+            FileFormat::Odb => litchi::FileFormat::Odb,
+            FileFormat::Pages => litchi::FileFormat::Pages,
+            FileFormat::Keynote => litchi::FileFormat::Keynote,
+            FileFormat::Numbers => litchi::FileFormat::Numbers,
+            FileFormat::Rtf => litchi::FileFormat::Rtf,
+        }
+    }
+
+    /// The format a `FileFormat` value or a name ("docx", "Docx", ".docx")
+    /// stands for.
+    pub(crate) fn extract(value: &Bound<'_, PyAny>) -> PyResult<Self> {
+        if let Ok(format) = value.cast::<Self>() {
+            return Ok(*format.borrow());
+        }
+        let Ok(name) = value.extract::<pyo3::pybacked::PyBackedStr>() else {
+            return Err(Failure::argument(
+                "format must be a FileFormat or a format name such as \"docx\"",
+            )
+            .into());
+        };
+        let bare = name.strip_prefix('.').unwrap_or(&name);
+        Self::ALL
+            .into_iter()
+            .find(|format| format.__str__().eq_ignore_ascii_case(bare))
+            .ok_or_else(|| {
+                Failure::argument(format!("unknown format name {:?}", &*name))
+                    .with_suggestion(
+                        "use a FileFormat value or a name such as \"docx\", \"xlsx\" or \"pptx\"",
+                    )
+                    .into()
+            })
+    }
+}
+
 #[pymethods]
 impl FileFormat {
     /// Returns the string representation of the format
