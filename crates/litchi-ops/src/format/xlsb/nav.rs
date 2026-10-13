@@ -490,6 +490,10 @@ impl<'f> Inspect<'f> for Nav<'f> {
         node.kind()
     }
 
+    fn early_children(&self, parent: &Node<'f>, kinds: KindSet<Kind>) -> Result<Children<'f>> {
+        finish(self.file, || Children::walk_early(parent, kinds))
+    }
+
     fn text<'n>(&'n self, node: &'n Node<'f>) -> Result<Option<Cow<'n, str>>> {
         finish(self.file, || {
             Ok(match node.item() {

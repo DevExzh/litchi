@@ -24,6 +24,9 @@ enum State<'f> {
         sheet: usize,
         cells: EagerCells<'f>,
     },
+    /// A positional worksheet's cells through the leaf's cell cursor
+    /// (record 0267).
+    Stream(Box<Stream<'f>>),
     Done,
     Sheets {
         next: usize,
@@ -46,6 +49,64 @@ enum State<'f> {
         grid: Grid,
         rows: std::vec::IntoIter<u32>,
     },
+}
+
+/// A positional worksheet's cells read through the leaf's cell cursor,
+/// which scans only as far as a walk that stops early reads.
+///
+/// The leaf gives a cursor only for a worksheet whose stored positions
+/// strictly ascend, so its records are the sorted grid's cells in order. A
+/// record that did not ascend all the same would make the walk continue on
+/// the sorted grid after the last coordinate it listed.
+struct Stream<'f> {
+    sheet: usize,
+    handle: SheetHandle<'f>,
+    cursor: litchi_xls::CellCursor,
+    worksheet: usize,
+    last: Option<(u32, u32)>,
+    /// The sorted grid and its remaining coordinates, once the records
+    /// stopped ascending.
+    rest: Option<(Grid, std::vec::IntoIter<(u32, u32)>)>,
+}
+
+impl Stream<'_> {
+    fn next<'f>(&mut self, file: &'f Xls) -> Result<Option<Node<'f>>> {
+        loop {
+            if let Some((grid, coords)) = &mut self.rest {
+                return Ok(coords.next().map(|at| {
+                    Node::new_cell(file, self.sheet, at, CellSource::Grid(grid.clone()))
+                }));
+            }
+            let Some(cell) = self.cursor.next().transpose()? else {
+                return Ok(None);
+            };
+            let at = (cell.row(), cell.column());
+            if let Some(last) = self.last
+                && at <= last
+            {
+                let grid = self.handle.grid()?;
+                let coords = grid
+                    .extents()
+                    .map_or_else(Vec::new, |rect| {
+                        grid.cells_in(rect)
+                            .map(|(at, _)| at)
+                            .filter(|at| *at > last)
+                            .collect()
+                    })
+                    .into_iter();
+                self.rest = Some((grid, coords));
+                continue;
+            }
+            self.last = Some(at);
+            let data = CellData::from_source(self.handle.package(), self.worksheet, &cell)?;
+            return Ok(Some(Node::new_cell(
+                file,
+                self.sheet,
+                at,
+                CellSource::Direct(Some(data)),
+            )));
+        }
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -253,6 +314,37 @@ impl<'f> Children<'f> {
         Ok(children)
     }
 
+    /// The query walker's children of `node` for a walk that is likely to
+    /// stop early: a positional worksheet whose cells alone are wanted lists
+    /// them through the leaf's cell cursor ([`Stream`]); everything else as
+    /// [`Self::walk`].
+    pub(super) fn walk_early(node: &Node<'f>, kinds: KindSet<Kind>) -> Result<Self> {
+        // A worksheet the cursor's validating scan refuses is read through
+        // the grid, which owns the refusal.
+        if let Item::Sheet(sheet) = node.item()
+            && sheet.handle.is_grid()
+            && kinds.contains(Kind::Cell)
+            && !kinds.contains(Kind::Row)
+            && !kinds.contains(Kind::Column)
+            && let Ok(Some((cursor, worksheet))) = sheet.handle.cell_cursor()
+        {
+            let mut children = Self::new(
+                node.file(),
+                State::Stream(Box::new(Stream {
+                    sheet: node.sheet_position(),
+                    handle: sheet.handle,
+                    cursor,
+                    worksheet,
+                    last: None,
+                    rest: None,
+                })),
+            );
+            children.fenced = false;
+            return Ok(children);
+        }
+        Self::walk(node, kinds)
+    }
+
     fn walk_children(node: &Node<'f>, kinds: KindSet<Kind>) -> Result<Self> {
         let file = node.file();
         let state = match node.item() {
@@ -332,6 +424,7 @@ impl<'f> Children<'f> {
                     CellSource::Direct(Some(data)),
                 )))
             },
+            State::Stream(stream) => stream.next(self.file),
             State::Done => Ok(None),
             State::Sheets { next, count, names } => {
                 if *next >= *count {

@@ -51,6 +51,10 @@ enum State {
         grid: Grid,
         cursor: Box<Cursor>,
     },
+    /// A source-backed worksheet's cells through the leaf's cell cursor,
+    /// which decodes only as many cells as a walk that stops early reads
+    /// (record 0267).
+    Stream(Box<Stream>),
     Dense {
         sheet: usize,
         grid: Grid,
@@ -158,6 +162,35 @@ impl<'f> Children<'f> {
         Ok(Self::new(file, state))
     }
 
+    /// The query walker's children of `node` for a walk that is likely to
+    /// stop early: a source-backed worksheet whose cells (and tables) alone
+    /// are wanted lists its cells through the leaf's cell cursor; everything
+    /// else as [`Self::walk`]. A worksheet the cursor refuses before its
+    /// first cell is read as [`Self::walk`] reads it.
+    pub(super) fn walk_early(node: &Node<'f>, kinds: KindSet<Kind>) -> Result<Self> {
+        if let Item::Sheet(sheet) = node.item()
+            && let SheetHandle::Source { sheet: leaf, .. } = &sheet.handle
+            && sheet.handle.is_grid()
+            && kinds.contains(Kind::Cell)
+            && !kinds.contains(Kind::Row)
+            && !kinds.contains(Kind::Column)
+            && let Ok(cursor) = leaf.cell_cursor()
+        {
+            return Ok(Self::new(
+                node.file(),
+                State::Stream(Box::new(Stream {
+                    sheet: sheet.position,
+                    handle: sheet.handle.clone(),
+                    cursor,
+                    current: None,
+                    yielded: false,
+                    tables: kinds.contains(Kind::Table),
+                })),
+            ));
+        }
+        Self::walk(node, kinds)
+    }
+
     /// Construct query-walk children for the requested kinds.
     pub(super) fn walk(node: &Node<'f>, kinds: KindSet<Kind>) -> Result<Self> {
         let file = node.file();
@@ -240,6 +273,37 @@ impl<'f> Children<'f> {
                     return Ok(None);
                 },
                 State::Sheet(items) => return items.next(file),
+                State::Stream(stream) => match stream.next(file) {
+                    Ok(Some(node)) => return Ok(Some(node)),
+                    Ok(None) => {
+                        self.state = if stream.tables {
+                            State::Tables {
+                                sheet: stream.sheet,
+                                parts: stream.handle.tables()?.into_iter(),
+                                index: 0,
+                            }
+                        } else {
+                            State::Done
+                        };
+                    },
+                    // Refused before the first cell: read the worksheet as
+                    // the ordinary walk does, which owns the refusal (or
+                    // the cached-value fallback).
+                    Err(_) if !stream.yielded => {
+                        let sheet = Sheet::new(stream.sheet.into(), stream.handle.clone());
+                        self.state = sheet_items(
+                            &sheet,
+                            Want {
+                                columns: false,
+                                rows: false,
+                                cells: true,
+                                tables: stream.tables,
+                            },
+                            false,
+                        )?;
+                    },
+                    Err(error) => return Err(error),
+                },
                 State::Tables {
                     sheet,
                     parts,
@@ -319,6 +383,49 @@ impl<'f> Iterator for Children<'f> {
 }
 
 impl std::iter::FusedIterator for Children<'_> {}
+
+/// A source-backed worksheet's cells read through the leaf's cell cursor,
+/// with the node grid of the leaf grid the cursor is reading.
+struct Stream {
+    sheet: usize,
+    handle: SheetHandle,
+    cursor: litchi_xlsb::sheet::CellCursor,
+    /// The node grid of the cursor's current grid, keyed by whether it is
+    /// the complete grid and its cell count.
+    current: Option<((bool, usize), Grid)>,
+    yielded: bool,
+    tables: bool,
+}
+
+impl Stream {
+    fn next<'f>(&mut self, file: &'f Xlsb) -> Result<Option<Node<'f>>> {
+        let Some(at) = self.cursor.next().transpose()? else {
+            return Ok(None);
+        };
+        let Some(leaf) = self.cursor.grid() else {
+            return Err(Error::new(
+                Code::InternalError,
+                "the worksheet cell cursor returned a cell without its grid",
+            ));
+        };
+        let key = (self.cursor.is_complete(), leaf.stored_cell_count());
+        let grid = match &self.current {
+            Some((held, grid)) if *held == key => grid.clone(),
+            _ => {
+                let grid = Grid::streamed(leaf.clone(), self.handle.clone(), key.0);
+                self.current = Some((key, grid.clone()));
+                grid
+            },
+        };
+        self.yielded = true;
+        Ok(Some(Node::new_cell(
+            file,
+            self.sheet,
+            at,
+            CellSource::Grid(grid),
+        )))
+    }
+}
 
 fn sheet_items(sheet: &Sheet, want: Want, view: bool) -> Result<State> {
     if !(want.columns || want.rows || want.cells || want.tables) {

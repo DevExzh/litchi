@@ -31,6 +31,7 @@ pub use read::Cells;
 // Sheet metadata is shared by eager and source-backed workbook views.  Keep
 // the ordinary vocabulary under this public sheet namespace; native tab IDs,
 // relationship IDs, and part names stay in the raw layer.
+pub use crate::workbook::CellCursor;
 pub use crate::workbook::catalog::{Kind, Selector, State, Tab};
 pub use litchi_core::Position;
 pub use litchi_sheet::{Area, At, Rect};

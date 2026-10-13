@@ -164,6 +164,11 @@ pub(super) struct GridInner {
     leaf: xlsb::sheet::Grid,
     handle: SheetHandle,
     cached_only: bool,
+    /// For a batch of the leaf's cell cursor (record 0267), `leaf` holds the
+    /// batch's cells only and this the worksheet's complete grid, read on
+    /// first use by a read that needs more than a cell's own record (its
+    /// merge).
+    complete: Option<OnceLock<xlsb::sheet::Grid>>,
 }
 
 impl std::ops::Deref for Grid {
@@ -199,7 +204,31 @@ impl Grid {
             leaf: read.leaf,
             handle: handle.clone(),
             cached_only: read.cached_only,
+            complete: None,
         })))
+    }
+
+    /// The node grid of a grid the leaf's cell cursor read: the complete
+    /// grid, or a batch of it.
+    pub(super) fn streamed(leaf: xlsb::sheet::Grid, handle: SheetHandle, complete: bool) -> Self {
+        Self(Arc::new(GridInner {
+            leaf,
+            handle,
+            cached_only: false,
+            complete: (!complete).then(OnceLock::new),
+        }))
+    }
+
+    /// The worksheet's complete grid.
+    fn full(&self) -> Result<&xlsb::sheet::Grid> {
+        let Some(complete) = &self.complete else {
+            return Ok(&self.leaf);
+        };
+        if let Some(grid) = complete.get() {
+            return Ok(grid);
+        }
+        let read = self.handle.grid_read()?;
+        Ok(complete.get_or_init(|| read.leaf))
     }
 
     pub(super) fn cached_only(&self) -> bool {
@@ -207,7 +236,13 @@ impl Grid {
     }
 
     pub(super) fn record(&self, at: Address) -> Result<Option<&xlsb::Cell>> {
-        Ok(self.leaf.cell_at(at)?)
+        if let Some(cell) = self.leaf.cell_at(at)? {
+            return Ok(Some(cell));
+        }
+        if self.complete.is_none() {
+            return Ok(None);
+        }
+        Ok(self.full()?.cell_at(at)?)
     }
 
     pub(super) fn cells(&self, rect: Rect) -> Result<Cells<'_>> {
@@ -250,7 +285,7 @@ impl Grid {
             ));
         }
         let (row, column) = at;
-        for merge in self.leaf.worksheet().merged_cells() {
+        for merge in self.full()?.worksheet().merged_cells() {
             if (merge.row_first..=merge.row_last).contains(&row)
                 && (merge.col_first..=merge.col_last).contains(&column)
             {

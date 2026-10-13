@@ -1859,3 +1859,20 @@ the eager `Document::comments`.
 | `Edit::insert_picture_at` | adopted (0251d) |
 | `numbering::{ListKind, AddedList}` | adopted (0251e) |
 | `Edit::{add_list, list_kind}` | adopted (0251e) |
+
+## Worksheet cell cursors (record 0267)
+
+Each source-backed worksheet handle gains `cell_cursor()`, a lazy iterator
+over its stored cells in row-major order that decodes only as many cells as
+the caller reads. The name follows the existing `Grid`/`Cells` vocabulary of
+each leaf: a cursor yields coordinates (and, for XLS, the owned cell the
+whole-sheet visitor reports), and the cells are read from the grid the cursor
+names. No second grid type or alias is introduced.
+
+| Name | Status |
+|---|---|
+| `litchi_xlsx::workbook::source::CellCursor`, `SourceWorksheet::cell_cursor() -> Result<CellCursor>` (items `(Address, RecordIndex)`; `CellCursor::{grid, is_complete}`) | adopted (0267) |
+| `litchi_xlsb::sheet::CellCursor`, `SourceBackedWorksheet::cell_cursor() -> Result<CellCursor>` (items `(u32, u32)`; `CellCursor::{grid, is_complete}`) | adopted (0267) |
+| `litchi_xls::CellCursor`, `SourceBackedWorksheet::cell_cursor() -> Result<Option<CellCursor>>` (items `SourceBackedCell`; `CellCursor::needs_formula_context`) | adopted (0267) |
+
+See [0267](unified-ops/0267-streaming-cell-cursors.md).

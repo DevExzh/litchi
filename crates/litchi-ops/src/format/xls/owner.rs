@@ -165,6 +165,43 @@ impl<'f> SheetHandle<'f> {
             .map_err(|error| worksheet_error(error.to_string()))
     }
 
+    /// The positional owner's cell cursor over this worksheet, with the
+    /// worksheet's index (record 0267); `None` for an eager owner, whose
+    /// cells are already parsed ([`Self::eager_cells`]), and for a worksheet
+    /// whose stored positions do not ascend (its sorted grid is not its
+    /// stream order).
+    pub(super) fn cell_cursor(&self) -> Result<Option<(litchi_xls::CellCursor, usize)>> {
+        let Some(source) = self.package.source_workbook() else {
+            return Ok(None);
+        };
+        let worksheet_index = self.metadata.parsed_worksheet_index().ok_or_else(|| {
+            Error::new(
+                Code::UnsupportedCapability,
+                "the selected XLS tab has no worksheet grid",
+            )
+            .with_format(litchi_core::FileFormat::Xls)
+        })?;
+        let worksheet = source
+            .worksheet_by_index(worksheet_index)?
+            .ok_or_else(|| missing_sheet(worksheet_index))?;
+        let Some(cursor) = worksheet.cell_cursor()? else {
+            return Ok(None);
+        };
+        // A formula whose text needs the workbook's name tables reads it
+        // from the eager worksheet ([`CellData::from_source`]), as the grid
+        // does; load it now, so a worksheet the eager reader refuses is
+        // refused before any cell, as the grid refuses it.
+        if cursor.needs_formula_context() {
+            self.eager_worksheet()?;
+        }
+        Ok(Some((cursor, worksheet_index)))
+    }
+
+    /// The owner, for cells a cursor reads.
+    pub(super) const fn package(&self) -> &'f Package {
+        self.package
+    }
+
     /// Borrow the eager worksheet's native cell iterator when the owner has
     /// already parsed its cells. Returning `None` preserves the source-backed
     /// fallback until a resumable positional cell cursor is available.
@@ -234,7 +271,7 @@ impl CellData {
     /// external-sheet tables.  A formula that needs them falls back to the
     /// eager reader's complete rendering; that compatibility escape
     /// materializes the workbook once and is cached by the native owner.
-    fn from_source(
+    pub(super) fn from_source(
         package: &Package,
         worksheet: usize,
         cell: &litchi_xls::SourceBackedCell,

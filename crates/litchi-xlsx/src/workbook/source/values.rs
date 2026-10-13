@@ -34,6 +34,7 @@
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 
 use super::blocks::Blocks;
+use super::cursor::Prefix;
 use crate::cell::Store;
 
 /// Logical ceiling on the parsed worksheet values one workbook retains.
@@ -88,6 +89,9 @@ pub(super) enum Axis {
     Grid,
     /// The worksheet XML outside `sheetData`.
     Blocks,
+    /// The parsed leading rows of one worksheet, which a cell cursor starts
+    /// from (record 0267).
+    Prefix,
 }
 
 /// One retained value.
@@ -95,6 +99,7 @@ pub(super) enum Axis {
 pub(super) enum Cached {
     Grid(Arc<Store>),
     Blocks(Arc<Blocks>),
+    Prefix(Arc<Prefix>),
 }
 
 impl Cached {
@@ -102,6 +107,7 @@ impl Cached {
         match self {
             Self::Grid(_) => Axis::Grid,
             Self::Blocks(_) => Axis::Blocks,
+            Self::Prefix(_) => Axis::Prefix,
         }
     }
 
@@ -110,6 +116,7 @@ impl Cached {
         match self {
             Self::Grid(value) => Arc::strong_count(value) == 1,
             Self::Blocks(value) => Arc::strong_count(value) == 1,
+            Self::Prefix(value) => Arc::strong_count(value) == 1 && value.is_clean(),
         }
     }
 }
@@ -225,7 +232,8 @@ impl ValueCache {
     /// If another reader published the same value while this one was being
     /// built, the published value is returned and the new one is dropped, so
     /// concurrent builds never retain two copies. A value heavier than the
-    /// whole ceiling is returned without being retained.
+    /// whole ceiling is returned without being retained. A worksheet prefix
+    /// replaces a retained prefix with fewer rows.
     pub(super) fn publish(&self, position: usize, value: Cached, weight: usize) -> Cached {
         let weight = weight.saturating_add(ENTRY_OVERHEAD_BYTES);
         let max_weight = max_retained_weight();
@@ -234,6 +242,29 @@ impl ValueCache {
             let mut state = self.lock();
             state.builds = state.builds.saturating_add(1);
             let tick = state.touch();
+            let longer = match (state.find(position, value.axis()), &value) {
+                (
+                    Some(Entry {
+                        value: Cached::Prefix(held),
+                        ..
+                    }),
+                    Cached::Prefix(offered),
+                ) => offered.rows() > held.rows(),
+                _ => false,
+            };
+            if longer && weight <= max_weight {
+                // Releasing the shorter prefix makes room the longer one
+                // then claims through the ordinary path below.
+                if let Some(index) = state.entries.iter().position(|entry| {
+                    entry.position == position && entry.value.axis() == Axis::Prefix
+                }) {
+                    let entry = state.entries.swap_remove(index);
+                    state.weight = state.weight.saturating_sub(entry.weight);
+                    if evicted.try_reserve(1).is_ok() {
+                        evicted.push(entry.value);
+                    }
+                }
+            }
             if let Some(existing) = state.find(position, value.axis()) {
                 existing.last_used = tick;
                 existing.value.clone()

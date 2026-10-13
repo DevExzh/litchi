@@ -80,7 +80,9 @@ struct Want {
 /// The items of one worksheet, phase by phase.
 struct SheetItems {
     sheet: usize,
-    grid: Grid,
+    /// The worksheet's grid; `None` while the leaf's cell cursor lists the
+    /// cells (it materializes the grid itself if the walk reads on).
+    grid: Option<Grid>,
     handle: SheetHandle,
     want: Want,
     /// The node view's listing: only rows with content or formatting, and
@@ -111,6 +113,9 @@ enum Phase {
     Records {
         next: usize,
     },
+    /// Every stored record through the leaf's cell cursor, which parses only
+    /// the leading rows a walk that stops early visits (record 0267).
+    Stream(Box<Stream>),
     Tables {
         parts: std::vec::IntoIter<TablePart>,
         index: usize,
@@ -118,9 +123,86 @@ enum Phase {
     Done,
 }
 
+/// A worksheet's records read through the leaf's cell cursor, with the
+/// node grid of the leaf grid the cursor is reading.
+struct Stream {
+    cursor: xlsx::workbook::source::CellCursor,
+    sheet: xlsx::SourceWorksheet,
+    /// The node grid of the cursor's current grid, keyed by what tells two
+    /// of the cursor's grids apart: whether it is the complete grid, and its
+    /// record count (a longer prefix that adds no record holds the same
+    /// records).
+    current: Option<((bool, usize), Grid)>,
+}
+
+impl Stream {
+    fn next<'f>(&mut self, file: &'f Xlsx, sheet: usize) -> Result<Option<Node<'f>>> {
+        let Some((at, index)) = self.cursor.next().transpose()? else {
+            return Ok(None);
+        };
+        let Some(leaf) = self.cursor.grid() else {
+            return Err(Error::new(
+                Code::InternalError,
+                "the worksheet cell cursor returned a record without its grid",
+            ));
+        };
+        let key = (self.cursor.is_complete(), leaf.stored_cell_count());
+        let grid = match &self.current {
+            Some((held, grid)) if *held == key => grid,
+            _ => {
+                let grid = Grid::streamed(leaf.clone(), self.sheet.clone(), key.0);
+                &self.current.insert((key, grid)).1
+            },
+        };
+        Ok(Some(listed_cell(file, sheet, grid, at, index)))
+    }
+}
+
 impl<'f> Children<'f> {
     const fn new(file: &'f Xlsx, state: State) -> Self {
         Self { file, state }
+    }
+
+    /// The query walker's children of `node` for a walk that is likely to
+    /// stop early ([`crate::query::inspect::Inspect::early_children`]): a
+    /// source-backed worksheet whose cells alone are wanted lists them
+    /// through the leaf's cell cursor; everything else as [`Self::walk`].
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::walk`].
+    pub(super) fn walk_early(node: &Node<'f>, kinds: KindSet<Kind>) -> Result<Self> {
+        let file = node.file();
+        if let Item::Sheet(sheet) = node.item()
+            && let SheetHandle::Source { sheet: leaf } = &sheet.handle
+            && sheet.handle.is_grid()
+            && kinds.contains(Kind::Cell)
+            && !kinds.contains(Kind::Row)
+            && !kinds.contains(Kind::Column)
+        {
+            let stream = Stream {
+                cursor: leaf.cell_cursor()?,
+                sheet: leaf.clone(),
+                current: None,
+            };
+            return Ok(Self::new(
+                file,
+                State::Sheet(Box::new(SheetItems {
+                    sheet: sheet.position,
+                    grid: None,
+                    handle: sheet.handle.clone(),
+                    want: Want {
+                        columns: false,
+                        rows: false,
+                        cells: true,
+                        tables: kinds.contains(Kind::Table),
+                    },
+                    view: false,
+                    phase: Phase::Stream(Box::new(stream)),
+                })),
+            ));
+        }
+        Self::walk(node, kinds)
     }
 
     /// The node view's children of `node`: OfficeCLI's listing.
@@ -336,7 +418,7 @@ fn sheet_items(sheet: &Sheet, want: Want, view: bool) -> Result<State> {
     }
     Ok(State::Sheet(Box::new(SheetItems {
         sheet: sheet.position,
-        grid: sheet.grid()?.clone(),
+        grid: Some(sheet.grid()?.clone()),
         handle: sheet.handle.clone(),
         want,
         view,
@@ -355,6 +437,35 @@ impl SheetItems {
                 view,
                 phase,
             } = self;
+            match phase {
+                Phase::Stream(stream) => {
+                    if let Some(node) = stream.next(file, *sheet)? {
+                        return Ok(Some(node));
+                    }
+                    *phase = tables_phase(handle, *want)?;
+                    continue;
+                },
+                Phase::Tables { parts, index } => {
+                    let Some(part) = parts.next() else {
+                        *phase = Phase::Done;
+                        continue;
+                    };
+                    let position = *index;
+                    *index += 1;
+                    return Ok(Some(Node::new_table(file, *sheet, position, part)));
+                },
+                Phase::Done => return Ok(None),
+                Phase::Start
+                | Phase::Columns { .. }
+                | Phase::Rows { .. }
+                | Phase::Records { .. } => {},
+            }
+            let Some(grid) = grid.as_ref() else {
+                return Err(Error::new(
+                    Code::InternalError,
+                    "a worksheet listing lost its grid",
+                ));
+            };
             match phase {
                 Phase::Start => {
                     *phase = if want.columns {
@@ -418,16 +529,8 @@ impl SheetItems {
                     }
                     *phase = tables_phase(handle, *want)?;
                 },
-                Phase::Tables { parts, index } => {
-                    let Some(part) = parts.next() else {
-                        *phase = Phase::Done;
-                        continue;
-                    };
-                    let position = *index;
-                    *index += 1;
-                    return Ok(Some(Node::new_table(file, *sheet, position, part)));
-                },
-                Phase::Done => return Ok(None),
+                // Read above, without the grid.
+                Phase::Stream(_) | Phase::Tables { .. } | Phase::Done => {},
             }
         }
     }

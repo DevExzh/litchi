@@ -76,6 +76,10 @@ struct SheetMetadata {
     /// Serializes builders for this worksheet only; parsing never holds the
     /// owner-wide cache mutex.
     build: Mutex<()>,
+    /// The first batch of the first cell cursor that validated this
+    /// worksheet (record 0267), which later cursors start from. A few dozen
+    /// cells.
+    first_batch: OnceCell<Arc<cursor::FirstBatch>>,
 }
 
 #[derive(Debug)]
@@ -117,6 +121,20 @@ struct SourceInner {
     /// Opt-in repair policy applied to lazily read worksheet content.
     leniency: Leniency,
 }
+
+/// What reading one worksheet stream needs ([`SourceBackedWorksheet`]).
+struct MaterializationInputs {
+    data: PartData,
+    name: String,
+    shared_strings: Arc<Vec<SharedString>>,
+    formula_context: Context,
+    workbook_position: usize,
+    cell_xf_count: usize,
+    comments_part: Option<PackURI>,
+}
+
+mod cursor;
+pub use cursor::CellCursor;
 
 /// A bounded XLSB workbook catalog whose worksheet bodies remain deferred.
 ///
@@ -648,6 +666,7 @@ impl SourceBackedWorkbook {
                     tolerance: OnceCell::new(),
                     cached_value_tolerance: OnceCell::new(),
                     build: Mutex::new(()),
+                    first_batch: OnceCell::new(),
                 });
                 continue;
             };
@@ -739,6 +758,7 @@ impl SourceBackedWorkbook {
                 tolerance: OnceCell::new(),
                 cached_value_tolerance: OnceCell::new(),
                 build: Mutex::new(()),
+                first_batch: OnceCell::new(),
             });
             if matches!(sheet_kind, Kind::Worksheet) {
                 worksheet_positions.push(catalog_position);
@@ -1780,6 +1800,31 @@ impl SourceBackedWorksheet {
     }
 
     fn parse_materialized(&self, partname: PackURI) -> Result<Worksheet> {
+        let inputs = self.materialization_inputs(partname)?;
+        let mut worksheet = Workbook::read_worksheet(
+            Cursor::new(inputs.data.as_bytes()),
+            inputs.name,
+            inputs.shared_strings.as_slice(),
+            &inputs.formula_context,
+            inputs.workbook_position,
+            inputs.cell_xf_count,
+            self.inner.leniency,
+        )?;
+        worksheet.set_scenarios(crate::package::scenarios::parse_worksheet(
+            inputs.data.as_bytes(),
+        )?);
+        if let Some(partname) = inputs.comments_part {
+            for comment in self.read_comments(&partname, worksheet.tolerance_report_mut())? {
+                worksheet.add_comment(comment);
+            }
+        }
+        Ok(worksheet)
+    }
+
+    /// What reading the worksheet stream needs, with every refusal the
+    /// materialization raises before it reads the stream (record 0267 shares
+    /// this with the cell cursor).
+    fn materialization_inputs(&self, partname: PackURI) -> Result<MaterializationInputs> {
         if self.inner.incomplete_formula_context {
             return Err(Error::UnsupportedFeature(
                 "source-backed XLSB worksheet materialization requires deferred PivotTable formula owners"
@@ -1821,35 +1866,35 @@ impl SourceBackedWorksheet {
         let mut formula_context = self.inner.formula_context.clone();
         formula_context.external_books = external_books;
         formula_context.tables = Arc::clone(&tables);
-        let mut worksheet = Workbook::read_worksheet(
-            Cursor::new(worksheet_data.as_bytes()),
-            metadata.name.clone(),
-            shared_strings.as_slice(),
-            &formula_context,
-            metadata.workbook_position,
-            styles.cell_xfs.len(),
-            self.inner.leniency,
-        )?;
-        worksheet.set_scenarios(crate::package::scenarios::parse_worksheet(
-            worksheet_data.as_bytes(),
-        )?);
-        if let Some(partname) = comments_part {
-            let comments_part = self.inner.package.part(&partname)?;
-            require_content_type(&comments_part, XLSB_COMMENTS_CONTENT_TYPE)?;
-            if !comments_part.rels().is_empty() {
-                return Err(Error::InvalidRelationship(
-                    "XLSB comments parts cannot own relationships".to_string(),
-                ));
-            }
-            let comments_data = comments_part.data()?;
-            for comment in crate::comments::read_recording(
-                comments_data.as_bytes(),
-                worksheet.tolerance_report_mut(),
-            )? {
-                worksheet.add_comment(comment);
-            }
+        Ok(MaterializationInputs {
+            data: worksheet_data,
+            name: metadata.name.clone(),
+            shared_strings,
+            formula_context,
+            workbook_position: metadata.workbook_position,
+            cell_xf_count: styles.cell_xfs.len(),
+            comments_part,
+        })
+    }
+
+    /// The comments of the worksheet's comments part.
+    fn read_comments(
+        &self,
+        partname: &PackURI,
+        report: &mut ToleranceReport,
+    ) -> Result<Vec<crate::comments::Record>> {
+        let comments_part = self.inner.package.part(partname)?;
+        require_content_type(&comments_part, XLSB_COMMENTS_CONTENT_TYPE)?;
+        if !comments_part.rels().is_empty() {
+            return Err(Error::InvalidRelationship(
+                "XLSB comments parts cannot own relationships".to_string(),
+            ));
         }
-        Ok(worksheet)
+        let comments_data = comments_part.data()?;
+        Ok(crate::comments::read_recording(
+            comments_data.as_bytes(),
+            report,
+        )?)
     }
 
     fn metadata(&self) -> &SheetMetadata {
