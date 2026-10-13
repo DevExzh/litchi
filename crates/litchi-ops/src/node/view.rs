@@ -392,6 +392,9 @@ pub(crate) enum Source<'a> {
     /// A DOC node's leaf values.
     #[cfg(feature = "doc")]
     Doc(crate::format::doc::NodeProps<'a>),
+    /// An ODP node's scene values.
+    #[cfg(feature = "odp")]
+    Odp(crate::format::odp::Props<'a>),
 }
 
 impl<'a> Source<'a> {
@@ -480,6 +483,8 @@ impl<'a> Source<'a> {
             Self::Xls(ref props) => props.get(index),
             #[cfg(feature = "doc")]
             Self::Doc(ref props) => props.get(index),
+            #[cfg(feature = "odp")]
+            Self::Odp(ref props) => props.get(index),
         }
     }
 }
@@ -676,6 +681,9 @@ enum Inner<'n, 'f> {
     /// The RTF iterator carries the native RTF handle through its nodes.
     #[cfg(feature = "rtf")]
     Rtf(crate::format::rtf::children::Children<'f>),
+    /// The ODP iterator carries its parent node and scene cursor.
+    #[cfg(feature = "odp")]
+    Odp(Box<crate::format::odp::children::Children<'f>>),
 }
 
 impl<'n, 'f> Children<'n, 'f> {
@@ -753,6 +761,14 @@ impl<'n, 'f> Children<'n, 'f> {
         }
     }
 
+    /// An ODP node's children.
+    #[cfg(feature = "odp")]
+    pub(crate) fn odp(children: crate::format::odp::children::Children<'f>) -> Self {
+        Self {
+            inner: Inner::Odp(Box::new(children)),
+        }
+    }
+
     /// An RTF node's children.
     #[cfg(feature = "rtf")]
     pub(crate) const fn rtf(children: crate::format::rtf::children::Children<'f>) -> Self {
@@ -787,6 +803,8 @@ impl<'f> Iterator for Children<'_, 'f> {
             Inner::Xls(children) => children.next().map(|child| child.map(Node::Xls)),
             #[cfg(feature = "rtf")]
             Inner::Rtf(children) => children.next().map(|child| child.map(Node::Rtf)),
+            #[cfg(feature = "odp")]
+            Inner::Odp(children) => children.next().map(|child| child.map(Node::Odp)),
         };
         if matches!(item, Some(Err(_)) | None) {
             self.inner = Inner::Empty(PhantomData);

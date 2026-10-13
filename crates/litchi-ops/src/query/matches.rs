@@ -13,7 +13,8 @@
         feature = "ppt",
         feature = "xlsb",
         feature = "xls",
-        feature = "rtf"
+        feature = "rtf",
+        feature = "odp"
     )),
     allow(
         dead_code,
@@ -39,7 +40,8 @@ use super::plan::{Diagnostic, Plan};
     feature = "ppt",
     feature = "xlsb",
     feature = "xls",
-    feature = "rtf"
+    feature = "rtf",
+    feature = "odp"
 ))]
 use super::walk::Walk;
 use crate::Result;
@@ -97,6 +99,8 @@ enum Inner<'f, 'q> {
     Xls(Walk<'q, 'f, crate::format::xls::Nav<'f>>),
     #[cfg(feature = "rtf")]
     Rtf(Walk<'q, 'f, crate::format::rtf::Nav<'f>>),
+    #[cfg(feature = "odp")]
+    Odp(Walk<'q, 'f, crate::format::odp::Nav<'f>>),
     /// Keeps the lifetimes in use in builds without an adapter; uninhabited.
     #[allow(dead_code, reason = "uninhabited: only keeps the lifetimes in use")]
     Never(Infallible, PhantomData<(&'f (), &'q ())>),
@@ -158,6 +162,14 @@ impl<'f, 'q> Matches<'f, 'q> {
         }
     }
 
+    /// The matches of an ODP walk.
+    #[cfg(feature = "odp")]
+    pub(crate) fn odp(walk: Walk<'q, 'f, crate::format::odp::Nav<'f>>) -> Self {
+        Self {
+            inner: Inner::Odp(walk),
+        }
+    }
+
     /// The same matches, stopping after `n` in all: the walk ends there,
     /// reading nothing more.
     ///
@@ -196,6 +208,10 @@ impl<'f, 'q> Matches<'f, 'q> {
             Inner::Rtf(walk) => Self {
                 inner: Inner::Rtf(walk.limit(n)),
             },
+            #[cfg(feature = "odp")]
+            Inner::Odp(walk) => Self {
+                inner: Inner::Odp(walk.limit(n)),
+            },
             Inner::Never(never, _) => match never {},
         }
     }
@@ -230,6 +246,8 @@ impl<'f, 'q> Matches<'f, 'q> {
             Inner::Xls(walk) => walk.plan(),
             #[cfg(feature = "rtf")]
             Inner::Rtf(walk) => walk.plan(),
+            #[cfg(feature = "odp")]
+            Inner::Odp(walk) => walk.plan(),
             Inner::Never(never, _) => match *never {},
         }
     }
@@ -263,6 +281,8 @@ impl<'f> Iterator for Matches<'f, '_> {
             Inner::Xls(walk) => walk.next().map(|node| node.map(Node::Xls)),
             #[cfg(feature = "rtf")]
             Inner::Rtf(walk) => walk.next().map(|node| node.map(Node::Rtf)),
+            #[cfg(feature = "odp")]
+            Inner::Odp(walk) => walk.next().map(|node| node.map(Node::Odp)),
             Inner::Never(never, _) => match *never {},
         }
     }

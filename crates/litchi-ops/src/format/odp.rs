@@ -1,21 +1,38 @@
-//! Handle for OpenDocument Presentation (`.odp`) inputs.
+//! Handle for OpenDocument Presentation (`.odp`) inputs (record 0278).
 //!
-//! ODP is tier 3 and read-only in M0a (record 0003 §2.3). The handle carries
-//! the facade's two payloads over unchanged: the eager
-//! `litchi_odp::Presentation` (byte and reader routes) and the
-//! filesystem-backed `litchi_odp::SourceBackedPresentation` (path route on
-//! `unix`/`windows`). Both keep the package they were opened from, so M6 can
-//! add write without reshaping this state.
+//! The handle retains the leaf owner it was opened as: the immutable
+//! `litchi_odp::Package` with its parsed `Presentation` projection (byte
+//! and reader routes, and every edited snapshot), the filesystem-backed
+//! `litchi_odp::SourceBackedPresentation` (path route on `unix`/`windows`),
+//! or the read-only `litchi_odp::FlatPresentation` of a flat `.fodp`
+//! document. Unified reads walk the leaf's byte-range scene index of
+//! `content.xml` (`litchi_odp::scene`), built once per handle on first use;
+//! unified writes stage checked scene splices on one `Package::edit()`.
+
+pub(crate) mod children;
+mod nav;
+mod node;
+mod spec;
+pub(crate) mod views;
+
+pub(crate) use nav::Nav;
+pub use node::Node;
+pub(crate) use node::Props;
+pub use spec::Kind;
+pub(crate) use spec::SPEC;
 
 use std::fmt;
-use std::sync::Arc;
+use std::io::Write as _;
+use std::path::Path;
+use std::sync::{Arc, OnceLock};
 
 use litchi_core::Metadata;
 use litchi_core::detection::FileFormat;
 use litchi_odf_common::PreparedPackage;
 use litchi_odf_common::leniency::ToleranceReport;
+use litchi_odp::scene::Scene;
 
-use crate::{Error, OpenOptions, Result};
+use crate::{Code, Error, OpenOptions, Result};
 
 /// An opened ODP presentation. Cheap to clone (one `Arc` bump);
 /// `Send + Sync`.
@@ -24,20 +41,36 @@ pub struct Odp(Arc<OdpState>);
 
 struct OdpState {
     owner: OdpOwner,
+    origin: Option<Arc<Path>>,
+    odf_options: litchi_odf_common::OpenOptions,
+    /// The scene index of the owner's `content.xml`, built on first use.
+    scene: OnceLock<Scene>,
+    /// Master pages, layouts and annotations, each parsed on first use.
+    masters: OnceLock<Vec<litchi_odp::master::Summary>>,
+    layouts: OnceLock<Vec<litchi_odp::layout::Layout>>,
+    annotations: OnceLock<Vec<litchi_odp::annotation::Info>>,
+    /// The package a source-backed owner materializes for its first write.
+    #[allow(dead_code, reason = "TEMP-READ-COMMIT: used by the write handlers")]
+    materialized: OnceLock<litchi_odp::Package>,
 }
 
-/// The ODP read owner, in the state today's route builds.
+/// The read owner, in the state the open route built.
 #[allow(
     clippy::large_enum_variant,
     reason = "the owner lives once behind the handle's `Arc`; boxing a variant would add an allocation to that open route"
 )]
 pub(crate) enum OdpOwner {
-    /// Parsed at open (byte and reader routes, and the path fallback on
-    /// other targets).
-    Eager(litchi_odp::Presentation),
+    /// The immutable package and its projection (byte and reader routes,
+    /// created and edited snapshots).
+    Eager {
+        package: litchi_odp::Package,
+        presentation: litchi_odp::Presentation,
+    },
     /// Filesystem-backed, with deferred package data (path route).
     #[cfg(any(unix, windows))]
     Source(litchi_odp::SourceBackedPresentation),
+    /// A flat (single XML document) presentation; read-only.
+    Flat(litchi_odp::FlatPresentation),
 }
 
 const fn assert_handle<T: Send + Sync + Clone>() {}
@@ -47,42 +80,332 @@ const _: () = {
 };
 
 /// Typed ODF limit failures stay `Source::Odf`; every other failure keeps
-/// its common-core payload as `Source::Core`, exactly as before W3.
-fn odf_error(error: litchi_odf_common::Error) -> Error {
+/// its common-core payload as `Source::Core`.
+pub(crate) fn odf_error(error: litchi_odf_common::Error) -> Error {
     match error {
         litchi_odf_common::Error::Core(error) => core_error(error),
         other => Error::from(other).with_format(FileFormat::Odp),
     }
 }
 
-fn core_error(error: litchi_core::Error) -> Error {
+pub(crate) fn core_error(error: litchi_core::Error) -> Error {
     Error::from(error).with_format(FileFormat::Odp)
 }
 
 impl Odp {
     /// Adopts the package detection prepared without a second ZIP index.
-    /// Every in-memory route uses this, including the one the facade served
-    /// by turning a prepared package back into bytes and parsing them again
-    /// (`DetectedFormat::Odp`).
-    pub(crate) fn from_prepared(prepared: PreparedPackage, _options: &OpenOptions) -> Result<Self> {
-        let presentation = litchi_odp::Package::from_prepared_package(prepared)
-            .map_err(odf_error)?
-            .presentation()
-            .map_err(core_error)?;
-        Ok(Self::from_owner(OdpOwner::Eager(presentation)))
+    pub(crate) fn from_prepared(prepared: PreparedPackage, options: &OpenOptions) -> Result<Self> {
+        let package = litchi_odp::Package::from_prepared_package(prepared).map_err(odf_error)?;
+        Self::from_package(package, None, options.odf_open_options())
     }
 
     /// Adopts the source-backed owner the path route built over the file.
     #[cfg(any(unix, windows))]
     pub(crate) fn from_source(
         presentation: litchi_odp::SourceBackedPresentation,
-        _options: &OpenOptions,
+        options: &OpenOptions,
     ) -> Result<Self> {
-        Ok(Self::from_owner(OdpOwner::Source(presentation)))
+        Ok(Self::from_owner(
+            OdpOwner::Source(presentation),
+            None,
+            options.odf_open_options(),
+        ))
     }
 
-    fn from_owner(owner: OdpOwner) -> Self {
-        Self(Arc::new(OdpState { owner }))
+    /// Adopts a flat (single XML) presentation for reads.
+    pub(crate) fn from_flat(bytes: Vec<u8>, options: &OpenOptions) -> Result<Self> {
+        let flat = litchi_odp::FlatPresentation::from_bytes(bytes).map_err(core_error)?;
+        Ok(Self::from_owner(
+            OdpOwner::Flat(flat),
+            None,
+            options.odf_open_options(),
+        ))
+    }
+
+    pub(crate) fn from_package(
+        package: litchi_odp::Package,
+        origin: Option<Arc<Path>>,
+        odf_options: litchi_odf_common::OpenOptions,
+    ) -> Result<Self> {
+        let presentation = package.presentation().map_err(core_error)?;
+        Ok(Self::from_owner(
+            OdpOwner::Eager {
+                package,
+                presentation,
+            },
+            origin,
+            odf_options,
+        ))
+    }
+
+    fn from_owner(
+        owner: OdpOwner,
+        origin: Option<Arc<Path>>,
+        odf_options: litchi_odf_common::OpenOptions,
+    ) -> Self {
+        Self(Arc::new(OdpState {
+            owner,
+            origin,
+            odf_options,
+            scene: OnceLock::new(),
+            masters: OnceLock::new(),
+            layouts: OnceLock::new(),
+            annotations: OnceLock::new(),
+            materialized: OnceLock::new(),
+        }))
+    }
+
+    /// The same snapshot, saving to `origin`.
+    pub(crate) fn with_origin(self, origin: Option<Arc<Path>>) -> Self {
+        let state = match Arc::try_unwrap(self.0) {
+            Ok(mut state) => {
+                state.origin = origin;
+                state
+            },
+            Err(shared) => OdpState {
+                owner: match &shared.owner {
+                    OdpOwner::Eager {
+                        package,
+                        presentation,
+                    } => OdpOwner::Eager {
+                        package: package.clone(),
+                        presentation: presentation.clone(),
+                    },
+                    // A source owner is adopted once by the opener; it is
+                    // never shared before its origin is attached.
+                    #[cfg(any(unix, windows))]
+                    OdpOwner::Source(_) => {
+                        return Self(shared);
+                    },
+                    OdpOwner::Flat(flat) => OdpOwner::Flat(flat.clone()),
+                },
+                origin,
+                odf_options: shared.odf_options,
+                scene: OnceLock::new(),
+                masters: OnceLock::new(),
+                layouts: OnceLock::new(),
+                annotations: OnceLock::new(),
+                materialized: OnceLock::new(),
+            },
+        };
+        Self(Arc::new(state))
+    }
+
+    /// The path a path-backed open retained.
+    #[allow(dead_code, reason = "TEMP-READ-COMMIT: used by the write handlers")]
+    pub(crate) fn origin(&self) -> Option<&Arc<Path>> {
+        self.0.origin.as_ref()
+    }
+
+    /// Adopt the package one checked edit published, keeping the origin.
+    #[allow(dead_code, reason = "TEMP-READ-COMMIT: used by the write handlers")]
+    pub(crate) fn with_package(&self, package: litchi_odp::Package) -> Result<Self> {
+        Self::from_package(package, self.0.origin.clone(), self.0.odf_options)
+    }
+
+    /// Create a presentation with one blank slide.
+    #[allow(dead_code, reason = "TEMP-READ-COMMIT: used by the write handlers")]
+    pub(crate) fn create(options: &crate::CreateOptions) -> Result<Self> {
+        use crate::{Conformance, Flavor};
+        let reason = if options.flavor_value() != Flavor::Document {
+            Some("ODP template (.otp) creation is not supported")
+        } else if options.conformance_value() == Conformance::Strict {
+            Some("ODP has no OOXML Strict conformance")
+        } else {
+            None
+        };
+        if let Some(reason) = reason {
+            return Err(Error::new(Code::UnsupportedCapability, reason)
+                .with_format(FileFormat::Odp)
+                .with_suggestion("use default CreateOptions for an ordinary presentation"));
+        }
+        let mut builder = litchi_odp::Builder::new();
+        builder
+            .add_slide_element(litchi_odp::Slide {
+                title: None,
+                text: String::new(),
+                index: 0,
+                notes: None,
+                transition: None,
+                animations: Vec::new(),
+                legacy_animation: None,
+                shapes: Vec::new(),
+            })
+            .map_err(core_error)?;
+        if let Some(metadata) = options.metadata_value() {
+            let simple = Metadata {
+                title: metadata.title.clone(),
+                author: metadata.author.clone(),
+                subject: metadata.subject.clone(),
+                description: metadata.description.clone(),
+                keywords: metadata.keywords.clone(),
+                ..Metadata::default()
+            };
+            if simple != *metadata {
+                return Err(Error::new(
+                    Code::UnsupportedCapability,
+                    "initial ODP metadata supports title, author, subject, description and keywords only",
+                )
+                .with_format(FileFormat::Odp)
+                .with_suggestion("set the other fields after creation is integrated (M6 ODP metadata)"));
+            }
+            builder.set_metadata(simple);
+        }
+        let package = builder.build().map_err(odf_error)?;
+        Self::from_package(package, None, litchi_odf_common::OpenOptions::new())
+    }
+
+    /// The retained leaf owner.
+    #[cfg(test)]
+    pub(crate) fn owner(&self) -> &OdpOwner {
+        &self.0.owner
+    }
+
+    /// Check a filesystem-backed source's revision.
+    pub(crate) fn check_source(&self) -> Result<()> {
+        match &self.0.owner {
+            #[cfg(any(unix, windows))]
+            OdpOwner::Source(presentation) => presentation.check_source().map_err(core_error),
+            _ => Ok(()),
+        }
+    }
+
+    /// The owner's `content.xml` (the whole document for a flat input).
+    pub(crate) fn content_xml(&self) -> Result<&str> {
+        match &self.0.owner {
+            OdpOwner::Eager { presentation, .. } => Ok(presentation.content_xml()),
+            #[cfg(any(unix, windows))]
+            OdpOwner::Source(presentation) => presentation.content_xml().map_err(core_error),
+            OdpOwner::Flat(flat) => std::str::from_utf8(flat.as_bytes()).map_err(|_| {
+                Error::new(Code::CorruptFile, "the flat ODP document is not UTF-8")
+                    .with_format(FileFormat::Odp)
+            }),
+        }
+    }
+
+    fn styles_xml(&self) -> Result<Option<&str>> {
+        match &self.0.owner {
+            OdpOwner::Eager { presentation, .. } => Ok(presentation.styles_xml()),
+            #[cfg(any(unix, windows))]
+            OdpOwner::Source(presentation) => presentation.styles_xml().map_err(core_error),
+            OdpOwner::Flat(_) => self.content_xml().map(Some),
+        }
+    }
+
+    /// The scene index of the snapshot, built on first use.
+    pub(crate) fn scene(&self) -> Result<&Scene> {
+        if let Some(scene) = self.0.scene.get() {
+            return Ok(scene);
+        }
+        let scene = Scene::parse(self.content_xml()?).map_err(core_error)?;
+        Ok(self.0.scene.get_or_init(|| scene))
+    }
+
+    /// The master pages, listed by identity on first use.
+    pub(crate) fn masters(&self) -> Result<&[litchi_odp::master::Summary]> {
+        if let Some(masters) = self.0.masters.get() {
+            return Ok(masters);
+        }
+        let masters = match self.styles_xml()? {
+            Some(styles) => litchi_odp::master::list(styles).map_err(core_error)?,
+            None => Vec::new(),
+        };
+        Ok(self.0.masters.get_or_init(|| masters))
+    }
+
+    /// The presentation page layouts, parsed on first use.
+    pub(crate) fn layouts(&self) -> Result<&[litchi_odp::layout::Layout]> {
+        if let Some(layouts) = self.0.layouts.get() {
+            return Ok(layouts);
+        }
+        let layouts = match self.styles_xml()? {
+            Some(styles) => {
+                litchi_odp::layout::parse(styles)
+                    .map_err(core_error)?
+                    .layouts
+            },
+            None => Vec::new(),
+        };
+        Ok(self.0.layouts.get_or_init(|| layouts))
+    }
+
+    /// The annotation inventory, parsed on first use.
+    pub(crate) fn annotations(&self) -> Result<&[litchi_odp::annotation::Info]> {
+        if let Some(annotations) = self.0.annotations.get() {
+            return Ok(annotations);
+        }
+        let annotations =
+            litchi_odp::annotation::inventory(self.content_xml()?).map_err(core_error)?;
+        Ok(self.0.annotations.get_or_init(|| annotations))
+    }
+
+    /// The immutable package writes start from: the eager owner, or a
+    /// source-backed owner's file materialized once under its revision
+    /// fence. Flat documents have no package.
+    #[allow(dead_code, reason = "TEMP-READ-COMMIT: used by the write handlers")]
+    pub(crate) fn package(&self) -> Result<&litchi_odp::Package> {
+        match &self.0.owner {
+            OdpOwner::Eager { package, .. } => Ok(package),
+            #[cfg(any(unix, windows))]
+            OdpOwner::Source(presentation) => {
+                if let Some(package) = self.0.materialized.get() {
+                    presentation.check_source().map_err(core_error)?;
+                    return Ok(package);
+                }
+                let origin = self.0.origin.as_ref().ok_or_else(|| {
+                    Error::new(
+                        Code::UnsupportedCapability,
+                        "a source-backed ODP owner without a path cannot be edited",
+                    )
+                    .with_format(FileFormat::Odp)
+                })?;
+                presentation.check_source().map_err(core_error)?;
+                let bytes = std::fs::read(origin).map_err(Error::from)?;
+                presentation.check_source().map_err(core_error)?;
+                let package =
+                    litchi_odp::Package::from_bytes_with_options(&bytes, self.0.odf_options)
+                        .map_err(odf_error)?;
+                Ok(self.0.materialized.get_or_init(|| package))
+            },
+            OdpOwner::Flat(_) => Err(flat_write()),
+        }
+    }
+
+    /// Whether this is a flat (single XML) document.
+    #[allow(dead_code, reason = "TEMP-READ-COMMIT: used by the write handlers")]
+    pub(crate) fn is_flat(&self) -> bool {
+        matches!(self.0.owner, OdpOwner::Flat(_))
+    }
+
+    /// Admit a write: the snapshot must have an editable package.
+    #[allow(dead_code, reason = "TEMP-READ-COMMIT: used by the write handlers")]
+    pub(crate) fn admit_edit(&self) -> Result<()> {
+        let package = self.package()?;
+        drop(package.edit().map_err(odf_error)?);
+        Ok(())
+    }
+
+    /// Whether two handles retain the same immutable snapshot.
+    #[allow(dead_code, reason = "TEMP-READ-COMMIT: used by the write handlers")]
+    pub(crate) fn same_snapshot(&self, other: &Self) -> bool {
+        if Arc::ptr_eq(&self.0, &other.0) {
+            return true;
+        }
+        match (&self.0.owner, &other.0.owner) {
+            (OdpOwner::Eager { package: left, .. }, OdpOwner::Eager { package: right, .. }) => {
+                std::ptr::eq(left.as_bytes(), right.as_bytes())
+            },
+            _ => false,
+        }
+    }
+
+    /// Whether two handles publish the same bytes.
+    #[allow(dead_code, reason = "TEMP-READ-COMMIT: used by the write handlers")]
+    pub(crate) fn same_content(&self, other: &Self) -> Result<bool> {
+        if self.same_snapshot(other) {
+            return Ok(true);
+        }
+        Ok(self.package()?.as_bytes() == other.package()?.as_bytes())
     }
 
     /// The text of every slide.
@@ -93,9 +416,16 @@ impl Odp {
     /// when a filesystem-backed source changed.
     pub fn text(&self) -> Result<String> {
         match &self.0.owner {
-            OdpOwner::Eager(presentation) => presentation.text(),
+            OdpOwner::Eager { presentation, .. } => presentation.text(),
             #[cfg(any(unix, windows))]
             OdpOwner::Source(presentation) => presentation.text(),
+            OdpOwner::Flat(flat) => Ok(flat
+                .slides()
+                .iter()
+                .map(litchi_odp::Slide::all_text)
+                .filter(|text| !text.is_empty())
+                .collect::<Vec<_>>()
+                .join("\n\n")),
         }
         .map_err(core_error)
     }
@@ -107,26 +437,52 @@ impl Odp {
     /// As for [`Self::text`].
     pub fn slide_count(&self) -> Result<usize> {
         match &self.0.owner {
-            OdpOwner::Eager(presentation) => presentation.slide_count(),
+            OdpOwner::Eager { presentation, .. } => presentation.slide_count(),
             #[cfg(any(unix, windows))]
             OdpOwner::Source(presentation) => presentation.slide_count(),
+            OdpOwner::Flat(flat) => Ok(flat.slide_count()),
         }
         .map_err(core_error)
     }
 
-    /// Document properties, as the facade reports them today: always
-    /// `Some(Metadata::default())`. The leaf's `meta.xml` projection is not
-    /// surfaced yet; changing that is a behaviour change left to M1.
+    /// The parsed slides, for the presentation family view.
+    pub(crate) fn slides(&self) -> Result<Vec<litchi_odp::Slide>> {
+        match &self.0.owner {
+            OdpOwner::Eager { presentation, .. } => presentation.slides(),
+            #[cfg(any(unix, windows))]
+            OdpOwner::Source(presentation) => presentation.slides(),
+            OdpOwner::Flat(flat) => Ok(flat.slides().to_vec()),
+        }
+        .map_err(core_error)
+    }
+
+    /// One parsed slide, for the presentation family view.
+    pub(crate) fn slide(&self, position: usize) -> Result<Option<litchi_odp::Slide>> {
+        match &self.0.owner {
+            OdpOwner::Eager { presentation, .. } => presentation.slide(position),
+            #[cfg(any(unix, windows))]
+            OdpOwner::Source(presentation) => presentation.slide(position),
+            OdpOwner::Flat(flat) => Ok(flat.slides().get(position).cloned()),
+        }
+        .map_err(core_error)
+    }
+
+    /// Document properties projected from `meta.xml`. A flat document
+    /// reports the default (empty) metadata.
     ///
     /// # Errors
     ///
-    /// Returns `io_error` when a filesystem-backed source changed.
+    /// Returns `io_error` when a filesystem-backed source changed and
+    /// `corrupt_file` when `meta.xml` is malformed.
     pub fn metadata(&self) -> Result<Option<Metadata>> {
-        #[cfg(any(unix, windows))]
-        if let OdpOwner::Source(presentation) = &self.0.owner {
-            presentation.check_source().map_err(core_error)?;
+        match &self.0.owner {
+            OdpOwner::Eager { presentation, .. } => {
+                presentation.metadata().map(Some).map_err(core_error)
+            },
+            #[cfg(any(unix, windows))]
+            OdpOwner::Source(presentation) => presentation.metadata().map(Some).map_err(core_error),
+            OdpOwner::Flat(_) => Ok(Some(Metadata::default())),
         }
-        Ok(Some(Metadata::default()))
     }
 
     /// Everything the reader repaired while opening the package and scanning
@@ -138,24 +494,66 @@ impl Odp {
     /// formats.
     pub fn tolerance_report(&self) -> Result<ToleranceReport> {
         Ok(match &self.0.owner {
-            OdpOwner::Eager(presentation) => presentation.tolerance_report().clone(),
+            OdpOwner::Eager { presentation, .. } => presentation.tolerance_report().clone(),
             #[cfg(any(unix, windows))]
             OdpOwner::Source(presentation) => presentation.tolerance_report().clone(),
+            OdpOwner::Flat(flat) => flat.tolerance_report().clone(),
         })
     }
 
-    /// The retained leaf owner, for the crate's family views.
-    pub(crate) fn owner(&self) -> &OdpOwner {
-        &self.0.owner
+    /// Publish the snapshot's exact package bytes.
+    #[allow(dead_code, reason = "TEMP-READ-COMMIT: used by the write handlers")]
+    pub(crate) fn write_to(&self, mut sink: impl std::io::Write) -> Result<()> {
+        if let OdpOwner::Flat(flat) = &self.0.owner {
+            sink.write_all(flat.as_bytes()).map_err(Error::from)?;
+            return Ok(());
+        }
+        let package = self.package()?;
+        sink.write_all(package.as_bytes()).map_err(Error::from)?;
+        self.check_source()
     }
+
+    /// Atomically publish the snapshot to `path`.
+    #[allow(dead_code, reason = "TEMP-READ-COMMIT: used by the write handlers")]
+    pub(crate) fn save_to(&self, path: &Path, options: &crate::SaveOptions) -> Result<u64> {
+        let bytes: &[u8] = match &self.0.owner {
+            OdpOwner::Flat(flat) => flat.as_bytes(),
+            _ => self.package()?.as_bytes(),
+        };
+        let overwrite = match options.overwrite {
+            crate::Overwrite::Replace => litchi_core::atomic::Overwrite::Replace,
+            crate::Overwrite::Refuse => litchi_core::atomic::Overwrite::Refuse,
+        };
+        litchi_core::atomic::save::<_, Error, _, _>(
+            path,
+            options.durability,
+            overwrite,
+            |staging| {
+                staging.write_all(bytes).map_err(Error::from)?;
+                Ok(u64::try_from(bytes.len()).unwrap_or(u64::MAX))
+            },
+            || self.check_source(),
+        )
+    }
+}
+
+#[allow(dead_code, reason = "TEMP-READ-COMMIT: used by the write handlers")]
+fn flat_write() -> Error {
+    Error::new(
+        Code::UnsupportedCapability,
+        "flat OpenDocument presentations (.fodp) are read-only in the unified API",
+    )
+    .with_format(FileFormat::Odp)
+    .with_suggestion("follow-up: M6 flat ODF writes; convert to a packaged .odp to edit")
 }
 
 impl fmt::Debug for Odp {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         let state = match &self.0.owner {
-            OdpOwner::Eager(_) => "eager",
+            OdpOwner::Eager { .. } => "eager",
             #[cfg(any(unix, windows))]
             OdpOwner::Source(_) => "source",
+            OdpOwner::Flat(_) => "flat",
         };
         formatter
             .debug_struct("Odp")

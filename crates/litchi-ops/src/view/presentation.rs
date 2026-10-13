@@ -10,7 +10,7 @@ use crate::compat::slide::Slide;
 #[cfg(feature = "pptx")]
 use crate::compat::slide::SlideData;
 #[cfg(feature = "odp")]
-use crate::format::odp::{Odp, OdpOwner};
+use crate::format::odp::Odp;
 #[cfg(feature = "ppt")]
 use crate::format::ppt::Ppt;
 #[cfg(feature = "pptx")]
@@ -47,11 +47,6 @@ pub(crate) enum Inner<'a> {
     Ppt(&'a Ppt),
     #[cfg(feature = "odp")]
     Odp(&'a Odp),
-}
-
-#[cfg(feature = "odp")]
-fn odp_error(error: litchi_core::Error) -> crate::Error {
-    crate::Error::from(error).with_format(FileFormat::Odp)
 }
 
 #[cfg(feature = "pptx")]
@@ -141,15 +136,7 @@ impl<'a> PresentationView<'a> {
             #[cfg(feature = "ppt")]
             Inner::Ppt(ppt) => ppt.reader().slides()?.iter().map(ppt_slide).collect(),
             #[cfg(feature = "odp")]
-            Inner::Odp(odp) => Ok(match odp.owner() {
-                OdpOwner::Eager(presentation) => presentation.slides(),
-                #[cfg(any(unix, windows))]
-                OdpOwner::Source(presentation) => presentation.slides(),
-            }
-            .map_err(odp_error)?
-            .into_iter()
-            .map(Slide::Odp)
-            .collect()),
+            Inner::Odp(odp) => Ok(odp.slides()?.into_iter().map(Slide::Odp).collect()),
         }
     }
 
@@ -170,13 +157,7 @@ impl<'a> PresentationView<'a> {
                 .map(|slide| ppt_slide(&slide))
                 .transpose(),
             #[cfg(feature = "odp")]
-            Inner::Odp(odp) => Ok(match odp.owner() {
-                OdpOwner::Eager(presentation) => presentation.slide(position),
-                #[cfg(any(unix, windows))]
-                OdpOwner::Source(presentation) => presentation.slide(position),
-            }
-            .map_err(odp_error)?
-            .map(Slide::Odp)),
+            Inner::Odp(odp) => Ok(odp.slide(position)?.map(Slide::Odp)),
         }
     }
 

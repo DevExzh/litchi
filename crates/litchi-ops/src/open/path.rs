@@ -13,6 +13,7 @@ use std::path::Path;
     feature = "pptx",
     feature = "rtf",
     feature = "xlsb",
+    feature = "odp",
     all(
         any(unix, windows),
         any(
@@ -40,6 +41,7 @@ use crate::{File, OpenOptions};
     feature = "pptx",
     feature = "rtf",
     feature = "xlsb",
+    feature = "odp",
     all(
         any(unix, windows),
         any(
@@ -120,7 +122,8 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
             feature = "pptx",
             feature = "xls",
             feature = "xlsb",
-            feature = "rtf"
+            feature = "rtf",
+            feature = "odp"
         ))]
         let file = if matches!(
             file.format(),
@@ -133,6 +136,7 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
                     | litchi_core::FileFormat::Pptx
                     | litchi_core::FileFormat::Rtf
                     | litchi_core::FileFormat::Xlsb
+                    | litchi_core::FileFormat::Odp
             )
         ) || matches!(&file, File::Locked(_))
         {
@@ -223,7 +227,8 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
         feature = "pptx",
         feature = "xls",
         feature = "xlsb",
-        feature = "rtf"
+        feature = "rtf",
+        feature = "odp"
     ))]
     let opened = if matches!(
         opened.format(),
@@ -236,6 +241,7 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
                 | litchi_core::FileFormat::Pptx
                 | litchi_core::FileFormat::Rtf
                 | litchi_core::FileFormat::Xlsb
+                | litchi_core::FileFormat::Odp
         )
     ) || matches!(&opened, File::Locked(_))
     {
@@ -489,10 +495,10 @@ mod zip {
                 )
                 .map_err(litchi_core::Error::from);
                 ensure_path_source_current(source.as_ref(), version)?;
-                Ok(File::Odp(crate::format::odp::Odp::from_source(
-                    presentation.map_err(error)?,
-                    options,
-                )?))
+                Ok(File::Odp(
+                    crate::format::odp::Odp::from_source(presentation.map_err(error)?, options)?
+                        .with_origin(Some(super::stable_origin(path)?)),
+                ))
             },
             other => {
                 let _ = (error, path, length);

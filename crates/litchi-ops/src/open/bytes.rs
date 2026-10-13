@@ -37,6 +37,12 @@ pub(super) fn open<T: ZipTail>(
 
     #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
     if let Some(format) = litchi_odf_common::detect::flat(&bytes) {
+        #[cfg(feature = "odp")]
+        if format == FileFormat::Odp {
+            return Ok(File::Odp(crate::format::odp::Odp::from_flat(
+                bytes, options,
+            )?));
+        }
         return Err(super::flat_odf_unsupported(format));
     }
 

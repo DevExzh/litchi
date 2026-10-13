@@ -139,6 +139,49 @@ pub(crate) const PPTX: &[&str] = &[
     "comment",
 ];
 
+/// OpenDocument presentation selectors (record 0278), recorded from the
+/// read adapter before its write handlers landed.
+#[cfg(feature = "odp")]
+pub(crate) const ODP: &[&str] = &[
+    "shape",
+    "shape[width>=10cm]",
+    "shape[x<2cm]",
+    "shape[y!=0]",
+    "shape:contains(a)",
+    "shape:empty",
+    "shape[name~=Title]",
+    "shape[isTitle=true]",
+    "title",
+    "textbox",
+    "picture",
+    "table",
+    "tr",
+    "tc",
+    "tc:contains(a)",
+    "paragraph",
+    "paragraph[level>=1]",
+    "p:contains(the)",
+    "run",
+    "run[style]",
+    "slide",
+    "slide[name~=page]",
+    "shape[1]",
+    "shape[last()]",
+    "slide > shape",
+    "notes",
+    "notes paragraph",
+    "comment",
+    "ole",
+    "chart",
+    "group",
+    "connector",
+    "slide:has(picture)",
+    "paragraph:not(:empty)",
+    "shape[width>=10cm and height<2cm]",
+    "slideMaster",
+    "slideLayout",
+];
+
 /// FNV-1a over two 64-bit lanes with different offsets.
 struct Fnv([u64; 2]);
 
@@ -304,13 +347,23 @@ pub(crate) fn corpus(root: &Path, extension: &str) -> Vec<PathBuf> {
 /// or read as another format).
 pub(crate) fn digests(root: &Path) -> BTreeMap<String, String> {
     let mut out = BTreeMap::new();
-    for (extension, format, selectors) in [
+    let formats = [
         ("xlsx", FileFormat::Xlsx, XLSX),
         ("docx", FileFormat::Docx, DOCX),
         ("pptx", FileFormat::Pptx, PPTX),
         ("xls", FileFormat::Xls, XLS),
         ("xlsb", FileFormat::Xlsb, XLSB),
-    ] {
+    ];
+    #[cfg(feature = "odp")]
+    let formats = {
+        let mut all = formats.to_vec();
+        all.extend([
+            ("odp", FileFormat::Odp, ODP),
+            ("fodp", FileFormat::Odp, ODP),
+        ]);
+        all
+    };
+    for (extension, format, selectors) in formats {
         let mut hashers: Vec<Fnv> = selectors.iter().map(|_| Fnv::new()).collect();
         let mut counts = vec![0_usize; selectors.len()];
         let (mut files, mut skipped) = (0_usize, 0_usize);

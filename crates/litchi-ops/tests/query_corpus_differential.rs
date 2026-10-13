@@ -9,8 +9,10 @@
 //! trunk, where the pre-0262 build `ab7e4b7480` and the merged build
 //! `80915b091b` printed byte-identical digests). The XLS and XLSB digests
 //! were added by record 0267, printed by trunk `4d1afe92bc` before its
-//! changes. Each digest covers, file by file, every match's kind,
-//! path, positional path and text, and every error, so a changed result set
+//! changes. The ODP and flat ODP digests were added by record 0278, printed
+//! by its read adapter before the ODP write handlers landed. Each digest
+//! covers, file by file, every match's kind, path, positional path and
+//! text, and every error, so a changed result set
 //! on any file changes it. Set `LITCHI_BLESS_GOLDEN=1` to write the current
 //! build's digests instead, after showing that a change of results is
 //! intended.
@@ -63,14 +65,21 @@ fn corpus_queries_return_what_they_returned_before() {
         golden.len(),
         differences.join("\n")
     );
-    // The selectors cover the three formats and find matches.
-    for (extension, selectors) in [
+    // The selectors cover the formats and find matches.
+    let formats = [
         ("xlsx", query_corpus::XLSX),
         ("docx", query_corpus::DOCX),
         ("pptx", query_corpus::PPTX),
         ("xls", query_corpus::XLS),
         ("xlsb", query_corpus::XLSB),
-    ] {
+    ];
+    #[cfg(feature = "odp")]
+    let formats = {
+        let mut all = formats.to_vec();
+        all.push(("odp", query_corpus::ODP));
+        all
+    };
+    for (extension, selectors) in formats {
         let matched = selectors
             .iter()
             .filter(|selector| {

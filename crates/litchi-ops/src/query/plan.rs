@@ -125,6 +125,8 @@ impl<'q> Plan<'q> {
             FileFormat::Rtf => super::compile::compile::<crate::format::rtf::Nav<'static>>(query),
             #[cfg(feature = "ppt")]
             FileFormat::Ppt => super::compile::compile::<crate::format::ppt::Nav<'static>>(query),
+            #[cfg(feature = "odp")]
+            FileFormat::Odp => super::compile::compile::<crate::format::odp::Nav<'static>>(query),
             _ => {
                 let _ = query;
                 Err(Error::new(

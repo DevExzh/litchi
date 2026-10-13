@@ -98,7 +98,8 @@
         feature = "pptx",
         feature = "xlsb",
         feature = "xls",
-        feature = "rtf"
+        feature = "rtf",
+        feature = "odp"
     )),
     allow(
         dead_code,
@@ -2278,6 +2279,8 @@ const fn view_gap(adapter: Adapter, mode: Mode) -> Option<&'static GapSpec> {
         Adapter::Ppt => m1_view_gap(mode),
         #[cfg(feature = "rtf")]
         Adapter::Rtf => m1_view_gap(mode),
+        #[cfg(feature = "odp")]
+        Adapter::Odp => m1_view_gap(mode),
     }
 }
 
@@ -2413,6 +2416,9 @@ check_capabilities!(crate::format::ppt::SPEC);
 
 #[cfg(feature = "rtf")]
 check_capabilities!(crate::format::rtf::SPEC);
+
+#[cfg(feature = "odp")]
+check_capabilities!(crate::format::odp::SPEC);
 
 /// Byte equality usable in constant evaluation.
 const fn same(a: &str, b: &str) -> bool {

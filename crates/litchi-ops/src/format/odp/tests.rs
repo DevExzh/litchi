@@ -56,10 +56,10 @@ fn assert_matches_leaf(odp: &Odp, leaf: &litchi_odp::Presentation, name: &str) {
         leaf.slide_count().expect("leaf slide count"),
         "{name}"
     );
-    // The facade reports `Some(Metadata::default())` for ODP.
+    // The handle projects the leaf's `meta.xml` (record 0278).
     assert_eq!(
-        format!("{:?}", odp.metadata().expect("metadata")),
-        format!("{:?}", Some(Metadata::default())),
+        odp.metadata().expect("metadata"),
+        Some(leaf.metadata().expect("leaf metadata")),
         "{name}"
     );
     assert_eq!(
@@ -88,7 +88,7 @@ fn byte_routes_match_the_leaf_reader() {
             .expect("leaf ODP");
         assert!(leaf.slide_count().expect("slides") > 0, "{name}");
         for odp in [open_prepared(bytes.clone()), open_detected(bytes)] {
-            assert!(matches!(odp.owner(), OdpOwner::Eager(_)));
+            assert!(matches!(odp.owner(), OdpOwner::Eager { .. }));
             assert_matches_leaf(&odp, &leaf, name);
         }
     }
