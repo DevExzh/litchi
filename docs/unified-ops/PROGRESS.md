@@ -334,6 +334,19 @@ Cut from `e467bcf4e8`:
   - A 10k fanout is one write (op cap 4,096 → 65,536), ~1.05×.
   - Misses: single set 1.18×; cell writes ~1.24×.
 
+- Merged `p7d-xlsb` (0261, `ab7e4b7480`):
+  - XLSB W2 residue: one `OpenOptions` replaces 37 routes; `raw::Encoder`; three families registered.
+  - Source-backed metadata sets are ×1.02–1.04 (was ×1.37–1.39).
+  - P0 formats, formulas, merges and named ranges, all ≤1.08.
+- Fixed `ce003ff150`: the harness metadata test used the deleted `Props`. Harness gates now build `--all-targets`.
+- Merged `p8-perf` (0262, `80915b091b`):
+  - one freshness check per step; typed comparisons; smaller nodes; O(1) XLSX records;
+  - `first()` in O(1);
+  - the 0252 and 0253 write misses fixed (1.00–1.01×);
+  - full queries still miss R4b (XLSX 10.5–13.7×, PPTX 6.7–11.8×).
+  - The query-corpus golden went stale through corpus growth (more vendored fixtures). The pre-0262 and merged builds print byte-identical digests over today's corpus, so it was re-recorded.
+- **Owner decision (2026-10-14): accepted.** A PPTX filter on one key reads only that key, so a malformed unrelated property no longer fails the filter; reading it directly still errors (record 0262).
+
 Still running from R1: `p7a-docx` (0251), `p7c-pptx` (0252), `p6-ooxml-meta` (0253).
 
 Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-pptx-w4` 9474e2b6ce, `uo/m2-l-xlsb-w1` 876588a23c, `uo/m1-r4-perf` 012fd509ff.

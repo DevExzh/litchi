@@ -5,7 +5,9 @@
 //!
 //! `tests/golden/query_corpus/digests.json` holds the digests the trunk
 //! build before record 0262 printed (`examples/query_corpus_digest.rs`, base
-//! `949224c319`). Each digest covers, file by file, every match's kind,
+//! `949224c319`; re-recorded over the larger corpus after the merge into
+//! trunk, where the pre-0262 build `ab7e4b7480` and the merged build
+//! `80915b091b` printed byte-identical digests). Each digest covers, file by file, every match's kind,
 //! path, positional path and text, and every error, so a changed result set
 //! on any file changes it. Set `LITCHI_BLESS_GOLDEN=1` to write the current
 //! build's digests instead, after showing that a change of results is
