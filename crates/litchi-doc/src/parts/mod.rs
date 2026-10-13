@@ -31,6 +31,7 @@ pub mod envelope;
 pub mod fib;
 pub mod fields;
 pub mod fkp;
+pub mod fonts;
 pub mod footnotes;
 pub mod form_fields;
 pub mod format_consistency;

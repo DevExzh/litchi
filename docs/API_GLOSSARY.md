@@ -57,6 +57,8 @@ transaction is the bare `Package::edit()`.
 | No-op introspection | `commit.diagnostics().changed()`; `patch.is_noop()` | `Transaction::is_changed()`, `Commit::is_changed()` (pptx), `Patch::is_empty()` (xlsx) | ✅ iWork/docx/PPTX primary (0118), XLSX primary (0250) · ✅ scoped PPTX families: `diagnostics().changed()` / `is_noop()` (0252) · 🔴 remaining W2 |
 | Inverse patch | `Patch::inverse()` | — | ✅ everywhere |
 | Rollback | *dropping the `Edit`* | `Transaction::rollback()` (pptx) | ✅ primary PPTX edit (0116); ✅ scoped PPTX families (0252) |
+
+| Rollback | *dropping the `Edit`* | `Transaction::rollback()` (pptx) | ✅ primary PPTX edit (0116); ✅ every DOC transaction, `rollback` banned crate-wide (0258); 🔴 scoped PPTX families (W2) |
 | Mutable writer on a package | *none — `edit()` is the only write path* | `document_mut()` (docx), `presentation_mut()` (pptx) | PPTX `presentation_mut` removed (0127); 🔴 remaining W2 authoring verbs move into `Edit`, direct mutators and `UnsafeEdit` vocabulary still require migration |
 
 Deferred (own tracks, not this glossary): `History`/undo-redo, patch
@@ -89,6 +91,8 @@ and redaction vocabulary remain pending.
 | Open from shared bytes (zero-copy) | `from_shared_bytes(Arc<[u8]>)` | — | ✅ numbers; offered only where zero-copy is real |
 | Open from reader | `from_reader(R)` | — | ✅ docx/xlsx; extended per wave |
 | Configured open | `open_with_options(path, OpenOptions)`, `from_bytes_with_options(bytes, OpenOptions)` | `open_with_limits`, `open_with` (doc), `open_with_options` under other type names | envelope decided in §5 · ✅ DOCX (0038) · ✅ XLSX `OpenOptions` (source limits, leniency, encryption limits; 0250) · ✅ PPTX owning `Package` and positional-source presentation owners (0252) |
+
+| Configured open | `open_with_options(path, OpenOptions)`, `from_bytes_with_options(bytes, OpenOptions)` | `open_with_limits`, `open_with` (doc), `open_with_options` under other type names | envelope decided in §5 · ✅ XLSX `OpenOptions` (source limits, leniency, encryption limits; 0250) · ✅ DOC raw owner and part editors, `open_with_limits*` banned crate-wide (0258) |
 | Minimal fresh artifact | `Package::new()` | `Workbook::create()` duplicate (xlsx) | ✅ docx; ✅ canonical PPTX constructor (0127); ✅ XLSB (0175); ✅ XLS (0199); ✅ RTF (0225); ✅ XLSX (0250) · all formats gain it |
 | Save to path | `save(path)` — **always atomic** (sibling temp + rename) | non-atomic `Builder::save` (odt/odp) | ✅ OOXML, including lazy DOCX (0041), and RTF (0226) · 🔴 ODF (W3, behavior change with CRUD evidence) |
 | Save with explicit durability | `save_with_durability(path, Durability)` | — | ✅ OOXML and RTF (0226); extended everywhere |
@@ -1683,3 +1687,23 @@ diagnostics, into_parts}`). The unified layer accepts initial metadata in
 `create_with` and `set("/metadata", ..)` with record 0254's 22
 root-metadata keys, `custom.<name>` and `null` removal; `/metadata` stays
 set-only for every format.
+
+## DOC P0 surface and W4 residue (record 0258)
+
+Positional DOC readers take `Position`, never raw `usize`:
+`Document::{body_paragraph, body_table, footnote, endnote, comment,
+header_footer_slot, section_header_footer}` and `StoryBlocks::{get,
+get_kind, paragraph, table, element, paragraph_text}`; `HeaderFooterSlot`
+reports its sections as `Position`. The primary `doc::Edit` gains
+`set_character_value(TextTarget, CharacterValue)`, `insert_paragraph`,
+`remove_paragraph` and `move_paragraph`; `TextTarget::BodySpan` addresses
+one run. Part-level ingress is `open(bytes)`, `open_with_policy` and
+`open_with_options(bytes, &EditOptions)` (revision limits plus protection
+policy); `SourceSnapshot` keeps `open_with_options(source,
+SourceBackedOptions)`; the raw owner's configured open is
+`raw::Package::open_with_options(path, OpenOptions)`; smart tags adopt a
+bounded `Snapshot::parse_with_options_and_policy` result through
+`Editor::from_snapshot`. `open_with_limits`, `open_with_limits_and_policy`
+and every `rollback` are removed and banned in both DOC profiles (dropping a
+transaction is the rollback). See
+[0258](unified-ops/0258-doc-p0-surface.md).

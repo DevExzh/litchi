@@ -60,8 +60,10 @@ impl Document {
 
     /// Get the number of tables in the document.
     ///
-    /// Counts top-level tables (`table_level` == 1) by scanning paragraph properties
-    /// for table markers. Based on Apache POI's table detection algorithm.
+    /// Counts the top-level tables [`Self::tables`] returns: a table starts at
+    /// a paragraph of table depth 1
+    /// ([`crate::parts::pap::ParagraphProperties::table_depth`]) and encloses
+    /// the paragraphs of any table nested in it.
     ///
     /// # Examples
     ///
@@ -75,30 +77,16 @@ impl Document {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn table_count(&self) -> Result<usize> {
-        // Count tables by iterating through paragraphs and tracking table boundaries
-        // A new table starts when we encounter a paragraph with in_table=true and
-        // table_level=1 after a paragraph that was not in a table or had a different level
-        let paragraphs = self.paragraphs()?;
-        let mut table_count = 0;
-        let mut in_table_level_1 = false;
+        use super::super::validation::{BlockGrouper, Placement};
 
-        for para in paragraphs {
-            let props = para.properties();
-
-            // Check if this paragraph is in a top-level table (level 1)
-            if props.in_table && props.table_nesting_level == 1 {
-                // If we weren't previously in a level-1 table, this is a new table
-                if !in_table_level_1 {
-                    table_count += 1;
-                    in_table_level_1 = true;
-                }
-            } else {
-                // We've exited the table
-                in_table_level_1 = false;
-            }
-        }
-
-        Ok(table_count)
+        let mut grouper = BlockGrouper::default();
+        Ok(self
+            .paragraphs()?
+            .iter()
+            .filter(|paragraph| {
+                grouper.place(paragraph.properties().table_depth()) == Placement::TableStart
+            })
+            .count())
     }
 
     /// Get access to the File Information Block.

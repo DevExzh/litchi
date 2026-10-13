@@ -139,12 +139,6 @@ impl Transaction {
         self.editor.reject(index).map_err(Error::Invalid)
     }
 
-    /// Discards the candidate and recovers its immutable source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
-    }
-
     /// Commits the candidate as a validated snapshot and reversible patch.
     pub fn commit(self) -> Result<Commit> {
         let snapshot = self.snapshot()?;

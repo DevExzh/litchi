@@ -256,6 +256,16 @@ pub(in crate::document) struct DocumentState {
     /// Parsed MTEF formulas rendered while their temporary parser arena is alive.
     /// Owned strings avoid a self-referential document and remain cheap to share.
     pub(in crate::document) parsed_mtef: HashMap<String, Arc<str>>,
+    /// Bounded raw source for the deferred font-table (`SttbfFfn`) parse, or
+    /// its deferred range/allocation diagnostic.
+    pub(in crate::document) font_table_source: std::result::Result<Option<Vec<u8>>, String>,
+    /// Deferred strict font-table parse, including the first parse error so
+    /// a malformed table is not reparsed.
+    pub(in crate::document) font_table:
+        OnceLock<std::result::Result<Option<crate::parts::fonts::FontTable>, String>>,
+    /// Memoized per-story element indexes (M1 L-DOC-R3), a weighted
+    /// clean-value cache; see [`Document::story_blocks`].
+    pub(in crate::document) story_indexes: super::semantic::stories::StoryIndexCache,
 }
 
 /// An owned, read-only semantic projection of a legacy Word document.

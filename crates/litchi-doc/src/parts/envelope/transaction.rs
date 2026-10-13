@@ -185,11 +185,6 @@ impl Transaction {
         self.before != self.working
     }
 
-    /// Restore the staged state to the source snapshot.
-    pub fn rollback(&mut self) {
-        self.working = self.before.clone();
-    }
-
     /// Replace the complete optional FIB range atomically.
     pub fn set(&mut self, envelope: Option<Envelope>) -> Result<(), Error> {
         self.working = Snapshot::from_option(envelope).map_err(Error::Invalid)?;

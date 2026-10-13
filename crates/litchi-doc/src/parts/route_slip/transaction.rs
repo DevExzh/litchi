@@ -299,11 +299,6 @@ impl Transaction {
         &self.working
     }
 
-    /// Restores the transaction candidate to its source snapshot.
-    pub fn rollback(&mut self) {
-        self.working = self.before.clone();
-    }
-
     /// Whether the candidate differs from its source snapshot.
     #[must_use]
     pub fn is_changed(&self) -> bool {
