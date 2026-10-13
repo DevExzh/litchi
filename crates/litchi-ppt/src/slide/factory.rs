@@ -1,5 +1,5 @@
 use super::directory::{SlideDirectory, SlideDirectoryEntry};
-use super::notes::{NoteDescriptor, NotesIndex};
+use super::notes::NoteDescriptor;
 use crate::consts::RecordType;
 /// `SlideFactory` - Creates slides from persist mapping with zero-copy parsing.
 ///
@@ -7,7 +7,6 @@ use crate::consts::RecordType;
 use crate::package::{Error, Result, SourceLimits};
 use crate::persist::PersistMapping;
 use crate::records::{PayloadStore, Record};
-use once_cell::unsync::OnceCell;
 use std::sync::Arc;
 
 /// Factory for creating slides from document data using persist mapping.
@@ -27,7 +26,8 @@ pub struct SlideFactory<'doc> {
     source: PayloadStore<'doc>,
     /// Persist ID to byte offset mapping
     persist_mapping: &'doc PersistMapping,
-    notes_index: OnceCell<NotesIndex>,
+    /// The slide directory, which also holds the presentation's notes index
+    /// (L-PPT-R2), so a factory parses nothing but the slides it is asked for
     slide_directory: &'doc SlideDirectory,
     source_limits: SourceLimits,
 }
@@ -93,7 +93,6 @@ impl<'doc> SlideFactory<'doc> {
         Self {
             source,
             persist_mapping,
-            notes_index: OnceCell::new(),
             slide_directory,
             source_limits,
         }
@@ -139,7 +138,7 @@ impl<'doc> SlideFactory<'doc> {
     fn parse_slide_at_offset(
         &self,
         offset: u32,
-        entry: &SlideDirectoryEntry,
+        entry: &'doc SlideDirectoryEntry,
     ) -> Result<SlideData<'doc>> {
         let offset_usize = offset as usize;
 
@@ -160,12 +159,11 @@ impl<'doc> SlideFactory<'doc> {
             )));
         }
 
-        let note_descriptor = self
-            .notes_index
-            .get_or_init(|| {
-                NotesIndex::build_with_limits(self.source, self.slide_directory, self.source_limits)
-            })
-            .descriptor(&record, entry.persist_id(), self.persist_mapping);
+        let note_descriptor = self.slide_directory.notes_index().descriptor(
+            &record,
+            entry.slide_id(),
+            self.persist_mapping,
+        );
 
         Ok(SlideData {
             persist_id: entry.persist_id(),
@@ -173,6 +171,7 @@ impl<'doc> SlideFactory<'doc> {
             slide_list_text: entry.list_text().to_string(),
             outline_text_interactions: entry.outline_text_interactions().to_vec(),
             outline_text_refs: entry.outline_text_refs().to_vec(),
+            outline_text_bodies: entry.outline_text_bodies(),
             offset: offset_usize,
             record,
             doc_data: self.source,
@@ -211,6 +210,8 @@ pub struct SlideData<'doc> {
     /// Range-anchored actions from `SlideListWithText` text bodies.
     pub(crate) outline_text_interactions: Vec<crate::TextBodyInteractions>,
     pub(crate) outline_text_refs: Vec<crate::OutlineTextRef>,
+    /// The slide's slide-list text bodies, borrowed from the directory.
+    pub(crate) outline_text_bodies: &'doc [crate::OutlineTextBody],
     /// Byte offset in document stream
     pub offset: usize,
     /// Parsed Slide record
@@ -276,6 +277,7 @@ impl<'doc> SlideData<'doc> {
             slide_list_text: String::new(),
             outline_text_interactions: Vec::new(),
             outline_text_refs: Vec::new(),
+            outline_text_bodies: &[],
             offset,
             record,
             doc_data: PayloadStore::Owned(doc_data),

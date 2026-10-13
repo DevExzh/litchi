@@ -15,6 +15,7 @@ impl<'doc> Slide<'doc> {
             slide_list_text: data.slide_list_text,
             outline_text_interactions: data.outline_text_interactions,
             outline_text_refs: data.outline_text_refs,
+            outline_text_bodies: data.outline_text_bodies,
             slide_number,
             source,
             record: data.record,

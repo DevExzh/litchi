@@ -45,6 +45,10 @@ pub(super) fn placeholder_display_from_record(
 
 /// Parse the shapes of `record`'s `PPDrawing`, recording every text-style
 /// and shape repair into `report`. `None` when the record has no drawing.
+///
+/// No slide-list text is resolved: the header, footer, and date
+/// placeholders this projection reads hold their text inline, and main
+/// masters have no slide-list text.
 fn drawing_shapes(
     record: &Record,
     report: &mut crate::leniency::ToleranceReport,
@@ -56,7 +60,7 @@ fn drawing_shapes(
     let mut shapes = Vec::with_capacity(parsed.len());
     for (index, shape) in parsed.iter().enumerate() {
         if let Some(converted) =
-            Slide::<'static>::convert_odraw_to_shape_enum(shape, index, report)?
+            Slide::<'static>::convert_odraw_to_shape_enum(shape, index, &[], report)?
         {
             shapes.push(converted);
         }

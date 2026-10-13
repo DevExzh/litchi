@@ -1664,3 +1664,473 @@ fn test_slide_text_extraction_preserves_order() {
     assert!(pos1 < pos2);
     assert!(pos2 < pos3);
 }
+
+// ---------------------------------------------------------------------------
+// L-PPT-R1: outline text references resolved into shapes (finding F-10).
+// ---------------------------------------------------------------------------
+
+const OUTLINE_TEXT_REF_ATOM: u16 = 0x0f9e;
+
+fn utf16(text: &str) -> Vec<u8> {
+    text.encode_utf16().flat_map(u16::to_le_bytes).collect()
+}
+
+/// One slide's slide-list text: a title body and a two-paragraph body.
+fn outline_bodies() -> Vec<crate::OutlineTextBody> {
+    let bytes = [
+        record_bytes(0, 0, 3999, &6u32.to_le_bytes()),
+        record_bytes(0, 0, 4000, &utf16("Resolved title")),
+        record_bytes(0, 1, 3999, &5u32.to_le_bytes()),
+        record_bytes(0, 0, 4000, &utf16("Body\rtext")),
+    ]
+    .concat();
+    let mut records = Vec::new();
+    let mut offset = 0;
+    while offset < bytes.len() {
+        let (record, consumed) = Record::parse(&bytes, offset).unwrap();
+        records.push(record);
+        offset += consumed;
+    }
+    crate::OutlineTextBody::collect(&records.iter().collect::<Vec<_>>()).unwrap()
+}
+
+/// A shape container whose `ClientTextbox` holds `textbox_records`, with a
+/// `PlaceholderAtom` when `placeholder` names a position and kind.
+fn outline_shape(
+    native_kind: u16,
+    id: u32,
+    placeholder: Option<(i32, u8)>,
+    textbox_records: &[u8],
+) -> Vec<u8> {
+    use crate::officeart_wire::{ShapeBuilder, record_type, write_atom, write_container};
+
+    let mut children = Vec::new();
+    ShapeBuilder::new(native_kind, id)
+        .with_flags(ROOT_SHAPE_FLAGS)
+        .write(&mut children)
+        .unwrap();
+    write_client_anchor(&mut children, 10, 10, 110, 60).unwrap();
+    if let Some((position, kind)) = placeholder {
+        let mut data = Vec::new();
+        data.extend_from_slice(&position.to_le_bytes());
+        data.push(kind);
+        data.push(0);
+        data.extend_from_slice(&0u16.to_le_bytes());
+        let mut client_data = Vec::new();
+        write_atom(&mut client_data, 0, 0, 3011, &data).unwrap();
+        write_container(&mut children, 0, record_type::CLIENT_DATA, &client_data).unwrap();
+    }
+    write_container(
+        &mut children,
+        0,
+        record_type::CLIENT_TEXTBOX,
+        textbox_records,
+    )
+    .unwrap();
+    let mut container = Vec::new();
+    write_container(&mut container, 0, record_type::SP_CONTAINER, &children).unwrap();
+    container
+}
+
+fn outline_ref(index: i32) -> Vec<u8> {
+    record_bytes(0, 0, OUTLINE_TEXT_REF_ATOM, &index.to_le_bytes())
+}
+
+/// Shapes 100-106: a resolved title placeholder, a dangling, a negative and
+/// a malformed reference, an auto shape and a text box that reference the
+/// body, and a placeholder that holds inline text beside its reference.
+fn outline_drawing() -> Vec<u8> {
+    let inline_title = record_bytes(0, 0, 4000, &utf16("Inline"));
+    let ruler = record_bytes(0, 0, 4006, &0u32.to_le_bytes());
+    let shapes = [
+        outline_shape(1, 100, Some((0, 13)), &outline_ref(0)),
+        outline_shape(1, 101, Some((1, 14)), &outline_ref(7)),
+        outline_shape(1, 102, Some((2, 14)), &outline_ref(-2)),
+        outline_shape(
+            1,
+            103,
+            Some((3, 14)),
+            &record_bytes(0, 0, OUTLINE_TEXT_REF_ATOM, &[1, 0]),
+        ),
+        outline_shape(1, 104, None, &outline_ref(1)),
+        outline_shape(202, 105, None, &[outline_ref(1), ruler].concat()),
+        outline_shape(
+            1,
+            106,
+            Some((4, 13)),
+            &[outline_ref(0), inline_title].concat(),
+        ),
+    ]
+    .concat();
+    drawing(&shapes)
+}
+
+fn unresolved_defects(report: &crate::leniency::ToleranceReport) -> Vec<(u32, Option<u32>)> {
+    report
+        .defects()
+        .iter()
+        .filter(|defect| {
+            defect.defect
+                == crate::Defect::Shape(crate::leniency::ShapeDefect::UnresolvedOutlineTextRef)
+        })
+        .map(|defect| (defect.context, defect.location.shape_id))
+        .collect()
+}
+
+#[test]
+fn outline_references_supply_text_and_record_what_they_cannot_resolve() {
+    let bodies = outline_bodies();
+    let drawing = outline_drawing();
+    let mut report = crate::leniency::ToleranceReport::default();
+    let shapes = Slide::parse_shape_enums(&drawing, &bodies, &mut report).unwrap();
+
+    let texts = shapes
+        .iter()
+        .map(|shape| shape.text().unwrap())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        texts,
+        [
+            "Resolved title",
+            "",
+            "",
+            "",
+            "Body\rtext",
+            "Body\rtext",
+            // The reference wins over inline text beside it, as in POI and
+            // LibreOffice.
+            "Resolved title",
+        ]
+    );
+    assert!(shapes[0].as_placeholder().is_some());
+    assert!(shapes[4].as_autoshape().is_some());
+    let textbox = shapes[5].as_textbox().expect("text box kind");
+    assert_eq!(textbox.outline_text_refs().len(), 1);
+    // The text box keeps its own ruler; the body has none.
+    assert!(textbox.text_ruler().is_some());
+    assert_eq!(
+        unresolved_defects(&report),
+        [
+            (7, Some(101)),
+            (0xffff_fffe, Some(102)),
+            (u32::MAX, Some(103))
+        ]
+    );
+
+    // Slide text resolves the same references in drawing order (each text
+    // box ends with a line feed; `Slide::text` trims the whole).
+    assert_eq!(
+        crate::odraw::text_from_slide_drawing(&drawing, &bodies).unwrap(),
+        "Resolved title\nBody\rtext\nBody\rtext\nResolved title\n"
+    );
+    // Without a slide, only inline text is read.
+    assert_eq!(
+        crate::odraw::text_from_drawing(&drawing).unwrap(),
+        "Inline\n"
+    );
+}
+
+#[test]
+fn outline_resolution_never_changes_which_shapes_are_read() {
+    let drawing = outline_drawing();
+    let identity = |shapes: &[ShapeEnum<'static>]| {
+        shapes
+            .iter()
+            .map(|shape| (shape.shape_type(), shape.text().is_ok()))
+            .collect::<Vec<_>>()
+    };
+    let mut resolved_report = crate::leniency::ToleranceReport::default();
+    let resolved =
+        Slide::parse_shape_enums(&drawing, &outline_bodies(), &mut resolved_report).unwrap();
+    let mut plain_report = crate::leniency::ToleranceReport::default();
+    let plain = Slide::parse_shape_enums(&drawing, &[], &mut plain_report).unwrap();
+    assert_eq!(identity(&resolved), identity(&plain));
+    // Without bodies every reference is unresolved, and every shape is kept.
+    assert_eq!(unresolved_defects(&plain_report).len(), 7);
+    assert!(
+        plain
+            .iter()
+            .take(6)
+            .all(|shape| shape.text().unwrap().is_empty())
+    );
+}
+
+#[test]
+fn outline_resolution_keeps_the_shapes_of_every_corpus_slide() {
+    for path in [
+        "../../test-data/ole/ppt/text_shapes.ppt",
+        "../../test-data/ole/ppt/empty_textbox.ppt",
+        "../../test-data/poi/test-data/slideshow/41246-1.ppt",
+        "../../test-data/poi/test-data/slideshow/ole2-embedding-2003.ppt",
+        "../../test-data/poi/test-data/slideshow/WithLinks.ppt",
+    ] {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(path);
+        let package = crate::Package::open(&path).unwrap();
+        let presentation = package.presentation().unwrap();
+        for slide in presentation.slides().unwrap() {
+            let Some(ppdrawing) = slide.record().find_child(RecordType::PPDrawing) else {
+                continue;
+            };
+            // The source-backed text editor's view of the slide.
+            let plain = Slide::parse_shape_enums(
+                &ppdrawing.data,
+                &[],
+                &mut crate::leniency::ToleranceReport::default(),
+            )
+            .unwrap();
+            let resolved = slide.shapes().unwrap();
+            assert_eq!(
+                resolved
+                    .iter()
+                    .map(ShapeEnum::shape_type)
+                    .collect::<Vec<_>>(),
+                plain.iter().map(ShapeEnum::shape_type).collect::<Vec<_>>(),
+                "{}",
+                path.display()
+            );
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// L-PPT-R3 (name and alternative text) and L-PPT-R4 (stable shape index).
+// ---------------------------------------------------------------------------
+
+fn utf16z(text: &str) -> Vec<u8> {
+    let mut bytes = utf16(text);
+    bytes.extend_from_slice(&[0, 0]);
+    bytes
+}
+
+/// A non-group shape container: `native_kind` and `id`, the flags of a root
+/// or group-child shape, an anchor unless `anchored` is false, and the
+/// complex `wzName`/`wzDescription` payloads given.
+fn identity_shape(
+    native_kind: u16,
+    id: u32,
+    child: bool,
+    anchored: bool,
+    name: Option<&[u8]>,
+    description: Option<&[u8]>,
+) -> Vec<u8> {
+    use crate::officeart_wire::{
+        PropertyBuilder, ShapeBuilder, record_type, write_child_anchor, write_container,
+    };
+
+    let mut flags = 0x0800 | if child { 0x0002 } else { 0 };
+    if anchored {
+        flags |= 0x0200;
+    }
+    let mut children = Vec::new();
+    ShapeBuilder::new(native_kind, id)
+        .with_flags(flags)
+        .write(&mut children)
+        .unwrap();
+    if name.is_some() || description.is_some() {
+        let mut properties = PropertyBuilder::new();
+        if let Some(name) = name {
+            properties.add_complex(0x0380, name);
+        }
+        if let Some(description) = description {
+            properties.add_complex(0x0381, description);
+        }
+        properties.write(&mut children).unwrap();
+    }
+    if anchored {
+        if child {
+            write_child_anchor(&mut children, 0, 0, 100, 50).unwrap();
+        } else {
+            write_client_anchor(&mut children, 10, 10, 110, 60).unwrap();
+        }
+    }
+    let mut container = Vec::new();
+    write_container(&mut container, 0, record_type::SP_CONTAINER, &children).unwrap();
+    container
+}
+
+/// Root group: an unanchored line (dropped), a named rectangle with
+/// alternative text, an unknown kind (dropped), a group whose first child is
+/// an unanchored line (dropped) and whose second is named, a rectangle whose
+/// name has no terminator and a trailing odd byte, and one whose name is
+/// empty.
+fn identity_drawing() -> Vec<u8> {
+    use crate::officeart_wire::{ShapeBuilder, record_type, write_container, write_spgr};
+
+    let header = |id: u32, flags: u32, anchored: bool| {
+        let mut children = Vec::new();
+        write_spgr(&mut children, 0, 0, 100, 100).unwrap();
+        ShapeBuilder::new(0, id)
+            .with_flags(flags)
+            .write(&mut children)
+            .unwrap();
+        if anchored {
+            write_client_anchor(&mut children, 0, 0, 100, 100).unwrap();
+        }
+        let mut container = Vec::new();
+        write_container(&mut container, 0, record_type::SP_CONTAINER, &children).unwrap();
+        container
+    };
+
+    let mut group_children = header(20, 0x0201, true);
+    group_children.extend(identity_shape(20, 21, true, false, None, None));
+    group_children.extend(identity_shape(
+        1,
+        22,
+        true,
+        true,
+        Some(&utf16z("Inner")),
+        None,
+    ));
+    let mut group = Vec::new();
+    write_container(&mut group, 0, record_type::SPGR_CONTAINER, &group_children).unwrap();
+
+    let mut odd = utf16("Odd");
+    odd.push(b'!');
+    let mut root_children = header(1, 0x0005, false);
+    root_children.extend(identity_shape(20, 2, false, false, None, None));
+    root_children.extend(identity_shape(
+        1,
+        3,
+        false,
+        true,
+        Some(&utf16z("Logo")),
+        Some(&utf16z("Company logo")),
+    ));
+    root_children.extend(identity_shape(300, 4, false, true, None, None));
+    root_children.extend(group);
+    root_children.extend(identity_shape(1, 5, false, true, Some(&odd), None));
+    root_children.extend(identity_shape(1, 6, false, true, Some(&[0, 0]), None));
+    let mut root = Vec::new();
+    write_container(&mut root, 0, record_type::SPGR_CONTAINER, &root_children).unwrap();
+    drawing(&root)
+}
+
+fn identity_slide(doc_data: &[u8]) -> Slide<'_> {
+    let ppdrawing = create_test_record(RecordType::PPDrawing, identity_drawing(), Vec::new());
+    let record = create_test_record(RecordType::Slide, Vec::new(), vec![ppdrawing]);
+    Slide::from_slide_data(create_slide_data(record, 256, doc_data), 1)
+}
+
+#[test]
+fn shapes_keep_their_name_and_alternative_text() {
+    let doc_data = vec![0u8; 32];
+    let slide = identity_slide(&doc_data);
+    let shapes = slide.shapes().unwrap();
+    let names = shapes.iter().map(ShapeEnum::name).collect::<Vec<_>>();
+    assert_eq!(names, [Some("Logo"), None, Some("Odd"), None]);
+    assert_eq!(shapes[0].description(), Some("Company logo"));
+    assert_eq!(
+        crate::shapes::Shape::properties(shapes[0].as_autoshape().unwrap())
+            .name
+            .as_deref(),
+        Some("Logo")
+    );
+    assert!(
+        shapes[1..]
+            .iter()
+            .all(|shape| shape.description().is_none())
+    );
+    let group = shapes[1].as_group().expect("group");
+    assert_eq!(group.children().len(), 1);
+    assert_eq!(group.children()[0].name(), Some("Inner"));
+}
+
+#[test]
+fn shapes_keep_their_source_position_when_siblings_are_dropped() {
+    let doc_data = vec![0u8; 32];
+    let slide = identity_slide(&doc_data);
+    let shapes = slide.shapes().unwrap();
+    // The unanchored line (position 0) and the unknown kind (position 2)
+    // are not returned; the others keep their drawing positions.
+    assert_eq!(
+        shapes
+            .iter()
+            .map(|shape| (shape.id(), shape.source_index()))
+            .collect::<Vec<_>>(),
+        [(3, Some(1)), (20, Some(3)), (5, Some(4)), (6, Some(5))]
+    );
+    let inner = &shapes[1].as_group().unwrap().children()[0];
+    assert_eq!((inner.id(), inner.source_index()), (22, Some(1)));
+
+    // A second read of the same drawing reports the same positions.
+    let again = identity_slide(&doc_data);
+    assert_eq!(
+        again
+            .shapes()
+            .unwrap()
+            .iter()
+            .map(ShapeEnum::source_index)
+            .collect::<Vec<_>>(),
+        [Some(1), Some(3), Some(4), Some(5)]
+    );
+
+    // A shape built by a caller has no source position.
+    let detached: ShapeEnum<'static> =
+        ShapeEnum::Line(crate::shapes::shape_enum::LineShape::new(9, 0, 0, 1, 1));
+    assert_eq!(detached.source_index(), None);
+    assert_eq!(detached.id(), 9);
+}
+
+#[test]
+fn shape_by_id_finds_group_children_and_only_returned_shapes() {
+    let doc_data = vec![0u8; 32];
+    let slide = identity_slide(&doc_data);
+    assert_eq!(slide.shape_by_id(3).unwrap().unwrap().name(), Some("Logo"));
+    assert_eq!(
+        slide.shape_by_id(22).unwrap().unwrap().name(),
+        Some("Inner")
+    );
+    assert!(slide.shape_by_id(20).unwrap().unwrap().as_group().is_some());
+    // The dropped line and an unknown identifier find nothing.
+    assert!(slide.shape_by_id(2).unwrap().is_none());
+    assert!(slide.shape_by_id(21).unwrap().is_none());
+    assert!(slide.shape_by_id(999).unwrap().is_none());
+}
+
+#[test]
+fn corpus_shapes_report_their_names_and_positions() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/ole/ppt/SampleShow.ppt");
+    let package = crate::Package::open(&path).unwrap();
+    let presentation = package.presentation().unwrap();
+    let slides = presentation.slides().unwrap();
+    let identities = |slide: &Slide<'_>| {
+        slide
+            .shapes()
+            .unwrap()
+            .iter()
+            .map(|shape| {
+                (
+                    shape.id(),
+                    shape.source_index(),
+                    shape.name().map(str::to_owned),
+                )
+            })
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        identities(&slides[0]),
+        [
+            (3074, Some(0), Some("The Title".to_owned())),
+            (3075, Some(1), Some("Another Subtitle".to_owned())),
+        ]
+    );
+    let notes = slides[0].speaker_notes().unwrap().expect("notes page");
+    assert_eq!(
+        notes
+            .shapes()
+            .unwrap()
+            .iter()
+            .map(|shape| shape.name().map(str::to_owned))
+            .collect::<Vec<_>>(),
+        [
+            Some("Slide Image Placeholder 1".to_owned()),
+            Some("Notes Placeholder 2".to_owned()),
+            Some("Slide Number Placeholder 3".to_owned()),
+        ]
+    );
+    assert_eq!(
+        slides[0].shape_by_id(3075).unwrap().unwrap().name(),
+        Some("Another Subtitle")
+    );
+}

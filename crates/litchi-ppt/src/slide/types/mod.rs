@@ -44,6 +44,8 @@ pub struct Slide<'doc> {
     slide_list_text: String,
     outline_text_interactions: Vec<crate::TextBodyInteractions>,
     outline_text_refs: Vec<crate::OutlineTextRef>,
+    /// The slide-list text bodies its shapes' outline references select.
+    outline_text_bodies: &'doc [crate::OutlineTextBody],
     /// Slide number (1-based for display).
     slide_number: usize,
     /// Slide record.

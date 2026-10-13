@@ -1447,9 +1447,13 @@ impl Presentation {
                 text.push_str(trimmed);
             }
 
-            // Extract text from Escher/PPDrawing using the optimized path
+            // Extract text from Escher/PPDrawing using the optimized path,
+            // resolving outline references as `Slide::text` does (L-PPT-R1)
             if let Some(ppdrawing) = slide_data.record.find_child(RecordType::PPDrawing) {
-                let escher_text = crate::odraw::text_from_drawing(&ppdrawing.data)?;
+                let escher_text = crate::odraw::text_from_slide_drawing(
+                    &ppdrawing.data,
+                    slide_data.outline_text_bodies,
+                )?;
                 let escher_trimmed = escher_text.trim();
                 if !escher_trimmed.is_empty() {
                     if !text.is_empty() {

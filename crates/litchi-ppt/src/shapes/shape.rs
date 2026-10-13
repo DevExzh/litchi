@@ -173,6 +173,20 @@ pub struct ShapeProperties {
     pub z_order: u16,
     /// Inert `PowerPoint` 12 placeholder compatibility metadata.
     pub powerpoint12_shape_metadata: Option<crate::slide_extension::ShapeMetadata>,
+    /// The shape's name (`wzName`, MS-ODRAW 2.3.4.1), as `PowerPoint` shows
+    /// it in the selection pane; `None` when the shape carries none
+    /// (L-PPT-R3).
+    pub name: Option<String>,
+    /// The shape's alternative text (`wzDescription`, MS-ODRAW 2.3.4.3);
+    /// `None` when the shape carries none (L-PPT-R3).
+    pub description: Option<String>,
+    /// The shape's stable position in its source drawing: its zero-based
+    /// index among its siblings (the drawing's top-level shapes, or its
+    /// group's children) in drawing order, counting every shape of the
+    /// drawing's shape tree, including shapes the reader does not return
+    /// (L-PPT-R4). The background shape and a group's own header are not
+    /// siblings. `None` for a shape that was not read from a drawing.
+    pub source_index: Option<usize>,
 }
 
 impl Default for ShapeProperties {
@@ -191,8 +205,31 @@ impl Default for ShapeProperties {
             hidden: false,
             z_order: 0,
             powerpoint12_shape_metadata: None,
+            name: None,
+            description: None,
+            source_index: None,
         }
     }
+}
+
+impl ShapeProperties {
+    pub(crate) fn apply_source_identity(&mut self, identity: SourceIdentity) {
+        self.name = identity.name;
+        self.description = identity.description;
+        self.source_index = Some(identity.index);
+    }
+}
+
+/// What a parsed shape keeps from its source drawing: its position among
+/// its siblings (L-PPT-R4) and its name and alternative text (L-PPT-R3).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct SourceIdentity {
+    /// Zero-based position among the shape's siblings in drawing order.
+    pub(crate) index: usize,
+    /// `wzName`, when present.
+    pub(crate) name: Option<String>,
+    /// `wzDescription`, when present.
+    pub(crate) description: Option<String>,
 }
 
 /// Base trait for all shape types in `PowerPoint` presentations.
@@ -626,6 +663,10 @@ impl<'a> ShapeContainer<'a> {
 
     pub(crate) fn mark_source_bound(&mut self) {
         self.source_bound = true;
+    }
+
+    pub(crate) fn apply_source_identity(&mut self, identity: SourceIdentity) {
+        self.properties.apply_source_identity(identity);
     }
 
     /// Set text margins from a 4-value tuple (left, top, right, bottom).

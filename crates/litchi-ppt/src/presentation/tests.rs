@@ -419,3 +419,43 @@ fn editing_a_shared_slide_payload_leaves_the_document_stream_intact() {
     }
     panic!("no fixture produced a slide to edit");
 }
+
+/// L-PPT-R2: the notes index is built once per presentation, at open, from
+/// the `DocumentContainer` the slide directory parsed. Selecting a slide
+/// parses that slide only: a factory over a stream whose `DocumentContainer`
+/// header no longer reads still finds every slide's notes page, which a
+/// factory that re-parsed the document for its own notes index could not.
+#[test]
+fn slide_selection_reads_notes_from_the_index_built_at_open() {
+    use crate::slide::{Slide, SlideFactory};
+
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/poi/test-data/slideshow/basic_test_ppt_file.ppt");
+    let package = crate::Package::open(path).unwrap();
+    let presentation = package.presentation().unwrap();
+    let expected = [
+        "These are the notes for page 1",
+        "These are the notes on page two, again lacking formatting",
+    ];
+
+    let mut document = presentation.inner.powerpoint_document.as_ref().clone();
+    let offset = presentation.inner.slide_directory.document_offset();
+    document[offset + 2..offset + 4].copy_from_slice(&0xffffu16.to_le_bytes());
+    let factory = SlideFactory::new(
+        &document,
+        &presentation.inner.persist_mapping,
+        &presentation.inner.slide_directory,
+    );
+    for (index, slide_data) in factory.slides().enumerate() {
+        let slide = Slide::from_slide_data(slide_data.unwrap(), index + 1);
+        let notes = slide.speaker_notes().unwrap().expect("notes page");
+        assert_eq!(notes.text().unwrap(), expected[index]);
+    }
+
+    // Each `slide_at` builds its own factory and shares the same index.
+    for (position, text) in expected.iter().enumerate() {
+        let slide = presentation.slide_at(position).unwrap().expect("slide");
+        let notes = slide.speaker_notes().unwrap().expect("notes page");
+        assert_eq!(notes.text().unwrap(), *text);
+    }
+}
