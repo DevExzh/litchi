@@ -394,6 +394,12 @@
           "add": false,
           "set": true,
           "get": false
+        },
+        "transition": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
         }
       },
       "predicates": {
@@ -516,13 +522,13 @@
         },
         "font": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "font.latin": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -540,19 +546,19 @@
         },
         "size": {
           "type": "font-size",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "bold": {
           "type": "bool",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "italic": {
           "type": "bool",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -618,7 +624,7 @@
         },
         "color": {
           "type": "color",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -657,7 +663,7 @@
             "dist",
             "thaiDist"
           ],
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -708,6 +714,18 @@
           "get": true
         },
         "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "fill": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "geometry": {
           "type": "string",
           "add": true,
           "set": true,
@@ -1016,6 +1034,18 @@
           "get": true
         },
         "text": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "fill": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "geometry": {
           "type": "string",
           "add": false,
           "set": true,

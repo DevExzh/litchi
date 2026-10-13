@@ -316,6 +316,13 @@
           "add": false,
           "set": true,
           "get": false
+        },
+        "transition": {
+          "type": "string",
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
         }
       },
       "propertyGaps": {
@@ -450,6 +457,9 @@
         },
         "x": {
           "type": "length",
+          "aliases": [
+            "left"
+          ],
           "unit": "emu",
           "add": true,
           "set": true,
@@ -457,6 +467,9 @@
         },
         "y": {
           "type": "length",
+          "aliases": [
+            "top"
+          ],
           "unit": "emu",
           "add": true,
           "set": true,
@@ -464,6 +477,9 @@
         },
         "width": {
           "type": "length",
+          "aliases": [
+            "w"
+          ],
           "unit": "emu",
           "constraint": {
             "minEmu": 1,
@@ -475,6 +491,9 @@
         },
         "height": {
           "type": "length",
+          "aliases": [
+            "h"
+          ],
           "unit": "emu",
           "constraint": {
             "minEmu": 1,
@@ -490,7 +509,7 @@
             "notEmpty": true
           },
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -500,7 +519,7 @@
             "notEmpty": true
           },
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -518,23 +537,27 @@
         },
         "size": {
           "type": "font-size",
+          "aliases": [
+            "fontSize",
+            "font.size"
+          ],
           "unit": "pt",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "bold": {
           "type": "bool",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "italic": {
           "type": "bool",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -612,7 +635,7 @@
           "type": "color",
           "colorContext": "drawing",
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -659,7 +682,7 @@
             "r": "right"
           },
           "clearable": true,
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -717,6 +740,29 @@
         "text": {
           "type": "string",
           "clearable": true,
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "fill": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "clearable": true,
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "geometry": {
+          "type": "string",
+          "aliases": [
+            "preset",
+            "shape"
+          ],
+          "constraint": {
+            "notEmpty": true
+          },
           "add": true,
           "set": true,
           "get": false
@@ -894,6 +940,9 @@
         },
         "x": {
           "type": "length",
+          "aliases": [
+            "left"
+          ],
           "unit": "emu",
           "add": false,
           "set": true,
@@ -901,6 +950,9 @@
         },
         "y": {
           "type": "length",
+          "aliases": [
+            "top"
+          ],
           "unit": "emu",
           "add": false,
           "set": true,
@@ -908,6 +960,9 @@
         },
         "width": {
           "type": "length",
+          "aliases": [
+            "w"
+          ],
           "unit": "emu",
           "constraint": {
             "minEmu": 1,
@@ -919,6 +974,9 @@
         },
         "height": {
           "type": "length",
+          "aliases": [
+            "h"
+          ],
           "unit": "emu",
           "constraint": {
             "minEmu": 1,
@@ -962,6 +1020,10 @@
         },
         "size": {
           "type": "font-size",
+          "aliases": [
+            "fontSize",
+            "font.size"
+          ],
           "unit": "pt",
           "clearable": true,
           "add": false,
@@ -1161,6 +1223,29 @@
         "text": {
           "type": "string",
           "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "fill": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "geometry": {
+          "type": "string",
+          "aliases": [
+            "preset",
+            "shape"
+          ],
+          "constraint": {
+            "notEmpty": true
+          },
           "add": false,
           "set": true,
           "get": false
@@ -2158,6 +2243,10 @@
       "properties": {
         "align": {
           "type": "enum",
+          "aliases": [
+            "alignment",
+            "halign"
+          ],
           "values": [
             "left",
             "center",
@@ -2468,6 +2557,11 @@
         },
         "font": {
           "type": "string",
+          "aliases": [
+            "fontname",
+            "fontFamily",
+            "font.name"
+          ],
           "constraint": {
             "notEmpty": true
           },

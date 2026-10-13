@@ -17,38 +17,39 @@ Kinds:
 - **gap**: Litchi lacks the verb, option, path form, element or property. Element and property refusals are cross-checked against the registry export (`crates/litchi-ops/tests/golden/registry/<format>.json`, the golden of `schema()`, which `capabilities()` shares): the note says what the registry records.
 - **delta**: a recorded difference, deliberate or caused upstream (table below).
 - **cascade**: a path that does not exist because an earlier `add` or `batch` of the same script was refused.
+- **warned**: the harness passes `--unsupported warn` to `set`, `add` and `batch`, because OfficeCLI applies the supported properties of a command and warns about the rest by default (record 0269). A warned call applied without the properties it lists (exit 9); each skipped property is listed in the gap tables below with refusal `warned`.
 - **bug**: a refusal of something the registry claims, or an unexplained failure; none may be a panic or `internal_error` (the test refuses those).
 - **resident**: `open`/`close`, not run (delta D5).
 - **read-back**: after each script the harness runs `view <file> text` and `get <file> / --depth 2` on every file the script created.
 
 ## Summary by script family
 
-| Family | Lines | Passed | of which translated | Gap | Delta | Cascade | Bug | Resident (not run) | Read-back |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| excel | 1633 | 1470 | 0 | 148 | 4 | 11 | 0 | 20 | 20/20 |
-| excel/charts | 743 | 408 | 0 | 330 | 5 | 0 | 0 | 32 | 32/32 |
-| ppt | 310 | 43 | 32 | 139 | 0 | 128 | 0 | 10 | 12/12 |
-| ppt/charts | 735 | 127 | 113 | 605 | 0 | 3 | 0 | 28 | 28/28 |
-| ppt/ole | 26 | 13 | 2 | 11 | 0 | 2 | 0 | 6 | 6/6 |
-| ppt/pictures | 68 | 6 | 5 | 49 | 7 | 6 | 0 | 2 | 2/2 |
-| ppt/shapes | 220 | 23 | 19 | 193 | 0 | 4 | 0 | 8 | 8/8 |
-| ppt/tables | 457 | 40 | 33 | 179 | 0 | 238 | 0 | 14 | 14/14 |
-| ppt/templates | 452 | 17 | 0 | 150 | 117 | 168 | 0 | 11 | 24/24 |
-| ppt/textboxes | 132 | 12 | 10 | 105 | 0 | 15 | 0 | 4 | 4/4 |
-| ppt/transitions | 522 | 136 | 127 | 386 | 0 | 0 | 0 | 18 | 18/18 |
-| word | 1133 | 614 | 3 | 415 | 6 | 98 | 0 | 24 | 32/32 |
-| **total** | **6431** | **2909** | **344** | **2710** | **139** | **673** | **0** | **177** | **200/200** |
+| Family | Lines | Passed | of which translated | Warned | Gap | Delta | Cascade | Bug | Resident (not run) | Read-back |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| excel | 1633 | 1480 | 0 | 18 | 131 | 4 | 0 | 0 | 20 | 20/20 |
+| excel/charts | 743 | 408 | 0 | 0 | 330 | 5 | 0 | 0 | 32 | 32/32 |
+| ppt | 310 | 128 | 32 | 37 | 144 | 0 | 1 | 0 | 10 | 12/12 |
+| ppt/charts | 735 | 130 | 113 | 124 | 460 | 0 | 21 | 0 | 28 | 28/28 |
+| ppt/ole | 26 | 19 | 2 | 0 | 5 | 0 | 2 | 0 | 6 | 6/6 |
+| ppt/pictures | 68 | 36 | 5 | 0 | 2 | 24 | 6 | 0 | 2 | 2/2 |
+| ppt/shapes | 220 | 102 | 19 | 92 | 26 | 0 | 0 | 0 | 8 | 8/8 |
+| ppt/tables | 457 | 95 | 33 | 7 | 69 | 0 | 286 | 0 | 14 | 14/14 |
+| ppt/templates | 452 | 27 | 0 | 152 | 52 | 119 | 102 | 0 | 11 | 24/24 |
+| ppt/textboxes | 132 | 50 | 10 | 17 | 65 | 0 | 0 | 0 | 4 | 4/4 |
+| ppt/transitions | 522 | 507 | 127 | 6 | 9 | 0 | 0 | 0 | 18 | 18/18 |
+| word | 1133 | 623 | 3 | 175 | 262 | 6 | 67 | 0 | 24 | 32/32 |
+| **total** | **6431** | **3605** | **344** | **628** | **1555** | **158** | **485** | **0** | **177** | **200/200** |
 
 ## Summary by format
 
 The format is the extension of the document each call names.
 
-| Format | Lines | Passed | of which translated | Gap | Delta | Cascade | Bug | Resident (not run) | Read-back |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| docx | 949 | 466 | 0 | 379 | 6 | 98 | 0 | 22 | 30/30 |
-| pptx | 2959 | 418 | 344 | 1853 | 124 | 564 | 0 | 99 | 114/114 |
-| xlsx | 2523 | 2025 | 0 | 478 | 9 | 11 | 0 | 56 | 56/56 |
-| **total** | **6431** | **2909** | **344** | **2710** | **139** | **673** | **0** | **177** | **200/200** |
+| Format | Lines | Passed | of which translated | Warned | Gap | Delta | Cascade | Bug | Resident (not run) | Read-back |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| docx | 949 | 473 | 0 | 172 | 231 | 6 | 67 | 0 | 22 | 30/30 |
+| pptx | 2959 | 1097 | 344 | 438 | 863 | 143 | 418 | 0 | 99 | 114/114 |
+| xlsx | 2523 | 2035 | 0 | 18 | 461 | 9 | 0 | 0 | 56 | 56/56 |
+| **total** | **6431** | **3605** | **344** | **628** | **1555** | **158** | **485** | **0** | **177** | **200/200** |
 
 ## Deltas
 
@@ -56,11 +57,12 @@ The format is the extension of the document each call names.
 |---|---|---|---|---:|---|
 | D1 | Created-path form captured by the script | `add` prints the new paragraph as `/body/p[@paraId=...]`, which the script greps to address it later | `add` prints the positional path `/body/p[N]` (record 0256 §3), so the capture is empty and the dependent `set` has no path (`missing_argument`) | 6 | `word/revisions.sh:286`, `word/revisions.sh:296`, `word/revisions.sh:305` |
 | D4 | Bare slide insertion | `add / --type slide` picks the deck's first layout; layout-type words (`blank`, `title`) also select a layout | `layout` names a layout exactly (record 0256 D4); the harness adds `layout=Title Slide` (the first layout of Litchi's blank deck) or maps `title` and `blank` to `Title Slide` and `Blank`, and counts the line as translated | 344 | `ppt/animations.sh:32`, `ppt/charts/charts-3d.sh:38`, `ppt/charts/charts-3d.sh:46` |
+| D4b | Bare slide insertion inside a batch | a batch `add` of a slide without `layout`, or with a layout-type word (`blank`), picks a layout as on the command line | the harness translates only command-line slide insertions (D4), not batch items, so the batch refuses (`missing_property` layout, or `not_found` for `layout=blank`) once its other properties are admitted (record 0269) | 2 | `ppt/templates/styles/brand--aura-coffee-dark/build.sh:157`, `ppt/templates/styles/science--space-exploration/build.sh:16` |
 | D5 | Resident mode | `open`/`close` start and stop a resident process that later commands reuse | absent (record 0256 D5); every command opens and saves the file, so the harness treats both as no-ops (counted as resident, not run) | 177 | `excel/cell-formatting.sh:27`, `excel/cell-formatting.sh:190`, `excel/charts.sh:17` |
 | D7 | Stray words on the command line | System.CommandLine leaves unmatched words unparsed and OfficeCLI ignores them; the examples pass unquoted values (`--prop categories=Product A,Product B`) that the shell splits | the argument parser refuses the command line (usage, exit 2): Litchi is strict by default (record 0015 D4) | 5 | `excel/charts/charts-bar.sh:203`, `excel/charts/charts-bar.sh:289`, `excel/charts/charts-bar.sh:303` |
 | U1 | Upstream script error: `--name=` | `--name=VALUE` is not an OfficeCLI option either: `RejectUnknownOptionTokens` refuses it (invalid_argument) | refused as an unknown option (usage, exit 2) | 111 | `ppt/templates/styles/product--geminicli-timetravel/build.sh:23`, `ppt/templates/styles/product--geminicli-timetravel/build.sh:27`, `ppt/templates/styles/product--geminicli-timetravel/build.sh:31` |
 | U2 | Upstream script error: batch input not shipped | the script pipes `slideN.json` files that the upstream example directory does not contain, so OfficeCLI reads an empty batch too | an empty batch payload is `corrupt_batch` | 6 | `ppt/templates/styles/tech--wildlife-company/build.sh:256`, `ppt/templates/styles/tech--wildlife-company/build.sh:261`, `ppt/templates/styles/tech--wildlife-company/build.sh:266` |
-| H1 | Harness: generated inputs need Pillow | the script draws its input pictures with Pillow before adding them | the harness runs `python3 -I -S` (standard library only) so every machine replays the same lines; the pictures are missing (`file_not_found`) | 7 | `ppt/pictures/pictures-basic.sh:128`, `ppt/pictures/pictures-basic.sh:261`, `ppt/pictures/pictures-basic.sh:265` |
+| H1 | Harness: generated inputs need Pillow | the script draws its input pictures with Pillow before adding them | the harness runs `python3 -I -S` (standard library only) so every machine replays the same lines; the pictures are missing (`file_not_found`) | 24 | `ppt/pictures/pictures-basic.sh:87`, `ppt/pictures/pictures-basic.sh:107`, `ppt/pictures/pictures-basic.sh:128` |
 | D8 | Formula with a leading `=` | the help schema documents `formula` "without leading =" (cell.json), but the cell handler also strips a leading `=` | the documented contract: a leading `=` is `invalid_value` | 4 | `excel/workbook-settings.sh:29`, `excel/workbook-settings.sh:32` |
 
 ## Named gaps
@@ -81,195 +83,324 @@ The format is the extension of the document each call names.
 | Verb | Element | Refusal | Property | Lines | Registry cross-check | Examples |
 |---|---|---|---|---:|---|---|
 | add | equation | `unsupported_element` | - | 80 | registry: no add on equation | `word/formulas.sh:19`, `word/formulas.sh:22` |
-| set | cell | `unsupported_property` | `shd` | 31 | not in the registry; OfficeCLI documents it | `word/revisions.sh:190`, `word/tables.sh:167` |
-| set | cell | `unsupported_property` | `bold` | 27 | not in the registry; OfficeCLI documents it | `word/revisions.sh:166`, `word/revisions.sh:167` |
+| set | cell | `warned` | `shd` | 70 | not in the registry; OfficeCLI documents it | `word/revisions.sh:190`, `word/tables.sh:34` |
+| set | cell | `warned` | `bold` | 64 | not in the registry; OfficeCLI documents it | `word/revisions.sh:166`, `word/revisions.sh:167` |
+| set | cell | `warned` | `color` | 64 | not in the registry; OfficeCLI documents it | `word/tables.sh:34`, `word/tables.sh:35` |
+| set | cell | `warned` | `align` | 57 | not in the registry; OfficeCLI documents it | `word/tables.sh:94`, `word/tables.sh:101` |
 | add | diagram | `unsupported_capability` | - | 19 | element not in the registry | `word/diagram.sh:64`, `word/diagram.sh:100` |
-| set | cell | `unsupported_property` | `vmerge` | 15 | registry: `vmerge` is not set-able; OfficeCLI documents it | `word/tables.sh:42`, `word/tables.sh:49` |
+| set | cell | `warned` | `vmerge` | 18 | registry: `vmerge` is not set-able; OfficeCLI documents it | `word/tables.sh:42`, `word/tables.sh:49` |
 | add | chart | `unsupported_element` | - | 14 | registry gap R4x | `word/charts.sh:50`, `word/charts.sh:67` |
 | set | document | `unsupported_element` | - | 13 | registry: no set on document | `word/document-formatting.sh:25`, `word/document-formatting.sh:28` |
-| set | cell | `unsupported_property` | `align` | 12 | not in the registry; OfficeCLI documents it | `word/tables.sh:108`, `word/tables.sh:109` |
 | add | textbox | `unsupported_element` | - | 11 | registry gap R4x | `word/textbox.sh:39`, `word/textbox.sh:184` |
 | add | num | `unsupported_capability` | - | 9 | registry gap L-DOCX-R6 (R4x) | `word/numbering.sh:73`, `word/numbering.sh:111` |
 | add | sdt | `unsupported_element` | - | 8 | registry: no add on sdt | `word/content-controls.sh:36`, `word/content-controls.sh:44` |
+| set | cell | `warned` | `valign` | 8 | registry: `valign` is not set-able; OfficeCLI documents it | `word/tables.sh:34`, `word/tables.sh:42` |
 | add | field | `unsupported_element` | - | 7 | registry gap R4x | `word/fields.sh:91`, `word/fields.sh:95` |
+| set | run | `warned` | `revision.author` | 7 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:77`, `word/revisions.sh:83` |
+| set | run | `warned` | `revision.date` | 7 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:77`, `word/revisions.sh:83` |
+| set | table | `unsupported_element` | - | 7 | registry: no set on table | `word/revisions.sh:177`, `word/tables.sh:189` |
 | query | revision | `unsupported_capability` | - | 6 | registry gap R4x | `word/revisions.sh:360`, `word/revisions.sh:389` |
-| set | cell | `unsupported_property` | `color` | 6 | not in the registry; OfficeCLI documents it | `word/tables.sh:47`, `word/tables.sh:54` |
+| set | run | `warned` | `revision.type` | 6 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:77`, `word/revisions.sh:83` |
 | add | abstractNum | `unsupported_capability` | - | 4 | registry gap L-DOCX-R6 (R4x) | `word/numbering.sh:46`, `word/numbering.sh:160` |
-| set | run | `unsupported_property` | `revision.type` | 4 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:77`, `word/revisions.sh:83` |
+| add | table | `warned` | `border.all` | 4 | not in the registry; OfficeCLI documents it | `word/tables.sh:179`, `word/tables.sh:247` |
+| set | cell | `warned` | `fill` | 4 | not in the registry; OfficeCLI documents it | `word/tables.sh:198`, `word/tables.sh:199` |
 | add | diagram | `unsupported_element` | - | 3 | element not in the registry | `word/diagram.sh:57`, `word/diagram.sh:78` |
-| add | paragraph | `unsupported_property` | `em` | 3 | not in the registry; not in OfficeCLI's help schema | `word/run-formatting.sh:135`, `word/run-formatting.sh:136` |
-| add | picture | `unsupported_property` | `anchor` | 3 | not in the registry; OfficeCLI documents it | `word/pictures.sh:106`, `word/pictures.sh:121` |
+| add | paragraph | `warned` | `em` | 3 | not in the registry; not in OfficeCLI's help schema | `word/run-formatting.sh:135`, `word/run-formatting.sh:136` |
+| add | paragraph | `warned` | `shading.fill` | 3 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:55`, `word/paragraph-formatting.sh:56` |
+| add | picture | `warned` | `anchor` | 3 | not in the registry; OfficeCLI documents it | `word/pictures.sh:106`, `word/pictures.sh:121` |
+| add | picture | `warned` | `wrap` | 3 | not in the registry; OfficeCLI documents it | `word/pictures.sh:106`, `word/pictures.sh:121` |
 | add | section | `unsupported_element` | - | 3 | registry: no add on section | `word/sections.sh:60`, `word/sections.sh:87` |
 | add | style | `unsupported_capability` | - | 3 | registry gap L-DOCX-R6 (R4x) | `word/fields.sh:37`, `word/fields.sh:40` |
-| add | table | `unsupported_property` | `border.all` | 3 | not in the registry; OfficeCLI documents it | `word/tables.sh:179`, `word/tables.sh:247` |
 | set | level | `unsupported_capability` | - | 3 | registry gap L-DOCX-R6 (R4x) | `word/numbering.sh:257`, `word/numbering.sh:302` |
 | add | endnote | `unsupported_element` | - | 2 | registry gap L-DOCX-R5 | `word/sections.sh:116`, `word/sections.sh:117` |
 | add | field | `unsupported_capability` | - | 2 | registry gap R4x | `word/fields.sh:149`, `word/fields.sh:153` |
 | add | footnote | `unsupported_element` | - | 2 | registry gap L-DOCX-R5 | `word/sections.sh:53`, `word/sections.sh:54` |
-| add | paragraph | `unsupported_property` | `border` | 2 | not in the registry; not in OfficeCLI's help schema | `word/paragraph-formatting.sh:127`, `word/paragraph-formatting.sh:128` |
-| add | paragraph | `unsupported_property` | `font` | 2 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:88`, `word/run-formatting.sh:92` |
-| add | paragraph | `unsupported_property` | `listStyle` | 2 | registry: `listStyle` is not add-able; OfficeCLI documents it | `word/paragraph-formatting.sh:153`, `word/paragraph-formatting.sh:154` |
-| add | paragraph | `unsupported_property` | `revision.author` | 2 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:115`, `word/revisions.sh:244` |
-| add | paragraph | `unsupported_property` | `shading.fill` | 2 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:55`, `word/paragraph-formatting.sh:56` |
-| add | paragraph | `unsupported_property` | `textAlignment` | 2 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:133`, `word/paragraph-formatting.sh:134` |
-| add | run | `unsupported_property` | `bdr` | 2 | not in the registry; OfficeCLI documents it | `word/run-formatting.sh:125`, `word/run-formatting.sh:126` |
+| add | paragraph | `warned` | `(more)` | 2 | not in the registry; not in OfficeCLI's help schema | `word/paragraph-formatting.sh:108`, `word/paragraph-formatting.sh:117` |
+| add | paragraph | `warned` | `border` | 2 | not in the registry; not in OfficeCLI's help schema | `word/paragraph-formatting.sh:127`, `word/paragraph-formatting.sh:128` |
+| add | paragraph | `warned` | `font` | 2 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:88`, `word/run-formatting.sh:92` |
+| add | paragraph | `warned` | `listStyle` | 2 | registry: `listStyle` is not add-able; OfficeCLI documents it | `word/paragraph-formatting.sh:153`, `word/paragraph-formatting.sh:154` |
+| add | paragraph | `warned` | `revision.author` | 2 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:115`, `word/revisions.sh:244` |
+| add | paragraph | `warned` | `revision.date` | 2 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:115`, `word/revisions.sh:244` |
+| add | paragraph | `warned` | `textAlignment` | 2 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:133`, `word/paragraph-formatting.sh:134` |
+| add | picture | `warned` | `(more)` | 2 | not in the registry; not in OfficeCLI's help schema | `word/pictures.sh:106`, `word/pictures.sh:135` |
+| add | picture | `warned` | `hAlign` | 2 | not in the registry; OfficeCLI documents it | `word/pictures.sh:106`, `word/pictures.sh:121` |
+| add | picture | `warned` | `hRelative` | 2 | not in the registry; OfficeCLI documents it | `word/pictures.sh:121`, `word/pictures.sh:135` |
+| add | run | `warned` | `bdr` | 2 | not in the registry; OfficeCLI documents it | `word/run-formatting.sh:125`, `word/run-formatting.sh:126` |
 | set | revision | `unsupported_capability` | - | 2 | registry gap R4x | `word/revisions.sh:398`, `word/revisions.sh:431` |
+| set | row | `unsupported_element` | - | 2 | registry: no set on row | `word/revisions.sh:183`, `word/tables.sh:197` |
+| set | run | `warned` | `(more)` | 2 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:145`, `word/revisions.sh:150` |
 | add | bookmark | `unsupported_element` | - | 1 | registry gap R4x | `word/fields.sh:75` |
 | add | cell | `unsupported_element` | - | 1 | registry: no add on cell | `word/revisions.sh:196` |
 | add | footer | `unsupported_element` | - | 1 | registry gap L-DOCX-R5 | `word/fields.sh:147` |
-| add | paragraph | `unsupported_property` | `autoSpaceDE` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:139` |
-| add | paragraph | `unsupported_property` | `border.top` | 1 | not in the registry; not in OfficeCLI's help schema | `word/paragraph-formatting.sh:129` |
-| add | paragraph | `unsupported_property` | `divId` | 1 | not in the registry; not in OfficeCLI's help schema | `word/paragraph-formatting.sh:149` |
-| add | paragraph | `unsupported_property` | `eastAsianLayout.vert` | 1 | not in the registry; not in OfficeCLI's help schema | `word/run-formatting.sh:123` |
-| add | paragraph | `unsupported_property` | `effect` | 1 | not in the registry; not in OfficeCLI's help schema | `word/run-formatting.sh:138` |
-| add | paragraph | `unsupported_property` | `fitText` | 1 | not in the registry; not in OfficeCLI's help schema | `word/run-formatting.sh:140` |
-| add | paragraph | `unsupported_property` | `font.eastAsia` | 1 | not in the registry; OfficeCLI documents it | `word/run-formatting.sh:63` |
-| add | paragraph | `unsupported_property` | `framePr.w` | 1 | not in the registry; not in OfficeCLI's help schema | `word/paragraph-formatting.sh:117` |
-| add | paragraph | `unsupported_property` | `kern` | 1 | not in the registry; OfficeCLI documents it | `word/run-formatting.sh:122` |
-| add | paragraph | `unsupported_property` | `kinsoku` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:138` |
-| add | paragraph | `unsupported_property` | `lang` | 1 | not in the registry; not in OfficeCLI's help schema | `word/run-formatting.sh:79` |
-| add | paragraph | `unsupported_property` | `markRPr.bold` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:60` |
-| add | paragraph | `unsupported_property` | `markRPr.italic` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:108` |
-| add | paragraph | `unsupported_property` | `mirrorIndents` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:145` |
-| add | paragraph | `unsupported_property` | `overflowPunct` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:140` |
-| add | paragraph | `unsupported_property` | `rtl` | 1 | not in the registry; OfficeCLI documents it | `word/run-formatting.sh:84` |
-| add | paragraph | `unsupported_property` | `shading` | 1 | not in the registry; OfficeCLI documents it | `word/run-formatting.sh:101` |
-| add | paragraph | `unsupported_property` | `shading.val` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:100` |
-| add | paragraph | `unsupported_property` | `shd` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:99` |
-| add | paragraph | `unsupported_property` | `suppressLineNumbers` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:144` |
-| add | paragraph | `unsupported_property` | `tabs` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:104` |
-| add | paragraph | `unsupported_property` | `textFill` | 1 | not in the registry; not in OfficeCLI's help schema | `word/run-formatting.sh:111` |
-| add | paragraph | `unsupported_property` | `textOutline` | 1 | not in the registry; not in OfficeCLI's help schema | `word/run-formatting.sh:112` |
-| add | paragraph | `unsupported_property` | `vertAlign` | 1 | not in the registry; OfficeCLI documents it | `word/run-formatting.sh:107` |
-| add | paragraph | `unsupported_property` | `w14glow` | 1 | not in the registry; not in OfficeCLI's help schema | `word/run-formatting.sh:113` |
-| add | paragraph | `unsupported_property` | `w14reflection` | 1 | not in the registry; not in OfficeCLI's help schema | `word/run-formatting.sh:114` |
-| add | paragraph | `unsupported_property` | `w14shadow` | 1 | not in the registry; not in OfficeCLI's help schema | `word/run-formatting.sh:115` |
-| add | paragraph | `unsupported_property` | `webHidden` | 1 | not in the registry; not in OfficeCLI's help schema | `word/run-formatting.sh:139` |
-| add | paragraph | `unsupported_property` | `wordWrap` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:80` |
-| add | picture | `unsupported_property` | `crop` | 1 | not in the registry; OfficeCLI documents it | `word/pictures.sh:81` |
-| add | picture | `unsupported_property` | `decorative` | 1 | not in the registry; OfficeCLI documents it | `word/pictures.sh:165` |
-| add | picture | `unsupported_property` | `link` | 1 | not in the registry; OfficeCLI documents it | `word/pictures.sh:151` |
-| add | row | `unsupported_property` | `revision.author` | 1 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:207` |
+| add | paragraph | `warned` | `adjustRightInd` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:145` |
+| add | paragraph | `warned` | `autoSpaceDE` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:139` |
+| add | paragraph | `warned` | `autoSpaceDN` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:139` |
+| add | paragraph | `warned` | `border.bottom` | 1 | not in the registry; not in OfficeCLI's help schema | `word/paragraph-formatting.sh:129` |
+| add | paragraph | `warned` | `border.top` | 1 | not in the registry; not in OfficeCLI's help schema | `word/paragraph-formatting.sh:129` |
+| add | paragraph | `warned` | `divId` | 1 | not in the registry; not in OfficeCLI's help schema | `word/paragraph-formatting.sh:149` |
+| add | paragraph | `warned` | `eastAsianLayout.combine` | 1 | not in the registry; not in OfficeCLI's help schema | `word/run-formatting.sh:123` |
+| add | paragraph | `warned` | `eastAsianLayout.vert` | 1 | not in the registry; not in OfficeCLI's help schema | `word/run-formatting.sh:123` |
+| add | paragraph | `warned` | `effect` | 1 | not in the registry; not in OfficeCLI's help schema | `word/run-formatting.sh:138` |
+| add | paragraph | `warned` | `fitText` | 1 | not in the registry; not in OfficeCLI's help schema | `word/run-formatting.sh:140` |
+| add | paragraph | `warned` | `font.eastAsia` | 1 | not in the registry; OfficeCLI documents it | `word/run-formatting.sh:63` |
+| add | paragraph | `warned` | `framePr.h` | 1 | not in the registry; not in OfficeCLI's help schema | `word/paragraph-formatting.sh:117` |
+| add | paragraph | `warned` | `framePr.w` | 1 | not in the registry; not in OfficeCLI's help schema | `word/paragraph-formatting.sh:117` |
+| add | paragraph | `warned` | `framePr.wrap` | 1 | not in the registry; not in OfficeCLI's help schema | `word/paragraph-formatting.sh:117` |
+| add | paragraph | `warned` | `kern` | 1 | not in the registry; OfficeCLI documents it | `word/run-formatting.sh:122` |
+| add | paragraph | `warned` | `kinsoku` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:138` |
+| add | paragraph | `warned` | `lang` | 1 | not in the registry; not in OfficeCLI's help schema | `word/run-formatting.sh:79` |
+| add | paragraph | `warned` | `markRPr.bold` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:60` |
+| add | paragraph | `warned` | `markRPr.color` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:60` |
+| add | paragraph | `warned` | `markRPr.italic` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:108` |
+| add | paragraph | `warned` | `markRPr.strike` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:108` |
+| add | paragraph | `warned` | `mirrorIndents` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:145` |
+| add | paragraph | `warned` | `overflowPunct` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:140` |
+| add | paragraph | `warned` | `revision.id` | 1 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:244` |
+| add | paragraph | `warned` | `rtl` | 1 | not in the registry; OfficeCLI documents it | `word/run-formatting.sh:84` |
+| add | paragraph | `warned` | `shading` | 1 | not in the registry; OfficeCLI documents it | `word/run-formatting.sh:101` |
+| add | paragraph | `warned` | `shading.color` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:100` |
+| add | paragraph | `warned` | `shading.val` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:100` |
+| add | paragraph | `warned` | `shd` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:99` |
+| add | paragraph | `warned` | `snapToGrid` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:145` |
+| add | paragraph | `warned` | `start` | 1 | registry: `start` is not add-able; OfficeCLI documents it | `word/paragraph-formatting.sh:154` |
+| add | paragraph | `warned` | `suppressAutoHyphens` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:144` |
+| add | paragraph | `warned` | `suppressLineNumbers` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:144` |
+| add | paragraph | `warned` | `tabs` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:104` |
+| add | paragraph | `warned` | `textFill` | 1 | not in the registry; not in OfficeCLI's help schema | `word/run-formatting.sh:111` |
+| add | paragraph | `warned` | `textOutline` | 1 | not in the registry; not in OfficeCLI's help schema | `word/run-formatting.sh:112` |
+| add | paragraph | `warned` | `textboxTightWrap` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:149` |
+| add | paragraph | `warned` | `topLinePunct` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:140` |
+| add | paragraph | `warned` | `vertAlign` | 1 | not in the registry; OfficeCLI documents it | `word/run-formatting.sh:107` |
+| add | paragraph | `warned` | `w14glow` | 1 | not in the registry; not in OfficeCLI's help schema | `word/run-formatting.sh:113` |
+| add | paragraph | `warned` | `w14reflection` | 1 | not in the registry; not in OfficeCLI's help schema | `word/run-formatting.sh:114` |
+| add | paragraph | `warned` | `w14shadow` | 1 | not in the registry; not in OfficeCLI's help schema | `word/run-formatting.sh:115` |
+| add | paragraph | `warned` | `webHidden` | 1 | not in the registry; not in OfficeCLI's help schema | `word/run-formatting.sh:139` |
+| add | paragraph | `warned` | `wordWrap` | 1 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:80` |
+| add | picture | `warned` | `behindText` | 1 | not in the registry; OfficeCLI documents it | `word/pictures.sh:106` |
+| add | picture | `warned` | `crop` | 1 | not in the registry; OfficeCLI documents it | `word/pictures.sh:81` |
+| add | picture | `warned` | `decorative` | 1 | not in the registry; OfficeCLI documents it | `word/pictures.sh:165` |
+| add | picture | `warned` | `hPosition` | 1 | not in the registry; OfficeCLI documents it | `word/pictures.sh:135` |
+| add | picture | `warned` | `link` | 1 | not in the registry; OfficeCLI documents it | `word/pictures.sh:151` |
+| add | picture | `warned` | `vAlign` | 1 | not in the registry; OfficeCLI documents it | `word/pictures.sh:106` |
+| add | picture | `warned` | `vPosition` | 1 | not in the registry; OfficeCLI documents it | `word/pictures.sh:135` |
+| add | picture | `warned` | `vRelative` | 1 | not in the registry; OfficeCLI documents it | `word/pictures.sh:121` |
+| add | row | `warned` | `revision.author` | 1 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:207` |
+| add | row | `warned` | `revision.date` | 1 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:207` |
 | add | run | `unsupported_capability` | - | 1 | registry lists add; refused for this target (operation gap) | `word/fields.sh:151` |
-| add | run | `unsupported_property` | `snapToGrid` | 1 | not in the registry; OfficeCLI documents it | `word/run-formatting.sh:144` |
-| add | run | `unsupported_property` | `specVanish` | 1 | not in the registry; OfficeCLI documents it | `word/run-formatting.sh:145` |
-| add | table | `unsupported_property` | `direction` | 1 | registry: `direction` is not add-able; OfficeCLI documents it | `word/tables.sh:261` |
+| add | run | `warned` | `snapToGrid` | 1 | not in the registry; OfficeCLI documents it | `word/run-formatting.sh:144` |
+| add | run | `warned` | `specVanish` | 1 | not in the registry; OfficeCLI documents it | `word/run-formatting.sh:145` |
+| add | table | `warned` | `cellSpacing` | 1 | registry: `cellSpacing` is not add-able; OfficeCLI documents it | `word/tables.sh:179` |
+| add | table | `warned` | `direction` | 1 | registry: `direction` is not add-able; OfficeCLI documents it | `word/tables.sh:261` |
+| add | table | `warned` | `indent` | 1 | registry: `indent` is not add-able; OfficeCLI documents it | `word/tables.sh:179` |
+| add | table | `warned` | `layout` | 1 | registry: `layout` is not add-able; OfficeCLI documents it | `word/tables.sh:179` |
+| add | table | `warned` | `padding` | 1 | not in the registry; OfficeCLI documents it | `word/tables.sh:179` |
 | add | toc | `unsupported_element` | - | 1 | registry gap R4x | `word/fields.sh:66` |
 | get | group | `unsupported_capability` | - | 1 | element not in the registry | `word/diagram.sh:60` |
 | query | field | `unsupported_capability` | - | 1 | registry gap R4x | `word/fields.sh:168` |
 | query | toc | `unsupported_capability` | - | 1 | registry gap R4x | `word/fields.sh:171` |
 | query | - | `unsupported_capability` | - | 1 | element not in the registry | `word/numbering.sh:335` |
+| set | cell | `warned` | `(more)` | 1 | not in the registry; not in OfficeCLI's help schema | `word/tables.sh:221` |
+| set | cell | `warned` | `border.all` | 1 | not in the registry; OfficeCLI documents it | `word/tables.sh:204` |
+| set | cell | `warned` | `border.bottom` | 1 | not in the registry; OfficeCLI documents it | `word/tables.sh:229` |
+| set | cell | `warned` | `border.left` | 1 | not in the registry; OfficeCLI documents it | `word/tables.sh:233` |
+| set | cell | `warned` | `border.right` | 1 | not in the registry; OfficeCLI documents it | `word/tables.sh:233` |
+| set | cell | `warned` | `border.tl2br` | 1 | not in the registry; OfficeCLI documents it | `word/tables.sh:204` |
+| set | cell | `warned` | `border.top` | 1 | not in the registry; OfficeCLI documents it | `word/tables.sh:229` |
+| set | cell | `warned` | `border.tr2bl` | 1 | not in the registry; OfficeCLI documents it | `word/tables.sh:204` |
+| set | cell | `warned` | `direction` | 1 | not in the registry; OfficeCLI documents it | `word/tables.sh:216` |
+| set | cell | `warned` | `fitText` | 1 | not in the registry; OfficeCLI documents it | `word/tables.sh:237` |
+| set | cell | `warned` | `font` | 1 | not in the registry; OfficeCLI documents it | `word/tables.sh:209` |
+| set | cell | `warned` | `gridspan` | 1 | not in the registry; OfficeCLI documents it | `word/tables.sh:94` |
+| set | cell | `warned` | `highlight` | 1 | not in the registry; OfficeCLI documents it | `word/tables.sh:209` |
+| set | cell | `warned` | `hmerge` | 1 | registry: `hmerge` is not set-able; OfficeCLI documents it | `word/tables.sh:252` |
+| set | cell | `warned` | `italic` | 1 | not in the registry; OfficeCLI documents it | `word/tables.sh:209` |
+| set | cell | `warned` | `nowrap` | 1 | registry: `nowrap` is not set-able; OfficeCLI documents it | `word/tables.sh:216` |
+| set | cell | `warned` | `padding.bottom` | 1 | registry: `padding.bottom` is not set-able; OfficeCLI documents it | `word/tables.sh:221` |
+| set | cell | `warned` | `padding.left` | 1 | registry: `padding.left` is not set-able; OfficeCLI documents it | `word/tables.sh:221` |
+| set | cell | `warned` | `padding.top` | 1 | registry: `padding.top` is not set-able; OfficeCLI documents it | `word/tables.sh:221` |
+| set | cell | `warned` | `revision.author` | 1 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:190` |
+| set | cell | `warned` | `revision.date` | 1 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:190` |
+| set | cell | `warned` | `skipGridSync` | 1 | not in the registry; OfficeCLI documents it | `word/tables.sh:240` |
+| set | cell | `warned` | `strike` | 1 | not in the registry; OfficeCLI documents it | `word/tables.sh:209` |
+| set | cell | `warned` | `textDirection` | 1 | registry: `textDirection` is not set-able; OfficeCLI documents it | `word/tables.sh:216` |
+| set | cell | `warned` | `underline` | 1 | not in the registry; OfficeCLI documents it | `word/tables.sh:209` |
+| set | cell | `warned` | `width` | 1 | registry: `width` is not set-able; OfficeCLI documents it | `word/tables.sh:240` |
 | set | field | `unsupported_capability` | - | 1 | registry gap R4x | `word/fields.sh:160` |
-| set | row | `unsupported_element` | - | 1 | registry: no set on row | `word/revisions.sh:183` |
-| set | run | `unsupported_property` | `font.color` | 1 | not in the registry; OfficeCLI documents it | `word/revisions.sh:90` |
-| set | table | `unsupported_element` | - | 1 | registry: no set on table | `word/revisions.sh:177` |
+| set | paragraph | `warned` | `revision.author` | 1 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:130` |
+| set | paragraph | `warned` | `revision.date` | 1 | not in the registry; not in OfficeCLI's help schema | `word/revisions.sh:130` |
+| set | run | `warned` | `font.color` | 1 | not in the registry; OfficeCLI documents it | `word/revisions.sh:90` |
 
 ## Element and property gaps: pptx
 
 | Verb | Element | Refusal | Property | Lines | Registry cross-check | Examples |
 |---|---|---|---|---:|---|---|
-| add | shape | `unsupported_property` | `size` | 461 | registry: `size` is not add-able; OfficeCLI documents it | `ppt/charts/charts-3d.sh:39`, `ppt/charts/charts-3d.sh:47` |
-| add | chart | `unsupported_type` | - | 446 | registry: no add on chart | `ppt/charts/charts-3d.sh:40`, `ppt/charts/charts-3d.sh:41` |
-| add | shape | `unsupported_property` | `fill` | 162 | registry gap L-PPTX-R6b; OfficeCLI documents it | `ppt/shapes/shapes-effects.sh:49`, `ppt/shapes/shapes-effects.sh:59` |
-| set | slide | `unsupported_property` | `transition` | 136 | registry gap M1-extended; OfficeCLI documents it | `ppt/animations.sh:39`, `ppt/animations.sh:68` |
-| add | shape | `unsupported_property` | `geometry` | 93 | registry gap L-PPTX-R6b; OfficeCLI documents it | `ppt/presentation-settings.sh:20`, `ppt/shapes/shapes-basic.sh:30` |
-| add | table | `unsupported_type` | - | 51 | registry: no add on table | `ppt/tables/tables-basic.sh:23`, `ppt/tables/tables-basic.sh:34` |
-| add | slide | `unsupported_property` | `background` | 30 | registry gap M1-extended; OfficeCLI documents it | `ppt/3d-model.sh:19`, `ppt/templates/styles/brand--aura-coffee/build.sh:8` |
-| add | run | `unsupported_type` | - | 29 | registry: no add on run | `ppt/textboxes/textboxes-advanced.sh:145`, `ppt/textboxes/textboxes-advanced.sh:146` |
-| batch | - | `unsupported_property` | `transition` | 25 | refused on a batch item; not in the registry | `ppt/templates/styles/brand--aura-coffee/build.sh:72`, `ppt/templates/styles/brand--aura-coffee/build.sh:101` |
-| add | paragraph | `unsupported_type` | - | 21 | registry: no add on paragraph | `ppt/shapes/shapes-typography.sh:30`, `ppt/shapes/shapes-typography.sh:31` |
+| add | chart | `unsupported_element` | - | 447 | registry: no add on chart | `ppt/charts/charts-3d.sh:40`, `ppt/charts/charts-3d.sh:41` |
+| add | shape | `warned` | `autoFit` | 117 | registry gap L-PPTX-R7b; OfficeCLI documents it | `ppt/charts/charts-3d.sh:39`, `ppt/charts/charts-3d.sh:47` |
+| add | shape | `warned` | `name` | 111 | registry: `name` is not add-able; OfficeCLI documents it | `ppt/shapes/shapes-effects.sh:215`, `ppt/shapes/shapes-effects.sh:228` |
+| add | shape | `warned` | `line` | 88 | registry gap L-PPTX-R6b; OfficeCLI documents it | `ppt/shapes/shapes-basic.sh:83`, `ppt/shapes/shapes-basic.sh:103` |
+| add | table | `unsupported_element` | - | 51 | registry: no add on table | `ppt/tables/tables-basic.sh:23`, `ppt/tables/tables-basic.sh:34` |
+| add | animation | `unsupported_element` | - | 44 | registry gap M1-extended | `ppt/animations.sh:63`, `ppt/animations.sh:94` |
+| add | run | `unsupported_element` | - | 44 | registry: no add on run | `ppt/textboxes/textboxes-advanced.sh:145`, `ppt/textboxes/textboxes-advanced.sh:146` |
+| add | slide | `warned` | `background` | 30 | registry gap M1-extended; OfficeCLI documents it | `ppt/3d-model.sh:19`, `ppt/templates/styles/brand--aura-coffee/build.sh:8` |
+| add | shape | `warned` | `opacity` | 27 | registry gap L-PPTX-R6b; OfficeCLI documents it | `ppt/shapes/shapes-basic.sh:77`, `ppt/shapes/shapes-connectors.sh:140` |
+| add | paragraph | `unsupported_element` | - | 25 | registry: no add on paragraph | `ppt/shapes/shapes-typography.sh:30`, `ppt/shapes/shapes-typography.sh:31` |
+| add | shape | `unsupported_capability` | - | 25 | registry lists add; refused for this target (operation gap) | `ppt/3d-model.sh:70`, `ppt/3d-model.sh:76` |
+| add | shape | `warned` | `lineWidth` | 22 | registry gap L-PPTX-R6b; OfficeCLI documents it | `ppt/shapes/shapes-basic.sh:119`, `ppt/shapes/shapes-basic.sh:125` |
+| add | shape | `warned` | `lineColor` | 21 | not in the registry; OfficeCLI documents it | `ppt/shapes/shapes-basic.sh:119`, `ppt/shapes/shapes-basic.sh:125` |
 | add | diagram | `unsupported_capability` | - | 19 | element not in the registry | `ppt/diagram.sh:98`, `ppt/diagram.sh:138` |
-| set | series | `unsupported_property` | `color` | 18 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:288`, `ppt/charts/charts-area.sh:94` |
-| set | tc | `unsupported_property` | `valign` | 14 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-nested.sh:59`, `ppt/tables/tables-nested.sh:60` |
-| add | connector | `unsupported_type` | - | 13 | registry: no add on connector | `ppt/shapes/shapes-connectors.sh:36`, `ppt/shapes/shapes-connectors.sh:50` |
-| set | shape | `unsupported_property` | `rotation` | 12 | registry: `rotation` is not set-able; OfficeCLI documents it | `ppt/templates/styles/lifestyle--cat-secret-life/build.sh:105`, `ppt/templates/styles/lifestyle--cat-secret-life/build.sh:108` |
-| set | slide | `unsupported_property` | `background` | 12 | registry gap M1-extended; OfficeCLI documents it | `ppt/animations.sh:33`, `ppt/animations.sh:47` |
-| add | slide | `unsupported_property` | `title` | 9 | not in the registry; OfficeCLI documents it | `ppt/animations.sh:46`, `ppt/animations.sh:74` |
-| set | shape | `unsupported_property` | `animation` | 9 | not in the registry; OfficeCLI documents it | `ppt/templates/styles/lifestyle--cat-secret-life/build.sh:133`, `ppt/templates/styles/lifestyle--cat-secret-life/build.sh:134` |
-| set | shape | `unsupported_property` | `opacity` | 9 | registry gap L-PPTX-R6b; OfficeCLI documents it | `ppt/templates/styles/lifestyle--cat-secret-life/build.sh:106`, `ppt/templates/styles/lifestyle--cat-secret-life/build.sh:107` |
-| set | tc | `unsupported_property` | `gridSpan` | 8 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-financial.sh:48`, `ppt/tables/tables-financial.sh:70` |
-| set | shape | `unsupported_property` | `preset` | 7 | not in the registry; OfficeCLI documents it | `ppt/templates/styles/lifestyle--cat-secret-life/build.sh:102`, `ppt/templates/styles/lifestyle--cat-secret-life/build.sh:123` |
-| add | picture | `unsupported_property` | `rotation` | 6 | registry: `rotation` is not add-able; OfficeCLI documents it | `ppt/pictures/pictures-basic.sh:182` |
-| add | shape | `unsupported_capability` | - | 6 | registry lists add; refused for this target (operation gap) | `ppt/shapes/shapes-typography.sh:260`, `ppt/templates/styles/lifestyle--cat-secret-life/build.sh:50` |
-| add | ole | `unsupported_type` | - | 4 | registry: no add on ole | `ppt/ole/ole-embed.sh:102`, `ppt/ole/ole-embed.sh:115` |
-| add | shape | `unsupported_property` | `shape` | 4 | not in the registry; OfficeCLI documents it | `ppt/transitions/transitions-morph.sh:32`, `ppt/transitions/transitions-morph.sh:45` |
-| set | axis | `unsupported_property` | `title` | 4 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:297`, `ppt/charts/charts-bar.sh:71` |
-| add | diagram | `unsupported_type` | - | 3 | element not in the registry | `ppt/diagram.sh:79`, `ppt/diagram.sh:91` |
-| add | picture | `unsupported_property` | `alt` | 3 | registry: `alt` is not add-able; OfficeCLI documents it | `ppt/pictures/pictures-basic.sh:87`, `ppt/pictures/pictures-basic.sh:97` |
-| add | picture | `unsupported_property` | `crop` | 3 | not in the registry; OfficeCLI documents it | `ppt/pictures/pictures-basic.sh:136`, `ppt/pictures/pictures-basic.sh:144` |
-| add | picture | `unsupported_property` | `link` | 3 | not in the registry; OfficeCLI documents it | `ppt/pictures/pictures-basic.sh:201`, `ppt/pictures/pictures-basic.sh:211` |
-| set | shape | `unsupported_property` | `list` | 3 | registry gap M1-extended; OfficeCLI documents it | `ppt/textboxes/textboxes-basic.sh:58`, `ppt/textboxes/textboxes-basic.sh:71` |
-| set | tc | `unsupported_property` | `border.tl2br` | 3 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-borders.sh:81`, `ppt/tables/tables-borders.sh:111` |
-| set | tc | `unsupported_property` | `merge.down` | 3 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-nested.sh:121`, `ppt/tables/tables-rows-cols.sh:198` |
-| add | picture | `unsupported_property` | `cropLeft` | 2 | not in the registry; OfficeCLI documents it | `ppt/pictures/pictures-basic.sh:152`, `ppt/pictures/pictures-basic.sh:294` |
-| add | shape | `unsupported_property` | `bold` | 2 | registry: `bold` is not add-able; OfficeCLI documents it | `ppt/textboxes/textboxes-basic.sh:46`, `ppt/textboxes/textboxes-basic.sh:61` |
-| batch | - | `unsupported_property` | `background` | 2 | refused on a batch item; not in the registry | `ppt/templates/styles/brand--aura-coffee-dark/build.sh:157`, `ppt/templates/styles/science--space-exploration/build.sh:16` |
-| set | presentation | `unsupported_property` | `slideSize` | 2 | registry: `slideSize` is not set-able; OfficeCLI documents it | `ppt/presentation-settings.sh:34`, `ppt/templates/styles/lifestyle--feline-report/build_ppt.sh:11` |
-| set | shape | `unsupported_property` | `fill` | 2 | registry gap L-PPTX-R6b; OfficeCLI documents it | `ppt/templates/styles/lifestyle--cat-secret-life/build.sh:164`, `ppt/templates/styles/lifestyle--cat-secret-life/build.sh:228` |
-| set | tc | `unsupported_property` | `bevel` | 2 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-basic.sh:221`, `ppt/tables/tables-nested.sh:110` |
-| set | tc | `unsupported_property` | `direction` | 2 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-basic.sh:214`, `ppt/tables/tables-nested.sh:120` |
-| set | tc | `unsupported_property` | `image` | 2 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-basic.sh:203`, `ppt/tables/tables-nested.sh:111` |
-| set | tc | `unsupported_property` | `linespacing` | 2 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-basic.sh:142`, `ppt/tables/tables-nested.sh:139` |
-| set | tc | `unsupported_property` | `opacity` | 2 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-basic.sh:176`, `ppt/tables/tables-nested.sh:109` |
-| set | tc | `unsupported_property` | `padding` | 2 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-basic.sh:166`, `ppt/tables/tables-nested.sh:113` |
-| set | tc | `unsupported_property` | `padding.bottom` | 2 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-basic.sh:171`, `ppt/tables/tables-nested.sh:114` |
-| set | tc | `unsupported_property` | `strike` | 2 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-basic.sh:125`, `ppt/tables/tables-nested.sh:136` |
-| set | tc | `unsupported_property` | `textdirection` | 2 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-basic.sh:209`, `ppt/tables/tables-nested.sh:119` |
-| set | tc | `unsupported_property` | `underline` | 2 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-basic.sh:120`, `ppt/tables/tables-nested.sh:135` |
-| set | tc | `unsupported_property` | `wrap` | 2 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-basic.sh:135`, `ppt/tables/tables-nested.sh:118` |
-| add | group | `unsupported_type` | - | 1 | registry: no add on group | `ppt/shapes/shapes-connectors.sh:146` |
-| add | picture | `unsupported_property` | `cropRight` | 1 | not in the registry; OfficeCLI documents it | `ppt/pictures/pictures-basic.sh:290` |
-| set | axis | `unsupported_property` | `dispUnits` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:236` |
-| set | axis | `unsupported_property` | `labelRotation` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:257` |
-| set | axis | `unsupported_property` | `logBase` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:244` |
-| set | axis | `unsupported_property` | `visible` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:251` |
-| set | chart | `unsupported_property` | `direction` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:46` |
-| set | chart | `unsupported_property` | `dispBlanksAs` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:212` |
-| set | presentation | `unsupported_property` | `author` | 1 | registry: `author` is not set-able; OfficeCLI documents it | `ppt/presentation-settings.sh:26` |
-| set | presentation | `unsupported_property` | `extended.company` | 1 | registry: `extended.company` is not set-able; OfficeCLI documents it | `ppt/presentation-settings.sh:30` |
-| set | presentation | `unsupported_property` | `print.what` | 1 | not in the registry; OfficeCLI documents it | `ppt/presentation-settings.sh:38` |
-| set | presentation | `unsupported_property` | `removePersonalInfo` | 1 | not in the registry; OfficeCLI documents it | `ppt/presentation-settings.sh:46` |
-| set | presentation | `unsupported_property` | `show.loop` | 1 | not in the registry; OfficeCLI documents it | `ppt/presentation-settings.sh:42` |
-| set | presentation | `unsupported_property` | `theme.color.dk1` | 1 | not in the registry; OfficeCLI documents it | `ppt/presentation-settings.sh:49` |
-| set | presentation | `unsupported_property` | `theme.font.major.latin` | 1 | not in the registry; OfficeCLI documents it | `ppt/presentation-settings.sh:56` |
-| set | series | `unsupported_property` | `values` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:274` |
-| set | table | `unsupported_property` | `border.all` | 1 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-nested.sh:91` |
-| set | table | `unsupported_property` | `firstRow` | 1 | registry: `firstRow` is not set-able; OfficeCLI documents it | `ppt/tables/tables-nested.sh:86` |
-| set | table | `unsupported_property` | `style` | 1 | registry: `style` is not set-able; OfficeCLI documents it | `ppt/tables/tables-nested.sh:54` |
+| add | slide | `warned` | `transition` | 17 | registry: `transition` is not add-able; OfficeCLI documents it | `ppt/3d-model.sh:19`, `ppt/templates/styles/lifestyle--feline-report/build_ppt.sh:14` |
+| add | connector | `unsupported_element` | - | 13 | registry: no add on connector | `ppt/shapes/shapes-connectors.sh:36`, `ppt/shapes/shapes-connectors.sh:50` |
+| add | shape | `warned` | `rotation` | 12 | registry: `rotation` is not add-able; OfficeCLI documents it | `ppt/shapes/shapes-basic.sh:164`, `ppt/templates/styles/lifestyle--cat-secret-life/build.sh:23` |
+| set | slide | `warned` | `background` | 12 | registry gap M1-extended; OfficeCLI documents it | `ppt/animations.sh:33`, `ppt/animations.sh:47` |
+| add | shape | `warned` | `valign` | 11 | registry gap L-PPTX-R7b; OfficeCLI documents it | `ppt/shapes/shapes-typography.sh:240`, `ppt/templates/styles/lifestyle--cat-secret-life/build.sh:43` |
+| add | slide | `warned` | `title` | 9 | not in the registry; OfficeCLI documents it | `ppt/animations.sh:46`, `ppt/animations.sh:74` |
+| add | model3d | `unsupported_element` | - | 8 | registry gap M1-extended | `ppt/3d-model.sh:26`, `ppt/3d-model.sh:31` |
+| add | shape | `warned` | `bevel` | 6 | not in the registry; OfficeCLI documents it | `ppt/shapes/shapes-effects.sh:151`, `ppt/shapes/shapes-effects.sh:158` |
+| add | shape | `warned` | `zorder` | 6 | registry: `zorder` is not add-able; OfficeCLI documents it | `ppt/shapes/shapes-effects.sh:228`, `ppt/shapes/shapes-effects.sh:233` |
+| set | presentation | `warned` | `(more)` | 6 | not in the registry; not in OfficeCLI's help schema | `ppt/presentation-settings.sh:26`, `ppt/presentation-settings.sh:30` |
+| add | shape | `warned` | `lineSpacing` | 5 | registry: `lineSpacing` is not add-able; OfficeCLI documents it | `ppt/shapes/shapes-typography.sh:38`, `ppt/templates/styles/science--alien-guide/build.sh:74` |
+| add | shape | `warned` | `margin` | 5 | registry gap L-PPTX-R7b; OfficeCLI documents it | `ppt/shapes/shapes-typography.sh:251`, `ppt/textboxes/textboxes-basic.sh:131` |
+| add | tr | `unsupported_element` | - | 5 | registry: no add on tr | `ppt/tables/tables-rows-cols.sh:41`, `ppt/tables/tables-rows-cols.sh:42` |
+| set | axis | `warned` | `format` | 5 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:236`, `ppt/charts/charts-advanced.sh:297` |
+| set | axis | `warned` | `title` | 5 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:257`, `ppt/charts/charts-advanced.sh:297` |
+| add | col | `unsupported_element` | - | 4 | registry gap L-PPTX-R8 | `ppt/tables/tables-rows-cols.sh:43`, `ppt/tables/tables-rows-cols.sh:48` |
+| add | ole | `unsupported_element` | - | 4 | registry: no add on ole | `ppt/ole/ole-embed.sh:102`, `ppt/ole/ole-embed.sh:115` |
+| add | shape | `warned` | `depth` | 4 | not in the registry; OfficeCLI documents it | `ppt/shapes/shapes-effects.sh:165`, `ppt/shapes/shapes-effects.sh:172` |
+| add | shape | `warned` | `font.cs` | 4 | registry: `font.cs` is not add-able; OfficeCLI documents it | `ppt/shapes/shapes-typography.sh:126`, `ppt/shapes/shapes-typography.sh:138` |
+| add | shape | `warned` | `lineDash` | 4 | not in the registry; OfficeCLI documents it | `ppt/shapes/shapes-basic.sh:119`, `ppt/shapes/shapes-basic.sh:203` |
+| add | shape | `warned` | `lineJoin` | 4 | not in the registry; OfficeCLI documents it | `ppt/shapes/shapes-basic.sh:218`, `ppt/shapes/shapes-basic.sh:232` |
+| set | axis | `warned` | `majorGridlines` | 4 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:244`, `ppt/charts/charts-bar.sh:71` |
+| set | axis | `warned` | `max` | 4 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:244`, `ppt/charts/charts-advanced.sh:297` |
+| set | axis | `warned` | `min` | 4 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:244`, `ppt/charts/charts-advanced.sh:297` |
+| add | diagram | `unsupported_element` | - | 3 | element not in the registry | `ppt/diagram.sh:79`, `ppt/diagram.sh:91` |
+| add | shape | `warned` | `cap` | 3 | registry: `cap` is not add-able; OfficeCLI documents it | `ppt/shapes/shapes-typography.sh:105`, `ppt/shapes/shapes-typography.sh:109` |
+| add | shape | `warned` | `direction` | 3 | registry: `direction` is not add-able; OfficeCLI documents it | `ppt/shapes/shapes-typography.sh:138`, `ppt/shapes/shapes-typography.sh:150` |
+| add | shape | `warned` | `font.ea` | 3 | registry: `font.ea` is not add-able; OfficeCLI documents it | `ppt/shapes/shapes-typography.sh:181`, `ppt/shapes/shapes-typography.sh:207` |
+| add | shape | `warned` | `gradient` | 3 | not in the registry; OfficeCLI documents it | `ppt/shapes/shapes-basic.sh:59`, `ppt/shapes/shapes-basic.sh:65` |
+| add | shape | `warned` | `image` | 3 | not in the registry; OfficeCLI documents it | `ppt/shapes/shapes-effects.sh:123`, `ppt/shapes/shapes-effects.sh:128` |
+| add | shape | `warned` | `lang` | 3 | not in the registry; OfficeCLI documents it | `ppt/shapes/shapes-typography.sh:193`, `ppt/shapes/shapes-typography.sh:200` |
+| add | shape | `warned` | `lighting` | 3 | not in the registry; OfficeCLI documents it | `ppt/shapes/shapes-effects.sh:172`, `ppt/shapes/shapes-effects.sh:178` |
+| add | shape | `warned` | `lineCap` | 3 | not in the registry; OfficeCLI documents it | `ppt/shapes/shapes-basic.sh:203` |
+| add | shape | `warned` | `material` | 3 | not in the registry; OfficeCLI documents it | `ppt/shapes/shapes-effects.sh:172`, `ppt/shapes/shapes-effects.sh:178` |
+| add | shape | `warned` | `softEdge` | 3 | not in the registry; OfficeCLI documents it | `ppt/shapes/shapes-effects.sh:199`, `ppt/shapes/shapes-effects.sh:204` |
+| add | shape | `warned` | `spacing` | 3 | registry: `spacing` is not add-able; OfficeCLI documents it | `ppt/shapes/shapes-typography.sh:78`, `ppt/shapes/shapes-typography.sh:83` |
+| batch | - | `warned` | `name` | 3 | refused on a batch item; the registry lists it on slide | `ppt/templates/styles/lifestyle--cat-philosophy/build.sh:20`, `ppt/templates/styles/productivity--attention-budget/build.sh:11` |
+| batch | - | `warned` | `opacity` | 3 | refused on a batch item; not in the registry | `ppt/templates/styles/lifestyle--cat-philosophy/build.sh:20`, `ppt/templates/styles/productivity--attention-budget/build.sh:11` |
+| batch | - | `warned` | `rotation` | 3 | refused on a batch item; not in the registry | `ppt/templates/styles/lifestyle--cat-philosophy/build.sh:20`, `ppt/templates/styles/productivity--attention-budget/build.sh:11` |
+| set | axis | `warned` | `visible` | 3 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:236`, `ppt/charts/charts-advanced.sh:251` |
+| set | shape | `warned` | `list` | 3 | registry gap M1-extended; OfficeCLI documents it | `ppt/textboxes/textboxes-basic.sh:58`, `ppt/textboxes/textboxes-basic.sh:71` |
+| add | shape | `warned` | `cmpd` | 2 | not in the registry; OfficeCLI documents it | `ppt/shapes/shapes-basic.sh:125`, `ppt/shapes/shapes-basic.sh:131` |
+| add | shape | `warned` | `flipH` | 2 | registry: `flipH` is not add-able; OfficeCLI documents it | `ppt/shapes/shapes-effects.sh:92`, `ppt/shapes/shapes-effects.sh:104` |
+| add | shape | `warned` | `flipV` | 2 | registry: `flipV` is not add-able; OfficeCLI documents it | `ppt/shapes/shapes-effects.sh:98`, `ppt/shapes/shapes-effects.sh:104` |
+| add | shape | `warned` | `headEnd` | 2 | not in the registry; OfficeCLI documents it | `ppt/shapes/shapes-basic.sh:142`, `ppt/shapes/shapes-basic.sh:147` |
+| add | shape | `warned` | `indent` | 2 | registry: `indent` is not add-able; not in OfficeCLI's help schema | `ppt/textboxes/textboxes-advanced.sh:75`, `ppt/textboxes/textboxes-advanced.sh:82` |
+| add | shape | `warned` | `kern` | 2 | not in the registry; OfficeCLI documents it | `ppt/shapes/shapes-typography.sh:94`, `ppt/shapes/shapes-typography.sh:99` |
+| add | shape | `warned` | `lineAlign` | 2 | not in the registry; OfficeCLI documents it | `ppt/shapes/shapes-basic.sh:245` |
+| add | shape | `warned` | `marginLeft` | 2 | registry: `marginLeft` is not add-able; not in OfficeCLI's help schema | `ppt/textboxes/textboxes-advanced.sh:68`, `ppt/textboxes/textboxes-advanced.sh:82` |
+| add | shape | `warned` | `tailEnd` | 2 | not in the registry; OfficeCLI documents it | `ppt/shapes/shapes-basic.sh:142`, `ppt/shapes/shapes-basic.sh:147` |
+| add | video | `unsupported_element` | - | 2 | registry gap L-PPTX-R11 | `ppt/video.sh:74`, `ppt/video.sh:103` |
+| set | axis | `warned` | `labelRotation` | 2 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:236`, `ppt/charts/charts-advanced.sh:257` |
+| set | presentation | `warned` | `slideSize` | 2 | registry: `slideSize` is not set-able; OfficeCLI documents it | `ppt/presentation-settings.sh:34`, `ppt/templates/styles/lifestyle--feline-report/build_ppt.sh:11` |
+| add | group | `unsupported_element` | - | 1 | registry: no add on group | `ppt/shapes/shapes-connectors.sh:146` |
+| add | picture | `unsupported_capability` | - | 1 | registry: no add on picture | `ppt/pictures/pictures-basic.sh:97` |
+| add | shape | `warned` | `animation` | 1 | not in the registry; OfficeCLI documents it | `ppt/shapes/shapes-typography.sh:276` |
+| add | shape | `warned` | `bevelBottom` | 1 | not in the registry; OfficeCLI documents it | `ppt/shapes/shapes-effects.sh:158` |
+| add | shape | `warned` | `glow` | 1 | not in the registry; OfficeCLI documents it | `ppt/shapes/shapes-basic.sh:178` |
+| add | shape | `warned` | `lineOpacity` | 1 | not in the registry; OfficeCLI documents it | `ppt/shapes/shapes-typography.sh:269` |
+| add | shape | `warned` | `linewidth` | 1 | registry gap L-PPTX-R6b; OfficeCLI documents it | `ppt/video.sh:84` |
+| add | shape | `warned` | `link` | 1 | registry gap M1-extended; OfficeCLI documents it | `ppt/shapes/shapes-effects.sh:215` |
+| add | shape | `warned` | `marginRight` | 1 | registry: `marginRight` is not add-able; not in OfficeCLI's help schema | `ppt/textboxes/textboxes-advanced.sh:89` |
+| add | shape | `warned` | `pattern` | 1 | not in the registry; OfficeCLI documents it | `ppt/shapes/shapes-basic.sh:71` |
+| add | shape | `warned` | `reflection` | 1 | not in the registry; OfficeCLI documents it | `ppt/shapes/shapes-basic.sh:184` |
+| add | shape | `warned` | `shadow` | 1 | not in the registry; OfficeCLI documents it | `ppt/shapes/shapes-basic.sh:172` |
+| add | shape | `warned` | `spaceAfter` | 1 | registry: `spaceAfter` is not add-able; OfficeCLI documents it | `ppt/shapes/shapes-typography.sh:50` |
+| add | shape | `warned` | `spaceBefore` | 1 | registry: `spaceBefore` is not add-able; OfficeCLI documents it | `ppt/shapes/shapes-typography.sh:50` |
+| add | shape | `warned` | `strike` | 1 | registry: `strike` is not add-able; OfficeCLI documents it | `ppt/shapes/shapes-typography.sh:225` |
+| add | shape | `warned` | `tooltip` | 1 | registry gap M1-extended; OfficeCLI documents it | `ppt/shapes/shapes-effects.sh:215` |
+| add | shape | `warned` | `underline` | 1 | registry: `underline` is not add-able; OfficeCLI documents it | `ppt/shapes/shapes-typography.sh:231` |
+| batch | - | `unsupported_capability` | - | 1 | element not in the registry | `ppt/templates/styles/brand--aura-coffee/build.sh:55` |
+| batch | - | `warned` | `(more)` | 1 | refused on a batch item; not in the registry | `ppt/templates/styles/productivity--attention-budget/build.sh:11` |
+| batch | - | `warned` | `background` | 1 | refused on a batch item; not in the registry | `ppt/templates/styles/productivity--attention-budget/build.sh:11` |
+| batch | - | `warned` | `line` | 1 | refused on a batch item; not in the registry | `ppt/templates/styles/productivity--attention-budget/build.sh:11` |
+| batch | - | `warned` | `valign` | 1 | refused on a batch item; not in the registry | `ppt/templates/styles/tech--wildlife-company/build.sh:15` |
+| set | axis | `warned` | `(more)` | 1 | not in the registry; not in OfficeCLI's help schema | `ppt/charts/charts-column.sh:68` |
+| set | axis | `warned` | `dispUnits` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:236` |
+| set | axis | `warned` | `logBase` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:244` |
+| set | axis | `warned` | `majorUnit` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:297` |
+| set | axis | `warned` | `minorGridlines` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-column.sh:68` |
+| set | axis | `warned` | `minorUnit` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:236` |
+| set | chart | `warned` | `direction` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:46` |
+| set | chart | `warned` | `dispBlanksAs` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:212` |
+| set | presentation | `warned` | `author` | 1 | registry: `author` is not set-able; OfficeCLI documents it | `ppt/presentation-settings.sh:26` |
+| set | presentation | `warned` | `compatMode` | 1 | not in the registry; OfficeCLI documents it | `ppt/presentation-settings.sh:34` |
+| set | presentation | `warned` | `description` | 1 | registry: `description` is not set-able; OfficeCLI documents it | `ppt/presentation-settings.sh:26` |
+| set | presentation | `warned` | `extended.company` | 1 | registry: `extended.company` is not set-able; OfficeCLI documents it | `ppt/presentation-settings.sh:30` |
+| set | presentation | `warned` | `extended.manager` | 1 | registry: `extended.manager` is not set-able; OfficeCLI documents it | `ppt/presentation-settings.sh:30` |
+| set | presentation | `warned` | `firstSlideNum` | 1 | not in the registry; OfficeCLI documents it | `ppt/presentation-settings.sh:34` |
+| set | presentation | `warned` | `keywords` | 1 | registry: `keywords` is not set-able; OfficeCLI documents it | `ppt/presentation-settings.sh:26` |
+| set | presentation | `warned` | `print.colorMode` | 1 | not in the registry; OfficeCLI documents it | `ppt/presentation-settings.sh:38` |
+| set | presentation | `warned` | `print.frameSlides` | 1 | not in the registry; OfficeCLI documents it | `ppt/presentation-settings.sh:38` |
+| set | presentation | `warned` | `print.what` | 1 | not in the registry; OfficeCLI documents it | `ppt/presentation-settings.sh:38` |
+| set | presentation | `warned` | `removePersonalInfo` | 1 | not in the registry; OfficeCLI documents it | `ppt/presentation-settings.sh:46` |
+| set | presentation | `warned` | `rtl` | 1 | not in the registry; OfficeCLI documents it | `ppt/presentation-settings.sh:34` |
+| set | presentation | `warned` | `show.animation` | 1 | not in the registry; OfficeCLI documents it | `ppt/presentation-settings.sh:42` |
+| set | presentation | `warned` | `show.loop` | 1 | not in the registry; OfficeCLI documents it | `ppt/presentation-settings.sh:42` |
+| set | presentation | `warned` | `show.narration` | 1 | not in the registry; OfficeCLI documents it | `ppt/presentation-settings.sh:42` |
+| set | presentation | `warned` | `subject` | 1 | registry: `subject` is not set-able; OfficeCLI documents it | `ppt/presentation-settings.sh:26` |
+| set | presentation | `warned` | `theme.color.dk1` | 1 | not in the registry; OfficeCLI documents it | `ppt/presentation-settings.sh:49` |
+| set | presentation | `warned` | `theme.color.lt1` | 1 | not in the registry; OfficeCLI documents it | `ppt/presentation-settings.sh:49` |
+| set | presentation | `warned` | `theme.font.major.latin` | 1 | not in the registry; OfficeCLI documents it | `ppt/presentation-settings.sh:56` |
+| set | presentation | `warned` | `title` | 1 | registry: `title` is not set-able; OfficeCLI documents it | `ppt/presentation-settings.sh:26` |
+| set | series | `warned` | `values` | 1 | not in the registry; OfficeCLI documents it | `ppt/charts/charts-advanced.sh:274` |
+| set | slide | `warned` | `advanceClick` | 1 | not in the registry; OfficeCLI documents it | `ppt/transitions/transitions-timing.sh:74` |
+| set | slide | `warned` | `advanceTime` | 1 | not in the registry; OfficeCLI documents it | `ppt/transitions/transitions-timing.sh:63` |
+| set | table | `warned` | `(more)` | 1 | not in the registry; not in OfficeCLI's help schema | `ppt/tables/tables-nested.sh:91` |
+| set | table | `warned` | `bandedRows` | 1 | registry: `bandedRows` is not set-able; OfficeCLI documents it | `ppt/tables/tables-nested.sh:54` |
+| set | table | `warned` | `border.all` | 1 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-nested.sh:91` |
+| set | table | `warned` | `border.bottom` | 1 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-nested.sh:91` |
+| set | table | `warned` | `border.top` | 1 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-nested.sh:91` |
+| set | table | `warned` | `firstRow` | 1 | registry: `firstRow` is not set-able; OfficeCLI documents it | `ppt/tables/tables-nested.sh:54` |
+| set | table | `warned` | `style` | 1 | registry: `style` is not set-able; OfficeCLI documents it | `ppt/tables/tables-nested.sh:54` |
 | set | tc | `unsupported_capability` | - | 1 | registry: no set on tc | `ppt/tables/tables-basic.sh:79` |
-| set | tc | `unsupported_property` | `border.all` | 1 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-nested.sh:103` |
-| set | tc | `unsupported_property` | `border.left` | 1 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-nested.sh:105` |
-| set | tc | `unsupported_property` | `border.top` | 1 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-nested.sh:104` |
-| set | tc | `unsupported_property` | `colspan` | 1 | registry gap L-PPTX-R8; OfficeCLI documents it | `ppt/tables/tables-nested.sh:67` |
-| set | tc | `unsupported_property` | `merge.right` | 1 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-nested.sh:123` |
-| set | tc | `unsupported_property` | `spaceafter` | 1 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-nested.sh:141` |
-| set | tc | `unsupported_property` | `spacebefore` | 1 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-nested.sh:140` |
+| set | tc | `warned` | `image` | 1 | not in the registry; OfficeCLI documents it | `ppt/tables/tables-basic.sh:203` |
 
 ## Element and property gaps: xlsx
 
 | Verb | Element | Refusal | Property | Lines | Registry cross-check | Examples |
 |---|---|---|---|---:|---|---|
-| add | chart | `unsupported_capability` | - | 317 | registry gap L-XLSX-R7 | `excel/charts.sh:160`, `excel/charts.sh:172` |
-| add | conditionalFormatting | `unsupported_capability` | - | 25 | registry gap M1-extended (R4x) | `excel/conditional-formatting.sh:32`, `excel/conditional-formatting.sh:33` |
-| add | dataValidation | `unsupported_capability` | - | 22 | registry gap M1-extended (R4x) | `excel/data-validation.sh:42`, `excel/data-validation.sh:44` |
-| add | shape | `unsupported_capability` | - | 20 | registry gap L-XLSX-R7 | `excel/shapes.sh:39`, `excel/shapes.sh:44` |
-| add | pivottable | `unsupported_capability` | - | 18 | registry gap M1-extended (R4x) | `excel/pivot-tables.sh:121`, `excel/pivot-tables.sh:138` |
-| set | cell | `unsupported_property` | `type` | 9 | registry: `type` is not set-able; OfficeCLI documents it | `excel/cell-formatting.sh:124`, `excel/cell-formatting.sh:126` |
-| add | sparkline | `unsupported_capability` | - | 7 | registry gap M1-extended (R4x) | `excel/sparklines.sh:55`, `excel/sparklines.sh:57` |
-| add | cell | `unsupported_capability` | - | 6 | registry: no add on cell | `excel/cell-formatting.sh:181`, `excel/cell-formatting.sh:183` |
+| add | chart | `unsupported_element` | - | 317 | registry gap L-XLSX-R7 | `excel/charts.sh:160`, `excel/charts.sh:172` |
+| add | conditionalFormatting | `unsupported_element` | - | 25 | registry gap M1-extended (R4x) | `excel/conditional-formatting.sh:32`, `excel/conditional-formatting.sh:33` |
+| add | dataValidation | `unsupported_element` | - | 22 | registry gap M1-extended (R4x) | `excel/data-validation.sh:42`, `excel/data-validation.sh:44` |
+| add | shape | `unsupported_element` | - | 20 | registry gap L-XLSX-R7 | `excel/shapes.sh:39`, `excel/shapes.sh:44` |
+| add | pivottable | `unsupported_element` | - | 18 | registry gap M1-extended (R4x) | `excel/pivot-tables.sh:121`, `excel/pivot-tables.sh:138` |
+| set | cell | `warned` | `type` | 9 | registry: `type` is not set-able; OfficeCLI documents it | `excel/cell-formatting.sh:124`, `excel/cell-formatting.sh:126` |
+| add | sparkline | `unsupported_element` | - | 7 | registry gap M1-extended (R4x) | `excel/sparklines.sh:55`, `excel/sparklines.sh:57` |
+| add | cell | `unsupported_element` | - | 6 | registry: no add on cell | `excel/cell-formatting.sh:181`, `excel/cell-formatting.sh:183` |
 | set | workbook | `unsupported_element` | - | 6 | registry: no set on workbook | `excel/workbook-settings.sh:35`, `excel/workbook-settings.sh:39` |
 | get | shape | `unsupported_capability` | - | 5 | registry gap L-XLSX-R7 | `excel/shapes.sh:186`, `excel/shapes.sh:187` |
-| add | slicer | `unsupported_capability` | - | 3 | registry gap M1-extended (R4x) | `excel/slicers.sh:81`, `excel/slicers.sh:92` |
-| add | sheet | `unsupported_property` | `tabColor` | 1 | registry gap M1-extended (R4x); OfficeCLI documents it | `excel/sheet-settings.sh:128` |
+| add | slicer | `unsupported_element` | - | 3 | registry gap M1-extended (R4x) | `excel/slicers.sh:81`, `excel/slicers.sh:92` |
+| set | sheet | `warned` | `(more)` | 2 | not in the registry; not in OfficeCLI's help schema | `excel/sheet-settings.sh:71`, `excel/sheet-settings.sh:110` |
+| add | sheet | `warned` | `tabColor` | 1 | registry gap M1-extended (R4x); OfficeCLI documents it | `excel/sheet-settings.sh:128` |
 | query | shape | `unsupported_capability` | - | 1 | registry gap L-XLSX-R7 | `excel/shapes.sh:185` |
 | set | axis | `unsupported_capability` | - | 1 | registry gap L-XLSX-R7 | `excel/charts/charts-line.sh:263` |
-| set | cell | `unsupported_property` | `arrayformula` | 1 | registry: `arrayformula` is not set-able; OfficeCLI documents it | `excel/cell-formatting.sh:166` |
-| set | cell | `unsupported_property` | `link` | 1 | registry gap M1-extended (R4x); OfficeCLI documents it | `excel/cell-formatting.sh:158` |
-| set | sheet | `unsupported_property` | `freeze` | 1 | registry gap M1-extended (R4x); OfficeCLI documents it | `excel/sheet-settings.sh:55` |
-| set | sheet | `unsupported_property` | `header` | 1 | not in the registry; OfficeCLI documents it | `excel/sheet-settings.sh:94` |
-| set | sheet | `unsupported_property` | `orientation` | 1 | not in the registry; OfficeCLI documents it | `excel/sheet-settings.sh:71` |
-| set | sheet | `unsupported_property` | `protect` | 1 | registry gap M1-extended (R4x); OfficeCLI documents it | `excel/sheet-settings.sh:121` |
-| set | sheet | `unsupported_property` | `tabColor` | 1 | registry gap M1-extended (R4x); OfficeCLI documents it | `excel/sheet-settings.sh:110` |
+| set | cell | `warned` | `arrayformula` | 1 | registry: `arrayformula` is not set-able; OfficeCLI documents it | `excel/cell-formatting.sh:166` |
+| set | cell | `warned` | `link` | 1 | registry gap M1-extended (R4x); OfficeCLI documents it | `excel/cell-formatting.sh:158` |
+| set | cell | `warned` | `tooltip` | 1 | registry gap M1-extended (R4x); OfficeCLI documents it | `excel/cell-formatting.sh:158` |
+| set | sheet | `warned` | `autoFilter` | 1 | registry gap M1-extended (R4x); OfficeCLI documents it | `excel/sheet-settings.sh:110` |
+| set | sheet | `warned` | `fitToPage` | 1 | not in the registry; OfficeCLI documents it | `excel/sheet-settings.sh:71` |
+| set | sheet | `warned` | `footer` | 1 | not in the registry; OfficeCLI documents it | `excel/sheet-settings.sh:94` |
+| set | sheet | `warned` | `freeze` | 1 | registry gap M1-extended (R4x); OfficeCLI documents it | `excel/sheet-settings.sh:55` |
+| set | sheet | `warned` | `gridlines` | 1 | not in the registry; OfficeCLI documents it | `excel/sheet-settings.sh:110` |
+| set | sheet | `warned` | `header` | 1 | not in the registry; OfficeCLI documents it | `excel/sheet-settings.sh:94` |
+| set | sheet | `warned` | `headings` | 1 | not in the registry; OfficeCLI documents it | `excel/sheet-settings.sh:110` |
+| set | sheet | `warned` | `orientation` | 1 | not in the registry; OfficeCLI documents it | `excel/sheet-settings.sh:71` |
+| set | sheet | `warned` | `paperSize` | 1 | not in the registry; OfficeCLI documents it | `excel/sheet-settings.sh:71` |
+| set | sheet | `warned` | `password` | 1 | not in the registry; OfficeCLI documents it | `excel/sheet-settings.sh:121` |
+| set | sheet | `warned` | `printArea` | 1 | registry gap M1-extended (R4x); OfficeCLI documents it | `excel/sheet-settings.sh:71` |
+| set | sheet | `warned` | `protect` | 1 | registry gap M1-extended (R4x); OfficeCLI documents it | `excel/sheet-settings.sh:121` |
+| set | sheet | `warned` | `sort` | 1 | not in the registry; OfficeCLI documents it | `excel/sheet-settings.sh:135` |
+| set | sheet | `warned` | `tabColor` | 1 | registry gap M1-extended (R4x); OfficeCLI documents it | `excel/sheet-settings.sh:110` |
+| set | sheet | `warned` | `zoom` | 1 | registry gap M1-extended (R4x); OfficeCLI documents it | `excel/sheet-settings.sh:110` |
 | set | slicer | `unsupported_capability` | - | 1 | registry gap M1-extended (R4x) | `excel/slicers.sh:113` |
 
 ## Bugs
@@ -286,109 +417,110 @@ None.
 
 | Follow-up | What | Lines |
 |---|---|---:|
-| F3 | property-granularity "apply the rest and warn": calls refused for one unsupported property (OfficeCLI applies the others and exits 2) | 1266 |
+| F3 | property-granularity "apply the rest and warn" (OfficeCLI applies the others and exits 2): `--unsupported warn` (record 0269); calls it applied without some properties | 628 |
+| F3 | calls still refused for an unsupported property (a property the warn policy cannot drop: an alias of a refused canonical name, or a verb without props) | 0 |
 | F4 | view options (`--start`, `--end`, `--max-lines`, ...) | 0 |
 | F6 | `add --from`, find/replace on `set`, `remove --shift`, `get --save` | 40 |
 | D6 | missing verbs (`validate`, `raw-set`, `add-part`, `dump`) | 138 |
 
 ## Summary by script
 
-| Script | Lines | Passed | of which translated | Gap | Delta | Cascade | Bug | Resident (not run) | Read-back |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| `excel/cell-formatting.sh` | 109 | 94 | 0 | 15 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts.sh` | 320 | 309 | 0 | 11 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-advanced.sh` | 17 | 4 | 0 | 13 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-area.sh` | 92 | 71 | 0 | 21 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-bar.sh` | 82 | 53 | 0 | 25 | 4 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-basic.sh` | 102 | 73 | 0 | 29 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-boxwhisker.sh` | 13 | 4 | 0 | 9 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-bubble.sh` | 24 | 6 | 0 | 18 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-column.sh` | 102 | 73 | 0 | 29 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-combo.sh` | 23 | 6 | 0 | 17 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-extended.sh` | 28 | 7 | 0 | 21 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-histogram.sh` | 37 | 7 | 0 | 30 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-line.sh` | 108 | 74 | 0 | 34 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-pie.sh` | 18 | 5 | 0 | 12 | 1 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-radar.sh` | 23 | 6 | 0 | 17 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-scatter.sh` | 33 | 8 | 0 | 25 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-stock.sh` | 18 | 5 | 0 | 13 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/charts/charts-waterfall.sh` | 23 | 6 | 0 | 17 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/conditional-formatting.sh` | 165 | 139 | 0 | 26 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/data-validation.sh` | 88 | 65 | 0 | 23 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/pivot-tables.sh` | 586 | 568 | 0 | 18 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/shapes.sh` | 62 | 35 | 0 | 27 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/sheet-settings.sh` | 104 | 86 | 0 | 7 | 0 | 11 | 0 | 2 | 2/2 |
-| `excel/slicers.sh` | 60 | 54 | 0 | 6 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/sparklines.sh` | 114 | 106 | 0 | 8 | 0 | 0 | 0 | 2 | 2/2 |
-| `excel/workbook-settings.sh` | 25 | 14 | 0 | 7 | 4 | 0 | 0 | 2 | 2/2 |
-| `ppt/3d-model.sh` | 35 | 1 | 0 | 9 | 0 | 25 | 0 | 2 | 2/2 |
-| `ppt/animations.sh` | 119 | 4 | 1 | 21 | 0 | 94 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-3d.sh` | 50 | 9 | 8 | 41 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-advanced.sh` | 61 | 9 | 8 | 50 | 0 | 2 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-area.sh` | 51 | 9 | 8 | 42 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-bar.sh` | 52 | 9 | 8 | 43 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-bubble.sh` | 52 | 9 | 8 | 43 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-column.sh` | 53 | 9 | 8 | 43 | 0 | 1 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-combo.sh` | 53 | 9 | 8 | 44 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-doughnut.sh` | 51 | 9 | 8 | 42 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-line.sh` | 52 | 9 | 8 | 43 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-pie.sh` | 51 | 9 | 8 | 42 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-radar.sh` | 51 | 9 | 8 | 42 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-scatter.sh` | 58 | 10 | 9 | 48 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-stock.sh` | 53 | 9 | 8 | 44 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/charts/charts-waterfall.sh` | 47 | 9 | 8 | 38 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/diagram.sh` | 72 | 24 | 23 | 47 | 0 | 1 | 0 | 0 | 2/2 |
-| `ppt/ole/ole-embed.sh` | 26 | 13 | 2 | 11 | 0 | 2 | 0 | 6 | 6/6 |
-| `ppt/pictures/pictures-basic.sh` | 68 | 6 | 5 | 49 | 7 | 6 | 0 | 2 | 2/2 |
-| `ppt/presentation-settings.sh` | 12 | 2 | 1 | 10 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/presentation.sh` | 52 | 8 | 6 | 44 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/shapes/shapes-basic.sh` | 66 | 6 | 5 | 60 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/shapes/shapes-connectors.sh` | 55 | 5 | 4 | 50 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/shapes/shapes-effects.sh` | 41 | 6 | 5 | 35 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/shapes/shapes-typography.sh` | 58 | 6 | 5 | 48 | 0 | 4 | 0 | 2 | 2/2 |
-| `ppt/tables/tables-basic.sh` | 73 | 6 | 5 | 27 | 0 | 40 | 0 | 2 | 2/2 |
-| `ppt/tables/tables-borders.sh` | 55 | 4 | 3 | 36 | 0 | 15 | 0 | 2 | 2/2 |
-| `ppt/tables/tables-financial.sh` | 75 | 5 | 4 | 11 | 0 | 59 | 0 | 2 | 2/2 |
-| `ppt/tables/tables-merged.sh` | 63 | 3 | 2 | 10 | 0 | 50 | 0 | 2 | 2/2 |
-| `ppt/tables/tables-nested.sh` | 63 | 5 | 4 | 46 | 0 | 12 | 0 | 2 | 2/2 |
-| `ppt/tables/tables-rows-cols.sh` | 84 | 5 | 4 | 18 | 0 | 61 | 0 | 2 | 2/2 |
-| `ppt/tables/tables-styled.sh` | 44 | 12 | 11 | 31 | 0 | 1 | 0 | 2 | 2/2 |
-| `ppt/templates/styles/brand--aura-coffee-dark/build.sh` | 2 | 1 | 0 | 1 | 0 | 0 | 0 | 1 | 2/2 |
-| `ppt/templates/styles/brand--aura-coffee/build.sh` | 13 | 2 | 0 | 10 | 0 | 1 | 0 | 1 | 2/2 |
-| `ppt/templates/styles/future--2050-vision/build.sh` | 43 | 2 | 0 | 10 | 0 | 31 | 0 | 1 | 2/2 |
-| `ppt/templates/styles/lifestyle--cat-philosophy/build.sh` | 11 | 1 | 0 | 9 | 0 | 1 | 0 | 1 | 2/2 |
-| `ppt/templates/styles/lifestyle--cat-secret-life/build.sh` | 121 | 2 | 0 | 54 | 0 | 65 | 0 | 1 | 2/2 |
-| `ppt/templates/styles/lifestyle--feline-report/build_ppt.sh` | 18 | 1 | 0 | 5 | 0 | 12 | 0 | 1 | 2/2 |
-| `ppt/templates/styles/product--geminicli-timetravel/build.sh` | 130 | 2 | 0 | 17 | 111 | 0 | 0 | 1 | 2/2 |
-| `ppt/templates/styles/productivity--attention-budget/build.sh` | 15 | 1 | 0 | 14 | 0 | 0 | 0 | 1 | 2/2 |
-| `ppt/templates/styles/science--alien-guide/build.sh` | 65 | 1 | 0 | 7 | 0 | 57 | 0 | 1 | 2/2 |
-| `ppt/templates/styles/science--space-exploration/build.sh` | 15 | 1 | 0 | 14 | 0 | 0 | 0 | 1 | 2/2 |
-| `ppt/templates/styles/science--time-travel/build.sh` | 2 | 1 | 0 | 1 | 0 | 0 | 0 | 0 | 2/2 |
-| `ppt/templates/styles/tech--wildlife-company/build.sh` | 17 | 2 | 0 | 8 | 6 | 1 | 0 | 1 | 2/2 |
-| `ppt/textboxes/textboxes-advanced.sh` | 81 | 7 | 6 | 61 | 0 | 13 | 0 | 2 | 2/2 |
-| `ppt/textboxes/textboxes-basic.sh` | 51 | 5 | 4 | 44 | 0 | 2 | 0 | 2 | 2/2 |
-| `ppt/transitions/transitions-bands.sh` | 85 | 22 | 21 | 63 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/transitions/transitions-basic.sh` | 26 | 7 | 6 | 19 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/transitions/transitions-directional.sh` | 101 | 26 | 25 | 75 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/transitions/transitions-dynamic.sh` | 101 | 26 | 25 | 75 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/transitions/transitions-modern.sh` | 77 | 20 | 19 | 57 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/transitions/transitions-morph.sh` | 21 | 5 | 4 | 16 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/transitions/transitions-random.sh` | 17 | 5 | 4 | 12 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/transitions/transitions-shapes.sh` | 57 | 15 | 14 | 42 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/transitions/transitions-timing.sh` | 37 | 10 | 9 | 27 | 0 | 0 | 0 | 2 | 2/2 |
-| `ppt/video.sh` | 20 | 4 | 1 | 8 | 0 | 8 | 0 | 2 | 2/2 |
-| `word/charts.sh` | 46 | 31 | 0 | 15 | 0 | 0 | 0 | 2 | 2/2 |
-| `word/content-controls.sh` | 21 | 11 | 0 | 9 | 0 | 1 | 0 | 2 | 2/2 |
-| `word/diagram.sh` | 50 | 26 | 0 | 24 | 0 | 0 | 0 | 0 | 2/2 |
-| `word/document-formatting.sh` | 17 | 5 | 0 | 12 | 0 | 0 | 0 | 2 | 2/2 |
-| `word/fields.sh` | 39 | 19 | 0 | 20 | 0 | 0 | 0 | 2 | 2/2 |
-| `word/formulas.sh` | 171 | 90 | 0 | 81 | 0 | 0 | 0 | 2 | 2/2 |
-| `word/numbering.sh` | 70 | 24 | 0 | 19 | 0 | 27 | 0 | 1 | 2/2 |
-| `word/paragraph-formatting.sh` | 78 | 54 | 0 | 24 | 0 | 0 | 0 | 0 | 2/2 |
-| `word/pictures.sh` | 31 | 24 | 0 | 7 | 0 | 0 | 0 | 2 | 2/2 |
-| `word/revisions.sh` | 73 | 35 | 0 | 29 | 6 | 3 | 0 | 2 | 2/2 |
-| `word/run-formatting.sh` | 80 | 56 | 0 | 24 | 0 | 0 | 0 | 0 | 2/2 |
-| `word/sections.sh` | 33 | 24 | 0 | 9 | 0 | 0 | 0 | 2 | 2/2 |
-| `word/tables.sh` | 357 | 201 | 3 | 128 | 0 | 28 | 0 | 6 | 6/6 |
-| `word/textbox.sh` | 67 | 14 | 0 | 14 | 0 | 39 | 0 | 1 | 2/2 |
-| **total** | **6431** | **2909** | **344** | **2710** | **139** | **673** | **0** | **177** | **200/200** |
+| Script | Lines | Passed | of which translated | Warned | Gap | Delta | Cascade | Bug | Resident (not run) | Read-back |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `excel/cell-formatting.sh` | 109 | 94 | 0 | 11 | 4 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts.sh` | 320 | 309 | 0 | 0 | 11 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-advanced.sh` | 17 | 4 | 0 | 0 | 13 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-area.sh` | 92 | 71 | 0 | 0 | 21 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-bar.sh` | 82 | 53 | 0 | 0 | 25 | 4 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-basic.sh` | 102 | 73 | 0 | 0 | 29 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-boxwhisker.sh` | 13 | 4 | 0 | 0 | 9 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-bubble.sh` | 24 | 6 | 0 | 0 | 18 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-column.sh` | 102 | 73 | 0 | 0 | 29 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-combo.sh` | 23 | 6 | 0 | 0 | 17 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-extended.sh` | 28 | 7 | 0 | 0 | 21 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-histogram.sh` | 37 | 7 | 0 | 0 | 30 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-line.sh` | 108 | 74 | 0 | 0 | 34 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-pie.sh` | 18 | 5 | 0 | 0 | 12 | 1 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-radar.sh` | 23 | 6 | 0 | 0 | 17 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-scatter.sh` | 33 | 8 | 0 | 0 | 25 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-stock.sh` | 18 | 5 | 0 | 0 | 13 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/charts/charts-waterfall.sh` | 23 | 6 | 0 | 0 | 17 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/conditional-formatting.sh` | 165 | 139 | 0 | 0 | 26 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/data-validation.sh` | 88 | 65 | 0 | 0 | 23 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/pivot-tables.sh` | 586 | 568 | 0 | 0 | 18 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/shapes.sh` | 62 | 35 | 0 | 0 | 27 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/sheet-settings.sh` | 104 | 96 | 0 | 7 | 1 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/slicers.sh` | 60 | 54 | 0 | 0 | 6 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/sparklines.sh` | 114 | 106 | 0 | 0 | 8 | 0 | 0 | 0 | 2 | 2/2 |
+| `excel/workbook-settings.sh` | 25 | 14 | 0 | 0 | 7 | 4 | 0 | 0 | 2 | 2/2 |
+| `ppt/3d-model.sh` | 35 | 1 | 0 | 8 | 26 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/animations.sh` | 119 | 61 | 1 | 13 | 45 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-3d.sh` | 50 | 9 | 8 | 8 | 33 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-advanced.sh` | 61 | 12 | 8 | 16 | 30 | 0 | 3 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-area.sh` | 51 | 9 | 8 | 8 | 33 | 0 | 1 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-bar.sh` | 52 | 9 | 8 | 9 | 33 | 0 | 1 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-bubble.sh` | 52 | 9 | 8 | 8 | 33 | 0 | 2 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-column.sh` | 53 | 9 | 8 | 9 | 33 | 0 | 2 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-combo.sh` | 53 | 9 | 8 | 9 | 33 | 0 | 2 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-doughnut.sh` | 51 | 9 | 8 | 8 | 33 | 0 | 1 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-line.sh` | 52 | 9 | 8 | 8 | 33 | 0 | 2 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-pie.sh` | 51 | 9 | 8 | 8 | 33 | 0 | 1 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-radar.sh` | 51 | 9 | 8 | 8 | 33 | 0 | 1 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-scatter.sh` | 58 | 10 | 9 | 9 | 37 | 0 | 2 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-stock.sh` | 53 | 9 | 8 | 8 | 33 | 0 | 3 | 0 | 2 | 2/2 |
+| `ppt/charts/charts-waterfall.sh` | 47 | 9 | 8 | 8 | 30 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/diagram.sh` | 72 | 48 | 23 | 0 | 23 | 0 | 1 | 0 | 0 | 2/2 |
+| `ppt/ole/ole-embed.sh` | 26 | 19 | 2 | 0 | 5 | 0 | 2 | 0 | 6 | 6/6 |
+| `ppt/pictures/pictures-basic.sh` | 68 | 36 | 5 | 0 | 2 | 24 | 6 | 0 | 2 | 2/2 |
+| `ppt/presentation-settings.sh` | 12 | 2 | 1 | 8 | 2 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/presentation.sh` | 52 | 8 | 6 | 0 | 44 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/shapes/shapes-basic.sh` | 66 | 21 | 5 | 43 | 2 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/shapes/shapes-connectors.sh` | 55 | 38 | 4 | 2 | 15 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/shapes/shapes-effects.sh` | 41 | 18 | 5 | 22 | 1 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/shapes/shapes-typography.sh` | 58 | 25 | 5 | 25 | 8 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/tables/tables-basic.sh` | 73 | 12 | 5 | 1 | 10 | 0 | 50 | 0 | 2 | 2/2 |
+| `ppt/tables/tables-borders.sh` | 55 | 22 | 3 | 0 | 16 | 0 | 17 | 0 | 2 | 2/2 |
+| `ppt/tables/tables-financial.sh` | 75 | 10 | 4 | 0 | 4 | 0 | 61 | 0 | 2 | 2/2 |
+| `ppt/tables/tables-merged.sh` | 63 | 5 | 2 | 0 | 3 | 0 | 55 | 0 | 2 | 2/2 |
+| `ppt/tables/tables-nested.sh` | 63 | 5 | 4 | 6 | 5 | 0 | 47 | 0 | 2 | 2/2 |
+| `ppt/tables/tables-rows-cols.sh` | 84 | 13 | 4 | 0 | 16 | 0 | 55 | 0 | 2 | 2/2 |
+| `ppt/tables/tables-styled.sh` | 44 | 28 | 11 | 0 | 15 | 0 | 1 | 0 | 2 | 2/2 |
+| `ppt/templates/styles/brand--aura-coffee-dark/build.sh` | 2 | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 1 | 2/2 |
+| `ppt/templates/styles/brand--aura-coffee/build.sh` | 13 | 2 | 0 | 1 | 6 | 0 | 4 | 0 | 1 | 2/2 |
+| `ppt/templates/styles/future--2050-vision/build.sh` | 43 | 2 | 0 | 32 | 5 | 0 | 4 | 0 | 1 | 2/2 |
+| `ppt/templates/styles/lifestyle--cat-philosophy/build.sh` | 11 | 1 | 0 | 2 | 4 | 0 | 4 | 0 | 1 | 2/2 |
+| `ppt/templates/styles/lifestyle--cat-secret-life/build.sh` | 121 | 7 | 0 | 27 | 9 | 0 | 78 | 0 | 1 | 2/2 |
+| `ppt/templates/styles/lifestyle--feline-report/build_ppt.sh` | 18 | 1 | 0 | 17 | 0 | 0 | 0 | 0 | 1 | 2/2 |
+| `ppt/templates/styles/product--geminicli-timetravel/build.sh` | 130 | 7 | 0 | 6 | 6 | 111 | 0 | 0 | 1 | 2/2 |
+| `ppt/templates/styles/productivity--attention-budget/build.sh` | 15 | 1 | 0 | 2 | 6 | 0 | 6 | 0 | 1 | 2/2 |
+| `ppt/templates/styles/science--alien-guide/build.sh` | 65 | 1 | 0 | 62 | 2 | 0 | 0 | 0 | 1 | 2/2 |
+| `ppt/templates/styles/science--space-exploration/build.sh` | 15 | 1 | 0 | 0 | 7 | 1 | 6 | 0 | 1 | 2/2 |
+| `ppt/templates/styles/science--time-travel/build.sh` | 2 | 1 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 2/2 |
+| `ppt/templates/styles/tech--wildlife-company/build.sh` | 17 | 2 | 0 | 2 | 7 | 6 | 0 | 0 | 1 | 2/2 |
+| `ppt/textboxes/textboxes-advanced.sh` | 81 | 30 | 6 | 10 | 41 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/textboxes/textboxes-basic.sh` | 51 | 20 | 4 | 7 | 24 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/transitions/transitions-bands.sh` | 85 | 84 | 21 | 0 | 1 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/transitions/transitions-basic.sh` | 26 | 25 | 6 | 0 | 1 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/transitions/transitions-directional.sh` | 101 | 100 | 25 | 0 | 1 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/transitions/transitions-dynamic.sh` | 101 | 100 | 25 | 0 | 1 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/transitions/transitions-modern.sh` | 77 | 76 | 19 | 0 | 1 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/transitions/transitions-morph.sh` | 21 | 16 | 4 | 4 | 1 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/transitions/transitions-random.sh` | 17 | 16 | 4 | 0 | 1 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/transitions/transitions-shapes.sh` | 57 | 56 | 14 | 0 | 1 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/transitions/transitions-timing.sh` | 37 | 34 | 9 | 2 | 1 | 0 | 0 | 0 | 2 | 2/2 |
+| `ppt/video.sh` | 20 | 8 | 1 | 8 | 4 | 0 | 0 | 0 | 2 | 2/2 |
+| `word/charts.sh` | 46 | 31 | 0 | 0 | 15 | 0 | 0 | 0 | 2 | 2/2 |
+| `word/content-controls.sh` | 21 | 11 | 0 | 0 | 9 | 0 | 1 | 0 | 2 | 2/2 |
+| `word/diagram.sh` | 50 | 26 | 0 | 0 | 24 | 0 | 0 | 0 | 0 | 2/2 |
+| `word/document-formatting.sh` | 17 | 5 | 0 | 0 | 12 | 0 | 0 | 0 | 2 | 2/2 |
+| `word/fields.sh` | 39 | 19 | 0 | 0 | 20 | 0 | 0 | 0 | 2 | 2/2 |
+| `word/formulas.sh` | 171 | 90 | 0 | 0 | 81 | 0 | 0 | 0 | 2 | 2/2 |
+| `word/numbering.sh` | 70 | 24 | 0 | 0 | 19 | 0 | 27 | 0 | 1 | 2/2 |
+| `word/paragraph-formatting.sh` | 78 | 54 | 0 | 23 | 1 | 0 | 0 | 0 | 0 | 2/2 |
+| `word/pictures.sh` | 31 | 24 | 0 | 6 | 1 | 0 | 0 | 0 | 2 | 2/2 |
+| `word/revisions.sh` | 73 | 35 | 0 | 15 | 17 | 6 | 0 | 0 | 2 | 2/2 |
+| `word/run-formatting.sh` | 80 | 56 | 0 | 23 | 1 | 0 | 0 | 0 | 0 | 2/2 |
+| `word/sections.sh` | 33 | 24 | 0 | 0 | 9 | 0 | 0 | 0 | 2 | 2/2 |
+| `word/tables.sh` | 357 | 210 | 3 | 108 | 39 | 0 | 0 | 0 | 6 | 6/6 |
+| `word/textbox.sh` | 67 | 14 | 0 | 0 | 14 | 0 | 39 | 0 | 1 | 2/2 |
+| **total** | **6431** | **3605** | **344** | **628** | **1555** | **158** | **485** | **0** | **177** | **200/200** |

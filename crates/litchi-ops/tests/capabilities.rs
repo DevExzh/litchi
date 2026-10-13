@@ -557,12 +557,21 @@ fn xlsx_reports_keep_selection_semantic_and_declare_cell_and_sheet_writes() {
 }
 
 #[cfg(feature = "pptx")]
-/// Rich text setters of record 0252.
+/// Rich text setters of record 0252, and the shape fill, geometry and slide
+/// transition of record 0269.
 fn pptx_text_format_set(element: &str, property: &str) -> bool {
     match element {
         "shape" | "placeholder" => matches!(
             property,
-            "bold" | "italic" | "size" | "color" | "font" | "font.latin" | "align"
+            "bold"
+                | "italic"
+                | "size"
+                | "color"
+                | "font"
+                | "font.latin"
+                | "align"
+                | "fill"
+                | "geometry"
         ),
         "paragraph" => matches!(
             property,
@@ -577,10 +586,17 @@ fn pptx_text_format_set(element: &str, property: &str) -> bool {
             "fill" | "text" | "bold" | "italic" | "size" | "color" | "font" | "align"
         ),
         "notes" => property == "text",
-        "slide" => property == "notes",
+        "slide" => matches!(property, "notes" | "transition"),
         "comment" => matches!(property, "text" | "x" | "y"),
         _ => false,
     }
+}
+
+#[cfg(feature = "pptx")]
+/// Text-box formatting a shape takes on `add` (record 0269).
+fn pptx_shape_add(property: &str) -> bool {
+    matches!(property, "text" | "x" | "y" | "width" | "height")
+        || pptx_text_format_set("shape", property)
 }
 
 #[cfg(feature = "pptx")]
@@ -590,7 +606,8 @@ fn pptx_write_only(element: &str, property: &str) -> bool {
         "paragraph" => matches!(property, "text" | "bold" | "italic" | "color" | "font"),
         "run" => matches!(property, "text" | "font"),
         "tc" => property != "fill",
-        "slide" => property == "notes",
+        "slide" => matches!(property, "notes" | "transition"),
+        "shape" | "placeholder" => matches!(property, "fill" | "geometry"),
         "picture" => property == "src",
         _ => false,
     }
@@ -634,8 +651,7 @@ fn pptx_reports_selection_and_structural_writes() {
             );
             let slide_add = element.name() == "slide"
                 && matches!(property.name(), "layout" | "name" | "hidden");
-            let shape_add = element.name() == "shape"
-                && matches!(property.name(), "text" | "x" | "y" | "width" | "height");
+            let shape_add = element.name() == "shape" && pptx_shape_add(property.name());
             let picture_add = element.name() == "picture"
                 && matches!(
                     property.name(),
@@ -685,7 +701,7 @@ fn pptx_reports_selection_and_structural_writes() {
     assert!(shape.operations().add);
     assert!(shape.operations().remove);
     for property in shape.properties() {
-        let add = matches!(property.name(), "text" | "x" | "y" | "width" | "height");
+        let add = pptx_shape_add(property.name());
         assert_eq!(property.add(), add, "{}", property.name());
     }
     let placeholder = caps.element("placeholder").unwrap();
@@ -1000,7 +1016,7 @@ fn pptx_structural_capabilities_follow_owner_and_retention_policy() {
     assert!(source_caps.element("shape").unwrap().operations().add);
     assert!(source_caps.element("shape").unwrap().operations().remove);
     for property in source_caps.element("shape").unwrap().properties() {
-        let add = matches!(property.name(), "text" | "x" | "y" | "width" | "height");
+        let add = pptx_shape_add(property.name());
         assert_eq!(property.add(), add, "{}", property.name());
         let set = matches!(property.name(), "text" | "x" | "y" | "width" | "height")
             || pptx_text_format_set("shape", property.name());
@@ -1087,7 +1103,7 @@ fn pptx_structural_capabilities_follow_owner_and_retention_policy() {
     );
     assert!(eager_caps.element("shape").unwrap().operations().add);
     for property in eager_caps.element("shape").unwrap().properties() {
-        let add = matches!(property.name(), "text" | "x" | "y" | "width" | "height");
+        let add = pptx_shape_add(property.name());
         assert_eq!(property.add(), add, "{}", property.name());
         let set = matches!(property.name(), "text" | "x" | "y" | "width" | "height")
             || pptx_text_format_set("shape", property.name());

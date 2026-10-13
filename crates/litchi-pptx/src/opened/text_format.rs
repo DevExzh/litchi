@@ -6,16 +6,21 @@
 //! and the `a:r`/`a:br`/`a:fld` children of a paragraph, in document order,
 //! exactly as the text-body reader numbers them.
 //!
+//! A shape target can also replace its fill and preset geometry, which live
+//! in the shape's `p:spPr` rather than its text body.
+//!
 //! Every rewrite is a byte splice: untouched siblings, attributes, extension
 //! lists and unknown children keep their exact source bytes. Inserted
-//! children follow the schema order of `a:rPr`, `a:pPr` and `a:tcPr` and use
-//! the prefix of the element that receives them.
+//! children follow the schema order of `a:rPr`, `a:pPr`, `a:tcPr` and
+//! `p:spPr` and use the `DrawingML` prefix of the element that receives them.
 
 use std::borrow::Cow;
 use std::ops::Range;
 
 use litchi_core::Position;
+use litchi_drawingml::geom::Preset;
 use litchi_drawingml::text::Alignment;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use quick_xml::Reader;
 use quick_xml::events::Event;
 
@@ -68,6 +73,16 @@ pub enum TextTarget {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Rgb(pub [u8; 3]);
 
+/// A shape's own fill, the fill choice of its `p:spPr`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum ShapeFill {
+    /// A solid colour (`a:solidFill/a:srgbClr`).
+    Solid(Rgb),
+    /// No fill (`a:noFill`).
+    None,
+}
+
 /// Optional property assignments for one [`TextEdit`].
 ///
 /// Each field is `None` to leave the property as it is, `Some(None)` to
@@ -87,6 +102,8 @@ pub struct TextProperties<'a> {
     latin: Option<Option<&'a str>>,
     align: Option<Option<Alignment>>,
     fill: Option<Option<Rgb>>,
+    shape_fill: Option<Option<ShapeFill>>,
+    geometry: Option<Preset>,
 }
 
 #[allow(
@@ -153,6 +170,22 @@ impl<'a> TextProperties<'a> {
         self.fill = Some(value);
         self
     }
+    /// Set or remove a shape's own fill (`p:spPr`); shape targets only.
+    /// Removal deletes the local fill choice, so the shape inherits its fill
+    /// from its style or placeholder.
+    #[must_use]
+    pub const fn with_shape_fill(mut self, value: Option<ShapeFill>) -> Self {
+        self.shape_fill = Some(value);
+        self
+    }
+    /// Replace a shape's geometry with a preset (`a:prstGeom`, with no
+    /// adjust values); shape targets only. Assigning the shape's current
+    /// preset keeps its adjust values and changes nothing.
+    #[must_use]
+    pub const fn with_geometry(mut self, value: Preset) -> Self {
+        self.geometry = Some(value);
+        self
+    }
     /// The replacement text, if any.
     #[must_use]
     pub const fn text(&self) -> Option<&'a str> {
@@ -166,11 +199,14 @@ impl<'a> TextProperties<'a> {
             || self.font.is_some()
             || self.latin.is_some()
     }
+    fn has_shape_properties(&self) -> bool {
+        self.shape_fill.is_some() || self.geometry.is_some()
+    }
+    fn has_body_properties(&self) -> bool {
+        self.text.is_some() || self.has_run_properties() || self.align.is_some()
+    }
     fn is_empty(&self) -> bool {
-        self.text.is_none()
-            && !self.has_run_properties()
-            && self.align.is_none()
-            && self.fill.is_none()
+        !self.has_body_properties() && self.fill.is_none() && !self.has_shape_properties()
     }
 }
 
@@ -359,6 +395,11 @@ fn validate(edit: &TextEdit<'_>) -> Result<()> {
     }
     if properties.fill.is_some() && !matches!(edit.target, TextTarget::Cell { .. }) {
         return Err(Error::Invalid("fill applies to table cells only".into()));
+    }
+    if properties.has_shape_properties() && !matches!(edit.target, TextTarget::Shape { .. }) {
+        return Err(Error::Invalid(
+            "shape fill and geometry apply to shape targets only".into(),
+        ));
     }
     Ok(())
 }
@@ -1142,6 +1183,116 @@ fn rewrite_body(
     splices.apply(body)
 }
 
+fn sppr_rank(local: &[u8]) -> u8 {
+    match local {
+        b"xfrm" => 0,
+        b"custGeom" | b"prstGeom" => 1,
+        b"noFill" | b"solidFill" | b"gradFill" | b"blipFill" | b"pattFill" | b"grpFill" => 2,
+        b"ln" => 3,
+        b"effectLst" | b"effectDag" => 4,
+        b"scene3d" => 5,
+        b"sp3d" => 6,
+        _ => 7,
+    }
+}
+
+/// The `DrawingML` prefix of a shape: that of its `p:spPr` children, else
+/// that of its text body's children.
+fn drawing_prefix(shape: &[u8], kids: &[Node], sppr_kids: &[Node]) -> Result<Vec<u8>> {
+    if let Some(first) = sppr_kids.first() {
+        return Ok(first.prefix(shape).to_vec());
+    }
+    if let Some(body) = child(shape, kids, b"txBody") {
+        let body_kids = children(shape, body)?;
+        if let Some(first) =
+            child(shape, &body_kids, b"bodyPr").or_else(|| child(shape, &body_kids, b"p"))
+        {
+            return Ok(first.prefix(shape).to_vec());
+        }
+    }
+    Err(Error::UnsafeEdit {
+        operation: "set_text_properties",
+        reason: "the shape has no DrawingML child naming the drawing prefix",
+    })
+}
+
+/// Rewrite a shape's `p:spPr` for fill and preset-geometry assignments.
+fn rewrite_sppr(
+    shape: &[u8],
+    kids: &[Node],
+    properties: &TextProperties<'_>,
+    splices: &mut Splices,
+) -> Result<()> {
+    let sppr = child(shape, kids, b"spPr").ok_or(Error::UnsafeEdit {
+        operation: "set_text_properties",
+        reason: "the shape has no shape properties",
+    })?;
+    let sppr_kids = children(shape, sppr)?;
+    let prefix = drawing_prefix(shape, kids, &sppr_kids)?;
+    let mut changes = Vec::new();
+    if let Some(preset) = properties.geometry {
+        let current = child(shape, &sppr_kids, b"prstGeom")
+            .and_then(|geometry| preset_token(&shape[geometry.span.start..geometry.open_end]));
+        let custom = child(shape, &sppr_kids, b"custGeom").is_some();
+        if custom || current.as_deref() != Some(preset.token().as_bytes()) {
+            let name = qualified(&prefix, "prstGeom");
+            let list = qualified(&prefix, "avLst");
+            let mut bytes = Vec::with_capacity(48 + preset.token().len());
+            bytes.push(b'<');
+            bytes.extend_from_slice(&name);
+            bytes.extend_from_slice(b" prst=\"");
+            bytes.extend_from_slice(preset.token().as_bytes());
+            bytes.extend_from_slice(b"\"><");
+            bytes.extend_from_slice(&list);
+            bytes.extend_from_slice(b"/></");
+            bytes.extend_from_slice(&name);
+            bytes.push(b'>');
+            changes.push(ChildChange {
+                rank: 1,
+                bytes: Some(bytes),
+            });
+        }
+    }
+    if let Some(fill) = properties.shape_fill {
+        changes.push(ChildChange {
+            rank: 2,
+            bytes: fill.map(|fill| match fill {
+                ShapeFill::Solid(color) => srgb_fill(&prefix, color),
+                ShapeFill::None => {
+                    let mut bytes = b"<".to_vec();
+                    bytes.extend_from_slice(&qualified(&prefix, "noFill"));
+                    bytes.extend_from_slice(b"/>");
+                    bytes
+                },
+            }),
+        });
+    }
+    if changes.is_empty() {
+        return Ok(());
+    }
+    let element = &shape[sppr.span.clone()];
+    let rewritten = rewrite_properties(element, &[], &changes, sppr_rank)?;
+    if rewritten != element {
+        splices.replace(sppr.span.clone(), rewritten);
+    }
+    Ok(())
+}
+
+/// The `prst` attribute of an `a:prstGeom` start tag.
+fn preset_token(tag: &[u8]) -> Option<Vec<u8>> {
+    let mut reader = Reader::from_reader(tag);
+    let Ok(Event::Start(start) | Event::Empty(start)) = reader.read_event() else {
+        return None;
+    };
+    for attribute in start.checked_attributes() {
+        let attribute = attribute.ok()?;
+        if attribute.key.as_ref() == b"prst" {
+            return Some(attribute.value.into_owned());
+        }
+    }
+    None
+}
+
 /// Rewrite a `p:sp` element for a shape, paragraph or run target.
 fn rewrite_shape(
     shape: &[u8],
@@ -1150,6 +1301,13 @@ fn rewrite_shape(
 ) -> Result<Vec<u8>> {
     let node = root(shape)?;
     let kids = children(shape, &node)?;
+    let mut splices = Splices::new();
+    if properties.has_shape_properties() {
+        rewrite_sppr(shape, &kids, properties, &mut splices)?;
+    }
+    if !properties.has_body_properties() {
+        return splices.apply(shape);
+    }
     let body = child(shape, &kids, b"txBody").ok_or(Error::UnsafeEdit {
         operation: "set_text_properties",
         reason: "the shape has no text body",
@@ -1173,7 +1331,6 @@ fn rewrite_shape(
         },
         _ => rewrite_body(element, paragraph, run, properties)?,
     };
-    let mut splices = Splices::new();
     splices.replace(body.span.clone(), replaced);
     splices.apply(shape)
 }

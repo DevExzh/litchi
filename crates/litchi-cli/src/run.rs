@@ -3,7 +3,7 @@
 use std::io::{Read as _, Write};
 use std::path::{Path, PathBuf};
 
-use litchi_ops::batch::{BatchItem, SourceLimits};
+use litchi_ops::batch::{BatchItem, ItemResult, Options, SourceLimits, Unsupported};
 use litchi_ops::capabilities::Capabilities;
 use litchi_ops::node::ViewOptions;
 use litchi_ops::view::Mode;
@@ -35,7 +35,8 @@ pub(crate) fn run(cli: Cli, out: &mut impl Write) -> Result<u8> {
             let mut item = BatchItem::new("set");
             item.path = Some(args.path.as_str().into());
             item.props = Some(props(&assignments)?);
-            write(&args.file, item, &args.output, "set", json, out)
+            let options = options(&args.policy);
+            write(&args.file, item, &options, &args.output, "set", json, out)
         },
         Command::Add(args) => {
             let mut item = BatchItem::new("add");
@@ -46,7 +47,8 @@ pub(crate) fn run(cli: Cli, out: &mut impl Write) -> Result<u8> {
                 item.props = Some(props(&args.props)?);
             }
             position(&mut item, &args.position);
-            write(&args.file, item, &args.output, "add", json, out)
+            let options = options(&args.policy);
+            write(&args.file, item, &options, &args.output, "add", json, out)
         },
         Command::Remove(args) => {
             let mut item = BatchItem::new("remove");
@@ -54,20 +56,44 @@ pub(crate) fn run(cli: Cli, out: &mut impl Write) -> Result<u8> {
             if !args.props.is_empty() {
                 item.props = Some(props(&args.props)?);
             }
-            write(&args.file, item, &args.output, "remove", json, out)
+            write(
+                &args.file,
+                item,
+                &Options::new(),
+                &args.output,
+                "remove",
+                json,
+                out,
+            )
         },
         Command::Move(args) => {
             let mut item = BatchItem::new("move");
             item.path = Some(args.path.as_str().into());
             item.to = args.to.as_deref().map(Into::into);
             position(&mut item, &args.position);
-            write(&args.file, item, &args.output, "move", json, out)
+            write(
+                &args.file,
+                item,
+                &Options::new(),
+                &args.output,
+                "move",
+                json,
+                out,
+            )
         },
         Command::Swap(args) => {
             let mut item = BatchItem::new("swap");
             item.path = Some(args.path1.as_str().into());
             item.path2 = Some(args.path2.as_str().into());
-            write(&args.file, item, &args.output, "swap", json, out)
+            write(
+                &args.file,
+                item,
+                &Options::new(),
+                &args.output,
+                "swap",
+                json,
+                out,
+            )
         },
         Command::Batch(args) => batch(&args, json, out),
     }
@@ -76,6 +102,14 @@ pub(crate) fn run(cli: Cli, out: &mut impl Write) -> Result<u8> {
 /// `--prop key=value` assignments, parsed by `litchi-ops`.
 fn props(assignments: &[String]) -> Result<Props<'_>> {
     Props::from_props(assignments)
+}
+
+/// The command-channel options a `--unsupported` policy selects.
+fn options(policy: &cli::Policy) -> Options {
+    Options::new().unsupported(match policy.unsupported {
+        cli::UnsupportedArg::Refuse => Unsupported::Refuse,
+        cli::UnsupportedArg::Warn => Unsupported::Warn,
+    })
 }
 
 fn position<'a>(item: &mut BatchItem<'a>, position: &'a cli::Position) {
@@ -284,13 +318,18 @@ fn publish(file: &File, changed: bool, output: &cli::Output) -> Result<Option<Pa
 fn write(
     path: &Path,
     item: BatchItem<'_>,
+    options: &Options,
     output: &cli::Output,
     verb: &str,
     json: bool,
     out: &mut impl Write,
 ) -> Result<u8> {
     let file = litchi_ops::open(path)?;
-    let commit = file.apply(item)?;
+    let commit = file.apply_with(item, options)?;
+    let warned = !commit.value.warnings.is_empty();
+    if !json {
+        render::warnings(&commit.value.warnings);
+    }
     let changed = commit.diagnostics.changed();
     let saved = publish(&commit.file, changed, output)?;
     let report = Report {
@@ -305,7 +344,7 @@ fn write(
         },
     };
     report.write(out, json, verb)?;
-    Ok(exit::OK)
+    Ok(if warned { exit::PARTIAL } else { exit::OK })
 }
 
 /// Reads the batch payload from `--commands`, `--input FILE` or stdin
@@ -350,9 +389,10 @@ fn batch(args: &cli::Batch, json: bool, out: &mut impl Write) -> Result<u8> {
     } else {
         BatchMode::Atomic
     };
+    let options = options(&args.policy).mode(mode);
     let file = litchi_ops::open(&args.file)?;
     let total = items.len();
-    let commit = match file.batch(&items, mode) {
+    let commit = match file.batch_with(&items, &options) {
         Ok(commit) => commit,
         Err(error) => {
             // An atomic failure discards every item; report which one
@@ -375,6 +415,15 @@ fn batch(args: &cli::Batch, json: bool, out: &mut impl Write) -> Result<u8> {
             return Err(error);
         },
     };
+    let mut warned = false;
+    for result in &commit.results {
+        if let ItemResult::Applied(applied) = result {
+            warned |= !applied.warnings.is_empty();
+            if !json {
+                render::warnings(&applied.warnings);
+            }
+        }
+    }
     let changed = commit.diagnostics.changed();
     let saved = publish(&commit.file, changed, &args.output)?;
     let results: Vec<ItemJson<'_>> = commit
@@ -398,5 +447,9 @@ fn batch(args: &cli::Batch, json: bool, out: &mut impl Write) -> Result<u8> {
         results,
     };
     report.write(out, json, "batch")?;
-    Ok(if failed == 0 { exit::OK } else { exit::PARTIAL })
+    Ok(if failed == 0 && !warned {
+        exit::OK
+    } else {
+        exit::PARTIAL
+    })
 }

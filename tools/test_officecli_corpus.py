@@ -92,6 +92,29 @@ class ClassifyTests(unittest.TestCase):
         ])
         self.assertEqual([v.rule for v in verdicts], ["G1", "D7"])
 
+    def test_warned_calls_and_their_skipped_properties(self):
+        calls = [call(result="warned", detail="style,colour,+2")]
+        regs = {"docx": registry([PARAGRAPH, CHART])}
+        (verdict,) = corpus.classify(calls, regs)
+        self.assertEqual((verdict.kind, verdict.rule), ("warned", "F3"))
+        # A warned call is not a refusal, so it starts no cascade.
+        self.assertFalse(calls[0].refused)
+        skipped = corpus.skipped_verdicts(calls, regs)
+        self.assertEqual([v.rule for _, v in skipped], [
+            "docx|add|paragraph|warned|style",
+            "docx|add|paragraph|warned|colour",
+            "docx|add|paragraph|warned|(more)",
+        ])
+        # Skipping a property the registry claims is a bug.
+        (bug,) = corpus.skipped_verdicts([call(result="warned", detail="align")], regs)
+        self.assertEqual(bug[1].kind, "bug")
+
+    def test_batch_slide_without_layout_is_delta_d4b(self):
+        (verdict,) = self.classify([
+            call(verb="batch", fmt="pptx", kind="", result="missing_property", detail="layout"),
+        ])
+        self.assertEqual((verdict.kind, verdict.rule), ("delta", "D4b"))
+
     def test_fatal_results_are_bugs(self):
         (verdict,) = self.classify([call(result="internal_error")])
         self.assertEqual((verdict.kind, verdict.rule), ("bug", "fatal"))
@@ -112,7 +135,7 @@ class GenerateTests(unittest.TestCase):
         verdicts = corpus.classify(calls, {"docx": registry([PARAGRAPH])})
         first = corpus.render(calls, verdicts, "abc")
         self.assertEqual(first, corpus.render(calls, verdicts, "abc"))
-        self.assertIn("| word | 2 | 1 | 0 | 0 | 1 | 0 | 0 | 0 | 1/1 |", first)
+        self.assertIn("| word | 2 | 1 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 1/1 |", first)
 
     def test_check_detects_a_stale_table(self):
         with tempfile.TemporaryDirectory() as tmp:

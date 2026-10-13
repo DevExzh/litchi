@@ -27,6 +27,11 @@
 #                       `blank` and `title` become the layout names
 #                       `Blank` and `Title Slide` (OfficeCLI matches layout
 #                       types too). Tagged `D4`.
+#   set, add, batch     gain `--unsupported warn` (record 0269): OfficeCLI
+#                       applies the supported properties of a command and
+#                       warns about the rest by default, Litchi only when
+#                       asked. A call that skipped properties exits 9 with
+#                       `warning[...]` lines and is recorded as `warned`.
 set -u
 log=${LITCHI_CORPUS_LOG:?LITCHI_CORPUS_LOG is not set}
 bin=${LITCHI_CORPUS_BIN:?LITCHI_CORPUS_BIN is not set}
@@ -40,6 +45,9 @@ printf '%s' "${OFFICECLI_LINE:-0}" >"$record/line"
 printf '%s\0' "$@" >"$record/argv"
 
 args=("$@")
+case "${1-}" in
+    set | add | batch) args+=(--unsupported warn) ;;
+esac
 case "${1-}" in
     open | close)
         printf 'skip' >"$record/status"

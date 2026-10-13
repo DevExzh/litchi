@@ -169,6 +169,15 @@ pub(crate) fn prop_aliases(adapter: Adapter, canonical: &str) -> &'static [PropA
             _ => &[],
         };
     }
+    #[cfg(feature = "pptx")]
+    if adapter == Adapter::Pptx {
+        return match canonical {
+            "shape" | "placeholder" => crate::format::pptx::SHAPE_PROP_ALIASES,
+            "paragraph" => crate::format::pptx::PARAGRAPH_PROP_ALIASES,
+            "run" => crate::format::pptx::RUN_PROP_ALIASES,
+            _ => &[],
+        };
+    }
     #[cfg(feature = "xlsb")]
     if adapter == Adapter::Xlsb {
         return match canonical {

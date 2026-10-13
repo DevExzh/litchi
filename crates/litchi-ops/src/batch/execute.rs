@@ -1,6 +1,6 @@
 //! Strict command admission over the shared immutable coordinator.
 
-use super::{BatchItem, BatchMode};
+use super::{BatchItem, BatchMode, Options, Unsupported};
 use crate::path::Path;
 use crate::transaction::{
     Commit, Diagnostics, Edit, Error as TransactionError, LimitKind, Patch, SemanticLimits,
@@ -18,12 +18,19 @@ pub struct Applied {
     pub path: Option<Box<Path<'static>>>,
     /// Whether this item changed its input logical document.
     pub changed: bool,
+    /// The properties this item skipped under [`Unsupported::Warn`], in the
+    /// order they were refused: each is the `unsupported_property` error
+    /// that refused it, naming the property and, where one exists, a
+    /// suggestion. Empty (and unallocated) under [`Unsupported::Refuse`];
+    /// boxed so a result stays four words.
+    pub warnings: Box<[Error]>,
 }
 impl fmt::Debug for Applied {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Applied")
             .field("has_path", &self.path.is_some())
             .field("changed", &self.changed)
+            .field("warnings", &self.warnings.len())
             .finish()
     }
 }
@@ -69,7 +76,55 @@ impl File {
     /// # Errors
     /// Returns the command's error with item index zero. The input is unchanged.
     pub fn apply<'i>(&self, item: impl Into<BatchItem<'i>>) -> Result<Commit<Applied>> {
-        self.edit(|edit| apply_item(edit, &item.into()).map_err(|error| error.with_item(0)))
+        self.apply_with(item, &Options::new())
+    }
+
+    /// [`Self::apply`] with command-channel options: the unsupported-property
+    /// policy and the semantic limits. The batch mode does not apply to a
+    /// single command.
+    ///
+    /// Under [`Unsupported::Warn`], a `set` or `add` whose target refuses a
+    /// property with `unsupported_property` is retried without it, until the
+    /// command succeeds or fails for another reason; the skipped properties
+    /// are reported in [`Applied::warnings`]. The remaining properties apply
+    /// atomically: every attempt runs in an isolated candidate, so a failed
+    /// attempt leaves nothing behind. A `set` whose every property is
+    /// skipped succeeds as a no-op.
+    ///
+    /// ```
+    /// # #[cfg(feature = "xlsx")]
+    /// # {
+    /// use litchi_core::FileFormat;
+    /// use litchi_ops::batch::{Options, Unsupported};
+    /// use litchi_ops::{BatchItem, Code, Props, create};
+    ///
+    /// let file = create(FileFormat::Xlsx)?;
+    /// let mut item = BatchItem::new("set");
+    /// item.path = Some("/Sheet1/A1".into());
+    /// item.props = Some(Props::new().with("value", "Total").with("sparkle", true));
+    /// // The library default refuses the whole command.
+    /// assert_eq!(file.apply(&item).unwrap_err().code(), Code::UnsupportedProperty);
+    /// // OfficeCLI's behaviour applies the value and reports the rest.
+    /// let commit = file.apply_with(&item, &Options::new().unsupported(Unsupported::Warn))?;
+    /// assert!(commit.diagnostics.changed());
+    /// assert_eq!(commit.value.warnings.len(), 1);
+    /// assert_eq!(commit.value.warnings[0].property(), Some("sparkle"));
+    /// # }
+    /// # Ok::<(), litchi_ops::Error>(())
+    /// ```
+    ///
+    /// # Errors
+    /// As [`Self::apply`]; under [`Unsupported::Warn`] only for failures
+    /// other than an unsupported property.
+    pub fn apply_with<'i>(
+        &self,
+        item: impl Into<BatchItem<'i>>,
+        options: &Options,
+    ) -> Result<Commit<Applied>> {
+        let unsupported = options.unsupported;
+        self.edit_with_limits(&options.limits, |edit| {
+            apply_item(edit, &item.into(), unsupported, 0).map_err(|error| error.with_item(0))
+        })
     }
 
     /// Execute ordered command payloads with atomic or explicit best-effort
@@ -150,6 +205,54 @@ impl File {
         I: IntoIterator,
         I::Item: Into<BatchItem<'i>>,
     {
+        self.batch_with(items, &Options::new().mode(mode).limits(*limits))
+    }
+
+    /// [`Self::batch`] with command-channel options: the batch mode, the
+    /// unsupported-property policy and the semantic limits.
+    ///
+    /// Under [`Unsupported::Warn`] every `set` and `add` item behaves as in
+    /// [`Self::apply_with`]: refused properties are skipped and reported in
+    /// the item's [`Applied::warnings`] (each carrying the item index), and
+    /// the rest of the item applies. Atomic `set` items are then not
+    /// coalesced, because a coalesced run reports its refusal only when the
+    /// run closes.
+    ///
+    /// ```
+    /// # #[cfg(feature = "xlsx")]
+    /// # {
+    /// use litchi_core::FileFormat;
+    /// use litchi_ops::batch::{self, Options, Unsupported};
+    /// use litchi_ops::{ItemResult, create};
+    ///
+    /// let file = create(FileFormat::Xlsx)?;
+    /// let items = batch::from_bytes(br#"[
+    ///   {"command":"set","path":"/Sheet1/A1","props":{"value":"Q1","sparkle":"yes"}},
+    ///   {"command":"set","path":"/Sheet1/A2","props":{"value":"Q2"}}
+    /// ]"#)?;
+    /// let options = Options::new().unsupported(Unsupported::Warn);
+    /// let commit = file.batch_with(&items, &options)?;
+    /// let ItemResult::Applied(first) = &commit.results[0] else { unreachable!() };
+    /// assert_eq!(first.warnings[0].item(), Some(0));
+    /// # }
+    /// # Ok::<(), litchi_ops::Error>(())
+    /// ```
+    ///
+    /// # Errors
+    /// As [`Self::batch_with_limits`].
+    pub fn batch_with<'i, I>(&self, items: I, options: &Options) -> Result<BatchCommit>
+    where
+        I: IntoIterator,
+        I::Item: Into<BatchItem<'i>>,
+    {
+        let Options {
+            mode,
+            unsupported,
+            ref limits,
+        } = *options;
+        // Coalesced runs defer their refusals, so warnings need per-item runs.
+        let coalesce = mode == BatchMode::Atomic;
+        let coalesce_set = coalesce && unsupported == Unsupported::Refuse;
         let commit = self.edit_with_limits(limits, |edit| {
             let mut results = Vec::new();
             for (index, item) in items.into_iter().enumerate() {
@@ -168,7 +271,7 @@ impl File {
                     Error::from(TransactionError::Allocation { source }).with_item(index)
                 })?;
                 let item = item.into();
-                if mode == BatchMode::Atomic && item.command.eq_ignore_ascii_case("set") {
+                if coalesce_set && item.command.eq_ignore_ascii_case("set") {
                     let (path, props) = match set_fields(&item) {
                         Ok(fields) => fields,
                         Err(error) => {
@@ -192,11 +295,12 @@ impl File {
                         results.push(ItemResult::Applied(Applied {
                             path: None,
                             changed,
+                            warnings: Box::default(),
                         }));
                         continue;
                     }
                 }
-                if mode == BatchMode::Atomic && item.command.eq_ignore_ascii_case("remove") {
+                if coalesce && item.command.eq_ignore_ascii_case("remove") {
                     let path = match remove_fields(&item) {
                         Ok(path) => path,
                         Err(error) => {
@@ -219,6 +323,7 @@ impl File {
                         results.push(ItemResult::Applied(Applied {
                             path: None,
                             changed,
+                            warnings: Box::default(),
                         }));
                         continue;
                     }
@@ -227,7 +332,9 @@ impl File {
                 // Metadata changes interpretation of the whole payload. It is
                 // never safe to skip a bad declaration and continue replay.
                 let meta = item.command.eq_ignore_ascii_case("meta");
-                match apply_item(edit, &item).map_err(|error| error.with_item(index)) {
+                match apply_item(edit, &item, unsupported, index)
+                    .map_err(|error| error.with_item(index))
+                {
                     Ok(applied) => results.push(ItemResult::Applied(applied)),
                     Err(error) if mode == BatchMode::Atomic || meta || fatal(&error) => {
                         return Err(error);
@@ -246,12 +353,88 @@ impl File {
     }
 }
 
-fn apply_item(edit: &mut Edit, item: &BatchItem<'_>) -> Result<Applied> {
+fn apply_item(
+    edit: &mut Edit,
+    item: &BatchItem<'_>,
+    unsupported: Unsupported,
+    index: usize,
+) -> Result<Applied> {
+    let warn = unsupported == Unsupported::Warn
+        && item.props.as_ref().is_some_and(|props| !props.is_empty())
+        && (item.command.eq_ignore_ascii_case("set") || item.command.eq_ignore_ascii_case("add"));
+    if warn {
+        return apply_skipping(edit, item, index);
+    }
     let (path, changed) = edit.isolated(|edit| dispatch(edit, item))?;
     Ok(Applied {
         path: path.map(Box::new),
         changed,
+        warnings: Box::default(),
     })
+}
+
+/// [`Unsupported::Warn`]: run the item; while its target refuses one of its
+/// properties with `unsupported_property`, drop that property (every
+/// assignment of it) and run again. Each attempt is isolated, so only the
+/// final, successful attempt leaves changes. The loop ends because every
+/// retry removes at least one assignment.
+fn apply_skipping(edit: &mut Edit, item: &BatchItem<'_>, index: usize) -> Result<Applied> {
+    let mut warnings = Vec::new();
+    let mut current: Option<BatchItem<'_>> = None;
+    loop {
+        let attempt = current.as_ref().unwrap_or(item);
+        let props = attempt.props.as_ref();
+        if attempt.command.eq_ignore_ascii_case("set") && props.is_none_or(Props::is_empty) {
+            // OfficeCLI applies nothing and reports the skipped properties.
+            return Ok(Applied {
+                path: None,
+                changed: false,
+                warnings: warnings.into_boxed_slice(),
+            });
+        }
+        let error = match edit.isolated(|edit| dispatch(edit, attempt)) {
+            Ok((path, changed)) => {
+                return Ok(Applied {
+                    path: path.map(Box::new),
+                    changed,
+                    warnings: warnings.into_boxed_slice(),
+                });
+            },
+            Err(error) => error,
+        };
+        let Some(rest) = props.and_then(|props| without_refused(props, &error)) else {
+            return Err(error);
+        };
+        warnings.try_reserve(1).map_err(|source| {
+            Error::from(TransactionError::Allocation { source }).with_item(index)
+        })?;
+        warnings.push(error.with_item(index));
+        let mut next = attempt.clone();
+        next.props = Some(rest);
+        current = Some(next);
+    }
+}
+
+/// `props` without the property `error` refused, when `error` is an
+/// `unsupported_property` refusal naming one of them.
+fn without_refused<'a>(props: &Props<'a>, error: &Error) -> Option<Props<'a>> {
+    if error.code() != Code::UnsupportedProperty {
+        return None;
+    }
+    let refused = error.property()?;
+    let skipped = |key: &crate::Key<'_>| key.as_str().eq_ignore_ascii_case(refused);
+    if !props.iter().any(|(key, _)| skipped(key)) {
+        // The refusal names a canonical property the caller spelled with an
+        // alias, or something that is not one of the props: never guess.
+        return None;
+    }
+    Some(
+        props
+            .iter()
+            .filter(|(key, _)| !skipped(key))
+            .map(|(key, value)| (key.clone(), value.clone()))
+            .collect(),
+    )
 }
 
 fn dispatch(edit: &mut Edit, item: &BatchItem<'_>) -> Result<Option<Path<'static>>> {

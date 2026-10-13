@@ -17,6 +17,9 @@ those rows and classifies every call that did not pass:
   something the registry claims is a **bug**, not a gap;
 - **cascade**: a path that does not exist because an earlier ``add`` or
   ``batch`` in the same script was refused;
+- **warned**: the call applied with ``--unsupported warn`` and skipped the
+  properties it lists (record 0269); each skipped property is cross-checked
+  like a refused one;
 - **bug**: anything else.
 
 It writes ``docs/unified-ops/officecli-corpus-deltas.md``: the summary per
@@ -105,8 +108,17 @@ class Call:
         return self.result == "ok"
 
     @property
+    def warned(self) -> bool:
+        return self.result == "warned"
+
+    @property
     def refused(self) -> bool:
-        return self.result not in ("ok", "skip")
+        return self.result not in ("ok", "skip", "warned")
+
+    def skipped(self) -> list[str]:
+        """The properties a warned call skipped; `+N` counts names the
+        48-character detail bound left out."""
+        return [name for name in self.detail.split(",") if name] if self.warned else []
 
 
 def parse(text: str) -> list[Call]:
@@ -217,7 +229,7 @@ class Registry:
 
 @dataclass
 class Verdict:
-    kind: str  # passed, resident, delta, gap, cascade, bug
+    kind: str  # passed, warned, resident, delta, gap, cascade, bug
     rule: str  # rule id or a group key
     note: str = ""
 
@@ -271,6 +283,18 @@ RULES: list[Rule] = [
         "`layout=Title Slide` (the first layout of Litchi's blank deck) or maps `title` "
         "and `blank` to `Title Slide` and `Blank`, and counts the line as translated",
         lambda c, e: c.detail == "translated:D4",
+    ),
+    When(
+        "D4b", "delta", "Bare slide insertion inside a batch",
+        "a batch `add` of a slide without `layout`, or with a layout-type word "
+        "(`blank`), picks a layout as on the command line",
+        "the harness translates only command-line slide insertions (D4), not batch "
+        "items, so the batch refuses (`missing_property` layout, or `not_found` for "
+        "`layout=blank`) once its other properties are admitted (record 0269)",
+        lambda c, e: c.verb == "batch" and c.fmt == "pptx" and (
+            (c.result == "missing_property" and c.detail == "layout")
+            or (c.result == "not_found" and not c.detail)
+        ),
     ),
     When(
         "D5", "delta", "Resident mode",
@@ -435,6 +459,8 @@ def classify(calls: list[Call], registries: dict[str, Registry]) -> list[Verdict
             verdict = Verdict("bug", "fatal", call.result)
         elif call.passed and call.detail != "translated:D4":
             verdict = Verdict("passed", "")
+        elif call.warned:
+            verdict = Verdict("warned", "F3")
         else:
             for rule in RULES:
                 if rule.matches(call, earlier):
@@ -465,7 +491,9 @@ def registries(repo: Path) -> dict[str, Registry]:
     return result
 
 
-COLUMNS = ("lines", "passed", "translated", "gap", "delta", "cascade", "bug", "resident")
+COLUMNS = (
+    "lines", "passed", "translated", "warned", "gap", "delta", "cascade", "bug", "resident",
+)
 
 
 def tally(pairs) -> dict[str, int]:
@@ -513,10 +541,10 @@ def table_rows(groups: dict[str, list]) -> list[str]:
 
 
 HEADER_ROW = (
-    "| {} | Lines | Passed | of which translated | Gap | Delta | Cascade | Bug | "
+    "| {} | Lines | Passed | of which translated | Warned | Gap | Delta | Cascade | Bug | "
     "Resident (not run) | Read-back |"
 )
-RULE_ROW = "|---|" + "---:|" * 9
+RULE_ROW = "|---|" + "---:|" * 10
 
 
 def cites(calls: list[Call], limit: int = 3) -> str:
@@ -530,8 +558,11 @@ def cites(calls: list[Call], limit: int = 3) -> str:
 
 
 FOLLOW_UPS = [
-    ("F3", "property-granularity \"apply the rest and warn\": calls refused for one "
-     "unsupported property (OfficeCLI applies the others and exits 2)",
+    ("F3", "property-granularity \"apply the rest and warn\" (OfficeCLI applies the others "
+     "and exits 2): `--unsupported warn` (record 0269); calls it applied without some "
+     "properties", lambda c, v: c.warned),
+    ("F3", "calls still refused for an unsupported property (a property the warn policy "
+     "cannot drop: an alias of a refused canonical name, or a verb without props)",
      lambda c, v: c.result == "unsupported_property"),
     ("F4", "view options (`--start`, `--end`, `--max-lines`, ...)",
      lambda c, v: c.verb == "view" and c.result == "usage"),
@@ -566,8 +597,30 @@ def unclaimed(calls: list[Call], registries: dict[str, Registry]) -> list[tuple[
     return found
 
 
+def skipped_verdicts(calls: list[Call],
+                     loaded: dict[str, Registry] | None) -> list[tuple[Call, Verdict]]:
+    """One verdict per property a warned call skipped, cross-checked as if
+    the call had been refused for it; the group key's refusal is `warned`."""
+    found = []
+    for call in calls:
+        for name in call.skipped():
+            if name.startswith("+"):
+                name = "(more)"
+            refused = Call(call.script, call.line, call.verb, call.fmt, call.kind,
+                           "unsupported_property", name, call.target)
+            verdict = cross_check(refused, (loaded or {}).get(call.fmt))
+            if verdict.kind == "bug":
+                verdict = Verdict("bug", verdict.rule, f"skipped {name}: {verdict.note}")
+                found.append((refused, verdict))
+                continue
+            key = verdict.rule.replace("|unsupported_property|", "|warned|", 1)
+            found.append((call, Verdict(verdict.kind, key, verdict.note)))
+    return found
+
+
 def render(calls: list[Call], verdicts: list[Verdict], commit: str,
-           under: list[tuple[Call, str]] | None = None) -> str:
+           under: list[tuple[Call, str]] | None = None,
+           registries_for_render: dict[str, Registry] | None = None) -> str:
     pairs = list(zip(calls, verdicts))
     out = [
         "# OfficeCLI example-corpus deltas",
@@ -598,6 +651,11 @@ def render(calls: list[Call], verdicts: list[Verdict], commit: str,
         "- **delta**: a recorded difference, deliberate or caused upstream (table below).",
         "- **cascade**: a path that does not exist because an earlier `add` or `batch` of "
         "the same script was refused.",
+        "- **warned**: the harness passes `--unsupported warn` to `set`, `add` and `batch`, "
+        "because OfficeCLI applies the supported properties of a command and warns about "
+        "the rest by default (record 0269). A warned call applied without the properties "
+        "it lists (exit 9); each skipped property is listed in the gap tables below with "
+        "refusal `warned`.",
         "- **bug**: a refusal of something the registry claims, or an unexplained failure; "
         "none may be a panic or `internal_error` (the test refuses those).",
         "- **resident**: `open`/`close`, not run (delta D5).",
@@ -645,6 +703,10 @@ def render(calls: list[Call], verdicts: list[Verdict], commit: str,
         if verdict.kind == "gap" and "|" in verdict.rule:
             groups[verdict.rule].append(call)
             notes[verdict.rule] = verdict.note
+    for call, skipped in skipped_verdicts(calls, registries_for_render):
+        if skipped.kind == "gap":
+            groups[skipped.rule].append(call)
+            notes[skipped.rule] = skipped.note
     for fmt in sorted({key.split("|")[0] for key in groups}):
         out += ["", f"## Element and property gaps: {fmt}", "",
                 "| Verb | Element | Refusal | Property | Lines | Registry cross-check | Examples |",
@@ -662,6 +724,10 @@ def render(calls: list[Call], verdicts: list[Verdict], commit: str,
 
     out += ["", "## Bugs", ""]
     bugs = [(call, verdict) for call, verdict in pairs if verdict.kind == "bug"]
+    bugs += [
+        (call, verdict) for call, verdict in skipped_verdicts(calls, registries_for_render)
+        if verdict.kind == "bug"
+    ]
     if not bugs:
         out.append("None: every refusal is a recorded delta, a gap the registry agrees with, "
                    "or a cascade.")
@@ -701,7 +767,8 @@ def generate(repo: Path, outcomes: Path) -> tuple[str, list[Call], list[Verdict]
     loaded = registries(repo)
     verdicts = classify(calls, loaded)
     commit = (repo / UPSTREAM_COMMIT).read_text(encoding="utf-8").strip()[:10]
-    return render(calls, verdicts, commit, unclaimed(calls, loaded)), calls, verdicts
+    text = render(calls, verdicts, commit, unclaimed(calls, loaded), loaded)
+    return text, calls, verdicts
 
 
 def main(argv: list[str] | None = None) -> int:

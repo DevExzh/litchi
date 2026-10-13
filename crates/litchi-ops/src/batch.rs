@@ -19,6 +19,8 @@ pub use decode::{
     Error, SourceLimitKind, SourceLimits, SourceLimitsBuilder, from_bytes, from_bytes_with_limits,
 };
 pub use execute::{Applied, BatchCommit, ItemResult};
+
+use crate::transaction::SemanticLimits;
 #[cfg(feature = "docx")]
 pub(crate) use execute::{has_text_controls, inline_text_props};
 
@@ -37,6 +39,85 @@ pub enum BatchMode {
     Atomic,
     /// Keep successful items and report each failed item in input order.
     BestEffort,
+}
+
+/// What a command does with a property its target does not support.
+///
+/// The library verbs ([`crate::File::set`], [`crate::File::add`], closure
+/// transactions) always refuse. Only the command channel
+/// ([`crate::File::apply_with`], [`crate::File::batch_with`]) can choose
+/// [`Unsupported::Warn`], OfficeCLI's "apply the rest and warn", so that
+/// OfficeCLI scripts replay (record 0015 Q2/Δ1, record 0269).
+///
+/// ```
+/// use litchi_ops::batch::Unsupported;
+/// assert_eq!(Unsupported::default(), Unsupported::Refuse);
+/// ```
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Unsupported {
+    /// Refuse the whole command with `unsupported_property`.
+    #[default]
+    Refuse,
+    /// Skip each property the target refuses with `unsupported_property`,
+    /// apply the remaining properties atomically, and report every skipped
+    /// property in [`Applied::warnings`]. Any other failure (an invalid
+    /// value, a missing path, a resource limit) still fails the command.
+    Warn,
+}
+
+/// Command-channel options of [`crate::File::apply_with`] and
+/// [`crate::File::batch_with`]: the batch mode, the property policy and the
+/// semantic limits. The default is an atomic batch that refuses unsupported
+/// properties under default limits, which is what [`crate::File::batch`]
+/// does.
+///
+/// ```
+/// use litchi_ops::BatchMode;
+/// use litchi_ops::batch::{Options, Unsupported};
+///
+/// // OfficeCLI's batch behaviour: keep going, apply what is supported.
+/// let options = Options::new()
+///     .mode(BatchMode::BestEffort)
+///     .unsupported(Unsupported::Warn);
+/// # let _ = options;
+/// ```
+#[derive(Debug, Clone, Copy, Default)]
+#[non_exhaustive]
+pub struct Options {
+    mode: BatchMode,
+    unsupported: Unsupported,
+    limits: SemanticLimits,
+}
+
+impl Options {
+    /// The defaults: atomic, refusing, default limits.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the batch mode. A single command ([`crate::File::apply_with`])
+    /// ignores it.
+    #[must_use]
+    pub const fn mode(mut self, mode: BatchMode) -> Self {
+        self.mode = mode;
+        self
+    }
+
+    /// Set what a command does with a property its target does not support.
+    #[must_use]
+    pub const fn unsupported(mut self, unsupported: Unsupported) -> Self {
+        self.unsupported = unsupported;
+        self
+    }
+
+    /// Set the semantic limits of the transaction.
+    #[must_use]
+    pub const fn limits(mut self, limits: SemanticLimits) -> Self {
+        self.limits = limits;
+        self
+    }
 }
 
 /// One OfficeCLI command payload, borrowing unescaped text when possible.

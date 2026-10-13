@@ -1466,6 +1466,10 @@ pub(super) enum TextSetter {
     FontLatin,
     Align,
     Fill,
+    /// A shape's own fill (`p:spPr`), `none` or a colour.
+    ShapeFill,
+    /// A shape's preset geometry (`a:prstGeom`).
+    Geometry,
 }
 
 /// A write entry for `spec` with a text setter; `get` keeps the spec's
@@ -1517,8 +1521,27 @@ const fn run_write_entries() -> [crate::registry::Entry<TextSetter>; RUN_WRITE_C
         text_entry(write_only("font", ValueType::Text), TextSetter::Font);
     entries
 }
-pub(super) const RUN_WRITE_TABLE: crate::registry::Table<TextSetter, RUN_WRITE_COUNT, 0> =
-    crate::registry::Table::new(run_write_entries(), []);
+/// OfficeCLI's run aliases of writable properties (`run.json`).
+const RUN_WRITE_ALIASES: [crate::registry::Alias; 3] = {
+    use crate::registry::Alias;
+    let font = RUN_PROPS.len() + 1;
+    [
+        Alias {
+            name: "fontname",
+            entry: font,
+        },
+        Alias {
+            name: "fontFamily",
+            entry: font,
+        },
+        Alias {
+            name: "font.name",
+            entry: font,
+        },
+    ]
+};
+pub(super) const RUN_WRITE_TABLE: crate::registry::Table<TextSetter, RUN_WRITE_COUNT, 3> =
+    crate::registry::Table::new(run_write_entries(), RUN_WRITE_ALIASES);
 pub(crate) const RUN_CAPABILITY_PROPS: &[PropSpec] = &RUN_WRITE_TABLE.readable();
 
 const PARAGRAPH_WRITE_COUNT: usize = PARAGRAPH_PROPS.len() + 5;
@@ -1545,11 +1568,22 @@ const fn paragraph_write_entries() -> [crate::registry::Entry<TextSetter>; PARAG
     entries[base + 4] = text_entry(write_only("font", ValueType::Text), TextSetter::Font);
     entries
 }
+/// OfficeCLI's paragraph aliases of writable properties (`paragraph.json`).
+const PARAGRAPH_WRITE_ALIASES: [crate::registry::Alias; 2] = [
+    crate::registry::Alias {
+        name: "alignment",
+        entry: ParagraphKey::Align as usize,
+    },
+    crate::registry::Alias {
+        name: "halign",
+        entry: ParagraphKey::Align as usize,
+    },
+];
 pub(super) const PARAGRAPH_WRITE_TABLE: crate::registry::Table<
     TextSetter,
     PARAGRAPH_WRITE_COUNT,
-    0,
-> = crate::registry::Table::new(paragraph_write_entries(), []);
+    2,
+> = crate::registry::Table::new(paragraph_write_entries(), PARAGRAPH_WRITE_ALIASES);
 pub(crate) const PARAGRAPH_CAPABILITY_PROPS: &[PropSpec] = &PARAGRAPH_WRITE_TABLE.readable();
 
 const CELL_WRITE_COUNT: usize = CELL_PROPS.len() + 7;
@@ -1571,7 +1605,7 @@ const fn cell_write_entries() -> [crate::registry::Entry<TextSetter>; CELL_WRITE
 pub(super) const CELL_WRITE_TABLE: crate::registry::Table<TextSetter, CELL_WRITE_COUNT, 0> =
     crate::registry::Table::new(cell_write_entries(), []);
 pub(crate) const CELL_CAPABILITY_PROPS: &[PropSpec] = &CELL_WRITE_TABLE.readable();
-const SHAPE_WRITE_COUNT: usize = SHAPE_PROPS.len() + 1;
+const SHAPE_WRITE_COUNT: usize = SHAPE_PROPS.len() + 3;
 const fn shape_write_entries() -> [crate::registry::Entry<ShapeSetter>; SHAPE_WRITE_COUNT] {
     use crate::registry::{Access, Constraint, Entry};
     let mut text_spec = PropSpec::new("text", ValueType::Text);
@@ -1583,6 +1617,20 @@ const fn shape_write_entries() -> [crate::registry::Entry<ShapeSetter>; SHAPE_WR
         clear: true,
     };
     let mut entries = [text; SHAPE_WRITE_COUNT];
+    // Write-only until the shape record keeps its `p:spPr` fill and geometry
+    // (read gap L-PPTX-R6b); writable since record 0269.
+    entries[SHAPE_PROPS.len() + 1] = Entry {
+        spec: write_only("fill", ValueType::Text),
+        access: Access::SetAndAdd(ShapeSetter::Format(TextSetter::ShapeFill)),
+        constraint: Constraint::NotEmpty,
+        clear: true,
+    };
+    entries[SHAPE_PROPS.len() + 2] = Entry {
+        spec: write_only("geometry", ValueType::Text),
+        access: Access::SetAndAdd(ShapeSetter::Format(TextSetter::Geometry)),
+        constraint: Constraint::NotEmpty,
+        clear: false,
+    };
     let mut index = 0;
     while index < SHAPE_PROPS.len() {
         entries[index] = Entry::read(SHAPE_PROPS[index]);
@@ -1612,11 +1660,9 @@ const fn shape_write_entries() -> [crate::registry::Entry<ShapeSetter>; SHAPE_WR
             None
         };
         if let Some(setter) = setter {
-            entries[index].access = if matches!(setter, ShapeSetter::Format(_)) {
-                Access::Set(setter)
-            } else {
-                Access::SetAndAdd(setter)
-            };
+            // Text boxes take their formatting at creation too (record 0269):
+            // the native add and the body formatting stage in one edit.
+            entries[index].access = Access::SetAndAdd(setter);
             if matches!(setter, ShapeSetter::Format(_)) {
                 entries[index].clear = true;
                 if index == ShapeKey::Font as usize || index == ShapeKey::FontLatin as usize {
@@ -1634,9 +1680,55 @@ const fn shape_write_entries() -> [crate::registry::Entry<ShapeSetter>; SHAPE_WR
     }
     entries
 }
-pub(super) const SHAPE_WRITE_TABLE: crate::registry::Table<ShapeSetter, SHAPE_WRITE_COUNT, 0> =
-    crate::registry::Table::new(shape_write_entries(), []);
+/// OfficeCLI's shape aliases of writable properties (`shape.json`): the
+/// corpus scripts size shapes with `w`/`h` and set `fontSize`.
+const SHAPE_WRITE_ALIASES: [crate::registry::Alias; 8] = {
+    use crate::registry::Alias;
+    [
+        Alias {
+            name: "left",
+            entry: ShapeKey::X as usize,
+        },
+        Alias {
+            name: "top",
+            entry: ShapeKey::Y as usize,
+        },
+        Alias {
+            name: "w",
+            entry: ShapeKey::Width as usize,
+        },
+        Alias {
+            name: "h",
+            entry: ShapeKey::Height as usize,
+        },
+        // Matched case-insensitively, so this also admits `fontsize`.
+        Alias {
+            name: "fontSize",
+            entry: ShapeKey::Size as usize,
+        },
+        Alias {
+            name: "font.size",
+            entry: ShapeKey::Size as usize,
+        },
+        Alias {
+            name: "preset",
+            entry: SHAPE_PROPS.len() + 2,
+        },
+        Alias {
+            name: "shape",
+            entry: SHAPE_PROPS.len() + 2,
+        },
+    ]
+};
+pub(super) const SHAPE_WRITE_TABLE: crate::registry::Table<ShapeSetter, SHAPE_WRITE_COUNT, 8> =
+    crate::registry::Table::new(shape_write_entries(), SHAPE_WRITE_ALIASES);
 pub(crate) const SHAPE_CAPABILITY_PROPS: &[PropSpec] = &SHAPE_WRITE_TABLE.readable();
+/// The schema export's per-property aliases of shapes, paragraphs and runs.
+pub(crate) const SHAPE_PROP_ALIASES: &[crate::registry::PropAlias] =
+    &SHAPE_WRITE_TABLE.prop_aliases();
+pub(crate) const PARAGRAPH_PROP_ALIASES: &[crate::registry::PropAlias] =
+    &PARAGRAPH_WRITE_TABLE.prop_aliases();
+pub(crate) const RUN_PROP_ALIASES: &[crate::registry::PropAlias] = &RUN_WRITE_TABLE.prop_aliases();
 
 const fn placeholder_capability_props() -> [PropSpec; SHAPE_WRITE_COUNT] {
     let mut props = SHAPE_WRITE_TABLE.readable();
@@ -1660,8 +1752,10 @@ pub(super) enum SlideProperty {
     Hidden,
     /// Speaker-notes text; set only, routed before slide metadata.
     Notes,
+    /// The slide's direct transition, OfficeCLI's shorthand (record 0269).
+    Transition,
 }
-const SLIDE_WRITE_COUNT: usize = SLIDE_PROPS.len() + 1;
+const SLIDE_WRITE_COUNT: usize = SLIDE_PROPS.len() + 2;
 const fn slide_write_entries() -> [crate::registry::Entry<SlideProperty>; SLIDE_WRITE_COUNT] {
     use crate::registry::{Access, Constraint, Entry};
     let mut entries = [Entry::read(SLIDE_PROPS[0]); SLIDE_WRITE_COUNT];
@@ -1691,6 +1785,16 @@ const fn slide_write_entries() -> [crate::registry::Entry<SlideProperty>; SLIDE_
     entries[SLIDE_PROPS.len()] = Entry {
         spec: write_only("notes", ValueType::Text),
         access: Access::Set(SlideProperty::Notes),
+        constraint: Constraint::None,
+        clear: true,
+    };
+    // Write-only until slides read their transition (read gap M1-extended).
+    entries[SLIDE_PROPS.len() + 1] = Entry {
+        spec: write_only("transition", ValueType::Text),
+        // Set only: a source-backed slide insertion refuses markup
+        // compatibility in the new slide, which Morph and the PowerPoint
+        // 2010+ effects need; set the transition after adding the slide.
+        access: Access::Set(SlideProperty::Transition),
         constraint: Constraint::None,
         clear: true,
     };

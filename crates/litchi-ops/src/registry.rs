@@ -329,8 +329,8 @@ impl<S: Copy + 'static, const N: usize, const A: usize> Table<S, N, A> {
     /// Every alias with the canonical name it resolves to, in declaration
     /// order: the schema export's per-property `aliases`.
     #[cfg_attr(
-        not(any(feature = "xlsx", feature = "xlsb", feature = "xls")),
-        allow(dead_code, reason = "only the workbook tables export aliases")
+        not(any(feature = "xlsx", feature = "xlsb", feature = "xls", feature = "pptx")),
+        allow(dead_code, reason = "only these formats' tables export aliases")
     )]
     pub(crate) const fn prop_aliases(&self) -> [PropAlias; A] {
         let mut aliases = [PropAlias {

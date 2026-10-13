@@ -7,7 +7,7 @@
 
 use std::path::PathBuf;
 
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 
 /// Open, read, query and edit Office documents through Litchi's unified
 /// operations layer.
@@ -15,7 +15,8 @@ use clap::{Args, Parser, Subcommand};
 /// Writes save in place atomically unless `--out` names another file. Exit
 /// statuses: 0 success, 1 other failure, 2 usage, 3 path, 4 property or
 /// argument, 5 unsupported, 6 I/O, 7 corrupt input, 8 protected, 9 a
-/// best-effort batch with failed items.
+/// best-effort batch with failed items or a `--unsupported warn` write that
+/// skipped properties.
 #[derive(Debug, Parser)]
 #[command(name = "litchi", version, about, long_about = None)]
 pub(crate) struct Cli {
@@ -63,6 +64,28 @@ pub(crate) enum Command {
     /// Print a format's property registry: every element's properties with
     /// type, unit, values, aliases, constraint and get/set/add flags.
     Schema(Schema),
+}
+
+/// What `set`, `add` and `batch` do with a property the target does not
+/// support (`--unsupported`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, ValueEnum)]
+pub(crate) enum UnsupportedArg {
+    /// Refuse the whole command (`unsupported_property`, exit 4).
+    #[default]
+    Refuse,
+    /// OfficeCLI's behaviour: apply the other properties, print a warning
+    /// for each skipped one and exit 9.
+    Warn,
+}
+
+/// The property policy shared by the property-taking writes.
+#[derive(Debug, Args)]
+pub(crate) struct Policy {
+    /// What to do with a property the target does not support: `refuse`
+    /// the command (the default) or `warn`, applying the rest as OfficeCLI
+    /// does and exiting 9.
+    #[arg(long, value_enum, value_name = "POLICY", default_value_t = UnsupportedArg::Refuse)]
+    pub(crate) unsupported: UnsupportedArg,
 }
 
 /// Where a write publishes its result.
@@ -159,6 +182,8 @@ pub(crate) struct Set {
     #[arg(long, value_name = "TEXT")]
     pub(crate) replace: Option<String>,
     #[command(flatten)]
+    pub(crate) policy: Policy,
+    #[command(flatten)]
     pub(crate) output: Output,
 }
 
@@ -185,6 +210,8 @@ pub(crate) struct Add {
     pub(crate) props: Vec<String>,
     #[command(flatten)]
     pub(crate) position: Position,
+    #[command(flatten)]
+    pub(crate) policy: Policy,
     #[command(flatten)]
     pub(crate) output: Output,
 }
@@ -252,6 +279,8 @@ pub(crate) struct Batch {
     /// when any failed. Never the default.
     #[arg(long)]
     pub(crate) best_effort: bool,
+    #[command(flatten)]
+    pub(crate) policy: Policy,
     #[command(flatten)]
     pub(crate) output: Output,
 }

@@ -14,8 +14,10 @@
 //!   so one refused line does not end the replay;
 //! - `tests/officecli_corpus/officecli` comes first on `PATH` as `officecli`:
 //!   it translates the call (resident `open`/`close` become no-ops, `batch`
-//!   reads stdin, a bare slide gets a layout; record 0265 §3), runs `litchi`
-//!   and records the call;
+//!   reads stdin, a bare slide gets a layout; record 0265 §3), passes
+//!   `--unsupported warn` to `set`, `add` and `batch` as OfficeCLI applies
+//!   the supported properties by default (record 0269), runs `litchi` and
+//!   records the call; a call that skipped properties is `warned`;
 //! - `python3` and `python` run the real interpreter with `-I -S`, so the
 //!   scripts' helper snippets see only the standard library and every
 //!   machine replays them the same way (no Pillow, no numpy);
@@ -406,6 +408,55 @@ fn error_field(stderr: &str, key: &str) -> Option<String> {
         .map(str::to_owned)
 }
 
+/// Whether stderr holds only `warning[...]` reports: a `--unsupported warn`
+/// write that applied and skipped properties.
+fn warned(stderr: &str) -> bool {
+    stderr.contains("warning[") && !stderr.contains("error[")
+}
+
+/// The properties a `--unsupported warn` write skipped, in report order,
+/// each once.
+fn skipped(stderr: &str) -> Vec<String> {
+    let mut properties: Vec<String> = Vec::new();
+    let mut in_warning = false;
+    for line in stderr.lines() {
+        if line.starts_with("warning[") {
+            in_warning = true;
+        } else if !line.starts_with("  ") {
+            in_warning = false;
+        } else if let Some(property) = line.strip_prefix("  property: ") {
+            if in_warning && !properties.iter().any(|known| known == property) {
+                properties.push(property.to_owned());
+            }
+        }
+    }
+    properties
+}
+
+/// The skipped properties, comma-separated, within the 48-character detail
+/// bound: names that do not fit are counted as a final `+N`.
+fn skipped_detail(properties: &[String]) -> String {
+    let mut detail = String::new();
+    for (index, property) in properties.iter().enumerate() {
+        let rest = properties.len() - index;
+        let separator = usize::from(!detail.is_empty());
+        // Leave room for `,+N` unless this is the last name.
+        let reserve = if rest > 1 { 4 } else { 0 };
+        if detail.len() + separator + property.len() + reserve > 48 {
+            if !detail.is_empty() {
+                detail.push(',');
+            }
+            detail.push_str(&format!("+{rest}"));
+            break;
+        }
+        if separator == 1 {
+            detail.push(',');
+        }
+        detail.push_str(property);
+    }
+    detail
+}
+
 fn error_code(stderr: &str) -> Option<String> {
     if stderr.trim_start().starts_with('{') {
         return error_field(stderr, "code");
@@ -482,6 +533,10 @@ impl Record {
             ("ok".to_owned(), detail)
         } else if self.stderr.contains("panicked at") {
             ("panic".to_owned(), String::new())
+        } else if status == "9" && warned(&self.stderr) {
+            // `--unsupported warn` applied the call without the properties
+            // it lists.
+            ("warned".to_owned(), skipped_detail(&skipped(&self.stderr)))
         } else if let Some(code) = error_code(&self.stderr) {
             let property = error_field(&self.stderr, "property").unwrap_or_default();
             (code, property)
@@ -522,8 +577,9 @@ const HEADER: &str = "\
 # read by `python3 tools/officecli_corpus.py`. Do not edit by hand.
 # `@ <script>` starts a script; each row is one `officecli` call in replay order:
 # line (0 = harness read-back), verb, format (the document's extension), --type,
-# result (ok, skip, usage, error code),
-# detail (property, offending argument or translated:<delta>), last path step.
+# result (ok, skip, usage, warned, error code),
+# detail (property, the skipped properties of a warned call, offending argument
+# or translated:<delta>), last path step.
 ";
 
 fn render(outcomes: &BTreeMap<String, Vec<Call>>) -> String {
@@ -734,6 +790,21 @@ fn instrumentation_keeps_line_numbers() {
     assert!(
         instrument("echo x\n").starts_with("trap 'export OFFICECLI_LINE=$LINENO' DEBUG; echo x")
     );
+}
+
+#[test]
+fn warned_calls_list_their_skipped_properties() {
+    let stderr = "warning[unsupported_property]: the element has no such property\n  \
+                  property: fill\n  suggestion: did you mean 'x'?\n\
+                  warning[unsupported_property]: m\n  property: geometry\nset: ok\n";
+    assert!(warned(stderr));
+    assert_eq!(skipped(stderr), ["fill", "geometry"]);
+    assert!(!warned("warning[x]: y\nerror[invalid_value]: z\n"));
+    let long: Vec<String> = (0..20).map(|n| format!("property{n}")).collect();
+    let detail = skipped_detail(&long);
+    assert!(detail.len() <= 48, "{detail}");
+    assert!(detail.starts_with("property0,property1,"));
+    assert!(detail.ends_with(",+16"), "{detail}");
 }
 
 #[test]

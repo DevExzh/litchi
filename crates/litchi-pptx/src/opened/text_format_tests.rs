@@ -4,7 +4,9 @@
 use litchi_core::Position;
 use litchi_drawingml::text::Alignment;
 
-use super::{Rgb, TextEdit, TextProperties, TextTarget};
+use litchi_drawingml::geom::Preset;
+
+use super::{Rgb, ShapeFill, TextEdit, TextProperties, TextTarget};
 use crate::{Error, Package, Result};
 
 fn deck() -> Result<Package> {
@@ -230,6 +232,111 @@ fn source_owner_matches_eager_owner() -> Result<()> {
     assert_eq!(edit.set_text_properties(Position::new(0), &edits)?, 2);
     let (after, patch) = edit.commit()?.into_parts();
     assert!(!patch.is_noop());
+    let reopened = Package::from_bytes(&after.to_bytes()?)?;
+    assert_eq!(slide_xml(&reopened)?, slide_xml(&eager)?);
+    assert_eq!(
+        after.apply(&patch.inverse())?.to_bytes()?,
+        source.to_bytes()?
+    );
+    Ok(())
+}
+
+fn shape_target() -> TextTarget {
+    TextTarget::Shape { shape: at(0) }
+}
+
+#[test]
+fn shape_fill_and_geometry_round_trip() -> Result<()> {
+    let package = deck()?;
+    let before = slide_xml(&package)?;
+    assert!(contains(&before, "<a:prstGeom prst=\"rect\">"));
+    let properties = TextProperties::default()
+        .with_shape_fill(Some(ShapeFill::Solid(Rgb([0x1E, 0x3A, 0x5F]))))
+        .with_geometry(Preset::Ellipse)
+        .with_bold(Some(true));
+    let (after, changed) = apply(&package, &[TextEdit::new(shape_target(), properties)])?;
+    assert_eq!(changed, 1);
+    let xml = slide_xml(&after)?;
+    assert!(contains(
+        &xml,
+        "<a:prstGeom prst=\"ellipse\"><a:avLst/></a:prstGeom>"
+    ));
+    assert!(contains(
+        &xml,
+        "<a:solidFill><a:srgbClr val=\"1E3A5F\"/></a:solidFill></p:spPr>"
+    ));
+    assert!(
+        !contains(&xml, "<a:noFill/></p:spPr>"),
+        "the old fill is replaced"
+    );
+    assert!(contains(&xml, "b=\"1\""));
+    // Schema order: geometry before fill, both after the transform.
+    let find = |needle: &[u8]| xml.windows(needle.len()).position(|w| w == needle);
+    let xfrm = find(b"</a:xfrm>").expect("transform");
+    let geometry = find(b"<a:prstGeom").expect("geometry");
+    let fill = find(b"<a:solidFill><a:srgbClr val=\"1E3A5F\"").expect("fill");
+    assert!(xfrm < geometry && geometry < fill);
+
+    // The same assignments again change nothing.
+    let (_, unchanged) = apply(&after, &[TextEdit::new(shape_target(), properties)])?;
+    assert_eq!(unchanged, 0);
+
+    // `None` writes `a:noFill`; removal deletes the local fill choice.
+    let none = TextProperties::default().with_shape_fill(Some(ShapeFill::None));
+    let (hidden, _) = apply(&after, &[TextEdit::new(shape_target(), none)])?;
+    assert!(contains(&slide_xml(&hidden)?, "<a:noFill/></p:spPr>"));
+    let cleared = TextProperties::default().with_shape_fill(None);
+    let (cleared, _) = apply(&hidden, &[TextEdit::new(shape_target(), cleared)])?;
+    let xml = slide_xml(&cleared)?;
+    assert!(!contains(&xml, "<a:noFill/></p:spPr>"));
+    assert!(contains(&xml, "</a:prstGeom></p:spPr>"));
+    Ok(())
+}
+
+#[test]
+fn shape_properties_refuse_other_targets() -> Result<()> {
+    let package = deck()?;
+    let mut edit = package.edit()?;
+    let fill = TextProperties::default().with_shape_fill(Some(ShapeFill::None));
+    let geometry = TextProperties::default().with_geometry(Preset::Star5);
+    for item in [
+        TextEdit::new(run(0, 0), fill),
+        TextEdit::new(
+            TextTarget::Paragraph {
+                shape: at(0),
+                paragraph: at(0),
+            },
+            geometry,
+        ),
+        // The table frame has no shape properties of its own.
+        TextEdit::new(TextTarget::Shape { shape: at(1) }, geometry),
+    ] {
+        assert!(
+            edit.set_text_properties(0usize, &[item]).is_err(),
+            "{item:?}"
+        );
+    }
+    assert!(!edit.commit()?.diagnostics().changed());
+    Ok(())
+}
+
+#[test]
+fn source_owner_writes_shape_properties_like_the_eager_owner() -> Result<()> {
+    use std::sync::Arc;
+    let bytes = deck()?.to_bytes()?;
+    let edits = [TextEdit::new(
+        shape_target(),
+        TextProperties::default()
+            .with_shape_fill(Some(ShapeFill::Solid(Rgb([0xFF, 0x00, 0x00]))))
+            .with_geometry(Preset::RoundRect),
+    )];
+    let eager = Package::from_bytes(&bytes)?;
+    let (eager, _) = apply(&eager, &edits)?;
+    let source =
+        crate::source::Package::from_read_at(Arc::new(litchi_core::OwnedSource::new(bytes)))?;
+    let mut edit = source.edit()?;
+    assert_eq!(edit.set_text_properties(Position::new(0), &edits)?, 1);
+    let (after, patch) = edit.commit()?.into_parts();
     let reopened = Package::from_bytes(&after.to_bytes()?)?;
     assert_eq!(slide_xml(&reopened)?, slide_xml(&eager)?);
     assert_eq!(

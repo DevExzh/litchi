@@ -12,12 +12,12 @@
 //! | `get <file> [<path>] [--depth N]` | `open`, `File::get`, `Node::view_with` |
 //! | `query <file> <selector> [--limit N] [--depth N]` | `File::query`, `Matches::limit` |
 //! | `view <file> [<mode> \| --mode M]` | `File::view` or `File::view_json` |
-//! | `set <file> <path> --prop k=v... [--find T] [--replace T]` | `File::apply` with a `set` item (`--find T` is `--prop find=T`, `--replace T` is `--prop replace=T`) |
-//! | `add <file> <parent> (--type T \| --from P) [--prop k=v...] [--index N \| --after P \| --before P]` | `File::apply` with an `add` item |
+//! | `set <file> <path> --prop k=v... [--find T] [--replace T] [--unsupported P]` | `File::apply_with` with a `set` item (`--find T` is `--prop find=T`, `--replace T` is `--prop replace=T`) |
+//! | `add <file> <parent> (--type T \| --from P) [--prop k=v...] [--index N \| --after P \| --before P] [--unsupported P]` | `File::apply_with` with an `add` item |
 //! | `remove <file> <path> [--prop k=v...]` | `File::apply` with a `remove` item |
 //! | `move <file> <path> [--to P] [--index N \| --after P \| --before P]` | `File::apply` with a `move` item |
 //! | `swap <file> <path1> <path2>` | `File::apply` with a `swap` item |
-//! | `batch <file> (--input F \| --commands JSON) [--atomic \| --best-effort]` | `batch::from_bytes_with_limits`, `File::batch` |
+//! | `batch <file> (--input F \| --commands JSON) [--atomic \| --best-effort] [--unsupported P]` | `batch::from_bytes_with_limits`, `File::batch_with` |
 //! | `capabilities (<file> \| --format T)` | `File::capabilities` or `Capabilities::of` |
 //! | `schema <type>` | `litchi_ops::schema` |
 //!
@@ -32,6 +32,15 @@
 //! nothing leaves the file untouched. A batch is atomic unless
 //! `--best-effort` is given; OfficeCLI's "apply the rest and report" mode is
 //! that flag, never the default.
+//!
+//! A property the target does not support refuses the whole command
+//! (`unsupported_property`, exit 4) unless `--unsupported warn` is given on
+//! `set`, `add` or `batch`. Then, as OfficeCLI does by default, the other
+//! properties apply atomically, each skipped property is printed on stderr
+//! as `warning[unsupported_property]: ...` with its `property` line (and in
+//! the item's `warnings` with `--json`), and the run exits 9. Invalid values
+//! and every other failure still refuse the command (`batch::Unsupported`,
+//! record 0269).
 //!
 //! # Output
 //!
@@ -50,7 +59,8 @@
 //!   "summary": {...}}`. Each result has `index` and `success`; a success
 //!   adds `changed` and, for `add`, the created `path`; a failure adds
 //!   `code`, `error` (the message), `suggestion`, `property` and the failed
-//!   input `item`. The summary counts `total`, `executed`, `succeeded`,
+//!   input `item`; a success under `--unsupported warn` adds `warnings`, one
+//!   `ErrorResult` per skipped property. The summary counts `total`, `executed`, `succeeded`,
 //!   `failed` and `skipped`, and adds `changed`, `saved` (the destination)
 //!   and `atomicRolledBack`.
 //!
@@ -74,7 +84,7 @@
 //! | 6 | I/O | `file_not_found`, `file_locked`, `file_exists`, `file_required`, `io_error` |
 //! | 7 | corrupt input | `corrupt_file`, `invalid_input` |
 //! | 8 | protected | `document_protected` |
-//! | 9 | partial: a `--best-effort` batch saved its successful items, and at least one item failed | (per-item codes in the result) |
+//! | 9 | partial: a `--best-effort` batch saved its successful items, and at least one item failed; or a `--unsupported warn` write saved the properties it could apply and skipped at least one | (per-item codes and warnings in the result) |
 //!
 //! A closed stdout pipe (`litchi get ... | head`) ends the run quietly.
 

@@ -23,7 +23,8 @@ pub(crate) const IO: u8 = 6;
 pub(crate) const CORRUPT: u8 = 7;
 /// The document is encrypted, signed or edit-protected.
 pub(crate) const PROTECTED: u8 = 8;
-/// A best-effort batch had failed items.
+/// A best-effort batch had failed items, or a `--unsupported warn` write
+/// skipped properties.
 pub(crate) const PARTIAL: u8 = 9;
 
 /// The exit status of a failure with `code`.

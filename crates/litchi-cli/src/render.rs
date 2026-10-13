@@ -217,6 +217,28 @@ pub(crate) fn error(error: &Error, json: bool) {
     }
 }
 
+/// Writes each property a `--unsupported warn` command skipped on stderr:
+/// `warning[<code>]: <message>` and its `item`, `property` and `suggestion`
+/// lines, the shape of an error.
+pub(crate) fn warnings(warnings: &[Error]) {
+    if warnings.is_empty() {
+        return;
+    }
+    let mut stderr = std::io::stderr().lock();
+    for warning in warnings {
+        let _ = writeln!(stderr, "warning[{}]: {}", warning.code(), warning.message());
+        if let Some(item) = warning.item() {
+            let _ = writeln!(stderr, "  item: {item}");
+        }
+        if let Some(property) = warning.property() {
+            let _ = writeln!(stderr, "  property: {property}");
+        }
+        if let Some(suggestion) = warning.suggestion() {
+            let _ = writeln!(stderr, "  suggestion: {suggestion}");
+        }
+    }
+}
+
 /// OfficeCLI's `ErrorResult`, plus the item and property Litchi reports.
 #[derive(Serialize)]
 struct ErrorJson<'a> {
@@ -264,6 +286,10 @@ pub(crate) struct ItemJson<'a> {
     /// The failed input item, echoed so a caller can inspect and retry it.
     #[serde(skip_serializing_if = "Option::is_none")]
     item: Option<&'a BatchItem<'a>>,
+    /// The properties a `--unsupported warn` item skipped, each in
+    /// `ErrorResult` shape (OfficeCLI's `warnings`).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    warnings: Vec<ErrorJson<'a>>,
 }
 
 impl<'a> ItemJson<'a> {
@@ -273,7 +299,7 @@ impl<'a> ItemJson<'a> {
     }
 
     /// A successful item.
-    pub(crate) fn applied(index: usize, applied: &Applied) -> Self {
+    pub(crate) fn applied(index: usize, applied: &'a Applied) -> Self {
         Self {
             index,
             success: true,
@@ -284,6 +310,7 @@ impl<'a> ItemJson<'a> {
             suggestion: None,
             property: None,
             item: None,
+            warnings: applied.warnings.iter().map(ErrorJson::of).collect(),
         }
     }
 
@@ -299,6 +326,7 @@ impl<'a> ItemJson<'a> {
             suggestion: error.suggestion(),
             property: error.property(),
             item,
+            warnings: Vec::new(),
         }
     }
 
@@ -322,6 +350,7 @@ impl<'a> ItemJson<'a> {
                 suggestion: None,
                 property: None,
                 item,
+                warnings: Vec::new(),
             },
         }
     }
@@ -365,11 +394,19 @@ impl Report<'_> {
                     .as_deref()
                     .map(|path| format!(" {path}"))
                     .unwrap_or_default();
-                let effect = if item.changed == Some(false) {
-                    " (no change)"
+                let mut effect = if item.changed == Some(false) {
+                    " (no change)".to_owned()
                 } else {
-                    ""
+                    String::new()
                 };
+                if !item.warnings.is_empty() {
+                    let skipped: Vec<&str> = item
+                        .warnings
+                        .iter()
+                        .map(|warning| warning.property.unwrap_or("?"))
+                        .collect();
+                    effect.push_str(&format!(" (skipped: {})", skipped.join(", ")));
+                }
                 if single {
                     format!("{verb}{target}: ok{effect}")
                 } else {

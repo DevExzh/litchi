@@ -938,3 +938,125 @@ fn officecli_option_spellings_reach_the_command_channel() {
         "refusals write nothing"
     );
 }
+
+#[test]
+fn unsupported_warn_applies_the_rest_and_exits_partial() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = scratch(dir.path(), "w.xlsx", None);
+    let before = std::fs::read(&path).expect("read");
+    // The default refuses the whole command and writes nothing.
+    let run = expect(
+        4,
+        [
+            "set",
+            arg(&path),
+            "/Sheet1/A1",
+            "--prop",
+            "value=Total",
+            "--prop",
+            "sparkle=yes",
+        ],
+    );
+    assert!(run.stderr.contains("property: sparkle"), "{}", run.stderr);
+    assert_eq!(std::fs::read(&path).expect("read"), before);
+
+    // `--unsupported warn` applies the value, warns and exits 9.
+    let run = expect(
+        9,
+        [
+            "set",
+            arg(&path),
+            "/Sheet1/A1",
+            "--prop",
+            "value=Total",
+            "--prop",
+            "sparkle=yes",
+            "--unsupported",
+            "warn",
+            "--json",
+        ],
+    );
+    let report = run.json();
+    assert_eq!(report["results"][0]["success"], true);
+    assert_eq!(report["results"][0]["changed"], true);
+    let warnings = report["results"][0]["warnings"]
+        .as_array()
+        .expect("warnings");
+    assert_eq!(warnings.len(), 1);
+    assert_eq!(warnings[0]["code"], "unsupported_property");
+    assert_eq!(warnings[0]["property"], "sparkle");
+    assert_eq!(text_of(&path, "/Sheet1/A1"), json!("Total"));
+
+    // Text output names the skipped property on stderr and the report line.
+    let run = expect(
+        9,
+        [
+            "set",
+            arg(&path),
+            "/Sheet1/A2",
+            "--prop",
+            "value=More",
+            "--prop",
+            "sparkle=yes",
+            "--unsupported",
+            "warn",
+        ],
+    );
+    assert!(
+        run.stderr.starts_with("warning[unsupported_property]:"),
+        "{}",
+        run.stderr
+    );
+    assert!(run.stderr.contains("  property: sparkle"), "{}", run.stderr);
+    assert!(run.stdout.contains("(skipped: sparkle)"), "{}", run.stdout);
+
+    // A clean call under warn exits 0; an invalid value still fails.
+    expect(
+        0,
+        [
+            "set",
+            arg(&path),
+            "/Sheet1/A3",
+            "--prop",
+            "value=3",
+            "--unsupported",
+            "warn",
+        ],
+    );
+    let after = std::fs::read(&path).expect("read");
+    expect(
+        4,
+        [
+            "set",
+            arg(&path),
+            "/Sheet1/A3",
+            "--prop",
+            "font.bold=maybe",
+            "--prop",
+            "sparkle=yes",
+            "--unsupported",
+            "warn",
+        ],
+    );
+    assert_eq!(std::fs::read(&path).expect("read"), after);
+
+    // Batches take the policy per item and exit 9 when any item warned.
+    let run = expect(
+        9,
+        [
+            "batch",
+            arg(&path),
+            "--unsupported",
+            "warn",
+            "--json",
+            "--commands",
+            r#"[{"command":"set","path":"/Sheet1/B1","props":{"value":"x","sparkle":"y"}},
+                {"command":"set","path":"/Sheet1/B2","props":{"value":"z"}}]"#,
+        ],
+    );
+    let report = run.json();
+    assert_eq!(report["summary"]["succeeded"], 2);
+    assert_eq!(report["results"][0]["warnings"][0]["item"], 0);
+    assert!(report["results"][1].get("warnings").is_none());
+    assert_eq!(text_of(&path, "/Sheet1/B2"), json!("z"));
+}
