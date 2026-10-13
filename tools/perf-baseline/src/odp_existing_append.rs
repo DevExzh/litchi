@@ -228,7 +228,7 @@ pub(crate) fn appended_body(shape: SemanticShape) -> String {
 }
 
 fn append_once(source_bytes: &[u8], shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
-    let source = litchi_odp::authoring::edit::Package::from_bytes(&source_bytes)?;
+    let source = litchi_odp::authoring::edit::Package::from_bytes(source_bytes)?;
     let mut transaction = source.edit()?;
     let title = appended_title(shape);
     let body = appended_body(shape);
@@ -295,7 +295,7 @@ pub(crate) fn find_member<'a>(
 pub(crate) fn semantic_slides(
     bytes: &[u8],
 ) -> Result<Vec<(Option<String>, String)>, Box<dyn Error>> {
-    let presentation = litchi_odp::Package::from_bytes(&bytes)?.presentation()?;
+    let presentation = litchi_odp::Package::from_bytes(bytes)?.presentation()?;
     let slides = presentation.slides()?;
     slides
         .into_iter()
@@ -507,18 +507,18 @@ fn verify_patch_contract(
     stale_bytes: &[u8],
     shape: SemanticShape,
 ) -> Result<(bool, bool, bool, bool), Box<dyn Error>> {
-    let source = litchi_odp::authoring::edit::Package::from_bytes(&source_bytes)?;
+    let source = litchi_odp::authoring::edit::Package::from_bytes(source_bytes)?;
     let mut transaction = source.edit()?;
     let title = appended_title(shape);
     let body = appended_body(shape);
     transaction.add(&title, &body)?;
     let commit = transaction.commit()?;
-    let replayed = source.apply(&commit.patch())?;
+    let replayed = source.apply(commit.patch())?;
     let replay_ok = replayed.as_bytes() == expected_output;
     let inverse_ok = replayed.apply(&commit.patch().inverse())?.as_bytes() == source.as_bytes();
-    let stale = litchi_odp::authoring::edit::Package::from_bytes(&stale_bytes)?;
+    let stale = litchi_odp::authoring::edit::Package::from_bytes(stale_bytes)?;
     let stale_refused = matches!(
-        stale.apply(&commit.patch()),
+        stale.apply(commit.patch()),
         Err(litchi_odf_common::Error::Core(litchi_core::Error::InvalidFormat(message)))
             if message == "stale ODP presentation patch source"
     );

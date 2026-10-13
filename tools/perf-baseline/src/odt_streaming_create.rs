@@ -272,7 +272,7 @@ fn inspect_odt_buffered_archive(
     let meta_xml = archive.read("meta.xml")?;
     verify_odt_buffered_default_parts(&styles_xml, &meta_xml)?;
 
-    let document = litchi_odt::Package::from_bytes(&bytes)?.document()?;
+    let document = litchi_odt::Package::from_bytes(bytes)?.document()?;
     let paragraphs = document.paragraphs()?;
     let expected = odt_buffered_expected_paragraphs(shape);
     if paragraphs.len() != expected.len() {

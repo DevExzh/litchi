@@ -1487,7 +1487,6 @@ pub(crate) fn leaf_xlsx_open(source: Arc<dyn ReadAt>) -> Result<LeafXlsx, Box<dy
     let mut repairs = litchi_ooxml_common::leniency::ToleranceReport::default();
     let metadata =
         litchi_ooxml_common::properties::read_source_backed_with_report(&package, &mut repairs)?
-            .map(Metadata::from)
             .unwrap_or_default();
     let workbook = litchi_xlsx::SourceBackedWorkbook::from_source_backed_package(package)?;
     Ok(LeafXlsx { workbook, metadata })
