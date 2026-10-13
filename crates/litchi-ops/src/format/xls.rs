@@ -18,11 +18,13 @@ use super::signature::{self, Opened, Signature};
 use crate::{OpenOptions, Result};
 
 mod children;
+mod layout;
 mod metadata;
 mod nav;
 mod node;
 pub(crate) mod owner;
 mod spec;
+mod structure;
 pub(crate) mod views;
 pub(crate) mod write;
 
@@ -30,7 +32,9 @@ pub(crate) use children::Children;
 pub(crate) use nav::Nav;
 pub use node::Node;
 pub(crate) use node::Props;
-pub(crate) use spec::{CELL_CAPABILITY_PROPS, SHEET_CAPABILITY_PROPS, SPEC};
+pub(crate) use spec::{
+    ADDABLE, CELL_CAPABILITY_PROPS, REMOVABLE, SETTABLE, SHEET_CAPABILITY_PROPS, SPEC, WRITE_GAPS,
+};
 pub(crate) use views::{Json as ViewJson, view_json, view_to};
 pub(crate) use write::WriteCommit;
 

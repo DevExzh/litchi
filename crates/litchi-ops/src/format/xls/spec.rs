@@ -98,7 +98,7 @@ pub(crate) enum SheetSetter {
 pub(crate) const SHEET_WRITE_TABLE: Table<SheetSetter, 1, 0> = Table::new(
     [Entry {
         spec: PropSpec::new("name", ValueType::Text),
-        access: Access::Set(SheetSetter::Name),
+        access: Access::SetAndAdd(SheetSetter::Name),
         constraint: Constraint::None,
         clear: false,
     }],
@@ -521,3 +521,108 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
 };
 
 check_format_spec!(SPEC);
+
+/// Elements whose properties the unified XLS writer sets.
+pub(crate) const SETTABLE: &[&str] = &["cell", "sheet"];
+/// Elements the unified XLS writer adds: worksheet tabs, and empty rows and
+/// columns inserted under a sheet.
+pub(crate) const ADDABLE: &[&str] = &["sheet", "row", "col"];
+/// Elements the unified XLS writer removes.
+pub(crate) const REMOVABLE: &[&str] = &["cell", "sheet", "row", "col"];
+
+const fn operation_gap(
+    verb: &'static str,
+    element: &'static str,
+    context: &'static str,
+    follow_up: &'static str,
+    reason: &'static str,
+) -> GapSpec {
+    GapSpec {
+        subject: Subject::Operation {
+            verb,
+            element,
+            context,
+        },
+        code: Code::UnsupportedCapability,
+        follow_up,
+        reason,
+    }
+}
+
+/// Write families that remain element- or property-level gaps.  The integrated
+/// verbs are listed by [`SETTABLE`], [`ADDABLE`] and [`REMOVABLE`]; these rows
+/// keep the remaining families visible so a format-level report never implies
+/// more than the adapter implements.
+pub(crate) static WRITE_GAPS: [GapSpec; 9] = [
+    operation_gap(
+        "get",
+        "metadata",
+        "path-read",
+        "File::metadata(); /metadata node reads with the shared metadata vocabulary",
+        "`set(\"/metadata\", ..)` writes the OLE document properties (root-metadata keys and custom.<name>); the path is set-only, and reads go through File::metadata()",
+    ),
+    operation_gap(
+        "remove",
+        "cell",
+        "native-dependency-closure",
+        "M2 XLS dependency-complete cell removal",
+        "formula cells and unrepresented range or drawing dependencies remain refused; removing the last rich or opaque string identity requires a semantic inverse that retains its metadata",
+    ),
+    operation_gap(
+        "set",
+        "cell",
+        "non-scalar-properties",
+        "M2 XLS formatting and formula setters",
+        "the XLS writer accepts scalar value and clear payloads; formulas, formatting and other cell metadata remain read-only",
+    ),
+    operation_gap(
+        "set",
+        "cell",
+        "existing-formula-cells",
+        "M4 XLS formula-token and formula-cache writes",
+        "scalar replacement and null or explicit clear on an existing formula cell would change its cached result without changing formula tokens, so the writer refuses the operation",
+    ),
+    operation_gap(
+        "set",
+        "cell",
+        "native-dependency-closure",
+        "M2 XLS dependency-complete scalar replacement",
+        "admitted scalar storage-family replacements preserve the XF and use native row-block and SST rewrites; packed MulBlank cells, unsupported formula ownership, non-adjacent ExtSST records and removal of the last rich or opaque string identity remain typed refusals until their dependency closures and semantic inverses are represented",
+    ),
+    operation_gap(
+        "set",
+        "sheet",
+        "tab-state",
+        "M2 XLS worksheet visibility setters",
+        "the XLS writer renames worksheets but does not change hidden or very-hidden tab state; added tabs are visible",
+    ),
+    operation_gap(
+        "remove",
+        "sheet",
+        "native-dependency-closure",
+        "M2 XLS dependency-closing tab removal",
+        "one ordinary worksheet per call; tabs that an internal 3-D reference range, a sheet-scoped name, a pivot data connection, a drawing or a pivot view still uses are refused, as are the last tab, the last visible tab, chart/macro tabs and macro-bearing or structure-protected workbooks",
+    ),
+    operation_gap(
+        "move",
+        "sheet",
+        "native-dependency-closure",
+        "M2 XLS 3-D range rewriting",
+        "tab order changes that would make an internal 3-D reference range noncontiguous, or that a protected or shared workbook structure forbids, are refused; cells, rows and columns do not move",
+    ),
+    operation_gap(
+        "add",
+        "row",
+        "native-dependency-closure",
+        "M2 XLS formula and name rewriting for axis shifts",
+        "row and column insertion requires an explicit position and takes no properties; workbooks whose formulas, names, tables or array/shared formulas the native axis shift cannot rewrite are refused, and deletion is limited to empty rows and columns",
+    ),
+];
+
+const _: () = {
+    let mut index = 0;
+    while index < WRITE_GAPS.len() {
+        assert!(crate::node::spec::gap_valid(&WRITE_GAPS[index]));
+        index += 1;
+    }
+};

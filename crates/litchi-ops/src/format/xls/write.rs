@@ -94,6 +94,12 @@ pub(crate) fn remove_with_limits(
     limits: &SemanticLimits,
 ) -> Result<WriteCommit> {
     file.admit_edit()?;
+    if let Some(commit) = super::structure::remove_sheet(file, &target, limits)? {
+        return Ok(commit);
+    }
+    if let Some(commit) = super::layout::remove_axis(file, &target, limits)? {
+        return Ok(commit);
+    }
     let targets = resolve_removal_targets(file, &target, limits)?;
     let staged = targets
         .len()
@@ -167,6 +173,7 @@ fn set_sheet_with_limits(
     }
 
     let SheetAssignment::Name(name) = assignment;
+    super::structure::validate_sheet_name(file, Some(position), &name)?;
     let mut edit = file.editable_package()?.edit().map_err(native_edit_error)?;
     edit.rename_sheet(Selector::Position(position), &name)
         .map_err(native_edit_error)?;
@@ -526,7 +533,7 @@ fn resolve_removal_targets(
         if error.code() == Code::UnsupportedElement {
             Error::new(
                 Code::UnsupportedCapability,
-                "XLS removal supports stored cells and ranges; worksheet, row, and column removal are not integrated",
+                "XLS removal supports worksheet tabs, empty rows and columns, stored cells and ranges",
             )
             .with_format(FileFormat::Xls)
         } else {
@@ -650,7 +657,7 @@ fn cell_state_facts(state: CellState<'_>) -> (bool, bool) {
     }
 }
 
-fn finish_commit(
+pub(super) fn finish_commit(
     file: &Xls,
     native: litchi_xls::Commit,
     fallback_operations: usize,
@@ -781,7 +788,7 @@ fn native_error(error: litchi_xls::package::edit::Error) -> Error {
     Error::from(error).with_format(FileFormat::Xls)
 }
 
-fn native_edit_error(error: litchi_xls::package::edit::Error) -> Error {
+pub(super) fn native_edit_error(error: litchi_xls::package::edit::Error) -> Error {
     native_error(error)
 }
 

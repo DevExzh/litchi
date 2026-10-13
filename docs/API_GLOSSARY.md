@@ -262,7 +262,9 @@ semantic-limit migrations.
 | Name identity policy | follows the producing application; fresh authoring defaults to Unicode caseless | silently mixing case policies | ✅ behavior unchanged; per-format registration below |
 
 Registered name-identity policies: xlsx sheet names — Unicode caseless
-(Excel semantics); docx glossary entries — NFD/case-fold/NFD (Word
+(Excel semantics); xls sheet names — the same Unicode caseless key (NFD,
+default case fold, NFD) for the reader's duplicate check, selector lookup,
+rename and tab insertion (`litchi_xls::sheet_name`, record 0259); docx glossary entries — NFD/case-fold/NFD (Word
 semantics); pages section names — case-sensitive (Pages semantics); keynote
 slide names — exact (Keynote semantics).
 

@@ -382,8 +382,8 @@ fn formula_cells_are_refused_and_other_targets_remain_untouched() {
 }
 
 #[test]
-fn row_column_and_sheet_removals_are_granular_capability_errors() {
-    for target in ["/sheet[1]/row[1]", "/sheet[1]/col[1]", "/sheet[1]"] {
+fn occupied_row_and_column_removals_are_granular_capability_errors() {
+    for target in ["/sheet[1]/row[1]", "/sheet[1]/col[1]"] {
         let original = open_owner(&fixture(), false);
         let before = original.to_bytes().expect("publish original");
         let error = original
@@ -677,25 +677,14 @@ fn xls_capabilities_advertise_cell_removal_and_granular_gaps() {
     assert!(capabilities.verb(Verb::Remove).is_supported());
     let cell = capabilities.element("cell").expect("cell capability");
     assert!(cell.operations().remove);
-    assert!(
-        !capabilities
-            .element("sheet")
-            .expect("sheet capability")
-            .operations()
-            .remove
-    );
-    assert!(
-        !capabilities
-            .element("row")
-            .expect("row capability")
-            .operations()
-            .remove
-    );
-    assert!(
-        !capabilities
-            .element("col")
-            .expect("column capability")
-            .operations()
-            .remove
-    );
+    for element in ["sheet", "row", "col"] {
+        assert!(
+            capabilities
+                .element(element)
+                .expect("structural capability")
+                .operations()
+                .remove,
+            "{element}"
+        );
+    }
 }

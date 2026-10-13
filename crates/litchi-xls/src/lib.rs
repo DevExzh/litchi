@@ -75,6 +75,7 @@ pub use package::{Package, Workbook};
     reason = "error conversion preserves unknown dependency error variants as inert InvalidData"
 )]
 mod error;
+pub mod sheet_name;
 
 /// BIFF8 password-to-open encryption support
 #[allow(

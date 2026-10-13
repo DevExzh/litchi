@@ -24,6 +24,7 @@
 )]
 
 mod structural;
+mod tabs;
 
 use crate::records::{BoundSheetRecord, Encoding, SheetType};
 use crate::workbook::{KeptCells, ValidationWorkbook};
@@ -1091,6 +1092,7 @@ impl Snapshot {
             resource_changes: Vec::new(),
             fixed_index: FixedChangeIndex::default(),
             structural_index: StructuralChangeIndex::default(),
+            tab_change: None,
         }
     }
 
@@ -1661,6 +1663,10 @@ pub struct Edit {
     resource_changes: Vec<ResourceChange>,
     fixed_index: FixedChangeIndex,
     structural_index: StructuralChangeIndex,
+    /// A complete-catalog tab-structure change.  It is exclusive: an edit
+    /// carrying one stages nothing else, because every other staged
+    /// operation addresses tabs by their source catalog position.
+    tab_change: Option<Box<tabs::TabChange>>,
 }
 
 /// One exact cell targeted differently by independently prepared transactions.
@@ -1777,6 +1783,15 @@ impl Edit {
     pub fn join(&mut self, incoming: Self) -> std::result::Result<&mut Self, JoinError> {
         if self.source.bytes() != incoming.source.bytes() {
             return Err(JoinError::DifferentSource);
+        }
+        if self.tab_change.is_some() || incoming.tab_change.is_some() {
+            // A tab-structure change renumbers every catalog position the
+            // other transaction addresses; it is never composed.
+            return Err(JoinError::StructuralConflicts(Box::new([
+                OperationConflict {
+                    target: tabs::SEMANTIC_TARGET.to_string(),
+                },
+            ])));
         }
         if self.source.inner.limits != incoming.source.inner.limits
             || self.source.inner.cfb_limits != incoming.source.inner.cfb_limits
@@ -3024,6 +3039,7 @@ impl Edit {
     }
 
     fn stage_resource(&mut self, change: ResourceChange) -> Result<()> {
+        self.require_no_tab_change()?;
         if self
             .resource_changes
             .iter()
@@ -3243,6 +3259,202 @@ impl Edit {
         })
     }
 
+    /// Reorders the complete workbook tab catalog.
+    ///
+    /// `order` names every tab exactly once, chart, macro and dialog tabs
+    /// included: the tab selected by `order[i]` moves to catalog position
+    /// `i`. Names compare by the workbook's Unicode caseless sheet identity.
+    /// The identity permutation is an exact no-op. Workbook-global tab
+    /// addresses (`Window1`, `RRTabId`, internal `ExternSheet` XTI ranges,
+    /// sheet-scoped names) and relocated worksheet `Index`/`ExtSST` offsets
+    /// are rewritten in the same closure.
+    ///
+    /// A tab-structure change must be the only operation of its edit.
+    ///
+    /// ```
+    /// use litchi_xls::cell_values::{Selector, Snapshot};
+    /// # let mut builder = litchi_xls::Builder::new();
+    /// # builder.add_worksheet("First")?;
+    /// # builder.add_worksheet("Second")?;
+    /// # let bytes = builder.build()?.to_bytes()?;
+    /// let source = Snapshot::from_bytes(bytes)?;
+    /// let mut edit = source.edit();
+    /// edit.reorder_sheets(&[Selector::Name("Second"), Selector::Name("first")])?;
+    /// let target = edit.commit()?.into_parts().0;
+    /// let names: Vec<_> = target.worksheets().map(|sheet| sheet.name().to_owned()).collect();
+    /// assert_eq!(names, ["Second", "First"]);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed selector, ambiguity, protection, dependency-closure
+    /// (for example a 3-D reference range made noncontiguous), exclusivity or
+    /// allocation refusal without staging.
+    pub fn reorder_sheets(&mut self, order: &[Selector<'_>]) -> Result<()> {
+        self.require_tab_edit(false)?;
+        let catalog = tabs::catalog(&self.source.inner.workbook_stream)?;
+        if order.len() != catalog.len() {
+            return Err(Error::UnsafeEdit(
+                "a tab reorder must name every catalog tab exactly once".into(),
+            ));
+        }
+        let mut positions = Vec::new();
+        positions
+            .try_reserve_exact(order.len())
+            .map_err(|_error| Error::Allocation("staging an XLS tab reorder"))?;
+        for selector in order {
+            positions.push(resolve_tab(&catalog, *selector)?);
+        }
+        if positions.iter().enumerate().all(|(new, old)| new == *old) {
+            return Ok(());
+        }
+        let kind = tabs::TabChangeKind::Reorder { order: positions };
+        self.stage_tab_change(&catalog, kind, None)
+    }
+
+    /// Inserts one empty ordinary worksheet at a complete-catalog position.
+    ///
+    /// `position` may equal the tab count to append. The name must satisfy
+    /// the BIFF8 sheet-name rule and must not equal another tab's name under
+    /// Unicode caseless comparison. The inserted worksheet is visible and is
+    /// not selected; 3-D reference ranges that would gain it are refused.
+    ///
+    /// ```
+    /// use litchi_core::Position;
+    /// use litchi_xls::cell_values::Snapshot;
+    /// # let bytes = litchi_xls::Package::new()?.to_bytes()?;
+    /// let source = Snapshot::from_bytes(bytes)?;
+    /// let mut edit = source.edit();
+    /// edit.insert_sheet(Position::new(0), "Summary")?;
+    /// let target = edit.commit()?.into_parts().0;
+    /// assert_eq!(target.worksheets().next().map(|sheet| sheet.name()), Some("Summary"));
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed name, uniqueness, position, protection, macro-project,
+    /// dependency-closure, exclusivity or allocation refusal without staging.
+    pub fn insert_sheet(&mut self, position: litchi_core::Position, name: &str) -> Result<()> {
+        self.require_tab_edit(true)?;
+        structural::validate_sheet_name(name)?;
+        let catalog = tabs::catalog(&self.source.inner.workbook_stream)?;
+        if catalog
+            .iter()
+            .any(|tab| crate::sheet_name::equivalent(&tab.name, name))
+        {
+            return Err(Error::UnsafeEdit(
+                "the inserted worksheet name would be ambiguous".into(),
+            ));
+        }
+        if position.get() > catalog.len() {
+            return Err(Error::UnsafeEdit(
+                "worksheet insertion position is outside the tab catalog".into(),
+            ));
+        }
+        let template = tabs::empty_worksheet_template()?;
+        let kind = tabs::TabChangeKind::Insert {
+            position: position.get(),
+            name: name.to_string(),
+        };
+        self.stage_tab_change(&catalog, kind, Some(&template))
+    }
+
+    /// Removes one ordinary worksheet tab and its complete substream.
+    ///
+    /// Removal is refused while any workbook dependency still addresses the
+    /// tab: an internal 3-D reference range, a sheet-scoped defined name, a
+    /// pivot data connection, or a drawing/pivot owner on the worksheet. The
+    /// workbook must retain a visible tab. When the active tab is removed the
+    /// first remaining visible tab becomes active and selected.
+    ///
+    /// ```
+    /// use litchi_xls::cell_values::{Selector, Snapshot};
+    /// # let mut builder = litchi_xls::Builder::new();
+    /// # builder.add_worksheet("Keep")?;
+    /// # builder.add_worksheet("Drop")?;
+    /// # let bytes = builder.build()?.to_bytes()?;
+    /// let source = Snapshot::from_bytes(bytes)?;
+    /// let mut edit = source.edit();
+    /// edit.remove_sheet(Selector::Name("Drop"))?;
+    /// let target = edit.commit()?.into_parts().0;
+    /// assert_eq!(target.worksheet_count(), 1);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed selector, dependency, last-tab, last-visible-tab,
+    /// protection, macro-project, exclusivity or allocation refusal without
+    /// staging.
+    pub fn remove_sheet(&mut self, selector: Selector<'_>) -> Result<()> {
+        self.require_tab_edit(true)?;
+        let catalog = tabs::catalog(&self.source.inner.workbook_stream)?;
+        let position = resolve_tab(&catalog, selector)?;
+        let tab = &catalog[position];
+        tabs::certify_removal(&self.source.inner.workbook_stream, &catalog, tab)?;
+        let kind = tabs::TabChangeKind::Remove {
+            position,
+            name: tab.name.clone(),
+            fingerprint: tabs::fingerprint(&self.source.inner.workbook_stream, tab),
+        };
+        self.stage_tab_change(&catalog, kind, None)
+    }
+
+    fn require_no_tab_change(&self) -> Result<()> {
+        if self.tab_change.is_some() {
+            return Err(Error::UnsafeEdit(
+                "a worksheet tab-structure change must be the only operation of its edit".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn require_tab_edit(&self, creates_or_destroys: bool) -> Result<()> {
+        self.require_no_tab_change()?;
+        if !self.changes.is_empty()
+            || !self.structural_changes.is_empty()
+            || !self.resource_changes.is_empty()
+        {
+            return Err(Error::UnsafeEdit(
+                "a worksheet tab-structure change must be the only operation of its edit".into(),
+            ));
+        }
+        if self.source.inner.source_policy.protection == SourceProtectionPolicy::WorkbookOrShared {
+            return Err(Error::UnsafeEdit(
+                "protected or shared workbook structure cannot change its tabs".into(),
+            ));
+        }
+        if creates_or_destroys && !self.source.inner.source_policy.macro_free_workbook {
+            return Err(Error::UnsafeEdit(
+                "adding or removing tabs would desynchronize the workbook's macro project".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn stage_tab_change(
+        &mut self,
+        catalog: &[tabs::Tab],
+        kind: tabs::TabChangeKind,
+        template: Option<&tabs::Template>,
+    ) -> Result<()> {
+        let workbook = tabs::rewrite(&self.source.inner.workbook_stream, &kind, template)?;
+        let source_names = catalog.iter().map(|tab| tab.name.clone()).collect();
+        let target_names = tabs::catalog(&workbook)?
+            .into_iter()
+            .map(|tab| tab.name)
+            .collect();
+        self.tab_change = Some(Box::new(tabs::TabChange {
+            kind,
+            source_names,
+            target_names,
+            workbook,
+        }));
+        Ok(())
+    }
+
     fn require_sheet(&self, selector: Selector<'_>, context: &str) -> Result<usize> {
         self.source
             .resolve_sheet(selector)?
@@ -3320,6 +3532,7 @@ impl Edit {
     }
 
     fn stage_structural(&mut self, change: StructuralChange) -> Result<()> {
+        self.require_no_tab_change()?;
         let sheet = operation_sheet_index(&change);
         if !matches!(change, StructuralChange::RenameSheet { .. })
             && self.resource_changes.iter().any(|resource| {
@@ -3380,6 +3593,7 @@ impl Edit {
         storage: Storage,
         value: Value,
     ) -> Result<()> {
+        self.require_no_tab_change()?;
         let reference = self.source.inner.sheets[sheet_index].entries[entry]
             .cell
             .reference;
@@ -3502,6 +3716,9 @@ impl Edit {
     /// Returns an error if stream patching, CFB reconstruction, complete XLS
     /// reopen, or typed semantic readback fails.
     pub fn commit(self) -> Result<Commit> {
+        if let Some(change) = self.tab_change {
+            return commit_tab_change(self.source, *change);
+        }
         let fixed_cells = self
             .changes
             .iter()
@@ -3682,6 +3899,76 @@ impl Edit {
             },
         })
     }
+}
+
+/// Resolves a semantic selector against the complete tab catalog.
+fn resolve_tab(catalog: &[tabs::Tab], selector: Selector<'_>) -> Result<usize> {
+    match selector {
+        Selector::Position(position) if position < catalog.len() => Ok(position),
+        Selector::Position(_) => Err(Error::WorksheetNotFound("tab catalog position".into())),
+        Selector::Name(name) => {
+            let mut matches = catalog
+                .iter()
+                .enumerate()
+                .filter(|(_, tab)| caseless_eq(&tab.name, name));
+            let found = matches
+                .next()
+                .map(|(index, _)| index)
+                .ok_or_else(|| Error::WorksheetNotFound("tab catalog name".into()))?;
+            if matches.next().is_some() {
+                return Err(Error::UnsafeEdit("tab catalog name is ambiguous".into()));
+            }
+            Ok(found)
+        },
+    }
+}
+
+/// Publishes one exclusive tab-structure change through the same checked
+/// package editor, complete reopen and exact patch as every other commit.
+fn commit_tab_change(source: Snapshot, change: tabs::TabChange) -> Result<Commit> {
+    let semantic = SemanticPatch::from_tab_change(&change)?;
+    let tabs::TabChange {
+        target_names,
+        workbook,
+        ..
+    } = change;
+    let workbook: Arc<[u8]> = Arc::from(workbook);
+    let mut package = PackageEditor::open_with_cfb_limits(
+        source.inner.bytes.to_vec(),
+        Targets::default(),
+        source.inner.limits,
+        source.inner.cfb_limits,
+    )?;
+    let rendered =
+        package.put_stream_shared_with_rendered(&source.inner.workbook_path, workbook)?;
+    let snapshot = Snapshot::open_package(package, Some(rendered), None)?;
+    let observed = tabs::catalog(&snapshot.inner.workbook_stream)?;
+    if observed.len() != target_names.len()
+        || observed
+            .iter()
+            .zip(&target_names)
+            .any(|(tab, name)| tab.name != *name)
+    {
+        return Err(Error::UnsafeEdit(
+            "worksheet tab structure failed catalog readback".into(),
+        ));
+    }
+    let patch = Patch::new(
+        Arc::clone(&source.inner.bytes),
+        Arc::clone(&snapshot.inner.bytes),
+        semantic,
+    );
+    let changed = !patch.is_noop();
+    Ok(Commit {
+        snapshot,
+        patch,
+        diagnostics: Diagnostics {
+            changed,
+            changed_cells: 0,
+            changed_number_fields: 0,
+            touched_streams: 1,
+        },
+    })
 }
 
 impl fmt::Debug for Edit {
@@ -4569,6 +4856,110 @@ impl SemanticPatch {
         Ok(Self { inner })
     }
 
+    fn from_tab_change(change: &tabs::TabChange) -> Result<Self> {
+        let limits = semantic_patch_limits();
+        let names = |names: &[String]| {
+            serde_json::Value::Array(
+                names
+                    .iter()
+                    .cloned()
+                    .map(serde_json::Value::String)
+                    .collect(),
+            )
+        };
+        let preconditions = |names_value: serde_json::Value| {
+            let mut map = BTreeMap::new();
+            map.insert("tab_names".to_string(), names_value);
+            map
+        };
+        let (forward, inverse) = match &change.kind {
+            tabs::TabChangeKind::Reorder { order } => {
+                let mut inverse_order = vec![0_usize; order.len()];
+                for (new, old) in order.iter().enumerate() {
+                    inverse_order[*old] = new;
+                }
+                (
+                    PatchOperation::new(
+                        limits,
+                        "sheet.reorder",
+                        tabs::SEMANTIC_TARGET.to_string(),
+                        preconditions(names(&change.source_names)),
+                        serde_json::json!(order),
+                    ),
+                    PatchOperation::new(
+                        limits,
+                        "sheet.reorder",
+                        tabs::SEMANTIC_TARGET.to_string(),
+                        preconditions(names(&change.target_names)),
+                        serde_json::json!(inverse_order),
+                    ),
+                )
+            },
+            tabs::TabChangeKind::Insert { position, name } => {
+                let target = tabs::semantic_tab_target(*position);
+                let mut inverse_preconditions = preconditions(names(&change.target_names));
+                inverse_preconditions.insert("empty".to_string(), serde_json::Value::Bool(true));
+                (
+                    PatchOperation::new(
+                        limits,
+                        "sheet.insert",
+                        target.clone(),
+                        preconditions(names(&change.source_names)),
+                        serde_json::json!({ "name": name }),
+                    ),
+                    PatchOperation::new(
+                        limits,
+                        "sheet.remove",
+                        target,
+                        inverse_preconditions,
+                        serde_json::json!({ "name": name }),
+                    ),
+                )
+            },
+            tabs::TabChangeKind::Remove {
+                position,
+                name,
+                fingerprint,
+            } => {
+                let target = tabs::semantic_tab_target(*position);
+                let mut forward_preconditions = preconditions(names(&change.source_names));
+                forward_preconditions.insert(
+                    "fingerprint".to_string(),
+                    serde_json::Value::String(fingerprint.clone()),
+                );
+                (
+                    PatchOperation::new(
+                        limits,
+                        "sheet.remove",
+                        target.clone(),
+                        forward_preconditions,
+                        serde_json::json!({ "name": name }),
+                    ),
+                    PatchOperation::new(
+                        limits,
+                        "sheet.restore",
+                        target,
+                        preconditions(names(&change.target_names)),
+                        serde_json::json!({ "name": name, "fingerprint": fingerprint }),
+                    ),
+                )
+            },
+        };
+        let operations = vec![ReversibleOperation::new(
+            forward.map_err(patch_error)?,
+            inverse.map_err(patch_error)?,
+        )];
+        let inner = CorePatch::<Reversible>::new(
+            limits,
+            "litchi-xls.cell-values",
+            operations,
+            BlobBundle::new(limits.blobs()),
+            BlobBundle::new(limits.blobs()),
+        )
+        .map_err(patch_error)?;
+        Ok(Self { inner })
+    }
+
     /// Parses canonical deterministic JSON under the XLS cell-patch bounds.
     ///
     /// # Errors
@@ -5362,7 +5753,18 @@ fn reversible_pairs(patch: &SemanticPatch) -> Vec<(PatchOperation, PatchOperatio
         .collect()
 }
 
+fn is_tab_operation(op: &str) -> bool {
+    matches!(
+        op,
+        "sheet.reorder" | "sheet.insert" | "sheet.remove" | "sheet.restore"
+    )
+}
+
 fn semantic_operations_overlap(left: &PatchOperation, right: &PatchOperation) -> bool {
+    if is_tab_operation(&left.op) || is_tab_operation(&right.op) {
+        // A tab-structure operation renumbers every catalog address.
+        return true;
+    }
     let left_sheet = semantic_operation_sheet(left);
     let right_sheet = semantic_operation_sheet(right);
     if left_sheet != right_sheet {
@@ -5402,7 +5804,9 @@ fn semantic_cell_identity(operation: &PatchOperation) -> Option<(usize, u16, u8)
 }
 
 fn semantic_operation_order(operation: &PatchOperation) -> u8 {
-    if operation.op == "sheet.rename" {
+    if is_tab_operation(&operation.op) {
+        4
+    } else if operation.op == "sheet.rename" {
         3
     } else if matches!(
         operation.op.as_str(),
@@ -5472,6 +5876,9 @@ fn apply_semantic_operation(
                 transaction.delete_columns(Selector::Position(sheet), start, count)
             }
         },
+        "sheet.reorder" | "sheet.insert" | "sheet.remove" | "sheet.restore" => {
+            apply_tab_semantic(source, transaction, operation)
+        },
         "sheet.rename" => {
             let sheet = parse_sheet_target(&operation.target, "name")?;
             let sheet_index = verify_semantic_sheet(source, sheet_names, sheet, operation)?;
@@ -5487,6 +5894,98 @@ fn apply_semantic_operation(
             "unsupported XLS cell patch operation {:?}",
             operation.op
         ))),
+    }
+}
+
+fn apply_tab_semantic(
+    source: &Snapshot,
+    transaction: &mut Edit,
+    operation: &PatchOperation,
+) -> Result<()> {
+    let catalog = tabs::catalog(&source.inner.workbook_stream)?;
+    let expected = operation
+        .preconditions
+        .get("tab_names")
+        .and_then(serde_json::Value::as_array)
+        .ok_or_else(|| Error::InvalidData("tab patch has no tab-name precondition".into()))?;
+    if expected.len() != catalog.len()
+        || expected
+            .iter()
+            .zip(&catalog)
+            .any(|(name, tab)| name.as_str() != Some(tab.name.as_str()))
+    {
+        return Err(Error::UnsafeEdit(
+            "tab patch precondition does not match the workbook tab catalog".into(),
+        ));
+    }
+    let name = || {
+        operation
+            .value
+            .get("name")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| Error::InvalidData("tab patch has no sheet name".into()))
+    };
+    match operation.op.as_str() {
+        "sheet.reorder" => {
+            if operation.target != tabs::SEMANTIC_TARGET {
+                return Err(Error::InvalidData("tab reorder target is malformed".into()));
+            }
+            let order = operation
+                .value
+                .as_array()
+                .ok_or_else(|| Error::InvalidData("tab reorder value is not a list".into()))?
+                .iter()
+                .map(|value| {
+                    value
+                        .as_u64()
+                        .and_then(|value| usize::try_from(value).ok())
+                        .map(Selector::Position)
+                        .ok_or_else(|| Error::InvalidData("tab reorder position is invalid".into()))
+                })
+                .collect::<Result<Vec<_>>>()?;
+            transaction.reorder_sheets(&order)
+        },
+        "sheet.insert" => {
+            let position = tabs::parse_semantic_tab_target(&operation.target)?;
+            transaction.insert_sheet(litchi_core::Position::new(position), name()?)
+        },
+        "sheet.remove" => {
+            let position = tabs::parse_semantic_tab_target(&operation.target)?;
+            let tab = catalog
+                .get(position)
+                .ok_or_else(|| Error::WorksheetNotFound("tab patch position".into()))?;
+            if tab.name != name()? {
+                return Err(Error::UnsafeEdit(
+                    "tab removal precondition names another tab".into(),
+                ));
+            }
+            if let Some(fingerprint) = operation.preconditions.get("fingerprint") {
+                if fingerprint.as_str()
+                    != Some(tabs::fingerprint(&source.inner.workbook_stream, tab).as_str())
+                {
+                    return Err(Error::UnsafeEdit(
+                        "tab removal precondition does not match the tab content".into(),
+                    ));
+                }
+            } else if operation.preconditions.get("empty") == Some(&serde_json::Value::Bool(true)) {
+                let empty = source
+                    .resolve_sheet(Selector::Position(position))?
+                    .is_some_and(|sheet| source.inner.sheets[sheet].entries.is_empty());
+                if !empty {
+                    return Err(Error::UnsafeEdit(
+                        "tab removal precondition requires an empty worksheet".into(),
+                    ));
+                }
+            } else {
+                return Err(Error::InvalidData(
+                    "tab removal patch has no content precondition".into(),
+                ));
+            }
+            transaction.remove_sheet(Selector::Position(position))
+        },
+        _ => Err(Error::UnsupportedFeature(
+            "restoring a removed worksheet requires the exact artifact patch".into(),
+        )),
     }
 }
 
@@ -6240,10 +6739,11 @@ fn commit_source_backed_numeric_plan(transaction: Edit) -> Result<SourceBackedPl
         changes,
         structural_changes,
         resource_changes,
+        tab_change,
         ..
     } = transaction;
 
-    if !structural_changes.is_empty() || !resource_changes.is_empty() {
+    if !structural_changes.is_empty() || !resource_changes.is_empty() || tab_change.is_some() {
         return Err(Error::UnsupportedFeature(
             "source-backed numeric plan accepts no structural or resource edits".into(),
         ));
@@ -6359,10 +6859,11 @@ fn commit_source_backed_numeric(transaction: Edit) -> Result<SourceBackedCommit>
         changes,
         structural_changes,
         resource_changes,
+        tab_change,
         ..
     } = transaction;
 
-    if !structural_changes.is_empty() || !resource_changes.is_empty() {
+    if !structural_changes.is_empty() || !resource_changes.is_empty() || tab_change.is_some() {
         return Err(Error::UnsupportedFeature(
             "source-backed numeric publication accepts no structural or resource edits".into(),
         ));
@@ -8344,9 +8845,7 @@ fn parse_error_code(object: &serde_json::Map<String, serde_json::Value>) -> Resu
 }
 
 fn caseless_eq(left: &str, right: &str) -> bool {
-    left.chars()
-        .flat_map(char::to_lowercase)
-        .eq(right.chars().flat_map(char::to_lowercase))
+    crate::sheet_name::equivalent(left, right)
 }
 
 fn require_bof(payload: &[u8], expected_substream: u16) -> Result<()> {
@@ -8679,3 +9178,6 @@ mod tests;
 
 #[cfg(test)]
 mod index_tests;
+
+#[cfg(test)]
+mod tab_tests;

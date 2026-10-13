@@ -1317,7 +1317,7 @@ impl SourceBackedWorkbook {
                 litchi_core::selector::Selector::Name(name) => inner
                     .sheets
                     .iter()
-                    .find(|sheet| sheet.name.eq_ignore_ascii_case(name.as_ref())),
+                    .find(|sheet| crate::sheet_name::equivalent(&sheet.name, name.as_ref())),
                 litchi_core::selector::Selector::Position(position) => {
                     inner.sheets.get(position.get())
                 },
@@ -1426,7 +1426,7 @@ impl SourceBackedWorkbook {
     pub fn worksheet_by_name(&self, name: &str) -> Result<Option<SourceBackedWorksheet>> {
         self.metadata(|inner| {
             let sheet_index = inner.sheets.iter().position(|sheet| {
-                sheet.worksheet_index.is_some() && sheet.name.eq_ignore_ascii_case(name)
+                sheet.worksheet_index.is_some() && crate::sheet_name::equivalent(&sheet.name, name)
             });
             sheet_index.map(|sheet_index| SourceBackedWorksheet {
                 owner: Arc::clone(&self.inner),

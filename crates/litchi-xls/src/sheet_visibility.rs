@@ -1432,9 +1432,7 @@ fn decode_visibility(visibility: SheetVisible) -> SheetVisibility {
 }
 
 fn caseless_eq(left: &str, right: &str) -> bool {
-    left.chars()
-        .flat_map(char::to_lowercase)
-        .eq(right.chars().flat_map(char::to_lowercase))
+    crate::sheet_name::equivalent(left, right)
 }
 
 fn read_patch_len(bytes: &[u8], offset: usize) -> Result<usize> {

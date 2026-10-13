@@ -164,7 +164,16 @@ fn every_format_has_one_answer_for_its_reads() {
                 && matches!(verb, Verb::Set | Verb::Edit | Verb::Batch);
             let xls_edit = format == FileFormat::Xls
                 && cfg!(feature = "xls")
-                && matches!(verb, Verb::Set | Verb::Remove | Verb::Edit | Verb::Batch);
+                && matches!(
+                    verb,
+                    Verb::Set
+                        | Verb::Add
+                        | Verb::Remove
+                        | Verb::Move
+                        | Verb::Swap
+                        | Verb::Edit
+                        | Verb::Batch
+                );
             assert_eq!(
                 capabilities.verb(verb),
                 if rtf_edit
@@ -234,7 +243,7 @@ fn publication_and_creation_are_not_existing_document_edits() {
 
 #[cfg(feature = "xls")]
 #[test]
-fn xls_adapter_advertises_initial_scalar_writes_and_keeps_other_edits_pending() {
+fn xls_adapter_advertises_writes_and_keeps_granular_gaps() {
     let capabilities = Capabilities::of(FileFormat::Xls);
     assert!(capabilities.verb(Verb::Get).is_supported());
     assert!(capabilities.verb(Verb::Find).is_supported());
@@ -244,17 +253,18 @@ fn xls_adapter_advertises_initial_scalar_writes_and_keeps_other_edits_pending() 
     assert!(capabilities.verb(Verb::Create).is_supported());
     assert!(capabilities.elements().next().is_some());
 
-    for verb in [Verb::Set, Verb::Remove, Verb::Edit, Verb::Batch] {
+    for verb in [
+        Verb::Set,
+        Verb::Add,
+        Verb::Remove,
+        Verb::Move,
+        Verb::Swap,
+        Verb::Edit,
+        Verb::Batch,
+    ] {
         assert!(
             capabilities.verb(verb).is_supported(),
             "XLS {verb:?} is supported for admitted writes"
-        );
-    }
-    for verb in [Verb::Add, Verb::Move, Verb::Swap] {
-        assert_eq!(
-            capabilities.verb(verb).code(),
-            Some(Code::UnsupportedCapability),
-            "XLS {verb:?} remains a granular structural gap"
         );
     }
 
@@ -267,7 +277,15 @@ fn xls_adapter_advertises_initial_scalar_writes_and_keeps_other_edits_pending() 
     assert!(!cell.property("clear").unwrap().get());
     let sheet = capabilities.element("sheet").unwrap();
     assert!(sheet.operations().set);
+    assert!(sheet.operations().add);
+    assert!(sheet.operations().remove);
     assert!(sheet.property("name").unwrap().set());
+    assert!(sheet.property("name").unwrap().add());
+    for axis in ["row", "col"] {
+        let element = capabilities.element(axis).unwrap();
+        assert!(element.operations().add, "{axis}");
+        assert!(element.operations().remove, "{axis}");
+    }
     assert!(!sheet.property("hidden").unwrap().set());
     assert!(!sheet.property("visibility").unwrap().set());
 
@@ -317,11 +335,9 @@ fn xls_adapter_advertises_initial_scalar_writes_and_keeps_other_edits_pending() 
         ("set", "cell", "existing-formula-cells"),
         ("set", "cell", "native-dependency-closure"),
         ("set", "sheet", "tab-state"),
-        ("add", "workbook", "structural-elements"),
-        ("remove", "workbook", "structural-elements"),
-        ("move", "workbook", "structural-elements"),
-        ("swap", "workbook", "structural-elements"),
-        ("batch", "workbook", "extended-commands"),
+        ("remove", "sheet", "native-dependency-closure"),
+        ("move", "sheet", "native-dependency-closure"),
+        ("add", "row", "native-dependency-closure"),
     ] {
         assert!(
             capabilities.gaps().any(|gap| {

@@ -725,6 +725,60 @@ impl Edit {
             .map_err(Error::from)
     }
 
+    /// Reorder the complete tab catalog; see
+    /// [`cell_values::Edit::reorder_sheets`]. The identity order is an exact
+    /// no-op, and a tab-structure change must be the only operation of its
+    /// edit.
+    ///
+    /// ```
+    /// use litchi_xls::Package;
+    /// use litchi_xls::cell_values::Selector;
+    /// let mut builder = litchi_xls::Builder::new();
+    /// builder.add_worksheet("A")?;
+    /// builder.add_worksheet("B")?;
+    /// let package = builder.build()?;
+    /// let mut edit = package.edit()?;
+    /// edit.reorder_sheets(&[Selector::Position(1), Selector::Position(0)])?;
+    /// let package = edit.commit()?.into_package();
+    /// assert_eq!(package.workbook().worksheet_names()?, ["B", "A"]);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed selector, protection, dependency-closure or
+    /// exclusivity refusal without staging.
+    pub fn reorder_sheets(&mut self, order: &[cell_values::Selector<'_>]) -> Result<()> {
+        self.inner.reorder_sheets(order).map_err(Error::from)
+    }
+
+    /// Insert one empty worksheet at a complete-catalog position; see
+    /// [`cell_values::Edit::insert_sheet`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed name, uniqueness, position, protection, macro-project
+    /// or dependency-closure refusal without staging.
+    pub fn insert_sheet(&mut self, position: litchi_core::Position, name: &str) -> Result<()> {
+        self.inner.insert_sheet(position, name).map_err(Error::from)
+    }
+
+    /// Remove one ordinary worksheet tab; see
+    /// [`cell_values::Edit::remove_sheet`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed selector, dependency, last-tab, last-visible-tab,
+    /// protection or macro-project refusal without staging.
+    pub fn remove_sheet<'a>(
+        &mut self,
+        selector: impl Into<cell_values::Selector<'a>>,
+    ) -> Result<()> {
+        self.inner
+            .remove_sheet(selector.into())
+            .map_err(Error::from)
+    }
+
     /// Publish the canonical immutable package commit.
     pub fn commit(self) -> Result<Commit> {
         check_source_guard(self.source_guard.as_ref())?;

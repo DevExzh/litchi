@@ -18,25 +18,16 @@
       "supported": true
     },
     "add": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "M2",
-      "reason": "edit verbs arrive with the write kernel in milestone M2"
+      "supported": true
     },
     "remove": {
       "supported": true
     },
     "move": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "M2",
-      "reason": "edit verbs arrive with the write kernel in milestone M2"
+      "supported": true
     },
     "swap": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "M2",
-      "reason": "edit verbs arrive with the write kernel in milestone M2"
+      "supported": true
     },
     "edit": {
       "supported": true
@@ -201,11 +192,11 @@
       "element": "sheet",
       "parent": "workbook",
       "operations": {
-        "add": false,
+        "add": true,
         "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "stable": [
@@ -297,7 +288,7 @@
       "properties": {
         "name": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -426,11 +417,11 @@
       "element": "row",
       "parent": "sheet",
       "operations": {
-        "add": false,
+        "add": true,
         "set": false,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "stable": [
@@ -457,11 +448,11 @@
         "col"
       ],
       "operations": {
-        "add": false,
+        "add": true,
         "set": false,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "stable": [
@@ -1342,7 +1333,7 @@
       "context": "non-scalar-properties",
       "code": "unsupported_capability",
       "followUp": "M2 XLS formatting and formula setters",
-      "reason": "the initial XLS writer accepts only scalar value and clear payloads; formulas, formatting and other cell metadata remain read-only"
+      "reason": "the XLS writer accepts scalar value and clear payloads; formulas, formatting and other cell metadata remain read-only"
     },
     {
       "subject": "operation",
@@ -1351,7 +1342,7 @@
       "context": "existing-formula-cells",
       "code": "unsupported_capability",
       "followUp": "M4 XLS formula-token and formula-cache writes",
-      "reason": "scalar replacement and null or explicit clear on an existing formula cell would change its cached result without changing formula tokens, so the initial writer refuses the operation"
+      "reason": "scalar replacement and null or explicit clear on an existing formula cell would change its cached result without changing formula tokens, so the writer refuses the operation"
     },
     {
       "subject": "operation",
@@ -1369,52 +1360,34 @@
       "context": "tab-state",
       "code": "unsupported_capability",
       "followUp": "M2 XLS worksheet visibility setters",
-      "reason": "the initial XLS writer renames worksheets but does not yet change hidden or very-hidden tab state"
-    },
-    {
-      "subject": "operation",
-      "verb": "add",
-      "element": "workbook",
-      "context": "structural-elements",
-      "code": "unsupported_capability",
-      "followUp": "M2 XLS structural add handlers",
-      "reason": "worksheet and other structural additions are not integrated into the initial XLS write adapter"
+      "reason": "the XLS writer renames worksheets but does not change hidden or very-hidden tab state; added tabs are visible"
     },
     {
       "subject": "operation",
       "verb": "remove",
-      "element": "workbook",
-      "context": "structural-elements",
+      "element": "sheet",
+      "context": "native-dependency-closure",
       "code": "unsupported_capability",
-      "followUp": "M2 XLS structural remove handlers",
-      "reason": "cell-record removal is integrated for ordinary stored cells; worksheet, row, column and other structural removals require their own native dependency-aware handlers"
+      "followUp": "M2 XLS dependency-closing tab removal",
+      "reason": "one ordinary worksheet per call; tabs that an internal 3-D reference range, a sheet-scoped name, a pivot data connection, a drawing or a pivot view still uses are refused, as are the last tab, the last visible tab, chart/macro tabs and macro-bearing or structure-protected workbooks"
     },
     {
       "subject": "operation",
       "verb": "move",
-      "element": "workbook",
-      "context": "structural-elements",
+      "element": "sheet",
+      "context": "native-dependency-closure",
       "code": "unsupported_capability",
-      "followUp": "M2 XLS structural move handlers",
-      "reason": "worksheet and cell movement is not integrated into the initial XLS write adapter"
+      "followUp": "M2 XLS 3-D range rewriting",
+      "reason": "tab order changes that would make an internal 3-D reference range noncontiguous, or that a protected or shared workbook structure forbids, are refused; cells, rows and columns do not move"
     },
     {
       "subject": "operation",
-      "verb": "swap",
-      "element": "workbook",
-      "context": "structural-elements",
+      "verb": "add",
+      "element": "row",
+      "context": "native-dependency-closure",
       "code": "unsupported_capability",
-      "followUp": "M2 XLS structural swap handlers",
-      "reason": "worksheet and cell swapping is not integrated into the initial XLS write adapter"
-    },
-    {
-      "subject": "operation",
-      "verb": "batch",
-      "element": "workbook",
-      "context": "extended-commands",
-      "code": "unsupported_capability",
-      "followUp": "M2 XLS extended batch commands",
-      "reason": "XLS batches currently compose admitted scalar cell and worksheet-name sets; structural, formatting and read commands remain pending"
+      "followUp": "M2 XLS formula and name rewriting for axis shifts",
+      "reason": "row and column insertion requires an explicit position and takes no properties; workbooks whose formulas, names, tables or array/shared formulas the native axis shift cannot rewrite are refused, and deletion is limited to empty rows and columns"
     },
     {
       "subject": "view",

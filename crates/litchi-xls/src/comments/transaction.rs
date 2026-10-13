@@ -240,7 +240,7 @@ impl Snapshot {
                     .sheets
                     .iter()
                     .enumerate()
-                    .filter(|(_, sheet)| sheet.name.eq_ignore_ascii_case(name));
+                    .filter(|(_, sheet)| crate::sheet_name::equivalent(&sheet.name, name));
                 let found = matches.next().map(|(index, _)| index);
                 if matches.next().is_some() {
                     return Err(Error::UnsafeEdit(format!(
