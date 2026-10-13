@@ -1452,11 +1452,23 @@ impl Parser<'_> {
                     return Ok(true);
                 },
                 Token::Control(ControlWord::Picture) => {
+                    // A picture group opened directly in the main story is
+                    // anchored at the current body offset.
+                    let body_anchor = self.states.last().is_some_and(|state| {
+                        state.destination == Destination::DocumentBody
+                            && !state.in_table
+                            && state.table_nesting_level < 2
+                    });
+                    let picture_index = self.pictures.len();
                     // Mark as picture destination and extract
                     if let Some(state) = self.states.last_mut() {
                         state.destination = Destination::Picture;
                     }
                     self.parse_picture()?;
+                    if body_anchor && self.pictures.len() == picture_index + 1 {
+                        self.text_provenance
+                            .push_picture(picture_index, self.body_text_len);
+                    }
                     self.skip_until_close_brace()?;
                     self.states.pop();
                     return Ok(true);

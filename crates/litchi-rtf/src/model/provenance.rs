@@ -38,6 +38,8 @@ pub(crate) struct TextProvenance {
     header_footer_paragraphs: Vec<(StoryParagraphKey, StorySource)>,
     notes: Vec<(usize, StorySource)>,
     annotations: Vec<(usize, StorySource)>,
+    /// Body text offset of each picture opened directly in the main story.
+    pictures: Vec<(usize, usize)>,
 }
 
 impl TextProvenance {
@@ -75,6 +77,20 @@ impl TextProvenance {
         {
             self.annotations.push((index, source));
         }
+    }
+
+    pub(crate) fn push_picture(&mut self, index: usize, body_offset: usize) {
+        if self.pictures.last().is_none_or(|(last, _)| *last < index) {
+            self.pictures.push((index, body_offset));
+        }
+    }
+
+    pub(crate) fn picture(&self, index: usize) -> Option<usize> {
+        self.pictures
+            .binary_search_by(|(candidate, _)| candidate.cmp(&index))
+            .ok()
+            .and_then(|position| self.pictures.get(position))
+            .map(|(_, offset)| *offset)
     }
 
     pub(crate) fn cell(&self, key: CellKey) -> Option<&StorySource> {

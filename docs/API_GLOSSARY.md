@@ -1559,6 +1559,17 @@ staging windows close at their limits, while scalar admission stays available
 when the optimization index cannot fit. Source-changing boundaries publish
 before resolving later positional paths.
 
+### RTF destination stories (0275)
+
+Native retained-destination text edits (`set_table_cell_text`,
+`set_header_footer_text`, `set_note_text`, `set_annotation_text`) keep their
+names and the canonical `Edit`/`Commit`/`Patch` family; publication now splices
+the replacement into recorded source provenance instead of reserializing the
+document. New read accessors follow existing vocabulary: `text::Paragraph::
+text_range`, `ParagraphFormat::{style, list_override, list_level}`,
+`Format::character_style`, and `Package`/`Document::picture_body_offset`
+(a UTF-8 text offset, not a `Position` selector). No alias is introduced.
+
 ## Gate hardening (record 0249)
 
 Record 0249 extends the registered gate without changing any public API. Every
