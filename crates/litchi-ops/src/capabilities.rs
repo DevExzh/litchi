@@ -1284,98 +1284,6 @@ static RTF_CREATION_OPTION_GAPS: [GapSpec; 3] = [
     },
 ];
 
-/// RTF's write adapter admits main-story paragraph text, alignment and the
-/// dependency-free paragraph layout facets, paragraph insertion, removal,
-/// paragraph ordering and paragraph swapping. Keep the remaining mutation
-/// verbs visible instead of making the format-level `set`/`remove`/`move`/
-/// `swap`/`edit`/`batch` support look like general CRUD. Run `set`, `add` and
-/// removal cover text and ten local character-format facets; insertion and
-/// removal use native source-preserving run transactions. Run move and swap
-/// remain explicit gaps.
-#[cfg(feature = "rtf")]
-static RTF_WRITE_GAPS: [GapSpec; 8] = [
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "set",
-            element: "run",
-            context: "native-source-closure",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "M6 RTF rich run preservation",
-        reason: "changed run text/formatting requires an ordinary uncompressed body without dependent destinations, review content, inline line breaks or paragraph style/list references; run text containing paragraph/line-break controls, native mixed-operation composition and durable replay remain unsupported; opaque body syntax is preserved when outside changed source spans with projectable UTF-8 anchors",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "set",
-            element: "paragraph",
-            context: "native-source-closure",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "M6 RTF rich paragraph preservation",
-        reason: "paragraph text, alignment and layout updates require the native editor to prove the source formatting and destination closure",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "remove",
-            element: "paragraph",
-            context: "native-source-closure",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "M6 RTF rich paragraph preservation",
-        reason: "paragraph removal requires the native editor to prove an ordinary literal body and retain every unselected source boundary",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "add",
-            element: "paragraph",
-            context: "native-source-closure",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "M6 RTF rich paragraph preservation",
-        reason: "paragraph insertion requires the native editor to prove the ordinary literal body and preserve every unselected source boundary",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "swap",
-            element: "body",
-            context: "native-source-closure",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "M6 RTF rich paragraph preservation",
-        reason: "paragraph swapping requires the native editor to prove an ordinary plain body and preserve paragraph order and boundaries",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "remove",
-            element: "run",
-            context: "native-source-closure",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "M6 RTF rich run preservation",
-        reason: "run removal preserves containing paragraphs through native empty text replacement; dependent destinations, compressed transport, inline line breaks, paragraph style/list references and opaque syntax overlapping changed source spans remain unsupported; opaque boundary anchors are projected through text edits",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "move",
-            element: "run",
-            context: "native-run-edit",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "M6 RTF atomic native run edits",
-        reason: "run reordering requires an atomic native character-run editor that preserves paragraph boundaries and formatting controls",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "swap",
-            element: "run",
-            context: "native-run-edit",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "M6 RTF atomic native run edits",
-        reason: "run swapping requires an atomic native character-run editor that preserves paragraph boundaries and formatting controls",
-    },
-];
-
 /// PPT creator options that the native minimal builder intentionally refuses.
 /// These remain visible even though the legacy PPT read adapter is still a
 /// separate follow-up, because creation and publication are already exposed
@@ -2690,7 +2598,7 @@ impl Element {
         #[cfg(feature = "rtf")]
         let settable = settable
             || (self.adapter == Adapter::Rtf
-                && matches!(self.data().canonical, "p" | "r")
+                && crate::format::rtf::SETTABLE.contains(&self.data().canonical)
                 && readable);
         let structural = {
             #[cfg(feature = "docx")]
@@ -2760,7 +2668,7 @@ impl Element {
         #[cfg(feature = "rtf")]
         let add = add
             || (self.adapter == Adapter::Rtf
-                && matches!(self.data().canonical, "body" | "p" | "r")
+                && crate::format::rtf::ADDABLE.contains(&self.data().canonical)
                 && readable);
         #[cfg(feature = "pptx")]
         let remove = structural
@@ -2817,7 +2725,7 @@ impl Element {
         #[cfg(feature = "rtf")]
         let remove = remove
             || (self.adapter == Adapter::Rtf
-                && matches!(self.data().canonical, "p" | "r")
+                && crate::format::rtf::REMOVABLE.contains(&self.data().canonical)
                 && readable);
         Operations {
             add,
@@ -3271,7 +3179,7 @@ fn option_gap(adapter: Adapter, index: usize) -> Option<Option<&'static GapSpec>
     }
     #[cfg(feature = "rtf")]
     if adapter == Adapter::Rtf {
-        return RTF_WRITE_GAPS.get(index).map(Some);
+        return crate::format::rtf::WRITE_GAPS.get(index).map(Some);
     }
     let _ = (adapter, index);
     None

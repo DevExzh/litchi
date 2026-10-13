@@ -31,13 +31,23 @@ enum Family {
     Paragraph,
     RunText,
     RunFormat,
+    /// Text of retained destination stories (cells, header/footer
+    /// paragraphs, notes, comments). These never shift a positional axis.
+    Destination,
     Noop,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Target {
+pub(super) enum Target {
     Paragraph(Position),
-    Run { paragraph: Position, run: Position },
+    Run {
+        paragraph: Position,
+        run: Position,
+    },
+    /// An exact destination path, before native resolution.
+    DestinationPath(super::destination::DirectPath),
+    /// A resolved native destination story.
+    Destination(super::destination::Target),
 }
 
 impl Target {
@@ -45,6 +55,8 @@ impl Target {
         match self {
             Self::Paragraph(paragraph) => (paragraph.get(), usize::MAX),
             Self::Run { paragraph, run } => (paragraph.get(), run.get()),
+            // Destination stories do not share the body's ordinal axes.
+            Self::DestinationPath(_) | Self::Destination(_) => (usize::MAX, usize::MAX),
         }
     }
 
@@ -136,6 +148,9 @@ struct RunMeta {
 struct SourceIndex {
     paragraphs: Box<[ParagraphMeta]>,
     runs: Box<[RunMeta]>,
+    /// Native note indices of the footnotes and of the endnotes, in order,
+    /// so `footnote[N]`/`endnote[N]` resolve in constant time.
+    notes: [Box<[usize]>; 2],
 }
 
 impl SourceIndex {
@@ -208,10 +223,35 @@ impl SourceIndex {
             });
             body_offset = text_end.saturating_add(1);
         }
+        let note_count = file.0.package.notes().len();
+        let note_charge = cache_charge
+            .checked_add(note_count.saturating_mul(size_of::<usize>()))
+            .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
+        if note_charge > limits.max_staged_bytes() {
+            return Err(staged_limit(note_charge, limits.max_staged_bytes()));
+        }
+        let mut footnotes = Vec::new();
+        let mut endnotes = Vec::new();
+        for (index, note) in file.0.package.notes().iter().enumerate() {
+            let list = if note.is_footnote {
+                &mut footnotes
+            } else {
+                &mut endnotes
+            };
+            list.try_reserve(1)
+                .map_err(|source| TransactionError::Allocation { source })?;
+            list.push(index);
+        }
         Ok(Self {
             paragraphs: paragraphs.into_boxed_slice(),
             runs: runs.into_boxed_slice(),
+            notes: [footnotes.into_boxed_slice(), endnotes.into_boxed_slice()],
         })
+    }
+
+    /// The native index of the `ordinal`-th footnote or endnote.
+    fn note(&self, footnotes: bool, ordinal: usize) -> Option<usize> {
+        self.notes[usize::from(!footnotes)].get(ordinal).copied()
     }
 
     fn paragraph(&self, position: Position) -> Result<&ParagraphMeta> {
@@ -259,6 +299,8 @@ pub(crate) struct Run {
     paragraph_layout: bool,
     staged_bytes: usize,
     native_operations: usize,
+    /// Destination stories staged in this window, sorted for duplicate checks.
+    destinations: Vec<super::destination::Target>,
 }
 
 /// Cheap syntactic admission used before constructing a source index.  It
@@ -319,6 +361,7 @@ impl Run {
             source,
             limits: *limits,
             items: Vec::new(),
+            destinations: Vec::new(),
             family: None,
             last_key: None,
             unsafe_run_paragraph: None,
@@ -364,6 +407,17 @@ impl Run {
         let Some(family) = self.family else {
             return false;
         };
+        if let Target::Destination(target) = plan.target {
+            // A destination window closes only on a family change, a full
+            // window, or a second write to the same native story.
+            return family != plan.family
+                || self.items.len() >= self.limits.max_expanded_targets()
+                || self
+                    .native_operations
+                    .saturating_add(plan.native_operations)
+                    > self.limits.max_operations()
+                || self.destinations.binary_search(&target).is_ok();
+        }
         if self.items.len() >= self.limits.max_expanded_targets() {
             return true;
         }
@@ -451,7 +505,18 @@ impl Run {
         if matches!(plan.family, Family::RunText) && !plan.stable_run_text {
             self.unsafe_run_paragraph = Some(plan.paragraph());
         }
-        self.last_key = Some(plan.key());
+        if let Target::Destination(target) = plan.target {
+            let slot = self
+                .destinations
+                .binary_search(&target)
+                .unwrap_or_else(|slot| slot);
+            self.destinations
+                .try_reserve(1)
+                .map_err(|source| TransactionError::Allocation { source })?;
+            self.destinations.insert(slot, target);
+        } else {
+            self.last_key = Some(plan.key());
+        }
         self.family = Some(plan.family);
         self.staged_bytes = bytes;
         self.native_operations = self
@@ -469,8 +534,8 @@ impl Run {
             limits,
             ..
         } = self;
-        let result =
-            stage_native(&mut edit, &items).and_then(|()| edit.commit().map_err(Error::from));
+        let result = stage_native(&mut edit, &base, &items)
+            .and_then(|()| edit.commit().map_err(Error::from));
         let native = match result {
             Ok(native) => native,
             Err(error) => return Err(locate_failure(&base, &items, error, &limits)),
@@ -502,11 +567,14 @@ impl Run {
     }
 }
 
-fn direct_target(path: &Path<'_>) -> Option<Target> {
+pub(super) fn direct_target(path: &Path<'_>) -> Option<Target> {
     if !path.is_absolute() {
         return None;
     }
     let steps = path.steps();
+    if let Some(destination) = destination_path(steps) {
+        return Some(Target::DestinationPath(destination));
+    }
     if !(steps.len() == 2 || steps.len() == 3) {
         return None;
     }
@@ -529,7 +597,51 @@ fn direct_target(path: &Path<'_>) -> Option<Target> {
     })
 }
 
-fn body_step(step: &Step<'_>) -> bool {
+/// An exact, purely positional destination-story path.
+fn destination_path(steps: &[Step<'_>]) -> Option<super::destination::DirectPath> {
+    use super::destination::DirectPath;
+    let named = |step: &Step<'_>, names: &[&str]| names.iter().any(|name| name_is(step, name));
+    match steps {
+        [body, table, row, cell]
+            if body_step(body)
+                && named(table, &["tbl", "table"])
+                && named(row, &["tr", "row"])
+                && named(cell, &["tc", "cell"]) =>
+        {
+            Some(DirectPath::Cell(
+                table.index()?.get(),
+                row.index()?.get(),
+                cell.index()?.get(),
+            ))
+        },
+        [story] | [story, _] if named(story, &["header", "footer"]) => {
+            let paragraph = match steps.get(1) {
+                Some(step) if named(step, &["p", "paragraph"]) => Some(step.index()?.get()),
+                Some(_) => return None,
+                None => None,
+            };
+            Some(DirectPath::Story {
+                headers: name_is(story, "header"),
+                story: story.index()?.get(),
+                paragraph,
+            })
+        },
+        [note] if named(note, &["footnote", "endnote"]) => Some(DirectPath::Note {
+            footnotes: name_is(note, "footnote"),
+            ordinal: note.index()?.get(),
+        }),
+        [comments, comment] if bare(comments, "comments") && name_is(comment, "comment") => {
+            Some(DirectPath::Comment(comment.index()?.get()))
+        },
+        _ => None,
+    }
+}
+
+fn bare(step: &Step<'_>, name: &str) -> bool {
+    name_is(step, name) && step.predicates().is_empty()
+}
+
+pub(super) fn body_step(step: &Step<'_>) -> bool {
     name_is(step, "body")
         && match step.predicates() {
             [] => true,
@@ -551,6 +663,49 @@ fn make_plan(
     staged_base: usize,
 ) -> Result<Plan> {
     match target {
+        Target::DestinationPath(path) => {
+            let resolved = match path {
+                super::destination::DirectPath::Note { footnotes, ordinal } => {
+                    super::destination::Target::Note(source.note(footnotes, ordinal).ok_or_else(
+                        || {
+                            Error::new(Code::PathNotFound, "the RTF note does not exist")
+                                .with_format(FileFormat::Rtf)
+                        },
+                    )?)
+                },
+                _ => super::destination::resolve(file, path)?,
+            };
+            make_plan(
+                file,
+                source,
+                Target::Destination(resolved),
+                props,
+                limits,
+                staged_base,
+            )
+        },
+        Target::Destination(resolved) => {
+            let text = super::destination::replacement_text(props)?;
+            let current = super::destination::current_text(file, resolved);
+            let per_target = size_of::<super::destination::Target>()
+                .checked_add(text.len())
+                .and_then(|bytes| bytes.checked_add(current.len()))
+                .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
+            admit_staged(staged_base, per_target, limits)?;
+            Ok(Plan {
+                target: Target::Destination(resolved),
+                family: Family::Destination,
+                text: Some(text.to_owned()),
+                alignment: None,
+                layout: None,
+                format: RunFormatPatch::new(),
+                staged_bytes: per_target,
+                changed: current != text,
+                structural_text: false,
+                stable_run_text: false,
+                native_operations: 1,
+            })
+        },
         Target::Paragraph(position) => {
             let meta = source.paragraph(position)?;
             let properties = paragraph_properties(props)?;
@@ -733,11 +888,27 @@ fn patch_changes(current: RunFormatPatch, requested: RunFormatPatch) -> bool {
             .is_some_and(|value| Some(value) != current.outline())
 }
 
-fn stage_native(edit: &mut litchi_rtf::edit::Edit, items: &[Item]) -> Result<()> {
+fn stage_native(edit: &mut litchi_rtf::edit::Edit, base: &Rtf, items: &[Item]) -> Result<()> {
     let Some(first) = items.first() else {
         return Ok(());
     };
     match first.plan.family {
+        Family::Destination => {
+            for item in items {
+                let Plan {
+                    target: Target::Destination(target),
+                    text: Some(text),
+                    ..
+                } = &item.plan
+                else {
+                    return Err(Error::new(
+                        Code::InternalError,
+                        "mixed RTF destination plans",
+                    ));
+                };
+                super::destination::stage(edit, base, *target, text)?;
+            }
+        },
         Family::Paragraph => {
             let mut texts = Vec::new();
             let mut alignments = Vec::new();
@@ -861,7 +1032,7 @@ fn replay(base: &Rtf, items: &[Item], limits: &SemanticLimits) -> Result<Rtf> {
         .0
         .package
         .edit_with_options(EditOptions::new().semantic_limits(native_limits));
-    stage_native(&mut edit, items)?;
+    stage_native(&mut edit, base, items)?;
     let native = edit.commit().map_err(Error::from)?;
     let changed = native.diagnostics().changed();
     let (package, _) = native.into_parts();
