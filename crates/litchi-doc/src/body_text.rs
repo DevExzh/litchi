@@ -214,6 +214,10 @@ pub enum Projection {
 }
 
 /// One of the seven text stories represented by `FibRgLw97` character counts.
+///
+/// The same values name a story to the readers
+/// ([`crate::Document::story_blocks`]) and to the editors here, so a read
+/// position maps onto the story an edit addresses.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Story {
     Main,
@@ -226,6 +230,31 @@ pub enum Story {
 }
 
 impl Story {
+    /// Every story, in the order the FIB lays their text out.
+    pub const ALL: [Self; 7] = [
+        Self::Main,
+        Self::Footnote,
+        Self::Header,
+        Self::Comment,
+        Self::Endnote,
+        Self::Textbox,
+        Self::HeaderTextbox,
+    ];
+
+    /// The story's `FibRgLw97` character-count slot (`ccpText` is 0); slot 3,
+    /// the retired macro story, still offsets the stories after it.
+    pub(crate) const fn character_count_slot(self) -> usize {
+        match self {
+            Self::Main => 0,
+            Self::Footnote => 1,
+            Self::Header => 2,
+            Self::Comment => 4,
+            Self::Endnote => 5,
+            Self::Textbox => 6,
+            Self::HeaderTextbox => 7,
+        }
+    }
+
     const fn index(self) -> usize {
         match self {
             Self::Main => 0,

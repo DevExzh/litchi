@@ -9,7 +9,9 @@ mod semantic;
 mod state;
 mod validation;
 
-pub use semantic::BodyParagraphs;
+pub(in crate::document) use semantic::stories::StoryIndexCache;
+pub use semantic::stories::{StoryBlock, StoryBlockKind, StoryBlocks, StoryIndexDiagnostics};
+pub use semantic::{BodyParagraphs, HeaderFooterSlot};
 pub use state::Document;
 
 pub(in crate::document) use state::DocumentState;
