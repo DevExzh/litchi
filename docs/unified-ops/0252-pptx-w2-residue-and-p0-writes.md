@@ -1,6 +1,6 @@
 # 0252 — PPTX ADR 0034 W2 residue and P0 writes
 
-Status: in progress on branch `uo2/p7c-pptx` (plan 0248 §6 steps 5-pptx and 7c).
+Status: complete for this wave on branch `uo2/p7c-pptx` (plan 0248 §6 steps 5-pptx and 7c); gaps listed in §8.
 
 ## 1. Ingress options and patch conflict (W2 residue, part 1)
 
@@ -229,3 +229,37 @@ default unified open route) still refuses insertion and order edits on
 section decks, because its root validators (`source_removal`,
 `source_cross_copy`) do not model the extension; unified slide add/move on a
 section deck therefore needs `SourceMode::Eager` until that follow-up.
+
+## 8. Fixtures, merge, gates and remaining work
+
+- Owner rule (no `3rdparty/` references): the three LibreOffice
+  `sd/qa/unit/data/pptx` fixtures used by
+  `crates/litchi-pptx/tests/source_backed_svg_lifecycle.rs` are vendored into
+  `test-data/libreoffice-core/sd/qa/unit/data/pptx/` with `PROVENANCE.md`;
+  drawingml doc comments name ECMA-376 / MS-ODRAWXML without the path. The
+  9474e2b6ce port adds no such reference.
+- Trunk (0249, 0250, 0254–0256) is merged. The Python write test that
+  added slides from the first (title) layout now uses the `Blank` layout,
+  because inserted slides now hold their layout's placeholders.
+- Final gates (after the merge, all exit 0): `cargo fmt --all --check`;
+  `cargo clippy -p litchi-pptx -p litchi-drawingml -p litchi-ops -p litchi -p litchi-py --all-targets --all-features -- -D warnings`;
+  `cargo test` for litchi-pptx, litchi-drawingml, litchi-ops, litchi and
+  litchi-cli (all features); `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps
+  --all-features -p litchi-pptx -p litchi-drawingml -p litchi-ops`;
+  `tools/check_crate_boundaries.py`; `tools/non_iwork_gate.py verify`;
+  `tools/check_api_glossary.py` (21 profiles, 890 bans, 16 families);
+  `tools/officecli_capability_delta.py --check`;
+  `crates/pyo3-litchi/tests/run_tests.sh` (242 tests).
+
+Remaining (follow-ups):
+1. Eager-owner single-set overhead for run formatting at ≥100 shapes
+   (17–22 %, §5): needs an eager scene cache or a positional fast path.
+2. `opened::Error` is the crate god-enum re-exported; `EditLimit` has no
+   `observed`; scoped families keep `Snapshot::edit()` and the crate error.
+3. Positional `from_path_*`/`from_read_at_*` constructor combinations on the
+   source owners.
+4. Picture `set` (geometry/replace), comment `remove`, modern comment writes,
+   notes on strict decks or decks without one notes master.
+5. Source-backed owner: section decks are still refused for insertion and
+   order edits; notes/comment/picture writes promote to an eager package.
+6. `docx` still exposes `StaleSource` (outside this branch's ownership).

@@ -254,7 +254,9 @@ class XlsxVerbTests(WriteAssertions):
 class PptxVerbTests(WriteAssertions):
     def setUp(self):
         file = L.create("pptx")
-        layout = file.get("/slidemaster[1]/slidelayout[1]", 0)["format"]["name"]
+        # A blank layout: slides added from a layout with placeholders hold
+        # those placeholders as shapes (record 0252).
+        layout = "Blank"
         file, self.first = file.add("/", "slide", {"layout": layout})
         file, self.second = file.add("/", "slide", {"layout": layout})
         self.file = file
