@@ -28,7 +28,7 @@ differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `4e7b212643def7f109a5c16da8f19abd855a0331adb9a527524a0f0e4bc14d4a` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `5dc72bbb9ec23999d9cb2d8efe02e2d61f0cb1ff737130ecfd9863615635c18d` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsb.json` | `6973955c10443443ee1e2b70a8a3d4bd1937c0124d97ce99e2ec81a7ec5989bc` |
-| golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `ee4398734bfa58c8b2867c7b4f22061af56ee570720a6ccb22aada478f30e6b8` |
+| golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `b7398c8669b21634506424ba4d2acc637d9840f9fd2887c114083f07c1776f3e` |
 | golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `51624cb2c23fd6fc8fa5b4b22fe4b896ebd8d38a375ce7750a757500e66dd0ab` |
 | golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `e5ce90bdf0f83b73b5d7a306bee39269cc4f07f3896861578948eebfc37b9cde` |
 | officecli | `schemas/help` (152 files, OfficeCLI commit `dced0d74`) | `0bcd8cae45fabc0c5e45ff99d1994465fb213ac1b8db3f7eadd87339fb40ced4` |
@@ -73,7 +73,7 @@ Elements:
 | rtf | 7 | 12 | 0 | 0 | 25 | 2 | 0 |
 | xlsx | 8 | 30 | 0 | 0 | 1 | 2 | 1 |
 | xlsb | 8 | 30 | 0 | 0 | 1 | 2 | 1 |
-| xls | 6 | 32 | 0 | 0 | 1 | 2 | 1 |
+| xls | 7 | 31 | 0 | 0 | 1 | 2 | 1 |
 | pptx | 23 | 10 | 0 | 0 | 0 | 1 | 8 |
 | ppt | 15 | 18 | 0 | 0 | 0 | 1 | 8 |
 
@@ -86,7 +86,7 @@ Property reads:
 | rtf | 25 | 0 | 225 | 0 | 196 | 1 | 514 | 39 |
 | xlsx | 89 | 16 | 489 | 0 | 26 | 1 | 70 | 63 |
 | xlsb | 62 | 45 | 489 | 0 | 24 | 1 | 70 | 2 |
-| xls | 16 | 17 | 509 | 0 | 24 | 1 | 124 | 0 |
+| xls | 56 | 4 | 504 | 0 | 24 | 1 | 102 | 0 |
 | pptx | 159 | 27 | 113 | 0 | 126 | 0 | 262 | 159 |
 | ppt | 41 | 3 | 318 | 0 | 48 | 0 | 277 | 47 |
 
@@ -99,7 +99,7 @@ Property writes:
 | rtf | 12 | 9 | 775 | 0 | 33 | 171 |
 | xlsx | 11 | 39 | 494 | 0 | 67 | 143 |
 | xlsb | 2 | 2 | 540 | 0 | 3 | 146 |
-| xls | 0 | 3 | 541 | 0 | 0 | 147 |
+| xls | 1 | 19 | 524 | 0 | 0 | 147 |
 | pptx | 25 | 38 | 498 | 0 | 44 | 241 |
 | ppt | 0 | 14 | 547 | 0 | 16 | 157 |
 
@@ -4993,7 +4993,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | formulacf | conditionalFormatting | gap | M1-extended (R6b) |
 | hyperlink | hyperlink | gap | M1-extended (R6b) |
 | iconset | conditionalFormatting | gap | M1-extended (R6b) |
-| namedrange | namedrange | gap | M1-extended (R6b) |
+| namedrange | namedrange | supported |  |
 | ole | ole | gap | M1-extended (R6b) |
 | pagebreak | colbreak | gap | M1-extended (R6b) |
 | picture | picture | gap | M1-extended (R6b) |
@@ -5032,27 +5032,27 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | autofilter | `range` | string | asg |  | element gap | gap | M1-extended (R6b) |
 | autofilter | `criteria0` | string | a-- |  | element gap | gap | M1-extended (R6b) |
 | cell | `value` | string | asg | -s- | write-only | partial |  |
-| cell | `formula` | string | asg |  | gap | gap | M1-extended (R6b) |
-| cell | `numberformat` | string | asg |  | missing | gap |  |
-| cell | `font.bold` | bool | asg |  | missing | gap |  |
-| cell | `font.italic` | bool | asg |  | missing | gap |  |
-| cell | `font.name` | string | asg |  | missing | gap |  |
-| cell | `font.size` | font-size | asg |  | missing | gap |  |
-| cell | `font.color` | color | asg |  | missing | gap |  |
-| cell | `fill` | color | asg |  | missing | gap |  |
-| cell | `fillPattern` | enum | asg |  | missing | gap |  |
-| cell | `fillBg` | color | asg |  | missing | gap |  |
-| cell | `strike` | bool | asg |  | missing | gap |  |
-| cell | `underline` | enum | asg |  | missing | gap |  |
+| cell | `formula` | string | asg | -sg | supported | partial |  |
+| cell | `numberformat` | string | asg | --g | supported | gap |  |
+| cell | `font.bold` | bool | asg | --g | supported | gap |  |
+| cell | `font.italic` | bool | asg | --g | supported | gap |  |
+| cell | `font.name` | string | asg | --g | supported | gap |  |
+| cell | `font.size` | font-size | asg | --g | supported | gap |  |
+| cell | `font.color` | color | asg | --g | supported | gap |  |
+| cell | `fill` | color | asg | -sg | supported | partial |  |
+| cell | `fillPattern` | enum | asg | -sg | supported | partial |  |
+| cell | `fillBg` | color | asg | -sg | supported | partial |  |
+| cell | `strike` | bool | asg | --g | supported | gap |  |
+| cell | `underline` | enum | asg | --g | supported | gap |  |
 | cell | `locked` | bool | as- |  | write-only | gap |  |
-| cell | `protection.locked` | bool | --g |  | missing | — |  |
-| cell | `protection.hidden` | bool | --g |  | missing | — |  |
+| cell | `protection.locked` | bool | --g | --g | supported | — |  |
+| cell | `protection.hidden` | bool | --g | --g | supported | — |  |
 | cell | `numFmtId` | number | --g |  | raw-only | — | ADR 0034: native selection requires explicit raw admission |
 | cell | `phonetic` | string | asg |  | missing | gap |  |
 | cell | `quotePrefix` | bool | --g |  | missing | — |  |
-| cell | `alignment.horizontal` | enum | asg |  | missing | gap |  |
-| cell | `alignment.vertical` | enum | asg |  | missing | gap |  |
-| cell | `alignment.wrapText` | bool | asg |  | missing | gap |  |
+| cell | `alignment.horizontal` | enum | asg | -sg | supported | partial |  |
+| cell | `alignment.vertical` | enum | asg | -sg | supported | partial |  |
+| cell | `alignment.wrapText` | bool | asg | -sg | supported | partial |  |
 | cell | `alignment.readingOrder` | enum | asg |  | missing | gap |  |
 | cell | `merge` | string | as- |  | write-only | gap |  |
 | cell | `ref` | string | a-- |  | write-only | gap |  |
@@ -5064,11 +5064,11 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | cell | `clear` | bool | as- | -s- | write-only | partial |  |
 | cell | `shift` | string | a-- |  | write-only | gap |  |
 | cell | `arrayformula` | string | as- |  | gap | gap | M1-extended (R6b) |
-| cell | `cachedValue` | string | --g |  | gap | — | M1-extended (R6b) |
+| cell | `cachedValue` | string | --g | --g | supported | — |  |
 | cell | `computedValue` | string | --g |  | missing | — |  |
 | cell | `evaluated` | bool | --g |  | gap | — | M1-extended (R6b) |
-| cell | `alignment.indent` | number | asg |  | missing | gap |  |
-| cell | `alignment.shrinkToFit` | bool | asg |  | missing | gap |  |
+| cell | `alignment.indent` | number | asg | -sg | supported | partial |  |
+| cell | `alignment.shrinkToFit` | bool | asg | -sg | supported | partial |  |
 | cell | `alignment.textRotation` | number | asg |  | missing | gap |  |
 | cell | `border.diagonal` | string | asg |  | missing | gap |  |
 | cell | `border.diagonal.color` | color | asg |  | missing | gap |  |
@@ -5076,10 +5076,10 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | cell | `border.diagonalUp` | bool | asg |  | missing | gap |  |
 | cell | `border` | string | as- |  | write-only | gap |  |
 | cell | `border.all` | string | as- |  | write-only | gap |  |
-| cell | `border.top` | string | asg |  | missing | gap |  |
-| cell | `border.bottom` | string | asg |  | missing | gap |  |
-| cell | `border.left` | string | asg |  | missing | gap |  |
-| cell | `border.right` | string | asg |  | missing | gap |  |
+| cell | `border.top` | string | asg | -sg | supported | partial |  |
+| cell | `border.bottom` | string | asg | -sg | supported | partial |  |
+| cell | `border.left` | string | asg | -sg | supported | partial |  |
+| cell | `border.right` | string | asg | -sg | supported | partial |  |
 | cell | `border.color` | color | as- |  | write-only | gap |  |
 | cell | `arrayref` | string | --g |  | gap | — | M1-extended (R6b) |
 | cell | `mergeAnchor` | bool | --g |  | missing | — |  |
@@ -5283,12 +5283,12 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | colorscale | `type` | string | --g |  | element gap | — | M1-extended (R6b) |
 | colorscale | `dxfId` | number | --g |  | element gap | — | M1-extended (R6b) |
 | column | `name` | string | a-- |  | write-only | gap |  |
-| column | `width` | length | asg |  | gap | gap | M1-extended (R6b) |
-| column | `hidden` | bool | asg |  | gap | gap | M1-extended (R6b) |
-| column | `outline` | int | -s- |  | gap | gap | M1-extended (R6b) |
-| column | `collapsed` | bool | -sg |  | gap | gap | M1-extended (R6b) |
+| column | `width` | length | asg | -sg | supported | partial |  |
+| column | `hidden` | bool | asg | -sg | supported | partial |  |
+| column | `outline` | int | -s- | --g | supported | gap |  |
+| column | `collapsed` | bool | -sg | --g | supported | gap |  |
 | column | `numberformat` | string | -sg |  | missing | gap |  |
-| column | `customWidth` | bool | --g |  | gap | — | M1-extended (R6b) |
+| column | `customWidth` | bool | --g | --g | supported | — |  |
 | column | `autofit` | bool | -s- |  | write-only | gap |  |
 | comment | `ref` | string | asg |  | element gap | gap | M1-extended (R6b) |
 | comment | `author` | string | asg |  | element gap | gap | M1-extended (R6b) |
@@ -5388,11 +5388,11 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | iconset | `showValue` | bool | a-- |  | element gap | gap | M1-extended (R6b) |
 | iconset | `type` | string | --g |  | element gap | — | M1-extended (R6b) |
 | iconset | `dxfId` | number | --g |  | element gap | — | M1-extended (R6b) |
-| namedrange | `name` | string | asg |  | element gap | gap | M1-extended (R6b) |
-| namedrange | `ref` | string | asg |  | element gap | gap | M1-extended (R6b) |
-| namedrange | `scope` | string | asg |  | element gap | gap | M1-extended (R6b) |
-| namedrange | `comment` | string | asg |  | element gap | gap | M1-extended (R6b) |
-| namedrange | `volatile` | bool | asg |  | element gap | gap | M1-extended (R6b) |
+| namedrange | `name` | string | asg | --g | supported | gap |  |
+| namedrange | `ref` | string | asg | --g | supported | gap |  |
+| namedrange | `scope` | string | asg | --g | supported | gap |  |
+| namedrange | `comment` | string | asg | --g | supported | gap |  |
+| namedrange | `volatile` | bool | asg | --g | supported | gap |  |
 | ole | `anchor` | string | asg |  | element gap | gap | M1-extended (R6b) |
 | ole | `shapeId` | number | --g |  | element gap | — | M1-extended (R6b) |
 | ole | `contentType` | string | --g |  | element gap | — | M1-extended (R6b) |
@@ -5490,12 +5490,12 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | row | `matchedTable` | string | --g |  | missing | — |  |
 | row | `tableSource` | string | --g |  | missing | — |  |
 | row | `cols` | int | a-- |  | write-only | gap |  |
-| row | `height` | length | asg |  | gap | gap | M1-extended (R6b) |
-| row | `hidden` | bool | asg |  | gap | gap | M1-extended (R6b) |
-| row | `outline` | int | -s- |  | gap | gap | M1-extended (R6b) |
-| row | `outlineLevel` | number | --g |  | gap | — | M1-extended (R6b) |
-| row | `collapsed` | bool | -sg |  | gap | gap | M1-extended (R6b) |
-| row | `customHeight` | bool | --g |  | gap | — | M1-extended (R6b) |
+| row | `height` | length | asg | -sg | supported | partial |  |
+| row | `hidden` | bool | asg | -sg | supported | partial |  |
+| row | `outline` | int | -s- | --g | supported | gap |  |
+| row | `outlineLevel` | number | --g | --g | supported | — |  |
+| row | `collapsed` | bool | -sg | --g | supported | gap |  |
+| row | `customHeight` | bool | --g | --g | supported | — |  |
 | rowbreak | `row` | int | as- |  | element gap | gap | M1-extended (R6b) |
 | rowbreak | `manual` | bool | -s- |  | element gap | gap | M1-extended (R6b) |
 | rowbreak | `min` | int | -s- |  | element gap | gap | M1-extended (R6b) |
@@ -5538,7 +5538,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | shape | `text` | string | asg |  | element gap | gap | M1-extended (R6b) |
 | shape | `underline` | string | asg |  | element gap | gap | M1-extended (R6b) |
 | shape | `valign` | string | asg |  | element gap | gap | M1-extended (R6b) |
-| sheet | `name` | string | asg | -sg | supported | partial |  |
+| sheet | `name` | string | asg | asg | supported | supported |  |
 | sheet | `autoFilter` | string | asg |  | missing | gap |  |
 | sheet | `tabColor` | color | asg |  | missing | gap |  |
 | sheet | `hidden` | bool | asg | --g | supported | gap |  |
@@ -5725,15 +5725,15 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | `create` | `workbook` | `unrepresentable-initial-metadata` | initial metadata is written to the OLE property sets; identifier, hyperlink_base and unzoned timestamps have no property-set slot and are refused rather than dropped | CreateOptions::metadata (OLE property sets, record 0254) |
 | `get` | `metadata` | `path-read` | `set("/metadata", ..)` writes the OLE document properties (root-metadata keys and custom.<name>); the path is set-only, and reads go through File::metadata() | File::metadata(); /metadata node reads with the shared metadata vocabulary |
 | `remove` | `cell` | `native-dependency-closure` | formula cells and unrepresented range or drawing dependencies remain refused; removing the last rich or opaque string identity requires a semantic inverse that retains its metadata | M2 XLS dependency-complete cell removal |
-| `set` | `cell` | `non-scalar-properties` | the initial XLS writer accepts only scalar value and clear payloads; formulas, formatting and other cell metadata remain read-only | M2 XLS formatting and formula setters |
-| `set` | `cell` | `existing-formula-cells` | scalar replacement and null or explicit clear on an existing formula cell would change its cached result without changing formula tokens, so the initial writer refuses the operation | M4 XLS formula-token and formula-cache writes |
+| `set` | `cell` | `non-scalar-properties` | alignment, border line styles and palette fill colors are written through a reused or authored XF; font, border colors, number format, protection, rotation and reading order are read-only because a new XF must keep an existing font/number-format/protection prefix, and formatting is set in its own call rather than together with value, clear or formula | M2 XLS font, number-format and protection setters |
+| `set` | `cell` | `existing-formula-cells` | an existing Formula record (possibly a shared, array or table owner, or a string-cache group) is not replaced by a value, clear or new formula; authored formulas use the BIFF8 tokenizer, which refuses 3-D, external and name references, and carry an empty cached result with always-recalculate set | M4 XLS dependency-aware formula replacement |
 | `set` | `cell` | `native-dependency-closure` | admitted scalar storage-family replacements preserve the XF and use native row-block and SST rewrites; packed MulBlank cells, unsupported formula ownership, non-adjacent ExtSST records and removal of the last rich or opaque string identity remain typed refusals until their dependency closures and semantic inverses are represented | M2 XLS dependency-complete scalar replacement |
-| `set` | `sheet` | `tab-state` | the initial XLS writer renames worksheets but does not yet change hidden or very-hidden tab state | M2 XLS worksheet visibility setters |
-| `add` | `workbook` | `structural-elements` | worksheet and other structural additions are not integrated into the initial XLS write adapter | M2 XLS structural add handlers |
-| `remove` | `workbook` | `structural-elements` | cell-record removal is integrated for ordinary stored cells; worksheet, row, column and other structural removals require their own native dependency-aware handlers | M2 XLS structural remove handlers |
-| `move` | `workbook` | `structural-elements` | worksheet and cell movement is not integrated into the initial XLS write adapter | M2 XLS structural move handlers |
-| `swap` | `workbook` | `structural-elements` | worksheet and cell swapping is not integrated into the initial XLS write adapter | M2 XLS structural swap handlers |
-| `batch` | `workbook` | `extended-commands` | XLS batches currently compose admitted scalar cell and worksheet-name sets; structural, formatting and read commands remain pending | M2 XLS extended batch commands |
+| `set` | `sheet` | `tab-state` | the XLS writer renames worksheets but does not change hidden or very-hidden tab state; added tabs are visible | M2 XLS worksheet visibility setters |
+| `remove` | `sheet` | `native-dependency-closure` | one ordinary worksheet per call; tabs that an internal 3-D reference range, a sheet-scoped name, a pivot data connection, a drawing or a pivot view still uses are refused, as are the last tab, the last visible tab, chart/macro tabs and macro-bearing or structure-protected workbooks | M2 XLS dependency-closing tab removal |
+| `move` | `sheet` | `native-dependency-closure` | tab order changes that would make an internal 3-D reference range noncontiguous, or that a protected or shared workbook structure forbids, are refused; cells, rows and columns do not move | M2 XLS 3-D range rewriting |
+| `set` | `row` | `outline-and-defaults` | row height and hidden and column width and hidden are written; outline level, collapsed state, clearing a custom size and worksheet default sizes are read-only | M2 XLS outline and default-layout setters |
+| `set` | `namedrange` | `native-editor` | defined names are read from the workbook's Lbl records; adding, changing and removing them needs a native Lbl/ExternSheet editor the leaf does not have | M2 XLS defined-name editor |
+| `add` | `row` | `native-dependency-closure` | row and column insertion requires an explicit position and takes no properties; workbooks whose formulas, names, tables or array/shared formulas the native axis shift cannot rewrite are refused, and deletion is limited to empty rows and columns | M2 XLS formula and name rewriting for axis shifts |
 
 ## pptx
 

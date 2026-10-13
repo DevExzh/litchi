@@ -68,8 +68,8 @@ impl Snapshot {
 
     /// Starts an independent failure-atomic edit.
     #[must_use]
-    pub fn edit(&self) -> super::Transaction {
-        super::Transaction::new(self.clone())
+    pub fn edit(&self) -> super::Edit {
+        super::Edit::new(self.clone())
     }
 
     /// Publishes this immutable snapshot without rebuilding the CFB.

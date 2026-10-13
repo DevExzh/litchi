@@ -408,7 +408,7 @@ impl<R: Read + Seek> Reader<R> {
     pub fn sheet_by_name(&self, name: &str) -> Option<&SheetMetadata> {
         self.sheets
             .iter()
-            .find(|sheet| sheet.name().eq_ignore_ascii_case(name))
+            .find(|sheet| crate::sheet_name::equivalent(sheet.name(), name))
     }
 
     /// Total number of cell references represented by the workbook SST.
@@ -703,5 +703,5 @@ impl<'a> WorksheetIteratorTrait<'a> for WorksheetIterator<'a> {
 }
 
 fn names_equal(left: &str, right: &str) -> bool {
-    left.to_lowercase() == right.to_lowercase()
+    crate::sheet_name::equivalent(left, right)
 }

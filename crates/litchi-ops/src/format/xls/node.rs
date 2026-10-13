@@ -10,10 +10,10 @@ use litchi_core::sheet::CellValue;
 
 use super::Xls;
 use super::children::Children;
-use super::owner::{CellData, Grid, SheetHandle};
+use super::owner::{CellData, ColumnLayout, Grid, LayoutLookup as _, RowLayout, SheetHandle};
 use super::spec::{
-    CELL_PROPS, COLUMN_PROPS, CellKey, ColumnKey, Kind, ROW_PROPS, RowKey, SHEET_PROPS,
-    WORKBOOK_PROPS, WorkbookKey,
+    CELL_PROPS, COLUMN_PROPS, CellKey, ColumnKey, Kind, NAMED_RANGE_PROPS, NamedRangeKey,
+    ROW_PROPS, RowKey, SHEET_PROPS, WORKBOOK_PROPS, WorkbookKey,
 };
 use crate::error::Result;
 use crate::format::workbook::Label;
@@ -27,31 +27,42 @@ use crate::node::{
 #[derive(Clone)]
 pub struct Node<'f> {
     file: &'f Xls,
-    item: Item,
+    item: Item<'f>,
     steps: [PathStep<'f>; 2],
     depth: u8,
     sheet: usize,
 }
 
 #[derive(Clone)]
-pub(super) enum Item {
+pub(super) enum Item<'f> {
     Workbook,
-    Sheet(Sheet),
+    Sheet(Sheet<'f>),
     Cell(CellItem),
     Range(RangeItem),
     Row(RowItem),
     Column(ColumnItem),
+    /// The defined name at this index of the workbook's non-macro names.
+    NamedRange(usize),
+}
+
+/// The workbook's non-macro defined names, through the eager reader.
+///
+/// The positional owner does not parse `Lbl` records, so a source-backed
+/// workbook materializes its eager reader once (cached by the native owner)
+/// when a path, query or view first reaches a defined name.
+pub(super) fn defined_names(file: &Xls) -> Result<&[litchi_xls::DefinedName]> {
+    Ok(file.owner().reader_ref()?.defined_names())
 }
 
 #[derive(Clone)]
-pub(super) struct Sheet {
+pub(super) struct Sheet<'f> {
     pub(super) position: usize,
-    pub(super) handle: SheetHandle,
+    pub(super) handle: SheetHandle<'f>,
     grid: OnceLock<Grid>,
 }
 
-impl Sheet {
-    pub(super) fn new(position: usize, handle: SheetHandle) -> Self {
+impl<'f> Sheet<'f> {
+    pub(super) fn new(position: usize, handle: SheetHandle<'f>) -> Self {
         Self {
             position,
             handle,
@@ -119,7 +130,7 @@ impl<'f> Node<'f> {
         }
     }
 
-    pub(super) fn new_sheet(file: &'f Xls, sheet: Sheet) -> Self {
+    pub(super) fn new_sheet(file: &'f Xls, sheet: Sheet<'f>) -> Self {
         let position = sheet.position;
         Self {
             file,
@@ -130,7 +141,7 @@ impl<'f> Node<'f> {
         }
     }
 
-    fn in_sheet(file: &'f Xls, sheet: usize, item: Item, tail: PathStep<'f>) -> Self {
+    fn in_sheet(file: &'f Xls, sheet: usize, item: Item<'f>, tail: PathStep<'f>) -> Self {
         Self {
             file,
             item,
@@ -173,6 +184,33 @@ impl<'f> Node<'f> {
         )
     }
 
+    pub(super) fn new_named_range(file: &'f Xls, index: usize) -> Self {
+        Self {
+            file,
+            item: Item::NamedRange(index),
+            steps: [PathStep::at("namedrange", Position::new(index)), NO_STEP],
+            depth: 1,
+            sheet: 0,
+        }
+    }
+
+    /// The name's reference without its leading `=`, else the name.
+    pub(super) fn named_range_text(&self) -> Result<Option<String>> {
+        let Item::NamedRange(index) = &self.item else {
+            return Ok(None);
+        };
+        Ok(defined_names(self.file)?.get(*index).map(|name| {
+            match name
+                .formula
+                .as_deref()
+                .map(|formula| formula.strip_prefix('=').unwrap_or(formula))
+            {
+                Some(reference) if !reference.is_empty() => reference.to_owned(),
+                _ => name.name.clone(),
+            }
+        }))
+    }
+
     pub(super) fn new_row(file: &'f Xls, sheet: usize, grid: Grid, index: u32) -> Self {
         Self::in_sheet(
             file,
@@ -203,7 +241,7 @@ impl<'f> Node<'f> {
         self.file
     }
 
-    pub(super) fn item(&self) -> &Item {
+    pub(super) fn item(&self) -> &Item<'f> {
         &self.item
     }
 
@@ -225,6 +263,7 @@ impl<'f> Node<'f> {
             Item::Range(_) => Kind::Range,
             Item::Row(_) => Kind::Row,
             Item::Column(_) => Kind::Column,
+            Item::NamedRange(_) => Kind::NamedRange,
         }
     }
 
@@ -266,6 +305,10 @@ impl<'f> Node<'f> {
         }
     }
 
+    fn sheet_handle(&self) -> Result<Option<SheetHandle<'f>>> {
+        SheetHandle::at(self.file, self.sheet)
+    }
+
     pub(super) fn cell_state(&self) -> Result<CellState<'_>> {
         let Item::Cell(cell) = &self.item else {
             return Ok(CellState::Missing);
@@ -292,7 +335,7 @@ impl<'f> Node<'f> {
         self.file.finish(|| self.props_unfenced())
     }
 
-    fn props_unfenced(&self) -> Result<Format<'_>> {
+    pub(super) fn props_unfenced(&self) -> Result<Format<'_>> {
         let (table, props) = match &self.item {
             Item::Workbook => {
                 let metadata = self.file.owner().metadata()?;
@@ -311,15 +354,37 @@ impl<'f> Node<'f> {
                     visibility: sheet.handle.visibility(),
                 },
             ),
-            Item::Cell(_) => (
-                CELL_PROPS,
-                Props::Cell(CellProps {
-                    state: self.cell_state()?,
-                }),
-            ),
+            Item::Cell(_) => {
+                let state = self.cell_state()?;
+                let styles = match state {
+                    CellState::Stored(_) => Some(styles(self.file)?),
+                    CellState::Missing | CellState::Stub => None,
+                };
+                (CELL_PROPS, Props::Cell(CellProps { state, styles }))
+            },
             Item::Range(_) => return Ok(Format::empty()),
-            Item::Row(_) => (ROW_PROPS, Props::Row(None)),
-            Item::Column(_) => (COLUMN_PROPS, Props::Column(None)),
+            Item::Row(row) => (
+                ROW_PROPS,
+                Props::Row(self.sheet_handle()?.and_then_row(row.index)?),
+            ),
+            Item::Column(column) => (
+                COLUMN_PROPS,
+                Props::Column(self.sheet_handle()?.and_then_column(column.index)?),
+            ),
+            Item::NamedRange(index) => {
+                let names = defined_names(self.file)?;
+                let Some(name) = names.get(*index) else {
+                    return Ok(Format::empty());
+                };
+                let scope = match name.scope {
+                    litchi_xls::NameScope::Workbook => None,
+                    litchi_xls::NameScope::Worksheet(position) => {
+                        SheetHandle::at(self.file, position)?
+                            .map(|handle| Cow::Owned(handle.name().to_owned()))
+                    },
+                };
+                (NAMED_RANGE_PROPS, Props::NamedRange { name, scope })
+            },
         };
         Ok(Format::new(table, Source::Xls(props)))
     }
@@ -351,12 +416,28 @@ pub(crate) enum Props<'a> {
         visibility: litchi_xls::SheetVisibility,
     },
     Cell(CellProps<'a>),
-    Row(Option<u32>),
-    Column(Option<(u32, u32)>),
+    Row(Option<RowLayout>),
+    Column(Option<ColumnLayout>),
+    NamedRange {
+        name: &'a litchi_xls::DefinedName,
+        scope: Option<Cow<'a, str>>,
+    },
 }
 
 pub(crate) struct CellProps<'a> {
     state: CellState<'a>,
+    styles: Option<super::style::Styles<'a>>,
+}
+
+/// The formatting tables of a file's cells.
+fn styles(file: &Xls) -> Result<super::style::Styles<'_>> {
+    Ok(match file.owner().source_workbook() {
+        Some(source) => super::style::Styles::Source {
+            formatting: source.formatting()?,
+            tables: source.style_tables()?,
+        },
+        None => super::style::Styles::Eager(file.owner().reader_ref()?),
+    })
 }
 
 impl fmt::Debug for Props<'_> {
@@ -367,6 +448,7 @@ impl fmt::Debug for Props<'_> {
             Self::Cell(_) => "Cell",
             Self::Row(_) => "Row",
             Self::Column(_) => "Column",
+            Self::NamedRange { .. } => "NamedRange",
         };
         formatter.debug_tuple("Props").field(&name).finish()
     }
@@ -393,9 +475,28 @@ impl<'a> Props<'a> {
                 },
             },
             Self::Cell(cell) => cell.get(CellKey::at(index)?),
-            Self::Row(row) => row.and_then(|row_index| row_value(row_index, RowKey::at(index)?)),
+            Self::Row(row) => row.and_then(|layout| row_value(layout, RowKey::at(index)?)),
             Self::Column(column) => {
-                column.and_then(|range| column_value(range, ColumnKey::at(index)?))
+                column.and_then(|layout| column_value(layout, ColumnKey::at(index)?))
+            },
+            Self::NamedRange { name, scope } => match NamedRangeKey::at(index)? {
+                NamedRangeKey::Name => Some(Value::Text(Cow::Borrowed(&name.name))),
+                NamedRangeKey::Ref => name
+                    .formula
+                    .as_deref()
+                    .map(|formula| formula.strip_prefix('=').unwrap_or(formula))
+                    .filter(|reference| !reference.is_empty())
+                    .map(|reference| Value::Text(Cow::Borrowed(reference))),
+                NamedRangeKey::Scope => match name.scope {
+                    litchi_xls::NameScope::Workbook => Some(Value::Text(Cow::Borrowed("workbook"))),
+                    litchi_xls::NameScope::Worksheet(_) => scope.clone().map(Value::Text),
+                },
+                NamedRangeKey::Comment => name
+                    .comment
+                    .as_deref()
+                    .filter(|comment| !comment.is_empty())
+                    .map(|comment| Value::Text(Cow::Borrowed(comment))),
+                NamedRangeKey::Volatile => name.function.then_some(Value::Bool(true)),
             },
         }
     }
@@ -451,17 +552,54 @@ impl<'a> CellProps<'a> {
         };
         match key {
             CellKey::Type => Some(Value::Token(cell_type(value))),
+            CellKey::Formula => match self.state {
+                CellState::Stored(cell) => cell.formula_text.as_deref().map(|formula| {
+                    Value::Text(Cow::Borrowed(formula.strip_prefix('=').unwrap_or(formula)))
+                }),
+                _ => None,
+            },
+            CellKey::CachedValue => match self.state {
+                CellState::Stored(cell) if cell.formula => {
+                    let cached = display_value(value);
+                    (!cached.is_empty()).then_some(Value::Text(cached))
+                },
+                _ => None,
+            },
             CellKey::Empty => matches!(value, CellValue::Empty).then_some(Value::Bool(true)),
+            key => match (self.state, &self.styles) {
+                (CellState::Stored(cell), Some(styles)) => {
+                    super::style::value(styles, cell.xf, key)
+                },
+                _ => None,
+            },
         }
     }
 }
 
-fn row_value(_index: u32, _key: RowKey) -> Option<Value<'static>> {
-    None
+fn row_value(layout: RowLayout, key: RowKey) -> Option<Value<'static>> {
+    match key {
+        RowKey::Height => Some(Value::Length(crate::value::Length::from_emu(
+            i64::from(layout.height_twips) * 635,
+        ))),
+        RowKey::Hidden => layout.hidden.then_some(Value::Bool(true)),
+        RowKey::OutlineLevel => {
+            (layout.outline_level > 0).then_some(Value::Int(i64::from(layout.outline_level)))
+        },
+        RowKey::Collapsed => layout.collapsed.then_some(Value::Bool(true)),
+        RowKey::CustomHeight => layout.custom_height.then_some(Value::Bool(true)),
+    }
 }
 
-fn column_value(_range: (u32, u32), _key: ColumnKey) -> Option<Value<'static>> {
-    None
+fn column_value(layout: ColumnLayout, key: ColumnKey) -> Option<Value<'static>> {
+    match key {
+        ColumnKey::Width => Value::number(f64::from(layout.width_256ths) / 256.0),
+        ColumnKey::Hidden => layout.hidden.then_some(Value::Bool(true)),
+        ColumnKey::CustomWidth => layout.user_set.then_some(Value::Bool(true)),
+        ColumnKey::OutlineLevel => {
+            (layout.outline_level > 0).then_some(Value::Int(i64::from(layout.outline_level)))
+        },
+        ColumnKey::Collapsed => layout.collapsed.then_some(Value::Bool(true)),
+    }
 }
 
 pub(super) fn display_value(value: &CellValue) -> Cow<'_, str> {
@@ -523,6 +661,7 @@ impl<'f> Project<'f> for Node<'f> {
                     column_rect(column.index)?,
                 )?)),
                 Item::Sheet(_) => self.sheet_name()?.map(Cow::Owned),
+                Item::NamedRange(_) => self.named_range_text()?.map(Cow::Owned),
                 Item::Workbook | Item::Range(_) => None,
             })
         })
@@ -537,6 +676,9 @@ impl<'f> Project<'f> for Node<'f> {
                 Item::Range(range) => Some(Preview::Text(Cow::Borrowed(range.label.as_str()))),
                 Item::Row(row) => Some(Preview::Text(Cow::Borrowed(row.label.as_str()))),
                 Item::Column(column) => Some(Preview::Text(Cow::Borrowed(column.label.as_str()))),
+                Item::NamedRange(_) => self
+                    .named_range_text()?
+                    .map(|text| Preview::Text(Cow::Owned(text))),
             })
         })
     }
@@ -545,6 +687,7 @@ impl<'f> Project<'f> for Node<'f> {
         self.file.finish(|| {
             let count = match &self.item {
                 Item::Workbook => super::nav::tab_count(self.file)?,
+                Item::NamedRange(_) => 0,
                 Item::Cell(_) | Item::Range(_) | Item::Column(_) => {
                     if matches!(self.item, Item::Range(_)) {
                         Children::count(self, options)?

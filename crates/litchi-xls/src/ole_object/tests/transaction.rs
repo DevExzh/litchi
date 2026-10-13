@@ -4,7 +4,7 @@ use super::super::{
     CheckState, EmbeddedObjectDraft, EmbeddedPayload, FormControl, FtCblsData, FtCf, FtCmo,
     FtPictFmla, FtPioGrbit, Limits, ObjSubrecord, ObjectMetadataEdit, OleObjectRecord,
 };
-use super::super::{Snapshot, Transaction};
+use super::super::{Edit, Snapshot};
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_ole_common::property_set::document_summary::DIGITAL_SIGNATURE;
 use litchi_ole_common::property_set::{
@@ -419,7 +419,7 @@ fn valid_control_edit_publishes_typed_patch_and_keeps_unknowns() {
     let authored = checkbox_control(8, 0xB2);
     let authored_bytes = authored.to_record_bytes().unwrap();
 
-    let mut transaction: Transaction = snapshot.edit();
+    let mut transaction: Edit = snapshot.edit();
     transaction.add_form_control(0, authored).unwrap();
     let commit = transaction.commit().unwrap();
 

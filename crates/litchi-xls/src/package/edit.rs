@@ -630,6 +630,110 @@ impl Edit {
             .map_err(Error::from)
     }
 
+    /// Write one formula cell, replacing an existing scalar cell in place;
+    /// see [`cell_values::Edit::set_formula`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a tokenizer, token-size, existing-formula, style, dependency
+    /// or transaction-bound refusal without partially staging.
+    pub fn set_formula<'a>(
+        &mut self,
+        selector: impl Into<cell_values::Selector<'a>>,
+        reference: cell_values::Reference,
+        expression: &str,
+    ) -> Result<()> {
+        self.inner
+            .set_formula(selector.into(), reference, expression)
+            .map_err(Error::from)
+    }
+
+    /// Set one row's height in twips and mark it custom; see
+    /// [`cell_values::Edit::set_row_height`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed range, selector, axis-overlap or bound refusal.
+    pub fn set_row_height<'a>(
+        &mut self,
+        selector: impl Into<cell_values::Selector<'a>>,
+        row: u16,
+        twips: u16,
+    ) -> Result<()> {
+        self.inner
+            .set_row_height(selector.into(), row, twips)
+            .map_err(Error::from)
+    }
+
+    /// Hide or show one row; see [`cell_values::Edit::set_row_hidden`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed selector, axis-overlap or bound refusal.
+    pub fn set_row_hidden<'a>(
+        &mut self,
+        selector: impl Into<cell_values::Selector<'a>>,
+        row: u16,
+        hidden: bool,
+    ) -> Result<()> {
+        self.inner
+            .set_row_hidden(selector.into(), row, hidden)
+            .map_err(Error::from)
+    }
+
+    /// Set one column's width in 1/256 character; see
+    /// [`cell_values::Edit::set_column_width`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed range, selector, record-layout, axis-overlap or bound
+    /// refusal.
+    pub fn set_column_width<'a>(
+        &mut self,
+        selector: impl Into<cell_values::Selector<'a>>,
+        column: u8,
+        width: u16,
+    ) -> Result<()> {
+        self.inner
+            .set_column_width(selector.into(), column, width)
+            .map_err(Error::from)
+    }
+
+    /// Hide or show one column; see [`cell_values::Edit::set_column_hidden`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed selector, record-layout, axis-overlap or bound
+    /// refusal.
+    pub fn set_column_hidden<'a>(
+        &mut self,
+        selector: impl Into<cell_values::Selector<'a>>,
+        column: u8,
+        hidden: bool,
+    ) -> Result<()> {
+        self.inner
+            .set_column_hidden(selector.into(), column, hidden)
+            .map_err(Error::from)
+    }
+
+    /// Change one cell's alignment, border styles or fill; see
+    /// [`cell_values::Edit::set_cell_format`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed indent, palette-color, selector, dependency,
+    /// style-resource or bound refusal without staging.
+    pub fn set_cell_format<'a>(
+        &mut self,
+        selector: impl Into<cell_values::Selector<'a>>,
+        reference: cell_values::Reference,
+        change: &cell_values::FormatChange,
+    ) -> Result<()> {
+        self.inner
+            .set_cell_format(selector.into(), reference, change)
+            .map_err(Error::from)
+    }
+
     /// Remove one supported cell record.
     pub fn remove_cell<'a>(
         &mut self,
@@ -722,6 +826,64 @@ impl Edit {
     ) -> Result<()> {
         self.inner
             .rename_sheet(selector.into(), name)
+            .map_err(Error::from)
+    }
+
+    /// Reorder the complete tab catalog; see
+    /// [`cell_values::Edit::reorder_sheets`]. The identity order is an exact
+    /// no-op, and a tab-structure change must be the only operation of its
+    /// edit.
+    ///
+    /// ```
+    /// use litchi_xls::Package;
+    /// use litchi_core::Position;
+    /// use litchi_xls::cell_values::Selector;
+    /// let mut builder = litchi_xls::Builder::new();
+    /// builder.add_worksheet("A")?;
+    /// builder.add_worksheet("B")?;
+    /// let package = builder.build()?;
+    /// let mut edit = package.edit()?;
+    /// edit.reorder_sheets(&[
+    ///     Selector::Position(Position::new(1)),
+    ///     Selector::Position(Position::new(0)),
+    /// ])?;
+    /// let package = edit.commit()?.into_package();
+    /// assert_eq!(package.workbook().worksheet_names()?, ["B", "A"]);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed selector, protection, dependency-closure or
+    /// exclusivity refusal without staging.
+    pub fn reorder_sheets(&mut self, order: &[cell_values::Selector<'_>]) -> Result<()> {
+        self.inner.reorder_sheets(order).map_err(Error::from)
+    }
+
+    /// Insert one empty worksheet at a complete-catalog position; see
+    /// [`cell_values::Edit::insert_sheet`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed name, uniqueness, position, protection, macro-project
+    /// or dependency-closure refusal without staging.
+    pub fn insert_sheet(&mut self, position: litchi_core::Position, name: &str) -> Result<()> {
+        self.inner.insert_sheet(position, name).map_err(Error::from)
+    }
+
+    /// Remove one ordinary worksheet tab; see
+    /// [`cell_values::Edit::remove_sheet`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed selector, dependency, last-tab, last-visible-tab,
+    /// protection or macro-project refusal without staging.
+    pub fn remove_sheet<'a>(
+        &mut self,
+        selector: impl Into<cell_values::Selector<'a>>,
+    ) -> Result<()> {
+        self.inner
+            .remove_sheet(selector.into())
             .map_err(Error::from)
     }
 

@@ -4104,6 +4104,138 @@
           "name": "set_property",
           "scope": "litchi_xls::Builder",
           "replacement": "Builder::set_metadata(Metadata) plus summary_properties_mut() for custom properties (ADR 0034 §7, record 0254)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_xls::sheet_visibility",
+          "replacement": "use the focused Edit type (record 0259)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_xls::ole_object",
+          "replacement": "use the focused Edit type (record 0259)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_xls::real_time_data",
+          "replacement": "use the focused Edit type (record 0259)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_xls::revision_records",
+          "replacement": "use the focused Edit type (record 0259)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_xls::user_names",
+          "replacement": "use the focused Edit type (record 0259)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_xls::picture_compression",
+          "replacement": "use the focused Edit type (record 0259)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_xls::chart::chart_area",
+          "replacement": "use the focused Edit type (record 0259)"
+        },
+        {
+          "name": "transaction",
+          "scope": "litchi_xls::sheet_visibility::Snapshot",
+          "replacement": "use Snapshot::edit() (record 0259)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_xls::ole_object::Edit",
+          "replacement": "drop the Edit; the source snapshot is unchanged (record 0259)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_xls::ole_object::Edit",
+          "replacement": "commit and read Patch::is_noop or the commit's change flag (record 0259)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_xls::real_time_data::Edit",
+          "replacement": "drop the Edit; the source snapshot is unchanged (record 0259)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_xls::real_time_data::Edit",
+          "replacement": "commit and read Patch::is_noop or the commit's change flag (record 0259)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_xls::revision_records::Edit",
+          "replacement": "drop the Edit; the source snapshot is unchanged (record 0259)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_xls::revision_records::Edit",
+          "replacement": "commit and read Patch::is_noop or the commit's change flag (record 0259)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_xls::user_names::Edit",
+          "replacement": "drop the Edit; the source snapshot is unchanged (record 0259)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_xls::user_names::Edit",
+          "replacement": "commit and read Patch::is_noop or the commit's change flag (record 0259)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_xls::user_names::publication::Edit",
+          "replacement": "drop the Edit; the source snapshot is unchanged (record 0259)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_xls::user_names::publication::Edit",
+          "replacement": "commit and read Patch::is_noop or the commit's change flag (record 0259)"
+        },
+        {
+          "name": "is_empty",
+          "scope": "litchi_xls::sheet_visibility::Patch",
+          "replacement": "use Patch::is_noop (record 0259)"
+        },
+        {
+          "name": "is_empty",
+          "scope": "litchi_xls::comments::Patch",
+          "replacement": "use Patch::is_noop (record 0259)"
+        },
+        {
+          "name": "is_empty",
+          "scope": "litchi_xls::real_time_data::Patch",
+          "replacement": "use Patch::is_noop (record 0259)"
+        },
+        {
+          "name": "is_empty",
+          "scope": "litchi_xls::user_names::Patch",
+          "replacement": "use Patch::is_noop (record 0259)"
+        },
+        {
+          "name": "is_empty",
+          "scope": "litchi_xls::user_names::publication::Patch",
+          "replacement": "use Patch::is_noop (record 0259)"
+        },
+        {
+          "name": "UserNamesTransaction",
+          "scope": "litchi_xls",
+          "replacement": "use UserNamesEdit / UserNamesPackageEdit (record 0259)",
+          "recursive": false
+        },
+        {
+          "name": "UserNamesPackageTransaction",
+          "scope": "litchi_xls",
+          "replacement": "use UserNamesEdit / UserNamesPackageEdit (record 0259)",
+          "recursive": false
+        },
+        {
+          "name": "UserNamesTransaction",
+          "scope": "litchi_xls::user_names",
+          "replacement": "use Edit (record 0259)"
         }
       ],
       "families": [

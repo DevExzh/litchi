@@ -21,6 +21,7 @@ mod enabled {
     use std::time::Instant;
 
     use litchi_core::FileSource;
+    use litchi_core::Position;
     use litchi_ops::{File, OpenOptions, SourceMode};
     use litchi_xls::cell_values::{Reference, Selector, Snapshot, Value};
     use litchi_xls::writer::Builder;
@@ -260,7 +261,7 @@ mod enabled {
 
     fn native_remove(package: &Package, reference: Reference) -> Package {
         let mut edit = package.edit().expect("start native XLS removal");
-        edit.remove_cell(Selector::Position(0), reference)
+        edit.remove_cell(Selector::Position(Position::new(0)), reference)
             .expect("stage native XLS removal");
         edit.commit()
             .expect("commit native XLS removal")
@@ -275,7 +276,7 @@ mod enabled {
         let bytes = package.to_bytes().expect("serialize native output");
         let snapshot = Snapshot::from_bytes(bytes.clone()).expect("parse native output");
         let sheet = snapshot
-            .worksheet(Selector::Position(0))
+            .worksheet(Selector::Position(Position::new(0)))
             .expect("resolve native output worksheet")
             .expect("native output Sheet1");
         assert_eq!(sheet.cells().count(), fixture.cells - 1);

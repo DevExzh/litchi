@@ -1,3 +1,4 @@
+use litchi_core::Position;
 use litchi_xls::cell_values::{Reference, Selector};
 use litchi_xls::comments::{Snapshot, Update, Value};
 use litchi_xls::writer::Builder;
@@ -268,27 +269,27 @@ fn exact_noop_and_batch_failure_do_not_publish_bytes() {
     let original = read_value(snapshot.bytes(), 0, 0);
     let mut edit = snapshot.edit();
     edit.replace(
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         Reference::new(0, 1).unwrap(),
         original,
     )
     .unwrap();
     edit.set_visibility(
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         Reference::new(0, 1).unwrap(),
         Visibility::Hidden,
     )
     .unwrap();
     assert!(
         edit.set_visibility(
-            Selector::Position(0),
+            Selector::Position(Position::new(0)),
             Reference::new(0, 1).unwrap(),
             Visibility::Visible,
         )
         .is_err()
     );
     let commit = edit.commit().unwrap();
-    assert!(commit.patch().is_empty());
+    assert!(commit.patch().is_noop());
     assert_eq!(commit.snapshot().bytes(), snapshot.bytes());
 
     let good = Update::new(
@@ -301,11 +302,11 @@ fn exact_noop_and_batch_failure_do_not_publish_bytes() {
     );
     let mut edit = snapshot.edit();
     assert!(
-        edit.replace_many(Selector::Position(0), [good, duplicate])
+        edit.replace_many(Selector::Position(Position::new(0)), [good, duplicate])
             .is_err()
     );
     let commit = edit.commit().unwrap();
-    assert!(commit.patch().is_empty());
+    assert!(commit.patch().is_noop());
 }
 
 #[test]
@@ -313,8 +314,11 @@ fn refuses_unsupported_lifecycle_and_enforces_batch_bound() {
     let snapshot = Snapshot::from_bytes(authored(257)).unwrap();
     let mut edit = snapshot.edit();
     assert!(
-        edit.remove(Selector::Position(0), Reference::new(0, 1).unwrap())
-            .is_err()
+        edit.remove(
+            Selector::Position(Position::new(0)),
+            Reference::new(0, 1).unwrap()
+        )
+        .is_err()
     );
     let updates = (0..257).map(|row| {
         Update::new(
@@ -322,8 +326,11 @@ fn refuses_unsupported_lifecycle_and_enforces_batch_bound() {
             Value::new(format!("A{row}"), format!("v{row}")).unwrap(),
         )
     });
-    assert!(edit.replace_many(Selector::Position(0), updates).is_err());
-    assert!(edit.commit().unwrap().patch().is_empty());
+    assert!(
+        edit.replace_many(Selector::Position(Position::new(0)), updates)
+            .is_err()
+    );
+    assert!(edit.commit().unwrap().patch().is_noop());
 }
 
 #[test]
@@ -339,26 +346,26 @@ fn refuses_protected_signed_encrypted_and_invalid_values() {
     let snapshot = Snapshot::from_bytes(output.into_inner()).unwrap();
     let mut edit = snapshot.edit();
     edit.replace(
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         Reference::new(0, 0).unwrap(),
         Value::new("A", "text").unwrap(),
     )
     .unwrap();
     edit.set_visibility(
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         Reference::new(0, 0).unwrap(),
         Visibility::Hidden,
     )
     .unwrap();
     assert!(
         edit.replace(
-            Selector::Position(0),
+            Selector::Position(Position::new(0)),
             Reference::new(0, 0).unwrap(),
             Value::new("B", "changed").unwrap(),
         )
         .is_err()
     );
-    assert!(edit.commit().unwrap().patch().is_empty());
+    assert!(edit.commit().unwrap().patch().is_noop());
 
     assert!(Value::new("", "text").is_err());
     assert!(Value::new("A".repeat(55), "text").is_err());
@@ -378,13 +385,13 @@ fn refuses_protected_signed_encrypted_and_invalid_values() {
     let mut edit = empty.edit();
     assert!(
         edit.replace(
-            Selector::Position(0),
+            Selector::Position(Position::new(0)),
             Reference::new(0, 0).unwrap(),
             Value::new("A", "now nonempty").unwrap(),
         )
         .is_err()
     );
-    assert!(edit.commit().unwrap().patch().is_empty());
+    assert!(edit.commit().unwrap().patch().is_noop());
 }
 
 #[test]
@@ -421,12 +428,15 @@ fn updates_poi_fixture_and_reopens() {
     let path = corpus.join("SimpleWithComments.xls");
     let bytes = std::fs::read(path).unwrap();
     let snapshot = Snapshot::from_bytes(bytes).unwrap();
-    let worksheet = snapshot.worksheet(Selector::Position(0)).unwrap().unwrap();
+    let worksheet = snapshot
+        .worksheet(Selector::Position(Position::new(0)))
+        .unwrap()
+        .unwrap();
     let source = worksheet.comments().next().unwrap();
     let reference = Reference::new(u32::from(source.row()), u32::from(source.column())).unwrap();
     let mut edit = snapshot.edit();
     edit.replace(
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         reference,
         Value::new("POI", "updated without normalizing OBJ").unwrap(),
     )
@@ -439,12 +449,15 @@ fn updates_poi_fixture_and_reopens() {
 
     let mixed = std::fs::read(corpus.join("DrawingAndComments.xls")).unwrap();
     let mixed = Snapshot::from_bytes(mixed).unwrap();
-    let worksheet = mixed.worksheet(Selector::Position(0)).unwrap().unwrap();
+    let worksheet = mixed
+        .worksheet(Selector::Position(Position::new(0)))
+        .unwrap()
+        .unwrap();
     let source = worksheet.comments().next().unwrap();
     let reference = Reference::new(u32::from(source.row()), u32::from(source.column())).unwrap();
     let mut edit = mixed.edit();
     edit.replace(
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         reference,
         Value::new("Mixed", "comment beside unrelated drawing shapes").unwrap(),
     )
@@ -462,7 +475,7 @@ fn source_backed_commit_handles_one_and_two_hundred_fifty_six_updates() {
     let snapshot = Snapshot::from_bytes(authored(256)).unwrap();
     let mut one = snapshot.edit();
     one.replace(
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         Reference::new(0, 1).unwrap(),
         Value::new("AuthoR 0", "texT 0").unwrap(),
     )
@@ -481,7 +494,7 @@ fn source_backed_commit_handles_one_and_two_hundred_fifty_six_updates() {
     let reopened = Snapshot::from_bytes(output).unwrap();
     assert_eq!(
         reopened
-            .worksheet(Selector::Position(0))
+            .worksheet(Selector::Position(Position::new(0)))
             .unwrap()
             .unwrap()
             .comment(Reference::new(0, 1).unwrap())
@@ -499,7 +512,8 @@ fn source_backed_commit_handles_one_and_two_hundred_fifty_six_updates() {
             Value::new(format!("AuthoR {row}"), format!("texT {row}")).unwrap(),
         )
     });
-    all.replace_many(Selector::Position(0), updates).unwrap();
+    all.replace_many(Selector::Position(Position::new(0)), updates)
+        .unwrap();
     let all = all.commit_source_backed().unwrap();
     assert_eq!(all.diagnostics().changed_comments(), 256);
     assert_eq!(all.diagnostics().touched_streams(), 1);
@@ -511,7 +525,7 @@ fn source_backed_commit_handles_one_and_two_hundred_fifty_six_updates() {
     let reopened = Snapshot::from_bytes(output).unwrap();
     assert_eq!(
         reopened
-            .worksheet(Selector::Position(0))
+            .worksheet(Selector::Position(Position::new(0)))
             .unwrap()
             .unwrap()
             .comment(Reference::new(255, 1).unwrap())
@@ -533,13 +547,13 @@ fn source_backed_commit_preserves_compressed_and_utf16_widths() {
     let snapshot = Snapshot::from_bytes(output.into_inner()).unwrap();
     let mut edit = snapshot.edit();
     edit.replace(
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         Reference::new(0, 0).unwrap(),
         Value::new("CD", "CD").unwrap(),
     )
     .unwrap();
     edit.replace(
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         Reference::new(1, 0).unwrap(),
         Value::new("文字", "😃😃").unwrap(),
     )
@@ -553,7 +567,7 @@ fn source_backed_commit_preserves_compressed_and_utf16_widths() {
     let reopened = Snapshot::from_bytes(output).unwrap();
     assert_eq!(
         reopened
-            .worksheet(Selector::Position(0))
+            .worksheet(Selector::Position(Position::new(0)))
             .unwrap()
             .unwrap()
             .comment(Reference::new(1, 0).unwrap())
@@ -569,7 +583,7 @@ fn source_backed_commit_refuses_length_or_encoding_width_changes() {
     let snapshot = Snapshot::from_bytes(authored(1)).unwrap();
     let mut edit = snapshot.edit();
     edit.replace(
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         Reference::new(0, 1).unwrap(),
         Value::new("Author 0", "text 00").unwrap(),
     )
@@ -586,7 +600,7 @@ fn source_backed_commit_refuses_length_or_encoding_width_changes() {
     // Both strings occupy two encoded bytes, but this changes compressed BIFF
     // text into UTF-16 and must remain an explicit refusal.
     edit.replace(
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         Reference::new(0, 0).unwrap(),
         Value::new("é", "é").unwrap(),
     )
@@ -602,7 +616,7 @@ fn source_backed_commit_exact_noop_unknown_stream_and_atomic_save() {
     let original = read_value(snapshot.bytes(), 0, 0);
     let mut edit = snapshot.edit();
     edit.replace(
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         Reference::new(0, 1).unwrap(),
         original,
     )
@@ -618,7 +632,7 @@ fn source_backed_commit_exact_noop_unknown_stream_and_atomic_save() {
 
     let mut edit = Snapshot::from_bytes(source.clone()).unwrap().edit();
     edit.replace(
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         Reference::new(0, 1).unwrap(),
         Value::new("Author 9", "text 9").unwrap(),
     )
@@ -691,7 +705,7 @@ fn source_backed_commit_handles_short_and_partial_sinks() {
     let snapshot = Snapshot::from_bytes(authored(1)).unwrap();
     let mut edit = snapshot.edit();
     edit.replace(
-        Selector::Position(0),
+        Selector::Position(Position::new(0)),
         Reference::new(0, 1).unwrap(),
         Value::new("Author 9", "text 9").unwrap(),
     )

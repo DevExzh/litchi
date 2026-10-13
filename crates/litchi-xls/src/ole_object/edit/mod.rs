@@ -8,4 +8,4 @@ mod model;
 mod transaction;
 
 pub use model::{Commit, Patch, Snapshot};
-pub use transaction::Transaction;
+pub use transaction::Edit;

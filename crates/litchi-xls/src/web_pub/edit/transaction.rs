@@ -14,13 +14,13 @@ use super::model::{Commit, Patch, Snapshot};
 /// values but cannot add/remove `srcName`, `ref8`, or `crtID`. Every rejected
 /// operation leaves the candidate untouched.
 #[derive(Clone, Debug)]
-pub struct Transaction {
+pub struct Edit {
     source: Snapshot,
     candidate: Vec<u8>,
     publication: WebPub,
 }
 
-impl Transaction {
+impl Edit {
     pub(super) fn new(source: Snapshot) -> Self {
         Self {
             candidate: source.bytes().to_vec(),
@@ -66,12 +66,6 @@ impl Transaction {
         } else {
             Snapshot::parse(&self.candidate)
         }
-    }
-
-    /// Whether a staged edit changes any payload byte.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.candidate.as_slice() != self.source.bytes()
     }
 
     /// Replaces the page behavior while retaining all other wire fields.
@@ -166,12 +160,6 @@ impl Transaction {
         let mut replacement = self.publication.clone();
         replacement.chart_shape_id = Some(value);
         self.replace(replacement)
-    }
-
-    /// Discards all staged edits and returns the original source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
     }
 
     /// Validates and publishes the candidate with a reversible source-checked

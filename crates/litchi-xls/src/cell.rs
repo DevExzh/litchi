@@ -251,6 +251,11 @@ impl Cell {
         self.array_formula().is_some()
     }
 
+    /// The rendered formula text, shared without copying.
+    pub(crate) fn formula_arc(&self) -> Option<Arc<str>> {
+        self.formula.clone()
+    }
+
     pub(crate) fn set_rendered_formula(&mut self, formula: Option<String>) {
         self.formula = formula.map(Arc::from);
     }

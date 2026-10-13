@@ -14,30 +14,105 @@ use crate::node::spec::{
 use crate::registry::{Access, Constraint, Entry, Table};
 use crate::value::ValueType;
 pub(crate) use workbook::{
-    CELL_PROPS as SHARED_CELL_PROPS, ColumnKey, Kind, RowKey, SHEET_PROPS, SheetKey,
-    WORKBOOK_PROPS as SHARED_WORKBOOK_PROPS, WorkbookKey,
+    CELL_PROPS as SHARED_CELL_PROPS, ColumnKey, Kind, NAMED_RANGE_PROPS, NamedRangeKey, RowKey,
+    SHEET_PROPS, SheetKey, WORKBOOK_PROPS as SHARED_WORKBOOK_PROPS, WorkbookKey,
 };
 
-/// The cell properties projected by the native BIFF reader. Formula text is
-/// intentionally absent: the common Package projection retains values and a
-/// formula bit, while source-backed cells do not retain formula tokens. The
-/// initial scalar writer therefore excludes existing formula cells until it
-/// can update formula tokens and their cached results together.
+/// The cell properties projected by the native BIFF reader: the type, the
+/// rendered formula text (without its leading `=`) and its cached result, the
+/// blank fact, and the cell XF's font, fill, border, alignment, protection
+/// and number format.  Formatting keys report only non-default values.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum CellKey {
     Type,
+    Formula,
+    CachedValue,
     Empty,
+    Bold,
+    Italic,
+    Strike,
+    Underline,
+    FontColor,
+    FontSize,
+    FontName,
+    Fill,
+    FillPattern,
+    FillBg,
+    BorderLeft,
+    BorderRight,
+    BorderTop,
+    BorderBottom,
+    WrapText,
+    Horizontal,
+    Vertical,
+    Indent,
+    ShrinkToFit,
+    Locked,
+    FormulaHidden,
+    NumFmtId,
+    NumberFormat,
 }
 
-impl CellKey {
-    const ALL: &'static [Self] = &[Self::Type, Self::Empty];
+/// Each [`CellKey`] with its shared workbook property name, in table order.
+const CELL_KEYS: [(CellKey, &str); 27] = [
+    (CellKey::Type, "type"),
+    (CellKey::Formula, "formula"),
+    (CellKey::CachedValue, "cachedValue"),
+    (CellKey::Empty, "empty"),
+    (CellKey::Bold, "font.bold"),
+    (CellKey::Italic, "font.italic"),
+    (CellKey::Strike, "strike"),
+    (CellKey::Underline, "underline"),
+    (CellKey::FontColor, "font.color"),
+    (CellKey::FontSize, "font.size"),
+    (CellKey::FontName, "font.name"),
+    (CellKey::Fill, "fill"),
+    (CellKey::FillPattern, "fillPattern"),
+    (CellKey::FillBg, "fillBg"),
+    (CellKey::BorderLeft, "border.left"),
+    (CellKey::BorderRight, "border.right"),
+    (CellKey::BorderTop, "border.top"),
+    (CellKey::BorderBottom, "border.bottom"),
+    (CellKey::WrapText, "alignment.wrapText"),
+    (CellKey::Horizontal, "alignment.horizontal"),
+    (CellKey::Vertical, "alignment.vertical"),
+    (CellKey::Indent, "alignment.indent"),
+    (CellKey::ShrinkToFit, "alignment.shrinkToFit"),
+    (CellKey::Locked, "protection.locked"),
+    (CellKey::FormulaHidden, "protection.hidden"),
+    (CellKey::NumFmtId, "numFmtId"),
+    (CellKey::NumberFormat, "numberformat"),
+];
 
+impl CellKey {
     pub(crate) fn at(index: usize) -> Option<Self> {
-        Self::ALL.get(index).copied()
+        CELL_KEYS.get(index).map(|(key, _)| *key)
     }
 }
 
-pub(crate) static CELL_PROPS: &[PropSpec] = &[SHARED_CELL_PROPS[0], SHARED_CELL_PROPS[6]];
+/// The shared workbook cell property spec named `name`.
+const fn shared_cell_prop(name: &str) -> PropSpec {
+    let mut index = 0;
+    while index < SHARED_CELL_PROPS.len() {
+        if same_name(SHARED_CELL_PROPS[index].name, name) {
+            return SHARED_CELL_PROPS[index];
+        }
+        index += 1;
+    }
+    panic!("XLS cell key is not a shared workbook cell property")
+}
+
+const fn cell_props() -> [PropSpec; CELL_KEYS.len()] {
+    let mut props = [PropSpec::new("", ValueType::Text); CELL_KEYS.len()];
+    let mut index = 0;
+    while index < CELL_KEYS.len() {
+        props[index] = shared_cell_prop(CELL_KEYS[index].1);
+        index += 1;
+    }
+    props
+}
+
+pub(crate) static CELL_PROPS: &[PropSpec] = &cell_props();
 
 /// The scalar cell payloads admitted by the initial unified XLS writer.
 ///
@@ -52,6 +127,29 @@ pub(crate) static CELL_PROPS: &[PropSpec] = &[SHARED_CELL_PROPS[0], SHARED_CELL_
 pub(crate) enum CellSetter {
     Value,
     Clear,
+    Formula,
+    Horizontal,
+    Vertical,
+    WrapText,
+    Indent,
+    ShrinkToFit,
+    BorderLeft,
+    BorderRight,
+    BorderTop,
+    BorderBottom,
+    FillPattern,
+    Fill,
+    FillBg,
+}
+
+/// One XF-backed cell formatting setter.
+const fn format_entry(name: &'static str, setter: CellSetter, clear: bool) -> Entry<CellSetter> {
+    Entry {
+        spec: shared_cell_prop(name),
+        access: Access::Set(setter),
+        constraint: Constraint::None,
+        clear,
+    }
 }
 
 const fn write_only(name: &'static str, ty: ValueType) -> PropSpec {
@@ -64,7 +162,7 @@ const fn write_only(name: &'static str, ty: ValueType) -> PropSpec {
     spec
 }
 
-pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 2, 0> = Table::new(
+pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 15, 0> = Table::new(
     [
         Entry {
             spec: write_only("value", ValueType::Scalar),
@@ -78,6 +176,29 @@ pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 2, 0> = Table::new(
             constraint: Constraint::None,
             clear: false,
         },
+        Entry {
+            spec: SHARED_CELL_PROPS[1],
+            access: Access::Set(CellSetter::Formula),
+            constraint: Constraint::None,
+            clear: false,
+        },
+        format_entry("alignment.horizontal", CellSetter::Horizontal, false),
+        format_entry("alignment.vertical", CellSetter::Vertical, false),
+        format_entry("alignment.wrapText", CellSetter::WrapText, false),
+        Entry {
+            spec: shared_cell_prop("alignment.indent"),
+            access: Access::Set(CellSetter::Indent),
+            constraint: Constraint::Int { min: 0, max: 15 },
+            clear: false,
+        },
+        format_entry("alignment.shrinkToFit", CellSetter::ShrinkToFit, false),
+        format_entry("border.left", CellSetter::BorderLeft, true),
+        format_entry("border.right", CellSetter::BorderRight, true),
+        format_entry("border.top", CellSetter::BorderTop, true),
+        format_entry("border.bottom", CellSetter::BorderBottom, true),
+        format_entry("fillPattern", CellSetter::FillPattern, false),
+        format_entry("fill", CellSetter::Fill, false),
+        format_entry("fillBg", CellSetter::FillBg, false),
     ],
     [],
 );
@@ -98,7 +219,7 @@ pub(crate) enum SheetSetter {
 pub(crate) const SHEET_WRITE_TABLE: Table<SheetSetter, 1, 0> = Table::new(
     [Entry {
         spec: PropSpec::new("name", ValueType::Text),
-        access: Access::Set(SheetSetter::Name),
+        access: Access::SetAndAdd(SheetSetter::Name),
         constraint: Constraint::None,
         clear: false,
     }],
@@ -128,6 +249,7 @@ const fn same_name(left: &str, right: &str) -> bool {
 /// [`CELL_PROPS`] prevents a write-only key from becoming queryable or being
 /// emitted by the read node view.
 const fn cell_capability_array() -> [PropSpec; CELL_PROPS.len() + 2] {
+    // `value` and `clear` are write-only; `formula` is both read and set.
     let mut props = [PropSpec::new("", ValueType::Text); CELL_PROPS.len() + 2];
     let mut index = 0;
     while index < CELL_PROPS.len() {
@@ -192,11 +314,105 @@ pub(crate) static WORKBOOK_PROPS: &[PropSpec] = &[
     SHARED_WORKBOOK_PROPS[10],
 ];
 
-/// BIFF row and column layout is kept by the native reader, but the
-/// source-backed Package bridge currently has no immutable layout accessor.
-/// Keep these tables empty until both owner routes can answer them.
-pub(crate) static ROW_PROPS: &[PropSpec] = &[];
-pub(crate) static COLUMN_PROPS: &[PropSpec] = &[];
+/// Row and column layout read through the eager reader's `Row` and `ColInfo`
+/// projection (a source-backed workbook materializes it on first use).
+pub(crate) use workbook::{COLUMN_PROPS, ROW_PROPS};
+
+/// Row assignments: height (points, written as twips) and hidden.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RowSetter {
+    Height,
+    Hidden,
+}
+
+pub(crate) const ROW_WRITE_TABLE: Table<RowSetter, 2, 0> = Table::new(
+    [
+        Entry {
+            spec: ROW_PROPS[0],
+            access: Access::Set(RowSetter::Height),
+            constraint: Constraint::Length {
+                min: crate::value::Length::from_points(0),
+                max: crate::value::Length::from_points(409),
+            },
+            clear: false,
+        },
+        Entry {
+            spec: ROW_PROPS[1],
+            access: Access::Set(RowSetter::Hidden),
+            constraint: Constraint::None,
+            clear: false,
+        },
+    ],
+    [],
+);
+
+pub(crate) const ROW_WRITE_PROPS: &[PropSpec] = &ROW_WRITE_TABLE.readable();
+
+/// Column assignments: width (characters, written as 1/256 character) and
+/// hidden.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ColumnSetter {
+    Width,
+    Hidden,
+}
+
+pub(crate) const COLUMN_WRITE_TABLE: Table<ColumnSetter, 2, 0> = Table::new(
+    [
+        Entry {
+            spec: COLUMN_PROPS[0],
+            access: Access::Set(ColumnSetter::Width),
+            constraint: Constraint::Number {
+                min: 0.0,
+                max: 255.0,
+            },
+            clear: false,
+        },
+        Entry {
+            spec: COLUMN_PROPS[1],
+            access: Access::Set(ColumnSetter::Hidden),
+            constraint: Constraint::None,
+            clear: false,
+        },
+    ],
+    [],
+);
+
+pub(crate) const COLUMN_WRITE_PROPS: &[PropSpec] = &COLUMN_WRITE_TABLE.readable();
+
+/// A read table with the set and add flags of a write table merged in.
+const fn merged<const N: usize>(read: &[PropSpec], write: &[PropSpec]) -> [PropSpec; N] {
+    let mut props = [PropSpec::new("", ValueType::Text); N];
+    let mut index = 0;
+    while index < N {
+        let mut prop = read[index];
+        let mut write_index = 0;
+        while write_index < write.len() {
+            if same_name(prop.name, write[write_index].name) {
+                prop.access.set = write[write_index].access.set;
+                prop.access.add = write[write_index].access.add;
+            }
+            write_index += 1;
+        }
+        props[index] = prop;
+        index += 1;
+    }
+    props
+}
+
+static ROW_CAPABILITY_PROPS: [PropSpec; 5] = merged(ROW_PROPS, ROW_WRITE_PROPS);
+static COLUMN_CAPABILITY_PROPS: [PropSpec; 5] = merged(COLUMN_PROPS, COLUMN_WRITE_PROPS);
+
+/// The capability projection of one element's properties, when it differs
+/// from the read table.
+pub(crate) fn capability_props(element: &str) -> Option<&'static [PropSpec]> {
+    match element {
+        "cell" => Some(CELL_CAPABILITY_PROPS),
+        "sheet" => Some(SHEET_CAPABILITY_PROPS),
+        "row" => Some(&ROW_CAPABILITY_PROPS),
+        "col" => Some(&COLUMN_CAPABILITY_PROPS),
+        _ => None,
+    }
+}
 
 const fn gap(element: &'static str, follow_up: &'static str, reason: &'static str) -> GapSpec {
     GapSpec {
@@ -227,18 +443,6 @@ static ACTIVE_TAB_GAP: GapSpec = property_gap(
     "M1-extended (R6b)",
     "the legacy XLS Package read bridge does not project the workbook window selection",
 );
-static FORMULA_GAP: GapSpec = property_gap(
-    "cell",
-    "formula",
-    "M1-extended (R6b)",
-    "the Package cell projection retains formula classification and cached scalar values but not formula token text",
-);
-static CACHED_VALUE_GAP: GapSpec = property_gap(
-    "cell",
-    "cachedValue",
-    "M1-extended (R6b)",
-    "the legacy source-backed cell projection does not expose a separate cached-value property",
-);
 static EVALUATED_GAP: GapSpec = property_gap(
     "cell",
     "evaluated",
@@ -262,11 +466,6 @@ static TABLE_GAP: GapSpec = gap(
     "table",
     "M1-extended (R6b)",
     "the legacy XLS Package read bridge does not project ListObject records into unified nodes yet",
-);
-static NAMED_RANGE_GAP: GapSpec = gap(
-    "namedrange",
-    "M1-extended (R6b)",
-    "the legacy XLS Package read bridge does not project defined names into unified nodes yet",
 );
 static COMMENT_GAP: GapSpec = gap(
     "comment",
@@ -395,10 +594,10 @@ static ELEMENTS: [ElementSpec<Kind>; 26] = [
     with_props(&workbook::SPEC.elements[1], SHEET_PROPS),
     with_props(&workbook::SPEC.elements[2], CELL_PROPS),
     with_props(&workbook::SPEC.elements[3], &[]),
-    with_props(&workbook::SPEC.elements[4], &[]),
+    with_props(&workbook::SPEC.elements[4], ROW_PROPS),
     with_props(&workbook::SPEC.elements[5], COLUMN_PROPS),
     with_gap(&workbook::SPEC.elements[6], &TABLE_GAP),
-    with_gap(&workbook::SPEC.elements[7], &NAMED_RANGE_GAP),
+    with_props(&workbook::SPEC.elements[7], NAMED_RANGE_PROPS),
     with_gap(&workbook::SPEC.elements[8], &COMMENT_GAP),
     with_gap(&workbook::SPEC.elements[9], &CHART_GAP),
     with_gap(&workbook::SPEC.elements[10], &SERIES_GAP),
@@ -454,72 +653,129 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             reason: "text, outline and cell statistics cover ordinary worksheets; chart and macro payloads remain unprojected",
         },
         ACTIVE_TAB_GAP,
-        FORMULA_GAP,
-        CACHED_VALUE_GAP,
         EVALUATED_GAP,
         ARRAY_FORMULA_GAP,
         ARRAY_REF_GAP,
-        property_gap(
-            "row",
-            "height",
-            "M1-extended (R6b)",
-            "BIFF ROW layout is not projected",
-        ),
-        property_gap(
-            "row",
-            "hidden",
-            "M1-extended (R6b)",
-            "BIFF ROW layout is not projected",
-        ),
-        property_gap(
-            "row",
-            "outlineLevel",
-            "M1-extended (R6b)",
-            "BIFF ROW layout is not projected",
-        ),
-        property_gap(
-            "row",
-            "collapsed",
-            "M1-extended (R6b)",
-            "BIFF ROW layout is not projected",
-        ),
-        property_gap(
-            "row",
-            "customHeight",
-            "M1-extended (R6b)",
-            "BIFF ROW layout is not projected",
-        ),
-        property_gap(
-            "column",
-            "width",
-            "M1-extended (R6b)",
-            "BIFF COLINFO layout is not projected",
-        ),
-        property_gap(
-            "column",
-            "hidden",
-            "M1-extended (R6b)",
-            "BIFF COLINFO layout is not projected",
-        ),
-        property_gap(
-            "column",
-            "customWidth",
-            "M1-extended (R6b)",
-            "BIFF COLINFO layout is not projected",
-        ),
-        property_gap(
-            "column",
-            "outlineLevel",
-            "M1-extended (R6b)",
-            "BIFF COLINFO layout is not projected",
-        ),
-        property_gap(
-            "column",
-            "collapsed",
-            "M1-extended (R6b)",
-            "BIFF COLINFO layout is not projected",
-        ),
     ],
 };
 
 check_format_spec!(SPEC);
+
+/// Elements whose properties the unified XLS writer sets.
+pub(crate) const SETTABLE: &[&str] = &["cell", "sheet", "row", "col"];
+/// Elements the unified XLS writer adds: worksheet tabs, and empty rows and
+/// columns inserted under a sheet.
+pub(crate) const ADDABLE: &[&str] = &["sheet", "row", "col"];
+/// Elements the unified XLS writer removes.
+pub(crate) const REMOVABLE: &[&str] = &["cell", "sheet", "row", "col"];
+
+const fn operation_gap(
+    verb: &'static str,
+    element: &'static str,
+    context: &'static str,
+    follow_up: &'static str,
+    reason: &'static str,
+) -> GapSpec {
+    GapSpec {
+        subject: Subject::Operation {
+            verb,
+            element,
+            context,
+        },
+        code: Code::UnsupportedCapability,
+        follow_up,
+        reason,
+    }
+}
+
+/// Write families that remain element- or property-level gaps.  The integrated
+/// verbs are listed by [`SETTABLE`], [`ADDABLE`] and [`REMOVABLE`]; these rows
+/// keep the remaining families visible so a format-level report never implies
+/// more than the adapter implements.
+pub(crate) static WRITE_GAPS: [GapSpec; 11] = [
+    operation_gap(
+        "get",
+        "metadata",
+        "path-read",
+        "File::metadata(); /metadata node reads with the shared metadata vocabulary",
+        "`set(\"/metadata\", ..)` writes the OLE document properties (root-metadata keys and custom.<name>); the path is set-only, and reads go through File::metadata()",
+    ),
+    operation_gap(
+        "remove",
+        "cell",
+        "native-dependency-closure",
+        "M2 XLS dependency-complete cell removal",
+        "formula cells and unrepresented range or drawing dependencies remain refused; removing the last rich or opaque string identity requires a semantic inverse that retains its metadata",
+    ),
+    operation_gap(
+        "set",
+        "cell",
+        "non-scalar-properties",
+        "M2 XLS font, number-format and protection setters",
+        "alignment, border line styles and palette fill colors are written through a reused or authored XF; font, border colors, number format, protection, rotation and reading order are read-only because a new XF must keep an existing font/number-format/protection prefix, and formatting is set in its own call rather than together with value, clear or formula",
+    ),
+    operation_gap(
+        "set",
+        "cell",
+        "existing-formula-cells",
+        "M4 XLS dependency-aware formula replacement",
+        "an existing Formula record (possibly a shared, array or table owner, or a string-cache group) is not replaced by a value, clear or new formula; authored formulas use the BIFF8 tokenizer, which refuses 3-D, external and name references, and carry an empty cached result with always-recalculate set",
+    ),
+    operation_gap(
+        "set",
+        "cell",
+        "native-dependency-closure",
+        "M2 XLS dependency-complete scalar replacement",
+        "admitted scalar storage-family replacements preserve the XF and use native row-block and SST rewrites; packed MulBlank cells, unsupported formula ownership, non-adjacent ExtSST records and removal of the last rich or opaque string identity remain typed refusals until their dependency closures and semantic inverses are represented",
+    ),
+    operation_gap(
+        "set",
+        "sheet",
+        "tab-state",
+        "M2 XLS worksheet visibility setters",
+        "the XLS writer renames worksheets but does not change hidden or very-hidden tab state; added tabs are visible",
+    ),
+    operation_gap(
+        "remove",
+        "sheet",
+        "native-dependency-closure",
+        "M2 XLS dependency-closing tab removal",
+        "one ordinary worksheet per call; tabs that an internal 3-D reference range, a sheet-scoped name, a pivot data connection, a drawing or a pivot view still uses are refused, as are the last tab, the last visible tab, chart/macro tabs and macro-bearing or structure-protected workbooks",
+    ),
+    operation_gap(
+        "move",
+        "sheet",
+        "native-dependency-closure",
+        "M2 XLS 3-D range rewriting",
+        "tab order changes that would make an internal 3-D reference range noncontiguous, or that a protected or shared workbook structure forbids, are refused; cells, rows and columns do not move",
+    ),
+    operation_gap(
+        "set",
+        "row",
+        "outline-and-defaults",
+        "M2 XLS outline and default-layout setters",
+        "row height and hidden and column width and hidden are written; outline level, collapsed state, clearing a custom size and worksheet default sizes are read-only",
+    ),
+    operation_gap(
+        "set",
+        "namedrange",
+        "native-editor",
+        "M2 XLS defined-name editor",
+        "defined names are read from the workbook's Lbl records; adding, changing and removing them needs a native Lbl/ExternSheet editor the leaf does not have",
+    ),
+    operation_gap(
+        "add",
+        "row",
+        "native-dependency-closure",
+        "M2 XLS formula and name rewriting for axis shifts",
+        "row and column insertion requires an explicit position and takes no properties; workbooks whose formulas, names, tables or array/shared formulas the native axis shift cannot rewrite are refused, and deletion is limited to empty rows and columns",
+    ),
+];
+
+const _: () = {
+    let mut index = 0;
+    while index < WRITE_GAPS.len() {
+        assert!(crate::node::spec::gap_valid(&WRITE_GAPS[index]));
+        index += 1;
+    }
+};

@@ -778,8 +778,16 @@ impl Capabilities {
                 return Support::Supported;
             }
             #[cfg(feature = "xls")]
-            if matches!(verb, Verb::Set | Verb::Remove | Verb::Edit | Verb::Batch)
-                && self.adapter() == Some(Adapter::Xls)
+            if matches!(
+                verb,
+                Verb::Set
+                    | Verb::Add
+                    | Verb::Remove
+                    | Verb::Move
+                    | Verb::Swap
+                    | Verb::Edit
+                    | Verb::Batch
+            ) && self.adapter() == Some(Adapter::Xls)
             {
                 // The canonical XLS Package always retains its editable
                 // owner.  Keep the check for contextual reports defensive so
@@ -1533,134 +1541,6 @@ static XLS_CREATION_OPTION_GAPS: [GapSpec; 3] = [
         "initial metadata is written to the OLE property sets; identifier, hyperlink_base and unzoned timestamps have no property-set slot and are refused rather than dropped",
     ),
 ];
-
-/// The initial XLS write adapter admits scalar cell payloads, stored-cell
-/// removal, and worksheet names. Keep the remaining write families visible as
-/// operation gaps so the format-level report does not imply that every edit
-/// verb has an implementation merely because a subset of `set`, `remove`,
-/// `edit` and `batch` is integrated.
-#[cfg(feature = "xls")]
-static XLS_WRITE_GAPS: [GapSpec; 11] = [
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "get",
-            element: "metadata",
-            context: "path-read",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "File::metadata(); /metadata node reads with the shared metadata vocabulary",
-        reason: "`set(\"/metadata\", ..)` writes the OLE document properties (root-metadata keys and custom.<name>); the path is set-only, and reads go through File::metadata()",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "remove",
-            element: "cell",
-            context: "native-dependency-closure",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "M2 XLS dependency-complete cell removal",
-        reason: "formula cells and unrepresented range or drawing dependencies remain refused; removing the last rich or opaque string identity requires a semantic inverse that retains its metadata",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "set",
-            element: "cell",
-            context: "non-scalar-properties",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "M2 XLS formatting and formula setters",
-        reason: "the initial XLS writer accepts only scalar value and clear payloads; formulas, formatting and other cell metadata remain read-only",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "set",
-            element: "cell",
-            context: "existing-formula-cells",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "M4 XLS formula-token and formula-cache writes",
-        reason: "scalar replacement and null or explicit clear on an existing formula cell would change its cached result without changing formula tokens, so the initial writer refuses the operation",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "set",
-            element: "cell",
-            context: "native-dependency-closure",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "M2 XLS dependency-complete scalar replacement",
-        reason: "admitted scalar storage-family replacements preserve the XF and use native row-block and SST rewrites; packed MulBlank cells, unsupported formula ownership, non-adjacent ExtSST records and removal of the last rich or opaque string identity remain typed refusals until their dependency closures and semantic inverses are represented",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "set",
-            element: "sheet",
-            context: "tab-state",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "M2 XLS worksheet visibility setters",
-        reason: "the initial XLS writer renames worksheets but does not yet change hidden or very-hidden tab state",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "add",
-            element: "workbook",
-            context: "structural-elements",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "M2 XLS structural add handlers",
-        reason: "worksheet and other structural additions are not integrated into the initial XLS write adapter",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "remove",
-            element: "workbook",
-            context: "structural-elements",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "M2 XLS structural remove handlers",
-        reason: "cell-record removal is integrated for ordinary stored cells; worksheet, row, column and other structural removals require their own native dependency-aware handlers",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "move",
-            element: "workbook",
-            context: "structural-elements",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "M2 XLS structural move handlers",
-        reason: "worksheet and cell movement is not integrated into the initial XLS write adapter",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "swap",
-            element: "workbook",
-            context: "structural-elements",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "M2 XLS structural swap handlers",
-        reason: "worksheet and cell swapping is not integrated into the initial XLS write adapter",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "batch",
-            element: "workbook",
-            context: "extended-commands",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "M2 XLS extended batch commands",
-        reason: "XLS batches currently compose admitted scalar cell and worksheet-name sets; structural, formatting and read commands remain pending",
-    },
-];
-
-#[cfg(feature = "xls")]
-const _: () = {
-    let mut index = 0;
-    while index < XLS_WRITE_GAPS.len() {
-        assert!(crate::node::spec::gap_valid(&XLS_WRITE_GAPS[index]));
-        index += 1;
-    }
-};
 
 /// XLSB creation options not represented by its native minimal creator.
 #[cfg(feature = "xlsb")]
@@ -2766,7 +2646,7 @@ impl Element {
         let settable = settable
             || (self.adapter == Adapter::Xls
                 && self.retains_source != Some(false)
-                && matches!(self.data().canonical, "cell" | "sheet")
+                && crate::format::xls::SETTABLE.contains(&self.data().canonical)
                 && readable);
         #[cfg(feature = "pptx")]
         let settable = settable
@@ -2837,6 +2717,12 @@ impl Element {
                 && self.retains_source != Some(false)
                 && self.data().canonical == "slide"
                 && readable);
+        #[cfg(feature = "xls")]
+        let add = add
+            || (self.adapter == Adapter::Xls
+                && self.retains_source != Some(false)
+                && crate::format::xls::ADDABLE.contains(&self.data().canonical)
+                && readable);
         #[cfg(feature = "rtf")]
         let add = add
             || (self.adapter == Adapter::Rtf
@@ -2872,7 +2758,7 @@ impl Element {
         let remove = remove
             || (self.adapter == Adapter::Xls
                 && self.retains_source != Some(false)
-                && self.data().canonical == "cell"
+                && crate::format::xls::REMOVABLE.contains(&self.data().canonical)
                 && readable);
         #[cfg(feature = "ppt")]
         let remove = remove
@@ -2994,11 +2880,10 @@ fn element_data(adapter: Adapter, index: u16) -> Data {
         };
         #[cfg(feature = "xls")]
         let props = if adapter == Adapter::Xls {
-            match crate::path::navigate::ElementKind::name(element.kind) {
-                "cell" => crate::format::xls::CELL_CAPABILITY_PROPS,
-                "sheet" => crate::format::xls::SHEET_CAPABILITY_PROPS,
-                _ => props,
-            }
+            crate::format::xls::capability_props(crate::path::navigate::ElementKind::name(
+                element.kind,
+            ))
+            .unwrap_or(props)
         } else {
             props
         };
@@ -3332,7 +3217,7 @@ fn option_gap(adapter: Adapter, index: usize) -> Option<Option<&'static GapSpec>
         if let Some(gap) = XLS_CREATION_OPTION_GAPS.get(index) {
             return Some(Some(gap));
         }
-        return XLS_WRITE_GAPS
+        return crate::format::xls::WRITE_GAPS
             .get(index.saturating_sub(XLS_CREATION_OPTION_GAPS.len()))
             .map(Some);
     }

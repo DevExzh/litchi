@@ -107,11 +107,11 @@
       "element": "sheet",
       "parent": "workbook",
       "operations": {
-        "add": false,
+        "add": true,
         "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "stable": [
@@ -203,7 +203,7 @@
       "properties": {
         "name": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -275,8 +275,276 @@
           "set": false,
           "get": true
         },
+        "formula": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "cachedValue": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
         "empty": {
           "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "font.bold": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "font.italic": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "strike": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "underline": {
+          "type": "enum",
+          "values": [
+            "single",
+            "double",
+            "singleAccounting",
+            "doubleAccounting"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "font.color": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "font.size": {
+          "type": "font-size",
+          "unit": "pt",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "font.name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "fill": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "fillPattern": {
+          "type": "enum",
+          "values": [
+            "none",
+            "solid",
+            "mediumGray",
+            "darkGray",
+            "lightGray",
+            "darkHorizontal",
+            "darkVertical",
+            "darkDown",
+            "darkUp",
+            "darkGrid",
+            "darkTrellis",
+            "lightHorizontal",
+            "lightVertical",
+            "lightDown",
+            "lightUp",
+            "lightGrid",
+            "lightTrellis",
+            "gray125",
+            "gray0625"
+          ],
+          "valueAliases": {
+            "gray25": "lightGray",
+            "gray50": "mediumGray",
+            "gray75": "darkGray"
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "fillBg": {
+          "type": "color",
+          "colorContext": "spreadsheet",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "border.left": {
+          "type": "enum",
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot"
+          ],
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "border.right": {
+          "type": "enum",
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot"
+          ],
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "border.top": {
+          "type": "enum",
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot"
+          ],
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "border.bottom": {
+          "type": "enum",
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot"
+          ],
+          "clearable": true,
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "alignment.wrapText": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "alignment.horizontal": {
+          "type": "enum",
+          "values": [
+            "general",
+            "left",
+            "center",
+            "right",
+            "fill",
+            "justify",
+            "centerContinuous",
+            "distributed"
+          ],
+          "valueAliases": {
+            "centeracrossselection": "centerContinuous"
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "alignment.vertical": {
+          "type": "enum",
+          "values": [
+            "top",
+            "center",
+            "bottom",
+            "justify",
+            "distributed"
+          ],
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "alignment.indent": {
+          "type": "int",
+          "constraint": {
+            "min": 0,
+            "max": 15
+          },
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "alignment.shrinkToFit": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "protection.locked": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "protection.hidden": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "numberformat": {
+          "type": "string",
           "add": false,
           "set": false,
           "get": true
@@ -296,16 +564,6 @@
         }
       },
       "propertyGaps": {
-        "formula": {
-          "code": "unsupported_capability",
-          "followUp": "M1-extended (R6b)",
-          "reason": "the Package cell projection retains formula classification and cached scalar values but not formula token text"
-        },
-        "cachedValue": {
-          "code": "unsupported_capability",
-          "followUp": "M1-extended (R6b)",
-          "reason": "the legacy source-backed cell projection does not expose a separate cached-value property"
-        },
         "evaluated": {
           "code": "unsupported_capability",
           "followUp": "M1-extended (R6b)",
@@ -328,7 +586,14 @@
           "text",
           "type",
           "value"
-        ]
+        ],
+        "aliases": {
+          "bold": "font.bold",
+          "color": "font.color",
+          "font": "font.name",
+          "italic": "font.italic",
+          "size": "font.size"
+        }
       }
     },
     {
@@ -360,11 +625,11 @@
       "element": "row",
       "parent": "sheet",
       "operations": {
-        "add": false,
-        "set": false,
+        "add": true,
+        "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "stable": [
@@ -374,32 +639,37 @@
           "/<sheet>/row[N]"
         ]
       },
-      "properties": {},
-      "propertyGaps": {
+      "properties": {
         "height": {
-          "code": "unsupported_capability",
-          "followUp": "M1-extended (R6b)",
-          "reason": "BIFF ROW layout is not projected"
+          "type": "length",
+          "unit": "pt",
+          "add": false,
+          "set": true,
+          "get": true
         },
         "hidden": {
-          "code": "unsupported_capability",
-          "followUp": "M1-extended (R6b)",
-          "reason": "BIFF ROW layout is not projected"
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
         },
         "outlineLevel": {
-          "code": "unsupported_capability",
-          "followUp": "M1-extended (R6b)",
-          "reason": "BIFF ROW layout is not projected"
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
         },
         "collapsed": {
-          "code": "unsupported_capability",
-          "followUp": "M1-extended (R6b)",
-          "reason": "BIFF ROW layout is not projected"
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
         },
         "customHeight": {
-          "code": "unsupported_capability",
-          "followUp": "M1-extended (R6b)",
-          "reason": "BIFF ROW layout is not projected"
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
         }
       },
       "predicates": {
@@ -418,11 +688,11 @@
         "col"
       ],
       "operations": {
-        "add": false,
-        "set": false,
+        "add": true,
+        "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "stable": [
@@ -433,32 +703,36 @@
           "/<sheet>/col[N]"
         ]
       },
-      "properties": {},
-      "propertyGaps": {
+      "properties": {
         "width": {
-          "code": "unsupported_capability",
-          "followUp": "M1-extended (R6b)",
-          "reason": "BIFF COLINFO layout is not projected"
+          "type": "number",
+          "add": false,
+          "set": true,
+          "get": true
         },
         "hidden": {
-          "code": "unsupported_capability",
-          "followUp": "M1-extended (R6b)",
-          "reason": "BIFF COLINFO layout is not projected"
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
         },
         "customWidth": {
-          "code": "unsupported_capability",
-          "followUp": "M1-extended (R6b)",
-          "reason": "BIFF COLINFO layout is not projected"
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
         },
         "outlineLevel": {
-          "code": "unsupported_capability",
-          "followUp": "M1-extended (R6b)",
-          "reason": "BIFF COLINFO layout is not projected"
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
         },
         "collapsed": {
-          "code": "unsupported_capability",
-          "followUp": "M1-extended (R6b)",
-          "reason": "BIFF COLINFO layout is not projected"
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
         }
       },
       "predicates": {
@@ -512,8 +786,8 @@
       "operations": {
         "add": false,
         "set": false,
-        "get": false,
-        "query": false,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
@@ -525,11 +799,44 @@
           "/namedrange[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M1-extended (R6b)",
-        "reason": "the legacy XLS Package read bridge does not project defined names into unified nodes yet"
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "ref": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "scope": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "comment": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "volatile": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1061,8 +1368,8 @@
       "element": "cell",
       "context": "non-scalar-properties",
       "code": "unsupported_capability",
-      "followUp": "M2 XLS formatting and formula setters",
-      "reason": "the initial XLS writer accepts only scalar value and clear payloads; formulas, formatting and other cell metadata remain read-only"
+      "followUp": "M2 XLS font, number-format and protection setters",
+      "reason": "alignment, border line styles and palette fill colors are written through a reused or authored XF; font, border colors, number format, protection, rotation and reading order are read-only because a new XF must keep an existing font/number-format/protection prefix, and formatting is set in its own call rather than together with value, clear or formula"
     },
     {
       "subject": "operation",
@@ -1070,8 +1377,8 @@
       "element": "cell",
       "context": "existing-formula-cells",
       "code": "unsupported_capability",
-      "followUp": "M4 XLS formula-token and formula-cache writes",
-      "reason": "scalar replacement and null or explicit clear on an existing formula cell would change its cached result without changing formula tokens, so the initial writer refuses the operation"
+      "followUp": "M4 XLS dependency-aware formula replacement",
+      "reason": "an existing Formula record (possibly a shared, array or table owner, or a string-cache group) is not replaced by a value, clear or new formula; authored formulas use the BIFF8 tokenizer, which refuses 3-D, external and name references, and carry an empty cached result with always-recalculate set"
     },
     {
       "subject": "operation",
@@ -1089,52 +1396,52 @@
       "context": "tab-state",
       "code": "unsupported_capability",
       "followUp": "M2 XLS worksheet visibility setters",
-      "reason": "the initial XLS writer renames worksheets but does not yet change hidden or very-hidden tab state"
-    },
-    {
-      "subject": "operation",
-      "verb": "add",
-      "element": "workbook",
-      "context": "structural-elements",
-      "code": "unsupported_capability",
-      "followUp": "M2 XLS structural add handlers",
-      "reason": "worksheet and other structural additions are not integrated into the initial XLS write adapter"
+      "reason": "the XLS writer renames worksheets but does not change hidden or very-hidden tab state; added tabs are visible"
     },
     {
       "subject": "operation",
       "verb": "remove",
-      "element": "workbook",
-      "context": "structural-elements",
+      "element": "sheet",
+      "context": "native-dependency-closure",
       "code": "unsupported_capability",
-      "followUp": "M2 XLS structural remove handlers",
-      "reason": "cell-record removal is integrated for ordinary stored cells; worksheet, row, column and other structural removals require their own native dependency-aware handlers"
+      "followUp": "M2 XLS dependency-closing tab removal",
+      "reason": "one ordinary worksheet per call; tabs that an internal 3-D reference range, a sheet-scoped name, a pivot data connection, a drawing or a pivot view still uses are refused, as are the last tab, the last visible tab, chart/macro tabs and macro-bearing or structure-protected workbooks"
     },
     {
       "subject": "operation",
       "verb": "move",
-      "element": "workbook",
-      "context": "structural-elements",
+      "element": "sheet",
+      "context": "native-dependency-closure",
       "code": "unsupported_capability",
-      "followUp": "M2 XLS structural move handlers",
-      "reason": "worksheet and cell movement is not integrated into the initial XLS write adapter"
+      "followUp": "M2 XLS 3-D range rewriting",
+      "reason": "tab order changes that would make an internal 3-D reference range noncontiguous, or that a protected or shared workbook structure forbids, are refused; cells, rows and columns do not move"
     },
     {
       "subject": "operation",
-      "verb": "swap",
-      "element": "workbook",
-      "context": "structural-elements",
+      "verb": "set",
+      "element": "row",
+      "context": "outline-and-defaults",
       "code": "unsupported_capability",
-      "followUp": "M2 XLS structural swap handlers",
-      "reason": "worksheet and cell swapping is not integrated into the initial XLS write adapter"
+      "followUp": "M2 XLS outline and default-layout setters",
+      "reason": "row height and hidden and column width and hidden are written; outline level, collapsed state, clearing a custom size and worksheet default sizes are read-only"
     },
     {
       "subject": "operation",
-      "verb": "batch",
-      "element": "workbook",
-      "context": "extended-commands",
+      "verb": "set",
+      "element": "namedrange",
+      "context": "native-editor",
       "code": "unsupported_capability",
-      "followUp": "M2 XLS extended batch commands",
-      "reason": "XLS batches currently compose admitted scalar cell and worksheet-name sets; structural, formatting and read commands remain pending"
+      "followUp": "M2 XLS defined-name editor",
+      "reason": "defined names are read from the workbook's Lbl records; adding, changing and removing them needs a native Lbl/ExternSheet editor the leaf does not have"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "row",
+      "context": "native-dependency-closure",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLS formula and name rewriting for axis shifts",
+      "reason": "row and column insertion requires an explicit position and takes no properties; workbooks whose formulas, names, tables or array/shared formulas the native axis shift cannot rewrite are refused, and deletion is limited to empty rows and columns"
     },
     {
       "subject": "view",

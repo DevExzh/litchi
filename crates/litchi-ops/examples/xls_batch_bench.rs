@@ -31,6 +31,7 @@ mod enabled {
     use std::time::Instant;
 
     use litchi_core::FileSource;
+    use litchi_core::Position;
     use litchi_ops::{BatchItem, BatchMode, File, OpenOptions, Props, SourceMode, props};
     use litchi_xls::cell_values::{Reference, Selector, Snapshot, Value};
     use litchi_xls::writer::Builder;
@@ -395,10 +396,14 @@ mod enabled {
             while index < fixture.references.len() {
                 let reference = fixture.references[index];
                 let result = match fixture.operation {
-                    Operation::Set => {
-                        edit.set_value(Selector::Position(0), reference, Value::Number(-1.0))
+                    Operation::Set => edit.set_value(
+                        Selector::Position(Position::new(0)),
+                        reference,
+                        Value::Number(-1.0),
+                    ),
+                    Operation::Remove => {
+                        edit.remove_cell(Selector::Position(Position::new(0)), reference)
                     },
-                    Operation::Remove => edit.remove_cell(Selector::Position(0), reference),
                 };
                 match result {
                     Ok(()) => {
@@ -480,7 +485,7 @@ mod enabled {
         let bytes = run.package.to_bytes().expect("serialize native output");
         let snapshot = Snapshot::from_bytes(bytes.clone()).expect("parse native output");
         let sheet = snapshot
-            .worksheet(Selector::Position(0))
+            .worksheet(Selector::Position(Position::new(0)))
             .expect("resolve native output worksheet")
             .expect("native output Sheet1");
         let mut checksum = FNV_OFFSET;

@@ -9,12 +9,12 @@ use super::validation;
 
 /// A bounded editor that can replace only the existing chart-area geometry.
 #[derive(Clone, Copy, Debug)]
-pub struct Transaction {
+pub struct Edit {
     base: Snapshot,
     working: Snapshot,
 }
 
-impl Transaction {
+impl Edit {
     pub(crate) fn new(source: Snapshot) -> Result<Self> {
         validation::ensure(source.rect())?;
         Ok(Self {

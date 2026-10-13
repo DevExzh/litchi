@@ -1363,8 +1363,12 @@ fn source_backed_real_producer_rk_fixture_reopens_and_inverts() {
         })
         .expect("POI 54016 fixture has an RK/MulRk cell with an RK replacement");
     let mut edit = source.edit();
-    edit.set_numeric(Selector::Position(sheet), reference, replacement)
-        .unwrap();
+    edit.set_numeric(
+        Selector::Position(Position::new(sheet)),
+        reference,
+        replacement,
+    )
+    .unwrap();
     let commit = edit.commit_source_backed().unwrap();
     let reopened = Snapshot::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
     let cell = reopened
@@ -3256,7 +3260,11 @@ fn generic_commit_publishes_the_artifact_a_second_render_would_produce() {
         // Fixed-numeric route.
         let mut numeric = source.edit();
         numeric
-            .set_numeric(Selector::Position(sheet), reference, value + 1.0)
+            .set_numeric(
+                Selector::Position(Position::new(sheet)),
+                reference,
+                value + 1.0,
+            )
             .unwrap();
         let numeric = numeric.commit().unwrap();
         assert_eq!(
@@ -3270,7 +3278,7 @@ fn generic_commit_publishes_the_artifact_a_second_render_would_produce() {
             .map(|column| Reference::new(1_000, column).unwrap())
             .find(|candidate| {
                 source
-                    .worksheet(Selector::Position(sheet))
+                    .worksheet(Selector::Position(Position::new(sheet)))
                     .unwrap()
                     .unwrap()
                     .cell(*candidate)
@@ -3280,7 +3288,11 @@ fn generic_commit_publishes_the_artifact_a_second_render_would_produce() {
             .unwrap();
         let mut structural = source.edit();
         structural
-            .insert_cell(Selector::Position(sheet), free, Value::Number(42.0))
+            .insert_cell(
+                Selector::Position(Position::new(sheet)),
+                free,
+                Value::Number(42.0),
+            )
             .unwrap();
         let structural = structural.commit().unwrap();
         assert_eq!(
