@@ -560,10 +560,11 @@ impl Edit {
         }
         let input_limit = svg_plan::payload_limit(&self.base).min(MAX_SVG_INPUT_BYTES);
         if bytes.len() > input_limit {
-            return Err(invalid(format!(
-                "SVG attachment input exceeds {} bytes",
-                input_limit
-            )));
+            return Err(Error::Limit {
+                kind: super::super::LimitKind::SvgInputBytes,
+                observed: u64::try_from(bytes.len()).unwrap_or(u64::MAX),
+                maximum: u64::try_from(input_limit).unwrap_or(u64::MAX),
+            });
         }
         self.take_svg_base_census()?;
         svg_plan::check_payload_budget(&self.base, self.svg_staged_payload_bytes, bytes.len())?;
@@ -1270,9 +1271,11 @@ impl Edit {
             .checked_mul(u64::from(source_range.columns()))
             .ok_or_else(|| invalid("cell-transfer area overflow"))?;
         if cells > MAX_CELL_TRANSFER {
-            return Err(invalid(format!(
-                "cell transfer contains {cells} cells; limit is {MAX_CELL_TRANSFER}"
-            )));
+            return Err(Error::Limit {
+                kind: super::super::LimitKind::TransferCells,
+                observed: cells,
+                maximum: MAX_CELL_TRANSFER,
+            });
         }
         if source_sheet.position() == target_sheet.position() && source_range == target_range {
             return Ok(Some(self));
@@ -1820,7 +1823,7 @@ impl Edit {
         if self.is_empty() {
             let source = self.base.clone();
             return Ok(Commit {
-                workbook: self.base,
+                package: crate::Package::from_workbook(self.base),
                 patch: Patch {
                     source: Some(source.clone()),
                     target: Some(source),
@@ -3520,7 +3523,7 @@ impl Edit {
         {
             let source = base.clone();
             return Ok(Commit {
-                workbook: base,
+                package: crate::Package::from_workbook(base),
                 patch: Patch {
                     source: Some(source.clone()),
                     target: Some(source),
@@ -3657,7 +3660,7 @@ impl Edit {
         let authority = (cross_workbook_scalar || !form_control_validations.is_empty())
             .then(|| PatchAuthority::new(base.clone(), workbook.clone()));
         Ok(Commit {
-            workbook: workbook.clone(),
+            package: crate::Package::from_workbook(workbook.clone()),
             patch: Patch {
                 changes: changes.into_boxed_slice(),
                 package_changes: package_changes.into_boxed_slice(),
@@ -4004,9 +4007,13 @@ impl Edit {
     fn ensure_no_range_formula_transfer(&self, sheet: &Worksheet, range: Rect) -> Result<()> {
         for (position, entry) in sheet.store()?.entries().iter().enumerate() {
             if position >= MAX_CELL_DEPENDENCY_SCAN {
-                return Err(invalid(format!(
-                    "cell-transfer dependency scan exceeds {MAX_CELL_DEPENDENCY_SCAN} stored cells"
-                )));
+                return Err(Error::Limit {
+                    kind: super::super::LimitKind::TransferDependencyScan,
+                    observed: u64::try_from(position)
+                        .unwrap_or(u64::MAX)
+                        .saturating_add(1),
+                    maximum: MAX_CELL_DEPENDENCY_SCAN as u64,
+                });
             }
             let State::Cell {
                 content: Cell::Formula(formula),

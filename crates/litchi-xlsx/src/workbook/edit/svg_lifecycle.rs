@@ -5658,7 +5658,7 @@ mod tests {
 
     #[test]
     fn chained_graph_additions_measure_final_source_less_relationships() {
-        let workbook = Workbook::new().unwrap();
+        let workbook = crate::Package::new().unwrap();
         let limits = workbook.inner.package.read_limits();
         let root = PackURI::new("/").unwrap();
         let owner = PackURI::new("/xl/new-owner.xml").unwrap();
@@ -5739,8 +5739,8 @@ mod tests {
         );
     }
 
-    fn one_picture_workbook() -> Workbook {
-        let baseline = Workbook::new().unwrap();
+    fn one_picture_workbook() -> crate::Package {
+        let baseline = crate::Package::new().unwrap();
         let mut package = baseline.inner.package.clone();
         let worksheet_uri = baseline.inner.sheets[0].part_uri.clone();
         package
@@ -5785,7 +5785,7 @@ mod tests {
                 TargetMode::Internal,
             )
             .unwrap();
-        Workbook::from_package(package).unwrap()
+        crate::Package::from_opc(package).unwrap()
     }
 
     #[test]

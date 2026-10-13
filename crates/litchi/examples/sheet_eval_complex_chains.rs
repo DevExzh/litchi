@@ -21,7 +21,7 @@
 //! ```
 
 use litchi::sheet::FormulaEvaluator;
-use litchi::xlsx::{Formula, Value, Workbook};
+use litchi::xlsx::{Formula, Package, Value};
 use std::env;
 use std::error::Error;
 
@@ -90,7 +90,7 @@ async fn main() -> ExampleResult<()> {
 }
 
 fn build_sample_xlsx(path: &str) -> ExampleResult<()> {
-    let wb = Workbook::create()?;
+    let wb = Package::new()?;
     let mut edit = wb.edit()?;
 
     // Sheet 0: Chains - summary and chain-heavy formulas.
@@ -262,7 +262,7 @@ fn build_sample_xlsx(path: &str) -> ExampleResult<()> {
         ws.set("D2", Formula::new("NETWORKDAYS(A2,B2,C2)")?)?;
     }
 
-    edit.commit()?.into_workbook().save(path)?;
+    edit.commit()?.into_package().save(path)?;
     println!("Created complex chains test workbook at {}", path);
 
     Ok(())

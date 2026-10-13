@@ -75,7 +75,7 @@ fn create_pptx(directory: &Path) -> Result<()> {
 fn create_xlsx(directory: &Path) -> Result<()> {
     let authored = directory.join("core-props.xlsx");
     let cleared = directory.join("core-props-cleared.xlsx");
-    let package = xlsx::Package::create()?;
+    let package = xlsx::Package::new()?;
     package.save(&authored)?;
 
     let mut graph = OpcPackage::open(&authored)?;

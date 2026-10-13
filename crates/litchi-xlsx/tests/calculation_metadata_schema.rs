@@ -18,7 +18,7 @@ fn workbook_xml(body: &str) -> Vec<u8> {
 }
 
 fn package_with_workbook_xml(xml: Vec<u8>) -> Package {
-    let mut raw = Package::create().expect("minimal package").into_plain_opc();
+    let mut raw = Package::new().expect("minimal package").into_plain_opc();
     let workbook = raw
         .main_document_part()
         .expect("main workbook part")
@@ -31,7 +31,7 @@ fn package_with_workbook_xml(xml: Vec<u8>) -> Package {
 }
 
 fn reopen(package: &Package) -> Package {
-    Package::from_bytes(package.to_bytes().expect("serialize package"))
+    Package::from_bytes(&package.to_bytes().expect("serialize package"))
         .expect("reopen serialized package")
 }
 
@@ -97,7 +97,7 @@ fn all_thirteen_calc_pr_setters_insert_and_round_trip_exact_authored_values() {
     expected.set_concurrent_manual_count(Some(4_000_000_002));
     expected.set_force_full_calculation(Some(true));
 
-    let mut package = Package::create().expect("fresh package");
+    let mut package = Package::new().expect("fresh package");
     assert!(
         package
             .calculation_metadata()
@@ -234,7 +234,7 @@ fn xsd_atomic_whitespace_and_leading_zero_unsigned_are_canonicalized_and_plus_re
     assert_eq!(specified.concurrent_manual_count(), Some(9));
     assert_eq!(specified.force_full_calculation(), Some(true));
 
-    let mut package = Package::create().expect("fresh package");
+    let mut package = Package::new().expect("fresh package");
     set_properties(&mut package, parsed);
     let reopened = reopen(&package);
     let snapshot = reopened.calculation_metadata().expect("canonical metadata");
@@ -279,7 +279,7 @@ fn complete_xsd_double_special_value_space_round_trips_through_public_setter() {
         properties
             .set_iteration_delta(Some(value))
             .expect("public setter accepts xsd:double value space");
-        let mut package = Package::create().expect("fresh package");
+        let mut package = Package::new().expect("fresh package");
         set_properties(&mut package, properties);
         let reopened = reopen(&package);
         let snapshot = reopened.calculation_metadata().expect("reopened metadata");
@@ -394,7 +394,7 @@ fn xsd_string_feature_names_preserve_empty_whitespace_and_supplementary_scalars(
             .collect(),
     )
     .expect("nonempty feature collection");
-    let mut package = Package::create().expect("fresh package");
+    let mut package = Package::new().expect("fresh package");
     set_features(&mut package, features);
 
     let reopened = reopen(&package);
@@ -429,7 +429,7 @@ fn xsd_string_feature_names_preserve_empty_whitespace_and_supplementary_scalars(
 
 #[test]
 fn strict_prefixed_noncanonical_workbook_writes_and_reopens_calc_pr() {
-    let mut raw = Package::create().expect("minimal package").into_plain_opc();
+    let mut raw = Package::new().expect("minimal package").into_plain_opc();
     let workbook_name = raw
         .main_document_part()
         .expect("workbook part")
@@ -488,7 +488,7 @@ fn strict_prefixed_noncanonical_workbook_writes_and_reopens_calc_pr() {
 
 #[test]
 fn strict_prefixed_workbook_inserts_calc_features_with_strict_core_qnames() {
-    let mut raw = Package::create().expect("minimal package").into_plain_opc();
+    let mut raw = Package::new().expect("minimal package").into_plain_opc();
     let workbook_name = raw
         .main_document_part()
         .expect("workbook part")
@@ -560,7 +560,7 @@ fn strict_prefixed_workbook_inserts_calc_features_with_strict_core_qnames() {
 #[test]
 fn mce_selected_calc_features_are_readable_but_changed_edit_is_refused() {
     const MC: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
-    let mut raw = Package::create().expect("minimal package").into_plain_opc();
+    let mut raw = Package::new().expect("minimal package").into_plain_opc();
     let workbook_name = raw.main_document_part().unwrap().partname().clone();
     let xml = std::str::from_utf8(raw.get_part(&workbook_name).unwrap().blob())
         .unwrap()

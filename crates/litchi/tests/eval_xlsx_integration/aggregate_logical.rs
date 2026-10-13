@@ -1,5 +1,5 @@
 use litchi::sheet::{CellValue, FormulaEvaluator};
-use litchi::xlsx::{Formula, Workbook};
+use litchi::xlsx::{Formula, Package};
 use tempfile::tempdir;
 
 const TOL: f64 = 1e-9;
@@ -64,7 +64,7 @@ async fn eval_aggregates_and_logical() {
 }
 
 fn build_workbook(path: &str) {
-    let wb = Workbook::create().expect("create workbook");
+    let wb = Package::new().expect("create workbook");
     let mut edit = wb.edit().expect("start workbook edit");
     edit.tab(0)
         .expect("worksheet tab lookup")
@@ -123,7 +123,7 @@ fn build_workbook(path: &str) {
 
     edit.commit()
         .expect("commit workbook edit")
-        .workbook()
+        .package()
         .save(path)
         .expect("save workbook");
 }

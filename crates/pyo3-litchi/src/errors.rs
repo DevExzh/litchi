@@ -34,13 +34,16 @@ use pyo3::types::{PyCode, PyCodeInput, PyCodeMethods, PyDict, PyModule, PyType};
 /// Python 3.8, the oldest version the `abi3-py38` build supports.
 const CLASSES: &CStr = cr#"
 class LitchiError(Exception):
-    """Base class of the errors litchi_py raises for a file it cannot open or read.
+    """Base class of the errors litchi_py raises for a file it cannot open, read,
+    edit or save.
 
     Attributes:
         code: The stable, machine-readable error code, for example
             "unsupported_format". It is the code Rust's ``litchi::Code`` reports.
         message: The human-readable message.
         suggestion: How to recover, or None when there is no known way.
+        item: The zero-based index of the batch item or edit operation that
+            failed, or None.
 
     ``str()`` gives the message, followed by the suggestion when there is one.
     Each family subclass also derives from the built-in exception that fits it,
@@ -49,11 +52,12 @@ class LitchiError(Exception):
 
     _default_code = "internal_error"
 
-    def __init__(self, message, code=None, suggestion=None):
+    def __init__(self, message, code=None, suggestion=None, item=None):
         super().__init__(message)
         self._code = type(self)._default_code if code is None else code
         self._message = message
         self._suggestion = suggestion
+        self._item = item
 
     @property
     def code(self):
@@ -70,13 +74,19 @@ class LitchiError(Exception):
         """How to recover, or None when there is no known way."""
         return self._suggestion
 
+    @property
+    def item(self):
+        """The zero-based index of the batch item or edit operation that
+        failed, or None when the error is not about one."""
+        return self._item
+
     def __str__(self):
         if self._suggestion is None:
             return str(self._message)
         return "{} (suggestion: {})".format(self._message, self._suggestion)
 
     def __reduce__(self):
-        return (type(self), (self._message, self._code, self._suggestion))
+        return (type(self), (self._message, self._code, self._suggestion, self._item))
 
 
 class PathError(LitchiError, LookupError):
@@ -116,8 +126,8 @@ class CorruptFileError(LitchiError, ValueError):
 
 
 class ProtectedError(LitchiError, ValueError):
-    """The document is encrypted, signed or edit-protected (code
-    "document_protected")."""
+    """The document is encrypted, signed or edit-protected, or a save would
+    change its protection (code "document_protected")."""
 
     _default_code = "document_protected"
 "#;
@@ -275,34 +285,47 @@ impl Opener {
 /// message and a suggestion a Python caller can act on.
 ///
 /// Plain Rust data, so it can be built while the GIL is released.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct Failure {
     class: Class,
-    code: &'static str,
+    code: Code,
     message: Cow<'static, str>,
     suggestion: Option<Cow<'static, str>>,
+    item: Option<usize>,
 }
 
 /// Python callers cannot unlock a document yet: the bindings expose no
 /// password entry point.
 const PROTECTED_SUGGESTION: &str = "remove the password in the application that created the file; litchi_py cannot unlock encrypted documents yet";
 
+/// The Python form of Rust's suggestion for an edit of a signed document.
+const SIGNED_SUGGESTION: &str = "remove the signature explicitly with File.unsign() before editing; the first write then publishes the document without it";
+
 impl Failure {
     /// A failure with `code` and `message` and no suggestion.
     pub(crate) fn new(code: Code, message: impl Into<Cow<'static, str>>) -> Self {
         Self {
             class: Class::of(code),
-            code: code.as_str(),
+            code,
             message: message.into(),
             suggestion: None,
+            item: None,
         }
     }
 
     /// A read failure of an opened file.
     pub(crate) fn read(error: &litchi::Error) -> Self {
         let mut failure = Self::new(error.code(), error.message().to_owned());
+        failure.item = error.item();
         failure.suggestion = match error.code() {
-            Code::DocumentProtected => Some(PROTECTED_SUGGESTION.into()),
+            // Rust's suggestions name Rust APIs: `Signed::unsign`, which
+            // `File.unsign()` exposes, and `Locked::unlock`, which the
+            // bindings do not expose yet.
+            Code::DocumentProtected => match error.suggestion() {
+                Some(text) if text.contains("unsign") => Some(SIGNED_SUGGESTION.into()),
+                Some(text) if !text.contains("unlock") => Some(text.to_owned().into()),
+                _ => Some(PROTECTED_SUGGESTION.into()),
+            },
             // The limits are the library defaults; Python offers no open
             // options to raise them.
             Code::LimitExceeded => None,
@@ -332,6 +355,70 @@ impl Failure {
         failure
     }
 
+    /// A refusal of `litchi_py.open` or `open_bytes`. `litchi::File` does
+    /// not hold Apple iWork documents yet (tier 3), so their refusal names
+    /// the opener of the family that reads them instead of a Rust API.
+    pub(crate) fn open_file(error: &litchi::Error) -> Self {
+        let mut failure = Self::read(error);
+        if error.code() == Code::UnsupportedFormat
+            && let Some(detected @ (FileFormat::Pages | FileFormat::Keynote | FileFormat::Numbers)) =
+                error.detected()
+            && let Some(opener) = Opener::of(detected)
+        {
+            failure.suggestion = Some(format!("open it with {}", opener.name()).into());
+        }
+        failure
+    }
+
+    /// A call on a `File` after its `close()`.
+    pub(crate) fn closed() -> Self {
+        Self::new(Code::FileRequired, "the file is closed")
+            .with_suggestion("open it again with litchi_py.open")
+    }
+
+    /// An argument a Python caller passed that the call cannot take.
+    pub(crate) fn argument(message: impl Into<Cow<'static, str>>) -> Self {
+        Self::new(Code::InvalidArgument, message)
+    }
+
+    /// The same failure, attributed to the zero-based batch item or edit
+    /// operation `item`.
+    pub(crate) fn with_item(mut self, item: usize) -> Self {
+        self.item = Some(item);
+        self
+    }
+
+    /// The error code's text.
+    pub(crate) fn code(&self) -> &'static str {
+        self.code.as_str()
+    }
+
+    /// The message.
+    pub(crate) fn message(&self) -> &str {
+        &self.message
+    }
+
+    /// The suggestion, if any.
+    pub(crate) fn suggestion(&self) -> Option<&str> {
+        self.suggestion.as_deref()
+    }
+
+    /// The failure as a unified error, for a Rust closure that must return
+    /// one (`litchi::File::edit`).
+    pub(crate) fn into_error(self) -> litchi::Error {
+        let error = litchi::Error::new(self.code, self.message);
+        match self.suggestion {
+            Some(suggestion) => error.with_suggestion(suggestion),
+            None => error,
+        }
+    }
+
+    /// The same failure with `suggestion`.
+    pub(crate) fn with_suggestion(mut self, suggestion: impl Into<Cow<'static, str>>) -> Self {
+        self.suggestion = Some(suggestion.into());
+        self
+    }
+
     /// A detected format these bindings have no `FileFormat` value for: a
     /// format a newer Litchi added before the bindings learned it.
     pub(crate) fn unknown_format(format: FileFormat) -> Self {
@@ -350,7 +437,7 @@ impl Failure {
             Err(error) => return error,
         };
         let class = classes.0[self.class as usize].bind(py);
-        match class.call1((self.message, self.code, self.suggestion)) {
+        match class.call1((self.message, self.code.as_str(), self.suggestion, self.item)) {
             Ok(instance) => PyErr::from_value(instance),
             Err(error) => error,
         }

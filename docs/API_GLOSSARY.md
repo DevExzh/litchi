@@ -25,9 +25,9 @@ Rules of reading:
 
 | Concept | Canonical | Banned | Notes / status |
 |---|---|---|---|
-| Immutable owner snapshot (physical + semantic, all state verbs) | `Package` | — | ✅ numbers/pages/keynote/doc/ods · ✅ RTF owner split (0223; atomic publication 0226) · ✅ XLS (0197–0198) · ✅ PPT immutable owner/publication and primary edit (0211–0212) · 🔴 pptx remaining direct mutators (0127 removes the package writer) · 🔴 docx immutable public owner (0019 shares the physical graph; mutable APIs remain) · 🔴 odt/odp (split out of the merged type, W3) · 🔴 xlsb (W2) |
+| Immutable owner snapshot (physical + semantic, all state verbs) | `Package` | — | ✅ numbers/pages/keynote/doc/ods · ✅ XLSX primary owner (0250; scoped `&mut` families pending) · ✅ RTF owner split (0223; atomic publication 0226) · ✅ XLS (0197–0198) · ✅ PPT immutable owner/publication and primary edit (0211–0212) · 🔴 pptx remaining direct mutators (0127 removes the package writer) · 🔴 docx immutable public owner (0019 shares the physical graph; mutable APIs remain) · 🔴 odt/odp (split out of the merged type, W3) · 🔴 xlsb (W2) |
 | Read-only semantic projection, word processing | `Document` | — | ✅ pages · ✅ RTF shared owned projection (0223) · ✅ docx owned `Package::document()` projection (0019) |
-| Read-only semantic projection, spreadsheets | `Workbook` | `Spreadsheet` | 🔴 numbers `Document`→`Workbook` (W1) · 🔴 xlsx `Workbook` demoted to projection (W2) · 🔴 ods `Spreadsheet`→`Workbook` (W3) · ✅ XLS (0197) |
+| Read-only semantic projection, spreadsheets | `Workbook` | `Spreadsheet` | 🔴 numbers `Document`→`Workbook` (W1) · ✅ xlsx `Workbook` owned projection via `Package::workbook()` (0250) · 🔴 ods `Spreadsheet`→`Workbook` (W3) · ✅ XLS (0197) |
 | Read-only semantic projection, decks | `Presentation` | — | 🔴 keynote `Document`→`Presentation` (W1) · ✅ pptx view / odp name (shape changes W2/W3) · ✅ PPT shared owned projection (0211) |
 | Projection accessor | `Package::{document, workbook, presentation}()` | — | owned projections primary; borrowed `*_ref()` views secondary |
 | Option-bearing fresh authoring | per-format `Builder` in a focused module | `WorkbookWriter` (xlsb), `Writer` (doc), `*DocumentBuilder` prefixes (litchi-iwa) | ✅ XLSB (0175), XLS (0200), PPT (0213) and RTF (0225) `Builder::build()` return `Package`; 🔴 remaining W2–W4 |
@@ -42,7 +42,7 @@ transaction is the bare `Package::edit()`.
 
 | Concept | Canonical | Banned | Notes / status |
 |---|---|---|---|
-| Edit entry, primary transaction | `Package::edit()` | `edit_document()` (docx), `opened_presentation_transaction()` (pptx), `Workbook::edit()` (xlsx — moves to `Package`) | ✅ docx eager/source entry name (0018; eager package-bound commit 0022, source 0031) · ✅ iWork/xlsx-name · ✅ pptx eager entry (0116) · 🔴 xlsx owner (W2), odt already `edit` but moves onto `Package` (W3) |
+| Edit entry, primary transaction | `Package::edit()` | `edit_document()` (docx), `opened_presentation_transaction()` (pptx), `Workbook::edit()` (xlsx — moves to `Package`) | ✅ docx eager/source entry name (0018; eager package-bound commit 0022, source 0031) · ✅ iWork/xlsx-name · ✅ pptx eager entry (0116) · ✅ xlsx `Package::edit()` (0250) · 🔴 odt already `edit` but moves onto `Package` (W3) |
 | Edit entry, scoped family | `Package::edit_x()` | — | ✅ numbers/keynote/pages families |
 | PPTX slide metadata | `Edit::{set_slide_name, set_slide_hidden}` | — | Eager/source primary edits and unified slide `name`/`hidden` setters; eager, source primary and focused source edits accept combined `set_slide_properties` (0162–0163) |
 | PPTX combined shape properties | `Edit::set_shape_properties`, `ShapePropertiesReplacement` | — | Eager/source primary edits share checked `Position` targets and optional text/bounds in one atomic operation (0153); broader shape properties remain pending |
@@ -50,11 +50,11 @@ transaction is the bare `Package::edit()`.
 | PPT chunked text publication | `Edit::set_shape_text_chunks` | — | At most 4096 globally distinct targets across at most 4096 chunks, each bounded at 256; one native publication and complete readback per call (0220); ordinary `set_shape_texts` remains bounded at 256 |
 | Transaction type | `Edit` | `Transaction` (pptx), `WorkbookEdit` (xlsb) | ✅ pptx primary `opened::Edit` (0116), XLSB structural and cell-value `Edit/Commit/Patch` families, diagnostics and Package commit triads (0165–0171); 🔴 remaining XLSB mutators/error families (W2); ✅ scoped PPTX families renamed `Edit` (0252) |
 | Commit | `Edit::commit() -> Result<Commit>` | — | ✅ everywhere; shape fixed by the rows below |
-| New snapshot accessor | `Commit::package()` / `Commit::into_package()` | `Commit::snapshot()` (docx/pptx), `Commit::{workbook, into_workbook}` (xlsx) | ✅ iWork/docx eager (0022) and source (0031), PPTX eager (0118) · 🔴 other W2 |
-| Diagnostics on every commit | `Commit::diagnostics()` | commits without diagnostics (xlsx, pptx) | ✅ docx/iWork/PPTX eager (0118) · 🔴 remaining owners (W2) |
-| Split commit | `Commit::into_parts() -> (Package, Patch)` | — | ✅ docx eager (0022) and source (0031), PPTX eager (0118); 🔴 remaining owner shapes |
-| Patch application | `Package::apply(&patch)`; scoped `Package::apply_x(&patch)` | `publish_document_commit()`, `apply_document_patch()` (docx), `apply_opened_presentation_commit/patch()` (pptx), `Workbook::apply` (xlsx — moves) | ✅ PPT primary immutable `apply` (0212) · ✅ iWork · ✅ docx eager immutable `apply` (0020) and source (0030); ✅ PPTX primary immutable apply (0118); 🔴 other W2 owners |
-| No-op introspection | `commit.diagnostics().changed()`; `patch.is_noop()` | `Transaction::is_changed()`, `Commit::is_changed()` (pptx), `Patch::is_empty()` (xlsx) | ✅ iWork/docx/PPTX primary (0118) · ✅ scoped PPTX families: `diagnostics().changed()` / `is_noop()` (0252) · 🔴 remaining W2 |
+| New snapshot accessor | `Commit::package()` / `Commit::into_package()` | `Commit::snapshot()` (docx/pptx), `Commit::{workbook, into_workbook}` (xlsx) | ✅ iWork/docx eager (0022) and source (0031), PPTX eager (0118), XLSX primary (0250) · 🔴 other W2 |
+| Diagnostics on every commit | `Commit::diagnostics()` | commits without diagnostics (xlsx, pptx) | ✅ docx/iWork/PPTX eager (0118), XLSX primary `workbook::edit::Diagnostics` (0250) · 🔴 remaining owners (W2) |
+| Split commit | `Commit::into_parts() -> (Package, Patch)` | — | ✅ docx eager (0022) and source (0031), PPTX eager (0118), XLSX primary (0250); 🔴 remaining owner shapes |
+| Patch application | `Package::apply(&patch)`; scoped `Package::apply_x(&patch)` | `publish_document_commit()`, `apply_document_patch()` (docx), `apply_opened_presentation_commit/patch()` (pptx), `Workbook::apply` (xlsx — moves) | ✅ PPT primary immutable `apply` (0212) · ✅ iWork · ✅ docx eager immutable `apply` (0020) and source (0030); ✅ PPTX primary immutable apply (0118); ✅ XLSX primary `Package::apply` and pivot `apply_pivot_*` (0250); 🔴 other W2 owners |
+| No-op introspection | `commit.diagnostics().changed()`; `patch.is_noop()` | `Transaction::is_changed()`, `Commit::is_changed()` (pptx), `Patch::is_empty()` (xlsx) | ✅ iWork/docx/PPTX primary (0118), XLSX primary (0250) · ✅ scoped PPTX families: `diagnostics().changed()` / `is_noop()` (0252) · 🔴 remaining W2 |
 | Inverse patch | `Patch::inverse()` | — | ✅ everywhere |
 | Rollback | *dropping the `Edit`* | `Transaction::rollback()` (pptx) | ✅ primary PPTX edit (0116); ✅ scoped PPTX families (0252) |
 | Mutable writer on a package | *none — `edit()` is the only write path* | `document_mut()` (docx), `presentation_mut()` (pptx) | PPTX `presentation_mut` removed (0127); 🔴 remaining W2 authoring verbs move into `Edit`, direct mutators and `UnsafeEdit` vocabulary still require migration |
@@ -85,11 +85,11 @@ and redaction vocabulary remain pending.
 | Concept | Canonical | Banned | Notes / status |
 |---|---|---|---|
 | Open from path | `open(path)` | — | ✅ everywhere |
-| Open from bytes (copy allowed) | `from_bytes(&[u8])` | `from_bytes(Vec<u8>)` signatures (xlsx/odt/odp), `from_slice` (xlsx), `from_vec` (pptx, removed 0252) | ✅ DOCX owning/lazy Package (0038/0040); ✅ PPTX (0252); 🔴 W2/W3 |
+| Open from bytes (copy allowed) | `from_bytes(&[u8])` | `from_bytes(Vec<u8>)` signatures (xlsx/odt/odp), `from_slice` (xlsx), `from_vec` (pptx, removed 0252) | ✅ DOCX owning/lazy Package (0038/0040); ✅ XLSX `Package` (0250; copies into the owned source archive); ✅ PPTX (0252) · 🔴 W2/W3 |
 | Open from shared bytes (zero-copy) | `from_shared_bytes(Arc<[u8]>)` | — | ✅ numbers; offered only where zero-copy is real |
 | Open from reader | `from_reader(R)` | — | ✅ docx/xlsx; extended per wave |
-| Configured open | `open_with_options(path, OpenOptions)`, `from_bytes_with_options(bytes, OpenOptions)` | `open_with_limits`, `open_with` (doc), `open_with_options` under other type names | envelope decided in §5 · ✅ DOCX (0038) · ✅ PPTX owning `Package` and positional-source presentation owners (0252) |
-| Minimal fresh artifact | `Package::new()` | `Workbook::create()` duplicate (xlsx) | ✅ docx; ✅ canonical PPTX constructor (0127); ✅ XLSB (0175); ✅ XLS (0199); ✅ RTF (0225) · 🔴 xlsx (W2); all formats gain it |
+| Configured open | `open_with_options(path, OpenOptions)`, `from_bytes_with_options(bytes, OpenOptions)` | `open_with_limits`, `open_with` (doc), `open_with_options` under other type names | envelope decided in §5 · ✅ DOCX (0038) · ✅ XLSX `OpenOptions` (source limits, leniency, encryption limits; 0250) · ✅ PPTX owning `Package` and positional-source presentation owners (0252) |
+| Minimal fresh artifact | `Package::new()` | `Workbook::create()` duplicate (xlsx) | ✅ docx; ✅ canonical PPTX constructor (0127); ✅ XLSB (0175); ✅ XLS (0199); ✅ RTF (0225); ✅ XLSX (0250) · all formats gain it |
 | Save to path | `save(path)` — **always atomic** (sibling temp + rename) | non-atomic `Builder::save` (odt/odp) | ✅ OOXML, including lazy DOCX (0041), and RTF (0226) · 🔴 ODF (W3, behavior change with CRUD evidence) |
 | Save with explicit durability | `save_with_durability(path, Durability)` | — | ✅ OOXML and RTF (0226); extended everywhere |
 | Bytes output | `to_bytes()` | `Builder::build() -> Vec<u8>` as output (ODF) | ✅ owning DOCX (0044); lazy managed DOCX bytes pending. `build()` returns `Package`; output lives on `Package` |
@@ -245,10 +245,10 @@ semantic-limit migrations.
 |---|---|---|---|
 | Semantic metadata type | `Metadata` (merged field union; typed `Keywords`; real time types) | `ooxml_common::Props`; the `creator` field name (→ `author`) | 🔴 W2 |
 | Metadata read | `Package::metadata()` | `Package::props()` (docx) | ✅ facade/ODF/iWork reads · 🔴 docx rename (W2) · 🔴 pptx/xlsx typed entry added (W2) |
-| Metadata mutation | `Package::{edit_metadata, apply_metadata}` + `metadata::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` | `put_props()`, `props_mut()`, `clear_props()` | 🔴 W2 |
+| Metadata mutation | `Package::{edit_metadata, apply_metadata}` + `metadata::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` | `put_props()`, `props_mut()`, `clear_props()` | 🔴 W2 · ✅ doc/xls/ppt `package::metadata` (0254) |
 | Custom properties | `custom_props()` / `edit_custom_props()` | — | ✅ name (docx/pptx/xlsx); mutation transactionalized W2 |
 | Application properties (OOXML-only) | `app_props()` | — | format-specific layer, OOXML only |
-| Fresh-authoring metadata | `Builder::set_metadata(Metadata)` | — | ✅ ODF; not an opened-document mutation |
+| Fresh-authoring metadata | `Builder::set_metadata(Metadata)` | `Builder::set_property` (doc/xls/ppt) | ✅ ODF · ✅ doc/xls/ppt (0254); not an opened-document mutation |
 | iWork metadata write | typed unsupported until native gates pass | — | no capability is claimed ahead of evidence |
 
 ## 7. Selectors and coordinates
@@ -853,7 +853,8 @@ follow-ups for command families and text/dump semantics not yet implemented.
 
 ## XLSX unified creation and publication (record 0095)
 
-`create(FileFormat::Xlsx)` adopts the native `Workbook::create` owner directly.
+`create(FileFormat::Xlsx)` adopts the native `Package::new` owner directly
+(record 0250 replaced the removed `Workbook::create`).
 `File::{to_bytes, write_to, save, save_as, save_with}` share the existing
 publication vocabulary and strict policies across DOCX and XLSX. Path-backed
 XLSX handles retain their origin through unlock; bytes and newly created
@@ -1503,6 +1504,90 @@ editable document model is introduced. Temporary source indexes are bounded;
 staging windows close at their limits, while scalar admission stays available
 when the optimization index cannot fit. Source-changing boundaries publish
 before resolving later positional paths.
+
+## Gate hardening (record 0249)
+
+Record 0249 extends the registered gate without changing any public API. Every
+added rule matches code that is already conformant; banned names that still
+exist are listed below as wave residue, not as failing rules.
+
+- **Families.** `litchi_docx::document` is registered in `docx-minimal` and
+  `docx-full`; it is the only OOXML module exporting all six family types.
+  **Pending, not registered:** pptx `opened`, `source` and `change_tracking`
+  (no `Error`, `LimitKind`); xlsb `cell_values` (no `LimitKind`) and its
+  structure/worksheet families; the scoped xlsx families
+  (`workbook::edit` is registered by record 0250) (no `Diagnostics`, `Error`, `LimitKind`, or no `Edit`); docx
+  `content_control`, `ink`, `section::layout`, `revision::conflict` and the
+  `source_backed::*` edit modules. Each registers in the change that completes it.
+- **pptx-full** now carries the nine primary-transaction bans `pptx-minimal`
+  already had (`opened::Transaction`, `opened_presentation_transaction`,
+  `apply_opened_presentation_{commit,patch}`, `opened::Edit::{rollback,
+  is_changed}`, `opened::Commit::{snapshot, is_changed}`,
+  `opened::Patch::is_empty`).
+- **ppt-full** builds every PPT feature with the `ppt-minimal` rules. XLS, RTF
+  and core declare no Cargo features, so their single profile is already the
+  full surface; no duplicate profile is added.
+- **core-minimal** bans the §4 configuration names that `litchi-core` must not
+  grow (`ReadLimits`, `ReadLimitsBuilder`, `ReadResource`,
+  `SourcePackageLimits`, `RecordLimits`, `DocumentSourceLimits`,
+  `DocumentLimits`, `DocumentSemanticLimits`, `PackageOpenOptions`,
+  `ReadOptions`, `LimitsError`). §4 bans `Limits` only as DOC's
+  `package::Limits` (already banned in the DOC profiles); core's execution
+  budget `litchi_core::Limits` is not a banned name.
+- **ooxml-common-minimal/full** register the transaction, open/output and
+  configuration names banned in §2–§4 that `litchi-ooxml-common` does not expose.
+- **Facade.** A `litchi` profile cannot be activated: even the featureless
+  facade re-exports dependency crates through public globs
+  (`common::*` → `litchi_core::*`), whose children rustdoc JSON omits, so the
+  checker refuses the profile (record 0017). It needs dependency export data.
+
+Wave residue that still exposes a glossary-banned name (owner: record 0248):
+
+| Crate | Public name | Canonical | Owner |
+|---|---|---|---|
+| ooxml-common | `custom_xml::Transaction`, `Transaction::is_changed`, `Commit::snapshot` | `Edit`, `diagnostics().changed()`, `Commit::package()` | Phase B step 6 (owns `litchi-ooxml-common`) |
+| ooxml-common | `custom_data::Limits` | `SemanticLimits` | Phase B step 6 |
+| core | `Limits`, `Error::ResourceLimit` (execution budgets) | not banned by §4; rename only on an owner decision | owner decision |
+| pptx, xlsb, xlsx, opc, ops | names listed in record 0248 §2 | §2–§4 | Phase B steps 4–5, ops follow-ups |
+
+## Legacy OLE metadata (record 0254)
+
+DOC, XLS and PPT author and edit document properties through the shared
+`litchi_ole_common::property_set::SummaryProperties` model
+(`SummaryInformation`, `DocumentSummaryInformation` and the user-defined
+section). Fresh authoring is `Builder::set_metadata(Metadata)` plus
+`Builder::{summary_properties, summary_properties_mut}` for typed and custom
+properties; the refusing (DOC) or silently dropping (PPT) `set_property` is
+deleted and banned. Opened packages expose `Package::{metadata,
+edit_metadata, apply_metadata}` and the registered
+`package::metadata::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}`
+family; `LimitKind` has no caller-selected dimension yet. The one
+`litchi_core::Metadata` conversion is `SummaryProperties::{from_metadata,
+merge_metadata}`; fields without a property-set slot (`identifier`,
+`hyperlink_base`, unzoned timestamps) are refused with
+`MetadataError::Unsupported`, never dropped. The unified layer accepts
+initial metadata in `create_with` and `set("/metadata", ..)` with
+root-metadata keys and `custom.<name>`. See
+[0254](unified-ops/0254-legacy-ole-metadata.md).
+
+## XLSX W2 owner reshape (record 0250)
+
+`xlsx::Package` is the immutable owner of every state verb: `new`, `open`,
+`from_bytes(&[u8])`, `from_reader`, the `*_with_options(.., OpenOptions)`
+ingress, `edit`, `apply`, the save/bytes/stream outputs and the security
+verbs. `xlsx::Workbook` is the owned read-only projection
+(`Package::workbook()`, borrowed `workbook_ref()`). `workbook::edit` is a
+registered family: `Commit::{package, patch, diagnostics, into_package,
+into_parts}`, `Patch::{is_noop, operation_count}`, `Diagnostics::changed`,
+`LimitKind` with `Error::Limit { kind, observed, maximum }`; `Error` is still
+the crate error (module split pending). Removed: `Package::create`,
+`Workbook::create`, `from_slice*`, `from_bytes(Vec)`, `*_with_limits` and
+`*_with_leniency` ingress, `Package::into_workbook`, `Commit::{workbook,
+into_workbook}`, `Patch::{is_empty, len}`, `Workbook::unsigned` (use
+`Package::unsign`) and the pivot `Workbook{Transaction,Patch,Commit}` types,
+now `PackageEdit`/`PackagePatch`/`PackageCommit` with `Package::apply_pivot_*`.
+Scoped `&mut` families and `SourceBackedWorkbook` ingress names remain W2
+residue.
 
 ## PPTX ingress options and patch conflict (0252)
 

@@ -13,7 +13,7 @@ use crate::parts::protection::{EditProtection, ProtectionPolicy, classify};
 use crate::user_defined_hyperlinks::{Limits, MutationError, UserDefinedHyperlinks};
 use litchi_cfb::{OleError, OleFile};
 use litchi_ole_common::property_set::{
-    self, Binding, PropertySetReader, Section, Stream, USER_DEFINED_PROPERTIES_FMTID,
+    self, Binding, CodePage, PropertySetReader, Section, Stream, USER_DEFINED_PROPERTIES_FMTID,
 };
 use litchi_ole_common::vba_signature;
 use std::io::Cursor;
@@ -176,6 +176,18 @@ impl Transaction {
         })
     }
 
+    /// The shared property-set editor, for the package metadata transaction.
+    pub(crate) const fn editor(&self) -> &property_set::Editor {
+        &self.editor
+    }
+
+    /// Mutable access to the shared editor; staging through it marks the
+    /// transaction changed.
+    pub(crate) fn editor_mut(&mut self) -> &mut property_set::Editor {
+        self.changed = true;
+        &mut self.editor
+    }
+
     /// Whether a successful edit has changed the transaction state.
     #[must_use]
     pub const fn is_changed(&self) -> bool {
@@ -297,17 +309,24 @@ impl Transaction {
     /// The common typed transaction is committed before its replacement is
     /// handed to the common CFB editor. A no-op typed commit does not stage a
     /// stream replacement, preserving the complete source artifact byte-for-byte.
+    ///
+    /// A package without a `\x05SummaryInformation` stream (a file the
+    /// [`crate::Builder`] built without properties, for one) starts from an
+    /// empty section with the Windows-1252 code page, and the stream is
+    /// created when the edit changes it; an existing blank section (no
+    /// property, not even a code page) is treated the same way.
     pub fn edit_summary_information<F>(&mut self, edit: F) -> Result<bool>
     where
         F: for<'a> FnOnce(
             &mut property_set::summary_information::Edit<'a>,
         ) -> std::result::Result<(), OleError>,
     {
-        let source = self
-            .editor
-            .property_set(Binding::SummaryInformation)?
-            .ok_or(OleError::StreamNotFound)?;
-        let snapshot = property_set::summary_information::Snapshot::from_section(&source)?;
+        let snapshot = match self.editor.property_set(Binding::SummaryInformation)? {
+            Some(source) if !source.is_empty() => {
+                property_set::summary_information::Snapshot::from_section(&source)?
+            },
+            _ => property_set::summary_information::Snapshot::new(CodePage::WINDOWS_1252)?,
+        };
         let mut transaction = snapshot.transaction()?;
         {
             let mut draft = transaction.edit();
@@ -324,17 +343,25 @@ impl Transaction {
     }
 
     /// Applies a typed `DocumentSummaryInformation` edit through the common PIDDSI owner.
+    ///
+    /// A missing or blank section is handled as in
+    /// [`Self::edit_summary_information`]; a user-defined section already in
+    /// the stream is kept.
     pub fn edit_document_summary_information<F>(&mut self, edit: F) -> Result<bool>
     where
         F: for<'a> FnOnce(
             &mut property_set::document_summary::Edit<'a>,
         ) -> std::result::Result<(), OleError>,
     {
-        let source = self
+        let snapshot = match self
             .editor
             .property_set(Binding::DocumentSummaryInformation)?
-            .ok_or(OleError::StreamNotFound)?;
-        let snapshot = property_set::document_summary::Snapshot::from_section(&source)?;
+        {
+            Some(source) if !source.is_empty() => {
+                property_set::document_summary::Snapshot::from_section(&source)?
+            },
+            _ => property_set::document_summary::Snapshot::new(CodePage::WINDOWS_1252)?,
+        };
         let mut transaction = snapshot.transaction()?;
         {
             let mut draft = transaction.edit();
@@ -798,6 +825,59 @@ mod tests {
         let applied = commit.patch().apply(&snapshot).unwrap();
         assert_eq!(applied.bytes(), commit.snapshot().bytes());
         assert_eq!(commit.patch().revert(&applied).unwrap().bytes(), source);
+    }
+
+    #[test]
+    fn missing_and_blank_standard_sections_are_created_by_typed_edits() {
+        // A document the writer created without properties, given blank
+        // standard sections (no property, not even a code page).
+        let mut builder = crate::Builder::new();
+        builder.add_paragraph("Body").unwrap();
+        let written = builder.build().unwrap().to_bytes().unwrap();
+        let mut source = OleFile::open(Cursor::new(written.clone())).unwrap();
+        let mut rebuilt = OleWriter::new();
+        for path in source.list_streams() {
+            let refs: Vec<&str> = path.iter().map(String::as_str).collect();
+            let data = source.open_stream(&refs).unwrap();
+            rebuilt.create_stream(&refs, &data).unwrap();
+        }
+        for (name, format_identifier) in [
+            ("\u{0005}SummaryInformation", SUMMARY_INFORMATION_FMTID),
+            (
+                "\u{0005}DocumentSummaryInformation",
+                DOCUMENT_SUMMARY_INFORMATION_FMTID,
+            ),
+        ] {
+            let blank = PropertyStream::new(Section::new(format_identifier))
+                .to_bytes()
+                .unwrap();
+            rebuilt.create_stream(&[name], &blank).unwrap();
+        }
+        let mut output = Cursor::new(Vec::new());
+        rebuilt.write_to(&mut output).unwrap();
+
+        for bytes in [written, output.into_inner()] {
+            let snapshot = Snapshot::from_bytes(bytes).unwrap();
+            let mut transaction = snapshot.transaction().unwrap();
+            assert!(
+                transaction
+                    .edit_summary_information(|edit| edit.set_title("title"))
+                    .unwrap()
+            );
+            assert!(
+                transaction
+                    .edit_document_summary_information(|edit| edit.set_company("company"))
+                    .unwrap()
+            );
+            let commit = transaction.commit().unwrap();
+            let edited = commit.snapshot();
+            let summary = edited.summary_information().unwrap().unwrap();
+            assert_eq!(summary.title(), Some("title"));
+            assert_eq!(summary.codepage(), Some(CodePage::WINDOWS_1252));
+            let document_summary = edited.document_summary_information().unwrap().unwrap();
+            assert_eq!(document_summary.company(), Some("company"));
+            assert_eq!(document_summary.codepage(), Some(CodePage::WINDOWS_1252));
+        }
     }
 
     #[test]

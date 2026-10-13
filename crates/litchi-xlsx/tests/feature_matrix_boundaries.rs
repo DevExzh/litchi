@@ -48,12 +48,12 @@ fn untouched_conditional_hyperlink_and_page_break_xml_stays_byte_exact_through_s
     assert_compact_xml(&worksheet);
 
     let uri = worksheet_uri();
-    let mut raw = Package::create().expect("minimal package").into_plain_opc();
+    let mut raw = Package::new().expect("minimal package").into_plain_opc();
     raw.get_part_mut(&uri)
         .expect("worksheet part")
         .set_blob(worksheet.clone());
     let package = Package::from_opc(raw).expect("validated package");
-    let reopened = Package::from_bytes(package.to_bytes().expect("serialized package"))
+    let reopened = Package::from_bytes(&package.to_bytes().expect("serialized package"))
         .expect("reopened package")
         .into_plain_opc();
 
@@ -65,7 +65,7 @@ fn untouched_conditional_hyperlink_and_page_break_xml_stays_byte_exact_through_s
 
 #[test]
 fn defined_names_are_inert_catalog_records_and_custom_props_use_the_package_facade() {
-    let mut raw = Package::create().expect("minimal package").into_plain_opc();
+    let mut raw = Package::new().expect("minimal package").into_plain_opc();
     let workbook_uri = raw
         .main_document_part()
         .expect("workbook part")
@@ -88,7 +88,7 @@ fn defined_names_are_inert_catalog_records_and_custom_props_use_the_package_faca
         .set_blob(workbook_xml);
 
     let package = Package::from_opc(raw).expect("defined-name package");
-    let workbook = package.workbook().expect("workbook snapshot");
+    let workbook = package.workbook();
     assert_eq!(workbook.defined_names().len(), 1);
     assert_eq!(workbook.defined_names()[0].name, "Rate");
     assert_eq!(workbook.defined_names()[0].reference, "Sheet1!$A$1");

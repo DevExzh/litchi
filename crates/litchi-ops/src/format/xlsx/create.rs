@@ -28,7 +28,7 @@ pub(crate) fn create(options: &CreateOptions) -> Result<Xlsx> {
         ));
     }
 
-    let workbook = litchi_xlsx::Workbook::create().map_err(Error::from)?;
+    let workbook = litchi_xlsx::Package::new().map_err(Error::from)?;
     Xlsx::from_workbook(workbook, &OpenOptions::new())
 }
 

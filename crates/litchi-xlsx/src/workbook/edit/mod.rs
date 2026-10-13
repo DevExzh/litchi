@@ -21,7 +21,13 @@ use crate::Style;
 use crate::cell::{Cell, Content};
 use crate::chain;
 use crate::column::{OutlineAt, State as ColumnState, WidthAt};
-use crate::error::{EditBlock, Error, RemoveBlock, Result, TabEditBlock, allocation, invalid};
+/// The error of the primary transaction family.
+///
+/// The family currently reports the crate error; its limit failures use
+/// [`Error::Limit`] with a [`LimitKind`]. The per-module split of the crate
+/// error is staged with later ADR 0034 waves.
+pub use crate::error::Error;
+use crate::error::{EditBlock, RemoveBlock, Result, TabEditBlock, allocation, invalid};
 use crate::layout;
 use crate::raw;
 use crate::raw::worksheet::edit::{
@@ -35,6 +41,7 @@ use crate::web::{Binding as WebBinding, Bindings as WebBindings};
 
 mod codec;
 mod drawing_transfer;
+mod family;
 mod model;
 mod package;
 mod planning;
@@ -53,6 +60,7 @@ use validation::{
 #[cfg(test)]
 mod tests;
 
+pub use family::{Diagnostics, LimitKind};
 pub use model::{
     ActiveTab, Change, Commit, Conflict, ConflictSet, JoinError, JoinFailure, PackageChange, Patch,
     State,

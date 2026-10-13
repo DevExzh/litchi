@@ -22,11 +22,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // PRESENTATION PROPERTIES
     // ============================================================
     println!("Setting presentation properties...");
-    writer.set_property("Title", "Comprehensive PPT Format Test");
-    writer.set_property("Author", "Litchi Library");
-    writer.set_property("Subject", "Testing all PPT writing features");
-    writer.set_property("Company", "Litchi Project");
-    writer.set_property("Comments", "Generated to test PowerPoint 97-2003 format");
+    writer.set_metadata(litchi_core::Metadata {
+        title: Some("Comprehensive PPT Format Test".to_owned()),
+        author: Some("Litchi Library".to_owned()),
+        subject: Some("Testing all PPT writing features".to_owned()),
+        company: Some("Litchi Project".to_owned()),
+        description: Some("Generated to test PowerPoint 97-2003 format".to_owned()),
+        ..litchi_core::Metadata::default()
+    })?;
 
     // ============================================================
     // SLIDE 1: TITLE SLIDE

@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::io;
 
-use litchi_xlsx::{Formula, Workbook};
+use litchi_xlsx::Formula;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let output = std::env::args_os().nth(1).ok_or_else(|| {
@@ -11,7 +11,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         )
     })?;
 
-    let source = Workbook::new()?;
+    let source = litchi_xlsx::Package::new()?;
     let mut edit = source.edit()?;
     edit.add("Summary")?
         .set("A1", "Created atomically")?
@@ -21,7 +21,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     edit.add("Active Data")?.set("A1", 42_i32)?.activate();
 
     let committed = edit.commit()?;
-    committed.workbook().save(output)?;
-    println!("committed {} semantic changes", committed.patch().len());
+    committed.package().save(output)?;
+    println!(
+        "committed {} semantic changes",
+        committed.patch().operation_count()
+    );
     Ok(())
 }

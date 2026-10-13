@@ -29,7 +29,7 @@ use crate::encryption::{EncryptionEntropy, EncryptionProfile};
 use crate::header_footer::HeaderFooter;
 use crate::transition::TransitionInfo;
 use crate::view_info::SlideViewInfo;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use zeroize::Zeroizing;
 
 /// Error type for PPT writing
@@ -48,6 +48,13 @@ pub enum WriteError {
     Vba(litchi_vba::Error),
     /// Host-neutral Office Graph authoring error.
     Graph(litchi_ograph::Error),
+    /// The metadata given to [`Builder::set_metadata`] cannot be stored in
+    /// the OLE property sets.
+    Metadata(litchi_ole_common::property_set::summary_properties::MetadataError),
+    /// Document properties were combined with password-to-open encryption,
+    /// whose encrypted summary stream ([MS-OFFCRYPTO] 2.3.5.4) is not
+    /// produced; the builder refuses rather than store them in plaintext.
+    EncryptedMetadata,
 }
 
 impl std::fmt::Debug for WriteError {
@@ -75,6 +82,11 @@ impl std::fmt::Debug for WriteError {
                 .debug_tuple("WriteError::Graph")
                 .field(error)
                 .finish(),
+            Self::Metadata(error) => formatter
+                .debug_tuple("WriteError::Metadata")
+                .field(error)
+                .finish(),
+            Self::EncryptedMetadata => formatter.write_str("WriteError::EncryptedMetadata"),
         }
     }
 }
@@ -94,6 +106,12 @@ impl From<litchi_cfb::OleError> for WriteError {
 impl From<litchi_vba::Error> for WriteError {
     fn from(err: litchi_vba::Error) -> Self {
         WriteError::Vba(err)
+    }
+}
+
+impl From<litchi_ole_common::property_set::summary_properties::MetadataError> for WriteError {
+    fn from(err: litchi_ole_common::property_set::summary_properties::MetadataError) -> Self {
+        Self::Metadata(err)
     }
 }
 
@@ -117,6 +135,11 @@ impl std::fmt::Display for WriteError {
             #[cfg(feature = "vba-inspection")]
             WriteError::Vba(e) => write!(f, "VBA project error: {e}"),
             WriteError::Graph(e) => write!(f, "Office Graph error: {e}"),
+            WriteError::Metadata(e) => write!(f, "PPT metadata error: {e}"),
+            WriteError::EncryptedMetadata => write!(
+                f,
+                "PPT document properties cannot be written with password-to-open encryption"
+            ),
         }
     }
 }
@@ -131,7 +154,8 @@ impl std::error::Error for WriteError {
             #[cfg(feature = "vba-inspection")]
             Self::Vba(error) => Some(error),
             Self::Graph(error) => Some(error),
-            Self::InvalidData(_) => None,
+            Self::Metadata(error) => Some(error),
+            Self::InvalidData(_) | Self::EncryptedMetadata => None,
         }
     }
 }
@@ -317,8 +341,10 @@ impl WritableSlide {
 pub struct Builder {
     /// Slides in the presentation
     pub(super) slides: Vec<WritableSlide>,
-    /// Presentation properties
-    pub(super) properties: HashMap<String, String>,
+    /// Presentation properties for the `\x05SummaryInformation` and
+    /// `\x05DocumentSummaryInformation` streams; the fixed blank streams are
+    /// written while empty.
+    pub(super) properties: litchi_ole_common::property_set::SummaryProperties,
     /// Slide width in EMUs (default: Letter size)
     pub(super) slide_width: i32,
     /// Slide height in EMUs (default: Letter size)

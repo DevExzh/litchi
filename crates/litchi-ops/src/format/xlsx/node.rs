@@ -220,10 +220,15 @@ impl SheetHandle {
             XlsxOwner::Source(workbook) => workbook
                 .sheet(position)?
                 .map(|sheet| Self::Source { sheet }),
-            XlsxOwner::Eager(workbook) => workbook.sheet(position)?.map(|sheet| Self::Eager {
-                sheet,
-                workbook: file.clone(),
-            }),
+            XlsxOwner::Eager(workbook) => {
+                workbook
+                    .workbook_ref()
+                    .sheet(position)?
+                    .map(|sheet| Self::Eager {
+                        sheet,
+                        workbook: file.clone(),
+                    })
+            },
         })
     }
 
@@ -234,10 +239,15 @@ impl SheetHandle {
             XlsxOwner::Source(workbook) => {
                 workbook.sheet(name)?.map(|sheet| Self::Source { sheet })
             },
-            XlsxOwner::Eager(workbook) => workbook.sheet(name)?.map(|sheet| Self::Eager {
-                sheet,
-                workbook: file.clone(),
-            }),
+            XlsxOwner::Eager(workbook) => {
+                workbook
+                    .workbook_ref()
+                    .sheet(name)?
+                    .map(|sheet| Self::Eager {
+                        sheet,
+                        workbook: file.clone(),
+                    })
+            },
         })
     }
 
@@ -458,6 +468,7 @@ fn base_format(file: &Xlsx) -> Result<Option<CellFormat>> {
     match &file.0.owner {
         XlsxOwner::Source(workbook) => Ok(workbook.format(None)?),
         XlsxOwner::Eager(workbook) => workbook
+            .workbook_ref()
             .styles()?
             .base()
             .map(|style| style.format())
@@ -842,7 +853,7 @@ pub(super) fn sheet_name(file: &Xlsx, position: usize) -> &str {
 pub(super) fn defined_names(file: &Xlsx) -> &[xlsx::raw::DefinedName] {
     match &file.0.owner {
         XlsxOwner::Source(workbook) => workbook.defined_names(),
-        XlsxOwner::Eager(workbook) => workbook.defined_names(),
+        XlsxOwner::Eager(workbook) => workbook.workbook_ref().defined_names(),
     }
 }
 
@@ -1268,7 +1279,7 @@ fn workbook_value(file: &Xlsx, key: WorkbookKey) -> Option<Value<'_>> {
         WorkbookKey::Date1904 => {
             let date_system = match &file.0.owner {
                 XlsxOwner::Source(workbook) => workbook.date_system(),
-                XlsxOwner::Eager(workbook) => workbook.date_system(),
+                XlsxOwner::Eager(workbook) => workbook.workbook_ref().date_system(),
             };
             matches!(date_system, xlsx::DateSystem::Excel1904).then_some(Value::Bool(true))
         },
@@ -1277,7 +1288,10 @@ fn workbook_value(file: &Xlsx, key: WorkbookKey) -> Option<Value<'_>> {
                 XlsxOwner::Source(workbook) => {
                     workbook.active_sheet().map(|sheet| sheet.position())
                 },
-                XlsxOwner::Eager(workbook) => workbook.active_sheet().map(|sheet| sheet.position()),
+                XlsxOwner::Eager(workbook) => workbook
+                    .workbook_ref()
+                    .active_sheet()
+                    .map(|sheet| sheet.position()),
             };
             active
                 .filter(|position| *position != 0)

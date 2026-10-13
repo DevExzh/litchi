@@ -17,16 +17,24 @@ use litchi_opc::{OpcPackage, PackURI};
 /// transaction starts ([`crate::Package::unsign`] or
 /// [`OpcPackage::unsign`]) to edit a signed workbook.
 pub struct Transaction<'a> {
-    target: &'a mut OpcPackage,
+    target: crate::package::Target<'a>,
     staged: OpcPackage,
 }
 
 impl<'a> Transaction<'a> {
     /// Start a transaction after validating the existing slicer graph.
     pub fn new(target: &'a mut OpcPackage) -> Result<Self> {
-        super::validation::graph(target)?;
+        Self::start(target.into())
+    }
+
+    pub(crate) fn for_package(package: &'a mut crate::Package) -> Result<Self> {
+        Self::start(crate::package::Target::Package(package))
+    }
+
+    fn start(target: crate::package::Target<'a>) -> Result<Self> {
+        super::validation::graph(&target)?;
         Ok(Self {
-            staged: target.clone(),
+            staged: (*target).clone(),
             target,
         })
     }
@@ -126,9 +134,9 @@ impl<'a> Transaction<'a> {
     }
 
     /// Publish the staged graph. Dropping without calling this discards it.
-    pub fn commit(self) -> Result<()> {
+    pub fn commit(mut self) -> Result<()> {
         super::validation::graph(&self.staged)?;
-        *self.target = self.staged;
+        self.target.publish(self.staged)?;
         Ok(())
     }
 

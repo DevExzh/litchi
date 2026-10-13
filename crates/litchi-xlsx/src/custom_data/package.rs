@@ -694,7 +694,7 @@ fn same_value(left: &CustomDataView, right: &CustomDataView, limits: Limits) -> 
 
 /// Clone-staged Custom Data CRUD transaction.
 pub struct Transaction<'a> {
-    target: &'a mut OpcPackage,
+    target: crate::package::Target<'a>,
     before: Snapshot,
     draft: Vec<Part>,
     limits: Limits,
@@ -709,8 +709,16 @@ impl<'a> Transaction<'a> {
 
     /// Start a transaction with explicit limits.
     pub fn with_limits(target: &'a mut OpcPackage, limits: &Limits) -> Result<Self> {
+        Self::start(target.into(), limits)
+    }
+
+    pub(crate) fn for_package(package: &'a mut crate::Package, limits: &Limits) -> Result<Self> {
+        Self::start(crate::package::Target::Package(package), limits)
+    }
+
+    fn start(target: crate::package::Target<'a>, limits: &Limits) -> Result<Self> {
         let limits = validate_limits(*limits)?;
-        let before = Snapshot::load_with_limits(target, &limits)?;
+        let before = Snapshot::load_with_limits(&target, &limits)?;
         let mut draft = Vec::new();
         draft
             .try_reserve_exact(before.entries.len())
@@ -753,7 +761,7 @@ impl<'a> Transaction<'a> {
         }
         let mut candidate = self.draft.clone();
         candidate[index].value = value;
-        validate_entries(self.target, &candidate, &self.limits)?;
+        validate_entries(&self.target, &candidate, &self.limits)?;
         if candidate[index].id().is_empty() && self.connections.count(current.id()) > 0 {
             return Err(Error::Unsupported {
                 feature: "renaming a referenced Custom Data storage to the unreferencable empty UID",
@@ -819,8 +827,8 @@ impl<'a> Transaction<'a> {
             return Err(invalid("Custom Data storage IDs must be unique"));
         }
         let workbook = self.target.main_document_part()?;
-        let properties_part_name = allocate_part_name(self.target, &self.draft, "properties")?;
-        let data_part_name = allocate_part_name(self.target, &self.draft, "data")?;
+        let properties_part_name = allocate_part_name(&self.target, &self.draft, "properties")?;
+        let data_part_name = allocate_part_name(&self.target, &self.draft, "data")?;
         let workbook_relationship_id =
             allocate_relationship_id(workbook, &self.draft, "rIdCustomData", true);
         let data_relationship_id = "rIdCustomData".to_owned();
@@ -842,7 +850,7 @@ impl<'a> Transaction<'a> {
             properties_relationships: None,
             data_relationships: None,
         });
-        validate_entries(self.target, &candidate, &self.limits)?;
+        validate_entries(&self.target, &candidate, &self.limits)?;
         self.draft = candidate;
         Ok(self.draft.len() - 1)
     }
@@ -886,7 +894,7 @@ impl<'a> Transaction<'a> {
         }
         let mut candidate = self.draft.clone();
         let removed = candidate.remove(index);
-        validate_entries(self.target, &candidate, &self.limits)?;
+        validate_entries(&self.target, &candidate, &self.limits)?;
         let count = self.connections.count(removed.id());
         let replacement = match &disposition {
             RemovalDisposition::RejectReferenced if count > 0 => {
@@ -922,7 +930,7 @@ impl<'a> Transaction<'a> {
     }
 
     /// Validate the source closure and atomically publish the staged graph.
-    pub fn commit(self) -> Result<Commit> {
+    pub fn commit(mut self) -> Result<Commit> {
         if !self.is_changed() {
             return Ok(Commit::new(
                 self.before.clone(),
@@ -933,7 +941,7 @@ impl<'a> Transaction<'a> {
         if self.target.is_signed() || self.target.requires_signature_edit_policy() {
             return Err(Error::Signed);
         }
-        let current = Snapshot::load_with_limits(self.target, &self.limits)?;
+        let current = Snapshot::load_with_limits(&self.target, &self.limits)?;
         if !current.same_source(&self.before) {
             return Err(Error::PatchConflict {
                 part: "Custom Data source closure".into(),
@@ -944,10 +952,10 @@ impl<'a> Transaction<'a> {
             &self.before.entries,
             &self.draft,
             self.limits,
-            bounded_read_limits(self.target, self.limits)?,
+            bounded_read_limits(&self.target, self.limits)?,
         )?;
         preflight_staged_output_budget(
-            self.target,
+            &self.target,
             &self.before,
             &self.draft,
             &self.connections,
@@ -981,7 +989,7 @@ impl<'a> Transaction<'a> {
             return Err(invalid("Custom Data publication changed staged semantics"));
         }
         let patch = Patch::new(self.before, snapshot.clone());
-        *self.target = candidate;
+        self.target.publish(candidate)?;
         Ok(Commit::new(snapshot, patch, true))
     }
 }
@@ -3118,7 +3126,7 @@ mod tests {
         ));
         let mut bytes = Vec::new();
         package.write_to(&mut bytes).unwrap();
-        let mut reopened = crate::Package::from_bytes(bytes).unwrap();
+        let mut reopened = crate::Package::from_bytes(&bytes).unwrap();
         assert_eq!(
             reopened.custom_data().unwrap().connection_references("New"),
             2
@@ -3129,7 +3137,7 @@ mod tests {
         assert!(reopened.custom_data().unwrap().is_empty());
         let output = reopened.to_bytes().unwrap();
         assert!(
-            crate::Package::from_bytes(output)
+            crate::Package::from_bytes(&output)
                 .unwrap()
                 .custom_data()
                 .unwrap()

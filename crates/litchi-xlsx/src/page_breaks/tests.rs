@@ -216,7 +216,7 @@ fn undeclared_element_and_attribute_prefixes_are_rejected() {
 
 #[test]
 fn package_transaction_reads_back_and_reverses_page_breaks() {
-    let mut package = crate::Package::create().unwrap();
+    let mut package = crate::Package::new().unwrap();
     let mut transaction = package.edit_page_breaks("Sheet1").unwrap();
     let collection = Collection::horizontal([Break::new(7, 0, 0).unwrap()]).unwrap();
     assert!(transaction.set_horizontal(collection.clone()).unwrap());

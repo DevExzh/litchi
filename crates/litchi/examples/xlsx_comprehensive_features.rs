@@ -14,7 +14,7 @@ use litchi::xlsx::style::format::{CellFont, CellFormat};
 use litchi::xlsx::style::stylesheet::{Scheme, Underline};
 use litchi::xlsx::writer::shape::ShapeSpec;
 use litchi::xlsx::{Fit, Formula, Orientation, Paper, Setup};
-use litchi::xlsx::{Number, Value, Workbook};
+use litchi::xlsx::{Number, Package, Value};
 use std::path::PathBuf;
 
 fn marker(column: u32, row: u32) -> CellMarker {
@@ -78,7 +78,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     // Immutable snapshots make the source state cheap to share; one edit
     // publishes all worksheet changes atomically at commit time.
-    let workbook = Workbook::create()?;
+    let workbook = Package::new()?;
     let mut edit = workbook.edit()?;
     edit.tab(0)?
         .ok_or("missing initial worksheet tab")?
@@ -124,7 +124,7 @@ fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     typed_feature_models();
 
-    let workbook = edit.commit()?.into_workbook();
+    let workbook = edit.commit()?.into_package();
     workbook.save(&output)?;
     println!("saved {}", output.display());
     Ok(())

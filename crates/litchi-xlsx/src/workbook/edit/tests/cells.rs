@@ -23,8 +23,8 @@ use crate::{FontChange, StyleState};
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{BlobPart, PackURI, SourceLimits, TargetMode};
 
-fn table_workbook(with_existing_merge: bool) -> Workbook {
-    let baseline = Workbook::new().expect("baseline");
+fn table_workbook(with_existing_merge: bool) -> crate::Package {
+    let baseline = crate::Package::new().expect("baseline");
     let mut package = baseline.inner.package.clone();
     let merge_cells = if with_existing_merge {
         r#"<mergeCells count="1"><mergeCell ref="B2:C3"/></mergeCells>"#
@@ -58,11 +58,11 @@ fn table_workbook(with_existing_merge: bool) -> Workbook {
             br#"<table xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" id="1" name="Table1" displayName="Table1" ref="B2:C3"><tableColumns count="2"><tableColumn id="1" name="One"/><tableColumn id="2" name="Two"/></tableColumns></table>"#.to_vec(),
         )))
         .expect("table part");
-    Workbook::from_package(package).expect("table workbook")
+    crate::Package::from_opc(package).expect("table workbook")
 }
 
-fn number_format_workbook() -> Workbook {
-    let baseline = Workbook::new().expect("baseline");
+fn number_format_workbook() -> crate::Package {
+    let baseline = crate::Package::new().expect("baseline");
     let mut package = baseline.inner.package.clone();
     package
         .get_part_mut(&PackURI::new("/xl/styles.xml").expect("styles URI"))
@@ -71,11 +71,11 @@ fn number_format_workbook() -> Workbook {
             br#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:f="urn:future"><numFmts count="1"><numFmt f:keep="yes" numFmtId="200" formatCode="0.000 &quot;kg&quot;"><f:format-future/></numFmt></numFmts><fonts count="1"><font/></fonts><fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFFFF00"/><bgColor indexed="64"/></patternFill></fill></fills><borders count="1"><border/></borders><cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs><cellXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" f:xf="yes"><f:xf-future/></xf></cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>"#
                 .to_vec(),
         );
-    Workbook::from_package(package).expect("number-format workbook")
+    crate::Package::from_opc(package).expect("number-format workbook")
 }
 
-fn fill_workbook() -> Workbook {
-    let baseline = Workbook::new().expect("baseline");
+fn fill_workbook() -> crate::Package {
+    let baseline = crate::Package::new().expect("baseline");
     let mut package = baseline.inner.package.clone();
     package
         .get_part_mut(&PackURI::new("/xl/styles.xml").expect("styles URI"))
@@ -90,11 +90,11 @@ fn fill_workbook() -> Workbook {
         .set_blob(
             br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" s="1"><v>1</v></c></row></sheetData></worksheet>"#.to_vec(),
         );
-    Workbook::from_package(package).expect("fill workbook")
+    crate::Package::from_opc(package).expect("fill workbook")
 }
 
-fn border_workbook() -> Workbook {
-    let baseline = Workbook::new().expect("baseline workbook");
+fn border_workbook() -> crate::Package {
+    let baseline = crate::Package::new().expect("baseline workbook");
     let mut package = baseline.inner.package.clone();
     package
         .get_part_mut(&PackURI::new("/xl/styles.xml").expect("styles URI"))
@@ -110,11 +110,11 @@ fn border_workbook() -> Workbook {
             br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" s="1"><v>1</v></c></row></sheetData></worksheet>"#
                 .to_vec(),
         );
-    Workbook::from_package(package).expect("border workbook")
+    crate::Package::from_opc(package).expect("border workbook")
 }
 
-fn low_part_workbook() -> Workbook {
-    let baseline = Workbook::new().expect("baseline workbook");
+fn low_part_workbook() -> crate::Package {
+    let baseline = crate::Package::new().expect("baseline workbook");
     let baseline_bytes = baseline.to_bytes().expect("baseline bytes");
     let maximum_part = baseline
         .inner
@@ -129,11 +129,15 @@ fn low_part_workbook() -> Workbook {
         .expect("part limit")
         .build()
         .expect("source limits");
-    Workbook::from_bytes_with_limits(baseline_bytes, limits).expect("limited workbook")
+    crate::Package::from_bytes_with_options(
+        &baseline_bytes,
+        crate::OpenOptions::new().source_limits(limits),
+    )
+    .expect("limited workbook")
 }
 
-fn lexical_gradient_workbook() -> Workbook {
-    let baseline = Workbook::new().expect("baseline");
+fn lexical_gradient_workbook() -> crate::Package {
+    let baseline = crate::Package::new().expect("baseline");
     let mut package = baseline.inner.package.clone();
     package
         .get_part_mut(&PackURI::new("/xl/styles.xml").expect("styles URI"))
@@ -148,7 +152,7 @@ fn lexical_gradient_workbook() -> Workbook {
         .set_blob(
             br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" s="1"><v>1</v></c></row></sheetData></worksheet>"#.to_vec(),
         );
-    Workbook::from_package(package).expect("lexical gradient workbook")
+    crate::Package::from_opc(package).expect("lexical gradient workbook")
 }
 
 fn authored_gradient_stops() -> Box<[GradientStop]> {
@@ -182,7 +186,7 @@ fn authored_path_gradient() -> GradientFill {
 
 #[test]
 fn cell_crud_is_atomic_reversible_and_source_preserving() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let source_bytes = source.to_bytes().expect("source bytes");
     let mut edit = source.edit().expect("edit");
     {
@@ -195,16 +199,16 @@ fn cell_crud_is_atomic_reversible_and_source_preserving() {
     }
     let committed = edit.commit().expect("commit");
     assert!(
-        committed.workbook().inner.sheets[0].cells.get().is_some(),
+        committed.package().inner.sheets[0].cells.get().is_some(),
         "the validated changed worksheet should be ready for its first public read"
     );
     assert_eq!(
         source.to_bytes().expect("source remains valid"),
         source_bytes
     );
-    assert_eq!(committed.patch().len(), 3);
+    assert_eq!(committed.patch().operation_count(), 3);
 
-    let book = committed.workbook();
+    let book = committed.package();
     let sheet = book.sheet("Sheet1").expect("lookup").expect("sheet");
     assert!(matches!(
         sheet.cell("A1").expect("A1").stored(),
@@ -226,12 +230,12 @@ fn cell_crud_is_atomic_reversible_and_source_preserving() {
         .apply(&committed.patch().inverse())
         .expect("inverse patch");
     assert_eq!(
-        restored.workbook().to_bytes().expect("restored"),
+        restored.package().to_bytes().expect("restored"),
         source_bytes
     );
     assert!(matches!(
         source.apply(committed.patch()),
-        Ok(applied) if applied.workbook().sheet("Sheet1").expect("lookup").expect("sheet").cell("A1").expect("cell").stored().is_some()
+        Ok(applied) if applied.package().sheet("Sheet1").expect("lookup").expect("sheet").cell("A1").expect("cell").stored().is_some()
     ));
     assert!(matches!(
         book.apply(committed.patch()),
@@ -241,14 +245,14 @@ fn cell_crud_is_atomic_reversible_and_source_preserving() {
 
 #[test]
 fn plain_cell_rewrite_preserves_neighbor_bytes_and_reopens_typed_formulas() {
-    let baseline = Workbook::new().expect("baseline");
+    let baseline = crate::Package::new().expect("baseline");
     let mut package = baseline.inner.package.clone();
     let source_sheet = br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1"><v>1</v></c><c r="B1"><f>SUM(A1,1)</f><v>2</v></c><c r="C1" t="inlineStr"><is><t>typed</t></is></c><x:c r="D1"><x:f>SUM(A1,3)</x:f><x:v>4</x:v></x:c></row></sheetData></worksheet>"#;
     package
         .get_part_mut(&baseline.inner.sheets[0].part_uri)
         .expect("worksheet part")
         .set_blob(source_sheet.to_vec());
-    let source = Workbook::from_package(package).expect("source workbook");
+    let source = crate::Package::from_opc(package).expect("source workbook");
     let source_sheet_xml = part_text(&source, "/xl/worksheets/sheet1.xml").to_owned();
     let untouched_formula = r#"<c r="B1"><f>SUM(A1,1)</f><v>2</v></c>"#;
     assert_eq!(
@@ -264,7 +268,7 @@ fn plain_cell_rewrite_preserves_neighbor_bytes_and_reopens_typed_formulas() {
         .set("A1", "edited")
         .expect("plain cell edit");
     let committed = edit.commit().expect("commit");
-    let changed_sheet_xml = part_text(committed.workbook(), "/xl/worksheets/sheet1.xml");
+    let changed_sheet_xml = part_text(committed.package(), "/xl/worksheets/sheet1.xml");
     assert_eq!(
         changed_sheet_xml.matches(untouched_formula).count(),
         1,
@@ -274,7 +278,7 @@ fn plain_cell_rewrite_preserves_neighbor_bytes_and_reopens_typed_formulas() {
     assert!(changed_sheet_xml.contains(r#"<c r="C1" t="inlineStr"><is><t>typed</t></is></c>"#));
     assert!(changed_sheet_xml.contains(r#"<x:c r="D1"><x:f>SUM(A1,3)</x:f><x:v>4</x:v></x:c>"#));
 
-    let reopened = Workbook::from_bytes(committed.workbook().to_bytes().expect("serialized"))
+    let reopened = crate::Package::from_bytes(&committed.package().to_bytes().expect("serialized"))
         .expect("reopened workbook");
     let sheet = reopened
         .sheet(0usize)
@@ -319,13 +323,13 @@ fn commit_adopts_only_the_changed_worksheet_store() {
         .expect("cell edit");
     let committed = edit.commit().expect("commit");
 
-    assert!(committed.workbook().inner.sheets[0].cells.get().is_some());
-    assert!(committed.workbook().inner.sheets[1].cells.get().is_none());
+    assert!(committed.package().inner.sheets[0].cells.get().is_some());
+    assert!(committed.package().inner.sheets[1].cells.get().is_none());
 }
 
 #[test]
 fn commit_does_not_retain_an_oversized_validated_store() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let mut edit = source.edit().expect("edit");
     {
         let mut sheet = edit.sheet("Sheet1").expect("sheet lookup").expect("sheet");
@@ -340,12 +344,12 @@ fn commit_does_not_retain_an_oversized_validated_store() {
     }
 
     let committed = edit.commit().expect("commit");
-    assert!(committed.workbook().inner.sheets[0].cells.get().is_none());
+    assert!(committed.package().inner.sheets[0].cells.get().is_none());
 }
 
 #[test]
 fn large_plain_worksheet_sparse_edit_reopens_and_preserves_store_policy() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let mut create = source.edit().expect("create edit");
     {
         let mut sheet = create
@@ -362,7 +366,7 @@ fn large_plain_worksheet_sparse_edit_reopens_and_preserves_store_policy() {
         }
     }
     let created = create.commit().expect("large worksheet commit");
-    let reopened = Workbook::from_bytes(created.workbook().to_bytes().expect("large bytes"))
+    let reopened = crate::Package::from_bytes(&created.package().to_bytes().expect("large bytes"))
         .expect("large worksheet reopen");
 
     let mut edit = reopened.edit().expect("sparse edit");
@@ -373,11 +377,11 @@ fn large_plain_worksheet_sparse_edit_reopens_and_preserves_store_policy() {
         .expect("changed value");
     let committed = edit.commit().expect("sparse commit");
     assert!(
-        committed.workbook().inner.sheets[0].cells.get().is_none(),
+        committed.package().inner.sheets[0].cells.get().is_none(),
         "large sparse verification must not retain a second full worksheet store"
     );
     let sheet = committed
-        .workbook()
+        .package()
         .sheet("Sheet1")
         .expect("sheet lookup")
         .expect("sheet");
@@ -385,8 +389,8 @@ fn large_plain_worksheet_sparse_edit_reopens_and_preserves_store_policy() {
         sheet.cell("A1").expect("updated cell").stored(),
         Some(Cell::Value(Value::Number(value))) if value.as_str() == "42"
     ));
-    let final_bytes = committed.workbook().to_bytes().expect("final bytes");
-    let final_reopen = Workbook::from_bytes(final_bytes).expect("final reopen");
+    let final_bytes = committed.package().to_bytes().expect("final bytes");
+    let final_reopen = crate::Package::from_bytes(&final_bytes).expect("final reopen");
     assert!(matches!(
         final_reopen
             .sheet("Sheet1")
@@ -429,9 +433,9 @@ fn merged_range_crud_is_sparse_safe_reversible_and_composable() {
         .and_then(|sheet| sheet.merge("C3:D4"))
         .expect("merged-range changes");
     let committed = edit.commit().expect("commit");
-    assert_eq!(committed.patch().len(), 3);
+    assert_eq!(committed.patch().operation_count(), 3);
     let sheet = committed
-        .workbook()
+        .package()
         .sheet("Sheet1")
         .expect("lookup")
         .expect("sheet");
@@ -452,11 +456,11 @@ fn merged_range_crud_is_sparse_safe_reversible_and_composable() {
         crate::cell::View::Covered(range) if range == Rect::from_a1("C3:D4").expect("range")
     ));
     let restored = committed
-        .workbook()
+        .package()
         .apply(&committed.patch().inverse())
         .expect("inverse");
     assert_eq!(
-        restored.workbook().to_bytes().expect("restored bytes"),
+        restored.package().to_bytes().expect("restored bytes"),
         source_bytes
     );
 
@@ -486,7 +490,7 @@ fn merged_range_crud_is_sparse_safe_reversible_and_composable() {
     let cleared = cleared.commit().expect("safe merge");
     assert!(matches!(
         cleared
-            .workbook()
+            .package()
             .sheet(0usize)
             .expect("lookup")
             .expect("sheet")
@@ -514,7 +518,7 @@ fn merged_range_crud_is_sparse_safe_reversible_and_composable() {
         merge
             .commit()
             .expect("joined clear and merge")
-            .workbook()
+            .package()
             .sheet(0usize)
             .expect("lookup")
             .expect("sheet")
@@ -568,7 +572,7 @@ fn merged_range_crud_is_sparse_safe_reversible_and_composable() {
     let created = created.commit().expect("create merged sheet");
     assert!(matches!(
         created
-            .workbook()
+            .package()
             .sheet("Merged")
             .expect("lookup")
             .expect("sheet")
@@ -594,7 +598,7 @@ fn merged_range_crud_is_sparse_safe_reversible_and_composable() {
     assert_eq!(
         left.commit()
             .expect("joined commit")
-            .workbook()
+            .package()
             .sheet(0usize)
             .expect("lookup")
             .expect("sheet")
@@ -657,7 +661,7 @@ fn merged_range_crud_is_sparse_safe_reversible_and_composable() {
         .expect("sheet")
         .unmerge("H8")
         .expect("missing range is a no-op");
-    assert!(missing.commit().expect("no-op commit").patch().is_empty());
+    assert!(missing.commit().expect("no-op commit").patch().is_noop());
 }
 
 #[test]
@@ -696,9 +700,9 @@ fn exact_existing_merge_remains_a_noop_inside_a_table() {
         .merge("B2:C3")
         .expect("stage exact merge");
     let committed = edit.commit().expect("exact merge no-op");
-    assert_eq!(committed.patch().len(), 0);
+    assert_eq!(committed.patch().operation_count(), 0);
     assert_eq!(
-        committed.workbook().to_bytes().expect("no-op bytes"),
+        committed.package().to_bytes().expect("no-op bytes"),
         source_bytes
     );
 }
@@ -724,23 +728,23 @@ fn merged_range_reads_share_one_snapshot_without_public_locks() {
 
 #[test]
 fn clear_and_remove_have_distinct_missing_and_empty_semantics() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let mut edit = source.edit().expect("edit");
     edit.sheet(0usize)
         .expect("lookup")
         .expect("sheet")
         .set("A1", "value")
         .expect("set");
-    let first = edit.commit().expect("first commit").into_workbook();
+    let first = edit.commit().expect("first commit").into_package();
 
     let mut edit = first.edit().expect("edit");
     let mut sheet = edit.sheet(0usize).expect("lookup").expect("sheet");
     sheet.clear("A1").expect("clear");
     sheet.clear("B1").expect("clear missing");
     let cleared = edit.commit().expect("clear commit");
-    assert_eq!(cleared.patch().len(), 1);
+    assert_eq!(cleared.patch().operation_count(), 1);
     let sheet = cleared
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("sheet");
@@ -750,7 +754,7 @@ fn clear_and_remove_have_distinct_missing_and_empty_semantics() {
     ));
     assert!(sheet.cell("B1").expect("cell").is_missing());
 
-    let mut edit = cleared.workbook().edit().expect("edit");
+    let mut edit = cleared.package().edit().expect("edit");
     edit.sheet(0usize)
         .expect("lookup")
         .expect("sheet")
@@ -759,7 +763,7 @@ fn clear_and_remove_have_distinct_missing_and_empty_semantics() {
     let removed = edit.commit().expect("remove commit");
     assert!(
         removed
-            .workbook()
+            .package()
             .sheet(0usize)
             .expect("lookup")
             .expect("sheet")
@@ -771,7 +775,7 @@ fn clear_and_remove_have_distinct_missing_and_empty_semantics() {
 
 #[test]
 fn clearing_a_cell_created_in_the_same_transaction_keeps_an_empty_record() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let mut edit = source.edit().expect("edit");
     let mut sheet = edit.sheet(0usize).expect("lookup").expect("sheet");
     sheet.set("A1", "temporary").expect("set");
@@ -779,7 +783,7 @@ fn clearing_a_cell_created_in_the_same_transaction_keeps_an_empty_record() {
     let committed = edit.commit().expect("commit");
     assert!(matches!(
         committed
-            .workbook()
+            .package()
             .sheet(0usize)
             .expect("lookup")
             .expect("sheet")
@@ -792,7 +796,7 @@ fn clearing_a_cell_created_in_the_same_transaction_keeps_an_empty_record() {
 
 #[test]
 fn calculation_chain_removal_is_atomic_and_reversible() {
-    let baseline = Workbook::new().expect("baseline");
+    let baseline = crate::Package::new().expect("baseline");
     let mut package = baseline.inner.package.clone();
     let chain_uri = PackURI::new("/xl/calcChain.xml").expect("chain URI");
     package
@@ -814,7 +818,7 @@ fn calculation_chain_removal_is_atomic_and_reversible() {
             TargetMode::Internal,
         )
         .expect("chain relationship");
-    let source = Workbook::from_package(package).expect("workbook with chain");
+    let source = crate::Package::from_opc(package).expect("workbook with chain");
     let source_bytes = source.to_bytes().expect("source bytes");
     let workbook_before = source
         .inner
@@ -835,7 +839,7 @@ fn calculation_chain_removal_is_atomic_and_reversible() {
     assert!(visibility.patch().graph.is_empty());
     assert!(
         visibility
-            .workbook()
+            .package()
             .inner
             .package
             .get_part(&chain_uri)
@@ -843,7 +847,7 @@ fn calculation_chain_removal_is_atomic_and_reversible() {
     );
     assert_eq!(
         visibility
-            .workbook()
+            .package()
             .inner
             .package
             .get_part(&source.inner.workbook_uri)
@@ -861,28 +865,28 @@ fn calculation_chain_removal_is_atomic_and_reversible() {
     let committed = edit.commit().expect("commit");
     assert!(
         committed
-            .workbook()
+            .package()
             .inner
             .package
             .get_part(&chain_uri)
             .is_err()
     );
     assert!(
-        calculation_chain_removal(committed.workbook())
+        calculation_chain_removal(committed.package())
             .expect("chain query")
             .is_empty()
     );
 
     let restored = committed
-        .workbook()
+        .package()
         .apply(&committed.patch().inverse())
         .expect("inverse");
     assert_eq!(
-        restored.workbook().to_bytes().expect("restored"),
+        restored.package().to_bytes().expect("restored"),
         source_bytes
     );
     assert!(
-        !calculation_chain_removal(restored.workbook())
+        !calculation_chain_removal(restored.package())
             .expect("restored chain")
             .is_empty()
     );
@@ -905,7 +909,7 @@ fn calculation_chain_removal_is_atomic_and_reversible() {
     shared_target
         .try_add_part(Box::new(referrer))
         .expect("referrer part");
-    let shared_target = Workbook::from_package(shared_target).expect("shared target workbook");
+    let shared_target = crate::Package::from_opc(shared_target).expect("shared target workbook");
     assert!(matches!(
         calculation_chain_removal(&shared_target),
         Err(Error::Invalid(message)) if message.contains("another incoming relationship")
@@ -923,7 +927,7 @@ fn calculation_chain_removal_is_atomic_and_reversible() {
             TargetMode::Internal,
         )
         .expect("chain outbound relationship");
-    let outbound = Workbook::from_package(outbound).expect("outbound chain workbook");
+    let outbound = crate::Package::from_opc(outbound).expect("outbound chain workbook");
     let mut edit = outbound.edit().expect("outbound chain edit");
     edit.sheet(0usize)
         .expect("lookup")
@@ -973,7 +977,7 @@ fn shared_style_crud_is_lineage_checked_reversible_and_exact() {
         .and_then(|sheet| sheet.style("D1", &accent))
         .expect("style changes");
     let committed = edit.commit().expect("commit");
-    assert_eq!(committed.patch().len(), 2);
+    assert_eq!(committed.patch().operation_count(), 2);
     assert!(matches!(
         committed.patch().changes()[0].cell(),
         Some((_, State::Missing, _))
@@ -987,7 +991,7 @@ fn shared_style_crud_is_lineage_checked_reversible_and_exact() {
         })) if number.as_str() == "42"
     ));
 
-    let book = committed.workbook();
+    let book = committed.package();
     let sheet = book.sheet(0usize).expect("lookup").expect("sheet");
     assert!(matches!(
         sheet.cell("D1").expect("D1").stored(),
@@ -1016,7 +1020,7 @@ fn shared_style_crud_is_lineage_checked_reversible_and_exact() {
     let descendant = descendant.commit().expect("descendant commit");
     assert!(matches!(
         descendant
-            .workbook()
+            .package()
             .sheet(0usize)
             .expect("lookup")
             .expect("sheet")
@@ -1025,7 +1029,7 @@ fn shared_style_crud_is_lineage_checked_reversible_and_exact() {
         Some(crate::LocalStyle::Shared(_))
     ));
 
-    let reopened = Workbook::from_bytes(source_bytes.clone()).expect("reopened source");
+    let reopened = crate::Package::from_bytes(&source_bytes).expect("reopened source");
     assert!(
         reopened
             .styles()
@@ -1049,7 +1053,7 @@ fn shared_style_crud_is_lineage_checked_reversible_and_exact() {
     };
     assert!(
         replayed
-            .workbook()
+            .package()
             .styles()
             .expect("replayed styles")
             .find(replayed_key)
@@ -1066,11 +1070,11 @@ fn shared_style_crud_is_lineage_checked_reversible_and_exact() {
         .apply(&committed.patch().inverse())
         .expect("inverse patch");
     assert_eq!(
-        restored.workbook().to_bytes().expect("restored bytes"),
+        restored.package().to_bytes().expect("restored bytes"),
         source_bytes
     );
 
-    let foreign = Workbook::new()
+    let foreign = crate::Package::new()
         .expect("other workbook")
         .styles()
         .expect("other styles")
@@ -1098,8 +1102,10 @@ fn shared_style_crud_is_lineage_checked_reversible_and_exact() {
         .get_part_mut(&styles_uri)
         .expect("styles part")
         .set_blob(changed_xml);
-    let changed = Workbook::from_package_with_styles(changed_package, Some(&source))
-        .expect("changed style table");
+    let changed = crate::Package::from_workbook(
+        Workbook::from_package_with_styles(changed_package, Some(&source))
+            .expect("changed style table"),
+    );
     assert!(
         changed
             .styles()
@@ -1155,7 +1161,7 @@ fn payload_and_style_effects_on_one_cell_join_without_locks() {
     payload.join(style).expect("disjoint cell facets");
     assert_eq!(payload.len(), 1);
     let committed = payload.commit().expect("commit");
-    assert_eq!(committed.patch().len(), 1);
+    assert_eq!(committed.patch().operation_count(), 1);
     assert!(matches!(
         committed.patch().changes()[0].cell(),
         Some((_, _, State::Cell {
@@ -1166,7 +1172,7 @@ fn payload_and_style_effects_on_one_cell_join_without_locks() {
     ));
 
     let sheet = committed
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("sheet");
@@ -1209,7 +1215,7 @@ fn rich_shared_string_transfer_keeps_exact_dependency_through_join_replay_and_in
         .set_blob(
             br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="s"><v>0</v></c></row></sheetData></worksheet>"#.to_vec(),
         );
-    let source = Workbook::from_package(package).expect("rich-string workbook");
+    let source = crate::Package::from_opc(package).expect("rich-string workbook");
     let source_bytes = source.to_bytes().expect("source bytes");
     let shared_before = part_text(&source, "/xl/sharedStrings.xml").to_owned();
 
@@ -1227,10 +1233,10 @@ fn rich_shared_string_transfer_keeps_exact_dependency_through_join_replay_and_in
     transfer.join(disjoint).expect("join disjoint edit");
     let committed = transfer.commit().expect("commit rich transfer");
 
-    let target_xml = part_text(committed.workbook(), "/xl/worksheets/sheet2.xml");
+    let target_xml = part_text(committed.package(), "/xl/worksheets/sheet2.xml");
     assert!(target_xml.contains(r#"<c r="B2" t="s"><v>0</v></c>"#));
     assert_eq!(
-        part_text(committed.workbook(), "/xl/sharedStrings.xml"),
+        part_text(committed.package(), "/xl/sharedStrings.xml"),
         shared_before
     );
     assert!(committed.patch().changes().iter().any(|change| matches!(
@@ -1249,15 +1255,15 @@ fn rich_shared_string_transfer_keeps_exact_dependency_through_join_replay_and_in
         .apply(committed.patch())
         .expect("replay rich transfer");
     assert!(
-        part_text(replayed.workbook(), "/xl/worksheets/sheet2.xml")
+        part_text(replayed.package(), "/xl/worksheets/sheet2.xml")
             .contains(r#"<c r="B2" t="s"><v>0</v></c>"#)
     );
     let restored = committed
-        .workbook()
+        .package()
         .apply(&committed.patch().inverse())
         .expect("inverse rich transfer");
     assert_eq!(
-        restored.workbook().to_bytes().expect("restored bytes"),
+        restored.package().to_bytes().expect("restored bytes"),
         source_bytes
     );
 }
@@ -1308,7 +1314,7 @@ fn cell_transfer_clones_selected_picture_graph_and_is_reversible() {
             TargetMode::Internal,
         )
         .expect("drawing relationship");
-    let source = Workbook::from_package(package).expect("drawing workbook");
+    let source = crate::Package::from_opc(package).expect("drawing workbook");
     let source_bytes = source.to_bytes().expect("source bytes");
     let mut edit = source.edit().expect("edit");
     edit.copy_cells("Sheet1", "A1:C3", "Sheet2", "E5")
@@ -1330,9 +1336,9 @@ fn cell_transfer_clones_selected_picture_graph_and_is_reversible() {
                 } if source.as_ref() == "Sheet1" && target.as_ref() == "Sheet2"
             ))
     );
-    let target_sheet = part_text(committed.workbook(), "/xl/worksheets/sheet2.xml");
+    let target_sheet = part_text(committed.package(), "/xl/worksheets/sheet2.xml");
     assert!(target_sheet.contains(r#"r:id="rIdDrawingCopy1""#));
-    let target_drawing = part_text(committed.workbook(), "/xl/drawings/drawing1_copy1.xml");
+    let target_drawing = part_text(committed.package(), "/xl/drawings/drawing1_copy1.xml");
     assert!(target_drawing.contains("<xdr:col>4</xdr:col>"));
     assert!(target_drawing.contains("<xdr:row>4</xdr:row>"));
     assert!(target_drawing.contains("<xdr:col>6</xdr:col>"));
@@ -1340,7 +1346,7 @@ fn cell_transfer_clones_selected_picture_graph_and_is_reversible() {
     assert!(target_drawing.contains(r#"r:embed="rIdImage""#));
     assert_eq!(
         committed
-            .workbook()
+            .package()
             .inner
             .package
             .get_part(&PackURI::new("/xl/media/image1_copy1.png").expect("cloned image URI"))
@@ -1353,15 +1359,15 @@ fn cell_transfer_clones_selected_picture_graph_and_is_reversible() {
         .apply(committed.patch())
         .expect("replay picture graph");
     assert_eq!(
-        replayed.workbook().to_bytes().expect("replayed bytes"),
-        committed.workbook().to_bytes().expect("committed bytes")
+        replayed.package().to_bytes().expect("replayed bytes"),
+        committed.package().to_bytes().expect("committed bytes")
     );
     let restored = committed
-        .workbook()
+        .package()
         .apply(&committed.patch().inverse())
         .expect("inverse picture graph");
     assert_eq!(
-        restored.workbook().to_bytes().expect("restored"),
+        restored.package().to_bytes().expect("restored"),
         source_bytes
     );
 }
@@ -1431,7 +1437,7 @@ fn cell_transfer_clones_classic_chart_graph_through_merge_and_durable_inverse() 
             TargetMode::Internal,
         )
         .expect("drawing relationship");
-    let source = Workbook::from_package(package).expect("chart workbook");
+    let source = crate::Package::from_opc(package).expect("chart workbook");
     let source_bytes = source.to_bytes().expect("source bytes");
 
     let mut transfer = source.edit().expect("transfer edit");
@@ -1456,13 +1462,13 @@ fn cell_transfer_clones_classic_chart_graph_through_merge_and_durable_inverse() 
         .commit()
         .expect("commit chart transfer");
 
-    let target_drawing = part_text(committed.workbook(), "/xl/drawings/drawing1_copy1.xml");
+    let target_drawing = part_text(committed.package(), "/xl/drawings/drawing1_copy1.xml");
     assert!(target_drawing.contains(r#"r:id="rIdChart""#));
     let target_drawing_uri =
         PackURI::new("/xl/drawings/drawing1_copy1.xml").expect("cloned drawing URI");
     let target_chart_uri = PackURI::new("/xl/charts/chart1_copy1.xml").expect("cloned chart URI");
     let target_chart_relationship = committed
-        .workbook()
+        .package()
         .inner
         .package
         .get_part(&target_drawing_uri)
@@ -1478,7 +1484,7 @@ fn cell_transfer_clones_classic_chart_graph_through_merge_and_durable_inverse() 
     );
     assert_eq!(
         committed
-            .workbook()
+            .package()
             .inner
             .package
             .get_part(&target_chart_uri)
@@ -1487,7 +1493,7 @@ fn cell_transfer_clones_classic_chart_graph_through_merge_and_durable_inverse() 
         chart_xml.as_slice()
     );
     let target_chart = committed
-        .workbook()
+        .package()
         .inner
         .package
         .get_part(&target_chart_uri)
@@ -1505,7 +1511,7 @@ fn cell_transfer_clones_classic_chart_graph_through_merge_and_durable_inverse() 
     );
     assert_eq!(
         committed
-            .workbook()
+            .package()
             .inner
             .package
             .get_part(&target_embedding_uri)
@@ -1515,7 +1521,7 @@ fn cell_transfer_clones_classic_chart_graph_through_merge_and_durable_inverse() 
     );
     assert!(matches!(
         committed
-            .workbook()
+            .package()
             .sheet("Sheet2")
             .expect("lookup")
             .expect("target")
@@ -1533,7 +1539,7 @@ fn cell_transfer_clones_classic_chart_graph_through_merge_and_durable_inverse() 
     let replayed = durable.apply(&source).expect("replay chart graph");
     assert_eq!(
         replayed.to_bytes().expect("replayed bytes"),
-        committed.workbook().to_bytes().expect("committed bytes")
+        committed.package().to_bytes().expect("committed bytes")
     );
     assert_eq!(
         durable
@@ -1557,7 +1563,7 @@ fn resetting_style_is_distinct_from_removal_and_missing_is_a_no_op() {
         .and_then(|sheet| sheet.reset_style("Z99"))
         .expect("style resets");
     let committed = edit.commit().expect("commit");
-    assert_eq!(committed.patch().len(), 1);
+    assert_eq!(committed.patch().operation_count(), 1);
     assert!(matches!(
         committed.patch().changes()[0].cell(),
         Some((
@@ -1570,7 +1576,7 @@ fn resetting_style_is_distinct_from_removal_and_missing_is_a_no_op() {
         ))
     ));
     let sheet = committed
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("sheet");
@@ -1581,15 +1587,15 @@ fn resetting_style_is_distinct_from_removal_and_missing_is_a_no_op() {
     assert!(sheet.cell("Z99").expect("missing").is_missing());
 
     let restored = committed
-        .workbook()
+        .package()
         .apply(&committed.patch().inverse())
         .expect("inverse");
-    assert_eq!(restored.workbook().to_bytes().expect("bytes"), source_bytes);
+    assert_eq!(restored.package().to_bytes().expect("bytes"), source_bytes);
 }
 
 #[test]
 fn signed_packages_refuse_edits_before_mutation() {
-    let baseline = Workbook::new().expect("baseline");
+    let baseline = crate::Package::new().expect("baseline");
     let mut package = baseline.inner.package.clone();
     package
         .rels_mut()
@@ -1600,7 +1606,7 @@ fn signed_packages_refuse_edits_before_mutation() {
             TargetMode::Internal,
         )
         .expect("signature relationship");
-    let signed = Workbook::from_package(package).expect("signed workbook snapshot");
+    let signed = crate::Package::from_opc(package).expect("signed workbook snapshot");
 
     assert!(matches!(signed.edit(), Err(Error::Signed)));
     assert!(matches!(
@@ -1611,7 +1617,7 @@ fn signed_packages_refuse_edits_before_mutation() {
 
 #[test]
 fn font_change_strike_and_underline_round_trip_by_coordinate() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let source_bytes = source.to_bytes().expect("source bytes");
     let address = Address::from_a1("A1").expect("address");
 
@@ -1628,14 +1634,14 @@ fn font_change_strike_and_underline_round_trip_by_coordinate() {
         )
         .expect("underline");
     let committed = edit.commit().expect("font commit");
-    assert_eq!(committed.patch().len(), 1);
+    assert_eq!(committed.patch().operation_count(), 1);
 
-    let committed_bytes = committed.workbook().to_bytes().expect("committed bytes");
-    let styles = part_text(committed.workbook(), "/xl/styles.xml");
+    let committed_bytes = committed.package().to_bytes().expect("committed bytes");
+    let styles = part_text(committed.package(), "/xl/styles.xml");
     assert!(styles.contains("<strike/>"));
     assert!(styles.contains(r#"<u val="double"/>"#));
     let sheet = committed
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet");
@@ -1652,7 +1658,7 @@ fn font_change_strike_and_underline_round_trip_by_coordinate() {
         Some(Underline::Double)
     );
 
-    let reopened = Workbook::from_bytes(committed_bytes.clone()).expect("reopened workbook");
+    let reopened = crate::Package::from_bytes(&committed_bytes).expect("reopened workbook");
     assert_eq!(part_text(&reopened, "/xl/styles.xml"), styles);
     assert_eq!(
         reopened
@@ -1671,22 +1677,22 @@ fn font_change_strike_and_underline_round_trip_by_coordinate() {
 
     let replayed = source.apply(committed.patch()).expect("replay patch");
     assert_eq!(
-        replayed.workbook().to_bytes().expect("replayed bytes"),
+        replayed.package().to_bytes().expect("replayed bytes"),
         committed_bytes
     );
     let restored = committed
-        .workbook()
+        .package()
         .apply(&committed.patch().inverse())
         .expect("inverse patch");
     assert_eq!(
-        restored.workbook().to_bytes().expect("restored bytes"),
+        restored.package().to_bytes().expect("restored bytes"),
         source_bytes
     );
 }
 
 #[test]
 fn font_change_same_property_conflicts_but_disjoint_properties_join() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let address = Address::from_a1("A1").expect("address");
 
     let mut strike = source.edit().expect("strike edit");
@@ -1708,7 +1714,7 @@ fn font_change_same_property_conflicts_but_disjoint_properties_join() {
         .expect("underline");
     strike.join(underline).expect("disjoint font properties");
     let joined = strike.commit().expect("joined font commit");
-    let joined_styles = part_text(joined.workbook(), "/xl/styles.xml");
+    let joined_styles = part_text(joined.package(), "/xl/styles.xml");
     assert!(joined_styles.contains("<strike/>"));
     assert!(joined_styles.contains(r#"<u/>"#));
 
@@ -1992,7 +1998,7 @@ fn mixed_fill_and_border_staging_budget_is_atomic_in_both_orders_and_join() {
 
 #[test]
 fn number_format_round_trip_composes_with_native_style_facets_and_payload() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let source_bytes = source.to_bytes().expect("source bytes");
     let address = Address::from_a1("A1").expect("address");
     let custom = "0.000 \"kg\"";
@@ -2014,13 +2020,13 @@ fn number_format_round_trip_composes_with_native_style_facets_and_payload() {
         .and_then(|sheet| sheet.number_format(address, Some(custom)))
         .expect("all style facets");
     let committed = edit.commit().expect("commit");
-    assert_eq!(committed.patch().len(), 1);
+    assert_eq!(committed.patch().operation_count(), 1);
 
-    let committed_bytes = committed.workbook().to_bytes().expect("committed bytes");
-    let styles = part_text(committed.workbook(), "/xl/styles.xml");
+    let committed_bytes = committed.package().to_bytes().expect("committed bytes");
+    let styles = part_text(committed.package(), "/xl/styles.xml");
     assert!(styles.contains(r#"formatCode="0.000 &quot;kg&quot;"#));
     let format = committed
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -2045,7 +2051,7 @@ fn number_format_round_trip_composes_with_native_style_facets_and_payload() {
     assert_eq!(protection_view.hidden(), Some(true));
     assert!(format.quote_prefix());
 
-    let reopened = Workbook::from_bytes(committed_bytes.clone()).expect("reopened workbook");
+    let reopened = crate::Package::from_bytes(&committed_bytes).expect("reopened workbook");
     let reopened_format = reopened
         .sheet(0usize)
         .expect("lookup")
@@ -2080,15 +2086,15 @@ fn number_format_round_trip_composes_with_native_style_facets_and_payload() {
 
     let replayed = source.apply(committed.patch()).expect("replay patch");
     assert_eq!(
-        replayed.workbook().to_bytes().expect("replayed bytes"),
+        replayed.package().to_bytes().expect("replayed bytes"),
         committed_bytes
     );
     let restored = committed
-        .workbook()
+        .package()
         .apply(&committed.patch().inverse())
         .expect("inverse patch");
     assert_eq!(
-        restored.workbook().to_bytes().expect("restored bytes"),
+        restored.package().to_bytes().expect("restored bytes"),
         source_bytes
     );
 }
@@ -2116,9 +2122,9 @@ fn number_format_reuses_builtin_and_declared_codes_and_clears_to_general() {
         .and_then(|sheet| sheet.number_format(addresses[3], Some(fresh)))
         .expect("number formats");
     let configured = edit.commit().expect("configured commit");
-    let configured_bytes = configured.workbook().to_bytes().expect("configured bytes");
+    let configured_bytes = configured.package().to_bytes().expect("configured bytes");
     let configured_sheet = configured
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet");
@@ -2172,7 +2178,7 @@ fn number_format_reuses_builtin_and_declared_codes_and_clears_to_general() {
     assert!(fresh_id >= crate::style::stylesheet::FIRST_CUSTOM_ID);
     assert_ne!(fresh_id, 200);
 
-    let styles = part_text(configured.workbook(), "/xl/styles.xml");
+    let styles = part_text(configured.package(), "/xl/styles.xml");
     assert_eq!(styles.matches("<numFmt ").count(), 2);
     assert_eq!(
         styles
@@ -2189,7 +2195,7 @@ fn number_format_reuses_builtin_and_declared_codes_and_clears_to_general() {
     let fresh_marker = format!(r#"numFmtId="{fresh_id}""#);
     assert!(styles.contains(fresh_marker.as_str()));
 
-    let mut repeat = configured.workbook().edit().expect("repeat edit");
+    let mut repeat = configured.package().edit().expect("repeat edit");
     repeat
         .sheet(0usize)
         .expect("lookup")
@@ -2200,13 +2206,13 @@ fn number_format_reuses_builtin_and_declared_codes_and_clears_to_general() {
         .and_then(|sheet| sheet.number_format(addresses[3], Some(fresh)))
         .expect("repeat number formats");
     let repeat = repeat.commit().expect("repeat commit");
-    assert!(repeat.patch().is_empty());
+    assert!(repeat.patch().is_noop());
     assert_eq!(
-        repeat.workbook().to_bytes().expect("repeat bytes"),
+        repeat.package().to_bytes().expect("repeat bytes"),
         configured_bytes
     );
 
-    let mut clear = configured.workbook().edit().expect("clear edit");
+    let mut clear = configured.package().edit().expect("clear edit");
     clear
         .sheet(0usize)
         .expect("lookup")
@@ -2215,7 +2221,7 @@ fn number_format_reuses_builtin_and_declared_codes_and_clears_to_general() {
         .expect("clear number format");
     let cleared = clear.commit().expect("clear commit");
     let cleared_format = cleared
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -2230,7 +2236,7 @@ fn number_format_reuses_builtin_and_declared_codes_and_clears_to_general() {
         0
     );
     assert_eq!(cleared_format.number_format().code(), Some("General"));
-    let cleared_styles = part_text(cleared.workbook(), "/xl/styles.xml");
+    let cleared_styles = part_text(cleared.package(), "/xl/styles.xml");
     assert_eq!(
         cleared_styles
             .matches(r#"formatCode="0.000 &quot;kg&quot;""#)
@@ -2238,7 +2244,7 @@ fn number_format_reuses_builtin_and_declared_codes_and_clears_to_general() {
         1
     );
 
-    let mut clear_repeat = cleared.workbook().edit().expect("clear repeat edit");
+    let mut clear_repeat = cleared.package().edit().expect("clear repeat edit");
     clear_repeat
         .sheet(0usize)
         .expect("lookup")
@@ -2246,19 +2252,19 @@ fn number_format_reuses_builtin_and_declared_codes_and_clears_to_general() {
         .number_format(addresses[1], None)
         .expect("repeat clear number format");
     let clear_repeat = clear_repeat.commit().expect("clear repeat commit");
-    assert!(clear_repeat.patch().is_empty());
+    assert!(clear_repeat.patch().is_noop());
     assert_eq!(
         clear_repeat
-            .workbook()
+            .package()
             .to_bytes()
             .expect("clear repeat bytes"),
-        cleared.workbook().to_bytes().expect("cleared bytes")
+        cleared.package().to_bytes().expect("cleared bytes")
     );
 }
 
 #[test]
 fn number_format_joins_disjoint_style_facets_and_conflicts_on_same_field() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let address = Address::from_a1("A1").expect("address");
 
     let mut number = source.edit().expect("number edit");
@@ -2286,7 +2292,7 @@ fn number_format_joins_disjoint_style_facets_and_conflicts_on_same_field() {
     number.join(facets).expect("disjoint style facets");
     let joined = number.commit().expect("joined commit");
     let format = joined
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -2381,7 +2387,7 @@ fn number_format_staging_is_discarded_by_style_reset_replacement_and_removal() {
         .expect("number format then style replacement");
     let replacement = replacement.commit().expect("replacement commit");
     let replacement_format = replacement
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -2403,7 +2409,7 @@ fn number_format_staging_is_discarded_by_style_reset_replacement_and_removal() {
         .expect("number format then reset");
     let reset = reset.commit().expect("reset commit");
     let reset_sheet = reset
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet");
@@ -2432,7 +2438,7 @@ fn number_format_staging_is_discarded_by_style_reset_replacement_and_removal() {
     let remove = remove.commit().expect("remove commit");
     assert!(
         remove
-            .workbook()
+            .package()
             .sheet(0usize)
             .expect("lookup")
             .expect("worksheet")
@@ -2440,10 +2446,7 @@ fn number_format_staging_is_discarded_by_style_reset_replacement_and_removal() {
             .expect("removed cell")
             .is_missing()
     );
-    assert_eq!(
-        part_text(remove.workbook(), "/xl/styles.xml"),
-        source_styles
-    );
+    assert_eq!(part_text(remove.package(), "/xl/styles.xml"), source_styles);
 }
 
 #[test]
@@ -2460,7 +2463,7 @@ fn number_format_rewrite_preserves_opaque_numfmt_and_xf_markup() {
         .number_format(address, Some(fresh))
         .expect("number format");
     let committed = edit.commit().expect("commit");
-    let styles = part_text(committed.workbook(), "/xl/styles.xml");
+    let styles = part_text(committed.package(), "/xl/styles.xml");
     assert_eq!(
         styles.matches(r#"f:keep="yes""#).count(),
         source_styles.matches(r#"f:keep="yes""#).count()
@@ -2477,7 +2480,7 @@ fn number_format_rewrite_preserves_opaque_numfmt_and_xf_markup() {
         styles.matches("<f:xf-future/>").count(),
         source_styles.matches("<f:xf-future/>").count() * 2
     );
-    let reopened = Workbook::from_bytes(committed.workbook().to_bytes().expect("bytes"))
+    let reopened = crate::Package::from_bytes(&committed.package().to_bytes().expect("bytes"))
         .expect("reopened workbook");
     let format = reopened
         .sheet(0usize)
@@ -2493,7 +2496,7 @@ fn number_format_rewrite_preserves_opaque_numfmt_and_xf_markup() {
 
 #[test]
 fn fill_change_round_trip_composes_with_native_style_facets_and_payload() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let source_bytes = source.to_bytes().expect("source bytes");
     let address = Address::from_a1("A1").expect("address");
     let tint = Tint::new(0.25).expect("tint");
@@ -2521,15 +2524,15 @@ fn fill_change_round_trip_composes_with_native_style_facets_and_payload() {
         .and_then(|sheet| sheet.quote_prefix(address, Some(true)))
         .expect("all style facets");
     let committed = edit.commit().expect("commit");
-    assert_eq!(committed.patch().len(), 1);
+    assert_eq!(committed.patch().operation_count(), 1);
 
-    let committed_bytes = committed.workbook().to_bytes().expect("committed bytes");
-    let styles = part_text(committed.workbook(), "/xl/styles.xml");
+    let committed_bytes = committed.package().to_bytes().expect("committed bytes");
+    let styles = part_text(committed.package(), "/xl/styles.xml");
     assert!(styles.contains(r#"patternType="solid""#));
     assert!(styles.contains(r#"rgb="FF112233""#));
     assert!(styles.contains(r#"theme="5""#));
     let format = committed
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -2555,7 +2558,7 @@ fn fill_change_round_trip_composes_with_native_style_facets_and_payload() {
     );
     assert!(format.quote_prefix());
 
-    let reopened = Workbook::from_bytes(committed_bytes.clone()).expect("reopened workbook");
+    let reopened = crate::Package::from_bytes(&committed_bytes).expect("reopened workbook");
     let reopened_format = reopened
         .sheet(0usize)
         .expect("lookup")
@@ -2580,22 +2583,22 @@ fn fill_change_round_trip_composes_with_native_style_facets_and_payload() {
 
     let replayed = source.apply(committed.patch()).expect("replay patch");
     assert_eq!(
-        replayed.workbook().to_bytes().expect("replayed bytes"),
+        replayed.package().to_bytes().expect("replayed bytes"),
         committed_bytes
     );
     let restored = committed
-        .workbook()
+        .package()
         .apply(&committed.patch().inverse())
         .expect("inverse patch");
     assert_eq!(
-        restored.workbook().to_bytes().expect("restored bytes"),
+        restored.package().to_bytes().expect("restored bytes"),
         source_bytes
     );
 }
 
 #[test]
 fn fill_change_colors_are_typed_and_selected_fields_do_not_imply_solid() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let addresses = [
         Address::from_a1("A1").expect("A1"),
         Address::from_a1("B1").expect("B1"),
@@ -2647,7 +2650,7 @@ fn fill_change_colors_are_typed_and_selected_fields_do_not_imply_solid() {
         .expect("typed colors");
     let configured = edit.commit().expect("configured commit");
     let sheet = configured
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet");
@@ -2681,7 +2684,7 @@ fn fill_change_colors_are_typed_and_selected_fields_do_not_imply_solid() {
         .expect("foreground only");
     let selected = selected.commit().expect("selected commit");
     let selected_format = selected
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -2700,9 +2703,9 @@ fn fill_change_colors_are_typed_and_selected_fields_do_not_imply_solid() {
         Some(Color::rgb(0xAA, 0xBB, 0xCC))
     );
     assert_eq!(selected_pattern.background(), None);
-    let selected_bytes = selected.workbook().to_bytes().expect("selected bytes");
+    let selected_bytes = selected.package().to_bytes().expect("selected bytes");
 
-    let mut repeat = selected.workbook().edit().expect("repeat edit");
+    let mut repeat = selected.package().edit().expect("repeat edit");
     repeat
         .sheet(0usize)
         .expect("lookup")
@@ -2713,9 +2716,9 @@ fn fill_change_colors_are_typed_and_selected_fields_do_not_imply_solid() {
         )
         .expect("repeat foreground only");
     let repeat = repeat.commit().expect("repeat commit");
-    assert!(repeat.patch().is_empty());
+    assert!(repeat.patch().is_noop());
     assert_eq!(
-        repeat.workbook().to_bytes().expect("repeat bytes"),
+        repeat.package().to_bytes().expect("repeat bytes"),
         selected_bytes
     );
 }
@@ -2735,7 +2738,7 @@ fn fill_change_defaults_clear_and_replay_are_distinct_and_exact() {
         .expect("explicit none pattern");
     let explicit = explicit.commit().expect("explicit commit");
     let explicit_format = explicit
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -2750,8 +2753,8 @@ fn fill_change_defaults_clear_and_replay_are_distinct_and_exact() {
         .expect("explicit pattern");
     assert_eq!(explicit_pattern.pattern(), Some(Pattern::None));
 
-    let explicit_bytes = explicit.workbook().to_bytes().expect("explicit bytes");
-    let mut repeat = explicit.workbook().edit().expect("repeat edit");
+    let explicit_bytes = explicit.package().to_bytes().expect("explicit bytes");
+    let mut repeat = explicit.package().edit().expect("repeat edit");
     repeat
         .sheet(0usize)
         .expect("lookup")
@@ -2759,13 +2762,13 @@ fn fill_change_defaults_clear_and_replay_are_distinct_and_exact() {
         .fill(address, &solid_none)
         .expect("repeat explicit none pattern");
     let repeat = repeat.commit().expect("repeat commit");
-    assert!(repeat.patch().is_empty());
+    assert!(repeat.patch().is_noop());
     assert_eq!(
-        repeat.workbook().to_bytes().expect("repeat bytes"),
+        repeat.package().to_bytes().expect("repeat bytes"),
         explicit_bytes
     );
 
-    let mut clear = explicit.workbook().edit().expect("clear edit");
+    let mut clear = explicit.package().edit().expect("clear edit");
     clear
         .sheet(0usize)
         .expect("lookup")
@@ -2774,7 +2777,7 @@ fn fill_change_defaults_clear_and_replay_are_distinct_and_exact() {
         .expect("clear pattern and foreground");
     let clear = clear.commit().expect("clear commit");
     let clear_format = clear
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -2793,7 +2796,7 @@ fn fill_change_defaults_clear_and_replay_are_distinct_and_exact() {
 
 #[test]
 fn fill_change_joins_disjoint_fields_and_conflicts_on_overlap() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let address = Address::from_a1("A1").expect("address");
 
     let mut pattern = source.edit().expect("pattern edit");
@@ -2816,7 +2819,7 @@ fn fill_change_joins_disjoint_fields_and_conflicts_on_overlap() {
     pattern.join(foreground).expect("disjoint fill fields");
     let joined = pattern.commit().expect("joined commit");
     let joined_format = joined
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -2913,7 +2916,7 @@ fn fill_change_staging_is_discarded_by_style_reset_replacement_and_removal() {
         .expect("fill then style replacement");
     let replacement = replacement.commit().expect("replacement commit");
     let replacement_format = replacement
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -2945,7 +2948,7 @@ fn fill_change_staging_is_discarded_by_style_reset_replacement_and_removal() {
         .expect("fill then reset");
     let reset = reset.commit().expect("reset commit");
     let reset_sheet = reset
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet");
@@ -2974,7 +2977,7 @@ fn fill_change_staging_is_discarded_by_style_reset_replacement_and_removal() {
     let remove = remove.commit().expect("remove commit");
     assert!(
         remove
-            .workbook()
+            .package()
             .sheet(0usize)
             .expect("lookup")
             .expect("worksheet")
@@ -2982,10 +2985,7 @@ fn fill_change_staging_is_discarded_by_style_reset_replacement_and_removal() {
             .expect("removed cell")
             .is_missing()
     );
-    assert_eq!(
-        part_text(remove.workbook(), "/xl/styles.xml"),
-        source_styles
-    );
+    assert_eq!(part_text(remove.package(), "/xl/styles.xml"), source_styles);
 }
 
 #[test]
@@ -3002,7 +3002,7 @@ fn fill_change_rewrite_preserves_opaque_fill_and_xf_markup() {
         .fill(address, &requested)
         .expect("fill");
     let committed = edit.commit().expect("commit");
-    let styles = part_text(committed.workbook(), "/xl/styles.xml");
+    let styles = part_text(committed.package(), "/xl/styles.xml");
     assert_eq!(
         styles.matches(r#"f:target-fill="yes""#).count(),
         source_styles.matches(r#"f:target-fill="yes""#).count() * 2
@@ -3023,7 +3023,7 @@ fn fill_change_rewrite_preserves_opaque_fill_and_xf_markup() {
         styles.matches("<f:xf-future/>").count(),
         source_styles.matches("<f:xf-future/>").count() * 2
     );
-    let reopened = Workbook::from_bytes(committed.workbook().to_bytes().expect("bytes"))
+    let reopened = crate::Package::from_bytes(&committed.package().to_bytes().expect("bytes"))
         .expect("reopened workbook");
     let format = reopened
         .sheet(0usize)
@@ -3045,7 +3045,7 @@ fn fill_change_rewrite_preserves_opaque_fill_and_xf_markup() {
 
 #[test]
 fn gradient_fill_replacements_round_trip_typed_stops_and_companion_styles() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let source_bytes = source.to_bytes().expect("source bytes");
     let linear = authored_linear_gradient();
     let path = authored_path_gradient();
@@ -3068,12 +3068,12 @@ fn gradient_fill_replacements_round_trip_typed_stops_and_companion_styles() {
         .and_then(|sheet| sheet.fill(second, &FillChange::replace(Fill::Gradient(path.clone()))))
         .expect("gradient and companion edits");
     let committed = edit.commit().expect("gradient commit");
-    let committed_bytes = committed.workbook().to_bytes().expect("committed bytes");
-    let styles = part_text(committed.workbook(), "/xl/styles.xml");
+    let committed_bytes = committed.package().to_bytes().expect("committed bytes");
+    let styles = part_text(committed.package(), "/xl/styles.xml");
     assert!(styles.matches("gradientFill").count() >= 2);
 
     let sheet = committed
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet");
@@ -3127,7 +3127,7 @@ fn gradient_fill_replacements_round_trip_typed_stops_and_companion_styles() {
     );
     assert_eq!(second_gradient.stops(), path.stops());
 
-    let reopened = Workbook::from_bytes(committed_bytes.clone()).expect("reopened workbook");
+    let reopened = crate::Package::from_bytes(&committed_bytes).expect("reopened workbook");
     let reopened_sheet = reopened
         .sheet(0usize)
         .expect("reopened lookup")
@@ -3154,22 +3154,22 @@ fn gradient_fill_replacements_round_trip_typed_stops_and_companion_styles() {
         .apply(committed.patch())
         .expect("replay gradient patch");
     assert_eq!(
-        replayed.workbook().to_bytes().expect("replayed bytes"),
+        replayed.package().to_bytes().expect("replayed bytes"),
         committed_bytes
     );
     let restored = committed
-        .workbook()
+        .package()
         .apply(&committed.patch().inverse())
         .expect("inverse gradient patch");
     assert_eq!(
-        restored.workbook().to_bytes().expect("restored bytes"),
+        restored.package().to_bytes().expect("restored bytes"),
         source_bytes
     );
 }
 
 #[test]
 fn fill_replacement_swaps_pattern_and_gradient() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let address = Address::from_a1("A1").expect("address");
     let pattern = PatternFill::new(
         Some(Pattern::Solid),
@@ -3187,7 +3187,7 @@ fn fill_replacement_swaps_pattern_and_gradient() {
         .expect("pattern replacement");
     let patterned = pattern_edit.commit().expect("pattern commit");
     let patterned_format = patterned
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -3204,7 +3204,7 @@ fn fill_replacement_swaps_pattern_and_gradient() {
         Some(Pattern::Solid)
     );
 
-    let mut gradient_edit = patterned.workbook().edit().expect("gradient edit");
+    let mut gradient_edit = patterned.package().edit().expect("gradient edit");
     gradient_edit
         .sheet(0usize)
         .expect("lookup")
@@ -3216,7 +3216,7 @@ fn fill_replacement_swaps_pattern_and_gradient() {
         .expect("gradient replacement");
     let gradient_commit = gradient_edit.commit().expect("gradient commit");
     let gradient_format = gradient_commit
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -3232,7 +3232,7 @@ fn fill_replacement_swaps_pattern_and_gradient() {
     assert_eq!(actual_gradient.kind(), GradientKind::Linear);
     assert_eq!(actual_gradient.stops(), gradient.stops());
 
-    let mut pattern_again = gradient_commit.workbook().edit().expect("pattern edit");
+    let mut pattern_again = gradient_commit.package().edit().expect("pattern edit");
     pattern_again
         .sheet(0usize)
         .expect("lookup")
@@ -3249,7 +3249,7 @@ fn fill_replacement_swaps_pattern_and_gradient() {
     let pattern_again = pattern_again.commit().expect("pattern commit");
     assert_eq!(
         pattern_again
-            .workbook()
+            .package()
             .sheet(0usize)
             .expect("lookup")
             .expect("worksheet")
@@ -3290,13 +3290,13 @@ fn matching_gradient_replacement_is_an_exact_lexical_no_op() {
         .fill("A1", &FillChange::replace(Fill::Gradient(expected.clone())))
         .expect("matching replacement");
     let committed = edit.commit().expect("no-op commit");
-    assert!(committed.patch().is_empty());
+    assert!(committed.patch().is_noop());
     assert_eq!(
-        committed.workbook().to_bytes().expect("no-op bytes"),
+        committed.package().to_bytes().expect("no-op bytes"),
         source_bytes
     );
     let actual_format = committed
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -3314,7 +3314,7 @@ fn matching_gradient_replacement_is_an_exact_lexical_no_op() {
 
 #[test]
 fn fill_replacement_joins_conflict_and_later_replacement_wins() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let address = Address::from_a1("A1").expect("address");
     let pattern = FillChange::replace(Fill::Pattern(PatternFill::new(
         Some(Pattern::Solid),
@@ -3357,7 +3357,7 @@ fn fill_replacement_joins_conflict_and_later_replacement_wins() {
     let staged = staged.commit().expect("staged commit");
     assert!(
         staged
-            .workbook()
+            .package()
             .sheet(0usize)
             .expect("lookup")
             .expect("worksheet")
@@ -3374,7 +3374,7 @@ fn fill_replacement_joins_conflict_and_later_replacement_wins() {
 
 #[test]
 fn granular_fill_after_pattern_replacement_composes_but_gradient_is_refused() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let address = Address::from_a1("A1").expect("address");
     let replacement = FillChange::replace(Fill::Pattern(PatternFill::new(
         Some(Pattern::Solid),
@@ -3393,7 +3393,7 @@ fn granular_fill_after_pattern_replacement_composes_but_gradient_is_refused() {
         .expect("pattern replacement and granular fill");
     let patterned = pattern_edit.commit().expect("pattern commit");
     let patterned_format = patterned
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -3426,7 +3426,7 @@ fn granular_fill_after_pattern_replacement_composes_but_gradient_is_refused() {
 
 #[test]
 fn failed_gradient_stage_does_not_poison_the_fill_budget() {
-    let baseline = Workbook::new().expect("baseline workbook");
+    let baseline = crate::Package::new().expect("baseline workbook");
     let baseline_bytes = baseline.to_bytes().expect("baseline bytes");
     let maximum_part = baseline
         .inner
@@ -3441,8 +3441,11 @@ fn failed_gradient_stage_does_not_poison_the_fill_budget() {
         .expect("part limit")
         .build()
         .expect("source limits");
-    let source =
-        Workbook::from_bytes_with_limits(baseline_bytes, limits).expect("limited workbook");
+    let source = crate::Package::from_bytes_with_options(
+        &baseline_bytes,
+        crate::OpenOptions::new().source_limits(limits),
+    )
+    .expect("limited workbook");
     let address = Address::from_a1("A1").expect("address");
     let stops = (0..4096)
         .map(|index| {
@@ -3471,7 +3474,7 @@ fn failed_gradient_stage_does_not_poison_the_fill_budget() {
     sheet.fill(address, &fallback).expect("fallback fill");
     let committed = edit.commit().expect("fallback commit");
     let committed_format = committed
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -3490,7 +3493,7 @@ fn failed_gradient_stage_does_not_poison_the_fill_budget() {
 
 #[test]
 fn gradient_join_resource_limit_returns_rejected_edit_and_allows_individual_commits() {
-    let baseline = Workbook::new().expect("baseline workbook");
+    let baseline = crate::Package::new().expect("baseline workbook");
     let baseline_bytes = baseline.to_bytes().expect("baseline bytes");
     let maximum_part = baseline
         .inner
@@ -3505,8 +3508,11 @@ fn gradient_join_resource_limit_returns_rejected_edit_and_allows_individual_comm
         .expect("part limit")
         .build()
         .expect("source limits");
-    let source =
-        Workbook::from_bytes_with_limits(baseline_bytes, limits).expect("limited workbook");
+    let source = crate::Package::from_bytes_with_options(
+        &baseline_bytes,
+        crate::OpenOptions::new().source_limits(limits),
+    )
+    .expect("limited workbook");
 
     // One small gradient is cheap to serialize. Reusing the same Arc-backed
     // request across many disjoint cells keeps the generated stylesheet
@@ -3583,13 +3589,13 @@ fn gradient_join_resource_limit_returns_rejected_edit_and_allows_individual_comm
         .commit()
         .expect("rejected edit commits independently");
     assert_eq!(
-        part_text(left_commit.workbook(), "/xl/styles.xml")
+        part_text(left_commit.package(), "/xl/styles.xml")
             .matches("<gradientFill")
             .count(),
         1
     );
     assert_eq!(
-        part_text(right_commit.workbook(), "/xl/styles.xml")
+        part_text(right_commit.package(), "/xl/styles.xml")
             .matches("<gradientFill")
             .count(),
         1
@@ -3598,7 +3604,7 @@ fn gradient_join_resource_limit_returns_rejected_edit_and_allows_individual_comm
 
 #[test]
 fn border_change_round_trips_edges_colors_diagonals_and_replays() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let source_bytes = source.to_bytes().expect("source bytes");
     let address = Address::from_a1("A1").expect("address");
     let left = Side::new(Line::Thick).with_color(Color::rgb(0x10, 0x20, 0x30));
@@ -3626,7 +3632,7 @@ fn border_change_round_trips_edges_colors_diagonals_and_replays() {
         .expect("border change");
     let committed = edit.commit().expect("border commit");
     let format = committed
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -3663,15 +3669,15 @@ fn border_change_round_trips_edges_colors_diagonals_and_replays() {
         .apply(committed.patch())
         .expect("replay border patch");
     assert_eq!(
-        replayed.workbook().to_bytes().expect("replayed bytes"),
-        committed.workbook().to_bytes().expect("committed bytes")
+        replayed.package().to_bytes().expect("replayed bytes"),
+        committed.package().to_bytes().expect("committed bytes")
     );
     let restored = committed
-        .workbook()
+        .package()
         .apply(&committed.patch().inverse())
         .expect("inverse border patch");
     assert_eq!(
-        restored.workbook().to_bytes().expect("restored bytes"),
+        restored.package().to_bytes().expect("restored bytes"),
         source_bytes
     );
 }
@@ -3698,9 +3704,9 @@ fn border_change_noop_is_exact_and_known_edits_preserve_opaque_markup() {
         .border("A1", &change)
         .expect("matching border");
     let noop = noop.commit().expect("no-op commit");
-    assert!(noop.patch().is_empty());
+    assert!(noop.patch().is_noop());
     assert_eq!(
-        noop.workbook().to_bytes().expect("no-op bytes"),
+        noop.package().to_bytes().expect("no-op bytes"),
         source_bytes
     );
 
@@ -3711,14 +3717,14 @@ fn border_change_noop_is_exact_and_known_edits_preserve_opaque_markup() {
         .border("A1", &BorderChange::new().left_line(Some(Line::Thick)))
         .expect("known side change");
     let committed = edit.commit().expect("opaque border commit");
-    let styles = part_text(committed.workbook(), "/xl/styles.xml");
+    let styles = part_text(committed.package(), "/xl/styles.xml");
     assert_eq!(styles.matches("<f:future/>").count(), 2);
     assert!(styles.contains(r#"<left style="thick">"#));
 }
 
 #[test]
 fn border_change_joins_disjoint_fields_conflicts_on_overlap_and_later_whole_wins() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let address = Address::from_a1("A1").expect("address");
 
     let mut left = source.edit().expect("left edit");
@@ -3742,7 +3748,7 @@ fn border_change_joins_disjoint_fields_conflicts_on_overlap_and_later_whole_wins
     left.join(right).expect("disjoint border fields");
     let joined = left.commit().expect("joined border commit");
     let joined_format = joined
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -3825,7 +3831,7 @@ fn border_change_joins_disjoint_fields_conflicts_on_overlap_and_later_whole_wins
         .expect("later whole side");
     let later = later.commit().expect("later whole commit");
     let later_format = later
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -3857,7 +3863,7 @@ fn border_change_is_discarded_by_style_replacement_and_reset() {
         .expect("border then style replacement");
     let replacement = replacement.commit().expect("replacement commit");
     let replacement_format = replacement
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -3878,7 +3884,7 @@ fn border_change_is_discarded_by_style_replacement_and_reset() {
         .expect("border then reset");
     let reset = reset.commit().expect("reset commit");
     let reset_sheet = reset
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet");
@@ -3938,7 +3944,7 @@ fn failed_border_stage_is_atomic_and_recovers_after_discard() {
     let committed = edit.commit().expect("recovered border commit");
 
     let remaining_format = committed
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -3954,7 +3960,7 @@ fn failed_border_stage_is_atomic_and_recovers_after_discard() {
         Some(Line::Thin)
     );
     let recovered_format = committed
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -4045,11 +4051,11 @@ fn border_join_resource_limit_returns_rejected_edit_and_allows_individual_commit
     let right_commit = rejected.commit().expect("right independent commit");
     for (workbook, address) in [
         (
-            left_commit.workbook(),
+            left_commit.package(),
             Address::from_a1("A1").expect("left A1"),
         ),
         (
-            right_commit.workbook(),
+            right_commit.package(),
             Address::from_a1("B1").expect("right B1"),
         ),
     ] {
@@ -4073,7 +4079,7 @@ fn border_join_resource_limit_returns_rejected_edit_and_allows_individual_commit
 
 #[test]
 fn font_change_repeated_values_and_unset_values_are_exact_no_ops() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let address = Address::from_a1("A1").expect("address");
     let mut create = source.edit().expect("create edit");
     let mut sheet = create.sheet(0usize).expect("lookup").expect("worksheet");
@@ -4086,7 +4092,7 @@ fn font_change_repeated_values_and_unset_values_are_exact_no_ops() {
                 .underline(Some(Underline::Double)),
         )
         .expect("font properties");
-    let configured = create.commit().expect("configured commit").into_workbook();
+    let configured = create.commit().expect("configured commit").into_package();
     let configured_bytes = configured.to_bytes().expect("configured bytes");
 
     let mut repeat = configured.edit().expect("repeat edit");
@@ -4102,9 +4108,9 @@ fn font_change_repeated_values_and_unset_values_are_exact_no_ops() {
         )
         .expect("repeat properties");
     let repeat = repeat.commit().expect("repeat commit");
-    assert!(repeat.patch().is_empty());
+    assert!(repeat.patch().is_noop());
     assert_eq!(
-        repeat.workbook().to_bytes().expect("repeat bytes"),
+        repeat.package().to_bytes().expect("repeat bytes"),
         configured_bytes
     );
 
@@ -4116,10 +4122,10 @@ fn font_change_repeated_values_and_unset_values_are_exact_no_ops() {
         .font(address, &FontChange::new().strike(None).underline(None))
         .expect("unset properties");
     let unset = unset.commit().expect("unset commit");
-    assert_eq!(unset.patch().len(), 1);
+    assert_eq!(unset.patch().operation_count(), 1);
     assert_eq!(
         unset
-            .workbook()
+            .package()
             .sheet(0usize)
             .expect("lookup")
             .expect("worksheet")
@@ -4136,7 +4142,7 @@ fn font_change_repeated_values_and_unset_values_are_exact_no_ops() {
 
 #[test]
 fn font_change_name_size_script_round_trip_replays_and_owns_input() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let source_bytes = source.to_bytes().expect("source bytes");
     let address = Address::from_a1("A1").expect("address");
     let mut authored_name = String::from("A&B <quoted> \"family\"\r\n\t字体");
@@ -4155,16 +4161,16 @@ fn font_change_name_size_script_round_trip_replays_and_owns_input() {
     sheet.set(address, "styled").expect("cell value");
     sheet.font(address, &change).expect("font properties");
     let committed = edit.commit().expect("font commit");
-    assert_eq!(committed.patch().len(), 1);
+    assert_eq!(committed.patch().operation_count(), 1);
 
-    let committed_bytes = committed.workbook().to_bytes().expect("committed bytes");
-    let styles = part_text(committed.workbook(), "/xl/styles.xml");
+    let committed_bytes = committed.package().to_bytes().expect("committed bytes");
+    let styles = part_text(committed.package(), "/xl/styles.xml");
     assert!(styles.contains("A&amp;B &lt;quoted"));
     assert!(styles.contains("&quot;family&quot;"));
     assert!(styles.contains(r#"<sz val="14.5"/>"#));
     assert!(styles.contains(r#"<vertAlign val="superscript"/>"#));
     let style = committed
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -4177,7 +4183,7 @@ fn font_change_name_size_script_round_trip_replays_and_owns_input() {
     assert_eq!(font.size(), Some(14.5));
     assert_eq!(font.script(), Some(Script::Superscript));
 
-    let reopened = Workbook::from_bytes(committed_bytes.clone()).expect("reopened workbook");
+    let reopened = crate::Package::from_bytes(&committed_bytes).expect("reopened workbook");
     assert_eq!(part_text(&reopened, "/xl/styles.xml"), styles);
     let reopened_format = reopened
         .sheet(0usize)
@@ -4195,22 +4201,22 @@ fn font_change_name_size_script_round_trip_replays_and_owns_input() {
 
     let replayed = source.apply(committed.patch()).expect("replay patch");
     assert_eq!(
-        replayed.workbook().to_bytes().expect("replayed bytes"),
+        replayed.package().to_bytes().expect("replayed bytes"),
         committed_bytes
     );
     let restored = committed
-        .workbook()
+        .package()
         .apply(&committed.patch().inverse())
         .expect("inverse patch");
     assert_eq!(
-        restored.workbook().to_bytes().expect("restored bytes"),
+        restored.package().to_bytes().expect("restored bytes"),
         source_bytes
     );
 }
 
 #[test]
 fn font_change_name_size_script_joins_disjoint_fields_and_conflicts_on_script() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let address = Address::from_a1("A1").expect("address");
 
     let mut name = source.edit().expect("name edit");
@@ -4242,7 +4248,7 @@ fn font_change_name_size_script_joins_disjoint_fields_and_conflicts_on_script() 
     name.join(script).expect("disjoint script");
     let joined = name.commit().expect("joined font commit");
     let format = joined
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -4285,7 +4291,7 @@ fn font_change_name_size_script_joins_disjoint_fields_and_conflicts_on_script() 
 
 #[test]
 fn font_change_name_size_script_repeats_and_unsets_without_spurious_changes() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let address = Address::from_a1("A1").expect("address");
     let mut create = source.edit().expect("create edit");
     let mut sheet = create.sheet(0usize).expect("lookup").expect("worksheet");
@@ -4301,7 +4307,7 @@ fn font_change_name_size_script_repeats_and_unsets_without_spurious_changes() {
                 .script(Some(Script::Superscript)),
         )
         .expect("font properties");
-    let configured = create.commit().expect("configured commit").into_workbook();
+    let configured = create.commit().expect("configured commit").into_package();
     let configured_bytes = configured.to_bytes().expect("configured bytes");
 
     let mut repeat = configured.edit().expect("repeat edit");
@@ -4320,9 +4326,9 @@ fn font_change_name_size_script_repeats_and_unsets_without_spurious_changes() {
         )
         .expect("repeat properties");
     let repeat = repeat.commit().expect("repeat commit");
-    assert!(repeat.patch().is_empty());
+    assert!(repeat.patch().is_noop());
     assert_eq!(
-        repeat.workbook().to_bytes().expect("repeat bytes"),
+        repeat.package().to_bytes().expect("repeat bytes"),
         configured_bytes
     );
 
@@ -4342,9 +4348,9 @@ fn font_change_name_size_script_repeats_and_unsets_without_spurious_changes() {
         )
         .expect("unset properties");
     let unset = unset.commit().expect("unset commit");
-    assert_eq!(unset.patch().len(), 1);
+    assert_eq!(unset.patch().operation_count(), 1);
     let format = unset
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -4361,7 +4367,7 @@ fn font_change_name_size_script_repeats_and_unsets_without_spurious_changes() {
 
 #[test]
 fn font_change_color_replaces_rgb_with_theme_tint_and_preserves_companions() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let source_bytes = source.to_bytes().expect("source bytes");
     let address = Address::from_a1("A1").expect("address");
     let rgb = Rgb::argb(0x80, 0x11, 0x22, 0x33);
@@ -4382,11 +4388,11 @@ fn font_change_color_replaces_rgb_with_theme_tint_and_preserves_companions() {
         )
         .expect("font properties");
     let rgb_commit = edit.commit().expect("RGB commit");
-    let rgb_bytes = rgb_commit.workbook().to_bytes().expect("RGB bytes");
-    let rgb_styles = part_text(rgb_commit.workbook(), "/xl/styles.xml");
+    let rgb_bytes = rgb_commit.package().to_bytes().expect("RGB bytes");
+    let rgb_styles = part_text(rgb_commit.package(), "/xl/styles.xml");
     assert!(rgb_styles.contains(r#"<color rgb="80112233"/>"#));
     let rgb_format = rgb_commit
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -4402,16 +4408,16 @@ fn font_change_color_replaces_rgb_with_theme_tint_and_preserves_companions() {
 
     let replayed = source.apply(rgb_commit.patch()).expect("replay RGB patch");
     assert_eq!(
-        replayed.workbook().to_bytes().expect("replayed RGB bytes"),
+        replayed.package().to_bytes().expect("replayed RGB bytes"),
         rgb_bytes
     );
     let restored = rgb_commit
-        .workbook()
+        .package()
         .apply(&rgb_commit.patch().inverse())
         .expect("inverse RGB patch");
     assert_eq!(
         restored
-            .workbook()
+            .package()
             .to_bytes()
             .expect("restored source bytes"),
         source_bytes
@@ -4421,7 +4427,7 @@ fn font_change_color_replaces_rgb_with_theme_tint_and_preserves_companions() {
     let theme_color = FontColor::theme(5).with_tint(tint);
     assert_eq!(theme_color.kind(), FontColorKind::Theme(5));
     assert_eq!(theme_color.tint(), Some(tint));
-    let mut replace = rgb_commit.workbook().edit().expect("replace edit");
+    let mut replace = rgb_commit.package().edit().expect("replace edit");
     replace
         .sheet(0usize)
         .expect("lookup")
@@ -4429,11 +4435,11 @@ fn font_change_color_replaces_rgb_with_theme_tint_and_preserves_companions() {
         .font(address, &FontChange::new().color(Some(theme_color)))
         .expect("theme color");
     let theme_commit = replace.commit().expect("theme commit");
-    let theme_bytes = theme_commit.workbook().to_bytes().expect("theme bytes");
-    let theme_styles = part_text(theme_commit.workbook(), "/xl/styles.xml");
+    let theme_bytes = theme_commit.package().to_bytes().expect("theme bytes");
+    let theme_styles = part_text(theme_commit.package(), "/xl/styles.xml");
     assert!(theme_styles.contains(r#"<color theme="5" tint="0.25"/>"#));
     let theme_format = theme_commit
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -4447,7 +4453,7 @@ fn font_change_color_replaces_rgb_with_theme_tint_and_preserves_companions() {
     assert_eq!(theme_font.name(), Some("Companion"));
     assert_eq!(theme_font.script(), Some(Script::Superscript));
 
-    let reopened = Workbook::from_bytes(theme_bytes.clone()).expect("reopened theme workbook");
+    let reopened = crate::Package::from_bytes(&theme_bytes).expect("reopened theme workbook");
     let reopened_format = reopened
         .sheet(0usize)
         .expect("lookup")
@@ -4463,23 +4469,23 @@ fn font_change_color_replaces_rgb_with_theme_tint_and_preserves_companions() {
     assert_eq!(reopened_font.script(), Some(Script::Superscript));
 
     let replayed_theme = rgb_commit
-        .workbook()
+        .package()
         .apply(theme_commit.patch())
         .expect("replay theme patch");
     assert_eq!(
         replayed_theme
-            .workbook()
+            .package()
             .to_bytes()
             .expect("replayed theme bytes"),
         theme_bytes
     );
     let restored_rgb = theme_commit
-        .workbook()
+        .package()
         .apply(&theme_commit.patch().inverse())
         .expect("inverse theme patch");
     assert_eq!(
         restored_rgb
-            .workbook()
+            .package()
             .to_bytes()
             .expect("restored RGB bytes"),
         rgb_bytes
@@ -4498,7 +4504,7 @@ fn font_change_color_semantics_ignore_source_lexical_spelling_and_deduplicate() 
         .get_part_mut(&styles_uri)
         .expect("styles part")
         .set_blob(styles.into_bytes());
-    let lexical_source = Workbook::from_package(package).expect("lexical source workbook");
+    let lexical_source = crate::Package::from_opc(package).expect("lexical source workbook");
     let before_bytes = lexical_source.to_bytes().expect("source bytes");
     let before_styles = part_text(&lexical_source, "/xl/styles.xml").to_owned();
     let semantic_color = FontColor::rgb(Rgb::argb(0xFF, 0x11, 0x22, 0x33));
@@ -4514,17 +4520,17 @@ fn font_change_color_semantics_ignore_source_lexical_spelling_and_deduplicate() 
         )
         .expect("repeat color");
     let repeated = repeat.commit().expect("repeat commit");
-    assert!(repeated.patch().is_empty());
+    assert!(repeated.patch().is_noop());
     assert_eq!(
-        repeated.workbook().to_bytes().expect("repeat bytes"),
+        repeated.package().to_bytes().expect("repeat bytes"),
         before_bytes
     );
     assert_eq!(
-        part_text(repeated.workbook(), "/xl/styles.xml"),
+        part_text(repeated.package(), "/xl/styles.xml"),
         before_styles
     );
 
-    let source = Workbook::new().expect("dedup source");
+    let source = crate::Package::new().expect("dedup source");
     let before = part_text(&source, "/xl/styles.xml").to_owned();
     let mut edit = source.edit().expect("dedup edit");
     let mut sheet = edit.sheet(0usize).expect("lookup").expect("worksheet");
@@ -4537,7 +4543,7 @@ fn font_change_color_semantics_ignore_source_lexical_spelling_and_deduplicate() 
             )
             .expect("shared color");
     }
-    let deduplicated = edit.commit().expect("dedup commit").into_workbook();
+    let deduplicated = edit.commit().expect("dedup commit").into_package();
     let after = part_text(&deduplicated, "/xl/styles.xml");
     assert_eq!(
         after.matches("<color").count(),
@@ -4573,16 +4579,16 @@ fn font_change_color_semantics_ignore_source_lexical_spelling_and_deduplicate() 
         )
         .expect("null color");
     let null = null.commit().expect("null commit");
-    assert!(null.patch().is_empty());
+    assert!(null.patch().is_noop());
     assert_eq!(
-        null.workbook().to_bytes().expect("null bytes"),
+        null.package().to_bytes().expect("null bytes"),
         source.to_bytes().expect("source bytes")
     );
 }
 
 #[test]
 fn font_change_color_joins_disjoint_fields_and_conflicts_on_color() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let address = Address::from_a1("A1").expect("address");
     let rgb = Rgb::new(0x20, 0x40, 0x60);
 
@@ -4605,7 +4611,7 @@ fn font_change_color_joins_disjoint_fields_and_conflicts_on_color() {
     color.join(name).expect("disjoint color and name");
     let joined = color.commit().expect("joined commit");
     let format = joined
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -4650,7 +4656,7 @@ fn font_change_color_joins_disjoint_fields_and_conflicts_on_color() {
 
 #[test]
 fn font_change_native_bool_integer_and_scheme_fields_round_trip_with_companions() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let source_bytes = source.to_bytes().expect("source bytes");
     let address = Address::from_a1("A1").expect("address");
     let change = FontChange::new()
@@ -4674,10 +4680,10 @@ fn font_change_native_bool_integer_and_scheme_fields_round_trip_with_companions(
     sheet.set(address, "styled").expect("cell value");
     sheet.font(address, &change).expect("font properties");
     let committed = edit.commit().expect("font commit");
-    assert_eq!(committed.patch().len(), 1);
+    assert_eq!(committed.patch().operation_count(), 1);
 
-    let committed_bytes = committed.workbook().to_bytes().expect("committed bytes");
-    let styles = part_text(committed.workbook(), "/xl/styles.xml");
+    let committed_bytes = committed.package().to_bytes().expect("committed bytes");
+    let styles = part_text(committed.package(), "/xl/styles.xml");
     assert!(styles.contains(r#"<outline val="0"/>"#));
     assert!(styles.contains(r#"<shadow/>"#));
     assert!(styles.contains(r#"<condense val="0"/>"#));
@@ -4686,7 +4692,7 @@ fn font_change_native_bool_integer_and_scheme_fields_round_trip_with_companions(
     assert!(styles.contains(r#"<family val="0"/>"#));
     assert!(styles.contains(r#"<scheme val="none"/>"#));
     let format = committed
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -4707,7 +4713,7 @@ fn font_change_native_bool_integer_and_scheme_fields_round_trip_with_companions(
     assert_eq!(font.size(), Some(12.0));
     assert_eq!(font.script(), Some(Script::Superscript));
 
-    let reopened = Workbook::from_bytes(committed_bytes.clone()).expect("reopened workbook");
+    let reopened = crate::Package::from_bytes(&committed_bytes).expect("reopened workbook");
     let reopened_format = reopened
         .sheet(0usize)
         .expect("lookup")
@@ -4731,22 +4737,22 @@ fn font_change_native_bool_integer_and_scheme_fields_round_trip_with_companions(
 
     let replayed = source.apply(committed.patch()).expect("replay patch");
     assert_eq!(
-        replayed.workbook().to_bytes().expect("replayed bytes"),
+        replayed.package().to_bytes().expect("replayed bytes"),
         committed_bytes
     );
     let restored = committed
-        .workbook()
+        .package()
         .apply(&committed.patch().inverse())
         .expect("inverse patch");
     assert_eq!(
-        restored.workbook().to_bytes().expect("restored bytes"),
+        restored.package().to_bytes().expect("restored bytes"),
         source_bytes
     );
 }
 
 #[test]
 fn font_change_native_fields_join_and_distinguish_false_zero_none_and_unset() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let address = Address::from_a1("A1").expect("address");
 
     let mut outline = source.edit().expect("outline edit");
@@ -4769,7 +4775,7 @@ fn font_change_native_fields_join_and_distinguish_false_zero_none_and_unset() {
     outline.join(family).expect("disjoint native fields");
     let joined = outline.commit().expect("joined commit");
     let joined_format = joined
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -4826,7 +4832,7 @@ fn font_change_native_fields_join_and_distinguish_false_zero_none_and_unset() {
                 .scheme(Some(Scheme::None)),
         )
         .expect("native fields");
-    let configured = create.commit().expect("configured commit").into_workbook();
+    let configured = create.commit().expect("configured commit").into_package();
     let configured_bytes = configured.to_bytes().expect("configured bytes");
 
     let mut repeat = configured.edit().expect("repeat edit");
@@ -4849,9 +4855,9 @@ fn font_change_native_fields_join_and_distinguish_false_zero_none_and_unset() {
         )
         .expect("repeat native fields");
     let repeat = repeat.commit().expect("repeat commit");
-    assert!(repeat.patch().is_empty());
+    assert!(repeat.patch().is_noop());
     assert_eq!(
-        repeat.workbook().to_bytes().expect("repeat bytes"),
+        repeat.package().to_bytes().expect("repeat bytes"),
         configured_bytes
     );
 
@@ -4875,9 +4881,9 @@ fn font_change_native_fields_join_and_distinguish_false_zero_none_and_unset() {
         )
         .expect("unset native fields");
     let unset = unset.commit().expect("unset commit");
-    assert_eq!(unset.patch().len(), 1);
+    assert_eq!(unset.patch().operation_count(), 1);
     let unset_format = unset
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -4898,7 +4904,7 @@ fn font_change_native_fields_join_and_distinguish_false_zero_none_and_unset() {
 
 #[test]
 fn alignment_change_all_fields_round_trip_with_font_and_payload() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let source_bytes = source.to_bytes().expect("source bytes");
     let address = Address::from_a1("A1").expect("address");
     let rotation = Rotation::degrees(45).expect("rotation");
@@ -4930,10 +4936,10 @@ fn alignment_change_all_fields_round_trip_with_font_and_payload() {
         .quote_prefix(address, Some(true))
         .expect("quote-prefix companion");
     let committed = edit.commit().expect("alignment commit");
-    assert_eq!(committed.patch().len(), 1);
+    assert_eq!(committed.patch().operation_count(), 1);
 
-    let committed_bytes = committed.workbook().to_bytes().expect("committed bytes");
-    let styles = part_text(committed.workbook(), "/xl/styles.xml");
+    let committed_bytes = committed.package().to_bytes().expect("committed bytes");
+    let styles = part_text(committed.package(), "/xl/styles.xml");
     assert!(styles.contains(r#"horizontal="center""#));
     assert!(styles.contains(r#"vertical="bottom""#));
     assert!(styles.contains(r#"textRotation="45""#));
@@ -4948,7 +4954,7 @@ fn alignment_change_all_fields_round_trip_with_font_and_payload() {
     assert!(styles.contains(r#"quotePrefix="1""#));
 
     let format = committed
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -4973,7 +4979,7 @@ fn alignment_change_all_fields_round_trip_with_font_and_payload() {
     assert_eq!(protection_view.hidden(), Some(true));
     assert!(format.quote_prefix());
 
-    let reopened = Workbook::from_bytes(committed_bytes.clone()).expect("reopened workbook");
+    let reopened = crate::Package::from_bytes(&committed_bytes).expect("reopened workbook");
     let reopened_format = reopened
         .sheet(0usize)
         .expect("lookup")
@@ -4995,15 +5001,15 @@ fn alignment_change_all_fields_round_trip_with_font_and_payload() {
 
     let replayed = source.apply(committed.patch()).expect("replay patch");
     assert_eq!(
-        replayed.workbook().to_bytes().expect("replayed bytes"),
+        replayed.package().to_bytes().expect("replayed bytes"),
         committed_bytes
     );
     let restored = committed
-        .workbook()
+        .package()
         .apply(&committed.patch().inverse())
         .expect("inverse patch");
     assert_eq!(
-        restored.workbook().to_bytes().expect("restored bytes"),
+        restored.package().to_bytes().expect("restored bytes"),
         source_bytes
     );
 }
@@ -5026,7 +5032,7 @@ fn alignment_change_preserves_source_shape_and_reopens() {
             br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" s="1"><v>1</v></c><c r="B1"><v>2</v></c></row></sheetData></worksheet>"#
                 .to_vec(),
         );
-    let source = Workbook::from_package(package).expect("source workbook");
+    let source = crate::Package::from_opc(package).expect("source workbook");
     let source_styles = part_text(&source, "/xl/styles.xml").to_owned();
     assert!(source_styles.contains("<!-- preserved alignment comment -->"));
     assert!(source_styles.contains("<!-- preserved protection comment -->"));
@@ -5054,7 +5060,7 @@ fn alignment_change_preserves_source_shape_and_reopens() {
         .and_then(|sheet| sheet.quote_prefix(address, Some(true)))
         .expect("alignment");
     let committed = edit.commit().expect("alignment commit");
-    let styles = part_text(committed.workbook(), "/xl/styles.xml");
+    let styles = part_text(committed.package(), "/xl/styles.xml");
     assert!(styles.contains("<!-- preserved alignment comment -->"));
     assert!(styles.contains("<!-- preserved protection comment -->"));
     assert!(styles.contains("horizontal='center'"));
@@ -5071,7 +5077,7 @@ fn alignment_change_preserves_source_shape_and_reopens() {
     assert!(styles.contains("hidden=\"1\""));
     assert!(styles.contains(r#"quotePrefix="1""#));
 
-    let reopened = Workbook::from_bytes(committed.workbook().to_bytes().expect("bytes"))
+    let reopened = crate::Package::from_bytes(&committed.package().to_bytes().expect("bytes"))
         .expect("reopened workbook");
     let format = reopened
         .sheet(0usize)
@@ -5100,7 +5106,7 @@ fn alignment_change_preserves_source_shape_and_reopens() {
 
 #[test]
 fn alignment_change_repeats_and_distinguishes_explicit_defaults_from_unset_and_clear() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let address = Address::from_a1("A1").expect("address");
 
     let mut unset = source.edit().expect("unset edit");
@@ -5111,7 +5117,7 @@ fn alignment_change_repeats_and_distinguishes_explicit_defaults_from_unset_and_c
         .alignment(address, &AlignmentChange::new())
         .expect("empty alignment");
     let unset = unset.commit().expect("unset commit");
-    assert!(unset.patch().is_empty());
+    assert!(unset.patch().is_noop());
 
     let mut explicit = source.edit().expect("explicit edit");
     explicit
@@ -5121,11 +5127,11 @@ fn alignment_change_repeats_and_distinguishes_explicit_defaults_from_unset_and_c
         .alignment(address, &AlignmentChange::new().wrap_text(Some(false)))
         .expect("explicit default");
     let explicit = explicit.commit().expect("explicit commit");
-    assert_eq!(explicit.patch().len(), 1);
-    let explicit_styles = part_text(explicit.workbook(), "/xl/styles.xml");
+    assert_eq!(explicit.patch().operation_count(), 1);
+    let explicit_styles = part_text(explicit.package(), "/xl/styles.xml");
     assert!(explicit_styles.contains(r#"wrapText="0""#));
     let explicit_format = explicit
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -5137,8 +5143,8 @@ fn alignment_change_repeats_and_distinguishes_explicit_defaults_from_unset_and_c
     let explicit_alignment = explicit_format.alignment().expect("explicit alignment");
     assert!(!explicit_alignment.wrap_text);
 
-    let explicit_bytes = explicit.workbook().to_bytes().expect("explicit bytes");
-    let mut repeat = explicit.workbook().edit().expect("repeat edit");
+    let explicit_bytes = explicit.package().to_bytes().expect("explicit bytes");
+    let mut repeat = explicit.package().edit().expect("repeat edit");
     repeat
         .sheet(0usize)
         .expect("lookup")
@@ -5146,13 +5152,13 @@ fn alignment_change_repeats_and_distinguishes_explicit_defaults_from_unset_and_c
         .alignment(address, &AlignmentChange::new().wrap_text(Some(false)))
         .expect("repeat explicit default");
     let repeat = repeat.commit().expect("repeat commit");
-    assert!(repeat.patch().is_empty());
+    assert!(repeat.patch().is_noop());
     assert_eq!(
-        repeat.workbook().to_bytes().expect("repeat bytes"),
+        repeat.package().to_bytes().expect("repeat bytes"),
         explicit_bytes
     );
 
-    let mut clear = explicit.workbook().edit().expect("clear edit");
+    let mut clear = explicit.package().edit().expect("clear edit");
     clear
         .sheet(0usize)
         .expect("lookup")
@@ -5160,11 +5166,11 @@ fn alignment_change_repeats_and_distinguishes_explicit_defaults_from_unset_and_c
         .alignment(address, &AlignmentChange::new().wrap_text(None))
         .expect("clear explicit default");
     let clear = clear.commit().expect("clear commit");
-    assert_eq!(clear.patch().len(), 1);
-    let clear_styles = part_text(clear.workbook(), "/xl/styles.xml");
+    assert_eq!(clear.patch().operation_count(), 1);
+    let clear_styles = part_text(clear.package(), "/xl/styles.xml");
     assert!(clear_styles.contains("<alignment/>") || clear_styles.contains("<alignment />"));
     let clear_format = clear
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -5181,7 +5187,7 @@ fn alignment_change_repeats_and_distinguishes_explicit_defaults_from_unset_and_c
 
 #[test]
 fn alignment_change_joins_disjoint_fields_and_font_but_conflicts_on_overlap() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let address = Address::from_a1("A1").expect("address");
 
     let mut horizontal = source.edit().expect("horizontal edit");
@@ -5209,7 +5215,7 @@ fn alignment_change_joins_disjoint_fields_and_font_but_conflicts_on_overlap() {
         .expect("disjoint alignment fields");
     let joined = horizontal.commit().expect("joined alignment commit");
     let joined_format = joined
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -5238,7 +5244,7 @@ fn alignment_change_joins_disjoint_fields_and_font_but_conflicts_on_overlap() {
     font.join(alignment).expect("font and alignment join");
     let joined = font.commit().expect("font/alignment commit");
     let joined_format = joined
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -5311,7 +5317,7 @@ fn alignment_staging_is_discarded_by_style_replacement_reset_and_removal() {
         .expect("alignment then style replacement");
     let replacement = replacement.commit().expect("replacement commit");
     let replacement_sheet = replacement
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet");
@@ -5352,7 +5358,7 @@ fn alignment_staging_is_discarded_by_style_replacement_reset_and_removal() {
         .expect("alignment then style reset");
     let reset = reset.commit().expect("reset commit");
     let reset_sheet = reset
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet");
@@ -5394,7 +5400,7 @@ fn alignment_staging_is_discarded_by_style_replacement_reset_and_removal() {
     let remove = remove.commit().expect("remove commit");
     assert!(
         remove
-            .workbook()
+            .package()
             .sheet(0usize)
             .expect("lookup")
             .expect("worksheet")
@@ -5402,10 +5408,7 @@ fn alignment_staging_is_discarded_by_style_replacement_reset_and_removal() {
             .expect("removed cell")
             .is_missing()
     );
-    assert_eq!(
-        part_text(remove.workbook(), "/xl/styles.xml"),
-        source_styles
-    );
+    assert_eq!(part_text(remove.package(), "/xl/styles.xml"), source_styles);
 }
 
 #[test]
@@ -5426,7 +5429,7 @@ fn alignment_after_style_reset_uses_reset_base_and_inverse_restores_source() {
         .expect("style reset then alignment");
     let committed = edit.commit().expect("commit");
     let sheet = committed
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet");
@@ -5445,11 +5448,11 @@ fn alignment_after_style_reset_uses_reset_base_and_inverse_restores_source() {
     ));
 
     let restored = committed
-        .workbook()
+        .package()
         .apply(&committed.patch().inverse())
         .expect("inverse");
     assert_eq!(
-        restored.workbook().to_bytes().expect("restored bytes"),
+        restored.package().to_bytes().expect("restored bytes"),
         source_bytes
     );
 }
@@ -5540,7 +5543,7 @@ fn alignment_and_complete_style_actions_conflict_when_joined() {
 
 #[test]
 fn protection_quote_and_extended_alignment_repeat_clear_without_spurious_changes() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let address = Address::from_a1("A1").expect("address");
     let alignment = AlignmentChange::new()
         .relative_indent(Some(-3))
@@ -5559,10 +5562,10 @@ fn protection_quote_and_extended_alignment_repeat_clear_without_spurious_changes
         .and_then(|sheet| sheet.quote_prefix(address, Some(false)))
         .expect("style facets");
     let configured = create.commit().expect("configured commit");
-    let configured_bytes = configured.workbook().to_bytes().expect("configured bytes");
-    let configured_styles = part_text(configured.workbook(), "/xl/styles.xml").to_owned();
+    let configured_bytes = configured.package().to_bytes().expect("configured bytes");
+    let configured_styles = part_text(configured.package(), "/xl/styles.xml").to_owned();
     let configured_format = configured
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -5579,7 +5582,7 @@ fn protection_quote_and_extended_alignment_repeat_clear_without_spurious_changes
     assert_eq!(configured_protection.hidden(), Some(true));
     assert!(!configured_format.quote_prefix());
 
-    let mut repeat = configured.workbook().edit().expect("repeat edit");
+    let mut repeat = configured.package().edit().expect("repeat edit");
     repeat
         .sheet(0usize)
         .expect("lookup")
@@ -5589,13 +5592,13 @@ fn protection_quote_and_extended_alignment_repeat_clear_without_spurious_changes
         .and_then(|sheet| sheet.quote_prefix(address, Some(false)))
         .expect("repeat style facets");
     let repeat = repeat.commit().expect("repeat commit");
-    assert!(repeat.patch().is_empty());
+    assert!(repeat.patch().is_noop());
     assert_eq!(
-        repeat.workbook().to_bytes().expect("repeat bytes"),
+        repeat.package().to_bytes().expect("repeat bytes"),
         configured_bytes
     );
 
-    let mut clear = configured.workbook().edit().expect("clear edit");
+    let mut clear = configured.package().edit().expect("clear edit");
     clear
         .sheet(0usize)
         .expect("lookup")
@@ -5612,8 +5615,8 @@ fn protection_quote_and_extended_alignment_repeat_clear_without_spurious_changes
         .and_then(|sheet| sheet.quote_prefix(address, None))
         .expect("clear style facets");
     let clear = clear.commit().expect("clear commit");
-    assert_eq!(clear.patch().len(), 1);
-    let styles = part_text(clear.workbook(), "/xl/styles.xml");
+    assert_eq!(clear.patch().operation_count(), 1);
+    let styles = part_text(clear.package(), "/xl/styles.xml");
     assert!(styles.contains("<alignment/>") || styles.contains("<alignment />"));
     assert!(styles.contains("<protection/>") || styles.contains("<protection />"));
     assert_eq!(
@@ -5637,7 +5640,7 @@ fn protection_quote_and_extended_alignment_repeat_clear_without_spurious_changes
         configured_styles.matches("quotePrefix=").count()
     );
     let clear_format = clear
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -5659,7 +5662,7 @@ fn protection_quote_and_extended_alignment_repeat_clear_without_spurious_changes
 
 #[test]
 fn protection_alignment_and_quote_facets_join_when_disjoint_and_conflict_when_overlapping() {
-    let source = Workbook::new().expect("source workbook");
+    let source = crate::Package::new().expect("source workbook");
     let address = Address::from_a1("A1").expect("address");
 
     let mut locked = source.edit().expect("locked edit");
@@ -5679,7 +5682,7 @@ fn protection_alignment_and_quote_facets_join_when_disjoint_and_conflict_when_ov
     locked.join(hidden).expect("disjoint protection fields");
     let joined = locked.commit().expect("protection join commit");
     let joined_format = joined
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -5714,7 +5717,7 @@ fn protection_alignment_and_quote_facets_join_when_disjoint_and_conflict_when_ov
         .expect("protection/alignment join");
     let joined = protection.commit().expect("protection/alignment commit");
     let joined_format = joined
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")
@@ -5749,7 +5752,7 @@ fn protection_alignment_and_quote_facets_join_when_disjoint_and_conflict_when_ov
     quote.join(quote_protection).expect("quote/protection join");
     let joined = quote.commit().expect("quote/protection commit");
     let joined_format = joined
-        .workbook()
+        .package()
         .sheet(0usize)
         .expect("lookup")
         .expect("worksheet")

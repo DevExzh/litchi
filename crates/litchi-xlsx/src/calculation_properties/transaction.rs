@@ -11,7 +11,7 @@ use crate::error::{Error, Result, invalid};
 
 /// A staged calculation-metadata edit over one OPC package.
 pub struct Transaction<'a> {
-    target: &'a mut OpcPackage,
+    target: crate::package::Target<'a>,
     before: Snapshot,
     properties: Option<Properties>,
     features: Option<Features>,
@@ -26,7 +26,15 @@ impl<'a> Transaction<'a> {
 
     /// Start a transaction with a caller-supplied resource policy.
     pub fn with_limits(target: &'a mut OpcPackage, limits: &Limits) -> Result<Self> {
-        let before = Snapshot::load_with_limits(target, limits)?;
+        Self::start(target.into(), limits)
+    }
+
+    pub(crate) fn for_package(package: &'a mut crate::Package, limits: &Limits) -> Result<Self> {
+        Self::start(crate::package::Target::Package(package), limits)
+    }
+
+    fn start(target: crate::package::Target<'a>, limits: &Limits) -> Result<Self> {
+        let before = Snapshot::load_with_limits(&target, limits)?;
         Ok(Self {
             target,
             properties: before.properties().cloned(),
@@ -113,7 +121,7 @@ impl<'a> Transaction<'a> {
     }
 
     /// Validate and atomically publish the staged metadata.
-    pub fn commit(self) -> Result<Commit> {
+    pub fn commit(mut self) -> Result<Commit> {
         if !self.is_changed() {
             let patch = Patch::new(self.before.clone(), self.before.clone());
             return Ok(Commit::new(self.before, patch, false));
@@ -122,7 +130,7 @@ impl<'a> Transaction<'a> {
             return Err(Error::Signed);
         }
 
-        if !self.before.matches_current_source(self.target) {
+        if !self.before.matches_current_source(&self.target) {
             return Err(Error::PatchConflict {
                 part: self.before.workbook_part_name().to_string(),
             });
@@ -154,7 +162,7 @@ impl<'a> Transaction<'a> {
             ));
         }
         let patch = Patch::new(self.before, snapshot.clone());
-        *self.target = candidate;
+        self.target.publish(candidate)?;
         Ok(Commit::new(snapshot, patch, true))
     }
 }

@@ -5,7 +5,6 @@ use std::io;
 use litchi_ooxml_common::web::{
     AddIn, Binding as AddInBinding, Conformance, Pane, Panes, Reference, Store,
 };
-use litchi_xlsx::Workbook;
 use litchi_xlsx::web::Binding as RangeBinding;
 
 const INSTANCE_ID: &str = "litchi-office-roundtrip";
@@ -36,7 +35,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 fn create(path: OsString) -> Result<(), Box<dyn Error>> {
-    let workbook = Workbook::new()?;
+    let workbook = litchi_xlsx::Package::new()?;
 
     let reference = Reference::file("Example3", "15.0", r"C:\Example")?;
     let add_in = AddIn::new(INSTANCE_ID, reference)?
@@ -58,12 +57,12 @@ fn create(path: OsString) -> Result<(), Box<dyn Error>> {
         .bind(RangeBinding::new(APP_REF, "Sheet1!$A$1:$B$2")?)?;
 
     package.join(range)?;
-    package.commit()?.workbook().save(path)?;
+    package.commit()?.package().save(path)?;
     Ok(())
 }
 
 fn check(path: OsString) -> Result<(), Box<dyn Error>> {
-    let workbook = Workbook::open(path)?;
+    let workbook = litchi_xlsx::Package::open(path)?;
     let panes = workbook
         .task_panes()?
         .ok_or_else(|| invalid_data("task panes are missing"))?;
@@ -86,6 +85,7 @@ fn check(path: OsString) -> Result<(), Box<dyn Error>> {
     }
 
     let sheet = workbook
+        .workbook_ref()
         .sheet("Sheet1")?
         .ok_or_else(|| invalid_data("Sheet1 is missing"))?;
     let range = sheet

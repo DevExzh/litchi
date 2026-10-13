@@ -11,7 +11,7 @@
 //! ```
 
 use litchi::sheet::FormulaEvaluator;
-use litchi::xlsx::{Formula, Number, Workbook};
+use litchi::xlsx::{Formula, Number, Package};
 use std::env;
 use std::error::Error;
 
@@ -63,7 +63,7 @@ async fn main() -> ExampleResult<()> {
 }
 
 fn build_sample_xlsx(path: &str) -> ExampleResult<()> {
-    let wb = Workbook::create()?;
+    let wb = Package::new()?;
     let mut edit = wb.edit()?;
 
     // Statistical functions sheet
@@ -149,7 +149,7 @@ fn build_sample_xlsx(path: &str) -> ExampleResult<()> {
         ws.set("B10", Formula::new("DURATION(0,365,0.05,0.10,2,0)")?)?;
     }
 
-    edit.commit()?.into_workbook().save(path)?;
+    edit.commit()?.into_package().save(path)?;
     println!("Created statistical/financial test workbook at {}", path);
 
     Ok(())

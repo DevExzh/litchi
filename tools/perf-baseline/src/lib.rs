@@ -105,10 +105,11 @@ use litchi_opc::{
 use litchi_pptx::shape::text::{
     extract as extract_drawingml_text, scan_ranges as scan_drawingml_ranges,
 };
+use litchi_xlsx::Package as XlsxPackage;
 use litchi_xlsx::{
     Cell as XlsxCell, MergeChoice, MergeLimits, Rect, RowIndex, SourceBackedWorkbook,
     StreamingCell, StreamingCellValue, StreamingWorkbookLimits, StreamingWorkbookWriter,
-    Value as XlsxValue, Workbook,
+    Value as XlsxValue,
 };
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesRef, Event};
@@ -20251,7 +20252,7 @@ fn xlsx_calculation_media_payload(index: usize) -> Vec<u8> {
 }
 
 fn xlsx_calculation_metadata_edit_bytes() -> Result<Vec<u8>, Box<dyn Error>> {
-    let mut package = litchi_xlsx::Package::create()?;
+    let mut package = litchi_xlsx::Package::new()?;
     let mut edit = package.edit_calculation_metadata()?;
     edit.set_properties(
         litchi_xlsx::calculation_properties::Properties::new().with_calculation_id(Some(7)),
@@ -20313,7 +20314,7 @@ fn xlsx_calculation_metadata_edit_bytes() -> Result<Vec<u8>, Box<dyn Error>> {
 
 fn build_xlsx_calculation_metadata_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
     let archive = xlsx_calculation_metadata_edit_bytes()?;
-    let package = litchi_xlsx::Package::from_slice(&archive)?;
+    let package = litchi_xlsx::Package::from_bytes(&archive)?;
     if package
         .calculation_metadata()?
         .properties()
@@ -20583,8 +20584,8 @@ fn build_xlsx_conditional_formatting_edit_corpus() -> Result<Corpus, Box<dyn Err
     Ok(corpus)
 }
 
-fn xlsx_merge_fixture() -> Result<(Workbook, Workbook), Box<dyn Error>> {
-    let workbook = Workbook::new()?;
+fn xlsx_merge_fixture() -> Result<(XlsxPackage, XlsxPackage), Box<dyn Error>> {
+    let workbook = XlsxPackage::new()?;
     let mut edit = workbook.edit()?;
     let mut sheet = edit
         .sheet("Sheet1")?
@@ -20592,14 +20593,14 @@ fn xlsx_merge_fixture() -> Result<(Workbook, Workbook), Box<dyn Error>> {
     sheet
         .set("A1", "litchi-xlsx-merge-anchor-v1")?
         .set("C1", "litchi-xlsx-merge-unrelated-v1")?;
-    let unmerged = edit.commit()?.into_workbook();
+    let unmerged = edit.commit()?.into_package();
 
     let mut merge_edit = unmerged.edit()?;
     merge_edit
         .sheet("Sheet1")?
         .ok_or("XLSX merge fixture is missing Sheet1")?
         .merge("A1:B2")?;
-    let merged = merge_edit.commit()?.into_workbook();
+    let merged = merge_edit.commit()?.into_package();
     Ok((unmerged, merged))
 }
 
@@ -22803,7 +22804,7 @@ fn build_xlsx_corpus(shape: XlsxShape) -> Result<Corpus, Box<dyn Error>> {
     };
     let workbook = build_xlsx_workbook(&spec)?;
     let archive = workbook.to_bytes()?;
-    let reopened = Workbook::from_bytes(archive.clone())?;
+    let reopened = XlsxPackage::from_bytes(&archive)?;
     verify_xlsx_cells(&reopened, &spec, &[])?;
 
     let cell_count = xlsx_cell_count(&spec)?;
@@ -22864,7 +22865,7 @@ fn build_xlsx_named_sheet_lookup_corpus(
     };
     let workbook = build_xlsx_workbook(&spec)?;
     let archive = workbook.to_bytes()?;
-    let reopened = Workbook::from_bytes(archive.clone())?;
+    let reopened = XlsxPackage::from_bytes(&archive)?;
     verify_xlsx_cells(&reopened, &spec, &[])?;
 
     let cell_count = xlsx_cell_count(&spec)?;
@@ -22918,7 +22919,7 @@ fn build_xlsx_named_sheet_lookup_corpus(
 /// facades, while the duplicate check exercises the authoring-side invariant
 /// that makes the sorted production index unambiguous.
 fn verify_xlsx_named_sheet_lookup_oracle() -> Result<(), Box<dyn Error>> {
-    let workbook = Workbook::new()?;
+    let workbook = XlsxPackage::new()?;
     let mut edit = workbook.edit()?;
     {
         let mut first = edit
@@ -22928,9 +22929,9 @@ fn verify_xlsx_named_sheet_lookup_oracle() -> Result<(), Box<dyn Error>> {
     }
     edit.add("Στοιχεία")?;
     edit.add("数据")?;
-    let committed = edit.commit()?.workbook().clone();
+    let committed = edit.commit()?.package().clone();
     let bytes = committed.to_bytes()?;
-    let owned = Workbook::from_bytes(bytes.clone())?;
+    let owned = XlsxPackage::from_bytes(&bytes)?;
     let source = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(bytes.clone())))?;
     // On native targets, `litchi::open_bytes` retains this same source-backed
     // catalog. Check its lightweight projection so the index stays compatible
@@ -22944,6 +22945,7 @@ fn verify_xlsx_named_sheet_lookup_oracle() -> Result<(), Box<dyn Error>> {
     ];
 
     let owned_names = owned
+        .workbook_ref()
         .sheets()
         .map(|sheet| sheet.name().to_owned())
         .collect::<Vec<_>>();
@@ -22967,6 +22969,7 @@ fn verify_xlsx_named_sheet_lookup_oracle() -> Result<(), Box<dyn Error>> {
         ("数据", "数据"),
     ] {
         let owned_sheet = owned
+            .workbook_ref()
             .sheet(query)?
             .ok_or("XLSX eager selector oracle missed an existing sheet")?;
         let source_sheet = source
@@ -22976,11 +22979,13 @@ fn verify_xlsx_named_sheet_lookup_oracle() -> Result<(), Box<dyn Error>> {
             return Err("XLSX selector oracle changed case-folded Unicode matching".into());
         }
     }
-    if owned.sheet("missing-selector")?.is_some() || source.sheet("missing-selector")?.is_some() {
+    if owned.workbook_ref().sheet("missing-selector")?.is_some()
+        || source.sheet("missing-selector")?.is_some()
+    {
         return Err("XLSX selector oracle changed missing-name behavior".into());
     }
 
-    let duplicate = Workbook::new()?;
+    let duplicate = XlsxPackage::new()?;
     let mut duplicate_edit = duplicate.edit()?;
     duplicate_edit.add("Data")?;
     duplicate_edit.add("data")?;
@@ -22988,10 +22993,10 @@ fn verify_xlsx_named_sheet_lookup_oracle() -> Result<(), Box<dyn Error>> {
         return Err("XLSX selector oracle accepted duplicate canonical sheet names".into());
     }
 
-    let duplicate_seed = Workbook::new()?;
+    let duplicate_seed = XlsxPackage::new()?;
     let mut duplicate_seed_edit = duplicate_seed.edit()?;
     duplicate_seed_edit.add("Data")?;
-    let duplicate_seed = duplicate_seed_edit.commit()?.workbook().clone();
+    let duplicate_seed = duplicate_seed_edit.commit()?.package().clone();
     let mut duplicate_package = OpcPackage::from_bytes(&duplicate_seed.to_bytes()?)?;
     let workbook_uri = PackURI::new("/xl/workbook.xml")?;
     let workbook_xml =
@@ -23004,7 +23009,7 @@ fn verify_xlsx_named_sheet_lookup_oracle() -> Result<(), Box<dyn Error>> {
         .get_part_mut(&workbook_uri)?
         .set_blob(duplicate_xml.into_bytes());
     let duplicate_archive = PackageWriter::to_bytes(&duplicate_package)?;
-    if Workbook::from_bytes(duplicate_archive.clone()).is_ok()
+    if XlsxPackage::from_bytes(&duplicate_archive).is_ok()
         || litchi::open_bytes(duplicate_archive.clone()).is_ok()
         || SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(duplicate_archive))).is_ok()
     {
@@ -23275,7 +23280,7 @@ fn build_xlsx_cell_crud_corpus(shape: XlsxCellCrudShape) -> Result<Corpus, Box<d
     }
     verify_xlsx_vendor_extension_package(&package, shape == XlsxCellCrudShape::VendorExtension)?;
     archive = PackageWriter::to_bytes(&package)?;
-    let reopened = Workbook::from_bytes(archive.clone())?;
+    let reopened = XlsxPackage::from_bytes(&archive)?;
     verify_xlsx_cells(&reopened, &spec, &[])?;
     let reopened_package = OpcPackage::from_bytes(&archive)?;
     verify_xlsx_vendor_extension_package(
@@ -23379,7 +23384,7 @@ fn build_xlsx_row_visibility_corpus(
     let workbook = build_xlsx_workbook(&spec)?;
     let mut archive = workbook.to_bytes()?;
     if initially_hidden {
-        let workbook = Workbook::from_bytes(archive.clone())?;
+        let workbook = XlsxPackage::from_bytes(&archive)?;
         let mut edit = workbook.edit()?;
         let mut sheet = edit
             .sheet("Sheet1")?
@@ -23387,7 +23392,7 @@ fn build_xlsx_row_visibility_corpus(
         for row in 0..litchi_xlsx::row_visibility::MAX_BATCH_EDITS {
             sheet.row(u32::try_from(row)?)?.hide();
         }
-        archive = edit.commit()?.workbook().to_bytes()?;
+        archive = edit.commit()?.package().to_bytes()?;
     }
     let mut package = OpcPackage::from_bytes(&archive)?;
     strip_xlsx_cell_crud_calc_properties(&mut package)?;
@@ -23399,9 +23404,10 @@ fn build_xlsx_row_visibility_corpus(
         )))?;
     }
     archive = PackageWriter::to_bytes(&package)?;
-    let reopened = Workbook::from_bytes(archive.clone())?;
+    let reopened = XlsxPackage::from_bytes(&archive)?;
     verify_xlsx_cells(&reopened, &spec, &[])?;
     let sheet = reopened
+        .workbook_ref()
         .sheet("Sheet1")?
         .ok_or("XLSX row-visibility corpus is missing Sheet1")?;
     for row in 0..litchi_xlsx::row_visibility::MAX_BATCH_EDITS {
@@ -23493,9 +23499,10 @@ fn xlsx_row_visibility_semantic_hash(
     initially_hidden: bool,
     updates: &[(RowIndex, bool)],
 ) -> Result<String, Box<dyn Error>> {
-    let workbook = Workbook::from_bytes(output.to_vec())?;
+    let workbook = XlsxPackage::from_bytes(output)?;
     verify_xlsx_cells(&workbook, spec, &[])?;
     let sheet = workbook
+        .workbook_ref()
         .sheet("Sheet1")?
         .ok_or("XLSX row-visibility output is missing Sheet1")?;
     let initial_hidden_limit = u32::try_from(litchi_xlsx::row_visibility::MAX_BATCH_EDITS)?;
@@ -23529,7 +23536,7 @@ fn xlsx_row_visibility_eager_output(
     corpus: &Corpus,
     updates: &[(RowIndex, bool)],
 ) -> Result<Vec<u8>, Box<dyn Error>> {
-    let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+    let workbook = XlsxPackage::from_bytes(&corpus.archive)?;
     let mut edit = workbook.edit()?;
     let mut sheet = edit
         .sheet("Sheet1")?
@@ -23543,7 +23550,7 @@ fn xlsx_row_visibility_eager_output(
         }
     }
     let commit = edit.commit()?;
-    let output = commit.workbook().to_bytes()?;
+    let output = commit.package().to_bytes()?;
     Ok(output)
 }
 
@@ -23906,8 +23913,8 @@ fn xlsx_row_visibility_lifecycle_gates(
     })
 }
 
-fn build_xlsx_workbook(spec: &XlsxCorpus) -> Result<Workbook, Box<dyn Error>> {
-    let workbook = Workbook::new()?;
+fn build_xlsx_workbook(spec: &XlsxCorpus) -> Result<XlsxPackage, Box<dyn Error>> {
+    let workbook = XlsxPackage::new()?;
     let mut edit = workbook.edit()?;
     if let Some(inventory) = spec.cell_inventory.as_ref() {
         for sheet_index in 0..spec.sheet_count {
@@ -23966,7 +23973,7 @@ fn build_xlsx_workbook(spec: &XlsxCorpus) -> Result<Workbook, Box<dyn Error>> {
             }
         }
     }
-    Ok(edit.commit()?.workbook().clone())
+    Ok(edit.commit()?.package().clone())
 }
 
 fn xlsx_one_percent_updates(shape: XlsxShape) -> Result<Vec<XlsxCoordinate>, Box<dyn Error>> {
@@ -24147,7 +24154,7 @@ fn verify_xlsx_cell_crud_output(
     updated: &[XlsxCoordinate],
 ) -> Result<(), Box<dyn Error>> {
     let spec = xlsx_spec(corpus)?;
-    let workbook = Workbook::from_bytes(output.to_vec())?;
+    let workbook = XlsxPackage::from_bytes(output)?;
     verify_xlsx_cells(&workbook, spec, updated)?;
     verify_xlsx_cell_crud_package_identity(corpus, output)
 }
@@ -24461,7 +24468,7 @@ fn xlsx_cell_crud_untouched_member_evidence(
 }
 
 fn xlsx_cell_values_semantic_hash_from_workbook(
-    workbook: &Workbook,
+    workbook: &XlsxPackage,
     spec: &XlsxCorpus,
 ) -> Result<String, Box<dyn Error>> {
     let inventory = spec
@@ -24471,6 +24478,7 @@ fn xlsx_cell_values_semantic_hash_from_workbook(
     let mut semantic = Vec::new();
     for coordinate in inventory.iter().flatten() {
         let sheet = workbook
+            .workbook_ref()
             .sheet(xlsx_sheet_name(coordinate.sheet).as_str())?
             .ok_or("XLSX semantic hash target sheet is missing")?;
         let address = xlsx_address(coordinate.row, coordinate.column)?;
@@ -24495,7 +24503,7 @@ fn xlsx_cell_values_output_semantic_hash(
     output: &[u8],
     spec: &XlsxCorpus,
 ) -> Result<String, Box<dyn Error>> {
-    let workbook = Workbook::from_bytes(output.to_vec())?;
+    let workbook = XlsxPackage::from_bytes(output)?;
     xlsx_cell_values_semantic_hash_from_workbook(&workbook, spec)
 }
 
@@ -24556,13 +24564,13 @@ fn run_xlsx_cell_value_lifecycle_gates(
         let mut published = Vec::new();
         editor.publish_multi_commit_to_stream(&mut published, &commit)?;
         verify_xlsx_cell_crud_package_identity(corpus, &published)?;
-        let workbook = Workbook::from_bytes(published.clone())?;
+        let workbook = XlsxPackage::from_bytes(&published)?;
         verify_xlsx_cell_crud_lifecycle_state(&workbook, spec, target, remove)?;
         let mut applied = OpcPackage::from_bytes(&corpus.archive)?;
         commit.patch().apply(&mut applied)?;
         let applied_bytes = PackageWriter::to_bytes(&applied)?;
         verify_xlsx_cell_crud_package_identity(corpus, &applied_bytes)?;
-        let applied_workbook = Workbook::from_bytes(applied_bytes)?;
+        let applied_workbook = XlsxPackage::from_bytes(&applied_bytes)?;
         verify_xlsx_cell_crud_lifecycle_state(&applied_workbook, spec, target, remove)?;
         if commit.patch().apply(&mut applied).is_ok() {
             return Err("XLSX lifecycle stale source was accepted".into());
@@ -24570,7 +24578,7 @@ fn run_xlsx_cell_value_lifecycle_gates(
         commit.patch().inverse().apply(&mut applied)?;
         let restored_bytes = PackageWriter::to_bytes(&applied)?;
         verify_xlsx_cell_crud_package_identity(corpus, &restored_bytes)?;
-        let restored_workbook = Workbook::from_bytes(restored_bytes)?;
+        let restored_workbook = XlsxPackage::from_bytes(&restored_bytes)?;
         verify_xlsx_cells(&restored_workbook, spec, &[])?;
     }
     let partial_sink_verified = if corpus.manifest.shape
@@ -24619,12 +24627,13 @@ fn run_xlsx_cell_value_lifecycle_gates(
 }
 
 fn verify_xlsx_cell_crud_lifecycle_state(
-    workbook: &Workbook,
+    workbook: &XlsxPackage,
     spec: &XlsxCorpus,
     target: XlsxCoordinate,
     removed: bool,
 ) -> Result<(), Box<dyn Error>> {
     let sheet = workbook
+        .workbook_ref()
         .sheet(xlsx_sheet_name(target.sheet).as_str())?
         .ok_or("XLSX lifecycle state is missing its target sheet")?;
     let address = xlsx_address(target.row, target.column)?;
@@ -24656,7 +24665,7 @@ fn xlsx_value(coordinate: XlsxCoordinate) -> i32 {
 }
 
 fn prepare_xlsx_updates(
-    workbook: &Workbook,
+    workbook: &XlsxPackage,
     updates: &[XlsxCoordinate],
 ) -> Result<litchi_xlsx::Edit, Box<dyn Error>> {
     let mut edit = workbook.edit()?;
@@ -24674,16 +24683,17 @@ fn prepare_xlsx_updates(
 }
 
 fn verify_xlsx_cells(
-    workbook: &Workbook,
+    workbook: &XlsxPackage,
     spec: &XlsxCorpus,
     updated: &[XlsxCoordinate],
 ) -> Result<(), Box<dyn Error>> {
-    if workbook.len() != spec.sheet_count {
+    if workbook.workbook_ref().len() != spec.sheet_count {
         return Err("XLSX workbook sheet count differs from corpus specification".into());
     }
     for sheet_index in 0..spec.sheet_count {
         let name = xlsx_sheet_name(sheet_index);
         let sheet = workbook
+            .workbook_ref()
             .sheet(name.as_str())?
             .ok_or("XLSX workbook sheet is missing")?;
         let expected = spec.cell_inventory.as_ref().map_or_else(
@@ -24735,11 +24745,15 @@ fn verify_xlsx_cells(
     Ok(())
 }
 
-fn xlsx_typed_full_text(workbook: &Workbook, spec: &XlsxCorpus) -> Result<String, Box<dyn Error>> {
+fn xlsx_typed_full_text(
+    workbook: &XlsxPackage,
+    spec: &XlsxCorpus,
+) -> Result<String, Box<dyn Error>> {
     let mut output = String::new();
     for sheet_index in 0..spec.sheet_count {
         let name = xlsx_sheet_name(sheet_index);
         let sheet = workbook
+            .workbook_ref()
             .sheet(name.as_str())?
             .ok_or("typed eager XLSX text oracle is missing a worksheet")?;
         let extent = sheet
@@ -32594,9 +32608,8 @@ fn verify_rtf_paragraph_split_merge_gates(
     let profile = litchi_rtf::SemanticLimits::builder()
         .max_operations(0)?
         .build()?;
-    let mut limited = source.edit_with_options(
-        litchi_rtf::EditOptions::new().semantic_limits(profile),
-    );
+    let mut limited =
+        source.edit_with_options(litchi_rtf::EditOptions::new().semantic_limits(profile));
     let limit_refusal_verified = match case {
         Case::RtfSemanticSplitParagraphSave => matches!(
             limited.split_paragraph(
@@ -33453,9 +33466,9 @@ fn run_rtf_logical_tail_append(
     let changed = stage_rtf_logical_tail(&source, &paragraph_inputs, limits)?;
     let noop = {
         let edit = source.edit_tail_append_with_options(
-        litchi_rtf::TailSelector::Body,
-        litchi_rtf::tail_append::EditOptions::new().semantic_limits(limits),
-    );
+            litchi_rtf::TailSelector::Body,
+            litchi_rtf::tail_append::EditOptions::new().semantic_limits(limits),
+        );
         edit.commit()?
     };
     let expected = changed.package().to_bytes()?;
@@ -33479,9 +33492,9 @@ fn run_rtf_logical_tail_append(
             },
             Case::RtfLogicalTailNoopSave => {
                 let edit = source.edit_tail_append_with_options(
-        litchi_rtf::TailSelector::Body,
-        litchi_rtf::tail_append::EditOptions::new().semantic_limits(limits),
-    );
+                    litchi_rtf::TailSelector::Body,
+                    litchi_rtf::tail_append::EditOptions::new().semantic_limits(limits),
+                );
                 let commit = edit.commit()?;
                 commit.write_to(&mut sink, limits)?
             },
@@ -33840,10 +33853,11 @@ fn verify_rtf_tail_publication_plan_gates(
         return Err("RTF publication plan did not honor pre-publication cancellation".into());
     }
 
-    let bounded_limits = limits.into_builder()
-        .max_output_bytes(expected.len().saturating_sub(1))?.build()?;
-    let mut bounded_edit =
-        source.edit_tail_append_with_options(
+    let bounded_limits = limits
+        .into_builder()
+        .max_output_bytes(expected.len().saturating_sub(1))?
+        .build()?;
+    let mut bounded_edit = source.edit_tail_append_with_options(
         litchi_rtf::TailSelector::Body,
         litchi_rtf::tail_append::EditOptions::new().semantic_limits(bounded_limits),
     );
@@ -33971,9 +33985,9 @@ fn run_rtf_logical_tail_publication(
     let changed = stage_rtf_logical_tail(&source, &changed_inputs, limits)?;
     let noop = {
         let edit = source.edit_tail_append_with_options(
-        litchi_rtf::TailSelector::Body,
-        litchi_rtf::tail_append::EditOptions::new().semantic_limits(limits),
-    );
+            litchi_rtf::TailSelector::Body,
+            litchi_rtf::tail_append::EditOptions::new().semantic_limits(limits),
+        );
         edit.commit()?
     };
     let expected_changed = changed.package().to_bytes()?;
@@ -33991,9 +34005,9 @@ fn run_rtf_logical_tail_publication(
 
     let correctness_plan = {
         let mut edit = source.edit_tail_append_with_options(
-        litchi_rtf::TailSelector::Body,
-        litchi_rtf::tail_append::EditOptions::new().semantic_limits(limits),
-    );
+            litchi_rtf::TailSelector::Body,
+            litchi_rtf::tail_append::EditOptions::new().semantic_limits(limits),
+        );
         edit.append_text_paragraphs(&paragraph_inputs)?;
         edit.publication_plan_with_limits(publication_limits)?
     };
@@ -42189,10 +42203,12 @@ fn run_xlsx_open_owned(
         let owned = corpus.archive.clone();
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
-        let workbook = Workbook::from_bytes(owned)?;
+        // The owned-move route: the archive is moved into the OPC reader
+        // without a copy and validated once by the immutable package owner.
+        let workbook = XlsxPackage::from_opc(OpcPackage::from_vec(owned)?)?;
         let duration = started.elapsed();
         let allocation_metrics = allocation_region.finish();
-        if workbook.len() != spec.sheet_count {
+        if workbook.workbook_ref().len() != spec.sheet_count {
             return Err("owned XLSX open sheet count differs from corpus specification".into());
         }
         std::hint::black_box(&workbook);
@@ -42286,11 +42302,12 @@ fn run_xlsx_named_sheet_lookup(
     } else {
         // Parse and catalog the owned workbook once; only the immutable named
         // selector itself belongs to the timed loop.
-        let workbook = Workbook::from_bytes(corpus.archive.clone())?;
-        if workbook.len() != spec.sheet_count {
+        let workbook = XlsxPackage::from_bytes(&corpus.archive)?;
+        if workbook.workbook_ref().len() != spec.sheet_count {
             return Err("owned named selector catalog has the wrong sheet count".into());
         }
         let target = workbook
+            .workbook_ref()
             .sheet(target_name.as_str())?
             .ok_or("owned named selector target sheet is missing")?;
         if target.name() != target_name
@@ -42306,6 +42323,7 @@ fn run_xlsx_named_sheet_lookup(
         for iteration in 0..iteration_count {
             let started = Instant::now();
             let sheet = workbook
+                .workbook_ref()
                 .sheet(std::hint::black_box(target_query.as_str()))?
                 .ok_or("owned named selector missed its target sheet")?;
             let duration = started.elapsed();
@@ -42328,10 +42346,11 @@ fn run_xlsx_list_sheets(
     let mut elapsed = Vec::with_capacity(samples);
     let mut observations = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+        let workbook = XlsxPackage::from_bytes(&corpus.archive)?;
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let names = workbook
+            .workbook_ref()
             .sheets()
             .map(|sheet| sheet.name().to_owned())
             .collect::<Vec<_>>();
@@ -42367,8 +42386,9 @@ fn run_xlsx_first_cell(
     let mut elapsed = Vec::with_capacity(samples);
     let mut observations = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+        let workbook = XlsxPackage::from_bytes(&corpus.archive)?;
         let sheet = workbook
+            .workbook_ref()
             .sheet("Sheet1")?
             .ok_or("XLSX first sheet is missing")?;
         let allocation_region = allocation_metrics::begin();
@@ -42406,8 +42426,9 @@ fn run_xlsx_full_cell_scan(
     let mut elapsed = Vec::with_capacity(samples);
     let mut observations = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+        let workbook = XlsxPackage::from_bytes(&corpus.archive)?;
         let sheet = workbook
+            .workbook_ref()
             .sheet("Sheet1")?
             .ok_or("XLSX first sheet is missing")?;
         let allocation_region = allocation_metrics::begin();
@@ -42444,8 +42465,9 @@ fn run_xlsx_narrow_column_range_scan(
     let mut elapsed = Vec::with_capacity(samples);
     let mut observations = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+        let workbook = XlsxPackage::from_bytes(&corpus.archive)?;
         let sheet = workbook
+            .workbook_ref()
             .sheet("Sheet1")?
             .ok_or("XLSX first sheet is missing")?;
         // Preload the full sparse store outside the timed traversal. The
@@ -43024,17 +43046,17 @@ fn run_xlsx_noop_commit(
     let mut elapsed = Vec::with_capacity(samples);
     let mut observations = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+        let workbook = XlsxPackage::from_bytes(&corpus.archive)?;
         let edit = workbook.edit()?;
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let commit = edit.commit()?;
         let duration = started.elapsed();
         let allocation_metrics = allocation_region.finish();
-        if !commit.patch().is_empty() {
+        if !commit.patch().is_noop() {
             return Err("XLSX no-op commit produced semantic changes".into());
         }
-        verify_xlsx_cells(commit.workbook(), spec, &[])?;
+        verify_xlsx_cells(commit.package(), spec, &[])?;
         std::hint::black_box(&commit);
         record_default_operation(
             &mut elapsed,
@@ -43062,20 +43084,20 @@ fn run_xlsx_noop_commit_save(
     let mut observations = Vec::with_capacity(samples);
     let mut sink_summaries = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+        let workbook = XlsxPackage::from_bytes(&corpus.archive)?;
         let edit = workbook.edit()?;
         let mut sink = CountingSink::bounded(maximum, 64 * 1024);
         sink.reserve_budget()?;
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let commit = edit.commit()?;
-        commit.workbook().write_to(&mut sink)?;
+        commit.package().write_to(&mut sink)?;
         let duration = started.elapsed();
         let allocation_metrics = allocation_region.finish();
-        if !commit.patch().is_empty() || sink.bytes != corpus.archive {
+        if !commit.patch().is_noop() || sink.bytes != corpus.archive {
             return Err("XLSX no-op commit/save is not byte-exact for generated corpus".into());
         }
-        let reopened = Workbook::from_bytes(sink.bytes.clone())?;
+        let reopened = XlsxPackage::from_bytes(&sink.bytes)?;
         verify_xlsx_cells(&reopened, spec, &[])?;
         if iteration >= warmup_iterations {
             sink_summaries.push(sink.summary());
@@ -43117,7 +43139,7 @@ fn run_xlsx_update_commit(
     let mut observations = Vec::with_capacity(samples);
     let mut final_commit = None;
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+        let workbook = XlsxPackage::from_bytes(&corpus.archive)?;
         let edit = prepare_xlsx_updates(&workbook, updates)?;
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
@@ -43127,7 +43149,7 @@ fn run_xlsx_update_commit(
             Some(sample) => Some(sample),
             None => Some(allocation_metrics::unavailable_sample()),
         };
-        if commit.patch().len() != updates.len() {
+        if commit.patch().operation_count() != updates.len() {
             return Err("XLSX update commit has an unexpected semantic change count".into());
         }
         std::hint::black_box(&commit);
@@ -43146,7 +43168,7 @@ fn run_xlsx_update_commit(
         final_commit
             .as_ref()
             .ok_or("XLSX update commit produced no final snapshot")?
-            .workbook(),
+            .package(),
         spec,
         updates,
     )?;
@@ -43173,12 +43195,13 @@ fn run_xlsx_one_cell_commit_first_read(
     let mut elapsed = Vec::with_capacity(samples);
     let mut final_commit = None;
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+        let workbook = XlsxPackage::from_bytes(&corpus.archive)?;
         let edit = prepare_xlsx_updates(&workbook, updates)?;
         let started = Instant::now();
         let commit = edit.commit()?;
         let sheet = commit
-            .workbook()
+            .package()
+            .workbook_ref()
             .sheet(sheet_name.as_str())?
             .ok_or("XLSX updated sheet is missing")?;
         let cell = sheet
@@ -43193,7 +43216,7 @@ fn run_xlsx_one_cell_commit_first_read(
         if actual.as_str() != expected {
             return Err("XLSX updated cell differs from deterministic expectation".into());
         }
-        if commit.patch().len() != 1 {
+        if commit.patch().operation_count() != 1 {
             return Err("XLSX update commit has an unexpected semantic change count".into());
         }
         final_commit = Some(commit);
@@ -43203,7 +43226,7 @@ fn run_xlsx_one_cell_commit_first_read(
         final_commit
             .as_ref()
             .ok_or("XLSX commit/read produced no final snapshot")?
-            .workbook(),
+            .package(),
         spec,
         updates,
     )?;
@@ -43223,7 +43246,7 @@ fn xlsx_commit_save_operation(
     sink: &mut CountingSink,
 ) -> Result<litchi_xlsx::edit::Commit, Box<dyn Error>> {
     let commit = edit.commit()?;
-    commit.workbook().write_to(sink)?;
+    commit.package().write_to(sink)?;
     Ok(commit)
 }
 
@@ -43250,7 +43273,7 @@ fn run_xlsx_update_commit_save(
     let mut observations = Vec::with_capacity(samples);
     let mut sink_summaries = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+        let workbook = XlsxPackage::from_bytes(&corpus.archive)?;
         let edit = prepare_xlsx_updates(&workbook, updates)?;
         let mut sink = CountingSink::bounded(maximum, 64 * 1024);
         sink.reserve_budget()?;
@@ -43267,7 +43290,7 @@ fn run_xlsx_update_commit_save(
                 "XLSX changed commit/save differs from deterministic expected output".into(),
             );
         }
-        let reopened = Workbook::from_bytes(sink.bytes.clone())?;
+        let reopened = XlsxPackage::from_bytes(&sink.bytes)?;
         verify_xlsx_cells(&reopened, spec, updates)?;
         std::hint::black_box(&commit);
         if iteration >= warmup_iterations {
@@ -43304,7 +43327,7 @@ fn xlsx_cell_crud_eager_output(
     corpus: &Corpus,
     updates: &[XlsxCoordinate],
 ) -> Result<Vec<u8>, Box<dyn Error>> {
-    let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+    let workbook = XlsxPackage::from_bytes(&corpus.archive)?;
     let mut edit = workbook.edit()?;
     for coordinate in updates {
         let mut sheet = edit
@@ -43316,7 +43339,7 @@ fn xlsx_cell_crud_eager_output(
         )?;
     }
     let commit = edit.commit()?;
-    let output = commit.workbook().to_bytes()?;
+    let output = commit.package().to_bytes()?;
     verify_xlsx_cell_crud_output(corpus, &output, updates)?;
     Ok(output)
 }
@@ -43331,12 +43354,12 @@ fn xlsx_cell_lifecycle_target(spec: &XlsxCorpus) -> Result<XlsxCoordinate, Box<d
 }
 
 fn verify_xlsx_cell_lifecycle_output(
-    workbook: &Workbook,
+    workbook: &XlsxPackage,
     spec: &XlsxCorpus,
     target: XlsxCoordinate,
     remove: bool,
 ) -> Result<(), Box<dyn Error>> {
-    if workbook.len() != spec.sheet_count {
+    if workbook.workbook_ref().len() != spec.sheet_count {
         return Err("XLSX cell lifecycle output changed worksheet count".into());
     }
     let inventory = spec
@@ -43345,6 +43368,7 @@ fn verify_xlsx_cell_lifecycle_output(
         .ok_or("XLSX cell lifecycle output has no cell inventory")?;
     for sheet_index in 0..spec.sheet_count {
         let sheet = workbook
+            .workbook_ref()
             .sheet(xlsx_sheet_name(sheet_index).as_str())?
             .ok_or("XLSX cell lifecycle output is missing a worksheet")?;
         let expected_count = inventory
@@ -43391,7 +43415,7 @@ fn xlsx_cell_lifecycle_semantic_hash(
     target: XlsxCoordinate,
     remove: bool,
 ) -> Result<String, Box<dyn Error>> {
-    let workbook = Workbook::from_bytes(output.to_vec())?;
+    let workbook = XlsxPackage::from_bytes(output)?;
     verify_xlsx_cell_lifecycle_output(&workbook, spec, target, remove)?;
     let inventory = spec
         .cell_inventory
@@ -43419,7 +43443,7 @@ fn xlsx_cell_lifecycle_eager_output(
     target: XlsxCoordinate,
     remove: bool,
 ) -> Result<Vec<u8>, Box<dyn Error>> {
-    let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+    let workbook = XlsxPackage::from_bytes(&corpus.archive)?;
     let mut edit = workbook.edit()?;
     let mut sheet = edit
         .sheet(xlsx_sheet_name(target.sheet).as_str())?
@@ -43431,8 +43455,8 @@ fn xlsx_cell_lifecycle_eager_output(
         sheet.clear(address)?;
     }
     let commit = edit.commit()?;
-    let output = commit.workbook().to_bytes()?;
-    let reopened = Workbook::from_bytes(output.clone())?;
+    let output = commit.package().to_bytes()?;
+    let reopened = XlsxPackage::from_bytes(&output)?;
     verify_xlsx_cell_lifecycle_output(&reopened, spec, target, remove)?;
     verify_xlsx_cell_crud_package_identity(corpus, &output)?;
     Ok(output)
@@ -43460,7 +43484,7 @@ fn xlsx_cell_lifecycle_source_output(
     }
     let mut output = Vec::new();
     editor.publish_multi_commit_to_stream(&mut output, &commit)?;
-    let reopened = Workbook::from_bytes(output.clone())?;
+    let reopened = XlsxPackage::from_bytes(&output)?;
     verify_xlsx_cell_lifecycle_output(&reopened, spec, target, remove)?;
     verify_xlsx_cell_crud_package_identity(corpus, &output)?;
     Ok(output)
@@ -43606,7 +43630,7 @@ fn run_xlsx_cell_lifecycle_edit_save(
             }
         } else {
             let open_started = Instant::now();
-            let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+            let workbook = XlsxPackage::from_bytes(&corpus.archive)?;
             let open_duration = open_started.elapsed();
             let open_ns = elapsed_ns(open_duration)?;
             duration += open_duration;
@@ -43630,7 +43654,7 @@ fn run_xlsx_cell_lifecycle_edit_save(
             let commit_ns = elapsed_ns(commit_duration)?;
             duration += commit_duration;
             let publication_started = Instant::now();
-            commit.workbook().write_to(&mut sink)?;
+            commit.package().write_to(&mut sink)?;
             let publication_duration = publication_started.elapsed();
             let publication_ns = elapsed_ns(publication_duration)?;
             duration += publication_duration;
@@ -43680,7 +43704,7 @@ fn run_xlsx_cell_lifecycle_edit_save(
             return Err("XLSX cell lifecycle publication exceeded the fixed sink bound".into());
         }
         let reopen_started = Instant::now();
-        let reopened = Workbook::from_bytes(expected.clone())?;
+        let reopened = XlsxPackage::from_bytes(&expected)?;
         verify_xlsx_cell_lifecycle_output(&reopened, spec, target, remove)?;
         let reopen_ns = elapsed_ns(reopen_started.elapsed())?;
         source_evidence.reopen_ns = reopen_ns;
@@ -43841,7 +43865,7 @@ fn run_xlsx_row_visibility_edit_save(
             source_version_calls = backing.version_calls();
         } else {
             let started = Instant::now();
-            let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+            let workbook = XlsxPackage::from_bytes(&corpus.archive)?;
             let open_duration = started.elapsed();
             open_ns = elapsed_ns(open_duration)?;
             duration += open_duration;
@@ -43869,7 +43893,7 @@ fn run_xlsx_row_visibility_edit_save(
             commit_ns = elapsed_ns(commit_duration)?;
             duration += commit_duration;
             let started = Instant::now();
-            commit.workbook().write_to(&mut sink)?;
+            commit.package().write_to(&mut sink)?;
             let publication_duration = started.elapsed();
             publication_ns = elapsed_ns(publication_duration)?;
             duration += publication_duration;
@@ -44333,7 +44357,7 @@ fn run_xlsx_cell_values_edit_save(
             });
         } else {
             let open_started = Instant::now();
-            let workbook = Workbook::from_bytes(eager_source.expect("eager source exists"))?;
+            let workbook = XlsxPackage::from_bytes(&eager_source.expect("eager source exists"))?;
             duration += open_started.elapsed();
             let plan_started = Instant::now();
             let mut edit = workbook.edit()?;
@@ -44350,7 +44374,7 @@ fn run_xlsx_cell_values_edit_save(
             let commit = edit.commit()?;
             duration += commit_started.elapsed();
             let publication_started = Instant::now();
-            commit.workbook().write_to(&mut sink)?;
+            commit.package().write_to(&mut sink)?;
             duration += publication_started.elapsed();
         }
         if sink.bytes.is_empty() {
@@ -44420,7 +44444,7 @@ fn run_xlsx_cell_values_edit_save(
 }
 
 fn prepare_xlsx_merge_edit(
-    workbook: &Workbook,
+    workbook: &XlsxPackage,
     merge: bool,
 ) -> Result<litchi_xlsx::Edit, Box<dyn Error>> {
     let mut edit = workbook.edit()?;
@@ -44436,8 +44460,9 @@ fn prepare_xlsx_merge_edit(
 }
 
 fn verify_xlsx_merge_output(output: &[u8], merged: bool) -> Result<(), Box<dyn Error>> {
-    let workbook = Workbook::from_bytes(output.to_vec())?;
+    let workbook = XlsxPackage::from_bytes(output)?;
     let sheet = workbook
+        .workbook_ref()
         .sheet("Sheet1")?
         .ok_or("XLSX merge output is missing Sheet1")?;
     let ranges = sheet.merges()?.map(Rect::a1).collect::<Vec<_>>();
@@ -44482,11 +44507,11 @@ fn verify_xlsx_merge_output(output: &[u8], merged: bool) -> Result<(), Box<dyn E
 }
 
 fn verify_xlsx_merge_durable_patch(
-    source: &Workbook,
+    source: &XlsxPackage,
     commit: &litchi_xlsx::Commit,
     expected: &[u8],
 ) -> Result<(), Box<dyn Error>> {
-    if commit.patch().is_empty() || commit.patch().len() != 1 {
+    if commit.patch().is_noop() || commit.patch().operation_count() != 1 {
         return Err("XLSX merge edit produced an unexpected semantic patch".into());
     }
     let durable = commit.patch().durable()?;
@@ -44509,7 +44534,7 @@ fn verify_xlsx_merge_durable_patch(
         .sheet("Sheet1")?
         .ok_or("XLSX merge fixture is missing Sheet1")?
         .set("C1", "litchi-xlsx-merge-stale-v1")?;
-    let stale = stale_edit.commit()?.into_workbook();
+    let stale = stale_edit.commit()?.into_package();
     if parsed.apply(&stale).is_ok() {
         return Err("XLSX merge durable patch accepted a stale source".into());
     }
@@ -44535,7 +44560,7 @@ fn run_xlsx_merge_edit_save(
         return Err("XLSX merge corpus source bytes differ from its fixture".into());
     }
     let expected_commit = prepare_xlsx_merge_edit(&source, merge)?.commit()?;
-    let expected = expected_commit.workbook().to_bytes()?;
+    let expected = expected_commit.package().to_bytes()?;
     verify_xlsx_merge_output(&expected, merge)?;
     verify_xlsx_merge_durable_patch(&source, &expected_commit, &expected)?;
     let expected_digest = sha256_hex(&expected);
@@ -44544,13 +44569,13 @@ fn run_xlsx_merge_edit_save(
     let mut sink_summaries = Vec::with_capacity(samples);
 
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let workbook = Workbook::from_bytes(source_bytes.clone())?;
+        let workbook = XlsxPackage::from_bytes(&source_bytes)?;
         let edit = prepare_xlsx_merge_edit(&workbook, merge)?;
         let mut sink = CountingSink::bounded(maximum, 64 * 1024);
         sink.reserve_budget()?;
         let started = Instant::now();
         let commit = edit.commit()?;
-        commit.workbook().write_to(&mut sink)?;
+        commit.package().write_to(&mut sink)?;
         let duration = started.elapsed();
         if sink.bytes != expected {
             return Err("XLSX merge commit/save differs from deterministic output".into());
@@ -44616,7 +44641,7 @@ fn xlsx_edit_composition_coordinates(
 }
 
 fn prepare_xlsx_composition_branch(
-    workbook: &Workbook,
+    workbook: &XlsxPackage,
     coordinate: XlsxCoordinate,
     value: i32,
 ) -> Result<litchi_xlsx::Edit, Box<dyn Error>> {
@@ -44628,7 +44653,7 @@ fn prepare_xlsx_composition_branch(
 }
 
 fn prepare_xlsx_composition_branches(
-    workbook: &Workbook,
+    workbook: &XlsxPackage,
     left_coordinate: XlsxCoordinate,
     left_value: i32,
     right_coordinate: XlsxCoordinate,
@@ -44661,8 +44686,8 @@ fn verify_xlsx_edit_composition_cells(
     expected: &[(XlsxCoordinate, i32)],
 ) -> Result<(), Box<dyn Error>> {
     let spec = xlsx_spec(corpus)?;
-    let workbook = Workbook::from_bytes(output.to_vec())?;
-    if workbook.len() != spec.sheet_count {
+    let workbook = XlsxPackage::from_bytes(output)?;
+    if workbook.workbook_ref().len() != spec.sheet_count {
         return Err("XLSX composition output changed sheet count".into());
     }
     let inventory = spec
@@ -44671,6 +44696,7 @@ fn verify_xlsx_edit_composition_cells(
         .ok_or("XLSX composition corpus has no cell inventory")?;
     for sheet_index in 0..spec.sheet_count {
         let sheet = workbook
+            .workbook_ref()
             .sheet(xlsx_sheet_name(sheet_index).as_str())?
             .ok_or("XLSX composition output is missing source sheet")?;
         let coordinates = inventory
@@ -44702,7 +44728,7 @@ fn verify_xlsx_edit_composition_cells(
 
 fn verify_xlsx_edit_composition_commit(
     corpus: &Corpus,
-    source: &Workbook,
+    source: &XlsxPackage,
     commit: &litchi_xlsx::Commit,
     output: &[u8],
     expected: &[u8],
@@ -44712,7 +44738,7 @@ fn verify_xlsx_edit_composition_commit(
         return Err("XLSX composition output differs from deterministic output".into());
     }
     verify_xlsx_edit_composition_cells(corpus, output, expected_cells)?;
-    let reopened = Workbook::from_bytes(output.to_vec())?;
+    let reopened = XlsxPackage::from_bytes(output)?;
     verify_xlsx_edit_composition_cells(corpus, &reopened.to_bytes()?, expected_cells)?;
 
     let durable = commit.patch().durable()?;
@@ -44733,7 +44759,7 @@ fn verify_xlsx_edit_composition_commit(
     let stale =
         prepare_xlsx_composition_branch(source, expected_cells[0].0, expected_cells[0].1 + 99)?
             .commit()?
-            .into_workbook();
+            .into_package();
     if parsed.apply(&stale).is_ok() {
         return Err("XLSX composition durable patch accepted a stale source".into());
     }
@@ -44750,7 +44776,7 @@ fn verify_xlsx_edit_composition_commit(
         xlsx_value(foreign_coordinate) + 77,
     )?
     .commit()?
-    .into_workbook();
+    .into_package();
     if parsed.apply(&foreign).is_ok() {
         return Err("XLSX composition durable patch accepted a foreign source".into());
     }
@@ -44783,11 +44809,11 @@ fn run_xlsx_edit_composition(
             (right_coordinate, right_value),
         ]
     };
-    let source = Workbook::from_bytes(corpus.archive.clone())?;
+    let source = XlsxPackage::from_bytes(&corpus.archive)?;
     if source.to_bytes()? != corpus.archive {
         return Err("XLSX composition source round trip changed source bytes".into());
     }
-    let noop = source.edit()?.commit()?.into_workbook();
+    let noop = source.edit()?.commit()?.into_package();
     if noop.to_bytes()? != corpus.archive {
         return Err("XLSX composition exact no-op changed source bytes".into());
     }
@@ -44799,10 +44825,10 @@ fn run_xlsx_edit_composition(
         empty
             .join(incoming)
             .map_err(|error| format!("XLSX empty-transaction join identity failed: {error}"))?;
-        let joined_bytes = empty.commit()?.workbook().to_bytes()?;
+        let joined_bytes = empty.commit()?.package().to_bytes()?;
         let single_bytes = prepare_xlsx_composition_branch(&source, left_coordinate, left_value)?
             .commit()?
-            .workbook()
+            .package()
             .to_bytes()?;
         joined_bytes == single_bytes
     };
@@ -44811,7 +44837,7 @@ fn run_xlsx_edit_composition(
     }
     let different_snapshot_refusal_verified = {
         let mut local = prepare_xlsx_composition_branch(&source, left_coordinate, left_value)?;
-        let foreign_source = Workbook::from_bytes(corpus.archive.clone())?;
+        let foreign_source = XlsxPackage::from_bytes(&corpus.archive)?;
         let foreign =
             prepare_xlsx_composition_branch(&foreign_source, right_coordinate, right_value)?;
         let join_refused = match local.join(foreign) {
@@ -44820,7 +44846,7 @@ fn run_xlsx_edit_composition(
         };
 
         let local = prepare_xlsx_composition_branch(&source, left_coordinate, left_value)?;
-        let foreign_source = Workbook::from_bytes(corpus.archive.clone())?;
+        let foreign_source = XlsxPackage::from_bytes(&corpus.archive)?;
         let foreign =
             prepare_xlsx_composition_branch(&foreign_source, right_coordinate, right_value)?;
         let plan_refused = local.plan_three_way(foreign, merge_limits).is_err();
@@ -44846,8 +44872,8 @@ fn run_xlsx_edit_composition(
         }
         plan.resolve(MergeChoice::Neither);
         let commit = plan.finish()?.commit()?;
-        let bytes = commit.workbook().to_bytes()?;
-        Some(bytes == corpus.archive && commit.patch().is_empty())
+        let bytes = commit.package().to_bytes()?;
+        Some(bytes == corpus.archive && commit.patch().is_noop())
     } else {
         None
     };
@@ -44880,7 +44906,7 @@ fn run_xlsx_edit_composition(
             }
             right_plan.resolve(MergeChoice::Right);
             let right_commit = right_plan.finish()?.commit()?;
-            let right_output = right_commit.workbook().to_bytes()?;
+            let right_output = right_commit.package().to_bytes()?;
             let right_expected_cells = vec![(right_coordinate, right_value)];
             verify_xlsx_edit_composition_cells(corpus, &right_output, &right_expected_cells)?;
             let right_resolution_verified = right_output != corpus.archive;
@@ -44911,7 +44937,7 @@ fn run_xlsx_edit_composition(
                 left.join(right)
                     .map_err(|error| format!("XLSX disjoint join preflight failed: {error}"))?;
                 let commit = left.commit()?;
-                let expected = commit.workbook().to_bytes()?;
+                let expected = commit.package().to_bytes()?;
                 verify_xlsx_edit_composition_commit(
                     corpus,
                     &source,
@@ -44954,7 +44980,7 @@ fn run_xlsx_edit_composition(
                     return Err("XLSX disjoint three-way plan was not automatic".into());
                 }
                 let commit = plan.finish()?.commit()?;
-                let expected = commit.workbook().to_bytes()?;
+                let expected = commit.package().to_bytes()?;
                 verify_xlsx_edit_composition_commit(
                     corpus,
                     &source,
@@ -44979,7 +45005,7 @@ fn run_xlsx_edit_composition(
                 }
                 plan.resolve(MergeChoice::Left);
                 let commit = plan.finish()?.commit()?;
-                let expected = commit.workbook().to_bytes()?;
+                let expected = commit.package().to_bytes()?;
                 verify_xlsx_edit_composition_commit(
                     corpus,
                     &source,
@@ -45057,7 +45083,7 @@ fn run_xlsx_edit_composition(
                     CountingSink::bounded(maximum.ok_or("missing XLSX output ceiling")?, 64 * 1024);
                 sink.reserve_budget()?;
                 let started = Instant::now();
-                commit.workbook().write_to(&mut sink)?;
+                commit.package().write_to(&mut sink)?;
                 let duration = started.elapsed();
                 timed_ns = timed_ns
                     .checked_add(u128::from(elapsed_ns(duration)?))
@@ -45126,7 +45152,7 @@ fn run_xlsx_edit_composition(
                     CountingSink::bounded(maximum.ok_or("missing XLSX output ceiling")?, 64 * 1024);
                 sink.reserve_budget()?;
                 let started = Instant::now();
-                commit.workbook().write_to(&mut sink)?;
+                commit.package().write_to(&mut sink)?;
                 let duration = started.elapsed();
                 timed_ns = timed_ns
                     .checked_add(u128::from(elapsed_ns(duration)?))
@@ -45182,7 +45208,7 @@ fn run_xlsx_edit_composition(
                     CountingSink::bounded(maximum.ok_or("missing XLSX output ceiling")?, 64 * 1024);
                 sink.reserve_budget()?;
                 let started = Instant::now();
-                commit.workbook().write_to(&mut sink)?;
+                commit.package().write_to(&mut sink)?;
                 let duration = started.elapsed();
                 timed_ns = timed_ns
                     .checked_add(u128::from(elapsed_ns(duration)?))
@@ -45211,7 +45237,7 @@ fn run_xlsx_edit_composition(
                 if output != expected {
                     return Err("XLSX composition output digest gate failed".into());
                 }
-                let reopened = Workbook::from_bytes(output.to_vec())?;
+                let reopened = XlsxPackage::from_bytes(output)?;
                 verify_xlsx_edit_composition_cells(corpus, &reopened.to_bytes()?, &expected_cells)?;
                 Some(started.elapsed())
             } else {
@@ -45368,9 +45394,9 @@ fn xlsx_expected_output(
     corpus: &Corpus,
     updates: &[XlsxCoordinate],
 ) -> Result<Vec<u8>, Box<dyn Error>> {
-    let workbook = Workbook::from_bytes(corpus.archive.clone())?;
+    let workbook = XlsxPackage::from_bytes(&corpus.archive)?;
     let commit = prepare_xlsx_updates(&workbook, updates)?.commit()?;
-    Ok(commit.workbook().to_bytes()?)
+    Ok(commit.package().to_bytes()?)
 }
 
 fn deterministic_sink_summary(
@@ -52457,8 +52483,8 @@ fn verify_xlsx_defined_names_edit_output(
     corpus: &Corpus,
     output: &[u8],
 ) -> Result<(), Box<dyn Error>> {
-    let reopened = litchi_xlsx::Package::from_slice(output)?;
-    if reopened.workbook()?.defined_names() != xlsx_defined_names_target() {
+    let reopened = litchi_xlsx::Package::from_bytes(&output)?;
+    if reopened.workbook().defined_names() != xlsx_defined_names_target() {
         return Err("XLSX defined-name output has unexpected catalog semantics".into());
     }
     if reopened
@@ -52537,14 +52563,14 @@ fn publish_xlsx_defined_names_edit<W: Write>(
         let opc = source_backed.into_opc_package()?;
         let materializations = opc.part_count();
         let package = litchi_xlsx::Package::from_opc(opc)?;
-        let workbook = package.into_workbook()?;
+        let workbook = package;
         let mut edit = workbook.edit()?;
         edit.replace_defined_names(xlsx_defined_names_target())?;
         let commit = edit.commit()?;
-        if commit.patch().is_empty() {
+        if commit.patch().is_noop() {
             return Err("XLSX eager defined-name edit produced an empty patch".into());
         }
-        commit.workbook().write_to(writer)?;
+        commit.package().write_to(writer)?;
         Ok(materializations)
     }
 }
@@ -52645,7 +52671,7 @@ fn verify_xlsx_calculation_metadata_edit_output(
     corpus: &Corpus,
     output: &[u8],
 ) -> Result<(), Box<dyn Error>> {
-    let reopened = litchi_xlsx::Package::from_slice(output)?;
+    let reopened = litchi_xlsx::Package::from_bytes(&output)?;
     if reopened
         .calculation_metadata()?
         .properties()
@@ -53826,7 +53852,7 @@ fn verify_xlsx_page_break_edit_output(
     corpus: &Corpus,
     output: &[u8],
 ) -> Result<(), Box<dyn Error>> {
-    let reopened = litchi_xlsx::Package::from_slice(output)?;
+    let reopened = litchi_xlsx::Package::from_bytes(&output)?;
     if reopened
         .calculation_metadata()?
         .properties()
@@ -54042,12 +54068,12 @@ fn run_xlsx_page_break_projection(
     // Verify both public entry points against the independent raw-XML oracle
     // before any timed work. This makes the Package path an explicit control
     // and ensures the direct Worksheet selector cannot hide a semantic drift.
-    let package = litchi_xlsx::Package::from_slice(&corpus.archive)?;
+    let package = litchi_xlsx::Package::from_bytes(&corpus.archive)?;
     let package_projection = package.page_breaks("Sheet1")?;
     if !xlsx_page_break_oracle_matches_public(package_projection.page_breaks(), &expected) {
         return Err("XLSX Package page-break projection differs from raw oracle".into());
     }
-    let workbook = package.workbook()?;
+    let workbook = package.workbook();
     let worksheet = workbook
         .sheet("Sheet1")?
         .ok_or("XLSX worksheet page-break oracle has no Sheet1")?;
@@ -54058,11 +54084,11 @@ fn run_xlsx_page_break_projection(
 
     let mut elapsed = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let package = litchi_xlsx::Package::from_slice(&corpus.archive)?;
+        let package = litchi_xlsx::Package::from_bytes(&corpus.archive)?;
         let mut outputs = Vec::with_capacity(XLSX_REPEATED_PAGE_BREAK_CALLS);
         let started = match case {
             Case::XlsxWorksheetRepeatedPageBreaks => {
-                let workbook = package.workbook()?;
+                let workbook = package.workbook();
                 let worksheet = workbook
                     .sheet("Sheet1")?
                     .ok_or("XLSX Worksheet repeated-query setup has no Sheet1")?;
@@ -54124,8 +54150,8 @@ fn verify_xlsx_page_margin_edit_output(
     corpus: &Corpus,
     output: &[u8],
 ) -> Result<(), Box<dyn Error>> {
-    let reopened = litchi_xlsx::Package::from_slice(output)?;
-    let workbook = reopened.workbook()?;
+    let reopened = litchi_xlsx::Package::from_bytes(&output)?;
+    let workbook = reopened.workbook();
     let sheet = workbook
         .sheet("Sheet1")?
         .ok_or("XLSX page-margin output has no Sheet1")?;
@@ -54208,16 +54234,16 @@ fn publish_xlsx_page_margin_edit<W: Write>(
         let opc = package.into_opc_package()?;
         let materializations = opc.part_count();
         let package = litchi_xlsx::Package::from_opc(opc)?;
-        let workbook = package.into_workbook()?;
+        let workbook = package;
         let mut edit = workbook.edit()?;
         if edit.put_page_margins("Sheet1", margins)?.is_none() {
             return Err("XLSX eager page-margin worksheet selector did not resolve".into());
         }
         let commit = edit.commit()?;
-        if commit.patch().is_empty() {
+        if commit.patch().is_noop() {
             return Err("XLSX eager page-margin edit produced an empty patch".into());
         }
-        commit.workbook().write_to(writer)?;
+        commit.package().write_to(writer)?;
         Ok(materializations)
     }
 }
@@ -54329,8 +54355,8 @@ fn verify_xlsx_page_setup_edit_output(
     corpus: &Corpus,
     output: &[u8],
 ) -> Result<(), Box<dyn Error>> {
-    let reopened = litchi_xlsx::Package::from_slice(output)?;
-    let workbook = reopened.workbook()?;
+    let reopened = litchi_xlsx::Package::from_bytes(&output)?;
+    let workbook = reopened.workbook();
     let sheet = workbook
         .sheet("Sheet1")?
         .ok_or("XLSX page-setup output has no Sheet1")?;
@@ -54420,16 +54446,16 @@ fn publish_xlsx_page_setup_edit<W: Write>(
         let opc = package.into_opc_package()?;
         let materializations = opc.part_count();
         let package = litchi_xlsx::Package::from_opc(opc)?;
-        let workbook = package.into_workbook()?;
+        let workbook = package;
         let mut edit = workbook.edit()?;
         if edit.put_page_setup("Sheet1", setup)?.is_none() {
             return Err("XLSX eager page-setup worksheet selector did not resolve".into());
         }
         let commit = edit.commit()?;
-        if commit.patch().is_empty() {
+        if commit.patch().is_noop() {
             return Err("XLSX eager page-setup edit produced an empty patch".into());
         }
-        commit.workbook().write_to(writer)?;
+        commit.package().write_to(writer)?;
         Ok(materializations)
     }
 }
@@ -54539,8 +54565,8 @@ fn verify_xlsx_print_options_edit_output(
     corpus: &Corpus,
     output: &[u8],
 ) -> Result<(), Box<dyn Error>> {
-    let reopened = litchi_xlsx::Package::from_slice(output)?;
-    let workbook = reopened.workbook()?;
+    let reopened = litchi_xlsx::Package::from_bytes(&output)?;
+    let workbook = reopened.workbook();
     let sheet = workbook
         .sheet("Sheet1")?
         .ok_or("XLSX print-options output has no Sheet1")?;
@@ -54623,16 +54649,16 @@ fn publish_xlsx_print_options_edit<W: Write>(
         let opc = package.into_opc_package()?;
         let materializations = opc.part_count();
         let package = litchi_xlsx::Package::from_opc(opc)?;
-        let workbook = package.into_workbook()?;
+        let workbook = package;
         let mut edit = workbook.edit()?;
         if edit.put_print_options("Sheet1", options)?.is_none() {
             return Err("XLSX eager print-options worksheet selector did not resolve".into());
         }
         let commit = edit.commit()?;
-        if commit.patch().is_empty() {
+        if commit.patch().is_noop() {
             return Err("XLSX eager print-options edit produced an empty patch".into());
         }
-        commit.workbook().write_to(writer)?;
+        commit.package().write_to(writer)?;
         Ok(materializations)
     }
 }
@@ -54778,8 +54804,8 @@ fn verify_xlsx_sheet_protection_edit_output(
     corpus: &Corpus,
     output: &[u8],
 ) -> Result<(), Box<dyn Error>> {
-    let reopened = litchi_xlsx::Package::from_slice(output)?;
-    let workbook = reopened.workbook()?;
+    let reopened = litchi_xlsx::Package::from_bytes(&output)?;
+    let workbook = reopened.workbook();
     let sheet = workbook
         .sheet("Sheet1")?
         .ok_or("XLSX sheet-protection output has no Sheet1")?;
@@ -55074,8 +55100,8 @@ fn verify_xlsx_auto_filter_edit_output(
     corpus: &Corpus,
     output: &[u8],
 ) -> Result<(), Box<dyn Error>> {
-    let reopened = litchi_xlsx::Package::from_slice(output)?;
-    let workbook = reopened.workbook()?;
+    let reopened = litchi_xlsx::Package::from_bytes(&output)?;
+    let workbook = reopened.workbook();
     let sheet = workbook
         .sheet("Sheet1")?
         .ok_or("XLSX auto-filter output has no Sheet1")?;
@@ -55994,8 +56020,8 @@ fn verify_xlsx_cell_crud_workbook_calculation_closure(
         .into());
     }
     if effective_invalidation {
-        let source_package = litchi_xlsx::Package::from_slice(&corpus.archive)?;
-        let candidate_package = litchi_xlsx::Package::from_slice(output)?;
+        let source_package = litchi_xlsx::Package::from_bytes(&corpus.archive)?;
+        let candidate_package = litchi_xlsx::Package::from_bytes(&output)?;
         let mut expected = source_package
             .calculation_metadata()?
             .properties()
@@ -56309,8 +56335,8 @@ fn verify_xlsx_conditional_formatting_edit_output(
     corpus: &Corpus,
     output: &[u8],
 ) -> Result<(), Box<dyn Error>> {
-    let reopened = litchi_xlsx::Package::from_slice(output)?;
-    let workbook = reopened.workbook()?;
+    let reopened = litchi_xlsx::Package::from_bytes(&output)?;
+    let workbook = reopened.workbook();
     let sheet = workbook
         .sheet("Sheet1")?
         .ok_or("XLSX conditional-formatting output has no Sheet1")?;
@@ -56539,8 +56565,8 @@ fn verify_xlsx_data_validation_edit_output(
     corpus: &Corpus,
     output: &[u8],
 ) -> Result<(), Box<dyn Error>> {
-    let reopened = litchi_xlsx::Package::from_slice(output)?;
-    let workbook = reopened.workbook()?;
+    let reopened = litchi_xlsx::Package::from_bytes(&output)?;
+    let workbook = reopened.workbook();
     let sheet = workbook
         .sheet("Sheet1")?
         .ok_or("XLSX data-validation output has no Sheet1")?;
@@ -60163,11 +60189,12 @@ fn verify_streaming_xlsx(bytes: Vec<u8>, shape: SemanticShape) -> Result<(), Box
     {
         return Err("streaming XLSX archive member set differs from its six-part shape".into());
     }
-    let workbook = Workbook::from_bytes(bytes)?;
-    if workbook.len() != 1 {
+    let workbook = XlsxPackage::from_bytes(&bytes)?;
+    if workbook.workbook_ref().len() != 1 {
         return Err("streaming XLSX workbook does not contain exactly one sheet".into());
     }
     let sheet = workbook
+        .workbook_ref()
         .sheet("Sheet1")?
         .ok_or("streaming XLSX Sheet1 is missing")?;
     if sheet.rows()?.count() != shape.streaming_units() {
@@ -67532,8 +67559,7 @@ mod tests {
         }
 
         let mut noop = source.edit();
-        noop
-            .move_paragraph(Position::new(0), Position::new(0))
+        noop.move_paragraph(Position::new(0), Position::new(0))
             .unwrap();
         let noop = noop.commit().unwrap();
         assert!(!noop.diagnostics().changed());
@@ -67568,8 +67594,7 @@ mod tests {
             assert_eq!(document.to_bytes().unwrap(), exact);
 
             let mut noop = document.edit();
-            noop
-                .move_paragraph(Position::new(0), Position::new(0))
+            noop.move_paragraph(Position::new(0), Position::new(0))
                 .unwrap();
             let noop = noop.commit().unwrap();
             assert!(!noop.diagnostics().changed());
@@ -67589,8 +67614,7 @@ mod tests {
         ));
         assert_eq!(watermark.to_bytes().unwrap(), exact);
         let mut noop = watermark.edit();
-        noop
-            .move_paragraph(Position::new(0), Position::new(0))
+        noop.move_paragraph(Position::new(0), Position::new(0))
             .unwrap();
         let noop = noop.commit().unwrap();
         assert!(!noop.diagnostics().changed());
@@ -67610,8 +67634,7 @@ mod tests {
                     edit.remove_paragraph(Position::new(1)).unwrap();
                 },
                 Case::RtfSemanticMoveParagraphSave => {
-                    edit
-                        .move_paragraph(Position::new(0), Position::new(2))
+                    edit.move_paragraph(Position::new(0), Position::new(2))
                         .unwrap();
                 },
                 _ => unreachable!(),
@@ -70661,7 +70684,7 @@ mod tests {
             );
         }
 
-        let workbook = super::Workbook::from_bytes(first.archive.clone()).unwrap();
+        let workbook = super::XlsxPackage::from_bytes(&first.archive).unwrap();
         super::verify_xlsx_cells(&workbook, spec, &[]).unwrap();
         let measured = run_case(Case::XlsxSourceBackedCellValuesOneEditSave, &first, 0, 1).unwrap();
         assert_eq!(

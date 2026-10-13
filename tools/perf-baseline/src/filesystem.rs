@@ -3654,8 +3654,9 @@ fn xlsx_repeat_store_semantic_projection(
 }
 
 fn typed_xlsx_repeat_store_projection(corpus: &super::Corpus) -> Result<String, Box<dyn Error>> {
-    let typed = litchi_xlsx::Workbook::from_bytes(corpus.archive.clone())?;
+    let typed = litchi_xlsx::Package::from_bytes(&corpus.archive)?;
     let sheet = typed
+        .workbook_ref()
         .sheet("Sheet1")?
         .ok_or("typed XLSX repeated-store oracle is missing Sheet1")?;
     let mut projection = Sha256::new();
@@ -5706,13 +5707,14 @@ fn xlsx_typed_semantic_oracle(
         .xlsx
         .as_ref()
         .ok_or("XLSX filesystem corpus omitted its typed specification")?;
-    let typed = litchi_xlsx::Workbook::from_bytes(corpus.archive.clone())?;
+    let typed = litchi_xlsx::Package::from_bytes(&corpus.archive)?;
     super::verify_xlsx_cells(&typed, spec, &[])?;
     let worksheet_names = typed
+        .workbook_ref()
         .sheets()
         .map(|sheet| sheet.name().to_owned())
         .collect::<Vec<_>>();
-    let worksheet_count = typed.len();
+    let worksheet_count = typed.workbook_ref().len();
     let full_text = super::xlsx_typed_full_text(&typed, spec)?;
     if worksheet_names.len() != XLSX_FILE_SOURCE_SHEET_COUNT
         || worksheet_count != XLSX_FILE_SOURCE_SHEET_COUNT
@@ -7665,7 +7667,7 @@ mod tests {
         let package = super::OpcPackage::from_bytes(&aligned).unwrap();
         assert!(package.part_count() > 0);
         let spec = corpus.xlsx.as_ref().unwrap();
-        let typed = litchi_xlsx::Workbook::from_bytes(aligned.clone()).unwrap();
+        let typed = litchi_xlsx::Package::from_bytes(&aligned).unwrap();
         crate::verify_xlsx_cells(&typed, spec, &[]).unwrap();
         let expected = super::xlsx_semantic_sha256(&corpus).unwrap();
 

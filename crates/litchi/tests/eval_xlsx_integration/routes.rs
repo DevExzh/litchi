@@ -2,7 +2,7 @@
 //! takes for an XLSX: the source-backed file and bytes, and the eager owner.
 
 use litchi::sheet::{CellValue, FormulaEvaluator, WorkbookTrait};
-use litchi::xlsx::{Formula, Workbook};
+use litchi::xlsx::{Formula, Package};
 use litchi::{File, OpenOptions, SourceMode};
 use tempfile::tempdir;
 
@@ -11,7 +11,7 @@ async fn eval_reads_the_workbook_view_of_every_route() {
     let dir = tempdir().expect("create temp dir");
     let path = dir.path().join("routes.xlsx");
 
-    let workbook = Workbook::create().expect("create workbook");
+    let workbook = Package::new().expect("create workbook");
     let mut edit = workbook.edit().expect("start workbook edit");
     edit.tab(0)
         .expect("worksheet tab lookup")
@@ -31,7 +31,7 @@ async fn eval_reads_the_workbook_view_of_every_route() {
     }
     edit.commit()
         .expect("commit workbook edit")
-        .workbook()
+        .package()
         .save(&path)
         .expect("save workbook");
 

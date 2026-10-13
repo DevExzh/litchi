@@ -43,6 +43,7 @@ impl Builder {
             toolbar: None,
             encryption: None,
             encryption_entropy: None,
+            properties: litchi_ole_common::property_set::SummaryProperties::new(),
         }
     }
 

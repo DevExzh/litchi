@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 use litchi_xlsx::style::cell_format::{
     Color, Fill, Format, Line, Pattern, Reading, Script, Side, Underline,
 };
-use litchi_xlsx::{LocalStyle, Rect, SourceBackedWorkbook, Workbook, WorksheetKind};
+use litchi_xlsx::{LocalStyle, Rect, SourceBackedWorkbook, WorksheetKind};
 
 fn fixture(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -275,8 +275,8 @@ fn keys(pairs: &[(&'static str, &str)]) -> BTreeMap<&'static str, String> {
 
 #[test]
 fn eager_style_format_reads_fonts_fills_alignment_and_number_formats() {
-    let workbook = Workbook::open(fixture("styles.xlsx")).unwrap();
-    let sheet = workbook.sheet(0_usize).unwrap().unwrap();
+    let workbook = litchi_xlsx::Package::open(fixture("styles.xlsx")).unwrap();
+    let sheet = workbook.workbook_ref().sheet(0_usize).unwrap().unwrap();
     let format = |at: &str| sheet.style(at).unwrap().unwrap().format().unwrap();
 
     let bold = format("A1");
@@ -332,8 +332,8 @@ fn eager_style_format_reads_fonts_fills_alignment_and_number_formats() {
         Some("Arial")
     );
 
-    let numbers = Workbook::open(fixture("Formatting.xlsx")).unwrap();
-    let styles = numbers.styles().unwrap();
+    let numbers = litchi_xlsx::Package::open(fixture("Formatting.xlsx")).unwrap();
+    let styles = numbers.workbook_ref().styles().unwrap();
     let date = styles.get(1).unwrap().format().unwrap();
     assert_eq!(
         litchi_xlsx::style::cell_format::raw::number_format_id(&date.number_format()),
@@ -352,8 +352,8 @@ fn eager_style_format_reads_fonts_fills_alignment_and_number_formats() {
 
 #[test]
 fn eager_borders_and_colors_keep_their_typed_references() {
-    let workbook = Workbook::open(fixture("cell-borders.xlsx")).unwrap();
-    let styles = workbook.styles().unwrap();
+    let workbook = litchi_xlsx::Package::open(fixture("cell-borders.xlsx")).unwrap();
+    let styles = workbook.workbook_ref().styles().unwrap();
     let double = styles.get(2).unwrap().format().unwrap();
     let border = double.border().unwrap();
     assert_eq!(
@@ -362,8 +362,15 @@ fn eager_borders_and_colors_keep_their_typed_references() {
     );
     assert_eq!(officecli(&double), keys(&[("border.top", "double")]));
 
-    let colors = Workbook::open(fixture("TextColor.xlsx")).unwrap();
-    let base = colors.styles().unwrap().base().unwrap().format().unwrap();
+    let colors = litchi_xlsx::Package::open(fixture("TextColor.xlsx")).unwrap();
+    let base = colors
+        .workbook_ref()
+        .styles()
+        .unwrap()
+        .base()
+        .unwrap()
+        .format()
+        .unwrap();
     assert!(base.is_base());
     assert_eq!(base.font().unwrap().color(), Some(Color::theme(1)));
     assert!(officecli(&base).is_empty());
@@ -371,8 +378,8 @@ fn eager_borders_and_colors_keep_their_typed_references() {
 
 #[test]
 fn formats_share_one_parsed_table_until_it_is_released() {
-    let workbook = Workbook::open(fixture("styles.xlsx")).unwrap();
-    let styles = workbook.styles().unwrap();
+    let workbook = litchi_xlsx::Package::open(fixture("styles.xlsx")).unwrap();
+    let styles = workbook.workbook_ref().styles().unwrap();
     let first = styles.get(1).unwrap().format().unwrap();
     let again = styles.get(1).unwrap().format().unwrap();
     assert!(first.same(&again), "a second read hits the cached table");
@@ -381,6 +388,7 @@ fn formats_share_one_parsed_table_until_it_is_released() {
     let clone = workbook.clone();
     assert!(
         clone
+            .workbook_ref()
             .styles()
             .unwrap()
             .get(1)
@@ -392,9 +400,9 @@ fn formats_share_one_parsed_table_until_it_is_released() {
 
     // An active format pins the table; once released, the next read parses
     // again and reports equal values.
-    assert!(!workbook.release_cached_formats());
+    assert!(!workbook.workbook_ref().release_cached_formats());
     drop((first, again));
-    assert!(workbook.release_cached_formats());
+    assert!(workbook.workbook_ref().release_cached_formats());
     let reread = styles.get(1).unwrap().format().unwrap();
     assert_eq!(
         snapshot(&reread),
@@ -438,10 +446,13 @@ fn every_repository_workbook_reads_the_same_formats_on_both_owners() {
 /// worksheets either owner refuses to read: those refusals belong to other
 /// tests and must at least agree.
 fn compare_owners(path: &Path, limit: usize) -> bool {
-    let (Ok(eager), Ok(source)) = (Workbook::open(path), SourceBackedWorkbook::open(path)) else {
+    let (Ok(eager), Ok(source)) = (
+        litchi_xlsx::Package::open(path),
+        SourceBackedWorkbook::open(path),
+    ) else {
         return false;
     };
-    for (eager_sheet, source_sheet) in eager.sheets().zip(source.sheets()) {
+    for (eager_sheet, source_sheet) in eager.workbook_ref().sheets().zip(source.sheets()) {
         if eager_sheet.kind() != WorksheetKind::Worksheet {
             continue;
         }

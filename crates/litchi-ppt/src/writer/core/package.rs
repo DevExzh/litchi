@@ -689,8 +689,15 @@ impl Builder {
         #[cfg(not(feature = "encryption"))]
         let encrypted = false;
         let current_user = build_current_user_stream(user_edit_offset, encrypted);
-        let summary_info = build_summary_information_stream();
-        let doc_summary = build_document_summary_information_stream();
+        // A presentation without properties keeps the fixed blank streams
+        // byte for byte; one with properties carries the serialized sections.
+        let (summary_info, doc_summary) = match self.properties.to_streams()? {
+            Some(streams) => streams.into_parts(),
+            None => (
+                build_summary_information_stream(),
+                build_document_summary_information_stream(),
+            ),
+        };
 
         #[cfg(feature = "encryption")]
         if let (Some(material), Some(session_id)) = (&encryption, encryption_session_id) {

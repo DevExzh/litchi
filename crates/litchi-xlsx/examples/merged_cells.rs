@@ -1,7 +1,7 @@
 use std::error::Error;
 use std::io;
 
-use litchi_xlsx::{Rect, Workbook, cell};
+use litchi_xlsx::{Rect, cell};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let arguments = std::env::args_os().skip(1).collect::<Vec<_>>();
@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .into());
     };
 
-    let workbook = Workbook::new()?;
+    let workbook = litchi_xlsx::Package::new()?;
     let mut create = workbook.edit()?;
     create
         .sheet("Sheet1")?
@@ -24,7 +24,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .merge("E1:F2")?;
     let created = create.commit()?;
 
-    let mut revise = created.workbook().edit()?;
+    let mut revise = created.package().edit()?;
     revise
         .sheet(0usize)?
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "first sheet is missing"))?
@@ -35,7 +35,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let revised = revise.commit()?;
 
     let sheet = revised
-        .workbook()
+        .package()
+        .workbook_ref()
         .sheet("Sheet1")?
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Sheet1 is missing"))?;
     let ranges = sheet.merges()?.map(Rect::a1).collect::<Vec<_>>();
@@ -48,10 +49,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Err(io::Error::other("covered/unmerged cell views differ").into());
     }
 
-    revised.workbook().save(output)?;
+    revised.package().save(output)?;
     println!(
         "saved two merged ranges after one unmerge in {} semantic changes",
-        created.patch().len().saturating_add(revised.patch().len())
+        created
+            .patch()
+            .operation_count()
+            .saturating_add(revised.patch().operation_count())
     );
     Ok(())
 }

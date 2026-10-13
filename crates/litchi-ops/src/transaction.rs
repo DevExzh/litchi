@@ -106,13 +106,13 @@ struct Step {
 }
 enum Leaf {
     #[cfg(feature = "doc")]
-    Doc(Box<litchi_doc::Patch>),
+    Doc(Box<crate::format::doc::StepPatch>),
     #[cfg(feature = "xlsb")]
     Xlsb(Box<crate::format::xlsb::write::Patch>),
     #[cfg(feature = "xls")]
-    Xls(Box<litchi_xls::Patch>),
+    Xls(Box<crate::format::xls::write::StepPatch>),
     #[cfg(feature = "ppt")]
-    Ppt(Box<litchi_ppt::Patch>),
+    Ppt(Box<crate::format::ppt::write::StepPatch>),
     #[cfg(feature = "pptx")]
     Pptx {
         source: crate::format::pptx::Editable,
@@ -125,8 +125,8 @@ enum Leaf {
     Rtf(Box<litchi_rtf::edit::Patch>),
     #[cfg(feature = "xlsx")]
     Xlsx {
-        source: litchi_xlsx::Workbook,
-        target: litchi_xlsx::Workbook,
+        source: litchi_xlsx::Package,
+        target: litchi_xlsx::Package,
         // Retain the complete native proof even though process-local replay
         // reuses a validated owner-bound endpoint.
         _patch: Box<litchi_xlsx::workbook::Patch>,
@@ -2059,7 +2059,7 @@ fn wrap_xlsx<T>(
 ) -> Result<(Step, T)> {
     let (after, source, target, patch) = commit.into_parts();
     let snapshot_bytes = patch.retained_bytes();
-    let leaf_operations = patch.len();
+    let leaf_operations = patch.operation_count();
     Ok((
         Step {
             before: File::Xlsx(before.clone()),
@@ -2143,7 +2143,7 @@ fn changed(steps: &[Step]) -> Result<bool> {
     }
     match (&first.leaf, &last.leaf) {
         #[cfg(feature = "doc")]
-        (Leaf::Doc(first), Leaf::Doc(last)) => Ok(first.before_bytes() != last.after_bytes()),
+        (Leaf::Doc(first), Leaf::Doc(last)) => Ok(first.before() != last.after()),
         #[cfg(feature = "xlsb")]
         (Leaf::Xlsb(first), Leaf::Xlsb(last)) => Ok(first.before() != last.after()),
         #[cfg(feature = "xls")]

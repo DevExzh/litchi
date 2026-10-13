@@ -1,0 +1,935 @@
+//! The unified read surface (record 0010 §8.2, M1 step R9):
+//! `litchi_py.open` and `open_bytes` return a [`File`], an immutable handle
+//! over `litchi::File` with `get`, `find`, `query`, `view`,
+//! `capabilities`, `text` and `metadata`.
+//!
+//! Every read releases the GIL for the Rust work (opening, resolving,
+//! walking, reading the node members, rendering a view) and holds it only
+//! to build the Python result. Node views are built as dicts straight from
+//! the node view's accessors ([`crate::nodes`]); view JSON, the capability
+//! report and the metadata through a `serde` serializer that builds Python
+//! objects ([`crate::pyser`]). Neither writes JSON text.
+//!
+//! The handle is thread-safe: `litchi::File` is `Send + Sync` and cheap to
+//! clone (one reference count), so each call clones it out of a lock and
+//! reads without holding the lock. `close()` drops the handle's own
+//! reference; a call already running on another thread keeps reading its
+//! clone.
+
+use std::borrow::Cow;
+use std::path::PathBuf;
+use std::sync::{PoisonError, RwLock};
+
+use litchi::node::{DEFAULT_MAX_NODES, ViewOptions};
+use litchi::view::Mode;
+use litchi::{Overwrite, SaveOptions, SaveTo};
+use pyo3::prelude::*;
+use pyo3::pybacked::PyBackedStr;
+use pyo3::types::{PyBytes, PyDict, PyList, PyModule, PyString};
+
+use crate::common::FileFormat;
+use crate::errors::Failure;
+use crate::write::{self, Commit, Edit, Items, Where};
+use crate::{nodes, props, pyser};
+
+/// Registers `File`, `open` and `open_bytes`.
+pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<File>()?;
+    m.add_function(wrap_pyfunction!(open, m)?)?;
+    m.add_function(wrap_pyfunction!(open_bytes, m)?)?;
+    m.add_function(wrap_pyfunction!(create, m)?)?;
+    Ok(())
+}
+
+/// The default node budget of `get`, `find` and `query`: the signatures
+/// spell it as the literal `100_000`, so `help()` and `inspect` show it.
+const _: () = assert!(DEFAULT_MAX_NODES == 100_000);
+
+/// Open the file at `path` through the unified API.
+///
+/// The format is detected from the file's content, not from its name, in
+/// one pass. Any format `litchi::File` holds opens: .docx, .xlsx, .pptx,
+/// .xlsb, .doc, .xls, .ppt, .rtf, .odt, .ods and .odp. An encrypted file
+/// opens locked (its reads raise ProtectedError; ``capabilities()`` says
+/// so), and a signed one opens readable. The GIL is released while the file
+/// is opened.
+///
+/// Args:
+///     path: Path to the file (str or os.PathLike)
+///
+/// Returns:
+///     A File
+///
+/// Raises:
+///     IoError: (an OSError) If the file cannot be read
+///     UnsupportedError: (a ValueError) If the file is not an Office file,
+///         or is in a format File does not hold (Apple iWork: open it with
+///         Document.open, Presentation.open or Workbook.open)
+///     CorruptFileError: (a ValueError) If the file is malformed
+#[pyfunction]
+fn open(py: Python<'_>, path: PathBuf) -> PyResult<File> {
+    let file = py.detach(|| litchi::open(&path).map_err(|error| Failure::open_file(&error)))?;
+    Ok(File::new(file))
+}
+
+/// Open an in-memory file through the unified API.
+///
+/// As ``open``, from the file's bytes, which are copied once. The GIL is
+/// released while the bytes are copied and opened.
+///
+/// Args:
+///     data: The file's content, as bytes
+///
+/// Returns:
+///     A File
+///
+/// Raises:
+///     UnsupportedError: (a ValueError) If the bytes are not an Office
+///         file, or are in a format File does not hold
+///     CorruptFileError: (a ValueError) If the file is malformed
+#[pyfunction]
+fn open_bytes(py: Python<'_>, data: &[u8]) -> PyResult<File> {
+    let file =
+        py.detach(|| litchi::open_bytes(data).map_err(|error| Failure::open_file(&error)))?;
+    Ok(File::new(file))
+}
+
+/// Create a new, empty document of ``format`` through the unified API.
+///
+/// The new File has no path: write it with ``save_as`` or ``to_bytes``.
+/// .docx, .xlsx, .pptx, .xlsb, .doc, .xls, .ppt and .rtf can be created.
+/// The GIL is released while the document is built.
+///
+/// Args:
+///     format: A FileFormat, or its name ("docx", "Xlsx", ".pptx")
+///
+/// Returns:
+///     A File
+///
+/// Raises:
+///     PropertyError: (a ValueError) If format names no format
+///         ("invalid_argument")
+///     UnsupportedError: (a ValueError) If Litchi cannot create the format
+#[pyfunction]
+fn create(py: Python<'_>, format: Bound<'_, PyAny>) -> PyResult<File> {
+    let format = FileFormat::extract(&format)?.to_core();
+    let file = py.detach(|| litchi::create(format).map_err(|error| Failure::read(&error)))?;
+    Ok(File::new(file))
+}
+
+/// An open document, workbook or presentation: the unified API.
+///
+/// Returned by ``litchi_py.open`` and ``litchi_py.open_bytes``. A File is
+/// an immutable handle: reads never change it, and it can be shared between
+/// threads. Every read releases the GIL while Litchi works and holds it
+/// only to build the result.
+///
+/// Reads address the document with OfficeCLI's paths (``/body/p[3]``,
+/// ``/Sheet1/B2``, ``Sheet1!B2``) and selectors (``paragraph[style=Heading1]``,
+/// ``row[Amount>5000]``), and return OfficeCLI's node view as dicts.
+/// ``capabilities()`` lists what the format answers; a format whose unified
+/// reader has not landed yet refuses every read with UnsupportedError
+/// (``unsupported_capability``).
+///
+/// A File is a context manager: leaving the ``with`` block closes it. After
+/// ``close()``, every read raises IoError (``file_required``).
+///
+/// # Examples
+///
+/// ```python
+/// import litchi_py
+///
+/// with litchi_py.open("report.docx") as doc:
+///     paragraph = doc.get("/body/p[1]")          # dict: path, type, text, format, ...
+///     headings = doc.query("paragraph[style=Heading1]", limit=10)
+///     print(doc.view("outline"))
+/// ```
+#[pyclass(frozen, module = "litchi_py")]
+pub struct File {
+    /// The open handle; `None` after `close()`.
+    handle: RwLock<Option<litchi::File>>,
+    /// The detected format, kept after `close()`.
+    format: Option<litchi::FileFormat>,
+}
+
+impl File {
+    pub(crate) fn new(file: litchi::File) -> Self {
+        Self {
+            format: file.format(),
+            handle: RwLock::new(Some(file)),
+        }
+    }
+
+    /// A clone of the open handle (one reference count), so the read runs
+    /// without holding the lock; the closed-file failure after `close()`.
+    fn handle(&self) -> Result<litchi::File, Failure> {
+        self.handle
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone()
+            .ok_or_else(Failure::closed)
+    }
+}
+
+#[pymethods]
+impl File {
+    /// The detected format, or None for an encrypted OOXML package whose
+    /// format is hidden until it is unlocked. Still available after
+    /// ``close()``.
+    #[getter]
+    fn format(&self) -> PyResult<Option<FileFormat>> {
+        self.format
+            .map(FileFormat::from_core)
+            .transpose()
+            .map_err(PyErr::from)
+    }
+
+    /// Whether ``close()`` has been called.
+    #[getter]
+    fn closed(&self) -> bool {
+        self.handle
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+            .is_none()
+    }
+
+    /// The node view of the element at ``path``.
+    ///
+    /// The view is OfficeCLI's node shape, as a dict: ``path`` (canonical),
+    /// ``type``, ``text``, ``preview``, ``style`` and ``childCount`` (each
+    /// left out when the node has none), ``format`` (the node's own
+    /// properties, with JSON types) and ``children`` (child views, ``depth``
+    /// levels down). Only the parts on the path are read.
+    ///
+    /// Args:
+    ///     path: An OfficeCLI path, such as "/body/p[3]", "/Sheet1/B2" or
+    ///         "Sheet1!B2"
+    ///     depth: Child levels to list below the node: 0 lists none; values
+    ///         above 64 count as 64
+    ///     max_nodes: The most nodes the result may hold, children included
+    ///     dense: For a cell range, list empty cells too, up to this many
+    ///
+    /// Returns:
+    ///     The node view
+    ///
+    /// Raises:
+    ///     PathError: (a LookupError) If the path is malformed
+    ///         ("invalid_path"), nothing is there ("path_not_found"), or the
+    ///         format has no such element ("unsupported_path")
+    ///     UnsupportedError: (a ValueError) If Litchi cannot read the
+    ///         element or the format yet ("unsupported_capability")
+    ///     ProtectedError: (a ValueError) If the file is encrypted
+    ///     PropertyError: (a ValueError) If an argument is negative
+    ///     LitchiError: If the view exceeds max_nodes ("output_too_large")
+    ///     IoError: (an OSError) If the file is closed or changed on disk
+    #[pyo3(signature = (path, depth = 1, *, max_nodes = 100_000, dense = None))]
+    fn get<'py>(
+        &self,
+        py: Python<'py>,
+        path: PyBackedStr,
+        depth: i64,
+        max_nodes: i64,
+        dense: Option<i64>,
+    ) -> PyResult<Bound<'py, PyDict>> {
+        let file = self.handle()?;
+        let options = view_options(depth, max_nodes, dense)?;
+        nodes::get(py, &file, &path, options)
+    }
+
+    /// The node view of the element at ``path``, or None when nothing is
+    /// there.
+    ///
+    /// As ``get``, except that a path that resolves to nothing returns None
+    /// instead of raising PathError ("path_not_found"). A malformed path
+    /// still raises.
+    ///
+    /// Args:
+    ///     path: An OfficeCLI path
+    ///     depth: Child levels to list below the node
+    ///     max_nodes: The most nodes the result may hold, children included
+    ///     dense: For a cell range, list empty cells too, up to this many
+    ///
+    /// Returns:
+    ///     The node view, or None
+    #[pyo3(signature = (path, depth = 1, *, max_nodes = 100_000, dense = None))]
+    fn find<'py>(
+        &self,
+        py: Python<'py>,
+        path: PyBackedStr,
+        depth: i64,
+        max_nodes: i64,
+        dense: Option<i64>,
+    ) -> PyResult<Option<Bound<'py, PyDict>>> {
+        let file = self.handle()?;
+        let options = view_options(depth, max_nodes, dense)?;
+        nodes::find(py, &file, &path, options)
+    }
+
+    /// The node views of the elements ``selector`` matches, in document
+    /// order.
+    ///
+    /// The selector is compiled once and the document is walked in one
+    /// pass, which stops after ``limit`` matches. Each match is a node view,
+    /// as ``get`` returns, with ``depth`` levels of children (none by
+    /// default). An unknown property key in the selector is not an error:
+    /// it matches nothing and issues a UserWarning that suggests the nearest
+    /// key.
+    ///
+    /// Args:
+    ///     selector: An OfficeCLI selector, such as "paragraph",
+    ///         "cell[type=Number]" or "Sheet1!row[Amount>5000]"
+    ///     limit: The most matches to return; None returns every match
+    ///     depth: Child levels to list below each match
+    ///     max_nodes: The most nodes the result may hold, matches and their
+    ///         children together
+    ///     dense: For cell ranges, list empty cells too, up to this many
+    ///
+    /// Returns:
+    ///     A list of node views
+    ///
+    /// Raises:
+    ///     PathError: (a LookupError) If the selector is malformed
+    ///         ("invalid_selector") or its scope path does not resolve
+    ///     UnsupportedError: (a ValueError) If Litchi cannot query the
+    ///         format yet ("unsupported_capability")
+    ///     ProtectedError: (a ValueError) If the file is encrypted
+    ///     PropertyError: (a ValueError) If an argument is negative
+    ///     LitchiError: If more than max_nodes nodes match
+    ///         ("output_too_large"); pass a limit
+    ///     IoError: (an OSError) If the file is closed or changed on disk
+    #[pyo3(signature = (selector, limit = None, depth = 0, *, max_nodes = 100_000, dense = None))]
+    fn query<'py>(
+        &self,
+        py: Python<'py>,
+        selector: PyBackedStr,
+        limit: Option<i64>,
+        depth: i64,
+        max_nodes: i64,
+        dense: Option<i64>,
+    ) -> PyResult<Bound<'py, PyList>> {
+        let file = self.handle()?;
+        let options = view_options(depth, max_nodes, dense)?;
+        let limit = limit_of(limit)?;
+        nodes::query(py, &file, &selector, limit, options)
+    }
+
+    /// One of OfficeCLI's semantic views of the whole document.
+    ///
+    /// The modes are "text" (the text, one line per element, with its
+    /// path), "annotated" (text with formatting annotations), "outline"
+    /// (the structure, with counts) and "stats" (counts and distributions),
+    /// or their one-letter aliases. The other OfficeCLI modes ("issues",
+    /// "forms", "html", "svg", "screenshot", "pdf") raise UnsupportedError.
+    ///
+    /// Args:
+    ///     mode: The view mode
+    ///     json: Return OfficeCLI's JSON form as Python objects instead of
+    ///         text
+    ///
+    /// Returns:
+    ///     The view as text, or as a dict when json is True
+    ///
+    /// Raises:
+    ///     PropertyError: (a ValueError) If the mode is unknown
+    ///         ("invalid_argument")
+    ///     UnsupportedError: (a ValueError) If the format or the mode is not
+    ///         supported ("unsupported_capability")
+    ///     ProtectedError: (a ValueError) If the file is encrypted
+    ///     IoError: (an OSError) If the file is closed or changed on disk
+    #[pyo3(signature = (mode, *, json = false))]
+    fn view<'py>(
+        &self,
+        py: Python<'py>,
+        mode: PyBackedStr,
+        json: bool,
+    ) -> PyResult<Bound<'py, PyAny>> {
+        let file = self.handle()?;
+        let read = |error: litchi::Error| Failure::read(&error);
+        let mode = Mode::parse(&mode).ok_or_else(|| {
+            let suggestion = match nearest_mode(&mode) {
+                Some(name) => format!("did you mean '{name}'?").into(),
+                None => Cow::Borrowed("use text, annotated, outline or stats (or t, a, o, s)"),
+            };
+            Failure::argument("unknown view mode").with_suggestion(suggestion)
+        })?;
+        if json {
+            let view = py.detach(|| file.view_json(mode).map_err(read))?;
+            pyser::to_py(py, &view)
+        } else {
+            let mut text = String::new();
+            py.detach(|| file.view_to(mode, &mut text).map_err(read))?;
+            Ok(PyString::new(py, &text).into_any())
+        }
+    }
+
+    /// What this file can do through the unified API: OfficeCLI's help
+    /// schema, as a dict.
+    ///
+    /// The report names the file's ``state`` ("open", "signed" or "locked"),
+    /// whether each verb and view mode is supported (or the code its
+    /// refusal raises, with the follow-up that adds it), every element the
+    /// format's reader knows with its paths and properties, and every listed
+    /// gap.
+    ///
+    /// Returns:
+    ///     The capability report
+    ///
+    /// Raises:
+    ///     IoError: (an OSError) If the file is closed
+    fn capabilities<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyAny>> {
+        let file = self.handle()?;
+        // A view over static tables and the handle's state: building it
+        // reads nothing, so only the Python objects cost.
+        pyser::to_py(py, &file.capabilities())
+    }
+
+    /// All text of the document, in reading order.
+    ///
+    /// Returns:
+    ///     The text
+    ///
+    /// Raises:
+    ///     ProtectedError: (a ValueError) If the file is encrypted
+    ///     IoError: (an OSError) If the file is closed or changed on disk
+    fn text(&self, py: Python<'_>) -> PyResult<String> {
+        let file = self.handle()?;
+        py.detach(|| file.text().map_err(|error| Failure::read(&error)))
+            .map_err(PyErr::from)
+    }
+
+    /// The document properties (title, author, dates, counts, ...), as a
+    /// dict with the keys that are set; dates are ISO 8601 text.
+    ///
+    /// Returns:
+    ///     The properties, or None when the format reports none (.pptx and
+    ///     .ppt without core properties)
+    ///
+    /// Raises:
+    ///     ProtectedError: (a ValueError) If the file is encrypted
+    ///     IoError: (an OSError) If the file is closed or changed on disk
+    fn metadata<'py>(&self, py: Python<'py>) -> PyResult<Option<Bound<'py, PyAny>>> {
+        let file = self.handle()?;
+        let metadata = py.detach(|| file.metadata().map_err(|error| Failure::read(&error)))?;
+        metadata
+            .map(|metadata| pyser::to_py(py, &metadata))
+            .transpose()
+    }
+
+    /// Set properties on the element(s) ``target`` names; return the
+    /// changed File.
+    ///
+    /// The File this is called on is unchanged. Properties use OfficeCLI's
+    /// names, and dotted keys are fine in a dict. Values keep their Python
+    /// types: ``None`` clears a property where it can be cleared, ``bool``,
+    /// ``int`` and ``float`` stay typed, and text is coerced through the
+    /// key's value type ("12pt", "#1F4E79", "accent1+lumMod75"). The GIL is
+    /// released while the change is made.
+    ///
+    /// Args:
+    ///     target: An OfficeCLI path ("/body/p[3]/r[1]", "/Sheet1/B2"), or
+    ///         a selector scoped to a path
+    ///     props: A dict ({"font.bold": True, "fill": "1F4E79"}) or a list
+    ///         of "key=value" strings
+    ///
+    /// Returns:
+    ///     The new File
+    ///
+    /// Raises:
+    ///     PathError: (a LookupError) If the target is malformed or
+    ///         resolves to nothing
+    ///     PropertyError: (a ValueError) If a property is unknown (with a
+    ///         did-you-mean suggestion) or a value is invalid
+    ///     UnsupportedError: (a ValueError) If the format cannot set this
+    ///         property or element yet ("unsupported_capability")
+    ///     ProtectedError: (a ValueError) If the file is encrypted or signed
+    ///         (call ``unsign()`` first)
+    ///     IoError: (an OSError) If the file is closed or changed on disk
+    fn set(&self, py: Python<'_>, target: PyBackedStr, props: Bound<'_, PyAny>) -> PyResult<File> {
+        let file = self.handle()?;
+        let props = props::props(Some(&props))?;
+        let next = py.detach(|| {
+            file.set(&*target, &props)
+                .map_err(|error| Failure::read(&error))
+        })?;
+        Ok(Self::new(next))
+    }
+
+    /// Add an element under ``parent``; return the new File and the new
+    /// element's path.
+    ///
+    /// Without ``index``, ``after`` or ``before`` (at most one), the element
+    /// is added after the parent's last child.
+    ///
+    /// Args:
+    ///     parent: The path of the new element's parent ("/body", "/",
+    ///         "/slide[1]")
+    ///     type: The element type: "paragraph", "run", "sheet", "slide",
+    ///         "shape", ...
+    ///     props: The new element's properties, as for ``set``
+    ///     index: Insert at this zero-based position among the children
+    ///     after: Insert right after the element at this path
+    ///     before: Insert right before the element at this path
+    ///
+    /// Returns:
+    ///     A tuple (new File, the new element's canonical path)
+    ///
+    /// Raises:
+    ///     As ``set``
+    #[pyo3(signature = (parent, r#type, props = None, *, index = None, after = None, before = None))]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "the keyword arguments mirror OfficeCLI's add options"
+    )]
+    fn add(
+        &self,
+        py: Python<'_>,
+        parent: PyBackedStr,
+        r#type: PyBackedStr,
+        props: Option<Bound<'_, PyAny>>,
+        index: Option<i64>,
+        after: Option<String>,
+        before: Option<String>,
+    ) -> PyResult<(File, String)> {
+        let file = self.handle()?;
+        let props = props::props(props.as_ref())?;
+        let place = Where {
+            to: None,
+            index,
+            after,
+            before,
+        };
+        let added = py.detach(|| {
+            let node = write::new_node(&r#type, &props, &place)?;
+            file.add(&*parent, node)
+                .map_err(|error| Failure::read(&error))
+        })?;
+        let path = added.path.to_string();
+        Ok((Self::new(added.file), path))
+    }
+
+    /// Remove the element(s) ``target`` names; return the new File.
+    ///
+    /// Args:
+    ///     target: An OfficeCLI path, or a selector scoped to a path
+    ///
+    /// Returns:
+    ///     The new File
+    ///
+    /// Raises:
+    ///     As ``set``
+    fn remove(&self, py: Python<'_>, target: PyBackedStr) -> PyResult<File> {
+        let file = self.handle()?;
+        let next = py.detach(|| file.remove(&*target).map_err(|error| Failure::read(&error)))?;
+        Ok(Self::new(next))
+    }
+
+    /// Move the element at ``path``; return the new File.
+    ///
+    /// Without ``to``, the element stays under its parent and ``index``,
+    /// ``after`` or ``before`` (at most one) says where it goes; without any
+    /// of them it goes last. With ``to``, it moves under that parent, last
+    /// or at ``index``. Positions count after the element is taken out.
+    ///
+    /// Args:
+    ///     path: The element to move
+    ///     to: The new parent's path
+    ///     index: The zero-based position to move to
+    ///     after: Move right after the element at this path
+    ///     before: Move right before the element at this path
+    ///
+    /// Returns:
+    ///     The new File
+    ///
+    /// Raises:
+    ///     As ``set``
+    #[pyo3(name = "move", signature = (path, to = None, *, index = None, after = None, before = None))]
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "the keyword arguments mirror OfficeCLI's move options"
+    )]
+    fn move_(
+        &self,
+        py: Python<'_>,
+        path: PyBackedStr,
+        to: Option<String>,
+        index: Option<i64>,
+        after: Option<String>,
+        before: Option<String>,
+    ) -> PyResult<File> {
+        let file = self.handle()?;
+        let place = Where {
+            to,
+            index,
+            after,
+            before,
+        };
+        let next = py.detach(|| {
+            let placement = place.placement()?;
+            file.move_to(&*path, placement)
+                .map_err(|error| Failure::read(&error))
+        })?;
+        Ok(Self::new(next))
+    }
+
+    /// Swap the elements at ``path`` and ``path2``; return the new File.
+    ///
+    /// Raises:
+    ///     As ``set``
+    fn swap(&self, py: Python<'_>, path: PyBackedStr, path2: PyBackedStr) -> PyResult<File> {
+        let file = self.handle()?;
+        let next = py.detach(|| {
+            file.swap(&*path, &*path2)
+                .map_err(|error| Failure::read(&error))
+        })?;
+        Ok(Self::new(next))
+    }
+
+    /// Start a transaction, or run ``fn`` in one.
+    ///
+    /// Without ``fn``, return an Edit: use it as a context manager (it
+    /// commits when the block ends normally) or call its ``commit()``.
+    /// With ``fn``, call ``fn(edit)`` and commit: the operations apply
+    /// together or not at all, and the returned Commit's ``value`` is what
+    /// ``fn`` returned. If ``fn`` raises, nothing is committed and the
+    /// exception propagates.
+    ///
+    /// Args:
+    ///     fn: A callable that takes the Edit
+    ///
+    /// Returns:
+    ///     An Edit without ``fn``; the Commit with it
+    ///
+    /// Raises:
+    ///     The first failed operation's error (its ``item`` names the
+    ///     operation), or what ``fn`` raised
+    #[pyo3(signature = (r#fn = None))]
+    fn edit(&self, py: Python<'_>, r#fn: Option<Bound<'_, PyAny>>) -> PyResult<Py<PyAny>> {
+        let file = self.handle()?;
+        let edit = Bound::new(py, Edit::new(file))?;
+        let Some(callable) = r#fn else {
+            return Ok(edit.into_any().unbind());
+        };
+        match callable.call1((edit.clone(),)) {
+            Ok(value) => Ok(edit.get().commit_with(py, Some(value.unbind()))?.into_any()),
+            Err(error) => {
+                edit.get().discard(py);
+                Err(error)
+            },
+        }
+    }
+
+    /// Run OfficeCLI batch items; return the Commit.
+    ///
+    /// Each item is a dict in OfficeCLI's ``BatchItem`` shape: ``command``
+    /// (or ``op``) and the fields it takes (``path``, ``path2``,
+    /// ``parent``, ``type``, ``to``, ``index``, ``after``, ``before``,
+    /// ``props``, ...). Keys match ASCII case-insensitively; an unknown or
+    /// repeated key, or a value of the wrong type, is ``corrupt_batch``.
+    /// ``items`` can also be JSON text (``str`` or ``bytes``) holding the
+    /// array, as OfficeCLI's ``batch`` reads it. The items are converted to
+    /// Rust once and run with the GIL released.
+    ///
+    /// In "atomic" mode (the default) the first failure raises, with the
+    /// item's ``index`` as ``item``, and nothing changes. In "best_effort"
+    /// mode a failed item is skipped and reported in ``results``.
+    ///
+    /// Args:
+    ///     items: A list of item dicts, or JSON text
+    ///     mode: "atomic" or "best_effort"
+    ///
+    /// Returns:
+    ///     A Commit: ``file``, ``changed``, ``operations`` and ``results``,
+    ///     one dict per item (``index``, ``success``, ``changed``, and
+    ///     ``path`` for an add; ``code``, ``error`` and ``suggestion`` for a
+    ///     failed item)
+    ///
+    /// Raises:
+    ///     PropertyError: (a ValueError) If an item is malformed
+    ///         ("corrupt_batch") or mode is unknown
+    ///     LitchiError: The first failed item's error in atomic mode, and in
+    ///         either mode a protection, I/O or resource-limit failure
+    #[pyo3(signature = (items, *, mode = "atomic"))]
+    fn batch(&self, py: Python<'_>, items: Bound<'_, PyAny>, mode: &str) -> PyResult<Commit> {
+        let file = self.handle()?;
+        let mode = write::mode(mode)?;
+        let items = Items::extract(&items)?;
+        let commit = py.detach(|| items.run(&file, mode))?;
+        let results = write::results(py, &commit.results)?;
+        Commit::new(
+            py,
+            commit.file,
+            commit.diagnostics.changed(),
+            commit.diagnostics.operations(),
+            Some(results),
+            None,
+        )
+    }
+
+    /// Run one OfficeCLI batch item; return the Commit.
+    ///
+    /// As ``batch`` with one item in atomic mode.
+    ///
+    /// Args:
+    ///     item: An item dict, such as {"command": "set", "path":
+    ///         "/body/p[1]", "props": {"bold": True}}
+    ///
+    /// Returns:
+    ///     A Commit whose ``results`` holds the item's result
+    fn apply(&self, py: Python<'_>, item: Bound<'_, PyAny>) -> PyResult<Commit> {
+        let file = self.handle()?;
+        let item = write::item_of(&item).map_err(|failure| failure.with_item(0))?;
+        let commit = py.detach(|| file.apply(item).map_err(|error| Failure::read(&error)))?;
+        let result = litchi::ItemResult::Applied(commit.value);
+        let results = write::results(py, std::slice::from_ref(&result))?;
+        Commit::new(
+            py,
+            commit.file,
+            commit.diagnostics.changed(),
+            commit.diagnostics.operations(),
+            Some(results),
+            None,
+        )
+    }
+
+    /// Save the File atomically, in its own format; return the bytes
+    /// written.
+    ///
+    /// Without ``path``, the File is written back to the path it was opened
+    /// from; with one, this is ``save_as``. The file is written to a
+    /// temporary sibling and renamed over the destination, so a failed save
+    /// leaves the destination as it was. The GIL is released while the file
+    /// is written.
+    ///
+    /// Args:
+    ///     path: Where to save; None saves to the path the File was opened
+    ///         from
+    ///     overwrite: Whether an existing file at the destination may be
+    ///         replaced
+    ///
+    /// Returns:
+    ///     The number of bytes written
+    ///
+    /// Raises:
+    ///     IoError: (an OSError) If the File has no path ("file_required";
+    ///         it was created or opened from bytes), the destination exists
+    ///         and overwrite is False ("file_exists"), the source changed, or
+    ///         writing fails
+    ///     ProtectedError: (a ValueError) If the File is encrypted and
+    ///         locked, or saving would remove its encryption
+    ///     UnsupportedError: (a ValueError) If the format cannot be saved, or
+    ///         path names another format's extension
+    #[pyo3(signature = (path = None, *, overwrite = true))]
+    fn save(&self, py: Python<'_>, path: Option<PathBuf>, overwrite: bool) -> PyResult<u64> {
+        let file = self.handle()?;
+        let options = SaveOptions::new().overwrite(if overwrite {
+            Overwrite::Replace
+        } else {
+            Overwrite::Refuse
+        });
+        let saved = py.detach(|| {
+            let to = match &path {
+                Some(path) => SaveTo::Path(path),
+                None => SaveTo::Origin,
+            };
+            file.save_with(to, &options)
+                .map_err(|error| Failure::read(&error))
+        })?;
+        Ok(saved.bytes)
+    }
+
+    /// Save the File atomically to ``path``, in its own format; return the
+    /// bytes written. The File keeps the path it was opened from.
+    ///
+    /// Args:
+    ///     path: Where to save
+    ///     overwrite: Whether an existing file at path may be replaced
+    ///
+    /// Returns:
+    ///     The number of bytes written
+    ///
+    /// Raises:
+    ///     As ``save``
+    #[pyo3(signature = (path, *, overwrite = true))]
+    fn save_as(&self, py: Python<'_>, path: PathBuf, overwrite: bool) -> PyResult<u64> {
+        self.save(py, Some(path), overwrite)
+    }
+
+    /// The File's bytes, in its own format.
+    ///
+    /// The document is written with the GIL released, then copied once into
+    /// the returned ``bytes``.
+    ///
+    /// Returns:
+    ///     The file's content
+    ///
+    /// Raises:
+    ///     As ``save``, without the path errors
+    fn to_bytes<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyBytes>> {
+        let file = self.handle()?;
+        let bytes = py.detach(|| file.to_bytes().map_err(|error| Failure::read(&error)))?;
+        Ok(PyBytes::new(py, &bytes))
+    }
+
+    /// A File that may edit this signed document.
+    ///
+    /// Editing a signed document invalidates its signature, so the write
+    /// verbs refuse it (ProtectedError). The returned File reads the same
+    /// content; its first write removes the signature and publishes the
+    /// document without it. This File stays signed. A File that is not
+    /// signed is returned as it is.
+    ///
+    /// Returns:
+    ///     The File that may be edited
+    ///
+    /// Raises:
+    ///     IoError: (an OSError) If the file is closed
+    fn unsign(&self) -> PyResult<File> {
+        let file = self.handle()?;
+        Ok(Self::new(match file {
+            litchi::File::Signed(signed) => signed.unsign(),
+            other => other,
+        }))
+    }
+
+    /// Whether the File is signed: its write verbs refuse until
+    /// ``unsign()``. False after ``close()``.
+    #[getter]
+    fn signed(&self) -> bool {
+        self.handle
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+            .as_ref()
+            .is_some_and(litchi::File::is_signed)
+    }
+
+    /// Whether the File is encrypted and locked: it reads and writes
+    /// nothing. False after ``close()``.
+    #[getter]
+    fn locked(&self) -> bool {
+        matches!(
+            self.handle
+                .read()
+                .unwrap_or_else(PoisonError::into_inner)
+                .as_ref(),
+            Some(litchi::File::Locked(_))
+        )
+    }
+
+    /// Close the file: drop this handle's reference to the document. Reads
+    /// raise IoError ("file_required") afterwards; closing again does
+    /// nothing. A read already running on another thread finishes first.
+    fn close(&self, py: Python<'_>) {
+        let file = self
+            .handle
+            .write()
+            .unwrap_or_else(PoisonError::into_inner)
+            .take();
+        if let Some(file) = file {
+            // Freeing a document's caches can take a while.
+            py.detach(move || drop(file));
+        }
+    }
+
+    fn __enter__(slf: Bound<'_, Self>) -> PyResult<Bound<'_, Self>> {
+        slf.get().handle()?;
+        Ok(slf)
+    }
+
+    fn __exit__(
+        &self,
+        py: Python<'_>,
+        exc_type: Option<Bound<'_, PyAny>>,
+        exc_value: Option<Bound<'_, PyAny>>,
+        traceback: Option<Bound<'_, PyAny>>,
+    ) -> bool {
+        let _ = (exc_type, exc_value, traceback);
+        self.close(py);
+        false
+    }
+
+    fn __repr__(&self) -> String {
+        let format = match self.format {
+            Some(format) => format!("{format:?}"),
+            None => "unknown format".to_owned(),
+        };
+        let state = match self
+            .handle
+            .read()
+            .unwrap_or_else(PoisonError::into_inner)
+            .as_ref()
+        {
+            None => ", closed",
+            Some(litchi::File::Locked(_)) => ", locked",
+            Some(file) if file.is_signed() => ", signed",
+            Some(_) => "",
+        };
+        format!("<File: {format}{state}>")
+    }
+}
+
+/// The node view options of `get`, `find` and `query`.
+pub(crate) fn view_options(
+    depth: i64,
+    max_nodes: i64,
+    dense: Option<i64>,
+) -> Result<ViewOptions, Failure> {
+    let mut options = ViewOptions::default()
+        .depth(count("depth", depth)?)
+        .max_nodes(count("max_nodes", max_nodes)?);
+    if let Some(cells) = dense {
+        options = options.dense(count("dense", cells)?);
+    }
+    Ok(options)
+}
+
+/// The view mode nearest to an unknown `name`, within two edits; only on
+/// the error path.
+fn nearest_mode(name: &str) -> Option<&'static str> {
+    let name = name.to_ascii_lowercase();
+    Mode::ALL
+        .iter()
+        .map(|mode| mode.name())
+        .map(|candidate| (distance(&name, candidate), candidate))
+        .filter(|(distance, _)| *distance <= 2)
+        .min_by_key(|(distance, _)| *distance)
+        .map(|(_, candidate)| candidate)
+}
+
+/// The Levenshtein distance of two short ASCII names.
+fn distance(a: &str, b: &str) -> usize {
+    let b = b.as_bytes();
+    let mut row: Vec<usize> = (0..=b.len()).collect();
+    for (i, &left) in a.as_bytes().iter().enumerate() {
+        let mut diagonal = row[0];
+        row[0] = i + 1;
+        for (j, &right) in b.iter().enumerate() {
+            let above = row[j + 1];
+            row[j + 1] = (above + 1)
+                .min(row[j] + 1)
+                .min(diagonal + usize::from(left != right));
+            diagonal = above;
+        }
+    }
+    row[b.len()]
+}
+
+/// `query`'s `limit` argument: negative is `invalid_argument`.
+pub(crate) fn limit_of(limit: Option<i64>) -> Result<Option<usize>, Failure> {
+    limit
+        .map(|limit| {
+            usize::try_from(limit)
+                .map_err(|_| Failure::argument(format!("limit must not be negative, got {limit}")))
+        })
+        .transpose()
+}
+
+/// A count argument: negative is `invalid_argument`; beyond `u32::MAX`
+/// counts as `u32::MAX`, which no document reaches.
+fn count(name: &str, value: i64) -> Result<u32, Failure> {
+    if value < 0 {
+        return Err(Failure::argument(format!(
+            "{name} must not be negative, got {value}"
+        )));
+    }
+    Ok(u32::try_from(value).unwrap_or(u32::MAX))
+}

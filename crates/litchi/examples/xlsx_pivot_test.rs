@@ -13,7 +13,7 @@
 //! # -> pivot_examples/pivot_basic.pivot-table.xml
 //! ```
 
-use litchi_xlsx::Workbook;
+use litchi_xlsx::Package;
 use litchi_xlsx::pivot::cache::{CacheRecord, Item, Records};
 use litchi_xlsx::pivot::cache::{Definition as CacheDefinition, Field as CacheField};
 use litchi_xlsx::pivot::fields::{AxisField, AxisItem, DataField, Field, PageField, Subtotal};
@@ -268,8 +268,8 @@ fn source_workbook<const C: usize>(
     rows: &[[&str; C]],
     summary_name: &str,
     summary_caption: &str,
-) -> ExampleResult<Workbook> {
-    let workbook = Workbook::create()?;
+) -> ExampleResult<Package> {
+    let workbook = Package::new()?;
     let mut edit = workbook.edit()?;
     edit.tab(0)?
         .ok_or("missing initial worksheet")?
@@ -287,7 +287,7 @@ fn source_workbook<const C: usize>(
     }
     let mut summary = edit.add(summary_name)?;
     summary.set("A1", summary_caption)?;
-    Ok(edit.commit()?.into_workbook())
+    Ok(edit.commit()?.into_package())
 }
 
 fn cache_definition<const N: usize>(

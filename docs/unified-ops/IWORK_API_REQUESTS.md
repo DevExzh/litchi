@@ -7,9 +7,12 @@ request lands, the gap stays visible in `capabilities()`.
 
 ## What already suffices (wiring only)
 
-The facade already holds each `Package` (`crates/litchi/src/document/types.rs:51`,
-`crates/litchi/src/presentation/types.rs:47`, `crates/litchi/src/sheet/workbook_types.rs:18`). The following unified
-verbs need no new iWork API:
+The facade no longer holds an iWork `Package`: the wrappers that did (`crates/litchi/src/document/types.rs`,
+`crates/litchi/src/presentation/types.rs`, `crates/litchi/src/sheet/workbook_types.rs`) were deleted in S9
+(`docs/unified-ops/s9-deletion.md`). `litchi::iwork::Document` (`crates/litchi/src/iwork/model.rs:19`) holds a
+decoded read-only snapshot, and `litchi::open` refuses iWork (`crates/litchi/src/lib.rs:173-176`). An ops adapter
+would hold each leaf `Package` directly (corrected by record 0249). The following unified verbs need no new iWork
+API:
 
 - **Save.** `Package::save` (atomic sibling-temp save) and `write_to`:
   - `crates/litchi-pages/src/package.rs:656,713`

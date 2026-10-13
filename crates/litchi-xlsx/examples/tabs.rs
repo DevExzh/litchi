@@ -2,8 +2,6 @@ use std::env;
 use std::error::Error;
 use std::io;
 
-use litchi_xlsx::Workbook;
-
 const USAGE: &str = "usage: tabs <input.xlsx> <output.xlsx> <sheet-name> <rename|show|hide|very-hide|activate|show-activate|before|after|to> [new-name|anchor|position]";
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -14,7 +12,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let operation = args.next().ok_or(USAGE)?;
     let target = args.next();
 
-    let source = Workbook::open(&input)?;
+    let source = litchi_xlsx::Package::open(&input)?;
     let mut edit = source.edit()?;
     let mut reported_name = name.as_str();
     match operation.as_str() {
@@ -102,13 +100,14 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let committed = edit.commit()?;
     let tab = committed
-        .workbook()
+        .package()
+        .workbook_ref()
         .sheet(reported_name)?
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "edited tab disappeared"))?;
-    committed.workbook().save(&output)?;
+    committed.package().save(&output)?;
     println!(
         "saved {} semantic change(s); {} is {:?}, active={}, position={}",
-        committed.patch().len(),
+        committed.patch().operation_count(),
         tab.name(),
         tab.visibility(),
         tab.is_active(),

@@ -22,7 +22,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("Creating PPT with new animation features...");
 
     let mut writer = Builder::new();
-    writer.set_property("Title", "New Animation Features Demo");
+    writer.set_metadata(litchi_core::Metadata {
+        title: Some("New Animation Features Demo".to_owned()),
+        ..litchi_core::Metadata::default()
+    })?;
 
     // Slide 1: New Entrance Effects with Sounds
     let slide1 = writer.add_slide()?;
