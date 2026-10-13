@@ -20,7 +20,7 @@ pub mod records;
 
 // Migration-only OfficeArt encoding internals. The typed public substrate is
 // `litchi-odraw`; numeric record builders are not part of the writer facade.
-mod escher;
+pub(crate) mod escher;
 
 /// PersistPtr offset mapping
 pub mod persist;

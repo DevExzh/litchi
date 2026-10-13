@@ -455,6 +455,13 @@ impl Edit {
         self.stage(1, |inner| inner.remove_slide(position))
     }
 
+    /// Insert a blank slide at a projected position (`slide_count()`
+    /// appends). It follows the master and color scheme of its preceding
+    /// slide and receives a new drawing and shape-identifier cluster.
+    pub fn insert_slide(&mut self, position: Position) -> Result<()> {
+        self.stage(1, |inner| inner.insert_slide(position))
+    }
+
     /// Insert a dependency-checked transfer plan at a projected position.
     pub fn insert_transfer(&mut self, position: Position, plan: &TransferPlan) -> Result<()> {
         self.stage(1, |inner| inner.insert_transfer(position, plan))

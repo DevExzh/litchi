@@ -581,6 +581,8 @@ mod artifact {
 
 use artifact::Artifact;
 
+mod blank;
+
 // Snapshots memoize their artifact digest through interior mutability
 // (`OnceLock`). Keep every shareable slide-order value `Send + Sync`; this
 // fails to compile if a future field breaks that.
@@ -2490,6 +2492,64 @@ impl Transaction {
         Ok(())
     }
 
+    /// Inserts a blank slide at a projected position; `position ==
+    /// slide_count()` appends.
+    ///
+    /// The slide uses the blank layout and follows the master, color scheme
+    /// and background of its preceding slide (or the following slide when it
+    /// becomes the first, or the first main master of an empty deck). Its
+    /// drawing receives a new drawing identifier and shape-identifier
+    /// cluster, registered in the drawing group at commit.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed position or signed-source refusal, or a resource
+    /// error when the persist, slide, drawing or shape identifier space is
+    /// exhausted.
+    pub fn insert_slide(&mut self, position: Position) -> Result<()> {
+        self.require_change_allowed()?;
+        let count = self.slide_count();
+        if position.get() > count {
+            return Err(Error::Refused(Refusal::SlideNotFound { position }));
+        }
+        let slides = self.document.slides()?;
+        let neighbor = position
+            .get()
+            .checked_sub(1)
+            .or_else(|| (count > 0).then_some(0))
+            .map(|index| slides[index].persist_id());
+        let (master_id, color_scheme) = match neighbor {
+            Some(persist_id) => {
+                let record = match self.inserted_records.get(&persist_id) {
+                    Some(record) => record.clone(),
+                    None => persisted_record(&self.working, persist_id)?,
+                };
+                blank::master_and_scheme(&record)?
+            },
+            None => {
+                let master = self
+                    .document
+                    .masters()?
+                    .first()
+                    .copied()
+                    .ok_or(Error::Refused(Refusal::MissingMasterDependency {
+                        master_id: 0,
+                    }))?;
+                (master.master_id(), None)
+            },
+        };
+        require_master(&self.document, master_id)?;
+        let allocation = blank::allocate(self.working.document.bytes(), &self.inserted_records)?;
+        let record = blank::slide_record(master_id, color_scheme, allocation)?;
+        let payload = SlidePayload {
+            group: blank::slide_list_group(),
+            record,
+            master_id,
+            pictures: Vec::new(),
+        };
+        self.insert_payload(position, payload)
+    }
+
     /// Inserts a dependency-checked cross-presentation transfer plan.
     /// `position == slide_count()` appends the transferred slide.
     ///
@@ -2532,25 +2592,31 @@ impl Transaction {
                 },
             }
         }
+        self.insert_payload(position, plan.payload.clone())
+    }
+
+    /// Allocates the persist and slide identifiers of an inserted slide and
+    /// stages its slide-list group and persisted record.
+    fn insert_payload(&mut self, position: Position, payload: SlidePayload) -> Result<()> {
         let persist_id = next_persist_id(&self.source, &self.inserted_records)?;
         let slide_id = next_slide_id(&self.document)?;
-        let mut group = plan.payload.group.clone();
+        let mut group = payload.group;
         rewrite_slide_persist(&mut group, persist_id, slide_id)?;
         let before_order = order_digest(&self.document)?;
         self.document
             .insert_slide_group(position.get(), group.clone())?;
         let after_order = order_digest(&self.document)?;
         self.inserted_records
-            .insert(persist_id, plan.payload.record.clone());
+            .insert(persist_id, payload.record.clone());
         self.structural.push(StructuralChange::Insert(ListChange {
             position,
             before_order,
             after_order,
             payload: SlidePayload {
                 group,
-                record: plan.payload.record.clone(),
-                master_id: plan.payload.master_id,
-                pictures: plan.payload.pictures.clone(),
+                record: payload.record,
+                master_id: payload.master_id,
+                pictures: payload.pictures,
             },
         }));
         Ok(())
@@ -2628,7 +2694,10 @@ impl Transaction {
         for (persist_id, record) in &self.inserted_records {
             editor.insert_persisted_record(*persist_id, record.clone())?;
         }
-        let mut document_bytes = document_commit.snapshot().bytes().to_vec();
+        let mut document_bytes = blank::register_inserted_drawings(
+            document_commit.snapshot().bytes(),
+            &self.inserted_records,
+        )?;
         let picture_stream = if self.inserted_pictures.is_empty() {
             None
         } else {
@@ -2779,7 +2848,10 @@ impl Transaction {
         for (persist_id, record) in &self.inserted_records {
             editor.insert_persisted_record(*persist_id, record.clone())?;
         }
-        let mut document_bytes = document_commit.snapshot().bytes().to_vec();
+        let mut document_bytes = blank::register_inserted_drawings(
+            document_commit.snapshot().bytes(),
+            &self.inserted_records,
+        )?;
         let picture_stream = if self.inserted_pictures.is_empty() {
             None
         } else {
