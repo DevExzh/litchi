@@ -28,6 +28,9 @@ REPO_ROOT = CRATE_DIR.parent.parent
 TEST_DATA = Path(os.environ.get("LITCHI_TEST_DATA", str(REPO_ROOT / "test-data")))
 STUB_PATH = CRATE_DIR / "python" / "litchi_py" / "__init__.pyi"
 README_PATH = CRATE_DIR / "README.md"
+#: The Rust golden files of the unified read API (litchi-ops): node views of
+#: real fixtures and capability reports. The Python dicts must equal them.
+GOLDEN_DIR = REPO_ROOT / "crates" / "litchi-ops" / "tests" / "golden"
 
 try:
     import litchi_py
@@ -91,6 +94,17 @@ def fixture(relative: str) -> str:
 def read_fixture(relative: str) -> bytes:
     with open(fixture(relative), "rb") as handle:
         return handle.read()
+
+
+def golden(relative: str):
+    """Load a Rust golden JSON file under ``GOLDEN_DIR`` (member order kept)."""
+    import json
+
+    path = GOLDEN_DIR / relative
+    if not path.is_file():
+        raise AssertionError(f"golden file missing: {path}")
+    with open(path, encoding="utf-8") as handle:
+        return json.load(handle)
 
 
 def copy_fixture(relative: str, directory: str, name: str | None = None) -> str:
@@ -199,6 +213,9 @@ class Stub:
     classes: dict
     functions: dict
     all: tuple
+    #: Classes whose name starts with ``_``: typing helpers that exist only in
+    #: the stub (the TypedDicts that describe returned dicts), by name.
+    typing_only: dict = field(default_factory=dict)
 
 
 def _params(node: ast.FunctionDef, drop_first: bool) -> tuple:
@@ -223,9 +240,16 @@ def _decorators(node: ast.FunctionDef) -> set:
 
 
 def parse_stub(path: Path = STUB_PATH) -> Stub:
-    """Parse ``__init__.pyi`` into classes, members, functions and ``__all__``."""
+    """Parse ``__init__.pyi`` into classes, members, functions and ``__all__``.
+
+    A class whose name starts with ``_`` is a typing helper that exists only
+    in the stub; it goes to ``typing_only`` instead of ``classes``. The
+    overloads of a method must share its parameter names (the runtime has one
+    signature), which this checks.
+    """
     tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
     classes: dict = {}
+    typing_only: dict = {}
     functions: dict = {}
     exported: tuple = ()
     for node in tree.body:
@@ -245,12 +269,18 @@ def parse_stub(path: Path = STUB_PATH) -> Stub:
                     elif "property" in decorators:
                         members[item.name] = StubMember(item.name, "property")
                     else:
-                        members[item.name] = StubMember(
-                            item.name, "method", _params(item, True)
-                        )
+                        member = StubMember(item.name, "method", _params(item, True))
+                        earlier = members.get(item.name)
+                        if earlier is not None and earlier.params != member.params:
+                            raise AssertionError(
+                                f"the overloads of {node.name}.{item.name} differ in "
+                                f"parameter names: {earlier.params} and {member.params}"
+                            )
+                        members[item.name] = member
                 elif isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
                     members[item.target.id] = StubMember(item.target.id, "attribute")
-            classes[node.name] = StubClass(
+            target = typing_only if node.name.startswith("_") else classes
+            target[node.name] = StubClass(
                 node.name, tuple(_dotted(base) for base in node.bases), members
             )
         elif isinstance(node, ast.FunctionDef):
@@ -258,7 +288,38 @@ def parse_stub(path: Path = STUB_PATH) -> Stub:
         elif isinstance(node, ast.Assign):
             if any(isinstance(t, ast.Name) and t.id == "__all__" for t in node.targets):
                 exported = tuple(ast.literal_eval(node.value))
-    return Stub(classes, functions, exported)
+    return Stub(classes, functions, exported, typing_only)
+
+
+def typed_dict_fields(path: Path = STUB_PATH) -> dict:
+    """``{name: {field: required}}`` for each TypedDict the stub declares.
+
+    A field is required unless the class says ``total=False`` or the field's
+    annotation is ``NotRequired[...]``.
+    """
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    result: dict = {}
+    for node in tree.body:
+        if not isinstance(node, ast.ClassDef):
+            continue
+        if not any(_dotted(base).endswith("TypedDict") for base in node.bases):
+            continue
+        total = all(
+            not (keyword.arg == "total" and isinstance(keyword.value, ast.Constant)
+                 and keyword.value.value is False)
+            for keyword in node.keywords
+        )
+        fields: dict = {}
+        for item in node.body:
+            if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
+                annotation = item.annotation
+                optional = (
+                    isinstance(annotation, ast.Subscript)
+                    and _dotted(annotation.value).endswith("NotRequired")
+                )
+                fields[item.target.id] = total and not optional
+        result[node.name] = fields
+    return result
 
 
 def public_members(cls) -> set:
