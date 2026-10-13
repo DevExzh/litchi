@@ -290,6 +290,19 @@ Cut from `e467bcf4e8`:
 - `fix-3rdparty` (0257): vendor the fixtures into `test-data/`, plus a guard.
 - `p11-doc` (0258), `p12-xls` (0259), `p13-ppt` (0260): tier 2 P0.
 
+- Merged `fix-3rdparty` (0257, `e072df4db4`):
+  - no code references `3rdparty/`; 376 fixtures (1.29 MB) vendored with provenance;
+  - the delta tool reads its vendored OfficeCLI schemas;
+  - guard `tools/test_no_3rdparty_references.py`, allowlist now down to the 4 docx files owned by p7a.
+- Merged `p6-ooxml-meta` (0253):
+  - one `litchi_core::Metadata`, `Props` deleted;
+  - a shared exact core/app/custom transaction;
+  - pptx/xlsx/xlsb `metadata` families; `/metadata` set and create-time metadata.
+  - Misses: sets on source-backed PPTX (×2.5) and XLSB (×1.4).
+  - Conflicts with 0252 resolved in `pptx/write.rs` (both dispatches kept) and in the glossary files.
+- Known pre-existing failure on trunk, not from this wave: `litchi-oth` `semantic_api::raw_zip_negatives_are_rejected_by_the_open_boundary` (a DTD package is accepted). Tier 3 ODF follow-up.
+- The `ods_formula_conditional_native` test target cannot compile: its 5.5 MB fixture was purged on 2026-10-05. It needs a reduced fixture.
+
 Still running from R1: `p7a-docx` (0251), `p7c-pptx` (0252), `p6-ooxml-meta` (0253).
 
 Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-pptx-w4` 9474e2b6ce, `uo/m2-l-xlsb-w1` 876588a23c, `uo/m1-r4-perf` 012fd509ff.
