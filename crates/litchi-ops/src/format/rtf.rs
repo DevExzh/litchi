@@ -21,6 +21,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use litchi_core::Metadata;
+use litchi_core::metadata::Timestamp;
 use litchi_rtf::leniency::ToleranceReport;
 use litchi_rtf::{Package, RtfDocument};
 
@@ -326,10 +327,8 @@ fn metadata(document: &RtfDocument<'_>) -> Metadata {
         template: None,
         last_modified_by: text(info.operator.as_deref()),
         revision: info.version.map(|value| value.to_string()),
-        created: None,
-        created_local: timestamp_to_naive(info.creation_timestamp),
-        modified: None,
-        modified_local: timestamp_to_naive(info.revision_timestamp),
+        created: timestamp_to_naive(info.creation_timestamp).map(Timestamp::Unzoned),
+        modified: timestamp_to_naive(info.revision_timestamp).map(Timestamp::Unzoned),
         page_count: info.pages,
         word_count: info.words,
         character_count: info.characters,
@@ -344,9 +343,8 @@ fn metadata(document: &RtfDocument<'_>) -> Metadata {
         content_status: None,
         content_type: None,
         version: info.revision.map(|value| value.to_string()),
-        last_printed_time: None,
-        last_printed_local: timestamp_to_naive(info.print_timestamp),
-        last_backup_local: timestamp_to_naive(info.backup_timestamp),
+        last_printed: timestamp_to_naive(info.print_timestamp).map(Timestamp::Unzoned),
+        last_backup: timestamp_to_naive(info.backup_timestamp).map(Timestamp::Unzoned),
         hyperlink_base: text(info.hyperlink_base.as_deref()),
         security: None,
         codepage: None,

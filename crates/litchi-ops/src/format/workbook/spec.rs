@@ -327,6 +327,14 @@ props! {
         Modified => "modified": ValueType::Text,
         Date1904 => "workbook.date1904": ValueType::Bool,
         ActiveTab => "activeTab": ValueType::Int,
+        ExtendedTemplate => "extended.template": ValueType::Text,
+        ExtendedManager => "extended.manager": ValueType::Text,
+        ExtendedCompany => "extended.company": ValueType::Text,
+        ExtendedApplication => "extended.application": ValueType::Text,
+        ExtendedPages => "extended.pages": ValueType::Int,
+        ExtendedWords => "extended.words": ValueType::Int,
+        ExtendedCharacters => "extended.characters": ValueType::Int,
+        ExtendedTotalTime => "extended.totalTime": ValueType::Int,
     }
 }
 

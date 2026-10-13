@@ -1358,6 +1358,7 @@ impl<'a> Props<'a> {
     pub(crate) fn get(&self, index: usize) -> Option<Value<'a>> {
         match &self.kind {
             PropKind::Root { size, metadata } => {
+                let count = |value: Option<u32>| value.map(|value| Value::Int(i64::from(value)));
                 let text = |value: Option<&'a String>| {
                     value
                         .filter(|value| !value.is_empty())
@@ -1376,6 +1377,25 @@ impl<'a> Props<'a> {
                         text(metadata.and_then(|m| m.last_modified_by.as_ref()))
                     },
                     RootKey::RevisionNumber => text(metadata.and_then(|m| m.revision.as_ref())),
+                    RootKey::Category => text(metadata.and_then(|m| m.category.as_ref())),
+                    RootKey::Created => metadata
+                        .and_then(|m| m.created)
+                        .map(|at| Value::Text(Cow::Owned(crate::format::metadata::round_trip(at)))),
+                    RootKey::Modified => metadata
+                        .and_then(|m| m.modified)
+                        .map(|at| Value::Text(Cow::Owned(crate::format::metadata::round_trip(at)))),
+                    RootKey::ExtendedTemplate => text(metadata.and_then(|m| m.template.as_ref())),
+                    RootKey::ExtendedManager => text(metadata.and_then(|m| m.manager.as_ref())),
+                    RootKey::ExtendedCompany => text(metadata.and_then(|m| m.company.as_ref())),
+                    RootKey::ExtendedApplication => {
+                        text(metadata.and_then(|m| m.application.as_ref()))
+                    },
+                    RootKey::ExtendedPages => count(metadata.and_then(|m| m.page_count)),
+                    RootKey::ExtendedWords => count(metadata.and_then(|m| m.word_count)),
+                    RootKey::ExtendedCharacters => count(metadata.and_then(|m| m.character_count)),
+                    RootKey::ExtendedTotalTime => {
+                        count(metadata.and_then(|m| m.editing_time_minutes))
+                    },
                 }
             },
             PropKind::Slide(facts) => match SlideKey::at(index)? {

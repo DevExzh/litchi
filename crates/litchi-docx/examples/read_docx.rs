@@ -64,8 +64,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         props.and_then(|p| p.subject.as_deref())
     );
     println!(
-        "Creator         : {:?}",
-        props.and_then(|p| p.creator.as_deref())
+        "Author          : {:?}",
+        props.and_then(|p| p.author.as_deref())
     );
     println!(
         "Keywords        : {:?}",

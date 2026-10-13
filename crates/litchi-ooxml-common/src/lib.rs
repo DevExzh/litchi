@@ -71,5 +71,5 @@ pub mod private {
 }
 
 pub use error::{Error, Result};
-pub use properties::{Keywords, Props};
+
 pub use xml::XmlError;

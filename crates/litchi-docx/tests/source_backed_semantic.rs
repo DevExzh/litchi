@@ -294,7 +294,7 @@ fn source_metadata_matches_dialects_absence_and_graph_failures() {
         source_backed::Package::from_read_at(Arc::new(OwnedSource::new(transitional))).unwrap();
     let metadata = source.metadata().unwrap();
     assert_eq!(metadata.title.as_deref(), eager_props.title.as_deref());
-    assert_eq!(metadata.author.as_deref(), eager_props.creator.as_deref());
+    assert_eq!(metadata.author.as_deref(), eager_props.author.as_deref());
     assert_eq!(
         metadata.revision.as_deref(),
         eager_props.revision.as_deref()

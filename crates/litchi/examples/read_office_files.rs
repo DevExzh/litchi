@@ -81,13 +81,13 @@ fn demo_unified_api() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn print_props(prefix: &str, props: Option<&litchi::ooxml_common::Props>) {
+fn print_props(prefix: &str, props: Option<&litchi_core::Metadata>) {
     if let Some(props) = props {
         if let Some(title) = &props.title {
             println!("{prefix}Title: {title}");
         }
-        if let Some(creator) = &props.creator {
-            println!("{prefix}Creator: {creator}");
+        if let Some(author) = &props.author {
+            println!("{prefix}Author: {author}");
         }
     } else {
         println!("{prefix}No core properties");

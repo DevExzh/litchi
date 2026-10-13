@@ -100,3 +100,16 @@ impl From<quick_xml::Error> for Error {
         Self::Xml(error.to_string())
     }
 }
+
+impl From<litchi_core::metadata::keywords::Error> for Error {
+    fn from(error: litchi_core::metadata::keywords::Error) -> Self {
+        match error {
+            litchi_core::metadata::keywords::Error::Limit { observed, maximum } => Self::Limit {
+                resource: "core property text bytes",
+                max: maximum,
+                actual: observed,
+            },
+            other => Self::Invalid(other.to_string()),
+        }
+    }
+}

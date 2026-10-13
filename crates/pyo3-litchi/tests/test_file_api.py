@@ -847,6 +847,9 @@ class TextAndMetadataTests(unittest.TestCase):
                 "last_modified_by": "Nick Burch",
                 "created": "2015-03-13T11:12:37Z",
                 "modified": "2015-03-13T11:16:26Z",
+                # docProps/app.xml joins the core properties (record 0253).
+                "application": "Microsoft Excel",
+                "security": 0,
             },
         )
         docx = open_fixture(HYPERLINK).metadata()

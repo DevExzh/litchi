@@ -572,6 +572,25 @@ impl Package {
     }
 
     /// Revalidate a candidate under the owner's retained projection policies.
+    /// [`Self::reparse_candidate`] that keeps the validated projection, so a
+    /// following [`Self::into_workbook`] does not parse the candidate again.
+    pub(crate) fn reparse_candidate_retaining_projection(
+        &self,
+        candidate: OpcPackage,
+    ) -> Result<Self> {
+        let workbook =
+            Workbook::reparse_candidate_with_policy(candidate.clone(), self.1, self.3, self.4)?;
+        let tolerance = workbook.tolerance_report().clone();
+        Ok(Self(
+            candidate,
+            self.1,
+            tolerance,
+            self.3,
+            self.4,
+            Some(Arc::new(workbook)),
+        ))
+    }
+
     pub(crate) fn reparse_candidate(&self, candidate: OpcPackage) -> Result<Self> {
         let workbook =
             Workbook::reparse_candidate_with_policy(candidate.clone(), self.1, self.3, self.4)?;

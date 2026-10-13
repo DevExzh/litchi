@@ -936,21 +936,13 @@ impl Builder {
 
         if let Some(created) = self.metadata.created.as_ref() {
             meta.push_str("<meta:creation-date>");
-            meta.push_str(&created.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true));
-            meta.push_str("</meta:creation-date>");
-        } else if let Some(created) = self.metadata.created_local.as_ref() {
-            meta.push_str("<meta:creation-date>");
-            meta.push_str(&created.format("%Y-%m-%dT%H:%M:%S%.f").to_string());
+            meta.push_str(&created.to_string());
             meta.push_str("</meta:creation-date>");
         }
 
         if let Some(modified) = self.metadata.modified.as_ref() {
             meta.push_str("<dc:date>");
-            meta.push_str(&modified.to_rfc3339_opts(chrono::SecondsFormat::AutoSi, true));
-            meta.push_str("</dc:date>");
-        } else if let Some(modified) = self.metadata.modified_local.as_ref() {
-            meta.push_str("<dc:date>");
-            meta.push_str(&modified.format("%Y-%m-%dT%H:%M:%S%.f").to_string());
+            meta.push_str(&modified.to_string());
             meta.push_str("</dc:date>");
         }
 
@@ -1057,12 +1049,18 @@ mod tests {
         builder.set_metadata(Metadata {
             title: Some("Title & details".to_string()),
             author: Some("Ada <Lovelace>".to_string()),
-            created: Some(Utc.with_ymd_and_hms(2024, 1, 2, 3, 4, 5).single().unwrap()),
-            modified_local: Some(
+            created: Some(
+                Utc.with_ymd_and_hms(2024, 1, 2, 3, 4, 5)
+                    .single()
+                    .unwrap()
+                    .into(),
+            ),
+            modified: Some(
                 NaiveDate::from_ymd_opt(2024, 6, 7)
                     .unwrap()
                     .and_hms_opt(8, 9, 10)
-                    .unwrap(),
+                    .unwrap()
+                    .into(),
             ),
             ..Default::default()
         });

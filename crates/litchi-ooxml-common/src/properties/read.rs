@@ -2,8 +2,8 @@
 //! 8.1), strict decoding for the writer.
 
 use super::{
-    CORE_PROPERTIES_NAMESPACE, Dialect, Keywords, MAX_PROPERTY_TEXT, MAX_XML_BYTES, MAX_XML_EVENTS,
-    Props, STRICT_CORE_PROPERTIES_NAMESPACE, graph,
+    CORE_PROPERTIES_NAMESPACE, Core, Dialect, Keywords, MAX_PROPERTY_TEXT, MAX_XML_BYTES,
+    MAX_XML_EVENTS, STRICT_CORE_PROPERTIES_NAMESPACE, graph,
     keyword::{self, Item},
     time,
 };
@@ -85,10 +85,10 @@ impl CoreProperty {
 ///
 /// Returns an error when input violates OOXML constraints, exceeds a configured
 /// bound, or an underlying XML or package operation fails.
-pub fn read_with_report(
+pub(crate) fn read_core_with_report(
     package: &OpcPackage,
     report: &mut ToleranceReport,
-) -> Result<Option<Props>> {
+) -> Result<Option<Core>> {
     let graph = graph::inspect_tolerant(package, report)?;
     let Some(part_name) = graph.part else {
         return Ok(None);
@@ -99,12 +99,12 @@ pub fn read_with_report(
 
 /// Decode the relationship-selected core-properties payload, repairing and
 /// recording a non-UTF-8 payload and a dialect mismatch (LENIENCY_AUDIT 8.1).
-fn decode_selected(
+pub(super) fn decode_selected(
     bytes: &[u8],
     part: &str,
     relationship_dialect: Option<Dialect>,
     report: &mut ToleranceReport,
-) -> Result<Props> {
+) -> Result<Core> {
     let mut recorder = Recorder {
         report,
         part,
@@ -167,7 +167,7 @@ impl Recorder<'_> {
 ///
 /// The catalog and relationship graph remain metadata-only until the
 /// relationship-selected core-properties part is read. This is the
-/// positional equivalent of [`read_with_report`]: it applies the same graph
+/// positional equivalent of [`read_core_with_report`]: it applies the same graph
 /// and dialect repairs (recording them), while retaining the source
 /// package's version and execution-policy checks around the selected payload
 /// read.
@@ -177,10 +177,10 @@ impl Recorder<'_> {
 /// Returns an error when input violates OOXML constraints, exceeds a
 /// configured bound, the source changes, execution is cancelled, or an
 /// underlying source/package operation fails.
-pub fn read_source_backed_with_report(
+pub(crate) fn read_core_source_backed_with_report(
     package: &SourceBackedPackage,
     report: &mut ToleranceReport,
-) -> Result<Option<Props>> {
+) -> Result<Option<Core>> {
     package.check_execution()?;
     package.source_version()?;
     let graph = graph::inspect_source(package, report)?;
@@ -202,15 +202,15 @@ pub fn read_source_backed_with_report(
 ///
 /// Added, replaced and removed Parts and relationships follow the effective
 /// catalog. Only the selected payload is loaded. Graph and XML repair rules
-/// match [`read_with_report`], including absence and dialect handling.
+/// match [`read_core_with_report`], including absence and dialect handling.
 /// Base and donor source/execution fences are checked on success and failure.
 ///
 /// # Errors
 /// Returns graph, XML, resource, source or execution errors.
-pub fn read_prepared_with_report(
+pub(crate) fn read_core_prepared_with_report(
     package: &litchi_opc::PreparedTopology,
     report: &mut ToleranceReport,
-) -> Result<Option<Props>> {
+) -> Result<Option<Core>> {
     package.check_source()?;
     let result = (|| {
         let graph = graph::inspect_prepared(package, report)?;
@@ -227,14 +227,14 @@ pub fn read_prepared_with_report(
     result
 }
 
-/// Decode core-properties XML strictly: every deviation [`read_with_report`]
+/// Decode core-properties XML strictly: every deviation [`read_core_with_report`]
 /// repairs is
 /// an error here.
 ///
 /// The writer uses this before replacing a payload, so content the typed
 /// model cannot carry (an unknown element, a duplicate) is never silently
 /// discarded by a write.
-pub(super) fn decode(xml: &str) -> Result<(Props, Dialect)> {
+pub(super) fn decode(xml: &str) -> Result<(Core, Dialect)> {
     let mut report = ToleranceReport::default();
     decode_reporting(
         xml,
@@ -256,7 +256,7 @@ pub(super) fn decode(xml: &str) -> Result<(Props, Dialect)> {
 /// unparseable date dropped. XML well-formedness, the document element, DTDs,
 /// the Markup Compatibility namespace (OPC M4.2), keyword structure, and the
 /// byte/event/text limits stay hard errors.
-fn decode_reporting(xml: &str, recorder: &mut Recorder<'_>) -> Result<(Props, Dialect)> {
+fn decode_reporting(xml: &str, recorder: &mut Recorder<'_>) -> Result<(Core, Dialect)> {
     if xml.len() > MAX_XML_BYTES {
         return Err(Error::Limit {
             resource: "core-properties XML bytes",
@@ -266,7 +266,7 @@ fn decode_reporting(xml: &str, recorder: &mut Recorder<'_>) -> Result<(Props, Di
     }
     let mut reader = NsReader::from_reader(xml.as_bytes());
     let mut buffer = Vec::new();
-    let mut props = Props::new();
+    let mut props = Core::default();
     let mut seen = [false; CoreProperty::COUNT];
     let mut root_namespace: Option<Vec<u8>> = None;
     let mut root_closed = false;
@@ -640,7 +640,7 @@ fn close_active(
     namespace: Option<&[u8]>,
     root_namespace: Option<&[u8]>,
     element: &BytesEnd<'_>,
-    props: &mut Props,
+    props: &mut Core,
     recorder: &mut Recorder<'_>,
 ) -> Result<()> {
     if matches!(active, Some(Active::Keywords { child: Some(_), .. })) {
@@ -815,7 +815,7 @@ fn append_bounded(text: &mut String, value: &str) -> Result<()> {
 }
 
 fn apply_property(
-    props: &mut Props,
+    props: &mut Core,
     property: CoreProperty,
     value: String,
     recorder: &mut Recorder<'_>,
@@ -894,14 +894,14 @@ fn bound_namespace<'a>(namespace: &'a ResolveResult<'a>) -> Option<&'a [u8]> {
 mod tests {
     use super::*;
 
-    fn read(package: &OpcPackage) -> Result<Option<Props>> {
-        read_with_report(package, &mut ToleranceReport::default())
+    fn read(package: &OpcPackage) -> Result<Option<Core>> {
+        read_core_with_report(package, &mut ToleranceReport::default())
     }
 
-    fn read_source_backed(package: &SourceBackedPackage) -> Result<Option<Props>> {
-        read_source_backed_with_report(package, &mut ToleranceReport::default())
+    fn read_source_backed(package: &SourceBackedPackage) -> Result<Option<Core>> {
+        read_core_source_backed_with_report(package, &mut ToleranceReport::default())
     }
-    use crate::Props;
+    use crate::properties::Core;
     use crate::properties::STRICT_CORE_PROPERTIES_RELATIONSHIP;
     use chrono::{DateTime, Utc};
     use litchi_core::OwnedSource;
@@ -1037,14 +1037,14 @@ mod tests {
         // same way and record the same defect.
         let mut eager_report = ToleranceReport::default();
         assert!(
-            read_with_report(&dangling, &mut eager_report)
+            read_core_with_report(&dangling, &mut eager_report)
                 .unwrap()
                 .is_none()
         );
         let source = source_package(&dangling);
         let mut source_report = ToleranceReport::default();
         assert!(
-            read_source_backed_with_report(&source, &mut source_report)
+            read_core_source_backed_with_report(&source, &mut source_report)
                 .unwrap()
                 .is_none()
         );
@@ -1061,7 +1061,11 @@ mod tests {
         let mut dangling = OpcPackage::new();
         dangling.relate_to("missing.xml", rt::CORE_PROPERTIES);
         let mut report = ToleranceReport::default();
-        assert!(read_with_report(&dangling, &mut report).unwrap().is_none());
+        assert!(
+            read_core_with_report(&dangling, &mut report)
+                .unwrap()
+                .is_none()
+        );
         assert_eq!(
             report
                 .iter()
@@ -1075,7 +1079,7 @@ mod tests {
         );
         // The writer still refuses to act on the dangling graph.
         assert!(matches!(
-            super::super::write(&mut dangling, Props::new().title("T")),
+            super::super::write_core(&mut dangling, Core::new().title("T")),
             Err(Error::Missing(_))
         ));
 
@@ -1099,7 +1103,11 @@ mod tests {
             xml.to_vec(),
         )));
         let mut report = ToleranceReport::default();
-        assert!(read_with_report(&orphan, &mut report).unwrap().is_none());
+        assert!(
+            read_core_with_report(&orphan, &mut report)
+                .unwrap()
+                .is_none()
+        );
         assert_eq!(
             report
                 .iter()
@@ -1130,7 +1138,9 @@ mod tests {
                 false,
             );
         let mut report = ToleranceReport::default();
-        let props = read_with_report(&duplicate, &mut report).unwrap().unwrap();
+        let props = read_core_with_report(&duplicate, &mut report)
+            .unwrap()
+            .unwrap();
         assert_eq!(props.title.as_deref(), Some("Selected"));
         let mut recorded: Vec<_> = report
             .iter()
@@ -1179,7 +1189,7 @@ mod tests {
         let created = DateTime::parse_from_rfc3339("2024-03-04T05:06:07+02:00")
             .unwrap()
             .with_timezone(&Utc);
-        let properties = Props::new()
+        let properties = Core::new()
             .title("A & B")
             .creator("Writer")
             .identifier("urn:test:42")
@@ -1209,7 +1219,7 @@ mod tests {
 
     /// Decode `xml`, returning the properties and the recorded repairs as
     /// `(defect, item)` pairs.
-    fn decode_recorded(xml: &str) -> (Props, Vec<(CorePropertiesDefect, Option<String>)>) {
+    fn decode_recorded(xml: &str) -> (Core, Vec<(CorePropertiesDefect, Option<String>)>) {
         let mut report = ToleranceReport::default();
         let (props, _) = decode_reporting(
             xml,
@@ -1267,7 +1277,7 @@ mod tests {
             ]
         );
 
-        let conformant = Props::new().title("A").creator("Me").xml().unwrap();
+        let conformant = Core::new().title("A").creator("Me").xml().unwrap();
         assert!(decode_recorded(&conformant).1.is_empty());
     }
 
@@ -1318,7 +1328,9 @@ mod tests {
         latin1.extend_from_slice(b"</dc:creator></cp:coreProperties>");
         let package = package_with_core("/docProps/core.xml", ct::OPC_CORE_PROPERTIES, &latin1);
         let mut report = ToleranceReport::default();
-        let props = read_with_report(&package, &mut report).unwrap().unwrap();
+        let props = read_core_with_report(&package, &mut report)
+            .unwrap()
+            .unwrap();
         assert_eq!(props.creator.as_deref(), Some("Jos\u{fffd}"));
         assert_eq!(
             report.iter().map(|t| t.defect()).collect::<Vec<_>>(),
@@ -1329,7 +1341,9 @@ mod tests {
         let strict_xml = br#"<cp:coreProperties xmlns:cp="http://purl.oclc.org/ooxml/package/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>T</dc:title></cp:coreProperties>"#;
         let package = package_with_core("/docProps/core.xml", ct::OPC_CORE_PROPERTIES, strict_xml);
         let mut report = ToleranceReport::default();
-        let props = read_with_report(&package, &mut report).unwrap().unwrap();
+        let props = read_core_with_report(&package, &mut report)
+            .unwrap()
+            .unwrap();
         assert_eq!(props.title.as_deref(), Some("T"));
         assert_eq!(
             report
@@ -1343,14 +1357,14 @@ mod tests {
         );
         let source = source_package(&package);
         let mut source_report = ToleranceReport::default();
-        read_source_backed_with_report(&source, &mut source_report).unwrap();
+        read_core_source_backed_with_report(&source, &mut source_report).unwrap();
         assert_eq!(source_report, report);
     }
 
     #[test]
     fn revision_is_a_lossless_string_including_empty_values() {
         for value in ["", "seven", "0007", " 7 "] {
-            let xml = Props::new().revision(value).xml().unwrap();
+            let xml = Core::new().revision(value).xml().unwrap();
             let (parsed, _) = decode(&xml).unwrap();
             assert_eq!(parsed.revision.as_deref(), Some(value));
         }
@@ -1373,7 +1387,7 @@ mod tests {
             "leadcolour;couleurtail"
         );
 
-        let encoded = Props::new().keywords(expected.clone()).xml().unwrap();
+        let encoded = Core::new().keywords(expected.clone()).xml().unwrap();
         assert!(encoded.contains(r#"<cp:keywords xml:lang="">"#));
         assert!(encoded.contains(r#"<cp:value xml:lang="en-CA">colour</cp:value>"#));
         assert_eq!(decode(&encoded).unwrap().0.keywords, Some(expected));
@@ -1481,7 +1495,7 @@ mod tests {
             ),
         ] {
             let mut report = ToleranceReport::default();
-            let props = read_with_report(&poi_package(name), &mut report)
+            let props = read_core_with_report(&poi_package(name), &mut report)
                 .unwrap_or_else(|error| panic!("{name}: {error}"));
             assert!(props.is_some(), "{name}");
             assert!(
@@ -1490,7 +1504,7 @@ mod tests {
             );
         }
         let mut report = ToleranceReport::default();
-        read_with_report(
+        read_core_with_report(
             &poi_package("OPCCompliance_CoreProperties_SUCCESS.docx"),
             &mut report,
         )

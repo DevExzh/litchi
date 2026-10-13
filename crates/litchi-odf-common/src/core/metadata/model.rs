@@ -251,13 +251,14 @@ impl Metadata {
             template: template.and_then(|template| template.href),
             last_modified_by,
             revision: editing_cycles,
-            created: Self::parse_date(creation_date),
-            modified: Self::parse_date(modification_date),
+            created: Self::parse_date(creation_date).map(litchi_core::metadata::Timestamp::Utc),
+            modified: Self::parse_date(modification_date)
+                .map(litchi_core::metadata::Timestamp::Utc),
             page_count: parse_u32_count(statistics.page_count),
             word_count: parse_u32_count(statistics.word_count),
             character_count: parse_u32_count(statistics.character_count),
             application: generator,
-            last_printed_time: Self::parse_date(print_date),
+            last_printed: Self::parse_date(print_date).map(litchi_core::metadata::Timestamp::Utc),
             ..Default::default()
         })
     }
@@ -282,13 +283,16 @@ impl From<Metadata> for CoreMetadata {
             template: odf_meta.template.and_then(|template| template.href),
             last_modified_by: odf_meta.creator,
             revision: odf_meta.editing_cycles,
-            created: Metadata::parse_date(odf_meta.creation_date),
-            modified: Metadata::parse_date(odf_meta.modification_date),
+            created: Metadata::parse_date(odf_meta.creation_date)
+                .map(litchi_core::metadata::Timestamp::Utc),
+            modified: Metadata::parse_date(odf_meta.modification_date)
+                .map(litchi_core::metadata::Timestamp::Utc),
             page_count: parse_u32_count(odf_meta.statistics.page_count),
             word_count: parse_u32_count(odf_meta.statistics.word_count),
             character_count: parse_u32_count(odf_meta.statistics.character_count),
             application: odf_meta.generator,
-            last_printed_time: Metadata::parse_date(odf_meta.print_date),
+            last_printed: Metadata::parse_date(odf_meta.print_date)
+                .map(litchi_core::metadata::Timestamp::Utc),
             ..Default::default()
         }
     }

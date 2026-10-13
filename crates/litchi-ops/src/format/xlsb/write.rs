@@ -48,6 +48,9 @@ pub(crate) enum Patch {
         retained_bytes: usize,
     },
     Cells(Vec<NativeCellPatch>),
+    /// A document-metadata patch with its canonical package images (record
+    /// 0253).
+    Metadata(Box<super::metadata::Images>),
 }
 
 impl Patch {
@@ -58,6 +61,7 @@ impl Patch {
                 .first()
                 .expect("cell patch invariant: at least one worksheet")
                 .before(),
+            Self::Metadata(images) => images.before(),
         }
     }
 
@@ -68,6 +72,7 @@ impl Patch {
                 .last()
                 .expect("cell patch invariant: at least one worksheet")
                 .after(),
+            Self::Metadata(images) => images.after(),
         }
     }
 
@@ -76,6 +81,7 @@ impl Patch {
     /// endpoint images alone would undercharge transaction history.
     pub(crate) fn snapshot_bytes(&self) -> usize {
         match self {
+            Self::Metadata(images) => images.retained_bytes(),
             Self::Structure { patch, .. } => {
                 patch.before().len().saturating_add(patch.after().len())
             },
@@ -92,6 +98,7 @@ impl Patch {
     /// remain infallible; cell patches retain their native semantic payloads.
     pub(crate) fn retained_bytes(&self) -> usize {
         match self {
+            Self::Metadata(images) => images.retained_bytes(),
             Self::Structure { retained_bytes, .. } => *retained_bytes,
             Self::Cells(patches) => patches
                 .iter()
@@ -102,11 +109,15 @@ impl Patch {
     }
 
     pub(crate) fn is_noop(&self) -> bool {
-        self.before() == self.after()
+        match self {
+            Self::Metadata(images) => images.patch.is_noop(),
+            _ => self.before() == self.after(),
+        }
     }
 
     pub(crate) fn operation_count(&self) -> usize {
         match self {
+            Self::Metadata(images) => images.patch.changes().len(),
             Self::Structure { patch, .. } => patch.operation_count(),
             Self::Cells(patches) => patches.iter().fold(0usize, |count, patch| {
                 count.saturating_add(patch.changes().len())
@@ -125,6 +136,14 @@ impl Commit {
     /// Consume the result for the format-neutral one-shot setter.
     pub(crate) fn into_file(self) -> Xlsb {
         self.after
+    }
+
+    /// Adapt a metadata commit (record 0253).
+    pub(super) fn from_metadata(after: Xlsb, images: super::metadata::Images) -> Self {
+        Self {
+            after,
+            patch: Patch::Metadata(Box::new(images)),
+        }
     }
 
     /// Consume the result for explicit transaction history.
@@ -254,6 +273,9 @@ pub(crate) fn set_with_limits<'p, 'v>(
 ) -> Result<Commit> {
     file.admit_edit()?;
     let props = Props::from_props(props)?;
+    if let Some(commit) = file.try_set_metadata(&target, &props)? {
+        return Ok(commit);
+    }
     if let Some(commit) = set_cells_with_limits(file, &target, &props, limits)? {
         return Ok(commit);
     }
@@ -1146,7 +1168,7 @@ fn duplicate_cell_property(property: &'static str) -> Error {
     .with_property(property)
 }
 
-fn package_from_editor(editor: XlsbEditor<'_>) -> litchi_xlsb::Package {
+pub(super) fn package_from_editor(editor: XlsbEditor<'_>) -> litchi_xlsb::Package {
     match editor {
         XlsbEditor::Eager(workbook) => workbook.to_package(),
         XlsbEditor::Materialized(workbook) => workbook.into_package(),

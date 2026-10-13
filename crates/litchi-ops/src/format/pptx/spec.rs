@@ -518,6 +518,17 @@ props! {
         Description = "description": ValueType::Text,
         LastModifiedBy = "lastModifiedBy": ValueType::Text,
         RevisionNumber = "revisionNumber": ValueType::Text,
+        Category = "category": ValueType::Text,
+        Created = "created": ValueType::Text,
+        Modified = "modified": ValueType::Text,
+        ExtendedTemplate = "extended.template": ValueType::Text,
+        ExtendedManager = "extended.manager": ValueType::Text,
+        ExtendedCompany = "extended.company": ValueType::Text,
+        ExtendedApplication = "extended.application": ValueType::Text,
+        ExtendedPages = "extended.pages": ValueType::Int,
+        ExtendedWords = "extended.words": ValueType::Int,
+        ExtendedCharacters = "extended.characters": ValueType::Int,
+        ExtendedTotalTime = "extended.totalTime": ValueType::Int,
     }
 }
 
@@ -1344,18 +1355,6 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             "defaultFont",
             "L-PPTX-R4",
             "the theme is not readable on the source-backed owner yet",
-        ),
-        property_gap(
-            "presentation",
-            "created",
-            "M1-extended",
-            "OfficeCLI prints .NET round-trip timestamps; the adapter does not format them yet",
-        ),
-        property_gap(
-            "presentation",
-            "modified",
-            "M1-extended",
-            "OfficeCLI prints .NET round-trip timestamps; the adapter does not format them yet",
         ),
         property_gap(
             "slide",

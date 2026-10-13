@@ -454,11 +454,7 @@ impl Docx {
             return self.0.owner.finish(Ok(metadata.clone()));
         }
         let metadata = match &self.0.owner {
-            DocxOwner::Eager(package) => package
-                .props()
-                .cloned()
-                .map(Metadata::from)
-                .unwrap_or_default(),
+            DocxOwner::Eager(package) => package.props().cloned().unwrap_or_default(),
             DocxOwner::Source(package) => {
                 let result = package.metadata().map_err(Error::from);
                 self.0.owner.finish(result)?

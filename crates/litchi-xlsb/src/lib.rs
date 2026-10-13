@@ -126,6 +126,7 @@ pub mod formula;
 pub mod hyperlinks;
 pub mod leniency;
 pub mod merged_cells;
+pub mod metadata;
 pub mod named_ranges;
 pub mod package;
 mod pivot_chart;

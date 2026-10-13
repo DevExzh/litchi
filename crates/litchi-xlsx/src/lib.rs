@@ -99,6 +99,7 @@ pub mod ignored_errors;
 pub mod layout;
 pub mod leniency;
 pub mod merge;
+pub mod metadata;
 pub mod named_sheet_view;
 pub mod ole_objects;
 mod open_options;

@@ -21,10 +21,10 @@ fails while a golden differs from the hash recorded below.
 |---|---|---|
 | golden | `crates/litchi-ops/tests/golden/capabilities/docx.json` | `2346df7c5afcf5597a4a3caf4cf1ca5467f80d948e93e7f87b8fdf13461921e2` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/docx-encryption.json` | `6b275d274a890fbc57f4ec07b8f6e61990df6daf2d351cd4e790f0cd79c7adcf` |
-| golden | `crates/litchi-ops/tests/golden/capabilities/xlsx.json` | `402174221748379047c6fd6cd6b5b7e89abb558f32f31e174b4ef03934be5549` |
-| golden | `crates/litchi-ops/tests/golden/capabilities/xlsb.json` | `457978593767efb194d16b90d471bc8ced452f7bba01ce44079bbf9edd5d37d9` |
+| golden | `crates/litchi-ops/tests/golden/capabilities/xlsx.json` | `4ded922b0c97735f138506c3cdbb7f94c63c44342e3b6f1a25928f4b4a699807` |
+| golden | `crates/litchi-ops/tests/golden/capabilities/xlsb.json` | `7b960c26076d4786a8fdd55ff10e2d2b4cb9980adb640f72e77795d753dba02c` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/xls.json` | `f3dc9441b5a941b499bd8d3673382c431dd8535a6f67e122395543e7f7f567f5` |
-| golden | `crates/litchi-ops/tests/golden/capabilities/pptx.json` | `8fa6da3921b2ff111ac4ec08ddda4efa56a194f61ba21c340042a27747e7723f` |
+| golden | `crates/litchi-ops/tests/golden/capabilities/pptx.json` | `e1dc1c383ee41034210feb9102d559136738ad76955f195532a88e96b07862f6` |
 | officecli | `schemas/help` (152 files, OfficeCLI commit `dced0d74`) | `0bcd8cae45fabc0c5e45ff99d1994465fb213ac1b8db3f7eadd87339fb40ced4` |
 
 ## Statuses
@@ -73,10 +73,10 @@ Property reads:
 | Format | supported | gap | element gap | pending | write-only | raw-only | missing | litchi-only |
 |---|---|---|---|---|---|---|---|---|
 | docx | 131 | 4 | 428 | 0 | 101 | 2 | 295 | 27 |
-| xlsx | 81 | 16 | 489 | 0 | 26 | 1 | 78 | 62 |
-| xlsb | 54 | 45 | 489 | 0 | 24 | 1 | 78 | 2 |
+| xlsx | 89 | 16 | 489 | 0 | 26 | 1 | 70 | 62 |
+| xlsb | 62 | 45 | 489 | 0 | 24 | 1 | 70 | 2 |
 | xls | 16 | 17 | 509 | 0 | 24 | 1 | 124 | 0 |
-| pptx | 148 | 29 | 113 | 0 | 126 | 0 | 271 | 159 |
+| pptx | 159 | 27 | 113 | 0 | 126 | 0 | 262 | 159 |
 
 Property writes:
 
@@ -1936,7 +1936,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | workbook | `lastModifiedBy` | string | -sg | --g | supported | gap |  |
 | workbook | `created` | string | --g | --g | supported | — |  |
 | workbook | `modified` | string | --g | --g | supported | — |  |
-| workbook | `extended.application` | string | --g |  | missing | — |  |
+| workbook | `extended.application` | string | --g | --g | supported | — |  |
 | workbook | `category` | string | -sg | --g | supported | gap |  |
 | workbook | `description` | string | -sg | --g | supported | gap |  |
 | workbook | `keywords` | string | -sg | --g | supported | gap |  |
@@ -1955,15 +1955,15 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | workbook | `workbook.lockWindows` | bool | -sg |  | missing | gap |  |
 | workbook | `workbook.password` | string | -sg |  | missing | gap |  |
 | workbook | `extended.applicationVersion` | string | --g |  | missing | — |  |
-| workbook | `extended.characters` | number | --g |  | missing | — |  |
-| workbook | `extended.company` | string | -sg |  | missing | gap |  |
+| workbook | `extended.characters` | number | --g | --g | supported | — |  |
+| workbook | `extended.company` | string | -sg | --g | supported | gap |  |
 | workbook | `extended.lines` | number | --g |  | missing | — |  |
-| workbook | `extended.manager` | string | -sg |  | missing | gap |  |
-| workbook | `extended.pages` | number | --g |  | missing | — |  |
+| workbook | `extended.manager` | string | -sg | --g | supported | gap |  |
+| workbook | `extended.pages` | number | --g | --g | supported | — |  |
 | workbook | `extended.paragraphs` | number | --g |  | missing | — |  |
-| workbook | `extended.template` | string | -sg |  | missing | gap |  |
-| workbook | `extended.totalTime` | number | --g |  | missing | — |  |
-| workbook | `extended.words` | number | --g |  | missing | — |  |
+| workbook | `extended.template` | string | -sg | --g | supported | gap |  |
+| workbook | `extended.totalTime` | number | --g | --g | supported | — |  |
+| workbook | `extended.words` | number | --g | --g | supported | — |  |
 | workbook | `subject` | string | -sg | --g | supported | gap |  |
 | workbook | `theme.color.accent1` | color | -sg |  | missing | gap |  |
 | workbook | `theme.color.accent2` | color | -sg |  | missing | gap |  |
@@ -1995,8 +1995,9 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | `get` | `cell` | `gradient-fill-projection` | ordinary fill readback follows OfficeCLI RGB stop text and integer degrees; complete geometry, stop positions and native colors remain available through Node::cell_format | M1 XLSX lossless scalar gradient property projection |
 | `create` | `workbook` | `template` | the XLSX creator currently authors ordinary workbooks and refuses template requests | use Flavor::Document; M2 XLSX template creation |
 | `create` | `workbook` | `strict-conformance` | the XLSX creator emits Transitional packages and refuses Strict requests | CreateOptions::conformance(Conformance::Transitional) |
-| `create` | `workbook` | `initial-metadata` | the XLSX creator refuses initial metadata until typed metadata authoring is integrated | M2 XLSX metadata creation |
+| `create` | `workbook` | `unrepresentable-initial-metadata` | initial metadata is committed through the leaf metadata transaction; content_type, last_backup and codepage have no OOXML property part and are refused rather than dropped | CreateOptions::metadata (OOXML document properties, record 0253) |
 | `save` | `workbook` | `execution-context-budgeting` | OpenOptions::execution checks open-boundary cancellation only; unified opens do not yet retain a managed owner for publication budgeting | managed OOXML open and publication (record 0008 A1) |
+| `get` | `metadata` | `path-read` | `set("/metadata", ..)` writes the OOXML document properties (root-metadata keys and custom.<name>, record 0253); the path is set-only, and reads go through File::metadata() and the root node | File::metadata(); /metadata node reads with the shared metadata vocabulary |
 | `set` | `range` | `merge-native-preservation-guards` | native merge edits refuse follower content, overlapping geometry, table intersections, group formulas and unmodeled or compatibility-owned payloads instead of discarding them | M2 XLSX dependency-aware and compatibility-aware merge edits |
 | `set` | `column` | `unit-qualified-width-input` | column width accepts native character-unit numbers; OfficeCLI unit-qualified width conversion remains pending | M2 XLSX OfficeCLI column width input conversion |
 | `set` | `workbook` | `row-column-table-targets` | row and column layout properties support scoped selectors; whole-row/column cell payloads, styles, table-driven keys and table writes remain pending | M2 XLSX row/column payload and table write admission |
@@ -2710,7 +2711,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | workbook | `lastModifiedBy` | string | -sg | --g | supported | gap |  |
 | workbook | `created` | string | --g | --g | supported | — |  |
 | workbook | `modified` | string | --g | --g | supported | — |  |
-| workbook | `extended.application` | string | --g |  | missing | — |  |
+| workbook | `extended.application` | string | --g | --g | supported | — |  |
 | workbook | `category` | string | -sg | --g | supported | gap |  |
 | workbook | `description` | string | -sg | --g | supported | gap |  |
 | workbook | `keywords` | string | -sg | --g | supported | gap |  |
@@ -2729,15 +2730,15 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | workbook | `workbook.lockWindows` | bool | -sg |  | missing | gap |  |
 | workbook | `workbook.password` | string | -sg |  | missing | gap |  |
 | workbook | `extended.applicationVersion` | string | --g |  | missing | — |  |
-| workbook | `extended.characters` | number | --g |  | missing | — |  |
-| workbook | `extended.company` | string | -sg |  | missing | gap |  |
+| workbook | `extended.characters` | number | --g | --g | supported | — |  |
+| workbook | `extended.company` | string | -sg | --g | supported | gap |  |
 | workbook | `extended.lines` | number | --g |  | missing | — |  |
-| workbook | `extended.manager` | string | -sg |  | missing | gap |  |
-| workbook | `extended.pages` | number | --g |  | missing | — |  |
+| workbook | `extended.manager` | string | -sg | --g | supported | gap |  |
+| workbook | `extended.pages` | number | --g | --g | supported | — |  |
 | workbook | `extended.paragraphs` | number | --g |  | missing | — |  |
-| workbook | `extended.template` | string | -sg |  | missing | gap |  |
-| workbook | `extended.totalTime` | number | --g |  | missing | — |  |
-| workbook | `extended.words` | number | --g |  | missing | — |  |
+| workbook | `extended.template` | string | -sg | --g | supported | gap |  |
+| workbook | `extended.totalTime` | number | --g | --g | supported | — |  |
+| workbook | `extended.words` | number | --g | --g | supported | — |  |
 | workbook | `subject` | string | -sg | --g | supported | gap |  |
 | workbook | `theme.color.accent1` | color | -sg |  | missing | gap |  |
 | workbook | `theme.color.accent2` | color | -sg |  | missing | gap |  |
@@ -2768,7 +2769,8 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 |---|---|---|---|---|
 | `create` | `workbook` | `template` | the XLSB creator currently authors ordinary workbooks and refuses template requests | use Flavor::Document; M2 XLSB template creation |
 | `create` | `workbook` | `strict-conformance` | the XLSB creator emits Transitional packages and refuses Strict requests | CreateOptions::conformance(Conformance::Transitional) |
-| `create` | `workbook` | `initial-metadata` | the XLSB creator refuses initial metadata until typed metadata authoring is integrated | M2 XLSB metadata creation |
+| `create` | `workbook` | `unrepresentable-initial-metadata` | initial metadata is committed through the leaf metadata transaction; content_type, last_backup and codepage have no OOXML property part and are refused rather than dropped | CreateOptions::metadata (OOXML document properties, record 0253) |
+| `get` | `metadata` | `path-read` | `set("/metadata", ..)` writes the OOXML document properties (root-metadata keys and custom.<name>, record 0253); the path is set-only, and reads go through File::metadata() and the root node | File::metadata(); /metadata node reads with the shared metadata vocabulary |
 | `add` | `workbook` | `non-sheet-elements` | XLSB structural addition creates complete workbook tabs; cells, ranges, rows, columns, tables and other nodes require their own native lifecycle owners | M2 XLSB structural add handlers for non-sheet elements |
 | `add` | `sheet` | `order-opaque-dependencies` | sheet insertion refuses shared-workbook revisions, data-model parts, connections, slicers, timelines, unmodeled workbook records, opaque volatile dependencies, unmodeled title layouts and markup-compatibility title metadata until their dependencies have a native remapping contract | M2 XLSB dependency-aware complete-catalog sheet insertion |
 | `add` | `sheet` | `vba-dependency` | sheet insertion refuses workbooks with a VBA project dependency until native catalog identity remapping is available | M2 XLSB dependency-aware complete-catalog sheet insertion |
@@ -4014,16 +4016,16 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | presentation | `author` | string | -sg | --g | supported | gap |  |
 | presentation | `keywords` | string | -sg | --g | supported | gap |  |
 | presentation | `description` | string | -sg | --g | supported | gap |  |
-| presentation | `category` | string | -sg |  | missing | gap |  |
+| presentation | `category` | string | -sg | --g | supported | gap |  |
 | presentation | `lastModifiedBy` | string | -sg | --g | supported | gap |  |
 | presentation | `revisionNumber` | string | -sg | --g | supported | gap |  |
-| presentation | `created` | string | --g |  | gap | — | M1-extended |
-| presentation | `modified` | string | --g |  | gap | — | M1-extended |
+| presentation | `created` | string | --g | --g | supported | — |  |
+| presentation | `modified` | string | --g | --g | supported | — |  |
 | presentation | `slideWidth` | string | -sg | --g | supported | gap |  |
 | presentation | `slideHeight` | string | -sg | --g | supported | gap |  |
 | presentation | `slideSize` | string | -sg | --g | supported | gap |  |
 | presentation | `defaultFont` | string | --g |  | gap | — | L-PPTX-R4 |
-| presentation | `extended.application` | string | --g |  | missing | — |  |
+| presentation | `extended.application` | string | --g | --g | supported | — |  |
 | presentation | `compatMode` | bool | -sg |  | missing | gap |  |
 | presentation | `firstSlideNum` | number | -sg |  | missing | gap |  |
 | presentation | `rtl` | bool | -s- |  | write-only | gap |  |
@@ -4039,15 +4041,15 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | presentation | `show.useTimings` | bool | -sg |  | missing | gap |  |
 | presentation | `removePersonalInfo` | bool | -sg |  | missing | gap |  |
 | presentation | `extended.applicationVersion` | string | --g |  | missing | — |  |
-| presentation | `extended.characters` | number | --g |  | missing | — |  |
-| presentation | `extended.company` | string | -sg |  | missing | gap |  |
+| presentation | `extended.characters` | number | --g | --g | supported | — |  |
+| presentation | `extended.company` | string | -sg | --g | supported | gap |  |
 | presentation | `extended.lines` | number | --g |  | missing | — |  |
-| presentation | `extended.manager` | string | -sg |  | missing | gap |  |
-| presentation | `extended.pages` | number | --g |  | missing | — |  |
+| presentation | `extended.manager` | string | -sg | --g | supported | gap |  |
+| presentation | `extended.pages` | number | --g | --g | supported | — |  |
 | presentation | `extended.paragraphs` | number | --g |  | missing | — |  |
-| presentation | `extended.template` | string | -sg |  | missing | gap |  |
-| presentation | `extended.totalTime` | number | --g |  | missing | — |  |
-| presentation | `extended.words` | number | --g |  | missing | — |  |
+| presentation | `extended.template` | string | -sg | --g | supported | gap |  |
+| presentation | `extended.totalTime` | number | --g | --g | supported | — |  |
+| presentation | `extended.words` | number | --g | --g | supported | — |  |
 | presentation | `subject` | string | -sg | --g | supported | gap |  |
 | presentation | `theme.color.accent1` | color | -sg |  | missing | gap |  |
 | presentation | `theme.color.accent2` | color | -sg |  | missing | gap |  |
@@ -4469,9 +4471,10 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 
 | Verb | Element | Context | Reason | Follow-up |
 |---|---|---|---|---|
+| `get` | `metadata` | `path-read` | `set("/metadata", ..)` writes the OOXML document properties (root-metadata keys and custom.<name>, record 0253); the path is set-only, and reads go through File::metadata() and the root node | File::metadata(); /metadata node reads with the shared metadata vocabulary |
 | `create` | `presentation` | `template` | native PPTX template creation is not integrated | M2 PPTX creation options |
 | `create` | `presentation` | `strict` | native PPTX Strict creation is not integrated | M2 PPTX creation options |
-| `create` | `presentation` | `metadata` | initial unified PPTX metadata authoring is not integrated | M2 PPTX creation options |
+| `create` | `presentation` | `unrepresentable-metadata` | initial metadata is committed through the leaf metadata transaction; content_type, last_backup and codepage have no OOXML property part and are refused rather than dropped | M2 PPTX creation options |
 | `add` | `shape` | `non-append-placement` | PPTX shape creation currently supports append placement only | M2 PPTX non-append shape placement |
 | `add` | `shape` | `non-slide-parent` | text-box creation requires a top-level slide parent; group, master and layout insertion remain pending | M2 PPTX group/master/layout shape creation |
 | `move` | `slide` | `positional-owner` | source-backed PPTX slide ordering still refuses sections, outline slide lists, numeric presentation ranges, and unknown or opaque metadata extensions | M2 PPTX positional-owner slide ordering |

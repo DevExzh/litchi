@@ -49,6 +49,7 @@ pub(super) use crate::vba_project::{
 pub(super) use crate::web_extensions as web;
 pub(super) use crate::writer::MutableDocument;
 pub(super) use crate::{font, glossary, web as docx_web};
+pub(super) use litchi_core::Metadata as Props;
 pub(super) use litchi_drawingml::diagram::{
     DIAGRAM_COLORS_REL, DIAGRAM_DATA_REL, DIAGRAM_LAYOUT_REL, DIAGRAM_QUICK_STYLE_REL,
 };
@@ -58,7 +59,7 @@ pub(super) use litchi_ooxml_common::custom_xml::{
     NewProps as NewCustomXmlProps, Props as CustomXmlProps,
 };
 pub(super) use litchi_ooxml_common::embedded;
-pub(super) use litchi_ooxml_common::properties::{Props, Slot};
+pub(super) use litchi_ooxml_common::properties::Slot;
 pub(super) use litchi_ooxml_common::ribbon;
 pub(super) use litchi_opc::OpcPackage;
 pub(super) use litchi_opc::constants::content_type as ct;

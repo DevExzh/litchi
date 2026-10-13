@@ -1086,10 +1086,12 @@ impl From<Metadata> for litchi_core::Metadata {
             template: ole_metadata.template,
             last_modified_by: ole_metadata.last_saved_by,
             revision: ole_metadata.revision_number,
-            created: ole_metadata.create_time,
-            created_local: None,
-            modified: ole_metadata.last_saved_time,
-            modified_local: None,
+            created: ole_metadata
+                .create_time
+                .map(litchi_core::metadata::Timestamp::Utc),
+            modified: ole_metadata
+                .last_saved_time
+                .map(litchi_core::metadata::Timestamp::Utc),
             page_count: ole_metadata.num_pages,
             word_count: ole_metadata.num_words,
             character_count: ole_metadata.num_chars,
@@ -1102,9 +1104,10 @@ impl From<Metadata> for litchi_core::Metadata {
             content_status: None,
             content_type: None,
             version: None,
-            last_printed_time: ole_metadata.last_printed_time,
-            last_printed_local: None,
-            last_backup_local: None,
+            last_printed: ole_metadata
+                .last_printed_time
+                .map(litchi_core::metadata::Timestamp::Utc),
+            last_backup: None,
             hyperlink_base: None,
             security: ole_metadata.security,
             codepage: ole_metadata.codepage,

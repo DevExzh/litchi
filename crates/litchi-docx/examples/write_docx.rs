@@ -7,8 +7,8 @@
 //! cargo run -p litchi-docx --example write_docx
 //! ```
 
+use litchi_core::Metadata;
 use litchi_docx::{Package, ParagraphAlignment};
-use litchi_ooxml_common::Props;
 use tempfile::NamedTempFile;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -17,12 +17,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut pkg = Package::new()?;
 
     // Set core properties.
-    let _ = pkg.put_props(
-        Props::new()
-            .title("litchi-docx example")
-            .creator("litchi-docx write_docx example")
-            .subject("Round-trip demo"),
-    );
+    let _ = pkg.put_props(Metadata {
+        title: Some("litchi-docx example".to_owned()),
+        author: Some("litchi-docx write_docx example".to_owned()),
+        subject: Some("Round-trip demo".to_owned()),
+        ..Metadata::default()
+    });
 
     // Build the body of the document.
     {
@@ -88,8 +88,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         props.and_then(|p| p.title.as_deref())
     );
     println!(
-        "Round-tripped creator : {:?}",
-        props.and_then(|p| p.creator.as_deref())
+        "Round-tripped author  : {:?}",
+        props.and_then(|p| p.author.as_deref())
     );
     println!(
         "Round-tripped subject : {:?}",

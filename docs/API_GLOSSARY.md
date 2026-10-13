@@ -243,12 +243,13 @@ semantic-limit migrations.
 
 | Concept | Canonical | Banned | Notes / status |
 |---|---|---|---|
-| Semantic metadata type | `Metadata` (merged field union; typed `Keywords`; real time types) | `ooxml_common::Props`; the `creator` field name (→ `author`) | 🔴 W2 |
-| Metadata read | `Package::metadata()` | `Package::props()` (docx) | ✅ facade/ODF/iWork reads · 🔴 docx rename (W2) · 🔴 pptx/xlsx typed entry added (W2) |
-| Metadata mutation | `Package::{edit_metadata, apply_metadata}` + `metadata::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` | `put_props()`, `props_mut()`, `clear_props()` | 🔴 W2 · ✅ doc/xls/ppt `package::metadata` (0254) |
-| Custom properties | `custom_props()` / `edit_custom_props()` | — | ✅ name (docx/pptx/xlsx); mutation transactionalized W2 |
-| Application properties (OOXML-only) | `app_props()` | — | format-specific layer, OOXML only |
-| Fresh-authoring metadata | `Builder::set_metadata(Metadata)` | `Builder::set_property` (doc/xls/ppt) | ✅ ODF · ✅ doc/xls/ppt (0254); not an opened-document mutation |
+| Semantic metadata type | `Metadata` (merged field union; typed `Keywords`; real time types) | `ooxml_common::Props`; the `creator` field name (→ `author`) | ✅ one `litchi_core::Metadata`; `Props` deleted and banned in the ooxml-common profiles; `author` is the only spelling (`dc:creator` stays in the codec); `Timestamp` replaces the `*_local`/`*_time` pairs (`created`, `modified`, `last_printed`, `last_backup`); OOXML-only `category`/`content_status`/`version`/`last_printed` are fields (0253) · 🔴 `Metadata.keywords` is still `Option<String>`: `Keywords` lives in `litchi_core::metadata` and the OOXML codec keeps keyword mixed content losslessly, but the field flips only after the iWork owners map their `Option<String>` keyword assignments with `.map(Keywords::from)` (IWORK_API_REQUESTS.md, 2026-10-13 request) |
+| Unstorable metadata field | typed `metadata::Error::Unsupported { field }` naming a `metadata::Field` | silently dropping a field | ✅ OOXML transaction (0253): `content_type`, `last_backup`, `codepage` |
+| Metadata read | `Package::metadata()` | `Package::props()` (docx) | ✅ facade/ODF/iWork reads · ✅ pptx/xlsx/xlsb `Package::metadata()` (0253) · 🔴 docx rename (W2, uo2/p7a) |
+| Metadata mutation | `Package::{edit_metadata, apply_metadata}` + `metadata::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` | `put_props()`, `props_mut()`, `clear_props()` | ✅ pptx/xlsx/xlsb `Package` and the shared `litchi_ooxml_common::properties` engine; families registered in the gate (0253) · ✅ doc/xls/ppt `package::metadata` (0254) · 🔴 docx (uo2/p7a) |
+| Custom properties | `custom_props()` / `edit_custom_props()` | — | ✅ name (docx/pptx/xlsx); OOXML custom properties are also staged through `metadata::Edit::set_custom_props` (0253) |
+| Application properties (OOXML-only) | `app_props()` | — | ✅ `litchi_ooxml_common::properties::app` (splice writer), pptx/xlsx/xlsb `Package::app_props()` (0253) |
+| Fresh-authoring metadata | `Builder::set_metadata(Metadata)` | `Builder::set_property` (doc/xls/ppt) | ✅ ODF · ✅ doc/xls/ppt (0254); not an opened-document mutation · OOXML creation commits a metadata `Edit` on the fresh package (0253) |
 | iWork metadata write | typed unsupported until native gates pass | — | no capability is claimed ahead of evidence |
 
 ## 7. Selectors and coordinates
@@ -1545,8 +1546,8 @@ Wave residue that still exposes a glossary-banned name (owner: record 0248):
 
 | Crate | Public name | Canonical | Owner |
 |---|---|---|---|
-| ooxml-common | `custom_xml::Transaction`, `Transaction::is_changed`, `Commit::snapshot` | `Edit`, `diagnostics().changed()`, `Commit::package()` | Phase B step 6 (owns `litchi-ooxml-common`) |
-| ooxml-common | `custom_data::Limits` | `SemanticLimits` | Phase B step 6 |
+| ooxml-common | `custom_xml::Transaction`, `Transaction::is_changed`, `Commit::snapshot` | `Edit`, `diagnostics().changed()`, `Commit::package()` | follow-up of record 0253 (not cheap: the in-place `&mut OpcPackage` owner needs a family reshape and docx call sites) |
+| ooxml-common | `custom_data::Limits` | `SemanticLimits` | follow-up of record 0253 (re-exported by xlsx/xlsb, which uo2/p4 and step 7d own) |
 | core | `Limits`, `Error::ResourceLimit` (execution budgets) | not banned by §4; rename only on an owner decision | owner decision |
 | pptx, xlsb, xlsx, opc, ops | names listed in record 0248 §2 | §2–§4 | Phase B steps 4–5, ops follow-ups |
 
@@ -1663,3 +1664,22 @@ primary edits instantiates the layout's placeholders (title, body, object,
 header and slide-image placeholders are not instantiated).
 `TextTarget::Shape` accepts text, so an empty placeholder body can be filled.
 No parallel transaction type is introduced.
+
+## OOXML metadata transaction (record 0253)
+
+`litchi_core::Metadata` is the one metadata type. Its timestamps are
+`metadata::Timestamp` (`Utc` instant or `Unzoned` wall clock), `metadata::Field`
+names a field in errors and diagnostics, and `metadata::Keywords` is the
+lossless keyword model shared with the OOXML codec.
+`litchi_ooxml_common::properties::{Snapshot, Edit, Commit, Patch, Change,
+Diagnostics, Error, LimitKind, Family}` is the exact, reversible engine over
+the core, application and custom parts; `properties::app::Props` is the
+application-properties model. pptx, xlsx and xlsb expose
+`Package::{metadata, app_props, edit_metadata, apply_metadata}`, and each
+re-exports
+`metadata::{Patch, Diagnostics, Error, LimitKind}` beside its owner-bound
+`metadata::{Edit, Commit}` (`Commit::{package, into_package, patch,
+diagnostics, into_parts}`). The unified layer accepts initial metadata in
+`create_with` and `set("/metadata", ..)` with record 0254's 22
+root-metadata keys, `custom.<name>` and `null` removal; `/metadata` stays
+set-only for every format.

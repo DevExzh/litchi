@@ -1491,9 +1491,9 @@ static XLSX_CREATION_OPTION_GAPS: [GapSpec; 3] = [
         "the XLSX creator emits Transitional packages and refuses Strict requests",
     ),
     xlsx_creation_gap(
-        "initial-metadata",
-        "M2 XLSX metadata creation",
-        "the XLSX creator refuses initial metadata until typed metadata authoring is integrated",
+        "unrepresentable-initial-metadata",
+        "CreateOptions::metadata (OOXML document properties, record 0253)",
+        "initial metadata is committed through the leaf metadata transaction; content_type, last_backup and codepage have no OOXML property part and are refused rather than dropped",
     ),
 ];
 
@@ -1659,9 +1659,9 @@ static XLSB_CREATION_OPTION_GAPS: [GapSpec; 3] = [
         "the XLSB creator emits Transitional packages and refuses Strict requests",
     ),
     xlsb_creation_gap(
-        "initial-metadata",
-        "M2 XLSB metadata creation",
-        "the XLSB creator refuses initial metadata until typed metadata authoring is integrated",
+        "unrepresentable-initial-metadata",
+        "CreateOptions::metadata (OOXML document properties, record 0253)",
+        "initial metadata is committed through the leaf metadata transaction; content_type, last_backup and codepage have no OOXML property part and are refused rather than dropped",
     ),
 ];
 
@@ -1670,7 +1670,17 @@ static XLSB_CREATION_OPTION_GAPS: [GapSpec; 3] = [
 /// structural add/remove elements. Complete-catalog sheet insertion, removal,
 /// and ordering dependency refusals remain explicit operation gaps below.
 #[cfg(feature = "xlsb")]
-static XLSB_WRITE_GAPS: [GapSpec; 24] = [
+static XLSB_WRITE_GAPS: [GapSpec; 25] = [
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "get",
+            element: "metadata",
+            context: "path-read",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "File::metadata(); /metadata node reads with the shared metadata vocabulary",
+        reason: "`set(\"/metadata\", ..)` writes the OOXML document properties (root-metadata keys and custom.<name>, record 0253); the path is set-only, and reads go through File::metadata() and the root node",
+    },
     GapSpec {
         subject: Subject::Operation {
             verb: "add",
@@ -2011,7 +2021,17 @@ const fn xlsb_creation_gap(
 }
 
 #[cfg(feature = "xlsx")]
-static XLSX_WRITE_GAPS: [GapSpec; 15] = [
+static XLSX_WRITE_GAPS: [GapSpec; 16] = [
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "get",
+            element: "metadata",
+            context: "path-read",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "File::metadata(); /metadata node reads with the shared metadata vocabulary",
+        reason: "`set(\"/metadata\", ..)` writes the OOXML document properties (root-metadata keys and custom.<name>, record 0253); the path is set-only, and reads go through File::metadata() and the root node",
+    },
     GapSpec {
         subject: Subject::Operation {
             verb: "set",
@@ -3018,15 +3038,25 @@ const fn pptx_create_gap(context: &'static str, reason: &'static str) -> GapSpec
 }
 
 #[cfg(feature = "pptx")]
-static PPTX_WRITE_GAPS: [GapSpec; 14] = [
+static PPTX_WRITE_GAPS: [GapSpec; 15] = [
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "get",
+            element: "metadata",
+            context: "path-read",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "File::metadata(); /metadata node reads with the shared metadata vocabulary",
+        reason: "`set(\"/metadata\", ..)` writes the OOXML document properties (root-metadata keys and custom.<name>, record 0253); the path is set-only, and reads go through File::metadata() and the root node",
+    },
     pptx_create_gap(
         "template",
         "native PPTX template creation is not integrated",
     ),
     pptx_create_gap("strict", "native PPTX Strict creation is not integrated"),
     pptx_create_gap(
-        "metadata",
-        "initial unified PPTX metadata authoring is not integrated",
+        "unrepresentable-metadata",
+        "initial metadata is committed through the leaf metadata transaction; content_type, last_backup and codepage have no OOXML property part and are refused rather than dropped",
     ),
     GapSpec {
         subject: Subject::Operation {

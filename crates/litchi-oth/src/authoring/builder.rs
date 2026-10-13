@@ -889,12 +889,20 @@ pub(crate) fn render_metadata(metadata: &litchi_core::Metadata) -> Result<String
     }
     if let Some(created) = metadata.created {
         output.push_str("<meta:creation-date>");
-        output.push_str(&created.to_rfc3339());
+        output.push_str(
+            &created
+                .utc()
+                .map_or_else(|| created.to_string(), |at| at.to_rfc3339()),
+        );
         output.push_str("</meta:creation-date>");
     }
     if let Some(modified) = metadata.modified {
         output.push_str("<dc:date>");
-        output.push_str(&modified.to_rfc3339());
+        output.push_str(
+            &modified
+                .utc()
+                .map_or_else(|| modified.to_string(), |at| at.to_rfc3339()),
+        );
         output.push_str("</dc:date>");
     }
     if metadata.page_count.is_some()
