@@ -352,6 +352,15 @@ pub enum Source {
     /// A source-backed legacy Word main-story edit error.
     #[cfg(feature = "doc")]
     DocBodyText(litchi_doc::body_text::source::Error),
+    /// A legacy Word document-property (metadata) transaction error.
+    #[cfg(feature = "doc")]
+    DocMetadata(litchi_doc::package::metadata::Error),
+    /// A legacy Excel document-property (metadata) transaction error.
+    #[cfg(feature = "xls")]
+    XlsMetadata(litchi_xls::package::metadata::Error),
+    /// A legacy PowerPoint document-property (metadata) transaction error.
+    #[cfg(feature = "ppt")]
+    PptMetadata(litchi_ppt::package::metadata::Error),
     /// A legacy Excel BIFF error.
     #[cfg(feature = "xls")]
     Xls(litchi_xls::Error),
@@ -446,6 +455,12 @@ impl Source {
             Self::DocWrite(error) => Some(error),
             #[cfg(feature = "doc")]
             Self::DocBodyText(error) => Some(error),
+            #[cfg(feature = "doc")]
+            Self::DocMetadata(error) => Some(error),
+            #[cfg(feature = "xls")]
+            Self::XlsMetadata(error) => Some(error),
+            #[cfg(feature = "ppt")]
+            Self::PptMetadata(error) => Some(error),
             #[cfg(feature = "xls")]
             Self::Xls(error) => Some(error),
             #[cfg(feature = "xls")]
@@ -1354,7 +1369,10 @@ impl Classify for litchi_doc::writer::WriteError {
             // VBA details remain a conservative malformed-write category.
             WriteError::Vba(_) => Class::of(Code::CorruptFile),
             WriteError::Package(error) => error.classify(),
-            WriteError::UnsupportedProperty => Class::of(Code::UnsupportedCapability),
+            WriteError::Metadata(error) => error.classify(),
+            WriteError::EncryptedMetadata => {
+                Class::suggest(Code::UnsupportedCapability, ENCRYPTED_METADATA_SUGGESTION)
+            },
         }
     }
 }
@@ -1365,6 +1383,10 @@ impl Classify for litchi_xls::Error {
         match self {
             Self::InvalidLimit { .. } | Self::EncryptionEntropyRequired => {
                 Class::of(Code::InvalidArgument)
+            },
+            Self::Metadata(error) => error.classify(),
+            Self::EncryptedMetadata => {
+                Class::suggest(Code::UnsupportedCapability, ENCRYPTED_METADATA_SUGGESTION)
             },
             Self::Limit { .. } | Self::StagedChangeLimit { .. } => Class::of(Code::LimitExceeded),
             Self::Io(error) => error.classify(),
@@ -1550,6 +1572,10 @@ impl Classify for litchi_ppt::writer::WriteError {
             Self::InvalidData(_) => Class::of(Code::InvalidArgument),
             #[cfg(feature = "encryption")]
             Self::EncryptionEntropyRequired => Class::of(Code::InvalidArgument),
+            Self::Metadata(error) => error.classify(),
+            Self::EncryptedMetadata => {
+                Class::suggest(Code::UnsupportedCapability, ENCRYPTED_METADATA_SUGGESTION)
+            },
             _ => Class::of(Code::UnsupportedCapability),
         }
     }
@@ -1899,6 +1925,71 @@ from_leaf!(
     litchi_xls::SourceBackedError => XlsSource, Some(FileFormat::Xls)
 );
 from_leaf!(#[cfg(feature = "ppt")] litchi_ppt::Error => Ppt, Some(FileFormat::Ppt));
+// Legacy OLE metadata (record 0254): the shared property-set conversion and
+// the three leaf metadata transaction families.
+#[cfg(any(feature = "doc", feature = "xls", feature = "ppt"))]
+const ENCRYPTED_METADATA_SUGGESTION: &str = "leave the metadata unset for an encrypted legacy document; its encrypted summary stream is not authored";
+
+#[cfg(any(feature = "doc", feature = "xls", feature = "ppt"))]
+impl Classify for litchi_ole_common::property_set::summary_properties::MetadataError {
+    fn classify(&self) -> Class {
+        match self {
+            Self::Unsupported { .. } => Class::suggest(
+                Code::UnsupportedCapability,
+                "leave identifier, hyperlink_base and unzoned timestamps unset for legacy binary formats",
+            ),
+            _ => Class::of(Code::InvalidValue),
+        }
+    }
+}
+
+macro_rules! ole_metadata_classify {
+    ($(#[$cfg:meta])* $leaf:ty, $protected:ident) => {
+        $(#[$cfg])*
+        impl Classify for $leaf {
+            fn classify(&self) -> Class {
+                match self {
+                    Self::Package(error) => error.classify(),
+                    Self::Metadata(error) => error.classify(),
+                    Self::Property(_) => Class::of(Code::InvalidValue),
+                    Self::$protected => {
+                        Class::suggest(Code::DocumentProtected, ENCRYPTED_METADATA_SUGGESTION)
+                    },
+                    Self::PatchConflict => Class::of(Code::InvalidInput),
+                    _ => Class::of(Code::InternalError),
+                }
+            }
+        }
+    };
+}
+
+ole_metadata_classify!(
+    #[cfg(feature = "doc")]
+    litchi_doc::package::metadata::Error,
+    Encrypted
+);
+ole_metadata_classify!(
+    #[cfg(feature = "xls")]
+    litchi_xls::package::metadata::Error,
+    Protected
+);
+ole_metadata_classify!(
+    #[cfg(feature = "ppt")]
+    litchi_ppt::package::metadata::Error,
+    Encrypted
+);
+from_leaf!(
+    #[cfg(feature = "doc")]
+    litchi_doc::package::metadata::Error => DocMetadata, Some(FileFormat::Doc)
+);
+from_leaf!(
+    #[cfg(feature = "xls")]
+    litchi_xls::package::metadata::Error => XlsMetadata, Some(FileFormat::Xls)
+);
+from_leaf!(
+    #[cfg(feature = "ppt")]
+    litchi_ppt::package::metadata::Error => PptMetadata, Some(FileFormat::Ppt)
+);
 from_leaf!(
     #[cfg(feature = "ppt")]
     litchi_ppt::text_edit::Error => PptTextEdit, Some(FileFormat::Ppt)

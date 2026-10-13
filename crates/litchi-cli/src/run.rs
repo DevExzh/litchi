@@ -1,0 +1,345 @@
+//! One function per verb, each a direct call into `litchi-ops`.
+
+use std::io::{Read as _, Write};
+use std::path::{Path, PathBuf};
+
+use litchi_ops::batch::{BatchItem, SourceLimits};
+use litchi_ops::capabilities::Capabilities;
+use litchi_ops::node::ViewOptions;
+use litchi_ops::view::Mode;
+use litchi_ops::{BatchMode, Code, Error, File, Overwrite, Props, Result, SaveOptions, SaveTo};
+
+use crate::cli::{self, Cli, Command};
+use crate::render::{self, ItemJson, Report, Summary};
+use crate::{exit, formats};
+
+/// Runs the parsed command line, writing its result to `out`, and returns
+/// the exit status of a run that did not fail outright.
+pub(crate) fn run(cli: Cli, out: &mut impl Write) -> Result<u8> {
+    let json = cli.json();
+    match cli.command {
+        Command::Create(args) => create(&args, json, out),
+        Command::Get(args) => get(&args, json, out),
+        Command::Query(args) => query(&args, json, out),
+        Command::View(args) => view(&args, json, out),
+        Command::Capabilities(args) => capabilities(&args, json, out),
+        Command::Set(args) => {
+            let mut item = BatchItem::new("set");
+            item.path = Some(args.path.as_str().into());
+            item.props = Some(props(&args.props)?);
+            write(&args.file, item, &args.output, "set", json, out)
+        },
+        Command::Add(args) => {
+            let mut item = BatchItem::new("add");
+            item.parent = Some(args.parent.as_str().into());
+            item.kind = Some(args.kind.as_str().into());
+            if !args.props.is_empty() {
+                item.props = Some(props(&args.props)?);
+            }
+            position(&mut item, &args.position);
+            write(&args.file, item, &args.output, "add", json, out)
+        },
+        Command::Remove(args) => {
+            let mut item = BatchItem::new("remove");
+            item.path = Some(args.path.as_str().into());
+            write(&args.file, item, &args.output, "remove", json, out)
+        },
+        Command::Move(args) => {
+            let mut item = BatchItem::new("move");
+            item.path = Some(args.path.as_str().into());
+            item.to = args.to.as_deref().map(Into::into);
+            position(&mut item, &args.position);
+            write(&args.file, item, &args.output, "move", json, out)
+        },
+        Command::Swap(args) => {
+            let mut item = BatchItem::new("swap");
+            item.path = Some(args.path1.as_str().into());
+            item.path2 = Some(args.path2.as_str().into());
+            write(&args.file, item, &args.output, "swap", json, out)
+        },
+        Command::Batch(args) => batch(&args, json, out),
+    }
+}
+
+/// `--prop key=value` assignments, parsed by `litchi-ops`.
+fn props(assignments: &[String]) -> Result<Props<'_>> {
+    Props::from_props(assignments)
+}
+
+fn position<'a>(item: &mut BatchItem<'a>, position: &'a cli::Position) {
+    item.index = position.index;
+    item.after = position.after.as_deref().map(Into::into);
+    item.before = position.before.as_deref().map(Into::into);
+}
+
+fn create(args: &cli::Create, json: bool, out: &mut impl Write) -> Result<u8> {
+    let format = match &args.kind {
+        Some(kind) => formats::parse(kind)?,
+        None => formats::of_path(&args.file).ok_or_else(|| {
+            Error::new(
+                Code::MissingArgument,
+                "the document type is neither given nor implied by the extension",
+            )
+            .with_suggestion("pass --type, for example --type docx")
+        })?,
+    };
+    // As OfficeCLI does, a path without an extension gains the type's.
+    let mut path = args.file.clone();
+    if path.extension().is_none() {
+        path.set_extension(formats::name(format));
+    }
+    let overwrite = if args.force {
+        Overwrite::Replace
+    } else {
+        Overwrite::Refuse
+    };
+    let saved = litchi_ops::create(format)?.save_with(
+        SaveTo::Path(&path),
+        &SaveOptions::new().overwrite(overwrite),
+    )?;
+    if json {
+        render::json(
+            out,
+            &serde_json::json!({
+                "path": saved.path.display().to_string(),
+                "type": formats::name(format),
+                "bytes": saved.bytes,
+            }),
+        )?;
+    } else {
+        writeln!(out, "created {}", saved.path.display()).map_err(|error| render::io(&error))?;
+    }
+    Ok(exit::OK)
+}
+
+fn get(args: &cli::Get, json: bool, out: &mut impl Write) -> Result<u8> {
+    let file = litchi_ops::open(&args.file)?;
+    let node = file.get(args.path.as_str())?;
+    let view = node.view_with(ViewOptions::default().depth(args.depth));
+    if json {
+        render::view_json(out, &view)?;
+    } else {
+        render::node_text(out, &view, 0)?;
+    }
+    Ok(exit::OK)
+}
+
+fn query(args: &cli::Query, json: bool, out: &mut impl Write) -> Result<u8> {
+    let file = litchi_ops::open(&args.file)?;
+    let mut matches = file.query(args.selector.as_str())?;
+    if let Some(limit) = args.limit {
+        matches = matches.limit(limit);
+    }
+    let options = ViewOptions::default().depth(args.depth);
+    let nodes = matches.collect::<Result<Vec<_>>>()?;
+    if json {
+        render::nodes_json(out, &nodes, options)?;
+    } else {
+        for node in &nodes {
+            render::node_text(out, &node.view_with(options), 0)?;
+        }
+        writeln!(out, "{} matches", nodes.len()).map_err(|error| render::io(&error))?;
+    }
+    Ok(exit::OK)
+}
+
+fn view(args: &cli::View, json: bool, out: &mut impl Write) -> Result<u8> {
+    let name = args
+        .positional_mode
+        .as_deref()
+        .or(args.mode.as_deref())
+        .unwrap_or("text");
+    let mode = Mode::parse(name).ok_or_else(|| {
+        Error::new(Code::InvalidArgument, format!("unknown view mode `{name}`"))
+            .with_suggestion("use text, annotated, outline, stats or issues")
+    })?;
+    let file = litchi_ops::open(&args.file)?;
+    if json {
+        render::json(out, &file.view_json(mode)?)?;
+    } else {
+        let text = file.view(mode)?;
+        out.write_all(text.as_bytes())
+            .map_err(|error| render::io(&error))?;
+        if !text.is_empty() && !text.ends_with('\n') {
+            writeln!(out).map_err(|error| render::io(&error))?;
+        }
+    }
+    Ok(exit::OK)
+}
+
+fn capabilities(args: &cli::Capabilities, json: bool, out: &mut impl Write) -> Result<u8> {
+    let capabilities = match (&args.file, &args.format) {
+        (Some(path), _) => litchi_ops::open(path)?.capabilities(),
+        (None, Some(format)) => Capabilities::of(formats::parse(format)?),
+        (None, None) => {
+            return Err(Error::new(
+                Code::MissingArgument,
+                "capabilities needs a file or --format",
+            ));
+        },
+    };
+    if json {
+        render::json(out, &capabilities)?;
+        return Ok(exit::OK);
+    }
+    let format = capabilities.format().map_or("unknown", formats::name);
+    let mut text = format!(
+        "format: {format}\nstate: {}\nverbs:\n",
+        capabilities.state().as_str()
+    );
+    for verb in litchi_ops::capabilities::Verb::ALL {
+        text.push_str(&support_line(verb.as_str(), capabilities.verb(verb)));
+    }
+    text.push_str("views:\n");
+    for &mode in Mode::ALL {
+        text.push_str(&support_line(mode.name(), capabilities.view(mode)));
+    }
+    text.push_str("elements:");
+    for element in capabilities.elements() {
+        text.push(' ');
+        text.push_str(element.name());
+    }
+    text.push('\n');
+    out.write_all(text.as_bytes())
+        .map_err(|error| render::io(&error))?;
+    Ok(exit::OK)
+}
+
+fn support_line(name: &str, support: litchi_ops::capabilities::Support) -> String {
+    use litchi_ops::capabilities::Support;
+    match support {
+        Support::Supported => format!("  {name}: supported\n"),
+        Support::Unsupported { code, reason, .. } => format!("  {name}: {code}: {reason}\n"),
+        _ => format!("  {name}: unknown\n"),
+    }
+}
+
+/// Publishes `file`: to `--out` when given, else in place when it changed.
+fn publish(file: &File, changed: bool, output: &cli::Output) -> Result<Option<PathBuf>> {
+    match &output.out {
+        Some(path) => file.save_as(path).map(|saved| Some(saved.path)),
+        None if changed => file.save().map(|saved| Some(saved.path)),
+        None => Ok(None),
+    }
+}
+
+/// A single-command write through the command channel (`File::apply`).
+fn write(
+    path: &Path,
+    item: BatchItem<'_>,
+    output: &cli::Output,
+    verb: &str,
+    json: bool,
+    out: &mut impl Write,
+) -> Result<u8> {
+    let file = litchi_ops::open(path)?;
+    let commit = file.apply(item)?;
+    let changed = commit.diagnostics.changed();
+    let saved = publish(&commit.file, changed, output)?;
+    let report = Report {
+        results: vec![ItemJson::applied(0, &commit.value)],
+        summary: Summary {
+            total: 1,
+            executed: 1,
+            succeeded: 1,
+            changed,
+            saved: saved.map(|path| path.display().to_string()),
+            ..Summary::default()
+        },
+    };
+    report.write(out, json, verb)?;
+    Ok(exit::OK)
+}
+
+/// Reads the batch payload from `--commands`, `--input FILE` or stdin
+/// (`--input -`), bounded by the decoder's input limit.
+fn payload(args: &cli::Batch, limits: &SourceLimits) -> Result<Vec<u8>> {
+    if let Some(commands) = &args.commands {
+        return Ok(commands.as_bytes().to_vec());
+    }
+    let Some(input) = &args.input else {
+        return Err(Error::new(
+            Code::MissingArgument,
+            "batch needs --input or --commands",
+        ));
+    };
+    // One byte over the limit lets the decoder report `limit_exceeded`.
+    let bound = u64::try_from(limits.max_input_bytes())
+        .unwrap_or(u64::MAX)
+        .saturating_add(1);
+    let mut bytes = Vec::new();
+    let result = if input.as_os_str() == "-" {
+        std::io::stdin().lock().take(bound).read_to_end(&mut bytes)
+    } else {
+        std::fs::File::open(input).and_then(|file| file.take(bound).read_to_end(&mut bytes))
+    };
+    result.map_err(|error| {
+        let code = if error.kind() == std::io::ErrorKind::NotFound {
+            Code::FileNotFound
+        } else {
+            Code::IoError
+        };
+        Error::new(code, format!("reading the batch input failed: {error}"))
+    })?;
+    Ok(bytes)
+}
+
+fn batch(args: &cli::Batch, json: bool, out: &mut impl Write) -> Result<u8> {
+    let limits = SourceLimits::default();
+    let bytes = payload(args, &limits)?;
+    let items = litchi_ops::batch::from_bytes_with_limits(&bytes, &limits)?;
+    let mode = if args.best_effort {
+        BatchMode::BestEffort
+    } else {
+        BatchMode::Atomic
+    };
+    let file = litchi_ops::open(&args.file)?;
+    let total = items.len();
+    let commit = match file.batch(&items, mode) {
+        Ok(commit) => commit,
+        Err(error) => {
+            // An atomic failure discards every item; report which one
+            // failed, then fail with its code.
+            if let Some(index) = error.item() {
+                let report = Report {
+                    results: vec![ItemJson::failed(index, &error, items.get(index))],
+                    summary: Summary {
+                        total,
+                        executed: index.saturating_add(1).min(total),
+                        succeeded: index.min(total),
+                        failed: 1,
+                        skipped: total.saturating_sub(index.saturating_add(1)),
+                        atomic_rolled_back: true,
+                        ..Summary::default()
+                    },
+                };
+                report.write(out, json, "batch")?;
+            }
+            return Err(error);
+        },
+    };
+    let changed = commit.diagnostics.changed();
+    let saved = publish(&commit.file, changed, &args.output)?;
+    let results: Vec<ItemJson<'_>> = commit
+        .results
+        .iter()
+        .enumerate()
+        .map(|(index, result)| ItemJson::of(index, result, items.get(index)))
+        .collect();
+    let failed = results.iter().filter(|item| !item.success()).count();
+    let report = Report {
+        summary: Summary {
+            total,
+            executed: results.len(),
+            succeeded: results.len() - failed,
+            failed,
+            skipped: total.saturating_sub(results.len()),
+            changed,
+            saved: saved.map(|path| path.display().to_string()),
+            ..Summary::default()
+        },
+        results,
+    };
+    report.write(out, json, "batch")?;
+    Ok(if failed == 0 { exit::OK } else { exit::PARTIAL })
+}

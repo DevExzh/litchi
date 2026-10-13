@@ -1074,7 +1074,7 @@ fn doc_write_errors_keep_the_write_type_and_map_native_categories() {
     use litchi_doc::package::Error as PackageError;
     use litchi_doc::writer::WriteError;
 
-    let unsupported = assert_code(WriteError::UnsupportedProperty, Code::UnsupportedCapability);
+    let unsupported = assert_code(WriteError::EncryptedMetadata, Code::UnsupportedCapability);
     assert!(matches!(unsupported.leaf(), Source::DocWrite(_)));
     assert!(std::error::Error::source(&unsupported).is_some());
     assert_code(

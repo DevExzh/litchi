@@ -23,6 +23,12 @@ impl Builder {
         if let Some(value) = &self.encryption {
             validate_writer_password(value.profile, value.password.as_str())
                 .map_err(WriteError::InvalidData)?;
+            // PowerPoint keeps the properties of an encrypted presentation in
+            // its encrypted summary stream ([MS-OFFCRYPTO] 2.3.5.4), which is
+            // not produced; refuse rather than write them in plaintext.
+            if !self.properties.is_empty() {
+                return Err(WriteError::EncryptedMetadata);
+            }
         }
         if let Some(value) = &self.modify_password {
             validate_modify_password(value.password.as_str())

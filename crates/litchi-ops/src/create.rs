@@ -139,8 +139,8 @@ impl CreateOptions {
 /// Create a new package with the default options.
 ///
 /// DOC, DOCX, PPT, RTF, XLS, XLSX, XLSB and PPTX have native-backed unified creators.
-/// The DOC creator emits one ordinary blank document paragraph; template,
-/// Strict and initial metadata options are refused explicitly. Other formats
+/// The DOC creator emits one ordinary blank document paragraph; template and
+/// Strict options are refused explicitly. Other formats
 /// return a typed capability or format refusal according to the features and
 /// creators present in this build.
 ///
@@ -155,12 +155,14 @@ pub fn create(format: FileFormat) -> Result<File> {
 
 /// Create a new package using `options`.
 ///
-/// The selected creator validates every option before publication. DOC
-/// supports an ordinary Transitional document without initial metadata.
-/// DOCX supports ordinary documents, templates, Transitional conformance, and
-/// the core metadata fields its leaf stores. PPT, RTF, XLS, XLSX, XLSB and PPTX
-/// support ordinary Transitional documents; template, Strict and initial
-/// metadata requests are refused explicitly by those creators.
+/// The selected creator validates every option before publication. DOCX
+/// supports ordinary documents, templates, Transitional conformance, and
+/// the core metadata fields its leaf stores. DOC, XLS and PPT support
+/// ordinary Transitional documents with initial metadata written to their
+/// OLE property sets (fields without a property-set slot are refused). RTF,
+/// XLSX, XLSB and PPTX support ordinary Transitional documents; template,
+/// Strict and initial metadata requests are refused explicitly by those
+/// creators.
 ///
 /// # Errors
 ///

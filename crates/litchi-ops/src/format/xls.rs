@@ -18,6 +18,7 @@ use super::signature::{self, Opened, Signature};
 use crate::{OpenOptions, Result};
 
 mod children;
+mod metadata;
 mod nav;
 mod node;
 pub(crate) mod owner;
@@ -154,11 +155,6 @@ impl Xls {
                 "legacy XLS does not support OOXML Strict conformance",
                 "use Conformance::Transitional",
             ))
-        } else if options.metadata_value().is_some() {
-            Some((
-                "initial XLS metadata authoring is not integrated",
-                "omit initial metadata",
-            ))
         } else {
             None
         };
@@ -167,7 +163,10 @@ impl Xls {
                 .with_format(FileFormat::Xls)
                 .with_suggestion(suggestion));
         }
-        Ok(Self(Opened::new(Package::new()?)))
+        match options.metadata_value() {
+            Some(metadata) => Ok(Self(Opened::new(metadata::create(metadata)?))),
+            None => Ok(Self(Opened::new(Package::new()?))),
+        }
     }
 
     pub(crate) fn with_origin(&self, origin: Option<Arc<std::path::Path>>) -> Self {

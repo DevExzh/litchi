@@ -372,10 +372,19 @@
       "subject": "operation",
       "verb": "create",
       "element": "document",
-      "context": "initial-metadata",
+      "context": "unrepresentable-initial-metadata",
       "code": "unsupported_capability",
-      "followUp": "M2 DOC initial metadata authoring",
-      "reason": "the DOC creator currently emits a blank body only and refuses initial metadata rather than dropping it"
+      "followUp": "CreateOptions::metadata (OLE property sets, record 0254)",
+      "reason": "initial metadata is written to the OLE property sets; identifier, hyperlink_base and unzoned timestamps have no property-set slot and are refused rather than dropped, as is metadata combined with CryptoAPI encryption"
+    },
+    {
+      "subject": "operation",
+      "verb": "get",
+      "element": "metadata",
+      "context": "path-read",
+      "code": "unsupported_capability",
+      "followUp": "File::metadata(); /metadata node reads with the shared metadata vocabulary",
+      "reason": "`set(\"/metadata\", ..)` writes the OLE document properties (root-metadata keys and custom.<name>); the path is set-only, and reads go through File::metadata()"
     },
     {
       "subject": "operation",

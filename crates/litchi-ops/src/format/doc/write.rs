@@ -200,7 +200,7 @@ impl Run {
         Ok(WriteCommit {
             before,
             after,
-            patch,
+            patch: super::StepPatch::Primary(patch),
             operations,
             snapshot_bytes,
         })

@@ -302,18 +302,18 @@ fn test_add_multiple_fonts() {
 }
 
 #[test]
-fn test_set_property() {
+fn test_set_metadata() {
     let mut writer = Builder::new();
-    writer.set_property("Title", "My Presentation");
-    writer.set_property("Author", "Test Author");
-    assert_eq!(
-        writer.properties.get("Title"),
-        Some(&"My Presentation".to_string())
-    );
-    assert_eq!(
-        writer.properties.get("Author"),
-        Some(&"Test Author".to_string())
-    );
+    writer
+        .set_metadata(litchi_core::Metadata {
+            title: Some("My Presentation".to_owned()),
+            author: Some("Test Author".to_owned()),
+            ..litchi_core::Metadata::default()
+        })
+        .unwrap();
+    let summary = writer.summary_properties().summary_information();
+    assert_eq!(summary.title(), Some("My Presentation"));
+    assert_eq!(summary.author(), Some("Test Author"));
 }
 
 #[test]
