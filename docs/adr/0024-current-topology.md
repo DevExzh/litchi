@@ -4879,3 +4879,25 @@ Together with the S2 through S7 amendments above, the current inventory is 66
 workspace packages, 267 internal dependency declarations, 255 canonical edges,
 12 development-only edges, 11 ordered migration debts with IDs
 `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]`, and one migration host.
+
+## 2026-10-13 amendment: `litchi-cli` command-line package
+
+Unified-ops record [0256](../unified-ops/0256-cli.md) (plan step 15, design
+§11) adds [`litchi-cli`](../../crates/litchi-cli/Cargo.toml), the `litchi`
+binary: OfficeCLI's verbs over the public `litchi-ops` API, with no document
+behaviour of its own. It adds two normal edges, `litchi-cli -> litchi-ops`
+(with the non-iWork format features) and `litchi-cli -> litchi-core` (for
+`FileFormat`), and one external dependency, `clap`, which the facade already
+uses as a development dependency. No package depends on `litchi-cli`.
+
+`litchi-cli` takes no iWork edge and no runtime package, so the policy
+classifies it as runtime-neutral and the non-iWork release gate counts it among
+its bulk packages (47 to 48). Its library target holds the command line, so the
+gate's per-package `--lib` roots reach its tests; the binary is a one-line
+shim.
+
+The policy now records 67 packages, 258 canonical edges, 12 development-only
+edges and 11 ordered migration debts with IDs
+`[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]` (269 policy edges including the
+migration edges), with one migration host. Cargo metadata lists 270 internal
+dependency declarations.

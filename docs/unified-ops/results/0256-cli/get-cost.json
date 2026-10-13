@@ -1,0 +1,105 @@
+{
+  "record": "0256",
+  "scenario": "litchi CLI process cost vs in-process open+get+node-view JSON",
+  "base_commit": "9e3872880a",
+  "build": "cargo build --release -p litchi-cli --bin litchi --example cli_get_cost (profile.release: lto=true, panic=abort)",
+  "command": "taskset -c 31 target/release/examples/cli_get_cost target/release/litchi 30 10",
+  "method": "per fixture, 10 rounds of A B C C B A blocks of 30 iterations (600 samples per leg); wall clock per iteration; in-process leg is warm (same process)",
+  "machine": "AMD EPYC 9R45, 32 CPUs, shared host (load average 15-23 during the run)",
+  "binary_bytes": 33019024,
+  "hyperfine_cross_check": {
+    "command": "taskset -c 31 hyperfine -N --warmup 50 --runs 500 /bin/true 'litchi --version' 'litchi get SimpleMultiCell.xlsx /Sheet1/A1 --json'",
+    "mean_us": {
+      "/bin/true": 210.4,
+      "litchi --version": 457.6,
+      "litchi get xlsx --json": 966.2
+    },
+    "system_us": {
+      "/bin/true": 23.8,
+      "litchi --version": 121.4,
+      "litchi get xlsx --json": 471.8
+    }
+  },
+  "results": {
+    "ole/xls/Simple.xls /sheet[1]": {
+      "cli-get": {
+        "median_us": 620.7,
+        "p10_us": 607.7,
+        "p90_us": 636.8,
+        "samples": 600
+      },
+      "cli-version": {
+        "median_us": 432.3,
+        "p10_us": 423.4,
+        "p90_us": 447.6,
+        "samples": 600
+      },
+      "in-process": {
+        "median_us": 20.3,
+        "p10_us": 20.2,
+        "p90_us": 21.1,
+        "samples": 600
+      }
+    },
+    "ooxml/docx/drawing.docx /body/p[2]": {
+      "cli-get": {
+        "median_us": 4113.7,
+        "p10_us": 4082.4,
+        "p90_us": 4265.4,
+        "samples": 600
+      },
+      "cli-version": {
+        "median_us": 448.7,
+        "p10_us": 434.5,
+        "p90_us": 475.1,
+        "samples": 600
+      },
+      "in-process": {
+        "median_us": 3491.1,
+        "p10_us": 3462.9,
+        "p90_us": 3547.6,
+        "samples": 600
+      }
+    },
+    "ooxml/pptx/sample.pptx /slide[1]": {
+      "cli-get": {
+        "median_us": 1149.5,
+        "p10_us": 1134.1,
+        "p90_us": 1180.3,
+        "samples": 600
+      },
+      "cli-version": {
+        "median_us": 441.9,
+        "p10_us": 428.8,
+        "p90_us": 461.7,
+        "samples": 600
+      },
+      "in-process": {
+        "median_us": 287.9,
+        "p10_us": 281.6,
+        "p90_us": 321.1,
+        "samples": 600
+      }
+    },
+    "ooxml/xlsx/SimpleMultiCell.xlsx /Sheet1/A1": {
+      "cli-get": {
+        "median_us": 946.6,
+        "p10_us": 935.2,
+        "p90_us": 976.6,
+        "samples": 600
+      },
+      "cli-version": {
+        "median_us": 434.6,
+        "p10_us": 423.2,
+        "p90_us": 450.3,
+        "samples": 600
+      },
+      "in-process": {
+        "median_us": 124.4,
+        "p10_us": 122.5,
+        "p90_us": 138.5,
+        "samples": 600
+      }
+    }
+  }
+}
