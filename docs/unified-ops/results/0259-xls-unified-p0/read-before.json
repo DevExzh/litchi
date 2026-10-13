@@ -1,0 +1,331 @@
+{
+  "schema": "litchi.xls_read_bench.v2",
+  "samples": 5,
+  "order": "ABBA by sample; nanoseconds per complete scan",
+  "generation_included": false,
+  "opening_included": false,
+  "path_parsing_included": false,
+  "query_compilation_included": false,
+  "cases": [
+    {
+      "cells": 1,
+      "owner": "eager",
+      "repeats": 10000,
+      "checksum": 4746241988361342811,
+      "native_get_ns": [
+        72,
+        71,
+        72,
+        72,
+        72
+      ],
+      "unified_get_ns": [
+        307,
+        304,
+        304,
+        303,
+        302
+      ],
+      "native_scan_ns": [
+        59,
+        58,
+        59,
+        58,
+        59
+      ],
+      "unified_scan_ns": [
+        458,
+        457,
+        456,
+        458,
+        453
+      ],
+      "median_native_get_ns": 72,
+      "median_unified_get_ns": 304,
+      "median_native_scan_ns": 59,
+      "median_unified_scan_ns": 457,
+      "get_ratio": 4.222222222222222,
+      "scan_ratio": 7.745762711864407
+    },
+    {
+      "cells": 1,
+      "owner": "positional",
+      "repeats": 10000,
+      "checksum": 4746241988361342811,
+      "native_get_ns": [
+        1257,
+        1252,
+        1249,
+        1272,
+        1281
+      ],
+      "unified_get_ns": [
+        3344,
+        3340,
+        3345,
+        3398,
+        3417
+      ],
+      "native_scan_ns": [
+        1148,
+        1145,
+        1148,
+        1166,
+        1186
+      ],
+      "unified_scan_ns": [
+        5355,
+        5337,
+        5356,
+        5418,
+        5533
+      ],
+      "median_native_get_ns": 1257,
+      "median_unified_get_ns": 3345,
+      "median_native_scan_ns": 1148,
+      "median_unified_scan_ns": 5356,
+      "get_ratio": 2.6610978520286395,
+      "scan_ratio": 4.665505226480836
+    },
+    {
+      "cells": 100,
+      "owner": "eager",
+      "repeats": 100,
+      "checksum": 5448005974848303896,
+      "native_get_ns": [
+        6242,
+        6285,
+        6189,
+        6221,
+        6238
+      ],
+      "unified_get_ns": [
+        33559,
+        33682,
+        33695,
+        33448,
+        33544
+      ],
+      "native_scan_ns": [
+        5269,
+        5284,
+        5219,
+        5175,
+        5205
+      ],
+      "unified_scan_ns": [
+        17173,
+        16912,
+        16883,
+        16738,
+        16665
+      ],
+      "median_native_get_ns": 6238,
+      "median_unified_get_ns": 33559,
+      "median_native_scan_ns": 5219,
+      "median_unified_scan_ns": 16883,
+      "get_ratio": 5.37976915678102,
+      "scan_ratio": 3.234910902471738
+    },
+    {
+      "cells": 100,
+      "owner": "positional",
+      "repeats": 100,
+      "checksum": 5448005974848303896,
+      "native_get_ns": [
+        112323,
+        110694,
+        111275,
+        109973,
+        109898
+      ],
+      "unified_get_ns": [
+        340285,
+        339361,
+        338412,
+        336710,
+        337600
+      ],
+      "native_scan_ns": [
+        12154,
+        12050,
+        12017,
+        11839,
+        11905
+      ],
+      "unified_scan_ns": [
+        128702,
+        128050,
+        127408,
+        127565,
+        128025
+      ],
+      "median_native_get_ns": 110694,
+      "median_unified_get_ns": 338412,
+      "median_native_scan_ns": 12017,
+      "median_unified_scan_ns": 128025,
+      "get_ratio": 3.0571846712558948,
+      "scan_ratio": 10.65365731879837
+    },
+    {
+      "cells": 1000,
+      "owner": "eager",
+      "repeats": 10,
+      "checksum": 16086015220855652458,
+      "native_get_ns": [
+        71379,
+        68933,
+        69102,
+        69474,
+        68844
+      ],
+      "unified_get_ns": [
+        332274,
+        332558,
+        333390,
+        332634,
+        332684
+      ],
+      "native_scan_ns": [
+        55580,
+        53858,
+        55066,
+        54591,
+        53818
+      ],
+      "unified_scan_ns": [
+        166974,
+        167399,
+        166645,
+        166376,
+        167532
+      ],
+      "median_native_get_ns": 69102,
+      "median_unified_get_ns": 332634,
+      "median_native_scan_ns": 54591,
+      "median_unified_scan_ns": 166974,
+      "get_ratio": 4.813666753494834,
+      "scan_ratio": 3.0586360389075122
+    },
+    {
+      "cells": 1000,
+      "owner": "positional",
+      "repeats": 10,
+      "checksum": 16086015220855652458,
+      "native_get_ns": [
+        1155833,
+        1154367,
+        1152502,
+        1143537,
+        1141823
+      ],
+      "unified_get_ns": [
+        3434445,
+        3430005,
+        3420420,
+        3416266,
+        3411126
+      ],
+      "native_scan_ns": [
+        103786,
+        102522,
+        103096,
+        102710,
+        103271
+      ],
+      "unified_scan_ns": [
+        1240951,
+        1235882,
+        1237434,
+        1232428,
+        1236238
+      ],
+      "median_native_get_ns": 1152502,
+      "median_unified_get_ns": 3420420,
+      "median_native_scan_ns": 103096,
+      "median_unified_scan_ns": 1236238,
+      "get_ratio": 2.9678213139760277,
+      "scan_ratio": 11.99113447660433
+    },
+    {
+      "cells": 10000,
+      "owner": "eager",
+      "repeats": 1,
+      "checksum": 5472908162558914972,
+      "native_get_ns": [
+        837194,
+        837055,
+        834145,
+        833194,
+        832414
+      ],
+      "unified_get_ns": [
+        3394809,
+        3384368,
+        3380228,
+        3371768,
+        3384479
+      ],
+      "native_scan_ns": [
+        601643,
+        592333,
+        601373,
+        593343,
+        599023
+      ],
+      "unified_scan_ns": [
+        1732859,
+        1719419,
+        1728410,
+        1730730,
+        1721759
+      ],
+      "median_native_get_ns": 834145,
+      "median_unified_get_ns": 3384368,
+      "median_native_scan_ns": 599023,
+      "median_unified_scan_ns": 1728410,
+      "get_ratio": 4.057289799735058,
+      "scan_ratio": 2.8853816965291816
+    },
+    {
+      "cells": 10000,
+      "owner": "positional",
+      "repeats": 1,
+      "checksum": 5472908162558914972,
+      "native_get_ns": [
+        15790745,
+        15633465,
+        15590944,
+        15680884,
+        15635854
+      ],
+      "unified_get_ns": [
+        38347467,
+        38314777,
+        38205597,
+        38272217,
+        38155556
+      ],
+      "native_scan_ns": [
+        1046286,
+        1033525,
+        1043125,
+        1041776,
+        1037406
+      ],
+      "unified_scan_ns": [
+        12416926,
+        12452507,
+        12414827,
+        12450787,
+        12448117
+      ],
+      "median_native_get_ns": 15635854,
+      "median_unified_get_ns": 38272217,
+      "median_native_scan_ns": 1041776,
+      "median_unified_scan_ns": 12448117,
+      "get_ratio": 2.447721563529565,
+      "scan_ratio": 11.948938159450783
+    }
+  ]
+}
