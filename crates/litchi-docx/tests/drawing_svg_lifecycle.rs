@@ -38,11 +38,11 @@ const IMAGE_REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/r
 
 const INLINE_FIXTURE: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../3rdparty/Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/svg.docx"
+    "/../../test-data/Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/svg.docx"
 );
 const FLOATING_FIXTURE: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../../3rdparty/libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf164835_nonDummyLineHeight.docx"
+    "/../../test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf164835_nonDummyLineHeight.docx"
 );
 
 const PNG: &[u8] = &[
