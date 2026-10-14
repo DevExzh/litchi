@@ -531,6 +531,21 @@ Cut from `80e24f8745`:
 
 Not dispatched: iWork M6. It waits for owner decisions D1/D2, and the iWork crates belong to their owners.
 
+## Wave R6 (2026-10-14)
+Cut from `9fe45629ab`:
+- `find2` (0285): the find/TOC bug from 0279, consolidating find with merge's substitution, header/footer/notes/comment and table-cell search.
+- `perf-ooxml` (0286): OOXML misses:
+  - DOCX single set 1.19×;
+  - PPTX open + first set 1.31×;
+  - XLSX chart set up to 1.35×;
+  - DOCX cells (borderline);
+  - PPTX scene `Arc` clones.
+- `perf-query2` (0287): ODS query 35–41×, node size and XLSX memory scans, RTF single-target costs, ODT, and redundant leaf probes inside the fence (the per-match check stays).
+- `odf-gaps` (0288): the ODF `metadata` family, ODG producer inserts, ODC chart writes, ODI geometry, tree-format coalescing.
+- `phase-g` (0289): Phase G acceptance — per-format CRUD checklist with a smoke matrix, full-corpus open → no-op → save regression, benchmark matrix.
+
+Coordinator scripts and agent scratch now live in `/home/zhuhe/code/litchi-worktrees/.coord/` (outside the repository), so they survive `/tmp` wipes.
+
 Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-pptx-w4` 9474e2b6ce, `uo/m2-l-xlsb-w1` 876588a23c, `uo/m1-r4-perf` 012fd509ff.
 
 - M0a S10 (`docs/unified-ops/s10-measurement.md` §9). M0a landed on the strength of two explanations. If either is rejected, the chosen alternative becomes a harness follow-up; M0a is not reverted.
