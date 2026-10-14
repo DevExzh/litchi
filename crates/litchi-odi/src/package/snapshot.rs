@@ -51,37 +51,95 @@ struct State {
 pub(crate) struct Snapshot(Arc<State>);
 
 impl Snapshot {
-    pub(crate) fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_package(Package::open(path, MIMETYPE, BODY_MARKER, "ODI")?)
-    }
-
     pub(crate) fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         Self::from_package(Package::from_bytes(bytes, MIMETYPE, BODY_MARKER, "ODI")?)
     }
 
-    pub(crate) fn from_bytes_with_password(
-        bytes: Vec<u8>,
-        password: impl Into<String>,
-    ) -> Result<Self> {
-        Self::from_package(Package::from_bytes_with_password(
-            bytes,
-            password,
+    pub(crate) fn open_with_options(
+        path: impl AsRef<Path>,
+        options: litchi_odf_common::OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        Ok(Self::from_package(Package::open_with_options(
+            path,
+            options,
             MIMETYPE,
             BODY_MARKER,
             "ODI",
+        )?)?)
+    }
+
+    pub(crate) fn open_with_password_and_options(
+        path: impl AsRef<Path>,
+        password: impl Into<String>,
+        options: litchi_odf_common::OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        Ok(Self::from_package(
+            Package::open_with_password_and_options(
+                path,
+                password,
+                options,
+                MIMETYPE,
+                BODY_MARKER,
+                "ODI",
+            )?,
         )?)
     }
 
-    pub(crate) fn open_with_password(
-        path: impl AsRef<Path>,
-        password: impl Into<String>,
-    ) -> Result<Self> {
-        Self::from_package(Package::open_with_password(
-            path,
-            password,
+    pub(crate) fn from_bytes_with_options(
+        bytes: Vec<u8>,
+        options: litchi_odf_common::OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        Ok(Self::from_package(Package::from_bytes_with_options(
+            bytes,
+            options,
             MIMETYPE,
             BODY_MARKER,
             "ODI",
+        )?)?)
+    }
+
+    pub(crate) fn from_bytes_with_password_and_options(
+        bytes: Vec<u8>,
+        password: impl Into<String>,
+        options: litchi_odf_common::OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        Ok(Self::from_package(
+            Package::from_bytes_with_password_and_options(
+                bytes,
+                password,
+                options,
+                MIMETYPE,
+                BODY_MARKER,
+                "ODI",
+            )?,
+        )?)
+    }
+
+    pub(crate) fn from_reader_with_options(
+        reader: impl std::io::Read,
+        options: litchi_odf_common::OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        Ok(Self::from_package(Package::from_reader_with_options(
+            reader,
+            options,
+            MIMETYPE,
+            BODY_MARKER,
+            "ODI",
+        )?)?)
+    }
+
+    pub(crate) fn from_owned_package_with_options(
+        archive: litchi_odf_common::core::OwnedPackage,
+        options: litchi_odf_common::OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        Ok(Self::from_package(
+            Package::from_owned_package_with_options(
+                archive,
+                options,
+                MIMETYPE,
+                BODY_MARKER,
+                "ODI",
+            )?,
         )?)
     }
 
@@ -176,19 +234,16 @@ impl Snapshot {
             .transpose()
     }
 
+    pub(crate) fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
+        self.0.package.tolerance_report()
+    }
+
     pub(crate) fn as_bytes(&self) -> &[u8] {
         self.0.package.as_bytes()
     }
 
     pub(crate) fn files(&self) -> Result<Vec<String>> {
         self.0.package.files()
-    }
-
-    pub(crate) fn into_bytes(self) -> Vec<u8> {
-        match Arc::try_unwrap(self.0) {
-            Ok(state) => state.package.into_bytes(),
-            Err(state) => state.package.as_bytes().to_vec(),
-        }
     }
 
     pub(crate) fn frames(&self) -> &[Frame] {

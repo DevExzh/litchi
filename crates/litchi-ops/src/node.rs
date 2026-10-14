@@ -66,6 +66,8 @@ macro_rules! dispatch {
             Node::Ods($inner) => $body,
             #[cfg(feature = "odp")]
             Node::Odp($inner) => $body,
+            #[cfg(feature = "odf-objects")]
+            Node::Object($inner) => $body,
             #[cfg(any(test, feature = "test-support"))]
             Node::Fake($inner) => $body,
             #[cfg(not(any(
@@ -80,6 +82,7 @@ macro_rules! dispatch {
                 feature = "odt",
                 feature = "ods",
                 feature = "odp",
+                feature = "odf-objects",
                 test,
                 feature = "test-support"
             )))]
@@ -143,7 +146,8 @@ pub(crate) use view::Project;
     feature = "xls",
     feature = "ods",
     feature = "odt",
-    feature = "odp"
+    feature = "odp",
+    feature = "odf-objects"
 ))]
 pub(crate) use view::Source;
 pub use view::{
@@ -207,6 +211,10 @@ pub enum Node<'f> {
     /// An OpenDocument presentation node (tier-3 adapter, record 0278).
     #[cfg(feature = "odp")]
     Odp(crate::format::odp::Node<'f>),
+    /// An OpenDocument drawing, chart, image, database or formula node
+    /// (object-tree adapter, record 0282).
+    #[cfg(feature = "odf-objects")]
+    Object(crate::format::odf_tree::Node<'f>),
     /// A node of the test-only fake format.
     #[cfg(any(test, feature = "test-support"))]
     #[doc(hidden)]
@@ -224,6 +232,7 @@ pub enum Node<'f> {
         feature = "odt",
         feature = "ods",
         feature = "odp",
+        feature = "odf-objects",
         test,
         feature = "test-support"
     )))]

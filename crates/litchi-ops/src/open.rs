@@ -341,6 +341,13 @@ fn not_enabled(format: FileFormat) -> Error {
         FileFormat::Odt => "odt",
         FileFormat::Ods => "ods",
         FileFormat::Odp => "odp",
+        FileFormat::Oth => "oth",
+        FileFormat::Odm => "odm",
+        FileFormat::Odg => "odg",
+        FileFormat::Odc => "odc",
+        FileFormat::Odi => "odi",
+        FileFormat::Odb => "odb",
+        FileFormat::Odf => "odf-formula",
         _ => return Error::unsupported_format(Some(format)),
     };
     Error::feature_disabled(format, feature)
@@ -378,14 +385,22 @@ fn signed_if(file: File, format: FileFormat, signed: bool, origin: crate::Signat
     feature = "xlsb",
     feature = "rtf",
     feature = "ods",
-    feature = "odp"
+    feature = "odp",
+    feature = "odt",
+    feature = "odf-objects"
 ))]
 pub(crate) fn attach_origin(file: File, origin: Arc<Path>) -> File {
     match file {
         #[cfg(feature = "rtf")]
         File::Rtf(rtf) => File::Rtf(rtf.with_origin(Some(origin))),
         #[cfg(feature = "odt")]
-        File::Odt(odt) => File::Odt(odt.with_origin(Some(origin))),
+        File::Odt(odt) | File::Oth(odt) | File::Odm(odt) => {
+            odt.with_origin(Some(origin)).into_file()
+        },
+        #[cfg(feature = "odf-objects")]
+        File::Odg(tree) | File::Odc(tree) | File::Odi(tree) | File::Odb(tree) | File::Odf(tree) => {
+            tree.with_origin(Some(origin)).into_file()
+        },
         #[cfg(feature = "odp")]
         File::Odp(odp) => File::Odp(odp.with_origin(Some(origin))),
         #[cfg(feature = "doc")]
@@ -551,7 +566,12 @@ pub(crate) fn ooxml_from_eager_package_with_origin(
 }
 
 /// Build the eager handle for an ODF package detection prepared.
-#[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
+#[cfg(any(
+    feature = "odt",
+    feature = "ods",
+    feature = "odp",
+    feature = "odf-objects"
+))]
 fn odf_from_prepared(
     prepared: litchi_odf_common::PreparedPackage,
     options: &OpenOptions,
@@ -559,6 +579,16 @@ fn odf_from_prepared(
     Ok(match prepared.format() {
         #[cfg(feature = "odt")]
         FileFormat::Odt => File::Odt(crate::format::odt::Odt::from_prepared(prepared, options)?),
+        #[cfg(feature = "oth")]
+        FileFormat::Oth => File::Oth(crate::format::odt::Odt::from_prepared(prepared, options)?),
+        #[cfg(feature = "odm")]
+        FileFormat::Odm => File::Odm(crate::format::odt::Odt::from_prepared(prepared, options)?),
+        #[cfg(feature = "odf-objects")]
+        FileFormat::Odg | FileFormat::Odc | FileFormat::Odi | FileFormat::Odb | FileFormat::Odf
+            if crate::read::Adapter::of(prepared.format()).is_some() =>
+        {
+            crate::format::odf_tree::OdfTree::from_prepared(prepared, options)?.into_file()
+        },
         #[cfg(feature = "ods")]
         FileFormat::Ods => File::Ods(crate::format::ods::Ods::from_prepared(prepared, options)?),
         #[cfg(feature = "odp")]
@@ -569,7 +599,12 @@ fn odf_from_prepared(
 
 /// Refuse a flat (single XML document) OpenDocument input: the read
 /// handles open packaged ODF only, as the facade's did.
-#[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
+#[cfg(any(
+    feature = "odt",
+    feature = "ods",
+    feature = "odp",
+    feature = "odf-objects"
+))]
 fn flat_odf_unsupported(format: FileFormat) -> Error {
     Error::new(
         crate::Code::UnsupportedCapability,

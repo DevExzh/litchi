@@ -3,7 +3,7 @@
     reason = "test code panics on failure; unwrap keeps assertions concise"
 )]
 
-use litchi_odb::{Builder, Database, connection::Connection, query::Query};
+use litchi_odb::{Builder, connection::Connection, query::Query};
 
 const COMPACT_CONTENT: &str = concat!(
     r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
@@ -39,16 +39,19 @@ fn focused_modules_are_the_canonical_semantic_api() {
         Connection::File(_)
     ));
 
-    let bytes = Builder::new().build().unwrap();
-    let database = Database::from_bytes(bytes).unwrap();
-    assert!(database.content_xml().contains("<office:database"));
+    let database = Builder::new().build().unwrap();
+    assert!(
+        database
+            .database()
+            .content_xml()
+            .contains("<office:database")
+    );
 }
 
 #[test]
 fn compact_authored_content_is_published_without_rewriting() {
-    let database =
-        Database::from_bytes(Builder::new().content_xml(COMPACT_CONTENT).build().unwrap()).unwrap();
-    assert_eq!(database.content_xml(), COMPACT_CONTENT);
+    let database = Builder::new().content_xml(COMPACT_CONTENT).build().unwrap();
+    assert_eq!(database.database().content_xml(), COMPACT_CONTENT);
 }
 
 #[test]
@@ -58,21 +61,21 @@ fn noncompact_authored_content_returns_a_typed_error() {
             .content_xml(NONCOMPACT_CONTENT)
             .build()
             .unwrap_err(),
-        litchi_core::Error::XmlCompactness {
+        litchi_odb::Error::Core(litchi_core::Error::XmlCompactness {
             kind: litchi_core::xml::CompactnessKind::FormattingWhitespace,
             ..
-        }
+        })
     ));
 }
 
 #[test]
 fn semantic_whitespace_is_preserved_exactly() {
-    let database = Database::from_bytes(
-        Builder::new()
-            .content_xml(SEMANTIC_WHITESPACE_CONTENT)
-            .build()
-            .unwrap(),
-    )
-    .unwrap();
-    assert_eq!(database.content_xml(), SEMANTIC_WHITESPACE_CONTENT);
+    let database = Builder::new()
+        .content_xml(SEMANTIC_WHITESPACE_CONTENT)
+        .build()
+        .unwrap();
+    assert_eq!(
+        database.database().content_xml(),
+        SEMANTIC_WHITESPACE_CONTENT
+    );
 }

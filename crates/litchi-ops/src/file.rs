@@ -5,6 +5,8 @@
 use crate::format::doc::Doc;
 #[cfg(feature = "docx")]
 use crate::format::docx::Docx;
+#[cfg(feature = "odf-objects")]
+use crate::format::odf_tree::OdfTree;
 #[cfg(feature = "odp")]
 use crate::format::odp::Odp;
 #[cfg(feature = "ods")]
@@ -161,16 +163,45 @@ pub enum File {
     /// A Rich Text Format (`.rtf`) document with paragraph-text writes.
     #[cfg(feature = "rtf")]
     Rtf(Rtf),
-    /// An OpenDocument Text (`.odt`) document; read-only.
+    /// An OpenDocument Text (`.odt`, `.ott`) document.
     #[cfg(feature = "odt")]
     Odt(Odt),
+    /// An OpenDocument HTML template (`.oth`, `text-web`), read and written
+    /// through the ODT content model (record 0282). Opened only when the
+    /// `oth` cargo feature is on.
+    #[cfg(feature = "odt")]
+    Oth(Odt),
+    /// An OpenDocument master document (`.odm`), read and written through
+    /// the ODT content model (record 0282); linked sub-documents stay links.
+    /// Opened only when the `odm` cargo feature is on.
+    #[cfg(feature = "odt")]
+    Odm(Odt),
     /// An OpenDocument Spreadsheet workbook: packaged `.ods` (editable) or
     /// flat `.fods` (read-only).
     #[cfg(feature = "ods")]
     Ods(Ods),
-    /// An OpenDocument Presentation (`.odp`) presentation; read-only.
+    /// An OpenDocument Presentation (`.odp`) presentation.
     #[cfg(feature = "odp")]
     Odp(Odp),
+    /// An OpenDocument drawing (`.odg`, `.otg`), read and written through
+    /// the object-tree adapter (record 0282). Opened when the `odg` cargo
+    /// feature is on.
+    #[cfg(feature = "odf-objects")]
+    Odg(OdfTree),
+    /// An OpenDocument chart (`.odc`); opened with the `odc` feature.
+    #[cfg(feature = "odf-objects")]
+    Odc(OdfTree),
+    /// An OpenDocument image (`.odi`); opened with the `odi` feature.
+    #[cfg(feature = "odf-objects")]
+    Odi(OdfTree),
+    /// An OpenDocument database front end (`.odb`); opened with the `odb`
+    /// feature.
+    #[cfg(feature = "odf-objects")]
+    Odb(OdfTree),
+    /// An OpenDocument formula (`.odf`); opened with the `odf-formula`
+    /// feature.
+    #[cfg(feature = "odf-objects")]
+    Odf(OdfTree),
     /// An encrypted input: neither readable nor editable until it is
     /// unlocked with its password.
     Locked(Locked),
@@ -192,6 +223,30 @@ const _: () = {
 const _: () = assert!(size_of::<File>() == 16);
 
 impl File {
+    /// The object-tree handle of an ODG, ODC, ODI, ODB or ODF formula file.
+    #[cfg(feature = "odf-objects")]
+    pub(crate) fn odf_tree(&self) -> Option<&OdfTree> {
+        match self {
+            Self::Odg(handle)
+            | Self::Odc(handle)
+            | Self::Odi(handle)
+            | Self::Odb(handle)
+            | Self::Odf(handle) => Some(handle),
+            #[allow(unreachable_patterns, reason = "format variants depend on features")]
+            _ => None,
+        }
+    }
+
+    /// The ODT-model handle of an ODT, OTH or ODM file.
+    #[cfg(feature = "odt")]
+    pub(crate) fn odt_family(&self) -> Option<&Odt> {
+        match self {
+            Self::Odt(handle) | Self::Oth(handle) | Self::Odm(handle) => Some(handle),
+            #[allow(unreachable_patterns, reason = "format variants depend on features")]
+            _ => None,
+        }
+    }
+
     /// The format of the content.
     ///
     /// A [`File::Signed`] reports the format of the file it wraps. Only a
@@ -229,7 +284,13 @@ impl File {
             #[cfg(feature = "rtf")]
             Self::Rtf(_) => Some(FileFormat::Rtf),
             #[cfg(feature = "odt")]
-            Self::Odt(_) => Some(FileFormat::Odt),
+            Self::Odt(handle) | Self::Oth(handle) | Self::Odm(handle) => Some(handle.format()),
+            #[cfg(feature = "odf-objects")]
+            Self::Odg(handle)
+            | Self::Odc(handle)
+            | Self::Odi(handle)
+            | Self::Odb(handle)
+            | Self::Odf(handle) => Some(handle.format()),
             #[cfg(feature = "ods")]
             Self::Ods(_) => Some(FileFormat::Ods),
             #[cfg(feature = "odp")]
@@ -371,7 +432,13 @@ impl File {
             #[cfg(feature = "rtf")]
             Self::Rtf(handle) => handle.text(),
             #[cfg(feature = "odt")]
-            Self::Odt(handle) => handle.text(),
+            Self::Odt(handle) | Self::Oth(handle) | Self::Odm(handle) => handle.text(),
+            #[cfg(feature = "odf-objects")]
+            Self::Odg(handle)
+            | Self::Odc(handle)
+            | Self::Odi(handle)
+            | Self::Odb(handle)
+            | Self::Odf(handle) => handle.text(),
             #[cfg(feature = "ods")]
             Self::Ods(handle) => handle.text(),
             #[cfg(feature = "odp")]
@@ -414,7 +481,13 @@ impl File {
             #[cfg(feature = "rtf")]
             Self::Rtf(handle) => handle.metadata(),
             #[cfg(feature = "odt")]
-            Self::Odt(handle) => handle.metadata(),
+            Self::Odt(handle) | Self::Oth(handle) | Self::Odm(handle) => handle.metadata(),
+            #[cfg(feature = "odf-objects")]
+            Self::Odg(handle)
+            | Self::Odc(handle)
+            | Self::Odi(handle)
+            | Self::Odb(handle)
+            | Self::Odf(handle) => handle.metadata(),
             #[cfg(feature = "ods")]
             Self::Ods(handle) => handle.metadata(),
             #[cfg(feature = "odp")]
@@ -453,7 +526,17 @@ impl File {
             #[cfg(feature = "rtf")]
             Self::Rtf(handle) => handle.tolerance_report().map(ToleranceReport::Rtf),
             #[cfg(feature = "odt")]
-            Self::Odt(handle) => handle.tolerance_report().map(ToleranceReport::Odt),
+            Self::Odt(handle) | Self::Oth(handle) | Self::Odm(handle) => {
+                handle.tolerance_report().map(ToleranceReport::Odt)
+            },
+            #[cfg(feature = "odf-objects")]
+            Self::Odg(handle)
+            | Self::Odc(handle)
+            | Self::Odi(handle)
+            | Self::Odb(handle)
+            | Self::Odf(handle) => handle
+                .tolerance_report()
+                .map(|report| ToleranceReport::Object(handle.format(), report)),
             #[cfg(feature = "ods")]
             Self::Ods(handle) => handle.tolerance_report().map(ToleranceReport::Ods),
             #[cfg(feature = "odp")]
@@ -492,7 +575,9 @@ impl File {
             #[cfg(feature = "rtf")]
             Self::Rtf(handle) => Ok(DocumentView::rtf(handle)),
             #[cfg(feature = "odt")]
-            Self::Odt(handle) => Ok(DocumentView::odt(handle)),
+            Self::Odt(handle) | Self::Oth(handle) | Self::Odm(handle) => {
+                Ok(DocumentView::odt(handle))
+            },
             Self::Locked(locked) => Err(locked.view_error(Family::Document)),
             Self::Signed(signed) => signed.file().document(),
             #[allow(
@@ -601,7 +686,13 @@ impl std::fmt::Debug for File {
             #[cfg(feature = "rtf")]
             Self::Rtf(handle) => handle.fmt(formatter),
             #[cfg(feature = "odt")]
-            Self::Odt(handle) => handle.fmt(formatter),
+            Self::Odt(handle) | Self::Oth(handle) | Self::Odm(handle) => handle.fmt(formatter),
+            #[cfg(feature = "odf-objects")]
+            Self::Odg(handle)
+            | Self::Odc(handle)
+            | Self::Odi(handle)
+            | Self::Odb(handle)
+            | Self::Odf(handle) => handle.fmt(formatter),
             #[cfg(feature = "ods")]
             Self::Ods(handle) => handle.fmt(formatter),
             #[cfg(feature = "odp")]

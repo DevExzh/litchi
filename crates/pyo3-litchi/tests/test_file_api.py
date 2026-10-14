@@ -159,10 +159,19 @@ class OpenTests(ErrorAssertions):
             "unsupported_capability",
         )
 
-    def test_formats_without_a_file_variant_are_refused(self):
-        error = raised(lambda: open_fixture("libreoffice-core/desktop/qa/data/BlankDrawDocument.odg"))
-        self.assertError(error, L.UnsupportedError, "unsupported_format", None)
-        self.assertEqual(error.message, "detected Odg, which this operation does not handle")
+    def test_every_odf_format_opens_as_a_file(self):
+        # Record 0282: the remaining ODF formats have File variants.
+        for relative, name in (
+            ("libreoffice-core/desktop/qa/data/BlankDrawDocument.odg", "Odg"),
+            ("odf/odc-producer-evidence/odfdom-created.odc", "Odc"),
+            ("odf/native-resave/source/font-styles.odf", "Odf"),
+            ("libreoffice-core/sw/qa/extras/odfexport/data/tdf121119.odm", "Odm"),
+            ("libreoffice-core/dbaccess/qa/unit/data/tdf132924.odb", "Odb"),
+        ):
+            with self.subTest(fixture=relative):
+                file = open_fixture(relative)
+                self.assertEqual(str(file.format), name)
+                self.assertEqual(file.get("/", 0)["path"], "/")
 
     def test_iwork_refusal_names_the_family_opener(self):
         # litchi::File holds Apple iWork from tier 3 (M6); the family classes

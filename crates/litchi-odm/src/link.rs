@@ -3,7 +3,7 @@
 use litchi_core::{Error, Position, Result};
 use std::{borrow::Cow, ops::Range, sync::Arc};
 
-use crate::Master;
+use crate::Package;
 
 const MAX_HREF_BYTES: usize = 16 * 1024;
 const MAX_CONTENT_BYTES: usize = 256 * 1024 * 1024;
@@ -38,7 +38,7 @@ impl From<Position> for Selector<'_> {
 
 /// An isolated edit of one existing `text:section-source` link.
 pub struct Edit<'source> {
-    source: &'source Master,
+    source: &'source Package,
     reference: Position,
     span: Range<usize>,
     before: String,
@@ -46,7 +46,7 @@ pub struct Edit<'source> {
 }
 
 impl<'source> Edit<'source> {
-    pub(crate) fn new(source: &'source Master, selector: Selector<'_>) -> Result<Self> {
+    pub(crate) fn new(source: &'source Package, selector: Selector<'_>) -> Result<Self> {
         let reference = resolve(source, selector)?;
         let selected = source
             .subdocuments()
@@ -165,12 +165,12 @@ impl Change {
 
 /// A validated publication result containing a new snapshot and patch.
 pub struct Commit {
-    snapshot: Master,
+    snapshot: Package,
     patch: Patch,
 }
 
 impl Commit {
-    fn new(source: &Master, snapshot: Master, change: Change) -> Self {
+    fn new(source: &Package, snapshot: Package, change: Change) -> Self {
         Self {
             patch: Patch {
                 before: source.shared_bytes(),
@@ -181,9 +181,9 @@ impl Commit {
         }
     }
 
-    /// Returns the committed immutable master-document snapshot.
+    /// Returns the committed immutable master-document package.
     #[must_use]
-    pub const fn snapshot(&self) -> &Master {
+    pub const fn package(&self) -> &Package {
         &self.snapshot
     }
 
@@ -193,10 +193,16 @@ impl Commit {
         &self.patch
     }
 
-    /// Consumes the commit and returns the published snapshot.
+    /// Consumes the commit and returns the published package.
     #[must_use]
-    pub fn into_snapshot(self) -> Master {
+    pub fn into_package(self) -> Package {
         self.snapshot
+    }
+
+    /// Consumes the commit into its published package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.snapshot, self.patch)
     }
 }
 
@@ -217,7 +223,7 @@ impl Patch {
 
     /// Returns whether the patch applies to this exact source artifact.
     #[must_use]
-    pub fn is_applicable_to(&self, source: &Master) -> bool {
+    pub fn is_applicable_to(&self, source: &Package) -> bool {
         source.as_bytes() == self.before.as_slice()
     }
 
@@ -226,13 +232,13 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error when the supplied source differs byte-for-byte.
-    pub fn apply(&self, source: &Master) -> Result<Master> {
+    pub(crate) fn apply(&self, source: &Package) -> Result<Package> {
         if !self.is_applicable_to(source) {
             return Err(invalid(
                 "ODM linked-section patch source does not match its expected snapshot",
             ));
         }
-        Master::from_shared_bytes(Arc::clone(&self.after))
+        Package::from_shared_bytes(Arc::clone(&self.after))
     }
 
     /// Returns the patch that restores the exact source package bytes.
@@ -286,7 +292,7 @@ pub(crate) fn replace_attribute_value(
     Ok(output)
 }
 
-fn resolve(source: &Master, selector: Selector<'_>) -> Result<Position> {
+fn resolve(source: &Package, selector: Selector<'_>) -> Result<Position> {
     match selector {
         Selector::Position(position) => source
             .subdocuments()

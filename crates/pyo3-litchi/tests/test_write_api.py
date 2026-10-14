@@ -44,7 +44,11 @@ NOTES_PPT = "poi/test-data/slideshow/basic_test_ppt_file.ppt"
 RTF_INPUT = rb"{\rtf1\ansi First\par Second\par Third\par Fourth}"
 
 #: The formats ``create`` builds.
-CREATABLE = ("docx", "xlsx", "pptx", "xlsb", "doc", "xls", "ppt", "rtf", "ods", "odt", "odp")
+CREATABLE = (
+    "docx", "xlsx", "pptx", "xlsb", "doc", "xls", "ppt", "rtf", "ods", "odt", "odp",
+    # The remaining ODF formats (record 0282).
+    "oth", "odm", "odg", "odc", "odi", "odb", "odf",
+)
 #: The formats File holds read-only, and a fixture of each: none since ODT
 #: (0276), ODS (0277) and ODP (0278) gained writers.
 READ_ONLY: tuple[tuple[str, str], ...] = ()
@@ -142,7 +146,7 @@ class CreateTests(WriteAssertions):
         self.assertError(raised(lambda: L.create(5)), L.PropertyError, "invalid_argument")
 
     def test_formats_without_a_builder_are_unsupported(self):
-        for name in ("pages", "odg"):
+        for name in ("pages",):
             with self.subTest(format=name):
                 error = raised(lambda: L.create(name))
                 self.assertIsInstance(error, L.UnsupportedError)
@@ -473,8 +477,9 @@ class CapabilityAgreementTests(WriteAssertions):
                     self.assertIsInstance(error, L.UnsupportedError)
                     self.assertEqual(error.code, verbs[verb]["code"])
         # DOC (0258), PPT (0260) and XLS (0259) support every write verb.
-        # DOC (0258), PPT (0260), XLS (0259), ODS (0277), ODT (0276) and ODP
-        # (0278) support every write verb; any other refusal is checked above.
+        # DOC (0258), PPT (0260), XLS (0259), ODS (0277), ODT (0276), ODP
+        # (0278), OTH and ODM (0282) support every write verb; the ODF object
+        # formats (0282) refuse their missing structural verbs, checked above.
 
     def test_read_only_formats_refuse_every_write(self):
         for relative, name in READ_ONLY:

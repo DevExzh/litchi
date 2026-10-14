@@ -24,6 +24,8 @@ registry fragments also carry their own MPL-2.0 / Apache-2.0 headers.
 | `sc/qa/unit/data/xlsb/pivottable_error_item_filter.xlsb` | `8e6f1e9e571d92c2f50ee63a7ad23a382b990ccf3efc36fa18f19ca2d652be58` | same |
 | `sc/qa/unit/data/xlsb/shared_formula.xlsb` | `e06ae79ed345495eee0bf5e7fd7a32638af0b646c5819f7d83a4f6fb97a151a3` | same |
 | `sc/qa/unit/data/xlsx/tdf169496_hidden_graphic.xlsx` | `0b647da300a085f39914fdfae961463ae9e54ffe772b2e0eb9860a841ab93f72` | `crates/litchi-xlsx/tests/drawing_svg_read.rs` |
+| `vcl/qa/cppunit/pdfexport/data/master.odm` | `55a725023e4d51c575c232b49452fbb83358b50376ddd0afdc8d151328a8aa0f` | `crates/litchi-ops/tests/odm_unified.rs`, query corpus (record 0282; copied 2026-10-14) |
+| `sw/qa/extras/uiwriter/data/DUMMY.odm` | `a9d6b79efd389eba58ddf3db8ed63cfd88fd3c1a753c124e0070410c1343e852` | same |
 
 ## Filter registry fragments
 

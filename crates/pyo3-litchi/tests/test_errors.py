@@ -36,6 +36,7 @@ ACCEPTED = (
     ("ole/doc/NoHeadFoot.doc", "Doc", L.Document),
     ("rtf/testStyles.rtf", "Rtf", L.Document),
     ("odf/corpus/writer-table.odt", "Odt", L.Document),
+    ("libreoffice-core/sw/qa/extras/odfexport/data/tdf121119.odm", "Odm", L.Document),
     ("iwork/pages/basic.pages", "Pages", L.Document),
     ("ooxml/pptx/sample.pptx", "Pptx", L.Presentation),
     ("odf/odp/tdf169979.odp", "Odp", L.Presentation),
@@ -50,12 +51,13 @@ ACCEPTED = (
 FLAT_ODF = ("odf/odt/form-controls.fodt", "odf/drawing/multicolor-gradient.fodp")
 FLAT_ODS = "odf/ods/grid-padding.fods"
 
-#: ODF variants that detection names but no Python opener reads.
+#: ODF object formats no family opener reads: ``litchi_py.open`` holds them
+#: as ``File`` (record 0282), but they are neither documents,
+#: presentations nor workbooks.
 DETECTED_NOT_OPENED = (
     "libreoffice-core/desktop/qa/data/BlankDrawDocument.odg",
     "odf/odc-producer-evidence/odfdom-created.odc",
     "odf/native-resave/source/font-styles.odf",
-    "libreoffice-core/sw/qa/extras/odfexport/data/tdf121119.odm",
     "libreoffice-core/dbaccess/qa/unit/data/tdf132924.odb",
 )
 
@@ -266,7 +268,7 @@ class MessageSnapshotTests(unittest.TestCase):
                 ]
                 rows += [
                     (opener, fixture(r), self.DETECTED.format(name))
-                    for r, name in zip(DETECTED_NOT_OPENED, ("Odg", "Odc", "Odf", "Odm", "Odb"))
+                    for r, name in zip(DETECTED_NOT_OPENED, ("Odg", "Odc", "Odf", "Odb"))
                 ]
             for relative, detected, accepting in ACCEPTED:
                 rows += [

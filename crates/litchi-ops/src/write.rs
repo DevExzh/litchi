@@ -11,7 +11,8 @@
     feature = "rtf",
     feature = "ods",
     feature = "odt",
-    feature = "odp"
+    feature = "odp",
+    feature = "odf-objects"
 ))]
 use std::io;
 use std::io::Write;
@@ -96,10 +97,23 @@ impl File {
                 })
             },
             #[cfg(feature = "odt")]
-            Self::Odt(handle) => {
+            Self::Odt(handle) | Self::Oth(handle) | Self::Odm(handle) => {
                 let (commit, path) = handle.add(_parent.into_path()?, _node.into_node()?)?;
                 Ok(Added {
-                    file: Self::Odt(commit.after),
+                    file: commit.after.into_file(),
+                    path,
+                })
+            },
+
+            #[cfg(feature = "odf-objects")]
+            Self::Odg(handle)
+            | Self::Odc(handle)
+            | Self::Odi(handle)
+            | Self::Odb(handle)
+            | Self::Odf(handle) => {
+                let (commit, path) = handle.add(_parent.into_path()?, _node.into_node()?)?;
+                Ok(Added {
+                    file: commit.after.into_file(),
                     path,
                 })
             },
@@ -213,9 +227,18 @@ impl File {
                 .move_to(_path.into_path()?, _to.into_placement()?)
                 .map(|commit| Self::Rtf(commit.after)),
             #[cfg(feature = "odt")]
-            Self::Odt(handle) => handle
+            Self::Odt(handle) | Self::Oth(handle) | Self::Odm(handle) => handle
                 .move_to(_path.into_path()?, _to.into_placement()?)
-                .map(|commit| Self::Odt(commit.after)),
+                .map(|commit| commit.after.into_file()),
+
+            #[cfg(feature = "odf-objects")]
+            Self::Odg(handle)
+            | Self::Odc(handle)
+            | Self::Odi(handle)
+            | Self::Odb(handle)
+            | Self::Odf(handle) => handle
+                .move_to(_path.into_path()?, _to.into_placement()?)
+                .map(|commit| commit.after.into_file()),
             #[cfg(feature = "doc")]
             Self::Doc(handle) => handle
                 .move_to(_path.into_path()?, _to.into_placement()?)
@@ -293,9 +316,18 @@ impl File {
                 .remove(_target.into_target()?)
                 .map(|commit| Self::Rtf(commit.after)),
             #[cfg(feature = "odt")]
-            Self::Odt(handle) => handle
+            Self::Odt(handle) | Self::Oth(handle) | Self::Odm(handle) => handle
                 .remove(_target.into_target()?)
-                .map(|commit| Self::Odt(commit.after)),
+                .map(|commit| commit.after.into_file()),
+
+            #[cfg(feature = "odf-objects")]
+            Self::Odg(handle)
+            | Self::Odc(handle)
+            | Self::Odi(handle)
+            | Self::Odb(handle)
+            | Self::Odf(handle) => handle
+                .remove(_target.into_target()?)
+                .map(|commit| commit.after.into_file()),
             #[cfg(feature = "doc")]
             Self::Doc(handle) => handle
                 .remove(_target.into_target()?)
@@ -373,9 +405,18 @@ impl File {
                 .swap(_a.into_path()?, _b.into_path()?)
                 .map(|commit| Self::Rtf(commit.after)),
             #[cfg(feature = "odt")]
-            Self::Odt(handle) => handle
+            Self::Odt(handle) | Self::Oth(handle) | Self::Odm(handle) => handle
                 .swap(_a.into_path()?, _b.into_path()?)
-                .map(|commit| Self::Odt(commit.after)),
+                .map(|commit| commit.after.into_file()),
+
+            #[cfg(feature = "odf-objects")]
+            Self::Odg(handle)
+            | Self::Odc(handle)
+            | Self::Odi(handle)
+            | Self::Odb(handle)
+            | Self::Odf(handle) => handle
+                .swap(_a.into_path()?, _b.into_path()?)
+                .map(|commit| commit.after.into_file()),
             #[cfg(feature = "doc")]
             Self::Doc(handle) => handle
                 .swap(_a.into_path()?, _b.into_path()?)
@@ -509,9 +550,18 @@ impl File {
                 .set(_target.into_target()?, _props)
                 .map(|commit| Self::Ods(commit.after)),
             #[cfg(feature = "odt")]
-            Self::Odt(handle) => handle
+            Self::Odt(handle) | Self::Oth(handle) | Self::Odm(handle) => handle
                 .set(_target.into_target()?, _props)
-                .map(|commit| Self::Odt(commit.after)),
+                .map(|commit| commit.after.into_file()),
+
+            #[cfg(feature = "odf-objects")]
+            Self::Odg(handle)
+            | Self::Odc(handle)
+            | Self::Odi(handle)
+            | Self::Odb(handle)
+            | Self::Odf(handle) => handle
+                .set(_target.into_target()?, _props)
+                .map(|commit| commit.after.into_file()),
             #[cfg(feature = "odp")]
             Self::Odp(handle) => handle
                 .set(_target.into_target()?, _props)
@@ -555,7 +605,8 @@ impl File {
             feature = "rtf",
             feature = "ods",
             feature = "odt",
-            feature = "odp"
+            feature = "odp",
+            feature = "odf-objects"
         )),
         allow(
             clippy::only_used_in_recursion,
@@ -571,7 +622,18 @@ impl File {
                 Ok(counted.bytes)
             },
             #[cfg(feature = "odt")]
-            Self::Odt(handle) => {
+            Self::Odt(handle) | Self::Oth(handle) | Self::Odm(handle) => {
+                let mut counted = Counted { sink, bytes: 0 };
+                handle.write_to(&mut counted)?;
+                Ok(counted.bytes)
+            },
+
+            #[cfg(feature = "odf-objects")]
+            Self::Odg(handle)
+            | Self::Odc(handle)
+            | Self::Odi(handle)
+            | Self::Odb(handle)
+            | Self::Odf(handle) => {
                 let mut counted = Counted { sink, bytes: 0 };
                 handle.write_to(&mut counted)?;
                 Ok(counted.bytes)
@@ -671,7 +733,8 @@ fn pending(file: &File, operation: &str) -> Error {
     feature = "rtf",
     feature = "ods",
     feature = "odt",
-    feature = "odp"
+    feature = "odp",
+    feature = "odf-objects"
 ))]
 pub(crate) struct Counted<W> {
     pub(crate) sink: W,
@@ -689,7 +752,8 @@ pub(crate) struct Counted<W> {
     feature = "rtf",
     feature = "ods",
     feature = "odt",
-    feature = "odp"
+    feature = "odp",
+    feature = "odf-objects"
 ))]
 impl<W: Write> Write for Counted<W> {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {

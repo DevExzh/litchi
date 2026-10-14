@@ -4,7 +4,7 @@
 )]
 
 use litchi_odm::{
-    Builder, Master,
+    Builder, Package,
     section::Section,
     structure::{IndexKind, Kind},
     subdocument::Subdocument,
@@ -40,15 +40,14 @@ fn focused_modules_are_the_canonical_semantic_api() {
     assert_eq!(section.children()[0].href(), "chapter-1.odt");
 
     let bytes = Builder::new().build().unwrap();
-    let master = Master::from_bytes(bytes).unwrap();
-    assert!(master.content_xml().contains("<office:text"));
+    let master = Package::from_bytes(bytes.as_bytes()).unwrap();
+    assert!(master.document().content_xml().contains("<office:text"));
 }
 
 #[test]
 fn compact_authored_content_is_published_without_rewriting() {
-    let master =
-        Master::from_bytes(Builder::new().content_xml(COMPACT_CONTENT).build().unwrap()).unwrap();
-    assert_eq!(master.content_xml(), COMPACT_CONTENT);
+    let master = Builder::new().content_xml(COMPACT_CONTENT).build().unwrap();
+    assert_eq!(master.document().content_xml(), COMPACT_CONTENT);
 }
 
 #[test]
@@ -58,23 +57,20 @@ fn noncompact_authored_content_returns_a_typed_error() {
             .content_xml(NONCOMPACT_CONTENT)
             .build()
             .unwrap_err(),
-        litchi_core::Error::XmlCompactness {
+        litchi_odf_common::Error::Core(litchi_core::Error::XmlCompactness {
             kind: litchi_core::xml::CompactnessKind::FormattingWhitespace,
             ..
-        }
+        })
     ));
 }
 
 #[test]
 fn semantic_whitespace_is_preserved_exactly() {
-    let master = Master::from_bytes(
-        Builder::new()
-            .content_xml(SEMANTIC_WHITESPACE_CONTENT)
-            .build()
-            .unwrap(),
-    )
-    .unwrap();
-    assert_eq!(master.content_xml(), SEMANTIC_WHITESPACE_CONTENT);
+    let master = Builder::new()
+        .content_xml(SEMANTIC_WHITESPACE_CONTENT)
+        .build()
+        .unwrap();
+    assert_eq!(master.document().content_xml(), SEMANTIC_WHITESPACE_CONTENT);
 }
 
 #[test]
@@ -96,9 +92,9 @@ fn typed_builder_authors_common_master_body_content() {
         .body_item(BodyItemSpec::generated_index(IndexKind::TableOfContents, "Contents").unwrap())
         .build()
         .unwrap();
-    let master = Master::from_bytes(bytes).unwrap();
+    let master = Package::from_bytes(bytes.as_bytes()).unwrap();
     assert_eq!(
-        master.structure().items(),
+        master.document().structure().items(),
         &[
             Kind::Paragraph,
             Kind::Heading,
@@ -107,8 +103,13 @@ fn typed_builder_authors_common_master_body_content() {
             Kind::GeneratedIndex(IndexKind::TableOfContents),
         ]
     );
-    assert!(master.content_xml().contains("Introduction &amp; scope"));
-    assert!(!master.content_xml().contains('\n'));
+    assert!(
+        master
+            .document()
+            .content_xml()
+            .contains("Introduction &amp; scope")
+    );
+    assert!(!master.document().content_xml().contains('\n'));
     assert!(BodyItemSpec::heading(0, "invalid").is_err());
     assert!(BodyItemSpec::list(Vec::new()).is_err());
     assert!(

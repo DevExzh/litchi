@@ -187,7 +187,7 @@ impl<'a> DocumentView<'a> {
             #[cfg(feature = "rtf")]
             Inner::Rtf(_) => FileFormat::Rtf,
             #[cfg(feature = "odt")]
-            Inner::Odt(_) => FileFormat::Odt,
+            Inner::Odt(odt) => odt.format(),
         }
     }
 

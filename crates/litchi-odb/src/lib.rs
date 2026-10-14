@@ -21,15 +21,19 @@ mod package;
 
 pub use authoring::{
     ActiveContentDisposition, Change, ChangeAction, ChangeKind, Commit, CompositionLimits,
-    DependencyDisposition, DurablePatch, Edit, EditPolicy, EncryptionCapability, EncryptionPolicy,
-    History, HistoryLimits, JoinError, JoinedEdits, Lineage, MergeChoice, MergePlan,
-    MergePlanError, Patch, PreparedEdit, ProtectionCapabilities, ProtectionDecision,
+    DependencyDisposition, Diagnostics, DurablePatch, Edit, EditPolicy, EncryptionCapability,
+    EncryptionPolicy, History, HistoryLimits, JoinError, JoinedEdits, Lineage, MergeChoice,
+    MergePlan, MergePlanError, Patch, PreparedEdit, ProtectionCapabilities, ProtectionDecision,
     ProtectionOperation, ProtectionRefusal, ProtectionStatus, ProtectionSupport,
     ProtectionTransition, QueryChange, SealedPatch, SignatureCapability, SignaturePolicy,
 };
-pub use facade::{Builder, Database};
+pub use facade::{Builder, Database, Package};
 pub use litchi_odf_common::signature::{
     DigitalSignature, DigitalSignatures, SignatureValidity, SignatureVerification,
+};
+pub use litchi_odf_common::{
+    Error, LimitKind, OpenOptions, PreparedPackage, SemanticLimitKind, SemanticLimits,
+    SourceLimitKind, SourceLimits,
 };
 pub use model::connection::Connection;
 pub use model::query::{

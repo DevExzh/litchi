@@ -444,6 +444,19 @@ const SIGNED: Refusal = Refusal {
 };
 
 /// The refusal of every edit verb in M1.
+/// The structural verbs the ODF object-format leaves do not offer
+/// (record 0282): moving and swapping elements, and adding or removing
+/// where the format has no such operation.
+#[cfg_attr(
+    not(feature = "odf-objects"),
+    allow(dead_code, reason = "read only when an object format is compiled in")
+)]
+const OBJECT_STRUCTURE: Refusal = Refusal {
+    code: Code::UnsupportedCapability,
+    follow_up: "0282 ODF object-format structure",
+    reason: "the format's leaf has no such structural operation",
+};
+
 const EDITS: Refusal = Refusal {
     code: Code::UnsupportedCapability,
     follow_up: "M2",
@@ -926,6 +939,15 @@ impl Capabilities {
                 }
                 return Support::Supported;
             }
+            #[cfg(feature = "odf-objects")]
+            if let Some(writes) = self.adapter().and_then(crate::format::odf_tree::writes) {
+                return match verb {
+                    Verb::Set | Verb::Edit | Verb::Batch => Support::Supported,
+                    Verb::Add if !writes.addable.is_empty() => Support::Supported,
+                    Verb::Remove if !writes.removable.is_empty() => Support::Supported,
+                    _ => OBJECT_STRUCTURE.support(),
+                };
+            }
             return EDITS.support();
         }
         match verb {
@@ -964,6 +986,21 @@ impl Capabilities {
             return Support::Supported;
         }
         if self.format == Some(FileFormat::Odt) && cfg!(feature = "odt") {
+            return Support::Supported;
+        }
+        if matches!(
+            self.format,
+            Some(
+                FileFormat::Oth
+                    | FileFormat::Odm
+                    | FileFormat::Odg
+                    | FileFormat::Odc
+                    | FileFormat::Odi
+                    | FileFormat::Odb
+                    | FileFormat::Odf
+            )
+        ) && self.adapter().is_some()
+        {
             return Support::Supported;
         }
         if self.format == Some(FileFormat::Odp) && cfg!(feature = "odp") {
@@ -1008,6 +1045,21 @@ impl Capabilities {
             return Support::Supported;
         }
         if self.format == Some(FileFormat::Odt) && cfg!(feature = "odt") {
+            return Support::Supported;
+        }
+        if matches!(
+            self.format,
+            Some(
+                FileFormat::Oth
+                    | FileFormat::Odm
+                    | FileFormat::Odg
+                    | FileFormat::Odc
+                    | FileFormat::Odi
+                    | FileFormat::Odb
+                    | FileFormat::Odf
+            )
+        ) && self.adapter().is_some()
+        {
             return Support::Supported;
         }
         if self.format == Some(FileFormat::Odp) && cfg!(feature = "odp") {
@@ -1167,6 +1219,13 @@ fn refused(format: FileFormat) -> Refusal {
         FileFormat::Odt => feature("enable the `odt` cargo feature"),
         FileFormat::Ods => feature("enable the `ods` cargo feature"),
         FileFormat::Odp => feature("enable the `odp` cargo feature"),
+        FileFormat::Oth => feature("enable the `oth` cargo feature"),
+        FileFormat::Odm => feature("enable the `odm` cargo feature"),
+        FileFormat::Odg => feature("enable the `odg` cargo feature"),
+        FileFormat::Odc => feature("enable the `odc` cargo feature"),
+        FileFormat::Odi => feature("enable the `odi` cargo feature"),
+        FileFormat::Odb => feature("enable the `odb` cargo feature"),
+        FileFormat::Odf => feature("enable the `odf-formula` cargo feature"),
         FileFormat::Pages | FileFormat::Keynote | FileFormat::Numbers => closed(
             "M6",
             "iWork documents join `File` in milestone M6; read them through `litchi::iwork::Document`",
@@ -2288,6 +2347,16 @@ const fn view_gap(adapter: Adapter, mode: Mode) -> Option<&'static GapSpec> {
         Adapter::Odt => m1_view_gap(mode),
         #[cfg(feature = "odp")]
         Adapter::Odp => m1_view_gap(mode),
+        #[cfg(feature = "odg")]
+        Adapter::Odg => m1_view_gap(mode),
+        #[cfg(feature = "odc")]
+        Adapter::Odc => m1_view_gap(mode),
+        #[cfg(feature = "odi")]
+        Adapter::Odi => m1_view_gap(mode),
+        #[cfg(feature = "odb")]
+        Adapter::Odb => m1_view_gap(mode),
+        #[cfg(feature = "odf-formula")]
+        Adapter::OdfFormula => m1_view_gap(mode),
     }
 }
 
@@ -2430,6 +2499,16 @@ check_capabilities!(crate::format::ods::SPEC);
 check_capabilities!(crate::format::odt::SPEC);
 #[cfg(feature = "odp")]
 check_capabilities!(crate::format::odp::SPEC);
+#[cfg(feature = "odg")]
+check_capabilities!(crate::format::odf_tree::odg::SPEC);
+#[cfg(feature = "odc")]
+check_capabilities!(crate::format::odf_tree::odc::SPEC);
+#[cfg(feature = "odi")]
+check_capabilities!(crate::format::odf_tree::odi::SPEC);
+#[cfg(feature = "odb")]
+check_capabilities!(crate::format::odf_tree::odb::SPEC);
+#[cfg(feature = "odf-formula")]
+check_capabilities!(crate::format::odf_tree::formula::SPEC);
 
 /// Byte equality usable in constant evaluation.
 const fn same(a: &str, b: &str) -> bool {
@@ -2732,6 +2811,11 @@ impl Element {
                 && self.retains_source != Some(false)
                 && crate::format::odp::SETTABLE.contains(&self.data().canonical)
                 && readable);
+        #[cfg(feature = "odf-objects")]
+        let settable = settable
+            || (crate::format::odf_tree::writes(self.adapter)
+                .is_some_and(|writes| writes.settable.contains(&self.data().canonical))
+                && readable);
         let structural = {
             #[cfg(feature = "docx")]
             {
@@ -2818,6 +2902,11 @@ impl Element {
                 && self.retains_source != Some(false)
                 && crate::format::odp::ADDABLE.contains(&self.data().canonical)
                 && readable);
+        #[cfg(feature = "odf-objects")]
+        let add = add
+            || (crate::format::odf_tree::writes(self.adapter)
+                .is_some_and(|writes| writes.addable.contains(&self.data().canonical))
+                && readable);
         #[cfg(feature = "pptx")]
         let remove = structural
             || (self.adapter == Adapter::Pptx
@@ -2891,6 +2980,11 @@ impl Element {
             || (self.adapter == Adapter::Odp
                 && self.retains_source != Some(false)
                 && crate::format::odp::REMOVABLE.contains(&self.data().canonical)
+                && readable);
+        #[cfg(feature = "odf-objects")]
+        let remove = remove
+            || (crate::format::odf_tree::writes(self.adapter)
+                .is_some_and(|writes| writes.removable.contains(&self.data().canonical))
                 && readable);
         Operations {
             add,
@@ -3382,6 +3476,10 @@ fn option_gap(adapter: Adapter, index: usize) -> Option<Option<&'static GapSpec>
     #[cfg(feature = "odp")]
     if adapter == Adapter::Odp {
         return crate::format::odp::WRITE_GAPS.get(index).map(Some);
+    }
+    #[cfg(feature = "odf-objects")]
+    if let Some(writes) = crate::format::odf_tree::writes(adapter) {
+        return writes.gaps.get(index).map(Some);
     }
     let _ = (adapter, index);
     None

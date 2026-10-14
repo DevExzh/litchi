@@ -15,7 +15,8 @@
         feature = "rtf",
         feature = "ods",
         feature = "odt",
-        feature = "odp"
+        feature = "odp",
+        feature = "odf-objects"
     )),
     allow(
         dead_code,
@@ -76,6 +77,8 @@ enum Inner<'f> {
     Odt(crate::format::odt::views::Json),
     #[cfg(feature = "odp")]
     Odp(crate::format::odp::views::Json),
+    #[cfg(feature = "odf-objects")]
+    Object(crate::format::odf_tree::views::Json),
     /// Keeps `'f` in use; uninhabited.
     #[allow(dead_code, reason = "uninhabited: only keeps the lifetime in use")]
     Never(Infallible, PhantomData<&'f ()>),
@@ -161,6 +164,14 @@ impl Json<'_> {
             inner: Inner::Odp(json),
         }
     }
+
+    /// An object-tree view (ODG, ODC, ODI, ODB, ODF formula).
+    #[cfg(feature = "odf-objects")]
+    pub(crate) fn object(json: crate::format::odf_tree::views::Json) -> Self {
+        Self {
+            inner: Inner::Object(json),
+        }
+    }
 }
 
 impl Serialize for Json<'_> {
@@ -188,6 +199,8 @@ impl Serialize for Json<'_> {
             Inner::Odt(json) => json.serialize(serializer),
             #[cfg(feature = "odp")]
             Inner::Odp(json) => json.serialize(serializer),
+            #[cfg(feature = "odf-objects")]
+            Inner::Object(json) => json.serialize(serializer),
             Inner::Never(never, _) => match *never {},
         }
     }

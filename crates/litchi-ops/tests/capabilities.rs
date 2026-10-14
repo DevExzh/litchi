@@ -26,6 +26,13 @@ fn capability_goldens_follow_enabled_formats() {
         (FileFormat::Ods, "ods", cfg!(feature = "ods")),
         (FileFormat::Odt, "odt", cfg!(feature = "odt")),
         (FileFormat::Odp, "odp", cfg!(feature = "odp")),
+        (FileFormat::Oth, "oth", cfg!(feature = "oth")),
+        (FileFormat::Odm, "odm", cfg!(feature = "odm")),
+        (FileFormat::Odg, "odg", cfg!(feature = "odg")),
+        (FileFormat::Odc, "odc", cfg!(feature = "odc")),
+        (FileFormat::Odi, "odi", cfg!(feature = "odi")),
+        (FileFormat::Odb, "odb", cfg!(feature = "odb")),
+        (FileFormat::Odf, "odf", cfg!(feature = "odf-formula")),
     ] {
         if !enabled {
             continue;

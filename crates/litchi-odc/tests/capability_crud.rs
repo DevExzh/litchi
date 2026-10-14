@@ -4,8 +4,8 @@
 )]
 
 use litchi_odc::{
-    AxisSpec, CachedCell, CachedRow, CachedTable, CachedValue, Chart, ChartClass, DataPointSpec,
-    Definition, DefinitionHistory, DefinitionSnapshot, Limits, SeriesSpec, StyleTarget,
+    AxisSpec, Builder, CachedCell, CachedRow, CachedTable, CachedValue, ChartClass, DataPointSpec,
+    Definition, DefinitionHistory, DefinitionSnapshot, Limits, Package, SeriesSpec, StyleTarget,
     chart::Dimension,
 };
 
@@ -96,41 +96,68 @@ fn formulas_ranges_and_caller_limits_refuse_invalid_publication() {
     let mut value = definition();
     value.cached_table.as_mut().unwrap().rows[0].cells[0].formula =
         Some("of:=SUM([.B2:.B4])".into());
-    assert!(Chart::from_definition(value.clone()).is_ok());
+    assert!(
+        Builder::new()
+            .with_definition(value.clone())
+            .build()
+            .is_ok()
+    );
 
     value.cached_table.as_mut().unwrap().rows[0].cells[0].formula =
         Some("of:=SUM([.b2:.B4])".into());
-    assert!(Chart::from_definition(value).is_err());
+    assert!(Builder::new().with_definition(value).build().is_err());
 
     let tight_axes = Limits::new().with_axes(1).unwrap();
     let mut too_many = definition();
     too_many.plot_area.axes.push(AxisSpec::new(Dimension::Y));
-    assert!(Chart::from_definition_with_limits(too_many, tight_axes).is_err());
+    assert!(
+        Builder::new()
+            .with_limits(tight_axes)
+            .with_definition(too_many)
+            .build()
+            .is_err()
+    );
 
-    let bytes = Chart::from_definition(definition()).unwrap().into_bytes();
-    let tight_package = Limits::new().with_package_bytes(bytes.len() - 1).unwrap();
-    assert!(Chart::from_bytes_with_limits(bytes, tight_package).is_err());
+    let bytes = Builder::new()
+        .with_definition(definition())
+        .build()
+        .unwrap()
+        .to_bytes()
+        .unwrap();
+    let tight_package = litchi_odc::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(bytes.len() - 1).unwrap())
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        Package::from_bytes_with_options(
+            &bytes,
+            litchi_odc::OpenOptions::new().source_limits(tight_package)
+        ),
+        Err(litchi_odc::Error::Limit { .. })
+    ));
 }
 
 #[test]
 fn package_styles_and_resource_crud_reopens_composes_and_reverses() {
     let styles = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" office:version="1.4"><office:styles/></office:document-styles>"#;
-    let source = Chart::from_definition(definition()).unwrap();
+    let source = Builder::new()
+        .with_definition(definition())
+        .build()
+        .unwrap();
     let mut first_edit = source.edit();
     first_edit.set_styles_xml(styles);
     first_edit
         .add_resource("Pictures/chart.bin", "application/octet-stream", b"one")
         .unwrap();
     let first = first_edit.commit().unwrap();
-    assert_eq!(first.chart().styles_xml(), Some(styles));
-    assert_eq!(first.chart().resources().len(), 1);
-    assert_eq!(first.chart().resource_bytes(0).unwrap(), b"one");
-    let reopened =
-        Chart::from_bytes_with_limits(first.chart().as_bytes().to_vec(), first.chart().limits())
-            .unwrap();
-    assert_eq!(reopened.resource_bytes(0).unwrap(), b"one");
+    assert_eq!(first.package().chart().styles_xml(), Some(styles));
+    assert_eq!(first.package().chart().resources().len(), 1);
+    assert_eq!(first.package().chart().resource_bytes(0).unwrap(), b"one");
+    let reopened = Package::from_bytes(first.package().as_bytes()).unwrap();
+    assert_eq!(reopened.chart().resource_bytes(0).unwrap(), b"one");
 
-    let mut second_edit = first.chart().edit();
+    let mut second_edit = first.package().edit();
     second_edit
         .update_resource(0, "application/octet-stream", b"two")
         .unwrap();
@@ -138,25 +165,32 @@ fn package_styles_and_resource_crud_reopens_composes_and_reverses() {
     let second = second_edit.commit().unwrap();
     let composed = first.patch().compose(second.patch()).unwrap();
     assert_eq!(
-        composed.apply(&source).unwrap().as_bytes(),
-        second.chart().as_bytes()
+        source.apply(&composed).unwrap().as_bytes(),
+        second.package().as_bytes()
     );
     assert_eq!(
-        composed.inverse().apply(second.chart()).unwrap().as_bytes(),
+        second
+            .package()
+            .apply(&composed.inverse())
+            .unwrap()
+            .as_bytes(),
         source.as_bytes()
     );
-    assert!(composed.apply(first.chart()).is_err());
+    assert!(first.package().apply(&composed).is_err());
 
-    let mut remove = second.chart().edit();
+    let mut remove = second.package().edit();
     remove.remove_resource(0).unwrap();
     let removed = remove.commit().unwrap();
-    assert!(removed.chart().resources().is_empty());
-    assert!(removed.patch().inverse().apply(removed.chart()).is_ok());
+    assert!(removed.package().chart().resources().is_empty());
+    assert!(removed.package().apply(&removed.patch().inverse()).is_ok());
 }
 
 #[test]
 fn malformed_style_resource_and_bounded_history_are_refused() {
-    let source = Chart::from_definition(definition()).unwrap();
+    let source = Builder::new()
+        .with_definition(definition())
+        .build()
+        .unwrap();
     let mut bad_style = source.edit();
     bad_style.set_styles_xml("<office:document-styles>");
     assert!(bad_style.commit().is_err());

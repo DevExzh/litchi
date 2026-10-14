@@ -1,4 +1,12 @@
 //! `OpenDocument` Chart support with semantic responsibility layers.
+//!
+//! [`Package`] is the immutable owner of one packaged chart (`.odc`/`.otc`)
+//! and owns every state verb: `new`, `open*`, `from_bytes*`, `from_reader*`,
+//! `from_prepared_package`, `edit`, `apply`, `save*`, `to_bytes` and
+//! `write_to`. [`Chart`] is its read-only projection ([`Package::chart`]).
+//! The primary transaction family is [`Edit`], [`Patch`], [`Commit`],
+//! [`Diagnostics`], [`Error`] and [`LimitKind`]; [`Builder::build`] returns a
+//! [`Package`].
 #![forbid(unsafe_code)]
 
 pub mod authoring;
@@ -22,7 +30,8 @@ pub use authoring::{
     serialize_series_fragment,
 };
 pub use facade::{
-    Builder, Chart, Commit, Edit, History, PackageMerge, Patch, ResourceChange, StylesChange,
+    Builder, Chart, Commit, Diagnostics, Edit, History, Package, PackageMerge, Patch,
+    ResourceChange, StylesChange,
 };
 pub use flat::{
     AxisChange, AxisUpdate, ExactAttribute, ExactChange, ExactTarget, FlatChart, FlatChartCommit,
@@ -30,6 +39,9 @@ pub use flat::{
 };
 pub use limits::Limits;
 pub use litchi_odf_common::chart;
+pub use litchi_odf_common::{
+    Error, LimitKind, OpenOptions, SemanticLimitKind, SemanticLimits, SourceLimitKind, SourceLimits,
+};
 pub use merge::{Conflict, DefinitionMerge};
 pub use package::ChartPackageKind;
 pub use resource::Resource;

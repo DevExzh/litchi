@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, reason = "test assertions use unwrap for clarity")]
 
 use litchi_odi::{
-    Builder, FlatImage, FrameEditor, History, Image,
+    Builder, FlatImage, FrameEditor, History,
     frame::Frame,
     map::{Area, AreaKind, ImageMap},
     source::Source,
@@ -98,38 +98,52 @@ fn authored_maps_styles_metadata_and_graph_round_trip() {
         .with_image_map(map);
     let styles = r#"<?xml version="1.0"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><office:styles><style:style style:name="gr1" style:family="graphic"/></office:styles></office:document-styles>"#;
     let meta = r#"<?xml version="1.0"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:meta="urn:oasis:names:tc:opendocument:xmlns:meta:1.0"><office:meta><dc:title>Before</dc:title><meta:user-defined meta:name="opaque">keep</meta:user-defined></office:meta></office:document-meta>"#;
-    let source = Image::from_bytes(
-        Builder::new()
-            .frame(&frame)
-            .styles_xml(styles)
-            .meta_xml(meta)
-            .resource("Pictures/photo.png", "image/png", b"png".to_vec())
-            .resource("Thumbnails/thumbnail.png", "image/png", b"thumb".to_vec())
-            .build()
-            .unwrap(),
-    )
-    .unwrap();
+    let source = Builder::new()
+        .frame(&frame)
+        .styles_xml(styles)
+        .meta_xml(meta)
+        .resource("Pictures/photo.png", "image/png", b"png".to_vec())
+        .resource("Thumbnails/thumbnail.png", "image/png", b"thumb".to_vec())
+        .build()
+        .unwrap();
+    let source_image = source.image();
     assert_eq!(
-        source.frame().unwrap().image_map().unwrap().areas().len(),
+        source_image
+            .frame()
+            .unwrap()
+            .image_map()
+            .unwrap()
+            .areas()
+            .len(),
         2
     );
-    assert_eq!(source.styles_xml(), Some(styles));
-    assert!(source.resource_graph().nodes().iter().any(|node| {
+    assert_eq!(source_image.styles_xml(), Some(styles));
+    assert!(source_image.resource_graph().nodes().iter().any(|node| {
         node.path() == "Thumbnails/thumbnail.png" && node.is_present() && !node.is_referenced()
     }));
-    assert_eq!(source.resource_graph().edges().len(), 1);
+    assert_eq!(source_image.resource_graph().edges().len(), 1);
 
     let mut edit = source.edit();
     edit_frame(&mut edit);
     edit.set_title(Some("After".into())).unwrap();
     let commit = edit.commit().unwrap();
-    assert_eq!(commit.image().frame().unwrap().style_name(), Some("gr2"));
     assert_eq!(
-        commit.image().metadata().unwrap().title.as_deref(),
+        commit.package().image().frame().unwrap().style_name(),
+        Some("gr2")
+    );
+    assert_eq!(
+        commit
+            .package()
+            .image()
+            .metadata()
+            .unwrap()
+            .title
+            .as_deref(),
         Some("After")
     );
     assert!(
         commit
+            .package()
             .image()
             .meta_xml()
             .unwrap()
@@ -139,9 +153,8 @@ fn authored_maps_styles_metadata_and_graph_round_trip() {
     assert!(commit.patch().metadata_change().is_some());
     assert_eq!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.image())
+            .package()
+            .apply(&commit.patch().inverse())
             .unwrap()
             .as_bytes(),
         source.as_bytes()

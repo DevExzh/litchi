@@ -25,6 +25,13 @@ fn registry_goldens_follow_enabled_formats() {
         (FileFormat::Xlsx, "xlsx", cfg!(feature = "xlsx")),
         (FileFormat::Ods, "ods", cfg!(feature = "ods")),
         (FileFormat::Odp, "odp", cfg!(feature = "odp")),
+        (FileFormat::Oth, "oth", cfg!(feature = "oth")),
+        (FileFormat::Odm, "odm", cfg!(feature = "odm")),
+        (FileFormat::Odg, "odg", cfg!(feature = "odg")),
+        (FileFormat::Odc, "odc", cfg!(feature = "odc")),
+        (FileFormat::Odi, "odi", cfg!(feature = "odi")),
+        (FileFormat::Odb, "odb", cfg!(feature = "odb")),
+        (FileFormat::Odf, "odf", cfg!(feature = "odf-formula")),
     ] {
         let schema = litchi_ops::schema(format);
         assert_eq!(schema.registered(), enabled, "{name}");

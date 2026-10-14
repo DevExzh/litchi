@@ -250,15 +250,17 @@ pub(crate) enum Opener {
 }
 
 impl Opener {
-    /// The opener that reads `format`, if any does. ODM and OTH belong to
-    /// the word-processing family but have no reader yet, like the other
-    /// OpenDocument formats outside the three families.
+    /// The opener that reads `format`, if any does. ODM and OTH read as
+    /// documents through the ODT adapter (record 0282); the OpenDocument
+    /// object formats belong to none of the three families.
     fn of(format: FileFormat) -> Option<Self> {
         match format {
             FileFormat::Doc
             | FileFormat::Docx
             | FileFormat::Rtf
             | FileFormat::Odt
+            | FileFormat::Oth
+            | FileFormat::Odm
             | FileFormat::Pages => Some(Self::Document),
             FileFormat::Ppt | FileFormat::Pptx | FileFormat::Odp | FileFormat::Keynote => {
                 Some(Self::Presentation)

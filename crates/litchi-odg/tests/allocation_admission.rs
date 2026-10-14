@@ -3,7 +3,7 @@
     reason = "the integration test observes allocation admission"
 )]
 
-use litchi_odg::{Drawing, FlatDrawing};
+use litchi_odg::{FlatDrawing, Package};
 use soapberry_zip::office::StreamingArchiveWriter;
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::{
@@ -101,7 +101,7 @@ fn oversized_ignored_event_does_not_get_owned_before_admission() {
 
     ALLOCATED.store(0, Ordering::Relaxed);
     OBSERVE.store(true, Ordering::Relaxed);
-    let result = Drawing::from_bytes(package);
+    let result = Package::from_bytes(&package);
     OBSERVE.store(false, Ordering::Relaxed);
 
     let error = match result {
@@ -109,13 +109,16 @@ fn oversized_ignored_event_does_not_get_owned_before_admission() {
         Err(error) => error,
     };
     assert!(
-        matches!(error, litchi_core::Error::InvalidFormat(reason) if reason.contains("event") && reason.contains("limit"))
+        matches!(error, litchi_odg::Error::Core(litchi_core::Error::InvalidFormat(reason)) if reason.contains("event") && reason.contains("limit"))
     );
+    // `Package::from_bytes(&[u8])` copies the borrowed input exactly once
+    // before indexing; the admission bound applies to everything after it.
     let allocated = ALLOCATED.load(Ordering::Relaxed);
     assert!(
         allocated
             < content_bytes
                 .saturating_mul(2)
+                .saturating_add(package.len())
                 .saturating_add(8 * 1024 * 1024),
         "oversized event allocation probe observed {allocated} bytes for {content_bytes} input bytes"
     );
@@ -135,7 +138,7 @@ fn packaged_public_path_rejects_oversized_unknown_prefix_before_resolution() {
 
     ALLOCATED.store(0, Ordering::Relaxed);
     OBSERVE.store(true, Ordering::Relaxed);
-    let result = Drawing::from_bytes(package);
+    let result = Package::from_bytes(&package);
     OBSERVE.store(false, Ordering::Relaxed);
 
     let error = match result {
@@ -143,14 +146,17 @@ fn packaged_public_path_rejects_oversized_unknown_prefix_before_resolution() {
         Err(error) => error,
     };
     assert!(
-        matches!(error, litchi_core::Error::InvalidFormat(ref reason) if reason.contains("limit")),
+        matches!(error, litchi_odg::Error::Core(litchi_core::Error::InvalidFormat(ref reason)) if reason.contains("limit")),
         "unexpected unknown-prefix error: {error}"
     );
+    // `Package::from_bytes(&[u8])` copies the borrowed input exactly once
+    // before indexing; the admission bound applies to everything after it.
     let allocated = ALLOCATED.load(Ordering::Relaxed);
     assert!(
         allocated
             < content_bytes
                 .saturating_mul(2)
+                .saturating_add(package.len())
                 .saturating_add(8 * 1024 * 1024),
         "unknown-prefix allocation probe observed {allocated} bytes for {content_bytes} input bytes"
     );
@@ -170,7 +176,7 @@ fn packaged_public_path_rejects_oversized_namespace_declaration_before_registrat
 
     ALLOCATED.store(0, Ordering::Relaxed);
     OBSERVE.store(true, Ordering::Relaxed);
-    let result = Drawing::from_bytes(package);
+    let result = Package::from_bytes(&package);
     OBSERVE.store(false, Ordering::Relaxed);
 
     let error = match result {
@@ -178,14 +184,17 @@ fn packaged_public_path_rejects_oversized_namespace_declaration_before_registrat
         Err(error) => error,
     };
     assert!(
-        matches!(error, litchi_core::Error::InvalidFormat(ref reason) if reason.contains("limit")),
+        matches!(error, litchi_odg::Error::Core(litchi_core::Error::InvalidFormat(ref reason)) if reason.contains("limit")),
         "unexpected namespace-declaration error: {error}"
     );
+    // `Package::from_bytes(&[u8])` copies the borrowed input exactly once
+    // before indexing; the admission bound applies to everything after it.
     let allocated = ALLOCATED.load(Ordering::Relaxed);
     assert!(
         allocated
             < content_bytes
                 .saturating_mul(2)
+                .saturating_add(package.len())
                 .saturating_add(8 * 1024 * 1024),
         "namespace-declaration allocation probe observed {allocated} bytes for {content_bytes} input bytes"
     );

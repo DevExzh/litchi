@@ -129,7 +129,8 @@ pub mod node;
     feature = "odp",
     feature = "pages",
     feature = "keynote",
-    feature = "numbers"
+    feature = "numbers",
+    feature = "odf-objects"
 ))]
 mod open;
 mod options;
@@ -172,7 +173,8 @@ pub use new_node::{Added, IntoNode, NewNode};
     feature = "odp",
     feature = "pages",
     feature = "keynote",
-    feature = "numbers"
+    feature = "numbers",
+    feature = "odf-objects"
 ))]
 pub use open::{
     open, open_bytes, open_bytes_with, open_bytes_with_tail, open_with, open_with_tail,
@@ -225,7 +227,8 @@ pub use litchi_crypto::ooxml::Password;
     feature = "odp",
     feature = "pages",
     feature = "keynote",
-    feature = "numbers"
+    feature = "numbers",
+    feature = "odf-objects"
 ))]
 pub mod detect;
 

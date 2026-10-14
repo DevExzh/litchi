@@ -360,13 +360,18 @@ impl Builder {
         self
     }
 
-    /// Validates, packages, reopens, and publishes the document bytes.
+    /// Validates, packages and reopens the document as an immutable
+    /// [`crate::Package`].
     ///
     /// # Errors
     ///
     /// Returns an error if content validation, package writing, or semantic
     /// readback fails, or raw and typed content were both supplied.
-    pub fn build(self) -> Result<Vec<u8>> {
+    pub fn build(self) -> std::result::Result<crate::Package, litchi_odf_common::Error> {
+        Ok(self.build_package()?)
+    }
+
+    fn build_package(self) -> Result<crate::Package> {
         if self.content_xml.is_some()
             && (!self.blocks.is_empty() || !self.forms.is_empty() || !self.resources.is_empty())
         {
@@ -423,12 +428,13 @@ impl Builder {
                 writer.add_file_with_media_type(&member.path, &member.bytes, &member.media_type)?;
             }
         }
-        let bytes = crate::package::Snapshot::from_bytes(writer.finish_to_bytes()?)?.into_bytes();
+        let package = crate::facade::Package::from_snapshot(crate::package::Snapshot::from_bytes(
+            writer.finish_to_bytes()?,
+        )?);
         if self.inline_changes.is_empty() {
-            return Ok(bytes);
+            return Ok(package);
         }
-        let template = crate::facade::Template::from_bytes(bytes)?;
-        let mut edit = template.edit();
+        let mut edit = package.edit();
         for (block, content) in &self.inline_changes {
             match *block {
                 crate::facade::InlineBlock::Paragraph(position) => {
@@ -439,7 +445,7 @@ impl Builder {
                 },
             }
         }
-        Ok(edit.commit()?.into_template().into_bytes())
+        Ok(edit.commit()?.into_package())
     }
 }
 

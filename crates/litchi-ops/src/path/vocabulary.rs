@@ -724,6 +724,94 @@ pub(crate) static ODT: Vocabulary = Vocabulary {
 #[cfg(feature = "odt")]
 const _: () = assert!(well_formed(&ODT) && names_are_aliases(&ODT) && ODT.elements.len() <= 128);
 
+/// OpenDocument drawings (record 0282): pages, their shapes and layers.
+#[cfg(feature = "odg")]
+pub(crate) static DRAWING: Vocabulary = Vocabulary {
+    family: Family::Other,
+    root: "drawing",
+    aliases: &[("layer", "layer"), ("page", "page"), ("shape", "shape")],
+    elements: &[
+        ElementRule::new("drawing"),
+        ElementRule::new("layer").bare(Bare::Name(Exact)),
+        ElementRule::new("page").bare(Bare::Name(Exact)),
+        ElementRule::new("shape").bare(Bare::Name(Exact)),
+    ],
+    roots: "/page[N], /page[N]/shape[N] or /page[N]/layer[N]",
+};
+
+#[cfg(feature = "odg")]
+const _: () = assert!(well_formed(&DRAWING) && names_are_aliases(&DRAWING));
+
+/// OpenDocument charts (record 0282): axes, series and the legend.
+#[cfg(feature = "odc")]
+pub(crate) static CHART: Vocabulary = Vocabulary {
+    family: Family::Other,
+    root: "chart",
+    aliases: &[("axis", "axis"), ("legend", "legend"), ("series", "series")],
+    elements: &[
+        ElementRule::new("axis").bare(Bare::Name(Exact)),
+        ElementRule::new("chart"),
+        ElementRule::new("legend"),
+        ElementRule::new("series"),
+    ],
+    roots: "/axis[N], /series[N] or /legend",
+};
+
+#[cfg(feature = "odc")]
+const _: () = assert!(well_formed(&CHART) && names_are_aliases(&CHART));
+
+/// OpenDocument images (record 0282): the image frame and `/metadata`.
+#[cfg(feature = "odi")]
+pub(crate) static IMAGE: Vocabulary = Vocabulary {
+    family: Family::Other,
+    root: "image",
+    aliases: &[
+        ("frame", "frame"),
+        ("metadata", "metadata"),
+        ("picture", "frame"),
+    ],
+    elements: &[
+        ElementRule::new("frame").bare(Bare::Name(Exact)),
+        ElementRule::new("image"),
+        ElementRule::new("metadata"),
+    ],
+    roots: "/frame[N] or /metadata",
+};
+
+#[cfg(feature = "odi")]
+const _: () = assert!(well_formed(&IMAGE) && names_are_aliases(&IMAGE));
+
+/// OpenDocument databases (record 0282): tables, their columns and queries.
+#[cfg(feature = "odb")]
+pub(crate) static DATABASE: Vocabulary = Vocabulary {
+    family: Family::Other,
+    root: "database",
+    aliases: &[("column", "column"), ("query", "query"), ("table", "table")],
+    elements: &[
+        ElementRule::new("column").bare(Bare::Name(Exact)),
+        ElementRule::new("database"),
+        ElementRule::new("query").bare(Bare::Name(Exact)),
+        ElementRule::new("table").bare(Bare::Name(Exact)),
+    ],
+    roots: "/table[N], /table[N]/column[N] or /query[N]",
+};
+
+#[cfg(feature = "odb")]
+const _: () = assert!(well_formed(&DATABASE) && names_are_aliases(&DATABASE));
+
+/// OpenDocument formulas (record 0282): the MathML element tree.
+#[cfg(feature = "odf-formula")]
+pub(crate) static MATH: Vocabulary = Vocabulary {
+    family: Family::Other,
+    root: "math",
+    aliases: &[("element", "element"), ("node", "element")],
+    elements: &[ElementRule::new("element"), ElementRule::new("math")],
+    roots: "/element[N] (nested: /element[N]/element[M])",
+};
+
+#[cfg(feature = "odf-formula")]
+const _: () = assert!(well_formed(&MATH) && names_are_aliases(&MATH));
+
 /// Legacy Word and RTF share the semantic path spelling but have no OOXML
 /// paragraph wire identities. Keep the known unsupported concepts for typed
 /// refusals.

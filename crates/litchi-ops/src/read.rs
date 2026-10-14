@@ -19,7 +19,8 @@ use litchi_core::FileFormat;
         feature = "rtf",
         feature = "ods",
         feature = "odt",
-        feature = "odp"
+        feature = "odp",
+        feature = "odf-objects"
     )),
     allow(
         clippy::only_used_in_recursion,
@@ -125,16 +126,26 @@ impl File {
                     .map(Node::Ods)
             },
             #[cfg(feature = "odt")]
-            Self::Odt(handle) => {
+            Self::Odt(handle) | Self::Oth(handle) | Self::Odm(handle) => {
                 let path = path.into_path()?;
                 crate::path::resolve::get(&crate::format::odt::Nav::new(handle), &path)
                     .map(Node::Odt)
+                    .map_err(|error| handle.retag(error))
             },
             #[cfg(feature = "odp")]
             Self::Odp(handle) => {
                 let path = path.into_path()?;
                 crate::path::resolve::get(&crate::format::odp::Nav::new(handle), &path)
                     .map(Node::Odp)
+            },
+            #[cfg(feature = "odf-objects")]
+            Self::Odg(handle)
+            | Self::Odc(handle)
+            | Self::Odi(handle)
+            | Self::Odb(handle)
+            | Self::Odf(handle) => {
+                let path = path.into_path()?;
+                crate::format::odf_tree::get(handle, &path)
             },
             Self::Signed(signed) => signed.file().get(path),
             Self::Locked(locked) => Err(locked.read_error()),
@@ -204,16 +215,26 @@ impl File {
                     .map(|node| node.map(Node::Ods))
             },
             #[cfg(feature = "odt")]
-            Self::Odt(handle) => {
+            Self::Odt(handle) | Self::Oth(handle) | Self::Odm(handle) => {
                 let path = path.into_path()?;
                 crate::path::resolve::find(&crate::format::odt::Nav::new(handle), &path)
                     .map(|node| node.map(Node::Odt))
+                    .map_err(|error| handle.retag(error))
             },
             #[cfg(feature = "odp")]
             Self::Odp(handle) => {
                 let path = path.into_path()?;
                 crate::path::resolve::find(&crate::format::odp::Nav::new(handle), &path)
                     .map(|node| node.map(Node::Odp))
+            },
+            #[cfg(feature = "odf-objects")]
+            Self::Odg(handle)
+            | Self::Odc(handle)
+            | Self::Odi(handle)
+            | Self::Odb(handle)
+            | Self::Odf(handle) => {
+                let path = path.into_path()?;
+                crate::format::odf_tree::find(handle, &path)
             },
             Self::Signed(signed) => signed.file().find(path),
             Self::Locked(locked) => Err(locked.read_error()),
@@ -281,12 +302,22 @@ impl File {
                 crate::query::run(crate::format::ods::Nav::new(handle), selector).map(Matches::ods)
             },
             #[cfg(feature = "odt")]
-            Self::Odt(handle) => {
-                crate::query::run(crate::format::odt::Nav::new(handle), selector).map(Matches::odt)
+            Self::Odt(handle) | Self::Oth(handle) | Self::Odm(handle) => {
+                crate::query::run(crate::format::odt::Nav::new(handle), selector)
+                    .map(Matches::odt)
+                    .map_err(|error| handle.retag(error))
             },
             #[cfg(feature = "odp")]
             Self::Odp(handle) => {
                 crate::query::run(crate::format::odp::Nav::new(handle), selector).map(Matches::odp)
+            },
+            #[cfg(feature = "odf-objects")]
+            Self::Odg(handle)
+            | Self::Odc(handle)
+            | Self::Odi(handle)
+            | Self::Odb(handle)
+            | Self::Odf(handle) => {
+                crate::format::odf_tree::query(handle, selector).map(Matches::object)
             },
             Self::Signed(signed) => signed.file().query(selector),
             Self::Locked(locked) => Err(locked.read_error()),
@@ -358,7 +389,7 @@ impl File {
                     .map(crate::view::Json::ods)
             },
             #[cfg(feature = "odt")]
-            Self::Odt(handle) => {
+            Self::Odt(handle) | Self::Oth(handle) | Self::Odm(handle) => {
                 crate::format::odt::views::view_json(handle, mode).map(crate::view::Json::odt)
             },
             #[cfg(feature = "odp")]
@@ -368,6 +399,13 @@ impl File {
                 &crate::view::mode::Options::default(),
             )
             .map(crate::view::Json::odp),
+            #[cfg(feature = "odf-objects")]
+            Self::Odg(handle)
+            | Self::Odc(handle)
+            | Self::Odi(handle)
+            | Self::Odb(handle)
+            | Self::Odf(handle) => crate::format::odf_tree::views::view_json(handle, mode)
+                .map(crate::view::Json::object),
             Self::Signed(signed) => signed.file().view_json(mode),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -428,7 +466,9 @@ impl File {
             #[cfg(feature = "rtf")]
             Self::Rtf(handle) => crate::format::rtf::views::view_to(handle, mode, output),
             #[cfg(feature = "odt")]
-            Self::Odt(handle) => crate::format::odt::views::view_to(handle, mode, output),
+            Self::Odt(handle) | Self::Oth(handle) | Self::Odm(handle) => {
+                crate::format::odt::views::view_to(handle, mode, output)
+            },
             #[cfg(feature = "ods")]
             Self::Ods(handle) => crate::format::ods::view_to(
                 handle,
@@ -443,6 +483,12 @@ impl File {
                 &crate::view::mode::Options::default(),
                 output,
             ),
+            #[cfg(feature = "odf-objects")]
+            Self::Odg(handle)
+            | Self::Odc(handle)
+            | Self::Odi(handle)
+            | Self::Odb(handle)
+            | Self::Odf(handle) => crate::format::odf_tree::views::view_to(handle, mode, output),
             Self::Signed(signed) => signed.file().view_to(mode, output),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -490,6 +536,21 @@ pub(crate) enum Adapter {
     /// OpenDocument Presentation (`.odp`, record 0278).
     #[cfg(feature = "odp")]
     Odp,
+    /// OpenDocument drawing (`.odg`, object-tree adapter, record 0282).
+    #[cfg(feature = "odg")]
+    Odg,
+    /// OpenDocument chart (`.odc`, record 0282).
+    #[cfg(feature = "odc")]
+    Odc,
+    /// OpenDocument image (`.odi`, record 0282).
+    #[cfg(feature = "odi")]
+    Odi,
+    /// OpenDocument database (`.odb`, record 0282).
+    #[cfg(feature = "odb")]
+    Odb,
+    /// OpenDocument formula (`.odf`, record 0282).
+    #[cfg(feature = "odf-formula")]
+    OdfFormula,
 }
 
 impl Adapter {
@@ -505,6 +566,11 @@ impl Adapter {
             FileFormat::Xlsx => Some(Self::Xlsx),
             #[cfg(feature = "odt")]
             FileFormat::Odt => Some(Self::Odt),
+            // The ODF text-family formats share the ODT adapter (record 0282).
+            #[cfg(feature = "oth")]
+            FileFormat::Oth => Some(Self::Odt),
+            #[cfg(feature = "odm")]
+            FileFormat::Odm => Some(Self::Odt),
             #[cfg(feature = "pptx")]
             FileFormat::Pptx => Some(Self::Pptx),
             #[cfg(feature = "ppt")]
@@ -519,6 +585,16 @@ impl Adapter {
             FileFormat::Ods => Some(Self::Ods),
             #[cfg(feature = "odp")]
             FileFormat::Odp => Some(Self::Odp),
+            #[cfg(feature = "odg")]
+            FileFormat::Odg => Some(Self::Odg),
+            #[cfg(feature = "odc")]
+            FileFormat::Odc => Some(Self::Odc),
+            #[cfg(feature = "odi")]
+            FileFormat::Odi => Some(Self::Odi),
+            #[cfg(feature = "odb")]
+            FileFormat::Odb => Some(Self::Odb),
+            #[cfg(feature = "odf-formula")]
+            FileFormat::Odf => Some(Self::OdfFormula),
             _ => None,
         }
     }
@@ -548,6 +624,16 @@ impl Adapter {
             Self::Ods => FileFormat::Ods,
             #[cfg(feature = "odp")]
             Self::Odp => FileFormat::Odp,
+            #[cfg(feature = "odg")]
+            Self::Odg => FileFormat::Odg,
+            #[cfg(feature = "odc")]
+            Self::Odc => FileFormat::Odc,
+            #[cfg(feature = "odi")]
+            Self::Odi => FileFormat::Odi,
+            #[cfg(feature = "odb")]
+            Self::Odb => FileFormat::Odb,
+            #[cfg(feature = "odf-formula")]
+            Self::OdfFormula => FileFormat::Odf,
         }
     }
 
@@ -617,6 +703,31 @@ macro_rules! with_spec {
             #[cfg(feature = "odp")]
             $crate::read::Adapter::Odp => {
                 let $spec = &$crate::format::odp::SPEC;
+                $body
+            },
+            #[cfg(feature = "odg")]
+            $crate::read::Adapter::Odg => {
+                let $spec = &$crate::format::odf_tree::odg::SPEC;
+                $body
+            },
+            #[cfg(feature = "odc")]
+            $crate::read::Adapter::Odc => {
+                let $spec = &$crate::format::odf_tree::odc::SPEC;
+                $body
+            },
+            #[cfg(feature = "odi")]
+            $crate::read::Adapter::Odi => {
+                let $spec = &$crate::format::odf_tree::odi::SPEC;
+                $body
+            },
+            #[cfg(feature = "odb")]
+            $crate::read::Adapter::Odb => {
+                let $spec = &$crate::format::odf_tree::odb::SPEC;
+                $body
+            },
+            #[cfg(feature = "odf-formula")]
+            $crate::read::Adapter::OdfFormula => {
+                let $spec = &$crate::format::odf_tree::formula::SPEC;
                 $body
             },
         }

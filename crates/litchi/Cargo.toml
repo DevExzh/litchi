@@ -77,6 +77,17 @@ rtf = ["dep:litchi-rtf", "dep:litchi-ops", "litchi-ops/rtf"]
 odt = ["dep:litchi-odt", "odf-common", "dep:litchi-ops", "litchi-ops/odt"]
 ods = ["dep:litchi-ods", "odf-common", "sheet", "dep:litchi-ops", "litchi-ops/ods"]
 odp = ["dep:litchi-odp", "odf-common", "dep:litchi-ops", "litchi-ops/odp"]
+# OpenDocument HTML templates and master documents open through the unified
+# ODT adapter (record 0282).
+oth = ["odt", "litchi-ops/oth"]
+odm = ["odt", "litchi-ops/odm"]
+# The OpenDocument object formats open through the unified object-tree
+# adapter (record 0282).
+odg = ["odf-common", "dep:litchi-ops", "litchi-ops/odg"]
+odc = ["odf-common", "dep:litchi-ops", "litchi-ops/odc"]
+odi = ["odf-common", "dep:litchi-ops", "litchi-ops/odi"]
+odb = ["odf-common", "dep:litchi-ops", "litchi-ops/odb"]
+odf-formula = ["odf-common", "dep:litchi-ops", "litchi-ops/odf-formula"]
 pages = [
     "dep:litchi-pages",
     "dep:litchi-iwa-detect",
@@ -181,7 +192,7 @@ yaml = ["dep:serde-saphyr", "litchi-ops?/yaml"]
 # Format and convenience aggregates
 legacy = ["doc", "ppt", "xls", "cfb", "ole"]
 ooxml = ["docx", "pptx", "xlsx", "xlsb", "opc", "ooxml-common", "drawingml"]
-odf = ["odt", "ods", "odp", "odf-common"]
+odf = ["odt", "ods", "odp", "oth", "odm", "odg", "odc", "odi", "odb", "odf-formula", "odf-common"]
 word = ["doc", "docx", "rtf", "odt", "pages"]
 slides = ["ppt", "pptx", "odp", "keynote"]
 spreadsheets = ["xls", "xlsx", "xlsb", "ods", "numbers", "sheet"]

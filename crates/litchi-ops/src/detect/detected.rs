@@ -68,7 +68,12 @@ pub enum DetectedFormat {
     #[cfg(feature = "ods")]
     Ods(Vec<u8>),
     /// Flat OpenDocument XML with its detected family.
-    #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
+    #[cfg(any(
+        feature = "odt",
+        feature = "ods",
+        feature = "odp",
+        feature = "odf-objects"
+    ))]
     FlatOdf(litchi_core::detection::FileFormat, Vec<u8>),
 
     // RTF format (plain text, no parsing structure needed)
@@ -84,6 +89,10 @@ impl DetectedFormat {
     /// discarding the classification and reporting only "not an Office file".
     #[must_use]
     pub const fn format(&self) -> litchi_core::detection::FileFormat {
+        #[allow(
+            unused_imports,
+            reason = "a build whose only ODF formats are the object formats names no variant format"
+        )]
         use litchi_core::detection::FileFormat;
 
         match self {
@@ -113,7 +122,12 @@ impl DetectedFormat {
             Self::Odp(_) => FileFormat::Odp,
             #[cfg(feature = "ods")]
             Self::Ods(_) => FileFormat::Ods,
-            #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
+            #[cfg(any(
+                feature = "odt",
+                feature = "ods",
+                feature = "odp",
+                feature = "odf-objects"
+            ))]
             Self::FlatOdf(format, _) => *format,
             #[cfg(feature = "rtf")]
             Self::Rtf(_) => FileFormat::Rtf,
@@ -150,7 +164,12 @@ impl std::fmt::Debug for DetectedFormat {
             Self::Odp(_) => "Odp",
             #[cfg(feature = "ods")]
             Self::Ods(_) => "Ods",
-            #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
+            #[cfg(any(
+                feature = "odt",
+                feature = "ods",
+                feature = "odp",
+                feature = "odf-objects"
+            ))]
             Self::FlatOdf(_, _) => "FlatOdf",
             #[cfg(feature = "rtf")]
             Self::Rtf(_) => "Rtf",
@@ -299,7 +318,12 @@ fn detect_format_smart_without_ooxml<T: ZipTail>(
         return None;
     }
 
-    #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
+    #[cfg(any(
+        feature = "odt",
+        feature = "ods",
+        feature = "odp",
+        feature = "odf-objects"
+    ))]
     if let Some(format) = litchi_odf_common::detect::flat(&bytes) {
         return Some(DetectedFormat::FlatOdf(format, bytes));
     }
@@ -337,7 +361,12 @@ fn detect_format_smart_without_ooxml<T: ZipTail>(
     }
 
     if mask.is_zip() {
-        #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
+        #[cfg(any(
+            feature = "odt",
+            feature = "ods",
+            feature = "odp",
+            feature = "odf-objects"
+        ))]
         let bytes = match litchi_odf_common::detect::prepared_or_original(bytes) {
             Ok(prepared) => {
                 let format = prepared.format();
@@ -399,7 +428,12 @@ pub fn detect_format_smart_with_limits_and_tail<T: ZipTail>(
     let _ = tail;
     #[cfg(any(
         any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
-        any(feature = "odt", feature = "ods", feature = "odp")
+        any(
+            feature = "odt",
+            feature = "ods",
+            feature = "odp",
+            feature = "odf-objects"
+        )
     ))]
     use litchi_core::detection::FileFormat;
     use litchi_core::detection::simd_utils::check_office_signatures;
@@ -412,7 +446,12 @@ pub fn detect_format_smart_with_limits_and_tail<T: ZipTail>(
         return None;
     }
 
-    #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
+    #[cfg(any(
+        feature = "odt",
+        feature = "ods",
+        feature = "odp",
+        feature = "odf-objects"
+    ))]
     if let Some(format) = litchi_odf_common::detect::flat(&bytes) {
         return Some(DetectedFormat::FlatOdf(format, bytes));
     }
@@ -456,18 +495,33 @@ pub fn detect_format_smart_with_limits_and_tail<T: ZipTail>(
     // Check ZIP candidates in the same order as the ordinary detector.
     if mask.is_zip() {
         #[cfg(all(
-            any(feature = "odt", feature = "ods", feature = "odp"),
+            any(
+                feature = "odt",
+                feature = "ods",
+                feature = "odp",
+                feature = "odf-objects"
+            ),
             any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
         ))]
         let odf_mime = litchi_odf_common::detect::packaged_mime(&bytes);
         #[cfg(all(
-            any(feature = "odt", feature = "ods", feature = "odp"),
+            any(
+                feature = "odt",
+                feature = "ods",
+                feature = "odp",
+                feature = "odf-objects"
+            ),
             any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
         ))]
         let normal_odf = odf_mime.is_some()
             && litchi_odf_common::detect::packaged_has_ooxml_catalog(&bytes) == Some(false);
         #[cfg(all(
-            not(any(feature = "odt", feature = "ods", feature = "odp")),
+            not(any(
+                feature = "odt",
+                feature = "ods",
+                feature = "odp",
+                feature = "odf-objects"
+            )),
             any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb")
         ))]
         let normal_odf = false;
@@ -500,7 +554,12 @@ pub fn detect_format_smart_with_limits_and_tail<T: ZipTail>(
             }
         }
 
-        #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
+        #[cfg(any(
+            feature = "odt",
+            feature = "ods",
+            feature = "odp",
+            feature = "odf-objects"
+        ))]
         let bytes = match litchi_odf_common::detect::prepared_or_original(bytes) {
             Ok(prepared) => {
                 let format = prepared.format();
@@ -747,7 +806,12 @@ pub(crate) fn detect_and_prepare_path_with_limits<T: ZipTail>(
 
     // Keep the reader path's container precedence: a validated ordinary
     // OpenDocument package is never probed as OPC.
-    #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
+    #[cfg(any(
+        feature = "odt",
+        feature = "ods",
+        feature = "odp",
+        feature = "odf-objects"
+    ))]
     {
         let catalog_limits = super::catalog_probe_limits(crate::opc::SourceLimits::default());
         match litchi_odf_common::detect::packaged_mime_read_at(source.as_ref()) {

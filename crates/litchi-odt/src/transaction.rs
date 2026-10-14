@@ -259,6 +259,33 @@ impl Package {
         Ok(Self::from_parsed(document))
     }
 
+    /// Adopt a prepared package of any ODF text-body family — ODT, an
+    /// OpenDocument web template (`FileFormat::Oth`) or a master document
+    /// (`FileFormat::Odm`) — through this crate's text model, reusing the
+    /// validated archive index. Every member outside the edited parts keeps
+    /// its source bytes, so the package keeps its own MIME type. This is the
+    /// reuse hook of the unified OTH/ODM adapters (record 0282).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`litchi_core::Error::UnexpectedFormat`] (as
+    /// [`PackageError::Core`]) for any other family.
+    pub fn from_prepared_text_package(
+        prepared: crate::core::PreparedPackage,
+    ) -> std::result::Result<Self, PackageError> {
+        use litchi_core::detection::FileFormat;
+        match prepared.format() {
+            FileFormat::Odt => Self::from_prepared_package(prepared),
+            FileFormat::Oth | FileFormat::Odm => Self::from_owned_package_with_options(
+                prepared.into_package(),
+                OpenOptions::default(),
+            ),
+            detected => Err(PackageError::Core(litchi_core::Error::UnexpectedFormat {
+                detected,
+            })),
+        }
+    }
+
     fn from_vec_with_options(
         bytes: Vec<u8>,
         options: OpenOptions,

@@ -66,7 +66,9 @@ impl ToMarkdown for File {
             #[cfg(feature = "rtf")]
             Self::Rtf(handle) => DocumentView::rtf(handle).to_markdown_with_options(options),
             #[cfg(feature = "odt")]
-            Self::Odt(handle) => DocumentView::odt(handle).to_markdown_with_options(options),
+            Self::Odt(handle) | Self::Oth(handle) | Self::Odm(handle) => {
+                DocumentView::odt(handle).to_markdown_with_options(options)
+            },
             #[cfg(feature = "pptx")]
             Self::Pptx(handle) => PresentationView::pptx(handle).to_markdown_with_options(options),
             #[cfg(feature = "ppt")]

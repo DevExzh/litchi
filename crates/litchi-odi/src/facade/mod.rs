@@ -1,53 +1,331 @@
-//! Concise family entry points.
+//! Concise family entry points: the immutable [`Package`] owner, its
+//! read-only [`Image`] projection, and the primary transaction family.
 
 use litchi_core::{Error, Metadata, Result};
 use litchi_odf_common::{
-    compact_xml,
+    SemanticLimitKind, compact_xml,
     core::{MetaXmlPatch, metadata::Metadata as OdfMetadata, patch_meta_xml},
 };
 use std::path::Path;
 
 pub use crate::authoring::Builder;
+use litchi_odf_common::{Error as PackageError, OpenOptions};
 
-/// Immutable document snapshot.
+/// The immutable, cheap-to-clone ODI owner snapshot.
+///
+/// It owns every state verb: opening, the primary [`Edit`] transaction,
+/// patch application and publication. Reads go through the [`Image`]
+/// projection returned by [`Package::image`].
+#[derive(Clone)]
+pub struct Package {
+    image: Image,
+}
+
+impl std::fmt::Debug for Package {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Package")
+            .field("bytes", &self.as_bytes().len())
+            .finish_non_exhaustive()
+    }
+}
+
+impl Package {
+    /// The minimal valid image package: one frame holding an inline 1x1 PNG.
+    /// Deterministic: no clock or randomness is consulted.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the builder output fails validation.
+    pub fn new() -> std::result::Result<Self, PackageError> {
+        Builder::new().build()
+    }
+
+    /// Opens an image package from a file path under the default limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be read or is not a valid package.
+    pub fn open(path: impl AsRef<Path>) -> std::result::Result<Self, PackageError> {
+        Self::open_with_options(path, OpenOptions::new())
+    }
+
+    /// Opens an image package from a file path under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PackageError::Limit`] when a selected limit is exceeded,
+    /// otherwise as for [`Self::open`].
+    pub fn open_with_options(
+        path: impl AsRef<Path>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        Self::adopt(
+            crate::package::Snapshot::open_with_options(path, options)?,
+            options,
+        )
+    }
+
+    /// Opens a password-encrypted image package from a file for inert
+    /// inspection. Protected snapshots remain rewrite-refused.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Self::open`].
+    pub fn open_with_password(
+        path: impl AsRef<Path>,
+        password: impl Into<String>,
+    ) -> std::result::Result<Self, PackageError> {
+        Self::open_with_password_and_options(path, password, OpenOptions::new())
+    }
+
+    /// Opens a password-encrypted image package from a file under
+    /// caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Self::open_with_options`].
+    pub fn open_with_password_and_options(
+        path: impl AsRef<Path>,
+        password: impl Into<String>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        Self::adopt(
+            crate::package::Snapshot::open_with_password_and_options(path, password, options)?,
+            options,
+        )
+    }
+
+    /// Opens an image package from borrowed bytes (copied once).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the bytes are not a valid package.
+    pub fn from_bytes(bytes: &[u8]) -> std::result::Result<Self, PackageError> {
+        Self::from_bytes_with_options(bytes, OpenOptions::new())
+    }
+
+    /// Opens an image package from borrowed bytes under caller-selected
+    /// limits.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Self::open_with_options`].
+    pub fn from_bytes_with_options(
+        bytes: &[u8],
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        Self::adopt(
+            crate::package::Snapshot::from_bytes_with_options(bytes.to_vec(), options)?,
+            options,
+        )
+    }
+
+    /// Opens password-encrypted package bytes for inert inspection.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Self::from_bytes`].
+    pub fn from_bytes_with_password(
+        bytes: &[u8],
+        password: impl Into<String>,
+    ) -> std::result::Result<Self, PackageError> {
+        Self::from_bytes_with_password_and_options(bytes, password, OpenOptions::new())
+    }
+
+    /// Opens password-encrypted package bytes under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Self::open_with_options`].
+    pub fn from_bytes_with_password_and_options(
+        bytes: &[u8],
+        password: impl Into<String>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        Self::adopt(
+            crate::package::Snapshot::from_bytes_with_password_and_options(
+                bytes.to_vec(),
+                password,
+                options,
+            )?,
+            options,
+        )
+    }
+
+    /// Reads an image package from a stream under the default limits.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Self::open`].
+    pub fn from_reader(reader: impl std::io::Read) -> std::result::Result<Self, PackageError> {
+        Self::from_reader_with_options(reader, OpenOptions::new())
+    }
+
+    /// Reads an image package from a stream under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Self::open_with_options`].
+    pub fn from_reader_with_options(
+        reader: impl std::io::Read,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        Self::adopt(
+            crate::package::Snapshot::from_reader_with_options(reader, options)?,
+            options,
+        )
+    }
+
+    /// Adopts the packaged ODF result smart detection prepared, reusing its
+    /// archive index. Source limits were applied when it was prepared.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the prepared package is not an ODI package or
+    /// fails validation.
+    pub fn from_prepared_package(
+        prepared: litchi_odf_common::PreparedPackage,
+    ) -> std::result::Result<Self, PackageError> {
+        if prepared.format() != litchi_core::detection::FileFormat::Odi {
+            return Err(Error::UnexpectedFormat {
+                detected: prepared.format(),
+            }
+            .into());
+        }
+        let options = OpenOptions::new();
+        Self::adopt(
+            crate::package::Snapshot::from_owned_package_with_options(
+                prepared.into_package(),
+                options,
+            )?,
+            options,
+        )
+    }
+
+    fn adopt(
+        package: crate::package::Snapshot,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        options.semantic_limits_value().check(
+            SemanticLimitKind::Units,
+            u64::try_from(package.frames().len()).unwrap_or(u64::MAX),
+        )?;
+        Ok(Self::from_snapshot(package))
+    }
+
+    pub(crate) const fn from_snapshot(package: crate::package::Snapshot) -> Self {
+        Self {
+            image: Image { package },
+        }
+    }
+
+    /// Reparses package bytes produced inside this crate.
+    pub(crate) fn from_vec(bytes: Vec<u8>) -> Result<Self> {
+        crate::package::Snapshot::from_bytes(bytes).map(Self::from_snapshot)
+    }
+
+    /// Returns the read-only image projection (a cheap shared clone).
+    #[must_use]
+    pub fn image(&self) -> Image {
+        self.image.clone()
+    }
+
+    /// Borrows the read-only projection.
+    pub(crate) const fn image_ref(&self) -> &Image {
+        &self.image
+    }
+
+    /// Everything a tolerant read repaired while this package was opened.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
+        self.image.package.tolerance_report()
+    }
+
+    /// Returns the exact package bytes.
+    #[must_use]
+    pub fn as_bytes(&self) -> &[u8] {
+        self.image.package.as_bytes()
+    }
+
+    /// Returns a copy of the exact package bytes.
+    ///
+    /// # Errors
+    ///
+    /// None today; the `Result` keeps the publication surface uniform.
+    pub fn to_bytes(&self) -> std::result::Result<Vec<u8>, PackageError> {
+        Ok(self.as_bytes().to_vec())
+    }
+
+    /// Writes the exact package bytes into `sink`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the sink fails.
+    pub fn write_to(&self, mut sink: impl std::io::Write) -> std::result::Result<(), PackageError> {
+        sink.write_all(self.as_bytes()).map_err(Error::from)?;
+        Ok(())
+    }
+
+    /// Atomically saves the package to `path` (sibling temporary file and
+    /// rename, with file and directory `fsync`).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when staging or replacement fails; the destination
+    /// is then left untouched.
+    pub fn save(&self, path: impl AsRef<Path>) -> std::result::Result<(), PackageError> {
+        self.save_with_durability(path, litchi_core::Durability::Full)
+    }
+
+    /// Atomically saves the package to `path` with an explicit durability.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Self::save`].
+    pub fn save_with_durability(
+        &self,
+        path: impl AsRef<Path>,
+        durability: litchi_core::Durability,
+    ) -> std::result::Result<(), PackageError> {
+        litchi_odf_common::publish::save_bytes(path.as_ref(), self.as_bytes(), durability)
+    }
+
+    /// Starts a source-bound package image transaction.
+    ///
+    /// This supports the same lossless existing-name and existing-source edits
+    /// as [`crate::FlatImage`], while rebuilding a validated ODI package and
+    /// preserving all untouched member payloads.
+    #[must_use]
+    pub fn edit(&self) -> Edit<'_> {
+        Edit {
+            source: self,
+            transaction: self.image.package.content_snapshot().transaction(),
+            resource_changes: Vec::new(),
+            metadata: None,
+            styles: None,
+        }
+    }
+
+    /// Applies a patch to its exact source package and returns the target.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when this package differs byte-for-byte from the
+    /// patch's source.
+    pub fn apply(&self, patch: &Patch) -> std::result::Result<Self, PackageError> {
+        Ok(patch.apply(self)?)
+    }
+}
+
+/// The read-only semantic image projection, obtained from
+/// [`Package::image`]. Cheap to clone; it has no state verbs.
 #[derive(Clone)]
 pub struct Image {
     package: crate::package::Snapshot,
 }
 
 impl Image {
-    /// Opens an image package from a file path.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the file cannot be read or is not a valid package.
-    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        crate::package::Snapshot::open(path).map(|package| Self { package })
-    }
-
-    /// Opens an image package from in-memory bytes.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the bytes are not a valid package.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        crate::package::Snapshot::from_bytes(bytes).map(|package| Self { package })
-    }
-
-    /// Opens a password-encrypted image package for inert inspection.
-    ///
-    /// The password is retained only by the shared package owner for lazy
-    /// member decryption. Protected snapshots remain rewrite-refused.
-    pub fn from_bytes_with_password(bytes: Vec<u8>, password: impl Into<String>) -> Result<Self> {
-        crate::package::Snapshot::from_bytes_with_password(bytes, password)
-            .map(|package| Self { package })
-    }
-
-    /// Opens a password-encrypted image package from a file for inert inspection.
-    pub fn open_with_password(path: impl AsRef<Path>, password: impl Into<String>) -> Result<Self> {
-        crate::package::Snapshot::open_with_password(path, password).map(|package| Self { package })
-    }
-
     /// Returns the `content.xml` document.
     #[must_use]
     pub fn content_xml(&self) -> &str {
@@ -73,12 +351,6 @@ impl Image {
     /// Returns an error if the retained package member cannot be read.
     pub fn meta_xml(&self) -> Result<Option<String>> {
         self.package.meta_xml()
-    }
-
-    /// Returns the raw package bytes.
-    #[must_use]
-    pub fn as_bytes(&self) -> &[u8] {
-        self.package.as_bytes()
     }
 
     /// Lists the file entries stored in the package.
@@ -198,33 +470,11 @@ impl Image {
     pub fn rewrite_capability(&self) -> Result<crate::RewriteCapability> {
         self.package.rewrite_capability()
     }
-
-    /// Starts a source-bound package image transaction.
-    ///
-    /// This supports the same lossless existing-name and existing-source edits
-    /// as [`crate::FlatImage`], while rebuilding a validated ODI package and
-    /// preserving all untouched member payloads.
-    #[must_use]
-    pub fn edit(&self) -> Edit<'_> {
-        Edit {
-            source: self,
-            transaction: self.package.content_snapshot().transaction(),
-            resource_changes: Vec::new(),
-            metadata: None,
-            styles: None,
-        }
-    }
-
-    /// Consumes the snapshot and returns the raw package bytes.
-    #[must_use]
-    pub fn into_bytes(self) -> Vec<u8> {
-        self.package.into_bytes()
-    }
 }
 
 /// A source-bound package image and resource transaction.
 pub struct Edit<'a> {
-    source: &'a Image,
+    source: &'a Package,
     transaction: crate::FlatImageTransaction,
     resource_changes: Vec<ResourceEdit>,
     metadata: Option<MetadataEdit>,
@@ -455,7 +705,7 @@ impl Edit<'_> {
         if let Some(xml) = &value {
             compact_xml::validate(xml.as_bytes()).map_err(Error::from)?;
         }
-        let before = self.source.styles_xml().map(str::to_owned);
+        let before = self.source.image.styles_xml().map(str::to_owned);
         if before == value {
             self.styles = None;
         } else {
@@ -512,7 +762,11 @@ impl Edit<'_> {
     ///
     /// Returns an error if the package cannot be safely rebuilt, including
     /// signed or non-compact source XML, or if semantic readback fails.
-    pub fn commit(self) -> Result<Commit> {
+    pub fn commit(self) -> std::result::Result<Commit, PackageError> {
+        Ok(self.commit_inner()?)
+    }
+
+    fn commit_inner(self) -> Result<Commit> {
         let content = self.transaction.commit()?;
         let changes = content.patch().changes().to_vec();
         let inverse_changes = content.patch().inverse().changes().to_vec();
@@ -536,7 +790,7 @@ impl Edit<'_> {
         });
         let replacement_meta_xml = metadata_change
             .as_ref()
-            .map(|change| patch_metadata(self.source, &change.after))
+            .map(|change| patch_metadata(&self.source.image, &change.after))
             .transpose()?;
         let snapshot = if changes.is_empty()
             && resource_edits.is_empty()
@@ -563,17 +817,15 @@ impl Edit<'_> {
                     None => crate::package::StylesReplacement::Remove,
                 },
             };
-            Image {
-                package: self.source.package.rebuild(
-                    xml,
-                    styles_replacement,
-                    replacement_meta_xml.as_deref(),
-                    &replacements,
-                )?,
-            }
+            Package::from_snapshot(self.source.image.package.rebuild(
+                xml,
+                styles_replacement,
+                replacement_meta_xml.as_deref(),
+                &replacements,
+            )?)
         };
         for change in &changes {
-            let actual = snapshot.frames().get(change.frame()).ok_or_else(|| {
+            let actual = snapshot.image.frames().get(change.frame()).ok_or_else(|| {
                 Error::InvalidFormat("ODI edited frame disappeared during readback".to_string())
             })?;
             if actual != change.after() {
@@ -583,7 +835,11 @@ impl Edit<'_> {
             }
         }
         for change in &resource_edits {
-            if snapshot.package.resource_file(&change.path)?.as_deref()
+            if snapshot
+                .image
+                .package
+                .resource_file(&change.path)?
+                .as_deref()
                 != change.after_bytes.as_deref()
             {
                 return Err(Error::InvalidFormat(
@@ -592,6 +848,7 @@ impl Edit<'_> {
             }
             if let Some(after_media_type) = change.after_media_type.as_deref()
                 && snapshot
+                    .image
                     .resource_graph()
                     .nodes()
                     .iter()
@@ -605,21 +862,28 @@ impl Edit<'_> {
             }
         }
         if let Some(change) = &metadata_change
-            && MetadataFields::from(snapshot.metadata()) != change.after
+            && MetadataFields::from(snapshot.image.metadata()) != change.after
         {
             return Err(Error::InvalidFormat(
                 "ODI package metadata edit failed semantic readback".to_string(),
             ));
         }
         if let Some(change) = &style_change
-            && snapshot.styles_xml() != change.after.as_deref()
+            && snapshot.image.styles_xml() != change.after.as_deref()
         {
             return Err(Error::InvalidFormat(
                 "ODI styles.xml edit failed semantic readback".to_string(),
             ));
         }
+        let diagnostics = Diagnostics {
+            changed: !changes.is_empty()
+                || !resource_changes.is_empty()
+                || style_change.is_some()
+                || metadata_change.is_some(),
+        };
         Ok(Commit {
-            snapshot: snapshot.clone(),
+            package: snapshot.clone(),
+            diagnostics,
             patch: Patch {
                 source: self.source.clone(),
                 target: snapshot,
@@ -641,10 +905,10 @@ impl Edit<'_> {
         after_media_type: Option<String>,
         after_bytes: Option<Vec<u8>>,
     ) -> Result<()> {
-        let selected = self.source.resources().get(resource).ok_or_else(|| {
+        let selected = self.source.image.resources().get(resource).ok_or_else(|| {
             Error::InvalidFormat("ODI resource selector is out of bounds".to_string())
         })?;
-        let before_bytes = self.source.resource_bytes(resource)?;
+        let before_bytes = self.source.image.resource_bytes(resource)?;
         let before_media_type = selected.media_type().map(str::to_owned);
         if let Some(change) = self
             .resource_changes
@@ -678,9 +942,10 @@ impl Edit<'_> {
         after_media_type: Option<String>,
         after_bytes: Option<Vec<u8>>,
     ) -> Result<()> {
-        let before_bytes = self.source.package.resource_file(&path)?;
+        let before_bytes = self.source.image.package.resource_file(&path)?;
         let before_media_type = self
             .source
+            .image
             .resource_graph()
             .nodes()
             .iter()
@@ -689,6 +954,7 @@ impl Edit<'_> {
             .map(str::to_owned);
         let resource = self
             .source
+            .image
             .resources()
             .iter()
             .position(|candidate| candidate.path() == path);
@@ -718,13 +984,13 @@ impl Edit<'_> {
     }
 
     fn metadata_mut(&mut self) -> Result<&mut MetadataEdit> {
-        if self.source.metadata().is_none() {
+        if self.source.image.metadata().is_none() {
             return Err(Error::InvalidFormat(
                 "ODI metadata editing requires an existing meta.xml part".to_string(),
             ));
         }
         if self.metadata.is_none() {
-            let before = MetadataFields::from(self.source.metadata());
+            let before = MetadataFields::from(self.source.image.metadata());
             self.metadata = Some(MetadataEdit {
                 before: before.clone(),
                 after: before,
@@ -779,57 +1045,70 @@ impl ResourceEdit {
     }
 }
 
+/// What a committed package edit changed.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct Diagnostics {
+    changed: bool,
+}
+
+impl Diagnostics {
+    /// Whether the published package differs from its source (`false` for
+    /// an exact no-op, whose package is the source byte-for-byte).
+    #[must_use]
+    pub const fn changed(&self) -> bool {
+        self.changed
+    }
+}
+
 /// A committed immutable image package and its exact-source patch.
 pub struct Commit {
-    snapshot: Image,
+    package: Package,
     patch: Patch,
+    diagnostics: Diagnostics,
 }
 
 impl Commit {
-    /// Returns whether the package bytes changed.
+    /// Returns the committed package.
     #[must_use]
-    pub fn changed(&self) -> bool {
-        !self.patch.changes.is_empty()
-            || !self.patch.resource_changes.is_empty()
-            || self.patch.style_change.is_some()
-            || self.patch.metadata_change.is_some()
-    }
-
-    /// Returns the committed image snapshot.
-    #[must_use]
-    pub fn image(&self) -> &Image {
-        &self.snapshot
+    pub const fn package(&self) -> &Package {
+        &self.package
     }
 
     /// Returns the reversible exact-source patch.
     #[must_use]
-    pub fn patch(&self) -> &Patch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
-    /// Returns the exact source snapshot accepted by this commit.
+    /// Returns what the commit changed.
     #[must_use]
-    pub const fn source(&self) -> &Image {
+    pub const fn diagnostics(&self) -> &Diagnostics {
+        &self.diagnostics
+    }
+
+    /// Returns the exact source package accepted by this commit.
+    pub(crate) const fn source(&self) -> &Package {
         &self.patch.source
     }
 
-    /// Builds a deterministic semantic patch under explicit limits.
-    pub fn semantic_patch(&self, policy: &crate::SecurityPolicy) -> Result<crate::SemanticPatch> {
-        crate::SemanticPatch::from_package_commit(self, policy)
+    /// Consumes this commit into its published package.
+    #[must_use]
+    pub fn into_package(self) -> Package {
+        self.package
     }
 
-    /// Consumes this commit into its published snapshot.
+    /// Consumes this commit into its published package and patch.
     #[must_use]
-    pub fn into_image(self) -> Image {
-        self.snapshot
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
     }
 }
 
 /// A source-checked reversible ODI package image/resource patch.
 #[derive(Clone)]
 pub struct Patch {
-    source: Image,
-    target: Image,
+    source: Package,
+    target: Package,
     changes: Vec<crate::FrameChange>,
     inverse_changes: Vec<crate::FrameChange>,
     resource_changes: Vec<ResourceChange>,
@@ -841,36 +1120,45 @@ pub struct Patch {
 }
 
 impl Patch {
-    /// Returns the exact source snapshot.
+    /// Returns the exact source package.
     #[must_use]
-    pub const fn source(&self) -> &Image {
+    pub const fn source(&self) -> &Package {
         &self.source
     }
 
-    /// Returns the exact target snapshot.
+    /// Returns the exact target package.
     #[must_use]
-    pub const fn target(&self) -> &Image {
+    pub const fn target(&self) -> &Package {
         &self.target
     }
 
     /// Returns whether the patch applies to this exact source byte sequence.
     #[must_use]
-    pub fn is_applicable_to(&self, source: &Image) -> bool {
+    pub fn is_applicable_to(&self, source: &Package) -> bool {
         self.source.as_bytes() == source.as_bytes()
     }
 
-    /// Applies this patch only to its exact immutable source.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the supplied source differs byte-for-byte.
-    pub fn apply(&self, source: &Image) -> Result<Image> {
+    /// Whether the patch changes nothing (its target is its source).
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.changes.is_empty()
+            && self.resource_changes.is_empty()
+            && self.style_change.is_none()
+            && self.metadata_change.is_none()
+    }
+
+    /// Applies this patch only to its exact immutable source
+    /// (public route: [`Package::apply`]).
+    pub(crate) fn apply(&self, source: &Package) -> Result<Package> {
         if !self.is_applicable_to(source) {
             return Err(Error::InvalidFormat(
                 "ODI package patch source does not match its expected snapshot".to_string(),
             ));
         }
-        Image::from_bytes(self.target.as_bytes().to_vec())
+        if self.is_noop() {
+            return Ok(source.clone());
+        }
+        Package::from_vec(self.target.as_bytes().to_vec())
     }
 
     /// Returns the semantic changes in source order.
@@ -1171,13 +1459,13 @@ fn validate_resource_path(path: &str) -> Result<()> {
     reason = "test code panics on failure; unwrap keeps assertions concise"
 )]
 mod tests {
-    use super::{Builder, Image};
+    use super::{Builder, Package};
 
     #[test]
     fn builder_opens_as_validated_snapshot() {
-        let bytes = Builder::new().build().unwrap();
-        let document = Image::from_bytes(bytes).unwrap();
-        assert!(document.content_xml().contains("<office:image"));
-        assert!(!document.as_bytes().is_empty());
+        let built = Builder::new().build().unwrap();
+        let package = Package::from_bytes(built.as_bytes()).unwrap();
+        assert!(package.image().content_xml().contains("<office:image"));
+        assert!(!package.as_bytes().is_empty());
     }
 }

@@ -4,20 +4,20 @@ use litchi_core::{Error, Metadata, Result};
 use litchi_odf_common::core::{MetaXmlPatch, metadata::Metadata as OdfMetadata, patch_meta_xml};
 use std::sync::Arc;
 
-use crate::Master;
+use crate::Package;
 
 const MAX_TITLE_BYTES: usize = 16 * 1024;
 
 /// An isolated title edit derived from one immutable master-document snapshot.
 pub struct Edit<'source> {
-    source: &'source Master,
+    source: &'source Package,
     source_meta_xml: Option<String>,
     before: Option<String>,
     after: Option<String>,
 }
 
 impl<'source> Edit<'source> {
-    pub(crate) fn new(source: &'source Master) -> Result<Self> {
+    pub(crate) fn new(source: &'source Package) -> Result<Self> {
         Ok(Self {
             source,
             source_meta_xml: source.meta_xml()?,
@@ -90,12 +90,12 @@ impl<'source> Edit<'source> {
 
 /// A validated publication result containing a new master snapshot and patch.
 pub struct Commit {
-    snapshot: Master,
+    snapshot: Package,
     patch: Patch,
 }
 
 impl Commit {
-    fn new(before: &Master, snapshot: Master) -> Self {
+    fn new(before: &Package, snapshot: Package) -> Self {
         Self {
             patch: Patch {
                 before: before.shared_bytes(),
@@ -105,9 +105,9 @@ impl Commit {
         }
     }
 
-    /// Returns the committed immutable snapshot.
+    /// Returns the committed immutable package.
     #[must_use]
-    pub const fn snapshot(&self) -> &Master {
+    pub const fn package(&self) -> &Package {
         &self.snapshot
     }
 
@@ -117,10 +117,16 @@ impl Commit {
         &self.patch
     }
 
-    /// Consumes this result and returns the committed immutable snapshot.
+    /// Consumes this result and returns the committed immutable package.
     #[must_use]
-    pub fn into_snapshot(self) -> Master {
+    pub fn into_package(self) -> Package {
         self.snapshot
+    }
+
+    /// Consumes the commit into its published package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.snapshot, self.patch)
     }
 }
 
@@ -134,7 +140,7 @@ pub struct Patch {
 impl Patch {
     /// Returns whether this patch applies to the exact source artifact.
     #[must_use]
-    pub fn is_applicable_to(&self, source: &Master) -> bool {
+    pub fn is_applicable_to(&self, source: &Package) -> bool {
         source.as_bytes() == self.before.as_slice()
     }
 
@@ -144,13 +150,13 @@ impl Patch {
     ///
     /// Returns an error when `source` is not byte-for-byte identical to the
     /// source snapshot accepted by this patch.
-    pub fn apply(&self, source: &Master) -> Result<Master> {
+    pub(crate) fn apply(&self, source: &Package) -> Result<Package> {
         if !self.is_applicable_to(source) {
             return Err(invalid(
                 "ODM title patch source does not match its expected snapshot",
             ));
         }
-        Master::from_shared_bytes(Arc::clone(&self.after))
+        Package::from_shared_bytes(Arc::clone(&self.after))
     }
 
     /// Returns the patch that restores the exact source package bytes.

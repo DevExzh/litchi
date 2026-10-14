@@ -3,7 +3,7 @@
     reason = "test code panics on failure; unwrap keeps assertions concise"
 )]
 
-use litchi_odg::{Builder, Drawing, layer::Layer, page::Page};
+use litchi_odg::{Builder, Package, layer::Layer, page::Page};
 
 const COMPACT_CONTENT: &str = concat!(
     r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
@@ -32,15 +32,15 @@ fn focused_modules_are_the_canonical_semantic_api() {
     assert_eq!(Page::new("Page 1").name(), Some("Page 1"));
     assert_eq!(Layer::new("Foreground").name(), "Foreground");
 
-    let bytes = Builder::new().build().unwrap();
-    let drawing = Drawing::from_bytes(bytes).unwrap();
+    let drawing = Builder::new().build().unwrap();
+    let reopened = Package::from_bytes(drawing.as_bytes()).unwrap();
+    assert_eq!(reopened.as_bytes(), drawing.as_bytes());
     assert!(drawing.content_xml().contains("<office:drawing"));
 }
 
 #[test]
 fn compact_authored_content_is_published_without_rewriting() {
-    let drawing =
-        Drawing::from_bytes(Builder::new().content_xml(COMPACT_CONTENT).build().unwrap()).unwrap();
+    let drawing = Builder::new().content_xml(COMPACT_CONTENT).build().unwrap();
     assert_eq!(drawing.content_xml(), COMPACT_CONTENT);
 }
 
@@ -51,38 +51,35 @@ fn noncompact_authored_content_returns_a_typed_error() {
             .content_xml(NONCOMPACT_CONTENT)
             .build()
             .unwrap_err(),
-        litchi_core::Error::XmlCompactness {
+        litchi_odg::Error::Core(litchi_core::Error::XmlCompactness {
             kind: litchi_core::xml::CompactnessKind::FormattingWhitespace,
             ..
-        }
+        })
     ));
 }
 
 #[test]
 fn semantic_whitespace_is_preserved_exactly() {
-    let drawing = Drawing::from_bytes(
-        Builder::new()
-            .content_xml(SEMANTIC_WHITESPACE_CONTENT)
-            .build()
-            .unwrap(),
-    )
-    .unwrap();
+    let drawing = Builder::new()
+        .content_xml(SEMANTIC_WHITESPACE_CONTENT)
+        .build()
+        .unwrap();
     assert_eq!(drawing.content_xml(), SEMANTIC_WHITESPACE_CONTENT);
 }
 
 #[test]
 fn otg_templates_are_explicit_and_preserved_across_edits() {
-    let bytes = Builder::new().build_template().unwrap();
-    assert!(Drawing::from_bytes(bytes.clone()).is_err());
-    let template = Drawing::from_template_bytes(bytes).unwrap();
+    let built = Builder::new().build_template().unwrap();
+    assert!(Package::from_bytes(built.as_bytes()).is_err());
+    let template = Package::from_template_bytes(built.as_bytes()).unwrap();
     assert!(template.is_template());
     let mut edit = template.edit();
     edit.add_page(Page::new("Template page")).unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.snapshot().is_template());
-    assert_eq!(commit.snapshot().pages()[0].name(), Some("Template page"));
+    assert!(commit.package().is_template());
+    assert_eq!(commit.package().pages()[0].name(), Some("Template page"));
     let durable = commit.patch().durable().unwrap();
-    let reopened = durable.apply(template.snapshot()).unwrap();
+    let reopened = durable.apply(&template).unwrap();
     assert!(reopened.is_template());
-    assert_eq!(reopened.as_bytes(), commit.snapshot().as_bytes());
+    assert_eq!(reopened.as_bytes(), commit.package().as_bytes());
 }

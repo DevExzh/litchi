@@ -163,13 +163,13 @@ class RaisedErrorTests(unittest.TestCase):
                 )
 
     def test_formats_no_opener_reads_get_no_suggestion(self):
-        # Odm is a word-processing format, but no Python opener reads it.
+        # Odg is detected, but no family opener reads OpenDocument drawings
+        # (litchi_py.open holds them as File, record 0282).
         for opener in (L.Document, L.Presentation, L.Workbook):
             with self.subTest(opener=opener.__name__):
-                error = raised(
-                    opener, fixture("libreoffice-core/sw/qa/extras/odfexport/data/tdf121119.odm")
-                )
+                error = raised(opener, fixture("libreoffice-core/desktop/qa/data/BlankDrawDocument.odg"))
                 self.assertError(error, L.UnsupportedError, "unsupported_format")
+                self.assertIsNone(error.suggestion)
 
     def test_unsupported_variants(self):
         self.assertError(

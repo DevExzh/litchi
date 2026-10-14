@@ -396,6 +396,9 @@ pub(crate) enum Source<'a> {
     /// An ODP node's scene values.
     #[cfg(feature = "odp")]
     Odp(crate::format::odp::Props<'a>),
+    /// An object-tree node's values, aligned with its property table.
+    #[cfg(feature = "odf-objects")]
+    Tree(&'a [Option<Value<'static>>]),
 }
 
 impl<'a> Source<'a> {
@@ -433,6 +436,8 @@ impl<'a> Source<'a> {
             Self::Odt(ref props) => props.get(index),
             #[cfg(feature = "odp")]
             Self::Odp(ref props) => props.get(index),
+            #[cfg(feature = "odf-objects")]
+            Self::Tree(values) => values.get(index)?.as_ref().map(Value::borrowed),
         }
     }
 }
@@ -638,6 +643,9 @@ enum Inner<'n, 'f> {
     /// The ODP iterator carries its parent node and scene cursor.
     #[cfg(feature = "odp")]
     Odp(Box<crate::format::odp::children::Children<'f>>),
+    /// The object-tree iterator walks one item's children.
+    #[cfg(feature = "odf-objects")]
+    Object(crate::format::odf_tree::children::Children<'f>),
 }
 
 impl<'n, 'f> Children<'n, 'f> {
@@ -731,6 +739,16 @@ impl<'n, 'f> Children<'n, 'f> {
         }
     }
 
+    /// An object-tree node's children.
+    #[cfg(feature = "odf-objects")]
+    pub(crate) const fn odf_tree(
+        children: crate::format::odf_tree::children::Children<'f>,
+    ) -> Self {
+        Self {
+            inner: Inner::Object(children),
+        }
+    }
+
     /// An RTF node's children.
     #[cfg(feature = "rtf")]
     pub(crate) const fn rtf(children: crate::format::rtf::children::Children<'f>) -> Self {
@@ -779,6 +797,8 @@ impl<'f> Iterator for Children<'_, 'f> {
             Inner::Odt(children) => children.next().map(|child| child.map(Node::Odt)),
             #[cfg(feature = "odp")]
             Inner::Odp(children) => children.next().map(|child| child.map(Node::Odp)),
+            #[cfg(feature = "odf-objects")]
+            Inner::Object(children) => children.next().map(|child| child.map(Node::Object)),
         };
         if matches!(item, Some(Err(_)) | None) {
             self.inner = Inner::Empty(PhantomData);

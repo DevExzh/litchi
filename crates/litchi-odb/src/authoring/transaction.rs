@@ -100,7 +100,7 @@ impl Change {
 /// driver, follows a component link, or executes a stored command.
 #[derive(Clone)]
 pub struct Edit<'source> {
-    source: &'source Database,
+    source: &'source crate::Package,
     policy: crate::EditPolicy,
     content: String,
     changes: Vec<Change>,
@@ -110,11 +110,11 @@ pub struct Edit<'source> {
 }
 
 impl<'source> Edit<'source> {
-    pub(crate) fn new(source: &'source Database, policy: crate::EditPolicy) -> Self {
+    pub(crate) fn new(source: &'source crate::Package, policy: crate::EditPolicy) -> Self {
         Self {
             source,
             policy,
-            content: source.content_xml().to_owned(),
+            content: source.database.content_xml().to_owned(),
             changes: Vec::new(),
             legacy_query: None,
             payload_additions: Vec::new(),
@@ -543,6 +543,7 @@ impl<'source> Edit<'source> {
         })?;
         if self
             .source
+            .database
             .package
             .contains_package_prefix(&destination_prefix)?
             || self
@@ -587,7 +588,7 @@ impl<'source> Edit<'source> {
                 }
                 continue;
             }
-            match self.source.package.file_matches(&addition)? {
+            match self.source.database.package.file_matches(&addition)? {
                 Some(true) => {},
                 Some(false) => {
                     return invalid("ODB component package dependency collides in destination");
@@ -606,7 +607,7 @@ impl<'source> Edit<'source> {
                 }
                 continue;
             }
-            match self.source.package.directory_media_type(&path)? {
+            match self.source.database.package.directory_media_type(&path)? {
                 Some(existing) if existing == media_type => {},
                 Some(_) => {
                     return invalid("ODB component package directory collides in destination");
@@ -1735,7 +1736,7 @@ impl<'source> Edit<'source> {
             return invalid("legacy query scalar setters support one query per transaction");
         }
         if self.legacy_query.is_none() {
-            let catalog = self.source.catalog()?;
+            let catalog = self.source.database.catalog()?;
             let query = catalog.query(name)?.ok_or_else(|| {
                 Error::InvalidFormat(format!("ODB query '{name}' does not exist"))
             })?;
@@ -1769,15 +1770,25 @@ impl<'source> Edit<'source> {
     }
 
     /// Atomically rebuilds, fully reopens, and semantically verifies the
-    /// candidate package.
-    pub fn commit(self) -> Result<Commit> {
-        if self.content == self.source.content_xml()
+    /// candidate package. An exact no-op returns the source package
+    /// byte-for-byte.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when protection policy refuses the change or the
+    /// rebuilt package fails validation or semantic readback.
+    pub fn commit(self) -> std::result::Result<Commit, litchi_odf_common::Error> {
+        Ok(self.commit_core()?)
+    }
+
+    fn commit_core(self) -> Result<Commit> {
+        if self.content == self.source.database.content_xml()
             && self.payload_additions.is_empty()
             && self.payload_directories.is_empty()
         {
             return Ok(Commit::unchanged(self.source.clone()));
         }
-        let protection = self.source.protection_status()?;
+        let protection = self.source.database.protection_status()?;
         if protection.is_signed()
             && matches!(
                 self.policy.signature(),
@@ -1803,24 +1814,26 @@ impl<'source> Edit<'source> {
             .iter()
             .any(|change| matches!(change.kind, ChangeKind::Connection | ChangeKind::Settings));
         crate::codec::validate(&self.content)?;
-        let snapshot = Database {
-            package: self.source.package.rebuild_with_content_and_additions(
-                &self.content,
-                self.payload_additions,
-                self.payload_directories,
-            )?,
-            settings: std::sync::Arc::new(std::sync::OnceLock::new()),
-        };
-        snapshot.catalog()?;
+        let snapshot = crate::Package::from_snapshot(
+            self.source
+                .database
+                .package
+                .rebuild_with_content_and_additions(
+                    &self.content,
+                    self.payload_additions,
+                    self.payload_directories,
+                )?,
+        );
+        snapshot.database.catalog()?;
         if typed_publication {
-            snapshot.settings()?;
+            snapshot.database.settings()?;
         }
         if protection.is_signed()
             && matches!(
                 self.policy.signature(),
                 crate::SignaturePolicy::RemoveInvalidated
             )
-            && snapshot.protection_status()?.is_signed()
+            && snapshot.database.protection_status()?.is_signed()
         {
             return Err(Error::InvalidFormat(
                 "ODB changed publication retained an invalidated signature member".to_string(),
@@ -1882,15 +1895,16 @@ impl QueryChange {
     }
 }
 
-/// A committed immutable database and its source-checked reversible patch.
+/// A committed immutable database package and its source-checked reversible
+/// patch.
 pub struct Commit {
-    snapshot: Database,
+    snapshot: crate::Package,
     patch: Patch,
     changed: bool,
 }
 
 impl Commit {
-    fn unchanged(snapshot: Database) -> Self {
+    fn unchanged(snapshot: crate::Package) -> Self {
         Self {
             patch: Patch {
                 source: snapshot.clone(),
@@ -1903,19 +1917,63 @@ impl Commit {
         }
     }
 
+    /// Borrows the published immutable package.
     #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-
-    #[must_use]
-    pub const fn database(&self) -> &Database {
+    pub const fn package(&self) -> &crate::Package {
         &self.snapshot
     }
 
+    /// Borrows the reversible source-checked patch.
     #[must_use]
     pub const fn patch(&self) -> &Patch {
         &self.patch
+    }
+
+    /// Returns content-free facts about this commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> Diagnostics {
+        Diagnostics {
+            changed: self.changed,
+            source: self.patch.source.clone(),
+            target: self.snapshot.clone(),
+        }
+    }
+
+    /// Consumes the commit into its published package.
+    #[must_use]
+    pub fn into_package(self) -> crate::Package {
+        self.snapshot
+    }
+
+    /// Consumes the commit into its published package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (crate::Package, Patch) {
+        (self.snapshot, self.patch)
+    }
+}
+
+/// Content-free facts about one [`Commit`].
+#[derive(Clone)]
+pub struct Diagnostics {
+    changed: bool,
+    source: crate::Package,
+    target: crate::Package,
+}
+
+impl std::fmt::Debug for Diagnostics {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Diagnostics")
+            .field("changed", &self.changed)
+            .finish_non_exhaustive()
+    }
+}
+
+impl Diagnostics {
+    /// Whether publication rebuilt the package.
+    #[must_use]
+    pub const fn changed(&self) -> bool {
+        self.changed
     }
 
     /// Inventories the protection lifecycle of this exact publication.
@@ -1928,33 +1986,35 @@ impl Commit {
     /// Returns an error if either package inventory cannot be inspected.
     pub fn protection_transition(&self) -> Result<crate::ProtectionTransition> {
         Ok(crate::ProtectionTransition::new(
-            self.patch.source.protection_status()?,
-            self.snapshot.protection_status()?,
+            self.source.database.protection_status()?,
+            self.target.database.protection_status()?,
         ))
-    }
-
-    #[must_use]
-    pub fn into_database(self) -> Database {
-        self.snapshot
     }
 }
 
 /// A byte-exact source-checked reversible ODB patch.
 #[derive(Clone)]
 pub struct Patch {
-    pub(super) source: Database,
-    pub(super) target: Database,
+    pub(super) source: crate::Package,
+    pub(super) target: crate::Package,
     pub(super) changes: Vec<Change>,
     pub(super) legacy_query: Option<QueryChange>,
 }
 
 impl Patch {
+    /// Whether `source` is byte-for-byte this patch's source.
     #[must_use]
-    pub fn is_applicable_to(&self, source: &Database) -> bool {
+    pub fn is_applicable_to(&self, source: &crate::Package) -> bool {
         self.source.as_bytes() == source.as_bytes()
     }
 
-    pub fn apply(&self, source: &Database) -> Result<Database> {
+    /// Whether this patch leaves its source unchanged.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.source.as_bytes() == self.target.as_bytes()
+    }
+
+    pub(crate) fn apply(&self, source: &crate::Package) -> Result<crate::Package> {
         if !self.is_applicable_to(source) {
             return invalid("ODB patch source does not match its expected snapshot");
         }
@@ -1973,6 +2033,7 @@ impl Patch {
         self.legacy_query.as_ref()
     }
 
+    /// Returns the patch that restores the exact source package.
     #[must_use]
     pub fn inverse(&self) -> Self {
         Self {

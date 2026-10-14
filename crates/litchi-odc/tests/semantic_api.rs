@@ -4,7 +4,7 @@
 )]
 
 use litchi_odc::{
-    AxisSpec, Builder, Chart, ChartClass, ChartClassKind, Definition, Text,
+    AxisSpec, Builder, Chart, ChartClass, ChartClassKind, Definition, Package, Text,
     chart::{Dimension, Kind, Position},
 };
 
@@ -17,22 +17,22 @@ fn focused_modules_are_the_canonical_semantic_api() {
     assert_eq!(Dimension::Z, Dimension::Z);
     assert_eq!(Position::BottomEnd, Position::BottomEnd);
 
-    let bytes = Builder::new().build().unwrap();
-    let chart = Chart::from_bytes(bytes).unwrap();
-    assert!(!chart.content_xml().contains('\n'));
-    assert!(chart.content_xml().contains("<office:chart"));
-    assert_eq!(chart.chart().kind(), Kind::Chart);
-    assert!(chart.plot_area().is_some());
+    let bytes = Builder::new().build().unwrap().to_bytes().unwrap();
+    let chart = Package::from_bytes(&bytes).unwrap();
+    assert!(!chart.chart().content_xml().contains('\n'));
+    assert!(chart.chart().content_xml().contains("<office:chart"));
+    assert_eq!(chart.chart().chart().kind(), Kind::Chart);
+    assert!(chart.chart().plot_area().is_some());
 }
 
 #[test]
 fn semantic_whitespace_in_typed_text_is_preserved() {
     let mut definition = Definition::new(ChartClass::line());
     definition.title = Some(Text::new("line one\n  line two"));
-    let chart =
-        Chart::from_bytes(Builder::new().with_definition(definition).build().unwrap()).unwrap();
+    let chart = Builder::new().with_definition(definition).build().unwrap();
     assert!(
         chart
+            .chart()
             .content_xml()
             .contains("<text:p>line one\n  line two</text:p>")
     );
@@ -44,7 +44,7 @@ fn validation_is_namespace_aware_and_structural() {
     definition.plot_area.axes.push(AxisSpec::new(Dimension::X));
     let bytes = Builder::new().with_definition(definition).build().unwrap();
     assert!(
-        Chart::from_bytes(bytes)
+        Package::from_bytes(bytes.as_bytes())
             .unwrap()
             .chart()
             .plot_area()
@@ -76,21 +76,36 @@ fn package_authoring_and_readback_keep_typed_chart_classes_compact() {
         ChartClass::surface(),
     ];
     for class in values {
-        let chart = Chart::from_definition(Definition::new(class.clone())).unwrap();
-        assert_eq!(chart.class().unwrap().kind(), class.kind());
-        assert!(chart.content_xml().contains(class.lexical()));
-        assert!(!chart.content_xml().contains("><\n"));
+        let chart = Builder::new()
+            .with_definition(Definition::new(class.clone()))
+            .build()
+            .unwrap();
+        assert_eq!(chart.chart().class().unwrap().kind(), class.kind());
+        assert!(chart.chart().content_xml().contains(class.lexical()));
+        assert!(!chart.chart().content_xml().contains("><\n"));
     }
 
     let class = ChartClass::extension("vendor:heat", "urn:example:chart").unwrap();
-    let chart = Chart::from_definition(Definition::new(class)).unwrap();
-    assert_eq!(chart.class().unwrap().kind(), ChartClassKind::Extension);
+    let chart = Builder::new()
+        .with_definition(Definition::new(class))
+        .build()
+        .unwrap();
+    assert_eq!(
+        chart.chart().class().unwrap().kind(),
+        ChartClassKind::Extension
+    );
     assert!(
         chart
+            .chart()
             .content_xml()
             .contains("xmlns:vendor=\"urn:example:chart\"")
     );
-    assert!(chart.content_xml().contains("chart:class=\"vendor:heat\""));
+    assert!(
+        chart
+            .chart()
+            .content_xml()
+            .contains("chart:class=\"vendor:heat\"")
+    );
 }
 
 #[test]
