@@ -5,8 +5,8 @@
 
 use litchi_core::{HistoryLimits, Metadata, Position};
 use litchi_oth::{
-    Block, Builder, CapabilityState, History, JoinFailure, Patch, ResourceMember, SecurityPolicy,
-    Template, TransferPolicy, TransferSelector, field,
+    Block, Builder, CapabilityState, History, JoinFailure, Package, Patch, ResourceMember,
+    SecurityPolicy, TransferPolicy, TransferSelector, field,
     form::{Control, Form},
     heading::Heading,
     inline::{Content as Inline, Field as InlineField, Span},
@@ -94,9 +94,9 @@ fn focused_modules_are_the_canonical_semantic_api() {
     assert_eq!(link.href(), "https://example.test");
     assert_eq!(link.label(), "Example");
 
-    let bytes = Builder::new().build().unwrap();
-    let template = Template::from_bytes(bytes).unwrap();
-    assert!(template.content_xml().contains("<office:text"));
+    let bytes = Builder::new().build().unwrap().to_bytes().unwrap();
+    let template = Package::from_bytes(&bytes).unwrap();
+    assert!(template.document().content_xml().contains("<office:text"));
 }
 
 #[test]
@@ -106,18 +106,21 @@ fn typed_builder_writes_byte_minimal_escaped_blocks() {
         .heading(heading)
         .paragraph(Paragraph::styled("<body>", "Body"))
         .build()
+        .unwrap()
+        .to_bytes()
         .unwrap();
-    let template = Template::from_bytes(bytes).unwrap();
-    assert!(template.content_xml().contains(
+    let template = Package::from_bytes(&bytes).unwrap();
+    assert!(template.document().content_xml().contains(
         "<text:h text:outline-level=\"2\" text:style-name=\"Heading\">A &amp; B</text:h>"
     ));
     assert!(
         template
+            .document()
             .content_xml()
             .contains("<text:p text:style-name=\"Body\">&lt;body&gt;</text:p>")
     );
-    assert!(!template.content_xml().contains('\n'));
-    assert!(!template.content_xml().contains(" />"));
+    assert!(!template.document().content_xml().contains('\n'));
+    assert!(!template.document().content_xml().contains(" />"));
     assert!(
         Builder::new()
             .content_xml(COMPACT_CONTENT)
@@ -129,11 +132,10 @@ fn typed_builder_writes_byte_minimal_escaped_blocks() {
 
 #[test]
 fn compact_authored_content_is_published_without_rewriting() {
-    let template =
-        Template::from_bytes(Builder::new().content_xml(COMPACT_CONTENT).build().unwrap()).unwrap();
-    assert_eq!(template.content_xml(), COMPACT_CONTENT);
-    assert!(!template.content_xml().contains("\n<"));
-    assert!(!template.content_xml().contains(" />"));
+    let template = Builder::new().content_xml(COMPACT_CONTENT).build().unwrap();
+    assert_eq!(template.document().content_xml(), COMPACT_CONTENT);
+    assert!(!template.document().content_xml().contains("\n<"));
+    assert!(!template.document().content_xml().contains(" />"));
 }
 
 #[test]
@@ -143,10 +145,10 @@ fn noncompact_authored_content_returns_a_typed_error() {
             .content_xml(NONCOMPACT_CONTENT)
             .build()
             .unwrap_err(),
-        litchi_core::Error::XmlCompactness {
+        litchi_oth::Error::Core(litchi_core::Error::XmlCompactness {
             kind: litchi_core::xml::CompactnessKind::FormattingWhitespace,
             ..
-        }
+        })
     ));
 }
 
@@ -160,11 +162,14 @@ fn builder_authors_compact_optional_xml_parts_and_reopens_before_publication() {
         .settings_xml(SETTINGS)
         .styles_xml(STYLES)
         .build()
+        .unwrap()
+        .to_bytes()
         .unwrap();
-    let template = Template::from_bytes(bytes).unwrap();
-    assert_eq!(template.styles_xml(), Some(STYLES));
+    let template = Package::from_bytes(&bytes).unwrap();
+    assert_eq!(template.document().styles_xml(), Some(STYLES));
     assert!(
         template
+            .document()
             .files()
             .unwrap()
             .iter()
@@ -248,19 +253,21 @@ fn fresh_builder_authors_common_semantics_and_resource_closure() {
         )
         .unwrap()
         .build()
+        .unwrap()
+        .to_bytes()
         .unwrap();
 
-    let template = Template::from_bytes(bytes.clone()).unwrap();
-    assert!(!template.content_xml().contains(">\n<"));
-    assert!(!template.meta_xml().unwrap().contains(">\n<"));
-    assert!(!template.styles_xml().unwrap().contains(">\n<"));
+    let template = Package::from_bytes(&bytes).unwrap();
+    assert!(!template.document().content_xml().contains(">\n<"));
+    assert!(!template.document().meta_xml().unwrap().contains(">\n<"));
+    assert!(!template.document().styles_xml().unwrap().contains(">\n<"));
     assert_eq!(
-        template.metadata().unwrap().title.as_deref(),
+        template.document().metadata().unwrap().title.as_deref(),
         Some("Fresh OTH")
     );
-    assert_eq!(template.metadata().unwrap().page_count, Some(2));
-    assert_eq!(template.styles().len(), 2);
-    let body = template.text_body().unwrap();
+    assert_eq!(template.document().metadata().unwrap().page_count, Some(2));
+    assert_eq!(template.document().styles().len(), 2);
+    let body = template.document().text_body().unwrap();
     assert_eq!(body.forms()[0].controls()[0].name(), Some("q"));
     assert_eq!(body.resources().len(), 3);
     assert_eq!(body.headings()[0].text(), "Fresh heading");
@@ -275,7 +282,7 @@ fn fresh_builder_authors_common_semantics_and_resource_closure() {
     assert_eq!(&rich_paragraph.text()[display_range], "2");
     assert_eq!(body.bookmarks().len(), 1);
     assert_eq!(body.lists()[1].items()[0].nested_lists().len(), 1);
-    let files = template.files().unwrap();
+    let files = template.document().files().unwrap();
     for expected in [
         "Pictures/fresh.bin",
         "Object 1/content.xml",
@@ -284,6 +291,7 @@ fn fresh_builder_authors_common_semantics_and_resource_closure() {
         assert!(files.iter().any(|path| path == expected));
     }
     template
+        .document()
         .check_security(SecurityPolicy {
             allow_embedded_objects: true,
             allow_external_resources: true,
@@ -291,9 +299,12 @@ fn fresh_builder_authors_common_semantics_and_resource_closure() {
             ..SecurityPolicy::default()
         })
         .unwrap();
-    let reopened = Template::from_bytes(template.as_bytes().to_vec()).unwrap();
+    let reopened = Package::from_bytes(template.as_bytes()).unwrap();
     assert_eq!(reopened.as_bytes(), bytes.as_slice());
-    assert_eq!(reopened.text_body().unwrap().resources(), body.resources());
+    assert_eq!(
+        reopened.document().text_body().unwrap().resources(),
+        body.resources()
+    );
 
     assert!(
         Builder::new()
@@ -340,30 +351,30 @@ fn fresh_builder_authors_common_semantics_and_resource_closure() {
 
 #[test]
 fn semantic_whitespace_is_preserved_exactly() {
-    let template = Template::from_bytes(
-        Builder::new()
-            .content_xml(SEMANTIC_WHITESPACE_CONTENT)
-            .build()
-            .unwrap(),
-    )
-    .unwrap();
-    assert_eq!(template.content_xml(), SEMANTIC_WHITESPACE_CONTENT);
+    let template = Builder::new()
+        .content_xml(SEMANTIC_WHITESPACE_CONTENT)
+        .build()
+        .unwrap();
+    assert_eq!(
+        template.document().content_xml(),
+        SEMANTIC_WHITESPACE_CONTENT
+    );
 }
 
 #[test]
 fn loaded_template_snapshot_remains_byte_exact() {
-    let bytes = Builder::new().build().unwrap();
-    let template = Template::from_bytes(bytes.clone()).unwrap();
+    let bytes = Builder::new().build().unwrap().to_bytes().unwrap();
+    let template = Package::from_bytes(&bytes).unwrap();
     assert_eq!(template.as_bytes(), bytes.as_slice());
-    assert_eq!(template.into_bytes(), bytes);
+    assert_eq!(template.to_bytes().unwrap(), bytes);
 }
 
 #[test]
 fn shared_archive_input_opens_without_changing_the_source_bytes() {
-    let bytes = Arc::new(Builder::new().build().unwrap());
+    let bytes = Arc::new(Builder::new().build().unwrap().to_bytes().unwrap());
     let original_bytes = bytes.as_slice().to_vec();
     let original_ptr = bytes.as_ptr();
-    let template = Template::from_shared_bytes(Arc::clone(&bytes)).unwrap();
+    let template = Package::from_shared_bytes(Arc::clone(&bytes)).unwrap();
     assert_eq!(template.as_bytes().as_ptr(), original_ptr);
     assert_eq!(template.as_bytes(), original_bytes.as_slice());
     assert_eq!(bytes.as_slice(), original_bytes.as_slice());
@@ -377,9 +388,11 @@ fn local_odf14_fixture_uses_namespace_aware_text_web_contract() {
     let bytes = Builder::new()
         .content_xml(PREFIX_ALIASED_TEXT_WEB)
         .build()
+        .unwrap()
+        .to_bytes()
         .unwrap();
-    let template = Template::from_bytes(bytes).unwrap();
-    let body = template.text_body().unwrap();
+    let template = Package::from_bytes(&bytes).unwrap();
+    let body = template.document().text_body().unwrap();
     assert_eq!(body.paragraphs().len(), 1);
     assert_eq!(body.paragraphs()[0].text(), "prefix-safe text");
 }
@@ -394,7 +407,7 @@ fn local_invalid_family_fixtures_fail_before_package_publication() {
 #[test]
 fn raw_zip_negatives_are_rejected_by_the_open_boundary() {
     for xml in [WRONG_FAMILY, DUPLICATE_BODY] {
-        assert!(Template::from_bytes(raw_negative_package(xml)).is_err());
+        assert!(Package::from_bytes(&raw_negative_package(xml)).is_err());
     }
     // A prologue DOCTYPE is ignored without being processed (the shared ODF
     // leniency F9.11, as LibreOffice's SAX import does), so the template
@@ -405,11 +418,12 @@ fn raw_zip_negatives_are_rejected_by_the_open_boundary() {
         "<!DOCTYPE office:document-content><office:document-content",
         1,
     );
-    let tolerated = Template::from_bytes(raw_negative_package(&dtd)).unwrap();
+    let tolerated = Package::from_bytes(&raw_negative_package(&dtd)).unwrap();
     assert_eq!(
-        tolerated.text_body().unwrap().paragraphs().len(),
-        Template::from_bytes(raw_negative_package(COMPACT_CONTENT))
+        tolerated.document().text_body().unwrap().paragraphs().len(),
+        Package::from_bytes(&raw_negative_package(COMPACT_CONTENT))
             .unwrap()
+            .document()
             .text_body()
             .unwrap()
             .paragraphs()
@@ -422,7 +436,7 @@ fn raw_zip_negatives_are_rejected_by_the_open_boundary() {
             1,
         )
         .replacen("<office:text>", "<office:text>&x;", 1);
-    assert!(Template::from_bytes(raw_negative_package(&entity)).is_err());
+    assert!(Package::from_bytes(&raw_negative_package(&entity)).is_err());
     let pretty_misplaced_inline = concat!(
         "<?xml version=\"1.0\"?>\n",
         "<office:document-content xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" ",
@@ -431,7 +445,7 @@ fn raw_zip_negatives_are_rejected_by_the_open_boundary() {
         "      <text:span>outside block</text:span>\n",
         "    </office:text>\n  </office:body>\n</office:document-content>",
     );
-    assert!(Template::from_bytes(raw_negative_package(pretty_misplaced_inline)).is_err());
+    assert!(Package::from_bytes(&raw_negative_package(pretty_misplaced_inline)).is_err());
 }
 
 #[test]
@@ -455,37 +469,35 @@ fn odf_grammar_derived_list_and_form_negatives_are_test_only_raw() {
         "<office:forms><form:text/></office:forms>",
     ] {
         let xml = format!("{PREFIX}{invalid_body}{SUFFIX}");
-        assert!(Template::from_bytes(raw_negative_package(&xml)).is_err());
+        assert!(Package::from_bytes(&raw_negative_package(&xml)).is_err());
     }
 }
 
 #[test]
 fn exact_noop_edit_is_source_checked_and_atomic() {
-    let source = Template::from_bytes(Builder::new().build().unwrap()).unwrap();
-    let alternate =
-        Template::from_bytes(Builder::new().content_xml(COMPACT_CONTENT).build().unwrap()).unwrap();
+    let source = Builder::new().build().unwrap();
+    let alternate = Builder::new().content_xml(COMPACT_CONTENT).build().unwrap();
     let commit = source.edit().commit().unwrap();
-    assert!(!commit.changed());
-    assert_eq!(commit.template().as_bytes(), source.as_bytes());
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().as_bytes(), source.as_bytes());
     assert_eq!(
-        commit.patch().apply(&source).unwrap().as_bytes(),
+        source.apply(commit.patch()).unwrap().as_bytes(),
         source.as_bytes()
     );
-    assert!(commit.patch().apply(&alternate).is_err());
+    assert!(alternate.apply(commit.patch()).is_err());
     let mut absent_removal_edit = source.edit();
     absent_removal_edit.remove_metadata();
     absent_removal_edit.remove_styles();
     let absent_removal_commit = absent_removal_edit.commit().unwrap();
-    assert!(!absent_removal_commit.changed());
+    assert!(!absent_removal_commit.diagnostics().changed());
     assert_eq!(
-        absent_removal_commit.template().as_bytes(),
+        absent_removal_commit.package().as_bytes(),
         source.as_bytes()
     );
     assert_eq!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.template())
+            .package()
+            .apply(&commit.patch().inverse())
             .unwrap()
             .as_bytes(),
         source.as_bytes(),
@@ -500,20 +512,26 @@ fn paragraph_edit_is_bounded_reversible_and_preserves_unknown_content() {
         r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.4">"#,
         r#"<office:body><office:text><text:p>before</text:p><foreign:keep xmlns:foreign="urn:example">opaque</foreign:keep></office:text></office:body></office:document-content>"#,
     );
-    let source =
-        Template::from_bytes(Builder::new().content_xml(CONTENT).build().unwrap()).unwrap();
+    let source = Builder::new().content_xml(CONTENT).build().unwrap();
     let mut edit = source.edit();
     edit.set_paragraph_text(Position::new(0), "after & exact")
         .unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert_eq!(
-        commit.template().text_body().unwrap().paragraphs()[0].text(),
+        commit
+            .package()
+            .document()
+            .text_body()
+            .unwrap()
+            .paragraphs()[0]
+            .text(),
         "after & exact"
     );
     assert!(
         commit
-            .template()
+            .package()
+            .document()
             .content_xml()
             .contains("<foreign:keep xmlns:foreign=\"urn:example\">opaque</foreign:keep>")
     );
@@ -524,9 +542,8 @@ fn paragraph_edit_is_bounded_reversible_and_preserves_unknown_content() {
     assert_eq!(commit.patch().change().unwrap().before(), "before");
     assert_eq!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.template())
+            .package()
+            .apply(&commit.patch().inverse())
             .unwrap()
             .as_bytes(),
         source.as_bytes()
@@ -541,8 +558,7 @@ fn paragraph_edit_refuses_nested_markup_that_cannot_be_rewritten_losslessly() {
         r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.4">"#,
         r#"<office:body><office:text><text:p>plain <text:span>nested</text:span></text:p></office:text></office:body></office:document-content>"#,
     );
-    let source =
-        Template::from_bytes(Builder::new().content_xml(CONTENT).build().unwrap()).unwrap();
+    let source = Builder::new().content_xml(CONTENT).build().unwrap();
     let mut edit = source.edit();
     assert!(
         edit.set_paragraph_text(Position::new(0), "replacement")
@@ -561,9 +577,8 @@ fn projects_headings_links_styles_and_odf_whitespace_as_inert_values() {
         r#"<text:p text:style-name="Body">one<text:s text:c="2"/><text:a xlink:href="https://example.test/value">link</text:a><text:tab/><text:line-break/>two</text:p>"#,
         r#"</office:text></office:body></office:document-content>"#,
     );
-    let template =
-        Template::from_bytes(Builder::new().content_xml(CONTENT).build().unwrap()).unwrap();
-    let body = template.text_body().unwrap();
+    let template = Builder::new().content_xml(CONTENT).build().unwrap();
+    let body = template.document().text_body().unwrap();
     assert_eq!(body.headings()[0].level(), 2);
     assert_eq!(body.paragraphs()[0].text(), "one  link\t\ntwo");
     assert_eq!(body.paragraphs()[0].style_name(), Some("Body"));
@@ -597,15 +612,12 @@ fn projects_lists_bookmarks_fields_formatting_resources_forms_and_styles() {
         r#"<style:style style:name="Body" style:family="paragraph" style:parent-style-name="Standard"/>"#,
         r#"</office:styles></office:document-styles>"#,
     );
-    let template = Template::from_bytes(
-        Builder::new()
-            .content_xml(CONTENT)
-            .styles_xml(STYLES)
-            .build()
-            .unwrap(),
-    )
-    .unwrap();
-    let body = template.text_body().unwrap();
+    let template = Builder::new()
+        .content_xml(CONTENT)
+        .styles_xml(STYLES)
+        .build()
+        .unwrap();
+    let body = template.document().text_body().unwrap();
     assert_eq!(body.lists().len(), 1);
     assert_eq!(body.lists()[0].style_name(), Some("Numbered"));
     assert_eq!(body.lists()[0].items()[0].start_value(), Some(3));
@@ -627,8 +639,11 @@ fn projects_lists_bookmarks_fields_formatting_resources_forms_and_styles() {
     assert_eq!(body.forms()[0].name(), Some("Search"));
     assert_eq!(body.forms()[0].controls()[0].kind(), "text");
     assert_eq!(body.forms()[0].controls()[0].id(), Some("query"));
-    assert_eq!(template.styles().len(), 2);
-    assert_eq!(template.styles()[1].parent_name(), Some("Standard"));
+    assert_eq!(template.document().styles().len(), 2);
+    assert_eq!(
+        template.document().styles()[1].parent_name(),
+        Some("Standard")
+    );
 }
 
 #[test]
@@ -643,9 +658,16 @@ fn typed_list_builder_append_composition_history_and_refusals_reopen() {
             ],
         ))
         .build()
+        .unwrap()
+        .to_bytes()
         .unwrap();
-    let source = Template::from_bytes(bytes).unwrap();
-    assert_eq!(source.text_body().unwrap().lists()[0].items().len(), 2);
+    let source = Package::from_bytes(&bytes).unwrap();
+    assert_eq!(
+        source.document().text_body().unwrap().lists()[0]
+            .items()
+            .len(),
+        2
+    );
 
     let mut text_edit = source.edit();
     text_edit
@@ -657,21 +679,35 @@ fn typed_list_builder_append_composition_history_and_refusals_reopen() {
         .unwrap();
     text_edit.join(append_edit).unwrap();
     let commit = text_edit.commit().unwrap();
-    assert!(commit.template().content_xml().contains("<text:list>"));
-    assert!(!commit.template().content_xml().contains("\n<"));
-    assert_eq!(commit.template().text_body().unwrap().lists().len(), 2);
+    assert!(
+        commit
+            .package()
+            .document()
+            .content_xml()
+            .contains("<text:list>")
+    );
+    assert!(!commit.package().document().content_xml().contains("\n<"));
+    assert_eq!(
+        commit
+            .package()
+            .document()
+            .text_body()
+            .unwrap()
+            .lists()
+            .len(),
+        2
+    );
     assert_eq!(commit.patch().appended().len(), 1);
     assert_eq!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.template())
+            .package()
+            .apply(&commit.patch().inverse())
             .unwrap()
             .as_bytes(),
         source.as_bytes(),
     );
 
-    let target = commit.template().clone();
+    let target = commit.package().clone();
     let mut history = History::new(source.clone(), HistoryLimits::new(4, 1_000_000));
     history.record(commit).unwrap();
     assert_eq!(history.current().as_bytes(), target.as_bytes());
@@ -687,15 +723,19 @@ fn typed_list_builder_append_composition_history_and_refusals_reopen() {
         .unwrap();
     let error = first.join(second).err().unwrap();
     assert_eq!(error.failure(), JoinFailure::Paragraph(Position::new(0)));
-    assert!(error.into_rejected().commit().unwrap().changed());
+    assert!(
+        error
+            .into_rejected()
+            .commit()
+            .unwrap()
+            .diagnostics()
+            .changed()
+    );
 
-    let alternate = Template::from_bytes(
-        Builder::new()
-            .paragraph(Paragraph::new("alternate"))
-            .build()
-            .unwrap(),
-    )
-    .unwrap();
+    let alternate = Builder::new()
+        .paragraph(Paragraph::new("alternate"))
+        .build()
+        .unwrap();
     let mut base_edit = source.edit();
     let cross_lineage = base_edit.join(alternate.edit()).err().unwrap();
     assert_eq!(cross_lineage.failure(), JoinFailure::DifferentSnapshot);
@@ -735,19 +775,16 @@ fn rich_semantic_ranges_and_resources_fail_closed() {
     }
 }
 
-fn structural_source() -> Template {
-    Template::from_bytes(
-        Builder::new()
-            .heading(Heading::new(1, "Heading").unwrap())
-            .paragraph(Paragraph::new("outside"))
-            .list(List::new([
-                Item::new(Paragraph::new("one")),
-                Item::new(Paragraph::new("two")),
-            ]))
-            .build()
-            .unwrap(),
-    )
-    .unwrap()
+fn structural_source() -> Package {
+    Builder::new()
+        .heading(Heading::new(1, "Heading").unwrap())
+        .paragraph(Paragraph::new("outside"))
+        .list(List::new([
+            Item::new(Paragraph::new("one")),
+            Item::new(Paragraph::new("two")),
+        ]))
+        .build()
+        .unwrap()
 }
 
 #[test]
@@ -765,15 +802,15 @@ fn heading_list_durable_and_merge_workflows_are_source_checked() {
     let durable = Patch::from_bytes(&wire).unwrap();
     assert_eq!(durable.heading_changes()[0].before(), "Heading");
     assert_eq!(
-        durable.apply(&source).unwrap().as_bytes(),
-        left_commit.template().as_bytes()
+        source.apply(&durable).unwrap().as_bytes(),
+        left_commit.package().as_bytes()
     );
-    let alternate = Template::from_bytes(Builder::new().build().unwrap()).unwrap();
-    assert!(durable.apply(&alternate).is_err());
+    let alternate = Builder::new().build().unwrap();
+    assert!(alternate.apply(&durable).is_err());
     let inverse_wire = durable.inverse().to_bytes().unwrap();
     let inverse = Patch::from_bytes(&inverse_wire).unwrap();
     assert_eq!(
-        inverse.apply(left_commit.template()).unwrap().as_bytes(),
+        left_commit.package().apply(&inverse).unwrap().as_bytes(),
         source.as_bytes()
     );
 
@@ -795,33 +832,42 @@ fn heading_list_durable_and_merge_workflows_are_source_checked() {
         Some("Bullets")
     );
     assert_eq!(
-        right_durable.apply(&source).unwrap().as_bytes(),
-        right_commit.template().as_bytes()
+        source.apply(&right_durable).unwrap().as_bytes(),
+        right_commit.package().as_bytes()
     );
     let plan = Patch::plan_three_way(&source, left_commit.patch(), right_commit.patch()).unwrap();
     assert!(plan.conflicts().is_empty());
     let merged = plan.publish().unwrap();
     assert_eq!(
-        merged.text_body().unwrap().headings()[0].text(),
+        merged.document().text_body().unwrap().headings()[0].text(),
         "Changed heading"
     );
     assert_eq!(
-        merged.text_body().unwrap().lists()[0].style_name(),
+        merged.document().text_body().unwrap().lists()[0].style_name(),
         Some("Bullets")
     );
 
     let mut remove = source.edit();
     remove.remove_list(Position::new(0)).unwrap();
     let removed = remove.commit().unwrap();
-    assert!(removed.template().text_body().unwrap().lists().is_empty());
+    assert!(
+        removed
+            .package()
+            .document()
+            .text_body()
+            .unwrap()
+            .lists()
+            .is_empty()
+    );
     let removed_wire = removed.patch().to_bytes().unwrap();
     let durable_removed = Patch::from_bytes(&removed_wire).unwrap();
     assert!(durable_removed.list_changes()[0].after().is_none());
     let restored_wire = durable_removed.inverse().to_bytes().unwrap();
     let durable_restored = Patch::from_bytes(&restored_wire).unwrap();
     assert_eq!(
-        durable_restored
-            .apply(removed.template())
+        removed
+            .package()
+            .apply(&durable_restored)
             .unwrap()
             .as_bytes(),
         source.as_bytes()
@@ -849,26 +895,26 @@ fn rich_inline_crud_is_durable_reversible_and_reopened() {
     edit.set_paragraph_inline(Position::new(0), &content)
         .unwrap();
     let commit = edit.commit().unwrap();
-    let body = commit.template().text_body().unwrap();
+    let body = commit.package().document().text_body().unwrap();
     let paragraph = &body.paragraphs()[0];
     assert_eq!(paragraph.text(), "before linked styled today ranged");
     assert_eq!(paragraph.links()[0].href(), "https://example.test/oth");
     assert_eq!(paragraph.formatting_runs()[0].style_name(), "Strong");
     assert!(matches!(paragraph.fields()[0].kind(), field::Kind::Date));
     assert_eq!(body.bookmarks().len(), 2);
-    assert!(!commit.template().content_xml().contains(">\n<"));
+    assert!(!commit.package().document().content_xml().contains(">\n<"));
 
     let wire = commit.patch().to_bytes().unwrap();
     let durable = Patch::from_bytes(&wire).unwrap();
     assert_eq!(durable.inline_changes().len(), 1);
     assert_eq!(
-        durable.apply(&source).unwrap().as_bytes(),
-        commit.template().as_bytes()
+        source.apply(&durable).unwrap().as_bytes(),
+        commit.package().as_bytes()
     );
     let inverse_wire = durable.inverse().to_bytes().unwrap();
     let inverse = Patch::from_bytes(&inverse_wire).unwrap();
     assert_eq!(
-        inverse.apply(commit.template()).unwrap().as_bytes(),
+        commit.package().apply(&inverse).unwrap().as_bytes(),
         source.as_bytes()
     );
 }
@@ -889,7 +935,7 @@ fn inline_boundary_splices_preserve_unknown_nested_markup_and_resource_packages(
         r#"<text:p><draw:frame><draw:image xlink:href="Pictures/source.bin"/></draw:frame></text:p>"#,
         r#"</office:text></office:body></office:document-content>"#,
     );
-    let source = Template::from_bytes(resource_package(
+    let source = Package::from_bytes(&resource_package(
         CONTENT,
         &[("Pictures/source.bin", b"source-pixels", "image/png")],
     ))
@@ -928,17 +974,18 @@ fn inline_boundary_splices_preserve_unknown_nested_markup_and_resource_packages(
         .unwrap();
     let commit = boundary.commit().unwrap();
     assert_eq!(commit.patch().inline_changes().len(), 3);
-    assert!(commit.template().content_xml().contains(
+    assert!(commit.package().document().content_xml().contains(
         r#"<foreign:opaque foreign:id="nested"><text:span>opaque</text:span></foreign:opaque>"#
     ));
     assert!(
         commit
-            .template()
+            .package()
+            .document()
             .content_xml()
             .contains(r#"<foreign:opaque foreign:id="heading">opaque</foreign:opaque>"#)
     );
-    assert!(!commit.template().content_xml().contains(">\n<"));
-    let body = commit.template().text_body().unwrap();
+    assert!(!commit.package().document().content_xml().contains(">\n<"));
+    let body = commit.package().document().text_body().unwrap();
     assert_eq!(body.headings()[0].text(), "[head opaque]");
     assert_eq!(body.paragraphs()[0].text(), "outer linked");
     assert_eq!(body.paragraphs()[1].text(), "before inner opaque after");
@@ -946,27 +993,28 @@ fn inline_boundary_splices_preserve_unknown_nested_markup_and_resource_packages(
     assert_eq!(body.resources().len(), 1);
     assert!(
         commit
-            .template()
+            .package()
+            .document()
             .files()
             .unwrap()
             .iter()
             .any(|path| path == "Pictures/source.bin")
     );
 
-    let reopened = Template::from_bytes(commit.template().as_bytes().to_vec()).unwrap();
-    assert_eq!(reopened.as_bytes(), commit.template().as_bytes());
+    let reopened = Package::from_bytes(commit.package().as_bytes()).unwrap();
+    assert_eq!(reopened.as_bytes(), commit.package().as_bytes());
     assert_eq!(
-        reopened.text_body().unwrap().paragraphs()[1].text(),
+        reopened.document().text_body().unwrap().paragraphs()[1].text(),
         "before inner opaque after"
     );
     let durable = Patch::from_bytes(&commit.patch().to_bytes().unwrap()).unwrap();
     assert_eq!(
-        durable.apply(&source).unwrap().as_bytes(),
-        commit.template().as_bytes()
+        source.apply(&durable).unwrap().as_bytes(),
+        commit.package().as_bytes()
     );
     let inverse = Patch::from_bytes(&durable.inverse().to_bytes().unwrap()).unwrap();
     assert_eq!(
-        inverse.apply(commit.template()).unwrap().as_bytes(),
+        commit.package().apply(&inverse).unwrap().as_bytes(),
         source_bytes
     );
 
@@ -979,10 +1027,10 @@ fn inline_boundary_splices_preserve_unknown_nested_markup_and_resource_packages(
     assert!(plan.conflicts().is_empty());
     let merged = plan.publish().unwrap();
     assert_eq!(
-        merged.text_body().unwrap().paragraphs()[1].text(),
+        merged.document().text_body().unwrap().paragraphs()[1].text(),
         "before inner opaque after"
     );
-    assert_eq!(merged.text_body().unwrap().resources().len(), 1);
+    assert_eq!(merged.document().text_body().unwrap().resources().len(), 1);
 
     let mut history = History::new(source.clone(), HistoryLimits::new(3, 1_000_000));
     history.record(commit).unwrap();
@@ -990,11 +1038,17 @@ fn inline_boundary_splices_preserve_unknown_nested_markup_and_resource_packages(
     assert_eq!(history.current().as_bytes(), source.as_bytes());
     assert!(history.redo());
     assert_eq!(
-        history.current().text_body().unwrap().paragraphs()[1].text(),
+        history
+            .current()
+            .document()
+            .text_body()
+            .unwrap()
+            .paragraphs()[1]
+            .text(),
         "before inner opaque after"
     );
 
-    let destination = Template::from_bytes(Builder::new().build().unwrap()).unwrap();
+    let destination = Builder::new().build().unwrap();
     let paragraph_transfer = destination
         .plan_transfer_from(
             history.current(),
@@ -1012,7 +1066,8 @@ fn inline_boundary_splices_preserve_unknown_nested_markup_and_resource_packages(
         .unwrap();
     assert_eq!(
         paragraph_transfer
-            .template()
+            .package()
+            .document()
             .text_body()
             .unwrap()
             .paragraphs()[0]
@@ -1036,7 +1091,8 @@ fn inline_boundary_splices_preserve_unknown_nested_markup_and_resource_packages(
         .unwrap();
     assert!(
         resource_transfer
-            .template()
+            .package()
+            .document()
             .files()
             .unwrap()
             .iter()
@@ -1049,18 +1105,25 @@ fn inline_boundary_splices_preserve_unknown_nested_markup_and_resource_packages(
         r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">"#,
         r#"<office:body><office:text><text:p/></office:text></office:body></office:document-content>"#,
     );
-    let empty = Template::from_bytes(Builder::new().content_xml(EMPTY).build().unwrap()).unwrap();
+    let empty = Builder::new().content_xml(EMPTY).build().unwrap();
     let mut fill = empty.edit();
     fill.append_paragraph_inline(Position::new(0), &[Inline::text("filled")])
         .unwrap();
     let filled = fill.commit().unwrap();
     assert_eq!(
-        filled.template().text_body().unwrap().paragraphs()[0].text(),
+        filled
+            .package()
+            .document()
+            .text_body()
+            .unwrap()
+            .paragraphs()[0]
+            .text(),
         "filled"
     );
     assert!(
         filled
-            .template()
+            .package()
+            .document()
             .content_xml()
             .contains("<text:p>filled</text:p>")
     );
@@ -1074,35 +1137,51 @@ fn inert_form_catalog_crud_is_durable_and_atomic() {
     let mut create = source.edit();
     create.set_forms(&[search]).unwrap();
     let created = create.commit().unwrap();
-    assert_eq!(created.template().text_body().unwrap().forms().len(), 1);
     assert_eq!(
-        created.template().text_body().unwrap().forms()[0].controls()[0].id(),
+        created
+            .package()
+            .document()
+            .text_body()
+            .unwrap()
+            .forms()
+            .len(),
+        1
+    );
+    assert_eq!(
+        created.package().document().text_body().unwrap().forms()[0].controls()[0].id(),
         Some("query")
     );
     let durable = Patch::from_bytes(&created.patch().to_bytes().unwrap()).unwrap();
     assert_eq!(durable.forms_change().unwrap().after().len(), 1);
 
     let updated_form = Form::new("Search").with_control(Control::new("button").with_name("go"));
-    let mut update = created.template().edit();
+    let mut update = created.package().edit();
     update.set_forms(&[updated_form]).unwrap();
     let updated = update.commit().unwrap();
     assert_eq!(
-        updated.template().text_body().unwrap().forms()[0].controls()[0].kind(),
+        updated.package().document().text_body().unwrap().forms()[0].controls()[0].kind(),
         "button"
     );
 
-    let mut remove = updated.template().edit();
+    let mut remove = updated.package().edit();
     remove.set_forms(&[]).unwrap();
     let removed = remove.commit().unwrap();
-    assert!(removed.template().text_body().unwrap().forms().is_empty());
+    assert!(
+        removed
+            .package()
+            .document()
+            .text_body()
+            .unwrap()
+            .forms()
+            .is_empty()
+    );
     assert_eq!(
         removed
-            .patch()
-            .inverse()
-            .apply(removed.template())
+            .package()
+            .apply(&removed.patch().inverse())
             .unwrap()
             .as_bytes(),
-        updated.template().as_bytes()
+        updated.package().as_bytes()
     );
 }
 
@@ -1115,9 +1194,8 @@ fn isolated_nested_list_replace_remove_is_durable() {
         r#"<text:list><text:list-item><text:p>outer</text:p><text:list><text:list-item><text:p>inner</text:p></text:list-item></text:list></text:list-item></text:list>"#,
         r#"</office:text></office:body></office:document-content>"#,
     );
-    let source =
-        Template::from_bytes(Builder::new().content_xml(CONTENT).build().unwrap()).unwrap();
-    assert_eq!(source.text_body().unwrap().lists()[0].level(), 2);
+    let source = Builder::new().content_xml(CONTENT).build().unwrap();
+    assert_eq!(source.document().text_body().unwrap().lists()[0].level(), 2);
     let mut replacement_edit = source.edit();
     replacement_edit
         .set_list(
@@ -1127,11 +1205,24 @@ fn isolated_nested_list_replace_remove_is_durable() {
         .unwrap();
     let replacement_commit = replacement_edit.commit().unwrap();
     assert_eq!(
-        replacement_commit.template().text_body().unwrap().lists()[0].level(),
+        replacement_commit
+            .package()
+            .document()
+            .text_body()
+            .unwrap()
+            .lists()[0]
+            .level(),
         2
     );
     assert_eq!(
-        replacement_commit.template().text_body().unwrap().lists()[0].items()[0].paragraphs()[0]
+        replacement_commit
+            .package()
+            .document()
+            .text_body()
+            .unwrap()
+            .lists()[0]
+            .items()[0]
+            .paragraphs()[0]
             .text(),
         "nested replacement"
     );
@@ -1145,7 +1236,7 @@ fn isolated_nested_list_replace_remove_is_durable() {
         .set_list(Position::new(1), replacement_tree)
         .unwrap();
     let outer_commit = outer_edit.commit().unwrap();
-    let outer_body = outer_commit.template().text_body().unwrap();
+    let outer_body = outer_commit.package().document().text_body().unwrap();
     assert_eq!(outer_body.lists().len(), 2);
     assert_eq!(
         outer_body.lists()[1].items()[0].paragraphs()[0].text(),
@@ -1163,9 +1254,9 @@ fn isolated_nested_list_replace_remove_is_durable() {
         1
     );
     assert_eq!(
-        outer_durable
-            .inverse()
-            .apply(outer_commit.template())
+        outer_commit
+            .package()
+            .apply(&outer_durable.inverse())
             .unwrap()
             .as_bytes(),
         source.as_bytes()
@@ -1175,11 +1266,23 @@ fn isolated_nested_list_replace_remove_is_durable() {
     removal_edit.remove_list(Position::new(0)).unwrap();
     let removal_commit = removal_edit.commit().unwrap();
     assert_eq!(
-        removal_commit.template().text_body().unwrap().lists().len(),
+        removal_commit
+            .package()
+            .document()
+            .text_body()
+            .unwrap()
+            .lists()
+            .len(),
         1
     );
     assert_eq!(
-        removal_commit.template().text_body().unwrap().lists()[0].level(),
+        removal_commit
+            .package()
+            .document()
+            .text_body()
+            .unwrap()
+            .lists()[0]
+            .level(),
         1
     );
 }
@@ -1212,19 +1315,22 @@ fn metadata_and_styles_are_durable_and_reversible() {
     let parts_commit = parts.commit().unwrap();
     assert_eq!(
         parts_commit
-            .template()
+            .package()
+            .document()
             .metadata()
             .and_then(|value| value.title.as_deref()),
         Some("Durable title")
     );
-    assert_eq!(parts_commit.template().styles()[0].name(), "Body2");
     assert_eq!(
-        parts_commit.template().styles()[0].parent_name(),
+        parts_commit.package().document().styles()[0].name(),
+        "Body2"
+    );
+    assert_eq!(
+        parts_commit.package().document().styles()[0].parent_name(),
         Some("Standard")
     );
-    let properties = parts_commit.template().styles()[0]
-        .text_properties()
-        .unwrap();
+    let parts_document = parts_commit.package().document();
+    let properties = parts_document.styles()[0].text_properties().unwrap();
     assert_eq!(properties.color(), Some("#AA00CC"));
     assert_eq!(properties.background_color(), Some("#00FF00"));
     assert_eq!(properties.weight(), Some(Weight::Bold));
@@ -1232,24 +1338,24 @@ fn metadata_and_styles_are_durable_and_reversible() {
     let parts_wire = parts_commit.patch().to_bytes().unwrap();
     let parts_durable = Patch::from_bytes(&parts_wire).unwrap();
     assert_eq!(
-        parts_durable.apply(&source).unwrap().as_bytes(),
-        parts_commit.template().as_bytes()
+        source.apply(&parts_durable).unwrap().as_bytes(),
+        parts_commit.package().as_bytes()
     );
     assert_eq!(
-        parts_durable
-            .inverse()
-            .apply(parts_commit.template())
+        parts_commit
+            .package()
+            .apply(&parts_durable.inverse())
             .unwrap()
             .as_bytes(),
         source.as_bytes()
     );
 
-    let mut removal = parts_commit.template().edit();
+    let mut removal = parts_commit.package().edit();
     removal.remove_metadata();
     removal.remove_styles();
     let removed = removal.commit().unwrap();
-    assert!(removed.template().meta_xml().is_none());
-    assert!(removed.template().styles_xml().is_none());
+    assert!(removed.package().document().meta_xml().is_none());
+    assert!(removed.package().document().styles_xml().is_none());
     assert!(removed.patch().removes_metadata());
     assert!(removed.patch().removes_styles());
     let removal_wire = removed.patch().to_bytes().unwrap();
@@ -1257,19 +1363,19 @@ fn metadata_and_styles_are_durable_and_reversible() {
     assert!(durable_removal.removes_metadata());
     assert!(durable_removal.removes_styles());
     assert_eq!(
-        durable_removal
-            .inverse()
-            .apply(removed.template())
+        removed
+            .package()
+            .apply(&durable_removal.inverse())
             .unwrap()
             .as_bytes(),
-        parts_commit.template().as_bytes()
+        parts_commit.package().as_bytes()
     );
 }
 
 #[test]
 fn security_policy_is_explicit_and_default_deny() {
-    let baseline = Template::from_bytes(Builder::new().build().unwrap()).unwrap();
-    let validation = baseline.validation_capabilities();
+    let baseline = Builder::new().build().unwrap();
+    let validation = baseline.document().validation_capabilities();
     assert_eq!(
         validation.namespace_family_envelope(),
         CapabilityState::Supported
@@ -1277,7 +1383,7 @@ fn security_policy_is_explicit_and_default_deny() {
     assert_eq!(validation.semantic_subset(), CapabilityState::Supported);
     assert_eq!(validation.compact_publication(), CapabilityState::Supported);
     assert_eq!(validation.odf_relax_ng(), CapabilityState::Refused);
-    let security = baseline.security_capabilities();
+    let security = baseline.document().security_capabilities();
     assert_eq!(security.inert_inventory(), CapabilityState::Supported);
     assert_eq!(security.policy_gate(), CapabilityState::Supported);
     assert_eq!(security.external_resolution(), CapabilityState::Refused);
@@ -1300,9 +1406,15 @@ fn security_policy_is_explicit_and_default_deny() {
         r#"<office:forms><form:form form:name="f"><form:text form:name="q"/></form:form></office:forms>"#,
         r#"</office:text></office:body></office:document-content>"#,
     );
-    let active = Template::from_bytes(Builder::new().content_xml(ACTIVE).build().unwrap()).unwrap();
-    assert!(active.check_security(SecurityPolicy::default()).is_err());
+    let active = Builder::new().content_xml(ACTIVE).build().unwrap();
+    assert!(
+        active
+            .document()
+            .check_security(SecurityPolicy::default())
+            .is_err()
+    );
     let report = active
+        .document()
         .check_security(SecurityPolicy {
             allow_embedded_objects: true,
             allow_external_resources: true,
@@ -1326,10 +1438,16 @@ fn security_policy_is_explicit_and_default_deny() {
             ),
         ],
     );
-    let protected = Template::from_bytes(protected_bytes.clone()).unwrap();
+    let protected = Package::from_bytes(&protected_bytes).unwrap();
     assert_eq!(protected.as_bytes(), protected_bytes.as_slice());
-    assert!(protected.check_security(SecurityPolicy::default()).is_err());
+    assert!(
+        protected
+            .document()
+            .check_security(SecurityPolicy::default())
+            .is_err()
+    );
     let protected_report = protected
+        .document()
         .check_security(SecurityPolicy {
             allow_scripts: true,
             allow_signatures: true,
@@ -1348,13 +1466,10 @@ fn security_policy_is_explicit_and_default_deny() {
 
 #[test]
 fn transfer_plan_resolves_style_parents_and_refuses_collisions() {
-    let source_without_styles = Template::from_bytes(
-        Builder::new()
-            .paragraph(Paragraph::styled("transfer me", "Body"))
-            .build()
-            .unwrap(),
-    )
-    .unwrap();
+    let source_without_styles = Builder::new()
+        .paragraph(Paragraph::styled("transfer me", "Body"))
+        .build()
+        .unwrap();
     let parent = Style::new("Base", "paragraph").unwrap();
     let body = Style::new("Body", "paragraph")
         .unwrap()
@@ -1365,8 +1480,8 @@ fn transfer_plan_resolves_style_parents_and_refuses_collisions() {
     source_edit
         .set_styles(&[parent.clone(), body.clone()])
         .unwrap();
-    let source = source_edit.commit().unwrap().into_template();
-    let destination = Template::from_bytes(Builder::new().build().unwrap()).unwrap();
+    let source = source_edit.commit().unwrap().into_package();
+    let destination = Builder::new().build().unwrap();
 
     let plan = destination
         .plan_transfer_from(
@@ -1378,12 +1493,19 @@ fn transfer_plan_resolves_style_parents_and_refuses_collisions() {
     assert_eq!(plan.imported_styles().len(), 2);
     let published = plan.publish().unwrap();
     assert_eq!(
-        published.template().text_body().unwrap().paragraphs()[0].text(),
+        published
+            .package()
+            .document()
+            .text_body()
+            .unwrap()
+            .paragraphs()[0]
+            .text(),
         "transfer me"
     );
     assert!(
         published
-            .template()
+            .package()
+            .document()
             .styles()
             .iter()
             .any(|style| style.name() == "Base")
@@ -1402,12 +1524,12 @@ fn transfer_plan_resolves_style_parents_and_refuses_collisions() {
             .is_err()
     );
 
-    let colliding_source = Template::from_bytes(Builder::new().build().unwrap()).unwrap();
+    let colliding_source = Builder::new().build().unwrap();
     let mut colliding_edit = colliding_source.edit();
     colliding_edit
         .set_styles(&[Style::new("Body", "text").unwrap()])
         .unwrap();
-    let colliding = colliding_edit.commit().unwrap().into_template();
+    let colliding = colliding_edit.commit().unwrap().into_package();
     assert!(
         colliding
             .plan_transfer_from(
@@ -1430,7 +1552,7 @@ fn resource_reference_and_payload_crud_is_durable_mergeable_and_fail_closed() {
         r#"<text:p>ordinary</text:p><text:p><draw:frame><draw:image xlink:href="Pictures/a.bin"/><draw:object xlink:href="./Object 1"/></draw:frame></text:p>"#,
         r#"</office:text></office:body></office:document-content>"#,
     );
-    let source = Template::from_bytes(resource_package(
+    let source = Package::from_bytes(&resource_package(
         CONTENT,
         &[
             ("Pictures/a.bin", b"before", "image/png"),
@@ -1456,12 +1578,13 @@ fn resource_reference_and_payload_crud_is_durable_mergeable_and_fail_closed() {
     assert_eq!(commit.patch().resource_changes().len(), 1);
     assert_eq!(commit.patch().resource_payload_changes().len(), 1);
     assert_eq!(
-        commit.template().text_body().unwrap().resources()[0].href(),
+        commit.package().document().text_body().unwrap().resources()[0].href(),
         "Pictures/b.bin"
     );
     assert!(
         commit
-            .template()
+            .package()
+            .document()
             .files()
             .unwrap()
             .iter()
@@ -1470,12 +1593,12 @@ fn resource_reference_and_payload_crud_is_durable_mergeable_and_fail_closed() {
 
     let durable = Patch::from_bytes(&commit.patch().to_bytes().unwrap()).unwrap();
     assert_eq!(
-        durable.apply(&source).unwrap().as_bytes(),
-        commit.template().as_bytes()
+        source.apply(&durable).unwrap().as_bytes(),
+        commit.package().as_bytes()
     );
     let inverse = Patch::from_bytes(&durable.inverse().to_bytes().unwrap()).unwrap();
     assert_eq!(
-        inverse.apply(commit.template()).unwrap().as_bytes(),
+        commit.package().apply(&inverse).unwrap().as_bytes(),
         source.as_bytes()
     );
 
@@ -1488,11 +1611,11 @@ fn resource_reference_and_payload_crud_is_durable_mergeable_and_fail_closed() {
     assert!(merge.conflicts().is_empty());
     let merged = merge.publish().unwrap();
     assert_eq!(
-        merged.text_body().unwrap().paragraphs()[0].text(),
+        merged.document().text_body().unwrap().paragraphs()[0].text(),
         "merged ordinary"
     );
     assert_eq!(
-        merged.text_body().unwrap().resources()[0].href(),
+        merged.document().text_body().unwrap().resources()[0].href(),
         "Pictures/b.bin"
     );
 
@@ -1532,7 +1655,8 @@ fn resource_reference_and_payload_crud_is_durable_mergeable_and_fail_closed() {
     let object_removed = remove_object.commit().unwrap();
     assert!(
         object_removed
-            .template()
+            .package()
+            .document()
             .files()
             .unwrap()
             .iter()
@@ -1545,17 +1669,27 @@ fn resource_reference_and_payload_crud_is_durable_mergeable_and_fail_closed() {
         .unwrap();
     coordinated.remove_resource(Position::new(0)).unwrap();
     let removed = coordinated.commit().unwrap();
-    assert_eq!(removed.template().text_body().unwrap().resources().len(), 1);
+    assert_eq!(
+        removed
+            .package()
+            .document()
+            .text_body()
+            .unwrap()
+            .resources()
+            .len(),
+        1
+    );
     assert!(
         removed
-            .template()
+            .package()
+            .document()
             .files()
             .unwrap()
             .iter()
             .all(|path| path != "Pictures/a.bin")
     );
 
-    let empty = Template::from_bytes(Builder::new().build().unwrap()).unwrap();
+    let empty = Builder::new().build().unwrap();
     let mut create = empty.edit();
     create
         .append_resource_with_payload(
@@ -1565,7 +1699,16 @@ fn resource_reference_and_payload_crud_is_durable_mergeable_and_fail_closed() {
         )
         .unwrap();
     let created = create.commit().unwrap();
-    assert_eq!(created.template().text_body().unwrap().resources().len(), 1);
+    assert_eq!(
+        created
+            .package()
+            .document()
+            .text_body()
+            .unwrap()
+            .resources()
+            .len(),
+        1
+    );
     assert!(created.patch().resource_changes()[0].before().is_none());
     assert_eq!(
         created.patch().resource_payload_changes()[0].after(),
@@ -1588,7 +1731,7 @@ fn exact_rich_nested_and_object_transfer_closes_dependencies() {
         r#"<text:p><draw:frame><draw:object xlink:href="./Object 1"/></draw:frame></text:p>"#,
         r#"</office:text></office:body></office:document-content>"#,
     );
-    let source = Template::from_bytes(resource_package(
+    let source = Package::from_bytes(&resource_package(
         CONTENT,
         &[
             ("Object 1/content.xml", b"<object/>", "text/xml"),
@@ -1596,7 +1739,7 @@ fn exact_rich_nested_and_object_transfer_closes_dependencies() {
         ],
     ))
     .unwrap();
-    let destination = Template::from_bytes(Builder::new().build().unwrap()).unwrap();
+    let destination = Builder::new().build().unwrap();
     let policy = TransferPolicy {
         security: SecurityPolicy {
             allow_embedded_objects: true,
@@ -1614,15 +1757,15 @@ fn exact_rich_nested_and_object_transfer_closes_dependencies() {
         .unwrap()
         .publish()
         .unwrap();
-    let rich_body = rich.template().text_body().unwrap();
+    let rich_body = rich.package().document().text_body().unwrap();
     let rich_paragraph = &rich_body.paragraphs()[0];
     assert_eq!(rich_paragraph.text(), "rich span link");
     assert_eq!(rich_paragraph.formatting_runs()[0].style_name(), "Strong");
     assert_eq!(rich_paragraph.links()[0].href(), "https://example.test/oth");
     let rich_durable = Patch::from_bytes(&rich.patch().to_bytes().unwrap()).unwrap();
     assert_eq!(
-        rich_durable.apply(&destination).unwrap().as_bytes(),
-        rich.template().as_bytes()
+        destination.apply(&rich_durable).unwrap().as_bytes(),
+        rich.package().as_bytes()
     );
 
     let inner_list = destination
@@ -1630,25 +1773,25 @@ fn exact_rich_nested_and_object_transfer_closes_dependencies() {
         .unwrap()
         .publish()
         .unwrap();
-    let inner_list_body = inner_list.template().text_body().unwrap();
+    let inner_list_body = inner_list.package().document().text_body().unwrap();
     assert_eq!(inner_list_body.lists().len(), 1);
     assert_eq!(inner_list_body.lists()[0].level(), 1);
     assert_eq!(
         inner_list_body.lists()[0].items()[0].paragraphs()[0].text(),
         "inner"
     );
-    assert!(inner_list.template().content_xml().contains(
+    assert!(inner_list.package().document().content_xml().contains(
         "<text:list><text:list-item><text:p>inner</text:p></text:list-item></text:list>"
     ));
     let inner_list_durable = Patch::from_bytes(&inner_list.patch().to_bytes().unwrap()).unwrap();
     assert_eq!(
-        inner_list_durable.apply(&destination).unwrap().as_bytes(),
-        inner_list.template().as_bytes()
+        destination.apply(&inner_list_durable).unwrap().as_bytes(),
+        inner_list.package().as_bytes()
     );
     assert_eq!(
-        inner_list_durable
-            .inverse()
-            .apply(inner_list.template())
+        inner_list
+            .package()
+            .apply(&inner_list_durable.inverse())
             .unwrap()
             .as_bytes(),
         destination.as_bytes()
@@ -1663,12 +1806,13 @@ fn exact_rich_nested_and_object_transfer_closes_dependencies() {
         .unwrap()
         .publish()
         .unwrap();
-    let inner_paragraph_body = inner_paragraph.template().text_body().unwrap();
+    let inner_paragraph_body = inner_paragraph.package().document().text_body().unwrap();
     assert_eq!(inner_paragraph_body.lists().len(), 0);
     assert_eq!(inner_paragraph_body.paragraphs()[0].text(), "inner");
     assert!(
         inner_paragraph
-            .template()
+            .package()
+            .document()
             .content_xml()
             .contains("<text:p>inner</text:p>")
     );
@@ -1678,7 +1822,7 @@ fn exact_rich_nested_and_object_transfer_closes_dependencies() {
         .unwrap()
         .publish()
         .unwrap();
-    let nested_body = nested.template().text_body().unwrap();
+    let nested_body = nested.package().document().text_body().unwrap();
     assert_eq!(nested_body.lists().len(), 2);
     assert_eq!(nested_body.lists()[1].items()[0].nested_lists().len(), 1);
     assert_eq!(
@@ -1687,8 +1831,8 @@ fn exact_rich_nested_and_object_transfer_closes_dependencies() {
     );
     let nested_durable = Patch::from_bytes(&nested.patch().to_bytes().unwrap()).unwrap();
     assert_eq!(
-        nested_durable.apply(&destination).unwrap().as_bytes(),
-        nested.template().as_bytes()
+        destination.apply(&nested_durable).unwrap().as_bytes(),
+        nested.package().as_bytes()
     );
 
     let object = destination
@@ -1702,7 +1846,7 @@ fn exact_rich_nested_and_object_transfer_closes_dependencies() {
         .unwrap();
     assert_eq!(object.patch().resource_changes().len(), 1);
     assert_eq!(object.patch().resource_payload_changes().len(), 2);
-    let object_files = object.template().files().unwrap();
+    let object_files = object.package().document().files().unwrap();
     assert!(
         object_files
             .iter()
@@ -1715,16 +1859,16 @@ fn exact_rich_nested_and_object_transfer_closes_dependencies() {
     );
     let object_durable = Patch::from_bytes(&object.patch().to_bytes().unwrap()).unwrap();
     assert_eq!(
-        object_durable.apply(&destination).unwrap().as_bytes(),
-        object.template().as_bytes()
+        destination.apply(&object_durable).unwrap().as_bytes(),
+        object.package().as_bytes()
     );
     let object_inverse = Patch::from_bytes(&object_durable.inverse().to_bytes().unwrap()).unwrap();
     assert_eq!(
-        object_inverse.apply(object.template()).unwrap().as_bytes(),
+        object.package().apply(&object_inverse).unwrap().as_bytes(),
         destination.as_bytes()
     );
 
-    let collision = Template::from_bytes(resource_package(
+    let collision = Package::from_bytes(&resource_package(
         COMPACT_CONTENT,
         &[("Object 1/content.xml", b"different", "text/xml")],
     ))
@@ -1749,9 +1893,8 @@ fn transfer_refuses_unprojected_inline_content_without_flattening_it() {
         r#"<text:p>before<foreign:opaque xmlns:foreign="urn:example">unknown</foreign:opaque>after</text:p>"#,
         r#"</office:text></office:body></office:document-content>"#,
     );
-    let source =
-        Template::from_bytes(Builder::new().content_xml(CONTENT).build().unwrap()).unwrap();
-    let destination = Template::from_bytes(Builder::new().build().unwrap()).unwrap();
+    let source = Builder::new().content_xml(CONTENT).build().unwrap();
+    let destination = Builder::new().build().unwrap();
     assert!(
         destination
             .plan_transfer_from(
@@ -1761,7 +1904,7 @@ fn transfer_refuses_unprojected_inline_content_without_flattening_it() {
             )
             .is_err()
     );
-    assert!(source.content_xml().contains("<foreign:opaque"));
+    assert!(source.document().content_xml().contains("<foreign:opaque"));
 }
 
 #[test]
@@ -1772,8 +1915,7 @@ fn multi_paragraph_edit_is_atomic_and_can_fill_an_empty_element() {
         r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.4">"#,
         r#"<office:body><office:text><text:p/><text:p>second</text:p><text:p>third</text:p></office:text></office:body></office:document-content>"#,
     );
-    let source =
-        Template::from_bytes(Builder::new().content_xml(CONTENT).build().unwrap()).unwrap();
+    let source = Builder::new().content_xml(CONTENT).build().unwrap();
     let mut edit = source.edit();
     edit.set_paragraph_text(Position::new(0), "first & ready")
         .unwrap();
@@ -1782,11 +1924,12 @@ fn multi_paragraph_edit_is_atomic_and_can_fill_an_empty_element() {
     assert_eq!(commit.patch().changes().len(), 2);
     assert!(
         commit
-            .template()
+            .package()
+            .document()
             .content_xml()
             .contains("<text:p>first &amp; ready</text:p>")
     );
-    let body = commit.template().text_body().unwrap();
+    let body = commit.package().document().text_body().unwrap();
     let texts = body
         .paragraphs()
         .iter()
@@ -1795,9 +1938,8 @@ fn multi_paragraph_edit_is_atomic_and_can_fill_an_empty_element() {
     assert_eq!(texts, ["first & ready", "second", "last"]);
     assert_eq!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.template())
+            .package()
+            .apply(&commit.patch().inverse())
             .unwrap()
             .as_bytes(),
         source.as_bytes(),
@@ -1807,10 +1949,10 @@ fn multi_paragraph_edit_is_atomic_and_can_fill_an_empty_element() {
 #[test]
 fn opens_and_edits_the_pretty_printed_libreoffice_web_template() {
     let bytes = include_bytes!("fixtures/libreoffice-desktop-html.oth").to_vec();
-    let source = Template::from_bytes(bytes.clone()).unwrap();
+    let source = Package::from_bytes(&bytes).unwrap();
     assert_eq!(source.as_bytes(), bytes);
     assert_eq!(
-        source.text_body().unwrap().paragraphs()[0].style_name(),
+        source.document().text_body().unwrap().paragraphs()[0].style_name(),
         Some("Standard")
     );
 
@@ -1819,13 +1961,25 @@ fn opens_and_edits_the_pretty_printed_libreoffice_web_template() {
         .unwrap();
     let commit = edit.commit().unwrap();
     assert_eq!(
-        commit.template().text_body().unwrap().paragraphs()[0].text(),
+        commit
+            .package()
+            .document()
+            .text_body()
+            .unwrap()
+            .paragraphs()[0]
+            .text(),
         "Web template"
     );
-    assert_eq!(commit.template().meta_xml(), source.meta_xml());
-    assert_eq!(commit.template().styles_xml(), source.styles_xml());
-    assert!(commit.template().styles_xml().is_some());
-    let mut rich_edit = commit.template().edit();
+    assert_eq!(
+        commit.package().document().meta_xml(),
+        source.document().meta_xml()
+    );
+    assert_eq!(
+        commit.package().document().styles_xml(),
+        source.document().styles_xml()
+    );
+    assert!(commit.package().document().styles_xml().is_some());
+    let mut rich_edit = commit.package().edit();
     rich_edit
         .set_paragraph_inline(
             Position::new(0),
@@ -1837,12 +1991,20 @@ fn opens_and_edits_the_pretty_printed_libreoffice_web_template() {
         )
         .unwrap();
     let rich_commit = rich_edit.commit().unwrap();
-    let rich_reopen = Template::from_bytes(rich_commit.template().as_bytes().to_vec()).unwrap();
+    let rich_reopen = Package::from_bytes(rich_commit.package().as_bytes()).unwrap();
     assert_eq!(
-        rich_reopen.text_body().unwrap().paragraphs()[0].text(),
+        rich_reopen.document().text_body().unwrap().paragraphs()[0].text(),
         "Web template"
     );
-    assert_eq!(rich_reopen.text_body().unwrap().bookmarks().len(), 1);
+    assert_eq!(
+        rich_reopen
+            .document()
+            .text_body()
+            .unwrap()
+            .bookmarks()
+            .len(),
+        1
+    );
     let mut resource_edit = rich_reopen.edit();
     resource_edit
         .append_resource_with_payload(
@@ -1852,23 +2014,36 @@ fn opens_and_edits_the_pretty_printed_libreoffice_web_template() {
         )
         .unwrap();
     let resource_commit = resource_edit.commit().unwrap();
-    let resource_reopen =
-        Template::from_bytes(resource_commit.template().as_bytes().to_vec()).unwrap();
-    assert_eq!(resource_reopen.text_body().unwrap().resources().len(), 1);
+    let resource_reopen = Package::from_bytes(resource_commit.package().as_bytes()).unwrap();
+    assert_eq!(
+        resource_reopen
+            .document()
+            .text_body()
+            .unwrap()
+            .resources()
+            .len(),
+        1
+    );
     assert!(
         resource_reopen
+            .document()
             .files()
             .unwrap()
             .iter()
             .any(|path| path == "Pictures/derived.bin")
     );
-    assert_eq!(resource_reopen.meta_xml(), source.meta_xml());
-    assert_eq!(resource_reopen.styles_xml(), source.styles_xml());
+    assert_eq!(
+        resource_reopen.document().meta_xml(),
+        source.document().meta_xml()
+    );
+    assert_eq!(
+        resource_reopen.document().styles_xml(),
+        source.document().styles_xml()
+    );
     assert_eq!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.template())
+            .package()
+            .apply(&commit.patch().inverse())
             .unwrap()
             .as_bytes(),
         source.as_bytes()

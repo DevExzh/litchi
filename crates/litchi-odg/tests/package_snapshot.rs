@@ -4,7 +4,7 @@
 )]
 
 use litchi_odf_common::core::PackageWriter;
-use litchi_odg::Drawing;
+use litchi_odg::Package;
 use soapberry_zip::office::StreamingArchiveWriter;
 use std::fmt::Write as _;
 
@@ -62,7 +62,7 @@ fn real_drawing_resource_xml_remains_exact_and_opaque() {
         .unwrap();
     let bytes = writer.finish_to_bytes().unwrap();
 
-    let drawing = Drawing::from_bytes(bytes.clone()).unwrap();
+    let drawing = Package::from_bytes(&bytes).unwrap();
     assert_eq!(drawing.as_bytes(), bytes.as_slice());
     assert_eq!(drawing.content_xml(), CONTENT);
     assert_eq!(drawing.styles_xml(), Some(STYLES));
@@ -83,7 +83,7 @@ fn real_drawing_resource_xml_remains_exact_and_opaque() {
 
 #[test]
 fn real_libreoffice_odg_opens_with_exact_bytes_and_declared_layers() {
-    let drawing = Drawing::from_bytes(LIBREOFFICE_ODG.to_vec()).unwrap();
+    let drawing = Package::from_bytes(LIBREOFFICE_ODG).unwrap();
     assert_eq!(drawing.as_bytes(), LIBREOFFICE_ODG);
     assert!(!drawing.pages().is_empty());
     assert!(drawing.pages().iter().any(|page| !page.shapes().is_empty()));
@@ -106,7 +106,7 @@ fn real_libreoffice_odg_opens_with_exact_bytes_and_declared_layers() {
 #[test]
 fn multiple_real_libreoffice_drawings_open_exactly_with_typed_pages() {
     for (name, bytes) in REAL_DRAW_CORPUS {
-        let drawing = Drawing::from_bytes(bytes.to_vec())
+        let drawing = Package::from_bytes(bytes)
             .unwrap_or_else(|error| panic!("real Draw fixture {name} failed: {error}"));
         assert_eq!(drawing.as_bytes(), *bytes, "fixture {name} lost provenance");
         assert!(!drawing.pages().is_empty(), "fixture {name} lost pages");
@@ -119,7 +119,7 @@ fn complex_real_fontwork_change_reopens_and_inverts_exactly() {
         .iter()
         .find_map(|(name, bytes)| (*name == "fontwork").then_some(*bytes))
         .unwrap();
-    let drawing = Drawing::from_bytes(bytes.to_vec()).unwrap();
+    let drawing = Package::from_bytes(bytes).unwrap();
     let shape = drawing.pages()[0]
         .shapes()
         .iter()
@@ -130,18 +130,18 @@ fn complex_real_fontwork_change_reopens_and_inverts_exactly() {
         .unwrap();
     let commit = edit.commit().unwrap();
     assert_eq!(
-        commit.snapshot().pages()[0].shapes()[shape].name(),
+        commit.package().pages()[0].shapes()[shape].name(),
         Some("Fontwork changed by Litchi")
     );
-    let fully_reopened = Drawing::from_bytes(commit.snapshot().as_bytes().to_vec()).unwrap();
-    assert_eq!(fully_reopened.as_bytes(), commit.snapshot().as_bytes());
+    let fully_reopened = Package::from_bytes(commit.package().as_bytes()).unwrap();
+    assert_eq!(fully_reopened.as_bytes(), commit.package().as_bytes());
     assert_eq!(
         commit
             .patch()
             .durable()
             .unwrap()
             .inverse()
-            .apply(commit.snapshot())
+            .apply(commit.package())
             .unwrap()
             .as_bytes(),
         drawing.as_bytes()
@@ -154,7 +154,7 @@ fn complex_real_nested_group_geometry_change_reopens_and_inverts_exactly() {
         .iter()
         .find_map(|(name, bytes)| (*name == "complex-groups").then_some(*bytes))
         .unwrap();
-    let drawing = Drawing::from_bytes(bytes.to_vec()).unwrap();
+    let drawing = Package::from_bytes(bytes).unwrap();
     let (group_shape, descendant, y, width, height) = drawing.pages()[0]
         .shapes()
         .iter()
@@ -180,18 +180,18 @@ fn complex_real_nested_group_geometry_change_reopens_and_inverts_exactly() {
         .unwrap();
     let commit = edit.commit().unwrap();
     assert_eq!(
-        commit.snapshot().pages()[0].shapes()[descendant].x(),
+        commit.package().pages()[0].shapes()[descendant].x(),
         Some("9cm")
     );
-    let reopened = Drawing::from_bytes(commit.snapshot().as_bytes().to_vec()).unwrap();
-    assert_eq!(reopened.as_bytes(), commit.snapshot().as_bytes());
+    let reopened = Package::from_bytes(commit.package().as_bytes()).unwrap();
+    assert_eq!(reopened.as_bytes(), commit.package().as_bytes());
     assert_eq!(
         commit
             .patch()
             .durable()
             .unwrap()
             .inverse()
-            .apply(commit.snapshot())
+            .apply(commit.package())
             .unwrap()
             .as_bytes(),
         drawing.as_bytes()
@@ -211,26 +211,26 @@ fn cross_drawing_transfer_closes_inherited_producer_namespaces() {
         writer.add_file("content.xml", content.as_bytes()).unwrap();
         writer.finish_to_bytes().unwrap()
     };
-    let source = Drawing::from_bytes(package(SOURCE)).unwrap();
-    let destination = Drawing::from_bytes(package(DESTINATION)).unwrap();
-    let transfer = source.snapshot().prepare_shape_transfer(0, 0).unwrap();
+    let source = Package::from_bytes(&package(SOURCE)).unwrap();
+    let destination = Package::from_bytes(&package(DESTINATION)).unwrap();
+    let transfer = source.prepare_shape_transfer(0, 0).unwrap();
 
     let mut edit = destination.edit();
     edit.insert_shape_transfer(0, 0, &transfer).unwrap();
     let commit = edit.commit().unwrap();
     assert!(
         commit
-            .snapshot()
+            .package()
             .content_xml()
             .contains("xmlns:loext=\"urn:example:libreoffice-extension\"")
     );
     assert!(
         commit
-            .snapshot()
+            .package()
             .content_xml()
             .contains("loext:custom-flag=\"retained\"")
     );
-    let reopened = Drawing::from_bytes(commit.snapshot().as_bytes().to_vec()).unwrap();
+    let reopened = Package::from_bytes(commit.package().as_bytes()).unwrap();
     assert_eq!(reopened.pages()[0].shapes().len(), 1);
 }
 
@@ -240,7 +240,7 @@ fn genuine_complex_group_transfer_remaps_all_colliding_dependency_families() {
         .iter()
         .find_map(|(name, bytes)| (*name == "complex-groups").then_some(*bytes))
         .unwrap();
-    let source = Drawing::from_bytes(bytes.to_vec()).unwrap();
+    let source = Package::from_bytes(bytes).unwrap();
     let group_shape = source.pages()[0]
         .shapes()
         .iter()
@@ -249,10 +249,7 @@ fn genuine_complex_group_transfer_remaps_all_colliding_dependency_families() {
         .max_by_key(|(position, _shape)| source.group(0, *position).unwrap().descendants().len())
         .map(|(position, _shape)| position)
         .unwrap();
-    let transfer = source
-        .snapshot()
-        .prepare_shape_transfer(0, group_shape)
-        .unwrap();
+    let transfer = source.prepare_shape_transfer(0, group_shape).unwrap();
     assert!(source.group(0, group_shape).unwrap().descendants().len() >= 3);
 
     let mut automatic_styles = String::new();
@@ -310,20 +307,20 @@ fn genuine_complex_group_transfer_remaps_all_colliding_dependency_families() {
             )
             .unwrap();
     }
-    let destination = Drawing::from_bytes(writer.finish_to_bytes().unwrap()).unwrap();
+    let destination = Package::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap();
     let mut edit = destination.edit();
     edit.insert_shape_transfer(0, 0, &transfer).unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.snapshot().content_xml().contains("_litchi_"));
-    let reopened = Drawing::from_bytes(commit.snapshot().as_bytes().to_vec()).unwrap();
-    assert_eq!(reopened.as_bytes(), commit.snapshot().as_bytes());
+    assert!(commit.package().content_xml().contains("_litchi_"));
+    let reopened = Package::from_bytes(commit.package().as_bytes()).unwrap();
+    assert_eq!(reopened.as_bytes(), commit.package().as_bytes());
     assert_eq!(
         commit
             .patch()
             .durable()
             .unwrap()
             .inverse()
-            .apply(commit.snapshot())
+            .apply(commit.package())
             .unwrap()
             .as_bytes(),
         destination.as_bytes()

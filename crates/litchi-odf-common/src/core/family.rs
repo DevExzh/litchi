@@ -484,6 +484,172 @@ impl Package {
         })
     }
 
+    /// Open a package from a path under one [`crate::OpenOptions`] envelope:
+    /// its source limits bound the archive, and its semantic limits bound
+    /// the declared `content.xml` and `styles.xml` sizes before either part
+    /// is inflated. Family units are counted by the concrete family.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Limit`] when a selected limit is exceeded, and
+    /// [`crate::Error::Core`] for every other archive, MIME type or
+    /// family-content failure.
+    pub fn open_with_options(
+        path: impl AsRef<Path>,
+        options: crate::OpenOptions,
+        mimetype: &str,
+        body_marker: &str,
+        family_name: &str,
+    ) -> std::result::Result<Self, crate::Error> {
+        let file = fs::File::open(path).map_err(Error::from)?;
+        Self::from_reader_with_options(file, options, mimetype, body_marker, family_name)
+    }
+
+    /// Open a password-protected package from a path under one
+    /// [`crate::OpenOptions`] envelope.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Self::open_with_options`].
+    pub fn open_with_password_and_options(
+        path: impl AsRef<Path>,
+        password: impl Into<String>,
+        options: crate::OpenOptions,
+        mimetype: &str,
+        body_marker: &str,
+        family_name: &str,
+    ) -> std::result::Result<Self, crate::Error> {
+        let file = fs::File::open(path).map_err(Error::from)?;
+        let archive = OwnedPackage::from_reader_with_zeroizing_password(
+            file,
+            options.source_limits_value(),
+            zeroizing_password(password),
+        )?;
+        Self::from_owned_package_with_options(archive, options, mimetype, body_marker, family_name)
+    }
+
+    /// Read a package from a stream under one [`crate::OpenOptions`]
+    /// envelope.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Self::open_with_options`].
+    pub fn from_reader_with_options(
+        reader: impl std::io::Read,
+        options: crate::OpenOptions,
+        mimetype: &str,
+        body_marker: &str,
+        family_name: &str,
+    ) -> std::result::Result<Self, crate::Error> {
+        let archive = OwnedPackage::from_reader_with_limits(reader, options.source_limits_value())?;
+        Self::from_owned_package_with_options(archive, options, mimetype, body_marker, family_name)
+    }
+
+    /// Decode package bytes under one [`crate::OpenOptions`] envelope.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Self::open_with_options`].
+    pub fn from_bytes_with_options(
+        bytes: Vec<u8>,
+        options: crate::OpenOptions,
+        mimetype: &str,
+        body_marker: &str,
+        family_name: &str,
+    ) -> std::result::Result<Self, crate::Error> {
+        let archive = OwnedPackage::from_bytes_with_limits(bytes, options.source_limits_value())?;
+        Self::from_owned_package_with_options(archive, options, mimetype, body_marker, family_name)
+    }
+
+    /// Decode password-protected package bytes under one
+    /// [`crate::OpenOptions`] envelope.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Self::open_with_options`].
+    pub fn from_bytes_with_password_and_options(
+        bytes: Vec<u8>,
+        password: impl Into<String>,
+        options: crate::OpenOptions,
+        mimetype: &str,
+        body_marker: &str,
+        family_name: &str,
+    ) -> std::result::Result<Self, crate::Error> {
+        Self::from_bytes_with_limits_and_password(
+            bytes,
+            options.source_limits_value(),
+            password,
+            mimetype,
+            body_marker,
+            family_name,
+        )
+        .map_err(crate::Error::from)
+        .and_then(|package| {
+            package.check_semantic_parts(options.semantic_limits_value())?;
+            Ok(package)
+        })
+    }
+
+    /// Adopt an already indexed archive (for example a detection result)
+    /// under the semantic limits of one [`crate::OpenOptions`] envelope; its
+    /// source limits were applied when the archive was indexed.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Self::open_with_options`].
+    pub fn from_owned_package_with_options(
+        archive: OwnedPackage,
+        options: crate::OpenOptions,
+        mimetype: &str,
+        body_marker: &str,
+        family_name: &str,
+    ) -> std::result::Result<Self, crate::Error> {
+        let semantic = options.semantic_limits_value();
+        if !semantic.is_default() {
+            check_declared_part(
+                &archive,
+                "content.xml",
+                semantic,
+                crate::SemanticLimitKind::ContentBytes,
+            )?;
+            check_declared_part(
+                &archive,
+                "styles.xml",
+                semantic,
+                crate::SemanticLimitKind::StylesBytes,
+            )?;
+        }
+        Ok(Self::from_owned_package(
+            archive,
+            mimetype,
+            body_marker,
+            family_name,
+        )?)
+    }
+
+    /// Check the declared `content.xml` and `styles.xml` sizes of this
+    /// package against `limits` (used after a password route, which
+    /// inflates the parts while decrypting).
+    fn check_semantic_parts(
+        &self,
+        limits: crate::SemanticLimits,
+    ) -> std::result::Result<(), crate::Error> {
+        if limits.is_default() {
+            return Ok(());
+        }
+        limits.check(
+            crate::SemanticLimitKind::ContentBytes,
+            u64::try_from(self.content_xml().len()).unwrap_or(u64::MAX),
+        )?;
+        if let Some(styles) = self.styles_xml() {
+            limits.check(
+                crate::SemanticLimitKind::StylesBytes,
+                u64::try_from(styles.len()).unwrap_or(u64::MAX),
+            )?;
+        }
+        Ok(())
+    }
+
     /// Return the decoded content XML.
     #[must_use]
     pub fn content_xml(&self) -> &str {
@@ -544,6 +710,20 @@ impl Package {
     pub fn into_bytes(self) -> Vec<u8> {
         self.archive.into_inner()
     }
+}
+
+/// Check one declared member size against a semantic limit before the member
+/// is inflated; an absent member passes.
+fn check_declared_part(
+    archive: &OwnedPackage,
+    path: &str,
+    limits: crate::SemanticLimits,
+    kind: crate::SemanticLimitKind,
+) -> std::result::Result<(), crate::Error> {
+    if let Some(size) = archive.package()?.member_materialized_size(path)? {
+        limits.check(kind, size)?;
+    }
+    Ok(())
 }
 
 /// Validate the bounded, family-specific `content.xml` contract shared by

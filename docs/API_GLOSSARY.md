@@ -25,12 +25,12 @@ Rules of reading:
 
 | Concept | Canonical | Banned | Notes / status |
 |---|---|---|---|
-| Immutable owner snapshot (physical + semantic, all state verbs) | `Package` | — | ✅ numbers/pages/keynote/doc/ods · ✅ XLSX primary owner (0250; scoped `&mut` families pending) · ✅ RTF owner split (0223; atomic publication 0226) · ✅ XLS (0197–0198) · ✅ PPT immutable owner/publication and primary edit (0211–0212) · 🔴 pptx remaining direct mutators (0127 removes the package writer) · 🔴 docx immutable public owner (0019 shares the physical graph; `document_mut`/`props*` removed 0251, package-level legacy mutators remain) · ✅ odt/odp/ods immutable `Package` owners split from the read-only `Document`/`Presentation`/`Workbook` projections (0268) · 🔴 xlsb (W2) |
+| Immutable owner snapshot (physical + semantic, all state verbs) | `Package` | — | ✅ numbers/pages/keynote/doc/ods · ✅ XLSX primary owner (0250; scoped `&mut` families pending) · ✅ RTF owner split (0223; atomic publication 0226) · ✅ XLS (0197–0198) · ✅ PPT immutable owner/publication and primary edit (0211–0212) · 🔴 pptx remaining direct mutators (0127 removes the package writer) · 🔴 docx immutable public owner (0019 shares the physical graph; `document_mut`/`props*` removed 0251, package-level legacy mutators remain) · ✅ odt/odp/ods immutable `Package` owners split from the read-only `Document`/`Presentation`/`Workbook` projections (0268) · ✅ oth/odm (`Document`), odg (`Drawing`), odc (`Chart`), odi (`Image`), odb (`Database`) and odf-formula (`Formula`) `Package` owners with read-only projections (0282) · 🔴 xlsb (W2) |
 | Read-only semantic projection, word processing | `Document` | — | ✅ pages · ✅ RTF shared owned projection (0223) · ✅ docx owned `Package::document()` projection (0019) |
 | Read-only semantic projection, spreadsheets | `Workbook` | `Spreadsheet` | 🔴 numbers `Document`→`Workbook` (W1) · ✅ xlsx `Workbook` owned projection via `Package::workbook()` (0250) · ✅ ods `Spreadsheet`→`Workbook` owned projection via `Package::workbook()` (0268) · ✅ XLS (0197) |
 | Read-only semantic projection, decks | `Presentation` | — | 🔴 keynote `Document`→`Presentation` (W1) · ✅ pptx view / odp `Presentation` owned projection via `Package::presentation()` (0268) · ✅ PPT shared owned projection (0211) |
 | Projection accessor | `Package::{document, workbook, presentation}()` | — | owned projections primary; borrowed `*_ref()` views secondary |
-| Option-bearing fresh authoring | per-format `Builder` in a focused module | `WorkbookWriter` (xlsb), `Writer` (doc), `*DocumentBuilder` prefixes (litchi-iwa) | ✅ XLSB (0175), XLS (0200), PPT (0213) and RTF (0225) `Builder::build()` return `Package`; ✅ ODT/ODS/ODP `Builder::build()` return `Package` (0268); 🔴 remaining W2–W4 and other `litchi-od*` builders |
+| Option-bearing fresh authoring | per-format `Builder` in a focused module | `WorkbookWriter` (xlsb), `Writer` (doc), `*DocumentBuilder` prefixes (litchi-iwa) | ✅ XLSB (0175), XLS (0200), PPT (0213) and RTF (0225) `Builder::build()` return `Package`; ✅ ODT/ODS/ODP `Builder::build()` return `Package` (0268); ✅ OTH/ODM/ODG/ODC/ODI/ODB/ODF-formula `Builder::build()` return `Package` (0282); 🔴 remaining W2–W4 builders |
 | iWork document identity (explicit, required) | `Identity` with `Identity::generate()` / fixed bytes | implicit random identity inside builders | 🔴 W1; `build()` without identity is a typed error |
 
 ## 2. Transaction vocabulary (iWork canonical form)
@@ -52,10 +52,10 @@ transaction is the bare `Package::edit()`.
 | ODP retained metadata edit | `Edit::{metadata, set_metadata}` | — | ✅ title/author/subject/description/keywords patched into the retained `meta.xml`; other fields refused (0278) |
 | Transaction type | `Edit` | `Transaction` (pptx), `WorkbookEdit` (xlsb) | ✅ pptx primary `opened::Edit` (0116), XLSB structural and cell-value `Edit/Commit/Patch` families, diagnostics and Package commit triads (0165–0171); ✅ XLSB `cell_values`, `cell_values::structure` and `cell_values::worksheet` complete with `Error` and `LimitKind` and registered (0261); ✅ XLS scoped families (`sheet_visibility`, `ole_object`, `real_time_data`, `revision_records`, `user_names`, `picture_compression`, `chart_area`, `web_pub`, `external_link`) (0259); ✅ scoped PPTX families renamed `Edit` (0252); ✅ ODP `Transaction`→`Edit`, ODT/ODS primary `Edit` on `Package` (0268); 🔴 remaining XLSB scoped mutators and scoped PPTX families (W2) |
 | Commit | `Edit::commit() -> Result<Commit>` | — | ✅ everywhere; shape fixed by the rows below |
-| New snapshot accessor | `Commit::package()` / `Commit::into_package()` | `Commit::snapshot()` (docx/pptx), `Commit::{workbook, into_workbook}` (xlsx) | ✅ iWork/docx eager (0022) and source (0031), PPTX eager (0118), XLSX primary (0250), ODT/ODS/ODP primary (0268) · 🔴 other W2 |
-| Diagnostics on every commit | `Commit::diagnostics()` | commits without diagnostics (xlsx, pptx) | ✅ docx/iWork/PPTX eager (0118), XLSX primary `workbook::edit::Diagnostics` (0250), ODT/ODS/ODP primary (0268) · 🔴 remaining owners (W2) |
+| New snapshot accessor | `Commit::package()` / `Commit::into_package()` | `Commit::snapshot()` (docx/pptx), `Commit::{workbook, into_workbook}` (xlsx) | ✅ iWork/docx eager (0022) and source (0031), PPTX eager (0118), XLSX primary (0250), ODT/ODS/ODP primary (0268), OTH/ODM/ODG/ODC/ODI/ODB/ODF-formula primary (0282) · 🔴 other W2 |
+| Diagnostics on every commit | `Commit::diagnostics()` | commits without diagnostics (xlsx, pptx) | ✅ docx/iWork/PPTX eager (0118), XLSX primary `workbook::edit::Diagnostics` (0250), ODT/ODS/ODP primary (0268), the other seven ODF primary families (0282) · 🔴 remaining owners (W2) |
 | Split commit | `Commit::into_parts() -> (Package, Patch)` | — | ✅ docx eager (0022) and source (0031), PPTX eager (0118), XLSX primary (0250), ODT/ODS/ODP primary (0268); 🔴 remaining owner shapes |
-| Patch application | `Package::apply(&patch)`; scoped `Package::apply_x(&patch)` | `publish_document_commit()`, `apply_document_patch()` (docx), `apply_opened_presentation_commit/patch()` (pptx), `Workbook::apply` (xlsx — moves) | ✅ PPT primary immutable `apply` (0212) · ✅ iWork · ✅ docx eager immutable `apply` (0020) and source (0030); ✅ PPTX primary immutable apply (0118); ✅ XLSX primary `Package::apply` and pivot `apply_pivot_*` (0250); ✅ ODT/ODS/ODP primary `Package::apply` (0268); 🔴 other W2 owners |
+| Patch application | `Package::apply(&patch)`; scoped `Package::apply_x(&patch)` | `publish_document_commit()`, `apply_document_patch()` (docx), `apply_opened_presentation_commit/patch()` (pptx), `Workbook::apply` (xlsx — moves) | ✅ PPT primary immutable `apply` (0212) · ✅ iWork · ✅ docx eager immutable `apply` (0020) and source (0030); ✅ PPTX primary immutable apply (0118); ✅ XLSX primary `Package::apply` and pivot `apply_pivot_*` (0250); ✅ ODT/ODS/ODP primary `Package::apply` (0268); ✅ OTH/ODM/ODG/ODC/ODI/ODB/ODF-formula `Package::apply` (0282); 🔴 other W2 owners |
 | No-op introspection | `commit.diagnostics().changed()`; `patch.is_noop()` | `Transaction::is_changed()`, `Commit::is_changed()` (pptx), `Patch::is_empty()` (xlsx) | ✅ iWork/docx/PPTX primary (0118), XLSX primary (0250), ODT/ODS/ODP primary (0268) · ✅ scoped PPTX families: `diagnostics().changed()` / `is_noop()` (0252) · 🔴 remaining W2 |
 | Inverse patch | `Patch::inverse()` | — | ✅ everywhere |
 | Rollback | *dropping the `Edit`* | `Transaction::rollback()` (pptx) | ✅ primary PPTX edit (0116); ✅ scoped PPTX families (0252) |
@@ -98,12 +98,12 @@ and redaction vocabulary remain pending.
 | Concept | Canonical | Banned | Notes / status |
 |---|---|---|---|
 | Open from path | `open(path)` | — | ✅ everywhere |
-| Open from bytes (copy allowed) | `from_bytes(&[u8])` | `from_bytes(Vec<u8>)` signatures (xlsx/odt/odp), `from_slice` (xlsx), `from_vec` (pptx, removed 0252) | ✅ DOCX owning/lazy Package (0038/0040); ✅ XLSX `Package` (0250; copies into the owned source archive); ✅ PPTX (0252); ✅ XLSB `Package` (0261; copies into the owned source archive; `from_slice*` deleted) · ✅ ODT/ODS/ODP `Package::from_bytes(&[u8])` (0268) · 🔴 other `litchi-od*` owners |
+| Open from bytes (copy allowed) | `from_bytes(&[u8])` | `from_bytes(Vec<u8>)` signatures (xlsx/odt/odp), `from_slice` (xlsx), `from_vec` (pptx, removed 0252) | ✅ DOCX owning/lazy Package (0038/0040); ✅ XLSX `Package` (0250; copies into the owned source archive); ✅ PPTX (0252); ✅ XLSB `Package` (0261; copies into the owned source archive; `from_slice*` deleted) · ✅ ODT/ODS/ODP `Package::from_bytes(&[u8])` (0268) · ✅ OTH/ODM/ODG/ODC/ODI/ODB/ODF-formula `Package::from_bytes(&[u8])` (0282); 🔴 flat `Flat*` owners |
 | Open from shared bytes (zero-copy) | `from_shared_bytes(Arc<[u8]>)` | — | ✅ numbers; offered only where zero-copy is real |
 | Open from reader | `from_reader(R)` | — | ✅ docx/xlsx; ✅ XLSB `Package`/`SourceBackedWorkbook` (0261); extended per wave |
-| Configured open | `open_with_options(path, OpenOptions)`, `from_bytes_with_options(bytes, OpenOptions)` | `open_with_limits`, `open_with` (doc), `open_with_options` under other type names | envelope decided in §5 · ✅ DOCX (0038) · ✅ XLSX `OpenOptions` (source limits, leniency, encryption limits; 0250) · ✅ PPTX owning `Package` and positional-source presentation owners (0252) · ✅ XLSB `OpenOptions` (source, external-link and cache limits, leniency, drawing decoding, execution context) on `Package`, the `Workbook` projection constructors and `SourceBackedWorkbook` (0261) · ✅ DOC raw owner and part editors, `open_with_limits*` banned crate-wide (0258) · ✅ PPT `text_edit::SourceSnapshot::open_with_options` and `slide_order::Snapshot::from_bytes_with_options` only (0260) · ✅ ODT/ODS/ODP `open_with_options`/`from_bytes_with_options`/`from_reader_with_options` with the `litchi_odf_common::OpenOptions` envelope (source + semantic limits, 0268); 🔴 PPT `raw::Reader` limits-only ingress and scoped-family `*_with_limits` (W4 residue) |
+| Configured open | `open_with_options(path, OpenOptions)`, `from_bytes_with_options(bytes, OpenOptions)` | `open_with_limits`, `open_with` (doc), `open_with_options` under other type names | envelope decided in §5 · ✅ DOCX (0038) · ✅ XLSX `OpenOptions` (source limits, leniency, encryption limits; 0250) · ✅ PPTX owning `Package` and positional-source presentation owners (0252) · ✅ XLSB `OpenOptions` (source, external-link and cache limits, leniency, drawing decoding, execution context) on `Package`, the `Workbook` projection constructors and `SourceBackedWorkbook` (0261) · ✅ DOC raw owner and part editors, `open_with_limits*` banned crate-wide (0258) · ✅ PPT `text_edit::SourceSnapshot::open_with_options` and `slide_order::Snapshot::from_bytes_with_options` only (0260) · ✅ ODT/ODS/ODP `open_with_options`/`from_bytes_with_options`/`from_reader_with_options` with the `litchi_odf_common::OpenOptions` envelope (source + semantic limits, 0268) · ✅ the other seven ODF `Package` owners `open_with_options`/`from_bytes_with_options`/`from_reader_with_options` (0282); 🔴 PPT `raw::Reader` limits-only ingress and scoped-family `*_with_limits` (W4 residue) |
 | Minimal fresh artifact | `Package::new()` | `Workbook::create()` duplicate (xlsx) | ✅ docx; ✅ canonical PPTX constructor (0127); ✅ XLSB (0175); ✅ XLS (0199); ✅ RTF (0225); ✅ XLSX (0250) · all formats gain it |
-| Save to path | `save(path)` — **always atomic** (sibling temp + rename) | non-atomic `Builder::save` (odt/odp) | ✅ OOXML, including lazy DOCX (0041), and RTF (0226) · ✅ ODF: every ODT/ODS/ODP/ODC/formula/generic whole-package save publishes through `litchi_core::atomic` with failed-save CRUD evidence (0268) |
+| Save to path | `save(path)` — **always atomic** (sibling temp + rename) | non-atomic `Builder::save` (odt/odp) | ✅ OOXML, including lazy DOCX (0041), and RTF (0226) · ✅ ODF: every ODT/ODS/ODP/ODC/formula/generic whole-package save publishes through `litchi_core::atomic` with failed-save CRUD evidence (0268); `Package::{save, save_with_durability}` on all seven remaining ODF owners (0282) |
 | Save with explicit durability | `save_with_durability(path, Durability)` | — | ✅ OOXML and RTF (0226); extended everywhere |
 | Bytes output | `to_bytes()` | `Builder::build() -> Vec<u8>` as output (ODF) | ✅ owning DOCX (0044); lazy managed DOCX bytes pending. `build()` returns `Package`; output lives on `Package` |
 | Stream output | `write_to(impl Write)` | `to_stream`, `write_to_stream` | ✅ owning/lazy DOCX Package (0041–0042); ✅ DOCX source tail-append `Plan`/`Commit` (0251); 🔴 OPC and remaining W2 |
@@ -124,7 +124,7 @@ and redaction vocabulary remain pending.
 | Ingress limit exceeded | `Error::Limit { kind, observed, maximum }` | `OpcError::ReadLimit`, facade `ResourceLimit` mapping drift | ✅ OPC (0036), DOC (0192), XLS (0196), PPT (0210) kind/observed/maximum; ✅ XLSB cell-values transaction bounds (`PackageError::Limit`, 0261); broader taxonomy pending |
 | Limit kind enums | `SourceLimitKind` / `SemanticLimitKind` | `ReadResource`, per-crate one-off kinds | ✅ OPC/OOXML (0036), DOC (0192), XLS (0196), PPT (0210) `SourceLimitKind`; ✅ XLSB `cell_values::LimitKind` (0261); other semantic kinds pending |
 | Dimension naming | nouns (`input_bytes`, `members`, `entry_bytes`, `aggregate_bytes`, `depth`, `events`, …); setters `max_<noun>` | a second name for an existing dimension | ✅ OPC common nouns (0037); shared defaults remain 512 MiB input and XML depth 256; other families pending |
-| Coverage policy | caller-selected limits on **every** public ingress path | — | ✅ PPT package/record ingress (0210), XLS eager ingress (0196); ✅ ODT/ODS/ODP `Package`, source-backed and catalog ingress via `OpenOptions` with typed `Error::{Limit, InvalidLimit}` (0268); 🔴 remaining specialized ingress and other `litchi-od*` leaves |
+| Coverage policy | caller-selected limits on **every** public ingress path | — | ✅ PPT package/record ingress (0210), XLS eager ingress (0196); ✅ ODT/ODS/ODP `Package`, source-backed and catalog ingress via `OpenOptions` with typed `Error::{Limit, InvalidLimit}` (0268); ✅ OTH/ODM/ODG/ODC/ODI/ODB/ODF-formula `Package` ingress, `from_prepared_package` included (0282); 🔴 remaining specialized ingress (ODF flat owners, ODC kept chart `Limits`) |
 
 ### RTF source dimensions
 
@@ -2084,3 +2084,32 @@ copy of the run's properties); XLSX worksheets report rich-text cells
 | `litchi_xlsx::Worksheet::has_rich_text` | adopted (0273) |
 
 See [0273](unified-ops/0273-find-replace.md).
+
+## Remaining ODF leaves, W3 (record 0282)
+
+`litchi-oth`, `litchi-odm`, `litchi-odg`, `litchi-odc`, `litchi-odi`,
+`litchi-odb` and `litchi-odf-formula` follow the ODT/ODS/ODP split of record
+0268. Each has one immutable `Package` owner with every state verb (`new`,
+`open`, `open_with_options`, `from_bytes(&[u8])`, `from_bytes_with_options`,
+`from_reader(_with_options)`, `from_prepared_package`, password routes where
+the crate had them, `edit`, `apply`, `save`, `save_with_durability`,
+`to_bytes`, `write_to`, `as_bytes`) and a read-only projection: OTH and ODM
+`Document`, ODG `Drawing`, ODC `Chart`, ODI `Image`, ODB `Database`,
+ODF formula `Formula`. The primary families are
+`litchi_oth`, `litchi_odm::transaction`, `litchi_odg::edit`, `litchi_odc`,
+`litchi_odi`, `litchi_odb` and `litchi_odf_formula`, each exporting
+`{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (`Error`/`LimitKind`
+are `litchi_odf_common`'s). `Commit` exposes `package`, `patch`,
+`diagnostics`, `into_package`, `into_parts`; `Patch::is_noop` is added and
+public `Patch::apply` removed. `Builder::build()` returns `Package`.
+Ingress applies `litchi_odf_common::OpenOptions` through the additive
+`core::family::Package::*_with_options` constructors.
+
+| Name | Status |
+|---|---|
+| `litchi_oth::Template`, `litchi_odm::Master`, `litchi_odg::Package*` root aliases, `Snapshot`, `Transaction` | removed and banned (profiles `oth`, `odm`, `odg`) |
+| projection state verbs (`Drawing::open`, `Chart::from_bytes`, `Image::edit`, `Database::into_bytes`, …) | removed and banned |
+| `Commit::{changed, template, master, snapshot, chart, image, database, formula}` | removed and banned per profile |
+| metadata `edit_metadata`/`apply_metadata` family on these crates | not adopted (gap; metadata writes stay in the primary `Edit` where the crate has them) |
+| flat `Flat*` owners, ODC `Definition*`, history/merge vocabularies | unchanged (out of scope, record 0282 gaps) |
+

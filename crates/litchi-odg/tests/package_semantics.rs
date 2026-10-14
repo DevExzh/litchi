@@ -6,11 +6,8 @@ use litchi_odf_common::{
     core::{OwnedPackage, PackageWriter},
 };
 use litchi_odg::{
-    Builder, DocumentSigner, Drawing, EncryptionProfile, FormControl,
-    PackageActiveContentWritePolicy, PackageDurablePatch, PackageMergePlan,
-    PackageSecurityLifecycleDisposition, PackageSecurityLifecycleOperation,
-    PackageSecurityLifecycleRefusal, PackageSecurityWritePolicy, SignatureAlgorithm,
-    SignatureValidity,
+    Builder, DocumentSigner, EncryptionProfile, FormControl, Package, SignatureAlgorithm,
+    SignatureValidity, edit,
     page::Page,
     shape::{Shape, ShapeKind},
     style::Style,
@@ -79,7 +76,7 @@ fn raw_security_fixture(encrypted: bool, signed: bool) -> Vec<u8> {
 
 #[test]
 fn semantic_package_views_use_layers_shapes_and_shared_frame_context() {
-    let drawing = Drawing::from_bytes(package(CONTENT)).unwrap();
+    let drawing = Package::from_bytes(&package(CONTENT)).unwrap();
     assert_eq!(
         drawing.page(0usize).unwrap().unwrap().name(),
         Some("Page 1")
@@ -137,102 +134,102 @@ fn semantic_package_views_use_layers_shapes_and_shared_frame_context() {
 #[test]
 fn exact_shape_name_selector_rejects_ambiguity() {
     let duplicate = CONTENT.replace("draw:name=\"Photo\"", "draw:name=\"Label\"");
-    let drawing = Drawing::from_bytes(package(&duplicate)).unwrap();
+    let drawing = Package::from_bytes(&package(&duplicate)).unwrap();
     assert!(drawing.pages()[0].shape("Label").is_err());
 }
 
 #[test]
 fn package_edit_is_source_checked_reversible_and_compact() {
-    let drawing = Drawing::from_bytes(package(CONTENT)).unwrap();
+    let drawing = Package::from_bytes(&package(CONTENT)).unwrap();
     let mut transaction = drawing.edit();
     transaction.set_shape_text(0, 0, "New <label>").unwrap();
     let commit = transaction.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
     assert_eq!(
-        commit.snapshot().pages()[0].shapes()[0].text(),
+        commit.package().pages()[0].shapes()[0].text(),
         "New <label>"
     );
     assert!(
         commit
-            .snapshot()
+            .package()
             .content_xml()
             .contains("<text:p>New &lt;label&gt;</text:p>")
     );
-    assert!(!commit.snapshot().content_xml().contains(">\n<"));
-    let output = OwnedPackage::from_bytes(commit.snapshot().as_bytes().to_vec()).unwrap();
+    assert!(!commit.package().content_xml().contains(">\n<"));
+    let output = OwnedPackage::from_bytes(commit.package().as_bytes().to_vec()).unwrap();
     let archive = output.package().unwrap();
     for path in ["content.xml", "META-INF/manifest.xml"] {
         compact_xml::validate(&archive.get_file(path).unwrap()).unwrap();
     }
-    assert!(!commit.snapshot().content_xml().contains(">\r\n<"));
-    assert!(commit.patch().is_applicable_to(drawing.snapshot()));
-    let reapplied = commit.patch().apply(drawing.snapshot()).unwrap();
-    assert_eq!(reapplied.as_bytes(), commit.snapshot().as_bytes());
-    let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+    assert!(!commit.package().content_xml().contains(">\r\n<"));
+    assert!(commit.patch().is_applicable_to(&drawing));
+    let reapplied = drawing.apply(commit.patch()).unwrap();
+    assert_eq!(reapplied.as_bytes(), commit.package().as_bytes());
+    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
     assert_eq!(restored.as_bytes(), drawing.as_bytes());
 }
 
 #[test]
 fn package_shape_name_edit_is_source_checked_reversible_and_compact() {
-    let drawing = Drawing::from_bytes(package(CONTENT)).unwrap();
+    let drawing = Package::from_bytes(&package(CONTENT)).unwrap();
     let mut transaction = drawing.edit();
     transaction.set_shape_name(0, 0, "Renamed & exact").unwrap();
     let commit = transaction.commit().unwrap();
 
-    let shape = &commit.snapshot().pages()[0].shapes()[0];
+    let shape = &commit.package().pages()[0].shapes()[0];
     assert_eq!(shape.name(), Some("Renamed & exact"));
     assert!(
         commit
-            .snapshot()
+            .package()
             .content_xml()
             .contains("draw:name=\"Renamed &amp; exact\"")
     );
     assert!(
         commit
-            .snapshot()
+            .package()
             .content_xml()
             .contains("draw:layer=\"Foreground\"")
     );
     assert!(
         commit
-            .snapshot()
+            .package()
             .content_xml()
             .contains("draw:name=\"Photo\"")
     );
-    assert!(!commit.snapshot().content_xml().contains(">\n<"));
-    assert!(!commit.snapshot().content_xml().contains(">\r\n<"));
+    assert!(!commit.package().content_xml().contains(">\n<"));
+    assert!(!commit.package().content_xml().contains(">\r\n<"));
 
     let change = commit.patch().name_change().unwrap();
     assert_eq!(change.before(), "Label");
     assert_eq!(change.after(), "Renamed & exact");
-    assert!(commit.patch().is_applicable_to(drawing.snapshot()));
+    assert!(commit.patch().is_applicable_to(&drawing));
     let different =
-        Drawing::from_bytes(package(&CONTENT.replace("Photo", "Different photo"))).unwrap();
-    assert!(!commit.patch().is_applicable_to(different.snapshot()));
-    assert!(commit.patch().apply(different.snapshot()).is_err());
-    let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+        Package::from_bytes(&package(&CONTENT.replace("Photo", "Different photo"))).unwrap();
+    assert!(!commit.patch().is_applicable_to(&different));
+    assert!(different.apply(commit.patch()).is_err());
+    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
     assert_eq!(restored.as_bytes(), drawing.as_bytes());
 }
 
 #[test]
 fn page_rename_is_durable_unique_and_dependency_checked() {
-    let drawing = Drawing::from_bytes(package(CONTENT)).unwrap();
+    let drawing = Package::from_bytes(&package(CONTENT)).unwrap();
     let mut edit = drawing.edit();
     edit.set_page_name(0, "Renamed page").unwrap();
     let commit = edit.commit().unwrap();
-    assert_eq!(commit.snapshot().pages()[0].name(), Some("Renamed page"));
+    assert_eq!(commit.package().pages()[0].name(), Some("Renamed page"));
     let durable = commit.patch().durable().unwrap();
     assert_eq!(durable.operations()[0].op, "page.name.set");
     assert_eq!(
-        durable.apply(drawing.snapshot()).unwrap().as_bytes(),
-        commit.snapshot().as_bytes()
+        durable.apply(&drawing).unwrap().as_bytes(),
+        commit.package().as_bytes()
     );
 
     let referenced = CONTENT.replace(
         "</draw:page></office:drawing>",
         r#"</draw:page><draw:page draw:name="Reference"><draw:page-thumbnail draw:page-name="Page 1"/></draw:page></office:drawing>"#,
     );
-    let referenced_drawing = Drawing::from_bytes(package(&referenced)).unwrap();
+    let referenced_drawing = Package::from_bytes(&package(&referenced)).unwrap();
     let mut refused = referenced_drawing.edit();
     assert!(refused.set_page_name(0, "Unsafe rename").is_err());
     let mut removal = referenced_drawing.edit();
@@ -250,16 +247,16 @@ fn page_style_change_requires_a_declared_style_and_roundtrips() {
             "<office:body>",
             r#"<office:automatic-styles><style:style style:name="dp1" style:family="drawing-page"/><style:style style:name="dp2" style:family="drawing-page"/></office:automatic-styles><office:body>"#,
         );
-    let drawing = Drawing::from_bytes(package(&styled)).unwrap();
+    let drawing = Package::from_bytes(&package(&styled)).unwrap();
     let mut edit = drawing.edit();
     edit.set_page_style_name(0, "dp2").unwrap();
     let commit = edit.commit().unwrap();
-    assert_eq!(commit.snapshot().pages()[0].style_name(), Some("dp2"));
+    assert_eq!(commit.package().pages()[0].style_name(), Some("dp2"));
     let durable = commit.patch().durable().unwrap();
     assert_eq!(
         durable
             .inverse()
-            .apply(commit.snapshot())
+            .apply(commit.package())
             .unwrap()
             .as_bytes(),
         drawing.as_bytes()
@@ -271,25 +268,25 @@ fn page_style_change_requires_a_declared_style_and_roundtrips() {
 
 #[test]
 fn package_layer_edit_is_declared_source_checked_and_reversible() {
-    let drawing = Drawing::from_bytes(package(CONTENT)).unwrap();
+    let drawing = Package::from_bytes(&package(CONTENT)).unwrap();
     let mut transaction = drawing.edit();
     transaction.set_shape_layer(0, 0, "Background").unwrap();
     let commit = transaction.commit().unwrap();
     assert_eq!(
-        commit.snapshot().pages()[0].shapes()[0].layer(),
+        commit.package().pages()[0].shapes()[0].layer(),
         Some("Background")
     );
     assert!(
         commit
-            .snapshot()
+            .package()
             .content_xml()
             .contains("draw:layer=\"Background\"")
     );
-    assert!(!commit.snapshot().content_xml().contains(">\n<"));
+    assert!(!commit.package().content_xml().contains(">\n<"));
     let change = commit.patch().layer_change().unwrap();
     assert_eq!(change.before(), "Foreground");
     assert_eq!(change.after(), "Background");
-    let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
     assert_eq!(restored.as_bytes(), drawing.as_bytes());
 
     let mut invalid = drawing.edit();
@@ -302,21 +299,21 @@ fn ended_page_scope_does_not_capture_shapes_outside_a_page() {
         "</draw:page></office:drawing>",
         "</draw:page><draw:g><draw:rect draw:name=\"outside\"/></draw:g></office:drawing>",
     );
-    assert!(Drawing::from_bytes(package(&malformed)).is_err());
+    assert!(Package::from_bytes(&package(&malformed)).is_err());
 }
 
 #[test]
 fn dtd_is_refused_and_noncompact_source_requires_checked_splices() {
     let dtd = CONTENT.replacen("<office:body>", "<!DOCTYPE drawing><office:body>", 1);
-    assert!(Drawing::from_bytes(raw_negative_fixture_package(&dtd)).is_err());
+    assert!(Package::from_bytes(&raw_negative_fixture_package(&dtd)).is_err());
 
     let noncompact = CONTENT.replacen("<office:body>", "\n<office:body>", 1);
-    let drawing = Drawing::from_bytes(raw_negative_fixture_package(&noncompact)).unwrap();
+    let drawing = Package::from_bytes(&raw_negative_fixture_package(&noncompact)).unwrap();
     let mut checked_splice = drawing.edit();
     checked_splice.set_shape_text(0, 0, "New label").unwrap();
     let commit = checked_splice.commit().unwrap();
     assert_eq!(
-        commit.snapshot().content_xml(),
+        commit.package().content_xml(),
         noncompact.replace("Old label", "New label")
     );
     assert_eq!(
@@ -325,7 +322,7 @@ fn dtd_is_refused_and_noncompact_source_requires_checked_splices() {
             .durable()
             .unwrap()
             .inverse()
-            .apply(commit.snapshot())
+            .apply(commit.package())
             .unwrap()
             .as_bytes(),
         drawing.as_bytes()
@@ -339,7 +336,7 @@ fn dtd_is_refused_and_noncompact_source_requires_checked_splices() {
 #[test]
 fn signed_and_encrypted_security_state_is_inert_and_rewrite_is_refused() {
     for (encrypted, signed) in [(true, false), (false, true), (true, true)] {
-        let drawing = Drawing::from_bytes(raw_security_fixture(encrypted, signed)).unwrap();
+        let drawing = Package::from_bytes(&raw_security_fixture(encrypted, signed)).unwrap();
         assert_eq!(drawing.security().is_encrypted(), encrypted);
         assert_eq!(drawing.security().is_signed(), signed);
         assert!(!drawing.security().allows_rewrite());
@@ -348,36 +345,33 @@ fn signed_and_encrypted_security_state_is_inert_and_rewrite_is_refused() {
         assert!(edit.commit().is_err());
     }
 
-    let signed = Drawing::from_bytes(raw_security_fixture(false, true)).unwrap();
+    let signed = Package::from_bytes(&raw_security_fixture(false, true)).unwrap();
     let mut explicit =
-        signed.edit_with_security_policy(PackageSecurityWritePolicy::RemoveSignatures);
+        signed.edit_with_security_policy(edit::SecurityWritePolicy::RemoveSignatures);
     explicit.set_shape_text(0, 0, "signature removed").unwrap();
     let commit = explicit.commit().unwrap();
-    assert!(!commit.snapshot().security().is_signed());
+    assert!(!commit.package().security().is_signed());
     let durable = commit.patch().durable().unwrap();
-    assert!(durable.apply(signed.snapshot()).is_err());
+    assert!(durable.apply(&signed).is_err());
     assert_eq!(
         durable
-            .apply_with_security_policy(
-                signed.snapshot(),
-                PackageSecurityWritePolicy::RemoveSignatures,
-            )
+            .apply_with_security_policy(&signed, edit::SecurityWritePolicy::RemoveSignatures,)
             .unwrap()
             .as_bytes(),
-        commit.snapshot().as_bytes()
+        commit.package().as_bytes()
     );
     assert_eq!(
         durable
             .inverse()
-            .apply(commit.snapshot())
+            .apply(commit.package())
             .unwrap()
             .as_bytes(),
         signed.as_bytes()
     );
 
-    let encrypted = Drawing::from_bytes(raw_security_fixture(true, false)).unwrap();
+    let encrypted = Package::from_bytes(&raw_security_fixture(true, false)).unwrap();
     let mut still_refused =
-        encrypted.edit_with_security_policy(PackageSecurityWritePolicy::RemoveSignatures);
+        encrypted.edit_with_security_policy(edit::SecurityWritePolicy::RemoveSignatures);
     still_refused.set_shape_text(0, 0, "no decryption").unwrap();
     assert!(still_refused.commit().is_err());
 }
@@ -393,7 +387,7 @@ fn active_content_is_inventoried_preserved_or_explicitly_refused() {
             "</draw:page>",
             r#"<script:event-listener xlink:href="https://example.invalid/script"/><ev:event-listener/><presentation:show/><office:dde-source/><draw:object xlink:href="https://example.invalid/object"/></draw:page>"#,
         );
-    let source = Drawing::from_bytes(package(&active)).unwrap();
+    let source = Package::from_bytes(&package(&active)).unwrap();
     let status = source.active_content();
     assert!(status.is_present());
     assert_eq!(status.scripts(), 1);
@@ -406,16 +400,16 @@ fn active_content_is_inventoried_preserved_or_explicitly_refused() {
     let mut preserved = source.edit();
     preserved.set_shape_text(0, 0, "preserved inertly").unwrap();
     let commit = preserved.commit().unwrap();
-    assert_eq!(commit.snapshot().active_content(), status);
+    assert_eq!(commit.package().active_content(), status);
     assert!(
         commit
-            .snapshot()
+            .package()
             .content_xml()
             .contains("script:event-listener")
     );
 
     let mut refused =
-        source.edit_with_active_content_policy(PackageActiveContentWritePolicy::Refuse);
+        source.edit_with_active_content_policy(edit::ActiveContentWritePolicy::Refuse);
     refused.set_shape_text(0, 0, "refused").unwrap();
     assert!(refused.commit().is_err());
 
@@ -423,9 +417,9 @@ fn active_content_is_inventoried_preserved_or_explicitly_refused() {
     assert!(
         durable
             .apply_with_policies(
-                source.snapshot(),
-                PackageSecurityWritePolicy::Refuse,
-                PackageActiveContentWritePolicy::Refuse,
+                &source,
+                edit::SecurityWritePolicy::Refuse,
+                edit::ActiveContentWritePolicy::Refuse,
             )
             .is_err()
     );
@@ -436,33 +430,29 @@ fn active_content_is_inventoried_preserved_or_explicitly_refused() {
         .unwrap();
     assert!(
         source
-            .snapshot()
             .apply_joined_with_policies(
                 joined,
-                PackageSecurityWritePolicy::Refuse,
-                PackageActiveContentWritePolicy::Refuse,
+                edit::SecurityWritePolicy::Refuse,
+                edit::ActiveContentWritePolicy::Refuse,
             )
             .is_err()
     );
 
-    let safe = Drawing::from_bytes(package(CONTENT)).unwrap();
+    let safe = Package::from_bytes(&package(CONTENT)).unwrap();
     let external_fill = StyleResource::new(StyleResourceKind::FillImage, "external-fill")
         .with_attribute("xlink:href", "https://example.invalid/fill.png")
         .with_attribute("xlink:type", "simple");
     let mut target_refused =
-        safe.edit_with_active_content_policy(PackageActiveContentWritePolicy::Refuse);
+        safe.edit_with_active_content_policy(edit::ActiveContentWritePolicy::Refuse);
     target_refused.put_style_resource(&external_fill).unwrap();
     assert!(target_refused.commit().is_err());
     let mut target_preserved = safe.edit();
     target_preserved.put_style_resource(&external_fill).unwrap();
     let target_commit = target_preserved.commit().unwrap();
-    assert_eq!(
-        target_commit.snapshot().active_content().external_links(),
-        1
-    );
+    assert_eq!(target_commit.package().active_content().external_links(), 1);
     assert!(
         target_commit
-            .snapshot()
+            .package()
             .content_xml()
             .contains("https://example.invalid/fill.png")
     );
@@ -470,7 +460,7 @@ fn active_content_is_inventoried_preserved_or_explicitly_refused() {
 
 #[test]
 fn advanced_named_style_resources_are_dependency_checked_and_durable() {
-    let source = Drawing::from_bytes(package(CONTENT)).unwrap();
+    let source = Package::from_bytes(&package(CONTENT)).unwrap();
     let mut edit = source.edit();
     edit.put_style_resource(
         &StyleResource::new(StyleResourceKind::Gradient, "advanced-gradient")
@@ -486,10 +476,10 @@ fn advanced_named_style_resources_are_dependency_checked_and_durable() {
     )
     .unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.snapshot().style_resources().iter().any(|resource| {
+    assert!(commit.package().style_resources().iter().any(|resource| {
         resource.kind() == StyleResourceKind::Gradient && resource.name() == "advanced-gradient"
     }));
-    let mut blocked = commit.snapshot().edit();
+    let mut blocked = commit.package().edit();
     assert!(
         blocked
             .remove_style_resource(StyleResourceKind::Gradient, "advanced-gradient")
@@ -501,7 +491,7 @@ fn advanced_named_style_resources_are_dependency_checked_and_durable() {
             .durable()
             .unwrap()
             .inverse()
-            .apply(commit.snapshot())
+            .apply(commit.package())
             .unwrap()
             .as_bytes(),
         source.as_bytes()
@@ -521,16 +511,18 @@ fn fresh_password_and_signing_lifecycle_is_explicit_and_verifiable() {
         "2026-08-10T12:00:00Z",
     )
     .unwrap();
-    let bytes = Builder::new()
+    let built = Builder::new()
         .build_encrypted_and_signed("drawing-password", EncryptionProfile::compatible(), signer)
         .unwrap();
-    assert!(Drawing::from_bytes_with_password(bytes.clone(), "wrong-password").is_err());
-    let drawing = Drawing::from_bytes_with_password(bytes, "drawing-password").unwrap();
+    let bytes = built.as_bytes();
+    assert!(Package::from_bytes_with_password(bytes, "wrong-password").is_err());
+    let drawing = Package::from_bytes_with_password(bytes, "drawing-password").unwrap();
+    assert_eq!(drawing.as_bytes(), bytes);
     assert!(drawing.security().is_encrypted());
     assert!(drawing.security().is_signed());
     let exact = drawing.edit().commit().unwrap();
-    assert!(!exact.changed());
-    assert_eq!(exact.snapshot().as_bytes(), drawing.as_bytes());
+    assert!(!exact.diagnostics().changed());
+    assert_eq!(exact.package().as_bytes(), drawing.as_bytes());
     let mut changed_encrypted = drawing.edit();
     changed_encrypted
         .add_page(Page::new("Refused change"))
@@ -546,19 +538,19 @@ fn fresh_password_and_signing_lifecycle_is_explicit_and_verifiable() {
     assert!(!capabilities.can_resign_existing());
     assert!(capabilities.can_remove_invalidated_signatures());
     assert_eq!(
-        capabilities.disposition(PackageSecurityLifecycleOperation::RewriteEncryptedExisting),
-        PackageSecurityLifecycleDisposition::ExactSourceOnly
+        capabilities.disposition(edit::SecurityLifecycleOperation::RewriteEncryptedExisting),
+        edit::SecurityLifecycleDisposition::ExactSourceOnly
     );
     assert_eq!(
-        capabilities.disposition(PackageSecurityLifecycleOperation::ChangeExistingPassword),
-        PackageSecurityLifecycleDisposition::Unsupported(
-            PackageSecurityLifecycleRefusal::ExistingPackageReencryptionUnavailable
+        capabilities.disposition(edit::SecurityLifecycleOperation::ChangeExistingPassword),
+        edit::SecurityLifecycleDisposition::Unsupported(
+            edit::SecurityLifecycleRefusal::ExistingPackageReencryptionUnavailable
         )
     );
     assert_eq!(
-        capabilities.disposition(PackageSecurityLifecycleOperation::ResignExisting),
-        PackageSecurityLifecycleDisposition::Unsupported(
-            PackageSecurityLifecycleRefusal::ExistingPackageResigningUnavailable
+        capabilities.disposition(edit::SecurityLifecycleOperation::ResignExisting),
+        edit::SecurityLifecycleDisposition::Unsupported(
+            edit::SecurityLifecycleRefusal::ExistingPackageResigningUnavailable
         )
     );
     assert_eq!(
@@ -598,9 +590,9 @@ fn hostile_raw_package_corpus_is_bounded_and_never_partially_opened() {
             r#"<office:automatic-styles><style:style style:name="active" style:family="graphic"><script:event-listener/></style:style></office:automatic-styles><office:body>"#,
         );
     for malformed in [duplicate_drawing, nested_page, layer_outside_page] {
-        assert!(Drawing::from_bytes(raw_negative_fixture_package(&malformed)).is_err());
+        assert!(Package::from_bytes(&raw_negative_fixture_package(&malformed)).is_err());
     }
-    assert!(Drawing::from_bytes(raw_negative_fixture_package(&active_style)).is_err());
+    assert!(Package::from_bytes(&raw_negative_fixture_package(&active_style)).is_err());
 
     let prefix = CONTENT.replace("</draw:page>", "");
     let deep = format!(
@@ -610,18 +602,18 @@ fn hostile_raw_package_corpus_is_bounded_and_never_partially_opened() {
         "</draw:g>".repeat(300),
         "</draw:page></office:drawing></office:body></office:document-content>"
     );
-    assert!(Drawing::from_bytes(raw_negative_fixture_package(&deep)).is_err());
+    assert!(Package::from_bytes(&raw_negative_fixture_package(&deep)).is_err());
 
     let valid_raw = raw_negative_fixture_package(CONTENT);
     let step = (valid_raw.len() / 64).max(1);
     for end in (0..valid_raw.len()).step_by(step) {
-        assert!(Drawing::from_bytes(valid_raw[..end].to_vec()).is_err());
+        assert!(Package::from_bytes(&valid_raw[..end]).is_err());
     }
 }
 
 #[test]
 fn durable_semantic_patch_roundtrips_inverts_and_refuses_stale_sources() {
-    let source = Drawing::from_bytes(package(CONTENT)).unwrap();
+    let source = Package::from_bytes(&package(CONTENT)).unwrap();
     let mut edit = source.edit();
     edit.set_shape_text(0, 0, "durable text").unwrap();
     edit.set_shape_geometry(0, 0, "2cm", "3cm", "5cm", "6cm")
@@ -631,38 +623,38 @@ fn durable_semantic_patch_roundtrips_inverts_and_refuses_stale_sources() {
     let durable = commit.patch().durable().unwrap();
     let wire = durable.to_deterministic_json().unwrap();
     assert_eq!(wire, durable.to_deterministic_json().unwrap());
-    let reopened = PackageDurablePatch::from_deterministic_json(&wire).unwrap();
+    let reopened = edit::DurablePatch::from_deterministic_json(&wire).unwrap();
     assert_eq!(reopened.operations().len(), 3);
     assert_eq!(
-        reopened.apply(source.snapshot()).unwrap().as_bytes(),
-        commit.snapshot().as_bytes()
+        reopened.apply(&source).unwrap().as_bytes(),
+        commit.package().as_bytes()
     );
     assert_eq!(
         reopened
             .inverse()
-            .apply(commit.snapshot())
+            .apply(commit.package())
             .unwrap()
             .as_bytes(),
         source.as_bytes()
     );
 
-    let stale = Drawing::from_bytes(package(&CONTENT.replace("Photo", "Changed"))).unwrap();
-    assert!(reopened.apply(stale.snapshot()).is_err());
+    let stale = Package::from_bytes(&package(&CONTENT.replace("Photo", "Changed"))).unwrap();
+    assert!(reopened.apply(&stale).is_err());
 }
 
 #[test]
 fn durable_structural_patch_reopens_full_package_and_inverts_exactly() {
-    let source = Drawing::from_bytes(package(CONTENT)).unwrap();
+    let source = Package::from_bytes(&package(CONTENT)).unwrap();
     let mut edit = source.edit();
     edit.add_page(Page::new("Added")).unwrap();
     let commit = edit.commit().unwrap();
     let durable = commit.patch().durable().unwrap();
     assert_eq!(durable.operations()[0].op, "package.replace");
     let reopened =
-        PackageDurablePatch::from_deterministic_json(&durable.to_deterministic_json().unwrap())
+        edit::DurablePatch::from_deterministic_json(&durable.to_deterministic_json().unwrap())
             .unwrap();
-    let applied = reopened.apply(source.snapshot()).unwrap();
-    assert_eq!(applied.as_bytes(), commit.snapshot().as_bytes());
+    let applied = reopened.apply(&source).unwrap();
+    assert_eq!(applied.as_bytes(), commit.package().as_bytes());
     assert_eq!(applied.pages().len(), 2);
     assert_eq!(
         reopened.inverse().apply(&applied).unwrap().as_bytes(),
@@ -676,7 +668,7 @@ fn path_data_is_typed_losslessly_editable_and_durable() {
         "</draw:page>",
         r#"<draw:path draw:name="Route" svg:d="M 0 0 L 10 10"/></draw:page>"#,
     );
-    let source = Drawing::from_bytes(package(&content)).unwrap();
+    let source = Package::from_bytes(&package(&content)).unwrap();
     assert_eq!(
         source.pages()[0].shapes()[2].path_data(),
         Some("M 0 0 L 10 10")
@@ -686,19 +678,19 @@ fn path_data_is_typed_losslessly_editable_and_durable() {
         .unwrap();
     let commit = edit.commit().unwrap();
     assert_eq!(
-        commit.snapshot().pages()[0].shapes()[2].path_data(),
+        commit.package().pages()[0].shapes()[2].path_data(),
         Some("M 1 2 C 3 4 5 6 7 8")
     );
     let durable = commit.patch().durable().unwrap();
     assert_eq!(durable.operations()[0].op, "shape.path.set");
     assert_eq!(
-        durable.apply(source.snapshot()).unwrap().as_bytes(),
-        commit.snapshot().as_bytes()
+        durable.apply(&source).unwrap().as_bytes(),
+        commit.package().as_bytes()
     );
     assert_eq!(
         durable
             .inverse()
-            .apply(commit.snapshot())
+            .apply(commit.package())
             .unwrap()
             .as_bytes(),
         source.as_bytes()
@@ -711,7 +703,7 @@ fn transforms_points_and_line_endpoints_insert_reopen_and_invert() {
         "</draw:page>",
         r#"<draw:polyline draw:name="Route"/><draw:line draw:name="Axis"/></draw:page>"#,
     );
-    let source = Drawing::from_bytes(package(&content)).unwrap();
+    let source = Package::from_bytes(&package(&content)).unwrap();
     let mut refused = source.edit();
     assert!(
         refused
@@ -719,7 +711,7 @@ fn transforms_points_and_line_endpoints_insert_reopen_and_invert() {
             .is_err()
     );
     assert_eq!(
-        refused.commit().unwrap().snapshot().as_bytes(),
+        refused.commit().unwrap().package().as_bytes(),
         source.as_bytes()
     );
     let mut edit = source.edit();
@@ -745,7 +737,7 @@ fn transforms_points_and_line_endpoints_insert_reopen_and_invert() {
     )
     .unwrap();
     let commit = edit.commit().unwrap();
-    let shapes = commit.snapshot().pages()[0].shapes();
+    let shapes = commit.package().pages()[0].shapes();
     assert_eq!(
         shapes[0].transform(),
         Some("rotate (15) translate (1cm 2cm)")
@@ -762,20 +754,20 @@ fn transforms_points_and_line_endpoints_insert_reopen_and_invert() {
         shapes[5].line_geometry(),
         [Some("0cm"), Some("0cm"), Some("4cm"), Some("5cm")]
     );
-    let reopened = Drawing::from_bytes(commit.snapshot().as_bytes().to_vec()).unwrap();
-    assert_eq!(reopened.as_bytes(), commit.snapshot().as_bytes());
+    let reopened = Package::from_bytes(commit.package().as_bytes()).unwrap();
+    assert_eq!(reopened.as_bytes(), commit.package().as_bytes());
     assert_eq!(
         commit
             .patch()
             .durable()
             .unwrap()
             .inverse()
-            .apply(commit.snapshot())
+            .apply(commit.package())
             .unwrap()
             .as_bytes(),
         source.as_bytes()
     );
-    assert!(!commit.snapshot().active_content().is_present());
+    assert!(!commit.package().active_content().is_present());
 }
 
 #[test]
@@ -784,7 +776,7 @@ fn form_controls_remain_inert_but_their_references_are_editable() {
         "</draw:page>",
         r#"<draw:control draw:name="Button" draw:control="button1"/></draw:page>"#,
     );
-    let source = Drawing::from_bytes(package(&content)).unwrap();
+    let source = Package::from_bytes(&package(&content)).unwrap();
     let control = &source.pages()[0].shapes()[2];
     assert_eq!(control.kind(), ShapeKind::Control);
     assert_eq!(control.control_reference(), Some("button1"));
@@ -792,20 +784,20 @@ fn form_controls_remain_inert_but_their_references_are_editable() {
     edit.set_shape_control_reference(0, 2, "button2").unwrap();
     let commit = edit.commit().unwrap();
     assert_eq!(
-        commit.snapshot().pages()[0].shapes()[2].control_reference(),
+        commit.package().pages()[0].shapes()[2].control_reference(),
         Some("button2")
     );
     let durable = commit.patch().durable().unwrap();
     assert_eq!(durable.operations()[0].op, "shape.control.set");
     assert_eq!(
-        durable.apply(source.snapshot()).unwrap().as_bytes(),
-        commit.snapshot().as_bytes()
+        durable.apply(&source).unwrap().as_bytes(),
+        commit.package().as_bytes()
     );
 }
 
 #[test]
 fn form_model_crud_is_inert_dependency_checked_and_durable() {
-    let source = Drawing::from_bytes(package(CONTENT)).unwrap();
+    let source = Package::from_bytes(&package(CONTENT)).unwrap();
     let mut edit = source.edit();
     edit.add_form_control(
         &FormControl::new("control1")
@@ -823,38 +815,38 @@ fn form_model_crud_is_inert_dependency_checked_and_durable() {
     )
     .unwrap();
     let commit = edit.commit().unwrap();
-    assert_eq!(commit.snapshot().form_controls()[0].id(), "control1");
-    assert_eq!(commit.snapshot().form_controls()[0].element(), "checkbox");
+    assert_eq!(commit.package().form_controls()[0].id(), "control1");
+    assert_eq!(commit.package().form_controls()[0].element(), "checkbox");
     assert_eq!(
-        commit.snapshot().form_controls()[0]
+        commit.package().form_controls()[0]
             .attributes()
             .get("form:label")
             .map(String::as_str),
         Some("Arbitrary label")
     );
     assert_eq!(
-        commit.snapshot().pages()[0].shapes()[2].control_reference(),
+        commit.package().pages()[0].shapes()[2].control_reference(),
         Some("control1")
     );
     let durable = commit.patch().durable().unwrap();
     assert_eq!(
-        durable.apply(source.snapshot()).unwrap().as_bytes(),
-        commit.snapshot().as_bytes()
+        durable.apply(&source).unwrap().as_bytes(),
+        commit.package().as_bytes()
     );
 
-    let mut blocked = commit.snapshot().edit();
+    let mut blocked = commit.package().edit();
     assert!(blocked.remove_form_control("control1").is_err());
 
-    let mut removal = commit.snapshot().edit();
+    let mut removal = commit.package().edit();
     removal.remove_shape(0, 2).unwrap();
     removal.remove_form_control("control1").unwrap();
     let removed = removal.commit().unwrap();
-    assert!(removed.snapshot().form_controls().is_empty());
+    assert!(removed.package().form_controls().is_empty());
 }
 
 #[test]
 fn arbitrary_style_properties_have_dependency_checked_crud_and_exact_inverse() {
-    let source = Drawing::from_bytes(package(CONTENT)).unwrap();
+    let source = Package::from_bytes(&package(CONTENT)).unwrap();
     let style = Style::new("custom-fill", "graphic")
         .with_property("draw:fill", "solid")
         .with_property("draw:fill-color", "#12ab34")
@@ -864,7 +856,7 @@ fn arbitrary_style_properties_have_dependency_checked_crud_and_exact_inverse() {
     let commit = edit.commit().unwrap();
     assert!(
         commit
-            .snapshot()
+            .package()
             .style_definitions()
             .iter()
             .any(|candidate| candidate == &style)
@@ -875,19 +867,19 @@ fn arbitrary_style_properties_have_dependency_checked_crud_and_exact_inverse() {
             .durable()
             .unwrap()
             .inverse()
-            .apply(commit.snapshot())
+            .apply(commit.package())
             .unwrap()
             .as_bytes(),
         source.as_bytes()
     );
 
-    let mut removal = commit.snapshot().edit();
+    let mut removal = commit.package().edit();
     assert_eq!(removal.remove_style("custom-fill").unwrap(), style);
     assert!(
         removal
             .commit()
             .unwrap()
-            .snapshot()
+            .package()
             .style_definitions()
             .is_empty()
     );
@@ -895,7 +887,7 @@ fn arbitrary_style_properties_have_dependency_checked_crud_and_exact_inverse() {
 
 #[test]
 fn joined_edits_are_deterministic_disjoint_and_conflict_aware() {
-    let source = Drawing::from_bytes(package(CONTENT)).unwrap();
+    let source = Package::from_bytes(&package(CONTENT)).unwrap();
     let limits = CompositionLimits::new(8, 8, 32, 16);
 
     let mut text_edit = source.edit();
@@ -905,7 +897,7 @@ fn joined_edits_are_deterministic_disjoint_and_conflict_aware() {
     name_edit.set_shape_name(0, 1, "Joined photo").unwrap();
     let name_commit = name_edit.commit().unwrap();
 
-    let mut joined = source.snapshot().joined_edits(limits);
+    let mut joined = source.joined_edits(limits);
     joined
         .join(text_commit.patch().prepare("z-text", limits).unwrap())
         .unwrap();
@@ -915,18 +907,18 @@ fn joined_edits_are_deterministic_disjoint_and_conflict_aware() {
     assert_eq!(
         joined
             .sub_edits()
-            .map(litchi_odg::PackagePreparedEdit::id)
+            .map(edit::PreparedEdit::id)
             .collect::<Vec<_>>(),
         ["a-name", "z-text"]
     );
-    let applied = source.snapshot().apply_joined(joined).unwrap();
+    let applied = source.apply_joined(joined).unwrap();
     assert_eq!(applied.pages()[0].shapes()[0].text(), "joined");
     assert_eq!(applied.pages()[0].shapes()[1].name(), Some("Joined photo"));
 
     let mut conflicting_edit = source.edit();
     conflicting_edit.set_shape_text(0, 0, "other").unwrap();
     let conflicting_commit = conflicting_edit.commit().unwrap();
-    let mut conflicts = source.snapshot().joined_edits(limits);
+    let mut conflicts = source.joined_edits(limits);
     conflicts
         .join(text_commit.patch().prepare("left", limits).unwrap())
         .unwrap();
@@ -938,7 +930,7 @@ fn joined_edits_are_deterministic_disjoint_and_conflict_aware() {
 
 #[test]
 fn three_way_plan_does_not_mutate_until_conflicts_are_resolved() {
-    let source = Drawing::from_bytes(package(CONTENT)).unwrap();
+    let source = Package::from_bytes(&package(CONTENT)).unwrap();
     let original = source.as_bytes().to_vec();
     let limits = CompositionLimits::new(8, 8, 32, 16);
     let mut left_edit = source.edit();
@@ -947,34 +939,34 @@ fn three_way_plan_does_not_mutate_until_conflicts_are_resolved() {
     let mut right_edit = source.edit();
     right_edit.set_shape_name(0, 0, "Right").unwrap();
     let right_commit = right_edit.commit().unwrap();
-    let mut left = source.snapshot().joined_edits(limits);
+    let mut left = source.joined_edits(limits);
     left.join(left_commit.patch().prepare("left", limits).unwrap())
         .unwrap();
-    let mut right = source.snapshot().joined_edits(limits);
+    let mut right = source.joined_edits(limits);
     right
         .join(right_commit.patch().prepare("right", limits).unwrap())
         .unwrap();
 
-    let plan = PackageMergePlan::new(left, right).unwrap();
+    let plan = edit::MergePlan::new(left, right).unwrap();
     assert_eq!(source.as_bytes(), original);
     assert_eq!(plan.conflicts().len(), 1);
     let mut unresolved = plan.finish().unwrap_err();
     unresolved.resolve(MergeChoice::Right);
     let staged = unresolved.finish().unwrap();
-    let applied = source.snapshot().apply_joined(staged).unwrap();
+    let applied = source.apply_joined(staged).unwrap();
     assert_eq!(applied.pages()[0].shapes()[0].name(), Some("Right"));
 }
 
 #[test]
 fn history_enforces_step_and_weight_bounds_without_mutating_on_refusal() {
-    let source = Drawing::from_bytes(package(CONTENT)).unwrap();
+    let source = Package::from_bytes(&package(CONTENT)).unwrap();
     let mut first_edit = source.edit();
     first_edit.set_shape_name(0, 0, "First").unwrap();
-    let first = first_edit.commit().unwrap().into_snapshot();
+    let first = first_edit.commit().unwrap().into_package();
     let mut second_edit = first.edit();
     second_edit.set_shape_name(0, 0, "Second").unwrap();
-    let second = second_edit.commit().unwrap().into_snapshot();
-    let mut history = source.snapshot().history(HistoryLimits::new(2, 10));
+    let second = second_edit.commit().unwrap().into_package();
+    let mut history = source.history(HistoryLimits::new(2, 10));
     history.record(first.clone(), 6).unwrap();
     history.record(second.clone(), 6).unwrap();
     assert_eq!(history.retained_weight(), 6);

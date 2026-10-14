@@ -2,7 +2,7 @@
 
 use litchi_core::{CompositionError, CompositionLimitKind, CompositionLimits, SubEditJoinFailure};
 use litchi_odf_common::core::PackageWriter;
-use litchi_odg::{Drawing, Transition};
+use litchi_odg::{Package, Transition};
 
 const CONTENT_AUTOMATIC: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" xmlns:presentation="urn:oasis:names:tc:opendocument:xmlns:presentation:1.0" xmlns:smil="urn:oasis:names:tc:opendocument:xmlns:smil-compatible:1.0" office:version="1.4"><office:automatic-styles><style:style style:name="dp1" style:family="drawing-page"><style:drawing-page-properties presentation:transition-type="manual" presentation:transition-style="fade-from-left"/></style:style><style:style style:name="dp2" style:family="drawing-page"><style:drawing-page-properties presentation:transition-type="automatic" presentation:transition-style="dissolve"/></style:style></office:automatic-styles><office:body><office:drawing><draw:page draw:name="Page 1" draw:style-name="dp1"/><draw:page draw:name="Page 2" draw:style-name="dp2"/></office:drawing></office:body></office:document-content>"#;
 
@@ -45,34 +45,34 @@ fn transition_with_smil() -> Transition {
     value
 }
 
-fn assert_exact_durable_round_trip(source: Drawing, value: Transition) {
+fn assert_exact_durable_round_trip(source: Package, value: Transition) {
     let mut edit = source.edit();
     edit.set_page_transition(0, Some(value)).unwrap();
     let commit = edit.commit().unwrap();
     let durable = commit.patch().durable().unwrap();
-    let replayed = durable.apply(source.snapshot()).unwrap();
-    assert_eq!(replayed.as_bytes(), commit.snapshot().as_bytes());
+    let replayed = durable.apply(&source).unwrap();
+    assert_eq!(replayed.as_bytes(), commit.package().as_bytes());
     let restored = durable.inverse().apply(&replayed).unwrap();
     assert_eq!(restored.as_bytes(), source.as_bytes());
 }
 
 #[test]
 fn equal_transition_is_a_noop_even_when_the_style_is_shared() {
-    let source = Drawing::from_bytes(package(CONTENT_SHARED, None)).unwrap();
+    let source = Package::from_bytes(&package(CONTENT_SHARED, None)).unwrap();
     let current = source.pages()[0].transition().cloned();
     let mut edit = source.edit();
     edit.set_page_transition(0, current).unwrap();
     let commit = edit.commit().unwrap();
 
-    assert!(!commit.changed());
+    assert!(!commit.diagnostics().changed());
     assert!(commit.patch().changes().is_empty());
-    assert_eq!(commit.snapshot().as_bytes(), source.as_bytes());
+    assert_eq!(commit.package().as_bytes(), source.as_bytes());
     assert_eq!(commit.patch().durable().unwrap().operations().len(), 0);
 }
 
 #[test]
 fn inherited_transition_can_be_replaced_but_cannot_be_cleared_locally() {
-    let source = Drawing::from_bytes(package(CONTENT_INHERITED, Some(STYLES_INHERITED))).unwrap();
+    let source = Package::from_bytes(&package(CONTENT_INHERITED, Some(STYLES_INHERITED))).unwrap();
     assert_eq!(
         source.pages()[0].transition().unwrap().style(),
         Some("fade-from-left")
@@ -85,7 +85,7 @@ fn inherited_transition_can_be_replaced_but_cannot_be_cleared_locally() {
     replacement
         .set_page_transition(0, Some(transition("automatic", "dissolve")))
         .unwrap();
-    let output = replacement.commit().unwrap().into_snapshot();
+    let output = replacement.commit().unwrap().into_package();
     assert_eq!(
         output.pages()[0].transition().unwrap().style(),
         Some("dissolve")
@@ -106,7 +106,7 @@ fn inherited_transition_can_be_replaced_but_cannot_be_cleared_locally() {
 
 #[test]
 fn named_style_transition_replays_and_inverts_durably() {
-    let source = Drawing::from_bytes(package(CONTENT_NAMED, Some(STYLES_NAMED))).unwrap();
+    let source = Package::from_bytes(&package(CONTENT_NAMED, Some(STYLES_NAMED))).unwrap();
     let mut edit = source.edit();
     edit.set_page_transition(0, Some(transition("automatic", "dissolve")))
         .unwrap();
@@ -114,8 +114,8 @@ fn named_style_transition_replays_and_inverts_durably() {
     let durable = commit.patch().durable().unwrap();
     assert_eq!(durable.operations()[0].op, "page.transition.set");
 
-    let replayed = durable.apply(source.snapshot()).unwrap();
-    assert_eq!(replayed.as_bytes(), commit.snapshot().as_bytes());
+    let replayed = durable.apply(&source).unwrap();
+    assert_eq!(replayed.as_bytes(), commit.package().as_bytes());
     let restored = durable.inverse().apply(&replayed).unwrap();
     assert_eq!(restored.as_bytes(), source.as_bytes());
 }
@@ -127,11 +127,11 @@ fn transition_inverse_preserves_new_namespace_bindings_for_automatic_and_named_s
         "",
     );
     assert_exact_durable_round_trip(
-        Drawing::from_bytes(package(&automatic_content, None)).unwrap(),
+        Package::from_bytes(&package(&automatic_content, None)).unwrap(),
         transition_with_smil(),
     );
     assert_exact_durable_round_trip(
-        Drawing::from_bytes(package(CONTENT_NAMED, Some(STYLES_NAMED))).unwrap(),
+        Package::from_bytes(&package(CONTENT_NAMED, Some(STYLES_NAMED))).unwrap(),
         transition_with_smil(),
     );
 }
@@ -143,7 +143,7 @@ fn transition_inverse_preserves_first_property_insertion_for_automatic_and_named
         "</style:style>",
     );
     assert_exact_durable_round_trip(
-        Drawing::from_bytes(package(&automatic_content, None)).unwrap(),
+        Package::from_bytes(&package(&automatic_content, None)).unwrap(),
         transition("automatic", "dissolve"),
     );
 
@@ -152,43 +152,43 @@ fn transition_inverse_preserves_first_property_insertion_for_automatic_and_named
         "</style:style>",
     );
     assert_exact_durable_round_trip(
-        Drawing::from_bytes(package(CONTENT_NAMED, Some(&named_styles))).unwrap(),
+        Package::from_bytes(&package(CONTENT_NAMED, Some(&named_styles))).unwrap(),
         transition("automatic", "dissolve"),
     );
 }
 
 #[test]
 fn transition_edit_does_not_rebind_a_foreign_presentation_prefix() {
-    let source = Drawing::from_bytes(package(CONTENT_FOREIGN_PRESENTATION, None)).unwrap();
+    let source = Package::from_bytes(&package(CONTENT_FOREIGN_PRESENTATION, None)).unwrap();
     let mut edit = source.edit();
     edit.set_page_transition(0, Some(transition("automatic", "dissolve")))
         .unwrap();
     let commit = edit.commit().unwrap();
     assert!(
         commit
-            .snapshot()
+            .package()
             .content_xml()
             .contains("presentation:vendor=\"keep\"")
     );
-    assert!(commit.snapshot().content_xml().contains(
+    assert!(commit.package().content_xml().contains(
         "xmlns:litchi_presentation=\"urn:oasis:names:tc:opendocument:xmlns:presentation:1.0\""
     ));
     let durable = commit.patch().durable().unwrap();
     let restored = durable
         .inverse()
-        .apply(&durable.apply(source.snapshot()).unwrap())
+        .apply(&durable.apply(&source).unwrap())
         .unwrap();
     assert_eq!(restored.as_bytes(), source.as_bytes());
 }
 
 #[test]
 fn transition_edit_avoids_foreign_alias_and_local_shadowing() {
-    let source = Drawing::from_bytes(package(CONTENT_LOCAL_FOREIGN_PRESENTATION, None)).unwrap();
+    let source = Package::from_bytes(&package(CONTENT_LOCAL_FOREIGN_PRESENTATION, None)).unwrap();
     let mut edit = source.edit();
     edit.set_page_transition(0, Some(transition("automatic", "dissolve")))
         .unwrap();
     let commit = edit.commit().unwrap();
-    let content = commit.snapshot().content_xml();
+    let content = commit.package().content_xml();
     assert!(content.contains("xmlns:litchi_presentation=\"urn:example:occupied\""));
     assert!(content.contains("xmlns:presentation=\"urn:example:foreign-presentation\""));
     assert!(content.contains(
@@ -199,14 +199,14 @@ fn transition_edit_avoids_foreign_alias_and_local_shadowing() {
     let durable = commit.patch().durable().unwrap();
     let restored = durable
         .inverse()
-        .apply(&durable.apply(source.snapshot()).unwrap())
+        .apply(&durable.apply(&source).unwrap())
         .unwrap();
     assert_eq!(restored.as_bytes(), source.as_bytes());
 }
 
 #[test]
 fn disjoint_transition_sub_edits_join_and_same_page_edits_conflict() {
-    let source = Drawing::from_bytes(package(CONTENT_AUTOMATIC, None)).unwrap();
+    let source = Package::from_bytes(&package(CONTENT_AUTOMATIC, None)).unwrap();
     let limits = CompositionLimits::new(4, 4, 8, 8);
 
     let mut first_edit = source.edit();
@@ -228,7 +228,7 @@ fn disjoint_transition_sub_edits_join_and_same_page_edits_conflict() {
     joined
         .join(second.patch().prepare("second", limits).unwrap())
         .unwrap();
-    let output = source.snapshot().apply_joined(joined).unwrap();
+    let output = source.apply_joined(joined).unwrap();
     assert_eq!(
         output.pages()[0].transition().unwrap().style(),
         Some("dissolve")
@@ -255,7 +255,7 @@ fn disjoint_transition_sub_edits_join_and_same_page_edits_conflict() {
 
 #[test]
 fn transition_sub_edit_admission_honors_each_composition_bound() {
-    let source = Drawing::from_bytes(package(CONTENT_AUTOMATIC, None)).unwrap();
+    let source = Package::from_bytes(&package(CONTENT_AUTOMATIC, None)).unwrap();
     let mut edit = source.edit();
     edit.set_page_transition(0, Some(transition("automatic", "dissolve")))
         .unwrap();

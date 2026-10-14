@@ -186,29 +186,82 @@ impl Block<'_> {
     }
 }
 
-/// Immutable document snapshot.
+/// The immutable OTH (`OpenDocument` HTML template) package owner.
+///
+/// Cheap to clone (one `Arc` bump). Every state verb lives here: open,
+/// create, [`Package::edit`], [`Package::apply`] and publication. Reads go
+/// through the read-only [`Document`] projection ([`Package::document`]).
 #[derive(Clone)]
-pub struct Template {
+pub struct Package {
     package: crate::package::Snapshot,
 }
 
-impl Template {
+impl fmt::Debug for Package {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Package")
+            .field("bytes", &self.as_bytes().len())
+            .finish_non_exhaustive()
+    }
+}
+
+impl Package {
+    /// Creates the minimal valid OTH package: an empty text-web body.
+    ///
+    /// Deterministic: no clock or randomness is consulted, so two calls
+    /// produce identical bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error only if the fresh package fails its own readback.
+    pub fn new() -> std::result::Result<Self, litchi_odf_common::Error> {
+        Builder::new().build()
+    }
+
     /// Opens a web-template package from a file path.
     ///
     /// # Errors
     ///
     /// Returns an error if the file cannot be read or is not a valid package.
-    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        crate::package::Snapshot::open(path).map(|package| Self { package })
+    pub fn open(path: impl AsRef<Path>) -> std::result::Result<Self, litchi_odf_common::Error> {
+        Self::open_with_options(path, litchi_odf_common::OpenOptions::default())
     }
 
-    /// Opens a web-template package from in-memory bytes.
+    /// Opens a web-template package from a file path under caller-selected
+    /// source and semantic limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`litchi_odf_common::Error::Limit`] when a selected limit is
+    /// exceeded, and another error if the package is invalid.
+    pub fn open_with_options(
+        path: impl AsRef<Path>,
+        options: litchi_odf_common::OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        crate::package::Snapshot::open_with_options(path, options).map(|package| Self { package })
+    }
+
+    /// Opens a web-template package from in-memory bytes (copied once).
     ///
     /// # Errors
     ///
     /// Returns an error if the bytes are not a valid package.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        crate::package::Snapshot::from_bytes(bytes).map(|package| Self { package })
+    pub fn from_bytes(bytes: &[u8]) -> std::result::Result<Self, litchi_odf_common::Error> {
+        Self::from_bytes_with_options(bytes, litchi_odf_common::OpenOptions::default())
+    }
+
+    /// Opens a web-template package from in-memory bytes under
+    /// caller-selected source and semantic limits.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Self::open_with_options`].
+    pub fn from_bytes_with_options(
+        bytes: &[u8],
+        options: litchi_odf_common::OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        crate::package::Snapshot::from_bytes_with_options(bytes.to_vec(), options)
+            .map(|package| Self { package })
     }
 
     /// Opens a web-template package from shared in-memory bytes without
@@ -217,38 +270,135 @@ impl Template {
     /// # Errors
     ///
     /// Returns an error if the bytes are not a valid package.
-    pub fn from_shared_bytes(bytes: Arc<Vec<u8>>) -> Result<Self> {
-        crate::package::Snapshot::from_shared_bytes(bytes).map(|package| Self { package })
+    pub fn from_shared_bytes(
+        bytes: Arc<Vec<u8>>,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        Ok(crate::package::Snapshot::from_shared_bytes(bytes).map(|package| Self { package })?)
     }
 
-    /// Returns the `content.xml` document.
-    #[must_use]
-    pub fn content_xml(&self) -> &str {
-        self.package.content_xml()
+    /// Reads a web-template package from a stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the stream fails or is not a valid package.
+    pub fn from_reader(
+        reader: impl std::io::Read,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        Self::from_reader_with_options(reader, litchi_odf_common::OpenOptions::default())
     }
 
-    /// Returns the `styles.xml` document, if present.
-    #[must_use]
-    pub fn styles_xml(&self) -> Option<&str> {
-        self.package.styles_xml()
+    /// Reads a web-template package from a stream under caller-selected
+    /// source and semantic limits.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Self::open_with_options`].
+    pub fn from_reader_with_options(
+        reader: impl std::io::Read,
+        options: litchi_odf_common::OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        crate::package::Snapshot::from_reader_with_options(reader, options)
+            .map(|package| Self { package })
     }
 
-    /// Returns the document metadata, if present.
-    #[must_use]
-    pub fn metadata(&self) -> Option<&Metadata> {
-        self.package.metadata()
+    /// Adopts the archive smart detection already indexed, without a second
+    /// ZIP index. The source limits were applied when it was prepared.
+    ///
+    /// # Errors
+    ///
+    /// Returns `UnexpectedFormat` when detection classified another format,
+    /// and another error if the package is not a valid web template.
+    pub fn from_prepared_package(
+        prepared: litchi_odf_common::PreparedPackage,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        if prepared.format() != litchi_core::detection::FileFormat::Oth {
+            return Err(Error::UnexpectedFormat {
+                detected: prepared.format(),
+            }
+            .into());
+        }
+        crate::package::Snapshot::from_owned_package_with_options(
+            prepared.into_package(),
+            litchi_odf_common::OpenOptions::default(),
+        )
+        .map(|package| Self { package })
     }
 
-    /// Returns the exact `meta.xml` source, if present.
-    #[must_use]
-    pub fn meta_xml(&self) -> Option<&str> {
-        self.package.meta_xml()
+    pub(crate) const fn from_snapshot(package: crate::package::Snapshot) -> Self {
+        Self { package }
     }
 
-    /// Returns named style declarations from `content.xml` and `styles.xml`.
+    /// The read-only semantic projection of this package.
     #[must_use]
-    pub fn styles(&self) -> &[crate::style::Style] {
-        self.package.styles()
+    pub fn document(&self) -> Document {
+        Document {
+            package: self.clone(),
+        }
+    }
+
+    /// Everything a tolerant read repaired while this package was opened.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
+        self.package.tolerance_report()
+    }
+
+    /// Applies a patch to its exact source package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when this package is not the patch's source.
+    pub fn apply(&self, patch: &Patch) -> std::result::Result<Self, litchi_odf_common::Error> {
+        Ok(patch.apply(self)?)
+    }
+
+    /// Atomically saves the package bytes to `path` (sibling temporary file
+    /// and rename, fully synced).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the destination cannot be published; an
+    /// existing destination then keeps its bytes.
+    pub fn save(
+        &self,
+        path: impl AsRef<Path>,
+    ) -> std::result::Result<(), litchi_odf_common::Error> {
+        self.save_with_durability(path, litchi_core::Durability::Full)
+    }
+
+    /// Atomically saves the package bytes to `path` with an explicit
+    /// durability.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Self::save`].
+    pub fn save_with_durability(
+        &self,
+        path: impl AsRef<Path>,
+        durability: litchi_core::Durability,
+    ) -> std::result::Result<(), litchi_odf_common::Error> {
+        litchi_odf_common::publish::save_bytes(path.as_ref(), self.as_bytes(), durability)
+    }
+
+    /// Returns a copy of the package bytes.
+    ///
+    /// # Errors
+    ///
+    /// Infallible today; the `Result` keeps the ODF owner surface uniform.
+    pub fn to_bytes(&self) -> std::result::Result<Vec<u8>, litchi_odf_common::Error> {
+        Ok(self.as_bytes().to_vec())
+    }
+
+    /// Writes the package bytes into `sink`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the sink fails.
+    pub fn write_to(
+        &self,
+        mut sink: impl std::io::Write,
+    ) -> std::result::Result<(), litchi_odf_common::Error> {
+        sink.write_all(self.as_bytes()).map_err(Error::from)?;
+        Ok(())
     }
 
     /// Returns the raw package bytes.
@@ -257,25 +407,43 @@ impl Template {
         self.package.as_bytes()
     }
 
+    /// Returns the `content.xml` document.
+    #[must_use]
+    pub(crate) fn content_xml(&self) -> &str {
+        self.package.content_xml()
+    }
+
+    /// Returns the `styles.xml` document, if present.
+    #[must_use]
+    pub(crate) fn styles_xml(&self) -> Option<&str> {
+        self.package.styles_xml()
+    }
+
+    /// Returns the document metadata, if present.
+    #[must_use]
+    pub(crate) fn metadata(&self) -> Option<&Metadata> {
+        self.package.metadata()
+    }
+
+    /// Returns the exact `meta.xml` source, if present.
+    #[must_use]
+    pub(crate) fn meta_xml(&self) -> Option<&str> {
+        self.package.meta_xml()
+    }
+
+    /// Returns named style declarations from `content.xml` and `styles.xml`.
+    #[must_use]
+    pub(crate) fn styles(&self) -> &[crate::style::Style] {
+        self.package.styles()
+    }
+
     /// Lists the file entries stored in the package.
     ///
     /// # Errors
     ///
     /// Returns an error if the package entries cannot be enumerated.
-    pub fn files(&self) -> Result<Vec<String>> {
+    pub(crate) fn files(&self) -> Result<Vec<String>> {
         self.package.files()
-    }
-
-    /// Returns the stable XML validation capability contract.
-    #[must_use]
-    pub const fn validation_capabilities(&self) -> ValidationCapabilities {
-        ValidationCapabilities::oth()
-    }
-
-    /// Returns the stable security lifecycle capability contract.
-    #[must_use]
-    pub const fn security_capabilities(&self) -> SecurityCapabilities {
-        SecurityCapabilities::oth()
     }
 
     /// Inventories inert active-content surfaces and enforces an explicit policy.
@@ -283,7 +451,7 @@ impl Template {
     /// # Errors
     ///
     /// Returns an error if package enumeration fails or a denied surface is present.
-    pub fn check_security(&self, policy: SecurityPolicy) -> Result<SecurityReport> {
+    pub(crate) fn check_security(&self, policy: SecurityPolicy) -> Result<SecurityReport> {
         let files = self.files()?;
         let report = SecurityReport {
             embedded_objects: self
@@ -333,7 +501,7 @@ impl Template {
     /// The ordinary paragraph projection is prepared at open time. Additional
     /// body structures remain lazy and parse once when a typed accessor is
     /// called, sharing the successful cache with subsequent clones.
-    pub fn text_body(&self) -> Result<TextBody> {
+    pub(crate) fn text_body(&self) -> Result<TextBody> {
         Ok(TextBody {
             package: self.package.clone(),
         })
@@ -417,11 +585,96 @@ impl Template {
             structure_lifecycle_changes: Vec::new(),
         }
     }
+}
 
-    /// Consumes the snapshot and returns the raw package bytes.
+/// The read-only semantic projection of an OTH [`Package`].
+///
+/// Cheap to clone; it shares the owner's immutable state and has no state
+/// verbs (open, edit and publication live on [`Package`]).
+#[derive(Clone)]
+pub struct Document {
+    package: Package,
+}
+
+impl fmt::Debug for Document {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_struct("Document").finish_non_exhaustive()
+    }
+}
+
+impl Document {
+    /// Returns the `content.xml` document.
     #[must_use]
-    pub fn into_bytes(self) -> Vec<u8> {
-        self.package.into_bytes()
+    pub fn content_xml(&self) -> &str {
+        self.package.content_xml()
+    }
+
+    /// Returns the `styles.xml` document, if present.
+    #[must_use]
+    pub fn styles_xml(&self) -> Option<&str> {
+        self.package.styles_xml()
+    }
+
+    /// Returns the document metadata, if present.
+    #[must_use]
+    pub fn metadata(&self) -> Option<&Metadata> {
+        self.package.metadata()
+    }
+
+    /// Returns the exact `meta.xml` source, if present.
+    #[must_use]
+    pub fn meta_xml(&self) -> Option<&str> {
+        self.package.meta_xml()
+    }
+
+    /// Returns named style declarations from `content.xml` and `styles.xml`.
+    #[must_use]
+    pub fn styles(&self) -> &[crate::style::Style] {
+        self.package.styles()
+    }
+
+    /// Lists the file entries stored in the package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the package entries cannot be enumerated.
+    pub fn files(&self) -> Result<Vec<String>> {
+        self.package.files()
+    }
+
+    /// Returns the stable XML validation capability contract.
+    #[must_use]
+    pub const fn validation_capabilities(&self) -> ValidationCapabilities {
+        ValidationCapabilities::oth()
+    }
+
+    /// Returns the stable security lifecycle capability contract.
+    #[must_use]
+    pub const fn security_capabilities(&self) -> SecurityCapabilities {
+        SecurityCapabilities::oth()
+    }
+
+    /// Inventories inert active-content surfaces and enforces an explicit policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if package enumeration fails or a denied surface is present.
+    pub fn check_security(&self, policy: SecurityPolicy) -> Result<SecurityReport> {
+        self.package.check_security(policy)
+    }
+
+    /// Projects inert paragraph character data from the validated text body.
+    ///
+    /// Fields, links, scripts, forms, resources, and embedded objects are not
+    /// evaluated, followed, activated, or otherwise executed.
+    ///
+    /// # Errors
+    ///
+    /// The ordinary paragraph projection is prepared at open time. Additional
+    /// body structures remain lazy and parse once when a typed accessor is
+    /// called, sharing the successful cache with subsequent clones.
+    pub fn text_body(&self) -> Result<TextBody> {
+        self.package.text_body()
     }
 }
 
@@ -615,7 +868,7 @@ impl Default for TransferPolicy {
 /// A validated, non-mutating cross-template publication plan.
 pub struct TransferPlan {
     block: Option<crate::ContentBlock>,
-    destination: Template,
+    destination: Package,
     fragment: Option<String>,
     imported_styles: Vec<crate::style::Style>,
     payloads: Vec<ResourcePayloadChange>,
@@ -657,7 +910,7 @@ impl TransferPlan {
             styles.extend(self.imported_styles);
             edit.set_styles(&styles)?;
         }
-        edit.commit()
+        edit.commit_inner()
     }
 }
 
@@ -833,7 +1086,7 @@ impl PartChange {
     }
 }
 
-/// A source-bound web-template text transaction.
+/// A source-bound web-template text edit.
 pub struct Edit<'a> {
     appended: Vec<crate::ContentBlock>,
     changes: Vec<ParagraphChange>,
@@ -845,7 +1098,7 @@ pub struct Edit<'a> {
     metadata: PartChange,
     payload_changes: Vec<ResourcePayloadChange>,
     resource_changes: Vec<ResourceChange>,
-    source: &'a Template,
+    source: &'a Package,
     styles: PartChange,
     structure_changes: Vec<StructureChange>,
     structure_lifecycle_changes: Vec<StructureLifecycleChange>,
@@ -2330,7 +2583,11 @@ impl Edit<'_> {
     ///
     /// Returns an error if the source cannot be losslessly rewritten or the
     /// fully reopened candidate fails semantic readback.
-    pub fn commit(self) -> Result<Commit> {
+    pub fn commit(self) -> std::result::Result<Commit, litchi_odf_common::Error> {
+        Ok(self.commit_inner()?)
+    }
+
+    fn commit_inner(self) -> Result<Commit> {
         if self.changes.is_empty()
             && self.durable_fragment.is_none()
             && self.forms_change.is_none()
@@ -2360,7 +2617,7 @@ impl Edit<'_> {
             &self.structure_changes,
             &self.structure_lifecycle_changes,
         )?)?;
-        let snapshot = Template {
+        let snapshot = Package {
             package: self.source.package.rebuild_with_parts(
                 &content,
                 &self.metadata,
@@ -2391,7 +2648,7 @@ impl Edit<'_> {
                 structure_changes,
                 structure_lifecycle_changes,
             },
-            changed: true,
+            diagnostics: Diagnostics { changed: true },
         })
     }
 }
@@ -2904,15 +3161,30 @@ impl ParagraphChange {
     }
 }
 
-/// A committed immutable template and its exact-source patch.
+/// A committed immutable package and its exact-source patch.
 pub struct Commit {
-    snapshot: Template,
+    snapshot: Package,
     patch: Patch,
+    diagnostics: Diagnostics,
+}
+
+/// What one OTH commit changed.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Diagnostics {
     changed: bool,
 }
 
+impl Diagnostics {
+    /// Whether the committed package differs from its source package; an
+    /// exact no-op commit returns the source bytes and reports `false`.
+    #[must_use]
+    pub const fn changed(&self) -> bool {
+        self.changed
+    }
+}
+
 impl Commit {
-    fn unchanged(snapshot: Template) -> Self {
+    fn unchanged(snapshot: Package) -> Self {
         Self {
             patch: Patch {
                 appended: Vec::new(),
@@ -2932,32 +3204,38 @@ impl Commit {
                 target: snapshot.clone(),
             },
             snapshot,
-            changed: false,
+            diagnostics: Diagnostics { changed: false },
         }
     }
 
-    /// Whether the committed package differs from its source snapshot.
+    /// The committed immutable package.
     #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
-    }
-
-    /// Returns the committed immutable template snapshot.
-    #[must_use]
-    pub fn template(&self) -> &Template {
+    pub fn package(&self) -> &Package {
         &self.snapshot
     }
 
-    /// Returns the source-checked reversible patch.
+    /// The source-checked reversible patch.
     #[must_use]
     pub fn patch(&self) -> &Patch {
         &self.patch
     }
 
-    /// Consumes the commit and returns the published template.
+    /// What the commit changed.
     #[must_use]
-    pub fn into_template(self) -> Template {
+    pub const fn diagnostics(&self) -> &Diagnostics {
+        &self.diagnostics
+    }
+
+    /// Consumes the commit and returns the published package.
+    #[must_use]
+    pub fn into_package(self) -> Package {
         self.snapshot
+    }
+
+    /// Consumes the commit and returns the published package and its patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.snapshot, self.patch)
     }
 }
 
@@ -2974,11 +3252,11 @@ pub struct Patch {
     metadata: PartChange,
     payload_changes: Vec<ResourcePayloadChange>,
     resource_changes: Vec<ResourceChange>,
-    source: Template,
+    source: Package,
     styles: PartChange,
     structure_changes: Vec<StructureChange>,
     structure_lifecycle_changes: Vec<StructureLifecycleChange>,
-    target: Template,
+    target: Package,
 }
 
 impl Patch {
@@ -2987,7 +3265,7 @@ impl Patch {
     /// # Errors
     ///
     /// Returns an error unless both patches authorize the exact supplied base.
-    pub fn plan_three_way(base: &Template, left: &Self, right: &Self) -> Result<MergePlan> {
+    pub fn plan_three_way(base: &Package, left: &Self, right: &Self) -> Result<MergePlan> {
         if !left.is_applicable_to(base) || !right.is_applicable_to(base) {
             return Err(Error::InvalidFormat(
                 "OTH three-way patch base does not match".to_string(),
@@ -3140,16 +3418,19 @@ impl Patch {
     }
     /// Returns whether this patch authorizes the supplied exact source bytes.
     #[must_use]
-    pub fn is_applicable_to(&self, source: &Template) -> bool {
+    pub fn is_applicable_to(&self, source: &Package) -> bool {
         self.source.as_bytes() == source.as_bytes()
     }
 
+    /// Whether the patch changes nothing (its source and target bytes are
+    /// identical).
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.source.as_bytes() == self.target.as_bytes()
+    }
+
     /// Applies this patch only to its exact immutable source.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the supplied source differs byte-for-byte.
-    pub fn apply(&self, source: &Template) -> Result<Template> {
+    pub(crate) fn apply(&self, source: &Package) -> Result<Package> {
         if !self.is_applicable_to(source) {
             return Err(Error::InvalidFormat(
                 "OTH patch source does not match its expected snapshot".to_string(),
@@ -3411,8 +3692,8 @@ impl Patch {
                 "invalid or oversized OTH durable patch".to_string(),
             ));
         };
-        let source = Template::from_bytes(read_wire_bytes(bytes, &mut cursor)?.to_vec())?;
-        let target = Template::from_bytes(read_wire_bytes(bytes, &mut cursor)?.to_vec())?;
+        let source = Package::from_bytes(read_wire_bytes(bytes, &mut cursor)?)?;
+        let target = Package::from_bytes(read_wire_bytes(bytes, &mut cursor)?)?;
         let appended_xml = read_wire_string(bytes, &mut cursor)?;
         let appended_list_count = if appended_xml.is_empty() {
             0
@@ -3612,7 +3893,7 @@ pub enum MergeConflict {
 
 /// Non-mutating three-way composition plan.
 pub struct MergePlan {
-    base: Template,
+    base: Package,
     conflicts: Vec<MergeConflict>,
     left: Patch,
     right: Patch,
@@ -3630,7 +3911,7 @@ impl MergePlan {
     /// # Errors
     ///
     /// Returns an error while conflicts remain or publication/readback fails.
-    pub fn publish(&self) -> Result<Template> {
+    pub fn publish(&self) -> Result<Package> {
         if !self.conflicts.is_empty() {
             return Err(Error::InvalidFormat(
                 "OTH three-way plan has unresolved conflicts".to_string(),
@@ -3687,7 +3968,7 @@ impl MergePlan {
         } else {
             &self.left.styles
         };
-        let candidate = Template {
+        let candidate = Package {
             package: self.base.package.rebuild_with_parts(
                 &content,
                 metadata,
@@ -3746,13 +4027,13 @@ impl MergePlan {
 
 /// Explicit bounded undo/redo history for immutable OTH snapshots.
 pub struct History {
-    inner: litchi_core::History<Template>,
+    inner: litchi_core::History<Package>,
 }
 
 impl History {
     /// Starts history at one immutable template.
     #[must_use]
-    pub fn new(current: Template, limits: HistoryLimits) -> Self {
+    pub fn new(current: Package, limits: HistoryLimits) -> Self {
         Self {
             inner: litchi_core::History::new(current, limits),
         }
@@ -3760,7 +4041,7 @@ impl History {
 
     /// Current immutable snapshot.
     #[must_use]
-    pub const fn current(&self) -> &Template {
+    pub const fn current(&self) -> &Package {
         self.inner.current()
     }
 
@@ -3769,9 +4050,9 @@ impl History {
     /// # Errors
     ///
     /// Returns a history budget error without changing the selected snapshot.
-    pub fn record(&mut self, commit: Commit) -> std::result::Result<Vec<Template>, PatchError> {
-        let weight = u64::try_from(commit.template().as_bytes().len()).unwrap_or(u64::MAX);
-        self.inner.record(commit.into_template(), weight)
+    pub fn record(&mut self, commit: Commit) -> std::result::Result<Vec<Package>, PatchError> {
+        let weight = u64::try_from(commit.package().as_bytes().len()).unwrap_or(u64::MAX);
+        self.inner.record(commit.into_package(), weight)
     }
 
     /// Selects the previous retained snapshot.
@@ -3798,7 +4079,7 @@ impl History {
 }
 
 fn transfer_block(
-    source: &Template,
+    source: &Package,
     selector: TransferSelector,
 ) -> Result<(crate::ContentBlock, crate::codec::ReplacementSite)> {
     match selector {
@@ -3872,8 +4153,8 @@ fn transfer_block(
 }
 
 fn transfer_resource_payloads(
-    source: &Template,
-    destination: &Template,
+    source: &Package,
+    destination: &Package,
     resource: &crate::resource::Resource,
 ) -> Result<Vec<ResourcePayloadChange>> {
     if !resource.is_embedded() {
@@ -3925,8 +4206,8 @@ fn transfer_resource_payloads(
 }
 
 fn transfer_site_payloads(
-    source: &Template,
-    destination: &Template,
+    source: &Package,
+    destination: &Package,
     site: &crate::codec::ReplacementSite,
 ) -> Result<Vec<ResourcePayloadChange>> {
     let mut changes = Vec::new();
@@ -4145,7 +4426,7 @@ fn collect_inline_merge_conflicts(
     }
 }
 
-fn validate_inline_readback(changes: &[InlineChange], snapshot: &Template) -> Result<()> {
+fn validate_inline_readback(changes: &[InlineChange], snapshot: &Package) -> Result<()> {
     for change in changes {
         validate_one_inline_change(change, snapshot, true)?;
     }
@@ -4154,7 +4435,7 @@ fn validate_inline_readback(changes: &[InlineChange], snapshot: &Template) -> Re
 
 fn validate_forms_readback(
     optional_change: Option<&FormsChange>,
-    snapshot: &Template,
+    snapshot: &Package,
 ) -> Result<()> {
     if let Some(forms_change) = optional_change {
         validate_forms_source(forms_change, snapshot, true)?;
@@ -4165,7 +4446,7 @@ fn validate_forms_readback(
 fn validate_resource_readback(
     references: &[ResourceChange],
     payloads: &[ResourcePayloadChange],
-    snapshot: &Template,
+    snapshot: &Package,
 ) -> Result<()> {
     validate_resource_references(references, snapshot, true)?;
     for change in payloads {
@@ -4189,7 +4470,7 @@ fn validate_resource_readback(
     Ok(())
 }
 
-fn validate_embedded_dependencies(snapshot: &Template) -> Result<()> {
+fn validate_embedded_dependencies(snapshot: &Package) -> Result<()> {
     let files = snapshot.files()?;
     for resource in snapshot
         .package
@@ -4273,7 +4554,7 @@ fn normalize_list_level(list: &crate::list::List, level: usize) -> crate::list::
     crate::list::List::projected(items, level, list.style_name().map(str::to_owned))
 }
 
-fn validate_edit_readback(edit: &Edit<'_>, snapshot: &Template) -> Result<()> {
+fn validate_edit_readback(edit: &Edit<'_>, snapshot: &Package) -> Result<()> {
     for change in &edit.changes {
         let actual = snapshot
             .package
@@ -4410,7 +4691,7 @@ fn validate_edit_readback(edit: &Edit<'_>, snapshot: &Template) -> Result<()> {
     Ok(())
 }
 
-fn published_durable_fragment(edit: &Edit<'_>, snapshot: &Template) -> Result<Option<String>> {
+fn published_durable_fragment(edit: &Edit<'_>, snapshot: &Package) -> Result<Option<String>> {
     if edit.durable_fragment.is_none() {
         return Ok(None);
     }
@@ -4443,7 +4724,7 @@ fn published_durable_fragment(edit: &Edit<'_>, snapshot: &Template) -> Result<Op
 
 fn published_structure_changes(
     edit: &Edit<'_>,
-    snapshot: &Template,
+    snapshot: &Package,
 ) -> Result<Vec<StructureChange>> {
     let mut changes = Vec::new();
     changes
@@ -4503,7 +4784,7 @@ fn published_structure_changes(
 }
 
 fn find_structure_site_by_identity(
-    template: &Template,
+    template: &Package,
     kind: StructureKind,
     identity: &str,
 ) -> Result<crate::codec::StructureSite> {
@@ -4525,7 +4806,7 @@ fn find_structure_site_by_identity(
 
 fn published_structure_lifecycle_changes(
     edit: &Edit<'_>,
-    snapshot: &Template,
+    snapshot: &Package,
 ) -> Result<Vec<StructureLifecycleChange>> {
     let mut changes = Vec::new();
     changes
@@ -4618,7 +4899,7 @@ fn published_structure_lifecycle_changes(
 fn validate_structure_readback(
     changes: &[StructureChange],
     lifecycle: &[StructureLifecycleChange],
-    snapshot: &Template,
+    snapshot: &Package,
 ) -> Result<()> {
     for change in changes {
         let site = find_structure_target_site(
@@ -4641,7 +4922,7 @@ fn validate_structure_readback(
 
 fn validate_structure_lifecycle_readback(
     changes: &[StructureLifecycleChange],
-    snapshot: &Template,
+    snapshot: &Package,
 ) -> Result<()> {
     for change in changes {
         let found = find_structure_site_by_identity(snapshot, change.kind, &change.identity);
@@ -4735,7 +5016,7 @@ fn replacement_sites_overlap(
 }
 
 fn find_structure_site(
-    template: &Template,
+    template: &Package,
     selector: StructureSelector,
 ) -> Result<crate::codec::StructureSite> {
     let kind = match selector {
@@ -4769,7 +5050,7 @@ fn structure_target_position(
 }
 
 fn find_structure_target_site(
-    template: &Template,
+    template: &Package,
     selector: StructureSelector,
     identity: Option<&str>,
     lifecycle: &[StructureLifecycleChange],
@@ -4893,7 +5174,7 @@ fn authored_table(name: &str, text: &str) -> Result<String> {
 }
 
 fn ensure_structure_reference_closure(
-    template: &Template,
+    template: &Package,
     site: &crate::codec::StructureSite,
     identity: &str,
 ) -> Result<()> {
@@ -4905,7 +5186,7 @@ fn ensure_structure_reference_closure(
     Ok(())
 }
 
-fn list_changes_overlap(template: &Template, left: &ListChange, right: &ListChange) -> bool {
+fn list_changes_overlap(template: &Package, left: &ListChange, right: &ListChange) -> bool {
     match (
         template.package.list_site(left.list.get()),
         template.package.list_site(right.list.get()),
@@ -5106,8 +5387,8 @@ fn read_wire_resource(
 fn read_paragraph_changes(
     bytes: &[u8],
     cursor: &mut usize,
-    source: &Template,
-    target: &Template,
+    source: &Package,
+    target: &Package,
 ) -> Result<Vec<ParagraphChange>> {
     let count = read_wire_usize(bytes, cursor)?;
     if count > source.package.paragraphs().len() || count > target.package.paragraphs().len() {
@@ -5153,8 +5434,8 @@ fn read_paragraph_changes(
 fn read_heading_changes(
     bytes: &[u8],
     cursor: &mut usize,
-    source: &Template,
-    target: &Template,
+    source: &Package,
+    target: &Package,
 ) -> Result<Vec<HeadingChange>> {
     let count = read_wire_usize(bytes, cursor)?;
     if count > source.package.headings().len() || count > target.package.headings().len() {
@@ -5200,8 +5481,8 @@ fn read_heading_changes(
 fn read_inline_changes(
     bytes: &[u8],
     cursor: &mut usize,
-    source: &Template,
-    target: &Template,
+    source: &Package,
+    target: &Package,
 ) -> Result<Vec<InlineChange>> {
     let count = read_wire_usize(bytes, cursor)?;
     let maximum = source
@@ -5257,7 +5538,7 @@ fn read_inline_changes(
 
 fn validate_one_inline_change(
     change: &InlineChange,
-    template: &Template,
+    template: &Package,
     after: bool,
 ) -> Result<()> {
     let (optional_site, text) = match change.block {
@@ -5306,8 +5587,8 @@ fn validate_one_inline_change(
 fn read_forms_change(
     bytes: &[u8],
     cursor: &mut usize,
-    source: &Template,
-    target: &Template,
+    source: &Package,
+    target: &Package,
 ) -> Result<Option<FormsChange>> {
     match read_wire_usize(bytes, cursor)? {
         0 => Ok(None),
@@ -5328,7 +5609,7 @@ fn read_forms_change(
     }
 }
 
-fn validate_forms_source(change: &FormsChange, template: &Template, after: bool) -> Result<()> {
+fn validate_forms_source(change: &FormsChange, template: &Package, after: bool) -> Result<()> {
     let actual_xml = match template.package.forms_site() {
         Some(site) => template
             .content_xml()
@@ -5352,8 +5633,8 @@ fn validate_forms_source(change: &FormsChange, template: &Template, after: bool)
 fn read_resource_changes(
     bytes: &[u8],
     cursor: &mut usize,
-    source: &Template,
-    target: &Template,
+    source: &Package,
+    target: &Package,
 ) -> Result<Vec<ResourceChange>> {
     let count = read_wire_usize(bytes, cursor)?;
     if count
@@ -5405,8 +5686,8 @@ fn read_resource_changes(
 fn read_payload_changes(
     bytes: &[u8],
     cursor: &mut usize,
-    source: &Template,
-    target: &Template,
+    source: &Package,
+    target: &Package,
 ) -> Result<Vec<ResourcePayloadChange>> {
     let count = read_wire_usize(bytes, cursor)?;
     let mut changes = Vec::new();
@@ -5462,7 +5743,7 @@ fn read_payload_changes(
 
 fn validate_resource_references(
     changes: &[ResourceChange],
-    template: &Template,
+    template: &Package,
     after: bool,
 ) -> Result<()> {
     let removed = changes
@@ -5553,8 +5834,8 @@ fn resource_target_index(changes: &[ResourceChange], change: &ResourceChange) ->
 fn read_list_changes(
     bytes: &[u8],
     cursor: &mut usize,
-    source: &Template,
-    target: &Template,
+    source: &Package,
+    target: &Package,
     appended_list_count: usize,
 ) -> Result<Vec<ListChange>> {
     let count = read_wire_usize(bytes, cursor)?;
@@ -5664,8 +5945,8 @@ fn read_list_changes(
 fn read_structure_changes(
     bytes: &[u8],
     cursor: &mut usize,
-    source: &Template,
-    target: &Template,
+    source: &Package,
+    target: &Package,
     version: u8,
 ) -> Result<Vec<StructureChange>> {
     let count = read_wire_usize(bytes, cursor)?;
@@ -5802,8 +6083,8 @@ fn read_structure_changes(
 fn read_structure_lifecycle_changes(
     bytes: &[u8],
     cursor: &mut usize,
-    source: &Template,
-    target: &Template,
+    source: &Package,
+    target: &Package,
 ) -> Result<Vec<StructureLifecycleChange>> {
     let count = read_wire_usize(bytes, cursor)?;
     if count > 1_000_000 {
@@ -5949,7 +6230,7 @@ fn validate_part_change(
 }
 
 fn replace_texts(
-    source: &Template,
+    source: &Package,
     changes: &[ParagraphChange],
     heading_changes: &[HeadingChange],
     inline_changes: &[InlineChange],

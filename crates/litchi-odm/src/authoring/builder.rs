@@ -38,12 +38,19 @@ impl Builder {
         self
     }
 
-    /// Validates and packages the document bytes.
+    /// Validates the document and returns the immutable package.
+    ///
+    /// Output (bytes, streams, files) lives on the returned
+    /// [`crate::Package`].
     ///
     /// # Errors
     ///
     /// Returns an error if content validation or package writing fails.
-    pub fn build(self) -> Result<Vec<u8>> {
+    pub fn build(self) -> std::result::Result<crate::Package, litchi_odf_common::Error> {
+        Ok(crate::Package::from_vec(self.build_bytes()?)?)
+    }
+
+    fn build_bytes(self) -> Result<Vec<u8>> {
         compact_xml::validate(self.content_xml.as_bytes())?;
         crate::codec::validate(&self.content_xml)?;
         let mut content_xml = self.content_xml;

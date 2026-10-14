@@ -2,6 +2,7 @@
 
 use litchi_core::{Error, Metadata, Result};
 use litchi_odf_common::core::{OwnedPackage, PackageWriter, family::Package};
+use litchi_odf_common::{Error as PackageError, OpenOptions, SemanticLimitKind};
 use std::{path::Path, sync::Arc};
 
 pub(crate) const MIMETYPE: &str = "application/vnd.oasis.opendocument.text-master";
@@ -32,9 +33,76 @@ pub(crate) struct ResourceWrite {
 pub(crate) struct Snapshot(Arc<State>);
 
 impl Snapshot {
-    pub(crate) fn open(path: impl AsRef<Path>) -> Result<Self> {
-        let package = Package::open(path, MIMETYPE, BODY_MARKER, "ODM")?;
-        Self::from_package(package)
+    pub(crate) fn open_with_options(
+        path: impl AsRef<Path>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        let package = Package::open_with_options(path, options, MIMETYPE, BODY_MARKER, "ODM")?;
+        Self::from_package_with_options(package, options)
+    }
+
+    pub(crate) fn open_with_password_and_options(
+        path: impl AsRef<Path>,
+        password: impl Into<String>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        let package = Package::open_with_password_and_options(
+            path,
+            password,
+            options,
+            MIMETYPE,
+            BODY_MARKER,
+            "ODM",
+        )?;
+        Self::from_package_with_options(package, options)
+    }
+
+    pub(crate) fn from_bytes_with_options(
+        bytes: Vec<u8>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        let package =
+            Package::from_bytes_with_options(bytes, options, MIMETYPE, BODY_MARKER, "ODM")?;
+        Self::from_package_with_options(package, options)
+    }
+
+    pub(crate) fn from_bytes_with_password_and_options(
+        bytes: Vec<u8>,
+        password: impl Into<String>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        let package = Package::from_bytes_with_password_and_options(
+            bytes,
+            password,
+            options,
+            MIMETYPE,
+            BODY_MARKER,
+            "ODM",
+        )?;
+        Self::from_package_with_options(package, options)
+    }
+
+    pub(crate) fn from_reader_with_options(
+        reader: impl std::io::Read,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        let package =
+            Package::from_reader_with_options(reader, options, MIMETYPE, BODY_MARKER, "ODM")?;
+        Self::from_package_with_options(package, options)
+    }
+
+    pub(crate) fn from_owned_package_with_options(
+        archive: OwnedPackage,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        let package = Package::from_owned_package_with_options(
+            archive,
+            options,
+            MIMETYPE,
+            BODY_MARKER,
+            "ODM",
+        )?;
+        Self::from_package_with_options(package, options)
     }
 
     pub(crate) fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
@@ -47,21 +115,18 @@ impl Snapshot {
         Self::from_package(package)
     }
 
-    pub(crate) fn from_bytes_with_password(
-        bytes: Vec<u8>,
-        password: impl Into<String>,
-    ) -> Result<Self> {
-        let package =
-            Package::from_bytes_with_password(bytes, password, MIMETYPE, BODY_MARKER, "ODM")?;
-        Self::from_package(package)
-    }
-
-    pub(crate) fn open_with_password(
-        path: impl AsRef<Path>,
-        password: impl Into<String>,
-    ) -> Result<Self> {
-        let package = Package::open_with_password(path, password, MIMETYPE, BODY_MARKER, "ODM")?;
-        Self::from_package(package)
+    /// Project a validated package, then bound its direct body items by the
+    /// semantic `units` limit.
+    fn from_package_with_options(
+        package: Package,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        let snapshot = Self::from_package(package)?;
+        let units = u64::try_from(snapshot.structure().items().len()).unwrap_or(u64::MAX);
+        options
+            .semantic_limits_value()
+            .check(SemanticLimitKind::Units, units)?;
+        Ok(snapshot)
     }
 
     fn from_package(package: Package) -> Result<Self> {
@@ -198,13 +263,6 @@ impl Snapshot {
 
     pub(crate) fn files(&self) -> Result<Vec<String>> {
         self.0.package.files()
-    }
-
-    pub(crate) fn into_bytes(self) -> Vec<u8> {
-        match Arc::try_unwrap(self.0) {
-            Ok(state) => state.package.into_bytes(),
-            Err(state) => state.package.as_bytes().to_vec(),
-        }
     }
 
     pub(crate) fn references(&self) -> &[crate::model::subdocument::Reference] {

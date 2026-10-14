@@ -10,7 +10,6 @@ use litchi_core::{Error, Result};
 use litchi_odf_common::package::edit::Addition;
 
 use super::{Change, ChangeKind, Patch};
-use crate::Database;
 
 pub use litchi_core::{CompositionLimits, MergeChoice};
 
@@ -74,7 +73,7 @@ impl Patch {
         if joined.lineage() != &lineage(&source) {
             return invalid("ODB composition source lineage changed");
         }
-        let base = source.content_xml();
+        let base = source.database.content_xml();
         let mut hunks = Vec::new();
         let mut changes = Vec::new();
         let mut additions = BTreeMap::<String, Addition>::new();
@@ -86,12 +85,16 @@ impl Patch {
                 return invalid("ODB composition patch source is stale");
             }
             merge_package_delta(
-                patch.source.package.delta_to(&patch.target.package)?,
+                patch
+                    .source
+                    .database
+                    .package
+                    .delta_to(&patch.target.database.package)?,
                 &mut additions,
                 &mut directories,
                 &mut excluded_paths,
             )?;
-            if let Some(hunk) = difference(base, patch.target.content_xml(), ordinal) {
+            if let Some(hunk) = difference(base, patch.target.database.content_xml(), ordinal) {
                 hunks.push(hunk);
             }
             changes
@@ -128,16 +131,15 @@ impl Patch {
             });
         }
         crate::codec::validate(&content)?;
-        let target = Database {
-            package: source.package.rebuild_with_content_and_mutations(
+        let target = crate::Package::from_snapshot(
+            source.database.package.rebuild_with_content_and_mutations(
                 &content,
                 additions.into_values().collect(),
                 directories.into_iter().collect(),
                 excluded_paths.into_iter().collect(),
             )?,
-            settings: Arc::new(std::sync::OnceLock::new()),
-        };
-        target.catalog()?;
+        );
+        target.database.catalog()?;
         Ok(Self {
             source,
             target,
@@ -201,7 +203,7 @@ struct Hunk {
     ordinal: usize,
 }
 
-fn lineage(database: &Database) -> Lineage {
+fn lineage(database: &crate::Package) -> Lineage {
     Lineage(Arc::from(database.as_bytes()))
 }
 

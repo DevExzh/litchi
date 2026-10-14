@@ -1,6 +1,7 @@
 //! Concise family entry points.
 
 use litchi_core::{Error, Metadata, Result};
+use litchi_odf_common::OpenOptions;
 use litchi_odf_common::chart::{ChartClass, Element, Legend, PlotArea, read};
 use std::{collections::BTreeSet, path::Path, sync::Arc};
 
@@ -12,7 +13,10 @@ enum StagedStyles {
     Remove,
 }
 
-/// Immutable document snapshot.
+/// The read-only projection of one chart package.
+///
+/// A `Chart` is a cheap clone of an `Arc` inner and owns no state verbs:
+/// ingress, editing, patch application and output live on [`Package`].
 #[derive(Clone)]
 pub struct Chart(Arc<State>);
 
@@ -22,79 +26,17 @@ struct State {
 }
 
 impl Chart {
-    /// Build a chart snapshot from a typed definition.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the definition fails to build into a valid chart
-    /// package.
-    pub fn from_definition(definition: Definition) -> Result<Self> {
-        Self::from_definition_with_limits(definition, crate::Limits::default())
-    }
-
-    /// Build a chart snapshot under caller-selected retained limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when validation or package publication fails.
-    pub fn from_definition_with_limits(
-        definition: Definition,
-        limits: crate::Limits,
-    ) -> Result<Self> {
-        Self::from_bytes_with_limits(
-            Builder::new()
-                .with_limits(limits)
-                .with_definition(definition)
-                .build()?,
-            limits,
-        )
-    }
-
-    /// Open a chart package from a file path.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the package cannot be read or the chart content
-    /// cannot be parsed.
-    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        let package = crate::package::Snapshot::open(path)?;
-        Self::from_package(package)
-    }
-
-    /// Open a chart package under caller-selected retained limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the file or chart package violates the limits.
-    pub fn open_with_limits(path: impl AsRef<Path>, limits: crate::Limits) -> Result<Self> {
-        Self::from_package(crate::package::Snapshot::open_with_limits(path, limits)?)
-    }
-
-    /// Open a chart package from in-memory bytes.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the package cannot be read or the chart content
-    /// cannot be parsed.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        let package = crate::package::Snapshot::from_bytes(bytes)?;
-        Self::from_package(package)
-    }
-
-    /// Open chart package bytes under caller-selected retained limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the package or chart content is invalid.
-    pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: crate::Limits) -> Result<Self> {
-        Self::from_package(crate::package::Snapshot::from_bytes_with_limits(
-            bytes, limits,
-        )?)
-    }
-
     fn from_package(package: crate::package::Snapshot) -> Result<Self> {
         let chart = read(package.content_xml())?;
         Ok(Self(Arc::new(State { package, chart })))
+    }
+
+    /// Decode complete package bytes produced or retained inside the crate
+    /// under the retained chart limits (durable patches).
+    fn decode(bytes: Vec<u8>, limits: crate::Limits) -> Result<Self> {
+        Self::from_package(crate::package::Snapshot::from_bytes_with_limits(
+            bytes, limits,
+        )?)
     }
 
     #[must_use]
@@ -231,13 +173,8 @@ impl Chart {
         self.0.package.resource_bytes(index)
     }
 
-    /// Starts a source-bound package chart transaction.
-    ///
-    /// The exact surface covers selected chart, plot, series, and axis
-    /// attributes; canonical definitions additionally support structural edits.
-    /// Untouched package members and unmodeled chart XML remain payload-exact.
-    #[must_use]
-    pub fn edit(&self) -> Edit<'_> {
+    /// Starts a source-bound package chart transaction over this projection.
+    pub(crate) fn edit(&self) -> Edit<'_> {
         Edit {
             source: self,
             transaction: self.0.package.content_snapshot().edit(),
@@ -250,13 +187,271 @@ impl Chart {
         }
     }
 
-    #[must_use]
-    pub fn into_bytes(self) -> Vec<u8> {
-        match Arc::try_unwrap(self.0) {
-            Ok(state) => state.package.into_bytes(),
-            Err(state) => state.package.as_bytes().to_vec(),
-        }
+    fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
+        self.0.package.tolerance_report()
     }
+
+    fn series_count(&self) -> usize {
+        self.plot_area()
+            .map_or(0, |plot_area| plot_area.series().count())
+    }
+}
+
+/// The immutable owner of one packaged ODF chart (`.odc`/`.otc`).
+///
+/// `Package` owns every state verb: ingress (`open*`, `from_bytes*`,
+/// `from_reader*`, [`Self::from_prepared_package`]), the primary [`Edit`]
+/// transaction, patch application and output (`save`,
+/// `save_with_durability`, `to_bytes`, `write_to`). It is cheap to clone;
+/// clones share the exact bytes and the [`Chart`] projection. A commit
+/// publishes a new package and never mutates its source.
+#[derive(Clone)]
+pub struct Package {
+    chart: Chart,
+}
+
+impl std::fmt::Debug for Package {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Package")
+            .field("bytes", &self.as_bytes().len())
+            .field("kind", &self.chart.package_kind())
+            .finish_non_exhaustive()
+    }
+}
+
+impl Package {
+    /// Create the minimal valid chart package (an empty line chart).
+    ///
+    /// The bytes are deterministic: no clock or randomness is consulted.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error only when the fixed minimal package cannot be built.
+    pub fn new() -> std::result::Result<Self, crate::Error> {
+        Ok(Builder::new().build()?)
+    }
+
+    /// Open a chart package from a path with the default [`OpenOptions`].
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Limit`] when a source or semantic dimension is
+    /// exceeded and [`crate::Error::Core`] for I/O, archive or chart
+    /// validation failures.
+    pub fn open(path: impl AsRef<Path>) -> std::result::Result<Self, crate::Error> {
+        Self::open_with_options(path, OpenOptions::new())
+    }
+
+    /// Open a chart package from a path under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn open_with_options(
+        path: impl AsRef<Path>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, crate::Error> {
+        Self::from_reader_with_options(std::fs::File::open(path)?, options)
+    }
+
+    /// Open a chart package from bytes (the bytes are copied once).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_bytes(bytes: &[u8]) -> std::result::Result<Self, crate::Error> {
+        Self::from_bytes_with_options(bytes, OpenOptions::new())
+    }
+
+    /// Open a chart package from bytes under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_bytes_with_options(
+        bytes: &[u8],
+        options: OpenOptions,
+    ) -> std::result::Result<Self, crate::Error> {
+        let limits = options.source_limits_value();
+        let observed = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
+        if observed > limits.max_input_bytes() {
+            return Err(crate::Error::Limit {
+                kind: crate::LimitKind::Source(litchi_odf_common::SourceLimitKind::InputBytes),
+                observed,
+                maximum: limits.max_input_bytes(),
+            });
+        }
+        let snapshot =
+            crate::package::Snapshot::from_bytes_with_options(copy_input(bytes)?, options)?;
+        Self::from_opened(snapshot, options)
+    }
+
+    /// Open a chart package from a reader with the default [`OpenOptions`].
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_reader(reader: impl std::io::Read) -> std::result::Result<Self, crate::Error> {
+        Self::from_reader_with_options(reader, OpenOptions::new())
+    }
+
+    /// Open a chart package from a reader under caller-selected limits. The
+    /// reader is consumed through an input-limit guard before indexing.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_reader_with_options(
+        reader: impl std::io::Read,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, crate::Error> {
+        let snapshot = crate::package::Snapshot::from_reader_with_options(reader, options)?;
+        Self::from_opened(snapshot, options)
+    }
+
+    /// Adopt a packaged ODF result prepared by smart detection, reusing its
+    /// validated archive index.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`litchi_core::Error::UnexpectedFormat`] (as
+    /// [`crate::Error::Core`]) when the prepared package is not a chart or
+    /// chart template, and otherwise as [`Self::open`].
+    pub fn from_prepared_package(
+        prepared: litchi_odf_common::PreparedPackage,
+    ) -> std::result::Result<Self, crate::Error> {
+        if prepared.format() != litchi_core::detection::FileFormat::Odc {
+            return Err(Error::UnexpectedFormat {
+                detected: prepared.format(),
+            }
+            .into());
+        }
+        let options = OpenOptions::new();
+        let snapshot =
+            crate::package::Snapshot::from_owned_with_options(prepared.into_package(), options)?;
+        Self::from_opened(snapshot, options)
+    }
+
+    fn from_opened(
+        snapshot: crate::package::Snapshot,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, crate::Error> {
+        let chart = Chart::from_package(snapshot)?;
+        let semantic = options.semantic_limits_value();
+        if !semantic.is_default() {
+            let series = u64::try_from(chart.series_count()).unwrap_or(u64::MAX);
+            semantic.check(litchi_odf_common::SemanticLimitKind::Units, series)?;
+        }
+        Ok(Self { chart })
+    }
+
+    /// Adopt a validated snapshot written by the crate's own authoring codec.
+    pub(crate) fn from_snapshot(snapshot: crate::package::Snapshot) -> Result<Self> {
+        Chart::from_package(snapshot).map(Self::from_chart)
+    }
+
+    const fn from_chart(chart: Chart) -> Self {
+        Self { chart }
+    }
+
+    /// Borrow the read-only chart projection of this package.
+    #[must_use]
+    pub const fn chart(&self) -> &Chart {
+        &self.chart
+    }
+
+    /// Repairs tolerated while this package was opened.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
+        self.chart.tolerance_report()
+    }
+
+    /// Borrow the exact package bytes.
+    #[must_use]
+    pub fn as_bytes(&self) -> &[u8] {
+        self.chart.as_bytes()
+    }
+
+    /// Starts a source-bound package chart transaction.
+    ///
+    /// The exact surface covers selected chart, plot, series, and axis
+    /// attributes; canonical definitions additionally support structural edits.
+    /// Untouched package members and unmodeled chart XML remain payload-exact.
+    #[must_use]
+    pub fn edit(&self) -> Edit<'_> {
+        self.chart.edit()
+    }
+
+    /// Apply a primary-transaction patch to this exact package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when this package is not byte-identical to the patch
+    /// source.
+    pub fn apply(&self, patch: &Patch) -> std::result::Result<Self, crate::Error> {
+        Ok(Self::from_chart(patch.apply(&self.chart)?))
+    }
+
+    /// Atomically replace `path` with this package (full durability).
+    ///
+    /// The artifact is staged in a sibling temporary file and published with
+    /// one rename; a failure before publication leaves the destination
+    /// unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::Core`] carrying the I/O failure.
+    pub fn save(&self, path: impl AsRef<Path>) -> std::result::Result<(), crate::Error> {
+        self.save_with_durability(path, litchi_core::Durability::Full)
+    }
+
+    /// Atomically replace `path` with this package under explicit durability.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::save`].
+    pub fn save_with_durability(
+        &self,
+        path: impl AsRef<Path>,
+        durability: litchi_core::Durability,
+    ) -> std::result::Result<(), crate::Error> {
+        litchi_odf_common::publish::save_bytes(path.as_ref(), self.as_bytes(), durability)
+    }
+
+    /// Copy the exact package bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an allocation failure.
+    pub fn to_bytes(&self) -> std::result::Result<Vec<u8>, crate::Error> {
+        Ok(copy_input(self.as_bytes())?)
+    }
+
+    /// Write the exact package bytes to a stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns the stream's I/O failure.
+    pub fn write_to(
+        &self,
+        mut writer: impl std::io::Write,
+    ) -> std::result::Result<(), crate::Error> {
+        writer.write_all(self.as_bytes())?;
+        Ok(())
+    }
+}
+
+fn copy_input(source: &[u8]) -> Result<Vec<u8>> {
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(source.len())
+        .map_err(|source| Error::Allocation {
+            resource: "ODC package bytes",
+            source,
+        })?;
+    bytes.extend_from_slice(source);
+    Ok(bytes)
 }
 
 /// A source-bound package chart transaction.
@@ -676,11 +871,15 @@ impl Edit<'_> {
     ///
     /// Returns an error when the source cannot be losslessly rewritten, when
     /// the package is signed, or when full reopen and typed readback fail.
+    pub fn commit(self) -> std::result::Result<Commit, crate::Error> {
+        Ok(self.publish()?)
+    }
+
     #[allow(
         clippy::too_many_lines,
         reason = "publication keeps content, styles, resources, and readback in one atomic boundary"
     )]
-    pub fn commit(mut self) -> Result<Commit> {
+    fn publish(mut self) -> Result<Commit> {
         let mut definition_changes = Vec::new();
         if let Some(typed_transaction) = self.typed_transaction.take() {
             let definition_commit = typed_transaction.commit()?;
@@ -838,8 +1037,10 @@ impl Edit<'_> {
                 ));
             }
         }
+        let changed = self.source.as_bytes() != snapshot.as_bytes();
         Ok(Commit {
-            snapshot: snapshot.clone(),
+            package: Package::from_chart(snapshot.clone()),
+            changed,
             patch: Patch {
                 source: self.source.clone(),
                 target: snapshot,
@@ -877,33 +1078,56 @@ impl ResourceEdit {
 
 /// A committed immutable chart package and its reversible patch.
 pub struct Commit {
-    snapshot: Chart,
+    package: Package,
     patch: Patch,
+    changed: bool,
 }
 
 impl Commit {
-    /// Returns whether package bytes changed.
+    /// Borrow the published immutable package.
     #[must_use]
-    pub fn changed(&self) -> bool {
-        self.patch.source.as_bytes() != self.patch.target.as_bytes()
+    pub const fn package(&self) -> &Package {
+        &self.package
     }
 
-    /// Returns the committed chart snapshot.
+    /// Borrow the exact-source reversible patch.
     #[must_use]
-    pub fn chart(&self) -> &Chart {
-        &self.snapshot
-    }
-
-    /// Returns the exact-source reversible patch.
-    #[must_use]
-    pub fn patch(&self) -> &Patch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
-    /// Consumes the commit into its immutable chart snapshot.
+    /// Content-free facts about this commit.
     #[must_use]
-    pub fn into_chart(self) -> Chart {
-        self.snapshot
+    pub const fn diagnostics(&self) -> Diagnostics {
+        Diagnostics {
+            changed: self.changed,
+        }
+    }
+
+    /// Consume the commit into its published package.
+    #[must_use]
+    pub fn into_package(self) -> Package {
+        self.package
+    }
+
+    /// Consume the commit into its published package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+}
+
+/// Content-free facts about one [`Commit`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Diagnostics {
+    changed: bool,
+}
+
+impl Diagnostics {
+    /// Whether publication changed the package bytes.
+    #[must_use]
+    pub const fn changed(&self) -> bool {
+        self.changed
     }
 }
 
@@ -926,18 +1150,19 @@ impl Patch {
 
     /// Returns whether this patch applies to the supplied exact package bytes.
     #[must_use]
-    pub fn is_applicable_to(&self, source: &Chart) -> bool {
+    pub fn is_applicable_to(&self, source: &Package) -> bool {
         self.source.as_bytes() == source.as_bytes()
     }
 
+    /// Returns whether this patch preserves the exact package bytes.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.source.as_bytes() == self.target.as_bytes()
+    }
+
     /// Applies this patch only to its exact immutable source.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the supplied package differs byte-for-byte from
-    /// the source against which this patch was committed.
-    pub fn apply(&self, source: &Chart) -> Result<Chart> {
-        if !self.is_applicable_to(source) {
+    pub(crate) fn apply(&self, source: &Chart) -> Result<Chart> {
+        if self.source.as_bytes() != source.as_bytes() {
             return Err(Error::InvalidFormat(
                 "ODC package patch source does not match its expected snapshot".to_string(),
             ));
@@ -1005,8 +1230,8 @@ impl Patch {
                 "ODC patch wire lengths do not match its payload".into(),
             ));
         }
-        let source = Chart::from_bytes_with_limits(bytes[cursor..source_end].to_vec(), limits)?;
-        let target = Chart::from_bytes_with_limits(bytes[source_end..target_end].to_vec(), limits)?;
+        let source = Chart::decode(bytes[cursor..source_end].to_vec(), limits)?;
+        let target = Chart::decode(bytes[source_end..target_end].to_vec(), limits)?;
         patch_between(source, target)
     }
 
@@ -1133,7 +1358,8 @@ impl Patch {
     ///
     /// Returns an error when reading resources or publishing a conflict-free
     /// transferred package fails.
-    pub fn transfer_to(&self, destination: &Chart) -> Result<PackageMerge> {
+    pub fn transfer_to(&self, destination: &Package) -> Result<PackageMerge> {
+        let destination = destination.chart();
         let mut conflicts = Vec::new();
         let mut edit = destination.edit();
         transfer_package_content(self, destination, &mut edit, &mut conflicts)?;
@@ -1222,7 +1448,7 @@ impl PackageMerge {
 
 /// Commit-coupled bounded package undo/redo history.
 pub struct History {
-    current: Chart,
+    current: Package,
     undo: Vec<Patch>,
     redo: Vec<Patch>,
 }
@@ -1230,9 +1456,9 @@ pub struct History {
 impl History {
     /// Start history at one immutable package snapshot.
     #[must_use]
-    pub fn new(chart: Chart) -> Self {
+    pub fn new(package: Package) -> Self {
         Self {
-            current: chart,
+            current: package,
             undo: Vec::new(),
             redo: Vec::new(),
         }
@@ -1240,7 +1466,7 @@ impl History {
 
     /// Return the current immutable package snapshot.
     #[must_use]
-    pub fn current(&self) -> &Chart {
+    pub fn current(&self) -> &Package {
         &self.current
     }
 
@@ -1256,15 +1482,15 @@ impl History {
                 "ODC history commit is not contiguous".into(),
             ));
         }
-        if !commit.changed() {
+        if !commit.diagnostics().changed() {
             return Ok(());
         }
-        if self.undo.len() >= self.current.limits().max_history() {
+        if self.undo.len() >= self.current.chart().limits().max_history() {
             return Err(Error::InvalidFormat(
                 "ODC package history exceeds the caller-selected limit".into(),
             ));
         }
-        self.current = commit.chart().clone();
+        self.current = commit.package().clone();
         self.undo.push(patch.clone());
         self.redo.clear();
         Ok(())
@@ -1279,7 +1505,7 @@ impl History {
         let Some(patch) = self.undo.pop() else {
             return Ok(false);
         };
-        self.current = patch.inverse().apply(&self.current)?;
+        self.current = Package::from_chart(patch.inverse().apply(self.current.chart())?);
         self.redo.push(patch);
         Ok(true)
     }
@@ -1293,7 +1519,7 @@ impl History {
         let Some(patch) = self.redo.pop() else {
             return Ok(false);
         };
-        self.current = patch.apply(&self.current)?;
+        self.current = Package::from_chart(patch.apply(self.current.chart())?);
         self.undo.push(patch);
         Ok(true)
     }
@@ -2153,12 +2379,13 @@ mod tests {
         reason = "tests are expected to panic on unexpected errors"
     )]
 
-    use super::{Builder, Chart};
+    use super::{Builder, Package};
 
     #[test]
-    fn builder_opens_as_validated_snapshot() {
-        let bytes = Builder::new().build().unwrap();
-        let document = Chart::from_bytes(bytes).unwrap();
+    fn builder_opens_as_validated_package() {
+        let bytes = Builder::new().build().unwrap().to_bytes().unwrap();
+        let package = Package::from_bytes(&bytes).unwrap();
+        let document = package.chart();
         assert!(document.content_xml().contains("<office:chart"));
         assert!(document.plot_area().is_some());
         assert!(!document.as_bytes().is_empty());

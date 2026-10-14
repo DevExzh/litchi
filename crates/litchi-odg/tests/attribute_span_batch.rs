@@ -1,7 +1,7 @@
 #![allow(clippy::unwrap_used, reason = "test assertions use unwrap for clarity")]
 
 use litchi_odf_common::core::PackageWriter;
-use litchi_odg::Drawing;
+use litchi_odg::Package;
 use soapberry_zip::office::StreamingArchiveWriter;
 
 fn package(content: &str) -> Vec<u8> {
@@ -47,7 +47,7 @@ const ALIAS_CONTENT: &str = concat!(
 
 #[test]
 fn all_shape_attribute_spans_edit_exactly_and_inverse_reopens() {
-    let source = Drawing::from_bytes(package(SPAN_CONTENT)).unwrap();
+    let source = Package::from_bytes(&package(SPAN_CONTENT)).unwrap();
     assert_eq!(source.pages()[0].shapes().len(), 5);
     assert_eq!(source.pages()[0].shapes()[0].name(), Some("Box"));
     assert_eq!(
@@ -115,7 +115,7 @@ fn all_shape_attribute_spans_edit_exactly_and_inverse_reopens() {
             "draw:control='control&amp;old'",
             "draw:control='control &amp; updated'",
         );
-    assert_eq!(commit.snapshot().content_xml(), expected);
+    assert_eq!(commit.package().content_xml(), expected);
 
     for preserved in [
         "foreign:opaque='&quot;keep&amp;me&quot;'",
@@ -129,59 +129,59 @@ fn all_shape_attribute_spans_edit_exactly_and_inverse_reopens() {
         "foreign:control='foreign-control'",
     ] {
         assert!(
-            commit.snapshot().content_xml().contains(preserved),
+            commit.package().content_xml().contains(preserved),
             "unrelated lexical attribute was changed: {preserved}"
         );
     }
     assert_eq!(
-        commit.snapshot().pages()[0].shapes()[0].name(),
+        commit.package().pages()[0].shapes()[0].name(),
         Some("Renamed & <Box>")
     );
     assert_eq!(
-        commit.snapshot().pages()[0].shapes()[0].layer(),
+        commit.package().pages()[0].shapes()[0].layer(),
         Some("back")
     );
     assert_eq!(
-        commit.snapshot().pages()[0].shapes()[0].line_geometry(),
+        commit.package().pages()[0].shapes()[0].line_geometry(),
         [None, None, None, None]
     );
     assert_eq!(
-        commit.snapshot().pages()[0].shapes()[1].line_geometry(),
+        commit.package().pages()[0].shapes()[1].line_geometry(),
         [Some("11cm"), Some("12cm"), Some("18cm"), Some("19cm")]
     );
     assert_eq!(
-        commit.snapshot().pages()[0].shapes()[2].points(),
+        commit.package().pages()[0].shapes()[2].points(),
         Some("0,0 100,200 200,0")
     );
     assert_eq!(
-        commit.snapshot().pages()[0].shapes()[3].path_data(),
+        commit.package().pages()[0].shapes()[3].path_data(),
         Some("M 1 2 C 3 4 5 6 7 8")
     );
     assert_eq!(
-        commit.snapshot().pages()[0].shapes()[4].control_reference(),
+        commit.package().pages()[0].shapes()[4].control_reference(),
         Some("control & updated")
     );
 
     let durable = commit.patch().durable().unwrap();
     assert_eq!(
-        durable.apply(source.snapshot()).unwrap().as_bytes(),
-        commit.snapshot().as_bytes()
+        durable.apply(&source).unwrap().as_bytes(),
+        commit.package().as_bytes()
     );
     assert_eq!(
         durable
             .inverse()
-            .apply(commit.snapshot())
+            .apply(commit.package())
             .unwrap()
             .as_bytes(),
         source.as_bytes()
     );
-    let reopened = Drawing::from_bytes(commit.snapshot().as_bytes().to_vec()).unwrap();
+    let reopened = Package::from_bytes(commit.package().as_bytes()).unwrap();
     assert_eq!(reopened.content_xml(), expected);
 }
 
 #[test]
 fn aliased_shape_attributes_ignore_same_local_foreign_fields() {
-    let source = Drawing::from_bytes(package(ALIAS_CONTENT)).unwrap();
+    let source = Package::from_bytes(&package(ALIAS_CONTENT)).unwrap();
     let shape = &source.pages()[0].shapes()[0];
     assert_eq!(source.pages()[0].name(), Some("Alias page"));
     assert_eq!(shape.name(), Some("old&name"));
@@ -220,7 +220,7 @@ fn aliased_shape_attributes_ignore_same_local_foreign_fields() {
             "drawAlias:style-name='gr1'",
             "drawAlias:style-name='gr2 &amp; alias'",
         );
-    assert_eq!(commit.snapshot().content_xml(), expected);
+    assert_eq!(commit.package().content_xml(), expected);
     for preserved in [
         "name='default-name'",
         "foreign:name='foreign-name'",
@@ -233,11 +233,11 @@ fn aliased_shape_attributes_ignore_same_local_foreign_fields() {
         "foreign:opaque='&quot;keep&amp;exact&quot;'",
     ] {
         assert!(
-            commit.snapshot().content_xml().contains(preserved),
+            commit.package().content_xml().contains(preserved),
             "same-local foreign attribute was not preserved: {preserved}"
         );
     }
-    let reopened = Drawing::from_bytes(commit.snapshot().as_bytes().to_vec()).unwrap();
+    let reopened = Package::from_bytes(commit.package().as_bytes()).unwrap();
     assert_eq!(reopened.pages()[0].shapes()[0].name(), Some("new & <name>"));
     assert_eq!(reopened.pages()[0].shapes()[0].layer(), Some("back"));
     assert_eq!(reopened.pages()[0].shapes()[0].x(), Some("10cm"));
@@ -249,8 +249,8 @@ fn malformed_trailing_shape_attribute_is_still_rejected() {
     const CONTENT: &str = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" office:version="1.4"><office:body><office:drawing><draw:page draw:name="Page"><draw:rect draw:name="Box" svg:x="1cm" svg:y="2cm" svg:width="3cm" svg:height="4cm" malformed/></draw:page></office:drawing></office:body></office:document-content>"#;
 
     let valid = CONTENT.replace(" malformed/>", "/>");
-    assert!(Drawing::from_bytes(raw_package(&valid)).is_ok());
-    assert!(Drawing::from_bytes(raw_package(CONTENT)).is_err());
+    assert!(Package::from_bytes(&raw_package(&valid)).is_ok());
+    assert!(Package::from_bytes(&raw_package(CONTENT)).is_err());
 }
 
 #[test]
@@ -258,6 +258,6 @@ fn duplicate_trailing_shape_attribute_is_still_rejected() {
     const CONTENT: &str = r#"<office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:foreign="urn:example:foreign" office:version="1.4"><office:body><office:drawing><draw:page draw:name="Page"><draw:rect draw:name="Box" svg:x="1cm" svg:y="2cm" svg:width="3cm" svg:height="4cm" foreign:opaque='first' foreign:opaque="second"/></draw:page></office:drawing></office:body></office:document-content>"#;
 
     let valid = CONTENT.replace(" foreign:opaque=\"second\"", "");
-    assert!(Drawing::from_bytes(raw_package(&valid)).is_ok());
-    assert!(Drawing::from_bytes(raw_package(CONTENT)).is_err());
+    assert!(Package::from_bytes(&raw_package(&valid)).is_ok());
+    assert!(Package::from_bytes(&raw_package(CONTENT)).is_err());
 }

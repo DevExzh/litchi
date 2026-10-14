@@ -17,14 +17,15 @@ use crate::model::{
 };
 use crate::transition::Transition;
 use litchi_core::{
-    BlobBundle, BlobLimits, CompositionLimits, DiagnosticFingerprint, Error, History,
-    HistoryLimits, JoinedSubEdits, Metadata, Patch as CorePatch, PatchLimits, PatchOperation,
-    Result, Reversible, ReversibleOperation, SubEdit,
+    BlobBundle, BlobLimits, CompositionLimits, DiagnosticFingerprint, Error,
+    History as CoreHistory, HistoryLimits, JoinedSubEdits, Metadata, Patch as CorePatch,
+    PatchLimits, PatchOperation, Result, Reversible, ReversibleOperation, SubEdit,
 };
 use litchi_odf_common::{
-    compact_xml,
+    Error as OdfError, OpenOptions, compact_xml,
     core::{
-        AuthoredXmlFragment, PackageWriter, XmlSourcePart, XmlSplicePublication, family::Package,
+        AuthoredXmlFragment, PackageWriter, XmlSourcePart, XmlSplicePublication,
+        family::Package as FamilyPackage,
     },
     drawing::Frame,
     media,
@@ -108,7 +109,7 @@ mod attribute_span_tests;
 mod attribute_value_tests;
 
 struct State {
-    package: Package,
+    package: FamilyPackage,
     mimetype: &'static str,
     security: SecurityStatus,
     pages: Vec<Page>,
@@ -381,88 +382,452 @@ impl SecurityStatus {
     }
 }
 
-/// An immutable, source-owning ODG package snapshot.
+/// The immutable, cheap-to-clone owner of one ODG or OTG package.
+///
+/// `Package` owns every state verb: ingress (`open*`, `from_bytes*`,
+/// `from_reader*`, [`Self::from_prepared_package`]), the primary
+/// [`Edit`] transaction, patch application ([`Self::apply`]) and output
+/// ([`Self::save`], [`Self::save_with_durability`], [`Self::to_bytes`],
+/// [`Self::write_to`]). Clones share the exact bytes and the parsed
+/// projection; [`Self::drawing`] returns the read-only [`crate::Drawing`]
+/// projection. A commit publishes a new package and never mutates its
+/// source.
 ///
 /// Unknown package members and unmodeled XML remain in the retained source
 /// bytes. Semantic inspection never evaluates controls, scripts, actions, DDE,
 /// links, or embedded payloads.
 #[derive(Clone)]
-pub struct Snapshot(Arc<State>);
+pub struct Package(Arc<State>);
 
-impl Snapshot {
-    /// Opens a package from a filesystem path.
+impl std::fmt::Debug for Package {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Package")
+            .field("bytes", &self.as_bytes().len())
+            .field("template", &self.is_template())
+            .finish_non_exhaustive()
+    }
+}
+
+/// One ODG package flavor: the regular drawing or the OTG template.
+#[derive(Clone, Copy)]
+struct Flavor {
+    mimetype: &'static str,
+    family_name: &'static str,
+}
+
+const DRAWING: Flavor = Flavor {
+    mimetype: MIMETYPE,
+    family_name: "ODG",
+};
+
+const TEMPLATE: Flavor = Flavor {
+    mimetype: TEMPLATE_MIMETYPE,
+    family_name: "OTG",
+};
+
+impl Package {
+    /// Creates the minimal valid drawing (one empty `office:drawing` body).
+    ///
+    /// The bytes are deterministic: no clock or randomness is consulted.
     ///
     /// # Errors
     ///
-    /// Returns an error when the package cannot be read or is not a structurally valid ODG.
-    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_package(Package::open(path, MIMETYPE, BODY_MARKER, "ODG")?, MIMETYPE)
+    /// Returns an error only when the fixed minimal package cannot be built.
+    pub fn new() -> std::result::Result<Self, OdfError> {
+        crate::Builder::new().build()
     }
 
-    /// Opens an `OpenDocument` drawing template from a filesystem path.
+    /// Opens an ODG package from a filesystem path with the default
+    /// [`OpenOptions`].
     ///
     /// # Errors
     ///
-    /// Returns an error when the package is unreadable or is not a structurally valid `OTG`.
-    pub fn open_template(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_package(
-            Package::open(path, TEMPLATE_MIMETYPE, BODY_MARKER, "OTG")?,
-            TEMPLATE_MIMETYPE,
-        )
+    /// Returns [`OdfError::Limit`] when a source or semantic limit is
+    /// exceeded and [`OdfError::Core`] when the package cannot be read or is
+    /// not a structurally valid ODG.
+    pub fn open(path: impl AsRef<Path>) -> std::result::Result<Self, OdfError> {
+        Self::open_with_options(path, OpenOptions::new())
     }
 
-    /// Opens a package from owned bytes.
+    /// Opens an ODG package from a filesystem path under caller-selected
+    /// limits.
     ///
     /// # Errors
     ///
-    /// Returns an error when the package is not a structurally valid ODG.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_package(
-            Package::from_bytes(bytes, MIMETYPE, BODY_MARKER, "ODG")?,
-            MIMETYPE,
-        )
+    /// As [`Self::open`].
+    pub fn open_with_options(
+        path: impl AsRef<Path>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, OdfError> {
+        Self::open_flavor(path, options, DRAWING)
     }
 
-    /// Opens password-protected ODG bytes for inert inspection.
-    ///
-    /// Encrypted snapshots remain read-only: semantic commit and durable application refuse to
-    /// strip or silently re-encrypt protected entries.
+    /// Opens an `OpenDocument` drawing template (OTG) from a filesystem path.
     ///
     /// # Errors
     ///
-    /// Returns an error for an invalid package, unsupported encryption metadata, or bad password.
-    pub fn from_bytes_with_password(bytes: Vec<u8>, password: impl Into<String>) -> Result<Self> {
-        Self::from_package(
-            Package::from_bytes_with_password(bytes, password, MIMETYPE, BODY_MARKER, "ODG")?,
-            MIMETYPE,
-        )
+    /// As [`Self::open`], for a structurally valid OTG.
+    pub fn open_template(path: impl AsRef<Path>) -> std::result::Result<Self, OdfError> {
+        Self::open_template_with_options(path, OpenOptions::new())
+    }
+
+    /// Opens an OTG drawing template from a filesystem path under
+    /// caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open_template`].
+    pub fn open_template_with_options(
+        path: impl AsRef<Path>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, OdfError> {
+        Self::open_flavor(path, options, TEMPLATE)
     }
 
     /// Opens a password-protected ODG file for inert inspection.
     ///
+    /// Encrypted packages remain read-only: semantic commit and durable
+    /// application refuse to strip or silently re-encrypt protected entries.
+    ///
     /// # Errors
     ///
-    /// Returns the same errors as [`Self::from_bytes_with_password`] plus filesystem errors.
-    pub fn open_with_password(path: impl AsRef<Path>, password: impl Into<String>) -> Result<Self> {
+    /// As [`Self::open`], plus unsupported encryption metadata or a bad
+    /// password.
+    pub fn open_with_password(
+        path: impl AsRef<Path>,
+        password: impl Into<String>,
+    ) -> std::result::Result<Self, OdfError> {
+        Self::open_with_password_and_options(path, password, OpenOptions::new())
+    }
+
+    /// Opens a password-protected ODG file under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open_with_password`].
+    pub fn open_with_password_and_options(
+        path: impl AsRef<Path>,
+        password: impl Into<String>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, OdfError> {
+        let package = FamilyPackage::open_with_password_and_options(
+            path,
+            password,
+            options,
+            MIMETYPE,
+            BODY_MARKER,
+            DRAWING.family_name,
+        )?;
+        Self::from_family(package, MIMETYPE, options)
+    }
+
+    /// Opens an ODG package from borrowed bytes (copied once after the input
+    /// size check).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_bytes(bytes: &[u8]) -> std::result::Result<Self, OdfError> {
+        Self::from_bytes_with_options(bytes, OpenOptions::new())
+    }
+
+    /// Opens an ODG package from borrowed bytes under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_bytes_with_options(
+        bytes: &[u8],
+        options: OpenOptions,
+    ) -> std::result::Result<Self, OdfError> {
+        Self::from_bytes_flavor(bytes, options, DRAWING)
+    }
+
+    /// Opens an OTG drawing template from borrowed bytes.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open_template`].
+    pub fn from_template_bytes(bytes: &[u8]) -> std::result::Result<Self, OdfError> {
+        Self::from_template_bytes_with_options(bytes, OpenOptions::new())
+    }
+
+    /// Opens an OTG drawing template from borrowed bytes under
+    /// caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open_template`].
+    pub fn from_template_bytes_with_options(
+        bytes: &[u8],
+        options: OpenOptions,
+    ) -> std::result::Result<Self, OdfError> {
+        Self::from_bytes_flavor(bytes, options, TEMPLATE)
+    }
+
+    /// Opens password-protected ODG bytes for inert inspection.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open_with_password`].
+    pub fn from_bytes_with_password(
+        bytes: &[u8],
+        password: impl Into<String>,
+    ) -> std::result::Result<Self, OdfError> {
+        Self::from_bytes_with_password_and_options(bytes, password, OpenOptions::new())
+    }
+
+    /// Opens password-protected ODG bytes under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open_with_password`].
+    pub fn from_bytes_with_password_and_options(
+        bytes: &[u8],
+        password: impl Into<String>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, OdfError> {
+        check_input_bytes(bytes.len(), options)?;
+        let package = FamilyPackage::from_bytes_with_password_and_options(
+            copy_input(bytes)?,
+            password,
+            options,
+            MIMETYPE,
+            BODY_MARKER,
+            DRAWING.family_name,
+        )?;
+        Self::from_family(package, MIMETYPE, options)
+    }
+
+    /// Opens an ODG package from a reader with the default [`OpenOptions`].
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_reader(reader: impl std::io::Read) -> std::result::Result<Self, OdfError> {
+        Self::from_reader_with_options(reader, OpenOptions::new())
+    }
+
+    /// Opens an ODG package from a reader under caller-selected limits. The
+    /// reader is consumed through an input-limit guard before indexing.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_reader_with_options(
+        reader: impl std::io::Read,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, OdfError> {
+        let package = FamilyPackage::from_reader_with_options(
+            reader,
+            options,
+            MIMETYPE,
+            BODY_MARKER,
+            DRAWING.family_name,
+        )?;
+        Self::from_family(package, MIMETYPE, options)
+    }
+
+    /// Adopts a packaged ODF result prepared by smart detection, reusing its
+    /// validated archive index. Both ODG and OTG packages are accepted; the
+    /// package MIME type selects the flavor.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OdfError::Core`] carrying [`Error::UnexpectedFormat`] when
+    /// the prepared package is another family, or the usual validation error.
+    pub fn from_prepared_package(
+        prepared: litchi_odf_common::PreparedPackage,
+    ) -> std::result::Result<Self, OdfError> {
+        if prepared.format() != litchi_core::detection::FileFormat::Odg {
+            return Err(Error::UnexpectedFormat {
+                detected: prepared.format(),
+            }
+            .into());
+        }
+        let archive = prepared.into_package();
+        let flavor = if archive.mimetype()? == TEMPLATE_MIMETYPE {
+            TEMPLATE
+        } else {
+            DRAWING
+        };
+        let options = OpenOptions::new();
+        let package = FamilyPackage::from_owned_package_with_options(
+            archive,
+            options,
+            flavor.mimetype,
+            BODY_MARKER,
+            flavor.family_name,
+        )?;
+        Self::from_family(package, flavor.mimetype, options)
+    }
+
+    fn open_flavor(
+        path: impl AsRef<Path>,
+        options: OpenOptions,
+        flavor: Flavor,
+    ) -> std::result::Result<Self, OdfError> {
+        let package = FamilyPackage::open_with_options(
+            path,
+            options,
+            flavor.mimetype,
+            BODY_MARKER,
+            flavor.family_name,
+        )?;
+        Self::from_family(package, flavor.mimetype, options)
+    }
+
+    fn from_bytes_flavor(
+        bytes: &[u8],
+        options: OpenOptions,
+        flavor: Flavor,
+    ) -> std::result::Result<Self, OdfError> {
+        check_input_bytes(bytes.len(), options)?;
+        let package = FamilyPackage::from_bytes_with_options(
+            copy_input(bytes)?,
+            options,
+            flavor.mimetype,
+            BODY_MARKER,
+            flavor.family_name,
+        )?;
+        Self::from_family(package, flavor.mimetype, options)
+    }
+
+    /// Projects a validated family package and checks the page count against
+    /// the semantic unit limit.
+    fn from_family(
+        package: FamilyPackage,
+        mimetype: &'static str,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, OdfError> {
+        let owner = Self::from_package(package, mimetype)?;
+        let semantic = options.semantic_limits_value();
+        if !semantic.is_default() {
+            semantic.check(
+                litchi_odf_common::SemanticLimitKind::Units,
+                u64::try_from(owner.pages().len()).unwrap_or(u64::MAX),
+            )?;
+        }
+        Ok(owner)
+    }
+
+    /// Reopens complete ODG bytes produced inside the crate.
+    pub(crate) fn from_vec(bytes: Vec<u8>) -> Result<Self> {
         Self::from_package(
-            Package::open_with_password(path, password, MIMETYPE, BODY_MARKER, "ODG")?,
+            FamilyPackage::from_bytes(bytes, MIMETYPE, BODY_MARKER, DRAWING.family_name)?,
             MIMETYPE,
         )
     }
 
-    /// Opens an `OpenDocument` drawing template from owned bytes.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the package is not a structurally valid `OTG`.
-    pub fn from_template_bytes(bytes: Vec<u8>) -> Result<Self> {
+    /// Reopens complete OTG bytes produced inside the crate.
+    pub(crate) fn from_template_vec(bytes: Vec<u8>) -> Result<Self> {
         Self::from_package(
-            Package::from_bytes(bytes, TEMPLATE_MIMETYPE, BODY_MARKER, "OTG")?,
+            FamilyPackage::from_bytes(bytes, TEMPLATE_MIMETYPE, BODY_MARKER, TEMPLATE.family_name)?,
             TEMPLATE_MIMETYPE,
         )
     }
 
-    fn from_package(package: Package, mimetype: &'static str) -> Result<Self> {
+    /// Reopens complete password-encrypted ODG bytes produced inside the crate.
+    pub(crate) fn from_encrypted_vec(bytes: Vec<u8>, password: String) -> Result<Self> {
+        Self::from_package(
+            FamilyPackage::from_bytes_with_password(
+                bytes,
+                password,
+                MIMETYPE,
+                BODY_MARKER,
+                DRAWING.family_name,
+            )?,
+            MIMETYPE,
+        )
+    }
+
+    /// Reopens bytes of the same flavor as `self`.
+    fn reopen_same_flavor(&self, bytes: Vec<u8>) -> Result<Self> {
+        if self.is_template() {
+            Self::from_template_vec(bytes)
+        } else {
+            Self::from_vec(bytes)
+        }
+    }
+
+    /// The read-only drawing projection of this package (one reference-count
+    /// increment).
+    #[must_use]
+    pub fn drawing(&self) -> crate::Drawing {
+        crate::Drawing::from_package(self.clone())
+    }
+
+    /// Returns the identity of the validated archive index retained by this
+    /// package, for diagnostics and tests.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn prepared_index_identity(&self) -> usize {
+        self.0.package.package().prepared_index_identity()
+    }
+
+    /// Repairs tolerated while this package was opened.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &litchi_odf_common::ToleranceReport {
+        self.0.package.tolerance_report()
+    }
+
+    /// Applies a primary-transaction patch to this exact package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when this package is not byte-identical to the patch
+    /// source.
+    pub fn apply(&self, patch: &Patch) -> std::result::Result<Self, OdfError> {
+        Ok(patch.apply(self)?)
+    }
+
+    /// Atomically replaces `path` with this package (full durability).
+    ///
+    /// The artifact is staged in a sibling temporary file and published with
+    /// one rename; a failure before publication leaves the destination
+    /// unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OdfError::Core`] carrying the I/O failure.
+    pub fn save(&self, path: impl AsRef<Path>) -> std::result::Result<(), OdfError> {
+        self.save_with_durability(path, litchi_core::Durability::Full)
+    }
+
+    /// Atomically replaces `path` with this package under explicit durability.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::save`].
+    pub fn save_with_durability(
+        &self,
+        path: impl AsRef<Path>,
+        durability: litchi_core::Durability,
+    ) -> std::result::Result<(), OdfError> {
+        litchi_odf_common::publish::save_bytes(path.as_ref(), self.as_bytes(), durability)
+    }
+
+    /// Copies the exact package bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an allocation failure.
+    pub fn to_bytes(&self) -> std::result::Result<Vec<u8>, OdfError> {
+        Ok(copy_input(self.as_bytes())?)
+    }
+
+    /// Writes the exact package bytes to a stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns the stream's I/O failure.
+    pub fn write_to(&self, mut writer: impl std::io::Write) -> std::result::Result<(), OdfError> {
+        writer.write_all(self.as_bytes()).map_err(Error::from)?;
+        Ok(())
+    }
+
+    fn from_package(package: FamilyPackage, mimetype: &'static str) -> Result<Self> {
         let archive = package.package().package()?;
         let security = SecurityStatus {
             encrypted: archive.manifest().has_encrypted_entries(),
@@ -711,7 +1076,7 @@ impl Snapshot {
 
     /// Starts a source-bound semantic transaction.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
+    pub fn edit(&self) -> Edit {
         self.edit_with_policies(
             SecurityWritePolicy::Refuse,
             ActiveContentWritePolicy::PreserveInert,
@@ -723,7 +1088,7 @@ impl Snapshot {
     /// Encryption is never silently stripped. `RemoveSignatures` permits signed-package edits and
     /// omits the now-stale signature members from the rebuilt package.
     #[must_use]
-    pub fn edit_with_security_policy(&self, security_policy: SecurityWritePolicy) -> Transaction {
+    pub fn edit_with_security_policy(&self, security_policy: SecurityWritePolicy) -> Edit {
         self.edit_with_policies(security_policy, ActiveContentWritePolicy::PreserveInert)
     }
 
@@ -732,7 +1097,7 @@ impl Snapshot {
     pub fn edit_with_active_content_policy(
         &self,
         active_content_policy: ActiveContentWritePolicy,
-    ) -> Transaction {
+    ) -> Edit {
         self.edit_with_policies(SecurityWritePolicy::Refuse, active_content_policy)
     }
 
@@ -742,8 +1107,8 @@ impl Snapshot {
         &self,
         security_policy: SecurityWritePolicy,
         active_content_policy: ActiveContentWritePolicy,
-    ) -> Transaction {
-        Transaction {
+    ) -> Edit {
+        Edit {
             source: self.clone(),
             content: self.content_xml().to_string(),
             styles: self.styles_xml().map(str::to_owned),
@@ -768,7 +1133,7 @@ impl Snapshot {
     ///
     /// Returns an error for stale lineage, unsupported operations, security refusal, or failed
     /// whole-package readback. No intermediate snapshot is published on failure.
-    pub fn apply_joined(&self, joined: JoinedEdits) -> Result<Snapshot> {
+    pub fn apply_joined(&self, joined: JoinedEdits) -> Result<Package> {
         self.apply_joined_with_policies(
             joined,
             SecurityWritePolicy::Refuse,
@@ -785,7 +1150,7 @@ impl Snapshot {
         &self,
         joined: JoinedEdits,
         security_policy: SecurityWritePolicy,
-    ) -> Result<Snapshot> {
+    ) -> Result<Package> {
         self.apply_joined_with_policies(
             joined,
             security_policy,
@@ -803,7 +1168,7 @@ impl Snapshot {
         joined: JoinedEdits,
         security_policy: SecurityWritePolicy,
         active_content_policy: ActiveContentWritePolicy,
-    ) -> Result<Snapshot> {
+    ) -> Result<Package> {
         if !joined.lineage().matches(self) {
             return invalid("joined ODG edits do not match the exact source snapshot");
         }
@@ -822,8 +1187,8 @@ impl Snapshot {
 
     /// Starts explicit bounded undo/redo history at this snapshot.
     #[must_use]
-    pub fn history(&self, limits: HistoryLimits) -> SnapshotHistory {
-        History::new(self.clone(), limits)
+    pub fn history(&self, limits: HistoryLimits) -> History {
+        CoreHistory::new(self.clone(), limits)
     }
 
     /// Prepares one compact shape or complete group subtree for checked cross-drawing transfer.
@@ -1113,20 +1478,40 @@ impl Snapshot {
             resources,
         })
     }
+}
 
-    /// Consumes the snapshot and returns its source bytes.
-    #[must_use]
-    pub fn into_bytes(self) -> Vec<u8> {
-        match Arc::try_unwrap(self.0) {
-            Ok(state) => state.package.into_bytes(),
-            Err(state) => state.package.as_bytes().to_vec(),
-        }
+/// Refuses input above the selected source input limit before copying it.
+fn check_input_bytes(length: usize, options: OpenOptions) -> std::result::Result<(), OdfError> {
+    let limits = options.source_limits_value();
+    let observed = u64::try_from(length).unwrap_or(u64::MAX);
+    if observed > limits.max_input_bytes() {
+        return Err(OdfError::Limit {
+            kind: litchi_odf_common::LimitKind::Source(
+                litchi_odf_common::SourceLimitKind::InputBytes,
+            ),
+            observed,
+            maximum: limits.max_input_bytes(),
+        });
     }
+    Ok(())
+}
+
+/// Copies caller bytes with a fallible reservation.
+fn copy_input(source: &[u8]) -> Result<Vec<u8>> {
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(source.len())
+        .map_err(|source| Error::Allocation {
+            resource: "ODG package bytes",
+            source,
+        })?;
+    bytes.extend_from_slice(source);
+    Ok(bytes)
 }
 
 /// A staged source-bound package shape edit.
-pub struct Transaction {
-    source: Snapshot,
+pub struct Edit {
+    source: Package,
     content: String,
     styles: Option<String>,
     content_splices: Option<Vec<ContentSplice>>,
@@ -1145,7 +1530,7 @@ struct ContentSplice {
     replacement: Vec<u8>,
 }
 
-impl Transaction {
+impl Edit {
     fn replace_or_insert_shape_attribute(
         &mut self,
         page: usize,
@@ -1691,7 +2076,7 @@ impl Transaction {
     ///
     /// ODF 1.4 Part 3 §§10.2.2-10.2.3 and 19.189 define drawing layers and
     /// their shape assignment. The destination must be one of the declarations
-    /// visible through [`Snapshot::layers`].
+    /// visible through [`Package::layers`].
     ///
     /// # Errors
     ///
@@ -3387,10 +3772,17 @@ impl Transaction {
 
     /// Atomically validates, rebuilds, and publishes the edited package.
     ///
+    /// An edit that leaves every part unchanged publishes the exact source
+    /// bytes and reports [`Diagnostics::changed`] as `false`.
+    ///
     /// # Errors
     ///
     /// Returns an error when source policy, rebuilding, parsing, or typed readback fails.
-    pub fn commit(self) -> Result<Commit> {
+    pub fn commit(self) -> std::result::Result<Commit, OdfError> {
+        Ok(self.commit_core()?)
+    }
+
+    pub(crate) fn commit_core(self) -> Result<Commit> {
         if self.content == self.source.content_xml()
             && self.styles == self.source.styles_xml().map(str::to_owned)
             && self.resource_edits.is_empty()
@@ -3451,11 +3843,7 @@ impl Transaction {
                 self.security_policy,
             )?
         };
-        let snapshot = if self.source.is_template() {
-            Snapshot::from_template_bytes(rebuilt)?
-        } else {
-            Snapshot::from_bytes(rebuilt)?
-        };
+        let snapshot = self.source.reopen_same_flavor(rebuilt)?;
         if snapshot.content_xml() != self.content {
             return invalid("ODG package edit failed exact content readback");
         }
@@ -3962,13 +4350,13 @@ struct ResourceReplacement<'a> {
 
 /// A committed package publication and its exact-source patch.
 pub struct Commit {
-    snapshot: Snapshot,
+    snapshot: Package,
     patch: Patch,
     changed: bool,
 }
 
 impl Commit {
-    fn unchanged(snapshot: Snapshot) -> Self {
+    fn unchanged(snapshot: Package) -> Self {
         Self {
             patch: Patch {
                 source: snapshot.clone(),
@@ -3982,36 +4370,74 @@ impl Commit {
         }
     }
 
-    /// Whether package bytes changed.
+    /// Borrows the published immutable package.
+    #[must_use]
+    pub const fn package(&self) -> &Package {
+        &self.snapshot
+    }
+
+    /// Borrows the reversible exact-source patch.
+    #[must_use]
+    pub const fn patch(&self) -> &Patch {
+        &self.patch
+    }
+
+    /// Content-free facts about this commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> Diagnostics {
+        Diagnostics {
+            changed: self.changed,
+            change_count: self.patch.changes.len(),
+            resource_change_count: self.patch.resource_changes.len(),
+        }
+    }
+
+    /// Consumes the commit into its published package.
+    #[must_use]
+    pub fn into_package(self) -> Package {
+        self.snapshot
+    }
+
+    /// Consumes the commit into its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.snapshot, self.patch)
+    }
+}
+
+/// Content-free facts about one [`Commit`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Diagnostics {
+    changed: bool,
+    change_count: usize,
+    resource_change_count: usize,
+}
+
+impl Diagnostics {
+    /// Whether publication rebuilt the package bytes.
     #[must_use]
     pub const fn changed(&self) -> bool {
         self.changed
     }
 
-    /// The published immutable snapshot.
+    /// The number of semantic operations the commit published.
     #[must_use]
-    pub fn snapshot(&self) -> &Snapshot {
-        &self.snapshot
+    pub const fn change_count(&self) -> usize {
+        self.change_count
     }
 
-    /// The reversible exact-source patch.
+    /// The number of package-local resource changes the commit published.
     #[must_use]
-    pub fn patch(&self) -> &Patch {
-        &self.patch
-    }
-
-    /// Consumes the commit into its snapshot.
-    #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
-        self.snapshot
+    pub const fn resource_change_count(&self) -> usize {
+        self.resource_change_count
     }
 }
 
 /// An exact-source-checked reversible package patch.
 #[derive(Clone)]
 pub struct Patch {
-    source: Snapshot,
-    target: Snapshot,
+    source: Package,
+    target: Package,
     changes: Vec<Change>,
     resource_changes: Vec<ResourceChange>,
     requires_package_projection: bool,
@@ -4020,16 +4446,19 @@ pub struct Patch {
 impl Patch {
     /// Whether this patch authorizes the supplied exact source bytes.
     #[must_use]
-    pub fn is_applicable_to(&self, source: &Snapshot) -> bool {
+    pub fn is_applicable_to(&self, source: &Package) -> bool {
         self.source.as_bytes() == source.as_bytes()
     }
 
-    /// Applies this patch only to its exact source snapshot.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when `source` is not the exact source artifact.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+    /// Whether this patch preserves the exact package bytes.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.source.as_bytes() == self.target.as_bytes()
+    }
+
+    /// Applies this patch only to its exact source package; the public route
+    /// is [`Package::apply`].
+    pub(crate) fn apply(&self, source: &Package) -> Result<Package> {
         if !self.is_applicable_to(source) {
             return invalid("ODG package patch source does not match");
         }
@@ -4234,11 +4663,11 @@ impl Patch {
 pub struct Lineage(Arc<[u8]>);
 
 impl Lineage {
-    fn new(snapshot: &Snapshot) -> Self {
+    fn new(snapshot: &Package) -> Self {
         Self(Arc::from(snapshot.as_bytes()))
     }
 
-    fn matches(&self, snapshot: &Snapshot) -> bool {
+    fn matches(&self, snapshot: &Package) -> bool {
         self.0.as_ref() == snapshot.as_bytes()
     }
 }
@@ -4253,7 +4682,7 @@ pub type JoinedEdits = JoinedSubEdits<Lineage, DurablePatch>;
 pub type MergePlan = litchi_core::ThreeWayMergePlan<Lineage, DurablePatch>;
 
 /// Explicit bounded ODG undo/redo history.
-pub type SnapshotHistory = History<Snapshot>;
+pub type History = CoreHistory<Package>;
 
 /// A bounded, provenance-bound shape or complete group-subtree transfer plan.
 #[derive(Clone)]
@@ -4494,7 +4923,7 @@ impl DurablePatch {
     ///
     /// Returns an error for stale source, unsupported operations, security refusal, or failed
     /// whole-package readback.
-    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+    pub fn apply(&self, source: &Package) -> Result<Package> {
         self.apply_with_policies(
             source,
             SecurityWritePolicy::Refuse,
@@ -4509,9 +4938,9 @@ impl DurablePatch {
     /// Returns an error for stale source, invalid policy, unsupported encryption, or readback.
     pub fn apply_with_security_policy(
         &self,
-        source: &Snapshot,
+        source: &Package,
         security_policy: SecurityWritePolicy,
-    ) -> Result<Snapshot> {
+    ) -> Result<Package> {
         self.apply_with_policies(
             source,
             security_policy,
@@ -4526,10 +4955,10 @@ impl DurablePatch {
     /// Returns an error for stale source, policy refusal, unsupported operations, or readback.
     pub fn apply_with_policies(
         &self,
-        source: &Snapshot,
+        source: &Package,
         security_policy: SecurityWritePolicy,
         active_content_policy: ActiveContentWritePolicy,
-    ) -> Result<Snapshot> {
+    ) -> Result<Package> {
         apply_durable_patch(source, self, true, security_policy, active_content_policy)
     }
 
@@ -4873,12 +5302,12 @@ fn durable_blob<'patch>(
 }
 
 fn apply_durable_patch(
-    source: &Snapshot,
+    source: &Package,
     patch: &DurablePatch,
     check_source: bool,
     security_policy: SecurityWritePolicy,
     active_content_policy: ActiveContentWritePolicy,
-) -> Result<Snapshot> {
+) -> Result<Package> {
     validate_durable_patch(&patch.inner)?;
     let source_fingerprint = fingerprint(source.as_bytes());
     if check_source
@@ -4898,11 +5327,7 @@ fn apply_durable_patch(
             enforce_security_policy(&current, security_policy)?;
             enforce_active_content_policy(&current, active_content_policy)?;
             let blob = durable_blob(patch, &operation.value)?;
-            current = if current.is_template() {
-                Snapshot::from_template_bytes(blob.to_vec())?
-            } else {
-                Snapshot::from_bytes(blob.to_vec())?
-            };
+            current = current.reopen_same_flavor(blob.to_vec())?;
             enforce_active_content_policy(&current, active_content_policy)?;
             continue;
         }
@@ -4959,7 +5384,7 @@ fn apply_durable_patch(
             },
             _ => return invalid("ODG durable patch operation is unsupported"),
         }
-        current = edit.commit()?.into_snapshot();
+        current = edit.commit_core()?.into_package();
     }
     Ok(current)
 }
@@ -7724,7 +8149,7 @@ fn parse_declared_layers(xml: &str) -> Result<Vec<Layer>> {
     Ok(layers)
 }
 
-fn scan_resources(package: &Package) -> Result<Vec<Resource>> {
+fn scan_resources(package: &FamilyPackage) -> Result<Vec<Resource>> {
     let archive = package.package().package()?;
     let images = media::scan_package(package.content_xml(), package.styles_xml(), &archive)?;
     let mut resources = Vec::new();
@@ -8034,7 +8459,7 @@ fn declares_style_resource_xml(xml: &str, kind: StyleResourceKind, name: &str) -
 }
 
 fn find_style_resource(
-    snapshot: &Snapshot,
+    snapshot: &Package,
     kind: StyleResourceKind,
     name: &str,
 ) -> Result<Option<ParsedStyleResource>> {
@@ -8608,7 +9033,7 @@ fn validate_transition_budget(transition: Option<&Transition>) -> Result<()> {
 }
 
 fn validate_transition_sound_reference(
-    transaction: &Transaction,
+    transaction: &Edit,
     transition: Option<&Transition>,
 ) -> Result<()> {
     let Some(href) = transition
@@ -8643,7 +9068,7 @@ fn validate_transition_sound_reference(
 }
 
 fn validate_transition_xml_ids(
-    transaction: &Transaction,
+    transaction: &Edit,
     current: Option<&Transition>,
     desired: Option<&Transition>,
     in_content: bool,
@@ -9370,7 +9795,7 @@ fn reference_value(reference: &quick_xml::events::BytesRef<'_>) -> Result<String
 }
 
 fn content_splice_publication(
-    source: &Snapshot,
+    source: &Package,
     splices: &[ContentSplice],
 ) -> Result<XmlSplicePublication> {
     let source_part = XmlSourcePart::load(source.0.package.package(), "content.xml")?;
@@ -9391,7 +9816,7 @@ fn content_splice_publication(
 }
 
 fn rebuild_spliced(
-    source: &Snapshot,
+    source: &Package,
     content: XmlSplicePublication,
     styles: Option<&str>,
     replacements: &[ResourceReplacement<'_>],
@@ -9434,7 +9859,7 @@ fn rebuild_spliced(
 }
 
 fn rebuild(
-    source: &Snapshot,
+    source: &Package,
     content: &str,
     styles: Option<&str>,
     replacements: &[ResourceReplacement<'_>],
@@ -9472,7 +9897,7 @@ fn rebuild(
     writer.finish_to_bounded_bytes()
 }
 
-fn enforce_security_policy(source: &Snapshot, policy: SecurityWritePolicy) -> Result<()> {
+fn enforce_security_policy(source: &Package, policy: SecurityWritePolicy) -> Result<()> {
     if source.security().is_signed() && policy == SecurityWritePolicy::Refuse {
         return invalid("ODG package edits refuse signed packages");
     }
@@ -9482,10 +9907,7 @@ fn enforce_security_policy(source: &Snapshot, policy: SecurityWritePolicy) -> Re
     Ok(())
 }
 
-fn enforce_active_content_policy(
-    source: &Snapshot,
-    policy: ActiveContentWritePolicy,
-) -> Result<()> {
+fn enforce_active_content_policy(source: &Package, policy: ActiveContentWritePolicy) -> Result<()> {
     if policy == ActiveContentWritePolicy::Refuse && source.active_content().is_present() {
         return Err(Error::Unsupported(
             "ODG active-content write policy refuses the source inventory".into(),
@@ -9494,7 +9916,7 @@ fn enforce_active_content_policy(
     Ok(())
 }
 
-fn ensure_compact_rewrite_source(source: &Snapshot) -> Result<()> {
+fn ensure_compact_rewrite_source(source: &Package) -> Result<()> {
     let archive = source.0.package.package();
     for path in source.files()? {
         let is_xml = Path::new(&path)
@@ -10641,7 +11063,7 @@ fn validate_shape_layer(page: &Page, global_layers: &[Layer], shape: &Shape) -> 
     Ok(())
 }
 
-fn resolve_transfer_layer(snapshot: &Snapshot, page: &Page, name: &str) -> Result<Layer> {
+fn resolve_transfer_layer(snapshot: &Package, page: &Page, name: &str) -> Result<Layer> {
     let visible = if page.has_layer_set() {
         page.layers()
     } else {
@@ -10670,7 +11092,7 @@ fn transfer_xml_references(xml: &str, href: &str) -> bool {
 /// must travel with an extracted shape or the destination document would have
 /// an unbound prefix.  Conflicting aliases are withheld and cause an explicit
 /// refusal below.
-fn transfer_source_namespaces(snapshot: &Snapshot) -> Result<BTreeMap<String, String>> {
+fn transfer_source_namespaces(snapshot: &Package) -> Result<BTreeMap<String, String>> {
     let mut namespaces = BTreeMap::new();
     let mut conflicts = BTreeSet::new();
     for xml in [Some(snapshot.content_xml()), snapshot.styles_xml()] {
@@ -11043,7 +11465,7 @@ fn transfer_namespace_uri_bytes(uri: &str) -> Option<&'static [u8]> {
     .find(|candidate| std::str::from_utf8(candidate).ok() == Some(uri))
 }
 
-fn declares_style(snapshot: &Snapshot, name: &str) -> Result<bool> {
+fn declares_style(snapshot: &Package, name: &str) -> Result<bool> {
     if declares_style_xml(snapshot.content_xml(), name)? {
         return Ok(true);
     }
@@ -11062,7 +11484,7 @@ fn declares_style_xml(xml: &str, name: &str) -> Result<bool> {
     })
 }
 
-fn find_style_definition(snapshot: &Snapshot, name: &str) -> Result<Option<ParsedStyleDefinition>> {
+fn find_style_definition(snapshot: &Package, name: &str) -> Result<Option<ParsedStyleDefinition>> {
     let mut matches = parse_style_definitions(snapshot.content_xml())?
         .into_iter()
         .filter(|definition| definition.style.name() == name)
@@ -11215,7 +11637,7 @@ fn unique_collision_name(base: &str, bytes: &[u8], reserved: &[String]) -> Strin
 }
 
 fn unique_resource_path(
-    source: &Snapshot,
+    source: &Package,
     staged: &[ResourceEdit],
     path: &str,
     bytes: &[u8],

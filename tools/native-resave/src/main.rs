@@ -499,21 +499,22 @@ fn readback_odp(input: &Path) -> Result<()> {
 #[cfg(feature = "odf")]
 fn generate_odf(output: &Path) -> Result<()> {
     let source = fixture("test-data/odf/native-resave/source/font-styles.odf");
-    let formula = litchi_odf_formula::Formula::from_bytes(fs::read(source)?)?;
-    let mut edit = formula.edit();
+    let package = litchi_odf_formula::Package::from_bytes(&fs::read(source)?)?;
+    let mut edit = package.edit();
     edit.set_text(&litchi_odf_formula::NodePath::new([0, 0, 0]), "g")?;
     edit.set_starmath(&litchi_odf_formula::OpaqueStarMath::new(
         litchi_odf_formula::StarMathVersion::V5,
         "g",
     )?)?;
-    let changed = edit.commit()?.into_formula();
-    fs::write(output, changed.to_bytes())?;
+    let changed = edit.commit()?.into_package();
+    fs::write(output, changed.as_bytes())?;
     readback_odf(output)
 }
 
 #[cfg(feature = "odf")]
 fn readback_odf(input: &Path) -> Result<()> {
-    let formula = litchi_odf_formula::Formula::from_bytes(fs::read(input)?)?;
+    let package = litchi_odf_formula::Package::from_bytes(&fs::read(input)?)?;
+    let formula = package.formula();
     let xml = litchi_odf_formula::codec::serialize(formula.root());
     if !xml.contains(">g<") {
         return Err("ODF Formula identifier g is absent after reopen".into());
@@ -531,18 +532,18 @@ fn readback_odf(input: &Path) -> Result<()> {
 #[cfg(feature = "odb")]
 fn generate_odb(output: &Path) -> Result<()> {
     let source = fixture("test-data/libreoffice-core/dbaccess/qa/unit/data/tdf132924.odb");
-    let database = litchi_odb::Database::open(source)?;
-    let mut edit = database.edit();
+    let package = litchi_odb::Package::open(source)?;
+    let mut edit = package.edit();
     edit.add_query(litchi_odb::Query::new(ODB_QUERY, "SELECT 424242"))?;
     let commit = edit.commit()?;
-    fs::write(output, commit.database().as_bytes())?;
+    fs::write(output, commit.package().as_bytes())?;
     readback_odb(output)
 }
 
 #[cfg(feature = "odb")]
 fn readback_odb(input: &Path) -> Result<()> {
-    let database = litchi_odb::Database::open(input)?;
-    let catalog = database.catalog()?;
+    let package = litchi_odb::Package::open(input)?;
+    let catalog = package.database().catalog()?;
     let query = catalog
         .query(ODB_QUERY)?
         .ok_or_else(|| missing("ODB sentinel query is absent after reopen"))?;
@@ -564,7 +565,7 @@ fn readback_odb(input: &Path) -> Result<()> {
 #[cfg(feature = "odg")]
 fn generate_odg(output: &Path) -> Result<()> {
     let source = fixture("test-data/odf/native-resave/source/rhbz1870501.odg");
-    let drawing = litchi_odg::Drawing::from_bytes(fs::read(source)?)?;
+    let drawing = litchi_odg::Package::from_bytes(&fs::read(source)?)?;
     let group = drawing.pages()[0]
         .shapes()
         .iter()
@@ -595,13 +596,13 @@ fn generate_odg(output: &Path) -> Result<()> {
     let mut edit = drawing.edit();
     edit.set_group_descendant_geometry(0, group, descendant, "9cm", y, width, height)?;
     let commit = edit.commit()?;
-    fs::write(output, commit.snapshot().as_bytes())?;
+    fs::write(output, commit.package().as_bytes())?;
     readback_odg(output)
 }
 
 #[cfg(feature = "odg")]
 fn readback_odg(input: &Path) -> Result<()> {
-    let drawing = litchi_odg::Drawing::from_bytes(fs::read(input)?)?;
+    let drawing = litchi_odg::Package::from_bytes(&fs::read(input)?)?;
     if !drawing
         .pages()
         .iter()

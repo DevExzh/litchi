@@ -1,18 +1,19 @@
-//! Ergonomic Formula document facade and source-bound transactions.
+//! The Formula package owner, its read-only projection and source-bound
+//! transactions.
 
 use litchi_core::{Error, Result};
-use std::io::Read;
-use std::path::Path;
 use std::sync::Arc;
 
 use crate::codec;
 use crate::model::{Content, Element};
 
+mod owner;
+
 /// Maximum UTF-8 bytes accepted by the validated opaque `StarMath` boundary.
 pub const MAX_STARMATH_SOURCE_BYTES: usize = 1024 * 1024;
 /// Maximum semantic operations retained by one commit or durable patch.
 pub const MAX_SEMANTIC_OPERATIONS: usize = 4_096;
-/// Maximum recent commit records retained by an in-memory Formula snapshot.
+/// Maximum recent commit records retained by an in-memory Formula package.
 pub const MAX_COMMIT_HISTORY: usize = 64;
 /// Maximum approximate semantic evidence retained across recent commits.
 pub const MAX_COMMIT_HISTORY_BYTES: usize = 8 * 1024 * 1024;
@@ -106,7 +107,7 @@ pub struct StarMathAnnotation<'element> {
     opaque: OpaqueStarMath,
 }
 
-/// One bounded semantic commit retained with a published snapshot.
+/// One bounded semantic commit retained with a published package.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CommitRecord {
     bytes: usize,
@@ -155,143 +156,58 @@ impl<'element> StarMathAnnotation<'element> {
     }
 }
 
-/// An immutable-or-transactionally-edited `OpenDocument` Formula package.
+/// The immutable owner of one packaged `OpenDocument` Formula artifact.
+///
+/// `Package` owns every state verb: ingress (`open*`, `from_bytes*`,
+/// `from_reader*`, [`Package::from_prepared_package`]), the primary [`Edit`]
+/// transaction, patch application and output (`save`, `save_with_durability`,
+/// `to_bytes`, `write_to`). It is cheap to clone; clones share the exact
+/// bytes, the validated archive index and the parsed [`Formula`] projection.
+/// A commit publishes a new package and never mutates its source.
+#[derive(Clone)]
+pub struct Package {
+    formula: Formula,
+}
+
+/// The read-only `MathML` projection of one Formula [`Package`].
+///
+/// `Formula` carries no state verbs: ingress, editing, patch application and
+/// output live on [`Package`]. Clones share the parsed root, the validated
+/// archive and the bounded commit history.
 #[derive(Clone)]
 pub struct Formula {
     history: Arc<[CommitRecord]>,
-    package: crate::package::Package,
+    archive: crate::package::Archive,
     root: Arc<Element>,
     limits: codec::Limits,
 }
 
 impl Formula {
-    /// Create a standard `.odf` package from validated `MathML`.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the `MathML` fails validation or the package
-    /// cannot be created.
-    pub fn create(mathml: impl AsRef<str>) -> Result<Self> {
-        Self::create_with_limits(mathml, codec::Limits::default())
+    pub(crate) fn from_mathml(mathml: &str, template: bool, limits: codec::Limits) -> Result<Self> {
+        let root = codec::parse_with_limits(mathml, limits)?;
+        let archive = crate::package::Archive::create(mathml.as_bytes(), template)?;
+        Self::from_validated_parts(archive, root, limits)
     }
 
-    /// Create a standard `.odf` package using caller-selected finite limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the `MathML` fails validation, a limit is
-    /// exceeded, or the package cannot be created.
-    pub fn create_with_limits(mathml: impl AsRef<str>, limits: codec::Limits) -> Result<Self> {
-        Self::create_with_flavor(mathml.as_ref(), false, limits)
-    }
-
-    /// Create a Formula template `.otf` package from validated `MathML`.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the `MathML` fails validation or the package
-    /// cannot be created.
-    pub fn create_template(mathml: impl AsRef<str>) -> Result<Self> {
-        Self::create_template_with_limits(mathml, codec::Limits::default())
-    }
-
-    /// Create a Formula template `.otf` package using caller-selected limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the `MathML` fails validation, a limit is
-    /// exceeded, or the package cannot be created.
-    pub fn create_template_with_limits(
-        mathml: impl AsRef<str>,
+    pub(crate) fn from_archive(
+        archive: crate::package::Archive,
         limits: codec::Limits,
     ) -> Result<Self> {
-        Self::create_with_flavor(mathml.as_ref(), true, limits)
-    }
-
-    fn create_with_flavor(mathml: &str, template: bool, limits: codec::Limits) -> Result<Self> {
-        let root = codec::parse_with_limits(mathml, limits)?;
-        let package = crate::package::Package::create(mathml.as_bytes(), template)?;
-        Self::from_validated_parts(package, root, limits)
-    }
-
-    /// Open a Formula package from a path.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the file cannot be opened or its contents are
-    /// not a valid Formula package.
-    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::open_with_limits(path, codec::Limits::default())
-    }
-
-    /// Open a Formula package from a path with caller-selected finite limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the file cannot be opened, a limit is exceeded,
-    /// or its contents are not a valid Formula package.
-    pub fn open_with_limits(path: impl AsRef<Path>, limits: codec::Limits) -> Result<Self> {
-        let file = std::fs::File::open(path)?;
-        Self::from_reader_with_limits(file, limits)
-    }
-
-    /// Read a Formula package from a stream.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when reading fails or the data is not a valid Formula
-    /// package.
-    pub fn from_reader(reader: impl Read) -> Result<Self> {
-        Self::from_reader_with_limits(reader, codec::Limits::default())
-    }
-
-    /// Read a Formula package from a stream under caller-selected limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when reading fails, the package byte ceiling is
-    /// exceeded, or the data is not a valid Formula package.
-    pub fn from_reader_with_limits(reader: impl Read, limits: codec::Limits) -> Result<Self> {
-        Self::from_bytes_with_limits(read_all(reader, limits.package_bytes())?, limits)
-    }
-
-    /// Read and validate a Formula package from owned bytes.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the bytes are not a valid Formula package.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, codec::Limits::default())
-    }
-
-    /// Read and validate owned Formula package bytes under selected limits.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when a resource limit is exceeded or the bytes are
-    /// not a valid Formula package.
-    pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: codec::Limits) -> Result<Self> {
-        check_package_bytes(bytes.len(), limits)?;
-        let package = crate::package::Package::from_bytes(bytes)?;
-        Self::from_package(package, limits)
-    }
-
-    fn from_package(package: crate::package::Package, limits: codec::Limits) -> Result<Self> {
-        check_package_bytes(package.as_bytes().len(), limits)?;
-        let root = codec::parse_with_limits(&package.content_xml()?, limits)?;
-        Self::from_validated_parts(package, root, limits)
+        check_package_bytes(archive.as_bytes().len(), limits)?;
+        let root = codec::parse_with_limits(&archive.content_xml()?, limits)?;
+        Self::from_validated_parts(archive, root, limits)
     }
 
     fn from_validated_parts(
-        package: crate::package::Package,
+        archive: crate::package::Archive,
         root: Element,
         limits: codec::Limits,
     ) -> Result<Self> {
-        check_package_bytes(package.as_bytes().len(), limits)?;
+        check_package_bytes(archive.as_bytes().len(), limits)?;
         validate_starmath_boundaries(&root)?;
         Ok(Self {
             history: Arc::from(Vec::new().into_boxed_slice()),
-            package,
+            archive,
             root: Arc::new(root),
             limits,
         })
@@ -303,13 +219,13 @@ impl Formula {
         &self.root
     }
 
-    /// Stable fingerprint of the exact package snapshot.
+    /// Stable fingerprint of the exact package bytes.
     #[must_use]
     pub fn revision(&self) -> Revision {
         Revision::from_bytes(self.as_bytes())
     }
 
-    /// Recent semantic commits coupled to this in-memory snapshot.
+    /// Recent semantic commits coupled to this in-memory package.
     ///
     /// The oldest record is evicted after [`MAX_COMMIT_HISTORY`] entries.
     #[must_use]
@@ -321,38 +237,6 @@ impl Formula {
     #[must_use]
     pub const fn limits(&self) -> codec::Limits {
         self.limits
-    }
-
-    /// Start a source-bound whole-root transaction.
-    #[must_use]
-    pub fn edit(&self) -> Edit<'_> {
-        Edit {
-            source: self,
-            replacement: None,
-            changes: Vec::new(),
-        }
-    }
-
-    /// Replace the `MathML` root and atomically rebuild the package.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the serialized root fails re-validation or the
-    /// rebuilt package cannot be assembled.
-    pub fn set_root(&mut self, root: Element) -> Result<()> {
-        let mut edit = self.edit();
-        edit.set_root(root)?;
-        *self = edit.commit()?.into_formula();
-        Ok(())
-    }
-
-    /// Apply a reversible patch only when this is its byte-exact source.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when this package differs from the patch source.
-    pub fn apply_patch(&self, patch: &Patch) -> Result<Self> {
-        patch.apply(self)
     }
 
     /// Return every `MathML` annotation in document order.
@@ -434,13 +318,13 @@ impl Formula {
     /// Return the exact package MIME type.
     #[must_use]
     pub fn mimetype(&self) -> &'static str {
-        self.package.mimetype()
+        self.archive.mimetype()
     }
 
     /// Whether this package uses the Formula template MIME type.
     #[must_use]
     pub const fn is_template(&self) -> bool {
-        self.package.is_template()
+        self.archive.is_template()
     }
 
     /// Read the exact package `content.xml` as UTF-8.
@@ -449,7 +333,7 @@ impl Formula {
     ///
     /// Returns an error when `content.xml` is missing or not valid UTF-8.
     pub fn content_xml(&self) -> Result<String> {
-        self.package.content_xml()
+        self.archive.content_xml()
     }
 
     /// List package members in archive order.
@@ -458,61 +342,19 @@ impl Formula {
     ///
     /// Returns an error when the archive member list cannot be read.
     pub fn files(&self) -> Result<Vec<String>> {
-        self.package.files()
+        self.archive.files()
     }
 
     /// Return the exact original package bytes.
     #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
-        self.package.as_bytes()
-    }
-
-    /// Clone the exact package bytes.
-    #[must_use]
-    pub fn to_bytes(&self) -> Vec<u8> {
-        self.as_bytes().to_vec()
-    }
-
-    /// Consume the facade and return the exact package bytes.
-    #[must_use]
-    pub fn into_bytes(self) -> Vec<u8> {
-        self.package.into_bytes()
-    }
-
-    /// Atomically replace `path` with the exact package bytes (full
-    /// durability) without rebuilding the archive.
-    ///
-    /// The bytes are staged in a sibling temporary file and published with
-    /// one rename, so a failed save leaves an existing destination unchanged.
-    ///
-    /// # Errors
-    ///
-    /// Returns the publication I/O failure.
-    pub fn save(
-        &self,
-        path: impl AsRef<Path>,
-    ) -> std::result::Result<(), litchi_odf_common::Error> {
-        self.save_with_durability(path, litchi_core::Durability::Full)
-    }
-
-    /// Atomically replace `path` with the exact package bytes under explicit
-    /// durability.
-    ///
-    /// # Errors
-    ///
-    /// As [`Self::save`].
-    pub fn save_with_durability(
-        &self,
-        path: impl AsRef<Path>,
-        durability: litchi_core::Durability,
-    ) -> std::result::Result<(), litchi_odf_common::Error> {
-        litchi_odf_common::publish::save_bytes(path.as_ref(), self.as_bytes(), durability)
+        self.archive.as_bytes()
     }
 }
 
 /// A source-bound whole-root edit.
 pub struct Edit<'source> {
-    source: &'source Formula,
+    source: &'source Package,
     replacement: Option<Arc<Element>>,
     changes: Vec<SemanticChange>,
 }
@@ -523,7 +365,7 @@ impl Edit<'_> {
     pub fn root(&self) -> &Element {
         self.replacement
             .as_deref()
-            .unwrap_or_else(|| self.source.root())
+            .unwrap_or_else(|| self.source.formula.root())
     }
 
     /// Semantic operations staged in call order.
@@ -532,7 +374,7 @@ impl Edit<'_> {
         &self.changes
     }
 
-    /// Plan transfer of another edit created from the same source snapshot.
+    /// Plan transfer of another edit created from the same source package.
     ///
     /// This method never mutates either edit.
     ///
@@ -575,10 +417,10 @@ impl Edit<'_> {
         for change in transfer.operations() {
             candidate = apply_semantic_change(&candidate, change)?;
         }
-        let validated = validate_candidate(&candidate, self.source.limits)?;
+        let validated = validate_candidate(&candidate, self.source.formula.limits)?;
         let mut joined_changes = self.changes.clone();
         joined_changes.extend_from_slice(transfer.operations());
-        self.replacement = (validated.as_ref() != self.source.root()).then_some(validated);
+        self.replacement = (validated.as_ref() != self.source.formula.root()).then_some(validated);
         self.changes = if self.replacement.is_some() {
             joined_changes
         } else {
@@ -597,7 +439,7 @@ impl Edit<'_> {
             element.insert_child(index, child.clone())
         })?;
         let path = parent.child(index);
-        let validated = validate_candidate(&after_root, self.source.limits)?;
+        let validated = validate_candidate(&after_root, self.source.formula.limits)?;
         self.stage(
             validated,
             SemanticChange::new(ChangeKind::Insert, path, None, Some(child)),
@@ -620,7 +462,7 @@ impl Edit<'_> {
                 .ok_or_else(|| invalid("MathML removal path is out of range"))?;
             Ok(())
         })?;
-        let validated = validate_candidate(&after_root, self.source.limits)?;
+        let validated = validate_candidate(&after_root, self.source.formula.limits)?;
         self.stage(
             validated,
             SemanticChange::new(ChangeKind::Remove, path.clone(), Some(before.clone()), None),
@@ -639,7 +481,7 @@ impl Edit<'_> {
             return Ok(before);
         }
         if path.is_root() {
-            let validated = validate_candidate(&replacement, self.source.limits)?;
+            let validated = validate_candidate(&replacement, self.source.formula.limits)?;
             self.stage(
                 validated,
                 SemanticChange::new(
@@ -658,7 +500,7 @@ impl Edit<'_> {
                 .ok_or_else(|| invalid("MathML replacement path is out of range"))?;
             Ok(())
         })?;
-        let validated = validate_candidate(&after_root, self.source.limits)?;
+        let validated = validate_candidate(&after_root, self.source.formula.limits)?;
         self.stage(
             validated,
             SemanticChange::new(
@@ -748,7 +590,7 @@ impl Edit<'_> {
     /// # Errors
     ///
     /// Returns an error when the root cannot be serialized and reparsed under
-    /// the source snapshot's retained limits.
+    /// the source package's retained limits.
     pub fn set_root(&mut self, root: Element) -> Result<()> {
         let path = NodePath::root();
         let _previous = self.replace(&path, root)?;
@@ -757,11 +599,17 @@ impl Edit<'_> {
 
     /// Atomically rebuild, reopen, and semantically verify the candidate.
     ///
+    /// An exact no-op publishes the source package byte for byte.
+    ///
     /// # Errors
     ///
     /// Returns an error when package rebuilding, bounded reopen, or semantic
-    /// readback fails. The source snapshot is never mutated.
-    pub fn commit(self) -> Result<Commit> {
+    /// readback fails. The source package is never mutated.
+    pub fn commit(self) -> std::result::Result<Commit, crate::Error> {
+        Ok(self.commit_core()?)
+    }
+
+    fn commit_core(self) -> Result<Commit> {
         let Some(replacement) = self.replacement else {
             return Ok(Commit::unchanged(self.source.clone()));
         };
@@ -770,25 +618,25 @@ impl Edit<'_> {
                 "Formula commit exceeds {MAX_SEMANTIC_OPERATIONS} semantic operations"
             )));
         }
+        let source = &self.source.formula;
         let xml = codec::serialize(&replacement);
-        let package = self.source.package.replace_content(xml.as_bytes())?;
-        let reopened = Formula::from_package(package, self.source.limits)?;
+        let archive = source.archive.replace_content(xml.as_bytes())?;
+        let reopened = Formula::from_archive(archive, source.limits)?;
         if reopened.root() != replacement.as_ref() {
             return Err(Error::InvalidFormat(
                 "Formula root edit failed semantic readback".to_string(),
             ));
         }
         let change = RootChange {
-            before: Arc::clone(&self.source.root),
+            before: Arc::clone(&source.root),
             after: replacement,
         };
-        let snapshot = reopened.with_commit_record(self.source, &self.changes)?;
-        let record = snapshot.history.last().cloned();
+        let package = Package::from_formula(reopened.with_commit_record(source, &self.changes)?);
         Ok(Commit {
-            snapshot: snapshot.clone(),
+            package: package.clone(),
             patch: Patch {
                 source: self.source.clone(),
-                target: snapshot,
+                target: package,
                 change: Some(change),
                 changes: self.changes,
             },
@@ -796,7 +644,6 @@ impl Edit<'_> {
                 changed: true,
                 candidate_reopened: true,
             },
-            record,
         })
     }
 
@@ -808,7 +655,7 @@ impl Edit<'_> {
     ) -> Result<()> {
         let before = element_at(self.root(), path.indices())?.clone();
         let after_root = transform_at(self.root(), path.indices(), mutation)?;
-        let validated = validate_candidate(&after_root, self.source.limits)?;
+        let validated = validate_candidate(&after_root, self.source.formula.limits)?;
         let after = element_at(&validated, path.indices())?.clone();
         if before != after {
             self.stage(
@@ -821,7 +668,7 @@ impl Edit<'_> {
 
     fn require_same_source(&self, other: &Self) -> Result<()> {
         if self.source.as_bytes() == other.source.as_bytes()
-            && self.source.limits == other.source.limits
+            && self.source.formula.limits == other.source.formula.limits
         {
             Ok(())
         } else {
@@ -830,7 +677,7 @@ impl Edit<'_> {
     }
 
     fn stage(&mut self, validated: Arc<Element>, change: SemanticChange) {
-        self.replacement = (validated.as_ref() != self.source.root()).then_some(validated);
+        self.replacement = (validated.as_ref() != self.source.formula.root()).then_some(validated);
         if self.replacement.is_some() {
             self.changes.push(change);
         } else {
@@ -1068,7 +915,7 @@ pub struct RootChange {
 }
 
 impl RootChange {
-    /// The source snapshot's root.
+    /// The source package's root.
     #[must_use]
     pub fn before(&self) -> &Element {
         &self.before
@@ -1102,42 +949,34 @@ impl Diagnostics {
     }
 }
 
-/// A committed immutable Formula snapshot and its reversible patch.
+/// A committed immutable Formula package and its reversible patch.
 pub struct Commit {
-    snapshot: Formula,
+    package: Package,
     patch: Patch,
     diagnostics: Diagnostics,
-    record: Option<CommitRecord>,
 }
 
 impl Commit {
-    fn unchanged(snapshot: Formula) -> Self {
+    fn unchanged(package: Package) -> Self {
         Self {
             patch: Patch {
-                source: snapshot.clone(),
-                target: snapshot.clone(),
+                source: package.clone(),
+                target: package.clone(),
                 change: None,
                 changes: Vec::new(),
             },
-            snapshot,
+            package,
             diagnostics: Diagnostics {
                 changed: false,
                 candidate_reopened: false,
             },
-            record: None,
         }
     }
 
-    /// Whether the committed package differs from its source.
+    /// The published immutable package.
     #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.diagnostics.changed
-    }
-
-    /// The published immutable Formula snapshot.
-    #[must_use]
-    pub const fn formula(&self) -> &Formula {
-        &self.snapshot
+    pub const fn package(&self) -> &Package {
+        &self.package
     }
 
     /// The source-checked reversible patch.
@@ -1152,24 +991,24 @@ impl Commit {
         self.diagnostics
     }
 
-    /// Commit-coupled semantic record, absent for an exact no-op.
+    /// Consume this commit into the published package.
     #[must_use]
-    pub const fn record(&self) -> Option<&CommitRecord> {
-        self.record.as_ref()
+    pub fn into_package(self) -> Package {
+        self.package
     }
 
-    /// Consume this commit into the published snapshot.
+    /// Consume this commit into the published package and its patch.
     #[must_use]
-    pub fn into_formula(self) -> Formula {
-        self.snapshot
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
     }
 }
 
 /// A byte-exact source-checked reversible Formula root patch.
 #[derive(Clone)]
 pub struct Patch {
-    source: Formula,
-    target: Formula,
+    source: Package,
+    target: Package,
     change: Option<RootChange>,
     changes: Vec<SemanticChange>,
 }
@@ -1177,24 +1016,29 @@ pub struct Patch {
 impl Patch {
     /// Whether this patch authorizes the supplied exact source package.
     #[must_use]
-    pub fn is_applicable_to(&self, source: &Formula) -> bool {
+    pub fn is_applicable_to(&self, source: &Package) -> bool {
         self.source.as_bytes() == source.as_bytes()
     }
 
+    /// Whether this patch publishes its source package unchanged.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.change.is_none() && self.source.as_bytes() == self.target.as_bytes()
+    }
+
     /// Apply this patch only to its byte-exact immutable source.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the supplied source is stale or unrelated.
-    pub fn apply(&self, source: &Formula) -> Result<Formula> {
+    pub(crate) fn apply(&self, source: &Package) -> Result<Package> {
         if !self.is_applicable_to(source) {
             return Err(Error::InvalidFormat(
-                "Formula patch source does not match its expected snapshot".to_string(),
+                "Formula patch source does not match its expected package".to_string(),
             ));
         }
-        self.target
-            .clone()
-            .with_commit_record(source, &self.changes)
+        Ok(Package::from_formula(
+            self.target
+                .formula
+                .clone()
+                .with_commit_record(&source.formula, &self.changes)?,
+        ))
     }
 
     /// The semantic root change, or `None` for an exact no-op.
@@ -1227,7 +1071,7 @@ impl Patch {
     ///
     /// Returns an error unless both patches use `base` as their byte-exact
     /// source or the non-conflicting candidate fails validation.
-    pub fn plan_three_way(base: &Formula, left: &Self, right: &Self) -> Result<ThreeWayPlan> {
+    pub fn plan_three_way(base: &Package, left: &Self, right: &Self) -> Result<ThreeWayPlan> {
         ThreeWayPlan::new(base, left, right)
     }
 
@@ -1256,20 +1100,21 @@ impl Patch {
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         let mut reader = WireReader::new(bytes);
         reader.expect_magic(PATCH_MAGIC)?;
-        let source = Formula::from_bytes(reader.read_blob()?.to_vec())?;
-        let target = Formula::from_bytes(reader.read_blob()?.to_vec())?;
+        let source = Package::from_wire(reader.read_blob()?)?;
+        let target = Package::from_wire(reader.read_blob()?)?;
+        let limits = source.formula.limits();
         let count = reader.read_usize()?;
-        if count > source.limits().nodes().min(MAX_SEMANTIC_OPERATIONS) {
+        if count > limits.nodes().min(MAX_SEMANTIC_OPERATIONS) {
             return Err(invalid("Formula patch has too many semantic changes"));
         }
         let mut changes = Vec::with_capacity(count);
         for _index in 0..count {
-            changes.push(reader.read_change(source.limits())?);
+            changes.push(reader.read_change(limits)?);
         }
         reader.finish()?;
-        let change = (source.root() != target.root()).then(|| RootChange {
-            before: Arc::clone(&source.root),
-            after: Arc::clone(&target.root),
+        let change = (source.formula.root() != target.formula.root()).then(|| RootChange {
+            before: Arc::clone(&source.formula.root),
+            after: Arc::clone(&target.formula.root),
         });
         let patch = Self {
             source,
@@ -1304,7 +1149,7 @@ impl Patch {
         if self.change.is_none() && !self.changes.is_empty() {
             return Err(invalid("no-op Formula patch contains semantic changes"));
         }
-        let mut candidate = self.source.root().clone();
+        let mut candidate = self.source.formula.root().clone();
         for change in &self.changes {
             if let Some(before) = change.before()
                 && before.namespace_uri() == Some(crate::model::NAMESPACE)
@@ -1319,7 +1164,7 @@ impl Patch {
             candidate = apply_semantic_change(&candidate, change)?;
         }
         codec::validate(&candidate)?;
-        if &candidate == self.target.root() {
+        if &candidate == self.target.formula.root() {
             Ok(())
         } else {
             Err(invalid(
@@ -1332,7 +1177,7 @@ impl Patch {
 /// Non-mutating three-way plan over two patches from one exact base.
 #[derive(Clone)]
 pub struct ThreeWayPlan {
-    base: Formula,
+    base: Package,
     candidate: Option<Arc<Element>>,
     changes: Vec<SemanticChange>,
     conflicts: Vec<DependencyConflict>,
@@ -1341,7 +1186,7 @@ pub struct ThreeWayPlan {
 }
 
 impl ThreeWayPlan {
-    fn new(base: &Formula, left: &Patch, right: &Patch) -> Result<Self> {
+    fn new(base: &Package, left: &Patch, right: &Patch) -> Result<Self> {
         if !left.is_applicable_to(base) || !right.is_applicable_to(base) {
             return Err(invalid(
                 "Formula three-way patches do not share the supplied exact base",
@@ -1361,11 +1206,11 @@ impl ThreeWayPlan {
         let mut changes = left.changes().to_vec();
         changes.extend_from_slice(transfer.operations());
         let candidate = if transfer.is_complete() {
-            let mut root = base.root().clone();
+            let mut root = base.formula.root().clone();
             for change in &changes {
                 root = apply_semantic_change(&root, change)?;
             }
-            Some(validate_candidate(&root, base.limits())?)
+            Some(validate_candidate(&root, base.formula.limits())?)
         } else {
             None
         };
@@ -1414,7 +1259,7 @@ impl ThreeWayPlan {
     /// # Errors
     ///
     /// Returns an error when conflicts exist or publication/readback fails.
-    pub fn publish(&self) -> Result<Commit> {
+    pub fn publish(&self) -> std::result::Result<Commit, crate::Error> {
         let candidate = self
             .candidate
             .as_ref()
@@ -1497,12 +1342,12 @@ impl History {
     /// # Errors
     ///
     /// Returns an error when the origin or any link is stale.
-    pub fn apply(&self, origin: &Formula) -> Result<Formula> {
-        let mut snapshot = origin.clone();
+    pub fn apply(&self, origin: &Package) -> Result<Package> {
+        let mut package = origin.clone();
         for patch in &self.patches {
-            snapshot = patch.apply(&snapshot)?;
+            package = patch.apply(&package)?;
         }
-        Ok(snapshot)
+        Ok(package)
     }
 
     /// Serialize all entries into a durable sidecar envelope.
@@ -1956,16 +1801,4 @@ fn check_package_bytes(actual: usize, limits: codec::Limits) -> Result<()> {
         )));
     }
     Ok(())
-}
-
-fn read_all(reader: impl Read, maximum: usize) -> Result<Vec<u8>> {
-    let mut bytes = Vec::new();
-    let read_limit = u64::try_from(maximum).unwrap_or(u64::MAX).saturating_add(1);
-    reader.take(read_limit).read_to_end(&mut bytes)?;
-    if bytes.len() > maximum {
-        return Err(Error::InvalidFormat(format!(
-            "Formula package stream exceeds the {maximum} byte limit"
-        )));
-    }
-    Ok(bytes)
 }

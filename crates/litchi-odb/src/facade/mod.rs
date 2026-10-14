@@ -8,30 +8,103 @@ use std::{
 
 pub use crate::authoring::Builder;
 
-/// Immutable document snapshot.
+/// The immutable, cheap-to-clone database package owner.
+///
+/// It owns every state verb (open, edit, apply, save); its read-only semantic
+/// projection is [`Database`], obtained from [`Package::database`].
 #[derive(Clone)]
-pub struct Database {
-    pub(crate) package: crate::package::Snapshot,
-    pub(crate) settings: Arc<OnceLock<crate::DatabaseSettings>>,
+pub struct Package {
+    pub(crate) database: Database,
 }
 
-impl Database {
-    /// Opens a database package from a file path.
+impl std::fmt::Debug for Package {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Package")
+            .field("bytes", &self.as_bytes().len())
+            .finish_non_exhaustive()
+    }
+}
+
+impl Package {
+    /// Creates the minimal valid database package (an empty data source).
+    ///
+    /// Creation is deterministic: no clock or randomness is consulted.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if package writing fails.
+    pub fn new() -> std::result::Result<Self, litchi_odf_common::Error> {
+        Builder::new().build()
+    }
+
+    /// Opens a database package from a file path under the default limits.
     ///
     /// # Errors
     ///
     /// Returns an error if the file cannot be read or is not a valid package.
-    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        crate::package::Snapshot::open(path).map(Self::from_package)
+    pub fn open(path: impl AsRef<Path>) -> std::result::Result<Self, litchi_odf_common::Error> {
+        Self::open_with_options(path, litchi_odf_common::OpenOptions::new())
     }
 
-    /// Opens a database package from in-memory bytes.
+    /// Opens a database package from a file path under caller-selected
+    /// source and semantic limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`litchi_odf_common::Error::Limit`] when a selected limit is
+    /// exceeded, and another error for an unreadable or invalid package.
+    pub fn open_with_options(
+        path: impl AsRef<Path>,
+        options: litchi_odf_common::OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        crate::package::Snapshot::open_with_options(path, options).map(Self::from_snapshot)
+    }
+
+    /// Opens a database package from in-memory bytes (copied once).
     ///
     /// # Errors
     ///
     /// Returns an error if the bytes are not a valid package.
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        crate::package::Snapshot::from_bytes(bytes).map(Self::from_package)
+    pub fn from_bytes(bytes: &[u8]) -> std::result::Result<Self, litchi_odf_common::Error> {
+        Self::from_bytes_with_options(bytes, litchi_odf_common::OpenOptions::new())
+    }
+
+    /// Opens a database package from in-memory bytes under caller-selected
+    /// limits.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Self::open_with_options`].
+    pub fn from_bytes_with_options(
+        bytes: &[u8],
+        options: litchi_odf_common::OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        crate::package::Snapshot::from_bytes_with_options(copy_input(bytes)?, options)
+            .map(Self::from_snapshot)
+    }
+
+    /// Reads a database package from a stream under the default limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the stream cannot be read or is not a valid package.
+    pub fn from_reader(
+        reader: impl std::io::Read,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        Self::from_reader_with_options(reader, litchi_odf_common::OpenOptions::new())
+    }
+
+    /// Reads a database package from a stream under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Self::open_with_options`].
+    pub fn from_reader_with_options(
+        reader: impl std::io::Read,
+        options: litchi_odf_common::OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        crate::package::Snapshot::from_reader_with_options(reader, options).map(Self::from_snapshot)
     }
 
     /// Opens a password-encrypted database package from a file path.
@@ -43,8 +116,26 @@ impl Database {
     ///
     /// Returns an error if the file cannot be read, the password is incorrect,
     /// or the decrypted package is invalid.
-    pub fn open_with_password(path: impl AsRef<Path>, password: impl Into<String>) -> Result<Self> {
-        crate::package::Snapshot::open_with_password(path, password).map(Self::from_package)
+    pub fn open_with_password(
+        path: impl AsRef<Path>,
+        password: impl Into<String>,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        Self::open_with_password_and_options(path, password, litchi_odf_common::OpenOptions::new())
+    }
+
+    /// Opens a password-encrypted database package from a file path under
+    /// caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Self::open_with_password`] and [`Self::open_with_options`].
+    pub fn open_with_password_and_options(
+        path: impl AsRef<Path>,
+        password: impl Into<String>,
+        options: litchi_odf_common::OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        crate::package::Snapshot::open_with_password_and_options(path, password, options)
+            .map(Self::from_snapshot)
     }
 
     /// Opens a password-encrypted database package from in-memory bytes.
@@ -52,17 +143,196 @@ impl Database {
     /// # Errors
     ///
     /// Returns an error for an incorrect password or invalid decrypted package.
-    pub fn from_bytes_with_password(bytes: Vec<u8>, password: impl Into<String>) -> Result<Self> {
-        crate::package::Snapshot::from_bytes_with_password(bytes, password).map(Self::from_package)
+    pub fn from_bytes_with_password(
+        bytes: &[u8],
+        password: impl Into<String>,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        Self::from_bytes_with_password_and_options(
+            bytes,
+            password,
+            litchi_odf_common::OpenOptions::new(),
+        )
     }
 
-    fn from_package(package: crate::package::Snapshot) -> Self {
+    /// Opens a password-encrypted database package from in-memory bytes
+    /// under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Self::from_bytes_with_password`] and
+    /// [`Self::open_with_options`].
+    pub fn from_bytes_with_password_and_options(
+        bytes: &[u8],
+        password: impl Into<String>,
+        options: litchi_odf_common::OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        crate::package::Snapshot::from_bytes_with_password_and_options(
+            copy_input(bytes)?,
+            password,
+            options,
+        )
+        .map(Self::from_snapshot)
+    }
+
+    /// Adopts the packaged ODF detection result without a second ZIP index.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when detection classified another format or the
+    /// package is not a valid database.
+    pub fn from_prepared_package(
+        prepared: litchi_odf_common::PreparedPackage,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        if prepared.format() != litchi_core::detection::FileFormat::Odb {
+            return Err(Error::UnexpectedFormat {
+                detected: prepared.format(),
+            }
+            .into());
+        }
+        crate::package::Snapshot::from_owned_package_with_options(
+            prepared.into_package(),
+            litchi_odf_common::OpenOptions::new(),
+        )
+        .map(Self::from_snapshot)
+    }
+
+    pub(crate) fn from_snapshot(package: crate::package::Snapshot) -> Self {
         Self {
-            package,
-            settings: Arc::new(OnceLock::new()),
+            database: Database {
+                package,
+                settings: Arc::new(OnceLock::new()),
+            },
         }
     }
 
+    /// Reopens bytes this crate published (default limits).
+    pub(crate) fn from_published(bytes: Vec<u8>) -> Result<Self> {
+        crate::package::Snapshot::from_bytes(bytes).map(Self::from_snapshot)
+    }
+
+    /// Returns the tolerated deviations recorded while opening the package.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
+        self.database.package.tolerance_report()
+    }
+
+    /// Borrows the read-only semantic projection; clone it for an owned,
+    /// cheap handle.
+    #[must_use]
+    pub const fn database(&self) -> &Database {
+        &self.database
+    }
+
+    /// Returns the exact package bytes.
+    #[must_use]
+    pub fn as_bytes(&self) -> &[u8] {
+        self.database.package.as_bytes()
+    }
+
+    /// Starts a source-bound unified database-front-end transaction.
+    ///
+    /// Connection targets, query commands, component links, and producer
+    /// extensions remain inert data and are never opened or executed.
+    #[must_use]
+    pub fn edit(&self) -> crate::Edit<'_> {
+        crate::Edit::new(self, crate::EditPolicy::default())
+    }
+
+    /// Starts a unified transaction with explicit protected-package policy.
+    #[must_use]
+    pub fn edit_with_policy(&self, policy: crate::EditPolicy) -> crate::Edit<'_> {
+        crate::Edit::new(self, policy)
+    }
+
+    /// Replays a committed patch onto this exact source package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when this package is not the patch's source.
+    pub fn apply(
+        &self,
+        patch: &crate::Patch,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        Ok(patch.apply(self)?)
+    }
+
+    /// Atomically saves the package (sibling temporary file, then rename,
+    /// with file and directory synchronization).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the staging file cannot be written or renamed;
+    /// the destination is then unchanged.
+    pub fn save(
+        &self,
+        path: impl AsRef<Path>,
+    ) -> std::result::Result<(), litchi_odf_common::Error> {
+        self.save_with_durability(path, litchi_core::Durability::Full)
+    }
+
+    /// Atomically saves the package with an explicit durability level.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Self::save`].
+    pub fn save_with_durability(
+        &self,
+        path: impl AsRef<Path>,
+        durability: litchi_core::Durability,
+    ) -> std::result::Result<(), litchi_odf_common::Error> {
+        litchi_odf_common::publish::save_bytes(path.as_ref(), self.as_bytes(), durability)
+    }
+
+    /// Returns a copy of the package bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the copy cannot be allocated.
+    pub fn to_bytes(&self) -> std::result::Result<Vec<u8>, litchi_odf_common::Error> {
+        Ok(copy_input(self.as_bytes())?)
+    }
+
+    /// Writes the package bytes to `sink`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the sink fails.
+    pub fn write_to(
+        &self,
+        mut sink: impl std::io::Write,
+    ) -> std::result::Result<(), litchi_odf_common::Error> {
+        sink.write_all(self.as_bytes()).map_err(Error::from)?;
+        Ok(())
+    }
+}
+
+fn copy_input(bytes: &[u8]) -> Result<Vec<u8>> {
+    let mut copy = Vec::new();
+    copy.try_reserve_exact(bytes.len())
+        .map_err(|source| Error::Allocation {
+            resource: "ODB package bytes",
+            source,
+        })?;
+    copy.extend_from_slice(bytes);
+    Ok(copy)
+}
+
+/// The read-only semantic projection of a database [`Package`].
+///
+/// Cheap to clone; it carries no state verbs.
+#[derive(Clone)]
+pub struct Database {
+    pub(crate) package: crate::package::Snapshot,
+    pub(crate) settings: Arc<OnceLock<crate::DatabaseSettings>>,
+}
+
+impl std::fmt::Debug for Database {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.debug_struct("Database").finish_non_exhaustive()
+    }
+}
+
+impl Database {
     /// Returns the `content.xml` document.
     #[must_use]
     pub fn content_xml(&self) -> &str {
@@ -364,27 +634,6 @@ impl Database {
     pub fn verify_document_signatures(&self) -> Result<Vec<crate::SignatureVerification>> {
         self.package.verify_document_signatures()
     }
-
-    /// Starts a source-bound unified database-front-end transaction.
-    ///
-    /// Connection targets, query commands, component links, and producer
-    /// extensions remain inert data and are never opened or executed.
-    #[must_use]
-    pub fn edit(&self) -> crate::Edit<'_> {
-        crate::Edit::new(self, crate::EditPolicy::default())
-    }
-
-    /// Starts a unified transaction with explicit protected-package policy.
-    #[must_use]
-    pub fn edit_with_policy(&self, policy: crate::EditPolicy) -> crate::Edit<'_> {
-        crate::Edit::new(self, policy)
-    }
-
-    /// Consumes the snapshot and returns the raw package bytes.
-    #[must_use]
-    pub fn into_bytes(self) -> Vec<u8> {
-        self.package.into_bytes()
-    }
 }
 
 #[cfg(test)]
@@ -393,13 +642,13 @@ impl Database {
     reason = "test code panics on failure; unwrap keeps assertions concise"
 )]
 mod tests {
-    use super::{Builder, Database};
+    use super::Builder;
     use crate::model::{parse_count, parse_test_lock, reset_parse_count};
 
     #[test]
     fn builder_opens_as_validated_snapshot() {
-        let bytes = Builder::new().build().unwrap();
-        let document = Database::from_bytes(bytes).unwrap();
+        let package = Builder::new().build().unwrap();
+        let document = package.database();
         assert!(document.content_xml().contains("<office:database"));
         assert!(!document.as_bytes().is_empty());
         assert!(document.catalog().unwrap().tables().is_empty());
@@ -409,7 +658,8 @@ mod tests {
     fn settings_reads_materialize_lazily_and_reuse_success() {
         let _lock = parse_test_lock().lock().unwrap();
         reset_parse_count();
-        let document = Database::from_bytes(Builder::new().build().unwrap()).unwrap();
+        let package = Builder::new().build().unwrap();
+        let document = package.database();
         assert_eq!(parse_count(), 0);
         let catalog = document.catalog().unwrap();
         assert!(catalog.tables().is_empty());
@@ -426,15 +676,13 @@ mod tests {
     fn custom_catalog_limits_do_not_reuse_default_settings_cache() {
         let _lock = parse_test_lock().lock().unwrap();
         reset_parse_count();
-        let document = Database::from_bytes(
-            Builder::new()
+        let package = Builder::new()
                 .content_xml(
                     r#"<?xml version="1.0"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:db="urn:oasis:names:tc:opendocument:xmlns:database:1.0" xmlns:xlink="http://www.w3.org/1999/xlink"><office:body><office:database><db:data-source><db:connection-data><db:connection-resource xlink:href="" xlink:type="simple"/><db:login db:user-name="alice"/></db:connection-data></db:data-source></office:database></office:body></office:document-content>"#,
                 )
                 .build()
-                .unwrap(),
-        )
-        .unwrap();
+                .unwrap();
+        let document = package.database();
         document.settings().unwrap();
         assert_eq!(parse_count(), 1);
 

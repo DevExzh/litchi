@@ -1,8 +1,8 @@
 //! Deterministic semantic patches, transfer, and non-mutating merge planning.
 
 use crate::{
-    Commit, Edit, FlatImage, FlatImageCommit, FrameChange, Image, MetadataFields, ResourceChange,
-    frame::Frame, map::ImageMap, source::Source,
+    Commit, Edit, FlatImage, FlatImageCommit, FrameChange, Image, MetadataFields, Package,
+    ResourceChange, frame::Frame, map::ImageMap, source::Source,
 };
 use litchi_core::{Error, Result};
 use quick_xml::{
@@ -502,16 +502,18 @@ impl SemanticPlan {
     }
 
     /// Applies this plan to a package and fully reopens the result.
-    pub fn commit_package(&self, source: &Image, policy: &SecurityPolicy) -> Result<Commit> {
+    pub fn commit_package(&self, source: &Package, policy: &SecurityPolicy) -> Result<Commit> {
         self.ensure_publishable(policy)?;
-        ensure_current_values(&self.operations, |key| package_value(source, key))?;
+        ensure_current_values(&self.operations, |key| {
+            package_value(source.image_ref(), key)
+        })?;
         let mut edit = source.edit();
         for operation in &self.operations {
             apply_package_operation(&mut edit, operation)?;
         }
         let commit = edit.commit()?;
-        let reopened = Image::from_bytes(commit.image().as_bytes().to_vec())?;
-        if reopened.as_bytes() != commit.image().as_bytes() {
+        let reopened = Package::from_vec(commit.package().as_bytes().to_vec())?;
+        if reopened.as_bytes() != commit.package().as_bytes() {
             return Err(invalid("ODI package plan failed full byte reopen"));
         }
         Ok(commit)
@@ -564,7 +566,14 @@ impl SemanticPatch {
         )
     }
 
-    pub(crate) fn from_package_commit(commit: &Commit, policy: &SecurityPolicy) -> Result<Self> {
+    /// Builds a deterministic semantic patch from a committed package edit
+    /// under explicit limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an operation or the retained byte count
+    /// violates `policy`.
+    pub fn from_package_commit(commit: &Commit, policy: &SecurityPolicy) -> Result<Self> {
         let mut operations = frame_operations(commit.patch().changes());
         if let Some(change) = commit.patch().metadata_change() {
             operations.extend(metadata_operations(change.before(), change.after()));
@@ -577,12 +586,16 @@ impl SemanticPatch {
             });
         }
         for change in commit.patch().resource_changes() {
-            operations.push(resource_operation(commit.source(), commit.image(), change)?);
+            operations.push(resource_operation(
+                commit.source().image_ref(),
+                commit.package().image_ref(),
+                change,
+            )?);
         }
         Self::new(
             ArtifactKind::Package,
             commit.source().as_bytes(),
-            commit.image().as_bytes(),
+            commit.package().as_bytes(),
             operations,
             policy,
         )
@@ -656,11 +669,11 @@ impl SemanticPatch {
     }
 
     /// Applies only to the exact package source and reparses the target bytes.
-    pub fn apply_package(&self, source: &Image) -> Result<Image> {
+    pub fn apply_package(&self, source: &Package) -> Result<Package> {
         if self.kind != ArtifactKind::Package || self.source.as_slice() != source.as_bytes() {
             return Err(invalid("stale or wrong-kind ODI semantic patch source"));
         }
-        Image::from_bytes(self.target.as_ref().clone())
+        Package::from_vec(self.target.as_ref().clone())
     }
 
     /// Joins two patches derived from the same exact source without mutation.
@@ -683,7 +696,8 @@ impl SemanticPatch {
 
     /// Plans a three-way application or cross-artifact transfer to a package.
     #[must_use]
-    pub fn plan_package(&self, current: &Image) -> SemanticPlan {
+    pub fn plan_package(&self, current: &Package) -> SemanticPlan {
+        let current = current.image_ref();
         let mut plan = plan_operations(&self.operations, |key| package_value(current, key));
         complete_package_dependencies(self, current, &mut plan);
         plan.operations
@@ -696,7 +710,7 @@ impl SemanticPatch {
 
 fn complete_package_dependencies(patch: &SemanticPatch, current: &Image, plan: &mut SemanticPlan) {
     let target_package = if patch.kind == ArtifactKind::Package {
-        Image::from_bytes(patch.target.as_ref().clone()).ok()
+        Package::from_vec(patch.target.as_ref().clone()).ok()
     } else {
         None
     };
@@ -709,7 +723,7 @@ fn complete_package_dependencies(patch: &SemanticPatch, current: &Image, plan: &
                 complete_resource_dependency(
                     patch,
                     current,
-                    target_package.as_ref(),
+                    target_package.as_ref().map(Package::image_ref),
                     *frame,
                     href,
                     operation.key(),
@@ -719,7 +733,7 @@ fn complete_package_dependencies(patch: &SemanticPatch, current: &Image, plan: &
             (FrameProperty::StyleName, SemanticValue::Text(Some(name))) => {
                 complete_style_dependency(
                     current,
-                    target_package.as_ref(),
+                    target_package.as_ref().map(Package::image_ref),
                     name,
                     "graphic",
                     operation.key(),
@@ -729,7 +743,7 @@ fn complete_package_dependencies(patch: &SemanticPatch, current: &Image, plan: &
             (FrameProperty::TextStyleName, SemanticValue::Text(Some(name))) => {
                 complete_style_dependency(
                     current,
-                    target_package.as_ref(),
+                    target_package.as_ref().map(Package::image_ref),
                     name,
                     "paragraph",
                     operation.key(),
