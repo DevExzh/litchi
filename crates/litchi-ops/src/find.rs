@@ -52,9 +52,15 @@ mod tests;
 use std::borrow::Cow;
 
 pub(crate) use matcher::Matcher;
+#[cfg(feature = "docx")]
+pub(crate) use plan::matches_with;
 #[cfg(test)]
 pub(crate) use plan::plan;
-pub(crate) use plan::{Piece, Scratch, Values, matches_with, plan_with, rewrite_ranges};
+#[cfg(any(feature = "pptx", feature = "xlsx", feature = "rtf"))]
+pub(crate) use plan::plan_with;
+pub(crate) use plan::{Piece, Scratch};
+#[cfg(feature = "pptx")]
+pub(crate) use plan::{Values, rewrite_ranges};
 
 use crate::error::{Code, Error, Result};
 use crate::props::{PropValue, Props};

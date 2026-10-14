@@ -72,7 +72,7 @@ impl<P: Clone> Edit<P> {
     }
 
     /// The main document's story within the elements `scopes` name. See
-    /// [`super::snapshot::Edit::story_within`].
+    /// [`crate::document::snapshot::Edit::story_within`].
     ///
     /// ```
     /// use litchi_core::Position;
@@ -114,7 +114,7 @@ impl<P: Clone> Edit<P> {
 
     /// [`Self::substitute`], formatting the runs that
     /// [`Replacement::formatted`] replacements split out. See
-    /// [`super::snapshot::Edit::substitute_formatted`].
+    /// [`crate::document::snapshot::Edit::substitute_formatted`].
     ///
     /// # Errors
     ///
