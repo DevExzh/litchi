@@ -1,0 +1,8 @@
+Xlsx set /title (eager open): native 8740 ns, unified 9110 ns, ratio 1.042
+Xlsx set /title (source open): native 8670 ns, unified 9120 ns, ratio 1.052
+Pptx set /title (eager open): native 70521 ns, unified 71410 ns, ratio 1.013
+Pptx set /title (source open): native 70030 ns, unified 71181 ns, ratio 1.016
+Xlsb set /title (eager open): native 32290 ns, unified 32770 ns, ratio 1.015
+Xlsb set /title (source open): native 32210 ns, unified 20680 ns, ratio 0.642
+Pptx open + first set /title (source open vs leaf eager open): native 377622 ns, unified 496403 ns, ratio 1.315
+Error: Os { code: 2, kind: NotFound, message: "No such file or directory" }
