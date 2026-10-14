@@ -488,6 +488,34 @@ pub struct OpcPackage {
 
     /// Save preferences
     save_options: SaveOptions,
+
+    /// The main-document partname, with the relationship it was resolved
+    /// from (record 0286). [`OpcPackage::main_document_part`] reuses it only
+    /// while the package's main-document relationship still has the same
+    /// identifier, target, base and source, so no mutation needs to clear
+    /// it; clones share it.
+    main_partname: OnceLock<Arc<MainPartname>>,
+}
+
+/// A resolved main-document partname and the relationship inputs it was
+/// resolved from.
+#[derive(Debug)]
+struct MainPartname {
+    relationship: crate::rel::Relationship,
+    partname: PackURI,
+}
+
+impl MainPartname {
+    /// Whether `relationship` resolves to this partname: the inputs of
+    /// [`crate::rel::Relationship::target_partname`] are all equal.
+    fn resolves(&self, relationship: &crate::rel::Relationship) -> bool {
+        let memo = &self.relationship;
+        memo.r_id() == relationship.r_id()
+            && memo.target_ref() == relationship.target_ref()
+            && memo.base_uri() == relationship.base_uri()
+            && memo.source_uri() == relationship.source_uri()
+            && memo.target_mode() == relationship.target_mode()
+    }
 }
 
 impl std::fmt::Debug for OpcPackage {
@@ -539,6 +567,7 @@ impl OpcPackage {
             non_part_members: Vec::new(),
             tolerance_report: ToleranceReport::default(),
             save_options: SaveOptions::default(),
+            main_partname: OnceLock::new(),
         }
     }
 
@@ -1701,8 +1730,18 @@ impl OpcPackage {
                 "main-document relationship cannot be external".to_string(),
             ));
         }
+        if let Some(memo) = self.main_partname.get()
+            && memo.resolves(rel)
+        {
+            return self.get_part(&memo.partname);
+        }
         let partname = rel.target_partname()?;
-        self.get_part(&partname)
+        let part = self.get_part(&partname)?;
+        let _first = self.main_partname.set(Arc::new(MainPartname {
+            relationship: rel.clone(),
+            partname,
+        }));
+        Ok(part)
     }
 
     /// Get a part by its partname.
@@ -1899,8 +1938,18 @@ impl OpcPackage {
     /// part is missing.
     pub fn part_by_reltype(&self, reltype: &str) -> Result<&dyn Part> {
         let rel = self.rels.part_with_reltype(reltype)?;
+        if let Some(memo) = self.main_partname.get()
+            && memo.resolves(rel)
+        {
+            return self.get_part(&memo.partname);
+        }
         let partname = rel.target_partname()?;
-        self.get_part(&partname)
+        let part = self.get_part(&partname)?;
+        let _first = self.main_partname.set(Arc::new(MainPartname {
+            relationship: rel.clone(),
+            partname,
+        }));
+        Ok(part)
     }
 
     /// Add a new part to the package.
@@ -4952,6 +5001,40 @@ mod tests {
 
         package.relate_to("other.xml", relationship_type::OFFICE_DOCUMENT);
         assert!(package.main_document_part().is_err());
+    }
+
+    #[test]
+    fn remembered_main_document_part_follows_relationship_changes() {
+        let mut package = OpcPackage::new();
+        for name in ["/word/document.xml", "/word/other.xml"] {
+            package.add_part(Box::new(BlobPart::new(
+                PackURI::new(name).unwrap(),
+                "application/xml".to_string(),
+                Vec::new(),
+            )));
+        }
+        let r_id = package.relate_to("word/document.xml", relationship_type::OFFICE_DOCUMENT);
+        let first = PackURI::new("/word/document.xml").unwrap();
+        assert_eq!(package.main_document_part().unwrap().partname(), &first);
+        // Remembered: a clone and a repeated call resolve the same part.
+        assert_eq!(package.main_document_part().unwrap().partname(), &first);
+        let clone = package.clone();
+        assert_eq!(clone.main_document_part().unwrap().partname(), &first);
+
+        // A retarget, a removal and a replacement are each seen at once.
+        package
+            .rels_mut()
+            .retarget(&r_id, "word/other.xml".to_owned())
+            .unwrap();
+        assert_eq!(
+            package.main_document_part().unwrap().partname().as_str(),
+            "/word/other.xml"
+        );
+        package.rels_mut().remove(&r_id);
+        assert!(package.main_document_part().is_err());
+        package.relate_to("word/document.xml", relationship_type::OFFICE_DOCUMENT);
+        assert_eq!(package.main_document_part().unwrap().partname(), &first);
+        assert_eq!(clone.main_document_part().unwrap().partname(), &first);
     }
 
     #[test]
