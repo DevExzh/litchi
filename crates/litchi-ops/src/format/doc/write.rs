@@ -56,12 +56,9 @@ impl Doc {
         };
         let path = target.path().expect("path checked above");
         let node = crate::path::resolve::get(&super::Nav::new(self), path)?;
+        // Run text and other nodes take the ordinary setter path (0289).
         let Some(position) = node.paragraph_position() else {
-            return Err(Error::new(
-                Code::UnsupportedCapability,
-                "DOC text writes target paragraph nodes",
-            )
-            .with_format(litchi_core::FileFormat::Doc));
+            return Ok(None);
         };
         Ok(Some(Plan {
             position,

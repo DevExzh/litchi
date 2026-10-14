@@ -954,8 +954,9 @@ const fn read_gap(element: &'static str) -> GapSpec {
 pub(crate) const SETTABLE: &[&str] = &[
     "p", "r", "tc", "header", "footer", "footnote", "endnote", "comment",
 ];
-/// Elements the unified RTF writer creates.
-pub(crate) const ADDABLE: &[&str] = &["body", "p", "r"];
+/// Elements the unified RTF writer creates: paragraphs (under the body)
+/// and runs. The body itself is a parent, never added (record 0289).
+pub(crate) const ADDABLE: &[&str] = &["p", "r"];
 /// Elements the unified RTF writer removes.
 pub(crate) const REMOVABLE: &[&str] = &["p", "r", "picture"];
 

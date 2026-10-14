@@ -24,7 +24,7 @@ differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `86e968845c303bf78b2f2f7ad0cecf24a277cb1ab77f87721fb2b86958bd89bd` |
 | golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `8b7d0fb6364c01a35f8e4ca4aa2b4d59214bb3be1144ae3c32804ff8211f1028` |
 | golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `85c16b486c3dadd7565c8855656c93f20bba6a09d62bf7dbee7e67603a0f6a54` |
-| golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `a6ee55a8d6d82990eadbd51ff37fa1d108e4093a9da73d89ed0a0b9a71510990` |
+| golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `c48a379cc794c4ef21c52b5194f6a5c48cebb0f00f9e101e260415adfdbd8461` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `728daa474cf4f13235a7d82ad19802d4a051195be4bdc6b73dc462cabea8b957` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `d261a29c010985932815530391ff3b57dff5ebb7c490acc95fa955b1ccf57f7e` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsb.json` | `ed42211205eb0476cc90d02802f88c447b9bcf6ae4a28c54816704539152e06f` |
