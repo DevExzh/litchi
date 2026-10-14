@@ -14,7 +14,7 @@ use crate::error::{Error, Result};
 /// Table, Row, and Cell structures for Word documents.
 use crate::namespace::{
     NamespaceBindings, direct_word_property_value, normalize_xml_integer, scan_word_element_ranges,
-    scan_word_element_ranges_with_context,
+    scan_word_element_ranges_with_context, scan_word_element_ranges_with_context_until,
 };
 use crate::paragraph::{Paragraph, extract_word_text, is_fragment_word_name};
 use crate::revision::Revision;
@@ -395,6 +395,44 @@ impl Table {
         Ok(rows)
     }
 
+    /// The row at `index` (zero-based), or `None` past the last row.
+    ///
+    /// Unlike [`Self::rows`], it reads the table only up to that row when the
+    /// rows are not cached yet, so addressing an early row of a long table
+    /// does not split the whole table.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
+    pub fn row(&self, index: usize) -> Result<Option<Row>> {
+        if let Some(rows) = self.cached_rows.get() {
+            return Ok(rows.get(index).cloned());
+        }
+        let (source, base_offset) = self.xml_data.get_or_create_arc();
+        let mut seen = 0_usize;
+        let mut found = None;
+        scan_word_element_ranges_with_context_until(
+            self.xml_bytes(),
+            self.xml_data.namespace_bindings(),
+            &[b"tr".as_slice()],
+            |_| {
+                let skip = seen < index;
+                seen += 1;
+                skip
+            },
+            |_, start, length, namespaces| {
+                found = Some(Row::from_arc_range(
+                    Arc::clone(&source),
+                    absolute_start(base_offset, start)?,
+                    length,
+                    namespaces,
+                ));
+                Ok(std::ops::ControlFlow::Break(()))
+            },
+        )?;
+        Ok(found)
+    }
+
     /// Get a specific cell by row and column index.
     ///
     /// Returns `None` if the indices are out of bounds.
@@ -403,12 +441,9 @@ impl Table {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn cell(&self, row_idx: usize, col_idx: usize) -> Result<Option<Cell>> {
-        let rows = self.rows()?;
-        if let Some(row) = rows.get(row_idx) {
-            let cells = row.cells()?;
-            Ok(cells.get(col_idx).cloned())
-        } else {
-            Ok(None)
+        match self.row(row_idx)? {
+            Some(row) => row.cell(col_idx),
+            None => Ok(None),
         }
     }
 
@@ -574,6 +609,41 @@ impl Row {
         // Slow path: parse and cache
         let cells = self.parse_cells()?;
         Ok(self.cached_cells.get_or_init(|| cells).clone())
+    }
+
+    /// The cell at `index` (zero-based), or `None` past the last cell. Reads
+    /// the row only up to that cell when the cells are not cached yet.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
+    pub fn cell(&self, index: usize) -> Result<Option<Cell>> {
+        if let Some(cells) = self.cached_cells.get() {
+            return Ok(cells.get(index).cloned());
+        }
+        let (source, base_offset) = self.xml_data.get_or_create_arc();
+        let mut seen = 0_usize;
+        let mut found = None;
+        scan_word_element_ranges_with_context_until(
+            self.xml_bytes(),
+            self.xml_data.namespace_bindings(),
+            &[b"tc".as_slice()],
+            |_| {
+                let skip = seen < index;
+                seen += 1;
+                skip
+            },
+            |_, start, length, namespaces| {
+                found = Some(Cell::from_arc_range_with_context(
+                    Arc::clone(&source),
+                    absolute_start(base_offset, start)?,
+                    length,
+                    namespaces,
+                ));
+                Ok(std::ops::ControlFlow::Break(()))
+            },
+        )?;
+        Ok(found)
     }
 
     /// Parse cells from XML (internal method).
@@ -924,6 +994,49 @@ mod tests {
         assert_eq!(paragraphs.len(), 1);
         assert_eq!(paragraphs[0].text().unwrap(), "A < B");
         assert_eq!(paragraphs[0].runs().unwrap()[0].text().unwrap(), "A < B");
+    }
+
+    #[test]
+    fn positional_row_and_cell_match_the_complete_lists() {
+        // Rows inside a content control and a custom-XML wrapper count; rows
+        // of a nested table and foreign look-alikes do not; a self-closing
+        // row counts. Skipped rows may redeclare prefixes.
+        let xml = br#"<w:tbl xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:x="urn:not-wordprocessingml">
+            <w:tr><w:tc><w:p><w:r><w:t>r0c0</w:t></w:r></w:p></w:tc><w:tc><w:tbl><w:tr><w:tc><w:p/></w:tc></w:tr></w:tbl><w:p/></w:tc></w:tr>
+            <x:tr/>
+            <w:sdt><w:sdtContent><w:tr xmlns:q="urn:q"><w:tc><w:p><w:r><w:t>r1c0</w:t></w:r></w:p></w:tc></w:tr></w:sdtContent></w:sdt>
+            <w:customXml><w:tr/></w:customXml>
+            <w:tr><w:tc><w:p><w:r><w:t>r3c0</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>r3c1</w:t></w:r></w:p></w:tc></w:tr>
+        </w:tbl>"#;
+        let rows = Table::new(xml.to_vec()).rows().unwrap();
+        assert_eq!(rows.len(), 4);
+        for index in 0..=rows.len() {
+            // A fresh table each time: nothing cached.
+            let row = Table::new(xml.to_vec()).row(index).unwrap();
+            assert_eq!(
+                row.as_ref().map(|row| row.xml_bytes().to_vec()),
+                rows.get(index).map(|row| row.xml_bytes().to_vec()),
+                "row {index}"
+            );
+            let Some(row) = row else { continue };
+            let cells = rows[index].cells().unwrap();
+            for column in 0..=cells.len() {
+                let cell = row.cell(column).unwrap();
+                assert_eq!(
+                    cell.as_ref().map(|cell| cell.text().unwrap()),
+                    cells.get(column).map(|cell| cell.text().unwrap()),
+                    "row {index} cell {column}"
+                );
+            }
+        }
+        // Cached lists answer too.
+        let table = Table::new(xml.to_vec());
+        table.rows().unwrap();
+        assert_eq!(
+            table.cell(3, 1).unwrap().map(|cell| cell.text().unwrap()),
+            Some("r3c1".to_owned())
+        );
+        assert!(table.cell(4, 0).unwrap().is_none());
     }
 
     #[test]

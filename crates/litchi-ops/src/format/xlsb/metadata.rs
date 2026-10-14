@@ -13,7 +13,7 @@ use std::sync::OnceLock;
 use litchi_core::{FileFormat, Metadata};
 use litchi_xlsb as xlsb;
 
-use super::write::{Commit, package_from_editor};
+use super::write::Commit;
 use super::{Xlsb, XlsbOwner};
 use crate::error::Result;
 use crate::format::metadata::{self, Assignments};
@@ -67,11 +67,11 @@ fn native(error: xlsb::metadata::Error) -> crate::Error {
 
 /// Commit `update` to `package`'s metadata.
 fn commit(
-    package: &xlsb::Package,
+    edit: std::result::Result<xlsb::metadata::Edit<'_>, xlsb::metadata::Error>,
     update: impl FnOnce(&mut Metadata),
     custom: Option<&Assignments>,
 ) -> Result<(xlsb::Package, xlsb::metadata::Patch, Metadata)> {
-    let mut edit = package.edit_metadata().map_err(native)?;
+    let mut edit = edit.map_err(native)?;
     edit.update(update).map_err(native)?;
     if let Some(assignments) = custom.filter(|assignments| assignments.has_custom()) {
         let props = assignments.apply_custom(edit.custom_props(), FileFormat::Xlsb)?;
@@ -105,9 +105,15 @@ impl Xlsb {
                 return self.set_source_metadata(source, assignments);
             }
         }
-        let source = package_from_editor(self.editor()?);
-        let (target, patch, metadata) =
-            commit(&source, |value| assignments.apply(value), Some(assignments))?;
+        // Stage on the workbook itself: no copy into a package first
+        // (record 0281).
+        let editor = self.editor()?;
+        let (target, patch, metadata) = commit(
+            editor.edit_metadata(),
+            |value| assignments.apply(value),
+            Some(assignments),
+        )?;
+        drop(editor);
         let (after, after_file) = if patch.is_noop() {
             (self.clone(), None)
         } else {
@@ -197,7 +203,11 @@ impl Xlsb {
 
 /// Create-time metadata: commit `metadata` to a fresh package.
 pub(super) fn create(package: xlsb::Package, metadata: &Metadata) -> Result<Xlsb> {
-    let (package, _, _) = commit(&package, |value| *value = metadata.clone(), None)?;
+    let (package, _, _) = commit(
+        package.edit_metadata(),
+        |value| *value = metadata.clone(),
+        None,
+    )?;
     Xlsb::from_package(package, &OpenOptions::new())
 }
 

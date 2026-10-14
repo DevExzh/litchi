@@ -1,0 +1,126 @@
+{
+  "schema": "litchi.xls_write_bench.v1",
+  "samples": 5,
+  "warmup_passes": 1,
+  "generation_included": false,
+  "opening_included": false,
+  "path_construction_included": false,
+  "serialization_included": false,
+  "verification_included": false,
+  "source_backed": false,
+  "python_required": false,
+  "cases": [
+    {
+      "cells": 1,
+      "xls_bytes": 4096,
+      "target_value": -1.0,
+      "expected_before_checksum": 10417878499401512927,
+      "expected_after_checksum": 1194506462546737119,
+      "native_checksum": 1194506462546737119,
+      "unified_checksum": 1194506462546737119,
+      "native_output_bytes": 4096,
+      "unified_output_bytes": 4096,
+      "output_bytes_equal": true,
+      "original_native_unchanged": true,
+      "original_unified_unchanged": true,
+      "native_ns": [
+        67951,
+        53040,
+        53000,
+        49201,
+        50160
+      ],
+      "unified_set_ns": [
+        59960,
+        53991,
+        51950,
+        58590,
+        51400
+      ]
+    },
+    {
+      "cells": 100,
+      "xls_bytes": 7168,
+      "target_value": -1.0,
+      "expected_before_checksum": 4054751163340653429,
+      "expected_after_checksum": 13278123200195429237,
+      "native_checksum": 13278123200195429237,
+      "unified_checksum": 13278123200195429237,
+      "native_output_bytes": 7168,
+      "unified_output_bytes": 7168,
+      "output_bytes_equal": true,
+      "original_native_unchanged": true,
+      "original_unified_unchanged": true,
+      "native_ns": [
+        125351,
+        109881,
+        106140,
+        111401,
+        106660
+      ],
+      "unified_set_ns": [
+        128881,
+        110101,
+        127531,
+        109551,
+        108491
+      ]
+    },
+    {
+      "cells": 1000,
+      "xls_bytes": 43520,
+      "target_value": -1.0,
+      "expected_before_checksum": 11251833652265854789,
+      "expected_after_checksum": 2028461615411078981,
+      "native_checksum": 2028461615411078981,
+      "unified_checksum": 2028461615411078981,
+      "native_output_bytes": 43520,
+      "unified_output_bytes": 43520,
+      "output_bytes_equal": true,
+      "original_native_unchanged": true,
+      "original_unified_unchanged": true,
+      "native_ns": [
+        853665,
+        726975,
+        739704,
+        731494,
+        732134
+      ],
+      "unified_set_ns": [
+        829575,
+        745184,
+        742884,
+        746085,
+        742745
+      ]
+    },
+    {
+      "cells": 10000,
+      "xls_bytes": 410112,
+      "target_value": -1.0,
+      "expected_before_checksum": 13863300601406287973,
+      "expected_after_checksum": 4639928564551512165,
+      "native_checksum": 4639928564551512165,
+      "unified_checksum": 4639928564551512165,
+      "native_output_bytes": 410112,
+      "unified_output_bytes": 410112,
+      "output_bytes_equal": true,
+      "original_native_unchanged": true,
+      "original_unified_unchanged": true,
+      "native_ns": [
+        8428919,
+        7009342,
+        6989671,
+        6993831,
+        7020361
+      ],
+      "unified_set_ns": [
+        8089887,
+        7477324,
+        6965732,
+        7029391,
+        6952522
+      ]
+    }
+  ]
+}

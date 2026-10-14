@@ -485,6 +485,32 @@ impl Package {
         ))
     }
 
+    /// [`Self::reparse_candidate_retaining_projection`] for a candidate
+    /// derived from `workbook`'s graph, with the workbook's policies.
+    pub(crate) fn reparse_workbook_candidate(
+        workbook: &Workbook,
+        candidate: OpcPackage,
+    ) -> Result<Self> {
+        let limits = workbook.external_link_limits();
+        let drawing_policy = workbook.drawing_load_policy();
+        let leniency = workbook.leniency();
+        let reparsed = Workbook::reparse_candidate_with_policy(
+            candidate.clone(),
+            limits,
+            drawing_policy,
+            leniency,
+        )?;
+        let tolerance = reparsed.tolerance_report().clone();
+        Ok(Self(
+            candidate,
+            limits,
+            tolerance,
+            drawing_policy,
+            leniency,
+            Some(Arc::new(reparsed)),
+        ))
+    }
+
     pub(crate) fn reparse_candidate(&self, candidate: OpcPackage) -> Result<Self> {
         let workbook =
             Workbook::reparse_candidate_with_policy(candidate.clone(), self.1, self.3, self.4)?;
