@@ -49,6 +49,11 @@ struct State {
 pub(crate) struct Snapshot(Arc<State>);
 
 impl Snapshot {
+    /// The retained physical package (metadata transactions, record 0288).
+    pub(crate) fn owned_package(&self) -> &OwnedPackage {
+        self.0.package.package()
+    }
+
     pub(crate) fn is_same(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.0, &other.0)
     }

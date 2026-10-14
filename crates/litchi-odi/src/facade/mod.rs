@@ -31,6 +31,11 @@ impl std::fmt::Debug for Package {
 }
 
 impl Package {
+    /// The retained physical package (metadata transactions, record 0288).
+    pub(crate) fn owned_package(&self) -> &litchi_odf_common::OwnedPackage {
+        self.image.package.owned_package()
+    }
+
     /// The minimal valid image package: one frame holding an inline 1x1 PNG.
     /// Deterministic: no clock or randomness is consulted.
     ///

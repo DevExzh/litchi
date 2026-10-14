@@ -16,6 +16,7 @@
 mod authoring;
 mod codec;
 mod facade;
+pub mod metadata;
 mod model;
 mod package;
 

@@ -59,20 +59,20 @@ impl<'source> Transaction<'source> {
         self.draft = CoreMetadata::default();
     }
 
-    /// Commit the draft into a bounded metadata XML result.
+    /// XmlCommit the draft into a bounded metadata XML result.
     ///
     /// # Errors
     /// Returns an error when the operation cannot be completed.
-    pub fn commit(self) -> Result<Commit<'source>> {
+    pub fn commit(self) -> Result<XmlCommit<'source>> {
         if self.remove_part {
-            return Ok(Commit {
+            return Ok(XmlCommit {
                 xml: None,
                 value: self.draft,
                 changed: self.source.is_some(),
             });
         }
         if supported_equal(&self.original, &self.draft) {
-            return Ok(Commit {
+            return Ok(XmlCommit {
                 xml: self.source.map(Cow::Borrowed),
                 value: self.draft,
                 changed: false,
@@ -96,7 +96,7 @@ impl<'source> Transaction<'source> {
             ));
         }
         Metadata::from_xml(&xml)?;
-        Ok(Commit {
+        Ok(XmlCommit {
             xml: Some(Cow::Owned(xml)),
             value: self.draft,
             changed: true,
@@ -236,13 +236,13 @@ impl Editor<'_, '_> {
 }
 
 /// The result of publishing a metadata transaction.
-pub struct Commit<'source> {
+pub struct XmlCommit<'source> {
     xml: Option<Cow<'source, str>>,
     value: CoreMetadata,
     changed: bool,
 }
 
-impl Commit<'_> {
+impl XmlCommit<'_> {
     /// Borrow the new metadata XML, or `None` when the part is absent.
     #[must_use]
     pub fn xml(&self) -> Option<&str> {
@@ -262,7 +262,7 @@ impl Commit<'_> {
     }
 }
 
-impl<'source> Commit<'source> {
+impl<'source> XmlCommit<'source> {
     #[must_use]
     pub fn into_xml(self) -> Option<Cow<'source, str>> {
         self.xml

@@ -20,6 +20,19 @@ impl std::fmt::Debug for Package {
 }
 
 impl Package {
+    /// The retained physical package (metadata transactions, record 0288).
+    pub(crate) fn owned_package(&self) -> &litchi_odf_common::OwnedPackage {
+        self.formula.archive.owned()
+    }
+
+    /// Adopt bytes a metadata commit published, under this formula's limits.
+    pub(crate) fn adopt_formula_bytes(&self, bytes: Vec<u8>) -> litchi_core::Result<Self> {
+        let archive = Archive::from_bytes(bytes)?;
+        Ok(Self {
+            formula: Formula::from_archive(archive, self.formula.limits())?,
+        })
+    }
+
     /// Create the minimal valid `.odf` package: one empty block `mrow`.
     ///
     /// The result is deterministic: it reads no clock or randomness, so every

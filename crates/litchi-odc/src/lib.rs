@@ -15,6 +15,7 @@ mod facade;
 pub mod flat;
 mod limits;
 mod merge;
+pub mod metadata;
 mod package;
 mod project;
 mod resource;

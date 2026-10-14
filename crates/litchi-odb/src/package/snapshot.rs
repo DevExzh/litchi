@@ -34,6 +34,11 @@ pub(crate) struct PackageDelta {
 }
 
 impl Snapshot {
+    /// The retained physical package (metadata transactions, record 0288).
+    pub(crate) fn owned_package(&self) -> &OwnedPackage {
+        self.0.package.package()
+    }
+
     pub(crate) fn open_with_options(
         path: impl AsRef<Path>,
         options: litchi_odf_common::OpenOptions,

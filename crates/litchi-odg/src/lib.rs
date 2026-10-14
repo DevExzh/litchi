@@ -13,6 +13,7 @@ mod authoring;
 mod codec;
 mod facade;
 mod flat;
+pub mod metadata;
 mod model;
 mod package;
 #[path = "model/transition.rs"]

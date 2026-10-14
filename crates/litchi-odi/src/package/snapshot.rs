@@ -51,6 +51,11 @@ struct State {
 pub(crate) struct Snapshot(Arc<State>);
 
 impl Snapshot {
+    /// The retained physical package (metadata transactions, record 0288).
+    pub(crate) fn owned_package(&self) -> &litchi_odf_common::OwnedPackage {
+        self.0.package.package()
+    }
+
     pub(crate) fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
         Self::from_package(Package::from_bytes(bytes, MIMETYPE, BODY_MARKER, "ODI")?)
     }

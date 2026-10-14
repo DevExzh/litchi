@@ -263,6 +263,11 @@ impl std::fmt::Debug for Package {
 }
 
 impl Package {
+    /// The retained physical package (metadata transactions, record 0288).
+    pub(crate) const fn owned_package(&self) -> &OwnedPackage {
+        &self.package
+    }
+
     /// Create the minimal valid presentation (no slides).
     ///
     /// # Errors

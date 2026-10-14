@@ -427,6 +427,11 @@ const TEMPLATE: Flavor = Flavor {
 };
 
 impl Package {
+    /// The retained physical package (metadata transactions, record 0288).
+    pub(crate) fn owned_package(&self) -> &litchi_odf_common::OwnedPackage {
+        self.0.package.package()
+    }
+
     /// Creates the minimal valid drawing (one empty `office:drawing` body).
     ///
     /// The bytes are deterministic: no clock or randomness is consulted.
@@ -743,7 +748,7 @@ impl Package {
     }
 
     /// Reopens bytes of the same flavor as `self`.
-    fn reopen_same_flavor(&self, bytes: Vec<u8>) -> Result<Self> {
+    pub(crate) fn reopen_same_flavor(&self, bytes: Vec<u8>) -> Result<Self> {
         if self.is_template() {
             Self::from_template_vec(bytes)
         } else {

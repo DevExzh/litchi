@@ -6384,7 +6384,8 @@
         }
       ],
       "families": [
-        "litchi_ods::document"
+        "litchi_ods::document",
+        "litchi_ods::metadata"
       ]
     },
     {
@@ -6741,7 +6742,8 @@
         }
       ],
       "families": [
-        "litchi_odp::edit"
+        "litchi_odp::edit",
+        "litchi_odp::metadata"
       ]
     },
     {
@@ -6907,7 +6909,8 @@
         }
       ],
       "families": [
-        "litchi_oth"
+        "litchi_oth",
+        "litchi_oth::metadata"
       ]
     },
     {
@@ -7109,6 +7112,7 @@
         }
       ],
       "families": [
+        "litchi_odm::metadata",
         "litchi_odm::transaction"
       ]
     },
@@ -7234,7 +7238,8 @@
         }
       ],
       "families": [
-        "litchi_odi"
+        "litchi_odi",
+        "litchi_odi::metadata"
       ]
     },
     {
@@ -7339,7 +7344,8 @@
         }
       ],
       "families": [
-        "litchi_odb"
+        "litchi_odb",
+        "litchi_odb::metadata"
       ]
     },
     {
@@ -7685,7 +7691,8 @@
         }
       ],
       "families": [
-        "litchi_odg::edit"
+        "litchi_odg::edit",
+        "litchi_odg::metadata"
       ]
     },
     {
@@ -7856,7 +7863,8 @@
         }
       ],
       "families": [
-        "litchi_odc"
+        "litchi_odc",
+        "litchi_odc::metadata"
       ]
     },
     {
@@ -8027,7 +8035,8 @@
         }
       ],
       "families": [
-        "litchi_odf_formula"
+        "litchi_odf_formula",
+        "litchi_odf_formula::metadata"
       ]
     },
     {

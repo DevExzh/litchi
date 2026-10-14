@@ -82,6 +82,11 @@ pub(crate) enum StylesReplacement<'a> {
 pub(crate) struct Snapshot(Arc<State>);
 
 impl Snapshot {
+    /// The retained physical package (metadata transactions, record 0288).
+    pub(crate) fn owned_package(&self) -> &OwnedPackage {
+        self.0.package.package()
+    }
+
     /// Index and validate package bytes under the retained chart limits
     /// only (builder output, durable patches and rebuilt packages).
     pub(crate) fn from_bytes_with_limits(bytes: Vec<u8>, limits: crate::Limits) -> Result<Self> {

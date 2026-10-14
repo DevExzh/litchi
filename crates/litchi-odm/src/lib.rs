@@ -12,6 +12,7 @@ mod codec;
 mod edit_ops;
 mod facade;
 pub mod link;
+pub mod metadata;
 mod model;
 mod package;
 pub mod title;
