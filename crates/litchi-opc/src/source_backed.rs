@@ -8597,8 +8597,12 @@ impl SourceBackedPackage {
             Ok(self.owned_source_shared())
         })?;
         let non_part_members = self.finish_stage(self.cloned_non_part_members())?;
-        let result =
-            self.materialize_opc_package_with_accounting(non_part_members, accounting, source);
+        let result = self.materialize_opc_package_with_accounting(
+            non_part_members,
+            accounting,
+            source,
+            preserve_source,
+        );
         self.finish_stage(result)
     }
 
@@ -8631,6 +8635,35 @@ impl SourceBackedPackage {
         Ok(Arc::new(bytes))
     }
 
+    /// Admit every catalog part's declared size against the part and
+    /// aggregate part-byte limits, as an owning open does before it defers
+    /// or reads any payload.
+    fn check_declared_part_bytes(&self) -> Result<()> {
+        let mut total = 0u64;
+        for part in &self.catalog.parts {
+            let declared = self
+                .archive
+                .metadata_for(part.entry_id)?
+                .uncompressed_size();
+            self.limits.check(
+                SourceLimitKind::PartBytes,
+                declared,
+                self.limits.max_part_bytes(),
+            )?;
+            total = total.checked_add(declared).ok_or(OpcError::Limit {
+                kind: SourceLimitKind::TotalPartBytes,
+                observed: u64::MAX,
+                maximum: self.limits.max_total_part_bytes(),
+            })?;
+            self.limits.check(
+                SourceLimitKind::TotalPartBytes,
+                total,
+                self.limits.max_total_part_bytes(),
+            )?;
+        }
+        Ok(())
+    }
+
     fn cloned_non_part_members(&self) -> Result<Vec<NonPartMember>> {
         let mut members = Vec::new();
         let reserve = members
@@ -8647,11 +8680,20 @@ impl SourceBackedPackage {
         Ok(members)
     }
 
+    /// Build the owning graph from the admitted catalog.
+    ///
+    /// With `defer_payloads` (the source-preserving conversion, which always
+    /// holds the source archive in memory), ordinary part payloads stay in
+    /// that retained archive and inflate on first use, exactly as an owning
+    /// open of the same bytes defers them (record 0286); the declared sizes
+    /// are admitted here, as that open admits them before any payload work.
+    /// Otherwise every payload is read now.
     fn materialize_opc_package_with_accounting(
         &self,
         non_part_members: Vec<NonPartMember>,
         mut accounting: Option<&mut OpcOperationAccounting>,
         source: Option<Arc<Vec<u8>>>,
+        defer_payloads: bool,
     ) -> Result<OpcPackage> {
         self.disable_read_ahead_for_publication()?;
         self.source.ensure_current()?;
@@ -8668,18 +8710,42 @@ impl SourceBackedPackage {
                     source,
                 }),
         )?;
+        let deferred = match &source {
+            Some(bytes) if defer_payloads => {
+                self.finish_stage(self.check_declared_part_bytes())?;
+                Some(Arc::new(crate::payload::DeferredPartSource::new(
+                    Arc::clone(bytes),
+                    self.limits,
+                )))
+            },
+            _ => None,
+        };
         let mut read_session = self.archive.read_session();
         for index in 0..self.catalog.parts.len() {
-            let bytes = self.finish_stage(self.read_part_with_session(
-                index,
-                &mut read_session,
-                accounting.as_deref_mut(),
-            ))?;
             let catalog_part = &self.catalog.parts[index];
-            let part_result = PartFactory::load_shared(
+            let payload = if let Some(deferred) = &deferred {
+                let member = catalog_part.partname.membername();
+                let mut name = String::new();
+                self.finish_stage(name.try_reserve_exact(member.len()).map_err(|source| {
+                    OpcError::Allocation {
+                        resource: "source-backed OPC deferred part member name",
+                        source,
+                    }
+                }))?;
+                name.push_str(member);
+                crate::payload::PartPayload::deferred(deferred, name.into_boxed_str())
+            } else {
+                let bytes = self.finish_stage(self.read_part_with_session(
+                    index,
+                    &mut read_session,
+                    accounting.as_deref_mut(),
+                ))?;
+                crate::payload::PartPayload::ready(self.finish_stage(bytes.into_arc())?)
+            };
+            let part_result = PartFactory::load_payload(
                 catalog_part.partname.clone(),
                 catalog_part.content_type.as_str().to_owned(),
-                self.finish_stage(bytes.into_arc())?,
+                payload,
             );
             let mut part = self.finish_stage(part_result)?;
             let result = copy_relationships(&catalog_part.relationships, part.rels_mut());
@@ -8742,7 +8808,8 @@ impl SourceBackedPackage {
         }
 
         for source_part in &self.catalog.parts {
-            let Ok(current) = package.get_part(&source_part.partname) else {
+            // Metadata only: a deferred payload stays in the archive.
+            let Some(current) = package.part_metadata(&source_part.partname) else {
                 continue;
             };
             if !current.rels().semantically_eq(&source_part.relationships) {
@@ -22562,6 +22629,27 @@ mod tests {
         changed.to_stream(&mut output).unwrap();
         let reopened = OpcPackage::from_bytes(&output).unwrap();
         assert_eq!(reopened.get_part(&document).unwrap().blob(), b"<changed/>");
+    }
+
+    #[test]
+    fn preserving_materialization_defers_part_payloads_until_read() {
+        let bytes = archive_bytes(root_relationships(), b"<document/>", true);
+        let package =
+            SourceBackedPackage::from_read_at(Arc::new(CountingSource::new(bytes.clone())))
+                .unwrap();
+
+        // Record 0286: no ordinary payload is inflated by the conversion.
+        let owned = package.to_opc_package_preserving_source().unwrap();
+        assert_eq!(owned.deferred_decode_counters(), Some((0, 0)));
+
+        let document = PackURI::new("/word/document.xml").unwrap();
+        assert_eq!(owned.get_part(&document).unwrap().blob(), b"<document/>");
+        assert_eq!(owned.deferred_decode_counters(), Some((1, 11)));
+
+        // An untouched package still publishes its exact source.
+        let mut output = Vec::new();
+        owned.to_stream(&mut output).unwrap();
+        assert_eq!(output, bytes);
     }
 
     #[test]

@@ -435,6 +435,10 @@ pub(crate) struct Inner {
     /// lineage's descendant snapshots and keyed by the styles payload
     /// allocation.
     pub(super) format_cache: Arc<FormatCache>,
+    /// Memo of the chart inventory of the worksheet drawing read last,
+    /// shared by the lineage like `format_cache` and keyed by the drawing
+    /// payload allocation (record 0286).
+    pub(super) chart_inventories: Arc<crate::chart::edit::InventoryCache>,
     /// Repairs made while the workbook catalog was parsed at open time.
     pub(super) tolerance: ToleranceReport,
     /// The opt-in repairs this workbook was opened with; snapshots derived
@@ -468,6 +472,11 @@ impl Workbook {
         leniency: Leniency,
     ) -> Result<Self> {
         Self::open_package(package, None, leniency)
+    }
+
+    /// The lineage's memo of worksheet drawing chart inventories.
+    pub(crate) fn chart_inventories(&self) -> &crate::chart::edit::InventoryCache {
+        &self.inner.chart_inventories
     }
 
     /// The opt-in repair policy the owning package was opened with.
@@ -573,6 +582,9 @@ impl Workbook {
             || Arc::new(FormatCache::new()),
             |source| Arc::clone(&source.inner.format_cache),
         );
+        let chart_inventories = source.map_or_else(Arc::default, |source| {
+            Arc::clone(&source.inner.chart_inventories)
+        });
         let sheets = catalog
             .sheets
             .into_iter()
@@ -641,6 +653,7 @@ impl Workbook {
                 external_reference_ids: catalog.external_reference_ids.into_boxed_slice(),
                 page_break_cache: lineage_page_break_cache,
                 format_cache,
+                chart_inventories,
                 tolerance,
                 leniency,
             }),

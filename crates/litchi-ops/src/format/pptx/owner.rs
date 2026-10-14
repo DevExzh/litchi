@@ -618,9 +618,9 @@ fn strict_scene(scene: Scene) -> Result<Scene> {
         Err(Error::from(pptx::Error::Invalid(
             "slide scene requires strict shape XML".into(),
         )))
-    } else if scene.iter().any(|handle| {
+    } else if scene.views().any(|shape| {
         matches!(
-            handle.view(),
+            shape,
             Shape::Frame(_) | Shape::Content(_) | Shape::Unknown(_)
         )
     }) {

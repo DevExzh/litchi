@@ -43,7 +43,7 @@
 //! ```
 
 use std::collections::BTreeSet;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, MutexGuard, Weak};
 
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
@@ -319,6 +319,63 @@ struct Inventory {
     frames: Vec<Frame>,
     max_id: u32,
     root_close: usize,
+}
+
+/// Owner-scoped, single-entry memo of the chart inventory of the drawing
+/// payload read last (record 0286).
+///
+/// A path resolution, [`Edit::chart`] and [`Edit::set`] each need the
+/// inventory of the same worksheet drawing; this lets them scan it once. It
+/// follows the format-table cache (`style::cell_format::cache`): the owner
+/// holds it and its lineage shares it, there is no process-wide state; the
+/// key is the drawing payload's allocation, held through a [`Weak`]
+/// reference, so a changed or replaced drawing never reuses an inventory and
+/// the cache never keeps a payload alive; a failed scan is never cached; and
+/// an inventory of more than [`MAX_CHARTS`] frames is returned but not
+/// retained, which bounds what one cache keeps.
+#[derive(Default)]
+pub(crate) struct InventoryCache {
+    entry: Mutex<Option<(Weak<Vec<u8>>, Arc<Inventory>)>>,
+}
+
+impl std::fmt::Debug for InventoryCache {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let frames = self
+            .lock()
+            .as_ref()
+            .map(|(_, inventory)| inventory.frames.len());
+        formatter
+            .debug_struct("InventoryCache")
+            .field("retained_frames", &frames)
+            .finish()
+    }
+}
+
+impl InventoryCache {
+    fn lock(&self) -> MutexGuard<'_, Option<(Weak<Vec<u8>>, Arc<Inventory>)>> {
+        self.entry
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+    }
+
+    /// The inventory of `drawing`'s payload, scanned on a miss.
+    fn get(&self, drawing: &dyn Part) -> Result<Arc<Inventory>> {
+        let payload = drawing.blob_arc();
+        let mut entry = self.lock();
+        // The retained weak reference keeps the allocation's block reserved,
+        // so an equal pointer is the same live allocation.
+        if let Some((key, inventory)) = entry.as_ref()
+            && std::ptr::eq(key.as_ptr(), Arc::as_ptr(&payload))
+        {
+            return Ok(Arc::clone(inventory));
+        }
+        *entry = None;
+        let inventory = Arc::new(inventory(&payload)?);
+        if inventory.frames.len() <= MAX_CHARTS {
+            *entry = Some((Arc::downgrade(&payload), Arc::clone(&inventory)));
+        }
+        Ok(inventory)
+    }
 }
 
 fn is_chart_namespace(namespace: &ResolveResult<'_>) -> bool {
@@ -772,9 +829,7 @@ impl Package {
         let Some(drawing) = drawing_uri(self.opc(), &worksheet)? else {
             return Ok(0);
         };
-        Ok(inventory(self.opc().get_part(&drawing)?.blob())?
-            .frames
-            .len())
+        Ok(self.chart_inventory(&drawing)?.frames.len())
     }
 
     /// The chart-space XML of the ordinary chart at `index` (drawing order)
@@ -789,8 +844,8 @@ impl Package {
         let Some(drawing) = drawing_uri(self.opc(), &worksheet)? else {
             return Ok(None);
         };
-        let frames = inventory(self.opc().get_part(&drawing)?.blob())?.frames;
-        let Some(frame) = frames.get(index) else {
+        let inventory = self.chart_inventory(&drawing)?;
+        let Some(frame) = inventory.frames.get(index) else {
             return Ok(None);
         };
         let chart = chart_uri(self.opc(), &drawing, &frame.relationship_id)?;
@@ -811,11 +866,19 @@ impl Package {
             return Ok(None);
         };
         let xml = self.opc().get_part(&drawing)?.blob();
-        let frames = inventory(xml)?.frames;
-        let Some(frame) = frames.get(index) else {
+        let inventory = self.chart_inventory(&drawing)?;
+        let Some(frame) = inventory.frames.get(index) else {
             return Ok(None);
         };
         Ok(marker_of(&xml[frame.anchor.clone()])?.map(|marker| marker.anchor))
+    }
+
+    /// The chart inventory of the drawing part `drawing`, through the
+    /// workbook lineage's memo.
+    fn chart_inventory(&self, drawing: &PackURI) -> Result<Arc<Inventory>> {
+        self.workbook_ref()
+            .chart_inventories()
+            .get(self.opc().get_part(drawing)?)
     }
 
     /// Start a worksheet chart edit.
@@ -861,11 +924,15 @@ impl Edit<'_> {
         self.touched.insert(name.as_str().to_owned());
     }
 
-    fn frames(&self, sheet: usize) -> Result<(PackURI, PackURI, Inventory)> {
+    fn frames(&self, sheet: usize) -> Result<(PackURI, PackURI, Arc<Inventory>)> {
         let worksheet = worksheet_uri(self.package, sheet)?;
         let drawing = drawing_uri(&self.staged, &worksheet)?
             .ok_or_else(|| invalid("the worksheet has no charts"))?;
-        let inventory = inventory(self.staged.get_part(&drawing)?.blob())?;
+        let inventory = self
+            .package
+            .workbook_ref()
+            .chart_inventories()
+            .get(self.staged.get_part(&drawing)?)?;
         Ok((worksheet, drawing, inventory))
     }
 
