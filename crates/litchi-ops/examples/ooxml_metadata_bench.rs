@@ -115,6 +115,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     {
         let bytes = create(FileFormat::Pptx)?.to_bytes()?;
         let title = "Quarterly review";
+        // `OOXML_METADATA_PROFILE=native|unified` loops one leg of this pair
+        // (`OOXML_METADATA_LOOPS` times, default 1,000) for a profiler.
+        if let Ok(leg) = std::env::var("OOXML_METADATA_PROFILE") {
+            let loops: usize = match std::env::var("OOXML_METADATA_LOOPS") {
+                Ok(loops) => loops.parse()?,
+                Err(_) => 1_000,
+            };
+            for _ in 0..loops {
+                if leg == "unified" {
+                    let file = open_bytes(bytes.as_slice())?;
+                    black_box(file.set("/metadata", Props::new().with("title", title))?);
+                } else {
+                    let package = litchi_pptx::Package::from_bytes(&bytes)?;
+                    let mut edit = package.edit_metadata()?;
+                    edit.update(|m| m.title = Some(title.to_owned()))?;
+                    black_box(edit.commit()?.into_package());
+                }
+            }
+            return Ok(());
+        }
         let mut native_ns = Vec::new();
         let mut unified_ns = Vec::new();
         for round in 0..ROUNDS + WARMUP {

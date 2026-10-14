@@ -11,7 +11,8 @@
 //! Run with `cargo run --release -p litchi-ops --example docx_fanout_bench
 //! --features docx` (pin the CPU with `taskset`). `DOCX_FANOUT_SIZES` picks
 //! the sizes (default `1,100,1000,10000`); `DOCX_FANOUT_PROFILE=leaf` or
-//! `unified` loops one leg instead, for a profiler.
+//! `unified` loops one leg instead, for a profiler (`DOCX_FANOUT_LOOPS` sets
+//! the loop count).
 
 #[cfg(feature = "docx")]
 use std::hint::black_box;
@@ -98,7 +99,10 @@ fn measure(size: usize) -> Outcome<serde_json::Value> {
 
     // `DOCX_FANOUT_PROFILE=leaf|unified` loops one leg for a profiler.
     if let Ok(leg) = std::env::var("DOCX_FANOUT_PROFILE") {
-        let loops = (2_000_000 / size).max(1);
+        let loops = match std::env::var("DOCX_FANOUT_LOOPS") {
+            Ok(loops) => loops.parse()?,
+            Err(_) => (2_000_000 / size).max(1),
+        };
         for _ in 0..loops {
             if leg == "leaf" {
                 black_box(leaf()?);

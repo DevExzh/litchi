@@ -138,6 +138,11 @@ pub(crate) struct DocxState {
     /// The OPC read limits of the open, which an unsigned copy is opened
     /// under (record 0013).
     ooxml_limits: SourceLimits,
+    /// The eager owner's body block index, read on the first path step that
+    /// needs it (record 0286). The owning package never changes under a
+    /// handle, so the index stays valid; a source-backed owner is not cached
+    /// here, because its reads are fenced against the source.
+    body: OnceLock<litchi_docx::Blocks>,
 }
 
 /// What a DOCX write starts from (M2).
@@ -316,7 +321,15 @@ impl Docx {
         tolerance: Option<ToleranceReport>,
         options: &OpenOptions,
     ) -> Self {
-        let state = DocxState {
+        Self(Opened::new(Self::state(owner, tolerance, options)))
+    }
+
+    fn state(
+        owner: DocxOwner,
+        tolerance: Option<ToleranceReport>,
+        options: &OpenOptions,
+    ) -> DocxState {
+        DocxState {
             owner,
             metadata: OnceLock::new(),
             unsigned: OnceLock::new(),
@@ -326,8 +339,8 @@ impl Docx {
             #[cfg(feature = "markdown")]
             markdown: OnceLock::new(),
             ooxml_limits: options.ooxml_limits.unwrap_or_default(),
-        };
-        Self(Opened::new(state))
+            body: OnceLock::new(),
+        }
     }
 
     /// Adopt a committed owning package without serializing and reopening it.
@@ -357,9 +370,22 @@ impl Docx {
             Signature::RemovalAuthorized => Signature::Unsigned,
             signature => signature,
         };
-        Self::with_owner(owner, tolerance, &options)
-            .with_origin(self.0.origin())
-            .with_signature(signature)
+        Self(Opened::adopted(
+            Self::state(owner, tolerance, &options),
+            signature,
+            self.0.origin(),
+        ))
+    }
+
+    /// The eager owner's body block index, if a path step has read it.
+    pub(crate) fn cached_body(&self) -> Option<&litchi_docx::Blocks> {
+        self.0.body.get()
+    }
+
+    /// Remember the eager owner's body block index; a concurrent first read
+    /// keeps the index stored first (both describe the same part).
+    pub(crate) fn cache_body(&self, blocks: litchi_docx::Blocks) -> &litchi_docx::Blocks {
+        self.0.body.get_or_init(|| blocks)
     }
 
     /// The stable path origin captured by a path open, if any.

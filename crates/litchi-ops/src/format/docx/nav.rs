@@ -61,7 +61,13 @@ pub(super) fn load_body(docx: &Docx) -> Result<Blocks> {
     #[cfg(test)]
     BODY_LOADS.with(|loads| loads.set(loads.get() + 1));
     Ok(match docx.owner() {
-        DocxOwner::Eager(package) => package.document()?.body_blocks()?,
+        DocxOwner::Eager(package) => {
+            if let Some(blocks) = docx.cached_body() {
+                return Ok(blocks.clone());
+            }
+            let blocks = package.document()?.body_blocks()?;
+            docx.cache_body(blocks).clone()
+        },
         DocxOwner::Source(package) => package.document()?.body_blocks()?,
     })
 }

@@ -993,6 +993,15 @@ fn admit_table<'a, const N: usize, const A: usize>(
 fn list_request(
     assignments: Vec<Assignment<'_>>,
 ) -> Result<(Option<super::lists::Request>, Vec<Assignment<'_>>)> {
+    let is_list = |assignment: &Assignment<'_>| {
+        matches!(
+            assignment.entry.access,
+            crate::registry::Access::Set(Setter::ParagraphListStyle | Setter::ParagraphListStart)
+        )
+    };
+    if !assignments.iter().any(is_list) {
+        return Ok((None, assignments));
+    }
     let mut request = None::<super::lists::Request>;
     let mut rest = Vec::with_capacity(assignments.len());
     for assignment in assignments {

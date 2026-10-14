@@ -59,6 +59,15 @@ impl<S> Opened<S> {
         Self::from_parts_with_origin(Signature::Unsigned, Arc::new(state), None)
     }
 
+    /// The handle of a committed state with its signature disposition and
+    /// path origin, built in one step (record 0286): adopting a commit
+    /// through [`Self::new`], [`Self::with_origin`] and
+    /// [`Self::with_signature`] allocates two handles only to drop them.
+    #[cfg(feature = "docx")]
+    pub(crate) fn adopted(state: S, signature: Signature, origin: Option<Arc<Path>>) -> Arc<Self> {
+        Self::from_parts_with_origin(signature, Arc::new(state), origin)
+    }
+
     fn from_parts_with_origin(
         signature: Signature,
         state: Arc<S>,
