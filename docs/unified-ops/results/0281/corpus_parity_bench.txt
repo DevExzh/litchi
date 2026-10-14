@@ -1,0 +1,15 @@
+{"scenario":"xlsx_apply_refuse_vs_warn","size":1,"samples":30,"leaf_or_a_median_ns":24100,"unified_or_b_median_ns":23741,"ratio":0.985}
+{"scenario":"xlsx_batch_100_refuse_vs_warn","size":100,"samples":30,"leaf_or_a_median_ns":336562,"unified_or_b_median_ns":335732,"ratio":0.998}
+{"scenario":"xlsx_apply_subset_vs_warn_one_refused","size":1,"samples":30,"leaf_or_a_median_ns":24430,"unified_or_b_median_ns":32950,"ratio":1.349}
+{"scenario":"pptx_add_formatted_text_box","size":1,"samples":30,"leaf_or_a_median_ns":331432,"unified_or_b_median_ns":339362,"ratio":1.024}
+{"scenario":"pptx_add_plain_text_box","size":1,"samples":30,"leaf_or_a_median_ns":311262,"unified_or_b_median_ns":310762,"ratio":0.998}
+{"scenario":"pptx_set_shape_fill_geometry","size":1,"samples":30,"leaf_or_a_median_ns":283932,"unified_or_b_median_ns":286962,"ratio":1.011}
+{"scenario":"pptx_set_slide_transition","size":1,"samples":30,"leaf_or_a_median_ns":283902,"unified_or_b_median_ns":284701,"ratio":1.003}
+{"scenario":"pptx_add_formatted_text_box","size":100,"samples":30,"leaf_or_a_median_ns":2507525,"unified_or_b_median_ns":2508565,"ratio":1.000}
+{"scenario":"pptx_add_plain_text_box","size":100,"samples":30,"leaf_or_a_median_ns":2082552,"unified_or_b_median_ns":2096922,"ratio":1.007}
+{"scenario":"pptx_set_shape_fill_geometry","size":100,"samples":30,"leaf_or_a_median_ns":1312287,"unified_or_b_median_ns":1310877,"ratio":0.999}
+{"scenario":"pptx_set_slide_transition","size":100,"samples":30,"leaf_or_a_median_ns":1334918,"unified_or_b_median_ns":1337638,"ratio":1.002}
+{"scenario":"pptx_add_formatted_text_box","size":1000,"samples":30,"leaf_or_a_median_ns":24531703,"unified_or_b_median_ns":24554462,"ratio":1.001}
+{"scenario":"pptx_add_plain_text_box","size":1000,"samples":30,"leaf_or_a_median_ns":19993956,"unified_or_b_median_ns":20058537,"ratio":1.003}
+{"scenario":"pptx_set_shape_fill_geometry","size":1000,"samples":30,"leaf_or_a_median_ns":10502771,"unified_or_b_median_ns":10457110,"ratio":0.996}
+{"scenario":"pptx_set_slide_transition","size":1000,"samples":30,"leaf_or_a_median_ns":10767422,"unified_or_b_median_ns":10758483,"ratio":0.999}
