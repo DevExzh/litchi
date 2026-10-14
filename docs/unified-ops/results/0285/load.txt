@@ -1,0 +1,4 @@
+ 07:56:15 up  7:32,  2 users,  load average: 14.02, 17.47, 17.30
+ 07:56:51 up  7:32,  2 users,  load average: 12.29, 16.63, 17.03
+ 07:57:07 up  7:32,  2 users,  load average: 12.10, 16.37, 16.93
+BENCHDONE

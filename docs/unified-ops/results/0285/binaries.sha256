@@ -1,0 +1,6 @@
+# after: built from this branch (cargo build --release -p litchi-ops --features docx,pptx --example find_replace_bench --example merge_bench)
+bb474802ee7e01733d7928b9e94d36ee6f415b3702ccf7dd15e5d85f83042ea1  find_replace_bench
+284a2a92ae608c582252f7cdc172fc7aefda7a29c5b5ffada99d9f0abc6beeb7  merge_bench
+# before: built from 9fe45629ab with the same command
+9acb45505eca6efa3ddc808431b3b345c13170538a7b2e66e15ec6015e113923  find_replace_bench
+9325900ebbf1aafe6156eb73d472a1e3c2dc776bb9645eb59a43532e8890a345  merge_bench
