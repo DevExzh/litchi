@@ -2651,7 +2651,10 @@ impl Element {
             {
                 self.adapter == Adapter::Docx
                     && self.retains_source != Some(false)
-                    && matches!(self.data().canonical, "p" | "r" | "hyperlink" | "tc" | "chart")
+                    && matches!(
+                        self.data().canonical,
+                        "p" | "r" | "hyperlink" | "tc" | "chart"
+                    )
                     && readable
             }
             #[cfg(not(feature = "docx"))]
