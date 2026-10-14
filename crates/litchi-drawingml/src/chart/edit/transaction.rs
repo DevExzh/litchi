@@ -238,6 +238,37 @@ impl Transaction {
         self.apply(candidate)
     }
 
+    /// Set (`Some`) or clear (`None`) the color of a series selected by its
+    /// stable index: its area fill, or for a line, scatter, stock or
+    /// unfilled radar series its line color. The color is `RRGGBB` or
+    /// `AARRGGBB`; the rest of the series' shape properties are kept.
+    ///
+    /// ```
+    /// use litchi_drawingml::chart::authoring::{Kind, Series, Spec, Variant};
+    /// use litchi_drawingml::chart::edit::Snapshot;
+    ///
+    /// let spec = Spec::new(Variant::new(Kind::Column))
+    ///     .with_series(Series::new("East", vec![1.0, 2.0]));
+    /// let snapshot = Snapshot::from_xml(spec.to_xml(None)?)?;
+    /// let mut edit = snapshot.edit();
+    /// edit.set_series_color(0, Some("C00000"))?;
+    /// let xml = edit.commit()?.into_snapshot().xml_bytes().to_vec();
+    /// assert!(String::from_utf8_lossy(&xml).contains(r#"<a:srgbClr val="C00000"/>"#));
+    /// # Ok::<(), litchi_drawingml::Error>(())
+    /// ```
+    /// # Errors
+    ///
+    /// Returns an error for a missing series, an invalid color, a series
+    /// with more than one fill, or malformed XML.
+    pub fn set_series_color(
+        &mut self,
+        series_index: u32,
+        color: Option<&str>,
+    ) -> Result<&mut Self> {
+        let candidate = codec::set_series_color(&self.working_xml, series_index, color)?;
+        self.apply(candidate)
+    }
+
     /// Replace the values of a series selected by its stable index (its Y
     /// values for a scatter or bubble series).
     ///

@@ -77,6 +77,7 @@
 pub mod authoring;
 pub mod axis;
 pub mod bubble;
+pub mod chartex;
 pub mod data;
 pub mod edit;
 pub mod extension;

@@ -52,6 +52,11 @@ use crate::chart::types::{
 };
 use crate::{Error, Result};
 
+mod read;
+mod workbook;
+
+pub use read::{Parsed, read};
+
 /// The most series one authored chart may carry (the spreadsheet limit).
 pub const MAX_SERIES: usize = 255;
 /// The most points one authored series may carry.
@@ -91,6 +96,48 @@ pub enum Kind {
     /// Column, line and area series on shared axes, one family per series
     /// ([`Spec::with_series_kinds`]).
     Combo,
+    /// A running total of increases and decreases, its last point the total
+    /// by default ([`Appearance::subtotals`]); an extended chart.
+    Waterfall,
+    /// Stages narrowing from the first value; an extended chart.
+    Funnel,
+    /// Nested rectangles sized by value; an extended chart.
+    Treemap,
+    /// Concentric rings sized by value; an extended chart.
+    Sunburst,
+    /// The distribution of the values in bins ([`Appearance::bins`]); an
+    /// extended chart.
+    Histogram,
+    /// Columns in descending order with a cumulative-percentage line; an
+    /// extended chart.
+    Pareto,
+    /// The quartiles, mean and outliers of each series; an extended chart.
+    BoxWhisker,
+}
+
+impl Kind {
+    /// Whether the family is an extended chart, written as a `cx:chartSpace`
+    /// part ([`crate::chart::chartex`]) rather than a `c:chartSpace` one.
+    ///
+    /// ```
+    /// use litchi_drawingml::chart::authoring::Kind;
+    ///
+    /// assert!(Kind::Waterfall.is_extended());
+    /// assert!(!Kind::Column.is_extended());
+    /// ```
+    #[must_use]
+    pub const fn is_extended(self) -> bool {
+        matches!(
+            self,
+            Self::Waterfall
+                | Self::Funnel
+                | Self::Treemap
+                | Self::Sunburst
+                | Self::Histogram
+                | Self::Pareto
+                | Self::BoxWhisker
+        )
+    }
 }
 
 /// How the series of a bar, line or area chart combine.
@@ -368,6 +415,59 @@ pub struct Appearance {
     /// The 3D view: X rotation (0-90), Y rotation (0-360) and perspective
     /// (0-240).
     pub view_3d: Option<(u32, u32, Option<u32>)>,
+    /// The zero-based points of a waterfall chart drawn as totals (the
+    /// running sum) rather than as changes; `None` makes the last point the
+    /// total, an empty list draws every point as a change.
+    pub subtotals: Option<Vec<usize>>,
+    /// The `RRGGBB` (or `AARRGGBB`) fill of a waterfall chart's increases.
+    pub increase_color: Option<String>,
+    /// The `RRGGBB` (or `AARRGGBB`) fill of a waterfall chart's decreases.
+    pub decrease_color: Option<String>,
+    /// The `RRGGBB` (or `AARRGGBB`) fill of a waterfall chart's totals.
+    pub total_color: Option<String>,
+    /// How a histogram (or a Pareto chart without categories) bins its
+    /// values; `None` lets the application choose.
+    pub bins: Option<Bins>,
+    /// How a box-and-whisker chart computes its quartiles.
+    pub quartile_method: Option<QuartileMethod>,
+    /// How a treemap places the labels of parent categories.
+    pub parent_labels: Option<ParentLabels>,
+}
+
+/// How a histogram groups its values into bins.
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct Bins {
+    /// The number of bins.
+    pub count: Option<u32>,
+    /// The width of each bin; exclusive with [`Self::count`].
+    pub size: Option<f64>,
+    /// Whether a bin includes its lower bound (`[a, b)`) rather than its
+    /// upper bound (`(a, b]`, the default).
+    pub closed_left: bool,
+    /// Values above this go to one overflow bin.
+    pub overflow: Option<f64>,
+    /// Values below this go to one underflow bin.
+    pub underflow: Option<f64>,
+}
+
+/// How a box-and-whisker chart computes quartiles.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum QuartileMethod {
+    /// The median is excluded from both halves.
+    Exclusive,
+    /// The median is included in both halves.
+    Inclusive,
+}
+
+/// How a treemap shows the labels of parent categories.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParentLabels {
+    /// Over the rectangles of their children.
+    Overlapping,
+    /// In a banner above their children.
+    Banner,
+    /// Not shown.
+    None,
 }
 
 /// A complete description of a new chart.
@@ -536,6 +636,56 @@ impl Spec {
         &self.binding
     }
 
+    /// The category (horizontal) axis title, if any.
+    #[must_use]
+    pub fn category_axis_title(&self) -> Option<&str> {
+        self.category_axis_title.as_deref()
+    }
+
+    /// The value (vertical) axis title, if any.
+    #[must_use]
+    pub fn value_axis_title(&self) -> Option<&str> {
+        self.value_axis_title.as_deref()
+    }
+
+    /// The series families of a combo chart, as given.
+    #[must_use]
+    pub fn series_kinds(&self) -> &[Kind] {
+        &self.series_kinds
+    }
+
+    /// The same spec as another variant, keeping its data and formatting.
+    #[must_use]
+    pub const fn with_variant(mut self, variant: Variant) -> Self {
+        self.variant = variant;
+        self
+    }
+
+    /// The same spec without its title.
+    #[must_use]
+    pub fn without_title(mut self) -> Self {
+        self.title = None;
+        self
+    }
+
+    /// The same spec with other categories and series, keeping the rest.
+    #[must_use]
+    pub fn with_data(mut self, categories: Vec<String>, series: Vec<Series>) -> Self {
+        self.categories = categories;
+        self.series = series;
+        self
+    }
+
+    /// The series, to change in place.
+    pub fn series_mut(&mut self) -> &mut [Series] {
+        &mut self.series
+    }
+
+    /// The formatting options, to change in place.
+    pub const fn appearance_mut(&mut self) -> &mut Appearance {
+        &mut self.appearance
+    }
+
     /// Set the title.
     #[must_use]
     pub fn with_title(mut self, title: impl Into<String>) -> Self {
@@ -617,6 +767,15 @@ impl Spec {
             return Err(Error::Invalid(
                 "a stock chart needs three (high, low, close) or four (open, high, low, close) series"
                     .into(),
+            ));
+        }
+        if matches!(
+            self.variant.kind,
+            Kind::Waterfall | Kind::Funnel | Kind::Treemap | Kind::Sunburst | Kind::Pareto
+        ) && self.series.len() != 1
+        {
+            return Err(Error::Invalid(
+                "a waterfall, funnel, treemap, sunburst or Pareto chart takes one series".into(),
             ));
         }
         if self.categories.len() > MAX_POINTS {
@@ -791,6 +950,42 @@ impl Spec {
         {
             return invalid("a marker, line width or 3D view value is outside its range");
         }
+        if [
+            &appearance.increase_color,
+            &appearance.decrease_color,
+            &appearance.total_color,
+        ]
+        .into_iter()
+        .flatten()
+        .any(|color| !is_argb(color))
+        {
+            return invalid("chart colors must be RRGGBB hex values");
+        }
+        if let Some(bins) = appearance.bins {
+            let finite = [bins.size, bins.overflow, bins.underflow]
+                .into_iter()
+                .flatten()
+                .all(f64::is_finite);
+            if !finite
+                || bins.count == Some(0)
+                || bins.size.is_some_and(|size| size <= 0.0)
+                || (bins.count.is_some() && bins.size.is_some())
+                || bins
+                    .underflow
+                    .zip(bins.overflow)
+                    .is_some_and(|(under, over)| under >= over)
+            {
+                return invalid(
+                    "a histogram takes a positive bin count or a positive bin size, and an underflow below its overflow",
+                );
+            }
+        }
+        if let Some(subtotals) = &appearance.subtotals {
+            let points = self.series.first().map_or(0, |series| series.values.len());
+            if subtotals.iter().any(|point| *point >= points) {
+                return invalid("a waterfall total names a point past the series");
+            }
+        }
         if let Some(position) = appearance.labels.and_then(|labels| labels.position) {
             use DataLabelPosition as P;
             let stacked = !matches!(self.variant.grouping, Grouping::Standard);
@@ -813,6 +1008,14 @@ impl Spec {
                     P::Center | P::InsideEnd | P::OutsideEnd | P::BestFit
                 ),
                 Kind::Doughnut | Kind::Area | Kind::Radar | Kind::Combo => false,
+                // `cx:dataLabels/@pos` admits every position.
+                Kind::Waterfall
+                | Kind::Funnel
+                | Kind::Treemap
+                | Kind::Sunburst
+                | Kind::Histogram
+                | Kind::Pareto
+                | Kind::BoxWhisker => true,
             };
             if !allowed || self.variant.three_d {
                 return invalid("this chart type does not take that data-label position");
@@ -924,7 +1127,12 @@ impl Spec {
         cells
     }
 
-    fn reference(&self, column: usize, first_row: usize, last_row: usize) -> Option<String> {
+    pub(crate) fn reference(
+        &self,
+        column: usize,
+        first_row: usize,
+        last_row: usize,
+    ) -> Option<String> {
         let Binding::Sheet {
             sheet,
             row: row_origin,
@@ -1257,6 +1465,13 @@ impl Spec {
                 TypeGroup::Radar(group)
             },
             Kind::Combo => unreachable!("combo charts build several groups"),
+            Kind::Waterfall
+            | Kind::Funnel
+            | Kind::Treemap
+            | Kind::Sunburst
+            | Kind::Histogram
+            | Kind::Pareto
+            | Kind::BoxWhisker => unreachable!("extended charts have no classic chart group"),
             Kind::Stock => {
                 let mut group = StockTypeGroup::new();
                 group.common = axes(self.common(false), false);
@@ -1336,6 +1551,11 @@ impl Spec {
     /// Returns the errors of [`Self::validate`].
     pub fn to_chart(&self) -> Result<Chart> {
         self.validate()?;
+        if self.variant.kind.is_extended() {
+            return Err(Error::Invalid(
+                "an extended chart has no classic chart model; write it with to_xml".into(),
+            ));
+        }
         let groups = self.type_groups();
         let mut plot_area = PlotArea::new();
         for axis in self.axes(&groups) {
@@ -1376,7 +1596,8 @@ impl Spec {
         Ok(chart)
     }
 
-    /// Write the complete chart-space part.
+    /// Write the complete chart-space part: a `c:chartSpace`, or for an
+    /// extended family ([`Kind::is_extended`]) a `cx:chartSpace`.
     ///
     /// `external_data` is the relationship ID of the embedded workbook the
     /// host attached, written as `c:externalData`; pass it with a
@@ -1386,6 +1607,9 @@ impl Spec {
     ///
     /// Returns the errors of [`Self::validate`] and of the chart writer.
     pub fn to_xml(&self, external_data: Option<&str>) -> Result<Vec<u8>> {
+        if self.variant.kind.is_extended() {
+            return crate::chart::chartex::write(self, external_data);
+        }
         let mut chart = self.to_chart()?;
         if external_data.is_some() {
             chart.external_data = Some(crate::chart::model::ExternalData::pending());

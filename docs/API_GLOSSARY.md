@@ -2084,3 +2084,26 @@ copy of the run's properties); XLSX worksheets report rich-text cells
 | `litchi_xlsx::Worksheet::has_rich_text` | adopted (0273) |
 
 See [0273](unified-ops/0273-find-replace.md).
+
+## DOCX charts and extended chart types (record 0283)
+
+`litchi_drawingml::chart::authoring::Kind` gains the extended families
+(`Waterfall`, `Funnel`, `Treemap`, `Sunburst`, `Histogram`, `Pareto`,
+`BoxWhisker`; `Kind::is_extended`), which `Spec::to_xml` writes as a
+`cx:chartSpace` part through the new `chart::chartex` module.
+`authoring::read` turns a `c:chartSpace` or `cx:chartSpace` part back into
+the `Spec` that writes it (`Parsed`, `Parsed::is_authored`), so hosts can
+rebuild a chart whose family or data changes without losing anything the
+model reads. `Spec::workbook_members` replaces the PPTX-private worksheet
+generator so DOCX shares it.
+
+| Name | Status |
+|---|---|
+| `litchi_drawingml::chart::authoring::Kind::{Waterfall, Funnel, Treemap, Sunburst, Histogram, Pareto, BoxWhisker, is_extended}` | adopted (0283) |
+| `litchi_drawingml::chart::authoring::{Bins, QuartileMethod, ParentLabels}`, `Appearance::{subtotals, increase_color, decrease_color, total_color, bins, quartile_method, parent_labels}` | adopted (0283) |
+| `litchi_drawingml::chart::authoring::{read, Parsed}`, `Parsed::is_authored` | adopted (0283) |
+| `litchi_drawingml::chart::authoring::Spec::{category_axis_title, value_axis_title, series_kinds, with_variant, without_title, with_data, series_mut, appearance_mut, workbook_members}` | adopted (0283) |
+| `litchi_drawingml::chart::chartex::{read, style_xml, colors_xml, NAMESPACE, CONTENT_TYPE, RELATIONSHIP_TYPE, GRAPHIC_DATA_URI, STYLE_CONTENT_TYPE, STYLE_RELATIONSHIP_TYPE, COLORS_CONTENT_TYPE, COLORS_RELATIONSHIP_TYPE, MAX_XML_BYTES}` | adopted (0283) |
+| `litchi_drawingml::chart::edit::Transaction::set_series_color` | adopted (0283) |
+
+See [0283](unified-ops/0283-docx-charts-and-chartex.md).

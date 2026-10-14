@@ -395,3 +395,128 @@ fn series_colors_override_the_palette_and_tint_whole_pies() {
     assert!(matches!(bad.validate(), Err(Error::Invalid(_))));
     assert!(bad.to_xml(None).is_err());
 }
+
+#[test]
+fn every_variant_reads_back_as_its_authored_spec() {
+    let kinds = [
+        Kind::Column,
+        Kind::Bar,
+        Kind::Line,
+        Kind::Pie,
+        Kind::Doughnut,
+        Kind::Area,
+        Kind::Scatter,
+        Kind::Bubble,
+        Kind::Radar,
+    ];
+    for kind in kinds {
+        for grouping in [
+            Grouping::Standard,
+            Grouping::Stacked,
+            Grouping::PercentStacked,
+        ] {
+            for three_d in [false, true] {
+                let variant = Variant::new(kind)
+                    .with_grouping(grouping)
+                    .with_three_d(three_d);
+                if !variant.is_valid() {
+                    continue;
+                }
+                let mut spec = sales(variant);
+                if matches!(kind, Kind::Pie | Kind::Doughnut) {
+                    spec.series.truncate(1);
+                }
+                for (binding, external) in [
+                    (Binding::Literal, None),
+                    (Binding::sheet("Sheet1"), Some("rId1")),
+                ] {
+                    let spec = spec.clone().with_binding(binding.clone());
+                    let xml = spec.to_xml(external).unwrap();
+                    let parsed = read(&xml).unwrap();
+                    assert_eq!(parsed.spec.variant(), variant);
+                    assert_eq!(parsed.spec.binding(), &binding, "{variant:?}");
+                    assert_eq!(parsed.external_data.as_deref(), external);
+                    assert!(parsed.is_authored(&xml), "{variant:?} {binding:?}");
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn formatting_reads_back_into_the_spec() {
+    let appearance = Appearance {
+        labels: Some(Labels {
+            value: true,
+            category: true,
+            position: Some(DataLabelPosition::OutsideEnd),
+            ..Labels::default()
+        }),
+        gap_width: Some(80),
+        overlap: Some(-20),
+        axis_min: Some(0.0),
+        axis_max: Some(200.0),
+        major_unit: Some(50.0),
+        legend_overlay: Some(true),
+        ..Appearance::default()
+    };
+    let spec = sales(Variant::new(Kind::Column))
+        .with_category_axis_title("Quarter")
+        .with_value_axis_title("Revenue")
+        .with_legend(Some(LegendPosition::Right))
+        .with_appearance(appearance.clone());
+    let mut spec = spec;
+    spec.series[1].color = Some("ED7D31".into());
+    let xml = spec.to_xml(None).unwrap();
+    let parsed = read(&xml).unwrap();
+    assert!(parsed.is_authored(&xml));
+    assert_eq!(parsed.spec.appearance(), &appearance);
+    assert_eq!(parsed.spec.series()[1].color.as_deref(), Some("ED7D31"));
+    assert_eq!(parsed.spec.category_axis_title(), Some("Quarter"));
+    assert_eq!(parsed.spec.value_axis_title(), Some("Revenue"));
+    // A changed family rebuilds with the same data and formatting.
+    let bar = parsed
+        .spec
+        .clone()
+        .with_variant(Variant::new(Kind::Bar))
+        .to_xml(None)
+        .unwrap();
+    let rebuilt = read(&bar).unwrap();
+    assert_eq!(rebuilt.spec.variant().kind, Kind::Bar);
+    assert_eq!(rebuilt.spec.series(), parsed.spec.series());
+
+    let pie = Spec::new(Variant::new(Kind::Doughnut))
+        .with_categories(["A", "B", "C"])
+        .with_series(Series::new("S", vec![1.0, 2.0, 3.0]))
+        .with_appearance(Appearance {
+            colors: vec!["FF0000".into(), "00FF00".into(), "0000FF".into()],
+            hole_size: Some(60),
+            first_slice_angle: Some(90),
+            explosion: Some(10),
+            ..Appearance::default()
+        });
+    let xml = pie.to_xml(None).unwrap();
+    let parsed = read(&xml).unwrap();
+    assert!(parsed.is_authored(&xml));
+    assert_eq!(parsed.spec.appearance().colors.len(), 3);
+
+    let combo = sales(Variant::new(Kind::Combo)).with_series_kinds(vec![Kind::Column, Kind::Line]);
+    let xml = combo.to_xml(None).unwrap();
+    let parsed = read(&xml).unwrap();
+    assert_eq!(parsed.spec.series_kinds(), [Kind::Column, Kind::Line]);
+    assert!(parsed.is_authored(&xml));
+}
+
+#[test]
+fn foreign_formatting_is_not_authored() {
+    let spec = sales(Variant::new(Kind::Column));
+    let xml = String::from_utf8(spec.to_xml(None).unwrap()).unwrap();
+    // A rounded-corner chart has a field the spec cannot write.
+    let foreign = xml.replace(
+        r#"<c:roundedCorners val="0"/>"#,
+        r#"<c:roundedCorners val="1"/>"#,
+    );
+    assert_ne!(foreign, xml);
+    let parsed = read(foreign.as_bytes()).unwrap();
+    assert!(!parsed.is_authored(foreign.as_bytes()));
+}

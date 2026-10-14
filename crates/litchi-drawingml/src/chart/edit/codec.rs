@@ -718,6 +718,184 @@ pub(crate) fn set_axis_title(
     }
 }
 
+const FILLS: [&[u8]; 6] = [
+    b"noFill",
+    b"solidFill",
+    b"gradFill",
+    b"blipFill",
+    b"pattFill",
+    b"grpFill",
+];
+
+/// The fill child of a shape-properties or line element, if any.
+fn fill_child(document: &Document, parent: usize) -> Result<Option<usize>> {
+    let mut found = None;
+    for fill in FILLS {
+        if let Some(node) = document.child(parent, fill, NamespaceKind::Drawing)? {
+            if found.is_some() {
+                return Err(Error::Invalid("chart shape has more than one fill".into()));
+            }
+            found = Some(node);
+        }
+    }
+    Ok(found)
+}
+
+/// Replace, insert or remove the fill of `parent` (an `spPr` or `a:ln`).
+/// `before` lists the children a new fill precedes, in schema order.
+fn set_fill_in(
+    xml: &[u8],
+    document: &Document,
+    parent: usize,
+    fill: Option<&str>,
+    before: &[&[u8]],
+) -> Result<Vec<u8>> {
+    let current = fill_child(document, parent)?;
+    match (current, fill) {
+        (Some(node), Some(fill)) => {
+            let node = document.node(node);
+            if &xml[node.start..node.end] == fill.as_bytes() {
+                return Ok(xml.to_vec());
+            }
+            replace_range(xml, node.start..node.end, fill.as_bytes())
+        },
+        (Some(node), None) => remove_node(xml, document, node),
+        (None, None) => Ok(xml.to_vec()),
+        (None, Some(fill)) => {
+            for name in before {
+                if let Some(child) = document.child(parent, name, NamespaceKind::Drawing)? {
+                    return insert_at(xml, document.node(child).start, fill.as_bytes());
+                }
+            }
+            append_to_parent(xml, document, parent, fill)
+        },
+    }
+}
+
+/// Set or clear the fill color of a series: its area fill, or for a
+/// line, scatter, radar or stock series its line color.
+pub(crate) fn set_series_color(xml: &[u8], index: u32, color: Option<&str>) -> Result<Vec<u8>> {
+    if let Some(color) = color {
+        let valid =
+            matches!(color.len(), 6 | 8) && color.bytes().all(|byte| byte.is_ascii_hexdigit());
+        if !valid {
+            return Err(Error::Invalid(
+                "a series color is RRGGBB or AARRGGBB".into(),
+            ));
+        }
+    }
+    let mut source = xml.to_vec();
+    let mut document = Document::parse(&source)?;
+    if color.is_some() && document.namespace_prefix(NamespaceKind::Drawing).is_none() {
+        source = ensure_namespace(&source, &document, b"a", DRAWING_TRANSITIONAL)?;
+        document = Document::parse(&source)?;
+    }
+    let drawing = document
+        .namespace_prefix(NamespaceKind::Drawing)
+        .unwrap_or_else(|| b"a".to_vec());
+    let a = |local: &str| qname(&drawing, local);
+    let fill = color.map(|color| {
+        let color = color.to_ascii_uppercase();
+        let inner = if color.len() == 8 {
+            let alpha = u32::from_str_radix(&color[..2], 16).unwrap_or(255);
+            format!(
+                r#"<{clr} val="{}"><{alpha_name} val="{}"/></{clr}>"#,
+                &color[2..],
+                alpha * 100_000 / 255,
+                clr = a("srgbClr"),
+                alpha_name = a("alpha"),
+            )
+        } else {
+            format!(r#"<{} val="{color}"/>"#, a("srgbClr"))
+        };
+        format!("<{fill}>{inner}</{fill}>", fill = a("solidFill"))
+    });
+    let series = document.series(&source, index)?;
+    let lined = document.node(series).parent.is_some_and(|parent| {
+        matches!(
+            document.node(parent).local.as_slice(),
+            b"lineChart" | b"line3DChart" | b"scatterChart" | b"stockChart"
+        ) || (document.node(parent).local == b"radarChart"
+            && document
+                .child(parent, b"radarStyle", NamespaceKind::Chart)
+                .ok()
+                .flatten()
+                .and_then(|style| {
+                    document
+                        .attribute_from(&source, style, b"val")
+                        .ok()
+                        .flatten()
+                })
+                .is_none_or(|style| style != b"filled"))
+    });
+    let shape = document.child(series, b"spPr", NamespaceKind::Chart)?;
+    let after_shape: &[&[u8]] = &[
+        b"ln",
+        b"effectLst",
+        b"effectDag",
+        b"scene3d",
+        b"sp3d",
+        b"extLst",
+    ];
+    match (shape, &fill) {
+        (None, None) => Ok(source),
+        (None, Some(fill)) => {
+            let prefix = document.prefix(series);
+            let body = if lined {
+                format!("<{ln}>{fill}</{ln}>", ln = a("ln"))
+            } else {
+                fill.clone()
+            };
+            let fragment = element(&prefix, "spPr", "", &body);
+            for anchor in [&b"tx"[..], b"order"] {
+                if let Some(node) = document.child(series, anchor, NamespaceKind::Chart)? {
+                    return insert_at(&source, document.node(node).end, fragment.as_bytes());
+                }
+            }
+            Err(Error::Invalid("chart series has no order".into()))
+        },
+        (Some(shape), fill) if lined => {
+            match document.child(shape, b"ln", NamespaceKind::Drawing)? {
+                Some(line) => set_fill_in(
+                    &source,
+                    &document,
+                    line,
+                    fill.as_deref(),
+                    &[
+                        b"prstDash",
+                        b"custDash",
+                        b"round",
+                        b"bevel",
+                        b"miter",
+                        b"headEnd",
+                        b"tailEnd",
+                        b"extLst",
+                    ],
+                ),
+                None => match fill {
+                    Some(fill) => {
+                        let fragment = format!("<{ln}>{fill}</{ln}>", ln = a("ln"));
+                        for name in &after_shape[1..] {
+                            if let Some(node) =
+                                document.child(shape, name, NamespaceKind::Drawing)?
+                            {
+                                return insert_at(
+                                    &source,
+                                    document.node(node).start,
+                                    fragment.as_bytes(),
+                                );
+                            }
+                        }
+                        append_to_parent(&source, &document, shape, &fragment)
+                    },
+                    None => Ok(source.clone()),
+                },
+            }
+        },
+        (Some(shape), fill) => set_fill_in(&source, &document, shape, fill.as_deref(), after_shape),
+    }
+}
+
 /// The value element of a series: `c:val`, or `c:yVal` for X/Y series.
 fn series_values_node(document: &Document, series: usize) -> Result<usize> {
     if let Some(node) = document.child(series, b"val", NamespaceKind::Chart)? {

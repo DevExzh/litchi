@@ -99,3 +99,47 @@ fn stale_and_invalid_edits_are_rejected_atomically() {
     );
     assert!(!edit.is_changed());
 }
+
+#[test]
+fn series_colors_replace_insert_and_clear_fills() {
+    use crate::chart::authoring::{Kind, Series, Spec, Variant};
+    let color = |xml: &[u8]| {
+        crate::chart::authoring::read(xml).unwrap().spec.series()[0]
+            .color
+            .clone()
+    };
+    // Inserted into a series without shape properties, then replaced, then
+    // cleared; the opaque extension of the fixture survives.
+    let snapshot = Snapshot::from_xml(CHART).unwrap();
+    let mut edit = snapshot.edit();
+    edit.set_series_color(0, Some("c00000")).unwrap();
+    let inserted = edit.commit().unwrap().into_snapshot();
+    assert!(String::from_utf8_lossy(inserted.xml_bytes()).contains("<x:payload keep=\"1\"/>"));
+    let mut edit = inserted.edit();
+    edit.set_series_color(0, Some("8000FF00")).unwrap();
+    let replaced = edit.commit().unwrap().into_snapshot();
+    let text = String::from_utf8_lossy(replaced.xml_bytes()).into_owned();
+    assert!(text.contains(r#"<a:srgbClr val="00FF00"><a:alpha val="50196"/></a:srgbClr>"#));
+    assert_eq!(text.matches("solidFill>").count(), 2, "{text}");
+    let mut edit = replaced.edit();
+    edit.set_series_color(0, None).unwrap();
+    assert!(
+        !String::from_utf8_lossy(edit.commit().unwrap().snapshot().xml_bytes()).contains("srgbClr")
+    );
+    assert!(snapshot.edit().set_series_color(0, Some("red")).is_err());
+    assert!(snapshot.edit().set_series_color(9, Some("FF0000")).is_err());
+
+    // A line series takes the color on its line.
+    for kind in [Kind::Line, Kind::Column] {
+        let spec = Spec::new(Variant::new(kind))
+            .with_series(Series::new("S", vec![1.0, 2.0]).with_color("112233"));
+        let snapshot = Snapshot::from_xml(spec.to_xml(None).unwrap()).unwrap();
+        let mut edit = snapshot.edit();
+        edit.set_series_color(0, Some("445566")).unwrap();
+        let xml = edit.commit().unwrap().into_snapshot().xml_bytes().to_vec();
+        assert_eq!(color(&xml).as_deref(), Some("445566"), "{kind:?}");
+        // The edited part reads as the authored chart of the new color.
+        let parsed = crate::chart::authoring::read(&xml).unwrap();
+        assert!(parsed.is_authored(&xml), "{kind:?}");
+    }
+}
