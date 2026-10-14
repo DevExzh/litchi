@@ -483,8 +483,9 @@ fn rtf_advertises_native_paragraph_structural_writes_and_keeps_closure_gaps() {
     assert!(capabilities.verb(Verb::Add).is_supported());
     assert!(capabilities.verb(Verb::Swap).is_supported());
 
+    // The body takes added paragraphs; it is not itself added (0289).
     let body = capabilities.element("body").expect("RTF body");
-    assert!(body.operations().add);
+    assert!(!body.operations().add);
 
     let paragraph = capabilities.element("paragraph").expect("RTF paragraph");
     assert!(paragraph.operations().set);

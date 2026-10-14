@@ -110,3 +110,19 @@ mod doc {
         assert_eq!(edit.to_bytes().unwrap(), set.to_bytes().unwrap());
     }
 }
+
+#[cfg(feature = "rtf")]
+mod rtf {
+    use litchi_core::FileFormat;
+    use litchi_ops::capabilities::Capabilities;
+
+    /// The body takes added paragraphs; it is not itself an element `add`
+    /// creates, so the report must not claim it.
+    #[test]
+    fn the_body_is_not_reported_addable() {
+        let caps = Capabilities::of(FileFormat::Rtf);
+        assert!(!caps.element("body").unwrap().operations().add);
+        assert!(caps.element("paragraph").unwrap().operations().add);
+        assert!(caps.element("run").unwrap().operations().add);
+    }
+}

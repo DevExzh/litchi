@@ -57,7 +57,7 @@
       "element": "body",
       "parent": "document",
       "operations": {
-        "add": true,
+        "add": false,
         "set": false,
         "get": true,
         "query": true,
