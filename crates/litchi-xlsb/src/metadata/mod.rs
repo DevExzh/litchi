@@ -35,19 +35,27 @@ use litchi_ooxml_common::properties::{self, Snapshot, app};
 
 pub use litchi_ooxml_common::properties::{Diagnostics, Error, LimitKind, Patch};
 
+use crate::Workbook;
 use crate::package::Package;
 
 pub mod source;
 
 type Result<T> = std::result::Result<T, Error>;
 
-/// A staged metadata edit of one [`Package`].
+/// A staged metadata edit of one [`Package`] or [`Workbook`].
 ///
 /// Dropping the edit discards it.
 #[derive(Debug)]
 pub struct Edit<'a> {
-    package: &'a Package,
+    owner: Owner<'a>,
     inner: properties::Edit,
+}
+
+/// The snapshot an [`Edit`] stages over.
+#[derive(Debug, Clone, Copy)]
+enum Owner<'a> {
+    Package(&'a Package),
+    Workbook(&'a Workbook),
 }
 
 impl Edit<'_> {
@@ -107,7 +115,19 @@ impl Edit<'_> {
     /// workbook.
     pub fn commit(self) -> Result<Commit> {
         let (_, patch, diagnostics) = self.inner.commit()?.into_parts();
-        let package = self.package.apply_metadata(&patch)?;
+        let package = match self.owner {
+            Owner::Package(package) => package.apply_metadata(&patch)?,
+            Owner::Workbook(workbook) => {
+                if patch.is_noop() {
+                    workbook.to_package()
+                } else {
+                    let mut candidate = workbook.package.clone();
+                    patch.apply(&mut candidate)?;
+                    Package::reparse_workbook_candidate(workbook, candidate)
+                        .map_err(|error| Error::Invalid(error.to_string()))?
+                }
+            },
+        };
         Ok(Commit {
             package,
             patch,
@@ -186,7 +206,7 @@ impl Package {
     /// Returns the strict graph errors of the property families.
     pub fn edit_metadata(&self) -> Result<Edit<'_>> {
         Ok(Edit {
-            package: self,
+            owner: Owner::Package(self),
             inner: self.metadata_snapshot()?.edit(),
         })
     }
@@ -212,9 +232,72 @@ impl Package {
     }
 }
 
+impl Workbook {
+    /// Start a metadata edit of this workbook; [`Edit::commit`] returns the
+    /// edited [`Package`], as [`Package::edit_metadata`] does for the
+    /// workbook's package, without first copying the workbook into a
+    /// package. The workbook is unchanged.
+    ///
+    /// ```
+    /// use litchi_xlsb::Package;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let workbook = Package::new()?.into_workbook()?;
+    /// let mut edit = workbook.edit_metadata()?;
+    /// edit.update(|metadata| metadata.title = Some("Budget".to_owned()))?;
+    /// let after = edit.commit()?.into_package();
+    /// assert_eq!(after.metadata()?.title.as_deref(), Some("Budget"));
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns the strict graph errors of the property families.
+    pub fn edit_metadata(&self) -> Result<Edit<'_>> {
+        Ok(Edit {
+            owner: Owner::Workbook(self),
+            inner: Snapshot::read(&self.package, Host::Excel)?.edit(),
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn workbook_edits_equal_package_edits() {
+        let package = Package::new().unwrap();
+        let workbook = package.clone().into_workbook().unwrap();
+        let stage = |edit: &mut Edit<'_>| {
+            edit.update(|metadata| {
+                metadata.title = Some("Budget".to_owned());
+                metadata.company = Some("Litchi".to_owned());
+            })
+            .unwrap();
+        };
+        let mut from_package = package.edit_metadata().unwrap();
+        stage(&mut from_package);
+        let mut from_workbook = workbook.edit_metadata().unwrap();
+        stage(&mut from_workbook);
+        let (expected, expected_patch) = from_package.commit().unwrap().into_parts();
+        let (actual, actual_patch) = from_workbook.commit().unwrap().into_parts();
+        assert_eq!(actual.to_bytes().unwrap(), expected.to_bytes().unwrap());
+        assert_eq!(actual.metadata().unwrap(), expected.metadata().unwrap());
+        assert_eq!(actual_patch.changes().len(), expected_patch.changes().len());
+        // The committed package carries its workbook projection.
+        let reopened = actual.into_workbook().unwrap();
+        assert_eq!(
+            reopened.to_package().metadata().unwrap().title.as_deref(),
+            Some("Budget")
+        );
+        // A no-op keeps every byte.
+        let edit = workbook.edit_metadata().unwrap();
+        let (same, patch) = edit.commit().unwrap().into_parts();
+        assert!(patch.is_noop());
+        assert_eq!(same.to_bytes().unwrap(), package.to_bytes().unwrap());
+    }
 
     #[test]
     fn edits_publish_a_new_package_and_replay_exactly() {
