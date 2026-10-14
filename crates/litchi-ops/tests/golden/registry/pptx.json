@@ -2977,8 +2977,8 @@
         "slideLayout"
       ],
       "operations": {
-        "add": false,
-        "set": false,
+        "add": true,
+        "set": true,
         "get": true,
         "query": true,
         "remove": true
@@ -2988,38 +2988,52 @@
           "/slide[N]/smartart[N]"
         ]
       },
+      "children": [
+        {
+          "element": "node",
+          "pathSegment": "node"
+        }
+      ],
       "properties": {
         "name": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "x": {
           "type": "length",
           "unit": "emu",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "y": {
           "type": "length",
           "unit": "emu",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "width": {
           "type": "length",
           "unit": "emu",
-          "add": false,
+          "constraint": {
+            "minEmu": 1,
+            "maxEmu": 9223372036854775807
+          },
+          "add": true,
           "set": false,
           "get": true
         },
         "height": {
           "type": "length",
           "unit": "emu",
-          "add": false,
+          "constraint": {
+            "minEmu": 1,
+            "maxEmu": 9223372036854775807
+          },
+          "add": true,
           "set": false,
           "get": true
         },
@@ -3028,6 +3042,33 @@
           "add": false,
           "set": false,
           "get": true
+        },
+        "layout": {
+          "type": "string",
+          "constraint": {
+            "notEmpty": true
+          },
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "layoutId": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "nodeCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
         }
       },
       "predicates": {
@@ -4430,6 +4471,54 @@
         "code": "unsupported_capability",
         "followUp": "M1-extended",
         "reason": "notes slides are read through /slide[N]/notes; their parts have no adapter node"
+      }
+    },
+    {
+      "format": "pptx",
+      "element": "node",
+      "parent": [
+        "smartart",
+        "node"
+      ],
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/smartart[N]/node[N]",
+          "/slide[N]/smartart[N]/node[N]/node[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "node",
+          "pathSegment": "node"
+        }
+      ],
+      "properties": {
+        "level": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     }
   ],

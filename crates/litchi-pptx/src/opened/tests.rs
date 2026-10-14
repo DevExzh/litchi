@@ -5841,3 +5841,97 @@ fn authored_charts_carry_a_deterministic_embedded_workbook_and_edit_in_place() -
     );
     Ok(())
 }
+
+#[test]
+fn smartart_add_replace_and_remove_keep_the_part_graph_consistent() -> Result<()> {
+    use litchi_drawingml::diagram::authoring::{Layout, Spec};
+    use litchi_drawingml::diagram::edit::Outline;
+
+    let package = opened_two_slide_package()?;
+    let before = part_states(&package);
+    let spec = Spec::parse_outline(Layout::Process, "Plan\n\tScope\nBuild\nShip")
+        .map_err(|error| Error::Invalid(error.to_string()))?;
+    let mut edit = package.opened_presentation()?.edit();
+    let id = edit.add_smartart(
+        0_usize,
+        &spec,
+        "Diagram 1",
+        (100, 200, 4_000_000, 2_000_000),
+    )?;
+    assert!(id > 0);
+    let (added, patch) = edit.commit()?.into_parts();
+    let names = |package: &Package| -> Vec<String> {
+        package
+            .opc
+            .iter_parts()
+            .map(|part| part.partname().to_string())
+            .filter(|name| name.starts_with("/ppt/diagrams/"))
+            .collect()
+    };
+    let mut diagram_parts = names(&added);
+    diagram_parts.sort();
+    assert_eq!(
+        diagram_parts,
+        [
+            "/ppt/diagrams/colors1.xml",
+            "/ppt/diagrams/data1.xml",
+            "/ppt/diagrams/drawing1.xml",
+            "/ppt/diagrams/layout1.xml",
+            "/ppt/diagrams/quickStyle1.xml",
+        ]
+    );
+    // Deterministic.
+    let mut again = package.opened_presentation()?.edit();
+    again.add_smartart(
+        0_usize,
+        &spec,
+        "Diagram 1",
+        (100, 200, 4_000_000, 2_000_000),
+    )?;
+    assert_eq!(
+        part_states(&again.commit()?.into_parts().0),
+        part_states(&added)
+    );
+
+    // The parts read back, and the data names the slide's drawing relationship.
+    let mut edit = added.opened_presentation()?.edit();
+    let parts = edit.smartart(0_usize, "Diagram 1")?;
+    let outline = Outline::read(&parts.data).map_err(|error| Error::Invalid(error.to_string()))?;
+    assert_eq!(outline.entries.len(), 4);
+    assert!(parts.drawing.is_some());
+    assert!(!edit.set_smartart(0_usize, "Diagram 1", parts.clone())?);
+
+    // Removing the cached drawing removes its part and relationship.
+    let mut without = parts.clone();
+    without.drawing = None;
+    assert!(edit.set_smartart(0_usize, "Diagram 1", without)?);
+    let (dropped, _) = edit.commit()?.into_parts();
+    assert_eq!(names(&dropped).len(), 4);
+    let read = dropped
+        .opened_presentation()?
+        .edit()
+        .smartart(0_usize, "Diagram 1")?;
+    assert!(read.drawing.is_none());
+    assert_eq!(
+        Outline::read(&read.data)
+            .map_err(|error| Error::Invalid(error.to_string()))?
+            .drawing_relationship,
+        None
+    );
+    // A new drawing is related again.
+    let mut edit = dropped.opened_presentation()?.edit();
+    assert!(edit.set_smartart(0_usize, "Diagram 1", parts)?);
+    let (restored, _) = edit.commit()?.into_parts();
+    assert_eq!(names(&restored).len(), 5);
+
+    // Removing the frame removes every diagram part, the drawing included.
+    let mut edit = added.opened_presentation()?.edit();
+    assert!(edit.remove_shape(0_usize, "Diagram 1")?);
+    let (removed, _) = edit.commit()?.into_parts();
+    assert!(names(&removed).is_empty());
+    assert_eq!(
+        part_states(&package.apply(&patch)?.apply(&patch.inverse())?),
+        before
+    );
+    Ok(())
+}

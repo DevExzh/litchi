@@ -29,7 +29,7 @@ differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `93bfa743cdb170045c8ae7c726aa622f90611b7c3b13e0f6424f7295c3a434cd` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsb.json` | `ed42211205eb0476cc90d02802f88c447b9bcf6ae4a28c54816704539152e06f` |
 | golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `299bb82c87cfef0c27ecfe8bd4fb7df4982635a954c5fa57ac58897900e0e2fa` |
-| golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `aacdf00a1d10834d59799fe149b44a78b0a9a6157437fe2f2a78c8841aa51d86` |
+| golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `6e2ebe464c0001593d3896882af76654d1137333638088de49cf6726eb39d358` |
 | golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `2038cde02828395f020df3d9b9732cc9350ce839bba5bc5aee3089cdd0e81fab` |
 | golden | `crates/litchi-ops/tests/golden/registry/odp.json` | `4b97c200a9d8e2b81e4625ba6888add00e49c483d67fed1ac7be39801f668cf8` |
 | golden | `crates/litchi-ops/tests/golden/registry/ods.json` | `0c1b9c65f4c932c9ef36d6f1d61183724b98354c9c1a0d04adaada0505ca1fb4` |
@@ -77,7 +77,7 @@ Elements:
 | xlsx | 11 | 27 | 0 | 0 | 1 | 2 | 1 |
 | xlsb | 8 | 30 | 0 | 0 | 1 | 2 | 1 |
 | xls | 7 | 31 | 0 | 0 | 1 | 2 | 1 |
-| pptx | 25 | 8 | 0 | 0 | 0 | 1 | 8 |
+| pptx | 25 | 8 | 0 | 0 | 0 | 1 | 9 |
 | ppt | 15 | 18 | 0 | 0 | 0 | 1 | 8 |
 | odp | 21 | 8 | 0 | 0 | 4 | 1 | 6 |
 | ods | 8 | 30 | 0 | 0 | 1 | 2 | 1 |
@@ -5929,6 +5929,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 |  | reply | litchi-only |  |
 |  | noteSlide | litchi-only | M1-extended |
 |  | notesMaster | litchi-only | M1-extended |
+|  | node | litchi-only |  |
 
 ### Properties
 

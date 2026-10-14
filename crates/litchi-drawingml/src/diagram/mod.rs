@@ -14,6 +14,10 @@
 //!   connection graph.
 //! - [`definition`]: inert header metadata for the layout, quick-style, and
 //!   colors definition parts.
+//! - [`authoring`]: deterministic authoring of a graphic from a text outline
+//!   with a built-in layout, including Litchi's own cached drawing.
+//! - [`edit`]: the outline of a data model and source-preserving text and
+//!   drawing-reference edits.
 //!
 //! Both the transitional and the ISO Strict `drawingml/diagram` namespaces are
 //! supported. Format-specific anchoring remains in the concrete `litchi-docx`
@@ -23,8 +27,10 @@
 //! `[MS-OI29500]` package relationships and the host anchors described by
 //! `[MS-PPTX]` remain outside this module.
 
+pub mod authoring;
 pub mod data;
 pub mod definition;
+pub mod edit;
 pub mod model;
 
 pub use data::{

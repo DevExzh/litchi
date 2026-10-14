@@ -59,7 +59,7 @@ pub use text_format::{
     MAX_FONT_SIZE, MAX_TYPEFACE_BYTES, MIN_FONT_SIZE, Rgb, ShapeFill, TextEdit, TextProperties,
     TextTarget,
 };
-pub use transaction::{Commit, Diagnostics, Edit};
+pub use transaction::{Commit, Diagnostics, Edit, SmartArtParts};
 
 pub(crate) use chunks::{
     ChunkAdmission, admit_shape_property_chunks, admit_shape_text_chunks,

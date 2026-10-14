@@ -44,10 +44,10 @@ use super::children::{Children, Listing};
 use super::owner::SlideFacts;
 use super::spec::{
     AXIS_PROPS, AxisKey, CELL_PROPS, CHART_PROPS, COMMENT_PROPS, CellKey, ChartKey, CommentKey,
-    FRAME_PROPS, FrameKey, Kind, NOTES_PROPS, NotesKey, PARAGRAPH_PROPS, PLACEHOLDER_TYPE,
-    PRESENTATION_PROPS, ParagraphKey, RUN_PROPS, RootKey, RunKey, SERIES_PROPS, SHAPE_PROPS,
-    SLIDE_PROPS, SLIDE_SIZE, SMARTART_PROPS, SeriesKey, ShapeKey, SlideKey, SmartArtKey,
-    TABLE_PROPS, TableKey,
+    FRAME_PROPS, FrameKey, Kind, NODE_PROPS, NOTES_PROPS, NodeKey, NotesKey, PARAGRAPH_PROPS,
+    PLACEHOLDER_TYPE, PRESENTATION_PROPS, ParagraphKey, RUN_PROPS, RootKey, RunKey, SERIES_PROPS,
+    SHAPE_PROPS, SLIDE_PROPS, SLIDE_SIZE, SMARTART_PROPS, SeriesKey, ShapeKey, SlideKey,
+    SmartArtKey, TABLE_PROPS, TableKey,
 };
 use super::steps::{self, Builder};
 use super::text;
@@ -58,6 +58,7 @@ use crate::node::{
     ViewOptions,
 };
 use crate::value::Length;
+use litchi_drawingml::diagram::edit::Outline;
 
 /// What a slide shows when it has no title placeholder (OfficeCLI).
 const UNTITLED: &str = "(untitled)";
@@ -108,6 +109,8 @@ pub(super) enum Item {
     Cell(TableItem),
     Series(ChartItem),
     Axis(ChartItem),
+    /// A SmartArt content node (record 0284).
+    DiagramNode(DiagramItem),
     Notes(NotesItem),
     Comment(CommentItem),
     ModernComment(ModernCommentItem),
@@ -314,6 +317,8 @@ pub(super) struct TreeItem {
     body: OnceLock<std::result::Result<Option<Arc<Body>>, Error>>,
     /// A chart frame's chart part, read on first use (record 0270).
     chart: OnceLock<std::result::Result<Option<Arc<Summary>>, Error>>,
+    /// A SmartArt frame's data model, read on first use (record 0284).
+    diagram: OnceLock<std::result::Result<Option<Arc<Outline>>, Error>>,
 }
 
 impl TreeItem {
@@ -325,6 +330,7 @@ impl TreeItem {
             ordinal,
             body: OnceLock::new(),
             chart: OnceLock::new(),
+            diagram: OnceLock::new(),
         }
     }
 
@@ -336,6 +342,7 @@ impl TreeItem {
             ordinal,
             body: OnceLock::new(),
             chart: OnceLock::new(),
+            diagram: OnceLock::new(),
         }
     }
 
@@ -353,6 +360,7 @@ impl TreeItem {
             ordinal,
             body: OnceLock::new(),
             chart: OnceLock::new(),
+            diagram: OnceLock::new(),
         }
     }
 
@@ -384,6 +392,19 @@ impl TreeItem {
             return Ok(None);
         }
         let read = self.chart.get_or_init(|| super::chart::summary(file, self));
+        read.clone()
+    }
+
+    /// A SmartArt frame's data-model outline, read from its data part on
+    /// first use; `None` for another element, a master or layout SmartArt,
+    /// or a frame that names no data part.
+    pub(super) fn diagram(&self, file: &Pptx) -> Result<Option<Arc<Outline>>> {
+        if self.kind != Kind::SmartArt {
+            return Ok(None);
+        }
+        let read = self
+            .diagram
+            .get_or_init(|| super::smartart::outline(file, self));
         read.clone()
     }
 
@@ -503,6 +524,42 @@ pub(super) struct ChartItem {
     pub(super) index: u32,
 }
 
+/// A content node of a SmartArt: the frame, its outline and the node's
+/// index in the outline's entries (record 0284).
+#[derive(Clone)]
+pub(super) struct DiagramItem {
+    pub(super) smartart: TreeItem,
+    pub(super) outline: Arc<Outline>,
+    pub(super) index: u32,
+}
+
+impl DiagramItem {
+    pub(super) fn entry(&self) -> Option<&litchi_drawingml::diagram::edit::Entry> {
+        self.outline.entries.get(self.index as usize)
+    }
+
+    /// The node's position among its siblings, then its ancestors'.
+    pub(super) fn positions(&self) -> Vec<u32> {
+        let mut out = Vec::new();
+        let mut current = Some(self.index as usize);
+        while let Some(index) = current {
+            let parent = self
+                .outline
+                .entries
+                .get(index)
+                .and_then(|entry| entry.parent);
+            let position = self.outline.entries[..index]
+                .iter()
+                .filter(|entry| entry.parent == parent)
+                .count();
+            out.push(u32::try_from(position).unwrap_or(u32::MAX));
+            current = parent;
+        }
+        out.reverse();
+        out
+    }
+}
+
 /// A slide's speaker notes.
 #[derive(Clone)]
 pub(super) struct NotesItem {
@@ -594,6 +651,10 @@ impl<'f> Node<'f> {
                 .chart
                 .slide_position()
                 .map(|position| position as usize),
+            Item::DiagramNode(item) => item
+                .smartart
+                .slide_position()
+                .map(|position| position as usize),
             Item::Notes(notes) => Some(notes.slide as usize),
             Item::Comment(comment) => Some(comment.slide as usize),
             Item::ModernComment(comment) => Some(comment.slide as usize),
@@ -612,6 +673,7 @@ impl<'f> Node<'f> {
             },
             Item::Row(table) | Item::Cell(table) => Some(&table.table.handle),
             Item::Series(item) | Item::Axis(item) => Some(&item.chart.handle),
+            Item::DiagramNode(item) => Some(&item.smartart.handle),
             _ => None,
         }
     }
@@ -649,6 +711,7 @@ impl<'f> Node<'f> {
             Item::Row(_) => Kind::Row,
             Item::Cell(_) => Kind::Cell,
             Item::Series(_) => Kind::Series,
+            Item::DiagramNode(_) => Kind::SmartArtNode,
             Item::Axis(_) => Kind::Axis,
             Item::Notes(_) => Kind::Notes,
             Item::Comment(_) => Kind::Comment,
@@ -683,6 +746,7 @@ impl<'f> Node<'f> {
             Item::Row(_) => "tr",
             Item::Cell(_) => "tc",
             Item::Series(_) => "series",
+            Item::DiagramNode(_) => "node",
             Item::Axis(_) => "axis",
             Item::Notes(_) => "notes",
             Item::Comment(_) => "comment",
@@ -760,6 +824,13 @@ impl<'f> Node<'f> {
                 out.push(at("axis", item.index));
                 out
             },
+            Item::DiagramNode(item) => {
+                let mut out = item.smartart.steps(canonical);
+                for position in item.positions() {
+                    out.push(at("node", position));
+                }
+                out
+            },
             Item::Notes(notes) => {
                 let mut out = Builder::new();
                 out.push(steps::slide(notes.slide));
@@ -802,7 +873,11 @@ impl<'f> Node<'f> {
             Item::Tree(tree) if tree.kind == Kind::Shape => {
                 Some(Cow::Borrowed(tree.handle.view().text().unwrap_or("")))
             },
+            Item::Tree(tree) if tree.kind == Kind::SmartArt => tree
+                .diagram(self.file)?
+                .map(|outline| Cow::Owned(super::smartart::outline_text(&outline))),
             Item::Tree(_) => None,
+            Item::DiagramNode(item) => item.entry().map(|entry| Cow::Owned(entry.text.clone())),
             Item::Paragraph(text) => text.paragraph().map(text::paragraph_text),
             Item::Run(text) => text.run().map(|run| Cow::Borrowed(run.text.as_str())),
             Item::LineBreak(_) => Some(Cow::Borrowed("")),
@@ -878,8 +953,12 @@ impl<'f> Node<'f> {
                 Kind::Chart => tree
                     .chart(self.file)?
                     .map_or(0, |chart| chart.series.len() + chart.axes.len()),
+                Kind::SmartArt => tree
+                    .diagram(self.file)?
+                    .map_or(0, |outline| outline.children(None).count()),
                 _ => 0,
             },
+            Item::DiagramNode(item) => item.outline.children(Some(item.index as usize)).count(),
             Item::Paragraph(text) => text.paragraph().map_or(0, |paragraph| {
                 paragraph
                     .runs
@@ -920,6 +999,9 @@ impl<'f> Node<'f> {
             },
             Kind::Table | Kind::Chart => self.format_member()?.get(index),
             Kind::SmartArt => match SmartArtKey::at(index) {
+                Some(SmartArtKey::Layout | SmartArtKey::LayoutId | SmartArtKey::NodeCount) => {
+                    self.format_member()?.get(index)
+                },
                 Some(key) => TreeProps::read_for(tree, Needs::smartart(tree, key))?.smartart(key),
                 None => None,
             },
@@ -1001,7 +1083,10 @@ impl<'f> Node<'f> {
                 },
                 Kind::SmartArt => (
                     SMARTART_PROPS,
-                    PropKind::SmartArt(Box::new(TreeProps::read(tree, false)?)),
+                    PropKind::SmartArt(Box::new(SmartArtProps {
+                        tree: TreeProps::read(tree, false)?,
+                        outline: tree.diagram(self.file)?,
+                    })),
                 ),
                 Kind::Chart => (
                     CHART_PROPS,
@@ -1026,6 +1111,7 @@ impl<'f> Node<'f> {
             Item::Cell(cell) => (CELL_PROPS, PropKind::Cell(text::cell_fill(cell)?)),
             Item::LineBreak(_) | Item::Row(_) => (&[][..], PropKind::Empty),
             Item::Series(item) => (SERIES_PROPS, PropKind::Series(item)),
+            Item::DiagramNode(item) => (NODE_PROPS, PropKind::DiagramNode(item)),
             Item::Axis(item) => (AXIS_PROPS, PropKind::Axis(item)),
             Item::Notes(notes) => (NOTES_PROPS, PropKind::Notes(&notes.text)),
             Item::Comment(comment) => match comment.comment() {
@@ -1186,7 +1272,8 @@ enum PropKind<'a> {
     Layout(&'a LayoutFacts),
     Shape(Box<TreeProps<'a>>),
     Frame(Box<TreeProps<'a>>),
-    SmartArt(Box<TreeProps<'a>>),
+    SmartArt(Box<SmartArtProps<'a>>),
+    DiagramNode(&'a DiagramItem),
     Chart(Box<ChartProps<'a>>),
     Series(&'a ChartItem),
     Axis(&'a ChartItem),
@@ -1312,6 +1399,7 @@ impl Needs {
             SmartArtKey::X | SmartArtKey::Y | SmartArtKey::Width | SmartArtKey::Height => {
                 Self::geometry(tree)
             },
+            SmartArtKey::Layout | SmartArtKey::LayoutId | SmartArtKey::NodeCount => Self::NONE,
         }
     }
 }
@@ -1495,6 +1583,7 @@ impl<'a> TreeProps<'a> {
             SmartArtKey::Width => self.width(),
             SmartArtKey::Height => self.height(),
             SmartArtKey::Zorder => self.zorder(),
+            SmartArtKey::Layout | SmartArtKey::LayoutId | SmartArtKey::NodeCount => None,
         }
     }
 }
@@ -1648,7 +1737,12 @@ impl<'a> Props<'a> {
             },
             PropKind::Shape(props) => props.shape(ShapeKey::at(index)?),
             PropKind::Frame(props) => props.frame(FrameKey::at(index)?),
-            PropKind::SmartArt(props) => props.smartart(SmartArtKey::at(index)?),
+            PropKind::SmartArt(props) => props.value(SmartArtKey::at(index)?),
+            PropKind::DiagramNode(item) => match NodeKey::at(index)? {
+                NodeKey::Level => item
+                    .entry()
+                    .map(|entry| Value::Int(i64::from(entry.depth) + 1)),
+            },
             PropKind::Chart(props) => props.value(ChartKey::at(index)?),
             PropKind::Series(item) => series_value(item, SeriesKey::at(index)?),
             PropKind::Axis(item) => axis_value(item, AxisKey::at(index)?),
@@ -1687,6 +1781,33 @@ impl<'a> Props<'a> {
             PropKind::ModernComment(comment) => modern_comment_value(comment, index),
             PropKind::Reply(reply) => reply_value(reply, index),
             PropKind::Empty => None,
+        }
+    }
+}
+
+/// A SmartArt frame's values: its frame properties, then its data model's.
+struct SmartArtProps<'a> {
+    tree: TreeProps<'a>,
+    outline: Option<Arc<Outline>>,
+}
+
+impl<'a> SmartArtProps<'a> {
+    fn value(&self, key: SmartArtKey) -> Option<Value<'a>> {
+        match key {
+            SmartArtKey::Layout => self
+                .outline
+                .as_ref()
+                .and_then(|outline| super::smartart::layout_name(outline))
+                .map(|name| Value::Text(Cow::Owned(name))),
+            SmartArtKey::LayoutId => self
+                .outline
+                .as_ref()
+                .and_then(|outline| outline.layout_type_id.clone())
+                .map(|id| Value::Text(Cow::Owned(id))),
+            SmartArtKey::NodeCount => self.outline.as_ref().map(|outline| {
+                Value::Int(i64::try_from(outline.entries.len()).unwrap_or(i64::MAX))
+            }),
+            _ => self.tree.smartart(key),
         }
     }
 }

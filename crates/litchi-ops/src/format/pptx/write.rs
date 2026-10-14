@@ -218,6 +218,9 @@ impl Pptx {
         if let Some(commit) = self.try_set_chart(&target, &props, limits)? {
             return Ok(commit);
         }
+        if let Some(commit) = self.try_set_smartart(&target, &props, limits)? {
+            return Ok(commit);
+        }
         if notes::accepts(&target, &props) {
             return self.set_notes(target, &props, limits);
         }

@@ -522,6 +522,19 @@ impl<'f> Nav<'f> {
         })
     }
 
+    /// A SmartArt's or node's child node, by position (record 0284).
+    fn diagram_node(self, parent: &Item, select: Select<'_>) -> Result<Lookup<Node<'f>, GapSpec>> {
+        let children = super::smartart::children(self.file, parent)?;
+        Ok(match pick_index(children.len(), select) {
+            Pick::Index(index) => match children.into_iter().nth(index as usize) {
+                Some(item) => Lookup::Found(Node::new(self.file, item)),
+                None => Lookup::Missing,
+            },
+            Pick::Missing => Lookup::Missing,
+            Pick::NotApplicable => Lookup::NotApplicable,
+        })
+    }
+
     fn row(self, table: &TreeItem, select: Select<'_>) -> Result<Lookup<Node<'f>, GapSpec>> {
         let (rows, _) = text::table_shape(&table.handle)?;
         Ok(match pick_index(rows, select) {
@@ -594,6 +607,10 @@ impl<'f> Nav<'f> {
             (Item::Tree(tree), Kind::Series | Kind::Axis) if tree.kind == Kind::Chart => {
                 nav.chart_child(tree, kind, select)
             },
+            (Item::Tree(tree), Kind::SmartArtNode) if tree.kind == Kind::SmartArt => {
+                nav.diagram_node(parent.item(), select)
+            },
+            (Item::DiagramNode(_), Kind::SmartArtNode) => nav.diagram_node(parent.item(), select),
             (Item::Row(row), Kind::Cell) => nav.cell(row, select),
             (Item::Paragraph(text), Kind::Run | Kind::LineBreak) => Ok(nav.run(text, kind, select)),
             (Item::Cell(_), Kind::Paragraph) => Ok(Lookup::Gap(&CELL_TEXT_GAP)),
@@ -839,6 +856,16 @@ fn available_unfenced<'f>(nav: Nav<'f>, parent: &Node<'f>, out: &mut Available) 
                 note(Kind::Row);
             }
         },
+        Item::Tree(tree) if tree.kind == Kind::SmartArt => {
+            for _ in super::smartart::children(nav.file, parent.item())? {
+                note(Kind::SmartArtNode);
+            }
+        },
+        Item::DiagramNode(_) => {
+            for _ in super::smartart::children(nav.file, parent.item())? {
+                note(Kind::SmartArtNode);
+            }
+        },
         Item::Tree(tree) if tree.kind == Kind::Chart => {
             if let Some(summary) = tree.chart(nav.file)? {
                 for _ in &summary.series {
@@ -922,5 +949,5 @@ impl<'f> Inspect<'f> for Nav<'f> {
 
 impl Kind {
     /// The number of kinds.
-    pub(crate) const COUNT: usize = 36;
+    pub(crate) const COUNT: usize = 37;
 }

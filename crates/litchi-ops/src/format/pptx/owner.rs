@@ -403,6 +403,41 @@ impl Pptx {
         })
     }
 
+    /// The data-model XML a slide relates through `relationship_id` (a
+    /// SmartArt frame's `r:dm`), or `None` when the slide has no such
+    /// diagram (record 0284). Only that data part is read.
+    pub(super) fn slide_diagram_xml(
+        &self,
+        position: usize,
+        relationship_id: &str,
+    ) -> Result<Option<Vec<u8>>> {
+        self.finish(|| {
+            if self.0.revision.is_some() {
+                return self
+                    .revised_slide(position)?
+                    .map(|slide| slide.diagram_xml(relationship_id))
+                    .transpose()
+                    .map(Option::flatten)
+                    .map_err(Error::from);
+            }
+            match &self.0.owner {
+                PptxOwner::Source(presentation) => {
+                    self.check_owner()?;
+                    let Some(slide) = presentation.slide(position) else {
+                        return Ok(None);
+                    };
+                    Ok(slide.diagram_xml(relationship_id)?)
+                },
+                PptxOwner::Eager(package) => {
+                    let Some(slide) = super::eager_slide(self, package, position)? else {
+                        return Ok(None);
+                    };
+                    Ok(slide.diagram_xml(relationship_id)?.map(<[u8]>::to_vec))
+                },
+            }
+        })
+    }
+
     /// The detached legacy-comments snapshot of the selected slide.
     pub(super) fn slide_comments(&self, position: usize) -> Result<Option<related::Comments>> {
         self.finish(|| match &self.0.owner {

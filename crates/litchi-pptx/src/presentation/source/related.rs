@@ -844,6 +844,41 @@ impl SourceSlide {
         })
     }
 
+    /// The data-model XML of the SmartArt this slide relates through
+    /// `relationship_id` (a SmartArt frame's `dgm:relIds/@r:dm`), or `None`
+    /// when the slide has no such diagram-data relationship (record 0284).
+    ///
+    /// # Errors
+    /// Returns typed source, execution, limit, relationship or XML errors.
+    pub fn diagram_xml(&self, relationship_id: &str) -> Result<Option<Vec<u8>>> {
+        with_fences(&self.owner, || {
+            let slide_part = self.owner.package.part(&self.data.part_uri)?;
+            let Some(relationship) = slide_part.rels().get(relationship_id) else {
+                return Ok(None);
+            };
+            if !is_relationship_type(
+                relationship.reltype(),
+                litchi_drawingml::diagram::DIAGRAM_DATA_REL,
+                "diagramData",
+            ) {
+                return Ok(None);
+            }
+            if relationship.target_mode() == TargetMode::External {
+                return Err(Error::Invalid(
+                    "source diagram relationship must be internal".into(),
+                ));
+            }
+            let target = relationship.target_partname()?;
+            let part = load_part(
+                &self.owner,
+                &target,
+                litchi_opc::constants::content_type::DML_DIAGRAM_DATA,
+                litchi_drawingml::diagram::edit::MAX_PART_BYTES,
+            )?;
+            Ok(Some(part.blob().to_vec()))
+        })
+    }
+
     /// Acquire the chart at a positional relationship index.
     ///
     /// # Errors

@@ -2084,3 +2084,26 @@ copy of the run's properties); XLSX worksheets report rich-text cells
 | `litchi_xlsx::Worksheet::has_rich_text` | adopted (0273) |
 
 See [0273](unified-ops/0273-find-replace.md).
+
+## Typed SmartArt CRUD (record 0284)
+
+`litchi_drawingml::diagram::authoring` is the host-neutral way to author a
+SmartArt graphic: a `Spec` (a built-in `Layout` and a tree of `Node`s, also
+parsed from a tab-indented text outline) writes the data model, the layout
+definition and Litchi's own deterministic cached drawing; `quick_style_xml`
+and `colors_xml` write the style parts; `Spec::{from_parts, recognize}`
+recognize parts this module wrote. `litchi_drawingml::diagram::edit` reads a
+data model's `Outline` (content `Entry`s in document order, layout and
+drawing reference) and makes source-preserving changes (`set_text`,
+`drawing_text`, `set_drawing_reference`); it is a set of pure functions over
+part bytes, not a transaction family. PPTX places and replaces the parts
+through the primary `opened::Edit`.
+
+| Name | Status |
+|---|---|
+| `litchi_drawingml::diagram::authoring::{Spec, Layout, Node, quick_style_xml, colors_xml}` | adopted (0284) |
+| `litchi_drawingml::diagram::edit::{Outline, Entry, set_text, drawing_text, set_drawing_reference}` | adopted (0284) |
+| `litchi_pptx::opened::Edit::{add_smartart, smartart, set_smartart}`, `litchi_pptx::opened::SmartArtParts` | adopted (0284) |
+| `litchi_pptx::slide::Slide::diagram_xml`, `SourceSlide::diagram_xml`, `source::Slide::diagram_xml` | adopted (0284) |
+
+See [0284](unified-ops/0284-typed-smartart-crud.md).

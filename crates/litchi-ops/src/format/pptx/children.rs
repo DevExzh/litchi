@@ -12,6 +12,7 @@
 //! | paragraph | its runs and line breaks (fields are not listed, as in OfficeCLI) |
 //! | table | its rows; a row, its cells |
 //! | chart | its series, then its axes (record 0270) |
+//! | smartart, node | its child nodes (record 0284) |
 //!
 //! Each child is read when it is pulled, so a walk that stops early decodes
 //! no later sibling; a slide's scene is read when the iterator is built for
@@ -121,7 +122,8 @@ enum State {
         next: u32,
         end: u32,
     },
-    /// A chart's series, then its axes (record 0270).
+    /// A chart's series, then its axes (record 0270); a SmartArt's or
+    /// node's child nodes (record 0284).
     Chart(std::vec::IntoIter<Item>),
 }
 
@@ -617,6 +619,9 @@ impl State {
                         .collect();
                     Self::Chart(items.into_iter())
                 },
+                Kind::SmartArt if kinds.contains(Kind::SmartArtNode) => {
+                    Self::Chart(super::smartart::children(file, parent.item())?.into_iter())
+                },
                 Kind::Table if kinds.contains(Kind::Row) => {
                     let (rows, _) = text::table_shape(&tree.handle)?;
                     Self::Rows {
@@ -636,6 +641,9 @@ impl State {
                     runs: 0,
                     breaks: 0,
                 }
+            },
+            Item::DiagramNode(_) if kinds.contains(Kind::SmartArtNode) => {
+                Self::Chart(super::smartart::children(file, parent.item())?.into_iter())
             },
             Item::Row(row) if kinds.contains(Kind::Cell) => {
                 let cells = text::row_cells(&row.table.handle, row.row)?;
