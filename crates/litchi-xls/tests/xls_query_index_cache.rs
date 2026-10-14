@@ -761,8 +761,8 @@ fn an_indexed_missing_target_still_takes_the_trailing_freshness_fence() {
 
     // Publish the worksheet index with two successful observations, then use
     // a coordinate absent from its occurrence table.  The hit has no source
-    // read of its own, so the mutation is injected into the trailing version
-    // observation rather than relying on the leading fence.
+    // read of its own and (record 0287) no leading fence, so its trailing
+    // version observation is its first; the mutation is injected there.
     assert_eq!(
         worksheet.cell_value(3_999, 0).unwrap(),
         Some(CellValue::Float(3_999.0))
@@ -772,12 +772,43 @@ fn an_indexed_missing_target_still_takes_the_trailing_freshness_fence() {
         Some(CellValue::Float(3_999.0))
     );
     source.clear_measurement();
-    source.bump_before_observation(2);
+    source.bump_before_observation(1);
     assert!(matches!(
         worksheet.cell_value(50_000, 7),
         Err(SourceBackedError::SourceChanged { .. })
     ));
     assert_eq!(source.read_count(), 0);
+}
+
+#[test]
+fn an_indexed_hit_fences_every_observation_of_its_frame() {
+    // Record 0287: an indexed hit takes no leading fence and defers its frame
+    // header's fence to the payload read. A source change before the call,
+    // or before either observation the hit makes, still fails the read.
+    for observation in 0..=2 {
+        let source = Arc::new(CountingSource::new(large_numeric_workbook(4_000)));
+        let owner = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+        let worksheet = owner.worksheet_by_index(0).unwrap().unwrap();
+        for _ in 0..2 {
+            assert_eq!(
+                worksheet.cell_value(3_999, 0).unwrap(),
+                Some(CellValue::Float(3_999.0))
+            );
+        }
+        source.clear_measurement();
+        if observation == 0 {
+            source.bump();
+        } else {
+            source.bump_before_observation(observation);
+        }
+        assert!(
+            matches!(
+                worksheet.cell_value(3_999, 0),
+                Err(SourceBackedError::SourceChanged { .. })
+            ),
+            "a change before observation {observation} must fail the hit"
+        );
+    }
 }
 
 #[test]

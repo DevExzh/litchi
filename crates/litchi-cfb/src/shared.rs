@@ -3130,6 +3130,72 @@ impl SharedOleStreamCursor<'_> {
         }
     }
 
+    /// Reads exactly `output.len()` bytes like [`Self::read_exact`], but
+    /// defers the success fence to the caller (record 0287).
+    ///
+    /// A failed read still observes the source, and a `SourceChanged` error
+    /// wins over the read's own error, as in [`Self::read_exact`]. A
+    /// successful read takes no observation: its bytes are unverified until a
+    /// later [`Self::read_exact`] or [`Self::check_source`] on this cursor
+    /// succeeds. Source versions only advance, so that later observation
+    /// proves the source unchanged across this read as well. The caller must
+    /// not let the bytes, or anything derived from them, outlive a failure of
+    /// that observation, and must fence every error path between the two
+    /// (with [`Self::check_source`], preferring its `SourceChanged`).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::read_exact`], except that a successful read is not fenced.
+    pub fn read_exact_deferred(&mut self, output: &mut [u8]) -> Result<(), OleError> {
+        let state = self.state;
+        let position = self.position;
+        let result = (|| {
+            let requested = output.len() as u64;
+            let end = position.checked_add(requested).ok_or_else(|| {
+                OleError::InvalidData("stream cursor read end overflow".to_string())
+            })?;
+            if end > self.length {
+                return Err(OleError::InvalidData(format!(
+                    "stream cursor read {position}..{end} exceeds length {}",
+                    self.length
+                )));
+            }
+            let state = self.read_from_state(state, output)?;
+            let state = if end == self.length {
+                SharedOleStreamCursorState::End
+            } else {
+                state
+            };
+            Ok((state, end))
+        })();
+        match result {
+            Ok((state, position)) => {
+                self.state = state;
+                self.position = position;
+                Ok(())
+            },
+            Err(error) => Err(self.fence_error(error)),
+        }
+    }
+
+    /// Observes the source: `Ok` when it still has the opened version.
+    ///
+    /// # Errors
+    ///
+    /// Returns the source's I/O error or `SourceChanged`.
+    pub fn check_source(&self) -> Result<(), OleError> {
+        self.file.check_source_version()
+    }
+
+    /// `error`, unless the source changed, whose `SourceChanged` error wins.
+    #[must_use]
+    pub fn fence_error(&self, error: OleError) -> OleError {
+        match self.file.check_source_version() {
+            Err(changed @ OleError::SourceChanged { .. }) => changed,
+            _ => error,
+        }
+    }
+
     fn move_forward(&mut self, bytes: u64) -> Result<(), OleError> {
         let state = self.state;
         let position = self.position;
@@ -9092,6 +9158,63 @@ mod tests {
         source.change_on_read.store(true, AtomicOrdering::SeqCst);
         assert!(matches!(
             cursor.read_exact(&mut output),
+            Err(OleError::SourceChanged { .. })
+        ));
+    }
+
+    #[test]
+    fn deferred_reads_leave_the_success_fence_to_the_next_fenced_read() {
+        // Record 0287: a deferred read takes no observation on success; the
+        // next fenced read or check observes a change made before either.
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(source.clone());
+        let mut cursor = file.stream_cursor_at(&["Large"], 0).unwrap();
+        source.reset_observation_counts();
+        let mut header = [0u8; 4];
+        cursor.read_exact_deferred(&mut header).unwrap();
+        assert_eq!(header, [0xA5; 4]);
+        assert_eq!(cursor.position(), 4);
+        let (reads, versions) = source.observation_counts();
+        assert_eq!(
+            (reads, versions),
+            (1, 0),
+            "no observation after a deferred read"
+        );
+        source.revision.store(1, AtomicOrdering::SeqCst);
+        let mut payload = [0u8; 4];
+        assert!(matches!(
+            cursor.read_exact(&mut payload),
+            Err(OleError::SourceChanged { .. })
+        ));
+        assert!(matches!(
+            cursor.check_source(),
+            Err(OleError::SourceChanged { .. })
+        ));
+        assert!(matches!(
+            cursor.fence_error(OleError::InvalidData("payload".into())),
+            OleError::SourceChanged { .. }
+        ));
+
+        // A failed deferred read still observes the source, and a change
+        // wins over the read's own error.
+        let source = Arc::new(TestSource::new(sample_bytes()));
+        let file = shared(source.clone());
+        let mut cursor = file.stream_cursor_at(&["Large"], 0).unwrap();
+        source.fail_next_read.store(true, AtomicOrdering::SeqCst);
+        assert!(matches!(
+            cursor.read_exact_deferred(&mut header),
+            Err(OleError::Io(_))
+        ));
+        assert_eq!(cursor.position(), 0, "a failed read does not commit");
+        source.fail_next_read.store(true, AtomicOrdering::SeqCst);
+        source.change_on_read.store(true, AtomicOrdering::SeqCst);
+        assert!(matches!(
+            cursor.read_exact_deferred(&mut header),
+            Err(OleError::SourceChanged { .. })
+        ));
+        let mut beyond = vec![0u8; usize::try_from(cursor.len()).unwrap() + 1];
+        assert!(matches!(
+            cursor.read_exact_deferred(&mut beyond),
             Err(OleError::SourceChanged { .. })
         ));
     }
