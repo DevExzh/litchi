@@ -44,7 +44,16 @@ impl Docx {
             return Ok(None);
         }
         let result = (|| {
-            let mut targets = admit_targets(&self.resolve_targets(target)?)?;
+            let nodes = self.resolve_targets(target)?;
+            // Charts have their own setter outside the formatting surface
+            // (record 0283): the ordinary set path writes them (0289).
+            if nodes
+                .iter()
+                .any(|node| node.element_kind() == crate::format::docx::Kind::Chart)
+            {
+                return Ok(None);
+            }
+            let mut targets = admit_targets(&nodes)?;
             let target = targets
                 .pop()
                 .ok_or_else(|| Error::new(Code::InternalError, "direct target is missing"))?;
@@ -60,10 +69,14 @@ fn plan(target: Target, props: &Props<'_>) -> Result<Option<Plan>> {
             .entry
             .prepare(Operation::Set, &assignment.value, |setter, _| {
                 // Lists stage numbering definitions: a barrier (0251e).
+                // A hyperlink target changes a relationship, which only the
+                // owning package editor can do: a barrier (0289).
                 Ok(setter.is_text()
                     || matches!(
                         setter,
-                        super::Setter::ParagraphListStyle | super::Setter::ParagraphListStart
+                        super::Setter::ParagraphListStyle
+                            | super::Setter::ParagraphListStart
+                            | super::Setter::HyperlinkUrl
                     ))
             })?
         {
