@@ -55,7 +55,7 @@ pub struct NodePath<'a> {
 }
 
 /// The most steps a [`NodePath`] carries by value.
-const INLINE_STEPS: usize = 4;
+pub(crate) const INLINE_STEPS: usize = 4;
 
 #[derive(Clone, Copy)]
 #[allow(

@@ -70,7 +70,7 @@ impl<'f> Children<'f> {
     pub(super) fn filtered(parent: &Node<'f>, filter: Option<KindSet<Kind>>) -> Self {
         let state = match (
             parent.kind,
-            parent.paragraph_position,
+            parent.paragraph_position(),
             parent.body_paragraph(),
         ) {
             (Kind::Body, _, _) => State::Body {
@@ -227,12 +227,12 @@ impl<'f> Children<'f> {
             },
             (Kind::Document, Kind::Comments) => (self.ordinal == 0
                 && !package.annotations().is_empty())
-            .then(|| Node::collection(doc, Kind::Comments, "comments")),
+            .then(|| Node::collection(doc, Kind::Comments)),
             (Kind::Document, Kind::Styles) => (self.ordinal == 0 && !package.styles().is_empty())
-                .then(|| Node::collection(doc, Kind::Styles, "styles")),
+                .then(|| Node::collection(doc, Kind::Styles)),
             (Kind::Document, Kind::Numbering) => (self.ordinal == 0
                 && !(package.lists().is_empty() && package.list_overrides().is_empty()))
-            .then(|| Node::collection(doc, Kind::Numbering, "numbering")),
+            .then(|| Node::collection(doc, Kind::Numbering)),
             (Kind::Table, Kind::Row) => {
                 let Item::Table { table, value } = parent.item else {
                     return None;
@@ -301,13 +301,10 @@ impl<'f> Children<'f> {
                     )
                 })
             },
-            (Kind::Styles, Kind::Style) => package.styles().get(self.ordinal).map(|style| {
-                parent.child_at(
-                    Kind::Style,
-                    Item::Style(style),
-                    crate::node::PathStep::new(style.name.as_ref()),
-                )
-            }),
+            (Kind::Styles, Kind::Style) => package
+                .styles()
+                .get(self.ordinal)
+                .map(|style| parent.child(Kind::Style, Item::Style(style), position)),
             (Kind::Numbering, Kind::AbstractNum) => package
                 .lists()
                 .get(self.ordinal)

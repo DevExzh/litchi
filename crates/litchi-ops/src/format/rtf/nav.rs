@@ -174,7 +174,7 @@ impl<'f> Navigate<'f> for Nav<'f> {
                 };
                 match select {
                     Select::None | Select::Last => Ok(if present {
-                        Lookup::Found(Node::collection(doc, kind, super::node::kind_step(kind)))
+                        Lookup::Found(Node::collection(doc, kind))
                     } else {
                         Lookup::Missing
                     }),
@@ -198,7 +198,7 @@ impl<'f> Navigate<'f> for Nav<'f> {
             },
             (Kind::Paragraph, Kind::Run) => {
                 let (Some(paragraph), Some(paragraph_position)) =
-                    (parent.body_paragraph(), parent.paragraph_position)
+                    (parent.body_paragraph(), parent.paragraph_position())
                 else {
                     return Ok(Lookup::NotApplicable);
                 };
@@ -365,13 +365,10 @@ impl<'f> Navigate<'f> for Nav<'f> {
                     package
                         .styles()
                         .iter()
-                        .find(|style| case.matches(style.name.as_ref(), name))
-                        .map(|style| {
-                            parent.child_at(
-                                Kind::Style,
-                                Item::Style(style),
-                                PathStep::new(style.name.as_ref()),
-                            )
+                        .enumerate()
+                        .find(|(_, style)| case.matches(style.name.as_ref(), name))
+                        .map(|(index, style)| {
+                            parent.child(Kind::Style, Item::Style(style), Position::new(index))
                         }),
                 )),
                 _ => Ok(Lookup::NotApplicable),
@@ -546,7 +543,7 @@ impl<'f> Inspect<'f> for Nav<'f> {
             Kind::Styles => PathStep::new("styles"),
             Kind::Numbering => PathStep::new("numbering"),
             Kind::Document => PathStep::new("document"),
-            _ => node.path().steps().last().copied().unwrap_or_else(|| {
+            _ => node.last_step().unwrap_or_else(|| {
                 PathStep::at(crate::path::navigate::ElementKind::name(kind), ordinal)
             }),
         };

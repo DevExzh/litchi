@@ -97,6 +97,11 @@ pub(crate) enum Target<'f> {
     Style(Style<'f>),
 }
 
+// Record 0287: nodes move through every query; keep this one no larger
+// than it is (the unified node is as large as its largest format node).
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(size_of::<Node<'static>>() <= 176);
+
 /// A node of an ODT document: the root, the body and every element the leaf
 /// body index models, the common styles and the document properties.
 #[derive(Clone)]
@@ -105,9 +110,18 @@ pub struct Node<'f> {
     pub(super) kind: Kind,
     pub(super) target: Target<'f>,
     pub(super) address: Address,
-    /// The style name of a style node, the step its path names.
-    pub(super) style_name: Option<Cow<'f, str>>,
-    paths: OnceLock<Box<[PathStep<'static>]>>,
+    /// Text the node spells out on first use (record 0287 keeps it in one
+    /// slot so the node stays small).
+    spelled: OnceLock<Spelled>,
+}
+
+/// What a node spells out on first use.
+#[derive(Clone)]
+enum Spelled {
+    /// A path deeper than [`NodePath`] carries by value.
+    Steps(Box<[PathStep<'static>]>),
+    /// A style name that the leaf had to unescape.
+    Name(Box<str>),
 }
 
 impl<'f> Node<'f> {
@@ -117,22 +131,33 @@ impl<'f> Node<'f> {
             kind,
             target,
             address,
-            style_name: None,
-            paths: OnceLock::new(),
+            spelled: OnceLock::new(),
         }
     }
 
     pub(super) fn style(odt: &'f Odt, style: Style<'f>, ordinal: u32) -> Self {
-        let mut node = Self::new(
+        Self::new(
             odt,
             Kind::Style,
             Target::Style(style),
             Address::root()
                 .with(Step::new(Kind::Styles, 0))
                 .with(Step::new(Kind::Style, ordinal)),
-        );
-        node.style_name = style.name();
-        node
+        )
+    }
+
+    /// The style name of a style node, the step its path names.
+    pub(super) fn style_name(&self) -> Option<&str> {
+        let (Kind::Style, Target::Style(style)) = (self.kind, self.target) else {
+            return None;
+        };
+        match style.name()? {
+            Cow::Borrowed(name) => Some(name),
+            Cow::Owned(name) => match self.spelled.get_or_init(|| Spelled::Name(name.into())) {
+                Spelled::Name(name) => Some(name),
+                Spelled::Steps(_) => None,
+            },
+        }
     }
 
     /// The element kind.
@@ -199,7 +224,7 @@ impl<'f> Node<'f> {
     /// The canonical positional path.
     #[must_use]
     pub fn path(&self) -> NodePath<'_> {
-        if let Some(name) = &self.style_name {
+        if let Some(name) = self.style_name() {
             if let Some(path) = NodePath::inline(&[PathStep::new("styles"), PathStep::new(name)]) {
                 return path;
             }
@@ -214,13 +239,18 @@ impl<'f> Node<'f> {
                 return path;
             }
         }
-        NodePath::new(self.paths.get_or_init(|| {
-            self.address
-                .steps()
-                .iter()
-                .map(|step| step.positional())
-                .collect()
-        }))
+        match self.spelled.get_or_init(|| {
+            Spelled::Steps(
+                self.address
+                    .steps()
+                    .iter()
+                    .map(|step| step.positional())
+                    .collect(),
+            )
+        }) {
+            Spelled::Steps(steps) => NodePath::new(steps),
+            Spelled::Name(_) => NodePath::ROOT,
+        }
     }
 
     /// The positional path; the same as [`Self::path`].

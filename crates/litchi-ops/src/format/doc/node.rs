@@ -25,31 +25,60 @@ use crate::value::{Color, Length};
 /// The longest DOC path: `/body/tbl[N]/tr[N]/tc[N]/p[N]/r[N]`.
 const MAX_STEPS: usize = 6;
 
-/// A positional path of at most [`MAX_STEPS`] steps, stored inline.
+/// The most steps [`NodePath`] carries by value; deeper paths are spelled
+/// out once into the node's lazily built step list.
+const INLINE_PATH_STEPS: usize = 4;
+
+/// A positional path of at most [`MAX_STEPS`] steps, stored compactly as
+/// kinds and positions (record 0287): a node no longer carries six full
+/// [`PathStep`]s (336 bytes) and writes them only when its path is read.
 #[derive(Clone, Copy)]
 pub(crate) struct Steps {
-    steps: [PathStep<'static>; MAX_STEPS],
+    positions: [usize; MAX_STEPS],
+    kinds: [Kind; MAX_STEPS],
     len: u8,
 }
 
 impl Steps {
     pub(super) const EMPTY: Self = Self {
-        steps: [PathStep::new("document"); MAX_STEPS],
+        positions: [0; MAX_STEPS],
+        kinds: [Kind::Document; MAX_STEPS],
         len: 0,
     };
 
-    /// These steps followed by `step`; a path already at the longest DOC
-    /// depth keeps its steps (no DOC element nests deeper).
-    pub(super) const fn then(mut self, step: PathStep<'static>) -> Self {
+    /// These steps followed by `kind` at `position`; a path already at the
+    /// longest DOC depth keeps its steps (no DOC element nests deeper).
+    pub(super) const fn then(mut self, kind: Kind, position: Position) -> Self {
         if (self.len as usize) < MAX_STEPS {
-            self.steps[self.len as usize] = step;
+            self.kinds[self.len as usize] = kind;
+            self.positions[self.len as usize] = position.get();
             self.len += 1;
         }
         self
     }
 
-    pub(super) fn as_slice(&self) -> &[PathStep<'static>] {
-        &self.steps[..usize::from(self.len)]
+    pub(super) const fn len(&self) -> usize {
+        self.len as usize
+    }
+
+    /// Step `index`, written as the path spells it.
+    fn step(&self, index: usize) -> PathStep<'static> {
+        step_of(self.kinds[index], Position::new(self.positions[index]))
+    }
+
+    /// The last step, `None` at the root.
+    pub(super) fn last(&self) -> Option<PathStep<'static>> {
+        self.len().checked_sub(1).map(|index| self.step(index))
+    }
+}
+
+/// The path step of `kind` at `position`: the collections are bare.
+const fn step_of(kind: Kind, position: Position) -> PathStep<'static> {
+    match kind {
+        Kind::Document => PathStep::new("document"),
+        Kind::Body => PathStep::new("body"),
+        Kind::Comments => PathStep::new("comments"),
+        kind => PathStep::at(kind_step(kind), position),
     }
 }
 
@@ -101,6 +130,11 @@ pub(crate) enum Item<'f> {
     },
 }
 
+// Record 0287: nodes move through every query; keep this one no larger
+// than it is (the unified node is as large as its largest format node).
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(size_of::<Node<'static>>() <= 144);
+
 /// A node of a DOC document.
 #[derive(Clone)]
 pub struct Node<'f> {
@@ -108,6 +142,9 @@ pub struct Node<'f> {
     pub(super) kind: Kind,
     pub(super) item: Item<'f>,
     pub(super) steps: Steps,
+    /// The spelled-out steps of a path deeper than [`NodePath`] carries by
+    /// value, built on the first read of such a path.
+    paths: OnceLock<Box<[PathStep<'static>]>>,
 }
 
 impl<'f> Node<'f> {
@@ -117,6 +154,7 @@ impl<'f> Node<'f> {
             kind: Kind::Document,
             item: Item::Bare,
             steps: Steps::EMPTY,
+            paths: OnceLock::new(),
         }
     }
 
@@ -125,7 +163,8 @@ impl<'f> Node<'f> {
             doc,
             kind: Kind::Body,
             item: Item::Bare,
-            steps: Steps::EMPTY.then(PathStep::new("body")),
+            steps: Steps::EMPTY.then(Kind::Body, Position::new(0)),
+            paths: OnceLock::new(),
         }
     }
 
@@ -134,7 +173,8 @@ impl<'f> Node<'f> {
             doc,
             kind: Kind::Comments,
             item: Item::Bare,
-            steps: Steps::EMPTY.then(PathStep::new("comments")),
+            steps: Steps::EMPTY.then(Kind::Comments, Position::new(0)),
+            paths: OnceLock::new(),
         }
     }
 
@@ -156,8 +196,9 @@ impl<'f> Node<'f> {
                 built: OnceLock::new(),
             },
             steps: Steps::EMPTY
-                .then(PathStep::new("body"))
-                .then(PathStep::at("p", position)),
+                .then(Kind::Body, Position::new(0))
+                .then(Kind::Paragraph, position),
+            paths: OnceLock::new(),
         }
     }
 
@@ -167,7 +208,8 @@ impl<'f> Node<'f> {
             doc: self.doc,
             kind,
             item,
-            steps: self.steps.then(PathStep::at(kind_step(kind), position)),
+            steps: self.steps.then(kind, position),
+            paths: OnceLock::new(),
         }
     }
 
@@ -181,7 +223,8 @@ impl<'f> Node<'f> {
             doc,
             kind,
             item: Item::Story { story, number },
-            steps: Steps::EMPTY.then(PathStep::at(kind_step(kind), position)),
+            steps: Steps::EMPTY.then(kind, position),
+            paths: OnceLock::new(),
         }
     }
 
@@ -315,7 +358,25 @@ impl<'f> Node<'f> {
 
     #[must_use]
     pub fn path(&self) -> NodePath<'_> {
-        NodePath::new(self.steps.as_slice())
+        let len = self.steps.len();
+        if len <= INLINE_PATH_STEPS {
+            let mut inline = [PathStep::new(""); INLINE_PATH_STEPS];
+            for (index, slot) in inline[..len].iter_mut().enumerate() {
+                *slot = self.steps.step(index);
+            }
+            if let Some(path) = NodePath::inline(&inline[..len]) {
+                return path;
+            }
+        }
+        NodePath::new(
+            self.paths
+                .get_or_init(|| (0..len).map(|index| self.steps.step(index)).collect()),
+        )
+    }
+
+    /// The node's own last path step; `None` for the root.
+    pub(super) fn last_step(&self) -> Option<PathStep<'static>> {
+        self.steps.last()
     }
 
     #[must_use]

@@ -355,7 +355,7 @@ impl<'f> Inspect<'f> for Nav<'f> {
             Kind::Body => PathStep::new("body"),
             Kind::Comments => PathStep::new("comments"),
             Kind::Document => PathStep::new("document"),
-            _ => node.path().steps().last().copied().unwrap_or_else(|| {
+            _ => node.last_step().unwrap_or_else(|| {
                 PathStep::at(crate::path::navigate::ElementKind::name(kind), ordinal)
             }),
         };
