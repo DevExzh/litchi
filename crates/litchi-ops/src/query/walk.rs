@@ -460,8 +460,21 @@ where
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         // The match moves out of the walk's slot once, without a `Hit`.
+        self.next_map(|node| node)
+    }
+}
+
+impl<'f, N> Walk<'_, 'f, N>
+where
+    N: Inspect<'f>,
+    N::Node: Clone,
+{
+    /// The next match, wrapped by `wrap` as it leaves the walk's slot, so
+    /// the node moves once into the caller's item (record 0287).
+    #[inline]
+    pub(crate) fn next_map<T>(&mut self, wrap: impl FnOnce(N::Node) -> T) -> Option<Result<T>> {
         match self.advance() {
-            Ok(Some(_)) => self.state.out.take().map(Ok),
+            Ok(Some(_)) => self.state.out.take().map(|node| Ok(wrap(node))),
             Ok(None) => None,
             Err(error) => Some(Err(error)),
         }
