@@ -72,7 +72,7 @@ impl Pptx {
                 "this element kind cannot be added to a PPTX presentation yet",
             )
             .with_suggestion(
-                "addable: slide, shape (textbox), picture, chart and comment; capabilities() lists the gaps",
+                "addable: slide, shape (textbox), picture, chart, smartart (and its nodes) and comment; capabilities() lists the gaps",
             ));
         }
         if ["picture", "image", "img"]
@@ -83,6 +83,12 @@ impl Pptx {
         }
         if node.kind().eq_ignore_ascii_case("chart") {
             return self.add_chart(parent, node, limits);
+        }
+        if node.kind().eq_ignore_ascii_case("smartart") {
+            return self.add_smartart(parent, node, limits);
+        }
+        if node.kind().eq_ignore_ascii_case("node") {
+            return self.add_smartart_node(parent, node, limits);
         }
         if node.kind().eq_ignore_ascii_case("comment") {
             return self.add_comment(parent, node, limits);
@@ -248,7 +254,7 @@ impl Pptx {
 }
 /// The element kinds a PPTX `add` creates (with their aliases).
 const ADDABLE: &[&str] = &[
-    "slide", "shape", "textbox", "picture", "image", "img", "chart", "comment",
+    "slide", "shape", "textbox", "picture", "image", "img", "chart", "comment", "smartart", "node",
 ];
 
 pub(super) fn bound(kind: LimitKind, observed: usize, maximum: usize) -> Result<()> {

@@ -2692,7 +2692,14 @@ impl Element {
                 && self.retains_source != Some(false)
                 && matches!(
                     self.data().canonical,
-                    "slide" | "shape" | "placeholder" | "chart" | "series" | "axis"
+                    "slide"
+                        | "shape"
+                        | "placeholder"
+                        | "chart"
+                        | "series"
+                        | "axis"
+                        | "smartart"
+                        | "node"
                 )
                 && readable);
         #[cfg(feature = "ppt")]
@@ -2753,7 +2760,7 @@ impl Element {
                 && self.retains_source != Some(false)
                 && match self.data().canonical {
                     "slide" => self.pptx_slide_add == Some(true),
-                    "shape" | "chart" => self.pptx_shape_add == Some(true),
+                    "shape" | "chart" | "smartart" | "node" => self.pptx_shape_add == Some(true),
                     _ => false,
                 }
                 && readable);
@@ -2826,6 +2833,7 @@ impl Element {
                             | "group"
                             | "connector"
                             | "smartart"
+                            | "node"
                             | "ole"
                     ) && self.pptx_shape_remove == Some(true)))
                 && readable);
@@ -2990,6 +2998,8 @@ fn element_data(adapter: Adapter, index: u16) -> Data {
                 "chart" => crate::format::pptx::CHART_CAPABILITY_PROPS,
                 "series" => crate::format::pptx::SERIES_CAPABILITY_PROPS,
                 "axis" => crate::format::pptx::AXIS_CAPABILITY_PROPS,
+                "smartart" => crate::format::pptx::SMARTART_CAPABILITY_PROPS,
+                "node" => crate::format::pptx::NODE_CAPABILITY_PROPS,
                 _ => props,
             }
         } else {

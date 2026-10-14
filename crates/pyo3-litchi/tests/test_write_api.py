@@ -285,6 +285,18 @@ class PptxVerbTests(WriteAssertions):
         self.assertEqual(child_paths(changed.remove(shape), self.first), [])
         self.assertEqual(self.assertReopens(changed).get(shape, 0)["text"], "Changed")
 
+    def test_smartart(self):
+        # Record 0284: typed SmartArt CRUD passes through unchanged.
+        file, art = self.file.add(self.first, "smartart", {"layout": "process", "text": "Plan\n\tScope\nShip"})
+        self.assertEqual(art, "/slide[1]/smartart[1]")
+        view = file.get(art, 0)
+        self.assertEqual((view["text"], view["format"]["layout"]), ("Plan\n\tScope\nShip", "process"))
+        file, node = file.add(art, "node", {"text": "Learn"})
+        self.assertEqual(node, "/slide[1]/smartart[1]/node[3]")
+        file = file.set("/slide[1]/smartart[1]/node[1]/node[1]", {"text": "Size"})
+        file = file.remove("/slide[1]/smartart[1]/node[2]")
+        self.assertEqual(self.assertReopens(file).get(art, 0)["text"], "Plan\n\tSize\nLearn")
+
 
 class XlsbVerbTests(WriteAssertions):
     def test_cells_and_sheets(self):

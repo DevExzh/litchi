@@ -52,6 +52,9 @@ impl Pptx {
 
     fn remove_inner<'p>(&self, target: TargetArg<'p>, limits: &SemanticLimits) -> Result<Commit> {
         self.admit_remove_owner()?;
+        if let Some(commit) = self.try_remove_smartart_node(&target, limits)? {
+            return Ok(commit);
+        }
         let mut positions = resolve_targets(self, &target, limits)?;
         admit_remove_targets(positions.len(), limits)?;
         reject_overlaps(&positions)?;

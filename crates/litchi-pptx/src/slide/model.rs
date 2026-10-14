@@ -321,6 +321,40 @@ impl<'a> Slide<'a> {
         Ok(Some(part.part().blob()))
     }
 
+    /// The data-model XML of the SmartArt this slide relates through
+    /// `relationship_id` (a SmartArt frame's `dgm:relIds/@r:dm`), or `None`
+    /// when the slide has no such diagram-data relationship (record 0284).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an external relationship or a target that is
+    /// not a diagram data part.
+    pub fn diagram_xml(&self, relationship_id: &str) -> Result<Option<&'a [u8]>> {
+        let Some(relationship) = self.part.part().rels().get(relationship_id) else {
+            return Ok(None);
+        };
+        if !crate::parts::is_relationship_type(
+            relationship.reltype(),
+            litchi_drawingml::diagram::DIAGRAM_DATA_REL,
+            "diagramData",
+        ) {
+            return Ok(None);
+        }
+        if relationship.is_external() {
+            return Err(crate::Error::Relationship(
+                "diagram relationships cannot be external".to_owned(),
+            ));
+        }
+        let target = relationship.target_partname()?;
+        let part = self.package.get_part(&target)?;
+        if part.content_type() != litchi_opc::constants::content_type::DML_DIAGRAM_DATA {
+            return Err(crate::Error::Relationship(
+                "the diagram relationship does not target a diagram data part".to_owned(),
+            ));
+        }
+        Ok(Some(part.blob()))
+    }
+
     /// Resolve Microsoft `ChartEx` parts attached to this slide.
     ///
     /// # Errors

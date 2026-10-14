@@ -62,6 +62,7 @@ mod publish;
 mod remove;
 mod scenes;
 mod shape_add;
+mod smartart;
 mod spec;
 mod steps;
 mod structure;
@@ -80,6 +81,7 @@ pub(crate) use spec::{
     SERIES_CAPABILITY_PROPS, SHAPE_CAPABILITY_PROPS, SHAPE_PROP_ALIASES, SLIDE_CAPABILITY_PROPS,
     SPEC,
 };
+pub(crate) use spec::{NODE_CAPABILITY_PROPS, SMARTART_CAPABILITY_PROPS};
 pub(crate) use views::{Json as ViewJson, view_json, view_to};
 
 /// An opened PowerPoint OOXML presentation.

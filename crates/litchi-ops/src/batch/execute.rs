@@ -696,6 +696,11 @@ fn fatal(error: &Error) -> bool {
 // has operation-specific control semantics. Run addition and paragraph setters
 // use inline normalization; command run setters use the literal first text node.
 fn add_text_props<'a>(kind: &str, props: &'a Props<'a>) -> Result<std::borrow::Cow<'a, Props<'a>>> {
+    // A SmartArt's `text` is an outline: its line breaks separate nodes
+    // (record 0284).
+    if kind.eq_ignore_ascii_case("smartart") {
+        return Ok(std::borrow::Cow::Borrowed(props));
+    }
     if !kind.eq_ignore_ascii_case("r") && !kind.eq_ignore_ascii_case("run") {
         if !kind.eq_ignore_ascii_case("p") && !kind.eq_ignore_ascii_case("paragraph") {
             text_semantics(props)?;

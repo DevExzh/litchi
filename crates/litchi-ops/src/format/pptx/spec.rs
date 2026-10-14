@@ -96,11 +96,13 @@ pub(crate) enum Kind {
     NoteSlide,
     /// The notes master (gap).
     NotesMaster,
+    /// A content node of a SmartArt graphic (record 0284).
+    SmartArtNode,
 }
 
 impl Kind {
     /// Every kind, in ordinal order.
-    const ALL: [Self; 36] = [
+    const ALL: [Self; 37] = [
         Self::Presentation,
         Self::Slide,
         Self::Shape,
@@ -137,6 +139,7 @@ impl Kind {
         Self::Col,
         Self::NoteSlide,
         Self::NotesMaster,
+        Self::SmartArtNode,
     ];
 
     /// The kind's spec entry.
@@ -203,6 +206,7 @@ impl ElementKind for Kind {
             "col" => Self::Col,
             "noteSlide" => Self::NoteSlide,
             "notesMaster" => Self::NotesMaster,
+            "node" => Self::SmartArtNode,
             _ => return None,
         })
     }
@@ -245,6 +249,7 @@ impl ElementKind for Kind {
             Self::Col => "col",
             Self::NoteSlide => "noteSlide",
             Self::NotesMaster => "notesMaster",
+            Self::SmartArtNode => "node",
         }
     }
 
@@ -676,7 +681,10 @@ props! {
 }
 
 props! {
-    /// A SmartArt frame (`SmartArtToNode`).
+    /// A SmartArt frame (`SmartArtToNode`), then what its data model says
+    /// (record 0284): the layout token (`list`, `process`, ... for the
+    /// layouts Litchi authors, else the last segment of the layout's unique
+    /// identifier), the layout's unique identifier and the node count.
     SMARTART_PROPS, SmartArtKey {
         Name = "name": ValueType::Text,
         Id = "id": ValueType::Int; raw,
@@ -685,6 +693,16 @@ props! {
         Width = "width": ValueType::Length(LOSSY_EXTENT),
         Height = "height": ValueType::Length(LOSSY_EXTENT),
         Zorder = "zorder": ValueType::Int,
+        Layout = "layout": ValueType::Text,
+        LayoutId = "layoutId": ValueType::Text,
+        NodeCount = "nodeCount": ValueType::Int,
+    }
+}
+
+props! {
+    /// A SmartArt content node (record 0284): its one-based nesting level.
+    NODE_PROPS, NodeKey {
+        Level = "level": ValueType::Int,
     }
 }
 
@@ -891,7 +909,7 @@ use Kind::{
     Animation, Audio, Axis, Cell, Chart, Col, Comment, Connector, Equation, Group, Hyperlink,
     LineBreak, Media, Model3d, ModernComment, NoteSlide, Notes, NotesMaster, Ole, Paragraph,
     Picture, Placeholder, Presentation, Reply, Row, Run, Series, Shape, Slide, SlideLayout,
-    SlideMaster, SmartArt, Table, Theme, Video, Zoom,
+    SlideMaster, SmartArt, SmartArtNode, Table, Theme, Video, Zoom,
 };
 
 /// What a slide or a group may hold.
@@ -1150,7 +1168,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             "smartart",
             &["smartart"],
             TREE_PARENTS,
-            &[],
+            &[SmartArtNode],
             SHAPE_IDS,
             &["/slide[N]/smartart[@id=ID]", "/slide[N]/smartart[N]"],
             SMARTART_PROPS,
@@ -1396,6 +1414,19 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &[],
             &["/notesMaster"],
             &NOTES_MASTER_GAP,
+        ),
+        element(
+            SmartArtNode,
+            "node",
+            &["node"],
+            &[SmartArt, SmartArtNode],
+            &[SmartArtNode],
+            &[],
+            &[
+                "/slide[N]/smartart[N]/node[N]",
+                "/slide[N]/smartart[N]/node[N]/node[N]",
+            ],
+            NODE_PROPS,
         ),
     ],
     gaps: &[
@@ -2190,3 +2221,96 @@ const fn axis_write_entries() -> [crate::registry::Entry<AxisSetter>; AXIS_PROPS
 pub(super) const AXIS_WRITE_TABLE: crate::registry::Table<AxisSetter, { AXIS_PROPS.len() }, 0> =
     crate::registry::Table::new(axis_write_entries(), []);
 pub(crate) const AXIS_CAPABILITY_PROPS: &[PropSpec] = &AXIS_WRITE_TABLE.readable();
+
+/// SmartArt assignments (record 0284): `add` authors a graphic from a text
+/// outline with a layout; `set` rebuilds it with another layout or outline.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum SmartArtSetter {
+    Name,
+    X,
+    Y,
+    Width,
+    Height,
+    Layout,
+    Text,
+}
+const SMARTART_WRITE_COUNT: usize = SMARTART_PROPS.len() + 1;
+const fn smartart_write_entries() -> [crate::registry::Entry<SmartArtSetter>; SMARTART_WRITE_COUNT]
+{
+    use crate::registry::{Access, Constraint, Entry};
+    let mut entries = [Entry::read(SMARTART_PROPS[0]); SMARTART_WRITE_COUNT];
+    let mut index = 0;
+    while index < SMARTART_PROPS.len() {
+        let spec = SMARTART_PROPS[index];
+        let access = if index == SmartArtKey::Name as usize {
+            Some(Access::Add(SmartArtSetter::Name))
+        } else if index == SmartArtKey::X as usize {
+            Some(Access::Add(SmartArtSetter::X))
+        } else if index == SmartArtKey::Y as usize {
+            Some(Access::Add(SmartArtSetter::Y))
+        } else if index == SmartArtKey::Width as usize {
+            Some(Access::Add(SmartArtSetter::Width))
+        } else if index == SmartArtKey::Height as usize {
+            Some(Access::Add(SmartArtSetter::Height))
+        } else if index == SmartArtKey::Layout as usize {
+            Some(Access::SetAndAdd(SmartArtSetter::Layout))
+        } else {
+            None
+        };
+        entries[index] = match access {
+            Some(access) => Entry {
+                spec,
+                access,
+                constraint: if index == SmartArtKey::Width as usize
+                    || index == SmartArtKey::Height as usize
+                {
+                    Constraint::Length {
+                        min: crate::value::Length::from_emu(1),
+                        max: crate::value::Length::from_emu(i64::MAX),
+                    }
+                } else if index == SmartArtKey::Layout as usize {
+                    Constraint::NotEmpty
+                } else {
+                    Constraint::None
+                },
+                clear: false,
+            },
+            None => Entry::read(spec),
+        };
+        index += 1;
+    }
+    entries[SMARTART_PROPS.len()] = Entry {
+        spec: write_only("text", ValueType::Text),
+        access: Access::SetAndAdd(SmartArtSetter::Text),
+        constraint: Constraint::None,
+        clear: false,
+    };
+    entries
+}
+pub(super) const SMARTART_WRITE_TABLE: crate::registry::Table<
+    SmartArtSetter,
+    SMARTART_WRITE_COUNT,
+    0,
+> = crate::registry::Table::new(smartart_write_entries(), []);
+pub(crate) const SMARTART_CAPABILITY_PROPS: &[PropSpec] = &SMARTART_WRITE_TABLE.readable();
+
+/// SmartArt node assignments (record 0284): the node's text.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum NodeSetter {
+    Text,
+}
+const NODE_WRITE_COUNT: usize = NODE_PROPS.len() + 1;
+const fn node_write_entries() -> [crate::registry::Entry<NodeSetter>; NODE_WRITE_COUNT] {
+    use crate::registry::{Access, Constraint, Entry};
+    let mut entries = [Entry::read(NODE_PROPS[0]); NODE_WRITE_COUNT];
+    entries[NODE_PROPS.len()] = Entry {
+        spec: write_only("text", ValueType::Text),
+        access: Access::SetAndAdd(NodeSetter::Text),
+        constraint: Constraint::None,
+        clear: false,
+    };
+    entries
+}
+pub(super) const NODE_WRITE_TABLE: crate::registry::Table<NodeSetter, NODE_WRITE_COUNT, 0> =
+    crate::registry::Table::new(node_write_entries(), []);
+pub(crate) const NODE_CAPABILITY_PROPS: &[PropSpec] = &NODE_WRITE_TABLE.readable();

@@ -2,6 +2,9 @@
 
 mod comments;
 mod notes;
+mod smartart;
+
+pub use smartart::SmartArtParts;
 
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::sync::{Arc, Weak};
@@ -866,8 +869,15 @@ impl Edit {
         let owner = self.working.get_part(&selected.part_name)?;
         let blob = owner.blob();
         let span = super::xml::shape_removal_span(blob, key)?;
-        let removed_relationships =
+        let mut removed_relationships =
             shape_relationship_ids(super::xml::span_bytes(blob, span.clone())?, owner.rels())?;
+        // A SmartArt's cached drawing is related by the slide but named only
+        // by its data model, so it leaves with the frame (record 0284).
+        let drawings: Vec<String> = removed_relationships
+            .iter()
+            .filter_map(|id| smartart::drawing_relationship(&self.working, &selected.part_name, id))
+            .collect();
+        removed_relationships.extend(drawings);
         let (xml, _) = super::xml::stage_shape_removal(
             blob,
             key,
