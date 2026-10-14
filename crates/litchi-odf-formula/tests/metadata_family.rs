@@ -24,6 +24,9 @@ fn round_trip(package: &Package) {
     assert!(meta.contains(">Title &amp; more</"), "{meta}");
     assert!(meta.contains(">alpha</") && meta.contains(">beta</"));
     let reopened = Package::from_bytes(next.as_bytes()).unwrap();
+    let read = reopened.metadata().unwrap().unwrap();
+    assert_eq!(read.title.as_deref(), Some("Title & more"));
+    assert_eq!(read.author.as_deref(), Some("Ann"));
     assert_eq!(reopened.as_bytes(), next.as_bytes());
 
     // A second edit replaces the spliced element in place.

@@ -6,7 +6,7 @@ use litchi_core::selector::Path;
 
 use super::tree::{length, text};
 use super::write::{
-    Commit, Patch, bound, element_refusal, finish, key_refusal, refusal, resolve, staging_error,
+    Commit, Patch, bound, element_refusal, finish, key_refusal, refusal, staging_error,
 };
 use super::{Flavor, Node, OdfTree, Owner, TreeBuilder, element, writable};
 use crate::Result;
@@ -14,7 +14,6 @@ use crate::error::Code;
 use crate::new_node::NewNode;
 use crate::node::spec::{FormatSpec, GapSpec, PropSpec, Subject};
 use crate::path::PathArg;
-use crate::props::Props;
 use crate::target::TargetArg;
 use crate::transaction::{LimitKind, SemanticLimits};
 use crate::value::{LengthSpec, ValueType};
@@ -134,6 +133,7 @@ pub(crate) static WRITES: super::Writes = super::Writes {
     settable: &["frame", "metadata"],
     addable: &[],
     removable: &[],
+    movable: &[],
     gaps: &OPERATION_GAPS,
 };
 
@@ -190,16 +190,17 @@ pub(crate) fn build(package: &litchi_odi::Package) -> Result<super::Tree> {
 pub(crate) fn set(
     file: &OdfTree,
     package: &litchi_odi::Package,
-    target: &TargetArg<'_>,
-    props: &Props<'_>,
+    groups: &[super::write::Group<'_, '_, '_>],
     limits: &SemanticLimits,
 ) -> Result<Commit> {
-    let nodes = resolve::<Odi>(file, target, limits.max_expanded_targets())?;
     let image = package.image();
     let mut edit = package.edit();
     let mut operations = 0usize;
     let staging = |error| staging_error(error, FileFormat::Odi);
-    for node in &nodes {
+    for (node, props) in groups
+        .iter()
+        .flat_map(|(nodes, props)| nodes.iter().map(move |node| (node, *props)))
+    {
         let kind = node.item().type_name();
         // Position and size stage together: the leaf audits a frame's
         // geometry as one set of four values.

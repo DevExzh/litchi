@@ -105,6 +105,9 @@ pub struct Edit<'source> {
     content: String,
     changes: Vec<Change>,
     legacy_query: Option<QueryChange>,
+    /// Whether scalar setters touched more than one query: the patch then
+    /// reports no single legacy query change (record 0288).
+    several_queries: bool,
     payload_additions: Vec<Addition>,
     payload_directories: Vec<(String, String)>,
 }
@@ -117,6 +120,7 @@ impl<'source> Edit<'source> {
             content: source.database.content_xml().to_owned(),
             changes: Vec::new(),
             legacy_query: None,
+            several_queries: false,
             payload_additions: Vec::new(),
             payload_directories: Vec::new(),
         }
@@ -1728,12 +1732,19 @@ impl<'source> Edit<'source> {
     }
 
     fn prepare_legacy_query(&mut self, name: &str) -> Result<()> {
+        if self.several_queries {
+            return Ok(());
+        }
         if self
             .legacy_query
             .as_ref()
             .is_some_and(|change| change.name != name)
         {
-            return invalid("legacy query scalar setters support one query per transaction");
+            // Scalar setters of several queries stage like any other edit;
+            // only the single-query compatibility report is dropped.
+            self.several_queries = true;
+            self.legacy_query = None;
+            return Ok(());
         }
         if self.legacy_query.is_none() {
             let catalog = self.source.database.catalog()?;
@@ -2027,7 +2038,8 @@ impl Patch {
         &self.changes
     }
 
-    /// Returns the legacy scalar query change when this transaction used it.
+    /// Returns the legacy scalar query change when this transaction used
+    /// scalar setters on exactly one query.
     #[must_use]
     pub const fn change(&self) -> Option<&QueryChange> {
         self.legacy_query.as_ref()

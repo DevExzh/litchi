@@ -328,8 +328,20 @@ fn dtd_is_refused_and_noncompact_source_requires_checked_splices() {
         drawing.as_bytes()
     );
 
+    // Page insertion is a checked splice too (record 0288): the producer's
+    // whitespace survives.
+    let mut inserted = drawing.edit();
+    inserted.add_page(Page::new("Page 2")).unwrap();
+    let inserted = inserted.commit().unwrap();
+    assert!(inserted.package().content_xml().contains("\n<office:body>"));
+    assert_eq!(inserted.package().drawing().pages().len(), 2);
+
+    // Edits without a splice form still rewrite the whole part, which a
+    // noncompact source refuses.
     let mut whole_source_rewrite = drawing.edit();
-    whole_source_rewrite.add_page(Page::new("Page 2")).unwrap();
+    whole_source_rewrite
+        .add_layer(0, litchi_odg::layer::Layer::new("extra"))
+        .unwrap();
     assert!(whole_source_rewrite.commit().is_err());
 }
 

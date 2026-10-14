@@ -554,7 +554,11 @@ fn plan(
     source: &[u8],
     fields: &BTreeMap<Field, Option<String>>,
 ) -> Result<Vec<(Range<usize>, String)>, Error> {
-    let text = std::str::from_utf8(source).map_err(|_| invalid("ODF meta.xml is not UTF-8"))?;
+    let full = std::str::from_utf8(source).map_err(|_| invalid("ODF meta.xml is not UTF-8"))?;
+    // The reader skips a byte-order mark: plan in the text after it, then
+    // shift the ranges back onto the part's bytes.
+    let text = full.strip_prefix('\u{feff}').unwrap_or(full);
+    let base = full.len() - text.len();
     let mut reader = NsReader::from_str(text);
     reader.config_mut().trim_text(false);
     let mut depth = 0usize;
@@ -686,6 +690,9 @@ fn plan(
     }
     splices.retain(|(range, bytes)| text.get(range.clone()) != Some(bytes.as_str()));
     splices.sort_by_key(|(range, _)| (range.start, range.end));
+    for (range, _) in &mut splices {
+        *range = range.start + base..range.end + base;
+    }
     Ok(splices)
 }
 
@@ -777,6 +784,17 @@ mod tests {
             &plan(META_XML.as_bytes(), &fields(&[(Field::Title, None)])).unwrap(),
         );
         assert!(!removed.contains("dc:title"));
+    }
+
+    #[test]
+    fn plans_on_part_bytes_after_a_byte_order_mark() {
+        let source = format!("\u{feff}{META_XML}");
+        let splices = plan(source.as_bytes(), &fields(&[(Field::Subject, Some("S"))])).unwrap();
+        let out = apply(&source, &splices);
+        assert!(
+            out.contains("<dc:subject>S</dc:subject></office:meta>"),
+            "{out}"
+        );
     }
 
     #[test]

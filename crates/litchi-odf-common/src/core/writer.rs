@@ -1607,13 +1607,21 @@ impl<W: Write> PackageWriter<W> {
                 "Rewriting encrypted ODF entries requires writer encryption".to_string(),
             ));
         }
-        for (path, entry) in &package.manifest().entries {
-            if path.ends_with('/')
-                && !matches!(path.as_str(), "/" | "META-INF/")
-                && !excluded_paths.contains(path)
-            {
-                self.add_manifest_entry(path, &entry.media_type)?;
-            }
+        // Directory entries in path order: the manifest map has no stable
+        // iteration order, and publication is deterministic (record 0288).
+        let mut directories: Vec<_> = package
+            .manifest()
+            .entries
+            .iter()
+            .filter(|(path, _)| {
+                path.ends_with('/')
+                    && !matches!(path.as_str(), "/" | "META-INF/")
+                    && !excluded_paths.contains(*path)
+            })
+            .collect();
+        directories.sort_by(|left, right| left.0.cmp(right.0));
+        for (path, entry) in directories {
+            self.add_manifest_entry(path, &entry.media_type)?;
         }
         for path in package.files()? {
             if path.ends_with('/')
@@ -1703,7 +1711,7 @@ impl<W: Write> PackageWriter<W> {
             ));
         }
 
-        for (path, entry) in &package.manifest().entries {
+        for (path, entry) in sorted_entries(package.manifest()) {
             if path.ends_with('/') && !Self::is_regenerated_package_part(path) {
                 self.add_manifest_entry(path, &entry.media_type)?;
             }
@@ -1766,7 +1774,7 @@ impl<W: Write> PackageWriter<W> {
                     .any(|candidate| path.starts_with(candidate))
         };
 
-        for (path, entry) in &package.manifest().entries {
+        for (path, entry) in sorted_entries(package.manifest()) {
             if path.ends_with('/') && !Self::is_regenerated_package_part(path) && !excluded(path) {
                 self.add_manifest_entry(path, &entry.media_type)?;
             }
@@ -3152,4 +3160,14 @@ mod encrypted_copy_tests {
                 .unwrap()
         );
     }
+}
+
+/// Manifest entries in path order: the manifest map has no stable
+/// iteration order, and package publication is deterministic (record 0288).
+fn sorted_entries(
+    manifest: &super::manifest::Manifest,
+) -> Vec<(&String, &super::manifest::ManifestEntry)> {
+    let mut entries: Vec<_> = manifest.entries.iter().collect();
+    entries.sort_by(|left, right| left.0.cmp(right.0));
+    entries
 }

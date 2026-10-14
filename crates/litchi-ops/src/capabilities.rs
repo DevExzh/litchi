@@ -954,6 +954,7 @@ impl Capabilities {
                     Verb::Set | Verb::Edit | Verb::Batch => Support::Supported,
                     Verb::Add if !writes.addable.is_empty() => Support::Supported,
                     Verb::Remove if !writes.removable.is_empty() => Support::Supported,
+                    Verb::Move | Verb::Swap if !writes.movable.is_empty() => Support::Supported,
                     _ => OBJECT_STRUCTURE.support(),
                 };
             }

@@ -1604,6 +1604,36 @@ impl Edit {
         self.content_splices = None;
     }
 
+    /// Replace `range` of the staged content with balanced `replacement`
+    /// markup (or delete it), keeping the edit on the exact-source splice
+    /// path when the range maps onto source bytes no earlier edit touched.
+    /// Otherwise the edit falls back to a whole-part rewrite, which the
+    /// commit admits only for compact sources (record 0288).
+    fn splice_content(&mut self, range: &Range<usize>, replacement: &str) -> Result<()> {
+        let next = replace_xml(&self.content, range, replacement)?;
+        if let Some(splices) = &mut self.content_splices
+            && stage_content_splice(
+                self.source.content_xml().as_bytes(),
+                self.content.as_bytes(),
+                splices,
+                range,
+                replacement.as_bytes(),
+            )
+            .is_err()
+        {
+            self.content_splices = None;
+        }
+        self.content = next;
+        Ok(())
+    }
+
+    /// Insert `child` markup at `at` in the staged content (expanding an
+    /// empty owner element whose `/>` starts at `at`).
+    fn insert_content_child(&mut self, at: usize, child: &str) -> Result<()> {
+        let (range, replacement) = child_insertion(&self.content, at, child)?;
+        self.splice_content(&range, &replacement)
+    }
+
     fn require_group_descendant(&self, page: usize, group: usize, descendant: usize) -> Result<()> {
         let parsed = parse_content(&self.content)?;
         if !group_selection(&parsed, page, group)?.contains(descendant) {
@@ -2560,9 +2590,13 @@ impl Edit {
                 .start
         };
         let xml = serialize_page(&page)?;
-        let content = insert_child_xml(&styled_content, at, &xml)?;
-        self.invalidate_content_splices();
-        self.content = content;
+        if generated_style.is_some() {
+            let content = insert_child_xml(&styled_content, at, &xml)?;
+            self.invalidate_content_splices();
+            self.content = content;
+        } else {
+            self.insert_content_child(at, &xml)?;
+        }
         if let Some((name, _style_xml)) = generated_style {
             self.changes
                 .push(Change::Structure(StructureChange::StyleInserted { name }));
@@ -2608,14 +2642,104 @@ impl Edit {
                 "ODG page removal is blocked by a draw:page-name dependency".into(),
             ));
         }
-        self.invalidate_content_splices();
-        self.content = content;
+        let span = span.clone();
+        self.splice_content(&span, "")?;
         self.changes
             .push(Change::Structure(StructureChange::PageRemoved {
                 position,
                 name: page.name().map(str::to_owned),
             }));
         Ok(page)
+    }
+
+    /// Moves the page at `from` so it ends at position `to` of the page
+    /// order. The page's bytes move unchanged; on a producer drawing both
+    /// edits stay exact-source splices.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a position out of bounds or a missing span.
+    pub fn move_page(&mut self, from: usize, to: usize) -> Result<()> {
+        let parsed = parse_content(&self.content)?;
+        if from >= parsed.pages.len() || to >= parsed.pages.len() {
+            return invalid("ODG page move position is out of bounds");
+        }
+        if from == to {
+            return Ok(());
+        }
+        let span = |index: usize| {
+            parsed.page_spans[index]
+                .clone()
+                .ok_or_else(|| Error::InvalidFormat("ODG page span is missing".into()))
+        };
+        let moved = span(from)?;
+        let at = if to > from {
+            span(to)?.end
+        } else {
+            span(to)?.start
+        };
+        self.relocate_content(moved, at)?;
+        self.changes
+            .push(Change::Structure(StructureChange::PageMoved { from, to }));
+        Ok(())
+    }
+
+    /// Moves the shape at `from` of `page` so it ends at position `to` of the
+    /// page's shape order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a selector out of bounds or a missing span.
+    pub fn move_shape(&mut self, page: usize, from: usize, to: usize) -> Result<()> {
+        let parsed = parse_content(&self.content)?;
+        let spans = parsed
+            .shape_spans
+            .get(page)
+            .ok_or_else(|| Error::InvalidFormat("ODG page selector is out of bounds".into()))?;
+        if from >= spans.len() || to >= spans.len() {
+            return invalid("ODG shape move position is out of bounds");
+        }
+        if from == to {
+            return Ok(());
+        }
+        let span = |index: usize| {
+            spans[index]
+                .clone()
+                .ok_or_else(|| Error::InvalidFormat("ODG shape span is missing".into()))
+        };
+        let moved = span(from)?;
+        let at = if to > from {
+            span(to)?.end
+        } else {
+            span(to)?.start
+        };
+        self.relocate_content(moved, at)?;
+        self.changes
+            .push(Change::Structure(StructureChange::ShapeMoved {
+                page,
+                from,
+                to,
+            }));
+        Ok(())
+    }
+
+    /// Move the staged bytes of `span` to the insertion point `at` (outside
+    /// the span), as a removal and an insertion.
+    fn relocate_content(&mut self, span: Range<usize>, at: usize) -> Result<()> {
+        let bytes = self
+            .content
+            .get(span.clone())
+            .ok_or_else(|| Error::InvalidFormat("ODG relocated span is invalid".into()))?
+            .to_owned();
+        if at >= span.end {
+            self.splice_content(&(at..at), &bytes)?;
+            self.splice_content(&span, "")
+        } else if at <= span.start {
+            self.splice_content(&span, "")?;
+            self.splice_content(&(at..at), &bytes)
+        } else {
+            invalid("ODG relocation target lies inside the moved element")
+        }
     }
 
     /// Inserts a detached shape at a checked page shape position.
@@ -2668,9 +2792,7 @@ impl Edit {
                 .start
         };
         let xml = serialize_shape(&shape)?;
-        let content = insert_child_xml(&self.content, at, &xml)?;
-        self.invalidate_content_splices();
-        self.content = content;
+        self.insert_content_child(at, &xml)?;
         self.changes
             .push(Change::Structure(StructureChange::ShapeInserted {
                 page,
@@ -3399,9 +3521,8 @@ impl Edit {
         let span = parsed.shape_spans[page][shape]
             .as_ref()
             .ok_or_else(|| Error::InvalidFormat("ODG shape span is missing".into()))?;
-        let content = remove_xml(&self.content, span)?;
-        self.invalidate_content_splices();
-        self.content = content;
+        let span = span.clone();
+        self.splice_content(&span, "")?;
         self.changes
             .push(Change::Structure(StructureChange::ShapeRemoved {
                 page,
@@ -4223,6 +4344,17 @@ pub enum StructureChange {
     PageInserted {
         position: usize,
         name: Option<String>,
+    },
+    /// A page moved from one source-order position to another.
+    PageMoved {
+        from: usize,
+        to: usize,
+    },
+    /// A shape moved within one page's shape order.
+    ShapeMoved {
+        page: usize,
+        from: usize,
+        to: usize,
     },
     PageRemoved {
         position: usize,
@@ -9812,6 +9944,8 @@ fn content_splice_publication(
         let proof = source_part.checked_range(splice.source_range.clone(), &splice.expected)?;
         let fragment = if splice.replacement.is_empty() {
             AuthoredXmlFragment::deletion()
+        } else if splice.replacement.first() == Some(&b'<') {
+            AuthoredXmlFragment::markup(splice.replacement.clone())?
         } else {
             AuthoredXmlFragment::text(splice.replacement.clone())?
         };
@@ -9988,6 +10122,18 @@ fn stage_content_splice(
         return Ok(());
     }
 
+    // A markup edit touching an earlier markup edit (two pages appended at
+    // the same point, a removal next to an insertion) joins it: two
+    // publication edits may not share one source boundary.
+    if is_markup_splice(replacement)
+        && let Some(index) = splices.iter().position(|splice| {
+            is_markup_splice(&splice.replacement)
+                && (splice.current_range.end == range.start
+                    || splice.current_range.start == range.end)
+        })
+    {
+        return merge_content_splice(source, actual, splices, index, range, replacement);
+    }
     let (removed_before, added_before) = splices
         .iter()
         .filter(|splice| splice.current_range.end <= range.start)
@@ -10032,6 +10178,91 @@ fn stage_content_splice(
         replacement: replacement.to_vec(),
     });
     shift_current_splices(splices, insertion_index, range.end, new_end)?;
+    splices.sort_unstable_by_key(|splice| splice.current_range.start);
+    Ok(())
+}
+
+/// Whether a splice replacement is a deletion or balanced markup (not an
+/// escaped text or attribute value).
+fn is_markup_splice(replacement: &[u8]) -> bool {
+    replacement.first().is_none_or(|byte| *byte == b'<')
+}
+
+/// Join the markup edit of `range` with the adjacent staged splice `index`.
+fn merge_content_splice(
+    source: &[u8],
+    actual: &[u8],
+    splices: &mut [ContentSplice],
+    index: usize,
+    range: &Range<usize>,
+    replacement: &[u8],
+) -> Result<()> {
+    let overflow = || Error::InvalidFormat("ODG content splice size overflow".into());
+    let held = &splices[index];
+    let append = held.current_range.end == range.start;
+    let length = range.len();
+    let source_range = if append {
+        held.source_range.start
+            ..held
+                .source_range
+                .end
+                .checked_add(length)
+                .ok_or_else(overflow)?
+    } else {
+        held.source_range
+            .start
+            .checked_sub(length)
+            .ok_or_else(overflow)?..held.source_range.end
+    };
+    let expected = source
+        .get(source_range.clone())
+        .ok_or_else(|| Error::InvalidFormat("ODG content splice source range is invalid".into()))?
+        .to_vec();
+    let mut joined = Vec::new();
+    joined
+        .try_reserve_exact(
+            held.replacement
+                .len()
+                .checked_add(replacement.len())
+                .ok_or_else(overflow)?,
+        )
+        .map_err(|allocation_error| Error::Allocation {
+            resource: "ODG content splice",
+            source: allocation_error,
+        })?;
+    let current_start = if append {
+        joined.extend_from_slice(&held.replacement);
+        joined.extend_from_slice(replacement);
+        held.current_range.start
+    } else {
+        joined.extend_from_slice(replacement);
+        joined.extend_from_slice(&held.replacement);
+        range.start
+    };
+    // The bytes the new edit removes must be the source bytes next to the
+    // held splice (no other edit rewrote them).
+    let removed = if append {
+        &expected[expected.len() - length..]
+    } else {
+        &expected[..length]
+    };
+    if removed != actual {
+        return invalid("ODG content splice lost exact source provenance");
+    }
+    let old_end = range.end;
+    let new_end = range
+        .start
+        .checked_add(replacement.len())
+        .ok_or_else(overflow)?;
+    let current_end = current_start
+        .checked_add(joined.len())
+        .ok_or_else(overflow)?;
+    let splice = &mut splices[index];
+    splice.source_range = source_range;
+    splice.expected = expected;
+    splice.replacement = joined;
+    splice.current_range = current_start..current_end;
+    shift_current_splices(splices, index, old_end, new_end)?;
     splices.sort_unstable_by_key(|splice| splice.current_range.start);
     Ok(())
 }
@@ -10179,6 +10410,53 @@ fn insert_automatic_style(source: &str, style: &str) -> Result<String> {
     owner.push_str(style);
     owner.push_str(suffix);
     insert_xml(source, at, &owner)
+}
+
+/// The replaced range and balanced replacement markup that insert `child`
+/// at `at`: an insertion point, or the `/>` of an empty owner element, which
+/// is expanded whole (`<owner …/>` becomes `<owner …>child</owner>`) so the
+/// replacement is balanced markup the splice publication accepts.
+fn child_insertion(source: &str, at: usize, child: &str) -> Result<(Range<usize>, String)> {
+    if source.as_bytes().get(at..at.saturating_add(2)) != Some(b"/>") {
+        if at > source.len() || !source.is_char_boundary(at) {
+            return invalid("ODG XML insertion point is invalid");
+        }
+        return Ok((at..at, child.to_owned()));
+    }
+    let element_start = source
+        .get(..at)
+        .and_then(|prefix| prefix.rfind('<'))
+        .ok_or_else(|| Error::InvalidFormat("ODG empty owner start is missing".into()))?;
+    let name_start = element_start + 1;
+    let name_end = source
+        .as_bytes()
+        .get(name_start..at)
+        .and_then(|bytes| {
+            bytes
+                .iter()
+                .position(|byte| byte.is_ascii_whitespace() || matches!(byte, b'/' | b'>'))
+                .map(|offset| name_start + offset)
+        })
+        .unwrap_or(at);
+    let name = source
+        .get(name_start..name_end)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| Error::InvalidFormat("ODG empty owner name is missing".into()))?;
+    let open = source[element_start..at].trim_end();
+    let mut replacement = String::new();
+    replacement
+        .try_reserve_exact(open.len() + child.len() + name.len() + 4)
+        .map_err(|allocation_error| Error::Allocation {
+            resource: "ODG edited content",
+            source: allocation_error,
+        })?;
+    replacement.push_str(open);
+    replacement.push('>');
+    replacement.push_str(child);
+    replacement.push_str("</");
+    replacement.push_str(name);
+    replacement.push('>');
+    Ok((element_start..at + 2, replacement))
 }
 
 fn insert_child_xml(source: &str, at: usize, child: &str) -> Result<String> {
@@ -11559,7 +11837,13 @@ fn xml_has_attribute(xml: &str, namespace: &[u8], local: &[u8], value: &str) -> 
                     return Ok(true);
                 }
             },
-            Event::DocType(_) | Event::GeneralRef(_) | Event::PI(_) => {
+            // Character references and the predefined entities in text
+            // (LibreOffice writes `&apos;`) are inert; custom entities are
+            // refused by `reference_value`.
+            Event::GeneralRef(reference) => {
+                reference_value(&reference)?;
+            },
+            Event::DocType(_) | Event::PI(_) => {
                 return invalid("active XML is prohibited in ODG dependencies");
             },
             Event::Eof => return Ok(false),
@@ -11958,6 +12242,15 @@ fn inverse_change(change: &Change) -> Change {
                 page: *page,
                 position: *position,
                 kind: *kind,
+            },
+            StructureChange::PageMoved { from, to } => StructureChange::PageMoved {
+                from: *to,
+                to: *from,
+            },
+            StructureChange::ShapeMoved { page, from, to } => StructureChange::ShapeMoved {
+                page: *page,
+                from: *to,
+                to: *from,
             },
             StructureChange::ShapeAdvancedGeometryChanged { page, shape } => {
                 StructureChange::ShapeAdvancedGeometryChanged {

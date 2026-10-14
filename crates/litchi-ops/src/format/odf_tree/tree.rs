@@ -95,6 +95,26 @@ pub(crate) struct Tree {
 }
 
 impl Tree {
+    /// A tree of only an empty root item.
+    pub(crate) fn root_only() -> Self {
+        Self {
+            items: vec![Item {
+                kind: 0,
+                type_name: "",
+                props: &[],
+                values: Box::new([]),
+                text: None,
+                label: None,
+                children: Vec::new(),
+                path: Box::new([]),
+                #[cfg(any(feature = "odg", feature = "odc", feature = "odi", feature = "odb"))]
+                leaf: [0, 0],
+                #[cfg(feature = "odf-formula")]
+                route: Box::new([]),
+            }],
+        }
+    }
+
     pub(crate) fn items(&self) -> &[Item] {
         &self.items
     }
@@ -282,7 +302,7 @@ pub(crate) fn length(value: Option<&str>) -> Option<Value<'static>> {
 /// An ODF length attribute value for `length`: the canonical unified
 /// spelling, or centimetres with six decimals when no two-decimal unit is
 /// exact (the spelling of the ODP adapter, record 0278).
-#[cfg(any(feature = "odg", feature = "odi"))]
+#[cfg(any(feature = "odg", feature = "odc", feature = "odi"))]
 pub(crate) fn odf_length(length: crate::value::Length) -> String {
     let display = length.display(crate::value::LengthStyle::Auto).to_string();
     if !display.ends_with("emu") {

@@ -768,9 +768,8 @@ fn presentation_writes_save_in_place() {
     expect(0, ["remove", file, "/slide[3]"]);
     expect(3, ["get", file, "/slide[3]"]);
 
-    // ODG (record 0282): on a fresh drawing (producer drawings refuse
-    // structural writes, a leaf gap), a page and a shape added, the shape's
-    // text changed and the shape removed, each saved in place.
+    // ODG (record 0282): on a fresh drawing, a page and a shape added, the
+    // shape's text changed and the shape removed, each saved in place.
     let path = dir.path().join("w.odg");
     let file = arg(&path);
     expect(0, ["create", file]);
@@ -805,6 +804,49 @@ fn presentation_writes_save_in_place() {
     assert_eq!(text_of(&path, &added), "Changed");
     expect(0, ["remove", file, &added]);
     expect(3, ["get", file, &added]);
+
+    // ODG on a LibreOffice drawing (record 0288): structural writes are
+    // exact-source splices; pages are inserted, moved and removed, and
+    // `/metadata` is set through the metadata family.
+    let path = scratch(
+        dir.path(),
+        "p.odg",
+        Some("libreoffice-core/desktop/qa/data/3page.odg"),
+    );
+    let file = arg(&path);
+    expect(
+        0,
+        [
+            "add",
+            file,
+            "/",
+            "--type",
+            "page",
+            "--prop",
+            "name=Front",
+            "--index",
+            "0",
+        ],
+    );
+    let name =
+        |node: &str| expect(0, ["get", file, node, "--json"]).json()["format"]["name"].clone();
+    assert_eq!(name("/page[1]"), "Front");
+    expect(0, ["move", file, "/page[1]", "--index", "3"]);
+    assert_eq!(name("/page[4]"), "Front");
+    expect(0, ["swap", file, "/page[1]", "/page[2]"]);
+    assert_eq!(name("/page[1]"), "page2");
+    expect(0, ["remove", file, "/page[4]"]);
+    expect(3, ["get", file, "/page[4]"]);
+    expect(0, ["set", file, "/metadata", "--prop", "title=CLI drawing"]);
+    let reopened = litchi_ops::open(&path).expect("reopen in process");
+    assert_eq!(
+        reopened
+            .metadata()
+            .expect("metadata")
+            .and_then(|metadata| metadata.title)
+            .as_deref(),
+        Some("CLI drawing")
+    );
 }
 
 #[test]

@@ -71,4 +71,18 @@ impl crate::Package {
     pub fn apply_metadata(&self, patch: &Patch) -> Result<Self, Error> {
         patch.apply(self)
     }
+
+    /// Document properties from `meta.xml`, when the package has one.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Core`] when `meta.xml` is malformed.
+    pub fn metadata(&self) -> Result<Option<litchi_core::Metadata>, Error> {
+        let owned = self.owned_package();
+        if !owned.has_file("meta.xml")? {
+            return Ok(None);
+        }
+        let meta = litchi_odf_common::core::Meta::from_vec(owned.get_file("meta.xml")?)?;
+        Ok(Some(meta.try_extract_metadata()?))
+    }
 }

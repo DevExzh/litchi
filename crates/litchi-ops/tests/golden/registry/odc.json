@@ -6,7 +6,7 @@
       "element": "chart",
       "operations": {
         "add": false,
-        "set": false,
+        "set": true,
         "get": true,
         "query": false,
         "remove": false
@@ -34,33 +34,33 @@
         "chartType": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "title": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "subtitle": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "width": {
           "type": "length",
           "unit": "emu",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "height": {
           "type": "length",
           "unit": "emu",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "axisCount": {
@@ -88,7 +88,7 @@
       "element": "axis",
       "parent": "chart",
       "operations": {
-        "add": false,
+        "add": true,
         "set": true,
         "get": true,
         "query": true,
@@ -102,26 +102,26 @@
       "properties": {
         "dimension": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "name": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "title": {
           "type": "string",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "categories": {
           "type": "string",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "style": {
@@ -144,8 +144,8 @@
       "element": "series",
       "parent": "chart",
       "operations": {
-        "add": false,
-        "set": false,
+        "add": true,
+        "set": true,
         "get": true,
         "query": true,
         "remove": true
@@ -158,26 +158,26 @@
       "properties": {
         "values": {
           "type": "string",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "label": {
           "type": "string",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "chartType": {
           "type": "string",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "axis": {
           "type": "string",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "pointCount": {
@@ -233,28 +233,28 @@
       "subject": "operation",
       "verb": "set",
       "element": "chart",
-      "context": "the title, subtitle, type and size of the chart",
+      "context": "a chart outside the leaf's lossless typed definition surface",
       "code": "unsupported_capability",
-      "followUp": "0282 ODC chart definition writes",
-      "reason": "the leaf rewrites those through a whole typed definition replacement, which the unified adapter does not author yet"
-    },
-    {
-      "subject": "operation",
-      "verb": "add",
-      "element": "series",
-      "context": "a new series or axis",
-      "code": "unsupported_capability",
-      "followUp": "0282 ODC typed series and axis creation",
-      "reason": "creating a series or an axis needs typed range and class values the unified registry does not have yet"
+      "followUp": "0288 ODC lossless producer definitions",
+      "reason": "title, type, size, series and axis writes replace the chart through its typed definition; a producer chart the leaf cannot project losslessly is refused rather than rewritten"
     },
     {
       "subject": "operation",
       "verb": "set",
       "element": "series",
-      "context": "series ranges, labels and classes",
+      "context": "data points, data labels, regressions and series styles",
       "code": "unsupported_capability",
-      "followUp": "0282 ODC series writes",
-      "reason": "the leaf replaces a series as a whole typed specification"
+      "followUp": "0288 ODC series detail writes",
+      "reason": "the unified registry writes a series' ranges, label, class and axis; its data points, labels, regression curves and styles stay as authored"
+    },
+    {
+      "subject": "operation",
+      "verb": "get",
+      "element": "metadata",
+      "context": "path-read",
+      "code": "unsupported_capability",
+      "followUp": "0288 ODF object metadata node",
+      "reason": "`set(\"/metadata\", ..)` writes meta.xml through the ODF metadata family; the path is set-only, and reads go through File::metadata()"
     },
     {
       "subject": "view",

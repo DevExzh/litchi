@@ -730,7 +730,7 @@ pub(crate) static WRITE_GAPS: [GapSpec; 12] = [
         "set",
         "metadata",
         "unowned-fields",
-        "the leaf metadata patcher owns title, subject, description, keywords and author; lastModifiedBy, created, modified, language, revision, template and custom.<name> are refused until an ODS metadata family lands",
+        "the ODF metadata family (record 0288) writes title, subject, description, author, lastModifiedBy, language and keywords; created, modified, revision, template, statistics and custom.<name> are refused",
     ),
     operation_gap(
         "set",

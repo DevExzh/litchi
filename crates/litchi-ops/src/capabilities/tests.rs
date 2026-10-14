@@ -244,6 +244,7 @@ fn every_format_has_one_answer_for_its_reads() {
                     Verb::Set | Verb::Edit | Verb::Batch => true,
                     Verb::Add => !writes.addable.is_empty(),
                     Verb::Remove => !writes.removable.is_empty(),
+                    Verb::Move | Verb::Swap => !writes.movable.is_empty(),
                     _ => false,
                 });
             #[cfg(not(feature = "odf-objects"))]

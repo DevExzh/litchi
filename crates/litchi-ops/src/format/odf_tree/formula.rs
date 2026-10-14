@@ -17,7 +17,6 @@ use crate::error::Code;
 use crate::new_node::NewNode;
 use crate::node::spec::{FormatSpec, GapSpec, PropSpec, Subject};
 use crate::path::PathArg;
-use crate::props::Props;
 use crate::target::TargetArg;
 use crate::transaction::{LimitKind, SemanticLimits};
 use crate::value::ValueType;
@@ -44,7 +43,7 @@ const ELEMENT_PROPS: &[PropSpec] = &[
     PropSpec::new("childCount", ValueType::Int),
 ];
 
-static OPERATION_GAPS: [GapSpec; 2] = [
+static OPERATION_GAPS: [GapSpec; 3] = [
     GapSpec {
         subject: Subject::Operation {
             verb: "add",
@@ -65,6 +64,7 @@ static OPERATION_GAPS: [GapSpec; 2] = [
         follow_up: "0282 formula layout text",
         reason: "only MathML token elements hold character data",
     },
+    super::METADATA_PATH_GAP,
 ];
 
 /// The formula spec table.
@@ -110,6 +110,7 @@ pub(crate) static WRITES: super::Writes = super::Writes {
     settable: &["math", "element"],
     addable: &[],
     removable: &["element"],
+    movable: &[],
     gaps: &OPERATION_GAPS,
 };
 
@@ -180,15 +181,16 @@ pub(crate) fn build(package: &litchi_odf_formula::Package) -> Result<super::Tree
 pub(crate) fn set(
     file: &OdfTree,
     package: &litchi_odf_formula::Package,
-    target: &TargetArg<'_>,
-    props: &Props<'_>,
+    groups: &[super::write::Group<'_, '_, '_>],
     limits: &SemanticLimits,
 ) -> Result<Commit> {
-    let nodes = resolve::<Formula>(file, target, limits.max_expanded_targets())?;
     let mut edit = package.edit();
     let mut operations = 0usize;
     let staging = |error| staging_error(error, FileFormat::Odf);
-    for node in &nodes {
+    for (node, props) in groups
+        .iter()
+        .flat_map(|(nodes, props)| nodes.iter().map(move |node| (node, *props)))
+    {
         for (key, value) in props.iter() {
             let key = key.as_str();
             operations += 1;

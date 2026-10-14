@@ -592,6 +592,7 @@ impl FlatImageTransaction {
             });
         }
         self.changes.sort_unstable_by_key(|change| change.frame);
+        let declared = root_prefix_bindings(self.source.as_bytes());
         let mut edits = Vec::with_capacity(self.changes.len() * 2);
         for change in &self.changes {
             let site = self.site(change.frame)?;
@@ -607,10 +608,10 @@ impl FlatImageTransaction {
                         .ok_or_else(|| invalid("ODI frame tag span is invalid"))?,
                 )
                 .map_err(|error| invalid(format!("ODI frame tag is not UTF-8: {error}")))?;
-                edits.push((
-                    span.clone(),
-                    rewrite_frame_tag(raw, &site.attributes, &change.before, &change.after)?,
-                ));
+                let mut tag =
+                    rewrite_frame_tag(raw, &site.attributes, &change.before, &change.after)?;
+                declare_inserted_prefixes(raw, &mut tag, &declared)?;
+                edits.push((span.clone(), tag));
             }
             let linked_source_changed = change.before.source() != change.after.source()
                 && matches!(change.after.source(), Source::Linked(_));
@@ -622,16 +623,15 @@ impl FlatImageTransaction {
                         .ok_or_else(|| invalid("ODI image tag span is invalid"))?,
                 )
                 .map_err(|error| invalid(format!("ODI image tag is not UTF-8: {error}")))?;
-                edits.push((
-                    site.image_tag.clone(),
-                    rewrite_image_tag(
-                        raw,
-                        site.href_attribute.as_deref(),
-                        &site.image_attributes,
-                        &change.before,
-                        &change.after,
-                    )?,
-                ));
+                let mut tag = rewrite_image_tag(
+                    raw,
+                    site.href_attribute.as_deref(),
+                    &site.image_attributes,
+                    &change.before,
+                    &change.after,
+                )?;
+                declare_inserted_prefixes(raw, &mut tag, &declared)?;
+                edits.push((site.image_tag.clone(), tag));
             }
             if change.before.source() != change.after.source()
                 && let Source::Embedded(bytes) = change.after.source()
@@ -2182,6 +2182,63 @@ fn text_element(name: &str, value: &str) -> String {
         "<{name} xmlns:svg=\"urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0\">{}</{name}>",
         quick_xml::escape::escape(value)
     )
+}
+
+/// The namespace each prefix an attribute insertion writes is bound to.
+const INSERTED_PREFIXES: [(&str, &[u8]); 5] = [
+    ("svg", SVG),
+    ("draw", DRAW),
+    ("style", STYLE),
+    ("text", TEXT),
+    ("xlink", b"http://www.w3.org/1999/xlink"),
+];
+
+/// The prefixes the document root binds to the namespaces of
+/// [`INSERTED_PREFIXES`].
+fn root_prefix_bindings(source: &[u8]) -> Vec<&'static str> {
+    let mut reader = quick_xml::Reader::from_reader(source);
+    let mut buffer = Vec::new();
+    loop {
+        match reader.read_event_into(&mut buffer) {
+            Ok(Event::Start(tag) | Event::Empty(tag)) => {
+                let raw = format!("<{}>", String::from_utf8_lossy(&tag));
+                return INSERTED_PREFIXES
+                    .iter()
+                    .filter(|(prefix, uri)| {
+                        find_attribute(&raw, &format!("xmlns:{prefix}"))
+                            .ok()
+                            .flatten()
+                            .is_some_and(|(_, value)| raw.as_bytes().get(value) == Some(*uri))
+                    })
+                    .map(|(prefix, _)| *prefix)
+                    .collect();
+            },
+            Ok(Event::Eof) | Err(_) => return Vec::new(),
+            Ok(_) => buffer.clear(),
+        }
+    }
+}
+
+/// Declare, on the rewritten `tag`, the prefix of every attribute the
+/// rewrite inserted whose namespace the root does not bind (a compact
+/// package drops unused declarations, record 0288).
+fn declare_inserted_prefixes(source: &str, tag: &mut String, declared: &[&str]) -> Result<()> {
+    for (prefix, uri) in INSERTED_PREFIXES {
+        if declared.contains(&prefix) {
+            continue;
+        }
+        let marker = format!(" {prefix}:");
+        let declaration = format!("xmlns:{prefix}");
+        if tag.contains(&marker)
+            && !source.contains(&marker)
+            && find_attribute(tag, &declaration)?.is_none()
+        {
+            let uri =
+                std::str::from_utf8(uri).map_err(|_| invalid("ODI namespace is not UTF-8"))?;
+            *tag = insert_attribute(tag, &declaration, uri)?;
+        }
+    }
+    Ok(())
 }
 
 fn rewrite_changed_attribute(

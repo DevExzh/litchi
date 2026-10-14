@@ -30,16 +30,10 @@
       "supported": true
     },
     "move": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "0282 ODF object-format structure",
-      "reason": "the format's leaf has no such structural operation"
+      "supported": true
     },
     "swap": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "0282 ODF object-format structure",
-      "reason": "the format's leaf has no such structural operation"
+      "supported": true
     },
     "edit": {
       "supported": true
@@ -198,7 +192,7 @@
         "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "stable": [
@@ -386,39 +380,39 @@
   "gaps": [
     {
       "subject": "operation",
-      "verb": "remove",
-      "element": "page",
-      "context": "a drawing page",
-      "code": "unsupported_capability",
-      "followUp": "0282 ODG page removal",
-      "reason": "the ODG leaf has no page removal"
-    },
-    {
-      "subject": "operation",
       "verb": "add",
       "element": "shape",
-      "context": "a shape other than a rectangle, or a positioned (non-append) shape",
+      "context": "a shape other than a text rectangle",
       "code": "unsupported_capability",
       "followUp": "0282 ODG typed shape creation",
-      "reason": "the adapter appends text rectangles; other geometries need typed shape values"
+      "reason": "the adapter adds text rectangles; other geometries need typed shape values"
     },
     {
       "subject": "operation",
       "verb": "move",
       "element": "shape",
-      "context": "pages and shapes",
+      "context": "a shape into another page",
       "code": "unsupported_capability",
-      "followUp": "0282 ODG reordering",
-      "reason": "the ODG leaf has no page or shape reordering"
+      "followUp": "0288 ODG cross-page shape transfer",
+      "reason": "shapes move within their page; a move to another page needs the leaf's dependency-checked shape transfer"
     },
     {
       "subject": "operation",
-      "verb": "set",
-      "element": "drawing",
-      "context": "`/` metadata",
+      "verb": "remove",
+      "element": "page",
+      "context": "a page another page's `draw:page-name` names",
       "code": "unsupported_capability",
-      "followUp": "0282 ODG metadata writes",
-      "reason": "the ODG leaf has no metadata edit (ADR 0034 §7 family pending)"
+      "followUp": "0288 ODG reference rewriting",
+      "reason": "the leaf refuses removing a page a link or thumbnail references rather than leaving it dangling"
+    },
+    {
+      "subject": "operation",
+      "verb": "get",
+      "element": "metadata",
+      "context": "path-read",
+      "code": "unsupported_capability",
+      "followUp": "0288 ODF object metadata node",
+      "reason": "`set(\"/metadata\", ..)` writes meta.xml through the ODF metadata family; the path is set-only, and reads go through File::metadata()"
     },
     {
       "subject": "view",

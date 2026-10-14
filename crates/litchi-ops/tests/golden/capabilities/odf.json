@@ -264,6 +264,15 @@
       "reason": "only MathML token elements hold character data"
     },
     {
+      "subject": "operation",
+      "verb": "get",
+      "element": "metadata",
+      "context": "path-read",
+      "code": "unsupported_capability",
+      "followUp": "0288 ODF object metadata node",
+      "reason": "`set(\"/metadata\", ..)` writes meta.xml through the ODF metadata family; the path is set-only, and reads go through File::metadata()"
+    },
+    {
       "subject": "view",
       "mode": "issues",
       "code": "unsupported_capability",

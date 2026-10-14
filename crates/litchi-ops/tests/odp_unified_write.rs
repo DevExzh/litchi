@@ -269,6 +269,10 @@ fn metadata_reads_and_sets() {
     let error = file
         .set("/metadata", props! { "company" => "Litchi" })
         .unwrap_err();
+    assert_eq!(error.code(), Code::UnsupportedCapability);
+    let error = file
+        .set("/metadata", props! { "nonsense" => "x" })
+        .unwrap_err();
     assert_eq!(error.code(), Code::UnsupportedProperty);
 }
 

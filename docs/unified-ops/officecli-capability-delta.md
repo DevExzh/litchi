@@ -31,14 +31,14 @@ differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `299bb82c87cfef0c27ecfe8bd4fb7df4982635a954c5fa57ac58897900e0e2fa` |
 | golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `73fafb3ba518137725602d97210ce5837886dff848671f143278fd3cb55063e3` |
 | golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `2038cde02828395f020df3d9b9732cc9350ce839bba5bc5aee3089cdd0e81fab` |
-| golden | `crates/litchi-ops/tests/golden/registry/odb.json` | `fef7fd32e70b71e9e2e86ea06ebb97ff932792037c2322b8e9f8e122b46e7529` |
-| golden | `crates/litchi-ops/tests/golden/registry/odc.json` | `04f56ce47c550f083c5e773cad56722ec3e70f0ab469771c413376b66f4ace1c` |
-| golden | `crates/litchi-ops/tests/golden/registry/odf.json` | `85885591939534dac9fa95ae04bdd71e2fe1ccbb55063f3115e3ad2d4c5733b9` |
-| golden | `crates/litchi-ops/tests/golden/registry/odg.json` | `dc4264b9d8d1ba2889382121b7f48c6537878a15db132922b7bd3222c3fa8854` |
+| golden | `crates/litchi-ops/tests/golden/registry/odb.json` | `0453235e155865a3fe31dc4514173f6efdd2fe8f96ffaf90f5a26b628b1e8d37` |
+| golden | `crates/litchi-ops/tests/golden/registry/odc.json` | `05e776b5e0c2e18ff9818b559fc374c50af6d1448a587e673ee37e2f0a8912e9` |
+| golden | `crates/litchi-ops/tests/golden/registry/odf.json` | `4dea6fd9a84402435381507f54fc3e7691aed039323e46431b65c5f029b5ecb7` |
+| golden | `crates/litchi-ops/tests/golden/registry/odg.json` | `6b0ed2d65585fd5309dedbb3f8bc7d861f43a09bd4eca8c318151d0305c9a120` |
 | golden | `crates/litchi-ops/tests/golden/registry/odi.json` | `886ee7e379793fe77e01457c872a630ce9467f7bdacbc6da8c7c6a35b1d713ef` |
 | golden | `crates/litchi-ops/tests/golden/registry/odm.json` | `7c8c5d4a61b73661fe047b7abe392e5942c3d7a529abd740b44b20fb7147de02` |
-| golden | `crates/litchi-ops/tests/golden/registry/odp.json` | `4b97c200a9d8e2b81e4625ba6888add00e49c483d67fed1ac7be39801f668cf8` |
-| golden | `crates/litchi-ops/tests/golden/registry/ods.json` | `0c1b9c65f4c932c9ef36d6f1d61183724b98354c9c1a0d04adaada0505ca1fb4` |
+| golden | `crates/litchi-ops/tests/golden/registry/odp.json` | `ebd7d17a818097117b0343558b54d6d853ccc2850415499d3e76204c337a6124` |
+| golden | `crates/litchi-ops/tests/golden/registry/ods.json` | `fb65bbebcd964b898a5fc2b4863dfa189ef8c53dfbab59e8552c929b190c72e0` |
 | golden | `crates/litchi-ops/tests/golden/registry/odt.json` | `530031295ae44a24667d22c7270cebc1afe59c456466d71014d85fe657180b3a` |
 | golden | `crates/litchi-ops/tests/golden/registry/oth.json` | `b24208bdbf248ce4fdc63b644b214beb2d6d5273921ce5aa5dce7a1ddfbe43ae` |
 | officecli | `schemas/help` (152 files, OfficeCLI commit `dced0d74`) | `0bcd8cae45fabc0c5e45ff99d1994465fb213ac1b8db3f7eadd87339fb40ced4` |
@@ -7854,6 +7854,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | `add` | `table` | `a table definition (columns, keys and types)` | creating a table needs a typed column schema the unified registry does not have yet | 0282 ODB typed table creation |
 | `add` | `column` | `a column definition` | creating a column needs a typed data type the unified registry does not have yet | 0282 ODB typed column creation |
 | `set` | `query` | `the `name` property (renaming a query)` | the leaf has no query rename; remove and add the query instead | 0282 ODB query rename |
+| `get` | `metadata` | `path-read` | `set("/metadata", ..)` writes meta.xml through the ODF metadata family; the path is set-only, and reads go through File::metadata() | 0288 ODF object metadata node |
 
 ## odc
 
@@ -7877,9 +7878,9 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 
 | Verb | Element | Context | Reason | Follow-up |
 |---|---|---|---|---|
-| `set` | `chart` | `the title, subtitle, type and size of the chart` | the leaf rewrites those through a whole typed definition replacement, which the unified adapter does not author yet | 0282 ODC chart definition writes |
-| `add` | `series` | `a new series or axis` | creating a series or an axis needs typed range and class values the unified registry does not have yet | 0282 ODC typed series and axis creation |
-| `set` | `series` | `series ranges, labels and classes` | the leaf replaces a series as a whole typed specification | 0282 ODC series writes |
+| `set` | `chart` | `a chart outside the leaf's lossless typed definition surface` | title, type, size, series and axis writes replace the chart through its typed definition; a producer chart the leaf cannot project losslessly is refused rather than rewritten | 0288 ODC lossless producer definitions |
+| `set` | `series` | `data points, data labels, regressions and series styles` | the unified registry writes a series' ranges, label, class and axis; its data points, labels, regression curves and styles stay as authored | 0288 ODC series detail writes |
+| `get` | `metadata` | `path-read` | `set("/metadata", ..)` writes meta.xml through the ODF metadata family; the path is set-only, and reads go through File::metadata() | 0288 ODF object metadata node |
 
 ## odf
 
@@ -7903,6 +7904,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 |---|---|---|---|---|
 | `add` | `element` | `a new MathML element` | inserting MathML needs a typed element value the unified registry does not have yet | 0282 formula element authoring |
 | `set` | `element` | `the `text` of a layout (non-token) element` | only MathML token elements hold character data | 0282 formula layout text |
+| `get` | `metadata` | `path-read` | `set("/metadata", ..)` writes meta.xml through the ODF metadata family; the path is set-only, and reads go through File::metadata() | 0288 ODF object metadata node |
 
 ## odg
 
@@ -7926,10 +7928,10 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 
 | Verb | Element | Context | Reason | Follow-up |
 |---|---|---|---|---|
-| `remove` | `page` | `a drawing page` | the ODG leaf has no page removal | 0282 ODG page removal |
-| `add` | `shape` | `a shape other than a rectangle, or a positioned (non-append) shape` | the adapter appends text rectangles; other geometries need typed shape values | 0282 ODG typed shape creation |
-| `move` | `shape` | `pages and shapes` | the ODG leaf has no page or shape reordering | 0282 ODG reordering |
-| `set` | `drawing` | ``/` metadata` | the ODG leaf has no metadata edit (ADR 0034 §7 family pending) | 0282 ODG metadata writes |
+| `add` | `shape` | `a shape other than a text rectangle` | the adapter adds text rectangles; other geometries need typed shape values | 0282 ODG typed shape creation |
+| `move` | `shape` | `a shape into another page` | shapes move within their page; a move to another page needs the leaf's dependency-checked shape transfer | 0288 ODG cross-page shape transfer |
+| `remove` | `page` | `a page another page's `draw:page-name` names` | the leaf refuses removing a page a link or thumbnail references rather than leaving it dangling | 0288 ODG reference rewriting |
+| `get` | `metadata` | `path-read` | `set("/metadata", ..)` writes meta.xml through the ODF metadata family; the path is set-only, and reads go through File::metadata() | 0288 ODF object metadata node |
 
 ## odi
 
@@ -8827,7 +8829,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | `remove` | `slide` | `referenced-page` | a slide (or a renamed slide) whose name links, custom shows or other markup reference is refused rather than leaving a dangling reference | M6 ODP reference rewriting |
 | `remove` | `shape` | `referenced-object` | an object whose draw:id or xml:id animations or other markup reference is refused; notes-page objects are not removed | M6 ODP reference rewriting |
 | `get` | `metadata` | `path-read` | `set("/metadata", ..)` writes meta.xml; the path is set-only, and reads go through File::metadata() and the root node's properties | File::metadata(); /metadata node reads with the shared metadata vocabulary |
-| `set` | `presentation` | `extended-metadata` | /metadata writes title, author, subject, description and keywords; the retained meta.xml patcher owns no other field | M6 ODF metadata patcher |
+| `set` | `presentation` | `extended-metadata` | /metadata writes title, subject, description, author, lastModifiedBy, language and keywords through the ODF metadata family; dates, statistics and custom.<name> are refused | 0288 ODF user-defined and statistics metadata |
 
 ## ods
 
@@ -9589,7 +9591,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | `query` | `row` | `header-column-predicates` | ODS does not yet bind row predicate names to header columns | ODS adapter follow-up (record 0277) |
 | `query` | `cell` | `styled-blank-cells` | queries enumerate content cells (a value, text, formula, link or merge span); styled blank padding runs are addressable by coordinate only | ODS adapter follow-up (record 0277) |
 | `get` | `metadata` | `path-read` | `set("/metadata", ..)` writes meta.xml; the path is set-only, and reads go through File::metadata() and the workbook root | ODS adapter follow-up (record 0277) |
-| `set` | `metadata` | `unowned-fields` | the leaf metadata patcher owns title, subject, description, keywords and author; lastModifiedBy, created, modified, language, revision, template and custom.<name> are refused until an ODS metadata family lands | ODS adapter follow-up (record 0277) |
+| `set` | `metadata` | `unowned-fields` | the ODF metadata family (record 0288) writes title, subject, description, author, lastModifiedBy, language and keywords; created, modified, revision, template, statistics and custom.<name> are refused | ODS adapter follow-up (record 0277) |
 | `set` | `cell` | `formatting-properties` | cell formatting is applied by naming an existing cell style (`style`); direct font, fill, border, alignment and number-format keys need an automatic-style author in the unified layer | ODS adapter follow-up (record 0277) |
 | `set` | `cell` | `formula-evaluation` | an authored OpenFormula is stored inert with the cell's cached value (or none); the unified layer does not evaluate ODS formulas | ODS adapter follow-up (record 0277) |
 | `set` | `sheet` | `producer-table-markup` | a rename copies the table fragment under its new name and drops the original; the leaf refuses sheets with formulas, ranges, drawings, forms, protection or other dependency owners, and the writer refuses names a formula or named range still uses | ODS adapter follow-up (record 0277) |

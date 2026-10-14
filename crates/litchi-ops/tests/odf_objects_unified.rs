@@ -111,19 +111,24 @@ mod odg {
             prop(&file, "/page[1]/shape[1]", "x").as_deref(),
             Some("2cm")
         );
-        // Structural writes on a LibreOffice-authored drawing are refused by
-        // the leaf's compact-XML audit (a gap); they run on a fresh drawing.
-        let error = file
+        // Structural writes on a LibreOffice-authored drawing publish as
+        // exact-source splices (record 0288).
+        let producer = file
             .add(
                 "/page[1]",
                 NewNode::new("shape")
                     .prop("x", "1cm")
                     .prop("y", "1cm")
                     .prop("width", "4cm")
-                    .prop("height", "2cm"),
+                    .prop("height", "2cm")
+                    .prop("text", "Producer"),
             )
-            .expect_err("producer whitespace");
-        assert_ne!(error.code(), Code::InternalError);
+            .expect("producer insert");
+        let producer = reopen(&producer.file);
+        assert_eq!(
+            text(&producer, "/page[1]/shape[last()]").as_deref(),
+            Some("Producer")
+        );
         let fresh = create(FileFormat::Odg)
             .unwrap()
             .add("/", NewNode::new("page").prop("name", "One"))
@@ -174,6 +179,195 @@ mod odg {
         assert_ne!(file.to_bytes().unwrap(), before);
     }
 
+    fn page_names(file: &File) -> Vec<String> {
+        let count: usize = prop(file, "/", "pageCount").unwrap().parse().unwrap();
+        (1..=count)
+            .map(|index| prop(file, &format!("/page[{index}]"), "name").unwrap())
+            .collect()
+    }
+
+    #[test]
+    fn adds_removes_moves_and_swaps_producer_pages() {
+        let file = read(THREE_PAGES);
+        let added = file
+            .add(
+                "/",
+                NewNode::new("page")
+                    .prop("name", "first")
+                    .at(litchi_ops::Placement::Start),
+            )
+            .expect("insert page");
+        assert_eq!(added.path.to_string(), "/page[1]");
+        let file = reopen(&added.file);
+        assert_eq!(page_names(&file), ["first", "page1", "page2", "page3"]);
+        let file = file.remove("/page[page2]").expect("remove page");
+        assert_eq!(page_names(&reopen(&file)), ["first", "page1", "page3"]);
+        let file = file
+            .move_to("/page[1]", litchi_ops::Placement::End)
+            .expect("move page");
+        assert_eq!(page_names(&reopen(&file)), ["page1", "page3", "first"]);
+        let file = file.swap("/page[1]", "/page[3]").expect("swap pages");
+        assert_eq!(page_names(&reopen(&file)), ["first", "page3", "page1"]);
+        let added = file
+            .add(
+                "/page[2]",
+                NewNode::new("shape")
+                    .prop("x", "1cm")
+                    .prop("y", "1cm")
+                    .prop("width", "2cm")
+                    .prop("height", "2cm")
+                    .prop("text", "Front")
+                    .at(litchi_ops::Placement::Start),
+            )
+            .expect("insert shape first");
+        assert_eq!(added.path.to_string(), "/page[2]/shape[1]");
+        let file = reopen(&added.file);
+        assert_eq!(text(&file, "/page[2]/shape[1]").as_deref(), Some("Front"));
+        let count: usize = prop(&file, "/page[2]", "shapeCount")
+            .unwrap()
+            .parse()
+            .unwrap();
+        assert!(count >= 2);
+        let file = file
+            .move_to("/page[2]/shape[1]", litchi_ops::Placement::End)
+            .expect("move shape");
+        let file = reopen(&file);
+        assert_eq!(
+            text(&file, &format!("/page[2]/shape[{count}]")).as_deref(),
+            Some("Front")
+        );
+        let error = file
+            .move_to(
+                "/page[2]/shape[1]",
+                litchi_ops::Placement::Into(
+                    litchi_ops::IntoPath::into_path("/page[1]").unwrap(),
+                    None,
+                ),
+            )
+            .expect_err("cross-page move");
+        assert_eq!(error.code(), Code::UnsupportedCapability);
+    }
+
+    /// A drawing with one page of `count` text rectangles.
+    fn drawing_with_shapes(count: usize) -> File {
+        let mut file = create(FileFormat::Odg)
+            .unwrap()
+            .add("/", NewNode::new("page").prop("name", "One"))
+            .unwrap()
+            .file;
+        file = file
+            .edit(|tx| {
+                for index in 0..count {
+                    tx.add(
+                        "/page[1]",
+                        NewNode::new("shape")
+                            .prop("x", "1cm")
+                            .prop("y", "1cm")
+                            .prop("width", "2cm")
+                            .prop("height", "1cm")
+                            .prop("text", format!("s{index}").as_str())
+                            .prop("name", format!("n{index}").as_str()),
+                    )?;
+                }
+                Ok(())
+            })
+            .unwrap()
+            .file;
+        file
+    }
+
+    #[test]
+    fn batches_coalesce_into_one_leaf_commit() {
+        let file = drawing_with_shapes(6);
+        let commit = file
+            .edit(|tx| {
+                for index in 1..=6 {
+                    tx.set(
+                        format!("/page[1]/shape[{index}]").as_str(),
+                        props! { "text" => format!("t{index}").as_str() },
+                    )?;
+                }
+                // Another property family of an already-written shape.
+                tx.set(
+                    "/page[1]/shape[1]",
+                    props! { "name" => "First", "x" => "3cm" },
+                )?;
+                tx.set("/page[1]", props! { "name" => "Renamed" })?;
+                Ok(())
+            })
+            .unwrap();
+        assert_eq!(commit.diagnostics.operations(), 8);
+        assert_eq!(commit.diagnostics.commits(), 1);
+        let after = reopen(&commit.file);
+        assert_eq!(text(&after, "/page[1]/shape[6]").as_deref(), Some("t6"));
+        assert_eq!(
+            prop(&after, "/page[1]/shape[1]", "name").as_deref(),
+            Some("First")
+        );
+        assert_eq!(
+            prop(&after, "/page[1]/shape[1]", "x").as_deref(),
+            Some("3cm")
+        );
+        assert_eq!(prop(&after, "/page[1]", "name").as_deref(), Some("Renamed"));
+        let restored = commit.patch.inverse().apply(&commit.file).unwrap();
+        assert_eq!(restored.to_bytes().unwrap(), file.to_bytes().unwrap());
+
+        // A second write of one shape's text, a second geometry write and a
+        // name-addressed set each see the published result.
+        let commit = file
+            .edit(|tx| {
+                tx.set("/page[1]/shape[1]", props! { "text" => "a", "x" => "4cm" })?;
+                tx.set("/page[1]/shape[1]", props! { "width" => "5cm" })?;
+                tx.set("/page[1]/shape[1]", props! { "text" => "b" })?;
+                tx.set("/page[One]/shape[2]", props! { "text" => "c" })?;
+                Ok(())
+            })
+            .unwrap();
+        assert!(commit.diagnostics.commits() >= 3);
+        let after = reopen(&commit.file);
+        assert_eq!(text(&after, "/page[1]/shape[1]").as_deref(), Some("b"));
+        assert_eq!(
+            prop(&after, "/page[1]/shape[1]", "x").as_deref(),
+            Some("4cm")
+        );
+        assert_eq!(
+            prop(&after, "/page[1]/shape[1]", "width").as_deref(),
+            Some("5cm")
+        );
+        assert_eq!(text(&after, "/page[1]/shape[2]").as_deref(), Some("c"));
+
+        // A failed batch leaves the input unchanged and names the item.
+        let before = file.to_bytes().unwrap();
+        let error = file
+            .edit(|tx| {
+                tx.set("/page[1]/shape[1]", props! { "text" => "ok" })?;
+                tx.set("/page[1]/shape[99]", props! { "text" => "missing" })?;
+                Ok(())
+            })
+            .unwrap_err();
+        assert_eq!(error.item(), Some(1));
+        assert_eq!(file.to_bytes().unwrap(), before);
+    }
+
+    #[test]
+    fn metadata_sets_through_the_family() {
+        let file = read(THREE_PAGES)
+            .set(
+                "/metadata",
+                props! { "title" => "Drawn", "author" => "Ann", "keywords" => "a, b" },
+            )
+            .expect("metadata");
+        let file = reopen(&file);
+        let metadata = file.metadata().unwrap().unwrap();
+        assert_eq!(metadata.title.as_deref(), Some("Drawn"));
+        assert_eq!(prop(&file, "/", "title").as_deref(), Some("Drawn"));
+        assert_eq!(prop(&file, "/", "author").as_deref(), Some("Ann"));
+        let error = file
+            .set("/metadata", props! { "created" => "2020-01-01" })
+            .expect_err("dates are producer-maintained");
+        assert_eq!(error.code(), Code::UnsupportedCapability);
+    }
+
     #[test]
     fn unchanged_values_are_exact_no_ops() {
         let file = read(THREE_PAGES);
@@ -186,9 +380,8 @@ mod odg {
     fn refusals_are_typed() {
         let file = read(THREE_PAGES);
         let error = file
-            .remove("/page[1]")
-            .expect_err("pages are not removable");
-        assert_eq!(error.code(), Code::UnsupportedCapability);
+            .set("/page[1]/layer[1]", props! { "name" => "x" })
+            .expect_err("layers are read-only");
         assert_eq!(error.format(), Some(FileFormat::Odg));
         let error = file
             .set("/page[1]/shape[1]", props! { "shapeType" => "ellipse" })
@@ -226,6 +419,8 @@ mod odg {
                 Verb::Set,
                 Verb::Add,
                 Verb::Remove,
+                Verb::Move,
+                Verb::Swap,
                 Verb::Save,
                 Verb::Create,
             ],
@@ -236,6 +431,7 @@ mod odg {
 #[cfg(feature = "odc")]
 mod odc {
     use super::*;
+    use litchi_ops::NewNode;
 
     const CHART: &str = "odf/odc-producer-evidence/odfdom-created.odc";
 
@@ -267,13 +463,119 @@ mod odc {
             Some("horizontal")
         );
         // This producer chart holds content outside the leaf's lossless
-        // typed surface, so a structural removal is a typed refusal.
+        // typed surface, so a structural removal and a title write are typed
+        // refusals; attribute writes stay exact-span splices (record 0288).
         let error = file.remove("/series[1]").expect_err("lossy typed edit");
         assert_eq!(error.code(), Code::UnsupportedCapability);
         let error = file
             .set("/", props! { "title" => "x" })
-            .expect_err("chart title is a gap");
+            .expect_err("producer chart title");
         assert_eq!(error.code(), Code::UnsupportedCapability);
+        let file = file
+            .set("/", props! { "chartType" => "bar" })
+            .expect("chart class");
+        let file = file
+            .set("/series[1]", props! { "chartType" => "chart:line" })
+            .expect("series class");
+        let file = reopen(&file);
+        assert_eq!(prop(&file, "/", "chartType").as_deref(), Some("chart:bar"));
+        assert_eq!(
+            prop(&file, "/series[1]", "chartType").as_deref(),
+            Some("chart:line")
+        );
+        let unchanged = file
+            .set("/", props! { "chartType" => "chart:bar" })
+            .expect("no-op");
+        assert_eq!(unchanged.to_bytes().unwrap(), file.to_bytes().unwrap());
+    }
+
+    #[test]
+    fn writes_titles_types_series_and_axes_of_a_typed_chart() {
+        let file = create(FileFormat::Odc).expect("create");
+        let file = file
+            .set(
+                "/",
+                props! { "title" => "Sales", "subtitle" => "FY", "chartType" => "bar" },
+            )
+            .expect("chart props");
+        let added = file
+            .add(
+                "/",
+                NewNode::new("axis")
+                    .prop("dimension", "x")
+                    .prop("name", "primary-x")
+                    .prop("categories", "local-table.A2:A5"),
+            )
+            .expect("add x axis");
+        assert_eq!(added.path.to_string(), "/axis[1]");
+        let added = added
+            .file
+            .add(
+                "/",
+                NewNode::new("axis")
+                    .prop("dimension", "y")
+                    .prop("name", "primary-y")
+                    .prop("title", "Units"),
+            )
+            .expect("add y axis");
+        let added = added
+            .file
+            .add(
+                "/",
+                NewNode::new("series")
+                    .prop("values", "local-table.B2:B5")
+                    .prop("label", "local-table.B1")
+                    .prop("axis", "primary-y"),
+            )
+            .expect("add series");
+        assert_eq!(added.path.to_string(), "/series[1]");
+        let file = added
+            .file
+            .set(
+                "/series[1]",
+                props! { "values" => "local-table.C2:C5", "chartType" => "line" },
+            )
+            .expect("series props")
+            .set("/axis[2]", props! { "title" => "Count" })
+            .expect("axis title")
+            .set("/", props! { "width" => "12cm", "height" => "8cm" })
+            .expect("chart size");
+        let file = reopen(&file);
+        assert_eq!(text(&file, "/").as_deref(), Some("Sales"));
+        assert_eq!(prop(&file, "/", "subtitle").as_deref(), Some("FY"));
+        assert_eq!(prop(&file, "/", "chartType").as_deref(), Some("chart:bar"));
+        assert_eq!(prop(&file, "/", "axisCount").as_deref(), Some("2"));
+        assert_eq!(
+            prop(&file, "/series[1]", "values").as_deref(),
+            Some("local-table.C2:C5")
+        );
+        assert_eq!(
+            prop(&file, "/series[1]", "chartType").as_deref(),
+            Some("chart:line")
+        );
+        assert_eq!(prop(&file, "/axis[2]", "title").as_deref(), Some("Count"));
+        assert_eq!(prop(&file, "/", "width").as_deref(), Some("12cm"));
+        assert_eq!(
+            prop(&file, "/axis[1]", "categories").as_deref(),
+            Some("local-table.A2:A5")
+        );
+        let file = file
+            .set("/", props! { "title" => litchi_ops::PropValue::Null })
+            .expect("clear");
+        assert_eq!(prop(&reopen(&file), "/", "title"), None);
+        let file = file.remove("/series[1]").expect("remove series");
+        assert_eq!(
+            prop(&reopen(&file), "/", "seriesCount").as_deref(),
+            Some("0")
+        );
+        let error = file
+            .set("/", props! { "chartType" => "pyramid" })
+            .expect_err("unknown type");
+        assert_eq!(error.code(), Code::InvalidValue);
+        let error = file
+            .add("/", NewNode::new("series").prop("label", "x"))
+            .expect_err("values required");
+        assert_ne!(error.code(), Code::InternalError);
     }
 
     #[test]
@@ -286,6 +588,7 @@ mod odc {
                 Verb::Get,
                 Verb::Query,
                 Verb::Set,
+                Verb::Add,
                 Verb::Remove,
                 Verb::Save,
                 Verb::Create,
@@ -317,12 +620,24 @@ mod odi {
         assert_eq!(prop(&file, "/frame[1]", "name").as_deref(), Some("Logo"));
         assert_eq!(prop(&file, "/frame[1]", "title").as_deref(), Some("Mark"));
         // A fresh image frame has no geometry and its compact content keeps
-        // no `svg` namespace declaration: inserting geometry is refused by
-        // the leaf's readback (a gap), as a typed caller error.
-        let error = file
-            .set("/frame[1]", props! { "width" => "5cm" })
-            .expect_err("no svg namespace");
-        assert_eq!(error.code(), Code::InvalidValue);
+        // no `svg` namespace declaration: the leaf declares it with the
+        // inserted geometry (record 0288).
+        let file = file
+            .set(
+                "/frame[1]",
+                props! { "x" => "1cm", "y" => "2cm", "width" => "5cm", "height" => "3cm" },
+            )
+            .expect("fresh geometry");
+        let file = reopen(&file);
+        assert_eq!(prop(&file, "/frame[1]", "width").as_deref(), Some("5cm"));
+        assert_eq!(prop(&file, "/frame[1]", "y").as_deref(), Some("2cm"));
+        let file = file
+            .set("/frame[1]", props! { "width" => "6cm" })
+            .expect("one geometry value");
+        assert_eq!(
+            prop(&reopen(&file), "/frame[1]", "width").as_deref(),
+            Some("6cm")
+        );
         assert_eq!(
             prop(&file, "/metadata", "title").as_deref(),
             Some("Image title")
@@ -402,6 +717,38 @@ mod odb {
             .set("/query[1]", props! { "name" => "Renamed" })
             .expect_err("query rename is a gap");
         assert_eq!(error.code(), Code::UnsupportedCapability);
+    }
+
+    #[test]
+    fn query_command_batches_coalesce() {
+        let mut file = create(FileFormat::Odb).expect("create");
+        for index in 0..3 {
+            file = file
+                .add(
+                    "/",
+                    NewNode::new("query")
+                        .prop("name", format!("q{index}").as_str())
+                        .prop("command", format!("SELECT {index}").as_str()),
+                )
+                .expect("add query")
+                .file;
+        }
+        let commit = file
+            .edit(|tx| {
+                for index in 1..=3 {
+                    tx.set(
+                        format!("/query[{index}]").as_str(),
+                        props! { "command" => format!("SELECT {index} FROM u").as_str() },
+                    )?;
+                }
+                Ok(())
+            })
+            .unwrap_or_else(|error| panic!("{error} {:?}", std::error::Error::source(&error)));
+        assert_eq!(commit.diagnostics.commits(), 1);
+        assert_eq!(
+            prop(&reopen(&commit.file), "/query[3]", "command").as_deref(),
+            Some("SELECT 3 FROM u")
+        );
     }
 
     #[test]

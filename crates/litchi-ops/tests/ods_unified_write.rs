@@ -342,11 +342,29 @@ fn metadata_is_set_through_meta_xml() {
     assert_eq!(metadata.title.as_deref(), Some("Budget"));
     assert_eq!(metadata.author.as_deref(), Some("Ada"));
     assert_eq!(json(&file, "/")["format"]["title"], "Budget");
+    // The metadata family (record 0288) also writes lastModifiedBy and
+    // language; producer-maintained dates stay refused.
+    let file = file
+        .set(
+            "/metadata",
+            props! { "lastModifiedBy" => "Bea", "language" => "en-GB" },
+        )
+        .must();
+    let metadata = reopen(&file).metadata().must().unwrap();
+    assert_eq!(metadata.last_modified_by.as_deref(), Some("Bea"));
+    // `File::metadata()` does not report `dc:language` (the shared ODF
+    // conversion omits it; record 0288 gap): check the written part.
+    let meta = litchi_odf_common::OwnedPackage::from_bytes(file.to_bytes().must())
+        .unwrap()
+        .get_file("meta.xml")
+        .unwrap();
+    assert!(String::from_utf8_lossy(&meta).contains(">en-GB</dc:language>"));
+    assert_eq!(metadata.author.as_deref(), Some("Ada"));
     let error = file
-        .set("/metadata", props! { "lastModifiedBy" => "x" })
+        .set("/metadata", props! { "created" => "2020-01-01T00:00:00Z" })
         .unwrap_err();
     assert_eq!(error.code(), Code::UnsupportedCapability);
-    assert_eq!(error.property(), Some("lastModifiedBy"));
+    assert_eq!(error.property(), Some("created"));
     let error = file
         .set("/metadata", props! { "nonsense" => "x" })
         .unwrap_err();
