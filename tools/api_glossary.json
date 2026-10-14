@@ -300,6 +300,31 @@
           "name": "write_to_stream",
           "scope": "litchi_docx",
           "replacement": "use write_to"
+        },
+        {
+          "name": "TextNode",
+          "scope": "litchi_docx::document",
+          "replacement": "use document::substitute::{Story, Segment} (record 0285)"
+        },
+        {
+          "name": "TextNodeRewrite",
+          "scope": "litchi_docx::document",
+          "replacement": "use document::substitute::Replacement (record 0285)"
+        },
+        {
+          "name": "ParagraphRewrite",
+          "scope": "litchi_docx::document",
+          "replacement": "use document::substitute::Replacement (record 0285)"
+        },
+        {
+          "name": "text_nodes",
+          "scope": "litchi_docx::document",
+          "replacement": "use Edit::story or Edit::story_within (record 0285)"
+        },
+        {
+          "name": "rewrite_text_nodes",
+          "scope": "litchi_docx::document",
+          "replacement": "use Edit::substitute_formatted (record 0285)"
         }
       ],
       "families": [
@@ -547,6 +572,31 @@
           "name": "write_to_stream",
           "scope": "litchi_docx",
           "replacement": "use write_to"
+        },
+        {
+          "name": "TextNode",
+          "scope": "litchi_docx::document",
+          "replacement": "use document::substitute::{Story, Segment} (record 0285)"
+        },
+        {
+          "name": "TextNodeRewrite",
+          "scope": "litchi_docx::document",
+          "replacement": "use document::substitute::Replacement (record 0285)"
+        },
+        {
+          "name": "ParagraphRewrite",
+          "scope": "litchi_docx::document",
+          "replacement": "use document::substitute::Replacement (record 0285)"
+        },
+        {
+          "name": "text_nodes",
+          "scope": "litchi_docx::document",
+          "replacement": "use Edit::story or Edit::story_within (record 0285)"
+        },
+        {
+          "name": "rewrite_text_nodes",
+          "scope": "litchi_docx::document",
+          "replacement": "use Edit::substitute_formatted (record 0285)"
         }
       ],
       "families": [

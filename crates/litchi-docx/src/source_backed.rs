@@ -1010,6 +1010,20 @@ impl Package {
         crate::comment::Comment::extract_from_payload(&payload)
     }
 
+    /// The header, footer, footnotes, endnotes and comments parts the main
+    /// document relates, in relationship order, each once; only the main
+    /// part's relationships are read (record 0285).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source changed or the main part's
+    /// relationships cannot be read.
+    pub fn story_parts(&self) -> Result<Vec<crate::document::substitute::StoryPart>> {
+        let package = self.source_backed_package()?;
+        let main = package.main_document_part()?;
+        crate::document::story_parts_of(main.rels())
+    }
+
     /// The chart part (a `c:chartSpace` or `cx:chartSpace`) the main
     /// document relates through `relationship_id` — an
     /// [`InlineChart`](crate::chart::InlineChart)'s — or `None` when the main

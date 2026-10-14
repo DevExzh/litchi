@@ -48,14 +48,17 @@ pub mod snapshot {
 
 /// Formatting-preserving text substitution over the text of a story: the
 /// main document, a header, a footer, the notes or the comments
-/// (record 0274).
+/// (records 0274 and 0285). It is the one leaf primitive behind template
+/// merge and find/replace.
 ///
-/// [`Edit::story`] and [`Edit::part_story`] read a [`substitute::Story`];
-/// [`Edit::substitute`] and [`Edit::substitute_part`] apply
-/// [`substitute::Replacement`]s planned over it.
+/// [`Edit::story`], [`Edit::story_within`] and [`Edit::part_story`] read a
+/// [`substitute::Story`]; [`Edit::substitute`], [`Edit::substitute_part`]
+/// and their `_formatted` forms apply [`substitute::Replacement`]s planned
+/// over it.
 pub mod substitute {
     pub use super::transaction::substitute::{
-        Field, FieldKind, OBJECT, Outcome, Paragraph, Replacement, Story,
+        Field, FieldKind, OBJECT, Outcome, Paragraph, Replacement, Segment, Story, StoryKind,
+        StoryPart,
     };
 }
 
@@ -73,6 +76,7 @@ pub mod fields {
 pub use limit::LimitKind;
 pub use owned::{Commit, Edit, HyperlinkTarget, NewChart, NewComment, NewPicture, chart_workbook};
 
+pub(crate) use owned::story_parts_of;
 pub(crate) use transaction::MAX_DOCUMENT_XML_BYTES;
 pub(crate) use transaction::validate_paragraph_text;
 pub(crate) use transaction::{ManagedAdmission, ManagedNamespaceAdmission, ManagedParserAdmission};
@@ -85,11 +89,10 @@ pub use transaction::{
     BodyAnchor, BodyBlock, CompactionPolicy, Composition, CompositionLimits, Diagnostics,
     ElementAnchor, ElementPath, ElementStep, Error, GraphChange, History, HistoryLimits,
     HyperlinkTextReplacement, JoinError, MAX_NEW_TABLE_DIMENSION, MergeChoice, NewParagraph,
-    NewRun, NewTable, Operation, ParagraphHyperlinkAddress, ParagraphRewrite,
-    ParagraphTextReplacement, ParagraphTransfer, Patch, PreparedEdit, Refusal, Result,
-    RevisionAction, RevisionKind, RevisionSelector, RunAnchor, Snapshot, SubEditConflict,
-    SubEditJoinFailure, TableCellAddress, TextNode, TextNodeRewrite, ThreeWayError,
-    ThreeWayMergeFailure, ThreeWayPlan, TransferGraph, TransferRefusal,
+    NewRun, NewTable, Operation, ParagraphHyperlinkAddress, ParagraphTextReplacement,
+    ParagraphTransfer, Patch, PreparedEdit, Refusal, Result, RevisionAction, RevisionKind,
+    RevisionSelector, RunAnchor, Snapshot, SubEditConflict, SubEditJoinFailure, TableCellAddress,
+    ThreeWayError, ThreeWayMergeFailure, ThreeWayPlan, TransferGraph, TransferRefusal,
 };
 
 /// Explicit native identifiers for indexed document blocks.

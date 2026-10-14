@@ -1,14 +1,21 @@
 //! Paired find/replace timing (record 0273): the unified `File::set` with
 //! `find=`/`replace=` against the best hand-written leaf equivalent.
 //!
-//! - DOCX: a body of 10,000 two-run paragraphs. The leaf leg reads each
-//!   paragraph's text nodes (`Edit::text_nodes`), replaces whole-node
-//!   occurrences with `str::replace` and writes every changed paragraph in
-//!   one `Edit::rewrite_text_nodes` call. It knows the fixture never splits
-//!   a match across nodes, so it skips cross-node matching: a lower bound.
+//! - DOCX: a body of 10,000 two-run paragraphs. The leaf leg reads the
+//!   main story (`Edit::story`, the substitution primitive find shares with
+//!   template merge since record 0285), finds `needle` in each text segment
+//!   with `str::match_indices` and writes every match in one
+//!   `Edit::substitute` call. It knows the fixture never splits a match
+//!   across segments, so it skips grouping and cross-segment matching: a
+//!   lower bound.
 //! - PPTX: 1,000 slides with one text box each. The leaf leg reads each
 //!   slide's shape scene, and stages one run-text edit per matching shape,
 //!   knowing each body is one paragraph of one run: a lower bound too.
+//!
+//! - DOCX paragraph scope (record 0285): the same body, `needle` in two
+//!   paragraphs, and a find over the middle one (`/body/p[5001]`). The leaf
+//!   leg reads that paragraph's story (`Edit::story_within`) and substitutes
+//!   its match.
 //!
 //! `M` paragraphs or slides hold the word `needle` (1 or 1,000). Owners are
 //! opened eagerly once; fixture construction and output checks are outside
@@ -40,10 +47,18 @@ fn main() -> Outcome<()> {
         std::env::var("FIND_DOCX_PARAGRAPHS").map_or(Ok(10_000), |value| value.parse())?;
     let slides: usize =
         std::env::var("FIND_PPTX_SLIDES").map_or(Ok(1_000), |value| value.parse())?;
+    // `FIND_BENCH_ONLY=docx-paragraph` runs that case alone (for a
+    // profiler).
+    let only = std::env::var("FIND_BENCH_ONLY").ok();
     let mut cases = Vec::new();
-    for matches in [1, 1_000] {
-        cases.push(docx(paragraphs, matches)?);
-        cases.push(pptx(slides, matches)?);
+    if only.is_none() {
+        for matches in [1, 1_000] {
+            cases.push(docx(paragraphs, matches)?);
+            cases.push(pptx(slides, matches)?);
+        }
+    }
+    if only.as_deref().is_none_or(|only| only == "docx-paragraph") {
+        cases.push(docx_paragraph(paragraphs)?);
     }
     println!(
         "{}",
@@ -61,8 +76,7 @@ fn main() -> Outcome<()> {
 
 #[cfg(all(feature = "docx", feature = "pptx"))]
 fn docx(paragraphs: usize, matches: usize) -> Outcome<serde_json::Value> {
-    use litchi_core::Position;
-    use litchi_docx::document::{ElementPath, ElementStep, ParagraphRewrite, TextNodeRewrite};
+    use litchi_docx::document::substitute::Replacement;
     use litchi_ops::{File, OpenOptions, SourceMode, props};
 
     let bytes = docx_fixture(paragraphs, matches)?;
@@ -73,21 +87,19 @@ fn docx(paragraphs: usize, matches: usize) -> Outcome<serde_json::Value> {
     )?;
     let leaf = || -> Outcome<litchi_docx::Package> {
         let mut edit = package.edit()?;
-        let mut rewrites = Vec::new();
-        for index in 0..paragraphs {
-            let path = ElementPath::new([ElementStep::Paragraph(Position::new(index))]);
-            let nodes = edit.text_nodes(&path)?;
-            let slots: Vec<TextNodeRewrite> = nodes
-                .iter()
-                .enumerate()
-                .filter(|(_, node)| node.text.contains("needle"))
-                .map(|(slot, node)| TextNodeRewrite::new(slot, node.text.replace("needle", "pin")))
-                .collect();
-            if !slots.is_empty() {
-                rewrites.push(ParagraphRewrite::new(path, slots));
+        let story = edit.story()?;
+        let mut replacements = Vec::new();
+        for (index, paragraph) in story.paragraphs().iter().enumerate() {
+            let text = paragraph.text();
+            for segment in paragraph.segments() {
+                let range = segment.range();
+                for (at, _) in text[range.clone()].match_indices("needle") {
+                    let start = range.start + at;
+                    replacements.push(Replacement::new(index, start..start + 6, "pin"));
+                }
             }
         }
-        edit.rewrite_text_nodes(&rewrites)?;
+        edit.substitute(&story, &replacements)?;
         Ok(edit.commit()?.into_package())
     };
     let unified = || -> Outcome<File> {
@@ -104,6 +116,68 @@ fn docx(paragraphs: usize, matches: usize) -> Outcome<serde_json::Value> {
         "docx",
         paragraphs,
         matches,
+        bytes.len(),
+        &mut || {
+            black_box(leaf()?);
+            Ok(())
+        },
+        &mut || {
+            black_box(unified()?);
+            Ok(())
+        },
+    )
+}
+
+/// A find scoped to one paragraph in the middle of the body.
+#[cfg(all(feature = "docx", feature = "pptx"))]
+fn docx_paragraph(paragraphs: usize) -> Outcome<serde_json::Value> {
+    use litchi_core::Position;
+    use litchi_docx::document::substitute::Replacement;
+    use litchi_docx::document::{ElementPath, ElementStep};
+    use litchi_ops::{File, OpenOptions, SourceMode, props};
+
+    let bytes = docx_fixture(paragraphs, 2)?;
+    let target = paragraphs / 2;
+    let package = litchi_docx::Package::from_bytes(&bytes)?;
+    let file = litchi_ops::open_bytes_with(
+        bytes.clone(),
+        &OpenOptions::new().source_mode(SourceMode::Eager),
+    )?;
+    let leaf = || -> Outcome<litchi_docx::Package> {
+        let mut edit = package.edit()?;
+        let path = ElementPath::new([ElementStep::Paragraph(Position::new(target))]);
+        let story = edit.story_within(&[path])?;
+        let mut replacements = Vec::new();
+        for (index, paragraph) in story.paragraphs().iter().enumerate() {
+            let text = paragraph.text();
+            for segment in paragraph.segments() {
+                let range = segment.range();
+                for (at, _) in text[range.clone()].match_indices("needle") {
+                    let start = range.start + at;
+                    replacements.push(Replacement::new(index, start..start + 6, "pin"));
+                }
+            }
+        }
+        edit.substitute(&story, &replacements)?;
+        Ok(edit.commit()?.into_package())
+    };
+    let path = format!("/body/p[{}]", target + 1);
+    let unified = || -> Outcome<File> {
+        Ok(file.set(
+            path.as_str(),
+            props! { "find" => "needle", "replace" => "pin" },
+        )?)
+    };
+    let mut leaf_package = leaf()?;
+    if leaf_package.document()?.text()?.matches("pin").count() != 1
+        || leaf_package.to_bytes()? != unified()?.to_bytes()?
+    {
+        return Err("DOCX paragraph scope: the legs disagree".into());
+    }
+    paired(
+        "docx-paragraph",
+        1,
+        1,
         bytes.len(),
         &mut || {
             black_box(leaf()?);

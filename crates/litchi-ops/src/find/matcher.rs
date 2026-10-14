@@ -23,7 +23,7 @@ impl<'p> Matcher<'p> {
     /// Whether `text` may hold a match: the same search without the
     /// whole-word check, so a `false` is exact and a `true` may not be.
     /// Adapters use it to skip containers before decoding them.
-    #[cfg(feature = "pptx")]
+    #[cfg(any(feature = "docx", feature = "pptx"))]
     pub(crate) fn may_match(&self, text: &str) -> bool {
         self.candidate(text, 0).is_some()
     }

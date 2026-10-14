@@ -277,6 +277,9 @@ impl<'a> Row<'a> {
     }
 }
 
+/// The transitional DrawingML main namespace.
+const DRAWINGML_MAIN: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/main";
+
 /// A borrowed table cell.
 #[derive(Debug, Clone, Copy)]
 pub struct Cell<'a> {
@@ -301,6 +304,93 @@ impl<'a> Cell<'a> {
     /// Returns an error if the operation fails.
     pub fn text(self) -> Result<String> {
         extract_text(self.xml()?, self.context)
+    }
+
+    /// The cell's text body (`a:txBody`) with its local properties, read
+    /// as a shape's text body is; `None` for a cell without one. Paragraph
+    /// and run positions count as [`crate::opened::TextTarget::CellRun`]
+    /// addresses them (record 0285).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed cell XML or a text body the reader
+    /// refuses.
+    pub fn text_body(self) -> Result<Option<litchi_drawingml::text::body::Body>> {
+        let xml = self.xml()?;
+        let mut reader = quick_xml::Reader::from_reader(xml);
+        let origin = ReaderOrigin::of(xml);
+        let mut depth = 0usize;
+        let mut body: Option<(usize, usize)> = None;
+        loop {
+            let start = origin
+                .offset(reader.buffer_position())
+                .ok_or_else(|| invalid("table cell offset overflows usize"))?;
+            let event = reader
+                .read_event()
+                .map_err(|_| invalid("malformed table cell XML"))?;
+            match event {
+                Event::Start(element) => {
+                    if depth == 1 && element.local_name().as_ref() == b"txBody" {
+                        if body.is_some() {
+                            return Err(invalid("table cell holds two text bodies"));
+                        }
+                        body = Some((start, 0));
+                    }
+                    depth += 1;
+                },
+                Event::Empty(element) => {
+                    if depth == 1 && element.local_name().as_ref() == b"txBody" {
+                        return Ok(None);
+                    }
+                },
+                Event::End(_) => {
+                    depth = depth
+                        .checked_sub(1)
+                        .ok_or_else(|| invalid("malformed table cell XML"))?;
+                    if depth == 1
+                        && let Some((start, 0)) = body
+                    {
+                        let end = origin
+                            .offset(reader.buffer_position())
+                            .ok_or_else(|| invalid("table cell offset overflows usize"))?;
+                        body = Some((start, end));
+                    }
+                },
+                Event::Eof => break,
+                _ => {},
+            }
+        }
+        let Some((start, end)) = body.filter(|(_, end)| *end > 0) else {
+            return Ok(None);
+        };
+        let scope = match self.context {
+            Some(context) => context.child(start)?.resolver()?,
+            // A fragment cut from its part: its own prefix is DrawingML's,
+            // as the cell text reader assumes.
+            None => {
+                let mut resolver = NamespaceResolver::default();
+                let tag = &xml[start..end];
+                let name_end = tag
+                    .iter()
+                    .position(|byte| matches!(byte, b' ' | b'>' | b'/' | b'\t' | b'\n' | b'\r'))
+                    .unwrap_or(tag.len());
+                let name = &tag[1.min(name_end)..name_end];
+                let declaration = match name.iter().position(|byte| *byte == b':') {
+                    Some(colon) => PrefixDeclaration::Named(&name[..colon]),
+                    None => PrefixDeclaration::Default,
+                };
+                resolver
+                    .add(declaration, Namespace(DRAWINGML_MAIN))
+                    .map_err(|_| invalid("table cell namespace scope is invalid"))?;
+                resolver
+            },
+        };
+        let body = litchi_drawingml::text::body::reader::read_with_options(
+            &xml[start..end],
+            scope,
+            litchi_drawingml::text::body::reader::Limits::DEFAULT,
+        )?;
+        Ok(Some(body))
     }
 
     /// The cell's local solid RGB fill (`a:tcPr/a:solidFill/a:srgbClr`).

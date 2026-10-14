@@ -435,6 +435,32 @@ impl Pptx {
         })
     }
 
+    /// The shape scene of the selected slide's notes page, when it has one
+    /// (record 0285: find reads its shapes' text bodies).
+    pub(super) fn slide_notes_scene(&self, position: usize) -> Result<Option<Scene>> {
+        self.finish(|| match &self.0.owner {
+            PptxOwner::Source(presentation) => {
+                self.check_owner()?;
+                if self.0.revision.is_some() {
+                    let Some(slide) = self.revised_slide(position)? else {
+                        return Ok(None);
+                    };
+                    return Ok(slide.notes()?.map(|notes| notes.scene().clone()));
+                }
+                let Some(slide) = presentation.slide(position) else {
+                    return Ok(None);
+                };
+                Ok(slide.notes()?.map(|notes| notes.scene().clone()))
+            },
+            PptxOwner::Eager(package) => {
+                let Some(slide) = super::eager_slide(self, package, position)? else {
+                    return Ok(None);
+                };
+                Ok(slide.notes()?.map(|notes| notes.scene().clone()))
+            },
+        })
+    }
+
     /// The chart-space XML a slide relates through `relationship_id` (a
     /// chart frame's payload), or `None` when the slide has no such chart
     /// (record 0270). Only that chart part is read.

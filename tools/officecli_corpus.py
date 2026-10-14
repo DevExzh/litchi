@@ -406,9 +406,10 @@ RULES: list[Rule] = [
         "G3", "gap", "Find and replace on `set`",
         "`set --find T --replace R` (or `--prop find=`/`replace=`) rewrites matching text",
         "the CLI maps the options to `find=`/`replace=` props (record 0265); record 0273 "
-        "integrates the engine for DOCX, PPTX, XLSX and RTF; regular expressions "
-        "(`regex=true`, record 0010 Q3), tracked-change finds and the other formats "
-        "remain refused",
+        "integrates the engine for DOCX, PPTX, XLSX and RTF, and record 0285 extends it "
+        "to DOCX headers, footers, notes, comments and field results and PPTX table cells "
+        "and notes; regular expressions (`regex=true`, record 0010 Q3), tracked-change "
+        "finds, XLSX rich-text cells and the other formats remain refused",
         lambda c, e: c.verb == "set" and c.detail.lower() in ("find", "replace", "regex"),
     ),
     When(

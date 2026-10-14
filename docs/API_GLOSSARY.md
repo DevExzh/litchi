@@ -2049,7 +2049,7 @@ owning package once for these writes (`Docx` keeps the promotion).
 | `File::{merge, merge_with_limits}`, `transaction::Edit::merge` | adopted (0274) |
 | `merge::{Record, Data, Options, Missing, Summary, Error}` | adopted (0274) |
 | `capabilities::Verb::Merge` | adopted (0274) |
-| `litchi_docx::document::Edit::{story, substitute}`; `Edit<Package>::{story_parts, part_story, substitute_part}` | adopted (0274) |
+| `litchi_docx::document::Edit::{story, substitute}`; `Edit<Package>::{story_parts, part_story, substitute_part}` | adopted (0274); `story_parts` returns `StoryPart`s (0285) |
 | `litchi_docx::document::substitute::{Story, Paragraph, Field, FieldKind, Replacement, Outcome, OBJECT}` | adopted (0274) |
 | CLI `litchi merge`, Python `File.merge` | adopted (0274) |
 
@@ -2120,11 +2120,40 @@ copy of the run's properties); XLSX worksheets report rich-text cells
 | `find`, `replace`, `matchCase`, `wholeWord`, `regex` properties of `set` | adopted (0273) |
 | `Applied::matched` | adopted (0273) |
 | `capabilities::Verb::Replace` | adopted (0273) |
-| `litchi_docx::document::{TextNode, TextNodeRewrite, ParagraphRewrite}`, `Edit::{text_nodes, rewrite_text_nodes}` (snapshot and package edits) | adopted (0273) |
+| `litchi_docx::document::{TextNode, TextNodeRewrite, ParagraphRewrite}`, `Edit::{text_nodes, rewrite_text_nodes}` (snapshot and package edits) | removed and banned (0285): `document::substitute` is the one primitive |
 | `litchi_pptx::opened::TextTarget::RunSpan` | adopted (0273) |
 | `litchi_xlsx::Worksheet::has_rich_text` | adopted (0273) |
 
 See [0273](unified-ops/0273-find-replace.md).
+
+## Find/replace and template merge on one primitive (record 0285)
+
+Find/replace and template merge share one DOCX leaf primitive, the story
+substitution of `litchi_docx::document::substitute`: a `Story` lists each
+paragraph's text with its `Segment`s (one per `w:t`, grouped where markup
+separates text) and fields; `Replacement`s rewrite ranges of it, optionally
+`formatted` (the new text, or a `keep` range's text, split into runs of its
+own that a run-property closure formats). Field results are text (OfficeCLI's
+find reads them), instructions are fixed content, and field state is followed
+across paragraphs. `Edit::story_within` reads only the paragraphs a set of
+element paths names; `Edit::substitute_formatted` and
+`Edit<Package>::substitute_part_formatted` apply formatted replacements;
+`Edit<Package>::story_parts` lists `StoryPart`s (`name`, `kind`:
+`StoryKind::{Header, Footer, Footnotes, Endnotes, Comments}`). The
+record-0273 text-node API is removed. PPTX find and merge share one run
+rewrite and one text-body walk in `litchi-ops`; PPTX text edits address
+table-cell runs (`opened::TextTarget::{CellRun, CellRunSpan}`, read through
+`table::Cell::text_body`) and notes-page shapes
+(`opened::Edit::set_notes_text_properties`).
+
+| Name | Status |
+|---|---|
+| `litchi_docx::document::Edit::{story_within, substitute_formatted}` (snapshot and package edits); `Edit<Package>::substitute_part_formatted`; `litchi_docx::source_backed::Package::story_parts` | adopted (0285) |
+| `litchi_docx::document::substitute::{Segment, StoryKind, StoryPart}`; `Replacement::{keep, formatted, text}`; `Outcome::formatted`; `Paragraph::{segments, item}` | adopted (0285) |
+| `litchi_pptx::opened::TextTarget::{CellRun, CellRunSpan}`, `litchi_pptx::table::Cell::text_body` | adopted (0285) |
+| `litchi_pptx::opened::Edit::set_notes_text_properties` | adopted (0285) |
+
+See [0285](unified-ops/0285-find-merge-consolidation.md).
 
 ## Typed SmartArt CRUD (record 0284)
 
