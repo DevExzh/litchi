@@ -424,7 +424,46 @@ pub(crate) fn validate(arg: &PathArg<'_>) -> Result<()> {
             ));
         }
     }
+    // Writing the canonical spelling is most of a short path's admission
+    // cost (record 0280); a path whose spelling cannot reach the limit skips
+    // it.
+    if spelling_bound(arg.path()) <= limits::MAX_INPUT_BYTES {
+        return Ok(());
+    }
     canonical_bound(arg.path())
+}
+
+/// An upper bound of the canonical spelling's length of an admitted path
+/// (positions, `last()` and single conditions only). Quoting at most doubles
+/// a name, key or value and adds its quotes; the other parts have a fixed
+/// width.
+fn spelling_bound(path: &Path<'_>) -> usize {
+    let quoted = |text: &str| text.len().saturating_mul(2).saturating_add(3);
+    path.steps().iter().fold(1usize, |total, step| {
+        let predicates = step.predicates().iter().fold(0usize, |sum, predicate| {
+            let width = match predicate {
+                // `[` + at most 39 digits (u128) + `]`.
+                Predicate::Index(_) => 41,
+                Predicate::Last => 8,
+                Predicate::Filter(Expr::Condition(Condition::Exists(key))) => {
+                    quoted(key.name()).saturating_add(3)
+                },
+                Predicate::Filter(Expr::Condition(Condition::Compare { key, value, .. })) => {
+                    quoted(key.name())
+                        .saturating_add(quoted(value.as_str()))
+                        .saturating_add(8)
+                },
+                // Rejected before this point, or a future form: keep the
+                // exact check.
+                _ => usize::MAX,
+            };
+            sum.saturating_add(width)
+        });
+        total
+            .saturating_add(1)
+            .saturating_add(quoted(step.name()))
+            .saturating_add(predicates)
+    })
 }
 
 fn canonical_bound(path: &Path<'_>) -> Result<()> {
@@ -446,4 +485,46 @@ fn canonical_bound(path: &Path<'_>) -> Result<()> {
             "canonical path exceeds the input byte limit",
         )
     })
+}
+
+#[cfg(test)]
+mod spelling_tests {
+    use litchi_core::selector::Path;
+
+    use super::spelling_bound;
+
+    /// The admission shortcut's bound never undercounts the canonical
+    /// spelling (record 0280).
+    #[test]
+    fn the_spelling_bound_covers_the_canonical_spelling() {
+        let names = ["p", "Sheet 1", "a/b", "\"q\"", "x\\y]", "Ünïcødé", ""];
+        let mut checked = 0;
+        for name in names {
+            for predicate in [
+                "",
+                "[3]",
+                "[last()]",
+                "[@id=\"a\\\"b\"]",
+                "[style=Heading1]",
+                "[@paraId]",
+                "[\"Full Name\"=\"x/y\"]",
+                "[184467440737095516]",
+            ] {
+                let quoted = name.replace('\\', "\\\\").replace('"', "\\\"");
+                let text = format!("/body/\"{quoted}\"{predicate}/r[2]");
+                let Ok(path) = Path::parse(&text) else {
+                    continue;
+                };
+                let spelling = path.to_string();
+                assert!(
+                    spelling_bound(&path) >= spelling.len(),
+                    "{text}: {} < {}",
+                    spelling_bound(&path),
+                    spelling.len()
+                );
+                checked += 1;
+            }
+        }
+        assert!(checked > 30);
+    }
 }

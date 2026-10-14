@@ -130,6 +130,7 @@ impl Pptx {
             ooxml_limits: self.0.ooxml_limits,
             eager_catalog: OnceLock::new(),
             masters: OnceLock::new(),
+            related: super::owner::Related::default(),
             scenes: Arc::clone(&self.0.scenes),
             metadata_package: OnceLock::new(),
             promotion: OnceLock::new(),

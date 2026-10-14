@@ -464,3 +464,119 @@ fn repeated_header_kinds_edit_only_the_addressable_story() {
     );
     assert_eq!(source.to_bytes().unwrap(), input);
 }
+
+/// Three paragraphs with three, one and two pictures.
+fn pictures_input() -> Vec<u8> {
+    let pict = format!(r"{{\pict\pngblip {PNG}}}");
+    format!(
+        r"{{\rtf1\ansi\pard A{pict}B{pict}C{pict}\par\pard D{pict}\par\pard E{pict}F{pict}\par}}"
+    )
+    .into_bytes()
+}
+
+/// Consecutive direct picture removals inside one edit publish one native
+/// removal with the bytes, and the history, of the same removals made one
+/// call at a time (record 0280).
+#[test]
+fn direct_picture_removals_coalesce_into_one_commit() {
+    let source = open_bytes(pictures_input()).unwrap();
+    let paths = [
+        "/body/p[1]/picture[2]",
+        "/body/p[1]/picture[1]",
+        "/body/p[3]/picture[2]",
+        "/body/p[1]/picture[1]",
+        "/body/p[2]/image[1]",
+    ];
+    let mut sequential = source.clone();
+    for path in paths {
+        sequential = sequential.remove(path).unwrap();
+    }
+    let commit = source
+        .edit(|edit| {
+            for path in paths {
+                edit.remove(path)?;
+            }
+            Ok(())
+        })
+        .unwrap();
+    assert_eq!(commit.diagnostics.commits(), 1);
+    assert_eq!(commit.diagnostics.operations(), paths.len());
+    assert_eq!(
+        commit.file.to_bytes().unwrap(),
+        sequential.to_bytes().unwrap()
+    );
+    assert_eq!(commit.file.query("picture").unwrap().count(), 1);
+    let undone = commit.patch.inverse().apply(&commit.file).unwrap();
+    assert_eq!(undone.to_bytes().unwrap(), pictures_input());
+}
+
+/// A read and a removal the run cannot place (a query) each close the run;
+/// a missing picture is reported for its own command.
+#[test]
+fn picture_removal_runs_close_at_barriers_and_attribute_errors() {
+    let source = open_bytes(pictures_input()).unwrap();
+    let commit = source
+        .edit(|edit| {
+            edit.remove("/body/p[1]/picture[1]")?;
+            assert_eq!(
+                edit.get("/body/p[1]")?.view().text()?.as_deref(),
+                Some("ABC")
+            );
+            edit.remove("/body/p[1]/picture[1]")?;
+            edit.remove(scoped("picture[1]"))?;
+            edit.remove("/body/p[3]/picture[1]")?;
+            Ok(())
+        })
+        .unwrap();
+    assert_eq!(commit.diagnostics.commits(), 4);
+    let mut sequential = source.clone();
+    sequential = sequential.remove("/body/p[1]/picture[1]").unwrap();
+    sequential = sequential.remove("/body/p[1]/picture[1]").unwrap();
+    sequential = sequential.remove(scoped("picture[1]")).unwrap();
+    sequential = sequential.remove("/body/p[3]/picture[1]").unwrap();
+    assert_eq!(
+        commit.file.to_bytes().unwrap(),
+        sequential.to_bytes().unwrap()
+    );
+
+    let error = source
+        .edit(|edit| {
+            edit.remove("/body/p[2]/picture[1]")?;
+            edit.remove("/body/p[2]/picture[1]")?;
+            Ok(())
+        })
+        .unwrap_err();
+    assert_eq!(error.item(), Some(1));
+    assert_eq!(
+        error.code(),
+        source.remove("/body/p[2]/picture[2]").unwrap_err().code()
+    );
+}
+
+/// More removals than one native removal accepts publish in several
+/// commits with the sequential result.
+#[test]
+fn picture_removal_runs_split_at_the_native_cap() {
+    let pict = format!(r"{{\pict\pngblip {PNG}}}");
+    let body: String = (0..70).map(|_| pict.as_str()).collect();
+    let input = format!(r"{{\rtf1\ansi\pard X{body}\par}}").into_bytes();
+    let source = open_bytes(input).unwrap();
+    let commit = source
+        .edit(|edit| {
+            for _ in 0..70 {
+                edit.remove("/body/p[1]/picture[1]")?;
+            }
+            Ok(())
+        })
+        .unwrap();
+    assert_eq!(commit.diagnostics.commits(), 2);
+    assert_eq!(commit.file.query("picture").unwrap().count(), 0);
+    let mut sequential = source.clone();
+    for _ in 0..70 {
+        sequential = sequential.remove("/body/p[1]/picture[1]").unwrap();
+    }
+    assert_eq!(
+        commit.file.to_bytes().unwrap(),
+        sequential.to_bytes().unwrap()
+    );
+}

@@ -71,8 +71,9 @@ pub struct Plan<'q> {
     /// table column has the same name.
     pub(crate) collisions: Vec<Cow<'q, str>>,
     /// For each kind ordinal, the kinds that can occur below it (the
-    /// transitive closure of the spec's child lists): the pruning table.
-    pub(crate) reach: Vec<u128>,
+    /// transitive closure of the spec's child lists): the pruning table,
+    /// computed once per spec table (record 0280).
+    pub(crate) reach: &'static [u128],
     /// The subject kinds of the top-level alternatives.
     pub(crate) wanted: u128,
     /// The kinds whose direct children `*` selects without a scope.

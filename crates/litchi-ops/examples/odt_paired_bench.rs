@@ -7,6 +7,9 @@
 //!   (the body index is built inside the clock on both sides);
 //! - `query_all`: every paragraph's text from a warm handle (leaf: the body
 //!   index walk; unified: `query("p")` with a path per match);
+//! - `query_all_owned` (record 0280): the same unified leg against a fair
+//!   leaf equivalent that also keeps each match's handle and positional
+//!   address;
 //! - `single_set`: replace one mid-document paragraph's text and commit;
 //! - `batch_bold_N`: set bold on N paragraphs (leaf: one `Edit` with N
 //!   `set_text_properties`; unified: one `File::edit` with N direct-path
@@ -157,6 +160,50 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
         );
         report("query_all", paragraphs, result);
+
+        // Record 0280: the fair leaf equivalent of the same query. Each
+        // match is kept as a retainable handle with its positional address
+        // (the parent and the ordinal among its paragraph siblings), which
+        // is what a unified node and its path carry.
+        let result = paired(
+            || {
+                let body = document.body().expect("body");
+                let mut total = 0usize;
+                let mut ordinals: Vec<(Option<litchi_odt::body::NodeId>, u32)> = Vec::new();
+                for node in body.nodes() {
+                    if node.kind() == litchi_odt::body::Kind::Paragraph {
+                        total += node.text().expect("text").len();
+                        let parent = node.parent().map(|parent| parent.id());
+                        let ordinal = match ordinals.iter_mut().find(|(at, _)| *at == parent) {
+                            Some((_, count)) => {
+                                *count += 1;
+                                *count
+                            },
+                            None => {
+                                ordinals.push((parent, 1));
+                                1
+                            },
+                        };
+                        black_box((node, parent, ordinal));
+                    }
+                }
+                black_box(total);
+            },
+            || {
+                let mut total = 0usize;
+                for node in file.query("p").expect("query") {
+                    let node = node.expect("node");
+                    total += node
+                        .view()
+                        .text()
+                        .expect("text")
+                        .map_or(0, |text| text.len());
+                    black_box(node.path());
+                }
+                black_box(total);
+            },
+        );
+        report("query_all_owned", paragraphs, result);
 
         // single set
         let middle = paragraphs / 2;

@@ -221,3 +221,55 @@ fn writing_through_an_independent_handle_changes_the_version() {
     assert_eq!(after.revision(), before.revision() + 1);
     assert_eq!(source.version().expect("stable changed version"), after);
 }
+
+/// The lock-free fast path (record 0280): readers on many threads observe
+/// every change on their next call, each thread's revisions never go back,
+/// and an unchanged file keeps its revision.
+#[test]
+fn concurrent_version_checks_observe_each_change_and_stay_monotonic() {
+    const READERS: usize = 4;
+    const CHANGES: usize = 50;
+    let directory = tempdir().expect("temporary directory");
+    let path = directory.path().join("source.bin");
+    fs::write(&path, b"x").expect("write source");
+    let source = FileSource::open(&path).expect("open source");
+    let start = source.version().expect("initial version");
+    let barrier = Arc::new(Barrier::new(READERS + 1));
+    let done = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let readers: Vec<_> = (0..READERS)
+        .map(|_| {
+            let (source, barrier, done) = (source.clone(), Arc::clone(&barrier), Arc::clone(&done));
+            thread::spawn(move || {
+                barrier.wait();
+                let mut last = 0;
+                while !done.load(std::sync::atomic::Ordering::Acquire) {
+                    let version = source.version().expect("version");
+                    assert!(version.revision() >= last, "a revision went back");
+                    last = version.revision();
+                }
+                last
+            })
+        })
+        .collect();
+    barrier.wait();
+    let mut writer = OpenOptions::new()
+        .append(true)
+        .open(&path)
+        .expect("open writer");
+    let mut seen = start.revision();
+    for _ in 0..CHANGES {
+        writer.write_all(b"y").expect("append");
+        // The writer's own next check sees the change, whoever published it.
+        let version = source.version().expect("changed version");
+        assert!(version.revision() > seen, "a change was not observed");
+        seen = version.revision();
+    }
+    done.store(true, std::sync::atomic::Ordering::Release);
+    for reader in readers {
+        assert!(reader.join().expect("reader") <= seen);
+    }
+    assert_eq!(
+        source.version().expect("stable"),
+        source.version().expect("stable")
+    );
+}

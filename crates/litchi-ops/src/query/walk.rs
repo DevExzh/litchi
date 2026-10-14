@@ -664,7 +664,10 @@ where
             let ordinal = self.bump(kind);
             let depth = self.state.frames.len();
             let verdict = self.visit(&node, kind, ordinal, depth)?;
-            let descend = self.descend(kind);
+            let descend = self.descend(kind) && {
+                let kinds = self.relevant(self.state.interest);
+                !self.nav.childless(&node, KindSet::from_bits(kinds))
+            };
             match verdict {
                 Verdict::No => {
                     if descend {

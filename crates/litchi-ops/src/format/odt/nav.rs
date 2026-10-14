@@ -213,6 +213,19 @@ impl<'f> Inspect<'f> for Nav<'f> {
         crate::node::Project::format(node)
     }
 
+    fn childless(&self, node: &Node<'f>, kinds: KindSet<Kind>) -> bool {
+        // A body element none of whose child elements projects to one of
+        // `kinds` lists no such children (record 0280): a paragraph of runs
+        // when the walk looks for paragraphs. Every other node is entered.
+        match node.target {
+            Target::Body(body, id) => body.node(id).is_some_and(|node| {
+                node.children()
+                    .all(|child| Kind::of(child.kind()).is_none_or(|kind| !kinds.contains(kind)))
+            }),
+            _ => false,
+        }
+    }
+
     fn write_step(
         &self,
         node: &Node<'f>,
