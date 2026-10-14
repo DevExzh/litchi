@@ -476,6 +476,14 @@ Cut from `80e24f8745`:
 - `charts-docx` (0283): DOCX charts, chartex types and chart set coverage.
 - `smartart` (0284): typed SmartArt CRUD (v1 scope).
 
+- Merged `smartart` (0284):
+  - PPTX `smartart` and nested `node` elements with add/get/query/set/remove;
+  - leaf `diagram::authoring` (7 layouts, deterministic parts including Litchi's own drawing) and `diagram::edit`;
+  - Litchi-made SmartArt is regenerated whole. Other producers' SmartArt takes in-place text edits (drawing patched or dropped); node add/remove there is refused until `layout` rebuilds it.
+  - Checked in LibreOffice 26.2.6.3; 1.00–1.02× the native calls.
+  - Open: DOCX (0284a), XLSX, node formatting; PowerPoint not verified.
+- Environment: a session restart wiped `/tmp`, which held the gate scripts and `TMPDIR`. Gate scripts now live in the session scratchpad and create their `TMPDIR`.
+
 Not dispatched: iWork M6. It waits for owner decisions D1/D2, and the iWork crates belong to their owners.
 
 Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-pptx-w4` 9474e2b6ce, `uo/m2-l-xlsb-w1` 876588a23c, `uo/m1-r4-perf` 012fd509ff.
