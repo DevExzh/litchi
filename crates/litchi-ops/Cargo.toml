@@ -155,3 +155,8 @@ required-features = ["docx"]
 [[example]]
 name              = "find_replace_bench"
 required-features = ["docx", "pptx"]
+
+# Paired leaf-vs-unified field refresh measurements (record 0279).
+[[example]]
+name              = "refresh_bench"
+required-features = ["docx", "xlsx", "eval"]

@@ -186,10 +186,6 @@ pub(crate) fn plan(
 ) -> Result<(Vec<Update>, Summary)> {
     let fields = index.fields();
     let paragraphs = index.paragraphs();
-    let instructions: Vec<Instruction> = fields
-        .iter()
-        .map(|field| Instruction::parse(field.instruction()))
-        .collect();
     let mut summary = Summary::default();
     let mut updates: Vec<Update> = Vec::new();
     let mut staged = 0usize;
@@ -220,8 +216,8 @@ pub(crate) fn plan(
     };
     // Paragraphs inside a table of contents' result are not headings.
     let mut in_toc = vec![false; paragraphs.len()];
-    for (field, instruction) in fields.iter().zip(&instructions) {
-        if instruction.kind == "TOC" {
+    for field in fields {
+        if first_word_is(field.instruction(), "TOC") {
             let (first, last) = field.paragraphs();
             for flag in &mut in_toc[first..=last.min(paragraphs.len() - 1)] {
                 *flag = true;
@@ -249,7 +245,7 @@ pub(crate) fn plan(
     let mut rebuilt: BTreeSet<usize> = BTreeSet::new();
     let mut seq: HashMap<String, (u64, bool)> = HashMap::new();
     let width = index.text_width().unwrap_or(DEFAULT_TEXT_WIDTH);
-    for (position, (field, instruction)) in fields.iter().zip(&instructions).enumerate() {
+    for (position, field) in fields.iter().enumerate() {
         // A field under a rebuilt table of contents is replaced with it.
         let mut ancestor = field.parent();
         let mut replaced = false;
@@ -263,6 +259,7 @@ pub(crate) fn plan(
         if replaced {
             continue;
         }
+        let instruction = &Instruction::parse(field.instruction());
         let kind = if instruction.kind.is_empty() {
             "EMPTY".to_owned()
         } else {
@@ -390,6 +387,14 @@ pub(crate) fn plan(
     Ok((updates, summary))
 }
 
+/// Whether the instruction's first word is `word`, ignoring ASCII case.
+fn first_word_is(instruction: &str, word: &str) -> bool {
+    instruction
+        .split_whitespace()
+        .next()
+        .is_some_and(|first| first.eq_ignore_ascii_case(word))
+}
+
 /// A planned table of contents.
 struct TocPlan {
     entries: Vec<TocEntry>,
@@ -468,13 +473,18 @@ fn plan_toc(
     let mut pagerefs: HashMap<usize, (String, String)> = HashMap::new();
     for field in fields {
         if field.parent() == Some(position) {
-            let nested = Instruction::parse(field.instruction());
-            if nested.kind == "PAGEREF"
-                && let Some(anchor) = nested.arguments.first()
+            let mut words = field.instruction().split_whitespace();
+            if words
+                .next()
+                .is_some_and(|word| word.eq_ignore_ascii_case("PAGEREF"))
+                && let Some(anchor) = words.next()
             {
                 pagerefs.insert(
                     field.paragraphs().0,
-                    (anchor.clone(), field.result().to_owned()),
+                    (
+                        anchor.trim_matches('"').to_owned(),
+                        field.result().to_owned(),
+                    ),
                 );
             }
         }
@@ -515,17 +525,26 @@ fn plan_toc(
             page,
         });
     }
+    // The cached page of an entry: by anchor, else by level and text.
+    let mut by_anchor: HashMap<&str, &str> = HashMap::new();
+    let mut by_text: HashMap<(u8, &str), &str> = HashMap::new();
+    for entry in &old {
+        let Some(page) = entry.page.as_deref().filter(|page| !page.is_empty()) else {
+            continue;
+        };
+        if let Some(anchor) = entry.anchor.as_deref() {
+            by_anchor.entry(anchor).or_insert(page);
+        }
+        by_text
+            .entry((entry.level, entry.text.as_str()))
+            .or_insert(page);
+    }
     let page_of = |anchor: Option<&str>, level: u8, text: &str| -> Option<String> {
-        old.iter()
-            .find(|entry| anchor.is_some() && entry.anchor.as_deref() == anchor)
-            .or_else(|| {
-                old.iter()
-                    .find(|entry| entry.level == level && entry.text == text)
-            })
-            .and_then(|entry| entry.page.clone())
-            .filter(|page| !page.is_empty())
+        anchor
+            .and_then(|anchor| by_anchor.get(anchor))
+            .or_else(|| by_text.get(&(level, text)))
+            .map(|page| (*page).to_owned())
     };
-    let mut entries = Vec::new();
     let mut new: Vec<Entry> = Vec::new();
     let mut bookmarks = Vec::new();
     let mut missing = 0;
@@ -597,17 +616,6 @@ fn plan_toc(
                 String::new()
             })
         });
-        let mut entry = TocEntry::new(level, text).hyperlink(hyperlinks);
-        if let Some(anchor) = &anchor {
-            entry = entry.anchor(anchor.clone());
-        }
-        if let Some(page) = &page {
-            entry = entry.page(page.clone()).tab(width);
-            if let Some(separator) = &separator {
-                entry = entry.separator(separator.clone());
-            }
-        }
-        entries.push(entry);
         new.push(Entry {
             level,
             text: text.to_owned(),
@@ -615,21 +623,26 @@ fn plan_toc(
             page,
         });
     }
-    // Old entries carry an anchor only through a link or a page reference.
-    let comparable = |entries: &[Entry]| -> Vec<(u8, String, Option<String>, Option<String>)> {
-        entries
-            .iter()
+    let unchanged = bookmarks.is_empty() && old == new;
+    let entries = if unchanged {
+        Vec::new()
+    } else {
+        new.into_iter()
             .map(|entry| {
-                (
-                    entry.level,
-                    entry.text.clone(),
-                    entry.anchor.clone(),
-                    entry.page.clone(),
-                )
+                let mut toc = TocEntry::new(entry.level, entry.text).hyperlink(hyperlinks);
+                if let Some(anchor) = entry.anchor {
+                    toc = toc.anchor(anchor);
+                }
+                if let Some(page) = entry.page {
+                    toc = toc.page(page).tab(width);
+                    if let Some(separator) = &separator {
+                        toc = toc.separator(separator.clone());
+                    }
+                }
+                toc
             })
             .collect()
     };
-    let unchanged = bookmarks.is_empty() && comparable(&old) == comparable(&new);
     Ok(TocPlan {
         entries,
         bookmarks,
