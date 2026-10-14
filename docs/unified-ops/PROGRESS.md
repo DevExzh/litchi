@@ -559,6 +559,28 @@ Cut from `9fe45629ab`:
   - XLS cell reads use 2 leaf source checks instead of 5, keeping the per-match check.
   - The 0280 6% regression is about 1% in work, the rest attributed to layout.
 
+- Merged `perf-ooxml` (0286):
+  - PPTX open + first metadata set 1.31× → 1.05× (preserving conversion defers payloads);
+  - XLSX chart set 1.35× → 1.01× (chart inventory cache);
+  - PPTX warm shape `get` 2.1× faster;
+  - DOCX single set 1.21× → 1.12–1.13×, still a miss (shared target parsing and resolution, about 4.6 K instructions; follow-up F1).
+  - Behaviour: corrupt parts on a source handle's preserving conversion now surface on first read.
+- Merged `phase-g` (0289), with steps 25–27 as generated, golden-tested artifacts:
+  - CRUD checklist over 18 formats;
+  - corpus fidelity over 813 files, every no-op save byte-identical;
+  - benchmark matrix of 1,016 rows from 0249–0284 (91 open misses, each with a cited follow-up).
+  - Fixed: DOCX hyperlink/chart and DOC run sets inside `edit`/`batch`, the RTF body add claim, ODF manifest determinism.
+- Merged `odf-gaps` (0288):
+  - the ADR 0034 metadata family on all ten ODF leaves through one engine;
+  - ODG structural edits on LibreOffice drawings;
+  - ODC chart/axis/series writes and add; ODI geometry;
+  - tree-format batches make one commit (1k 0.98–1.005×).
+  - Fixed `meta.xml` edits after a BOM.
+  - Miss: ODB single set 1.35× on 1,000 queries.
+  - The `language` reporting fix was reverted by the agent over the Markdown golden. Coordinator: the golden is ours to update for intended changes; queued.
+- After R6, the checklist has 7 claimed cells still failing (F1–F4, F6, F7; F5 now passes) and 70 unreached for lack of fixtures.
+- Wave R6 complete.
+
 Coordinator scripts and agent scratch now live in `/home/zhuhe/code/litchi-worktrees/.coord/` (outside the repository), so they survive `/tmp` wipes.
 
 Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-pptx-w4` 9474e2b6ce, `uo/m2-l-xlsb-w1` 876588a23c, `uo/m1-r4-perf` 012fd509ff.
