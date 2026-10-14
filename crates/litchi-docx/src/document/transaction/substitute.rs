@@ -696,7 +696,28 @@ fn refused(paragraph: usize, reason: Refusal) -> Error {
 
 /// Whether `bytes` mention a field character.
 fn mentions_field_characters(bytes: &[u8]) -> bool {
-    bytes.windows(7).any(|window| window == b"fldChar")
+    match std::str::from_utf8(bytes) {
+        Ok(text) => text.contains("fldChar"),
+        Err(_) => bytes.windows(7).any(|window| window == b"fldChar"),
+    }
+}
+
+/// The staged main-document bytes for a story: shared when the snapshot
+/// owns them, else copied.
+fn story_xml(snapshot: &super::Snapshot) -> Arc<Vec<u8>> {
+    snapshot
+        .xml
+        .shared()
+        .map_or_else(|| Arc::new(snapshot.xml_bytes().to_vec()), Arc::clone)
+}
+
+/// Whether `story` was read from the staged bytes of `snapshot`.
+fn is_current(snapshot: &super::Snapshot, story: &Story) -> bool {
+    snapshot
+        .xml
+        .shared()
+        .is_some_and(|xml| Arc::ptr_eq(xml, &story.xml))
+        || snapshot.xml_bytes() == story.xml.as_slice()
 }
 
 impl Edit {
@@ -706,7 +727,7 @@ impl Edit {
     ///
     /// Returns an XML error for malformed markup.
     pub fn story(&self) -> Result<Story> {
-        let xml = Arc::new(self.projected.xml_bytes().to_vec());
+        let xml = story_xml(&self.projected);
         let scanned = scan::scan(&xml, whole(&xml, true))?;
         Ok(Story {
             part: None,
@@ -736,7 +757,7 @@ impl Edit {
             return self.story();
         }
         let snapshot = &self.projected;
-        let xml = Arc::new(snapshot.xml_bytes().to_vec());
+        let xml = story_xml(snapshot);
         let mut listing = Vec::with_capacity(scopes.len());
         // The direct-body paragraphs every scope lies in, when it does.
         let mut fragments: Vec<(litchi_core::Position, Range<usize>)> = Vec::new();
@@ -888,7 +909,7 @@ impl Edit {
             return Err(refused(0, Refusal::StoryReference));
         }
         self.ensure_unmanaged("substitute")?;
-        if self.projected.xml_bytes() != story.xml.as_slice() {
+        if !is_current(&self.projected, story) {
             return Err(Error::StaleSource);
         }
         let plan = write::plan(story, replacements, &mut format)?;

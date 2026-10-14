@@ -1006,6 +1006,14 @@ enum XmlStorage {
 }
 
 impl XmlStorage {
+    /// The shared owned bytes, when the storage holds them.
+    fn shared(&self) -> Option<&Arc<Vec<u8>>> {
+        match self {
+            Self::Owned(xml) | Self::OwnedWithIdentity { xml, .. } => Some(xml),
+            Self::Managed(_) | Self::Source { .. } => None,
+        }
+    }
+
     fn bytes(&self) -> &[u8] {
         match self {
             Self::Owned(xml) => xml.as_slice(),
