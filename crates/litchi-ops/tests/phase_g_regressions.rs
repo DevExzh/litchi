@@ -126,3 +126,50 @@ mod rtf {
         assert!(caps.element("run").unwrap().operations().add);
     }
 }
+
+#[cfg(all(feature = "odt", feature = "ods", feature = "odp", feature = "odg"))]
+mod odf {
+    use litchi_ops::{Props, open};
+
+    /// The same write on the same input publishes the same bytes.
+    /// LibreOffice packages list manifest directory entries the writer
+    /// copies; they came out in hash-map order, so two identical writes
+    /// differed.
+    #[test]
+    fn identical_writes_publish_identical_bytes() {
+        for (relative, path, key) in [
+            (
+                "odf/corpus/writer-definition-lists.odt",
+                "/metadata",
+                "author",
+            ),
+            ("odf/corpus/calc-two-sheets.ods", "/metadata", "title"),
+            ("odf/corpus/impress-basic.odp", "/metadata", "title"),
+            (
+                "libreoffice-core/svx/qa/unit/data/FontWork.odg",
+                "/page[1]",
+                "name",
+            ),
+        ] {
+            let file = open(
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("../../test-data")
+                    .join(relative),
+            )
+            .unwrap();
+            let write = || {
+                file.set(path, Props::new().with(key, "Litchi"))
+                    .unwrap_or_else(|error| panic!("{relative}: {error}"))
+                    .to_bytes()
+                    .unwrap()
+            };
+            let first = write();
+            for _ in 0..4 {
+                assert!(
+                    write() == first,
+                    "{relative}: {path} {key} is not deterministic"
+                );
+            }
+        }
+    }
+}

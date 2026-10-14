@@ -457,6 +457,16 @@ use crate::package::validate_manifest_path;
 
 const MANIFEST_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:manifest:1.0";
 
+/// Manifest entries in path order. The manifest model is a hash map, and a
+/// generated manifest must not depend on its iteration order (record 0289).
+fn sorted_entries(
+    manifest: &super::manifest::Manifest,
+) -> Vec<(&String, &super::manifest::ManifestEntry)> {
+    let mut entries: Vec<_> = manifest.entries.iter().collect();
+    entries.sort_unstable_by(|a, b| a.0.cmp(b.0));
+    entries
+}
+
 fn normalized_manifest_path(path: &str) -> &str {
     if path == "/" {
         "/"
@@ -1607,7 +1617,7 @@ impl<W: Write> PackageWriter<W> {
                 "Rewriting encrypted ODF entries requires writer encryption".to_string(),
             ));
         }
-        for (path, entry) in &package.manifest().entries {
+        for (path, entry) in sorted_entries(package.manifest()) {
             if path.ends_with('/')
                 && !matches!(path.as_str(), "/" | "META-INF/")
                 && !excluded_paths.contains(path)
@@ -1703,7 +1713,7 @@ impl<W: Write> PackageWriter<W> {
             ));
         }
 
-        for (path, entry) in &package.manifest().entries {
+        for (path, entry) in sorted_entries(package.manifest()) {
             if path.ends_with('/') && !Self::is_regenerated_package_part(path) {
                 self.add_manifest_entry(path, &entry.media_type)?;
             }
@@ -1766,7 +1776,7 @@ impl<W: Write> PackageWriter<W> {
                     .any(|candidate| path.starts_with(candidate))
         };
 
-        for (path, entry) in &package.manifest().entries {
+        for (path, entry) in sorted_entries(package.manifest()) {
             if path.ends_with('/') && !Self::is_regenerated_package_part(path) && !excluded(path) {
                 self.add_manifest_entry(path, &entry.media_type)?;
             }
