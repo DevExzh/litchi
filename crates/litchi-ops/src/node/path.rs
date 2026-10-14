@@ -107,6 +107,32 @@ impl<'a> NodePath<'a> {
         })
     }
 
+    /// The path of `len` steps from the root, each written by `step` from
+    /// its index, carried by value; `None` for more than four steps. The
+    /// steps are written in place (record 0287), with no staging array.
+    #[cfg_attr(
+        not(any(feature = "doc", feature = "rtf", feature = "odt")),
+        allow(
+            dead_code,
+            reason = "the DOC, RTF and ODT adapters spell their compact paths this way"
+        )
+    )]
+    pub(crate) fn inline_with(
+        len: usize,
+        mut step: impl FnMut(usize) -> PathStep<'a>,
+    ) -> Option<Self> {
+        let len = u8::try_from(len)
+            .ok()
+            .filter(|&len| usize::from(len) <= INLINE_STEPS)?;
+        let mut steps = [EMPTY_STEP; INLINE_STEPS];
+        for (index, slot) in steps[..usize::from(len)].iter_mut().enumerate() {
+            *slot = step(index);
+        }
+        Some(Self {
+            repr: Repr::Inline { steps, len },
+        })
+    }
+
     /// The path of `first` and, when given, `second`, carried by value.
     #[cfg_attr(
         not(any(feature = "xlsx", feature = "xls", feature = "ods")),

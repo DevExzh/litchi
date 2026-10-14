@@ -342,12 +342,7 @@ impl<'f> Node<'f> {
 
     #[must_use]
     pub fn path(&self) -> NodePath<'_> {
-        let len = self.steps.len();
-        let mut steps = [PathStep::new(""); MAX_STEPS];
-        for (index, slot) in steps[..len].iter_mut().enumerate() {
-            *slot = self.step(index);
-        }
-        NodePath::inline(&steps[..len]).unwrap_or(NodePath::ROOT)
+        NodePath::inline_with(self.steps.len(), |index| self.step(index)).unwrap_or(NodePath::ROOT)
     }
 
     /// Path step `index`, written as the path spells it.

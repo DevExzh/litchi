@@ -230,14 +230,8 @@ impl<'f> Node<'f> {
             }
         }
         let steps = self.address.steps();
-        if steps.len() <= 4 {
-            let mut inline = [PathStep::new(""); 4];
-            for (slot, step) in inline.iter_mut().zip(steps) {
-                *slot = step.positional();
-            }
-            if let Some(path) = NodePath::inline(&inline[..steps.len()]) {
-                return path;
-            }
+        if let Some(path) = NodePath::inline_with(steps.len(), |index| steps[index].positional()) {
+            return path;
         }
         match self.spelled.get_or_init(|| {
             Spelled::Steps(

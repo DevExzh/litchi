@@ -25,10 +25,6 @@ use crate::value::{Color, Length};
 /// The longest DOC path: `/body/tbl[N]/tr[N]/tc[N]/p[N]/r[N]`.
 const MAX_STEPS: usize = 6;
 
-/// The most steps [`NodePath`] carries by value; deeper paths are spelled
-/// out once into the node's lazily built step list.
-const INLINE_PATH_STEPS: usize = 4;
-
 /// A positional path of at most [`MAX_STEPS`] steps, stored compactly as
 /// kinds and positions (record 0287): a node no longer carries six full
 /// [`PathStep`]s (336 bytes) and writes them only when its path is read.
@@ -359,14 +355,8 @@ impl<'f> Node<'f> {
     #[must_use]
     pub fn path(&self) -> NodePath<'_> {
         let len = self.steps.len();
-        if len <= INLINE_PATH_STEPS {
-            let mut inline = [PathStep::new(""); INLINE_PATH_STEPS];
-            for (index, slot) in inline[..len].iter_mut().enumerate() {
-                *slot = self.steps.step(index);
-            }
-            if let Some(path) = NodePath::inline(&inline[..len]) {
-                return path;
-            }
+        if let Some(path) = NodePath::inline_with(len, |index| self.steps.step(index)) {
+            return path;
         }
         NodePath::new(
             self.paths
