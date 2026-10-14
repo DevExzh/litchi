@@ -482,6 +482,15 @@ Cut from `80e24f8745`:
   - Litchi-made SmartArt is regenerated whole. Other producers' SmartArt takes in-place text edits (drawing patched or dropped); node add/remove there is refused until `layout` rebuilds it.
   - Checked in LibreOffice 26.2.6.3; 1.00–1.02× the native calls.
   - Open: DOCX (0284a), XLSX, node formatting; PowerPoint not verified.
+- Merged `perf-writes` (0281):
+  - `Warn` atomic batches coalesce again (49× → 1.00×);
+  - PPTX text-box add builds its edit once (1.42× → 1.00–1.02×);
+  - DOCX `Table::row`/`Row::cell` (cell writes 1.25× → 1.09×), find 1.12× → 1.07–1.09×;
+  - `litchi_xlsb::Workbook::edit_metadata` (1.10× → 1.02×).
+  - Misses left, with callgrind profiles:
+    - DOCX single set 1.19× (F1: main-part name normalization in `litchi-opc`, the shared resolver, commit wrapping);
+    - PPTX open + first set 1.31× (F2: promotion re-decompresses members);
+    - XLS reads (F3, handed to 0280).
 - Environment: a session restart wiped `/tmp`, which held the gate scripts and `TMPDIR`. Gate scripts now live in the session scratchpad and create their `TMPDIR`.
 
 Not dispatched: iWork M6. It waits for owner decisions D1/D2, and the iWork crates belong to their owners.
