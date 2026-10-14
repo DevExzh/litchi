@@ -174,6 +174,133 @@ fn warn_batches_report_per_item_and_stay_atomic() {
     assert!(matches!(&commit.results[1], ItemResult::Failed(_)));
 }
 
+#[cfg(feature = "xlsx")]
+#[test]
+fn warn_batches_keep_the_native_runs() {
+    // Record 0281: an atomic warn batch coalesces like a refusing one. A
+    // homogeneous batch is one native commit under both policies.
+    let file = create(FileFormat::Xlsx).unwrap();
+    let paths: Vec<String> = (1..=100).map(|row| format!("/Sheet1/A{row}")).collect();
+    let items: Vec<BatchItem<'_>> = paths
+        .iter()
+        .map(|path| set(path, Props::new().with("value", 7)))
+        .collect();
+    let refuse = file.batch_with(&items, &Options::new()).unwrap();
+    let warned = file.batch_with(&items, &warn()).unwrap();
+    assert_eq!(refuse.diagnostics.commits(), 1);
+    assert_eq!(warned.diagnostics.commits(), 1);
+    assert_eq!(warned.diagnostics.operations(), 100);
+    assert_eq!(
+        warned.file.to_bytes().unwrap(),
+        refuse.file.to_bytes().unwrap()
+    );
+
+    // A refused item closes the run, applies its supported subset alone and
+    // reports its own warnings; the runs on either side stay native. The
+    // result equals applying each item in turn.
+    let items = batch::from_bytes(
+        br#"[
+          {"command":"set","path":"/Sheet1/A1","props":{"value":"a"}},
+          {"command":"set","path":"/Sheet1/A2","props":{"value":"b"}},
+          {"command":"set","path":"/Sheet1/A3","props":{"value":"c","sparkle":1}},
+          {"command":"set","path":"/Sheet1/A4","props":{"value":"d"}},
+          {"command":"set","path":"/Sheet1/A5","props":{"glow":1}},
+          {"command":"set","path":"/Sheet1/A6","props":{"value":"f"}},
+          {"command":"set","path":"/Sheet1/A7","props":{"value":"g"}}
+        ]"#,
+    )
+    .unwrap();
+    let commit = file.batch_with(&items, &warn()).unwrap();
+    let mut sequential = file.clone();
+    for (index, item) in items.iter().enumerate() {
+        let step = sequential.apply_with(item, &warn()).unwrap();
+        let ItemResult::Applied(applied) = &commit.results[index] else {
+            panic!("item {index} failed");
+        };
+        assert_eq!(applied.changed, step.value.changed, "item {index}");
+        let properties = |warnings: &[litchi_ops::Error]| -> Vec<Option<String>> {
+            warnings
+                .iter()
+                .map(|warning| warning.property().map(str::to_owned))
+                .collect()
+        };
+        assert_eq!(
+            properties(&applied.warnings),
+            properties(&step.value.warnings),
+            "item {index}"
+        );
+        // Batch warnings carry the wire index.
+        assert!(applied.warnings.iter().all(|w| w.item() == Some(index)));
+        sequential = step.file;
+    }
+    assert_eq!(
+        commit.file.to_bytes().unwrap(),
+        sequential.to_bytes().unwrap()
+    );
+    // Runs: A1-A2, A3 alone, A4, A6-A7. A5 skips its only property: a
+    // no-op that dispatches nothing.
+    assert_eq!(commit.diagnostics.operations(), 6);
+    assert!(
+        commit.diagnostics.commits() <= 4,
+        "{:?}",
+        commit.diagnostics
+    );
+
+    // A failure other than a refusal still rolls back the whole batch and is
+    // attributed to its own item, after a pending run.
+    let items = batch::from_bytes(
+        br#"[
+          {"command":"set","path":"/Sheet1/A1","props":{"value":"a"}},
+          {"command":"set","path":"/Sheet1/A2","props":{"value":"b","sparkle":1}},
+          {"command":"set","path":"/Sheet1/A3","props":{"value":"c"}},
+          {"command":"set","path":"/Sheet1/A4","props":{"font.bold":"maybe"}}
+        ]"#,
+    )
+    .unwrap();
+    let error = file.batch_with(&items, &warn()).unwrap_err();
+    assert_eq!((error.code(), error.item()), (Code::InvalidValue, Some(3)));
+}
+
+#[cfg(feature = "docx")]
+#[test]
+fn warn_docx_formatting_runs_match_sequential_application() {
+    let file = create(FileFormat::Docx).unwrap();
+    let mut seed = Vec::new();
+    for text in ["one", "two", "three", "four"] {
+        let mut item = BatchItem::new("add");
+        item.parent = Some("/body".into());
+        item.kind = Some("paragraph".into());
+        item.props = Some(Props::new().with("text", text));
+        seed.push(item);
+    }
+    let file = file.batch(&seed, BatchMode::Atomic).unwrap().file;
+    let items = batch::from_bytes(
+        br#"[
+          {"command":"set","path":"/body/p[1]/r[1]","props":{"bold":true}},
+          {"command":"set","path":"/body/p[2]/r[1]","props":{"italic":true,"sparkle":1}},
+          {"command":"set","path":"/body/p[3]/r[1]","props":{"bold":true}},
+          {"command":"set","path":"/body/p[4]/r[1]","props":{"underline":"single"}}
+        ]"#,
+    )
+    .unwrap();
+    let commit = file.batch_with(&items, &warn()).unwrap();
+    let mut sequential = file.clone();
+    for item in &items {
+        sequential = sequential.apply_with(item, &warn()).unwrap().file;
+    }
+    assert_eq!(
+        commit.file.to_bytes().unwrap(),
+        sequential.to_bytes().unwrap()
+    );
+    let ItemResult::Applied(applied) = &commit.results[1] else {
+        panic!("item 1 failed");
+    };
+    assert_eq!(applied.warnings.len(), 1);
+    assert_eq!(applied.warnings[0].property(), Some("sparkle"));
+    assert_eq!(applied.warnings[0].item(), Some(1));
+    assert!(commit.diagnostics.commits() < 4, "{:?}", commit.diagnostics);
+}
+
 #[cfg(feature = "docx")]
 #[test]
 fn warn_adds_the_element_without_the_refused_properties() {

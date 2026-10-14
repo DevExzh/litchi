@@ -262,9 +262,11 @@ impl File {
     /// Under [`Unsupported::Warn`] every `set` and `add` item behaves as in
     /// [`Self::apply_with`]: refused properties are skipped and reported in
     /// the item's [`Applied::warnings`] (each carrying the item index), and
-    /// the rest of the item applies. Atomic `set` items are then not
-    /// coalesced, because a coalesced run reports its refusal only when the
-    /// run closes.
+    /// the rest of the item applies. Atomic `set` items still join the same
+    /// native runs as under [`Unsupported::Refuse`]: a run admits every
+    /// property of an item before staging it, so an item whose target refuses
+    /// a property never joins a run; it closes the run and is retried
+    /// without the refused properties on its own.
     ///
     /// ```
     /// # #[cfg(feature = "xlsx")]
@@ -298,9 +300,7 @@ impl File {
             unsupported,
             ref limits,
         } = *options;
-        // Coalesced runs defer their refusals, so warnings need per-item runs.
         let coalesce = mode == BatchMode::Atomic;
-        let coalesce_set = coalesce && unsupported == Unsupported::Refuse;
         let commit = self.edit_with_limits(limits, |edit| {
             let mut results = Vec::new();
             for (index, item) in items.into_iter().enumerate() {
@@ -319,7 +319,7 @@ impl File {
                     Error::from(TransactionError::Allocation { source }).with_item(index)
                 })?;
                 let item = item.into();
-                if coalesce_set && item.command.eq_ignore_ascii_case("set") {
+                if coalesce && item.command.eq_ignore_ascii_case("set") {
                     let (path, props) = match set_fields(&item) {
                         Ok(fields) => fields,
                         Err(error) => {
@@ -329,24 +329,27 @@ impl File {
                             return Err(error.with_item(index));
                         },
                     };
-                    if let Some(changed) =
-                        edit.coalesce_set(path, props, index).map_err(|error| {
-                            // A closing prior run already carries its originating
-                            // wire index. Do not reattribute it to the next item.
-                            if error.item().is_some() {
-                                error
-                            } else {
-                                error.with_item(index)
-                            }
-                        })?
-                    {
-                        results.push(ItemResult::Applied(Applied {
-                            path: None,
-                            changed,
-                            warnings: Box::default(),
-                            found: 0,
-                        }));
-                        continue;
+                    match edit.coalesce_set(path, props, index) {
+                        Ok(Some(changed)) => {
+                            results.push(ItemResult::Applied(Applied {
+                                path: None,
+                                changed,
+                                warnings: Box::default(),
+                                found: 0,
+                            }));
+                            continue;
+                        },
+                        Ok(None) => {},
+                        // A closing prior run already carries its originating
+                        // wire index. Do not reattribute it to the next item.
+                        Err(error) if error.item().is_some() => return Err(error),
+                        // Runs admit every property before staging, so a
+                        // refusal is this item's own and nothing of it was
+                        // staged: retry it alone, skipping what is refused.
+                        Err(error)
+                            if unsupported == Unsupported::Warn
+                                && error.code() == Code::UnsupportedProperty => {},
+                        Err(error) => return Err(error.with_item(index)),
                     }
                 }
                 if coalesce && item.command.eq_ignore_ascii_case("remove") {
