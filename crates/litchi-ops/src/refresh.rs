@@ -36,7 +36,7 @@
 //! [`Summary::missing_page_numbers`]. Such a table is marked dirty (unless
 //! [`Options::mark_dirty`] is off) so a word processor recomputes it on
 //! open. [`PageNumbers::Require`] refuses such a refresh with
-//! [`Code::RefreshFailed`](crate::Code::RefreshFailed) instead.
+//! [`Code::RefreshFailed`] instead.
 //!
 //! # No ambient clock
 //!

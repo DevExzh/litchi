@@ -209,8 +209,8 @@ Fixtures (copied into `test-data/libreoffice-core/`, recorded in its
 ## 4. Corpus and capability delta
 
 `LITCHI_BLESS=1 cargo test -p litchi-cli --all-features --test
-officecli_corpus`, `python3 tools/officecli_corpus.py`, `--check`: see §6
-for the outcome. No corpus script calls `refresh` (`word/fields.sh` relies on
+officecli_corpus`, `python3 tools/officecli_corpus.py`, `--check`: no
+diff. No corpus script calls `refresh` (`word/fields.sh` relies on
 `updateFields=true` instead), so outcomes are unchanged. Capability goldens
 were re-blessed with all features and with every feature except
 `encryption`; the only change is the new `refresh` verb. The OfficeCLI
@@ -250,8 +250,41 @@ checked equal outside the clock (document XML; workbook bytes).
 
 ## 6. Gates
 
-Commands and exit codes are listed in the merge hand-off of this record's
-branch (final report).
+All with `CARGO_TARGET_DIR=<worktree>/target`, exit 0:
+
+- `cargo fmt --all --check`;
+- `cargo clippy -p litchi-docx -p litchi-xlsx -p litchi-pptx -p litchi-ops
+  -p litchi -p litchi-py -p litchi-cli --all-targets --all-features -- -D
+  warnings`, and `cargo clippy -p litchi-ops --no-default-features
+  [--features F] --all-targets -- -D warnings` for no features, `docx`,
+  `pptx`, `xlsx`, `xlsx,eval`, `xlsb,eval`, `xls,eval`, `eval`, `rtf`;
+- `cargo test --all-features` for `litchi-docx` (2,380 passed),
+  `litchi-xlsx` (2,445), `litchi-pptx` (1,773), `litchi-ops` (2,123,
+  `--no-fail-fast`), `litchi` (260), `litchi-cli` (31);
+- `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features` for the six
+  Rust crates above;
+- `python3 tools/check_crate_boundaries.py`, `python3
+  tools/non_iwork_gate.py verify`, `RUSTC_BOOTSTRAP=1 python3
+  tools/check_api_glossary.py --target-dir target/api-glossary` (26
+  profiles);
+- `crates/pyo3-litchi/tests/run_tests.sh` (264 tests);
+- `LITCHI_BLESS=1 cargo test -p litchi-cli --all-features --test
+  officecli_corpus`, `python3 tools/officecli_corpus.py` and `--check` (no
+  diff), `python3 tools/officecli_capability_delta.py --officecli …` (no
+  diff);
+- `cd tools/perf-baseline && cargo check --locked --all-targets`.
+
+Two existing tests walk every fixture under `test-data/`, so the four new
+fixtures moved them:
+
+- `litchi-docx` `the_route_and_proof_follow_the_historical_gate_on_mutated_sources`
+  counts fallbacks over the first 20 fixtures in path order; the new files
+  sort into that window and left the count at its bound (20, needs > 20).
+  It now takes the first 40.
+- `litchi-ops` `query_corpus_differential` (record 0262): with the four new
+  files moved aside the digests match the golden unchanged; with them, the
+  golden was re-blessed (`LITCHI_BLESS_GOLDEN=1`), changing only the
+  aggregate DOCX digests the new files enter.
 
 ## 7. Gaps and follow-ups
 

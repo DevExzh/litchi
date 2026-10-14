@@ -1,7 +1,7 @@
 {
  "record": "0279",
  "command": "cargo build --release -p litchi-ops --features docx,xlsx,eval --example refresh_bench; taskset -c 29 target/release/examples/refresh_bench 1000 11",
- "source_commit": "cd7b6338fb98dee3f3556c81b39b4421741efbe7 plus the uncommitted planner and bench changes of the 0279 performance commit",
+ "source_commit": "150c557e1f (the binary was built from that commit's working tree before formatting; no code difference)",
  "binary_sha256": "b9d1aaae32a1bae9ae97f2561cdf381f22b3e3ab2c4efc0f675336ce7f3c4acd",
  "load_average": "16.9 / 17.3 / 16.2 (six agents share 32 cores)",
  "scenarios": {

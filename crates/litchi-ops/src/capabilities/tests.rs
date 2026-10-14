@@ -101,9 +101,14 @@ fn every_format_has_one_answer_for_its_reads() {
             },
         }
         // Import is a worksheet verb with its own answer (`m4_verbs_...`);
-        // merge is a template verb (`merge_is_a_template_verb`).
+        // merge is a template verb (`merge_is_a_template_verb`); refresh
+        // has its own answer (`refresh_is_supported_where_fields_are_computed`).
         for verb in Verb::ALL.into_iter().filter(|verb| {
-            verb.is_edit() && !matches!(verb, Verb::Import | Verb::Merge | Verb::Replace)
+            verb.is_edit()
+                && !matches!(
+                    verb,
+                    Verb::Import | Verb::Merge | Verb::Replace | Verb::Refresh
+                )
         }) {
             #[cfg(feature = "pptx")]
             if format == FileFormat::Pptx
@@ -744,5 +749,28 @@ fn merge_is_a_template_verb() {
             template,
             "{format:?}"
         );
+    }
+}
+
+#[test]
+fn refresh_is_supported_where_fields_are_computed() {
+    for format in [
+        FileFormat::Docx,
+        FileFormat::Pptx,
+        FileFormat::Xlsx,
+        FileFormat::Xlsb,
+        FileFormat::Xls,
+        FileFormat::Doc,
+        FileFormat::Ppt,
+        FileFormat::Rtf,
+        FileFormat::Odt,
+    ] {
+        let support = Capabilities::of(format).verb(Verb::Refresh);
+        let adapter = (format == FileFormat::Docx && cfg!(feature = "docx"))
+            || (format == FileFormat::Pptx && cfg!(feature = "pptx"))
+            || (format == FileFormat::Xlsx && cfg!(all(feature = "xlsx", feature = "eval")))
+            || (format == FileFormat::Xlsb && cfg!(all(feature = "xlsb", feature = "eval")))
+            || (format == FileFormat::Xls && cfg!(all(feature = "xls", feature = "eval")));
+        assert_eq!(support.is_supported(), adapter, "{format:?}");
     }
 }
