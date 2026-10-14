@@ -778,7 +778,7 @@ fn resolve_mutation_targets(
         }
         append(node)?;
     } else if let Some(query) = target.query() {
-        let walk = crate::query::run(Nav::new(file), query.clone())?;
+        let walk = crate::query::run(Nav::new(file), query)?;
         if !walk.plan().diagnostics().is_empty() {
             return Err(Error::new(
                 Code::InvalidSelector,

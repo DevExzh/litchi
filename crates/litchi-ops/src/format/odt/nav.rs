@@ -236,7 +236,7 @@ impl<'f> Inspect<'f> for Nav<'f> {
         use crate::path::navigate::ElementKind;
         let step = match kind {
             Kind::Body | Kind::Styles | Kind::Metadata => PathStep::new(kind.name()),
-            Kind::Style => match &node.style_name {
+            Kind::Style => match node.style_name() {
                 Some(name) => return fmt::Display::fmt(&PathStep::new(name), out),
                 None => PathStep::at(kind.name(), ordinal),
             },

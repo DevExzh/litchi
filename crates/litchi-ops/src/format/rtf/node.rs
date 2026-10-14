@@ -23,32 +23,39 @@ use crate::node::{
 
 /// The longest RTF path: `/body/tbl[N]/tr[N]/tc[N]`.
 const MAX_STEPS: usize = 4;
+const _: () = assert!(MAX_STEPS <= crate::node::INLINE_STEPS);
 
-/// A positional path of at most [`MAX_STEPS`] steps, stored inline.
+/// A positional path of at most [`MAX_STEPS`] steps, stored compactly as
+/// kinds and positions (record 0287): a node no longer carries four full
+/// [`PathStep`]s (224 bytes) and writes them only when its path is read. A
+/// style's step is its name, read from the node's style.
 #[derive(Clone, Copy)]
-pub(crate) struct Steps<'f> {
-    steps: [PathStep<'f>; MAX_STEPS],
+pub(crate) struct Steps {
+    positions: [usize; MAX_STEPS],
+    kinds: [Kind; MAX_STEPS],
     len: u8,
 }
 
-impl<'f> Steps<'f> {
+impl Steps {
     pub(super) const EMPTY: Self = Self {
-        steps: [PathStep::new("document"); MAX_STEPS],
+        positions: [0; MAX_STEPS],
+        kinds: [Kind::Document; MAX_STEPS],
         len: 0,
     };
 
-    /// These steps followed by `step`; a path at the longest RTF depth keeps
-    /// its steps (no RTF element nests deeper).
-    pub(super) const fn then(mut self, step: PathStep<'f>) -> Self {
+    /// These steps followed by `kind` at `position`; a path at the longest
+    /// RTF depth keeps its steps (no RTF element nests deeper).
+    pub(super) const fn then(mut self, kind: Kind, position: Position) -> Self {
         if (self.len as usize) < MAX_STEPS {
-            self.steps[self.len as usize] = step;
+            self.kinds[self.len as usize] = kind;
+            self.positions[self.len as usize] = position.get();
             self.len += 1;
         }
         self
     }
 
-    pub(super) fn as_slice(&self) -> &[PathStep<'f>] {
-        &self.steps[..usize::from(self.len)]
+    const fn len(&self) -> usize {
+        self.len as usize
     }
 }
 
@@ -118,26 +125,25 @@ pub(crate) enum Item<'f> {
     Level(&'f ListLevel<'f>),
 }
 
+// Record 0287: nodes move through every query; keep this one no larger
+// than it is (the unified node is as large as its largest format node).
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(size_of::<Node<'static>>() <= 160);
+
 /// A node of an RTF document.
 #[derive(Clone, Copy)]
 pub struct Node<'f> {
     pub(super) doc: &'f Rtf,
     pub(super) kind: Kind,
-    /// The containing main-story paragraph's zero-based position.
-    pub(super) paragraph_position: Option<Position>,
-    /// The run's zero-based position within its containing paragraph.
-    pub(super) run_position: Option<Position>,
     pub(super) item: Item<'f>,
-    pub(super) steps: Steps<'f>,
+    pub(super) steps: Steps,
 }
 
 impl<'f> Node<'f> {
-    const fn bare(doc: &'f Rtf, kind: Kind, steps: Steps<'f>) -> Self {
+    const fn bare(doc: &'f Rtf, kind: Kind, steps: Steps) -> Self {
         Self {
             doc,
             kind,
-            paragraph_position: None,
-            run_position: None,
             item: Item::Bare,
             steps,
         }
@@ -148,13 +154,17 @@ impl<'f> Node<'f> {
     }
 
     pub(super) const fn body(doc: &'f Rtf) -> Self {
-        Self::bare(doc, Kind::Body, Steps::EMPTY.then(PathStep::new("body")))
+        Self::bare(
+            doc,
+            Kind::Body,
+            Steps::EMPTY.then(Kind::Body, Position::new(0)),
+        )
     }
 
     /// A collection directly under the root (`/comments`, `/styles`,
     /// `/numbering`).
-    pub(super) const fn collection(doc: &'f Rtf, kind: Kind, name: &'static str) -> Self {
-        Self::bare(doc, kind, Steps::EMPTY.then(PathStep::new(name)))
+    pub(super) const fn collection(doc: &'f Rtf, kind: Kind) -> Self {
+        Self::bare(doc, kind, Steps::EMPTY.then(kind, Position::new(0)))
     }
 
     pub(super) const fn paragraph(
@@ -165,12 +175,10 @@ impl<'f> Node<'f> {
         Self {
             doc,
             kind: Kind::Paragraph,
-            paragraph_position: Some(position),
-            run_position: None,
             item: Item::Paragraph(paragraph),
             steps: Steps::EMPTY
-                .then(PathStep::new("body"))
-                .then(PathStep::at("p", position)),
+                .then(Kind::Body, Position::new(0))
+                .then(Kind::Paragraph, position),
         }
     }
 
@@ -183,13 +191,11 @@ impl<'f> Node<'f> {
         Self {
             doc,
             kind: Kind::Run,
-            paragraph_position: Some(paragraph_position),
-            run_position: Some(run_position),
             item: Item::Run(run),
             steps: Steps::EMPTY
-                .then(PathStep::new("body"))
-                .then(PathStep::at("p", paragraph_position))
-                .then(PathStep::at("r", run_position)),
+                .then(Kind::Body, Position::new(0))
+                .then(Kind::Paragraph, paragraph_position)
+                .then(Kind::Run, run_position),
         }
     }
 
@@ -205,13 +211,11 @@ impl<'f> Node<'f> {
         Self {
             doc,
             kind,
-            paragraph_position: Some(paragraph),
-            run_position: None,
             item,
             steps: Steps::EMPTY
-                .then(PathStep::new("body"))
-                .then(PathStep::at("p", paragraph))
-                .then(PathStep::at(kind_step(kind), position)),
+                .then(Kind::Body, Position::new(0))
+                .then(Kind::Paragraph, paragraph)
+                .then(kind, position),
         }
     }
 
@@ -219,28 +223,18 @@ impl<'f> Node<'f> {
     pub(super) fn top(doc: &'f Rtf, kind: Kind, item: Item<'f>, position: Position) -> Self {
         Self {
             item,
-            ..Self::bare(
-                doc,
-                kind,
-                Steps::EMPTY.then(PathStep::at(kind_step(kind), position)),
-            )
+            ..Self::bare(doc, kind, Steps::EMPTY.then(kind, position))
         }
     }
 
-    /// A child of `self` with its own kind, value and positional step.
+    /// A child of `self` with its own kind, value and positional step (a
+    /// style's step is its name).
     pub(super) fn child(&self, kind: Kind, item: Item<'f>, position: Position) -> Self {
-        self.child_at(kind, item, PathStep::at(kind_step(kind), position))
-    }
-
-    /// A child of `self` with its own kind, value and last step.
-    pub(super) fn child_at(&self, kind: Kind, item: Item<'f>, step: PathStep<'f>) -> Self {
         Self {
             doc: self.doc,
             kind,
-            paragraph_position: self.paragraph_position,
-            run_position: None,
             item,
-            steps: self.steps.then(step),
+            steps: self.steps.then(kind, position),
         }
     }
 
@@ -250,16 +244,35 @@ impl<'f> Node<'f> {
         self.kind
     }
 
-    /// The containing main-story paragraph's zero-based position.
+    /// The containing main-story paragraph's zero-based position: the
+    /// `p[N]` step of a path under `/body/p[N]`.
     #[must_use]
     pub const fn paragraph_position(&self) -> Option<Position> {
-        self.paragraph_position
+        let steps = &self.steps;
+        if steps.len() >= 2
+            && matches!(steps.kinds[0], Kind::Body)
+            && matches!(steps.kinds[1], Kind::Paragraph)
+        {
+            Some(Position::new(steps.positions[1]))
+        } else {
+            None
+        }
     }
 
-    /// The run's zero-based position within its containing paragraph.
+    /// The run's zero-based position within its containing paragraph: the
+    /// last step of a main-story run's `/body/p[N]/r[M]` path.
     #[must_use]
     pub const fn run_position(&self) -> Option<Position> {
-        self.run_position
+        let steps = &self.steps;
+        if matches!(self.kind, Kind::Run)
+            && steps.len() == 3
+            && matches!(steps.kinds[2], Kind::Run)
+            && self.paragraph_position().is_some()
+        {
+            Some(Position::new(steps.positions[2]))
+        } else {
+            None
+        }
     }
 
     /// The borrowed native run retained by this run node.
@@ -329,7 +342,32 @@ impl<'f> Node<'f> {
 
     #[must_use]
     pub fn path(&self) -> NodePath<'_> {
-        NodePath::new(self.steps.as_slice())
+        NodePath::inline_with(self.steps.len(), |index| self.step(index)).unwrap_or(NodePath::ROOT)
+    }
+
+    /// Path step `index`, written as the path spells it.
+    fn step(&self, index: usize) -> PathStep<'f> {
+        let position = Position::new(self.steps.positions[index]);
+        match self.steps.kinds[index] {
+            kind @ (Kind::Document
+            | Kind::Body
+            | Kind::Comments
+            | Kind::Styles
+            | Kind::Numbering) => PathStep::new(kind_step(kind)),
+            Kind::Style => match self.item {
+                Item::Style(style) => PathStep::new(style.name.as_ref()),
+                _ => PathStep::at(kind_step(Kind::Style), position),
+            },
+            kind => PathStep::at(kind_step(kind), position),
+        }
+    }
+
+    /// The node's own last path step; `None` for the root.
+    pub(super) fn last_step(&self) -> Option<PathStep<'f>> {
+        self.steps
+            .len()
+            .checked_sub(1)
+            .map(|index| self.step(index))
     }
 
     #[must_use]

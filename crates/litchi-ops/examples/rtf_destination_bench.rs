@@ -3,7 +3,8 @@
 //! Each case compares the native destination editor with two unified routes:
 //! one direct path `set` per target inside an edit closure (coalesced into one
 //! native publication) and, where the selector grammar reaches the story,
-//! one query fan-out `set`. Picture removal compares the native exact-source
+//! one query fan-out `set` (also with the selector compiled once into a
+//! `Plan`, record 0287). Picture removal compares the native exact-source
 //! remover with one unified query `remove`. Sources, paths, properties and
 //! native operations are prepared outside timing; staging and commit are
 //! timed. Every sample's output is checked byte-for-byte against the native
@@ -11,6 +12,8 @@
 
 #[cfg(feature = "rtf")]
 use litchi_core::selector::{Path, Query, Scope};
+#[cfg(feature = "rtf")]
+use litchi_ops::query::Plan;
 #[cfg(feature = "rtf")]
 use litchi_ops::transaction::SemanticLimits;
 #[cfg(feature = "rtf")]
@@ -149,6 +152,8 @@ struct Prepared {
     props: Vec<Props<'static>>,
     texts: Vec<String>,
     fanout: Option<Query<'static>>,
+    /// The fan-out selector compiled once for RTF (record 0287).
+    fanout_plan: Option<Plan<'static>>,
 }
 
 #[cfg(feature = "rtf")]
@@ -187,7 +192,12 @@ impl Prepared {
                 })
                 .expect("fan-out selector")
         });
+        let fanout_plan = fanout
+            .as_ref()
+            .map(|query| Plan::compile(query, litchi_core::FileFormat::Rtf))
+            .transpose()?;
         Ok(Self {
+            fanout_plan,
             family,
             count,
             bytes,
@@ -279,6 +289,19 @@ impl Prepared {
         }
     }
 
+    /// The fan-out with the selector compiled once outside the clock.
+    fn unified_fanout_plan(&self, plan: &Plan<'static>) -> litchi_ops::Result<File> {
+        self.unified
+            .edit_with_limits(&self.limits, |edit| {
+                if self.family == Family::PictureRemoval {
+                    edit.remove(plan)
+                } else {
+                    edit.set(plan, Props::new().with("text", "shared"))
+                }
+            })
+            .map(|commit| commit.file)
+    }
+
     fn unified_fanout(&self, query: &Query<'static>) -> litchi_ops::Result<File> {
         self.unified
             .edit_with_limits(&self.limits, |edit| {
@@ -320,13 +343,15 @@ fn run_case(case: &Prepared) -> Result<serde_json::Value, Box<dyn std::error::Er
     let mut native_shared = Vec::with_capacity(18);
     let mut fanout = Vec::with_capacity(18);
     let mut direct = Vec::with_capacity(18);
-    // Two warm-up rounds, then nine A-B-C-D-E-E-D-C-B-A rounds: 18 samples
-    // per route. C/D (native and unified fan-out with one shared value) run
-    // only where the query walker reaches the story; E (one direct
+    let mut fanout_plan = Vec::with_capacity(18);
+    // Two warm-up rounds, then nine A-B-C-D-E-F-F-E-D-C-B-A rounds: 18
+    // samples per route. C/D (native and unified fan-out with one shared
+    // value) and F (the same fan-out with a precompiled plan, record 0287)
+    // run only where the query walker reaches the story; E (one direct
     // `File::set`/`remove`) only for a single target.
     for round in 0..11 {
-        for route in [0u8, 1, 2, 3, 4, 4, 3, 2, 1, 0] {
-            if (route == 2 || route == 3) && fanout_query.is_none() {
+        for route in [0u8, 1, 2, 3, 4, 5, 5, 4, 3, 2, 1, 0] {
+            if matches!(route, 2 | 3 | 5) && fanout_query.is_none() {
                 continue;
             }
             if route == 4 && case.count != 1 {
@@ -354,6 +379,12 @@ fn run_case(case: &Prepared) -> Result<serde_json::Value, Box<dyn std::error::Er
                     Output::Unified(black_box(case.unified_direct()?)),
                     &per_target,
                 ),
+                5 => (
+                    Output::Unified(black_box(
+                        case.unified_fanout_plan(case.fanout_plan.as_ref().ok_or("plan")?)?,
+                    )),
+                    fanout_oracle,
+                ),
                 _ => (
                     Output::Unified(black_box(
                         case.unified_fanout(fanout_query.ok_or("query")?)?,
@@ -373,7 +404,8 @@ fn run_case(case: &Prepared) -> Result<serde_json::Value, Box<dyn std::error::Er
                     1 => batch.push(elapsed),
                     2 => native_shared.push(elapsed),
                     3 => fanout.push(elapsed),
-                    _ => direct.push(elapsed),
+                    4 => direct.push(elapsed),
+                    _ => fanout_plan.push(elapsed),
                 }
             }
         }
@@ -385,6 +417,7 @@ fn run_case(case: &Prepared) -> Result<serde_json::Value, Box<dyn std::error::Er
     let fanout_median = (!fanout.is_empty()).then(|| median(&fanout));
     let shared_median = (!native_shared.is_empty()).then(|| median(&native_shared));
     let direct_median = (!direct.is_empty()).then(|| median(&direct));
+    let fanout_plan_median = (!fanout_plan.is_empty()).then(|| median(&fanout_plan));
     Ok(json!({
         "family": case.family.name(),
         "count": case.count,
@@ -402,6 +435,9 @@ fn run_case(case: &Prepared) -> Result<serde_json::Value, Box<dyn std::error::Er
         "unified_direct_ns": direct,
         "unified_direct_median_ns": direct_median,
         "direct_ratio": direct_median.map(|value| value / native_median),
+        "unified_fanout_plan_ns": fanout_plan,
+        "unified_fanout_plan_median_ns": fanout_plan_median,
+        "fanout_plan_ratio": fanout_plan_median.zip(shared_median).map(|(fanout, native)| fanout / native),
         "exact_bytes_and_source_immutability": true
     }))
 }
@@ -421,7 +457,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "schema": "rtf_destination_benchmark.v1",
             "rounds": 9,
             "warmup_rounds": 2,
-            "order": "ABCDEEDCBA",
+            "order": "ABCDEFFEDCBA",
             "timing": "warmed immutable owners; paths, properties and native operations prepared outside timing; staging and commit timed; serialization and validation excluded",
             "cases": cases
         }))?

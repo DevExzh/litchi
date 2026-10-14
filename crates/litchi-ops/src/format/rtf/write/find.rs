@@ -91,7 +91,7 @@ impl Rtf {
         if let Some(path) = target.path() {
             collect(crate::path::resolve::get(&nav, path)?)?;
         } else if let Some(query) = target.query() {
-            let walk = crate::query::run(&nav, query.clone())?;
+            let walk = crate::query::run(&nav, query)?;
             if !walk.plan().diagnostics().is_empty() {
                 return Err(Error::new(
                     Code::InvalidSelector,

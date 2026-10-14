@@ -25,3 +25,13 @@ UNIFIED_QUERY_DIR=/some/scratch taskset -c 0 \
 Each JSON line holds per-sample unified and leaf times (in-process ABBA) and
 the median ratio. Only public APIs are used, so binaries built before and
 after a change can be alternated. Never commit the compiled binary.
+
+Record 0287 adds the `all-formats` cargo feature, which compiles the unified
+layer with every non-iWork format as the `litchi` facade with all features
+does, so the unified `Node` has the size a full build gives it (408 bytes
+before record 0287, 184 after). Routes and their names are unchanged.
+
+```sh
+CARGO_TARGET_DIR=target/bench cargo build --release --features all-formats \
+  --manifest-path tools/perf-baseline/unified-query/Cargo.toml
+```

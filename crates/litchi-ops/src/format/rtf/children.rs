@@ -14,7 +14,8 @@ use crate::path::navigate::KindSet;
 
 /// The parent whose children are walked, with the native cursor of the axis
 /// being walked. The hot main-story axes keep only what they read; any other
-/// parent is boxed so the iterator stays small.
+/// parent is kept by value (record 0287: an RTF node is small enough to copy,
+/// which spares an allocation per walked container).
 enum State<'f> {
     None,
     Body {
@@ -29,7 +30,7 @@ enum State<'f> {
         anchors: std::ops::Range<usize>,
         runs: litchi_rtf::text::Runs<'f>,
     },
-    Other(Box<Node<'f>>),
+    Other(Node<'f>),
 }
 
 /// The children of one node, in the order of its kind's child table.
@@ -70,7 +71,7 @@ impl<'f> Children<'f> {
     pub(super) fn filtered(parent: &Node<'f>, filter: Option<KindSet<Kind>>) -> Self {
         let state = match (
             parent.kind,
-            parent.paragraph_position,
+            parent.paragraph_position(),
             parent.body_paragraph(),
         ) {
             (Kind::Body, _, _) => State::Body {
@@ -89,7 +90,7 @@ impl<'f> Children<'f> {
             // Header/footer paragraphs expose text only; runs, links and
             // pictures are main-story axes.
             (Kind::Paragraph, _, _) => State::None,
-            _ => State::Other(Box::new(*parent)),
+            _ => State::Other(*parent),
         };
         Self {
             state,
@@ -227,12 +228,12 @@ impl<'f> Children<'f> {
             },
             (Kind::Document, Kind::Comments) => (self.ordinal == 0
                 && !package.annotations().is_empty())
-            .then(|| Node::collection(doc, Kind::Comments, "comments")),
+            .then(|| Node::collection(doc, Kind::Comments)),
             (Kind::Document, Kind::Styles) => (self.ordinal == 0 && !package.styles().is_empty())
-                .then(|| Node::collection(doc, Kind::Styles, "styles")),
+                .then(|| Node::collection(doc, Kind::Styles)),
             (Kind::Document, Kind::Numbering) => (self.ordinal == 0
                 && !(package.lists().is_empty() && package.list_overrides().is_empty()))
-            .then(|| Node::collection(doc, Kind::Numbering, "numbering")),
+            .then(|| Node::collection(doc, Kind::Numbering)),
             (Kind::Table, Kind::Row) => {
                 let Item::Table { table, value } = parent.item else {
                     return None;
@@ -301,13 +302,10 @@ impl<'f> Children<'f> {
                     )
                 })
             },
-            (Kind::Styles, Kind::Style) => package.styles().get(self.ordinal).map(|style| {
-                parent.child_at(
-                    Kind::Style,
-                    Item::Style(style),
-                    crate::node::PathStep::new(style.name.as_ref()),
-                )
-            }),
+            (Kind::Styles, Kind::Style) => package
+                .styles()
+                .get(self.ordinal)
+                .map(|style| parent.child(Kind::Style, Item::Style(style), position)),
             (Kind::Numbering, Kind::AbstractNum) => package
                 .lists()
                 .get(self.ordinal)

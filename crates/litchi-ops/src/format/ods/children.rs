@@ -205,6 +205,22 @@ impl<'f> Children<'f> {
                     return Ok(Self::done(file));
                 }
                 let position = parent.sheet_position();
+                if [Kind::Column, Kind::Row, Kind::Comment, Kind::MergeCell]
+                    .into_iter()
+                    .all(|kind| !kinds.contains(kind))
+                {
+                    // Only cells are wanted (record 0287): the sheet walk's
+                    // other phases would list nothing, so list the content
+                    // cells directly, in the same order.
+                    return Ok(Self {
+                        file,
+                        state: State::Cells {
+                            sheet: position,
+                            rows: sheet,
+                            cells: CellIter::Slice(sheet_index(file, position)?.cells().iter()),
+                        },
+                    });
+                }
                 Self {
                     file,
                     state: State::Sheet(Box::new(SheetItems {

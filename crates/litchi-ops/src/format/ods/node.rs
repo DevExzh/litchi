@@ -6,6 +6,7 @@
 
 use std::borrow::Cow;
 use std::fmt;
+use std::sync::OnceLock;
 
 use litchi_core::Position;
 use litchi_core::selector::CellRef;
@@ -60,19 +61,21 @@ pub(super) struct CellItem<'f> {
     pub(super) at: (u32, u32),
     /// The run covering the coordinate, when one is stored.
     pub(super) cell: Option<&'f Cell>,
-    label: Label,
+    /// The A1 label, written on first use (record 0287: a walk that never
+    /// reads it writes none).
+    label: OnceLock<Label>,
 }
 
 #[derive(Clone)]
 pub(super) struct RangeItem {
     pub(super) rect: Rect,
-    label: Label,
+    label: OnceLock<Label>,
 }
 
 #[derive(Clone)]
 pub(super) struct LineItem {
     pub(super) index: u32,
-    label: Label,
+    label: OnceLock<Label>,
 }
 
 #[derive(Clone)]
@@ -87,7 +90,7 @@ pub(super) struct CommentItem {
 pub(super) struct MergeItem {
     pub(super) rect: Rect,
     pub(super) ordinal: usize,
-    label: Label,
+    label: OnceLock<Label>,
 }
 
 impl<'f> Node<'f> {
@@ -118,19 +121,18 @@ impl<'f> Node<'f> {
             item: Item::Cell(CellItem {
                 at: (row, column),
                 cell,
-                label: Label::cell(column, row),
+                label: OnceLock::new(),
             }),
             sheet,
         }
     }
 
     pub(super) fn new_range(file: &'f Ods, sheet: u32, rect: Rect) -> Self {
-        let (first_row, first_column, last_row, last_column) = rect;
         Self {
             file,
             item: Item::Range(RangeItem {
                 rect,
-                label: Label::range((first_column, first_row), (last_column, last_row)),
+                label: OnceLock::new(),
             }),
             sheet,
         }
@@ -141,7 +143,7 @@ impl<'f> Node<'f> {
             file,
             item: Item::Row(LineItem {
                 index,
-                label: Label::row(index),
+                label: OnceLock::new(),
             }),
             sheet,
         }
@@ -152,7 +154,7 @@ impl<'f> Node<'f> {
             file,
             item: Item::Column(LineItem {
                 index,
-                label: Label::column(index),
+                label: OnceLock::new(),
             }),
             sheet,
         }
@@ -180,7 +182,7 @@ impl<'f> Node<'f> {
             item: Item::Merge(MergeItem {
                 rect: (span.row, span.column, span.last_row, span.last_column),
                 ordinal,
-                label: Label::range((span.column, span.row), (span.last_column, span.last_row)),
+                label: OnceLock::new(),
             }),
             sheet,
         }
@@ -214,6 +216,22 @@ impl<'f> Node<'f> {
     /// The content index of the node's worksheet.
     pub(super) fn index(&self) -> Result<&'f SheetIndex> {
         sheet_index(self.file, self.sheet)
+    }
+
+    /// The A1 label of a cell, range, row, column or merge node, written on
+    /// first use.
+    fn label(&self) -> Option<&Label> {
+        Some(match &self.item {
+            Item::Cell(cell) => cell.label.get_or_init(|| Label::cell(cell.at.1, cell.at.0)),
+            Item::Range(range) => range.label.get_or_init(|| {
+                let (first_row, first_column, last_row, last_column) = range.rect;
+                Label::range((first_column, first_row), (last_column, last_row))
+            }),
+            Item::Row(row) => row.label.get_or_init(|| Label::row(row.index)),
+            Item::Column(column) => column.label.get_or_init(|| Label::column(column.index)),
+            Item::Merge(merge) => merge_label(merge),
+            _ => return None,
+        })
     }
 
     /// The node's own path step under its parent, written from the item.
@@ -288,7 +306,9 @@ impl<'f> Node<'f> {
 
     pub(super) fn cell_ref(&self) -> Option<CellRef> {
         match &self.item {
-            Item::Cell(cell) => CellRef::parse(cell.label.as_str()),
+            Item::Cell(_) => self
+                .label()
+                .and_then(|label| CellRef::parse(label.as_str())),
             _ => None,
         }
     }
@@ -356,7 +376,7 @@ impl<'f> Node<'f> {
                 );
                 (COMMENT_PROPS, Props::Comment { entry, label })
             },
-            Item::Merge(merge) => (MERGE_PROPS, Props::Merge(merge.label)),
+            Item::Merge(merge) => (MERGE_PROPS, Props::Merge(*merge_label(merge))),
         };
         Ok(Format::new(table, Source::Ods(props)))
     }
@@ -435,6 +455,12 @@ pub(super) fn annotations(file: &Ods) -> Result<&litchi_ods::annotations::Snapsh
 pub(super) fn sheet_index(file: &Ods, position: u32) -> Result<&SheetIndex> {
     let sheets = file.worksheets()?;
     file.cache().sheet(sheets, position as usize)
+}
+
+/// The row-run ends of the worksheet at `position`.
+pub(super) fn row_ends(file: &Ods, position: u32) -> Result<&super::index::RowEnds> {
+    let sheets = file.worksheets()?;
+    file.cache().rows(sheets, position as usize)
 }
 
 pub(super) fn missing_sheet() -> Error {
@@ -666,12 +692,13 @@ impl<'f> Project<'f> for Node<'f> {
             Ok(match &self.item {
                 Item::Workbook | Item::Comment(_) => None,
                 Item::Sheet(sheet) => Some(Preview::Text(Cow::Borrowed(sheet.name.as_str()))),
-                Item::Cell(cell) => Some(Preview::Text(Cow::Borrowed(cell.label.as_str()))),
-                Item::Range(range) => Some(Preview::Text(Cow::Borrowed(range.label.as_str()))),
-                Item::Row(line) | Item::Column(line) => {
-                    Some(Preview::Text(Cow::Borrowed(line.label.as_str())))
-                },
-                Item::Merge(merge) => Some(Preview::Text(Cow::Borrowed(merge.label.as_str()))),
+                Item::Cell(_)
+                | Item::Range(_)
+                | Item::Row(_)
+                | Item::Column(_)
+                | Item::Merge(_) => self
+                    .label()
+                    .map(|label| Preview::Text(Cow::Borrowed(label.as_str()))),
                 Item::NamedRange(_) => self
                     .named_range_text()?
                     .map(|text| Preview::Text(Cow::Borrowed(text))),
@@ -713,6 +740,14 @@ impl<'f> Project<'f> for Node<'f> {
             Err(error) => ViewChildren::failed(error),
         }
     }
+}
+
+/// The A1 label of a merge span, written on first use.
+fn merge_label(merge: &MergeItem) -> &Label {
+    merge.label.get_or_init(|| {
+        let (row, column, last_row, last_column) = merge.rect;
+        Label::range((column, row), (last_column, last_row))
+    })
 }
 
 /// The displayed text of the content cells in `rect`, space-separated.

@@ -4,6 +4,20 @@ version = "0.1.0"
 edition = "2024"
 publish = false
 
+[features]
+# Record 0287: compile the unified layer with every non-iWork format, as the
+# `litchi` facade with all features does, so the unified `Node` has the size
+# a full build gives it. Routes are unchanged.
+all-formats = [
+    "litchi-ops/doc",
+    "litchi-ops/ppt",
+    "litchi-ops/rtf",
+    "litchi-ops/odt",
+    "litchi-ops/ods",
+    "litchi-ops/odp",
+    "litchi-ops/odg",
+]
+
 [dependencies]
 litchi-core = { path = "../../../crates/litchi-core" }
 litchi-docx = { path = "../../../crates/litchi-docx" }

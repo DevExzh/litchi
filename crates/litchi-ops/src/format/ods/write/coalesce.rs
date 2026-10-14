@@ -48,7 +48,9 @@ impl Ods {
         {
             return Ok(None);
         }
-        let node = crate::path::resolve::get(&Nav::new(self), path)?;
+        // A batch resolves many coordinates of one snapshot: find each row
+        // by binary search over the cached row runs (record 0287).
+        let node = crate::path::resolve::get(&Nav::with_indexed_rows(self), path)?;
         let Target::Cell { sheet, row, column } = Target::of(&node) else {
             return Ok(None);
         };

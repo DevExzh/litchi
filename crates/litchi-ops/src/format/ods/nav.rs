@@ -10,7 +10,7 @@ use litchi_core::selector::{CellRange, CellRef};
 
 use super::Ods;
 use super::children::Children;
-use super::node::{Item, Node, annotations, raw_value, sheet_index};
+use super::node::{Item, Node, annotations, raw_value, row_ends, sheet_index};
 use super::spec::{Kind, SPEC};
 use crate::error::{Code, Error, Result};
 use crate::node::spec::{FormatSpec, GapSpec};
@@ -27,11 +27,26 @@ const MAX_COLUMN: u32 = 16_383;
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Nav<'f> {
     file: &'f Ods,
+    /// Look coordinates up through the snapshot's cached row-run ends
+    /// (record 0287), for callers that resolve many coordinates.
+    indexed_rows: bool,
 }
 
 impl<'f> Nav<'f> {
     pub(crate) const fn new(file: &'f Ods) -> Self {
-        Self { file }
+        Self {
+            file,
+            indexed_rows: false,
+        }
+    }
+
+    /// A navigator that finds coordinates by binary search over the cached
+    /// row runs; it resolves exactly what [`Self::new`] does.
+    pub(crate) const fn with_indexed_rows(file: &'f Ods) -> Self {
+        Self {
+            file,
+            indexed_rows: true,
+        }
     }
 
     fn sheet(self, select: Select<'_>) -> Result<Lookup<Node<'f>, GapSpec>> {
@@ -132,12 +147,12 @@ impl<'f> Nav<'f> {
         Ok(match (kind, select) {
             (Kind::Cell, Select::Cell(at)) => {
                 let (row, column) = (at.row(), at.column());
-                Lookup::Found(Node::new_cell(
-                    self.file,
-                    position,
-                    (row, column),
-                    sheet.cell(row as usize, column as usize),
-                ))
+                let cell = if self.indexed_rows {
+                    row_ends(self.file, position)?.cell(sheet, row as usize, column as usize)
+                } else {
+                    sheet.cell(row as usize, column as usize)
+                };
+                Lookup::Found(Node::new_cell(self.file, position, (row, column), cell))
             },
             (Kind::Range, Select::Range(range)) => {
                 Lookup::Found(Node::new_range(self.file, position, rect(range)))

@@ -1489,10 +1489,22 @@ impl SourceBackedWorkbook {
         row: u32,
         column: u32,
     ) -> Result<Option<SourceBackedCell>> {
-        let worksheet = self
-            .worksheet_by_index(worksheet_index)?
-            .ok_or_else(|| SourceBackedError::WorksheetNotFound(worksheet_index.to_string()))?;
-        worksheet.cell(row, column)
+        // The lookup reads only retained metadata, and every path of the cell
+        // read observes the source after it, so the lookup's own trailing
+        // check would only repeat that observation (record 0287). A missing
+        // worksheet still checks before it reports.
+        let Some(sheet_index) = self
+            .inner
+            .sheets
+            .iter()
+            .position(|sheet| sheet.worksheet_index == Some(worksheet_index))
+        else {
+            self.ensure_current()?;
+            return Err(SourceBackedError::WorksheetNotFound(
+                worksheet_index.to_string(),
+            ));
+        };
+        query_cell(&self.inner, sheet_index, row, column, None)
     }
 
     /// The workbook's number formats and XF table.
@@ -3904,7 +3916,6 @@ fn query_cell(
     if let Some(context) = execution {
         context.check().map_err(SourceBackedError::from)?;
     }
-    owner.ensure_current()?;
     if row > u32::from(u16::MAX) || column > u32::from(u8::MAX) {
         owner.ensure_current()?;
         return Ok(None);
@@ -3913,6 +3924,9 @@ fn query_cell(
         .query_cache
         .lookup(sheet_index, owner.expected_version)
     {
+        // The replay publishes nothing, and each of its reads and its
+        // trailing check observe the source, so a leading check would only
+        // repeat them (record 0287).
         return replay_indexed_cell(
             owner,
             sheet_index,
@@ -3922,6 +3936,8 @@ fn query_cell(
             execution,
         );
     }
+    // A scan updates the cache's miss state before it reads: check first.
+    owner.ensure_current()?;
     let index_candidate = owner
         .query_cache
         .observe_miss(sheet_index)
@@ -4154,11 +4170,26 @@ fn read_indexed_frame(
         ));
     }
     let mut header = [0_u8; 4];
+    // The payload read below fences the header as well (record 0287); every
+    // error between the two reads is fenced, so a changed source still wins.
     cursor
-        .read_exact(&mut header)
+        .read_exact_deferred(&mut header)
         .map_err(SourceBackedError::from)?;
     let kind = u16::from_le_bytes([header[0], header[1]]);
     let payload_len = usize::from(u16::from_le_bytes([header[2], header[3]]));
+    let payload = indexed_payload(offset, payload_len, upper_bound)
+        .map_err(|error| fence_error(cursor, error))?;
+    let mut payload = payload;
+    cursor
+        .read_exact(&mut payload)
+        .map_err(SourceBackedError::from)?;
+    Ok((kind, payload))
+}
+
+/// The zeroed buffer for an indexed frame's payload of `payload_len` bytes
+/// whose header starts at `offset`, after checking it against the record
+/// limit and `upper_bound`.
+fn indexed_payload(offset: u64, payload_len: usize, upper_bound: u64) -> Result<Vec<u8>> {
     if payload_len > litchi_biff::MAX_RECORD_BYTES {
         return Err(SourceBackedError::ResourceLimit {
             resource: "BIFF record bytes",
@@ -4185,10 +4216,18 @@ fn read_indexed_frame(
             requested: payload_len as u64,
         })?;
     payload.resize(payload_len, 0);
-    cursor
-        .read_exact(&mut payload)
-        .map_err(SourceBackedError::from)?;
-    Ok((kind, payload))
+    Ok(payload)
+}
+
+/// `error`, unless the source changed since the cursor's last fenced read,
+/// whose `SourceChanged` error wins.
+fn fence_error(cursor: &SharedOleStreamCursor<'_>, error: SourceBackedError) -> SourceBackedError {
+    match cursor.check_source() {
+        Err(OleError::SourceChanged { expected, observed }) => {
+            SourceBackedError::SourceChanged { expected, observed }
+        },
+        _ => error,
+    }
 }
 
 fn replay_mul_rk_record(payload: &[u8], slot: &CellSlot) -> Result<CellRecord> {

@@ -102,6 +102,8 @@ mod tests;
 mod value;
 mod view;
 
+#[cfg(feature = "rtf")]
+pub(crate) use path::INLINE_STEPS;
 #[cfg(any(test, feature = "test-support"))]
 pub(crate) use path::Ident;
 #[cfg(test)]

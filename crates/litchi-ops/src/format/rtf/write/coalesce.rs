@@ -154,6 +154,48 @@ struct SourceIndex {
 }
 
 impl SourceIndex {
+    /// Admits the index `build` would make under `limits`, without building
+    /// it: the same charges, checked in the same order (record 0287 builds
+    /// the index only when a plan first reads it).
+    fn admit(file: &Rtf, limits: &SemanticLimits) -> Result<()> {
+        let paragraph_charge = file
+            .0
+            .package
+            .paragraph_count()
+            .checked_mul(size_of::<ParagraphMeta>())
+            .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
+        if paragraph_charge > limits.max_staged_bytes() {
+            return Err(staged_limit(paragraph_charge, limits.max_staged_bytes()));
+        }
+        let run_charge = file
+            .0
+            .package
+            .body()
+            .runs()
+            .count()
+            .checked_mul(size_of::<RunMeta>())
+            .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
+        let cache_charge = paragraph_charge
+            .checked_add(run_charge)
+            .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
+        if cache_charge > limits.max_staged_bytes() {
+            return Err(staged_limit(cache_charge, limits.max_staged_bytes()));
+        }
+        let note_charge = cache_charge
+            .checked_add(
+                file.0
+                    .package
+                    .notes()
+                    .len()
+                    .saturating_mul(size_of::<usize>()),
+            )
+            .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
+        if note_charge > limits.max_staged_bytes() {
+            return Err(staged_limit(note_charge, limits.max_staged_bytes()));
+        }
+        Ok(())
+    }
+
     fn build(file: &Rtf, limits: &SemanticLimits) -> Result<Self> {
         let paragraph_count = file.0.package.paragraph_count();
         let paragraph_charge = paragraph_count
@@ -279,6 +321,23 @@ impl SourceIndex {
     }
 }
 
+/// A run's source index, built on first use.
+struct SourceRef<'a> {
+    file: &'a Rtf,
+    limits: &'a SemanticLimits,
+    index: &'a std::sync::OnceLock<SourceIndex>,
+}
+
+impl SourceRef<'_> {
+    fn get(&self) -> Result<&SourceIndex> {
+        if let Some(index) = self.index.get() {
+            return Ok(index);
+        }
+        let built = SourceIndex::build(self.file, self.limits)?;
+        Ok(self.index.get_or_init(|| built))
+    }
+}
+
 struct Item {
     plan: Plan,
     index: usize,
@@ -287,7 +346,8 @@ struct Item {
 pub(crate) struct Run {
     base: Rtf,
     edit: litchi_rtf::edit::Edit,
-    source: SourceIndex,
+    /// Built on the first plan that reads it; admitted when the run opens.
+    source: std::sync::OnceLock<SourceIndex>,
     limits: SemanticLimits,
     items: Vec<Item>,
     family: Option<Family>,
@@ -324,8 +384,8 @@ pub(crate) fn direct_candidate(target: &TargetArg<'_>, props: &Props<'_>) -> Res
 impl Run {
     pub(crate) fn new(base: &Rtf, limits: &SemanticLimits) -> Result<Option<Self>> {
         base.admit_edit()?;
-        let source = match SourceIndex::build(base, limits) {
-            Ok(source) => source,
+        match SourceIndex::admit(base, limits) {
+            Ok(()) => {},
             Err(error)
                 if matches!(
                     error.leaf(),
@@ -340,7 +400,7 @@ impl Run {
                 return Ok(None);
             },
             Err(error) => return Err(error),
-        };
+        }
         let native_limits = NativeLimits::builder()
             .max_operations(limits.max_operations())
             .map_err(Error::from)?
@@ -358,7 +418,7 @@ impl Run {
             // Index storage has its own check against the staging bound;
             // it is not authored payload/action charge (nor a heap budget).
             staged_bytes: 0,
-            source,
+            source: std::sync::OnceLock::new(),
             limits: *limits,
             items: Vec::new(),
             destinations: Vec::new(),
@@ -394,7 +454,11 @@ impl Run {
         }
         make_plan(
             &self.base,
-            &self.source,
+            &SourceRef {
+                file: &self.base,
+                limits: &self.limits,
+                index: &self.source,
+            },
             target,
             props,
             &self.limits,
@@ -656,7 +720,7 @@ fn name_is(step: &Step<'_>, name: &str) -> bool {
 
 fn make_plan(
     file: &Rtf,
-    source: &SourceIndex,
+    source: &SourceRef<'_>,
     target: Target,
     props: &Props<'_>,
     limits: &SemanticLimits,
@@ -666,12 +730,12 @@ fn make_plan(
         Target::DestinationPath(path) => {
             let resolved = match path {
                 super::destination::DirectPath::Note { footnotes, ordinal } => {
-                    super::destination::Target::Note(source.note(footnotes, ordinal).ok_or_else(
-                        || {
+                    super::destination::Target::Note(
+                        source.get()?.note(footnotes, ordinal).ok_or_else(|| {
                             Error::new(Code::PathNotFound, "the RTF note does not exist")
                                 .with_format(FileFormat::Rtf)
-                        },
-                    )?)
+                        })?,
+                    )
                 },
                 _ => super::destination::resolve(file, path)?,
             };
@@ -707,7 +771,7 @@ fn make_plan(
             })
         },
         Target::Paragraph(position) => {
-            let meta = source.paragraph(position)?;
+            let meta = source.get()?.paragraph(position)?;
             let properties = paragraph_properties(props)?;
             let current_text = source_text(file, &meta.text);
             let layout_intent = layout_intent(props)?;
@@ -764,7 +828,7 @@ fn make_plan(
             })
         },
         Target::Run { paragraph, run } => {
-            let meta = source.run(paragraph, run)?;
+            let meta = source.get()?.run(paragraph, run)?;
             let text = run_text(props)?;
             let format = run_format_patch(props)?;
             let current_text = source_text(file, &meta.text);

@@ -239,14 +239,65 @@ fn too_many() -> Error {
     .with_suggestion("address cells directly by coordinate, or split the worksheet")
 }
 
+/// The logical end of each physical row run of one worksheet, so a
+/// coordinate finds its row by binary search instead of a scan (record
+/// 0287). Built only by callers that look up many coordinates of one
+/// snapshot (a coalesced batch); one direct lookup scans the runs.
+#[derive(Debug)]
+pub(crate) struct RowEnds(Box<[usize]>);
+
+impl RowEnds {
+    fn build(sheet: &Sheet) -> Self {
+        let mut end = 0_usize;
+        Self(
+            sheet
+                .rows
+                .iter()
+                .map(|row| {
+                    end = end.saturating_add(row.repeat());
+                    end
+                })
+                .collect(),
+        )
+    }
+
+    /// The physical run covering `(row, column)`: what
+    /// [`Sheet::cell`] returns, found by binary search over the row runs.
+    pub(crate) fn cell<'s>(&self, sheet: &'s Sheet, row: usize, column: usize) -> Option<&'s Cell> {
+        // `Sheet::row` takes the first run whose end lies past `row`; the
+        // ends never decrease.
+        let physical = self.0.partition_point(|&end| end <= row);
+        sheet.rows.get(physical)?.cell(column)
+    }
+}
+
 /// The read caches of one snapshot.
 #[derive(Default)]
 pub(crate) struct Cache {
     sheets: OnceLock<Box<[OnceLock<std::result::Result<SheetIndex, Error>>]>>,
+    rows: OnceLock<Box<[OnceLock<RowEnds>]>>,
     annotations: OnceLock<std::result::Result<litchi_ods::annotations::Snapshot, Error>>,
 }
 
 impl Cache {
+    /// The row-run ends of the worksheet at `position` of `sheets`.
+    pub(crate) fn rows<'c>(&'c self, sheets: &[Sheet], position: usize) -> Result<&'c RowEnds> {
+        let slots = self.rows.get_or_init(|| {
+            (0..sheets.len())
+                .map(|_| OnceLock::new())
+                .collect::<Vec<_>>()
+                .into_boxed_slice()
+        });
+        let (Some(slot), Some(sheet)) = (slots.get(position), sheets.get(position)) else {
+            return Err(Error::new(
+                Code::PathNotFound,
+                "the worksheet position is outside the workbook",
+            )
+            .with_format(FileFormat::Ods));
+        };
+        Ok(slot.get_or_init(|| RowEnds::build(sheet)))
+    }
+
     /// The content index of the worksheet at `position` of `sheets`.
     pub(crate) fn sheet<'c>(&'c self, sheets: &[Sheet], position: usize) -> Result<&'c SheetIndex> {
         let slots = self.sheets.get_or_init(|| {

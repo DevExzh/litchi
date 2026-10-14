@@ -112,6 +112,10 @@ where
     interest: u128,
     /// `(interest, kinds worth asking the adapter for)`, the two most recent.
     relevant: [(u128, u128); 2],
+    /// The latest match, from the step that found it until the iterator or
+    /// the hit takes it (record 0287: the node moves once into this slot and
+    /// once out, instead of through every layer of the step's result).
+    out: Option<N::Node>,
     /// The latest match of a `[last()]` subject, with its ancestors.
     pending: Option<(N::Node, N::Kind, u32)>,
     pending_path: Vec<(N::Node, N::Kind, u32)>,
@@ -166,12 +170,18 @@ where
     Done,
 }
 
-/// A match found by the walk.
+/// A match found by the walk; the node itself waits in the state's `out`
+/// slot.
 struct Found<'f, N: Navigate<'f>> {
-    node: N::Node,
     kind: N::Kind,
     ordinal: u32,
     ancestors: Ancestors,
+}
+
+/// A match with its node, as a [`Hit`] holds it.
+struct Matched<'f, N: Navigate<'f>> {
+    node: N::Node,
+    found: Found<'f, N>,
 }
 
 /// Where a match's ancestors are, for its path.
@@ -301,6 +311,7 @@ where
                 alts: vec![Alt::default(); alternatives],
                 interest,
                 relevant: [(0, 0); 2],
+                out: None,
                 pending: None,
                 pending_path: Vec::new(),
                 bindings: Vec::new(),
@@ -341,7 +352,13 @@ where
     /// The next match, with access to its path.
     pub(crate) fn next_hit(&mut self) -> Option<Result<Hit<'_, 'q, 'f, N>>> {
         match self.advance() {
-            Ok(Some(found)) => Some(Ok(Hit { walk: self, found })),
+            Ok(Some(found)) => {
+                let node = self.state.out.take()?;
+                Some(Ok(Hit {
+                    walk: self,
+                    found: Matched { node, found },
+                }))
+            },
             Ok(None) => None,
             Err(error) => Some(Err(error)),
         }
@@ -370,9 +387,13 @@ where
             let _scope = Scope::enter(self.nav.fence_key());
             self.advance_checked()
         };
-        let result = self.nav.check_source().and(result);
+        let result = match self.nav.check_source() {
+            Ok(()) => result,
+            Err(error) => Err(error),
+        };
         if result.is_err() {
             self.finish();
+            self.state.out = None;
             self.state.pending_path.clear();
         }
         result
@@ -404,8 +425,8 @@ where
                 self.finish();
                 Ok(pending.map(|(node, kind, ordinal)| {
                     self.state.yielded += 1;
+                    self.state.out = Some(node);
                     Found {
-                        node,
                         kind,
                         ordinal,
                         ancestors: Ancestors::Pending,
@@ -438,9 +459,22 @@ where
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        // The match moves out of the walk once, without a `Hit`.
+        // The match moves out of the walk's slot once, without a `Hit`.
+        self.next_map(|node| node)
+    }
+}
+
+impl<'f, N> Walk<'_, 'f, N>
+where
+    N: Inspect<'f>,
+    N::Node: Clone,
+{
+    /// The next match, wrapped by `wrap` as it leaves the walk's slot, so
+    /// the node moves once into the caller's item (record 0287).
+    #[inline]
+    pub(crate) fn next_map<T>(&mut self, wrap: impl FnOnce(N::Node) -> T) -> Option<Result<T>> {
         match self.advance() {
-            Ok(Some(found)) => Some(Ok(found.node)),
+            Ok(Some(_)) => self.state.out.take().map(|node| Ok(wrap(node))),
             Ok(None) => None,
             Err(error) => Some(Err(error)),
         }
@@ -460,7 +494,7 @@ where
     N: Inspect<'f>,
 {
     walk: &'w Walk<'q, 'f, N>,
-    found: Found<'f, N>,
+    found: Matched<'f, N>,
 }
 
 impl<'w, 'q, 'f, N> Hit<'w, 'q, 'f, N>
@@ -474,7 +508,7 @@ where
 
     /// The matching node's kind.
     pub(crate) fn kind(&self) -> N::Kind {
-        self.found.kind
+        self.found.found.kind
     }
 
     /// The match's path, written from the walk's stack: the scope as the
@@ -516,7 +550,7 @@ where
             f.write_char('/')?;
             nav.write_step(node, kind, Position::new(ordinal as usize), f)
         };
-        match self.hit.found.ancestors {
+        match self.hit.found.found.ancestors {
             Ancestors::Frames(depth) => {
                 for frame in walk.state.frames.iter().take(depth).skip(1) {
                     step(&frame.node, frame.kind, frame.ordinal)?;
@@ -529,7 +563,7 @@ where
             },
         }
         let found = &self.hit.found;
-        step(&found.node, found.kind, found.ordinal)
+        step(&found.node, found.found.kind, found.found.ordinal)
     }
 }
 
@@ -683,16 +717,15 @@ where
                     }
                 },
                 Verdict::Yield => {
-                    let found = if descend {
+                    self.state.out = Some(if descend {
                         let kinds = self.relevant(self.state.interest);
                         let yielded = node.clone();
                         self.push(node, kind, ordinal, kinds, Source::Lazy)?;
                         yielded
                     } else {
                         node
-                    };
+                    });
                     return Ok(Some(Found {
-                        node: found,
                         kind,
                         ordinal,
                         ancestors: Ancestors::Frames(depth),
