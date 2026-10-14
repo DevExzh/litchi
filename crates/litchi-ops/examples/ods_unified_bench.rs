@@ -27,7 +27,8 @@
 //!
 //! `LITCHI_ODS_BENCH_SAMPLES` sets the ABBA rounds (default 5; each round
 //! times each leg twice). `LITCHI_ODS_BENCH_ROWS` sets the fixture rows
-//! (default 1000; ten columns).
+//! (default 1000; ten columns). `LITCHI_ODS_BENCH_ONLY` (record 0287), a
+//! comma-separated list of scenario names, runs only those scenarios.
 
 #[cfg(feature = "ods")]
 mod enabled {
@@ -104,7 +105,11 @@ mod enabled {
         outputs_identical: Option<bool>,
         mut leaf: impl FnMut() -> u128,
         mut unified: impl FnMut() -> u128,
-    ) -> Scenario {
+    ) -> Option<Scenario> {
+        let name = name.into();
+        if !selected(&name) {
+            return None;
+        }
         leaf();
         unified();
         let (mut leaf_ns, mut unified_ns) = (Vec::new(), Vec::new());
@@ -115,15 +120,38 @@ mod enabled {
             leaf_ns.push(leaf());
         }
         let (leaf_median_ns, unified_median_ns) = (median(&leaf_ns), median(&unified_ns));
-        Scenario {
-            name: name.into(),
+        Some(Scenario {
+            name,
             outputs_identical,
             ratio: unified_median_ns as f64 / leaf_median_ns as f64,
             leaf_ns,
             unified_ns,
             leaf_median_ns,
             unified_median_ns,
-        }
+        })
+    }
+
+    /// Whether `LITCHI_ODS_BENCH_ONLY` (when set) names `scenario`.
+    fn selected(scenario: &str) -> bool {
+        std::env::var("LITCHI_ODS_BENCH_ONLY").map_or(true, |only| {
+            only.split(',').any(|wanted| wanted == scenario)
+        })
+    }
+
+    /// The unified leg of the query scenarios, kept out of line so a
+    /// profiler can select it (`--toggle-collect=*unified_query*`).
+    #[inline(never)]
+    fn unified_query(file: &File) -> usize {
+        file.query("cell")
+            .expect("query")
+            .map(|node| {
+                node.expect("node")
+                    .view()
+                    .text()
+                    .expect("text")
+                    .map_or(0, |text| text.len())
+            })
+            .sum::<usize>()
     }
 
     fn cell(index: usize) -> (usize, usize, String) {
@@ -193,7 +221,7 @@ mod enabled {
         let file = litchi_ops::open_bytes(bytes.clone()).expect("unified open");
         let mut scenarios = Vec::new();
 
-        scenarios.push(abba(
+        scenarios.extend(abba(
             "open_get",
             rounds,
             None,
@@ -216,7 +244,7 @@ mod enabled {
             },
         ));
 
-        scenarios.push(abba(
+        scenarios.extend(abba(
             "query",
             rounds,
             None,
@@ -242,19 +270,7 @@ mod enabled {
                 // A fresh handle per sample, so the content index is built
                 // inside the timed region as a first query builds it.
                 let fresh = litchi_ops::open_bytes(bytes.clone()).expect("unified open");
-                time(|| {
-                    fresh
-                        .query("cell")
-                        .expect("query")
-                        .map(|node| {
-                            node.expect("node")
-                                .view()
-                                .text()
-                                .expect("text")
-                                .map_or(0, |text| text.len())
-                        })
-                        .sum::<usize>()
-                })
+                time(|| unified_query(&fresh))
             },
         ));
 
@@ -264,7 +280,7 @@ mod enabled {
         // clock on a freshly opened handle.
         let warm = litchi_ops::open_bytes(bytes.clone()).expect("unified open");
         let _ = warm.query("cell").expect("query").count();
-        scenarios.push(abba(
+        scenarios.extend(abba(
             "query_warm",
             rounds,
             None,
@@ -286,22 +302,9 @@ mod enabled {
                     total
                 })
             },
-            || {
-                time(|| {
-                    warm.query("cell")
-                        .expect("query")
-                        .map(|node| {
-                            node.expect("node")
-                                .view()
-                                .text()
-                                .expect("text")
-                                .map_or(0, |text| text.len())
-                        })
-                        .sum::<usize>()
-                })
-            },
+            || time(|| unified_query(&warm)),
         ));
-        scenarios.push(abba(
+        scenarios.extend(abba(
             "query_cold",
             rounds,
             None,
@@ -326,29 +329,24 @@ mod enabled {
             },
             || {
                 let fresh = litchi_ops::open_bytes(bytes.clone()).expect("unified open");
-                time(|| {
-                    fresh
-                        .query("cell")
-                        .expect("query")
-                        .map(|node| {
-                            node.expect("node")
-                                .view()
-                                .text()
-                                .expect("text")
-                                .map_or(0, |text| text.len())
-                        })
-                        .sum::<usize>()
-                })
+                time(|| unified_query(&fresh))
             },
         ));
 
-        let leaf_output = leaf_set(&package, 1).to_bytes().expect("bytes");
-        let unified_output = file
-            .set("/Data/A1", Props::new().with("value", -1))
-            .expect("unified set")
-            .to_bytes()
-            .expect("bytes");
-        scenarios.push(abba(
+        let leaf_output = if selected("set") {
+            leaf_set(&package, 1).to_bytes().expect("bytes")
+        } else {
+            Vec::new()
+        };
+        let unified_output = if selected("set") {
+            file.set("/Data/A1", Props::new().with("value", -1))
+                .expect("unified set")
+                .to_bytes()
+                .expect("bytes")
+        } else {
+            Vec::new()
+        };
+        scenarios.extend(abba(
             "set",
             rounds,
             Some(leaf_output == unified_output),
@@ -362,7 +360,7 @@ mod enabled {
         ));
 
         for count in [1, 10, 100, 1_000, 10_000] {
-            if count > rows * COLUMNS {
+            if count > rows * COLUMNS || !selected(&format!("batch_{count}")) {
                 continue;
             }
             let items: Vec<BatchItem<'static>> = (0..count)
@@ -376,7 +374,7 @@ mod enabled {
                 .collect();
             let leaf_output = leaf_set(&package, count).to_bytes().expect("bytes");
             let unified_output = unified_batch(&file, &items).to_bytes().expect("bytes");
-            scenarios.push(abba(
+            scenarios.extend(abba(
                 format!("batch_{count}"),
                 rounds,
                 Some(leaf_output == unified_output),

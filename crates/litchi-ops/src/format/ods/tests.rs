@@ -188,3 +188,43 @@ fn broken_package(mimetype: &str) -> Vec<u8> {
     writer.write_all(b"<office:document-content>").unwrap();
     writer.finish().unwrap().into_inner()
 }
+
+/// Record 0287: a walk that wants only cells lists a sheet's content cells
+/// directly; it must find exactly the cells, in the same order and with the
+/// same paths and previews, that the phased sheet walk finds when it also
+/// lists rows, columns and merges.
+#[test]
+fn cell_only_walks_match_the_phased_sheet_walk() {
+    let mut fixtures: Vec<&str> = FIXTURES.to_vec();
+    fixtures.extend([
+        "odf/corpus/calc-cell-styles.ods",
+        "odf/ods/grid-padding-package.ods",
+        "odfdo/tests/samples/simple_table_named_range.ods",
+    ]);
+    for name in fixtures {
+        let file =
+            crate::open_bytes(std::fs::read(fixture(name)).expect("fixture")).expect("open ODS");
+        let describe = |node: crate::node::Node<'_>| {
+            let view = node.view();
+            (
+                node.kind(),
+                node.path().to_string(),
+                view.preview().expect("preview").map(|p| p.to_string()),
+                view.text().expect("text").map(|text| text.into_owned()),
+            )
+        };
+        let direct: Vec<_> = file
+            .query("cell")
+            .expect("query")
+            .map(|node| describe(node.expect("node")))
+            .collect();
+        let phased: Vec<_> = file
+            .query("cell, row, col, mergeCell")
+            .expect("query")
+            .map(|node| describe(node.expect("node")))
+            .filter(|(kind, ..)| *kind == "cell")
+            .collect();
+        assert!(!direct.is_empty(), "{name}: no cells");
+        assert_eq!(direct, phased, "{name}");
+    }
+}
