@@ -29,6 +29,7 @@ use crate::value::{LengthSpec, Scalar, ValueType};
 pub(crate) mod coalesce;
 mod destination;
 mod find;
+pub(crate) mod removal;
 
 /// The native proof and immutable endpoints of one RTF write.
 pub(crate) struct Commit {

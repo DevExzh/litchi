@@ -231,6 +231,10 @@ pub struct Edit {
     formatting: Option<crate::format::docx::write::coalesce::Run>,
     #[cfg(feature = "rtf")]
     rtf: Option<crate::format::rtf::write::coalesce::Run>,
+    /// Direct RTF picture removals published as one native removal
+    /// (record 0280).
+    #[cfg(feature = "rtf")]
+    rtf_pictures: Option<crate::format::rtf::write::removal::PictureRun>,
     #[cfg(feature = "odt")]
     odt: Option<crate::format::odt::write::coalesce::Run>,
     #[cfg(feature = "xlsx")]
@@ -322,6 +326,8 @@ impl File {
                 formatting: None,
                 #[cfg(feature = "rtf")]
                 rtf: None,
+                #[cfg(feature = "rtf")]
+                rtf_pictures: None,
                 #[cfg(feature = "odt")]
                 odt: None,
                 #[cfg(feature = "xlsx")]
@@ -1038,8 +1044,51 @@ impl Edit {
             self.operations += 1;
             return Ok(Some(changed));
         }
+        #[cfg(feature = "rtf")]
+        if let File::Rtf(handle) = &self.current {
+            return self.coalesce_rtf_picture_removal(&handle.clone(), target, index);
+        }
         let _ = (target, index);
         Ok(None)
+    }
+
+    /// Stages a direct RTF picture removal (`/body/p[N]/picture[M]`) in the
+    /// pending picture run, so consecutive removals publish one native
+    /// removal (record 0280). Any other target closes the run and takes the
+    /// ordinary path.
+    #[cfg(feature = "rtf")]
+    fn coalesce_rtf_picture_removal(
+        &mut self,
+        handle: &crate::format::rtf::Rtf,
+        target: &crate::TargetArg<'_>,
+        index: usize,
+    ) -> Result<Option<bool>> {
+        use crate::format::rtf::write::removal::PictureRun;
+        if self.rtf.is_some() {
+            self.flush_pending()?;
+        }
+        if self.rtf_pictures.as_ref().is_some_and(PictureRun::is_full) {
+            self.flush_pending()?;
+        }
+        let planned = match &self.rtf_pictures {
+            Some(run) => run.plan(target),
+            None => PictureRun::new(handle).plan(target),
+        };
+        let Some(picture) = planned else {
+            // Not a remaining direct picture: publish the staged removals so
+            // the ordinary path resolves against the current candidate.
+            self.flush_pending()?;
+            return Ok(None);
+        };
+        let File::Rtf(current) = &self.current else {
+            return Err(pending());
+        };
+        let run = self
+            .rtf_pictures
+            .get_or_insert_with(|| PictureRun::new(current));
+        run.stage(picture, index);
+        self.operations += 1;
+        Ok(Some(true))
     }
     /// Move an element, resolving its path against the current candidate.
     ///
@@ -1389,6 +1438,11 @@ impl Edit {
             }
             self.operations += 1;
             return Ok(Some(changed));
+        }
+        // A set closes pending picture removals (record 0280).
+        #[cfg(feature = "rtf")]
+        if self.rtf_pictures.is_some() {
+            self.flush_pending()?;
         }
         #[cfg(feature = "rtf")]
         if let File::Rtf(handle) = self.current.clone() {
@@ -2131,6 +2185,31 @@ impl Edit {
             let index = run.first_index();
             let result = (|| -> Result<()> {
                 let (base, commit) = run.commit()?;
+                let (step, ()) = wrap_rtf(&base, commit, ())?;
+                let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
+                if bytes > self.limits.max_snapshot_bytes() {
+                    return Err(Error::Limit {
+                        kind: LimitKind::SnapshotBytes,
+                        observed: bytes,
+                        maximum: self.limits.max_snapshot_bytes(),
+                    }
+                    .into());
+                }
+                self.steps
+                    .try_reserve(1)
+                    .map_err(|source| Error::Allocation { source })?;
+                self.current = step.after.clone();
+                self.steps.push(step);
+                self.snapshot_bytes = bytes;
+                Ok(())
+            })();
+            result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
+        }
+        #[cfg(feature = "rtf")]
+        if let Some(run) = self.rtf_pictures.take() {
+            let index = run.first_index();
+            let result = (|| -> Result<()> {
+                let (base, commit) = run.commit(&self.limits)?;
                 let (step, ()) = wrap_rtf(&base, commit, ())?;
                 let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
                 if bytes > self.limits.max_snapshot_bytes() {

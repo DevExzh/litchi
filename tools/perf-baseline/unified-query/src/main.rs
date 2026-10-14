@@ -241,6 +241,30 @@ fn xlsx_leaf_cells(
     matches
 }
 
+/// Record 0280's fair leaf equivalent of a full `cell` query: every stored
+/// record of every sheet, each kept as an owned, retainable handle (the
+/// sheet position, a shared grid handle and the address, which is what a
+/// unified node holds), and with `fenced`, one source-freshness check per
+/// match, the guarantee a unified query gives on every pull.
+fn xlsx_leaf_owned(leaf: &SourceBackedWorkbook, fenced: bool) -> usize {
+    let mut matches = 0;
+    for position in 0..leaf.len() {
+        let sheet = leaf.sheet(position).expect("reads").expect("a sheet");
+        let grid = sheet.grid().expect("a grid");
+        let Some(extent) = grid.extents().stored() else {
+            continue;
+        };
+        for (address, _) in grid.cells(extent).expect("cells") {
+            if fenced {
+                black_box(leaf.source_version().expect("current"));
+            }
+            black_box((position, grid.clone(), address));
+            matches += 1;
+        }
+    }
+    matches
+}
+
 fn over_1000(cell: &litchi_xlsx::Cell) -> bool {
     xlsx_number(cell).is_some_and(|value| value > 1000.0)
 }
@@ -325,6 +349,19 @@ fn xlsx_routes(context: &XlsxContext) -> Vec<Route<'_>> {
             full_reps,
             move || count_matches(file, all),
             move || xlsx_leaf_cells(leaf, usize::MAX, any_cell),
+        ),
+        // Record 0280: fair leaf legs for the same unified query.
+        Route::new(
+            format!("xlsx_{tag}_all_cell_owned_v1"),
+            full_reps,
+            move || count_matches(file, all),
+            move || xlsx_leaf_owned(leaf, false),
+        ),
+        Route::new(
+            format!("xlsx_{tag}_all_cell_fenced_v1"),
+            full_reps,
+            move || count_matches(file, all),
+            move || xlsx_leaf_owned(leaf, true),
         ),
     ];
     if rows > 10_000 {
@@ -824,6 +861,49 @@ fn pptx_leaf_shapes(
     matches
 }
 
+/// Record 0280's fair leaf equivalent of a full `shape` query from the
+/// root: the query visits every slide, master and layout scene, so the leaf
+/// leg reads them all too (the masters and layouts through the leaf's own
+/// catalog reads), keeps each matching shape as an owned handle, and with
+/// `fenced` checks the source once per match.
+fn pptx_leaf_owned(leaf: &SourceBackedPresentation, fenced: bool) -> usize {
+    fn scene_shapes(
+        scene: &litchi_pptx::shape::owned::Scene,
+        leaf: &SourceBackedPresentation,
+        fenced: bool,
+    ) -> usize {
+        let mut matches = 0;
+        for handle in scene.iter() {
+            if matches!(handle.view(), Shape::Auto(_)) {
+                if fenced {
+                    leaf.check_source().expect("current");
+                }
+                black_box(handle);
+                matches += 1;
+            }
+        }
+        matches
+    }
+    let mut matches = 0;
+    let mut position = 0;
+    while let Some(slide) = leaf.slide(position) {
+        matches += scene_shapes(&slide.scene().expect("reads"), leaf, fenced);
+        position += 1;
+    }
+    let masters = leaf.masters().expect("masters");
+    for (index, master) in masters.iter().enumerate() {
+        matches += scene_shapes(master.scene(), leaf, fenced);
+        let layouts = leaf
+            .layouts(Position::new(index))
+            .expect("layouts")
+            .unwrap_or_default();
+        for layout in &layouts {
+            matches += scene_shapes(layout.scene(), leaf, fenced);
+        }
+    }
+    matches
+}
+
 fn wide(shape: Shape<'_>) -> bool {
     shape
         .bounds()
@@ -932,6 +1012,19 @@ fn pptx_routes(context: &PptxContext) -> Vec<Route<'_>> {
             full_reps,
             move || count_matches(file, all_plan),
             move || pptx_leaf_shapes(leaf, usize::MAX, any_shape),
+        ),
+        // Record 0280: fair leaf legs for the same unified query.
+        Route::new(
+            format!("pptx_{label}_all_shape_owned_v1"),
+            full_reps,
+            move || count_matches(file, all_plan),
+            move || pptx_leaf_owned(leaf, false),
+        ),
+        Route::new(
+            format!("pptx_{label}_all_shape_fenced_v1"),
+            full_reps,
+            move || count_matches(file, all_plan),
+            move || pptx_leaf_owned(leaf, true),
         ),
     ]
 }

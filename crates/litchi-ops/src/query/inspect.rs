@@ -69,6 +69,21 @@ pub(crate) trait Inspect<'f>: Navigate<'f> {
         self.children(parent, kinds)
     }
 
+    /// Whether `node` has no children whose kinds are in `kinds`, known
+    /// without building its child iterator. The walker then does not enter
+    /// it: a matched node is yielded without a clone, a frame or a child
+    /// read (record 0280). The default, `false`, always enters; an adapter
+    /// answers `true` only when [`Navigate::children`] with `kinds` would be
+    /// empty.
+    fn childless(
+        &self,
+        node: &Self::Node,
+        kinds: crate::path::navigate::KindSet<Self::Kind>,
+    ) -> bool {
+        let _ = (node, kinds);
+        false
+    }
+
     /// The node's local properties, in the order of its kind's property
     /// table. Read once per candidate that reaches a property predicate.
     fn format<'n>(&'n self, node: &'n Self::Node) -> Result<Format<'n>>;
@@ -202,6 +217,14 @@ impl<'f, N: Inspect<'f>> Inspect<'f> for &N {
         kinds: crate::path::navigate::KindSet<Self::Kind>,
     ) -> Result<Self::Children> {
         (**self).early_children(parent, kinds)
+    }
+
+    fn childless(
+        &self,
+        node: &Self::Node,
+        kinds: crate::path::navigate::KindSet<Self::Kind>,
+    ) -> bool {
+        (**self).childless(node, kinds)
     }
 
     fn format<'n>(&'n self, node: &'n Self::Node) -> Result<Format<'n>> {

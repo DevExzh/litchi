@@ -119,6 +119,8 @@ struct PptxState {
     /// asks for it, and reading it parses the presentation part, whose cost
     /// grows with the deck (record 0262).
     masters: OnceLock<usize>,
+    /// Master and layout scenes and layout counts (record 0280).
+    related: owner::Related,
     /// Eager slide scenes, shared with every handle a write derives from
     /// this one (see [`scenes`]).
     scenes: Arc<scenes::Scenes>,
@@ -287,6 +289,7 @@ impl Pptx {
             ooxml_limits: self.0.ooxml_limits,
             eager_catalog: OnceLock::new(),
             masters: OnceLock::new(),
+            related: owner::Related::default(),
             scenes: Arc::clone(&self.0.scenes),
             metadata_package: OnceLock::new(),
             promotion: OnceLock::new(),
@@ -328,6 +331,7 @@ impl Pptx {
             ooxml_limits: options.ooxml_limits.unwrap_or_default(),
             eager_catalog: OnceLock::new(),
             masters: OnceLock::new(),
+            related: owner::Related::default(),
             scenes: Arc::default(),
             metadata_package: OnceLock::new(),
             promotion: OnceLock::new(),
@@ -369,6 +373,7 @@ impl Pptx {
             ooxml_limits: self.0.ooxml_limits,
             eager_catalog: OnceLock::new(),
             masters: OnceLock::new(),
+            related: owner::Related::default(),
             scenes: Arc::clone(&self.0.scenes),
             metadata_package: OnceLock::new(),
             promotion: OnceLock::new(),

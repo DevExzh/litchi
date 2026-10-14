@@ -15,6 +15,42 @@ use crate::Result;
 use crate::error::Error;
 use crate::pptx;
 
+/// Master and layout reads kept per handle (record 0280): the layout counts
+/// and the strict scenes of masters and layouts. A query from the root
+/// visits every master and layout, and the source-backed leaf re-reads the
+/// presentation part and the related part for each of them, which cost
+/// about a third of a full query on a 500-slide deck. A handle's content
+/// never changes (a changed source fails the handle's freshness fence, and a
+/// write returns a new handle with its own cache), so the values stay valid;
+/// a failed read is not kept.
+#[derive(Default)]
+pub(super) struct Related {
+    layout_counts: std::sync::Mutex<Vec<(usize, usize)>>,
+    masters: std::sync::Mutex<Vec<(usize, Scene)>>,
+    layouts: std::sync::Mutex<Vec<((usize, usize), Scene)>>,
+}
+
+/// The value cached under `key` in `cache`, else `read()`'s, kept when it
+/// is present.
+fn cached<K: PartialEq + Copy, V: Clone>(
+    cache: &std::sync::Mutex<Vec<(K, V)>>,
+    key: K,
+    read: impl FnOnce() -> Result<Option<V>>,
+) -> Result<Option<V>> {
+    if let Ok(entries) = cache.lock()
+        && let Some((_, value)) = entries.iter().find(|(at, _)| *at == key)
+    {
+        return Ok(Some(value.clone()));
+    }
+    let value = read()?;
+    if let (Some(value), Ok(mut entries)) = (&value, cache.lock())
+        && !entries.iter().any(|(at, _)| *at == key)
+    {
+        entries.push((key, value.clone()));
+    }
+    Ok(value)
+}
+
 /// The values a slide node exposes from the presentation and its layout.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct SlideFacts {
@@ -123,6 +159,15 @@ impl Pptx {
 
     /// The number of layouts owned by one slide master.
     pub(super) fn layouts_in_catalog(&self, master: usize) -> Result<usize> {
+        self.finish(|| {
+            cached(&self.0.related.layout_counts, master, || {
+                self.read_layouts_in_catalog(master).map(Some)
+            })
+            .map(Option::unwrap_or_default)
+        })
+    }
+
+    fn read_layouts_in_catalog(&self, master: usize) -> Result<usize> {
         self.finish(|| match &self.0.owner {
             PptxOwner::Source(presentation) => {
                 self.check_owner()?;
@@ -142,6 +187,14 @@ impl Pptx {
 
     /// The detached shape scene of one slide master.
     pub(super) fn master_scene(&self, position: usize) -> Result<Option<Scene>> {
+        self.finish(|| {
+            cached(&self.0.related.masters, position, || {
+                self.read_master_scene(position)
+            })
+        })
+    }
+
+    fn read_master_scene(&self, position: usize) -> Result<Option<Scene>> {
         self.finish(|| match &self.0.owner {
             PptxOwner::Source(presentation) => {
                 self.check_owner()?;
@@ -188,6 +241,20 @@ impl Pptx {
 
     /// The detached shape scene of one layout owned by one master.
     pub(super) fn layout_scene(
+        &self,
+        master_position: usize,
+        layout_position: usize,
+    ) -> Result<Option<Scene>> {
+        self.finish(|| {
+            cached(
+                &self.0.related.layouts,
+                (master_position, layout_position),
+                || self.read_layout_scene(master_position, layout_position),
+            )
+        })
+    }
+
+    fn read_layout_scene(
         &self,
         master_position: usize,
         layout_position: usize,

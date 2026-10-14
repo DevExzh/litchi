@@ -219,26 +219,7 @@ impl<'q, 'f, N: Inspect<'f>> Compiler<'q, 'f, N> {
                 )));
             }
         }
-        // The transitive closure of the child lists: what can occur below
-        // each kind, the walker's pruning table (record 0010 §5.3).
-        let mut reach = vec![0_u128; elements.len()];
-        loop {
-            let mut changed = false;
-            for (index, element) in elements.iter().enumerate() {
-                let mut below = reach[index];
-                for child in element.children {
-                    let child = usize::from(child.ordinal());
-                    below |= bit_of(child) | reach.get(child).copied().unwrap_or(0);
-                }
-                if below != reach[index] {
-                    reach[index] = below;
-                    changed = true;
-                }
-            }
-            if !changed {
-                break;
-            }
-        }
+        let reach = reach_table(elements);
         let all = elements
             .iter()
             .enumerate()
@@ -1267,4 +1248,50 @@ fn to_u16(value: usize) -> Result<u16> {
 
 fn to_u8(value: usize) -> Result<u8> {
     u8::try_from(value).map_err(|_| internal("a query plan kind index overflowed"))
+}
+
+/// The transitive closure of the child lists of `elements`: what can occur
+/// below each kind, the walker's pruning table (record 0010 §5.3).
+///
+/// A spec table is static, so the closure is computed once per table and
+/// kept for the process (record 0280: recomputing it was about a fifth of
+/// compiling a short selector). Tables are told apart by address; there is
+/// one per format adapter, so the cache stays a handful of entries.
+fn reach_table<K: ElementKind>(elements: &'static [ElementSpec<K>]) -> &'static [u128] {
+    type Tables = std::sync::RwLock<Vec<(usize, &'static [u128])>>;
+    static TABLES: Tables = std::sync::RwLock::new(Vec::new());
+    let key = elements.as_ptr().addr();
+    if let Ok(tables) = TABLES.read()
+        && let Some(&(_, reach)) = tables.iter().find(|(at, _)| *at == key)
+    {
+        return reach;
+    }
+    let mut reach = vec![0_u128; elements.len()];
+    loop {
+        let mut changed = false;
+        for (index, element) in elements.iter().enumerate() {
+            let mut below = reach[index];
+            for child in element.children {
+                let child = usize::from(child.ordinal());
+                below |= bit_of(child) | reach.get(child).copied().unwrap_or(0);
+            }
+            if below != reach[index] {
+                reach[index] = below;
+                changed = true;
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+    let Ok(mut tables) = TABLES.write() else {
+        // A poisoned cache only costs the recomputation.
+        return Box::leak(reach.into_boxed_slice());
+    };
+    if let Some(&(_, existing)) = tables.iter().find(|(at, _)| *at == key) {
+        return existing;
+    }
+    let reach: &'static [u128] = Box::leak(reach.into_boxed_slice());
+    tables.push((key, reach));
+    reach
 }

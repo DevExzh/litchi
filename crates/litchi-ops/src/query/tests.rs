@@ -1689,3 +1689,111 @@ fn sparse_row_probes_are_bounded_and_terminal_row_does_not_overflow() {
     let nav = Nav::new(&doc);
     assert!(run(&nav, "row[Region=West]").unwrap().next().is_none());
 }
+
+/// Record 0280: the walker skips nodes the adapter reports childless
+/// (`Inspect::childless`). On every ODT and flat-ODT fixture, a query for
+/// each element kind returns exactly the nodes of that kind an unpruned
+/// depth-first walk over `Navigate::children` (all kinds) finds, in the
+/// same order; `limit` and `first()` return their leading matches.
+#[cfg(feature = "odt")]
+#[test]
+fn odt_queries_match_an_unpruned_walk() {
+    use crate::format::odt::Nav as OdtNav;
+    use crate::path::navigate::{ElementKind, KindSet, Navigate};
+    use crate::query::inspect::Inspect;
+
+    fn walk<'f>(
+        nav: &OdtNav<'f>,
+        node: crate::format::odt::Node<'f>,
+        out: &mut Vec<(String, String)>,
+    ) {
+        let children: Vec<_> = nav
+            .children(&node, KindSet::ALL)
+            .expect("children")
+            .collect::<Result<_>>()
+            .expect("child");
+        out.push((
+            nav.kind(&node).name().to_owned(),
+            crate::node::Node::Odt(node).path().to_string(),
+        ));
+        for child in children {
+            walk(nav, child, out);
+        }
+    }
+
+    fn collect(directory: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+        let Ok(entries) = std::fs::read_dir(directory) else {
+            return;
+        };
+        for entry in entries {
+            let path = entry.expect("entry").path();
+            if path.is_dir() {
+                collect(&path, out);
+            } else if path
+                .extension()
+                .is_some_and(|extension| extension == "odt" || extension == "fodt")
+            {
+                out.push(path);
+            }
+        }
+    }
+
+    let mut opened = 0;
+    let mut entries = Vec::new();
+    collect(
+        std::path::Path::new(concat!(env!("CARGO_MANIFEST_DIR"), "/../../test-data")),
+        &mut entries,
+    );
+    entries.sort();
+    for path in entries {
+        let Ok(file) = crate::open(&path) else {
+            continue;
+        };
+        let crate::File::Odt(handle) = &file else {
+            continue;
+        };
+        opened += 1;
+        let nav = OdtNav::new(handle);
+        let mut all = Vec::new();
+        walk(&nav, nav.root().expect("root"), &mut all);
+        for element in <OdtNav<'_> as Inspect<'_>>::SPEC.elements {
+            let name = element.kind.name();
+            if element.gap.is_some() || matches!(name, "document") {
+                continue;
+            }
+            let expected: Vec<&str> = all
+                .iter()
+                .filter(|(kind, _)| kind == name)
+                .map(|(_, path)| path.as_str())
+                .collect();
+            let Ok(matches) = file.query(name) else {
+                continue;
+            };
+            let actual: Vec<String> = matches
+                .map(|node| node.expect("match").path().to_string())
+                .collect();
+            assert_eq!(actual, expected, "{} `{name}`", path.display());
+            for limit in [1, 2, 5] {
+                let limited: Vec<String> = file
+                    .query(name)
+                    .expect("query")
+                    .limit(limit)
+                    .map(|node| node.expect("match").path().to_string())
+                    .collect();
+                assert_eq!(
+                    limited,
+                    actual[..actual.len().min(limit)],
+                    "{name} limit {limit}"
+                );
+            }
+            let first = file
+                .query(name)
+                .expect("query")
+                .first()
+                .expect("first")
+                .map(|node| node.path().to_string());
+            assert_eq!(first.as_deref(), actual.first().map(String::as_str));
+        }
+    }
+    assert!(opened >= 5, "only {opened} ODT fixtures opened");
+}

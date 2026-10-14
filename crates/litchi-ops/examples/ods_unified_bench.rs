@@ -7,6 +7,9 @@
 //!   `open_bytes` + `get("/Data/C5")`);
 //! - `query`: enumerate every content cell's text (leaf: the projection's
 //!   typed runs; unified: `query("cell")`), on an opened handle;
+//! - `query_warm` and `query_cold` (record 0280): the same enumeration with
+//!   both legs warm, and with both legs building their index on a freshly
+//!   opened handle inside the clock;
 //! - `set`: one cell value (leaf `Package::edit` + one `set_cells` + commit;
 //!   unified `File::set`);
 //! - `batch_N`: N distinct cell values in one edit (leaf: one `set_cells`
@@ -238,6 +241,90 @@ mod enabled {
             || {
                 // A fresh handle per sample, so the content index is built
                 // inside the timed region as a first query builds it.
+                let fresh = litchi_ops::open_bytes(bytes.clone()).expect("unified open");
+                time(|| {
+                    fresh
+                        .query("cell")
+                        .expect("query")
+                        .map(|node| {
+                            node.expect("node")
+                                .view()
+                                .text()
+                                .expect("text")
+                                .map_or(0, |text| text.len())
+                        })
+                        .sum::<usize>()
+                })
+            },
+        ));
+
+        // Record 0280: fair pairings of the same query. `query_warm` reads a
+        // warm handle on both sides (the leaf's projection and the unified
+        // content index already built); `query_cold` builds both inside the
+        // clock on a freshly opened handle.
+        let warm = litchi_ops::open_bytes(bytes.clone()).expect("unified open");
+        let _ = warm.query("cell").expect("query").count();
+        scenarios.push(abba(
+            "query_warm",
+            rounds,
+            None,
+            || {
+                time(|| {
+                    let workbook = package.workbook().expect("projection");
+                    let mut total = 0_usize;
+                    for sheet in workbook.sheets() {
+                        for row in &sheet.rows {
+                            for _ in 0..row.repeat() {
+                                for cell in &row.cells {
+                                    if !cell.text.is_empty() {
+                                        total += cell.repeat() * cell.text.len();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    total
+                })
+            },
+            || {
+                time(|| {
+                    warm.query("cell")
+                        .expect("query")
+                        .map(|node| {
+                            node.expect("node")
+                                .view()
+                                .text()
+                                .expect("text")
+                                .map_or(0, |text| text.len())
+                        })
+                        .sum::<usize>()
+                })
+            },
+        ));
+        scenarios.push(abba(
+            "query_cold",
+            rounds,
+            None,
+            || {
+                let fresh = Package::from_bytes(&bytes).expect("leaf open");
+                time(|| {
+                    let workbook = fresh.workbook().expect("projection");
+                    let mut total = 0_usize;
+                    for sheet in workbook.sheets() {
+                        for row in &sheet.rows {
+                            for _ in 0..row.repeat() {
+                                for cell in &row.cells {
+                                    if !cell.text.is_empty() {
+                                        total += cell.repeat() * cell.text.len();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    total
+                })
+            },
+            || {
                 let fresh = litchi_ops::open_bytes(bytes.clone()).expect("unified open");
                 time(|| {
                     fresh
