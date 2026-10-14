@@ -544,6 +544,14 @@ Cut from `9fe45629ab`:
 - `odf-gaps` (0288): the ODF `metadata` family, ODG producer inserts, ODC chart writes, ODI geometry, tree-format coalescing.
 - `phase-g` (0289): Phase G acceptance — per-format CRUD checklist with a smoke matrix, full-corpus open → no-op → save regression, benchmark matrix.
 
+- Merged `find2` (0285):
+  - DOCX find and template merge share `document::substitute`; the 0273 text-node API is removed and banned;
+  - the 0279 TOC bug is fixed — field state carries across paragraphs, results are searched as OfficeCLI does, instructions and markers are never touched;
+  - DOCX find reaches headers, footers, notes, comments and text boxes; PPTX find and merge reach table cells and notes;
+  - DOCX find is 23–31% faster; merge ≤1.05×; PPTX find 1.07× for one match.
+  - New delta F5b: `/body` is the main story only.
+  - Open: XLSX rich-text cells, `mc:AlternateContent` documents, PPTX masters and layouts.
+
 Coordinator scripts and agent scratch now live in `/home/zhuhe/code/litchi-worktrees/.coord/` (outside the repository), so they survive `/tmp` wipes.
 
 Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-pptx-w4` 9474e2b6ce, `uo/m2-l-xlsb-w1` 876588a23c, `uo/m1-r4-perf` 012fd509ff.
