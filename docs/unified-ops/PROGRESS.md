@@ -518,6 +518,14 @@ Cut from `80e24f8745`:
   - corpus 3,847 passed, 779 gap, 0 bugs; new delta D10.
   - Miss: XLSX chart `set` 1.12–1.13× at 10 charts and 1.35× at 100 (an extra drawing-inventory read; cache it).
   - LibreOffice draws the extended charts as plain charts, and DOCX extended charts not at all.
+- Merged `perf-query` (0280):
+  - lock-free `fstat` source check in `litchi-core`; file-backed full queries are 16–23% faster;
+  - the walker skips nodes with no wanted children (ODT 6× → 3.9×);
+  - PPTX master/layout cache (full queries 26–83% faster);
+  - direct RTF picture removals coalesce (64 removals 53–56× → 1.6×);
+  - fair leaf baseline routes added.
+  - Open: ODS query 35–41×, XLSX memory scans 4.4–4.8×, a 6% XLSX-memory 1k-row regression (layout), RTF single-target fixed costs. Handed to R6.
+- Wave R5 complete.
 - **Owner decision (2026-10-14):** keep the per-match file-source freshness check in queries (record 0280 G1, raised by 0281 F3). A once-per-walk check is rejected because it would break "the next pull after a source change fails". Per-check cost work (0280's lock-free `fstat`) stays.
 - Environment: a session restart wiped `/tmp`, which held the gate scripts and `TMPDIR`. Gate scripts now live in the session scratchpad and create their `TMPDIR`.
 
