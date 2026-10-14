@@ -12,3 +12,4 @@ Apache POI checkout (no git metadata; pinned by SHA-256):
 | Path | SHA-256 | Used by |
 |---|---|---|
 | `test-data/poifs/60320-protected.xlsx` | `deed30663d59c44ea36728f81c8428ed5ff85373b30f4e4c92974d0f8b3e5329` | `crates/litchi-crypto/tests/native_ooxml_encryption.rs` |
+| `test-data/slideshow/42485.ppt` | `333ef0b2bf22158cd4ca8a8f650e534e3740437156cd47e05951ae08f03f58c9` | `crates/litchi-ops/tests/crud_matrix.rs`, PPT group (record 0289; copied 2026-10-14) |
