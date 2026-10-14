@@ -221,6 +221,19 @@ impl std::fmt::Debug for Package {
 }
 
 impl Package {
+    /// The retained physical package (metadata transactions, record 0288).
+    pub(crate) fn owned_package(&self) -> &litchi_odf_common::OwnedPackage {
+        self.chart.0.package.owned_package()
+    }
+
+    /// Adopt bytes a metadata commit published, under this chart's limits.
+    pub(crate) fn adopt_chart_bytes(&self, bytes: Vec<u8>) -> Result<Self> {
+        Self::from_snapshot(crate::package::Snapshot::from_bytes_with_limits(
+            bytes,
+            self.chart.limits(),
+        )?)
+    }
+
     /// Create the minimal valid chart package (an empty line chart).
     ///
     /// The bytes are deterministic: no clock or randomness is consulted.

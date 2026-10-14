@@ -3945,8 +3945,8 @@ odg	drawing	view	supported		ok 6 instances, first `libreoffice-core/desktop/qa/d
 odg	drawing	set	n/a	set not offered for this element	-
 odg	drawing	add	n/a	add not offered for this element	-
 odg	drawing	remove	n/a	remove not offered for this element	-
-odg	drawing	move	gap	0282 ODF object-format structure	unreached
-odg	drawing	swap	gap	0282 ODF object-format structure	unreached
+odg	drawing	move	format-verb		unreached
+odg	drawing	swap	format-verb		unreached
 odg	drawing	edit	n/a	edit not offered for this element	-
 odg	drawing	batch	n/a	batch not offered for this element	-
 odg	drawing	create	supported		ok format
@@ -3957,9 +3957,9 @@ odg	page	query	supported		ok matches in libreoffice-core/desktop/qa/data/BlankDr
 odg	page	view	supported		ok 8 instances, first `libreoffice-core/desktop/qa/data/BlankDrawDocument.odg` /page[1]
 odg	page	set	supported		ok `create() + add page` /page[1] name=Litchi
 odg	page	add	supported		ok /page[1] on `create()` under / []
-odg	page	remove	n/a	remove not offered for this element	-
-odg	page	move	gap	0282 ODF object-format structure	refused unsupported_capability
-odg	page	swap	gap	0282 ODF object-format structure	refused unsupported_capability
+odg	page	remove	supported		ok `create() + add page` /page[1]
+odg	page	move	format-verb		ok `create() + add page` /page[1] /page[2]
+odg	page	swap	format-verb		ok `create() + add page` /page[1] /page[2]
 odg	page	edit	supported		ok tx.set
 odg	page	batch	supported		ok set item
 odg	page	create	supported		ok format
@@ -3971,8 +3971,8 @@ odg	shape	view	supported		ok 6 instances, first `libreoffice-core/svx/qa/unit/da
 odg	shape	set	supported		ok `create() + add page + add shape` /page[1]/shape[1] text=Litchi
 odg	shape	add	supported		ok /page[1]/shape[1] on `create() + add page` under /page[1] [x,y,width,height,text]
 odg	shape	remove	supported		ok `create() + add page + add shape` /page[1]/shape[1]
-odg	shape	move	gap	0282 ODF object-format structure	refused unsupported_capability
-odg	shape	swap	gap	0282 ODF object-format structure	refused unsupported_capability
+odg	shape	move	format-verb		ok `create() + add page + add shape` /page[1]/shape[1] /page[1]/shape[2]
+odg	shape	swap	format-verb		ok `create() + add page + add shape` /page[1]/shape[1] /page[1]/shape[2]
 odg	shape	edit	supported		ok tx.set
 odg	shape	batch	supported		ok set item
 odg	shape	create	supported		ok format
@@ -3984,49 +3984,49 @@ odg	layer	view	supported		unreached
 odg	layer	set	n/a	set not offered for this element	unreached
 odg	layer	add	n/a	add not offered for this element	-
 odg	layer	remove	n/a	remove not offered for this element	unreached
-odg	layer	move	gap	0282 ODF object-format structure	unreached
-odg	layer	swap	gap	0282 ODF object-format structure	unreached
+odg	layer	move	format-verb		unreached
+odg	layer	swap	format-verb		unreached
 odg	layer	edit	n/a	edit not offered for this element	-
 odg	layer	batch	n/a	batch not offered for this element	-
 odg	layer	create	supported		ok format
 odg	layer	save	supported		ok format
-odc	chart	get	supported		ok 3 instances, first `odf/odc-producer-evidence/odfdom-created.odc` /
-odc	chart	find	supported		ok 3 instances, first `odf/odc-producer-evidence/odfdom-created.odc` /
+odc	chart	get	supported		ok 5 instances, first `odf/odc-producer-evidence/odfdom-created.odc` /
+odc	chart	find	supported		ok 5 instances, first `odf/odc-producer-evidence/odfdom-created.odc` /
 odc	chart	query	n/a	query not offered for this element	-
-odc	chart	view	supported		ok 3 instances, first `odf/odc-producer-evidence/odfdom-created.odc` /
-odc	chart	set	n/a	set not offered for this element	-
-odc	chart	add	gap	0282 ODF object-format structure	-
+odc	chart	view	supported		ok 5 instances, first `odf/odc-producer-evidence/odfdom-created.odc` /
+odc	chart	set	supported		ok `create() + add axis` / title=Litchi
+odc	chart	add	n/a	add not offered for this element	-
 odc	chart	remove	n/a	remove not offered for this element	-
 odc	chart	move	gap	0282 ODF object-format structure	unreached
 odc	chart	swap	gap	0282 ODF object-format structure	unreached
-odc	chart	edit	n/a	edit not offered for this element	-
-odc	chart	batch	n/a	batch not offered for this element	-
+odc	chart	edit	supported		ok tx.set
+odc	chart	batch	supported		ok set item
 odc	chart	create	supported		ok format
 odc	chart	save	supported		ok format
-odc	axis	get	supported		ok 4 instances, first `odf/odc-producer-evidence/odfdom-created.odc` /axis[1]
-odc	axis	find	supported		ok 4 instances, first `odf/odc-producer-evidence/odfdom-created.odc` /axis[1]
+odc	axis	get	supported		ok 6 instances, first `odf/odc-producer-evidence/odfdom-created.odc` /axis[1]
+odc	axis	find	supported		ok 6 instances, first `odf/odc-producer-evidence/odfdom-created.odc` /axis[1]
 odc	axis	query	supported		ok matches in odf/odc-producer-evidence/odfdom-created.odc
-odc	axis	view	supported		ok 4 instances, first `odf/odc-producer-evidence/odfdom-created.odc` /axis[1]
-odc	axis	set	supported		ok `odf/odc-producer-evidence/odfdom-created.odc` /axis[1] name=Litchi
-odc	axis	add	gap	0282 ODF object-format structure	-
-odc	axis	remove	supported		FAILED unsupported_capability: Unsupported feature: opened ODC contains lexical or semantic content outside the lossless typed edit surface
+odc	axis	view	supported		ok 6 instances, first `odf/odc-producer-evidence/odfdom-created.odc` /axis[1]
+odc	axis	set	supported		ok `create() + add axis` /axis[1] name=Litchi
+odc	axis	add	supported		ok /axis[1] on `create()` under / [dimension]
+odc	axis	remove	supported		ok `create() + add axis` /axis[1]
 odc	axis	move	gap	0282 ODF object-format structure	refused unsupported_capability
 odc	axis	swap	gap	0282 ODF object-format structure	refused unsupported_capability
 odc	axis	edit	supported		ok tx.set
 odc	axis	batch	supported		ok set item
 odc	axis	create	supported		ok format
 odc	axis	save	supported		ok format
-odc	series	get	supported		ok 2 instances, first `odf/odc-producer-evidence/odfdom-created.odc` /series[1]
-odc	series	find	supported		ok 2 instances, first `odf/odc-producer-evidence/odfdom-created.odc` /series[1]
+odc	series	get	supported		ok 4 instances, first `odf/odc-producer-evidence/odfdom-created.odc` /series[1]
+odc	series	find	supported		ok 4 instances, first `odf/odc-producer-evidence/odfdom-created.odc` /series[1]
 odc	series	query	supported		ok matches in odf/odc-producer-evidence/odfdom-created.odc
-odc	series	view	supported		ok 2 instances, first `odf/odc-producer-evidence/odfdom-created.odc` /series[1]
-odc	series	set	n/a	set not offered for this element	-
-odc	series	add	gap	0282 ODF object-format structure	-
-odc	series	remove	supported		FAILED unsupported_capability: Unsupported feature: opened ODC contains lexical or semantic content outside the lossless typed edit surface
-odc	series	move	gap	0282 ODF object-format structure	unreached
-odc	series	swap	gap	0282 ODF object-format structure	unreached
-odc	series	edit	n/a	edit not offered for this element	-
-odc	series	batch	n/a	batch not offered for this element	-
+odc	series	view	supported		ok 4 instances, first `odf/odc-producer-evidence/odfdom-created.odc` /series[1]
+odc	series	set	supported		ok `create() + add series` /series[1] values=Sheet1.B1:B3 (value unchanged: no-op only)
+odc	series	add	supported		ok /series[1] on `create()` under / [values]
+odc	series	remove	supported		ok `create() + add series` /series[1]
+odc	series	move	gap	0282 ODF object-format structure	refused unsupported_capability
+odc	series	swap	gap	0282 ODF object-format structure	refused unsupported_capability
+odc	series	edit	supported		ok tx.set
+odc	series	batch	supported		ok set item
 odc	series	create	supported		ok format
 odc	series	save	supported		ok format
 odc	legend	get	supported		unreached
@@ -4034,7 +4034,7 @@ odc	legend	find	supported		unreached
 odc	legend	query	supported		unreached
 odc	legend	view	supported		unreached
 odc	legend	set	n/a	set not offered for this element	unreached
-odc	legend	add	gap	0282 ODF object-format structure	-
+odc	legend	add	n/a	add not offered for this element	-
 odc	legend	remove	n/a	remove not offered for this element	unreached
 odc	legend	move	gap	0282 ODF object-format structure	unreached
 odc	legend	swap	gap	0282 ODF object-format structure	unreached
@@ -4410,7 +4410,7 @@ oth	metadata	get	supported		ok 8 instances, first `create()` /metadata
 oth	metadata	find	supported		ok 8 instances, first `create()` /metadata
 oth	metadata	query	supported		ok matches in create()
 oth	metadata	view	supported		ok 8 instances, first `create()` /metadata
-oth	metadata	set	supported		FAILED title=Litchi: corrupt_file: Invalid format: the ODT package has no meta.xml for metadata edits   title=7: corrupt_file: Invalid format: the ODT packag...
+oth	metadata	set	supported		FAILED title=Litchi: corrupt_file: Invalid format: the ODF package has no meta.xml for metadata edits   title=7: corrupt_file: Invalid format: the ODF packag...
 oth	metadata	add	n/a	add not offered for this element	-
 oth	metadata	remove	n/a	remove not offered for this element	-
 oth	metadata	move	format-verb		unreached

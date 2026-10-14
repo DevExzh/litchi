@@ -6,7 +6,7 @@ libreoffice-core/chart2/qa/extras/data/xls/chart.xls	xls	exact		refused	/sheet[1
 libreoffice-core/chart2/qa/extras/data/xlsx/boxWhisker.xlsx	xlsx	exact		value-exact	/sheet[1] name: 13397 -> 13382 bytes, first difference at 1771
 libreoffice-core/chart2/qa/extras/data/xlsx/tdf143127.xlsx	xlsx	exact		value-exact	/sheet[1] name: 18486 -> 18479 bytes, first difference at 1841
 libreoffice-core/dbaccess/qa/unit/data/tdf132924.odb	odb	exact		value-exact	/table[1] name: 3148 -> 2777 bytes, first difference at 7
-libreoffice-core/desktop/qa/data/3page.odg	odg	exact		value-exact	/page[1]/shape[1] text: 11175 -> 9735 bytes, first difference at 7
+libreoffice-core/desktop/qa/data/3page.odg	odg	exact		value-exact	/page[1] name: 11175 -> 9735 bytes, first difference at 7
 libreoffice-core/desktop/qa/data/BlankDrawDocument.odg	odg	exact		value-exact	/page[1] name: 8183 -> 6844 bytes, first difference at 7
 libreoffice-core/embeddedobj/qa/cppunit/data/insert-file-config.doc	doc	exact		value-exact	/body/p[1] text: 22016 -> 24576 bytes, first difference at 548
 libreoffice-core/extras/source/database/biblio.odb	odb	exact		value-exact	/table[1] name: 2892 -> 2427 bytes, first difference at 7

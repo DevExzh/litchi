@@ -2,8 +2,8 @@
 //! read from the `litchi_odg::Drawing` projection and written through
 //! `litchi_odg::edit::Edit`.
 
-use litchi_core::FileFormat;
 use litchi_core::selector::Path;
+use litchi_core::{FileFormat, Position};
 use litchi_odg::shape::ShapeKind;
 
 use super::tree::{count, length, odf_length, text};
@@ -17,7 +17,6 @@ use crate::error::Code;
 use crate::new_node::NewNode;
 use crate::node::spec::{FormatSpec, GapSpec, PropSpec, Subject};
 use crate::path::PathArg;
-use crate::props::Props;
 use crate::target::TargetArg;
 use crate::transaction::{LimitKind, SemanticLimits};
 use crate::value::{LengthSpec, ValueType};
@@ -70,44 +69,35 @@ const LAYER_PROPS: &[PropSpec] = &[
 static OPERATION_GAPS: [GapSpec; 4] = [
     GapSpec {
         subject: Subject::Operation {
-            verb: "remove",
-            element: "page",
-            context: "a drawing page",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "0282 ODG page removal",
-        reason: "the ODG leaf has no page removal",
-    },
-    GapSpec {
-        subject: Subject::Operation {
             verb: "add",
             element: "shape",
-            context: "a shape other than a rectangle, or a positioned (non-append) shape",
+            context: "a shape other than a text rectangle",
         },
         code: Code::UnsupportedCapability,
         follow_up: "0282 ODG typed shape creation",
-        reason: "the adapter appends text rectangles; other geometries need typed shape values",
+        reason: "the adapter adds text rectangles; other geometries need typed shape values",
     },
     GapSpec {
         subject: Subject::Operation {
             verb: "move",
             element: "shape",
-            context: "pages and shapes",
+            context: "a shape into another page",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "0282 ODG reordering",
-        reason: "the ODG leaf has no page or shape reordering",
+        follow_up: "0288 ODG cross-page shape transfer",
+        reason: "shapes move within their page; a move to another page needs the leaf's dependency-checked shape transfer",
     },
     GapSpec {
         subject: Subject::Operation {
-            verb: "set",
-            element: "drawing",
-            context: "`/` metadata",
+            verb: "remove",
+            element: "page",
+            context: "a page another page's `draw:page-name` names",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "0282 ODG metadata writes",
-        reason: "the ODG leaf has no metadata edit (ADR 0034 §7 family pending)",
+        follow_up: "0288 ODG reference rewriting",
+        reason: "the leaf refuses removing a page a link or thumbnail references rather than leaving it dangling",
     },
+    super::METADATA_PATH_GAP,
 ];
 
 /// The ODG spec table.
@@ -171,7 +161,8 @@ impl Flavor for Odg {
 pub(crate) static WRITES: super::Writes = super::Writes {
     settable: &["page", "shape"],
     addable: &["page", "shape"],
-    removable: &["shape"],
+    removable: &["page", "shape"],
+    movable: &["page", "shape"],
     gaps: &OPERATION_GAPS,
 };
 
@@ -268,15 +259,16 @@ fn staging(error: litchi_core::Error) -> crate::Error {
 pub(crate) fn set(
     file: &OdfTree,
     package: &litchi_odg::Package,
-    target: &TargetArg<'_>,
-    props: &Props<'_>,
+    groups: &[super::write::Group<'_, '_, '_>],
     limits: &SemanticLimits,
 ) -> Result<Commit> {
-    let nodes = resolve::<Odg>(file, target, limits.max_expanded_targets())?;
     let drawing = package.drawing();
     let mut edit = package.edit();
     let mut operations = 0usize;
-    for node in &nodes {
+    for (node, props) in groups
+        .iter()
+        .flat_map(|(nodes, props)| nodes.iter().map(move |node| (node, *props)))
+    {
         let [page, shape] = node.item().leaf();
         let mut geometry: [Option<String>; 4] = [None, None, None, None];
         for (key, value) in props.iter() {
@@ -383,15 +375,6 @@ pub(crate) fn add(
     limits: &SemanticLimits,
 ) -> Result<(Commit, Path<'static>)> {
     let parent_node = super::write::parent::<Odg>(file, parent)?;
-    if node
-        .placement()
-        .is_some_and(|placement| !matches!(placement, crate::Placement::End))
-    {
-        return Err(refusal(
-            Code::UnsupportedCapability,
-            "ODG pages and shapes are appended; a placement is not supported",
-        ));
-    }
     let mut props = std::collections::HashMap::new();
     for (key, value) in node.props().iter() {
         props.insert(key.as_str().to_owned(), value);
@@ -415,9 +398,11 @@ pub(crate) fn add(
                     page = page.with_style_name(style);
                 }
             }
-            edit.add_page(page).map_err(staging)?;
+            let count = package.drawing().pages().len();
+            let position = insertion(file, node.placement(), count, Kind::Page)?;
+            edit.insert_page(position, page).map_err(staging)?;
             let commit = commit(file, edit, 1, limits)?;
-            let path = added_path(&commit.after, &parent_path, "page", None)?;
+            let path = added_path(&commit.after, &parent_path, "page", Some(position))?;
             Ok((commit, path))
         },
         ("shape" | "rect" | "rectangle" | "textbox", "page") => {
@@ -454,10 +439,16 @@ pub(crate) fn add(
                 }
             }
             reject_rest(&props, "shape")?;
-            edit.add_shape(parent_node.item().leaf()[0], shape)
-                .map_err(staging)?;
+            let page = parent_node.item().leaf()[0];
+            let count = package
+                .drawing()
+                .pages()
+                .get(page)
+                .map_or(0, |value| value.shapes().len());
+            let position = insertion(file, node.placement(), count, Kind::Shape)?;
+            edit.insert_shape(page, position, shape).map_err(staging)?;
             let commit = commit(file, edit, 1, limits)?;
-            let path = added_path(&commit.after, &parent_path, "shape", None)?;
+            let path = added_path(&commit.after, &parent_path, "shape", Some(position))?;
             Ok((commit, path))
         },
         _ => Err(refusal(
@@ -495,18 +486,193 @@ pub(crate) fn remove(
 ) -> Result<Commit> {
     let nodes = resolve::<Odg>(file, target, limits.max_expanded_targets())?;
     bound(LimitKind::Operations, nodes.len(), limits.max_operations())?;
+    let mut pages = Vec::new();
     let mut shapes = Vec::with_capacity(nodes.len());
     for node in &nodes {
-        if node.item().type_name() != "shape" {
-            return Err(element_refusal("remove", node));
+        match node.item().type_name() {
+            "page" => pages.push(node.item().leaf()[0]),
+            "shape" => shapes.push(node.item().leaf()),
+            _ => return Err(element_refusal("remove", node)),
         }
-        shapes.push(node.item().leaf());
     }
-    // Later shapes first, so earlier removals do not shift later positions.
+    // Shapes of removed pages go with their page.
+    shapes.retain(|[page, _]| !pages.contains(page));
+    // Later elements first, so earlier removals do not shift later
+    // positions.
     shapes.sort_unstable_by(|left, right| right.cmp(left));
+    shapes.dedup();
+    pages.sort_unstable_by(|left, right| right.cmp(left));
+    pages.dedup();
+    if !pages.is_empty() && pages.len() >= package.drawing().pages().len() {
+        return Err(refusal(
+            Code::InvalidArgument,
+            "an ODG drawing keeps at least one page",
+        ));
+    }
     let mut edit = package.edit();
     for [page, shape] in shapes {
         edit.remove_shape(page, shape).map_err(staging)?;
     }
+    for page in pages {
+        edit.remove_page(page).map_err(staging)?;
+    }
     commit(file, edit, nodes.len(), limits)
+}
+
+/// The final position an `add` placement names among `count` siblings.
+fn insertion(
+    file: &OdfTree,
+    placement: Option<&crate::Placement<'_>>,
+    count: usize,
+    kind: Kind,
+) -> Result<usize> {
+    use crate::Placement;
+    let index = match placement {
+        None | Some(Placement::End) => count,
+        Some(Placement::Start) => 0,
+        Some(Placement::Position(position)) => position.get(),
+        Some(Placement::Before(path)) => anchor(file, path, kind)?,
+        Some(Placement::After(path)) => anchor(file, path, kind)? + 1,
+        Some(Placement::Into(_, position)) => position.map_or(count, Position::get),
+    };
+    if index > count {
+        return Err(refusal(
+            Code::OutOfRange,
+            "the ODG insertion position is outside its parent",
+        ));
+    }
+    Ok(index)
+}
+
+/// The sibling position of the placement anchor at `path`.
+fn anchor(file: &OdfTree, path: &PathArg<'_>, kind: Kind) -> Result<usize> {
+    let node = super::write::parent::<Odg>(file, path)?;
+    let [page, shape] = node.item().leaf();
+    match (node.item().type_name(), kind) {
+        ("page", Kind::Page) => Ok(page),
+        ("shape", Kind::Shape) => Ok(shape),
+        _ => Err(refusal(
+            Code::UnsupportedType,
+            "the ODG placement anchor is not a sibling of the element",
+        )),
+    }
+}
+
+/// The final position a move placement names for the element at `from`
+/// among `count` siblings.
+fn destination(
+    file: &OdfTree,
+    from: usize,
+    count: usize,
+    placement: &crate::Placement<'_>,
+    kind: Kind,
+) -> Result<usize> {
+    use crate::Placement;
+    let last = count.saturating_sub(1);
+    let to = match placement {
+        Placement::Start => 0,
+        Placement::End => last,
+        Placement::Position(position) => position.get(),
+        Placement::Before(path) => {
+            let anchor = anchor(file, path, kind)?;
+            if from < anchor { anchor - 1 } else { anchor }
+        },
+        Placement::After(path) => {
+            let anchor = anchor(file, path, kind)?;
+            if from < anchor { anchor } else { anchor + 1 }
+        },
+        Placement::Into(_, position) => position.map_or(last, Position::get),
+    };
+    if to >= count {
+        return Err(refusal(
+            Code::OutOfRange,
+            "the ODG move position is outside its parent",
+        ));
+    }
+    Ok(to)
+}
+
+/// Move a page within the drawing, or a shape within its page.
+pub(crate) fn move_to(
+    file: &OdfTree,
+    package: &litchi_odg::Package,
+    path: &PathArg<'_>,
+    placement: &crate::Placement<'_>,
+    limits: &SemanticLimits,
+) -> Result<Commit> {
+    let node = super::write::parent::<Odg>(file, path)?;
+    let [page, shape] = node.item().leaf();
+    let drawing = package.drawing();
+    let mut edit = package.edit();
+    match node.item().type_name() {
+        "page" => {
+            if matches!(placement, crate::Placement::Into(..)) {
+                return Err(refusal(
+                    Code::UnsupportedCapability,
+                    "an ODG page moves among the drawing's pages",
+                ));
+            }
+            let to = destination(file, page, drawing.pages().len(), placement, Kind::Page)?;
+            edit.move_page(page, to).map_err(staging)?;
+        },
+        "shape" => {
+            if let crate::Placement::Into(parent, _) = placement {
+                let target = super::write::parent::<Odg>(file, parent)?;
+                if target.item().type_name() != "page" || target.item().leaf()[0] != page {
+                    return Err(refusal(
+                        Code::UnsupportedCapability,
+                        "an ODG shape moves within its own page",
+                    )
+                    .with_suggestion("follow-up: 0288 ODG cross-page shape transfer"));
+                }
+            }
+            let count = drawing
+                .pages()
+                .get(page)
+                .map_or(0, |value| value.shapes().len());
+            let to = destination(file, shape, count, placement, Kind::Shape)?;
+            edit.move_shape(page, shape, to).map_err(staging)?;
+        },
+        _ => return Err(element_refusal("move", &node)),
+    }
+    commit(file, edit, 1, limits)
+}
+
+/// Exchange two pages, or two shapes of one page.
+pub(crate) fn swap(
+    file: &OdfTree,
+    package: &litchi_odg::Package,
+    left: &PathArg<'_>,
+    right: &PathArg<'_>,
+    limits: &SemanticLimits,
+) -> Result<Commit> {
+    let left = super::write::parent::<Odg>(file, left)?;
+    let right = super::write::parent::<Odg>(file, right)?;
+    let [left_page, left_shape] = left.item().leaf();
+    let [right_page, right_shape] = right.item().leaf();
+    let mut edit = package.edit();
+    match (left.item().type_name(), right.item().type_name()) {
+        ("page", "page") => {
+            let (first, second) = (left_page.min(right_page), left_page.max(right_page));
+            if first != second {
+                edit.move_page(first, second).map_err(staging)?;
+                edit.move_page(second - 1, first).map_err(staging)?;
+            }
+        },
+        ("shape", "shape") if left_page == right_page => {
+            let (first, second) = (left_shape.min(right_shape), left_shape.max(right_shape));
+            if first != second {
+                edit.move_shape(left_page, first, second).map_err(staging)?;
+                edit.move_shape(left_page, second - 1, first)
+                    .map_err(staging)?;
+            }
+        },
+        _ => {
+            return Err(refusal(
+                Code::UnsupportedCapability,
+                "ODG swap exchanges two pages or two shapes of one page",
+            ));
+        },
+    }
+    commit(file, edit, 2, limits)
 }

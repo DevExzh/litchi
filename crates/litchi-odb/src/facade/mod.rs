@@ -27,6 +27,11 @@ impl std::fmt::Debug for Package {
 }
 
 impl Package {
+    /// The retained physical package (metadata transactions, record 0288).
+    pub(crate) fn owned_package(&self) -> &litchi_odf_common::OwnedPackage {
+        self.database.package.owned_package()
+    }
+
     /// Creates the minimal valid database package (an empty data source).
     ///
     /// Creation is deterministic: no clock or randomness is consulted.

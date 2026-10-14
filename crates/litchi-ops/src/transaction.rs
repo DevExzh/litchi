@@ -129,9 +129,9 @@ enum Leaf {
     #[cfg(feature = "odt")]
     Odt(Box<crate::format::odt::write::Patch>),
     #[cfg(feature = "ods")]
-    Ods(Box<litchi_ods::document::Patch>),
+    Ods(Box<crate::format::ods::write::Patch>),
     #[cfg(feature = "odp")]
-    Odp(Box<litchi_odp::edit::Patch>),
+    Odp(Box<crate::format::odp::write::Patch>),
     #[cfg(feature = "odf-objects")]
     Object(Box<crate::format::odf_tree::write::Patch>),
     #[cfg(feature = "xlsx")]
@@ -253,6 +253,9 @@ pub struct Edit {
     odp: Option<crate::format::odp::write::coalesce::Run>,
     #[cfg(feature = "ods")]
     ods_cells: Option<crate::format::ods::write::coalesce::Run>,
+    /// Coalesced object-format sets (record 0288).
+    #[cfg(feature = "odf-objects")]
+    odf_tree: Option<crate::format::odf_tree::coalesce::Run>,
     /// The match count of the last `find=` set (record 0273).
     matched: Option<usize>,
 }
@@ -346,6 +349,8 @@ impl File {
                 odp: None,
                 #[cfg(feature = "ods")]
                 ods_cells: None,
+                #[cfg(feature = "odf-objects")]
+                odf_tree: None,
                 matched: None,
             };
             let value = f(&mut edit);
@@ -2126,6 +2131,57 @@ impl Edit {
             self.operations += 1;
             return Ok(Some(true));
         }
+        #[cfg(feature = "odf-objects")]
+        if let Some(handle) = self.current.odf_tree() {
+            // Sets resolve against the pending run's base: the run holds
+            // only sets that change no address and read no pending value.
+            let planned = match &self.odf_tree {
+                Some(run) => run.base().set_plan(_target, _props),
+                None => handle.set_plan(_target, _props),
+            };
+            if planned.is_err() {
+                self.flush_pending()?;
+            }
+            let Some(mut node) = planned? else {
+                self.flush_pending()?;
+                return Ok(None);
+            };
+            if self.operations >= self.limits.max_operations() {
+                return Err(Error::Limit {
+                    kind: LimitKind::Operations,
+                    observed: self.operations.saturating_add(1),
+                    maximum: self.limits.max_operations(),
+                }
+                .into());
+            }
+            if self
+                .odf_tree
+                .as_ref()
+                .is_some_and(|run| run.requires_barrier(node, _props, &self.limits))
+            {
+                self.flush_pending()?;
+                let Some(handle) = self.current.odf_tree() else {
+                    return Err(pending());
+                };
+                let Some(replanned) = handle.set_plan(_target, _props)? else {
+                    return Ok(None);
+                };
+                node = replanned;
+            }
+            if self.odf_tree.is_none() {
+                let Some(handle) = self.current.odf_tree() else {
+                    return Err(pending());
+                };
+                self.odf_tree = Some(crate::format::odf_tree::coalesce::Run::new(handle));
+            }
+            let run = self
+                .odf_tree
+                .as_mut()
+                .ok_or_else(|| crate::Error::new(Code::InternalError, "object run missing"))?;
+            run.stage(node, _props, _index);
+            self.operations += 1;
+            return Ok(Some(true));
+        }
         Ok(None)
     }
 
@@ -2411,6 +2467,32 @@ impl Edit {
             let result = (|| -> Result<()> {
                 let (base, commit) = run.commit()?;
                 let (step, ()) = wrap_ppt(&base, commit, ())?;
+                let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
+                if bytes > self.limits.max_snapshot_bytes() {
+                    return Err(Error::Limit {
+                        kind: LimitKind::SnapshotBytes,
+                        observed: bytes,
+                        maximum: self.limits.max_snapshot_bytes(),
+                    }
+                    .into());
+                }
+                self.steps
+                    .try_reserve(1)
+                    .map_err(|source| Error::Allocation { source })?;
+                self.current = step.after.clone();
+                self.steps.push(step);
+                self.snapshot_bytes = bytes;
+                Ok(())
+            })();
+            result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
+        }
+        #[cfg(feature = "odf-objects")]
+        if let Some(run) = self.odf_tree.take() {
+            let index = run.first_index();
+            let limits = self.limits;
+            let result = (|| -> Result<()> {
+                let (base, commit) = run.commit(&limits)?;
+                let (step, ()) = wrap_object(&base, commit, ())?;
                 let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
                 if bytes > self.limits.max_snapshot_bytes() {
                     return Err(Error::Limit {

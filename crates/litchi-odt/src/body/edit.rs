@@ -250,7 +250,7 @@ pub(crate) struct BodyEdits {
     /// End markers (`text:bookmark-end`, `office:annotation-end`) removed
     /// with their start.
     marker_removals: Vec<Range<usize>>,
-    metadata: BTreeMap<u8, (Metadata, Option<String>)>,
+    metadata: litchi_odf_common::metadata::Assignments,
     styles: StyleAllocator,
     generated: Generated,
 }
@@ -648,8 +648,12 @@ impl BodyEdits {
         if let Some(value) = &value {
             xml::check_text(value, "metadata value")?;
         }
-        self.metadata.insert(field as u8, (field, value));
-        Ok(())
+        self.metadata
+            .set(field, value.as_deref())
+            .map_err(|error| match error {
+                litchi_odf_common::Error::Core(error) => error,
+                other => invalid(other.to_string()),
+            })
     }
 
     fn place(
@@ -1970,170 +1974,16 @@ fn whole_content(target: Node<'_>, text: &str, out: &mut String) -> Result<()> {
     Ok(())
 }
 
-/// One `meta.xml` publication for the staged metadata edits.
+/// One `meta.xml` publication for the staged metadata edits, through the
+/// shared ODF metadata engine (record 0288).
 fn metadata_publication(
     document: &Document,
-    fields: &BTreeMap<u8, (Metadata, Option<String>)>,
+    fields: &litchi_odf_common::metadata::Assignments,
 ) -> Result<Option<XmlSplicePublication>> {
-    let package = document.transaction_package();
-    if !package.has_file("meta.xml")? {
-        return Err(invalid(
-            "the ODT package has no meta.xml for metadata edits",
-        ));
-    }
-    let part = XmlSourcePart::load(package, "meta.xml")?;
-    let source = std::str::from_utf8(part.bytes())
-        .map_err(|_error| invalid("ODT meta.xml is not UTF-8"))?
-        .to_owned();
-    let prefixes = Prefixes::of_root(&source);
-    for ns in [Ns::Dc, Ns::Meta] {
-        if fields
-            .values()
-            .any(|(field, value)| value.is_some() && field.qualified().0 == ns)
-        {
-            require_bound(&prefixes, ns)?;
-        }
-    }
-    // Locate office:meta and its children.
-    let mut reader = Reader::from_str(&source);
-    reader.config_mut().trim_text(false);
-    let mut depth = 0usize;
-    let mut meta: Option<(Range<usize>, bool)> = None;
-    let mut meta_close: Option<usize> = None;
-    let mut children: Vec<(Ns, String, Range<usize>)> = Vec::new();
-    let mut open_child: Option<(Ns, String, usize)> = None;
-    loop {
-        let start = usize::try_from(reader.buffer_position()).unwrap_or(0);
-        let event = reader
-            .read_event()
-            .map_err(|error| invalid(format!("ODT meta.xml: {error}")))?;
-        let end = usize::try_from(reader.buffer_position()).unwrap_or(0);
-        match event {
-            Event::Start(tag) | Event::Empty(tag) => {
-                let empty = source.as_bytes().get(end.saturating_sub(2)) == Some(&b'/');
-                let name = tag.name();
-                let resolved = prefixes.resolve(name.as_ref());
-                if depth == 1
-                    && resolved.is_some_and(|(ns, local)| ns == Ns::Office && local == b"meta")
-                {
-                    meta = Some((start..end, empty));
-                } else if depth == 2 && meta.is_some() && meta_close.is_none() {
-                    if let Some((ns, local)) = resolved {
-                        let local = String::from_utf8_lossy(local).into_owned();
-                        if empty {
-                            children.push((ns, local, start..end));
-                        } else {
-                            open_child = Some((ns, local, start));
-                        }
-                    }
-                }
-                if !empty {
-                    depth += 1;
-                }
-            },
-            Event::End(_) => {
-                depth = depth.saturating_sub(1);
-                if depth == 2 {
-                    if let Some((ns, local, begin)) = open_child.take() {
-                        children.push((ns, local, begin..end));
-                    }
-                }
-                if depth == 1 && meta.is_some() && meta_close.is_none() {
-                    meta_close = Some(start);
-                }
-            },
-            Event::Eof => break,
-            _ => {},
-        }
-    }
-    let Some((meta_range, meta_empty)) = meta else {
-        return Err(invalid("ODT meta.xml has no office:meta element"));
-    };
-    let mut splices: Vec<Splice> = Vec::new();
-    let mut appended = String::new();
-    for (field, value) in fields.values() {
-        let (ns, local) = field.qualified();
-        let existing: Vec<&Range<usize>> = children
-            .iter()
-            .filter(|(held_ns, held_local, _)| *held_ns == ns && held_local == local)
-            .map(|(_, _, range)| range)
-            .collect();
-        let mut rendered = String::new();
-        if let Some(value) = value {
-            let values: Vec<&str> = if *field == Metadata::Keywords {
-                value
-                    .split(',')
-                    .map(str::trim)
-                    .filter(|v| !v.is_empty())
-                    .collect()
-            } else {
-                vec![value.as_str()]
-            };
-            for value in values {
-                rendered.push('<');
-                prefixes.push_name(&mut rendered, ns, local);
-                if value.is_empty() {
-                    rendered.push_str("/>");
-                } else {
-                    rendered.push('>');
-                    xml::escape_into(&mut rendered, value);
-                    rendered.push_str("</");
-                    prefixes.push_name(&mut rendered, ns, local);
-                    rendered.push('>');
-                }
-            }
-        }
-        match existing.split_first() {
-            Some((first, rest)) => {
-                splices.push(Splice {
-                    range: (*first).clone(),
-                    bytes: rendered,
-                    start_tag: false,
-                });
-                for range in rest {
-                    splices.push(Splice {
-                        range: (*range).clone(),
-                        bytes: String::new(),
-                        start_tag: false,
-                    });
-                }
-            },
-            None => appended.push_str(&rendered),
-        }
-    }
-    if !appended.is_empty() {
-        if meta_empty {
-            let tag = &source[meta_range.clone()];
-            splices.push(Splice {
-                range: meta_range,
-                bytes: format!(
-                    "{}{appended}{}",
-                    open_form(&normalize_tag(tag)),
-                    end_tag(tag)
-                ),
-                start_tag: false,
-            });
-        } else {
-            let close = meta_close.ok_or_else(|| invalid("ODT office:meta is not closed"))?;
-            splices.push(Splice {
-                range: close..close,
-                bytes: appended,
-                start_tag: false,
-            });
-        }
-    }
-    splices.retain(|splice| source[splice.range.clone()] != splice.bytes);
-    if splices.is_empty() {
-        return Ok(None);
-    }
-    splices.sort_by_key(|splice| (splice.range.start, splice.range.end));
-    let mut publication = XmlSplicePublication::new(part.clone());
-    for splice in splices {
-        let proof = part.checked_range(
-            splice.range.clone(),
-            &source.as_bytes()[splice.range.clone()],
-        )?;
-        publication.replace(proof, classify(splice.bytes, false)?)?;
-    }
-    Ok(Some(publication))
+    fields
+        .publication(document.transaction_package())
+        .map_err(|error| match error {
+            litchi_odf_common::Error::Core(error) => error,
+            other => invalid(other.to_string()),
+        })
 }

@@ -219,6 +219,16 @@ impl EditOptions {
 }
 
 impl Package {
+    /// The retained physical package (metadata transactions, record 0288).
+    pub(crate) fn owned_package(&self) -> &litchi_odf_common::OwnedPackage {
+        self.package.package()
+    }
+
+    /// Adopt bytes a metadata commit published, under this package's limits.
+    pub(crate) fn adopt_metadata_bytes(&self, bytes: Vec<u8>) -> Result<Self> {
+        Self::from_vec_with(bytes, self.limits)
+    }
+
     /// Create the minimal valid spreadsheet: one empty worksheet named
     /// `Sheet1`, as a spreadsheet application authors a new document.
     ///

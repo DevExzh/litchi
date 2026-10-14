@@ -54,6 +54,7 @@ macro_rules! kinds {
 }
 
 pub(crate) mod children;
+pub(crate) mod coalesce;
 mod nav;
 mod node;
 mod tree;
@@ -92,7 +93,8 @@ pub struct OdfTree(Arc<State>);
 
 struct State {
     owner: Owner,
-    tree: Tree,
+    /// Built at open; after a write, on the first read (record 0288).
+    tree: std::sync::OnceLock<Tree>,
     origin: Option<Arc<Path>>,
 }
 
@@ -226,7 +228,24 @@ impl OdfTree {
         let tree = owner.tree()?;
         Ok(Self(Arc::new(State {
             owner,
-            tree,
+            tree: std::sync::OnceLock::from(tree),
+            origin,
+        })))
+    }
+
+    /// Adopt a package a leaf commit published and verified. The object
+    /// tree is built on the first read, so a write (or a batch of writes)
+    /// does not pay for a projection nobody reads. Only the drawing, chart,
+    /// image and formula trees build infallibly; a database tree parses its
+    /// catalog, which can fail, so it is still built here.
+    pub(crate) fn from_commit(owner: Owner, origin: Option<Arc<Path>>) -> Result<Self> {
+        #[cfg(feature = "odb")]
+        if matches!(owner, Owner::Odb(_)) {
+            return Self::from_owner(owner, origin);
+        }
+        Ok(Self(Arc::new(State {
+            owner,
+            tree: std::sync::OnceLock::new(),
             origin,
         })))
     }
@@ -261,7 +280,11 @@ impl OdfTree {
 
     /// The object tree built at open.
     pub(crate) fn tree(&self) -> &Tree {
-        &self.0.tree
+        self.0.tree.get_or_init(|| {
+            // Only infallible builders are deferred (`from_commit`); a
+            // failure would still leave the root rather than panic.
+            self.0.owner.tree().unwrap_or_else(|_| Tree::root_only())
+        })
     }
 
     /// The `File` variant of this handle's format.
@@ -301,7 +324,7 @@ impl OdfTree {
     ///
     /// # Errors
     ///
-    /// None today; the `Result` keeps the read surface uniform.
+    /// A malformed formula `meta.xml` (the other leaves parse it at open).
     pub fn metadata(&self) -> Result<Option<Metadata>> {
         Ok(match self.owner() {
             #[cfg(feature = "odg")]
@@ -313,7 +336,9 @@ impl OdfTree {
             #[cfg(feature = "odb")]
             Owner::Odb(package) => package.database().metadata().cloned(),
             #[cfg(feature = "odf-formula")]
-            Owner::Formula(_) => None,
+            Owner::Formula(package) => package
+                .metadata()
+                .map_err(|error| odf_error(error, FileFormat::Odf))?,
         })
     }
 
@@ -454,7 +479,7 @@ impl OdfTree {
         write::remove(self, target, limits).map_err(|error| self.tag(error))
     }
 
-    /// Moving elements is not offered by these leaves.
+    /// Move an element (ODG pages and shapes; other formats refuse).
     pub(crate) fn move_to<'p, 'q>(
         &self,
         path: crate::path::PathArg<'p>,
@@ -467,22 +492,17 @@ impl OdfTree {
         )
     }
 
-    /// Moving elements is not offered by these leaves.
+    /// Move an element with the caller's transaction limits.
     pub(crate) fn move_to_with_limits<'p, 'q>(
         &self,
         path: crate::path::PathArg<'p>,
         placement: crate::Placement<'q>,
         limits: &crate::transaction::SemanticLimits,
     ) -> Result<write::Commit> {
-        let _ = (path, placement, limits);
-        Err(write::refusal(
-            crate::Code::UnsupportedCapability,
-            "moving elements is not supported for this OpenDocument format",
-        )
-        .with_format(self.format()))
+        write::move_to(self, path, placement, limits).map_err(|error| self.tag(error))
     }
 
-    /// Exchanging elements is not offered by these leaves.
+    /// Exchange two elements (ODG pages and shapes; other formats refuse).
     pub(crate) fn swap<'p, 'q>(
         &self,
         left: crate::path::PathArg<'p>,
@@ -491,19 +511,14 @@ impl OdfTree {
         self.swap_with_limits(left, right, &crate::transaction::SemanticLimits::default())
     }
 
-    /// Exchanging elements is not offered by these leaves.
+    /// Exchange two elements with the caller's transaction limits.
     pub(crate) fn swap_with_limits<'p, 'q>(
         &self,
         left: crate::path::PathArg<'p>,
         right: crate::path::PathArg<'q>,
         limits: &crate::transaction::SemanticLimits,
     ) -> Result<write::Commit> {
-        let _ = (left, right, limits);
-        Err(write::refusal(
-            crate::Code::UnsupportedCapability,
-            "swapping elements is not supported for this OpenDocument format",
-        )
-        .with_format(self.format()))
+        write::swap(self, left, right, limits).map_err(|error| self.tag(error))
     }
 
     /// Tag an error with this handle's format.
@@ -525,6 +540,24 @@ impl fmt::Debug for OdfTree {
             .finish_non_exhaustive()
     }
 }
+
+/// The `/metadata` path of the object formats: set-only (record 0288).
+#[cfg(any(
+    feature = "odg",
+    feature = "odc",
+    feature = "odb",
+    feature = "odf-formula"
+))]
+pub(crate) const METADATA_PATH_GAP: crate::node::spec::GapSpec = crate::node::spec::GapSpec {
+    subject: crate::node::spec::Subject::Operation {
+        verb: "get",
+        element: "metadata",
+        context: "path-read",
+    },
+    code: crate::Code::UnsupportedCapability,
+    follow_up: "0288 ODF object metadata node",
+    reason: "`set(\"/metadata\", ..)` writes meta.xml through the ODF metadata family; the path is set-only, and reads go through File::metadata()",
+};
 
 /// One element of a flavor's spec table.
 #[allow(
@@ -564,7 +597,7 @@ pub(crate) const fn writable(
 }
 
 /// A readable property that `set` writes and `add` accepts.
-#[cfg(any(feature = "odg", feature = "odb"))]
+#[cfg(any(feature = "odg", feature = "odc", feature = "odb"))]
 pub(crate) const fn addable(
     name: &'static str,
     ty: crate::value::ValueType,
@@ -616,6 +649,11 @@ pub(crate) fn get<'f>(
     with_flavor!(file.format(), F => {
         crate::path::resolve::get(&Nav::<F>::new(file), path).map(crate::node::Node::Object)
     })
+}
+
+/// The object node at `path`.
+pub(crate) fn object<'f>(file: &'f OdfTree, path: &crate::path::PathArg<'_>) -> Result<Node<'f>> {
+    with_flavor!(file.format(), F => crate::path::resolve::get(&Nav::<F>::new(file), path))
 }
 
 /// `File::find` over an object tree.
@@ -723,6 +761,7 @@ pub(crate) struct Writes {
     pub(crate) settable: &'static [&'static str],
     pub(crate) addable: &'static [&'static str],
     pub(crate) removable: &'static [&'static str],
+    pub(crate) movable: &'static [&'static str],
     pub(crate) gaps: &'static [crate::node::spec::GapSpec],
 }
 

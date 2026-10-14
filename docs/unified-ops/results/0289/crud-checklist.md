@@ -26,8 +26,8 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | odt | 22 | 205 | 205 | 0 | 0 | 0 | 37 | 29 | 5 |
 | ods | 26 | 78 | 78 | 0 | 0 | 221 | 21 | 2 | 8 |
 | odp | 30 | 170 | 165 | 1 | 4 | 143 | 39 | 4 | 10 |
-| odg | 4 | 32 | 28 | 0 | 4 | 8 | 12 | 0 | 0 |
-| odc | 4 | 28 | 22 | 2 | 4 | 12 | 12 | 0 | 0 |
+| odg | 4 | 33 | 29 | 0 | 4 | 0 | 11 | 4 | 0 |
+| odc | 4 | 36 | 32 | 0 | 4 | 8 | 8 | 0 | 0 |
 | odi | 3 | 23 | 23 | 0 | 0 | 12 | 4 | 0 | 0 |
 | odb | 4 | 36 | 36 | 0 | 0 | 8 | 8 | 0 | 0 |
 | oth | 22 | 205 | 177 | 1 | 21 | 0 | 37 | 26 | 0 |
@@ -432,22 +432,22 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| drawing | ok | ok | n/a | ok | n/a | n/a | n/a | gap | gap | n/a | n/a | ok | ok |
-| page | ok | ok | ok | ok | ok | ok | n/a | gap | gap | ok | ok | ok | ok |
-| shape | ok | ok | ok | ok | ok | ok | ok | gap | gap | ok | ok | ok | ok |
-| layer | unreached | unreached | unreached | unreached | n/a | n/a | n/a | gap | gap | n/a | n/a | ok | ok |
+| drawing | ok | ok | n/a | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| page | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
+| shape | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
+| layer | unreached | unreached | unreached | unreached | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 
 ## odc
 
-- fixtures: `create()`, `odf/odc-producer-evidence/odfdom-created.odc`, `odf/odc-producer-evidence/odfdom-resaved.odc`
+- fixtures: `create()`, `odf/odc-producer-evidence/odfdom-created.odc`, `odf/odc-producer-evidence/odfdom-resaved.odc`, `create() + add axis`, `create() + add series`
 - document views on `odf/odc-producer-evidence/odfdom-created.odc`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| chart | ok | ok | n/a | ok | n/a | gap | n/a | gap | gap | n/a | n/a | ok | ok |
-| axis | ok | ok | ok | ok | ok | gap | FAIL | gap | gap | ok | ok | ok | ok |
-| series | ok | ok | ok | ok | n/a | gap | FAIL | gap | gap | n/a | n/a | ok | ok |
-| legend | unreached | unreached | unreached | unreached | n/a | gap | n/a | gap | gap | n/a | n/a | ok | ok |
+| chart | ok | ok | n/a | ok | ok | n/a | n/a | gap | gap | ok | ok | ok | ok |
+| axis | ok | ok | ok | ok | ok | ok | ok | gap | gap | ok | ok | ok | ok |
+| series | ok | ok | ok | ok | ok | ok | ok | gap | gap | ok | ok | ok | ok |
+| legend | unreached | unreached | unreached | unreached | n/a | n/a | n/a | gap | gap | n/a | n/a | ok | ok |
 
 ## odi
 

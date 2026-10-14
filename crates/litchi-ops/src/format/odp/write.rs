@@ -31,11 +31,28 @@ use crate::target::TargetArg;
 use crate::transaction::{Error as TransactionError, LimitKind, SemanticLimits};
 use crate::value::Scalar;
 
+/// The native proof of one unified ODP write.
+pub(crate) enum Patch {
+    /// A primary presentation transaction.
+    Edit(litchi_odp::edit::Patch),
+    /// A `/metadata` commit of the metadata family (record 0288).
+    Metadata(litchi_odp::metadata::Patch),
+}
+
+impl Patch {
+    pub(crate) fn is_noop(&self) -> bool {
+        match self {
+            Self::Edit(patch) => patch.is_noop(),
+            Self::Metadata(patch) => patch.is_noop(),
+        }
+    }
+}
+
 /// The native proof and immutable endpoints of one unified ODP write.
 pub(crate) struct WriteCommit {
     pub(crate) before: Odp,
     pub(crate) after: Odp,
-    pub(crate) patch: litchi_odp::edit::Patch,
+    pub(crate) patch: Patch,
     pub(crate) operations: usize,
     pub(crate) snapshot_bytes: usize,
 }
@@ -64,7 +81,7 @@ pub(crate) fn set_with_limits<'p, 'v>(
     limits: &SemanticLimits,
 ) -> Result<WriteCommit> {
     let props = Props::from_props(props)?;
-    if crate::format::odf_odp::is_metadata_target(&target) {
+    if crate::format::odf_metadata::is_target(&target) {
         return set_metadata(file, &props, limits);
     }
     let nodes = resolve_nodes(file, &target, limits)?;
@@ -278,14 +295,32 @@ fn plan_node(node: &Node<'_>, values: Values, plan: &mut Plan) -> Result<()> {
     Ok(())
 }
 
-/// Set `/metadata`: the five simple `meta.xml` fields.
+/// Set `/metadata` through the leaf metadata family (record 0288).
 fn set_metadata(file: &Odp, props: &Props<'_>, limits: &SemanticLimits) -> Result<WriteCommit> {
     let package = file.package()?;
-    let mut edit = package.edit().map_err(odf_error)?;
-    let mut metadata = edit.metadata().map_err(core_error)?;
-    crate::format::odf_odp::apply_metadata(&mut metadata, props, FileFormat::Odp)?;
-    edit.set_metadata(&metadata).map_err(leaf_error)?;
-    finish(file, edit, 1, limits)
+    let mut edit = package.edit_metadata();
+    crate::format::odf_metadata::stage(&mut edit, props, FileFormat::Odp, limits)?;
+    let (next, patch, changed) = crate::format::odf_metadata::commit(edit, FileFormat::Odp)?;
+    let snapshot_bytes = package
+        .as_bytes()
+        .len()
+        .saturating_add(next.as_bytes().len());
+    if snapshot_bytes > limits.max_snapshot_bytes() {
+        return Err(snapshot_limit(snapshot_bytes, limits.max_snapshot_bytes()));
+    }
+    let after = if changed {
+        file.with_package(next)?
+    } else {
+        file.clone()
+    };
+    file.check_source()?;
+    Ok(WriteCommit {
+        before: file.clone(),
+        after,
+        patch: Patch::Metadata(patch),
+        operations: if changed { props.len() } else { 0 },
+        snapshot_bytes,
+    })
 }
 
 /// Commit `changes` as one checked splice on one leaf edit.
@@ -332,7 +367,7 @@ fn finish(
     Ok(WriteCommit {
         before: file.clone(),
         after,
-        patch,
+        patch: Patch::Edit(patch),
         operations: if changed { operations.max(1) } else { 0 },
         snapshot_bytes,
     })

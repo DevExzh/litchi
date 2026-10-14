@@ -17,6 +17,7 @@ mod editing;
 mod facade;
 mod flat;
 mod history;
+pub mod metadata;
 mod model;
 mod package;
 mod semantic;

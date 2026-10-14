@@ -14,6 +14,7 @@ pub mod codec;
 pub mod content;
 pub mod facade;
 pub mod handout_master;
+pub mod metadata;
 pub mod model;
 pub mod package;
 pub mod scene;

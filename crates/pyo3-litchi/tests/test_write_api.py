@@ -445,6 +445,45 @@ class OdpVerbTests(WriteAssertions):
             self.assertEqual(L.open(target).get(path, 0)["text"], "Box")
 
 
+class OdfObjectTests(WriteAssertions):
+    """ODF object formats (record 0288): producer drawing structure, the
+    metadata family and typed chart writes."""
+
+    def test_producer_drawing_structure_and_metadata(self):
+        source = L.open(fixture("libreoffice-core/desktop/qa/data/3page.odg"))
+        before = source.to_bytes()
+        file, path = source.add("/", "page", {"name": "Front"}, index=0)
+        self.assertEqual(path, "/page[1]")
+        name = lambda f, p: f.get(p, 0)["format"]["name"]
+        moved = file.move("/page[1]", index=3)
+        self.assertEqual(name(moved, "/page[4]"), "Front")
+        swapped = moved.swap("/page[1]", "/page[2]")
+        self.assertEqual(name(swapped, "/page[1]"), "page2")
+        removed = swapped.remove("/page[4]")
+        noted = removed.set("/metadata", {"title": "Drawing", "author": "Ada"})
+        reopened = self.assertReopens(noted)
+        self.assertEqual(reopened.metadata()["title"], "Drawing")
+        self.assertEqual(reopened.get("/", 0)["format"]["pageCount"], 3)
+        self.assertUnchanged(source, before)
+        batched = source.batch(
+            [
+                {"command": "set", "path": f"/page[{index}]", "props": {"name": f"P{index}"}}
+                for index in (1, 2, 3)
+            ]
+        ).file
+        self.assertEqual(name(batched, "/page[3]"), "P3")
+
+    def test_typed_chart_and_fresh_image(self):
+        chart = L.create("odc").set("/", {"title": "Sales", "chartType": "bar"})
+        chart, path = chart.add("/", "series", {"values": "local-table.B2:B5"})
+        self.assertEqual(path, "/series[1]")
+        reopened = self.assertReopens(chart)
+        self.assertEqual(reopened.get("/", 0)["format"]["title"], "Sales")
+        self.assertEqual(reopened.get("/series[1]", 0)["format"]["values"], "local-table.B2:B5")
+        image = L.create("odi").set("/frame[1]", {"x": "1cm", "y": "1cm", "width": "4cm", "height": "3cm"})
+        self.assertEqual(self.assertReopens(image).get("/frame[1]", 0)["format"]["width"], "4cm")
+
+
 class CapabilityAgreementTests(WriteAssertions):
     """A write verb the report marks unsupported raises its code."""
 

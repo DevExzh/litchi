@@ -1931,8 +1931,8 @@
       "element": "presentation",
       "context": "extended-metadata",
       "code": "unsupported_capability",
-      "followUp": "M6 ODF metadata patcher",
-      "reason": "/metadata writes title, author, subject, description and keywords; the retained meta.xml patcher owns no other field"
+      "followUp": "0288 ODF user-defined and statistics metadata",
+      "reason": "/metadata writes title, subject, description, author, lastModifiedBy, language and keywords through the ODF metadata family; dates, statistics and custom.<name> are refused"
     },
     {
       "subject": "view",

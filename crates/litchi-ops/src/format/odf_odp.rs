@@ -1,77 +1,8 @@
-//! ODF helpers of the ODP adapter (record 0278).
-//!
-//! The `/metadata` set path for OpenDocument packages, and the conversion
-//! of unified lengths to ODF length attributes. Nothing here is ODP
-//! specific; the ODT and ODS adapters landed concurrently with their own
-//! copies, so this file is a consolidation candidate (record 0278 §8).
+//! ODF helpers of the ODP adapter (record 0278): the conversion of unified
+//! lengths to ODF length attributes. The `/metadata` set path moved to the
+//! shared `format::odf_metadata` (record 0288).
 
-use litchi_core::{FileFormat, Metadata};
-
-use crate::error::{Code, Error, Result};
-use crate::props::{PropValue, Props};
-use crate::target::TargetArg;
 use crate::value::{Length, LengthStyle};
-
-/// Whether `target` is the `/metadata` path.
-pub(crate) fn is_metadata_target(target: &TargetArg<'_>) -> bool {
-    target.path().is_some_and(|path| {
-        let path = path.path();
-        path.is_absolute()
-            && matches!(path.steps(), [step]
-                if step.predicates().is_empty() && step.name().eq_ignore_ascii_case("metadata"))
-    })
-}
-
-/// The metadata keys the retained-source `meta.xml` patcher owns, sorted.
-const KEYS: [&str; 5] = ["author", "description", "keywords", "subject", "title"];
-
-/// Apply `/metadata` assignments to `metadata`: `title`, `author`,
-/// `subject`, `description` and `keywords` take text, `null` removes.
-///
-/// # Errors
-///
-/// `unsupported_property` for any other key (the ODF patcher owns only these
-/// five), `invalid_value` for a value that is not text or null.
-pub(crate) fn apply_metadata(
-    metadata: &mut Metadata,
-    props: &Props<'_>,
-    format: FileFormat,
-) -> Result<()> {
-    for (key, value) in props.iter() {
-        let key = key.as_str();
-        let value = match value {
-            PropValue::Null => None,
-            other => Some(
-                other
-                    .as_text()
-                    .ok_or_else(|| {
-                        Error::new(Code::InvalidValue, "a metadata value must be text or null")
-                            .with_format(format)
-                            .with_property(key.to_owned())
-                    })?
-                    .to_owned(),
-            ),
-        };
-        let field = match key.to_ascii_lowercase().as_str() {
-            "title" => &mut metadata.title,
-            "author" | "creator" => &mut metadata.author,
-            "subject" => &mut metadata.subject,
-            "description" => &mut metadata.description,
-            "keywords" => &mut metadata.keywords,
-            _ => {
-                return Err(Error::new(
-                    Code::UnsupportedProperty,
-                    "the OpenDocument metadata patcher owns title, author, subject, description and keywords only",
-                )
-                .with_format(format)
-                .with_property(key.to_owned())
-                .with_suggestion(format!("use one of: {}", KEYS.join(", "))));
-            },
-        };
-        *field = value;
-    }
-    Ok(())
-}
 
 /// An ODF length attribute value for `length`: the unified canonical
 /// spelling (`2.54cm`, `72pt`, `1in`), or centimetres with six decimals when

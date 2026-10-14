@@ -21,6 +21,7 @@ mod error;
 pub mod leniency;
 pub mod limits;
 pub mod media;
+pub mod metadata;
 pub mod namespace;
 pub mod package;
 pub mod publish;

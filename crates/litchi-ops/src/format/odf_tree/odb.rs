@@ -16,7 +16,6 @@ use crate::error::Code;
 use crate::new_node::NewNode;
 use crate::node::spec::{FormatSpec, GapSpec, PropSpec, Subject};
 use crate::path::PathArg;
-use crate::props::Props;
 use crate::target::TargetArg;
 use crate::transaction::{LimitKind, SemanticLimits};
 use crate::value::ValueType;
@@ -54,7 +53,7 @@ const QUERY_PROPS: &[PropSpec] = &[
     PropSpec::new("columnCount", ValueType::Int),
 ];
 
-static OPERATION_GAPS: [GapSpec; 3] = [
+static OPERATION_GAPS: [GapSpec; 4] = [
     GapSpec {
         subject: Subject::Operation {
             verb: "add",
@@ -85,6 +84,7 @@ static OPERATION_GAPS: [GapSpec; 3] = [
         follow_up: "0282 ODB query rename",
         reason: "the leaf has no query rename; remove and add the query instead",
     },
+    super::METADATA_PATH_GAP,
 ];
 
 /// The ODB spec table.
@@ -148,6 +148,7 @@ pub(crate) static WRITES: super::Writes = super::Writes {
     settable: &["table", "column", "query"],
     addable: &["query"],
     removable: &["table", "column", "query"],
+    movable: &[],
     gaps: &OPERATION_GAPS,
 };
 
@@ -223,15 +224,16 @@ fn table_of(file: &OdfTree, node: &super::Node<'_>) -> String {
 pub(crate) fn set(
     file: &OdfTree,
     package: &litchi_odb::Package,
-    target: &TargetArg<'_>,
-    props: &Props<'_>,
+    groups: &[super::write::Group<'_, '_, '_>],
     limits: &SemanticLimits,
 ) -> Result<Commit> {
-    let nodes = resolve::<Odb>(file, target, limits.max_expanded_targets())?;
     let mut edit = package.edit();
     let mut operations = 0usize;
     let staging = |error| staging_error(error, FileFormat::Odb);
-    for node in &nodes {
+    for (node, props) in groups
+        .iter()
+        .flat_map(|(nodes, props)| nodes.iter().map(move |node| (node, *props)))
+    {
         let kind = node.item().type_name();
         let own = own_name(node);
         for (key, value) in props.iter() {

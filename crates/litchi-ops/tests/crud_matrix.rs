@@ -309,6 +309,24 @@ struct Recipe {
 const PNG: &str = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAYAAAB/qH1jAAAAEklEQVR4nGP4z8DwHxkzoAsAAA8hD/EEN8afAAAAAElFTkSuQmCC";
 
 const RECIPES: &[Recipe] = &[
+    // Record 0288: ODC axis/series add work on a chart Litchi made; the
+    // odfdom fixtures hold content outside the leaf's lossless surface.
+    Recipe {
+        format: "odc",
+        element: "axis",
+        fixture: "create()",
+        parent: "/",
+        props: &[("dimension", "x")],
+        start: false,
+    },
+    Recipe {
+        format: "odc",
+        element: "series",
+        fixture: "create()",
+        parent: "/",
+        props: &[("values", "Sheet1.B1:B3")],
+        start: false,
+    },
     Recipe {
         format: "docx",
         element: "hyperlink",
@@ -534,14 +552,6 @@ const KNOWN_FAILURES: &[(&str, &str, &str, &str)] = &[
         "F4: `hidden` rewrites an existing SSSlideInfoAtom; producer slides and \
          `create()` slides have none, and the leaf does not insert one",
     ),
-    (
-        "odc",
-        "axis",
-        "remove",
-        "F5: the only ODC fixtures (odfdom) hold content outside the leaf's \
-         lossless edit surface; `create()` has no chart and ODC has no `add`",
-    ),
-    ("odc", "series", "remove", "F5: as `axis`"),
     (
         "rtf",
         "picture",

@@ -701,6 +701,7 @@ impl Error {
         feature = "xlsb",
         feature = "ods",
         feature = "odt",
+        feature = "odp",
         feature = "odf-objects"
     ))]
     pub(crate) fn caused_by_argument(mut self, code: Code) -> Self {

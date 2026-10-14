@@ -30,41 +30,9 @@ pub use litchi_odf_common::Error;
 /// The dimension named by [`Error::Limit`] and [`Error::InvalidLimit`].
 pub use litchi_odf_common::LimitKind;
 
-use crate::body::xml::Ns;
-
-/// A document property the metadata transaction writes.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-#[non_exhaustive]
-pub enum Field {
-    /// `dc:title`.
-    Title,
-    /// `dc:subject`.
-    Subject,
-    /// `dc:description`.
-    Description,
-    /// `meta:initial-creator`, the original author.
-    Author,
-    /// `dc:creator`, who saved the document last.
-    LastModifiedBy,
-    /// `dc:language`.
-    Language,
-    /// The `meta:keyword` elements, written from a comma-separated list.
-    Keywords,
-}
-
-impl Field {
-    pub(crate) const fn qualified(self) -> (Ns, &'static str) {
-        match self {
-            Self::Title => (Ns::Dc, "title"),
-            Self::Subject => (Ns::Dc, "subject"),
-            Self::Description => (Ns::Dc, "description"),
-            Self::Author => (Ns::Meta, "initial-creator"),
-            Self::LastModifiedBy => (Ns::Dc, "creator"),
-            Self::Language => (Ns::Dc, "language"),
-            Self::Keywords => (Ns::Meta, "keyword"),
-        }
-    }
-}
+/// A document property the metadata transaction writes (shared by every
+/// ODF leaf, record 0288).
+pub use litchi_odf_common::metadata::Field;
 
 /// A detached metadata edit of one source package.
 pub struct Edit {

@@ -17,7 +17,7 @@ use crate::path::PathArg;
 use crate::props::{IntoProps, PropValue, Props};
 use crate::target::TargetArg;
 use crate::transaction::{Error as TransactionError, LimitKind, SemanticLimits};
-#[cfg(any(feature = "odg", feature = "odi"))]
+#[cfg(any(feature = "odg", feature = "odc", feature = "odi"))]
 use crate::value::{Length, LengthSpec};
 use crate::value::{Scalar, ValueType};
 
@@ -39,6 +39,39 @@ pub(crate) enum Patch {
     Odb(litchi_odb::Patch),
     #[cfg(feature = "odf-formula")]
     Formula(litchi_odf_formula::Patch),
+    /// A `/metadata` commit of the leaf metadata family (record 0288).
+    Metadata(MetadataPatch),
+}
+
+/// The metadata-family proof of one object format.
+pub(crate) enum MetadataPatch {
+    #[cfg(feature = "odg")]
+    Odg(litchi_odg::metadata::Patch),
+    #[cfg(feature = "odc")]
+    Odc(litchi_odc::metadata::Patch),
+    #[cfg(feature = "odi")]
+    Odi(litchi_odi::metadata::Patch),
+    #[cfg(feature = "odb")]
+    Odb(litchi_odb::metadata::Patch),
+    #[cfg(feature = "odf-formula")]
+    Formula(Box<litchi_odf_formula::metadata::Patch>),
+}
+
+impl MetadataPatch {
+    fn is_noop(&self) -> bool {
+        match self {
+            #[cfg(feature = "odg")]
+            Self::Odg(patch) => patch.is_noop(),
+            #[cfg(feature = "odc")]
+            Self::Odc(patch) => patch.is_noop(),
+            #[cfg(feature = "odi")]
+            Self::Odi(patch) => patch.is_noop(),
+            #[cfg(feature = "odb")]
+            Self::Odb(patch) => patch.is_noop(),
+            #[cfg(feature = "odf-formula")]
+            Self::Formula(patch) => patch.is_noop(),
+        }
+    }
 }
 
 impl Patch {
@@ -55,9 +88,13 @@ impl Patch {
             Self::Odb(patch) => patch.is_noop(),
             #[cfg(feature = "odf-formula")]
             Self::Formula(patch) => patch.is_noop(),
+            Self::Metadata(patch) => patch.is_noop(),
         }
     }
 }
+
+/// One set of a write: the nodes it resolved and the properties it assigns.
+pub(crate) type Group<'f, 'p, 'v> = (Vec<Node<'f>>, &'p Props<'v>);
 
 /// The leaf proof and immutable endpoints of one write.
 pub(crate) struct Commit {
@@ -130,7 +167,7 @@ pub(crate) fn finish(
         snapshot_bytes,
         limits.max_snapshot_bytes(),
     )?;
-    let after = OdfTree::from_owner(owner, file.origin().cloned())?;
+    let after = OdfTree::from_commit(owner, file.origin().cloned())?;
     Ok(Commit {
         before: file.clone(),
         after,
@@ -177,13 +214,13 @@ pub(crate) fn resolve<'f, F: Flavor>(
     Ok(nodes)
 }
 
-#[cfg(any(feature = "odg", feature = "odb"))]
+#[cfg(any(feature = "odg", feature = "odc", feature = "odb"))]
 /// Resolve the parent of an `add`.
 pub(crate) fn parent<'f, F: Flavor>(file: &'f OdfTree, path: &PathArg<'_>) -> Result<Node<'f>> {
     crate::path::resolve::get(&Nav::<F>::new(file), path)
 }
 
-#[cfg(any(feature = "odg", feature = "odb"))]
+#[cfg(any(feature = "odg", feature = "odc", feature = "odb"))]
 /// The path of the `ordinal`th child of `kind` under `parent` in `file`'s
 /// tree, after an add committed.
 pub(crate) fn added_path(
@@ -237,7 +274,7 @@ pub(crate) fn text(value: &PropValue<'_>, key: &'static str) -> Result<Option<St
         .map_err(|error| error.with_property(key))
 }
 
-#[cfg(any(feature = "odg", feature = "odi"))]
+#[cfg(any(feature = "odg", feature = "odc", feature = "odi"))]
 /// The value of `key` coerced to a length; `null` is `None`.
 pub(crate) fn length(
     value: &PropValue<'_>,
@@ -267,7 +304,12 @@ pub(crate) fn int(value: &PropValue<'_>, key: &'static str) -> Result<Option<i64
         .map_err(|error| error.with_property(key))
 }
 
-#[cfg(any(feature = "odg", feature = "odb", feature = "odf-formula"))]
+#[cfg(any(
+    feature = "odg",
+    feature = "odc",
+    feature = "odb",
+    feature = "odf-formula"
+))]
 /// A required (non-null) value.
 pub(crate) fn required<T>(value: Option<T>, key: &'static str) -> Result<T> {
     value.ok_or_else(|| {
@@ -332,18 +374,114 @@ pub(crate) fn set<'p, 'v>(
             "a set needs at least one property",
         ));
     }
+    if crate::format::odf_metadata::is_target(&target) {
+        return set_metadata(file, &props, limits);
+    }
+    let maximum = limits.max_expanded_targets();
     match file.owner() {
         #[cfg(feature = "odg")]
-        Owner::Odg(package) => super::odg::set(file, package, &target, &props, limits),
+        Owner::Odg(package) => {
+            let nodes = resolve::<super::odg::Odg>(file, &target, maximum)?;
+            super::odg::set(file, package, &[(nodes, &props)], limits)
+        },
         #[cfg(feature = "odc")]
-        Owner::Odc(package) => super::odc::set(file, package, &target, &props, limits),
+        Owner::Odc(package) => {
+            let nodes = resolve::<super::odc::Odc>(file, &target, maximum)?;
+            super::odc::set(file, package, &[(nodes, &props)], limits)
+        },
         #[cfg(feature = "odi")]
-        Owner::Odi(package) => super::odi::set(file, package, &target, &props, limits),
+        Owner::Odi(package) => {
+            let nodes = resolve::<super::odi::Odi>(file, &target, maximum)?;
+            super::odi::set(file, package, &[(nodes, &props)], limits)
+        },
         #[cfg(feature = "odb")]
-        Owner::Odb(package) => super::odb::set(file, package, &target, &props, limits),
+        Owner::Odb(package) => {
+            let nodes = resolve::<super::odb::Odb>(file, &target, maximum)?;
+            super::odb::set(file, package, &[(nodes, &props)], limits)
+        },
         #[cfg(feature = "odf-formula")]
-        Owner::Formula(package) => super::formula::set(file, package, &target, &props, limits),
+        Owner::Formula(package) => {
+            let nodes = resolve::<super::formula::Formula>(file, &target, maximum)?;
+            super::formula::set(file, package, &[(nodes, &props)], limits)
+        },
     }
+}
+
+/// Stage every group of a set (or of a coalesced run of sets) on one leaf
+/// edit and commit once.
+pub(crate) fn set_groups(
+    file: &OdfTree,
+    groups: &[Group<'_, '_, '_>],
+    limits: &SemanticLimits,
+) -> Result<Commit> {
+    match file.owner() {
+        #[cfg(feature = "odg")]
+        Owner::Odg(package) => super::odg::set(file, package, groups, limits),
+        #[cfg(feature = "odc")]
+        Owner::Odc(package) => super::odc::set(file, package, groups, limits),
+        #[cfg(feature = "odi")]
+        Owner::Odi(package) => super::odi::set(file, package, groups, limits),
+        #[cfg(feature = "odb")]
+        Owner::Odb(package) => super::odb::set(file, package, groups, limits),
+        #[cfg(feature = "odf-formula")]
+        Owner::Formula(package) => super::formula::set(file, package, groups, limits),
+    }
+}
+
+/// Set `/metadata` through the leaf metadata family (record 0288).
+fn set_metadata(file: &OdfTree, props: &Props<'_>, limits: &SemanticLimits) -> Result<Commit> {
+    let format = file.format();
+    match file.owner() {
+        #[cfg(feature = "odg")]
+        Owner::Odg(package) => metadata_commit(file, package, props, limits, |package, patch| {
+            (Owner::Odg(package), MetadataPatch::Odg(patch))
+        }),
+        #[cfg(feature = "odc")]
+        Owner::Odc(package) => metadata_commit(file, package, props, limits, |package, patch| {
+            (Owner::Odc(package), MetadataPatch::Odc(patch))
+        }),
+        #[cfg(feature = "odi")]
+        Owner::Odi(package) => metadata_commit(file, package, props, limits, |package, patch| {
+            (Owner::Odi(package), MetadataPatch::Odi(patch))
+        }),
+        #[cfg(feature = "odb")]
+        Owner::Odb(package) => metadata_commit(file, package, props, limits, |package, patch| {
+            (Owner::Odb(package), MetadataPatch::Odb(patch))
+        }),
+        #[cfg(feature = "odf-formula")]
+        Owner::Formula(package) => {
+            metadata_commit(file, package, props, limits, |package, patch| {
+                (
+                    Owner::Formula(package),
+                    MetadataPatch::Formula(Box::new(patch)),
+                )
+            })
+        },
+    }
+    .map_err(|error| error.with_format(format))
+}
+
+/// Stage and commit `props` on `package`'s metadata family.
+fn metadata_commit<P: litchi_odf_common::metadata::Owner>(
+    file: &OdfTree,
+    package: &P,
+    props: &Props<'_>,
+    limits: &SemanticLimits,
+    adopt: fn(P, litchi_odf_common::metadata::Patch<P>) -> (Owner, MetadataPatch),
+) -> Result<Commit> {
+    let format = file.format();
+    let mut edit = litchi_odf_common::metadata::Edit::new(package);
+    crate::format::odf_metadata::stage(&mut edit, props, format, limits)?;
+    let (next, patch, changed) = crate::format::odf_metadata::commit(edit, format)?;
+    let (owner, patch) = adopt(next, patch);
+    finish(
+        file,
+        changed,
+        owner,
+        Patch::Metadata(patch),
+        props.len(),
+        limits,
+    )
 }
 
 /// Add one element.
@@ -384,6 +522,54 @@ pub(crate) fn remove<'p>(
         Owner::Odb(package) => super::odb::remove(file, package, &target, limits),
         #[cfg(feature = "odf-formula")]
         Owner::Formula(package) => super::formula::remove(file, package, &target, limits),
+    }
+}
+
+/// Move one element.
+pub(crate) fn move_to<'p, 'q>(
+    file: &OdfTree,
+    path: PathArg<'p>,
+    placement: crate::Placement<'q>,
+    limits: &SemanticLimits,
+) -> Result<Commit> {
+    match file.owner() {
+        #[cfg(feature = "odg")]
+        Owner::Odg(package) => super::odg::move_to(file, package, &path, &placement, limits),
+        #[allow(
+            unreachable_patterns,
+            reason = "only the drawing leaf orders its elements"
+        )]
+        _ => {
+            let _ = (path, placement, limits);
+            Err(refusal(
+                Code::UnsupportedCapability,
+                "moving elements is not supported for this OpenDocument format",
+            ))
+        },
+    }
+}
+
+/// Exchange two elements.
+pub(crate) fn swap<'p, 'q>(
+    file: &OdfTree,
+    left: PathArg<'p>,
+    right: PathArg<'q>,
+    limits: &SemanticLimits,
+) -> Result<Commit> {
+    match file.owner() {
+        #[cfg(feature = "odg")]
+        Owner::Odg(package) => super::odg::swap(file, package, &left, &right, limits),
+        #[allow(
+            unreachable_patterns,
+            reason = "only the drawing leaf orders its elements"
+        )]
+        _ => {
+            let _ = (left, right, limits);
+            Err(refusal(
+                Code::UnsupportedCapability,
+                "swapping elements is not supported for this OpenDocument format",
+            ))
+        },
     }
 }
 
@@ -450,38 +636,32 @@ const EMPTY_ODI_META: &str = concat!(
     r#"xmlns:dc="http://purl.org/dc/elements/1.1/" office:version="1.4"><office:meta/></office:document-meta>"#,
 );
 
-/// Commit create-time metadata through the format's metadata setter.
+/// Commit create-time metadata through the leaf metadata family.
 fn create_metadata(file: OdfTree, metadata: &litchi_core::Metadata) -> Result<OdfTree> {
     let format = file.format();
-    #[cfg(feature = "odi")]
-    if format == FileFormat::Odi {
-        let mut props = Props::new();
-        for (key, value) in [
-            ("title", &metadata.title),
-            ("author", &metadata.author),
-            ("subject", &metadata.subject),
-            ("description", &metadata.description),
-            ("keywords", &metadata.keywords),
-        ] {
-            if let Some(value) = value {
-                props = props.with(key, value.as_str());
-            }
-        }
-        if props.is_empty() {
-            return Ok(file);
-        }
-        return set(
-            &file,
-            TargetArg::parse("/metadata")?,
-            props,
-            &SemanticLimits::default(),
-        )
-        .map(|commit| commit.after);
+    match file.owner() {
+        #[cfg(feature = "odg")]
+        Owner::Odg(package) => created(package, metadata, format, Owner::Odg),
+        #[cfg(feature = "odc")]
+        Owner::Odc(package) => created(package, metadata, format, Owner::Odc),
+        #[cfg(feature = "odi")]
+        Owner::Odi(package) => created(package, metadata, format, Owner::Odi),
+        #[cfg(feature = "odb")]
+        Owner::Odb(package) => created(package, metadata, format, Owner::Odb),
+        #[cfg(feature = "odf-formula")]
+        Owner::Formula(package) => created(package, metadata, format, Owner::Formula),
     }
-    let _ = metadata;
-    Err(refusal(
-        Code::UnsupportedCapability,
-        "create-time metadata is not written for this OpenDocument format",
-    )
-    .with_format(format))
+}
+
+/// A fresh handle over `package` with create-time `metadata` committed.
+fn created<P: litchi_odf_common::metadata::Owner>(
+    package: &P,
+    metadata: &litchi_core::Metadata,
+    format: FileFormat,
+    wrap: fn(P) -> Owner,
+) -> Result<OdfTree> {
+    let mut edit = litchi_odf_common::metadata::Edit::new(package);
+    crate::format::odf_metadata::stage_created(&mut edit, metadata, format)?;
+    let (next, _, _) = crate::format::odf_metadata::commit(edit, format)?;
+    OdfTree::from_owner(wrap(next), None)
 }

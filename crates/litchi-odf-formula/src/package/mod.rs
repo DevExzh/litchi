@@ -39,6 +39,11 @@ pub(crate) struct Archive {
 }
 
 impl Archive {
+    /// The retained physical package.
+    pub(crate) const fn owned(&self) -> &OwnedPackage {
+        &self.owned
+    }
+
     /// Build a package containing a validated Formula-family `content.xml`.
     pub(crate) fn create(content: &[u8], template: bool) -> Result<Self> {
         let flavor = if template {

@@ -18,7 +18,7 @@ use std::num::NonZeroUsize;
 use litchi_core::selector::{Path, Predicate, Step};
 use litchi_core::{FileFormat, Position};
 use litchi_ods::annotations::Annotation;
-use litchi_ods::document::{Edit, LogicalRowEdit, Patch, SheetPosition};
+use litchi_ods::document::{Edit, LogicalRowEdit, SheetPosition};
 use litchi_ods::model::names::{Definition, Range as NamedRange, Scope};
 use litchi_ods::worksheet::{CellChange, Selector};
 use litchi_ods::{Cell, CellValue, Merge, Package, Row, Sheet};
@@ -38,6 +38,23 @@ use crate::registry::Operation;
 use crate::target::TargetArg;
 use crate::transaction::{Error as TransactionError, LimitKind, SemanticLimits};
 use crate::value::Scalar;
+
+/// The native proof of one unified ODS write.
+pub(crate) enum Patch {
+    /// A primary document transaction.
+    Document(litchi_ods::document::Patch),
+    /// A `/metadata` commit of the metadata family (record 0288).
+    Metadata(litchi_ods::metadata::Patch),
+}
+
+impl Patch {
+    pub(crate) fn is_noop(&self) -> bool {
+        match self {
+            Self::Document(patch) => patch.is_noop(),
+            Self::Metadata(patch) => patch.is_noop(),
+        }
+    }
+}
 
 /// The native proof and immutable endpoints of one unified ODS write.
 pub(crate) struct Commit {
@@ -396,7 +413,7 @@ pub(super) fn finish(
     Ok(Commit {
         before: file.clone(),
         after,
-        patch,
+        patch: Patch::Document(patch),
         operations,
         snapshot_bytes,
     })

@@ -287,8 +287,8 @@ pub(crate) static WRITE_GAPS: [GapSpec; 10] = [
         "set",
         "presentation",
         "extended-metadata",
-        "M6 ODF metadata patcher",
-        "/metadata writes title, author, subject, description and keywords; the retained meta.xml patcher owns no other field",
+        "0288 ODF user-defined and statistics metadata",
+        "/metadata writes title, subject, description, author, lastModifiedBy, language and keywords through the ODF metadata family; dates, statistics and custom.<name> are refused",
     ),
 ];
 
