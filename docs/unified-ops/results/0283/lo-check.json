@@ -1,0 +1,47 @@
+{
+ "libreoffice": "26.2.6.3",
+ "docx_classic_rendered": [
+  "column",
+  "bar",
+  "line",
+  "pie",
+  "doughnut",
+  "area",
+  "scatter",
+  "bubble",
+  "radar",
+  "stock",
+  "combo",
+  "stackedColumn",
+  "percentStackedBar",
+  "column3d",
+  "pie3d"
+ ],
+ "docx_extended_rendered": [],
+ "pptx_extended_rendered": [
+  "waterfall",
+  "funnel",
+  "treemap",
+  "sunburst",
+  "histogram",
+  "pareto",
+  "boxWhisker"
+ ],
+ "xlsx_extended_rendered": [
+  "waterfall",
+  "funnel",
+  "treemap",
+  "sunburst",
+  "histogram",
+  "pareto",
+  "boxWhisker"
+ ],
+ "pdfs": [
+  "charts.pdf",
+  "sheets.pdf",
+  "slides.pdf"
+ ],
+ "add_failures": 0,
+ "observed": "LibreOffice draws PPTX and XLSX extended charts with their titles and plotted values, as an ordinary chart (its ChartEx import has no waterfall, funnel, treemap, sunburst, histogram, Pareto or box shapes); Writer does not import an inline DOCX ChartEx frame",
+ "command": "bash docs/unified-ops/results/0283/lo_check.sh target/debug/litchi <scratch dir>"
+}

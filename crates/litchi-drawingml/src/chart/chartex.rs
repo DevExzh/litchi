@@ -183,11 +183,13 @@ fn gap(value: u32) -> String {
     (f64::from(value) / 100.0).to_string()
 }
 
-fn write_title(xml: &mut String, element: &str, title: &str) {
+/// A chart or axis title, as rich text (`cx:tx/cx:rich`): the form
+/// applications other than Excel read as well.
+fn write_title(xml: &mut String, chart: bool, title: &str) {
     let _ = write!(
         xml,
-        r#"<cx:{element}{}><cx:tx><cx:txData><cx:v>{}</cx:v></cx:txData></cx:tx></cx:{element}>"#,
-        if element == "title" {
+        r#"<cx:title{}><cx:tx><cx:rich><a:bodyPr/><a:p><a:r><a:t>{}</a:t></a:r></a:p></cx:rich></cx:tx></cx:title>"#,
+        if chart {
             r#" pos="t" align="ctr" overlay="0""#
         } else {
             ""
@@ -390,7 +392,7 @@ fn write_axes(xml: &mut String, spec: &Spec) {
         gap(appearance.gap_width.unwrap_or(default_gap))
     );
     if let Some(title) = spec.category_axis_title() {
-        write_title(xml, "title", title);
+        write_title(xml, false, title);
     }
     xml.push_str("<cx:tickLabels/></cx:axis>");
     xml.push_str(r#"<cx:axis id="1"><cx:valScaling"#);
@@ -405,7 +407,7 @@ fn write_axes(xml: &mut String, spec: &Spec) {
     }
     xml.push_str("/>");
     if let Some(title) = spec.value_axis_title() {
-        write_title(xml, "title", title);
+        write_title(xml, false, title);
     }
     if !appearance.hide_gridlines {
         xml.push_str("<cx:majorGridlines/>");
@@ -442,7 +444,7 @@ pub(crate) fn write(spec: &Spec, external_data: Option<&str>) -> Result<Vec<u8>>
     }
     xml.push_str("</cx:chartData><cx:chart>");
     if let Some(title) = spec.title() {
-        write_title(&mut xml, "title", title);
+        write_title(&mut xml, true, title);
     }
     xml.push_str("<cx:plotArea><cx:plotAreaRegion>");
     for (index, series) in spec.series().iter().enumerate() {
