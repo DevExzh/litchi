@@ -89,7 +89,9 @@ impl Pptx {
         }
         if node.kind().eq_ignore_ascii_case("shape") || node.kind().eq_ignore_ascii_case("textbox")
         {
-            let source = self.editable()?;
+            // `add_text_box` constructs the native edit on every success
+            // path, which performs the strict admission once (record 0281).
+            let source = self.editable_owner()?;
             return self.add_text_box(parent, node, source, limits);
         }
         let nav = Nav::new(self);
