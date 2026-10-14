@@ -43,11 +43,10 @@ use super::Pptx;
 use super::children::{Children, Listing};
 use super::owner::SlideFacts;
 use super::spec::{
-    AXIS_PROPS, AxisKey, CELL_PROPS, CHART_PROPS, COMMENT_PROPS, CellKey, ChartKey, CommentKey,
-    FRAME_PROPS, FrameKey, Kind, NOTES_PROPS, NotesKey, PARAGRAPH_PROPS, PLACEHOLDER_TYPE,
-    PRESENTATION_PROPS, ParagraphKey, RUN_PROPS, RootKey, RunKey, SERIES_PROPS, SHAPE_PROPS,
-    SLIDE_PROPS, SLIDE_SIZE, SMARTART_PROPS, SeriesKey, ShapeKey, SlideKey, SmartArtKey,
-    TABLE_PROPS, TableKey,
+    AXIS_PROPS, AxisKey, CELL_PROPS, COMMENT_PROPS, CellKey, ChartKey, CommentKey, FRAME_PROPS,
+    FrameKey, Kind, NOTES_PROPS, NotesKey, PARAGRAPH_PROPS, PLACEHOLDER_TYPE, PRESENTATION_PROPS,
+    ParagraphKey, RUN_PROPS, RootKey, RunKey, SERIES_PROPS, SHAPE_PROPS, SLIDE_PROPS, SLIDE_SIZE,
+    SMARTART_PROPS, SeriesKey, ShapeKey, SlideKey, SmartArtKey, TABLE_PROPS, TableKey,
 };
 use super::steps::{self, Builder};
 use super::text;
@@ -1004,7 +1003,7 @@ impl<'f> Node<'f> {
                     PropKind::SmartArt(Box::new(TreeProps::read(tree, false)?)),
                 ),
                 Kind::Chart => (
-                    CHART_PROPS,
+                    super::spec::CHART_CAPABILITY_PROPS,
                     PropKind::Chart(Box::new(ChartProps {
                         tree: TreeProps::read(tree, false)?,
                         chart: tree.chart(self.file)?,
@@ -1649,7 +1648,7 @@ impl<'a> Props<'a> {
             PropKind::Shape(props) => props.shape(ShapeKey::at(index)?),
             PropKind::Frame(props) => props.frame(FrameKey::at(index)?),
             PropKind::SmartArt(props) => props.smartart(SmartArtKey::at(index)?),
-            PropKind::Chart(props) => props.value(ChartKey::at(index)?),
+            PropKind::Chart(props) => props.value_at(index),
             PropKind::Series(item) => series_value(item, SeriesKey::at(index)?),
             PropKind::Axis(item) => axis_value(item, AxisKey::at(index)?),
             PropKind::Table(props) => props.value(TableKey::at(index)?),
@@ -1698,6 +1697,17 @@ struct ChartProps<'a> {
 }
 
 impl<'a> ChartProps<'a> {
+    /// The value of the write table's entry at `index`: a chart key, or a
+    /// formatting key read back from the chart's spec.
+    fn value_at(&self, index: usize) -> Option<Value<'a>> {
+        if let Some(key) = ChartKey::at(index) {
+            return self.value(key);
+        }
+        let format = index.checked_sub(super::spec::CHART_FORMAT_INDEX)?;
+        let (key, _) = crate::format::chart::FORMAT_PROPS.get(format)?;
+        self.chart.as_ref()?.format(*key)
+    }
+
     fn value(&self, key: ChartKey) -> Option<Value<'a>> {
         if let Some(frame) = FrameKey::at(key as usize) {
             return self.tree.frame(frame);
@@ -1736,6 +1746,10 @@ fn series_value(item: &ChartItem, key: SeriesKey) -> Option<Value<'_>> {
         )))),
         SeriesKey::Categories => (!series.categories.is_empty())
             .then(|| Value::Text(Cow::Owned(series.categories.join(",")))),
+        SeriesKey::Color => series
+            .color
+            .as_deref()
+            .map(|color| Value::Text(Cow::Borrowed(color))),
     }
 }
 
@@ -1747,6 +1761,8 @@ fn axis_value(item: &ChartItem, key: AxisKey) -> Option<Value<'_>> {
             .title
             .as_deref()
             .map(|title| Value::Text(Cow::Borrowed(title))),
+        AxisKey::Min => axis.min.and_then(Value::number),
+        AxisKey::Max => axis.max.and_then(Value::number),
     }
 }
 

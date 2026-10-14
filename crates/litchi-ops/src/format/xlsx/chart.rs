@@ -91,6 +91,7 @@ pub(crate) enum SeriesKey {
     Name,
     Values,
     Categories,
+    Color,
 }
 
 /// A chart series (`/Sheet1/chart[N]/series[K]`).
@@ -98,12 +99,15 @@ pub(crate) const SERIES_PROPS: &[PropSpec] = &[
     PropSpec::new("name", ValueType::Text),
     PropSpec::new("values", ValueType::Text),
     PropSpec::new("categories", ValueType::Text),
+    PropSpec::new("color", ValueType::Text),
 ];
 
 /// A chart axis (`/Sheet1/chart[N]/axis[@role=ROLE]`).
 pub(crate) const AXIS_PROPS: &[PropSpec] = &[
     PropSpec::new("role", ValueType::Text),
     PropSpec::new("title", ValueType::Text),
+    PropSpec::new("min", ValueType::Number),
+    PropSpec::new("max", ValueType::Number),
 ];
 
 /// Chart assignments.
@@ -160,15 +164,15 @@ const CHART_NUMBERED_START: usize = CHART_FORMAT_START + shared::FORMAT_PROPS.le
 const CHART_DOTTED_START: usize = CHART_NUMBERED_START + shared::NUMBERED_SERIES_PROPS.len();
 const CHART_WRITE_COUNT: usize = CHART_DOTTED_START + shared::DOTTED_SERIES_PROPS.len();
 const _: () = assert!(
-    CHART_WRITE_COUNT <= 128,
-    "chart adds track assignments in a u128"
+    CHART_WRITE_COUNT <= shared::MAX_TABLE,
+    "chart adds track assignments in an Assigned set"
 );
 
 const fn chart_entries() -> [Entry<ChartSetter>; CHART_WRITE_COUNT] {
     let base: [Entry<ChartSetter>; CHART_BASE_COUNT] = [
         entry(
             CHART_PROPS[0],
-            Access::Add(ChartSetter::ChartType),
+            Access::SetAndAdd(ChartSetter::ChartType),
             Constraint::None,
             false,
         ),
@@ -199,7 +203,7 @@ const fn chart_entries() -> [Entry<ChartSetter>; CHART_WRITE_COUNT] {
         Entry::read(CHART_PROPS[5]),
         entry(
             write_only("data", ValueType::Text),
-            Access::Add(ChartSetter::Data),
+            Access::SetAndAdd(ChartSetter::Data),
             Constraint::NotEmpty,
             false,
         ),
@@ -211,9 +215,9 @@ const fn chart_entries() -> [Entry<ChartSetter>; CHART_WRITE_COUNT] {
         ),
         entry(
             write_only("axisTitle", ValueType::Text),
-            Access::Add(ChartSetter::AxisTitle),
+            Access::SetAndAdd(ChartSetter::AxisTitle),
             Constraint::None,
-            false,
+            true,
         ),
         entry(
             write_only("name", ValueType::Text),
@@ -222,26 +226,26 @@ const fn chart_entries() -> [Entry<ChartSetter>; CHART_WRITE_COUNT] {
             false,
         ),
         entry(
-            write_only("x", ValueType::Int),
-            Access::Add(ChartSetter::X),
+            PropSpec::new("x", ValueType::Int),
+            Access::SetAndAdd(ChartSetter::X),
             CELL_ORIGIN,
             false,
         ),
         entry(
-            write_only("y", ValueType::Int),
-            Access::Add(ChartSetter::Y),
+            PropSpec::new("y", ValueType::Int),
+            Access::SetAndAdd(ChartSetter::Y),
             CELL_ORIGIN,
             false,
         ),
         entry(
-            write_only("width", ValueType::Int),
-            Access::Add(ChartSetter::Width),
+            PropSpec::new("width", ValueType::Int),
+            Access::SetAndAdd(ChartSetter::Width),
             CELL_SPAN,
             false,
         ),
         entry(
-            write_only("height", ValueType::Int),
-            Access::Add(ChartSetter::Height),
+            PropSpec::new("height", ValueType::Int),
+            Access::SetAndAdd(ChartSetter::Height),
             Constraint::Int {
                 min: 1,
                 max: 1_048_576,
@@ -260,7 +264,7 @@ const fn chart_entries() -> [Entry<ChartSetter>; CHART_WRITE_COUNT] {
         let (key, spec) = shared::FORMAT_PROPS[format];
         entries[CHART_FORMAT_START + format] = entry(
             spec,
-            Access::Add(ChartSetter::Format(key)),
+            Access::SetAndAdd(ChartSetter::Format(key)),
             Constraint::None,
             false,
         );
@@ -282,12 +286,9 @@ const fn chart_entries() -> [Entry<ChartSetter>; CHART_WRITE_COUNT] {
         let setter = ChartSetter::Dotted((dotted / 3) as u8, field);
         entries[CHART_DOTTED_START + dotted] = entry(
             shared::DOTTED_SERIES_PROPS[dotted],
-            // A series' name and values are also settable on the chart
-            // (OfficeCLI's chart-level `set`); its color only on add.
-            match field {
-                shared::SeriesField::Color => Access::Add(setter),
-                _ => Access::SetAndAdd(setter),
-            },
+            // A series' name, values and color are also settable on the
+            // chart (OfficeCLI's chart-level `set`).
+            Access::SetAndAdd(setter),
             Constraint::NotEmpty,
             false,
         );
@@ -320,8 +321,9 @@ pub(crate) const CHART_CAPABILITY_PROPS: &[PropSpec] = &CHART_WRITE_TABLE.readab
 pub(crate) enum SeriesSetter {
     Name,
     Values,
+    Color,
 }
-pub(crate) const SERIES_WRITE_TABLE: Table<SeriesSetter, 3, 0> = Table::new(
+pub(crate) const SERIES_WRITE_TABLE: Table<SeriesSetter, 4, 0> = Table::new(
     [
         Entry {
             spec: SERIES_PROPS[0],
@@ -336,6 +338,12 @@ pub(crate) const SERIES_WRITE_TABLE: Table<SeriesSetter, 3, 0> = Table::new(
             clear: false,
         },
         Entry::read(SERIES_PROPS[2]),
+        Entry {
+            spec: SERIES_PROPS[3],
+            access: Access::Set(SeriesSetter::Color),
+            constraint: Constraint::NotEmpty,
+            clear: true,
+        },
     ],
     [],
 );
@@ -344,13 +352,27 @@ pub(crate) const SERIES_CAPABILITY_PROPS: &[PropSpec] = &SERIES_WRITE_TABLE.read
 #[derive(Clone, Copy)]
 pub(crate) enum AxisSetter {
     Title,
+    Min,
+    Max,
 }
-pub(crate) const AXIS_WRITE_TABLE: Table<AxisSetter, 2, 0> = Table::new(
+pub(crate) const AXIS_WRITE_TABLE: Table<AxisSetter, 4, 0> = Table::new(
     [
         Entry::read(AXIS_PROPS[0]),
         Entry {
             spec: AXIS_PROPS[1],
             access: Access::Set(AxisSetter::Title),
+            constraint: Constraint::None,
+            clear: true,
+        },
+        Entry {
+            spec: AXIS_PROPS[2],
+            access: Access::Set(AxisSetter::Min),
+            constraint: Constraint::None,
+            clear: true,
+        },
+        Entry {
+            spec: AXIS_PROPS[3],
+            access: Access::Set(AxisSetter::Max),
             constraint: Constraint::None,
             clear: true,
         },
@@ -366,10 +388,37 @@ fn text(value: Option<Scalar<'_>>) -> Option<String> {
     }
 }
 
+fn number(value: Option<Scalar<'_>>) -> Option<f64> {
+    match value {
+        Some(Scalar::Number(value)) => Some(value),
+        Some(Scalar::Int(value)) => Some(value as f64),
+        _ => None,
+    }
+}
+
 fn int(value: Option<Scalar<'_>>) -> u32 {
     match value {
         Some(Scalar::Int(value)) => u32::try_from(value).unwrap_or(0),
         _ => 0,
+    }
+}
+
+/// The value of the chart write table's entry at `index`: a chart key, the
+/// anchor's cell geometry, or a formatting key read back from the chart.
+pub(crate) fn chart_value_at(summary: &Summary, index: usize) -> Option<Value<'static>> {
+    if let Some(key) = ChartKey::at(index) {
+        return chart_value(summary, key);
+    }
+    match index {
+        10..=13 => {
+            let cells = summary.cells?;
+            Some(Value::Int(i64::from(cells[index - 10])))
+        },
+        _ => {
+            let format = index.checked_sub(CHART_FORMAT_START)?;
+            let (key, _) = shared::FORMAT_PROPS.get(format)?;
+            summary.format(*key)
+        },
     }
 }
 
@@ -402,7 +451,13 @@ pub(crate) fn chart_value(summary: &Summary, key: ChartKey) -> Option<Value<'sta
 /// The value of a series node's key (`name`, `values`, `categories`).
 pub(crate) fn series_value(item: &ChartItem, index: usize) -> Option<Value<'_>> {
     let series = item.summary.series.get(item.child as usize)?;
-    let key = [SeriesKey::Name, SeriesKey::Values, SeriesKey::Categories].get(index)?;
+    let key = [
+        SeriesKey::Name,
+        SeriesKey::Values,
+        SeriesKey::Categories,
+        SeriesKey::Color,
+    ]
+    .get(index)?;
     match key {
         SeriesKey::Name => series
             .name
@@ -411,6 +466,10 @@ pub(crate) fn series_value(item: &ChartItem, index: usize) -> Option<Value<'_>> 
         SeriesKey::Values => Some(Value::Text(Cow::Owned(shared::join_values(&series.values)))),
         SeriesKey::Categories => (!series.categories.is_empty())
             .then(|| Value::Text(Cow::Owned(series.categories.join(",")))),
+        SeriesKey::Color => series
+            .color
+            .as_deref()
+            .map(|color| Value::Text(Cow::Borrowed(color))),
     }
 }
 
@@ -423,6 +482,8 @@ pub(crate) fn axis_value(item: &ChartItem, index: usize) -> Option<Value<'_>> {
             .title
             .as_deref()
             .map(|title| Value::Text(Cow::Borrowed(title))),
+        2 => axis.min.and_then(Value::number),
+        3 => axis.max.and_then(Value::number),
         _ => None,
     }
 }
@@ -450,23 +511,41 @@ impl Xlsx {
 
     /// The chart at `index` on the worksheet at `sheet`, read from its part.
     pub(super) fn sheet_chart(&self, sheet: usize, index: usize) -> Result<Option<Arc<Summary>>> {
-        let xml = self.0.owner.finish(|| {
+        let read = self.0.owner.finish(|| {
             Ok(match &self.0.owner {
                 super::XlsxOwner::Source(workbook) => match workbook.sheet(sheet)? {
                     Some(worksheet) if worksheet.kind() == xlsx::WorksheetKind::Worksheet => {
-                        worksheet.chart_xml(index)?
+                        match worksheet.chart_xml(index)? {
+                            Some(xml) => Some((xml, worksheet.chart_anchor(index)?)),
+                            None => None,
+                        }
                     },
                     _ => None,
                 },
                 super::XlsxOwner::Eager(package) => match package.workbook_ref().sheet(sheet)? {
                     Some(worksheet) if worksheet.kind() == xlsx::WorksheetKind::Worksheet => {
-                        package.chart_xml(sheet, index)?.map(<[u8]>::to_vec)
+                        match package.chart_xml(sheet, index)? {
+                            Some(xml) => Some((xml.to_vec(), package.chart_anchor(sheet, index)?)),
+                            None => None,
+                        }
                     },
                     _ => None,
                 },
             })
         })?;
-        xml.map(|xml| Summary::read(&xml).map(Arc::new)).transpose()
+        let Some((xml, anchor)) = read else {
+            return Ok(None);
+        };
+        let mut summary = Summary::read(&xml)?;
+        summary.cells = anchor.map(|anchor| {
+            [
+                anchor.from_col,
+                anchor.from_row,
+                anchor.to_col.saturating_sub(anchor.from_col),
+                anchor.to_row.saturating_sub(anchor.from_row),
+            ]
+        });
+        Ok(Some(Arc::new(summary)))
     }
 
     /// Add a chart to a worksheet.
@@ -493,20 +572,18 @@ impl Xlsx {
         let mut name = None;
         let mut origin = [0_u32; 2];
         let mut span = [8_u32, 15];
-        let mut assigned = 0_u128;
+        let mut assigned = shared::Assigned::default();
         for (key, value) in node.props().iter() {
             let (index, entry) = CHART_WRITE_TABLE
                 .resolve(key.as_str())
                 .map_err(|e| e.with_property(key.as_str().to_owned()))?;
-            let bit = 1_u128 << index;
-            if assigned & bit != 0 {
+            if !assigned.insert(index) {
                 return Err(error(
                     Code::InvalidArgument,
                     "a chart property was assigned more than once",
                 )
                 .with_property(entry.spec.name));
             }
-            assigned |= bit;
             entry.prepare(Operation::Add, value, |setter, scalar| {
                 match setter {
                     ChartSetter::ChartType => {
@@ -703,12 +780,15 @@ impl Xlsx {
             return Ok(None);
         };
         let mut edit = ChartEdit::default();
+        let mut geometry = [None::<u32>; 4];
+        let summary = &item.summary;
         for (key, value) in props.iter() {
             match node.item() {
                 Item::Chart(_) => {
                     let (_, entry) = CHART_WRITE_TABLE
                         .resolve(key.as_str())
                         .map_err(|e| e.with_property(key.as_str().to_owned()))?;
+                    let name = entry.spec.name;
                     entry.prepare(Operation::Set, value, |setter, scalar| {
                         match setter {
                             ChartSetter::Title => edit.title = Some(text(scalar)),
@@ -722,23 +802,40 @@ impl Xlsx {
                                     "categories",
                                 )?);
                             },
-                            ChartSetter::CatTitle => {
-                                let axis = item.summary.axis(Role::Category).ok_or_else(|| {
-                                    error(
-                                        Code::UnsupportedCapability,
-                                        "the chart has no category axis",
-                                    )
-                                    .with_property("catTitle")
+                            ChartSetter::CatTitle | ChartSetter::AxisTitle => {
+                                let role = if matches!(setter, ChartSetter::CatTitle) {
+                                    Role::Category
+                                } else {
+                                    Role::Value
+                                };
+                                let axis = summary.axis(role).ok_or_else(|| {
+                                    error(Code::UnsupportedCapability, "the chart has no such axis")
+                                        .with_property(name)
                                 })?;
                                 edit.axis_titles.push((axis.id, text(scalar)));
                             },
                             ChartSetter::Dotted(number, field) => edit.dotted_series(
-                                &item.summary,
+                                summary,
                                 usize::from(number) + 1,
                                 field,
                                 text(scalar),
                             )?,
-                            _ => unreachable!("chart set admission"),
+                            ChartSetter::ChartType => {
+                                edit.chart_type(summary, &text(scalar).unwrap_or_default())?;
+                            },
+                            ChartSetter::Data => {
+                                edit.data(summary, &text(scalar).unwrap_or_default())?;
+                            },
+                            ChartSetter::Format(key) => edit.format(summary, key, name, scalar)?,
+                            ChartSetter::X => geometry[0] = Some(int(scalar)),
+                            ChartSetter::Y => geometry[1] = Some(int(scalar)),
+                            ChartSetter::Width => geometry[2] = Some(int(scalar)),
+                            ChartSetter::Height => geometry[3] = Some(int(scalar)),
+                            ChartSetter::DataRange
+                            | ChartSetter::Name
+                            | ChartSetter::Numbered(_) => {
+                                unreachable!("chart set admission")
+                            },
                         }
                         Ok(())
                     })?;
@@ -760,23 +857,33 @@ impl Xlsx {
                                 index,
                                 shared::parse_values(&text(scalar).unwrap_or_default(), "values")?,
                             )),
+                            SeriesSetter::Color => edit.series_colors.push((
+                                index,
+                                text(scalar)
+                                    .map(|color| shared::parse_color(&color, "color"))
+                                    .transpose()?,
+                            )),
                         }
                         Ok(())
                     })?;
                 },
                 _ => {
-                    let id = item
+                    let axis = item
                         .summary
                         .axes
                         .get(item.child as usize)
-                        .map(|axis| axis.id)
                         .ok_or_else(|| error(Code::PathNotFound, "the axis is missing"))?;
                     let (_, entry) = AXIS_WRITE_TABLE
                         .resolve(key.as_str())
                         .map_err(|e| e.with_property(key.as_str().to_owned()))?;
                     entry.prepare(Operation::Set, value, |setter, scalar| {
                         match setter {
-                            AxisSetter::Title => edit.axis_titles.push((id, text(scalar))),
+                            AxisSetter::Title => edit.axis_titles.push((axis.id, text(scalar))),
+                            AxisSetter::Min | AxisSetter::Max => edit.axis_bound(
+                                axis,
+                                matches!(setter, AxisSetter::Max),
+                                number(scalar),
+                            )?,
                         }
                         Ok(())
                     })?;
@@ -786,8 +893,31 @@ impl Xlsx {
         let sheet = node.sheet_position();
         let source = self.editor()?;
         let mut native = source.edit_charts()?;
+        if geometry.iter().any(Option::is_some) {
+            let current = item.summary.cells.ok_or_else(|| {
+                error(
+                    Code::UnsupportedCapability,
+                    "only a chart placed by a two-cell anchor can be moved",
+                )
+                .with_property("x")
+            })?;
+            let [x, y, width, height] =
+                [0, 1, 2, 3].map(|slot| geometry[slot].unwrap_or(current[slot]));
+            let (to_col, to_row) = (x.saturating_add(width), y.saturating_add(height));
+            if to_col >= 16_384 || to_row >= 1_048_576 {
+                return Err(
+                    error(Code::OutOfRange, "the chart extends past the worksheet")
+                        .with_property("width"),
+                );
+            }
+            native.set_anchor(
+                sheet,
+                item.chart as usize,
+                &xlsx::chart::Anchor::new(x, y, to_col, to_row),
+            )?;
+        }
         let xml = native.chart(sheet, item.chart as usize)?;
-        if let Some(edited) = edit.apply(xml)? {
+        if let Some(edited) = edit.apply(xml, false)? {
             native.set(sheet, item.chart as usize, edited.xml)?;
         }
         let commit = native.commit()?;

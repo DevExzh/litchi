@@ -151,6 +151,18 @@ fn binding(chart: &Chart) -> Binding {
         .unwrap_or(Binding::Literal)
 }
 
+impl Spec {
+    /// The authoring spec of a typed chart (see [`read`]), with its binding
+    /// inferred from the first series' references.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Invalid`] for a chart with no authoring form.
+    pub fn of(chart: &Chart) -> Result<Self> {
+        of_chart(chart)
+    }
+}
+
 /// The authoring spec of a typed chart.
 #[allow(
     clippy::too_many_lines,

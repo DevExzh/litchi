@@ -480,6 +480,27 @@ impl<'f> Navigate<'f> for Nav<'f> {
                     None => Lookup::NotApplicable,
                 })
             },
+            (Value::Paragraph { paragraph, .. }, Kind::Chart) => {
+                let charts = paragraph.charts()?;
+                Ok(match pick_index(charts.len(), &step.select) {
+                    Some(Some(index)) => {
+                        let chart = charts.into_iter().nth(index).ok_or_else(missing_child)?;
+                        Lookup::Found(super::chart::chart_node(
+                            self.docx,
+                            &parent.value,
+                            &address,
+                            ordinal(index),
+                            chart,
+                        ))
+                    },
+                    Some(None) => Lookup::Missing,
+                    None => Lookup::NotApplicable,
+                })
+            },
+            // OfficeCLI addresses charts document-wide (`/chart[N]`).
+            (Value::Document | Value::Body(_), Kind::Chart) => {
+                super::chart::pick_document_chart(self.docx, &step.select)
+            },
             (Value::Paragraph { paragraph, .. }, Kind::Hyperlink) => {
                 let links = hyperlinks(self.docx, paragraph)?;
                 Ok(match pick_index(links.len(), &step.select) {

@@ -52,7 +52,7 @@ pub(super) fn text<'n>(node: &'n Node<'_>) -> Result<Option<Cow<'n, str>>> {
         },
         Value::Equation(block) => equation_latex(block)?.map(Cow::Owned),
         Value::Comment(comment) => Some(Cow::Owned(comment_text(comment)?)),
-        Value::Picture(_) => None,
+        Value::Picture(_) | Value::Chart(_) => None,
         Value::Document
         | Value::Body(_)
         | Value::Table(_)
@@ -153,7 +153,8 @@ pub(super) fn child_count(node: &Node<'_>) -> Result<Option<u32>> {
         | Value::Equation(_)
         | Value::Section(_)
         | Value::Comment(_)
-        | Value::Picture(_) => 0,
+        | Value::Picture(_)
+        | Value::Chart(_) => 0,
     };
     Ok(Some(u32::try_from(count).unwrap_or(u32::MAX)))
 }
@@ -232,6 +233,7 @@ pub(super) fn format<'n>(node: &'n Node<'_>) -> Result<Format<'n>> {
             text: comment_text(comment)?,
         })),
         Value::Picture(picture) => Props::Picture(Arc::clone(picture)),
+        Value::Chart(chart) => Props::Chart(node.docx, Arc::clone(chart)),
         Value::Body(_) | Value::Section(_) | Value::Comments => Props::None,
     };
     let invalid = match &props {
@@ -316,6 +318,8 @@ pub(crate) enum Props<'a> {
     Sdt(Box<SdtProps>),
     Comment(Box<CommentProps>),
     Picture(Arc<litchi_docx::image::InlineImage>),
+    /// A chart: its frame, and its chart part read through the handle.
+    Chart(&'a super::Docx, Arc<super::chart::ChartValue>),
 }
 
 impl<'a> Props<'a> {
@@ -334,6 +338,7 @@ impl<'a> Props<'a> {
             Self::Sdt(sdt) => sdt_value(sdt, index),
             Self::Comment(comment) => comment_value(comment, index),
             Self::Picture(picture) => picture_value(picture, index),
+            Self::Chart(docx, chart) => super::chart::chart_value(docx, chart, index),
         }
     }
 }
@@ -353,6 +358,7 @@ impl std::fmt::Debug for Props<'_> {
             Self::Sdt(_) => "Props::Sdt",
             Self::Comment(_) => "Props::Comment",
             Self::Picture(_) => "Props::Picture",
+            Self::Chart(..) => "Props::Chart",
         })
     }
 }

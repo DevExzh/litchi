@@ -60,7 +60,7 @@ pub mod substitute {
 }
 
 pub use limit::LimitKind;
-pub use owned::{Commit, Edit, HyperlinkTarget, NewChart, NewComment, NewPicture};
+pub use owned::{Commit, Edit, HyperlinkTarget, NewChart, NewComment, NewPicture, chart_workbook};
 
 pub(crate) use transaction::MAX_DOCUMENT_XML_BYTES;
 pub(crate) use transaction::validate_paragraph_text;

@@ -165,6 +165,10 @@ impl Docx {
         let editor = self.edit()?;
         let nodes = self.resolve_targets(&target)?;
         let props = Props::from_props(props)?;
+        let editor = match self.try_set_chart(editor, &nodes, &props)? {
+            Ok(commit) => return Ok(commit),
+            Err(editor) => editor,
+        };
         let controls = command_text && crate::batch::has_text_controls(&props);
         if controls
             && nodes

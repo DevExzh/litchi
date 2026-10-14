@@ -50,6 +50,8 @@ struct ShapeGeometry {
     transforms: usize,
     transform: Option<TransformGeometry>,
     malformed: bool,
+    /// Whether the transform is a graphic frame's own `p:xfrm`.
+    frame: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -144,9 +146,12 @@ pub(super) fn rewrite_shape_bounds_many(
             ));
         }
         let shape = scene.at(index)?;
-        if !matches!(shape, crate::shape::Shape::Auto(_)) {
+        if !matches!(
+            shape,
+            crate::shape::Shape::Auto(_) | crate::shape::Shape::Chart(_)
+        ) {
             return Err(Error::Invalid(
-                "opened-presentation geometry authoring supports ordinary p:sp shapes only".into(),
+                "opened-presentation geometry authoring supports ordinary p:sp shapes and chart frames only".into(),
             ));
         }
         let span = shape.common().span()?.range(xml.len())?;
@@ -289,6 +294,16 @@ fn validate_bounds_domain(
 }
 
 fn validate_typed_transform(shape: crate::shape::Shape<'_>) -> Result<()> {
+    // A graphic frame's transform has no rotation or flips: its bounds are
+    // its whole typed geometry.
+    if matches!(shape, crate::shape::Shape::Chart(_)) {
+        return match shape.common().bounds() {
+            Some(_) => Ok(()),
+            None => Err(Error::Invalid(
+                "opened-presentation selected chart frame has no direct p:xfrm geometry".into(),
+            )),
+        };
+    }
     match shape.common().transform() {
         Ok(Some(_)) => Ok(()),
         Ok(None) => Err(Error::Invalid(
@@ -324,7 +339,7 @@ fn checked_transform(record: &ShapeGeometry, required: bool) -> Result<Option<&T
             "opened-presentation shape has a malformed direct transform owner".into(),
         ));
     }
-    if record.shape_properties == 0 || record.transforms == 0 {
+    if record.transforms == 0 || (record.shape_properties == 0 && !record.frame) {
         if required {
             return Err(Error::Invalid(
                 "opened-presentation selected shape has no direct a:xfrm geometry".into(),
@@ -567,6 +582,7 @@ fn start_element(
             transforms: 0,
             transform: None,
             malformed: false,
+            frame: false,
         });
         return Ok(Some(index));
     }
@@ -583,8 +599,11 @@ fn start_element(
                 record.malformed = true;
             }
         },
-        ElementKind::Transform if direct(ElementKind::ShapeProperties) => {
+        ElementKind::Transform
+            if direct(ElementKind::ShapeProperties) || direct(ElementKind::Shape) =>
+        {
             let record = &mut shapes[shape];
+            record.frame |= direct(ElementKind::Shape);
             record.transforms = record.transforms.saturating_add(1);
             if record.transforms == 1 {
                 record.transform = Some(TransformGeometry::new());
@@ -827,8 +846,16 @@ fn classify_element(
     stack: &[ElementFrame],
 ) -> ElementKind {
     let local = element.local_name();
-    if is_pml(namespace) && local.as_ref() == b"sp" {
+    if is_pml(namespace) && matches!(local.as_ref(), b"sp" | b"graphicFrame") {
         ElementKind::Shape
+    } else if is_pml(namespace)
+        && local.as_ref() == b"xfrm"
+        && stack
+            .last()
+            .is_some_and(|frame| frame.kind == ElementKind::Shape && frame.shape.is_some())
+    {
+        // A graphic frame's own transform (`p:graphicFrame/p:xfrm`).
+        ElementKind::Transform
     } else if is_pml(namespace)
         && local.as_ref() == b"spPr"
         && stack

@@ -76,6 +76,7 @@ use crate::options::{OpenOptions, SourceMode};
 #[doc(hidden)]
 #[path = "docx/support.rs"]
 pub mod __unified;
+mod chart;
 mod children;
 pub(crate) mod create;
 mod element;

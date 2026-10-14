@@ -1818,7 +1818,7 @@
         "chartType": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": true
         },
         "title": {
@@ -1854,7 +1854,7 @@
         "data": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": false
         },
         "dataRange": {
@@ -1866,7 +1866,7 @@
         "axisTitle": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": false
         },
         "name": {
@@ -1878,182 +1878,242 @@
         "x": {
           "type": "int",
           "add": true,
-          "set": false,
-          "get": false
+          "set": true,
+          "get": true
         },
         "y": {
           "type": "int",
           "add": true,
-          "set": false,
-          "get": false
+          "set": true,
+          "get": true
         },
         "width": {
           "type": "int",
           "add": true,
-          "set": false,
-          "get": false
+          "set": true,
+          "get": true
         },
         "height": {
           "type": "int",
           "add": true,
-          "set": false,
-          "get": false
+          "set": true,
+          "get": true
         },
         "colors": {
           "type": "string",
           "add": true,
-          "set": false,
-          "get": false
+          "set": true,
+          "get": true
         },
         "dataLabels": {
           "type": "string",
           "add": true,
-          "set": false,
-          "get": false
+          "set": true,
+          "get": true
         },
         "labelPos": {
           "type": "string",
           "add": true,
-          "set": false,
-          "get": false
+          "set": true,
+          "get": true
         },
         "varyColors": {
           "type": "bool",
           "add": true,
-          "set": false,
-          "get": false
+          "set": true,
+          "get": true
         },
         "gapWidth": {
           "type": "int",
           "add": true,
-          "set": false,
-          "get": false
+          "set": true,
+          "get": true
         },
         "overlap": {
           "type": "int",
           "add": true,
-          "set": false,
-          "get": false
+          "set": true,
+          "get": true
         },
         "holeSize": {
           "type": "int",
           "add": true,
-          "set": false,
-          "get": false
+          "set": true,
+          "get": true
         },
         "firstSliceAngle": {
           "type": "int",
           "add": true,
-          "set": false,
-          "get": false
+          "set": true,
+          "get": true
         },
         "scatterStyle": {
           "type": "string",
           "add": true,
-          "set": false,
-          "get": false
+          "set": true,
+          "get": true
         },
         "radarStyle": {
           "type": "string",
           "add": true,
-          "set": false,
-          "get": false
+          "set": true,
+          "get": true
         },
         "smooth": {
           "type": "bool",
           "add": true,
-          "set": false,
-          "get": false
+          "set": true,
+          "get": true
         },
         "explosion": {
           "type": "int",
           "add": true,
-          "set": false,
-          "get": false
+          "set": true,
+          "get": true
         },
         "legend.overlay": {
           "type": "bool",
           "add": true,
-          "set": false,
-          "get": false
+          "set": true,
+          "get": true
         },
         "autoTitleDeleted": {
           "type": "bool",
           "add": true,
-          "set": false,
-          "get": false
+          "set": true,
+          "get": true
         },
         "axisMin": {
           "type": "number",
           "add": true,
-          "set": false,
-          "get": false
+          "set": true,
+          "get": true
         },
         "axisMax": {
           "type": "number",
           "add": true,
-          "set": false,
-          "get": false
+          "set": true,
+          "get": true
         },
         "majorUnit": {
           "type": "number",
           "add": true,
-          "set": false,
-          "get": false
+          "set": true,
+          "get": true
         },
         "gridlines": {
           "type": "string",
           "add": true,
-          "set": false,
-          "get": false
+          "set": true,
+          "get": true
         },
         "minorGridlines": {
           "type": "string",
           "add": true,
-          "set": false,
-          "get": false
+          "set": true,
+          "get": true
         },
         "comboTypes": {
           "type": "string",
           "add": true,
-          "set": false,
-          "get": false
+          "set": true,
+          "get": true
         },
         "comboSplit": {
           "type": "int",
           "add": true,
-          "set": false,
+          "set": true,
           "get": false
         },
         "marker": {
           "type": "string",
           "add": true,
-          "set": false,
-          "get": false
+          "set": true,
+          "get": true
         },
         "markerSize": {
           "type": "int",
           "add": true,
-          "set": false,
-          "get": false
+          "set": true,
+          "get": true
         },
         "showMarkers": {
           "type": "bool",
           "add": true,
-          "set": false,
-          "get": false
+          "set": true,
+          "get": true
         },
         "lineWidth": {
           "type": "number",
           "add": true,
-          "set": false,
-          "get": false
+          "set": true,
+          "get": true
         },
         "view3d": {
           "type": "string",
           "add": true,
-          "set": false,
-          "get": false
+          "set": true,
+          "get": true
+        },
+        "increaseColor": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "decreaseColor": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "totalColor": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "binCount": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "binSize": {
+          "type": "number",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "intervalClosed": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "overflowBin": {
+          "type": "number",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "underflowBin": {
+          "type": "number",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "quartileMethod": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "parentLabelLayout": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
         },
         "series1": {
           "type": "string",
@@ -2190,7 +2250,7 @@
         "series1.color": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": false
         },
         "series2.name": {
@@ -2208,7 +2268,7 @@
         "series2.color": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": false
         },
         "series3.name": {
@@ -2226,7 +2286,7 @@
         "series3.color": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": false
         },
         "series4.name": {
@@ -2244,7 +2304,7 @@
         "series4.color": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": false
         },
         "series5.name": {
@@ -2262,7 +2322,7 @@
         "series5.color": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": false
         },
         "series6.name": {
@@ -2280,7 +2340,7 @@
         "series6.color": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": false
         },
         "series7.name": {
@@ -2298,7 +2358,7 @@
         "series7.color": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": false
         },
         "series8.name": {
@@ -2316,7 +2376,7 @@
         "series8.color": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": false
         },
         "series9.name": {
@@ -2334,7 +2394,7 @@
         "series9.color": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": false
         },
         "series10.name": {
@@ -2352,7 +2412,7 @@
         "series10.color": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": false
         },
         "series11.name": {
@@ -2370,7 +2430,7 @@
         "series11.color": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": false
         },
         "series12.name": {
@@ -2388,7 +2448,7 @@
         "series12.color": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": false
         },
         "series13.name": {
@@ -2406,7 +2466,7 @@
         "series13.color": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": false
         },
         "series14.name": {
@@ -2424,7 +2484,7 @@
         "series14.color": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": false
         },
         "series15.name": {
@@ -2442,7 +2502,7 @@
         "series15.color": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": false
         },
         "series16.name": {
@@ -2460,7 +2520,7 @@
         "series16.color": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": false
         },
         "series17.name": {
@@ -2478,7 +2538,7 @@
         "series17.color": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": false
         },
         "series18.name": {
@@ -2496,7 +2556,7 @@
         "series18.color": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": false
         },
         "series19.name": {
@@ -2514,7 +2574,7 @@
         "series19.color": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": false
         },
         "series20.name": {
@@ -2532,7 +2592,7 @@
         "series20.color": {
           "type": "string",
           "add": true,
-          "set": false,
+          "set": true,
           "get": false
         }
       },
@@ -2578,6 +2638,12 @@
           "add": false,
           "set": false,
           "get": true
+        },
+        "color": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
         }
       },
       "predicates": {
@@ -2614,6 +2680,18 @@
         },
         "title": {
           "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "min": {
+          "type": "number",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "max": {
+          "type": "number",
           "add": false,
           "set": true,
           "get": true

@@ -21,15 +21,15 @@ differs from the hash recorded below.
 
 | Input | File | SHA-256 |
 |---|---|---|
-| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `139c594a2f560a90482c753a0329783d25bbe8b4c3e91568a9e4248876e7af82` |
-| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `d3f12d7418d7cad326a8db6fdf4ad4b445e30f12932ded53bcee908625c017ec` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `ee02e9b50246ebf4c98c9e6ea611fdbac8a43140a4e70062b1bae5df8e62d0ef` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `5400853a6e617cd56e79e9b376eae247b2492952cf8b43bd2e09645e00eb1e64` |
 | golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `85c16b486c3dadd7565c8855656c93f20bba6a09d62bf7dbee7e67603a0f6a54` |
 | golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `a6ee55a8d6d82990eadbd51ff37fa1d108e4093a9da73d89ed0a0b9a71510990` |
-| golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `a23bc5ede1ae767e43b4b29ecfeacec0284fd404696c419fad9a6027c7524d39` |
-| golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `93bfa743cdb170045c8ae7c726aa622f90611b7c3b13e0f6424f7295c3a434cd` |
+| golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `728daa474cf4f13235a7d82ad19802d4a051195be4bdc6b73dc462cabea8b957` |
+| golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `d261a29c010985932815530391ff3b57dff5ebb7c490acc95fa955b1ccf57f7e` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsb.json` | `ed42211205eb0476cc90d02802f88c447b9bcf6ae4a28c54816704539152e06f` |
 | golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `299bb82c87cfef0c27ecfe8bd4fb7df4982635a954c5fa57ac58897900e0e2fa` |
-| golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `aacdf00a1d10834d59799fe149b44a78b0a9a6157437fe2f2a78c8841aa51d86` |
+| golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `d19636fbcc021f0c9babafb8e2c695d7fee01fb6663bb52ccaba04eb85b48fc6` |
 | golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `2038cde02828395f020df3d9b9732cc9350ce839bba5bc5aee3089cdd0e81fab` |
 | golden | `crates/litchi-ops/tests/golden/registry/odp.json` | `4b97c200a9d8e2b81e4625ba6888add00e49c483d67fed1ac7be39801f668cf8` |
 | golden | `crates/litchi-ops/tests/golden/registry/ods.json` | `0c1b9c65f4c932c9ef36d6f1d61183724b98354c9c1a0d04adaada0505ca1fb4` |
@@ -71,7 +71,7 @@ Elements:
 
 | Format | supported | gap | folded | pending | missing | out of scope | litchi-only |
 |---|---|---|---|---|---|---|---|
-| docx | 13 | 22 | 0 | 0 | 9 | 2 | 5 |
+| docx | 14 | 21 | 0 | 0 | 9 | 2 | 5 |
 | doc | 15 | 11 | 0 | 0 | 18 | 2 | 1 |
 | rtf | 22 | 8 | 0 | 0 | 14 | 2 | 1 |
 | xlsx | 11 | 27 | 0 | 0 | 1 | 2 | 1 |
@@ -87,13 +87,13 @@ Property reads:
 
 | Format | supported | gap | element gap | pending | write-only | raw-only | missing | litchi-only |
 |---|---|---|---|---|---|---|---|---|
-| docx | 138 | 3 | 391 | 0 | 113 | 2 | 314 | 28 |
+| docx | 174 | 3 | 283 | 0 | 155 | 2 | 344 | 118 |
 | doc | 39 | 0 | 231 | 0 | 205 | 1 | 485 | 38 |
 | rtf | 68 | 0 | 143 | 0 | 203 | 1 | 546 | 34 |
-| xlsx | 101 | 16 | 328 | 0 | 100 | 1 | 145 | 145 |
+| xlsx | 135 | 16 | 328 | 0 | 69 | 1 | 142 | 152 |
 | xlsb | 78 | 29 | 489 | 0 | 24 | 1 | 70 | 30 |
 | xls | 56 | 4 | 504 | 0 | 24 | 1 | 102 | 0 |
-| pptx | 167 | 22 | 70 | 0 | 144 | 0 | 284 | 249 |
+| pptx | 197 | 22 | 70 | 0 | 117 | 0 | 281 | 256 |
 | ppt | 41 | 3 | 318 | 0 | 48 | 0 | 277 | 47 |
 | odp | 70 | 3 | 80 | 0 | 123 | 0 | 411 | 65 |
 | ods | 25 | 11 | 501 | 0 | 26 | 1 | 127 | 6 |
@@ -103,13 +103,13 @@ Property writes:
 
 | Format | supported | partial | gap | pending | litchi-only | — |
 |---|---|---|---|---|---|---|
-| docx | 92 | 30 | 674 | 0 | 12 | 181 |
+| docx | 129 | 30 | 637 | 0 | 102 | 181 |
 | doc | 1 | 13 | 782 | 0 | 21 | 182 |
 | rtf | 12 | 15 | 769 | 0 | 22 | 177 |
-| xlsx | 21 | 69 | 454 | 0 | 149 | 143 |
+| xlsx | 54 | 42 | 448 | 0 | 156 | 143 |
 | xlsb | 8 | 26 | 510 | 0 | 31 | 146 |
 | xls | 1 | 19 | 524 | 0 | 0 | 147 |
-| pptx | 53 | 55 | 453 | 0 | 133 | 242 |
+| pptx | 86 | 28 | 447 | 0 | 140 | 242 |
 | ppt | 0 | 14 | 547 | 0 | 16 | 157 |
 | odp | 3 | 37 | 521 | 0 | 17 | 174 |
 | ods | 6 | 5 | 533 | 0 | 6 | 147 |
@@ -127,7 +127,7 @@ Property writes:
 | bookmarkEnd |  | missing |  |
 | chart-axis |  | missing |  |
 | chart-series |  | missing |  |
-| chart | chart | gap | R4x |
+| chart | chart | supported |  |
 | comment | comment | supported |  |
 | diagram |  | missing |  |
 | document | document | supported |  |
@@ -241,114 +241,204 @@ Property writes:
 | chart-series | `values` | string | asg |  | missing | gap |  |
 | chart-series | `bubbleSize` | string | a-g |  | missing | gap |  |
 | chart-series | `bubbleSizeRef` | string | a-g |  | missing | gap |  |
-| chart | `dispUnits` | string | asg |  | element gap | gap | R4x |
-| chart | `seriesCount` | number | --g |  | element gap | — | R4x |
-| chart | `radarstyle` | string | as- |  | element gap | gap | R4x |
-| chart | `roundedcorners` | bool | as- |  | element gap | gap | R4x |
-| chart | `valaxisvisible` | bool | as- |  | element gap | gap | R4x |
-| chart | `areafill` | string | as- |  | element gap | gap | R4x |
-| chart | `autotitledeleted` | bool | as- |  | element gap | gap | R4x |
-| chart | `axisfont` | string | as- |  | element gap | gap | R4x |
-| chart | `axisline` | string | as- |  | element gap | gap | R4x |
-| chart | `axismax` | number | as- |  | element gap | gap | R4x |
-| chart | `axismin` | number | as- |  | element gap | gap | R4x |
-| chart | `axisnumfmt` | string | as- |  | element gap | gap | R4x |
-| chart | `axisorientation` | string | as- |  | element gap | gap | R4x |
-| chart | `axisposition` | string | as- |  | element gap | gap | R4x |
-| chart | `axistitle` | string | as- |  | element gap | gap | R4x |
-| chart | `axisvisible` | bool | as- |  | element gap | gap | R4x |
-| chart | `bubbleScale` | number | asg |  | element gap | gap | R4x |
-| chart | `catAxisVisible` | bool | asg |  | element gap | gap | R4x |
-| chart | `catTitle` | string | asg |  | element gap | gap | R4x |
-| chart | `cataxisline` | string | as- |  | element gap | gap | R4x |
-| chart | `categories` | string | asg |  | element gap | gap | R4x |
-| chart | `chartFill` | color | asg |  | element gap | gap | R4x |
-| chart | `chartType` | enum | a-g |  | element gap | gap | R4x |
-| chart | `chartareafill` | string | as- |  | element gap | gap | R4x |
-| chart | `chartborder` | string | as- |  | element gap | gap | R4x |
-| chart | `colorrule` | string | as- |  | element gap | gap | R4x |
-| chart | `colors` | string | a-- |  | element gap | gap | R4x |
-| chart | `combosplit` | number | a-- |  | element gap | gap | R4x |
-| chart | `combotypes` | string | as- |  | element gap | gap | R4x |
-| chart | `crossBetween` | string | asg |  | element gap | gap | R4x |
-| chart | `crosses` | string | asg |  | element gap | gap | R4x |
-| chart | `crossesAt` | number | asg |  | element gap | gap | R4x |
-| chart | `data` | string | a-- |  | element gap | gap | R4x |
-| chart | `dataLabels` | string | asg |  | element gap | gap | R4x |
-| chart | `dataTable` | bool | asg |  | element gap | gap | R4x |
-| chart | `decreaseColor` | color | a-- |  | element gap | gap | R4x |
-| chart | `dispBlanksAs` | enum | asg |  | element gap | gap | R4x |
-| chart | `droplines` | string | asg |  | element gap | gap | R4x |
-| chart | `errbars` | string | as- |  | element gap | gap | R4x |
-| chart | `explosion` | number | asg |  | element gap | gap | R4x |
-| chart | `firstSliceAngle` | number | asg |  | element gap | gap | R4x |
-| chart | `gapdepth` | number | as- |  | element gap | gap | R4x |
-| chart | `gapwidth` | number | asg |  | element gap | gap | R4x |
-| chart | `gradient` | string | asg |  | element gap | gap | R4x |
-| chart | `gradients` | string | as- |  | element gap | gap | R4x |
-| chart | `gridlines` | bool | asg |  | element gap | gap | R4x |
-| chart | `height` | length | asg |  | element gap | gap | R4x |
-| chart | `hilowlines` | string | asg |  | element gap | gap | R4x |
-| chart | `holeSize` | number | asg |  | element gap | gap | R4x |
-| chart | `increaseColor` | color | a-- |  | element gap | gap | R4x |
-| chart | `invertifneg` | bool | as- |  | element gap | gap | R4x |
-| chart | `labelPos` | string | asg |  | element gap | gap | R4x |
-| chart | `labelfont` | string | as- |  | element gap | gap | R4x |
-| chart | `labelFont.size` | number | --g |  | element gap | — | R4x |
-| chart | `labelFont.color` | string | --g |  | element gap | — | R4x |
-| chart | `labelFont.bold` | bool | --g |  | element gap | — | R4x |
-| chart | `labelFont.name` | string | --g |  | element gap | — | R4x |
-| chart | `labeloffset` | number | as- |  | element gap | gap | R4x |
-| chart | `labelrotation` | number | as- |  | element gap | gap | R4x |
-| chart | `leaderlines` | bool | as- |  | element gap | gap | R4x |
-| chart | `legend` | enum | asg |  | element gap | gap | R4x |
-| chart | `legend.overlay` | bool | asg |  | element gap | gap | R4x |
-| chart | `legendFont` | string | asg |  | element gap | gap | R4x |
-| chart | `linedash` | string | as- |  | element gap | gap | R4x |
-| chart | `linewidth` | number | as- |  | element gap | gap | R4x |
-| chart | `logbase` | number | as- |  | element gap | gap | R4x |
-| chart | `majorTickMark` | string | asg |  | element gap | gap | R4x |
-| chart | `majorunit` | number | as- |  | element gap | gap | R4x |
-| chart | `marker` | string | as- |  | element gap | gap | R4x |
-| chart | `markersize` | number | as- |  | element gap | gap | R4x |
-| chart | `markercolor` | string | -sg |  | element gap | gap | R4x |
-| chart | `minorGridlines` | bool | asg |  | element gap | gap | R4x |
-| chart | `minorTickMark` | string | asg |  | element gap | gap | R4x |
-| chart | `minorunit` | number | as- |  | element gap | gap | R4x |
-| chart | `overlap` | number | asg |  | element gap | gap | R4x |
-| chart | `plotFill` | color | asg |  | element gap | gap | R4x |
-| chart | `plotborder` | string | as- |  | element gap | gap | R4x |
-| chart | `plotvisonly` | bool | as- |  | element gap | gap | R4x |
-| chart | `preset` | string | as- |  | element gap | gap | R4x |
-| chart | `referenceline` | string | as- |  | element gap | gap | R4x |
-| chart | `scatterstyle` | string | as- |  | element gap | gap | R4x |
-| chart | `secondaryaxis` | string | as- |  | element gap | gap | R4x |
-| chart | `series{N}` | string | -s- |  | element gap | gap | R4x |
-| chart | `seriesoutline` | string | as- |  | element gap | gap | R4x |
-| chart | `seriesshadow` | string | as- |  | element gap | gap | R4x |
-| chart | `serlines` | string | as- |  | element gap | gap | R4x |
-| chart | `shape` | string | as- |  | element gap | gap | R4x |
-| chart | `showMarker` | string | -sg |  | element gap | gap | R4x |
-| chart | `shownegbubbles` | bool | as- |  | element gap | gap | R4x |
-| chart | `sizerepresents` | string | as- |  | element gap | gap | R4x |
-| chart | `smooth` | string | asg |  | element gap | gap | R4x |
-| chart | `style` | number | asg |  | element gap | gap | R4x |
-| chart | `tickLabelPos` | string | asg |  | element gap | gap | R4x |
-| chart | `ticklabelskip` | number | as- |  | element gap | gap | R4x |
-| chart | `title` | string | asg |  | element gap | gap | R4x |
-| chart | `title.bold` | string | asg |  | element gap | gap | R4x |
-| chart | `title.color` | color | asg |  | element gap | gap | R4x |
-| chart | `title.font` | string | asg |  | element gap | gap | R4x |
-| chart | `title.overlay` | bool | asg |  | element gap | gap | R4x |
-| chart | `title.size` | font-size | asg |  | element gap | gap | R4x |
-| chart | `totalColor` | color | a-- |  | element gap | gap | R4x |
-| chart | `transparency` | number | as- |  | element gap | gap | R4x |
-| chart | `trendline` | string | asg |  | element gap | gap | R4x |
-| chart | `updownbars` | string | asg |  | element gap | gap | R4x |
-| chart | `valaxisline` | string | as- |  | element gap | gap | R4x |
-| chart | `varyColors` | string | asg |  | element gap | gap | R4x |
-| chart | `view3d` | string | asg |  | element gap | gap | R4x |
-| chart | `width` | length | asg |  | element gap | gap | R4x |
+| chart | `dispUnits` | string | asg |  | missing | gap |  |
+| chart | `seriesCount` | number | --g | --g | supported | — |  |
+| chart | `radarstyle` | string | as- | asg | supported | supported |  |
+| chart | `roundedcorners` | bool | as- |  | write-only | gap |  |
+| chart | `valaxisvisible` | bool | as- |  | write-only | gap |  |
+| chart | `areafill` | string | as- |  | write-only | gap |  |
+| chart | `autotitledeleted` | bool | as- | asg | supported | supported |  |
+| chart | `axisfont` | string | as- |  | write-only | gap |  |
+| chart | `axisline` | string | as- |  | write-only | gap |  |
+| chart | `axismax` | number | as- | asg | supported | supported |  |
+| chart | `axismin` | number | as- | asg | supported | supported |  |
+| chart | `axisnumfmt` | string | as- |  | write-only | gap |  |
+| chart | `axisorientation` | string | as- |  | write-only | gap |  |
+| chart | `axisposition` | string | as- |  | write-only | gap |  |
+| chart | `axistitle` | string | as- | as- | write-only | supported |  |
+| chart | `axisvisible` | bool | as- |  | write-only | gap |  |
+| chart | `bubbleScale` | number | asg |  | missing | gap |  |
+| chart | `catAxisVisible` | bool | asg |  | missing | gap |  |
+| chart | `catTitle` | string | asg | asg | supported | supported |  |
+| chart | `cataxisline` | string | as- |  | write-only | gap |  |
+| chart | `categories` | string | asg | asg | supported | supported |  |
+| chart | `chartFill` | color | asg |  | missing | gap |  |
+| chart | `chartType` | enum | a-g | asg | supported | supported |  |
+| chart | `chartareafill` | string | as- |  | write-only | gap |  |
+| chart | `chartborder` | string | as- |  | write-only | gap |  |
+| chart | `colorrule` | string | as- |  | write-only | gap |  |
+| chart | `colors` | string | a-- | asg | supported | supported |  |
+| chart | `combosplit` | number | a-- | as- | write-only | supported |  |
+| chart | `combotypes` | string | as- | asg | supported | supported |  |
+| chart | `crossBetween` | string | asg |  | missing | gap |  |
+| chart | `crosses` | string | asg |  | missing | gap |  |
+| chart | `crossesAt` | number | asg |  | missing | gap |  |
+| chart | `data` | string | a-- | as- | write-only | supported |  |
+| chart | `dataLabels` | string | asg | asg | supported | supported |  |
+| chart | `dataTable` | bool | asg |  | missing | gap |  |
+| chart | `decreaseColor` | color | a-- | asg | supported | supported |  |
+| chart | `dispBlanksAs` | enum | asg |  | missing | gap |  |
+| chart | `droplines` | string | asg |  | missing | gap |  |
+| chart | `errbars` | string | as- |  | write-only | gap |  |
+| chart | `explosion` | number | asg | asg | supported | supported |  |
+| chart | `firstSliceAngle` | number | asg | asg | supported | supported |  |
+| chart | `gapdepth` | number | as- |  | write-only | gap |  |
+| chart | `gapwidth` | number | asg | asg | supported | supported |  |
+| chart | `gradient` | string | asg |  | missing | gap |  |
+| chart | `gradients` | string | as- |  | write-only | gap |  |
+| chart | `gridlines` | bool | asg | asg | supported | supported |  |
+| chart | `height` | length | asg | asg | supported | supported |  |
+| chart | `hilowlines` | string | asg |  | missing | gap |  |
+| chart | `holeSize` | number | asg | asg | supported | supported |  |
+| chart | `increaseColor` | color | a-- | asg | supported | supported |  |
+| chart | `invertifneg` | bool | as- |  | write-only | gap |  |
+| chart | `labelPos` | string | asg | asg | supported | supported |  |
+| chart | `labelfont` | string | as- |  | write-only | gap |  |
+| chart | `labelFont.size` | number | --g |  | missing | — |  |
+| chart | `labelFont.color` | string | --g |  | missing | — |  |
+| chart | `labelFont.bold` | bool | --g |  | missing | — |  |
+| chart | `labelFont.name` | string | --g |  | missing | — |  |
+| chart | `labeloffset` | number | as- |  | write-only | gap |  |
+| chart | `labelrotation` | number | as- |  | write-only | gap |  |
+| chart | `leaderlines` | bool | as- |  | write-only | gap |  |
+| chart | `legend` | enum | asg | asg | supported | supported |  |
+| chart | `legend.overlay` | bool | asg | asg | supported | supported |  |
+| chart | `legendFont` | string | asg |  | missing | gap |  |
+| chart | `linedash` | string | as- |  | write-only | gap |  |
+| chart | `linewidth` | number | as- | asg | supported | supported |  |
+| chart | `logbase` | number | as- |  | write-only | gap |  |
+| chart | `majorTickMark` | string | asg |  | missing | gap |  |
+| chart | `majorunit` | number | as- | asg | supported | supported |  |
+| chart | `marker` | string | as- | asg | supported | supported |  |
+| chart | `markersize` | number | as- | asg | supported | supported |  |
+| chart | `markercolor` | string | -sg |  | missing | gap |  |
+| chart | `minorGridlines` | bool | asg | asg | supported | supported |  |
+| chart | `minorTickMark` | string | asg |  | missing | gap |  |
+| chart | `minorunit` | number | as- |  | write-only | gap |  |
+| chart | `overlap` | number | asg | asg | supported | supported |  |
+| chart | `plotFill` | color | asg |  | missing | gap |  |
+| chart | `plotborder` | string | as- |  | write-only | gap |  |
+| chart | `plotvisonly` | bool | as- |  | write-only | gap |  |
+| chart | `preset` | string | as- |  | write-only | gap |  |
+| chart | `referenceline` | string | as- |  | write-only | gap |  |
+| chart | `scatterstyle` | string | as- | asg | supported | supported |  |
+| chart | `secondaryaxis` | string | as- |  | write-only | gap |  |
+| chart | `series{N}` | string | -s- |  | write-only | gap |  |
+| chart | `seriesoutline` | string | as- |  | write-only | gap |  |
+| chart | `seriesshadow` | string | as- |  | write-only | gap |  |
+| chart | `serlines` | string | as- |  | write-only | gap |  |
+| chart | `shape` | string | as- |  | write-only | gap |  |
+| chart | `showMarker` | string | -sg |  | missing | gap |  |
+| chart | `shownegbubbles` | bool | as- |  | write-only | gap |  |
+| chart | `sizerepresents` | string | as- |  | write-only | gap |  |
+| chart | `smooth` | string | asg | asg | supported | supported |  |
+| chart | `style` | number | asg |  | supported | gap | the node's text |
+| chart | `tickLabelPos` | string | asg |  | missing | gap |  |
+| chart | `ticklabelskip` | number | as- |  | write-only | gap |  |
+| chart | `title` | string | asg | asg | supported | supported |  |
+| chart | `title.bold` | string | asg |  | missing | gap |  |
+| chart | `title.color` | color | asg |  | missing | gap |  |
+| chart | `title.font` | string | asg |  | missing | gap |  |
+| chart | `title.overlay` | bool | asg |  | missing | gap |  |
+| chart | `title.size` | font-size | asg |  | missing | gap |  |
+| chart | `totalColor` | color | a-- | asg | supported | supported |  |
+| chart | `transparency` | number | as- |  | write-only | gap |  |
+| chart | `trendline` | string | asg |  | missing | gap |  |
+| chart | `updownbars` | string | asg |  | missing | gap |  |
+| chart | `valaxisline` | string | as- |  | write-only | gap |  |
+| chart | `varyColors` | string | asg | asg | supported | supported |  |
+| chart | `view3d` | string | asg | asg | supported | supported |  |
+| chart | `width` | length | asg | asg | supported | supported |  |
+| chart | `name` | string |  | a-g | litchi-only | litchi-only |  |
+| chart | `alt` | string |  | a-g | litchi-only | litchi-only |  |
+| chart | `showMarkers` | bool |  | asg | litchi-only | litchi-only |  |
+| chart | `binCount` | int |  | asg | litchi-only | litchi-only |  |
+| chart | `binSize` | number |  | asg | litchi-only | litchi-only |  |
+| chart | `intervalClosed` | string |  | asg | litchi-only | litchi-only |  |
+| chart | `overflowBin` | number |  | asg | litchi-only | litchi-only |  |
+| chart | `underflowBin` | number |  | asg | litchi-only | litchi-only |  |
+| chart | `quartileMethod` | string |  | asg | litchi-only | litchi-only |  |
+| chart | `parentLabelLayout` | string |  | asg | litchi-only | litchi-only |  |
+| chart | `series1` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series2` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series3` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series4` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series5` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series6` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series7` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series8` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series9` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series10` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series11` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series12` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series13` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series14` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series15` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series16` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series17` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series18` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series19` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series20` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series1.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series1.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series1.color` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series2.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series2.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series2.color` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series3.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series3.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series3.color` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series4.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series4.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series4.color` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series5.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series5.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series5.color` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series6.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series6.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series6.color` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series7.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series7.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series7.color` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series8.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series8.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series8.color` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series9.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series9.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series9.color` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series10.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series10.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series10.color` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series11.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series11.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series11.color` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series12.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series12.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series12.color` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series13.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series13.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series13.color` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series14.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series14.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series14.color` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series15.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series15.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series15.color` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series16.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series16.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series16.color` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series17.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series17.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series17.color` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series18.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series18.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series18.color` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series19.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series19.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series19.color` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series20.name` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series20.values` | string |  | as- | litchi-only | litchi-only |  |
+| chart | `series20.color` | string |  | as- | litchi-only | litchi-only |  |
 | comment | `id` | number | --g | --g | supported | — |  |
 | comment | `anchoredTo` | string | --g |  | missing | — |  |
 | comment | `runStart` | int | a-- |  | write-only | gap |  |
@@ -3552,8 +3642,8 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | chart-axis | `labelRotation` | number | -sg |  | missing | gap |  |
 | chart-axis | `logBase` | number | -sg |  | missing | gap |  |
 | chart-axis | `majorGridlines` | bool | -sg |  | missing | gap |  |
-| chart-axis | `max` | number | -sg |  | missing | gap |  |
-| chart-axis | `min` | number | -sg |  | missing | gap |  |
+| chart-axis | `max` | number | -sg | -sg | supported | supported |  |
+| chart-axis | `min` | number | -sg | -sg | supported | supported |  |
 | chart-axis | `minorGridlines` | bool | -sg |  | missing | gap |  |
 | chart-axis | `tickLabelSkip` | number | --g |  | missing | — |  |
 | chart-axis | `title` | string | -sg | -sg | supported | supported |  |
@@ -3565,7 +3655,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | chart-series | `outlineColor` | color | --g |  | missing | — |  |
 | chart-series | `categories` | string | asg | --g | supported | gap |  |
 | chart-series | `categoriesRef` | string | --g |  | missing | — |  |
-| chart-series | `color` | color | asg |  | missing | gap |  |
+| chart-series | `color` | color | asg | -sg | supported | partial |  |
 | chart-series | `dataLabels.numFmt` | string | --g |  | missing | — |  |
 | chart-series | `dataLabels.separator` | string | --g |  | missing | — |  |
 | chart-series | `errBars` | string | -sg |  | missing | gap |  |
@@ -3584,7 +3674,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | chart-series | `bubbleSize` | string | a-g |  | missing | gap |  |
 | chart-series | `bubbleSizeRef` | string | a-g |  | missing | gap |  |
 | chart | `dataRange` | string | a-- | a-- | write-only | supported |  |
-| chart | `radarStyle` | string | asg | a-- | write-only | partial |  |
+| chart | `radarStyle` | string | asg | asg | supported | supported |  |
 | chart | `roundedCorners` | string | asg |  | missing | gap |  |
 | chart | `valAxisVisible` | bool | asg |  | missing | gap |  |
 | chart | `view3d.perspective` | number | --g |  | missing | — |  |
@@ -3592,19 +3682,19 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | chart | `view3d.rotateY` | number | --g |  | missing | — |  |
 | chart | `anchor` | string | as- |  | write-only | gap |  |
 | chart | `dispunits` | string | as- |  | write-only | gap |  |
-| chart | `x` | length | asg | a-- | write-only | partial |  |
-| chart | `y` | length | asg | a-- | write-only | partial |  |
+| chart | `x` | length | asg | asg | supported | supported |  |
+| chart | `y` | length | asg | asg | supported | supported |  |
 | chart | `seriesCount` | number | --g | --g | supported | — |  |
 | chart | `areafill` | string | as- |  | write-only | gap |  |
-| chart | `autotitledeleted` | bool | as- | a-- | write-only | partial |  |
+| chart | `autotitledeleted` | bool | as- | asg | supported | supported |  |
 | chart | `axisfont` | string | as- |  | write-only | gap |  |
 | chart | `axisline` | string | as- |  | write-only | gap |  |
-| chart | `axismax` | number | as- | a-- | write-only | partial |  |
-| chart | `axismin` | number | as- | a-- | write-only | partial |  |
+| chart | `axismax` | number | as- | asg | supported | supported |  |
+| chart | `axismin` | number | as- | asg | supported | supported |  |
 | chart | `axisnumfmt` | string | as- |  | write-only | gap |  |
 | chart | `axisorientation` | string | as- |  | write-only | gap |  |
 | chart | `axisposition` | string | as- |  | write-only | gap |  |
-| chart | `axistitle` | string | as- | a-- | write-only | partial |  |
+| chart | `axistitle` | string | as- | as- | write-only | supported |  |
 | chart | `axisvisible` | bool | as- |  | write-only | gap |  |
 | chart | `bubbleScale` | number | asg |  | missing | gap |  |
 | chart | `catAxisVisible` | bool | asg |  | missing | gap |  |
@@ -3612,36 +3702,36 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | chart | `cataxisline` | string | as- |  | write-only | gap |  |
 | chart | `categories` | string | asg | asg | supported | supported |  |
 | chart | `chartFill` | color | asg |  | missing | gap |  |
-| chart | `chartType` | enum | a-g | a-g | supported | supported |  |
+| chart | `chartType` | enum | a-g | asg | supported | supported |  |
 | chart | `chartareafill` | string | as- |  | write-only | gap |  |
 | chart | `chartborder` | string | as- |  | write-only | gap |  |
 | chart | `colorrule` | string | as- |  | write-only | gap |  |
-| chart | `colors` | string | a-- | a-- | write-only | supported |  |
-| chart | `combosplit` | number | a-- | a-- | write-only | supported |  |
-| chart | `combotypes` | string | as- | a-- | write-only | partial |  |
+| chart | `colors` | string | a-- | asg | supported | supported |  |
+| chart | `combosplit` | number | a-- | as- | write-only | supported |  |
+| chart | `combotypes` | string | as- | asg | supported | supported |  |
 | chart | `crossBetween` | string | asg |  | missing | gap |  |
 | chart | `crosses` | string | asg |  | missing | gap |  |
 | chart | `crossesAt` | number | asg |  | missing | gap |  |
-| chart | `data` | string | a-- | a-- | write-only | supported |  |
-| chart | `dataLabels` | string | asg | a-- | write-only | partial |  |
+| chart | `data` | string | a-- | as- | write-only | supported |  |
+| chart | `dataLabels` | string | asg | asg | supported | supported |  |
 | chart | `dataTable` | bool | asg |  | missing | gap |  |
-| chart | `decreaseColor` | color | a-- |  | write-only | gap |  |
+| chart | `decreaseColor` | color | a-- | asg | supported | supported |  |
 | chart | `dispBlanksAs` | enum | asg |  | missing | gap |  |
 | chart | `droplines` | string | asg |  | missing | gap |  |
 | chart | `errbars` | string | as- |  | write-only | gap |  |
-| chart | `explosion` | number | asg | a-- | write-only | partial |  |
-| chart | `firstSliceAngle` | number | asg | a-- | write-only | partial |  |
+| chart | `explosion` | number | asg | asg | supported | supported |  |
+| chart | `firstSliceAngle` | number | asg | asg | supported | supported |  |
 | chart | `gapdepth` | number | as- |  | write-only | gap |  |
-| chart | `gapwidth` | number | asg | a-- | write-only | partial |  |
+| chart | `gapwidth` | number | asg | asg | supported | supported |  |
 | chart | `gradient` | string | asg |  | missing | gap |  |
 | chart | `gradients` | string | as- |  | write-only | gap |  |
-| chart | `gridlines` | bool | asg | a-- | write-only | partial |  |
-| chart | `height` | length | asg | a-- | write-only | partial |  |
+| chart | `gridlines` | bool | asg | asg | supported | supported |  |
+| chart | `height` | length | asg | asg | supported | supported |  |
 | chart | `hilowlines` | string | asg |  | missing | gap |  |
-| chart | `holeSize` | number | asg | a-- | write-only | partial |  |
-| chart | `increaseColor` | color | a-- |  | write-only | gap |  |
+| chart | `holeSize` | number | asg | asg | supported | supported |  |
+| chart | `increaseColor` | color | a-- | asg | supported | supported |  |
 | chart | `invertifneg` | bool | as- |  | write-only | gap |  |
-| chart | `labelPos` | string | asg | a-- | write-only | partial |  |
+| chart | `labelPos` | string | asg | asg | supported | supported |  |
 | chart | `labelfont` | string | as- |  | write-only | gap |  |
 | chart | `labelFont.size` | number | --g |  | missing | — |  |
 | chart | `labelFont.color` | string | --g |  | missing | — |  |
@@ -3651,26 +3741,26 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | chart | `labelrotation` | number | as- |  | write-only | gap |  |
 | chart | `leaderlines` | bool | as- |  | write-only | gap |  |
 | chart | `legend` | enum | asg | asg | supported | supported |  |
-| chart | `legend.overlay` | bool | asg | a-- | write-only | partial |  |
+| chart | `legend.overlay` | bool | asg | asg | supported | supported |  |
 | chart | `legendFont` | string | asg |  | missing | gap |  |
 | chart | `linedash` | string | as- |  | write-only | gap |  |
-| chart | `linewidth` | number | as- | a-- | write-only | partial |  |
+| chart | `linewidth` | number | as- | asg | supported | supported |  |
 | chart | `logbase` | number | as- |  | write-only | gap |  |
 | chart | `majorTickMark` | string | asg |  | missing | gap |  |
-| chart | `majorunit` | number | as- | a-- | write-only | partial |  |
-| chart | `marker` | string | as- | a-- | write-only | partial |  |
-| chart | `markersize` | number | as- | a-- | write-only | partial |  |
+| chart | `majorunit` | number | as- | asg | supported | supported |  |
+| chart | `marker` | string | as- | asg | supported | supported |  |
+| chart | `markersize` | number | as- | asg | supported | supported |  |
 | chart | `markercolor` | string | -sg |  | missing | gap |  |
-| chart | `minorGridlines` | bool | asg | a-- | write-only | partial |  |
+| chart | `minorGridlines` | bool | asg | asg | supported | supported |  |
 | chart | `minorTickMark` | string | asg |  | missing | gap |  |
 | chart | `minorunit` | number | as- |  | write-only | gap |  |
-| chart | `overlap` | number | asg | a-- | write-only | partial |  |
+| chart | `overlap` | number | asg | asg | supported | supported |  |
 | chart | `plotFill` | color | asg |  | missing | gap |  |
 | chart | `plotborder` | string | as- |  | write-only | gap |  |
 | chart | `plotvisonly` | bool | as- |  | write-only | gap |  |
 | chart | `preset` | string | as- |  | write-only | gap |  |
 | chart | `referenceline` | string | as- |  | write-only | gap |  |
-| chart | `scatterstyle` | string | as- | a-- | write-only | partial |  |
+| chart | `scatterstyle` | string | as- | asg | supported | supported |  |
 | chart | `secondaryaxis` | string | as- |  | write-only | gap |  |
 | chart | `series{N}` | string | -s- |  | write-only | gap |  |
 | chart | `seriesoutline` | string | as- |  | write-only | gap |  |
@@ -3680,7 +3770,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | chart | `showMarker` | string | -sg |  | missing | gap |  |
 | chart | `shownegbubbles` | bool | as- |  | write-only | gap |  |
 | chart | `sizerepresents` | string | as- |  | write-only | gap |  |
-| chart | `smooth` | string | asg | a-- | write-only | partial |  |
+| chart | `smooth` | string | asg | asg | supported | supported |  |
 | chart | `style` | number | asg |  | supported | gap | the node's text |
 | chart | `tickLabelPos` | string | asg |  | missing | gap |  |
 | chart | `ticklabelskip` | number | as- |  | write-only | gap |  |
@@ -3690,16 +3780,23 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | chart | `title.font` | string | asg |  | missing | gap |  |
 | chart | `title.overlay` | bool | asg |  | missing | gap |  |
 | chart | `title.size` | font-size | asg |  | missing | gap |  |
-| chart | `totalColor` | color | a-- |  | write-only | gap |  |
+| chart | `totalColor` | color | a-- | asg | supported | supported |  |
 | chart | `transparency` | number | as- |  | write-only | gap |  |
 | chart | `trendline` | string | asg |  | missing | gap |  |
 | chart | `updownbars` | string | asg |  | missing | gap |  |
 | chart | `valaxisline` | string | as- |  | write-only | gap |  |
-| chart | `varyColors` | string | asg | a-- | write-only | partial |  |
-| chart | `view3d` | string | asg | a-- | write-only | partial |  |
-| chart | `width` | length | asg | a-- | write-only | partial |  |
+| chart | `varyColors` | string | asg | asg | supported | supported |  |
+| chart | `view3d` | string | asg | asg | supported | supported |  |
+| chart | `width` | length | asg | asg | supported | supported |  |
 | chart | `name` | string |  | a-- | litchi-only | litchi-only |  |
-| chart | `showMarkers` | bool |  | a-- | litchi-only | litchi-only |  |
+| chart | `showMarkers` | bool |  | asg | litchi-only | litchi-only |  |
+| chart | `binCount` | int |  | asg | litchi-only | litchi-only |  |
+| chart | `binSize` | number |  | asg | litchi-only | litchi-only |  |
+| chart | `intervalClosed` | string |  | asg | litchi-only | litchi-only |  |
+| chart | `overflowBin` | number |  | asg | litchi-only | litchi-only |  |
+| chart | `underflowBin` | number |  | asg | litchi-only | litchi-only |  |
+| chart | `quartileMethod` | string |  | asg | litchi-only | litchi-only |  |
+| chart | `parentLabelLayout` | string |  | asg | litchi-only | litchi-only |  |
 | chart | `series1` | string |  | a-- | litchi-only | litchi-only |  |
 | chart | `series2` | string |  | a-- | litchi-only | litchi-only |  |
 | chart | `series3` | string |  | a-- | litchi-only | litchi-only |  |
@@ -3722,64 +3819,64 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | chart | `series20` | string |  | a-- | litchi-only | litchi-only |  |
 | chart | `series1.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series1.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series1.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series1.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series2.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series2.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series2.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series2.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series3.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series3.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series3.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series3.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series4.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series4.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series4.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series4.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series5.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series5.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series5.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series5.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series6.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series6.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series6.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series6.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series7.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series7.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series7.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series7.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series8.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series8.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series8.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series8.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series9.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series9.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series9.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series9.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series10.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series10.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series10.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series10.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series11.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series11.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series11.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series11.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series12.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series12.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series12.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series12.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series13.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series13.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series13.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series13.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series14.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series14.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series14.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series14.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series15.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series15.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series15.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series15.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series16.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series16.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series16.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series16.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series17.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series17.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series17.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series17.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series18.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series18.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series18.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series18.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series19.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series19.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series19.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series19.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series20.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series20.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series20.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series20.color` | string |  | as- | litchi-only | litchi-only |  |
 | colbreak | `col` | string | as- |  | element gap | gap | M1-extended (R4x) |
 | colbreak | `manual` | bool | -s- |  | element gap | gap | M1-extended (R4x) |
 | colbreak | `min` | int | -s- |  | element gap | gap | M1-extended (R4x) |
@@ -5964,8 +6061,8 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | chart-axis | `labelRotation` | number | -sg |  | missing | gap |  |
 | chart-axis | `logBase` | number | -sg |  | missing | gap |  |
 | chart-axis | `majorGridlines` | bool | -sg |  | missing | gap |  |
-| chart-axis | `max` | number | -sg |  | missing | gap |  |
-| chart-axis | `min` | number | -sg |  | missing | gap |  |
+| chart-axis | `max` | number | -sg | -sg | supported | supported |  |
+| chart-axis | `min` | number | -sg | -sg | supported | supported |  |
 | chart-axis | `minorGridlines` | bool | -sg |  | missing | gap |  |
 | chart-axis | `tickLabelSkip` | number | --g |  | missing | — |  |
 | chart-axis | `title` | string | -sg | -sg | supported | supported |  |
@@ -5976,7 +6073,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | chart-series | `alpha` | number | --g |  | missing | — |  |
 | chart-series | `outlineColor` | color | --g |  | missing | — |  |
 | chart-series | `categoriesRef` | string | --g |  | missing | — |  |
-| chart-series | `color` | color | asg |  | missing | gap |  |
+| chart-series | `color` | color | asg | -sg | supported | partial |  |
 | chart-series | `dataLabels.numFmt` | string | --g |  | missing | — |  |
 | chart-series | `dataLabels.separator` | string | --g |  | missing | — |  |
 | chart-series | `errBars` | string | -sg |  | missing | gap |  |
@@ -5997,25 +6094,25 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | chart | `direction` | string | -s- |  | write-only | gap |  |
 | chart | `id` | number | a-g |  | missing | gap |  |
 | chart | `zorder` | number | a-g | --g | supported | gap |  |
-| chart | `chartType` | enum | a-g | a-g | supported | supported |  |
+| chart | `chartType` | enum | a-g | asg | supported | supported |  |
 | chart | `name` | string | a-g | a-g | supported | supported |  |
 | chart | `anchor` | string | as- |  | write-only | gap |  |
 | chart | `dispunits` | string | as- |  | write-only | gap |  |
-| chart | `x` | length | asg | a-g | supported | partial |  |
-| chart | `y` | length | asg | a-g | supported | partial |  |
-| chart | `radarstyle` | string | as- | a-- | write-only | partial |  |
+| chart | `x` | length | asg | asg | supported | supported |  |
+| chart | `y` | length | asg | asg | supported | supported |  |
+| chart | `radarstyle` | string | as- | asg | supported | supported |  |
 | chart | `roundedcorners` | bool | as- |  | write-only | gap |  |
 | chart | `valaxisvisible` | bool | as- |  | write-only | gap |  |
 | chart | `areafill` | string | as- |  | write-only | gap |  |
-| chart | `autotitledeleted` | bool | as- | a-- | write-only | partial |  |
+| chart | `autotitledeleted` | bool | as- | asg | supported | supported |  |
 | chart | `axisfont` | string | as- |  | write-only | gap |  |
 | chart | `axisline` | string | as- |  | write-only | gap |  |
-| chart | `axismax` | number | as- | a-- | write-only | partial |  |
-| chart | `axismin` | number | as- | a-- | write-only | partial |  |
+| chart | `axismax` | number | as- | asg | supported | supported |  |
+| chart | `axismin` | number | as- | asg | supported | supported |  |
 | chart | `axisnumfmt` | string | as- |  | write-only | gap |  |
 | chart | `axisorientation` | string | as- |  | write-only | gap |  |
 | chart | `axisposition` | string | as- |  | write-only | gap |  |
-| chart | `axistitle` | string | as- | a-- | write-only | partial |  |
+| chart | `axistitle` | string | as- | as- | write-only | supported |  |
 | chart | `axisvisible` | bool | as- |  | write-only | gap |  |
 | chart | `bubbleScale` | number | asg |  | missing | gap |  |
 | chart | `catAxisVisible` | bool | asg |  | missing | gap |  |
@@ -6026,32 +6123,32 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | chart | `chartareafill` | string | as- |  | write-only | gap |  |
 | chart | `chartborder` | string | as- |  | write-only | gap |  |
 | chart | `colorrule` | string | as- |  | write-only | gap |  |
-| chart | `colors` | string | a-- | a-- | write-only | supported |  |
-| chart | `combosplit` | number | a-- | a-- | write-only | supported |  |
-| chart | `combotypes` | string | as- | a-- | write-only | partial |  |
+| chart | `colors` | string | a-- | asg | supported | supported |  |
+| chart | `combosplit` | number | a-- | as- | write-only | supported |  |
+| chart | `combotypes` | string | as- | asg | supported | supported |  |
 | chart | `crossBetween` | string | asg |  | missing | gap |  |
 | chart | `crosses` | string | asg |  | missing | gap |  |
 | chart | `crossesAt` | number | asg |  | missing | gap |  |
-| chart | `data` | string | a-- | a-- | write-only | supported |  |
-| chart | `dataLabels` | string | asg | a-- | write-only | partial |  |
+| chart | `data` | string | a-- | as- | write-only | supported |  |
+| chart | `dataLabels` | string | asg | asg | supported | supported |  |
 | chart | `dataTable` | bool | asg |  | missing | gap |  |
-| chart | `decreaseColor` | color | a-- |  | write-only | gap |  |
+| chart | `decreaseColor` | color | a-- | asg | supported | supported |  |
 | chart | `dispBlanksAs` | enum | asg |  | missing | gap |  |
 | chart | `droplines` | string | asg |  | missing | gap |  |
 | chart | `errbars` | string | as- |  | write-only | gap |  |
-| chart | `explosion` | number | asg | a-- | write-only | partial |  |
-| chart | `firstSliceAngle` | number | asg | a-- | write-only | partial |  |
+| chart | `explosion` | number | asg | asg | supported | supported |  |
+| chart | `firstSliceAngle` | number | asg | asg | supported | supported |  |
 | chart | `gapdepth` | number | as- |  | write-only | gap |  |
-| chart | `gapwidth` | number | asg | a-- | write-only | partial |  |
+| chart | `gapwidth` | number | asg | asg | supported | supported |  |
 | chart | `gradient` | string | asg |  | missing | gap |  |
 | chart | `gradients` | string | as- |  | write-only | gap |  |
-| chart | `gridlines` | bool | asg | a-- | write-only | partial |  |
-| chart | `height` | length | asg | a-g | supported | partial |  |
+| chart | `gridlines` | bool | asg | asg | supported | supported |  |
+| chart | `height` | length | asg | asg | supported | supported |  |
 | chart | `hilowlines` | string | asg |  | missing | gap |  |
-| chart | `holeSize` | number | asg | a-- | write-only | partial |  |
-| chart | `increaseColor` | color | a-- |  | write-only | gap |  |
+| chart | `holeSize` | number | asg | asg | supported | supported |  |
+| chart | `increaseColor` | color | a-- | asg | supported | supported |  |
 | chart | `invertifneg` | bool | as- |  | write-only | gap |  |
-| chart | `labelPos` | string | asg | a-- | write-only | partial |  |
+| chart | `labelPos` | string | asg | asg | supported | supported |  |
 | chart | `labelfont` | string | as- |  | write-only | gap |  |
 | chart | `labelFont.size` | number | --g |  | missing | — |  |
 | chart | `labelFont.color` | string | --g |  | missing | — |  |
@@ -6061,26 +6158,26 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | chart | `labelrotation` | number | as- |  | write-only | gap |  |
 | chart | `leaderlines` | bool | as- |  | write-only | gap |  |
 | chart | `legend` | enum | asg | asg | supported | supported |  |
-| chart | `legend.overlay` | bool | asg | a-- | write-only | partial |  |
+| chart | `legend.overlay` | bool | asg | asg | supported | supported |  |
 | chart | `legendFont` | string | asg |  | missing | gap |  |
 | chart | `linedash` | string | as- |  | write-only | gap |  |
-| chart | `linewidth` | number | as- | a-- | write-only | partial |  |
+| chart | `linewidth` | number | as- | asg | supported | supported |  |
 | chart | `logbase` | number | as- |  | write-only | gap |  |
 | chart | `majorTickMark` | string | asg |  | missing | gap |  |
-| chart | `majorunit` | number | as- | a-- | write-only | partial |  |
-| chart | `marker` | string | as- | a-- | write-only | partial |  |
-| chart | `markersize` | number | as- | a-- | write-only | partial |  |
+| chart | `majorunit` | number | as- | asg | supported | supported |  |
+| chart | `marker` | string | as- | asg | supported | supported |  |
+| chart | `markersize` | number | as- | asg | supported | supported |  |
 | chart | `markercolor` | string | -sg |  | missing | gap |  |
-| chart | `minorGridlines` | bool | asg | a-- | write-only | partial |  |
+| chart | `minorGridlines` | bool | asg | asg | supported | supported |  |
 | chart | `minorTickMark` | string | asg |  | missing | gap |  |
 | chart | `minorunit` | number | as- |  | write-only | gap |  |
-| chart | `overlap` | number | asg | a-- | write-only | partial |  |
+| chart | `overlap` | number | asg | asg | supported | supported |  |
 | chart | `plotFill` | color | asg |  | missing | gap |  |
 | chart | `plotborder` | string | as- |  | write-only | gap |  |
 | chart | `plotvisonly` | bool | as- |  | write-only | gap |  |
 | chart | `preset` | string | as- |  | write-only | gap |  |
 | chart | `referenceline` | string | as- |  | write-only | gap |  |
-| chart | `scatterstyle` | string | as- | a-- | write-only | partial |  |
+| chart | `scatterstyle` | string | as- | asg | supported | supported |  |
 | chart | `secondaryaxis` | string | as- |  | write-only | gap |  |
 | chart | `series{N}` | string | -s- |  | write-only | gap |  |
 | chart | `seriesoutline` | string | as- |  | write-only | gap |  |
@@ -6090,7 +6187,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | chart | `showMarker` | string | -sg |  | missing | gap |  |
 | chart | `shownegbubbles` | bool | as- |  | write-only | gap |  |
 | chart | `sizerepresents` | string | as- |  | write-only | gap |  |
-| chart | `smooth` | string | asg | a-- | write-only | partial |  |
+| chart | `smooth` | string | asg | asg | supported | supported |  |
 | chart | `style` | number | asg |  | supported | gap | the node's text |
 | chart | `tickLabelPos` | string | asg |  | missing | gap |  |
 | chart | `ticklabelskip` | number | as- |  | write-only | gap |  |
@@ -6100,19 +6197,26 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | chart | `title.font` | string | asg |  | missing | gap |  |
 | chart | `title.overlay` | bool | asg |  | missing | gap |  |
 | chart | `title.size` | font-size | asg |  | missing | gap |  |
-| chart | `totalColor` | color | a-- |  | write-only | gap |  |
+| chart | `totalColor` | color | a-- | asg | supported | supported |  |
 | chart | `transparency` | number | as- |  | write-only | gap |  |
 | chart | `trendline` | string | asg |  | missing | gap |  |
 | chart | `updownbars` | string | asg |  | missing | gap |  |
 | chart | `valaxisline` | string | as- |  | write-only | gap |  |
-| chart | `varyColors` | string | asg | a-- | write-only | partial |  |
-| chart | `view3d` | string | asg | a-- | write-only | partial |  |
-| chart | `width` | length | asg | a-g | supported | partial |  |
+| chart | `varyColors` | string | asg | asg | supported | supported |  |
+| chart | `view3d` | string | asg | asg | supported | supported |  |
+| chart | `width` | length | asg | asg | supported | supported |  |
 | chart | `alt` | string |  | --g | litchi-only | — |  |
 | chart | `rotation` | number |  | --g | litchi-only | — |  |
 | chart | `flipH` | bool |  | --g | litchi-only | — |  |
 | chart | `flipV` | bool |  | --g | litchi-only | — |  |
-| chart | `showMarkers` | bool |  | a-- | litchi-only | litchi-only |  |
+| chart | `showMarkers` | bool |  | asg | litchi-only | litchi-only |  |
+| chart | `binCount` | int |  | asg | litchi-only | litchi-only |  |
+| chart | `binSize` | number |  | asg | litchi-only | litchi-only |  |
+| chart | `intervalClosed` | string |  | asg | litchi-only | litchi-only |  |
+| chart | `overflowBin` | number |  | asg | litchi-only | litchi-only |  |
+| chart | `underflowBin` | number |  | asg | litchi-only | litchi-only |  |
+| chart | `quartileMethod` | string |  | asg | litchi-only | litchi-only |  |
+| chart | `parentLabelLayout` | string |  | asg | litchi-only | litchi-only |  |
 | chart | `series1` | string |  | a-- | litchi-only | litchi-only |  |
 | chart | `series2` | string |  | a-- | litchi-only | litchi-only |  |
 | chart | `series3` | string |  | a-- | litchi-only | litchi-only |  |
@@ -6135,64 +6239,64 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | chart | `series20` | string |  | a-- | litchi-only | litchi-only |  |
 | chart | `series1.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series1.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series1.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series1.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series2.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series2.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series2.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series2.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series3.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series3.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series3.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series3.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series4.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series4.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series4.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series4.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series5.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series5.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series5.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series5.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series6.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series6.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series6.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series6.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series7.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series7.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series7.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series7.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series8.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series8.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series8.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series8.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series9.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series9.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series9.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series9.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series10.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series10.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series10.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series10.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series11.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series11.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series11.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series11.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series12.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series12.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series12.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series12.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series13.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series13.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series13.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series13.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series14.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series14.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series14.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series14.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series15.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series15.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series15.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series15.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series16.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series16.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series16.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series16.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series17.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series17.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series17.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series17.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series18.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series18.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series18.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series18.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series19.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series19.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series19.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series19.color` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series20.name` | string |  | as- | litchi-only | litchi-only |  |
 | chart | `series20.values` | string |  | as- | litchi-only | litchi-only |  |
-| chart | `series20.color` | string |  | a-- | litchi-only | litchi-only |  |
+| chart | `series20.color` | string |  | as- | litchi-only | litchi-only |  |
 | comment | `index` | int | --g | --g | supported | — |  |
 | comment | `x` | length | asg | asg | supported | supported |  |
 | comment | `y` | length | asg | asg | supported | supported |  |

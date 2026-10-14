@@ -7,7 +7,7 @@
 //! | `body`, a cell, a content control | paragraphs, tables, content controls, display equations and (in the body) section breaks, in visible order; `w:customXml` wrappers flattened; `w:altChunk` anchors and unknown children skipped |
 //! | a table | rows |
 //! | a row | cells |
-//! | a paragraph | its addressable runs, then its direct hyperlinks, then its inline pictures |
+//! | a paragraph | its addressable runs, then its direct hyperlinks, then its inline pictures, then its charts |
 //!
 //! The iterator owns what it reads (shared leaf values, an index cursor), so
 //! it borrows neither the adapter nor the parent node, and a walk that
@@ -71,13 +71,41 @@ enum Source {
         links: vec::IntoIter<InlineHyperlink>,
         next: u32,
         pictures: Option<Paragraph>,
+        charts: Option<Box<Charted>>,
     },
-    /// A paragraph's inline pictures, read when the first is needed.
-    PictureList(Paragraph),
+    /// A paragraph's inline pictures, read when the first is needed; its
+    /// charts follow when `charts` holds the paragraph.
+    PictureList(Paragraph, Option<Box<Charted>>),
     Pictures {
         pictures: vec::IntoIter<litchi_docx::image::InlineImage>,
         next: u32,
+        charts: Option<Box<Charted>>,
     },
+    /// A paragraph's charts, read when the first is needed.
+    ChartList(Box<Charted>),
+    Charts {
+        charts: vec::IntoIter<litchi_docx::chart::InlineChart>,
+        next: u32,
+        paragraph: Box<Charted>,
+    },
+}
+
+/// The paragraph whose charts a listing reads: its value and address.
+pub(super) struct Charted {
+    pub(super) value: Value,
+    pub(super) address: Address,
+}
+
+impl Source {
+    /// What follows a paragraph's hyperlinks: its pictures, then its charts,
+    /// each when wanted.
+    fn after_links(pictures: Option<Paragraph>, charts: Option<Box<Charted>>) -> Self {
+        match (pictures, charts) {
+            (Some(paragraph), charts) => Self::PictureList(paragraph, charts),
+            (None, Some(charts)) => Self::ChartList(charts),
+            (None, None) => Self::Done,
+        }
+    }
 }
 
 impl<'f> Children<'f> {
@@ -109,8 +137,14 @@ impl<'f> Children<'f> {
                     paragraph: paragraph.clone(),
                     links: kinds.contains(Kind::Hyperlink),
                     pictures: kinds.contains(Kind::Picture),
+                    charts: kinds.contains(Kind::Chart).then(|| {
+                        Box::new(Charted {
+                            value: parent.value.clone(),
+                            address: parent.child_address(),
+                        })
+                    }),
                 };
-                let rest = (rest.links || rest.pictures).then_some(rest);
+                let rest = (rest.links || rest.pictures || rest.charts.is_some()).then_some(rest);
                 if kinds.contains(Kind::Run) {
                     Source::Runs {
                         runs: paragraph.addressable_runs()?.into_vec().into_iter(),
@@ -230,8 +264,9 @@ impl<'f> Children<'f> {
                 },
                 Source::Links(rest) => {
                     let pictures = rest.pictures.then(|| rest.paragraph.clone());
+                    let charts = rest.charts.take();
                     if !rest.links {
-                        self.source = pictures.map_or(Source::Done, Source::PictureList);
+                        self.source = Source::after_links(pictures, charts);
                         continue;
                     }
                     match nav::hyperlinks(self.docx, &rest.paragraph) {
@@ -240,22 +275,73 @@ impl<'f> Children<'f> {
                                 links: links.into_iter(),
                                 next: 0,
                                 pictures,
+                                charts,
                             };
                         },
                         Err(error) => return Some(Err(error)),
                     }
                 },
-                Source::PictureList(paragraph) => match paragraph.images() {
+                Source::PictureList(paragraph, charts) => match paragraph.images() {
                     Ok(pictures) => {
                         self.source = Source::Pictures {
                             pictures: pictures.into_vec().into_iter(),
                             next: 0,
+                            charts: charts.take(),
                         };
                     },
                     Err(error) => return Some(Err(error.into())),
                 },
-                Source::Pictures { pictures, next } => {
-                    let picture = pictures.next()?;
+                Source::ChartList(paragraph) => {
+                    let Value::Paragraph {
+                        paragraph: value, ..
+                    } = &paragraph.value
+                    else {
+                        self.source = Source::Done;
+                        continue;
+                    };
+                    match value.charts() {
+                        Ok(charts) => {
+                            let paragraph = std::mem::replace(
+                                paragraph,
+                                Box::new(Charted {
+                                    value: Value::Document,
+                                    address: Address::root(),
+                                }),
+                            );
+                            self.source = Source::Charts {
+                                charts: charts.into_vec().into_iter(),
+                                next: 0,
+                                paragraph,
+                            };
+                        },
+                        Err(error) => return Some(Err(error.into())),
+                    }
+                },
+                Source::Charts {
+                    charts,
+                    next,
+                    paragraph,
+                } => {
+                    let chart = charts.next()?;
+                    let ordinal = *next;
+                    *next += 1;
+                    return Some(Ok(super::chart::chart_node(
+                        self.docx,
+                        &paragraph.value,
+                        &paragraph.address,
+                        ordinal,
+                        chart,
+                    )));
+                },
+                Source::Pictures {
+                    pictures,
+                    next,
+                    charts,
+                } => {
+                    let Some(picture) = pictures.next() else {
+                        self.source = charts.take().map_or(Source::Done, Source::ChartList);
+                        continue;
+                    };
                     let ordinal = *next;
                     *next += 1;
                     return Some(Ok(Node::new(
@@ -269,9 +355,10 @@ impl<'f> Children<'f> {
                     links,
                     next,
                     pictures,
+                    charts,
                 } => {
                     let Some(link) = links.next() else {
-                        self.source = pictures.take().map_or(Source::Done, Source::PictureList);
+                        self.source = Source::after_links(pictures.take(), charts.take());
                         continue;
                     };
                     let ordinal = *next;
@@ -294,6 +381,8 @@ struct Rest {
     paragraph: Paragraph,
     links: bool,
     pictures: bool,
+    /// The paragraph's charts follow its pictures when wanted.
+    charts: Option<Box<Charted>>,
 }
 
 /// Whether `kinds` holds a kind a block container lists.

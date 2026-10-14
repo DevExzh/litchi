@@ -985,7 +985,7 @@ impl<'f> Node<'f> {
             ),
             Item::Table(table) => (TABLE_PROPS, Props::Table(table.part.table())),
             Item::Chart(chart) => (
-                super::chart::CHART_PROPS,
+                super::chart::CHART_CAPABILITY_PROPS,
                 Props::Chart(Arc::clone(&chart.summary)),
             ),
             Item::Series(chart) => (super::chart::SERIES_PROPS, Props::Series(chart.clone())),
@@ -1440,9 +1440,7 @@ impl<'a> Props<'a> {
             Self::Row(row) => row_value(row, RowKey::at(index)?),
             Self::Column(column) => column_value(column, ColumnKey::at(index)?),
             Self::Table(table) => table_value(table, TableKey::at(index)?),
-            Self::Chart(ref summary) => {
-                super::chart::chart_value(summary, super::chart::ChartKey::at(index)?)
-            },
+            Self::Chart(ref summary) => super::chart::chart_value_at(summary, index),
             Self::Series(ref item) => super::chart::series_value(item, index).map(owned),
             Self::Axis(ref item) => super::chart::axis_value(item, index).map(owned),
             Self::NamedRange { name, scope } => match NamedRangeKey::at(index)? {

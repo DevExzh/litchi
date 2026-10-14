@@ -517,7 +517,28 @@ impl Edit<Package> {
 }
 
 /// The embedded workbook of an authored chart: the spec's workbook
-/// members, zipped.
+/// members ([`Spec::workbook_members`]), zipped. [`Edit::insert_chart_at`]
+/// embeds this workbook; pass it to [`Edit::set_chart`] after changing a
+/// chart's data so the workbook keeps matching the chart.
+///
+/// ```
+/// use litchi_drawingml::chart::authoring::{Binding, Kind, Series, Spec, Variant};
+///
+/// let spec = Spec::new(Variant::new(Kind::Column))
+///     .with_series(Series::new("East", vec![1.0]))
+///     .with_binding(Binding::sheet("Sheet1"));
+/// let bytes = litchi_docx::document::chart_workbook(&spec)?;
+/// assert!(bytes.starts_with(b"PK"));
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+///
+/// # Errors
+///
+/// Returns [`Refusal::InvalidPropertyValue`] for an invalid spec.
+pub fn chart_workbook(spec: &Spec) -> Result<Vec<u8>> {
+    workbook_bytes(spec)
+}
+
 fn workbook_bytes(spec: &Spec) -> Result<Vec<u8>> {
     let members = spec.workbook_members().map_err(|_| invalid())?;
     let mut writer = litchi_opc::phys_pkg::PhysPkgWriter::new();

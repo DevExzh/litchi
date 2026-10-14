@@ -635,19 +635,24 @@ props! {
 }
 
 props! {
-    /// A chart series (`chart-series`): its name, values and categories.
+    /// A chart series (`chart-series`): its name, values, categories and
+    /// fill color.
     SERIES_PROPS, SeriesKey {
         Name = "name": ValueType::Text,
         Values = "values": ValueType::Text,
         Categories = "categories": ValueType::Text,
+        Color = "color": ValueType::Text,
     }
 }
 
 props! {
-    /// A chart axis (`chart-axis`): its role and title.
+    /// A chart axis (`chart-axis`): its role, title and the range of a
+    /// value axis.
     AXIS_PROPS, AxisKey {
         Role = "role": ValueType::Text,
         Title = "title": ValueType::Text,
+        Min = "min": ValueType::Number,
+        Max = "max": ValueType::Number,
     }
 }
 
@@ -2023,15 +2028,15 @@ const fn chart_write_entries() -> [crate::registry::Entry<ChartSetter>; CHART_WR
         let access = if index == ChartKey::Name as usize {
             Some(Access::Add(ChartSetter::Name))
         } else if index == ChartKey::X as usize {
-            Some(Access::Add(ChartSetter::X))
+            Some(Access::SetAndAdd(ChartSetter::X))
         } else if index == ChartKey::Y as usize {
-            Some(Access::Add(ChartSetter::Y))
+            Some(Access::SetAndAdd(ChartSetter::Y))
         } else if index == ChartKey::Width as usize {
-            Some(Access::Add(ChartSetter::Width))
+            Some(Access::SetAndAdd(ChartSetter::Width))
         } else if index == ChartKey::Height as usize {
-            Some(Access::Add(ChartSetter::Height))
+            Some(Access::SetAndAdd(ChartSetter::Height))
         } else if index == ChartKey::ChartType as usize {
-            Some(Access::Add(ChartSetter::ChartType))
+            Some(Access::SetAndAdd(ChartSetter::ChartType))
         } else if index == ChartKey::Title as usize {
             Some(Access::SetAndAdd(ChartSetter::Title))
         } else if index == ChartKey::Legend as usize {
@@ -2065,22 +2070,22 @@ const fn chart_write_entries() -> [crate::registry::Entry<ChartSetter>; CHART_WR
     }
     entries[CHART_PROPS.len()] = Entry {
         spec: write_only("data", ValueType::Text),
-        access: Access::Add(ChartSetter::Data),
+        access: Access::SetAndAdd(ChartSetter::Data),
         constraint: Constraint::NotEmpty,
         clear: false,
     };
     entries[CHART_PROPS.len() + 1] = Entry {
         spec: write_only("axisTitle", ValueType::Text),
-        access: Access::Add(ChartSetter::AxisTitle),
+        access: Access::SetAndAdd(ChartSetter::AxisTitle),
         constraint: Constraint::None,
-        clear: false,
+        clear: true,
     };
     let mut format = 0;
     while format < crate::format::chart::FORMAT_PROPS.len() {
         let (key, spec) = crate::format::chart::FORMAT_PROPS[format];
         entries[CHART_FORMAT_START + format] = Entry {
             spec,
-            access: Access::Add(ChartSetter::Format(key)),
+            access: Access::SetAndAdd(ChartSetter::Format(key)),
             constraint: Constraint::None,
             clear: false,
         };
@@ -2102,12 +2107,9 @@ const fn chart_write_entries() -> [crate::registry::Entry<ChartSetter>; CHART_WR
         let setter = ChartSetter::Dotted((dotted / 3) as u8, field);
         entries[CHART_DOTTED_START + dotted] = Entry {
             spec: crate::format::chart::DOTTED_SERIES_PROPS[dotted],
-            // A series' name and values are also settable on the chart
-            // (OfficeCLI's chart-level `set`); its color only on add.
-            access: match field {
-                crate::format::chart::SeriesField::Color => Access::Add(setter),
-                _ => Access::SetAndAdd(setter),
-            },
+            // A series' name, values and color are also settable on the
+            // chart (OfficeCLI's chart-level `set`).
+            access: Access::SetAndAdd(setter),
             constraint: Constraint::NotEmpty,
             clear: false,
         };
@@ -2116,9 +2118,11 @@ const fn chart_write_entries() -> [crate::registry::Entry<ChartSetter>; CHART_WR
     entries
 }
 const _: () = assert!(
-    CHART_WRITE_COUNT <= 128,
-    "chart adds track assignments in a u128"
+    CHART_WRITE_COUNT <= crate::format::chart::MAX_TABLE,
+    "chart adds track assignments in an Assigned set"
 );
+/// The first formatting key of [`CHART_WRITE_TABLE`].
+pub(super) const CHART_FORMAT_INDEX: usize = CHART_FORMAT_START;
 pub(super) const CHART_WRITE_TABLE: crate::registry::Table<ChartSetter, CHART_WRITE_COUNT, 3> =
     crate::registry::Table::new(
         chart_write_entries(),
@@ -2144,6 +2148,7 @@ pub(crate) const CHART_CAPABILITY_PROPS: &[PropSpec] = &CHART_WRITE_TABLE.readab
 pub(super) enum SeriesSetter {
     Name,
     Values,
+    Color,
 }
 const fn series_write_entries() -> [crate::registry::Entry<SeriesSetter>; SERIES_PROPS.len()] {
     use crate::registry::{Access, Constraint, Entry};
@@ -2162,6 +2167,12 @@ const fn series_write_entries() -> [crate::registry::Entry<SeriesSetter>; SERIES
     };
     entries[SeriesKey::Categories as usize] =
         Entry::read(SERIES_PROPS[SeriesKey::Categories as usize]);
+    entries[SeriesKey::Color as usize] = Entry {
+        spec: SERIES_PROPS[SeriesKey::Color as usize],
+        access: Access::Set(SeriesSetter::Color),
+        constraint: Constraint::NotEmpty,
+        clear: true,
+    };
     entries
 }
 pub(super) const SERIES_WRITE_TABLE: crate::registry::Table<
@@ -2175,6 +2186,8 @@ pub(crate) const SERIES_CAPABILITY_PROPS: &[PropSpec] = &SERIES_WRITE_TABLE.read
 #[derive(Clone, Copy)]
 pub(super) enum AxisSetter {
     Title,
+    Min,
+    Max,
 }
 const fn axis_write_entries() -> [crate::registry::Entry<AxisSetter>; AXIS_PROPS.len()] {
     use crate::registry::{Access, Constraint, Entry};
@@ -2182,6 +2195,18 @@ const fn axis_write_entries() -> [crate::registry::Entry<AxisSetter>; AXIS_PROPS
     entries[AxisKey::Title as usize] = Entry {
         spec: AXIS_PROPS[AxisKey::Title as usize],
         access: Access::Set(AxisSetter::Title),
+        constraint: Constraint::None,
+        clear: true,
+    };
+    entries[AxisKey::Min as usize] = Entry {
+        spec: AXIS_PROPS[AxisKey::Min as usize],
+        access: Access::Set(AxisSetter::Min),
+        constraint: Constraint::None,
+        clear: true,
+    };
+    entries[AxisKey::Max as usize] = Entry {
+        spec: AXIS_PROPS[AxisKey::Max as usize],
+        access: Access::Set(AxisSetter::Max),
         constraint: Constraint::None,
         clear: true,
     };
