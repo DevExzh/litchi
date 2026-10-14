@@ -491,6 +491,18 @@ Cut from `80e24f8745`:
     - DOCX single set 1.19× (F1: main-part name normalization in `litchi-opc`, the shared resolver, commit wrapping);
     - PPTX open + first set 1.31× (F2: promotion re-decompresses members);
     - XLS reads (F3, handed to 0280).
+- Merged `odf-leaves` (0282): all 21 claimed formats except iWork now open as `File`.
+  - W3 owner split for OTH, ODM, ODG, ODC, ODI, ODB and ODF formula, in seven glossary profiles.
+  - `File::{Oth, Odm}` reuse the ODT adapter.
+  - `File::{Odg, Odc, Odi, Odb, Odf}` share the new `format::odf_tree` adapter.
+  - Open +1.7–2.5% (formula +11.6 µs); single set ≤1.06×.
+  - Open: G1–G11. These include:
+    - ODG inserts on LibreOffice files;
+    - ODC chart writes;
+    - ODI geometry;
+    - no coalescing on the tree formats;
+    - flat files;
+    - the metadata family not adopted.
 - Environment: a session restart wiped `/tmp`, which held the gate scripts and `TMPDIR`. Gate scripts now live in the session scratchpad and create their `TMPDIR`.
 
 Not dispatched: iWork M6. It waits for owner decisions D1/D2, and the iWork crates belong to their owners.
