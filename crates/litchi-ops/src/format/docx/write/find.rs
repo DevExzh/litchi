@@ -19,11 +19,11 @@ use litchi_core::FileFormat;
 use litchi_docx::document::ElementPath;
 use litchi_docx::document::substitute::{Replacement, Story, StoryKind};
 
-use super::super::Docx;
 use super::super::element;
 use super::super::merge::owning_editor;
 use super::super::node::{Node, WriteSelection};
 use super::super::spec::Kind;
+use super::super::{Docx, DocxOwner};
 use super::{Assignment, Commit, TargetKind, WorkEdit, admit_assignments, property_error};
 use crate::error::{Code, Error, Result};
 use crate::find::{Matcher, Piece, Scratch, Spec, matches_with};
@@ -51,6 +51,14 @@ impl Reach {
 
     fn stories(&self) -> bool {
         self.parts || self.comments.is_some()
+    }
+
+    /// Whether a story part of `kind` is in reach.
+    fn wants(&self, kind: StoryKind) -> bool {
+        match kind {
+            StoryKind::Comments => self.comments.is_some(),
+            _ => self.parts,
+        }
     }
 }
 
@@ -107,7 +115,20 @@ impl Docx {
             Vec::new()
         };
         let nodes = self.resolve_targets(target)?;
-        let reach = reach(&nodes)?;
+        let mut reach = reach(&nodes)?;
+        // A source-backed document without the story parts the find reaches
+        // keeps its source editor: only the main part's relationships are
+        // read to know.
+        if reach.stories()
+            && let DocxOwner::Source(package) = self.owner()
+            && !package
+                .story_parts()?
+                .iter()
+                .any(|part| reach.wants(part.kind()))
+        {
+            reach.parts = false;
+            reach.comments = None;
+        }
         // Header, footer, note and comment stories publish only through
         // the owning package's editor.
         let editor = if reach.stories() {
@@ -149,13 +170,12 @@ impl Docx {
                 ));
             };
             for part in edit.story_parts()? {
-                let items = match part.kind() {
-                    StoryKind::Comments => match &reach.comments {
-                        Some(items) => items.as_deref(),
-                        None => continue,
-                    },
-                    _ if reach.parts => None,
-                    _ => continue,
+                if !reach.wants(part.kind()) {
+                    continue;
+                }
+                let items = match (part.kind(), &reach.comments) {
+                    (StoryKind::Comments, Some(items)) => items.as_deref(),
+                    _ => None,
                 };
                 let story = edit.part_story(part.name())?;
                 let replacements = plan(&story, items, &matcher, spec, &mut scratch, &mut totals)?;

@@ -2148,7 +2148,7 @@ table-cell runs (`opened::TextTarget::{CellRun, CellRunSpan}`, read through
 
 | Name | Status |
 |---|---|
-| `litchi_docx::document::Edit::{story_within, substitute_formatted}` (snapshot and package edits); `Edit<Package>::substitute_part_formatted` | adopted (0285) |
+| `litchi_docx::document::Edit::{story_within, substitute_formatted}` (snapshot and package edits); `Edit<Package>::substitute_part_formatted`; `litchi_docx::source_backed::Package::story_parts` | adopted (0285) |
 | `litchi_docx::document::substitute::{Segment, StoryKind, StoryPart}`; `Replacement::{keep, formatted, text}`; `Outcome::formatted`; `Paragraph::{segments, item}` | adopted (0285) |
 | `litchi_pptx::opened::TextTarget::{CellRun, CellRunSpan}`, `litchi_pptx::table::Cell::text_body` | adopted (0285) |
 | `litchi_pptx::opened::Edit::set_notes_text_properties` | adopted (0285) |

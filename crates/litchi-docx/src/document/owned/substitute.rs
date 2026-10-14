@@ -19,6 +19,29 @@ const STORY_RELATIONSHIPS: [(&str, StoryKind); 5] = [
     ("/comments", StoryKind::Comments),
 ];
 
+/// The story parts a main document's relationships name, in order, each
+/// once.
+pub(crate) fn story_parts_of(rels: &litchi_opc::Relationships) -> crate::Result<Vec<StoryPart>> {
+    let mut parts: Vec<StoryPart> = Vec::new();
+    for relationship in rels.iter() {
+        if relationship.is_external() {
+            continue;
+        }
+        let Some(kind) = STORY_RELATIONSHIPS
+            .iter()
+            .find(|(suffix, _)| relationship.reltype().ends_with(suffix))
+            .map(|(_, kind)| *kind)
+        else {
+            continue;
+        };
+        let name = relationship.target_partname()?.as_str().to_owned();
+        if !parts.iter().any(|part| part.name() == name) {
+            parts.push(StoryPart::new(name, kind));
+        }
+    }
+    Ok(parts)
+}
+
 impl<P: Clone> Edit<P> {
     /// The main document's story over the staged document: the text of
     /// every paragraph in its body paragraphs, tables and block content
@@ -120,28 +143,7 @@ impl Edit<Package> {
             .opc_package()
             .main_document_part()
             .map_err(crate::Error::from)?;
-        let mut parts: Vec<StoryPart> = Vec::new();
-        for relationship in main.rels().iter() {
-            if relationship.is_external() {
-                continue;
-            }
-            let Some(kind) = STORY_RELATIONSHIPS
-                .iter()
-                .find(|(suffix, _)| relationship.reltype().ends_with(suffix))
-                .map(|(_, kind)| *kind)
-            else {
-                continue;
-            };
-            let name = relationship
-                .target_partname()
-                .map_err(crate::Error::from)?
-                .as_str()
-                .to_owned();
-            if !parts.iter().any(|part| part.name() == name) {
-                parts.push(StoryPart::new(name, kind));
-            }
-        }
-        Ok(parts)
+        Ok(story_parts_of(main.rels())?)
     }
 
     /// The story of one part (a name from [`Self::story_parts`]), staged
