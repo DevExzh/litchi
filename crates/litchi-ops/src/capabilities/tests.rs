@@ -6,8 +6,8 @@
 use litchi_core::FileFormat;
 
 use super::{
-    CREATE_PENDING, Capabilities, EDITS, SAVE_PENDING, State, Support, Verb, path_segment,
-    positional, refused,
+    CREATE_PENDING, Capabilities, EDITS, OBJECT_STRUCTURE, SAVE_PENDING, State, Support, Verb,
+    path_segment, positional, refused,
 };
 use crate::Code;
 use crate::view::Mode;
@@ -217,6 +217,39 @@ fn every_format_has_one_answer_for_its_reads() {
                         | Verb::Edit
                         | Verb::Batch
                 );
+            // OTH and ODM share the ODT adapter (record 0282).
+            let text_family_edit = matches!(format, FileFormat::Oth | FileFormat::Odm)
+                && crate::read::Adapter::of(format).is_some()
+                && matches!(
+                    verb,
+                    Verb::Set
+                        | Verb::Add
+                        | Verb::Remove
+                        | Verb::Move
+                        | Verb::Swap
+                        | Verb::Edit
+                        | Verb::Batch
+                );
+            // The object formats edit through their leaves and refuse the
+            // structural verbs their leaves lack (record 0282).
+            #[cfg(feature = "odf-objects")]
+            let object_edit = crate::read::Adapter::of(format)
+                .and_then(crate::format::odf_tree::writes)
+                .is_some_and(|writes| match verb {
+                    Verb::Set | Verb::Edit | Verb::Batch => true,
+                    Verb::Add => !writes.addable.is_empty(),
+                    Verb::Remove => !writes.removable.is_empty(),
+                    _ => false,
+                });
+            #[cfg(not(feature = "odf-objects"))]
+            let object_edit = false;
+            #[cfg(feature = "odf-objects")]
+            let object_refusal = crate::read::Adapter::of(format)
+                .and_then(crate::format::odf_tree::writes)
+                .is_some()
+                && !object_edit;
+            #[cfg(not(feature = "odf-objects"))]
+            let object_refusal = false;
             let odp_edit = format == FileFormat::Odp
                 && cfg!(feature = "odp")
                 && matches!(
@@ -253,8 +286,12 @@ fn every_format_has_one_answer_for_its_reads() {
                                 | Verb::Edit
                                 | Verb::Batch
                         ))
+                    || text_family_edit
+                    || object_edit
                 {
                     Support::Supported
+                } else if object_refusal {
+                    OBJECT_STRUCTURE.support()
                 } else if get.is_supported() {
                     EDITS.support()
                 } else {
@@ -278,7 +315,17 @@ fn every_format_has_one_answer_for_its_reads() {
                 || (format == FileFormat::Rtf && cfg!(feature = "rtf"))
                 || (format == FileFormat::Ods && cfg!(feature = "ods"))
                 || (format == FileFormat::Odt && cfg!(feature = "odt"))
-                || (format == FileFormat::Odp && cfg!(feature = "odp"));
+                || (format == FileFormat::Odp && cfg!(feature = "odp"))
+                || (matches!(
+                    format,
+                    FileFormat::Oth
+                        | FileFormat::Odm
+                        | FileFormat::Odg
+                        | FileFormat::Odc
+                        | FileFormat::Odi
+                        | FileFormat::Odb
+                        | FileFormat::Odf
+                ) && crate::read::Adapter::of(format).is_some());
             let expected = if integrated {
                 Support::Supported
             } else if get.is_supported() {
@@ -416,18 +463,8 @@ fn xls_adapter_advertises_writes_and_keeps_granular_gaps() {
 
 #[test]
 fn formats_without_a_variant_point_at_m6() {
-    for format in [
-        FileFormat::Pages,
-        FileFormat::Keynote,
-        FileFormat::Numbers,
-        FileFormat::Odg,
-        FileFormat::Odc,
-        FileFormat::Odf,
-        FileFormat::Odi,
-        FileFormat::Odm,
-        FileFormat::Oth,
-        FileFormat::Odb,
-    ] {
+    // Every ODF format has a `File` variant since record 0282.
+    for format in [FileFormat::Pages, FileFormat::Keynote, FileFormat::Numbers] {
         let refusal = refused(format);
         assert_eq!(refusal.code, Code::UnsupportedFormat, "{format:?}");
         assert_eq!(refusal.follow_up, "M6", "{format:?}");

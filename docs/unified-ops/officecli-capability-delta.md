@@ -31,9 +31,16 @@ differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `299bb82c87cfef0c27ecfe8bd4fb7df4982635a954c5fa57ac58897900e0e2fa` |
 | golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `aacdf00a1d10834d59799fe149b44a78b0a9a6157437fe2f2a78c8841aa51d86` |
 | golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `2038cde02828395f020df3d9b9732cc9350ce839bba5bc5aee3089cdd0e81fab` |
+| golden | `crates/litchi-ops/tests/golden/registry/odb.json` | `fef7fd32e70b71e9e2e86ea06ebb97ff932792037c2322b8e9f8e122b46e7529` |
+| golden | `crates/litchi-ops/tests/golden/registry/odc.json` | `04f56ce47c550f083c5e773cad56722ec3e70f0ab469771c413376b66f4ace1c` |
+| golden | `crates/litchi-ops/tests/golden/registry/odf.json` | `85885591939534dac9fa95ae04bdd71e2fe1ccbb55063f3115e3ad2d4c5733b9` |
+| golden | `crates/litchi-ops/tests/golden/registry/odg.json` | `dc4264b9d8d1ba2889382121b7f48c6537878a15db132922b7bd3222c3fa8854` |
+| golden | `crates/litchi-ops/tests/golden/registry/odi.json` | `886ee7e379793fe77e01457c872a630ce9467f7bdacbc6da8c7c6a35b1d713ef` |
+| golden | `crates/litchi-ops/tests/golden/registry/odm.json` | `7c8c5d4a61b73661fe047b7abe392e5942c3d7a529abd740b44b20fb7147de02` |
 | golden | `crates/litchi-ops/tests/golden/registry/odp.json` | `4b97c200a9d8e2b81e4625ba6888add00e49c483d67fed1ac7be39801f668cf8` |
 | golden | `crates/litchi-ops/tests/golden/registry/ods.json` | `0c1b9c65f4c932c9ef36d6f1d61183724b98354c9c1a0d04adaada0505ca1fb4` |
 | golden | `crates/litchi-ops/tests/golden/registry/odt.json` | `530031295ae44a24667d22c7270cebc1afe59c456466d71014d85fe657180b3a` |
+| golden | `crates/litchi-ops/tests/golden/registry/oth.json` | `b24208bdbf248ce4fdc63b644b214beb2d6d5273921ce5aa5dce7a1ddfbe43ae` |
 | officecli | `schemas/help` (152 files, OfficeCLI commit `dced0d74`) | `0bcd8cae45fabc0c5e45ff99d1994465fb213ac1b8db3f7eadd87339fb40ced4` |
 
 ## Statuses
@@ -79,9 +86,16 @@ Elements:
 | xls | 7 | 31 | 0 | 0 | 1 | 2 | 1 |
 | pptx | 25 | 8 | 0 | 0 | 0 | 1 | 8 |
 | ppt | 15 | 18 | 0 | 0 | 0 | 1 | 8 |
+| odb | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
+| odc | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
+| odf | 0 | 0 | 0 | 0 | 0 | 0 | 2 |
+| odg | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
+| odi | 0 | 0 | 0 | 0 | 0 | 0 | 3 |
+| odm | 0 | 0 | 0 | 0 | 0 | 0 | 22 |
 | odp | 21 | 8 | 0 | 0 | 4 | 1 | 6 |
 | ods | 8 | 30 | 0 | 0 | 1 | 2 | 1 |
 | odt | 19 | 12 | 0 | 0 | 13 | 2 | 5 |
+| oth | 0 | 0 | 0 | 0 | 0 | 0 | 22 |
 
 Property reads:
 
@@ -95,9 +109,16 @@ Property reads:
 | xls | 56 | 4 | 504 | 0 | 24 | 1 | 102 | 0 |
 | pptx | 167 | 22 | 70 | 0 | 144 | 0 | 284 | 249 |
 | ppt | 41 | 3 | 318 | 0 | 48 | 0 | 277 | 47 |
+| odb | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| odc | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| odf | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| odg | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| odi | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| odm | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | odp | 70 | 3 | 80 | 0 | 123 | 0 | 411 | 65 |
 | ods | 25 | 11 | 501 | 0 | 26 | 1 | 127 | 6 |
 | odt | 63 | 0 | 199 | 0 | 168 | 1 | 530 | 45 |
+| oth | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 
 Property writes:
 
@@ -111,9 +132,16 @@ Property writes:
 | xls | 1 | 19 | 524 | 0 | 0 | 147 |
 | pptx | 53 | 55 | 453 | 0 | 133 | 242 |
 | ppt | 0 | 14 | 547 | 0 | 16 | 157 |
+| odb | 0 | 0 | 0 | 0 | 0 | 0 |
+| odc | 0 | 0 | 0 | 0 | 0 | 0 |
+| odf | 0 | 0 | 0 | 0 | 0 | 0 |
+| odg | 0 | 0 | 0 | 0 | 0 | 0 |
+| odi | 0 | 0 | 0 | 0 | 0 | 0 |
+| odm | 0 | 0 | 0 | 0 | 0 | 0 |
 | odp | 3 | 37 | 521 | 0 | 17 | 174 |
 | ods | 6 | 5 | 533 | 0 | 6 | 147 |
 | odt | 12 | 32 | 752 | 0 | 31 | 179 |
+| oth | 0 | 0 | 0 | 0 | 0 | 0 |
 
 ## docx
 
@@ -7696,6 +7724,185 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | `set` | `shape` | `native-shape-preservation` | top-level shape, outline placeholder, paragraph and notes text and shape anchors require native closure admission: a changed text length refuses where interactions, field metacharacters or several formatting or language runs hold character positions; nested groups, new text bodies and rich-text formatting remain unsupported | M2 PPT nested-shape and rich-text edits |
 | `batch` | `presentation` | `native-write-coalescing` | distinct direct shape text/geometry sets share native transactions; selectors, repeated shapes, reads and structural edits close the run; broader coalescing and frozen-harness qualification remain open | M2 PPT broader native edit runs and performance qualification |
 
+## odb
+
+### Elements
+
+| OfficeCLI element | Litchi element | Status | Follow-up |
+|---|---|---|---|
+|  | database | litchi-only |  |
+|  | table | litchi-only |  |
+|  | column | litchi-only |  |
+|  | query | litchi-only |  |
+
+### Properties
+
+| Element | Property | Type | OfficeCLI `asg` | Litchi `asg` | Read | Write | Follow-up |
+|---|---|---|---|---|---|---|---|
+
+### Contextual operation gaps
+
+These operation gaps apply only to the named selection or leaf context; ordinary element operation support remains in the capability report.
+
+| Verb | Element | Context | Reason | Follow-up |
+|---|---|---|---|---|
+| `add` | `table` | `a table definition (columns, keys and types)` | creating a table needs a typed column schema the unified registry does not have yet | 0282 ODB typed table creation |
+| `add` | `column` | `a column definition` | creating a column needs a typed data type the unified registry does not have yet | 0282 ODB typed column creation |
+| `set` | `query` | `the `name` property (renaming a query)` | the leaf has no query rename; remove and add the query instead | 0282 ODB query rename |
+
+## odc
+
+### Elements
+
+| OfficeCLI element | Litchi element | Status | Follow-up |
+|---|---|---|---|
+|  | chart | litchi-only |  |
+|  | axis | litchi-only |  |
+|  | series | litchi-only |  |
+|  | legend | litchi-only |  |
+
+### Properties
+
+| Element | Property | Type | OfficeCLI `asg` | Litchi `asg` | Read | Write | Follow-up |
+|---|---|---|---|---|---|---|---|
+
+### Contextual operation gaps
+
+These operation gaps apply only to the named selection or leaf context; ordinary element operation support remains in the capability report.
+
+| Verb | Element | Context | Reason | Follow-up |
+|---|---|---|---|---|
+| `set` | `chart` | `the title, subtitle, type and size of the chart` | the leaf rewrites those through a whole typed definition replacement, which the unified adapter does not author yet | 0282 ODC chart definition writes |
+| `add` | `series` | `a new series or axis` | creating a series or an axis needs typed range and class values the unified registry does not have yet | 0282 ODC typed series and axis creation |
+| `set` | `series` | `series ranges, labels and classes` | the leaf replaces a series as a whole typed specification | 0282 ODC series writes |
+
+## odf
+
+### Elements
+
+| OfficeCLI element | Litchi element | Status | Follow-up |
+|---|---|---|---|
+|  | math | litchi-only |  |
+|  | element | litchi-only |  |
+
+### Properties
+
+| Element | Property | Type | OfficeCLI `asg` | Litchi `asg` | Read | Write | Follow-up |
+|---|---|---|---|---|---|---|---|
+
+### Contextual operation gaps
+
+These operation gaps apply only to the named selection or leaf context; ordinary element operation support remains in the capability report.
+
+| Verb | Element | Context | Reason | Follow-up |
+|---|---|---|---|---|
+| `add` | `element` | `a new MathML element` | inserting MathML needs a typed element value the unified registry does not have yet | 0282 formula element authoring |
+| `set` | `element` | `the `text` of a layout (non-token) element` | only MathML token elements hold character data | 0282 formula layout text |
+
+## odg
+
+### Elements
+
+| OfficeCLI element | Litchi element | Status | Follow-up |
+|---|---|---|---|
+|  | drawing | litchi-only |  |
+|  | page | litchi-only |  |
+|  | shape | litchi-only |  |
+|  | layer | litchi-only |  |
+
+### Properties
+
+| Element | Property | Type | OfficeCLI `asg` | Litchi `asg` | Read | Write | Follow-up |
+|---|---|---|---|---|---|---|---|
+
+### Contextual operation gaps
+
+These operation gaps apply only to the named selection or leaf context; ordinary element operation support remains in the capability report.
+
+| Verb | Element | Context | Reason | Follow-up |
+|---|---|---|---|---|
+| `remove` | `page` | `a drawing page` | the ODG leaf has no page removal | 0282 ODG page removal |
+| `add` | `shape` | `a shape other than a rectangle, or a positioned (non-append) shape` | the adapter appends text rectangles; other geometries need typed shape values | 0282 ODG typed shape creation |
+| `move` | `shape` | `pages and shapes` | the ODG leaf has no page or shape reordering | 0282 ODG reordering |
+| `set` | `drawing` | ``/` metadata` | the ODG leaf has no metadata edit (ADR 0034 §7 family pending) | 0282 ODG metadata writes |
+
+## odi
+
+### Elements
+
+| OfficeCLI element | Litchi element | Status | Follow-up |
+|---|---|---|---|
+|  | image | litchi-only |  |
+|  | frame | litchi-only |  |
+|  | metadata | litchi-only |  |
+
+### Properties
+
+| Element | Property | Type | OfficeCLI `asg` | Litchi `asg` | Read | Write | Follow-up |
+|---|---|---|---|---|---|---|---|
+
+### Contextual operation gaps
+
+These operation gaps apply only to the named selection or leaf context; ordinary element operation support remains in the capability report.
+
+| Verb | Element | Context | Reason | Follow-up |
+|---|---|---|---|---|
+| `add` | `frame` | `an ODI image holds exactly one frame` | the ODI leaf admits exactly one image frame | 0282 ODI single frame |
+| `set` | `frame` | `the `source` property (the image payload)` | replacing the image payload needs a typed source value the unified registry does not have yet | 0282 ODI image payload writes |
+
+## odm
+
+### Elements
+
+| OfficeCLI element | Litchi element | Status | Follow-up |
+|---|---|---|---|
+|  | document | litchi-only |  |
+|  | body | litchi-only |  |
+|  | paragraph | litchi-only |  |
+|  | heading | litchi-only |  |
+|  | run | litchi-only |  |
+|  | hyperlink | litchi-only |  |
+|  | list | litchi-only |  |
+|  | listItem | litchi-only |  |
+|  | table | litchi-only |  |
+|  | row | litchi-only |  |
+|  | cell | litchi-only |  |
+|  | section | litchi-only |  |
+|  | frame | litchi-only |  |
+|  | picture | litchi-only |  |
+|  | textbox | litchi-only |  |
+|  | footnote | litchi-only |  |
+|  | endnote | litchi-only |  |
+|  | comment | litchi-only |  |
+|  | bookmark | litchi-only |  |
+|  | styles | litchi-only |  |
+|  | style | litchi-only |  |
+|  | metadata | litchi-only |  |
+
+### Properties
+
+| Element | Property | Type | OfficeCLI `asg` | Litchi `asg` | Read | Write | Follow-up |
+|---|---|---|---|---|---|---|---|
+
+### Contextual operation gaps
+
+These operation gaps apply only to the named selection or leaf context; ordinary element operation support remains in the capability report.
+
+| Verb | Element | Context | Reason | Follow-up |
+|---|---|---|---|---|
+| `remove` | `cell` | `table-grid` | cells keep the table grid: remove or move the whole row, or set the cell's text | M6 ODT table grid edits |
+| `add` | `cell` | `table-grid` | adding a cell would break the table grid; add a row, which spans the first row's columns | M6 ODT table grid edits |
+| `move` | `cell` | `table-grid` | cells move only with their row | M6 ODT table grid edits |
+| `remove` | `row` | `vertical-merge` | a row holding vertically merged or covered cells cannot leave the table | M6 ODT table grid edits |
+| `add` | `picture` | `image-resources` | adding an image needs a package media resource and a frame; frames and images are readable, settable (frame geometry) and removable | M6 ODT drawing and media edits |
+| `add` | `frame` | `drawing-resources` | frames are created with their content (image or text box), which the body edits do not author yet | M6 ODT drawing and media edits |
+| `set` | `style` | `common-styles` | common styles in styles.xml are read-only; paragraph and run formatting derives automatic styles instead | M6 ODT style definitions |
+| `set` | `run` | `clear-formatting` | a null value cannot remove a character or paragraph property; set the property's off value instead | M6 ODT formatting removal |
+| `set` | `cell` | `typed-values` | cell text writes a string cell; numeric, date and formula cell values are not authored | M6 ODT typed cell values |
+| `set` | `document` | `signed-or-encrypted-package` | the leaf preserves signed and encrypted packages only as exact no-ops; changed writes are refused | ADR 0034 ODF security vocabulary (record 0268 G5) |
+| `get` | `document` | `flat-odf-input` | single-XML .fodt input is detected but refused; the leaf flat snapshot has no body index or package owner the adapter can publish through | M6 flat ODF owner |
+| `create` | `document` | `template` | ODT template creation (.ott) is not supported | use Flavor::Document |
+
 ## odp
 
 ### Elements
@@ -10357,6 +10564,59 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | watermark | `size` | string | asg |  | missing | gap |  |
 | watermark | `width` | string | asg |  | missing | gap |  |
 | watermark | `height` | string | asg |  | missing | gap |  |
+
+### Contextual operation gaps
+
+These operation gaps apply only to the named selection or leaf context; ordinary element operation support remains in the capability report.
+
+| Verb | Element | Context | Reason | Follow-up |
+|---|---|---|---|---|
+| `remove` | `cell` | `table-grid` | cells keep the table grid: remove or move the whole row, or set the cell's text | M6 ODT table grid edits |
+| `add` | `cell` | `table-grid` | adding a cell would break the table grid; add a row, which spans the first row's columns | M6 ODT table grid edits |
+| `move` | `cell` | `table-grid` | cells move only with their row | M6 ODT table grid edits |
+| `remove` | `row` | `vertical-merge` | a row holding vertically merged or covered cells cannot leave the table | M6 ODT table grid edits |
+| `add` | `picture` | `image-resources` | adding an image needs a package media resource and a frame; frames and images are readable, settable (frame geometry) and removable | M6 ODT drawing and media edits |
+| `add` | `frame` | `drawing-resources` | frames are created with their content (image or text box), which the body edits do not author yet | M6 ODT drawing and media edits |
+| `set` | `style` | `common-styles` | common styles in styles.xml are read-only; paragraph and run formatting derives automatic styles instead | M6 ODT style definitions |
+| `set` | `run` | `clear-formatting` | a null value cannot remove a character or paragraph property; set the property's off value instead | M6 ODT formatting removal |
+| `set` | `cell` | `typed-values` | cell text writes a string cell; numeric, date and formula cell values are not authored | M6 ODT typed cell values |
+| `set` | `document` | `signed-or-encrypted-package` | the leaf preserves signed and encrypted packages only as exact no-ops; changed writes are refused | ADR 0034 ODF security vocabulary (record 0268 G5) |
+| `get` | `document` | `flat-odf-input` | single-XML .fodt input is detected but refused; the leaf flat snapshot has no body index or package owner the adapter can publish through | M6 flat ODF owner |
+| `create` | `document` | `template` | ODT template creation (.ott) is not supported | use Flavor::Document |
+
+## oth
+
+### Elements
+
+| OfficeCLI element | Litchi element | Status | Follow-up |
+|---|---|---|---|
+|  | document | litchi-only |  |
+|  | body | litchi-only |  |
+|  | paragraph | litchi-only |  |
+|  | heading | litchi-only |  |
+|  | run | litchi-only |  |
+|  | hyperlink | litchi-only |  |
+|  | list | litchi-only |  |
+|  | listItem | litchi-only |  |
+|  | table | litchi-only |  |
+|  | row | litchi-only |  |
+|  | cell | litchi-only |  |
+|  | section | litchi-only |  |
+|  | frame | litchi-only |  |
+|  | picture | litchi-only |  |
+|  | textbox | litchi-only |  |
+|  | footnote | litchi-only |  |
+|  | endnote | litchi-only |  |
+|  | comment | litchi-only |  |
+|  | bookmark | litchi-only |  |
+|  | styles | litchi-only |  |
+|  | style | litchi-only |  |
+|  | metadata | litchi-only |  |
+
+### Properties
+
+| Element | Property | Type | OfficeCLI `asg` | Litchi `asg` | Read | Write | Follow-up |
+|---|---|---|---|---|---|---|---|
 
 ### Contextual operation gaps
 

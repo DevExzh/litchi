@@ -23,6 +23,8 @@ pub mod docx;
 pub(crate) mod metadata;
 #[cfg(feature = "odp")]
 pub(crate) mod odf_odp;
+#[cfg(feature = "odf-objects")]
+pub mod odf_tree;
 #[cfg(feature = "odp")]
 pub mod odp;
 #[cfg(feature = "ods")]

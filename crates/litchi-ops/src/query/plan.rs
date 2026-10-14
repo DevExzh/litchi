@@ -37,7 +37,7 @@ use crate::value::compare::Compiled;
 /// let query = Query::parse("paragraph[style=Heading1]")?;
 /// // Format adapters register their query support in M1 step R4; until a
 /// // format has one, compiling for it is `unsupported_capability`.
-/// let error = Plan::compile(&query, FileFormat::Odg).unwrap_err();
+/// let error = Plan::compile(&query, FileFormat::Pages).unwrap_err();
 /// assert_eq!(error.code(), litchi_ops::Code::UnsupportedCapability);
 /// # Ok::<(), litchi_ops::Error>(())
 /// ```
@@ -125,12 +125,27 @@ impl<'q> Plan<'q> {
             FileFormat::Rtf => super::compile::compile::<crate::format::rtf::Nav<'static>>(query),
             #[cfg(feature = "odt")]
             FileFormat::Odt => super::compile::compile::<crate::format::odt::Nav<'static>>(query),
+            // OTH and ODM run the ODT adapter's plans (record 0282).
+            #[cfg(feature = "oth")]
+            FileFormat::Oth => super::compile::compile::<crate::format::odt::Nav<'static>>(query),
+            #[cfg(feature = "odm")]
+            FileFormat::Odm => super::compile::compile::<crate::format::odt::Nav<'static>>(query),
             #[cfg(feature = "ppt")]
             FileFormat::Ppt => super::compile::compile::<crate::format::ppt::Nav<'static>>(query),
             #[cfg(feature = "ods")]
             FileFormat::Ods => super::compile::compile::<crate::format::ods::Nav<'static>>(query),
             #[cfg(feature = "odp")]
             FileFormat::Odp => super::compile::compile::<crate::format::odp::Nav<'static>>(query),
+            #[cfg(feature = "odf-objects")]
+            FileFormat::Odg
+            | FileFormat::Odc
+            | FileFormat::Odi
+            | FileFormat::Odb
+            | FileFormat::Odf
+                if crate::read::Adapter::of(format).is_some() =>
+            {
+                crate::format::odf_tree::compile(query, format)
+            },
             _ => {
                 let _ = query;
                 Err(Error::new(

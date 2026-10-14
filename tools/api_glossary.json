@@ -8037,7 +8037,14 @@
       "features": [
         "odt",
         "ods",
-        "odp"
+        "odp",
+        "oth",
+        "odm",
+        "odg",
+        "odc",
+        "odi",
+        "odb",
+        "odf-formula"
       ],
       "banned_names": [
         {

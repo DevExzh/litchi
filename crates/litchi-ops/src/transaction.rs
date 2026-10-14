@@ -131,6 +131,8 @@ enum Leaf {
     Ods(Box<litchi_ods::document::Patch>),
     #[cfg(feature = "odp")]
     Odp(Box<litchi_odp::edit::Patch>),
+    #[cfg(feature = "odf-objects")]
+    Object(Box<crate::format::odf_tree::write::Patch>),
     #[cfg(feature = "xlsx")]
     Xlsx {
         source: litchi_xlsx::Package,
@@ -500,7 +502,8 @@ impl Edit {
                 feature = "rtf",
                 feature = "ods",
                 feature = "odt",
-                feature = "odp"
+                feature = "odp",
+                feature = "odf-objects"
             ))]
             let limits = self.limits;
             self.execute(|file| match file {
@@ -550,8 +553,17 @@ impl Edit {
                     wrap_ods(handle, handle.set_with_limits(target, props, &limits)?, ())
                 },
                 #[cfg(feature = "odt")]
-                File::Odt(handle) => {
+                File::Odt(handle) | File::Oth(handle) | File::Odm(handle) => {
                     wrap_odt(handle, handle.set_with_limits(target, props, &limits)?, ())
+                },
+
+                #[cfg(feature = "odf-objects")]
+                File::Odg(handle)
+                | File::Odc(handle)
+                | File::Odi(handle)
+                | File::Odb(handle)
+                | File::Odf(handle) => {
+                    wrap_object(handle, handle.set_with_limits(target, props, &limits)?, ())
                 },
                 #[allow(unreachable_patterns)]
                 _ => Err(pending()),
@@ -579,7 +591,8 @@ impl Edit {
             feature = "xls",
             feature = "ods",
             feature = "odt",
-            feature = "odp"
+            feature = "odp",
+            feature = "odf-objects"
         ))]
         let limits = self.limits;
         self.execute(|file| match file {
@@ -624,10 +637,21 @@ impl Edit {
                 wrap_ods(handle, commit, path)
             },
             #[cfg(feature = "odt")]
-            File::Odt(handle) => {
+            File::Odt(handle) | File::Oth(handle) | File::Odm(handle) => {
                 let (commit, path) =
                     handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
                 wrap_odt(handle, commit, path)
+            },
+
+            #[cfg(feature = "odf-objects")]
+            File::Odg(handle)
+            | File::Odc(handle)
+            | File::Odi(handle)
+            | File::Odb(handle)
+            | File::Odf(handle) => {
+                let (commit, path) =
+                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                wrap_object(handle, commit, path)
             },
             #[cfg(feature = "doc")]
             File::Doc(handle) => {
@@ -665,7 +689,8 @@ impl Edit {
             feature = "xls",
             feature = "ods",
             feature = "odt",
-            feature = "odp"
+            feature = "odp",
+            feature = "odf-objects"
         ))]
         let limits = self.limits;
         self.execute(|file| match file {
@@ -711,10 +736,21 @@ impl Edit {
                 wrap_ods(handle, commit, path)
             },
             #[cfg(feature = "odt")]
-            File::Odt(handle) => {
+            File::Odt(handle) | File::Oth(handle) | File::Odm(handle) => {
                 let (commit, path) =
                     handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
                 wrap_odt(handle, commit, path)
+            },
+
+            #[cfg(feature = "odf-objects")]
+            File::Odg(handle)
+            | File::Odc(handle)
+            | File::Odi(handle)
+            | File::Odb(handle)
+            | File::Odf(handle) => {
+                let (commit, path) =
+                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                wrap_object(handle, commit, path)
             },
             #[cfg(feature = "doc")]
             File::Doc(handle) => {
@@ -784,7 +820,8 @@ impl Edit {
                 feature = "rtf",
                 feature = "ods",
                 feature = "odt",
-                feature = "odp"
+                feature = "odp",
+                feature = "odf-objects"
             ))]
             let limits = self.limits;
             self.execute(|file| match file {
@@ -833,7 +870,18 @@ impl Edit {
                     (),
                 ),
                 #[cfg(feature = "odt")]
-                File::Odt(handle) => wrap_odt(
+                File::Odt(handle) | File::Oth(handle) | File::Odm(handle) => wrap_odt(
+                    handle,
+                    handle.remove_with_limits(target.clone(), &limits)?,
+                    (),
+                ),
+
+                #[cfg(feature = "odf-objects")]
+                File::Odg(handle)
+                | File::Odc(handle)
+                | File::Odi(handle)
+                | File::Odb(handle)
+                | File::Odf(handle) => wrap_object(
                     handle,
                     handle.remove_with_limits(target.clone(), &limits)?,
                     (),
@@ -1010,7 +1058,8 @@ impl Edit {
             feature = "rtf",
             feature = "ods",
             feature = "odt",
-            feature = "odp"
+            feature = "odp",
+            feature = "odf-objects"
         ))]
         let limits = self.limits;
         self.execute(|file| match file {
@@ -1063,7 +1112,18 @@ impl Edit {
                 (),
             ),
             #[cfg(feature = "odt")]
-            File::Odt(handle) => wrap_odt(
+            File::Odt(handle) | File::Oth(handle) | File::Odm(handle) => wrap_odt(
+                handle,
+                handle.move_to_with_limits(_path.into_path()?, _to.into_placement()?, &limits)?,
+                (),
+            ),
+
+            #[cfg(feature = "odf-objects")]
+            File::Odg(handle)
+            | File::Odc(handle)
+            | File::Odi(handle)
+            | File::Odb(handle)
+            | File::Odf(handle) => wrap_object(
                 handle,
                 handle.move_to_with_limits(_path.into_path()?, _to.into_placement()?, &limits)?,
                 (),
@@ -1098,7 +1158,8 @@ impl Edit {
             feature = "rtf",
             feature = "ods",
             feature = "odt",
-            feature = "odp"
+            feature = "odp",
+            feature = "odf-objects"
         ))]
         let limits = self.limits;
         self.execute(|file| match file {
@@ -1145,7 +1206,18 @@ impl Edit {
                 (),
             ),
             #[cfg(feature = "odt")]
-            File::Odt(handle) => wrap_odt(
+            File::Odt(handle) | File::Oth(handle) | File::Odm(handle) => wrap_odt(
+                handle,
+                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &limits)?,
+                (),
+            ),
+
+            #[cfg(feature = "odf-objects")]
+            File::Odg(handle)
+            | File::Odc(handle)
+            | File::Odi(handle)
+            | File::Odb(handle)
+            | File::Odf(handle) => wrap_object(
                 handle,
                 handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &limits)?,
                 (),
@@ -1432,7 +1504,7 @@ impl Edit {
             return Ok(Some(changed));
         }
         #[cfg(feature = "odt")]
-        if let File::Odt(handle) = self.current.clone() {
+        if let Some(handle) = self.current.odt_family().cloned() {
             // A run plans every set against its base handle (the current
             // candidate until the run is flushed). A set the run cannot plan
             // runs on its own after the run is published.
@@ -1459,7 +1531,7 @@ impl Edit {
                 .is_some_and(|run| run.requires_barrier(&plan))
             {
                 self.flush_pending()?;
-                let File::Odt(handle) = self.current.clone() else {
+                let Some(handle) = self.current.odt_family().cloned() else {
                     return Err(pending());
                 };
                 match crate::format::odt::write::plan(&handle, _target, _props) {
@@ -1470,7 +1542,7 @@ impl Edit {
                 plan
             };
             if self.odt.is_none() {
-                let File::Odt(handle) = &self.current else {
+                let Some(handle) = self.current.odt_family() else {
                     return Err(pending());
                 };
                 self.odt = Some(crate::format::odt::write::coalesce::Run::new(
@@ -2705,6 +2777,31 @@ fn wrap_ods<T>(
     ))
 }
 
+#[cfg(feature = "odf-objects")]
+fn wrap_object<T>(
+    _before: &crate::format::odf_tree::OdfTree,
+    commit: crate::format::odf_tree::write::Commit,
+    value: T,
+) -> Result<(Step, T)> {
+    let crate::format::odf_tree::write::Commit {
+        before,
+        after,
+        patch,
+        operations,
+        snapshot_bytes,
+    } = commit;
+    Ok((
+        Step {
+            before: before.into_file(),
+            after: after.into_file(),
+            leaf: Leaf::Object(Box::new(patch)),
+            leaf_operations: operations,
+            snapshot_bytes,
+        },
+        value,
+    ))
+}
+
 #[cfg(feature = "odt")]
 fn wrap_odt<T>(
     _before: &crate::format::odt::Odt,
@@ -2720,8 +2817,8 @@ fn wrap_odt<T>(
     } = commit;
     Ok((
         Step {
-            before: File::Odt(before),
-            after: File::Odt(after),
+            before: before.into_file(),
+            after: after.into_file(),
             leaf: Leaf::Odt(Box::new(patch)),
             leaf_operations: operations,
             snapshot_bytes,
@@ -2798,8 +2895,21 @@ fn changed(steps: &[Step]) -> Result<bool> {
         }
         return Ok(!before.same_content(after)?);
     }
+    #[cfg(feature = "odf-objects")]
+    if let (Some(before), Some(after)) = (first.before.odf_tree(), last.after.odf_tree()) {
+        if let [
+            Step {
+                leaf: Leaf::Object(patch),
+                ..
+            },
+        ] = steps
+        {
+            return Ok(!patch.is_noop());
+        }
+        return Ok(!before.same_content(after));
+    }
     #[cfg(feature = "odt")]
-    if let (File::Odt(before), File::Odt(after)) = (&first.before, &last.after) {
+    if let (Some(before), Some(after)) = (first.before.odt_family(), last.after.odt_family()) {
         if let [
             Step {
                 leaf: Leaf::Odt(patch),
@@ -2852,7 +2962,15 @@ fn same_snapshot(left: &File, right: &File) -> bool {
         #[cfg(feature = "xlsb")]
         (File::Xlsb(left), File::Xlsb(right)) => left.same_snapshot(right),
         #[cfg(feature = "odt")]
-        (File::Odt(left), File::Odt(right)) => left.same_snapshot(right),
+        (File::Odt(left), File::Odt(right))
+        | (File::Oth(left), File::Oth(right))
+        | (File::Odm(left), File::Odm(right)) => left.same_snapshot(right),
+        #[cfg(feature = "odf-objects")]
+        (File::Odg(left), File::Odg(right))
+        | (File::Odc(left), File::Odc(right))
+        | (File::Odi(left), File::Odi(right))
+        | (File::Odb(left), File::Odb(right))
+        | (File::Odf(left), File::Odf(right)) => left.same_snapshot(right),
         #[cfg(feature = "xls")]
         (File::Xls(left), File::Xls(right)) => left.same_snapshot(right),
         #[cfg(feature = "ppt")]
@@ -2914,7 +3032,13 @@ fn admit(file: &File) -> Result<()> {
         #[cfg(feature = "ods")]
         File::Ods(handle) => handle.admit_edit(),
         #[cfg(feature = "odt")]
-        File::Odt(handle) => handle.admit_edit(),
+        File::Odt(handle) | File::Oth(handle) | File::Odm(handle) => handle.admit_edit(),
+        #[cfg(feature = "odf-objects")]
+        File::Odg(handle)
+        | File::Odc(handle)
+        | File::Odi(handle)
+        | File::Odb(handle)
+        | File::Odf(handle) => handle.admit_edit(),
         #[cfg(feature = "odp")]
         File::Odp(handle) => handle.admit_edit(),
         _ => check_source(file),
@@ -2953,7 +3077,13 @@ fn check_source(file: &File) -> Result<()> {
         #[cfg(feature = "ods")]
         File::Ods(handle) => handle.check_source(),
         #[cfg(feature = "odt")]
-        File::Odt(handle) => handle.check_source(),
+        File::Odt(handle) | File::Oth(handle) | File::Odm(handle) => handle.check_source(),
+        #[cfg(feature = "odf-objects")]
+        File::Odg(handle)
+        | File::Odc(handle)
+        | File::Odi(handle)
+        | File::Odb(handle)
+        | File::Odf(handle) => handle.check_source(),
         #[cfg(feature = "odp")]
         File::Odp(handle) => handle.check_source(),
         File::Signed(signed) => Err(crate::Error::signed(signed.format())),

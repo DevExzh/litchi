@@ -39,6 +39,20 @@ rtf     = ["dep:litchi-rtf", "dep:chrono"]
 odt     = ["dep:litchi-odf-common", "dep:litchi-odt"]
 ods     = ["dep:litchi-odf-common", "dep:litchi-ods"]
 odp     = ["dep:litchi-odf-common", "dep:litchi-odp"]
+# The ODF text-family formats read and write through the ODT body machinery
+# (record 0282): `File::Oth`/`File::Odm` hold the ODT handle; the leaf crate
+# supplies the minimal package `create` starts from.
+oth     = ["odt", "dep:litchi-oth"]
+odm     = ["odt", "dep:litchi-odm"]
+# The ODF object formats (record 0282) share one object-tree adapter
+# (`format::odf_tree`); `odf-objects` is its internal umbrella and is turned
+# on by each of them.
+odg         = ["odf-objects", "dep:litchi-odg"]
+odc         = ["odf-objects", "dep:litchi-odc"]
+odi         = ["odf-objects", "dep:litchi-odi"]
+odb         = ["odf-objects", "dep:litchi-odb"]
+odf-formula = ["odf-objects", "dep:litchi-odf-formula"]
+odf-objects = ["dep:litchi-odf-common"]
 pages   = []
 keynote = []
 numbers = []
@@ -93,11 +107,18 @@ litchi-drawingml    = { workspace = true, optional = true }
 litchi-eval         = { workspace = true, optional = true } # Formula evaluation (record 0266)
 litchi-formula      = { workspace = true, optional = true }
 litchi-markdown     = { workspace = true, optional = true }
+litchi-odb          = { workspace = true, optional = true }
+litchi-odc          = { workspace = true, optional = true }
 litchi-odf-common   = { workspace = true, optional = true }
+litchi-odf-formula  = { workspace = true, optional = true }
+litchi-odg          = { workspace = true, optional = true }
+litchi-odi          = { workspace = true, optional = true }
 litchi-odp          = { workspace = true, optional = true }
 litchi-ods          = { workspace = true, optional = true }
 litchi-odt          = { workspace = true, optional = true }
+litchi-odm          = { workspace = true, optional = true }
 litchi-ole-common   = { workspace = true, optional = true }
+litchi-oth          = { workspace = true, optional = true }
 litchi-ooxml-common = { workspace = true, optional = true }
 litchi-opc          = { workspace = true, optional = true }
 litchi-ppt          = { workspace = true, optional = true }
@@ -155,3 +176,8 @@ required-features = ["docx"]
 [[example]]
 name              = "find_replace_bench"
 required-features = ["docx", "pptx"]
+
+# Paired leaf-vs-unified measurements of the remaining ODF formats (record 0282).
+[[example]]
+name              = "odf_leaves_bench"
+required-features = ["oth", "odm", "odg", "odc", "odi", "odb", "odf-formula"]

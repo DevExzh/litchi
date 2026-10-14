@@ -224,6 +224,36 @@ pub fn create_with(format: FileFormat, options: &CreateOptions) -> Result<File> 
         return crate::format::odp::Odp::create(options).map(File::Odp);
     }
 
+    // The ODF text-family formats start from the leaf's minimal package and
+    // are then owned by the ODT body machinery (record 0282).
+    #[cfg(feature = "oth")]
+    if format == FileFormat::Oth {
+        return crate::format::odt::write::create_from(options, format, || {
+            let base = litchi_oth::Package::new().map_err(crate::format::odt::odf_error)?;
+            litchi_odt::Package::from_bytes(base.as_bytes()).map_err(crate::format::odt::odf_error)
+        })
+        .map(File::Oth);
+    }
+
+    #[cfg(feature = "odm")]
+    if format == FileFormat::Odm {
+        return crate::format::odt::write::create_from(options, format, || {
+            let base = litchi_odm::Package::new().map_err(crate::format::odt::odf_error)?;
+            litchi_odt::Package::from_bytes(base.as_bytes()).map_err(crate::format::odt::odf_error)
+        })
+        .map(File::Odm);
+    }
+
+    #[cfg(feature = "odf-objects")]
+    if matches!(
+        format,
+        FileFormat::Odg | FileFormat::Odc | FileFormat::Odi | FileFormat::Odb | FileFormat::Odf
+    ) && crate::read::Adapter::of(format).is_some()
+    {
+        return crate::format::odf_tree::OdfTree::create(format, options)
+            .map(|file| file.into_file());
+    }
+
     let _ = options;
     if format_feature_enabled(format) {
         Err(unsupported_capability(format))
@@ -250,17 +280,14 @@ fn format_feature_enabled(format: FileFormat) -> bool {
         FileFormat::Odt => cfg!(feature = "odt"),
         FileFormat::Ods => cfg!(feature = "ods"),
         FileFormat::Odp => cfg!(feature = "odp"),
-        FileFormat::Pages
-        | FileFormat::Keynote
-        | FileFormat::Numbers
-        | FileFormat::Odg
-        | FileFormat::Odc
-        | FileFormat::Odf
-        | FileFormat::Odi
-        | FileFormat::Odm
-        | FileFormat::Oth
-        | FileFormat::Odb
-        | _ => false,
+        FileFormat::Oth => cfg!(feature = "oth"),
+        FileFormat::Odm => cfg!(feature = "odm"),
+        FileFormat::Odg => cfg!(feature = "odg"),
+        FileFormat::Odc => cfg!(feature = "odc"),
+        FileFormat::Odi => cfg!(feature = "odi"),
+        FileFormat::Odb => cfg!(feature = "odb"),
+        FileFormat::Odf => cfg!(feature = "odf-formula"),
+        FileFormat::Pages | FileFormat::Keynote | FileFormat::Numbers | _ => false,
     }
 }
 
@@ -277,6 +304,13 @@ fn feature_suggestion(format: FileFormat) -> &'static str {
         FileFormat::Odt => "enable the `odt` cargo feature",
         FileFormat::Ods => "enable the `ods` cargo feature",
         FileFormat::Odp => "enable the `odp` cargo feature",
+        FileFormat::Oth => "enable the `oth` cargo feature",
+        FileFormat::Odm => "enable the `odm` cargo feature",
+        FileFormat::Odg => "enable the `odg` cargo feature",
+        FileFormat::Odc => "enable the `odc` cargo feature",
+        FileFormat::Odi => "enable the `odi` cargo feature",
+        FileFormat::Odb => "enable the `odb` cargo feature",
+        FileFormat::Odf => "enable the `odf-formula` cargo feature",
         _ => "the format has no unified creator in this build",
     }
 }

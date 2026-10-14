@@ -1,0 +1,414 @@
+{
+ "runs": [
+  [
+   {
+    "engine_us": 125.7592,
+    "format": "oth",
+    "leaf_us": 447.25355,
+    "ratio_unified_engine": 1.006603890609991,
+    "ratio_unified_leaf": 0.28303788756959,
+    "scenario": "open_first_get",
+    "unified_us": 126.5897
+   },
+   {
+    "engine_us": 334.78290000000004,
+    "format": "oth",
+    "leaf_us": 727.1141,
+    "ratio_unified_engine": 1.0015950635471522,
+    "ratio_unified_leaf": 0.4611613225489644,
+    "scenario": "single_set",
+    "unified_us": 335.3169
+   },
+   {
+    "engine_us": 621.98632,
+    "format": "odm",
+    "leaf_us": 1429.64448,
+    "ratio_unified_engine": 0.9974787226831614,
+    "ratio_unified_leaf": 0.43396671597682807,
+    "scenario": "open_first_get",
+    "unified_us": 620.41812
+   },
+   {
+    "engine_us": 2162.9276999999997,
+    "format": "odm",
+    "ratio_unified_engine": 1.0015719665525575,
+    "ratio_unified_leaf": 1.0015719665525575,
+    "scenario": "single_set",
+    "unified_us": 2166.32775
+   },
+   {
+    "format": "odg",
+    "leaf_us": 2242.8447,
+    "ratio_unified_leaf": 1.024657213225686,
+    "scenario": "open_first_get",
+    "unified_us": 2298.147
+   },
+   {
+    "format": "odg",
+    "leaf_us": 10106.5202,
+    "ratio_unified_leaf": 0.999200110439595,
+    "scenario": "single_set",
+    "unified_us": 10098.436099999999
+   },
+   {
+    "format": "odc",
+    "leaf_us": 75.02242,
+    "ratio_unified_leaf": 1.0168029770300664,
+    "scenario": "open_first_get",
+    "unified_us": 76.28302
+   },
+   {
+    "format": "odc",
+    "leaf_us": 203.59064999999998,
+    "ratio_unified_leaf": 1.0205684789551976,
+    "scenario": "single_set",
+    "unified_us": 207.77819999999997
+   },
+   {
+    "format": "odi",
+    "leaf_us": 56.862719999999996,
+    "ratio_unified_leaf": 1.0183533253421575,
+    "scenario": "open_first_get",
+    "unified_us": 57.90634
+   },
+   {
+    "format": "odi",
+    "leaf_us": 143.41180000000003,
+    "ratio_unified_leaf": 1.009943393779312,
+    "scenario": "single_set",
+    "unified_us": 144.8378
+   },
+   {
+    "format": "odb",
+    "leaf_us": 63.82835,
+    "ratio_unified_leaf": 1.0205324123214843,
+    "scenario": "open_first_get",
+    "unified_us": 65.1389
+   },
+   {
+    "format": "odb",
+    "leaf_us": 288.9027,
+    "ratio_unified_leaf": 1.066811421284744,
+    "scenario": "single_set",
+    "unified_us": 308.2047
+   },
+   {
+    "format": "odf",
+    "leaf_us": 66.62378,
+    "ratio_unified_leaf": 1.166160791237003,
+    "scenario": "open_first_get",
+    "unified_us": 77.69404
+   },
+   {
+    "format": "odf",
+    "leaf_us": 309.00625,
+    "ratio_unified_leaf": 1.0457241560648045,
+    "scenario": "single_set",
+    "unified_us": 323.13530000000003
+   }
+  ],
+  [
+   {
+    "engine_us": 124.7422,
+    "format": "oth",
+    "leaf_us": 440.828,
+    "ratio_unified_engine": 1.0047818621124205,
+    "ratio_unified_leaf": 0.2843256326730607,
+    "scenario": "open_first_get",
+    "unified_us": 125.33869999999999
+   },
+   {
+    "engine_us": 328.9948,
+    "format": "oth",
+    "leaf_us": 716.518,
+    "ratio_unified_engine": 1.0037508191618834,
+    "ratio_unified_leaf": 0.4608799778930885,
+    "scenario": "single_set",
+    "unified_us": 330.2288
+   },
+   {
+    "engine_us": 615.60648,
+    "format": "odm",
+    "leaf_us": 1439.1675400000001,
+    "ratio_unified_engine": 0.9957258409625577,
+    "ratio_unified_leaf": 0.4259235029717248,
+    "scenario": "open_first_get",
+    "unified_us": 612.97528
+   },
+   {
+    "engine_us": 2173.0958,
+    "format": "odm",
+    "ratio_unified_engine": 1.0019136524031753,
+    "ratio_unified_leaf": 1.0019136524031753,
+    "scenario": "single_set",
+    "unified_us": 2177.25435
+   },
+   {
+    "format": "odg",
+    "leaf_us": 2251.2717000000002,
+    "ratio_unified_leaf": 1.02543713404295,
+    "scenario": "open_first_get",
+    "unified_us": 2308.5376
+   },
+   {
+    "format": "odg",
+    "leaf_us": 10077.476,
+    "ratio_unified_leaf": 1.0004641936135596,
+    "scenario": "single_set",
+    "unified_us": 10082.153900000001
+   },
+   {
+    "format": "odc",
+    "leaf_us": 76.64564,
+    "ratio_unified_leaf": 1.0173917263917425,
+    "scenario": "open_first_get",
+    "unified_us": 77.97864
+   },
+   {
+    "format": "odc",
+    "leaf_us": 205.38764999999998,
+    "ratio_unified_leaf": 1.0148356047698095,
+    "scenario": "single_set",
+    "unified_us": 208.43469999999996
+   },
+   {
+    "format": "odi",
+    "leaf_us": 56.60972000000001,
+    "ratio_unified_leaf": 1.0174634320749156,
+    "scenario": "open_first_get",
+    "unified_us": 57.59832
+   },
+   {
+    "format": "odi",
+    "leaf_us": 143.1748,
+    "ratio_unified_leaf": 1.0085699438728044,
+    "scenario": "single_set",
+    "unified_us": 144.4018
+   },
+   {
+    "format": "odb",
+    "leaf_us": 64.81835000000001,
+    "ratio_unified_leaf": 1.0193232317700156,
+    "scenario": "open_first_get",
+    "unified_us": 66.07085000000001
+   },
+   {
+    "format": "odb",
+    "leaf_us": 292.3556,
+    "ratio_unified_leaf": 1.0619321128105637,
+    "scenario": "single_set",
+    "unified_us": 310.4618
+   },
+   {
+    "format": "odf",
+    "leaf_us": 66.68058,
+    "ratio_unified_leaf": 1.1838025404098163,
+    "scenario": "open_first_get",
+    "unified_us": 78.93664
+   },
+   {
+    "format": "odf",
+    "leaf_us": 310.72975,
+    "ratio_unified_leaf": 1.0447385549661723,
+    "scenario": "single_set",
+    "unified_us": 324.63135
+   }
+  ],
+  [
+   {
+    "engine_us": 125.3477,
+    "format": "oth",
+    "leaf_us": 446.704,
+    "ratio_unified_engine": 1.00574801133168,
+    "ratio_unified_leaf": 0.28221865038146066,
+    "scenario": "open_first_get",
+    "unified_us": 126.0682
+   },
+   {
+    "engine_us": 331.9148,
+    "format": "oth",
+    "leaf_us": 723.1040999999999,
+    "ratio_unified_engine": 1.0007053014809826,
+    "ratio_unified_leaf": 0.4593375974496619,
+    "scenario": "single_set",
+    "unified_us": 332.1489
+   },
+   {
+    "engine_us": 623.0089,
+    "format": "odm",
+    "leaf_us": 1432.58266,
+    "ratio_unified_engine": 0.9910915879371868,
+    "ratio_unified_leaf": 0.43101099660106174,
+    "scenario": "open_first_get",
+    "unified_us": 617.45888
+   },
+   {
+    "engine_us": 2168.0557,
+    "format": "odm",
+    "ratio_unified_engine": 1.002637155493745,
+    "ratio_unified_leaf": 1.002637155493745,
+    "scenario": "single_set",
+    "unified_us": 2173.7732
+   },
+   {
+    "format": "odg",
+    "leaf_us": 2234.0191,
+    "ratio_unified_leaf": 1.0263524156977888,
+    "scenario": "open_first_get",
+    "unified_us": 2292.8909
+   },
+   {
+    "format": "odg",
+    "leaf_us": 10052.5006,
+    "ratio_unified_leaf": 1.0015936432771761,
+    "scenario": "single_set",
+    "unified_us": 10068.5207
+   },
+   {
+    "format": "odc",
+    "leaf_us": 77.56004000000001,
+    "ratio_unified_leaf": 1.0143759595791852,
+    "scenario": "open_first_get",
+    "unified_us": 78.67504000000001
+   },
+   {
+    "format": "odc",
+    "leaf_us": 208.66469999999998,
+    "ratio_unified_leaf": 1.0209235198862099,
+    "scenario": "single_set",
+    "unified_us": 213.03070000000002
+   },
+   {
+    "format": "odi",
+    "leaf_us": 57.65473999999999,
+    "ratio_unified_leaf": 1.0164080177969756,
+    "scenario": "open_first_get",
+    "unified_us": 58.600739999999995
+   },
+   {
+    "format": "odi",
+    "leaf_us": 144.4803,
+    "ratio_unified_leaf": 1.0080810325006246,
+    "scenario": "single_set",
+    "unified_us": 145.64785
+   },
+   {
+    "format": "odb",
+    "leaf_us": 64.74685,
+    "ratio_unified_leaf": 1.0193368480474339,
+    "scenario": "open_first_get",
+    "unified_us": 65.99884999999999
+   },
+   {
+    "format": "odb",
+    "leaf_us": 291.5877,
+    "ratio_unified_leaf": 1.0621360228843673,
+    "scenario": "single_set",
+    "unified_us": 309.7058
+   },
+   {
+    "format": "odf",
+    "leaf_us": 66.94918000000001,
+    "ratio_unified_leaf": 1.1691560673334607,
+    "scenario": "open_first_get",
+    "unified_us": 78.27404
+   },
+   {
+    "format": "odf",
+    "leaf_us": 309.7447,
+    "ratio_unified_leaf": 1.0433053414634696,
+    "scenario": "single_set",
+    "unified_us": 323.1583
+   }
+  ]
+ ],
+ "medians": [
+  {
+   "format": "oth",
+   "scenario": "open_first_get",
+   "engine_us": 125.3477,
+   "leaf_us": 446.704,
+   "unified_us": 126.0682
+  },
+  {
+   "format": "oth",
+   "scenario": "single_set",
+   "engine_us": 331.9148,
+   "leaf_us": 723.1040999999999,
+   "unified_us": 332.1489
+  },
+  {
+   "format": "odm",
+   "scenario": "open_first_get",
+   "engine_us": 621.98632,
+   "leaf_us": 1432.58266,
+   "unified_us": 617.45888
+  },
+  {
+   "format": "odm",
+   "scenario": "single_set",
+   "engine_us": 2168.0557,
+   "unified_us": 2173.7732
+  },
+  {
+   "format": "odg",
+   "scenario": "open_first_get",
+   "leaf_us": 2242.8447,
+   "unified_us": 2298.147
+  },
+  {
+   "format": "odg",
+   "scenario": "single_set",
+   "leaf_us": 10077.476,
+   "unified_us": 10082.153900000001
+  },
+  {
+   "format": "odc",
+   "scenario": "open_first_get",
+   "leaf_us": 76.64564,
+   "unified_us": 77.97864
+  },
+  {
+   "format": "odc",
+   "scenario": "single_set",
+   "leaf_us": 205.38764999999998,
+   "unified_us": 208.43469999999996
+  },
+  {
+   "format": "odi",
+   "scenario": "open_first_get",
+   "leaf_us": 56.862719999999996,
+   "unified_us": 57.90634
+  },
+  {
+   "format": "odi",
+   "scenario": "single_set",
+   "leaf_us": 143.41180000000003,
+   "unified_us": 144.8378
+  },
+  {
+   "format": "odb",
+   "scenario": "open_first_get",
+   "leaf_us": 64.74685,
+   "unified_us": 65.99884999999999
+  },
+  {
+   "format": "odb",
+   "scenario": "single_set",
+   "leaf_us": 291.5877,
+   "unified_us": 309.7058
+  },
+  {
+   "format": "odf",
+   "scenario": "open_first_get",
+   "leaf_us": 66.68058,
+   "unified_us": 78.27404
+  },
+  {
+   "format": "odf",
+   "scenario": "single_set",
+   "leaf_us": 309.7447,
+   "unified_us": 323.1583
+  }
+ ]
+}

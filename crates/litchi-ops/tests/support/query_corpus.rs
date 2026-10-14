@@ -185,6 +185,55 @@ pub(crate) const ODT: &[&str] = &[
     "/body/r[bold=true]",
 ];
 
+/// OpenDocument drawing selectors (record 0282), recorded from the
+/// object-tree adapter's reads.
+#[cfg(feature = "odg")]
+pub(crate) const ODG: &[&str] = &[
+    "page",
+    "shape",
+    "layer",
+    "shape[name]",
+    "page > shape",
+    "shape:contains(a)",
+    "shape[width>=5cm]",
+    "shape[shapeType=rect]",
+    "page[1]",
+    "shape[last()]",
+    "/page[1]/shape",
+];
+
+/// OpenDocument chart selectors (record 0282).
+#[cfg(feature = "odc")]
+pub(crate) const ODC: &[&str] = &[
+    "axis",
+    "series",
+    "legend",
+    "axis[dimension=x]",
+    "series[values]",
+];
+
+/// OpenDocument database selectors (record 0282).
+#[cfg(feature = "odb")]
+pub(crate) const ODB: &[&str] = &[
+    "table",
+    "column",
+    "query",
+    "table > column",
+    "column[typeName]",
+    "query:contains(SELECT)",
+    "table[columnCount>2]",
+];
+
+/// OpenDocument formula selectors (record 0282).
+#[cfg(feature = "odf-formula")]
+pub(crate) const ODF_FORMULA: &[&str] = &[
+    "element",
+    "element[tag=mi]",
+    "element[text]",
+    "element > element",
+    "element:contains(x)",
+];
+
 /// OpenDocument presentation selectors (record 0278), recorded from the
 /// read adapter before its write handlers landed.
 #[cfg(feature = "odp")]
@@ -403,6 +452,17 @@ pub(crate) fn digests(root: &Path) -> BTreeMap<String, String> {
         ("fods", FileFormat::Ods, ODS),
         #[cfg(feature = "odt")]
         ("odt", FileFormat::Odt, ODT),
+        // ODM master documents run the ODT selectors (record 0282).
+        #[cfg(feature = "odm")]
+        ("odm", FileFormat::Odm, ODT),
+        #[cfg(feature = "odg")]
+        ("odg", FileFormat::Odg, ODG),
+        #[cfg(feature = "odc")]
+        ("odc", FileFormat::Odc, ODC),
+        #[cfg(feature = "odb")]
+        ("odb", FileFormat::Odb, ODB),
+        #[cfg(feature = "odf-formula")]
+        ("odf", FileFormat::Odf, ODF_FORMULA),
         #[cfg(feature = "odp")]
         ("odp", FileFormat::Odp, ODP),
         #[cfg(feature = "odp")]

@@ -40,6 +40,10 @@ pub struct Odt(Arc<OdtState>);
 
 struct OdtState {
     owner: OdtOwner,
+    /// The package's format: ODT, or an ODF text-family format read through
+    /// the same content model (OTH web template, ODM master document,
+    /// record 0282).
+    format: FileFormat,
     /// The immutable leaf package: set for eager owners, materialized on
     /// first use for a filesystem-backed owner.
     package: OnceLock<litchi_odt::Package>,
@@ -115,18 +119,28 @@ impl Odt {
     /// a second ZIP index. The ODF limits were applied when the package was
     /// prepared.
     pub(crate) fn from_prepared(prepared: PreparedPackage, _options: &OpenOptions) -> Result<Self> {
-        let package = litchi_odt::Package::from_prepared_package(prepared).map_err(odf_error)?;
-        Self::from_package(package, None)
+        let format = prepared.format();
+        let package = if format == FileFormat::Odt {
+            litchi_odt::Package::from_prepared_package(prepared)
+        } else {
+            litchi_odt::Package::from_prepared_text_package(prepared)
+        }
+        .map_err(|error| odf_error(error).with_format(format))?;
+        Self::from_package(package, None, format)
     }
 
     /// Adopts an immutable leaf package (a commit result or a fresh one).
     pub(crate) fn from_package(
         package: litchi_odt::Package,
         origin: Option<Arc<Path>>,
+        format: FileFormat,
     ) -> Result<Self> {
-        let document = package.document().map_err(core_error)?;
+        let document = package
+            .document()
+            .map_err(|error| core_error(error).with_format(format))?;
         Ok(Self(Arc::new(OdtState {
             owner: OdtOwner::Eager(document),
+            format,
             package: OnceLock::from(package),
             tree: OnceLock::new(),
             kinds: OnceLock::new(),
@@ -154,6 +168,7 @@ impl Odt {
     fn from_owner(owner: OdtOwner) -> Self {
         Self(Arc::new(OdtState {
             owner,
+            format: FileFormat::Odt,
             package: OnceLock::new(),
             tree: OnceLock::new(),
             kinds: OnceLock::new(),
@@ -170,6 +185,32 @@ impl Odt {
                 Self(Arc::new(state))
             },
             Err(shared) => Self(shared),
+        }
+    }
+
+    /// The package's format: [`FileFormat::Odt`], [`FileFormat::Oth`] or
+    /// [`FileFormat::Odm`].
+    #[must_use]
+    pub fn format(&self) -> FileFormat {
+        self.0.format
+    }
+
+    /// Re-tags an error the shared ODT machinery reported as ODT with this
+    /// handle's format (OTH, ODM).
+    pub(crate) fn retag(&self, error: Error) -> Error {
+        if self.0.format != FileFormat::Odt && error.format() == Some(FileFormat::Odt) {
+            error.with_format(self.0.format)
+        } else {
+            error
+        }
+    }
+
+    /// The `File` variant of this handle's format.
+    pub(crate) fn into_file(self) -> crate::File {
+        match self.0.format {
+            FileFormat::Oth => crate::File::Oth(self),
+            FileFormat::Odm => crate::File::Odm(self),
+            _ => crate::File::Odt(self),
         }
     }
 
@@ -403,6 +444,7 @@ impl Odt {
             props,
             &crate::transaction::SemanticLimits::default(),
         )
+        .map_err(|error| self.retag(error))
     }
 
     /// Set properties with the caller's transaction limits.
@@ -412,7 +454,7 @@ impl Odt {
         props: impl crate::IntoProps<'v>,
         limits: &crate::transaction::SemanticLimits,
     ) -> Result<write::Commit> {
-        write::set_with_limits(self, target, props, limits)
+        write::set_with_limits(self, target, props, limits).map_err(|error| self.retag(error))
     }
 
     /// Add one element with the default unified limits.
@@ -427,6 +469,7 @@ impl Odt {
             node,
             &crate::transaction::SemanticLimits::default(),
         )
+        .map_err(|error| self.retag(error))
     }
 
     /// Add one element with the caller's transaction limits.
@@ -436,12 +479,13 @@ impl Odt {
         node: crate::NewNode<'n>,
         limits: &crate::transaction::SemanticLimits,
     ) -> Result<(write::Commit, crate::path::Path<'static>)> {
-        write::add_with_limits(self, parent, node, limits)
+        write::add_with_limits(self, parent, node, limits).map_err(|error| self.retag(error))
     }
 
     /// Remove targets with the default unified limits.
     pub(crate) fn remove<'p>(&self, target: crate::TargetArg<'p>) -> Result<write::Commit> {
         write::remove_with_limits(self, target, &crate::transaction::SemanticLimits::default())
+            .map_err(|error| self.retag(error))
     }
 
     /// Remove targets with the caller's transaction limits.
@@ -450,7 +494,7 @@ impl Odt {
         target: crate::TargetArg<'p>,
         limits: &crate::transaction::SemanticLimits,
     ) -> Result<write::Commit> {
-        write::remove_with_limits(self, target, limits)
+        write::remove_with_limits(self, target, limits).map_err(|error| self.retag(error))
     }
 
     /// Move one element with the default unified limits.
@@ -465,6 +509,7 @@ impl Odt {
             placement,
             &crate::transaction::SemanticLimits::default(),
         )
+        .map_err(|error| self.retag(error))
     }
 
     /// Move one element with the caller's transaction limits.
@@ -474,7 +519,7 @@ impl Odt {
         placement: crate::Placement<'q>,
         limits: &crate::transaction::SemanticLimits,
     ) -> Result<write::Commit> {
-        write::move_to_with_limits(self, path, placement, limits)
+        write::move_to_with_limits(self, path, placement, limits).map_err(|error| self.retag(error))
     }
 
     /// Exchange two elements with the default unified limits.
@@ -489,6 +534,7 @@ impl Odt {
             right,
             &crate::transaction::SemanticLimits::default(),
         )
+        .map_err(|error| self.retag(error))
     }
 
     /// Exchange two elements with the caller's transaction limits.
@@ -498,7 +544,7 @@ impl Odt {
         right: crate::path::PathArg<'q>,
         limits: &crate::transaction::SemanticLimits,
     ) -> Result<write::Commit> {
-        write::swap_with_limits(self, left, right, limits)
+        write::swap_with_limits(self, left, right, limits).map_err(|error| self.retag(error))
     }
 }
 

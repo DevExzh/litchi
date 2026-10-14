@@ -2113,3 +2113,12 @@ Ingress applies `litchi_odf_common::OpenOptions` through the additive
 | metadata `edit_metadata`/`apply_metadata` family on these crates | not adopted (gap; metadata writes stay in the primary `Edit` where the crate has them) |
 | flat `Flat*` owners, ODC `Definition*`, history/merge vocabularies | unchanged (out of scope, record 0282 gaps) |
 
+
+## Unified ODF formats (record 0282)
+
+| Name | Status |
+|---|---|
+| `litchi_ops::File::{Oth, Odm}` (hold `format::odt::Odt`; `Odt::format()`) | adopted (0282) |
+| `litchi_ops::File::{Odg, Odc, Odi, Odb, Odf}`, `format::odf_tree::{OdfTree, Node}`, `node::Node::Object`, `ToleranceReport::Object` | adopted (0282) |
+| `litchi_odt::Package::from_prepared_text_package` (ODT/OTH/ODM prepared packages) | adopted (0282, additive reuse hook) |
+| `litchi_odf_common::core::family::Package::*_with_options` | adopted (0282, additive) |

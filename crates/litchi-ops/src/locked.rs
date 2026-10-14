@@ -282,7 +282,8 @@ impl LockedState {
         feature = "odp",
         feature = "pages",
         feature = "keynote",
-        feature = "numbers"
+        feature = "numbers",
+        feature = "odf-objects"
     )
 ))]
 impl Locked {
@@ -349,7 +350,8 @@ impl Locked {
         feature = "odp",
         feature = "pages",
         feature = "keynote",
-        feature = "numbers"
+        feature = "numbers",
+        feature = "odf-objects"
     )
 ))]
 impl LockedState {
@@ -376,7 +378,8 @@ impl LockedState {
         feature = "odp",
         feature = "pages",
         feature = "keynote",
-        feature = "numbers"
+        feature = "numbers",
+        feature = "odf-objects"
     )
 ))]
 impl LockedSource {

@@ -93,7 +93,7 @@ pub(crate) fn finish(
         limits.max_snapshot_bytes(),
     )?;
     let after = if changed {
-        Odt::from_package(package, file.origin().cloned())?
+        Odt::from_package(package, file.origin().cloned(), file.format())?
     } else {
         file.clone()
     };
@@ -560,7 +560,7 @@ fn set_metadata(file: &Odt, props: &Props<'_>, limits: &SemanticLimits) -> Resul
         limits.max_snapshot_bytes(),
     )?;
     let after = if changed {
-        Odt::from_package(package, file.origin().cloned())?
+        Odt::from_package(package, file.origin().cloned(), file.format())?
     } else {
         file.clone()
     };
@@ -1084,6 +1084,28 @@ pub(crate) fn swap_with_limits<'p, 'q>(
 /// A fresh empty text document, with create-time metadata committed through
 /// the leaf metadata edit.
 pub(crate) fn create(options: &crate::CreateOptions) -> Result<Odt> {
+    create_from(options, FileFormat::Odt, || {
+        litchi_odt::Package::new().map_err(odf_error)
+    })
+}
+
+/// A fresh empty document of an ODF text-family `format` whose minimal
+/// package `base` builds (the ODT body machinery then owns it, record
+/// 0282), with create-time metadata committed through the leaf metadata
+/// edit.
+pub(crate) fn create_from(
+    options: &crate::CreateOptions,
+    format: FileFormat,
+    base: impl FnOnce() -> Result<litchi_odt::Package>,
+) -> Result<Odt> {
+    create_tagged(options, format, base).map_err(|error| error.with_format(format))
+}
+
+fn create_tagged(
+    options: &crate::CreateOptions,
+    format: FileFormat,
+    base: impl FnOnce() -> Result<litchi_odt::Package>,
+) -> Result<Odt> {
     use crate::{Conformance, Flavor};
     if options.flavor_value() != Flavor::Document {
         return Err(refusal(
@@ -1098,9 +1120,9 @@ pub(crate) fn create(options: &crate::CreateOptions) -> Result<Odt> {
             "ODT does not support OOXML Strict conformance",
         ));
     }
-    let package = litchi_odt::Package::new().map_err(odf_error)?;
+    let package = base()?;
     let Some(metadata) = options.metadata_value() else {
-        return Odt::from_package(package, None);
+        return Odt::from_package(package, None, format);
     };
     let unsupported = metadata.identifier.is_some()
         || metadata.template.is_some()
@@ -1137,7 +1159,7 @@ pub(crate) fn create(options: &crate::CreateOptions) -> Result<Odt> {
         }
     }
     let package = edit.commit().map_err(odf_error)?.into_package();
-    Odt::from_package(package, None)
+    Odt::from_package(package, None, format)
 }
 
 /// The columns a table's first row spans (`table:number-columns-repeated`

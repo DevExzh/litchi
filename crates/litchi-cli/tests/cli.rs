@@ -111,6 +111,32 @@ const READS: &[(&str, &[&str], &str)] = &[
         &["/", "/slide[1]", "/slide[1]/shape[1]"],
         "shape",
     ),
+    // The remaining ODF formats (record 0282).
+    (
+        "libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm",
+        &["/", "/body", "/body/p[1]"],
+        "p",
+    ),
+    (
+        "libreoffice-core/desktop/qa/data/3page.odg",
+        &["/", "/page[1]", "/page[1]/shape[1]"],
+        "shape",
+    ),
+    (
+        "odf/odc-producer-evidence/odfdom-created.odc",
+        &["/", "/axis[1]", "/series[1]"],
+        "axis",
+    ),
+    (
+        "libreoffice-core/dbaccess/qa/unit/data/tdf132924.odb",
+        &["/", "/table[1]", "/table[1]/column[1]"],
+        "column",
+    ),
+    (
+        "odf/native-resave/source/font-styles.odf",
+        &["/", "/element[1]"],
+        "element",
+    ),
 ];
 
 #[test]
@@ -435,7 +461,8 @@ fn applied(run: &Run) -> Value {
 fn create_writes_every_creatable_format_and_refuses_overwrite() {
     let dir = tempfile::tempdir().expect("tempdir");
     for format in [
-        "docx", "xlsx", "pptx", "xlsb", "doc", "xls", "ppt", "rtf", "ods", "odt", "odp",
+        "docx", "xlsx", "pptx", "xlsb", "doc", "xls", "ppt", "rtf", "ods", "odt", "odp", "oth",
+        "odm", "odg", "odc", "odi", "odb", "odf",
     ] {
         let path = scratch(dir.path(), &format!("blank.{format}"), None);
         let file = litchi_ops::open(&path).expect("reopen in process");
@@ -740,6 +767,44 @@ fn presentation_writes_save_in_place() {
     assert_eq!(text_of(&path, "/slide[1]/shape[1]"), first);
     expect(0, ["remove", file, "/slide[3]"]);
     expect(3, ["get", file, "/slide[3]"]);
+
+    // ODG (record 0282): on a fresh drawing (producer drawings refuse
+    // structural writes, a leaf gap), a page and a shape added, the shape's
+    // text changed and the shape removed, each saved in place.
+    let path = dir.path().join("w.odg");
+    let file = arg(&path);
+    expect(0, ["create", file]);
+    expect(0, ["add", file, "/", "--type", "page", "--prop", "name=P"]);
+    let run = expect(
+        0,
+        [
+            "add",
+            file,
+            "/page[1]",
+            "--type",
+            "shape",
+            "--prop",
+            "x=1cm",
+            "--prop",
+            "y=1cm",
+            "--prop",
+            "width=3cm",
+            "--prop",
+            "height=2cm",
+            "--prop",
+            "text=Box",
+            "--json",
+        ],
+    );
+    let added = applied(&run)["results"][0]["path"]
+        .as_str()
+        .expect("path")
+        .to_owned();
+    assert_eq!(text_of(&path, &added), "Box");
+    expect(0, ["set", file, &added, "--prop", "text=Changed"]);
+    assert_eq!(text_of(&path, &added), "Changed");
+    expect(0, ["remove", file, &added]);
+    expect(3, ["get", file, &added]);
 }
 
 #[test]

@@ -16,6 +16,7 @@ use std::path::Path;
     feature = "ods",
     feature = "odt",
     feature = "odp",
+    feature = "odf-objects",
     all(
         any(unix, windows),
         any(
@@ -46,6 +47,7 @@ use crate::{File, OpenOptions};
     feature = "ods",
     feature = "odt",
     feature = "odp",
+    feature = "odf-objects",
     all(
         any(unix, windows),
         any(
@@ -128,7 +130,9 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
             feature = "xlsb",
             feature = "rtf",
             feature = "ods",
-            feature = "odp"
+            feature = "odp",
+            feature = "odt",
+            feature = "odf-objects"
         ))]
         let file = if matches!(
             file.format(),
@@ -235,7 +239,9 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
         feature = "xlsb",
         feature = "rtf",
         feature = "ods",
-        feature = "odp"
+        feature = "odp",
+        feature = "odt",
+        feature = "odf-objects"
     ))]
     let opened = if matches!(
         opened.format(),
@@ -250,6 +256,13 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
                 | litchi_core::FileFormat::Xlsb
                 | litchi_core::FileFormat::Ods
                 | litchi_core::FileFormat::Odp
+                | litchi_core::FileFormat::Oth
+                | litchi_core::FileFormat::Odm
+                | litchi_core::FileFormat::Odg
+                | litchi_core::FileFormat::Odc
+                | litchi_core::FileFormat::Odi
+                | litchi_core::FileFormat::Odb
+                | litchi_core::FileFormat::Odf
         )
     ) || matches!(&opened, File::Locked(_))
     {
@@ -289,7 +302,9 @@ mod zip {
         feature = "xlsb",
         feature = "odt",
         feature = "ods",
-        feature = "odp"
+        feature = "odp",
+        feature = "odt",
+        feature = "odf-objects"
     ))]
     use crate::detect::detected::ensure_path_source_current;
     use crate::detect::tail::ZipTail;
@@ -310,7 +325,12 @@ mod zip {
         tail: &T,
     ) -> Result<File> {
         // 1. An ordinary ODF package: an ODF `mimetype` and no OPC catalog.
-        #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
+        #[cfg(any(
+            feature = "odt",
+            feature = "ods",
+            feature = "odp",
+            feature = "odf-objects"
+        ))]
         let odf = {
             let mime = litchi_odf_common::detect::packaged_mime_read_at(source.as_ref())?;
             ensure_path_source_current(source.as_ref(), version)?;
@@ -328,7 +348,12 @@ mod zip {
                 None => None,
             }
         };
-        #[cfg(not(any(feature = "odt", feature = "ods", feature = "odp")))]
+        #[cfg(not(any(
+            feature = "odt",
+            feature = "ods",
+            feature = "odp",
+            feature = "odf-objects"
+        )))]
         let odf: Option<(FileFormat, Option<bool>)> = None;
 
         if let Some((format, Some(false))) = odf {
@@ -436,7 +461,12 @@ mod zip {
 
     /// Adopt the positional owner of an ODF package of `format`.
     #[cfg_attr(
-        not(any(feature = "odt", feature = "ods", feature = "odp")),
+        not(any(
+            feature = "odt",
+            feature = "ods",
+            feature = "odp",
+            feature = "odf-objects"
+        )),
         allow(
             unused_variables,
             clippy::needless_pass_by_value,
@@ -509,6 +539,27 @@ mod zip {
                         .with_origin(Some(super::stable_origin(path)?)),
                 ))
             },
+            // The other packaged ODF formats (record 0282) have no
+            // source-backed owner: their packages are read whole once and
+            // adopted through the detection-prepared byte route.
+            #[cfg(any(feature = "odt", feature = "odf-objects"))]
+            other => {
+                let _ = (error, length);
+                let bytes = super::super::read_whole_source(
+                    source.as_ref(),
+                    version,
+                    super::super::input_ceiling(options),
+                )?;
+                let file = match litchi_odf_common::detect::prepared_or_original(bytes) {
+                    Ok(prepared) => super::super::odf_from_prepared(prepared, options)?,
+                    Err(_) => return Err(super::super::not_enabled(other)),
+                };
+                Ok(super::super::attach_origin(
+                    file,
+                    super::stable_origin(path)?,
+                ))
+            },
+            #[cfg(not(any(feature = "odt", feature = "odf-objects")))]
             other => {
                 let _ = (error, path, length);
                 Err(super::super::not_enabled(other))

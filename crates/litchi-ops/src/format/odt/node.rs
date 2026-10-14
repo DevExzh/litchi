@@ -192,8 +192,8 @@ impl<'f> Node<'f> {
     }
 
     #[must_use]
-    pub const fn file_format(&self) -> FileFormat {
-        FileFormat::Odt
+    pub fn file_format(&self) -> FileFormat {
+        self.odt.format()
     }
 
     /// The canonical positional path.
@@ -262,7 +262,7 @@ impl<'f> Project<'f> for Node<'f> {
     }
 
     fn file_format(&self) -> FileFormat {
-        FileFormat::Odt
+        self.odt.format()
     }
 
     fn path(&self) -> NodePath<'_> {
