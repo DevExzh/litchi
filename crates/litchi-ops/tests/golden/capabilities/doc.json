@@ -59,6 +59,12 @@
       "followUp": "record 0273 follow-up: a find adapter over the format's run-level text edits",
       "reason": "DOC find/replace is not integrated; the leaf's body run spans can carry it"
     },
+    "refresh": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "field refresh for the legacy, RTF and ODF formats (record 0279 follow-up)",
+      "reason": "field refresh recomputes DOCX fields, PPTX slide fields and workbook formulas"
+    },
     "save": {
       "supported": true
     },

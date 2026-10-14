@@ -47,6 +47,9 @@
     "replace": {
       "supported": true
     },
+    "refresh": {
+      "supported": true
+    },
     "save": {
       "supported": true
     },

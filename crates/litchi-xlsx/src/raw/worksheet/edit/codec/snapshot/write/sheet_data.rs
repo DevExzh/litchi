@@ -777,7 +777,10 @@ fn write_cell(output: &mut Vec<u8>, source: &[u8], cell: &CellSlot, action: &Act
     let content = payload.as_ref().filter(|payload| {
         matches!(
             payload,
-            Payload::Set(_) | Payload::SharedString { .. } | Payload::SharedFormula { .. }
+            Payload::Set(_)
+                | Payload::SharedString { .. }
+                | Payload::SharedFormula { .. }
+                | Payload::Cache(_)
         )
     });
     let cell_type = content.and_then(payload_type);
@@ -806,8 +809,10 @@ fn write_cell(output: &mut Vec<u8>, source: &[u8], cell: &CellSlot, action: &Act
     if remains_empty {
         return Ok(());
     }
-    if let Some(content) = content {
-        write_payload(output, cell_name, content)?;
+    match content {
+        Some(Payload::Cache(value)) => write_cache(output, source, cell, cell_name, value)?,
+        Some(content) => write_payload(output, cell_name, content)?,
+        None => {},
     }
     if !cell.empty {
         if payload.is_some() {
@@ -880,6 +885,13 @@ fn payload_type(payload: &Payload) -> Option<&'static str> {
         Payload::Set(content) => content_type(content),
         Payload::SharedString { .. } => Some("s"),
         Payload::SharedFormula { .. } => None,
+        Payload::Cache(value) => match value {
+            Value::Bool(_) => Some("b"),
+            Value::Text(_) => Some("str"),
+            Value::Date(_) => Some("d"),
+            Value::Error(_) => Some("e"),
+            Value::Number(_) => None,
+        },
         Payload::Clear | Payload::ClearIfPresent => None,
     }
 }
@@ -896,8 +908,54 @@ fn write_payload(output: &mut Vec<u8>, cell_name: &str, payload: &Payload) -> Re
             reference,
             formula,
         } => write_shared_formula(output, cell_name, *index, reference, formula.as_ref()),
-        Payload::Clear | Payload::ClearIfPresent => Ok(()),
+        Payload::Clear | Payload::ClearIfPresent | Payload::Cache(_) => Ok(()),
     }
+}
+
+/// Write an existing formula cell's `f` element unchanged, then its new
+/// cached result (record 0279).
+fn write_cache(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    cell: &CellSlot,
+    cell_name: &str,
+    value: &Value,
+) -> Result<()> {
+    let formula = cell
+        .primary
+        .as_slice()
+        .iter()
+        .find(|span| {
+            let bytes = &source[span.start..span.end];
+            let name_end = bytes[1..]
+                .iter()
+                .position(|byte| matches!(*byte, b' ' | b'>' | b'/' | b'\t' | b'\n' | b'\r'))
+                .map_or(bytes.len(), |offset| offset + 1);
+            let name = &bytes[1..name_end];
+            name == b"f" || name.ends_with(b":f")
+        })
+        .ok_or_else(|| invalid("a formula cache needs a stored formula"))?;
+    output.extend_from_slice(&source[formula.start..formula.end]);
+    match value {
+        Value::Bool(value) => {
+            write_text_element(output, cell_name, "v", if *value { "1" } else { "0" });
+        },
+        Value::Number(value) => {
+            write_text_element(output, cell_name, "v", &escape_xml(value.as_str()));
+        },
+        Value::Text(value) => {
+            require_xml_text(value.as_str())?;
+            write_text_element(output, cell_name, "v", &escape_xml(value.as_str()));
+        },
+        Value::Date(value) => {
+            require_xml_text(value)?;
+            write_text_element(output, cell_name, "v", &escape_xml(value));
+        },
+        Value::Error(value) => {
+            write_text_element(output, cell_name, "v", &escape_xml(value.as_str()));
+        },
+    }
+    Ok(())
 }
 
 fn write_shared_formula(

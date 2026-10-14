@@ -181,3 +181,8 @@ required-features = ["docx", "pptx"]
 [[example]]
 name              = "odf_leaves_bench"
 required-features = ["oth", "odm", "odg", "odc", "odi", "odb", "odf-formula"]
+
+# Paired leaf-vs-unified field refresh measurements (record 0279).
+[[example]]
+name              = "refresh_bench"
+required-features = ["docx", "xlsx", "eval"]

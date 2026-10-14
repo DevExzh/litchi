@@ -150,7 +150,9 @@ fn the_route_and_proof_follow_the_historical_gate_on_mutated_sources() {
         "<!--a--b-->",
     ];
     let mut fallbacks = 0usize;
-    for xml in fixture_documents().into_iter().take(20) {
+    // The first 40 fixtures in path order: enough mutated paragraphs that
+    // adding fixtures (record 0279 added three) keeps the bound meaningful.
+    for xml in fixture_documents().into_iter().take(40) {
         let Some(body) = xml.windows(8).position(|window| window == b"<w:body>") else {
             continue;
         };

@@ -933,13 +933,18 @@ fn is_run(local: &[u8]) -> bool {
 
 /// Rewrite one run element (`a:r`, `a:br`, `a:fld`) for run properties and
 /// optional replacement text.
-fn rewrite_run(run: &[u8], properties: &TextProperties<'_>, text: Option<&str>) -> Result<Vec<u8>> {
+pub(super) fn rewrite_run(
+    run: &[u8],
+    properties: &TextProperties<'_>,
+    text: Option<&str>,
+) -> Result<Vec<u8>> {
     let node = root(run)?;
     let prefix = node.prefix(run).to_vec();
-    if text.is_some() && node.local(run) != b"r" {
+    let field = node.local(run) == b"fld";
+    if text.is_some() && node.local(run) != b"r" && !field {
         return Err(Error::UnsafeEdit {
             operation: "set_text_properties",
-            reason: "run text applies to a text run (a:r)",
+            reason: "run text applies to a text run (a:r) or a field's cached result (a:fld)",
         });
     }
     let kids = children(run, &node)?;
@@ -985,8 +990,22 @@ fn rewrite_run(run: &[u8], properties: &TextProperties<'_>, text: Option<&str>) 
     }
     if let Some(text) = text {
         let escaped = escape_text(text, text.len().saturating_mul(6).max(16))?;
-        let t =
-            child(&body, &kids, b"t").ok_or_else(|| invalid("a text run has no a:t element"))?;
+        let Some(t) = child(&body, &kids, b"t") else {
+            if !field || node.empty {
+                return Err(invalid("a text run has no a:t element"));
+            }
+            // A field without a cached result: its a:t follows a:rPr and
+            // a:pPr (record 0279).
+            let mut element = b"<".to_vec();
+            element.extend_from_slice(&qualified(&prefix, "t"));
+            element.push(b'>');
+            element.extend_from_slice(&escaped);
+            element.extend_from_slice(b"</");
+            element.extend_from_slice(&qualified(&prefix, "t"));
+            element.push(b'>');
+            splices.insert(node.close_start, element);
+            return splices.apply(&body);
+        };
         let qname = t.qname(&body).to_vec();
         let mut element = b"<".to_vec();
         element

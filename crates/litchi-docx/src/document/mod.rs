@@ -59,6 +59,17 @@ pub mod substitute {
     };
 }
 
+/// Field results of the main story, indexed and rewritten for field refresh
+/// (record 0279).
+///
+/// [`Edit::fields`] reads a [`fields::Fields`] index; [`Edit::refresh_fields`]
+/// applies [`fields::Update`]s planned over it. Nothing is evaluated here.
+pub mod fields {
+    pub use super::transaction::fields::{
+        Bookmark, Field, Fields, Outcome, Paragraph, TocEntry, Update,
+    };
+}
+
 pub use limit::LimitKind;
 pub use owned::{Commit, Edit, HyperlinkTarget, NewComment, NewPicture};
 

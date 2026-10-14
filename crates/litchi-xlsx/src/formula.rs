@@ -58,6 +58,17 @@ impl Formula {
         }
     }
 
+    /// This formula with `value` as its stored result cache, as a package
+    /// that holds it reads back (record 0279).
+    #[must_use]
+    pub(crate) fn with_cache(&self, value: Value) -> Self {
+        Self {
+            text: self.text.clone(),
+            kind: self.kind.clone(),
+            cached: Some(Cache::stored(value)),
+        }
+    }
+
     /// Formula expression without the leading `=`.
     #[must_use]
     pub fn text(&self) -> &str {

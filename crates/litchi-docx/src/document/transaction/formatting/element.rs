@@ -467,6 +467,23 @@ fn refusal(reason: Refusal) -> Error {
     }
 }
 
+/// The `(start, end)` byte ranges of the body's direct element children and
+/// the offset of the body's end tag, as the element operations count them
+/// (record 0279).
+pub(in crate::document::transaction) fn body_children(
+    snapshot: &Snapshot,
+) -> Result<(Vec<(usize, usize)>, usize)> {
+    let (children, _) = container_children(snapshot, &ElementPath::new(Vec::<ElementStep>::new()))?;
+    Ok((
+        children
+            .children
+            .iter()
+            .map(|(start, end, _)| (*start, *end))
+            .collect(),
+        children.close_start,
+    ))
+}
+
 /// The byte range of the element `path` names in `snapshot`, for the
 /// story substitution of record 0274.
 pub(in crate::document::transaction) fn locate_element(

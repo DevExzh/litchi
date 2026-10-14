@@ -8,6 +8,7 @@ mod durable;
 mod element_tests;
 mod formatting;
 pub(crate) use formatting::PictureMarkup;
+pub(crate) mod fields;
 #[cfg(test)]
 mod formatting_tests;
 #[cfg(test)]

@@ -66,7 +66,7 @@ fn merge_inner(
 /// it. An unsigned source-backed owner goes straight to its materialized
 /// package, whose edit applies the same admission a source edit would;
 /// every other state takes [`Docx::edit`]'s policy first.
-fn owning_editor(file: &Docx) -> Result<DocxEditor> {
+pub(super) fn owning_editor(file: &Docx) -> Result<DocxEditor> {
     if let (Signature::Unsigned, DocxOwner::Source(package), true) =
         (file.signature(), file.owner(), file.0.retain_source)
     {

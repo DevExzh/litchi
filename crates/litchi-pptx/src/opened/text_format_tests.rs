@@ -399,3 +399,25 @@ fn run_spans_split_runs_and_format_only_the_span() -> Result<()> {
     }
     Ok(())
 }
+
+/// Record 0279: a field's cached result takes run text; one without an
+/// `a:t` gains one after its properties.
+#[test]
+fn field_results_take_run_text() -> Result<()> {
+    let text = TextProperties::default().with_text("7");
+    let field =
+        br#"<a:fld id="{1}" type="slidenum"><a:rPr lang="en-US"/><a:t>&lt;#&gt;</a:t></a:fld>"#;
+    let rewritten = super::text_format::rewrite_run(field, &text, Some("7"))?;
+    assert_eq!(
+        rewritten,
+        br#"<a:fld id="{1}" type="slidenum"><a:rPr lang="en-US"/><a:t>7</a:t></a:fld>"#
+    );
+    let bare = br#"<a:fld id="{1}" type="slidenum"><a:rPr lang="en-US"/></a:fld>"#;
+    let rewritten = super::text_format::rewrite_run(bare, &text, Some("7"))?;
+    assert_eq!(
+        rewritten,
+        br#"<a:fld id="{1}" type="slidenum"><a:rPr lang="en-US"/><a:t>7</a:t></a:fld>"#
+    );
+    assert!(super::text_format::rewrite_run(b"<a:br/>", &text, Some("7")).is_err());
+    Ok(())
+}

@@ -100,6 +100,7 @@ pub(crate) fn run(cli: Cli, out: &mut impl Write) -> Result<u8> {
         Command::Evaluate(args) => crate::m4::evaluate(&args, json, out),
         Command::Recalculate(args) => crate::m4::recalculate(&args, json, out),
         Command::Merge(args) => crate::merge::merge(&args, json, out),
+        Command::Refresh(args) => crate::refresh::refresh(&args, json, out),
     }
 }
 

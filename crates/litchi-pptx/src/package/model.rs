@@ -1013,6 +1013,18 @@ impl Package {
         Ok(&self.opc)
     }
 
+    /// The number of the first slide, `p:presentation/@firstSlideNum`
+    /// (1 when absent), the number slide-number fields count from
+    /// (record 0279).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing or malformed presentation part.
+    pub fn first_slide_number(&self) -> Result<u32> {
+        let part = self.opc()?.main_document_part()?;
+        crate::presentation::first_slide_number(part.blob())
+    }
+
     /// Run a read-only operation against the current clear OPC graph.
     ///
     /// For encrypted provenance this explicitly exposes plaintext OPC content;

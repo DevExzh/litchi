@@ -367,6 +367,73 @@ impl WorksheetEdit<'_> {
         Ok(self)
     }
 
+    /// Store `value` as the cached result of an existing scalar formula
+    /// cell, keeping its formula markup (shared-formula members included)
+    /// byte for byte; the cell type follows the value (record 0279).
+    ///
+    /// ```
+    /// # fn main() -> litchi_xlsx::Result<()> {
+    /// use litchi_xlsx::{Cell, Formula, Package, State, Value};
+    ///
+    /// let mut edit = Package::new()?.edit()?;
+    /// edit.sheet("Sheet1")?.expect("worksheet").set("A1", Formula::new("1+1")?)?;
+    /// let workbook = edit.commit()?.into_package();
+    /// let mut edit = workbook.edit()?;
+    /// let mut sheet = edit.sheet("Sheet1")?.expect("worksheet");
+    /// sheet.set_cached("A1", 2)?;
+    /// let State::Cell { content: Cell::Formula(formula), .. } = sheet.state("A1")? else {
+    ///     unreachable!()
+    /// };
+    /// assert_eq!(formula.cached().map(|cache| cache.value()), Some(&Value::from(2)));
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an invalid-input error when the stored cell is not a scalar
+    /// formula, the value cannot be written, or the same cell already has a
+    /// payload change in this edit.
+    pub fn set_cached<'a>(
+        &mut self,
+        at: impl Into<At<'a>>,
+        value: impl Into<crate::Value>,
+    ) -> Result<&mut Self> {
+        let address = at.into().resolve()?;
+        let value = value.into();
+        Content::Value(value.clone()).validate_for_write()?;
+        if self
+            .edit
+            .sheets
+            .get(&self.position)
+            .and_then(|actions| actions.cells.get(&address))
+            .is_some_and(|action| action.payload().is_some() || matches!(action, Action::Remove))
+        {
+            return Err(invalid(
+                "a formula cache cannot join another payload change of the same cell",
+            ));
+        }
+        let sheet = self
+            .edit
+            .base
+            .sheet(self.position)?
+            .ok_or_else(|| invalid("worksheet edit target disappeared"))?;
+        let scalar = sheet.store()?.entry(address).is_some_and(|stored| {
+            matches!(&stored.cell, Cell::Formula(formula)
+                if matches!(formula.kind(), crate::formula::Kind::Scalar))
+        });
+        if !scalar {
+            return Err(invalid("a formula cache needs a stored scalar formula"));
+        }
+        match self.edit.actions(self.position).entry(address) {
+            Entry::Vacant(entry) => {
+                entry.insert(Action::cache(value));
+            },
+            Entry::Occupied(mut entry) => entry.get_mut().set_payload(Payload::Cache(value)),
+        }
+        Ok(self)
+    }
+
     /// Remove primary value/formula content while retaining the cell record,
     /// local style, metadata, comments, and unknown non-payload children.
     pub fn clear<'a>(&mut self, at: impl Into<At<'a>>) -> Result<&mut Self> {

@@ -27,6 +27,9 @@ pub(crate) enum Payload {
         reference: Box<str>,
         formula: Option<Formula>,
     },
+    /// Replace the cached result of an existing formula cell, keeping its
+    /// `f` element byte for byte (record 0279).
+    Cache(crate::cell::Value),
     /// Ensure an explicit empty cell record exists.
     Clear,
     /// Clear only when another effect or the base snapshot retains the cell.
@@ -71,6 +74,13 @@ impl Action {
                 reference: reference.into(),
                 formula,
             }),
+            style: None,
+        }
+    }
+
+    pub(crate) const fn cache(value: crate::cell::Value) -> Self {
+        Self::Update {
+            payload: Some(Payload::Cache(value)),
             style: None,
         }
     }
