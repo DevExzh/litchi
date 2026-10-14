@@ -83,3 +83,30 @@ mod docx {
         assert_eq!(edit.to_bytes().unwrap(), set.to_bytes().unwrap());
     }
 }
+
+#[cfg(feature = "doc")]
+mod doc {
+    use litchi_ops::{open_bytes, props};
+
+    /// Run text takes the ordinary setter path inside an edit closure; the
+    /// paragraph-text run admits paragraphs only.
+    #[test]
+    fn run_text_sets_run_in_edit_closures() {
+        let file = open_bytes(
+            std::fs::read(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/../../test-data/ole/doc/documentProperties.doc"
+            ))
+            .unwrap(),
+        )
+        .unwrap();
+        let set = file
+            .set("/body/p[1]/r[1]", props! { "text" => "Run" })
+            .unwrap();
+        let edit = file
+            .edit(|tx| tx.set("/body/p[1]/r[1]", props! { "text" => "Run" }))
+            .unwrap()
+            .file;
+        assert_eq!(edit.to_bytes().unwrap(), set.to_bytes().unwrap());
+    }
+}
