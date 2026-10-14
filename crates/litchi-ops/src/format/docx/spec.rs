@@ -102,7 +102,7 @@ pub enum Kind {
     FormField,
     /// A picture (gap).
     Picture,
-    /// A chart (gap).
+    /// A chart of a paragraph (record 0283).
     Chart,
     /// An embedded OLE object (gap).
     Ole,
@@ -862,7 +862,6 @@ gaps! {
     BOOKMARK_GAP: "bookmark", "R4x", "bookmarks have no located reader yet";
     FIELD_GAP: "field", "R4x", "fields have no located reader yet";
     FORM_FIELD_GAP: "formfield", "R4x", "legacy form fields have no located reader yet";
-    CHART_GAP: "chart", "R4x", "charts have no located reader yet";
     OLE_GAP: "ole", "R4x", "embedded objects have no located reader yet";
     TOC_GAP: "toc", "R4x", "tables of contents have no located reader yet";
     REVISION_GAP: "revision", "R4x", "tracked revisions have no located reader yet";
@@ -964,7 +963,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                     "paragraph",
                     &["p", "paragraph"],
                     CONTAINERS,
-                    &[K::Run, K::Hyperlink],
+                    &[K::Run, K::Hyperlink, K::Chart],
                     &[
                         "/body/p[N]",
                         "/body/p[@paraId=X]",
@@ -1216,13 +1215,14 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 &["/body/p[N]/picture[M]"],
                 PICTURE_PROPS,
             ),
-            gap(
+            element(
                 K::Chart,
                 "chart",
                 &["chart"],
-                &[K::Paragraph],
-                &["/chart[N]"],
-                &CHART_GAP,
+                &[K::Paragraph, K::Document],
+                &[],
+                &["/body/p[N]/chart[M]", "/chart[N]", "/body/chart[N]"],
+                super::chart::CHART_PROPS,
             ),
             gap(
                 K::Ole,

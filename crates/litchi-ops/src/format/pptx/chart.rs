@@ -104,21 +104,19 @@ impl Pptx {
         let mut props = AddProps::default();
         let mut name = None;
         let mut geometry = [None; 4];
-        let mut assigned = 0_u128;
+        let mut assigned = shared::Assigned::default();
         let mut staged_bytes = 0_usize;
         for (key, value) in node.props().iter() {
             let (index, entry) = CHART_WRITE_TABLE
                 .resolve(key.as_str())
                 .map_err(|e| e.with_property(key.as_str().to_owned()))?;
-            let bit = 1_u128 << index;
-            if assigned & bit != 0 {
+            if !assigned.insert(index) {
                 return Err(error(
                     Code::InvalidArgument,
                     "a chart property was assigned more than once",
                 )
                 .with_property(entry.spec.name));
             }
-            assigned |= bit;
             entry.prepare(Operation::Add, value, |setter, scalar| {
                 if let Some(Scalar::Text(value)) = scalar {
                     staged_bytes = staged_bytes.saturating_add(value.len());
@@ -274,20 +272,50 @@ impl Pptx {
             ));
         }
         bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
-        let edit = admit_set(self, &which, &tree, props, limits)?;
+        let (edit, geometry) = admit_set(self, &which, &tree, props, limits)?;
         let position = tree.handle.position().get();
         let source = self.editable_owner()?;
         let base = eager(&source)?;
         let mut native = base.edit()?;
+        if geometry.iter().any(Option::is_some) {
+            let current = tree
+                .handle
+                .view()
+                .common()
+                .bounds()
+                .map(|bounds| (bounds.x(), bounds.y(), bounds.width(), bounds.height()))
+                .ok_or_else(|| {
+                    error(
+                        Code::UnsupportedCapability,
+                        "the chart frame has no transform",
+                    )
+                })?;
+            let bounds = (
+                geometry[0].unwrap_or(current.0),
+                geometry[1].unwrap_or(current.1),
+                geometry[2].unwrap_or(current.2),
+                geometry[3].unwrap_or(current.3),
+            );
+            native.set_shape_properties(
+                slide as usize,
+                &[
+                    litchi_pptx::opened::ShapePropertiesReplacement::new(Position::new(position))
+                        .with_bounds(bounds),
+                ],
+            )?;
+        }
         let (xml, workbook) = native.chart(slide as usize, position)?;
-        if let Some(edited) = edit.apply(xml)? {
+        if let Some(edited) = edit.apply(xml, true)? {
             // The embedded workbook follows a data or series-name edit when
             // the chart refers to the authored layout; a data edit of any
             // other embedded workbook is refused, so the workbook never
             // silently diverges from the chart's cached values.
+            let rebuilt = edited.spec.clone().map(|spec| {
+                spec.with_binding(litchi_drawingml::chart::authoring::Binding::sheet("Sheet1"))
+            });
             let workbook = match workbook {
                 Some(_) if edited.data_changed || edited.names_changed => {
-                    match shared::embedded_spec(&edited.xml) {
+                    match rebuilt.or_else(|| shared::embedded_spec(&edited.xml)) {
                         Some(spec) => Some(
                             litchi_pptx::presentation::embedded::excel::Workbook::from_spec(&spec)?
                                 .into_bytes(),
@@ -336,14 +364,17 @@ fn eager(source: &Editable) -> Result<Arc<litchi_pptx::Package>> {
     })
 }
 
+/// Admit a chart, series or axis `set`: the chart edit, and the frame
+/// geometry `[x, y, width, height]` it moves to.
 fn admit_set(
     file: &Pptx,
     which: &SetTarget,
     tree: &TreeItem,
     props: &Props<'_>,
     limits: &SemanticLimits,
-) -> Result<ChartEdit> {
+) -> Result<(ChartEdit, [Option<i64>; 4])> {
     let mut edit = ChartEdit::default();
+    let mut geometry = [None; 4];
     let mut staged_bytes = 0_usize;
     let mut charge = |value: &Option<Scalar<'_>>| -> Result<()> {
         if let Some(Scalar::Text(value)) = value {
@@ -356,12 +387,22 @@ fn admit_set(
         }
         Ok(())
     };
+    let mut summary: Option<Arc<Summary>> = None;
+    let chart = |summary: &mut Option<Arc<Summary>>| -> Result<Arc<Summary>> {
+        if let Some(summary) = summary {
+            return Ok(Arc::clone(summary));
+        }
+        let read = chart_summary(file, tree)?;
+        *summary = Some(Arc::clone(&read));
+        Ok(read)
+    };
     for (key, value) in props.iter() {
         match which {
             SetTarget::Chart => {
-                let (_, entry) = CHART_WRITE_TABLE
+                let (index, entry) = CHART_WRITE_TABLE
                     .resolve(key.as_str())
                     .map_err(|e| e.with_property(key.as_str().to_owned()))?;
+                let name = entry.spec.name;
                 entry.prepare(Operation::Set, value, |setter, scalar| {
                     charge(&scalar)?;
                     match setter {
@@ -376,19 +417,21 @@ fn admit_set(
                                 "categories",
                             )?);
                         },
-                        ChartSetter::CatTitle => {
-                            let summary = chart_summary(file, tree)?;
-                            let axis = summary.axis(Role::Category).ok_or_else(|| {
-                                error(
-                                    Code::UnsupportedCapability,
-                                    "the chart has no category axis",
-                                )
-                                .with_property("catTitle")
+                        ChartSetter::CatTitle | ChartSetter::AxisTitle => {
+                            let role = if matches!(setter, ChartSetter::CatTitle) {
+                                Role::Category
+                            } else {
+                                Role::Value
+                            };
+                            let summary = chart(&mut summary)?;
+                            let axis = summary.axis(role).ok_or_else(|| {
+                                error(Code::UnsupportedCapability, "the chart has no such axis")
+                                    .with_property(name)
                             })?;
                             edit.axis_titles.push((axis.id, text(scalar)));
                         },
                         ChartSetter::Dotted(number, field) => {
-                            let summary = chart_summary(file, tree)?;
+                            let summary = chart(&mut summary)?;
                             edit.dotted_series(
                                 &summary,
                                 usize::from(number) + 1,
@@ -396,10 +439,40 @@ fn admit_set(
                                 text(scalar),
                             )?;
                         },
-                        _ => unreachable!("chart set admission"),
+                        ChartSetter::ChartType => {
+                            let summary = chart(&mut summary)?;
+                            edit.chart_type(&summary, &text(scalar).unwrap_or_default())?;
+                        },
+                        ChartSetter::Data => {
+                            let summary = chart(&mut summary)?;
+                            edit.data(&summary, &text(scalar).unwrap_or_default())?;
+                        },
+                        ChartSetter::Format(key) => {
+                            let summary = chart(&mut summary)?;
+                            edit.format(&summary, key, name, scalar)?;
+                        },
+                        ChartSetter::X
+                        | ChartSetter::Y
+                        | ChartSetter::Width
+                        | ChartSetter::Height => {
+                            let Some(Scalar::Length(length)) = scalar else {
+                                unreachable!("chart geometry coercion")
+                            };
+                            let slot = match setter {
+                                ChartSetter::X => 0,
+                                ChartSetter::Y => 1,
+                                ChartSetter::Width => 2,
+                                _ => 3,
+                            };
+                            geometry[slot] = Some(length.emu());
+                        },
+                        ChartSetter::Name | ChartSetter::Numbered(_) => {
+                            unreachable!("chart set admission")
+                        },
                     }
                     Ok(())
                 })?;
+                let _ = index;
             },
             SetTarget::Series(index) => {
                 let (_, entry) = SERIES_WRITE_TABLE
@@ -413,6 +486,12 @@ fn admit_set(
                             *index,
                             shared::parse_values(&text(scalar).unwrap_or_default(), "values")?,
                         )),
+                        SeriesSetter::Color => edit.series_colors.push((
+                            *index,
+                            text(scalar)
+                                .map(|color| shared::parse_color(&color, "color"))
+                                .transpose()?,
+                        )),
                     }
                     Ok(())
                 })?;
@@ -425,13 +504,33 @@ fn admit_set(
                     charge(&scalar)?;
                     match setter {
                         AxisSetter::Title => edit.axis_titles.push((*id, text(scalar))),
+                        AxisSetter::Min | AxisSetter::Max => {
+                            let summary = chart(&mut summary)?;
+                            let axis =
+                                summary.axes.iter().find(|axis| axis.id == *id).ok_or_else(
+                                    || error(Code::PathNotFound, "the axis is missing"),
+                                )?;
+                            edit.axis_bound(
+                                axis,
+                                matches!(setter, AxisSetter::Max),
+                                number(scalar),
+                            )?;
+                        },
                     }
                     Ok(())
                 })?;
             },
         }
     }
-    Ok(edit)
+    Ok((edit, geometry))
+}
+
+fn number(value: Option<Scalar<'_>>) -> Option<f64> {
+    match value {
+        Some(Scalar::Number(value)) => Some(value),
+        Some(Scalar::Int(value)) => Some(value as f64),
+        _ => None,
+    }
 }
 
 fn chart_summary(file: &Pptx, tree: &TreeItem) -> Result<Arc<Summary>> {

@@ -1253,6 +1253,7 @@ impl Edit {
         bounds: (i64, i64, i64, i64),
     ) -> Result<u32> {
         use litchi_drawingml::chart::authoring::Binding;
+        use litchi_drawingml::chart::chartex;
         use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 
         if bounds.2 <= 0 || bounds.3 <= 0 {
@@ -1263,22 +1264,57 @@ impl Edit {
         }
         let selected = self.resolve_slide(slide.into())?;
         let spec = chart.clone().with_binding(Binding::sheet("Sheet1"));
+        let extended = spec.variant().kind.is_extended();
         let workbook =
             crate::presentation::embedded::excel::Workbook::from_spec(&spec)?.into_bytes();
         let mut candidate = self.working.clone();
         crate::package::signature::refuse_signed_change(&candidate)?;
         let scene = crate::shape::Scene::read(candidate.get_part(&selected.part_name)?.blob())?;
         let shape_id = next_shape_id(&scene, "chart")?;
-        let chart_name = free_part_name(&candidate, "/ppt/charts/chart", ".xml")?;
+        let (chart_stem, content_type, relationship_type) = if extended {
+            (
+                "/ppt/charts/chartEx",
+                chartex::CONTENT_TYPE,
+                chartex::RELATIONSHIP_TYPE,
+            )
+        } else {
+            ("/ppt/charts/chart", ct::DML_CHART, rt::CHART)
+        };
+        let chart_name = free_part_name(&candidate, chart_stem, ".xml")?;
         let workbook_name = free_part_name(
             &candidate,
             "/ppt/embeddings/Microsoft_Excel_Worksheet",
             ".xlsx",
         )?;
-        let mut chart_part =
-            BlobPart::new(chart_name.clone(), ct::DML_CHART.to_owned(), Vec::new());
+        let mut chart_part = BlobPart::new(chart_name.clone(), content_type.to_owned(), Vec::new());
         let workbook_ref = workbook_name.relative_ref(chart_name.base_uri());
         let workbook_rel = chart_part.relate_to(&workbook_ref, rt::PACKAGE);
+        if extended {
+            // An extended chart needs its style and color companions.
+            for (stem, content_type, relationship_type, bytes) in [
+                (
+                    "/ppt/charts/style",
+                    chartex::STYLE_CONTENT_TYPE,
+                    chartex::STYLE_RELATIONSHIP_TYPE,
+                    chartex::style_xml(),
+                ),
+                (
+                    "/ppt/charts/colors",
+                    chartex::COLORS_CONTENT_TYPE,
+                    chartex::COLORS_RELATIONSHIP_TYPE,
+                    chartex::colors_xml(),
+                ),
+            ] {
+                let companion = free_part_name(&candidate, stem, ".xml")?;
+                let reference = companion.relative_ref(chart_name.base_uri());
+                chart_part.relate_to(&reference, relationship_type);
+                candidate.add_part(Box::new(BlobPart::new(
+                    companion,
+                    content_type.to_owned(),
+                    bytes,
+                )));
+            }
+        }
         let xml = spec
             .to_xml(Some(&workbook_rel))
             .map_err(|error| invalid(format!("authored chart: {error}")))?;
@@ -1292,8 +1328,8 @@ impl Edit {
         let chart_ref = chart_name.relative_ref(selected.part_name.base_uri());
         let relationship_id = candidate
             .get_part_mut(&selected.part_name)?
-            .relate_to(&chart_ref, rt::CHART);
-        let fragment = chart_frame(shape_id, &relationship_id, name, bounds);
+            .relate_to(&chart_ref, relationship_type);
+        let fragment = chart_frame(shape_id, &relationship_id, name, bounds, extended);
         let owner = candidate.get_part(&selected.part_name)?;
         let xml = super::xml::append_shape(owner.blob(), fragment.as_bytes())?;
         let scene = crate::shape::Scene::read(&xml)?;
@@ -1359,8 +1395,14 @@ impl Edit {
         let selected = self.resolve_slide(slide.into())?;
         let (chart_name, workbook_name) =
             chart_targets(&self.working, &selected.part_name, shape.into())?;
-        litchi_drawingml::chart::reader::read(&xml[..])
-            .map_err(|error| invalid(format!("replacement chart XML: {error}")))?;
+        let current = self.working.get_part(&chart_name)?.content_type();
+        if current == litchi_drawingml::chart::chartex::CONTENT_TYPE {
+            litchi_drawingml::chart::chartex::read(&xml)
+                .map_err(|error| invalid(format!("replacement chart XML: {error}")))?;
+        } else {
+            litchi_drawingml::chart::reader::read(&xml[..])
+                .map_err(|error| invalid(format!("replacement chart XML: {error}")))?;
+        }
         let chart_changed = self.working.get_part(&chart_name)?.blob() != xml.as_slice();
         let workbook_change = match (workbook, workbook_name) {
             (None, _) => None,
@@ -2311,8 +2353,10 @@ fn chart_targets(
         .rels()
         .get(&relationship_id)
         .ok_or_else(|| invalid("the chart frame relationship is missing"))?;
+    let extended = relationship.reltype() == litchi_drawingml::chart::chartex::RELATIONSHIP_TYPE;
     if relationship.is_external()
-        || !crate::parts::is_relationship_type(relationship.reltype(), rt::CHART, "chart")
+        || !(extended
+            || crate::parts::is_relationship_type(relationship.reltype(), rt::CHART, "chart"))
     {
         return Err(invalid(
             "the chart frame relationship is not an internal chart",
@@ -2320,7 +2364,12 @@ fn chart_targets(
     }
     let chart = relationship.target_partname()?;
     let part = package.get_part(&chart)?;
-    if part.content_type() != ct::DML_CHART {
+    let expected = if extended {
+        litchi_drawingml::chart::chartex::CONTENT_TYPE
+    } else {
+        ct::DML_CHART
+    };
+    if part.content_type() != expected {
         return Err(invalid("the chart frame target is not a chart part"));
     }
     let mut workbook = None;
@@ -2344,18 +2393,29 @@ fn chart_frame(
     relationship_id: &str,
     name: &str,
     bounds: (i64, i64, i64, i64),
+    extended: bool,
 ) -> String {
     use litchi_core::xml::escape_xml;
     let (x, y, width, height) = bounds;
+    let (uri, element) = if extended {
+        (litchi_drawingml::chart::chartex::GRAPHIC_DATA_URI, "cx")
+    } else {
+        (
+            "http://schemas.openxmlformats.org/drawingml/2006/chart",
+            "c",
+        )
+    };
     format!(
         concat!(
             r#"<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="{id}" name="{name}"/>"#,
             r#"<p:cNvGraphicFramePr><a:graphicFrameLocks noGrp="1"/></p:cNvGraphicFramePr><p:nvPr/></p:nvGraphicFramePr>"#,
             r#"<p:xfrm><a:off x="{x}" y="{y}"/><a:ext cx="{width}" cy="{height}"/></p:xfrm>"#,
-            r#"<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart">"#,
-            r#"<c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" r:id="{rel}"/>"#,
+            r#"<a:graphic><a:graphicData uri="{uri}">"#,
+            r#"<{prefix}:chart xmlns:{prefix}="{uri}" r:id="{rel}"/>"#,
             r#"</a:graphicData></a:graphic></p:graphicFrame>"#
         ),
+        uri = uri,
+        prefix = element,
         id = shape_id,
         name = escape_xml(name),
         x = x,

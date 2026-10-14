@@ -871,6 +871,18 @@ impl SourceWorksheet {
         crate::chart::edit::source_chart_xml(&self.owner.package, &self.data.part_uri, index)
     }
 
+    /// The two-cell anchor of the chart at `index` (drawing order) on this
+    /// worksheet; `None` past the last chart or for a one-cell or absolute
+    /// anchor. Only the worksheet's relationships and its drawing are read.
+    pub fn chart_anchor(&self, index: usize) -> Result<Option<crate::chart::Anchor>> {
+        if self.data.kind != WorksheetKind::Worksheet {
+            return Err(Error::NotWorksheet {
+                sheet: self.data.name.clone(),
+            });
+        }
+        crate::chart::edit::source_chart_anchor(&self.owner.package, &self.data.part_uri, index)
+    }
+
     /// Read the worksheet's admitted SpreadsheetML form controls.
     pub fn form_controls(&self) -> Result<crate::form_control::FormControlCollection> {
         if self.data.kind != WorksheetKind::Worksheet {

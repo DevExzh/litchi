@@ -15,7 +15,8 @@
 //!   applied through the source-preserving chart editor.
 
 use litchi_drawingml::chart::authoring::{
-    Appearance, Grouping, Kind, Labels, Line, Series, Spec, Variant,
+    Appearance, Bins, Grouping, Kind, Labels, Line, ParentLabels, QuartileMethod, Series, Spec,
+    Variant,
 };
 use litchi_drawingml::chart::data::TitleText;
 use litchi_drawingml::chart::plot_area::TypeGroup;
@@ -60,6 +61,13 @@ pub(crate) fn variant_name(variant: Variant) -> String {
         Kind::Radar => "radar",
         Kind::Stock => "stock",
         Kind::Combo => "combo",
+        Kind::Waterfall => "waterfall",
+        Kind::Funnel => "funnel",
+        Kind::Treemap => "treemap",
+        Kind::Sunburst => "sunburst",
+        Kind::Histogram => "histogram",
+        Kind::Pareto => "pareto",
+        Kind::BoxWhisker => "boxWhisker",
     };
     let mut name = match variant.grouping {
         Grouping::Standard => family.to_owned(),
@@ -80,7 +88,9 @@ pub(crate) fn variant_name(variant: Variant) -> String {
 
 /// Parse an OfficeCLI `chartType` name: a family (`column`, `col`, `bar`,
 /// `line`, `pie`, `doughnut`/`donut`, `area`, `scatter`/`xy`, `bubble`,
-/// `radar`/`spider`, `stock`/`ohlc`) with an optional `stacked` or
+/// `radar`/`spider`, `stock`/`ohlc`, `combo`, or an extended family:
+/// `waterfall`/`wf`, `funnel`, `treemap`, `sunburst`, `histogram`,
+/// `pareto`, `boxWhisker`) with an optional `stacked` or
 /// `percentStacked` modifier (either side) and an optional `3d` suffix,
 /// case-insensitively.
 pub(crate) fn parse_variant(text: &str) -> Result<Variant> {
@@ -115,15 +125,21 @@ pub(crate) fn parse_variant(text: &str) -> Result<Variant> {
         "radar" | "spider" => Kind::Radar,
         "stock" | "ohlc" => Kind::Stock,
         "combo" => Kind::Combo,
-        "waterfall" | "wf" | "funnel" | "treemap" | "sunburst" | "boxwhisker" | "histogram"
-        | "pareto" | "pieofpie" | "barofpie" => {
+        "waterfall" | "wf" => Kind::Waterfall,
+        "funnel" => Kind::Funnel,
+        "treemap" => Kind::Treemap,
+        "sunburst" => Kind::Sunburst,
+        "histogram" => Kind::Histogram,
+        "pareto" => Kind::Pareto,
+        "boxwhisker" | "box" => Kind::BoxWhisker,
+        "pieofpie" | "barofpie" => {
             return Err(Error::new(
                 Code::UnsupportedCapability,
                 "this chart type is not authored yet",
             )
             .with_property("chartType")
             .with_suggestion(
-                "use column, bar, line, pie, doughnut, area, scatter, bubble, radar or stock",
+                "use column, bar, line, pie, doughnut, area, scatter, bubble, radar, stock, combo or an extended type",
             ));
         },
         _ => {
@@ -247,8 +263,9 @@ pub(crate) fn parse_data(text: &str) -> Result<Vec<Series>> {
     Ok(series)
 }
 
-/// The chart formatting keys `add` accepts on both hosts (write-only:
-/// the node view does not read them back yet).
+/// The chart formatting keys: written by `add`, rewritten by a `set` that
+/// rebuilds an authored chart (record 0283), and read back from the chart
+/// part where the spec carries them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum FormatKey {
     Colors,
@@ -277,6 +294,16 @@ pub(crate) enum FormatKey {
     ShowMarkers,
     LineWidth,
     View3d,
+    IncreaseColor,
+    DecreaseColor,
+    TotalColor,
+    BinCount,
+    BinSize,
+    IntervalClosed,
+    OverflowBin,
+    UnderflowBin,
+    QuartileMethod,
+    ParentLabelLayout,
 }
 
 const fn write_only(name: &'static str, ty: ValueType) -> PropSpec {
@@ -285,83 +312,144 @@ const fn write_only(name: &'static str, ty: ValueType) -> PropSpec {
     spec
 }
 
+const fn read_write(name: &'static str, ty: ValueType) -> PropSpec {
+    PropSpec::new(name, ty)
+}
+
 /// The formatting keys with their value types, OfficeCLI's spellings.
-pub(crate) const FORMAT_PROPS: [(FormatKey, PropSpec); 26] = [
-    (FormatKey::Colors, write_only("colors", ValueType::Text)),
+pub(crate) const FORMAT_PROPS: [(FormatKey, PropSpec); 36] = [
+    (FormatKey::Colors, read_write("colors", ValueType::Text)),
     (
         FormatKey::DataLabels,
-        write_only("dataLabels", ValueType::Text),
+        read_write("dataLabels", ValueType::Text),
     ),
-    (FormatKey::LabelPos, write_only("labelPos", ValueType::Text)),
+    (FormatKey::LabelPos, read_write("labelPos", ValueType::Text)),
     (
         FormatKey::VaryColors,
-        write_only("varyColors", ValueType::Bool),
+        read_write("varyColors", ValueType::Bool),
     ),
-    (FormatKey::GapWidth, write_only("gapWidth", ValueType::Int)),
-    (FormatKey::Overlap, write_only("overlap", ValueType::Int)),
-    (FormatKey::HoleSize, write_only("holeSize", ValueType::Int)),
+    (FormatKey::GapWidth, read_write("gapWidth", ValueType::Int)),
+    (FormatKey::Overlap, read_write("overlap", ValueType::Int)),
+    (FormatKey::HoleSize, read_write("holeSize", ValueType::Int)),
     (
         FormatKey::FirstSliceAngle,
-        write_only("firstSliceAngle", ValueType::Int),
+        read_write("firstSliceAngle", ValueType::Int),
     ),
     (
         FormatKey::ScatterStyle,
-        write_only("scatterStyle", ValueType::Text),
+        read_write("scatterStyle", ValueType::Text),
     ),
     (
         FormatKey::RadarStyle,
-        write_only("radarStyle", ValueType::Text),
+        read_write("radarStyle", ValueType::Text),
     ),
-    (FormatKey::Smooth, write_only("smooth", ValueType::Bool)),
+    (FormatKey::Smooth, read_write("smooth", ValueType::Bool)),
     (
         FormatKey::Explosion,
-        write_only("explosion", ValueType::Int),
+        read_write("explosion", ValueType::Int),
     ),
     (
         FormatKey::LegendOverlay,
-        write_only("legend.overlay", ValueType::Bool),
+        read_write("legend.overlay", ValueType::Bool),
     ),
     (
         FormatKey::AutoTitleDeleted,
-        write_only("autoTitleDeleted", ValueType::Bool),
+        read_write("autoTitleDeleted", ValueType::Bool),
     ),
-    (FormatKey::AxisMin, write_only("axisMin", ValueType::Number)),
-    (FormatKey::AxisMax, write_only("axisMax", ValueType::Number)),
+    (FormatKey::AxisMin, read_write("axisMin", ValueType::Number)),
+    (FormatKey::AxisMax, read_write("axisMax", ValueType::Number)),
     (
         FormatKey::MajorUnit,
-        write_only("majorUnit", ValueType::Number),
+        read_write("majorUnit", ValueType::Number),
     ),
     (
         FormatKey::Gridlines,
-        write_only("gridlines", ValueType::Text),
+        read_write("gridlines", ValueType::Text),
     ),
     (
         FormatKey::MinorGridlines,
-        write_only("minorGridlines", ValueType::Text),
+        read_write("minorGridlines", ValueType::Text),
     ),
     (
         FormatKey::ComboTypes,
-        write_only("comboTypes", ValueType::Text),
+        read_write("comboTypes", ValueType::Text),
     ),
     (
         FormatKey::ComboSplit,
         write_only("comboSplit", ValueType::Int),
     ),
-    (FormatKey::Marker, write_only("marker", ValueType::Text)),
+    (FormatKey::Marker, read_write("marker", ValueType::Text)),
     (
         FormatKey::MarkerSize,
-        write_only("markerSize", ValueType::Int),
+        read_write("markerSize", ValueType::Int),
     ),
     (
         FormatKey::ShowMarkers,
-        write_only("showMarkers", ValueType::Bool),
+        read_write("showMarkers", ValueType::Bool),
     ),
     (
         FormatKey::LineWidth,
-        write_only("lineWidth", ValueType::Number),
+        read_write("lineWidth", ValueType::Number),
     ),
-    (FormatKey::View3d, write_only("view3d", ValueType::Text)),
+    (FormatKey::View3d, read_write("view3d", ValueType::Text)),
+    (
+        FormatKey::IncreaseColor,
+        read_write("increaseColor", ValueType::Text),
+    ),
+    (
+        FormatKey::DecreaseColor,
+        read_write("decreaseColor", ValueType::Text),
+    ),
+    (
+        FormatKey::TotalColor,
+        read_write("totalColor", ValueType::Text),
+    ),
+    (FormatKey::BinCount, read_write("binCount", ValueType::Int)),
+    (FormatKey::BinSize, read_write("binSize", ValueType::Number)),
+    (
+        FormatKey::IntervalClosed,
+        read_write("intervalClosed", ValueType::Text),
+    ),
+    (
+        FormatKey::OverflowBin,
+        read_write("overflowBin", ValueType::Number),
+    ),
+    (
+        FormatKey::UnderflowBin,
+        read_write("underflowBin", ValueType::Number),
+    ),
+    (
+        FormatKey::QuartileMethod,
+        read_write("quartileMethod", ValueType::Text),
+    ),
+    (
+        FormatKey::ParentLabelLayout,
+        read_write("parentLabelLayout", ValueType::Text),
+    ),
 ];
+
+/// A set of property-table indices, for duplicate-assignment checks on
+/// tables of up to 256 entries without allocating.
+#[derive(Default)]
+pub(crate) struct Assigned([u64; 4]);
+
+impl Assigned {
+    /// Record `index`; `false` when it was already recorded.
+    pub(crate) fn insert(&mut self, index: usize) -> bool {
+        let (word, bit) = (index / 64, 1_u64 << (index % 64));
+        match self.0.get_mut(word) {
+            Some(slot) if *slot & bit == 0 => {
+                *slot |= bit;
+                true
+            },
+            Some(_) => false,
+            None => true,
+        }
+    }
+}
+
+/// The largest chart property table [`Assigned`] tracks.
+pub(crate) const MAX_TABLE: usize = 256;
 
 /// The legacy numbered series keys (`series1=Name:1,2,3`).
 pub(crate) const NUMBERED_SERIES: [&str; 20] = [
@@ -555,6 +643,15 @@ fn rgb(text: &str, property: &'static str) -> Result<String> {
     } else {
         Err(invalid("a chart color is not RRGGBB", property))
     }
+}
+
+/// Parse a series color: `RRGGBB` or `AARRGGBB`, `#` allowed.
+#[cfg_attr(
+    not(any(feature = "pptx", feature = "xlsx")),
+    allow(dead_code, reason = "DOCX charts have no series or axis nodes yet")
+)]
+pub(crate) fn parse_color(text: &str, property: &'static str) -> Result<String> {
+    argb(text, property)
 }
 
 /// `RRGGBB`, or `AARRGGBB` with an alpha byte (OfficeCLI's ARGB colors).
@@ -867,6 +964,72 @@ impl AddProps {
                     _ => return Err(invalid("view3d is rotX,rotY,perspective", "view3d")),
                 });
             },
+            FormatKey::IncreaseColor => {
+                appearance.increase_color = Some(argb(&text(), "increaseColor")?);
+            },
+            FormatKey::DecreaseColor => {
+                appearance.decrease_color = Some(argb(&text(), "decreaseColor")?);
+            },
+            FormatKey::TotalColor => appearance.total_color = Some(argb(&text(), "totalColor")?),
+            FormatKey::BinCount => {
+                let bins = appearance.bins.get_or_insert_with(Bins::default);
+                bins.count = Some(
+                    u32::try_from(int())
+                        .ok()
+                        .filter(|count| *count > 0)
+                        .ok_or_else(|| invalid("binCount is a positive count", "binCount"))?,
+                );
+                bins.size = None;
+            },
+            FormatKey::BinSize => {
+                let bins = appearance.bins.get_or_insert_with(Bins::default);
+                bins.size = Some(number()).filter(|size| *size > 0.0);
+                if bins.size.is_none() {
+                    return Err(invalid("binSize is a positive width", "binSize"));
+                }
+                bins.count = None;
+            },
+            FormatKey::IntervalClosed => {
+                let bins = appearance.bins.get_or_insert_with(Bins::default);
+                bins.closed_left = match text().trim().to_ascii_lowercase().as_str() {
+                    "l" | "left" => true,
+                    "r" | "right" => false,
+                    _ => return Err(invalid("intervalClosed is l or r", "intervalClosed")),
+                };
+            },
+            FormatKey::OverflowBin => {
+                appearance.bins.get_or_insert_with(Bins::default).overflow = Some(number());
+            },
+            FormatKey::UnderflowBin => {
+                appearance.bins.get_or_insert_with(Bins::default).underflow = Some(number());
+            },
+            FormatKey::QuartileMethod => {
+                appearance.quartile_method =
+                    Some(match text().trim().to_ascii_lowercase().as_str() {
+                        "exclusive" => QuartileMethod::Exclusive,
+                        "inclusive" => QuartileMethod::Inclusive,
+                        _ => {
+                            return Err(invalid(
+                                "quartileMethod is exclusive or inclusive",
+                                "quartileMethod",
+                            ));
+                        },
+                    });
+            },
+            FormatKey::ParentLabelLayout => {
+                appearance.parent_labels =
+                    Some(match text().trim().to_ascii_lowercase().as_str() {
+                        "overlapping" | "overlap" => ParentLabels::Overlapping,
+                        "banner" => ParentLabels::Banner,
+                        "none" => ParentLabels::None,
+                        _ => {
+                            return Err(invalid(
+                                "parentLabelLayout is overlapping, banner or none",
+                                "parentLabelLayout",
+                            ));
+                        },
+                    });
+            },
         }
         Ok(())
     }
@@ -907,12 +1070,28 @@ impl AddProps {
                 series.color = entry.color;
             }
         }
-        let data = self.data.ok_or_else(|| {
+        let mut data = self.data.ok_or_else(|| {
             Error::new(Code::MissingProperty, "a chart needs data")
                 .with_property("data")
                 .with_suggestion("pass data=Name:1,2,3;Other:4,5,6")
         })?;
-        let mut spec = Spec::new(self.variant.unwrap_or(Variant::new(Kind::Column)));
+        let variant = self.variant.unwrap_or(Variant::new(Kind::Column));
+        // A one-series family given `Start:100,Q1:-30,...` (one single-value
+        // series per item) takes the items as its points, their names as its
+        // categories (OfficeCLI's waterfall flattening).
+        if matches!(
+            variant.kind,
+            Kind::Waterfall | Kind::Funnel | Kind::Treemap | Kind::Sunburst | Kind::Pareto
+        ) && data.len() > 1
+            && data.iter().all(|series| series.values.len() == 1)
+        {
+            if self.categories.is_none() {
+                self.categories = Some(data.iter().map(|series| series.name.clone()).collect());
+            }
+            let values = data.iter().map(|series| series.values[0]).collect();
+            data = vec![Series::new("Series 1", values)];
+        }
+        let mut spec = Spec::new(variant);
         if let Some(title) = self.title {
             spec = spec.with_title(title);
         }
@@ -967,6 +1146,9 @@ impl AddProps {
                 ("series famil", "comboTypes"),
                 ("grouping or 3D form", "chartType"),
                 ("stock chart", "data"),
+                ("takes one series", "data"),
+                ("bin", "binCount"),
+                ("waterfall total", "data"),
             ]
             .iter()
             .find(|(needle, _)| message.contains(needle))
@@ -985,6 +1167,10 @@ pub(crate) enum Role {
     Series,
 }
 
+#[cfg_attr(
+    not(any(feature = "pptx", feature = "xlsx")),
+    allow(dead_code, reason = "DOCX charts have no series or axis nodes yet")
+)]
 impl Role {
     pub(crate) const fn name(self) -> &'static str {
         match self {
@@ -1007,11 +1193,14 @@ impl Role {
 /// One series of a chart, as its node prints it.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct SeriesSummary {
-    /// The stable `c:idx` the editor selects the series by.
+    /// The stable `c:idx` the editor selects the series by (its position
+    /// for an extended chart).
     pub(crate) index: u32,
     pub(crate) name: Option<String>,
     pub(crate) values: Vec<f64>,
     pub(crate) categories: Vec<String>,
+    /// The series' own fill, `RRGGBB` or `AARRGGBB`.
+    pub(crate) color: Option<String>,
 }
 
 /// One axis of a chart, as its node prints it.
@@ -1020,16 +1209,30 @@ pub(crate) struct AxisSummary {
     pub(crate) id: u32,
     pub(crate) role: Role,
     pub(crate) title: Option<String>,
+    /// The scaling minimum of a value axis.
+    pub(crate) min: Option<f64>,
+    /// The scaling maximum of a value axis.
+    pub(crate) max: Option<f64>,
+    /// Whether the axis is a value axis (it has a numeric range).
+    pub(crate) numeric: bool,
 }
 
 /// The read projection of one chart part.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub(crate) struct Summary {
     pub(crate) variant: Option<Variant>,
     pub(crate) title: Option<String>,
     pub(crate) legend: Option<LegendPosition>,
     pub(crate) series: Vec<SeriesSummary>,
     pub(crate) axes: Vec<AxisSummary>,
+    /// The authoring spec the part reads as, when it has one; the source of
+    /// the formatting keys' values and of rebuilt parts. Built on first use
+    /// from the typed chart (an extended chart's is built at once).
+    spec: std::sync::OnceLock<Option<Spec>>,
+    /// The typed chart of an ordinary part, kept for [`Self::spec`].
+    chart: Option<std::sync::Arc<Chart>>,
+    /// Whether the part is an extended (`cx:chartSpace`) chart.
+    pub(crate) extended: bool,
 }
 
 fn title_text(title: Option<&TitleText>) -> Option<String> {
@@ -1039,15 +1242,87 @@ fn title_text(title: Option<&TitleText>) -> Option<String> {
     }
 }
 
+/// The fill color of a series' shape properties.
+fn series_color(series: &litchi_drawingml::chart::Series) -> Option<String> {
+    let xml = String::from_utf8_lossy(series.shape_properties.as_ref()?.as_xml()).into_owned();
+    let start = xml.find("srgbClr")?;
+    xml[start..]
+        .split("val=\"")
+        .nth(1)?
+        .get(..6)
+        .map(str::to_ascii_uppercase)
+}
+
 impl Summary {
-    /// Read a chart part.
+    /// Read a chart part: a `c:chartSpace`, or an extended `cx:chartSpace`.
     pub(crate) fn read(xml: &[u8]) -> Result<Self> {
+        if litchi_drawingml::chart::chartex::is_chartex(xml) {
+            let parsed = litchi_drawingml::chart::chartex::read(xml)
+                .map_err(|error| Error::new(Code::CorruptFile, format!("chart part: {error}")))?;
+            return Ok(Self::of_extended(parsed.spec));
+        }
         let chart = litchi_drawingml::chart::reader::read(xml)
             .map_err(|error| Error::new(Code::CorruptFile, format!("chart part: {error}")))?;
-        Ok(Self::of(&chart))
+        Ok(Self::of(chart))
     }
 
-    pub(crate) fn of(chart: &Chart) -> Self {
+    /// The projection of an extended chart's spec: its series by position,
+    /// and the category and value axes its family has.
+    fn of_extended(spec: Spec) -> Self {
+        let series = spec
+            .series()
+            .iter()
+            .enumerate()
+            .map(|(index, series)| SeriesSummary {
+                index: u32::try_from(index).unwrap_or(u32::MAX),
+                name: Some(series.name.clone()),
+                values: series.values.clone(),
+                categories: spec.categories().to_vec(),
+                color: series.color.clone(),
+            })
+            .collect();
+        let axes = match spec.variant().kind {
+            Kind::Treemap | Kind::Sunburst => Vec::new(),
+            Kind::Funnel => vec![AxisSummary {
+                id: 0,
+                role: Role::Category,
+                title: None,
+                min: None,
+                max: None,
+                numeric: false,
+            }],
+            _ => vec![
+                AxisSummary {
+                    id: 0,
+                    role: Role::Category,
+                    title: spec.category_axis_title().map(str::to_owned),
+                    min: None,
+                    max: None,
+                    numeric: false,
+                },
+                AxisSummary {
+                    id: 1,
+                    role: Role::Value,
+                    title: spec.value_axis_title().map(str::to_owned),
+                    min: spec.appearance().axis_min,
+                    max: spec.appearance().axis_max,
+                    numeric: true,
+                },
+            ],
+        };
+        Self {
+            variant: Some(spec.variant()),
+            title: spec.title().map(str::to_owned),
+            legend: spec.legend(),
+            series,
+            axes,
+            spec: std::sync::OnceLock::from(Some(spec)),
+            chart: None,
+            extended: true,
+        }
+    }
+
+    pub(crate) fn of(chart: Chart) -> Self {
         let series = chart
             .plot_area
             .type_groups
@@ -1067,6 +1342,7 @@ impl Summary {
                     (None, Some(x)) => x.values.iter().map(f64::to_string).collect(),
                     (None, None) => Vec::new(),
                 },
+                color: series_color(series),
             })
             .collect();
         let axes = chart
@@ -1074,16 +1350,19 @@ impl Summary {
             .axes
             .iter()
             .map(|axis| {
-                let (role, common) = match axis {
-                    Axis::Category(axis) => (Role::Category, &axis.common),
-                    Axis::Date(axis) => (Role::Category, &axis.common),
-                    Axis::Series(axis) => (Role::Series, &axis.common),
-                    Axis::Value(axis) => (Role::Value, &axis.common),
+                let (role, common, range) = match axis {
+                    Axis::Category(axis) => (Role::Category, &axis.common, (None, None)),
+                    Axis::Date(axis) => (Role::Category, &axis.common, (None, None)),
+                    Axis::Series(axis) => (Role::Series, &axis.common, (None, None)),
+                    Axis::Value(axis) => (Role::Value, &axis.common, (axis.min, axis.max)),
                 };
                 AxisSummary {
                     id: common.axis_id,
                     role,
                     title: title_text(common.title.as_ref()),
+                    min: range.0,
+                    max: range.1,
+                    numeric: matches!(axis, Axis::Value(_)),
                 }
             })
             .collect::<Vec<_>>();
@@ -1096,12 +1375,22 @@ impl Summary {
             first.role = Role::Category;
         }
         Self {
-            variant: Variant::of(chart),
+            variant: Variant::of(&chart),
             title: title_text(chart.title.as_ref()),
             legend: chart.legend.as_ref().map(|legend| legend.position),
             series,
             axes,
+            spec: std::sync::OnceLock::new(),
+            chart: Some(std::sync::Arc::new(chart)),
+            extended: false,
         }
+    }
+
+    /// The authoring spec the part reads as, when it has one.
+    pub(crate) fn spec(&self) -> Option<&Spec> {
+        self.spec
+            .get_or_init(|| self.chart.as_deref().and_then(|chart| Spec::of(chart).ok()))
+            .as_ref()
     }
 
     /// The chart's category labels: those of its first series.
@@ -1121,9 +1410,238 @@ impl Summary {
     pub(crate) fn chart_type(&self) -> Option<String> {
         self.variant.map(variant_name)
     }
+
+    /// The value of a formatting key, read from the chart's spec; `None`
+    /// when the chart does not set it (the application default applies).
+    pub(crate) fn format(&self, key: FormatKey) -> Option<crate::node::Value<'static>> {
+        format_value(self.spec()?, key)
+    }
+}
+
+fn text_value(text: impl Into<String>) -> crate::node::Value<'static> {
+    crate::node::Value::Text(std::borrow::Cow::Owned(text.into()))
+}
+
+fn label_position_name(position: DataLabelPosition) -> &'static str {
+    match position {
+        DataLabelPosition::OutsideEnd => "outsideEnd",
+        DataLabelPosition::InsideEnd => "insideEnd",
+        DataLabelPosition::InsideBase => "insideBase",
+        DataLabelPosition::Center => "center",
+        DataLabelPosition::BestFit => "bestFit",
+        DataLabelPosition::Top => "top",
+        DataLabelPosition::Bottom => "bottom",
+        DataLabelPosition::Left => "left",
+        DataLabelPosition::Right => "right",
+    }
+}
+
+fn gridline_text(line: Option<&Line>) -> String {
+    match line {
+        None => "true".to_owned(),
+        Some(line) => {
+            let mut text = line.color.clone();
+            if let Some(width) = line.width {
+                text.push(':');
+                text.push_str(&width.to_string());
+                if let Some(dash) = &line.dash {
+                    text.push(':');
+                    text.push_str(dash);
+                }
+            }
+            text
+        },
+    }
+}
+
+/// The value of a formatting key in a spec, in the grammar `add` accepts.
+#[allow(
+    clippy::too_many_lines,
+    reason = "one arm per formatting key, mirroring AddProps::format"
+)]
+pub(crate) fn format_value(spec: &Spec, key: FormatKey) -> Option<crate::node::Value<'static>> {
+    use crate::node::Value;
+    let appearance = spec.appearance();
+    let int = |value: u32| Value::Int(i64::from(value));
+    let number = |value: f64| Value::number(value);
+    Some(match key {
+        FormatKey::Colors => {
+            let colors: Vec<String> = if appearance.colors.is_empty() {
+                spec.series()
+                    .iter()
+                    .map(|series| series.color.clone())
+                    .collect::<Option<Vec<_>>>()?
+            } else {
+                appearance.colors.clone()
+            };
+            if colors.is_empty() {
+                return None;
+            }
+            text_value(colors.join(","))
+        },
+        FormatKey::DataLabels => {
+            let labels = appearance.labels?;
+            let parts: Vec<&str> = [
+                (labels.value, "value"),
+                (labels.category, "category"),
+                (labels.series, "series"),
+                (labels.percent, "percent"),
+            ]
+            .into_iter()
+            .filter_map(|(shown, name)| shown.then_some(name))
+            .collect();
+            text_value(if parts.is_empty() {
+                "none".to_owned()
+            } else {
+                parts.join(",")
+            })
+        },
+        FormatKey::LabelPos => text_value(label_position_name(appearance.labels?.position?)),
+        FormatKey::VaryColors => Value::Bool(appearance.vary_colors?),
+        FormatKey::GapWidth => int(appearance.gap_width?),
+        FormatKey::Overlap => Value::Int(i64::from(appearance.overlap?)),
+        FormatKey::HoleSize => int(appearance.hole_size?),
+        FormatKey::FirstSliceAngle => int(appearance.first_slice_angle?),
+        FormatKey::ScatterStyle => text_value(match appearance.scatter_style? {
+            ScatterStyle::Line => "line",
+            ScatterStyle::LineMarker => "lineMarker",
+            ScatterStyle::Marker => "marker",
+            ScatterStyle::Smooth => "smooth",
+            ScatterStyle::SmoothMarker => "smoothMarker",
+            ScatterStyle::None => "none",
+        }),
+        FormatKey::RadarStyle => text_value(match appearance.radar_style? {
+            RadarStyle::Standard => "standard",
+            RadarStyle::Marker => "marker",
+            RadarStyle::Filled => "filled",
+        }),
+        FormatKey::Smooth => Value::Bool(appearance.smooth?),
+        FormatKey::Explosion => int(appearance.explosion?),
+        FormatKey::LegendOverlay => Value::Bool(appearance.legend_overlay?),
+        FormatKey::AutoTitleDeleted => Value::Bool(appearance.auto_title_deleted?),
+        FormatKey::AxisMin => number(appearance.axis_min?)?,
+        FormatKey::AxisMax => number(appearance.axis_max?)?,
+        FormatKey::MajorUnit => number(appearance.major_unit?)?,
+        FormatKey::Gridlines => {
+            if appearance.hide_gridlines {
+                text_value("none")
+            } else {
+                text_value(gridline_text(appearance.gridlines.as_ref()?.as_ref()))
+            }
+        },
+        FormatKey::MinorGridlines => {
+            text_value(gridline_text(appearance.minor_gridlines.as_ref()?.as_ref()))
+        },
+        FormatKey::ComboTypes => {
+            if spec.variant().kind != Kind::Combo || spec.series_kinds().is_empty() {
+                return None;
+            }
+            text_value(
+                spec.series_kinds()
+                    .iter()
+                    .map(|kind| match kind {
+                        Kind::Line => "line",
+                        Kind::Area => "area",
+                        _ => "column",
+                    })
+                    .collect::<Vec<_>>()
+                    .join(","),
+            )
+        },
+        FormatKey::ComboSplit => return None,
+        FormatKey::Marker => text_value(marker_name(appearance.marker?)),
+        FormatKey::MarkerSize => int(appearance.marker_size?),
+        FormatKey::ShowMarkers => {
+            if appearance.marker? == MarkerStyle::None {
+                Value::Bool(false)
+            } else {
+                return None;
+            }
+        },
+        FormatKey::LineWidth => number(appearance.line_width?)?,
+        FormatKey::View3d => {
+            let (x, y, perspective) = appearance.view_3d?;
+            text_value(match perspective {
+                Some(perspective) => format!("{x},{y},{perspective}"),
+                None => format!("{x},{y}"),
+            })
+        },
+        FormatKey::IncreaseColor => text_value(appearance.increase_color.clone()?),
+        FormatKey::DecreaseColor => text_value(appearance.decrease_color.clone()?),
+        FormatKey::TotalColor => text_value(appearance.total_color.clone()?),
+        FormatKey::BinCount => int(appearance.bins?.count?),
+        FormatKey::BinSize => number(appearance.bins?.size?)?,
+        FormatKey::IntervalClosed => text_value(if appearance.bins?.closed_left {
+            "l"
+        } else {
+            "r"
+        }),
+        FormatKey::OverflowBin => number(appearance.bins?.overflow?)?,
+        FormatKey::UnderflowBin => number(appearance.bins?.underflow?)?,
+        FormatKey::QuartileMethod => text_value(match appearance.quartile_method? {
+            QuartileMethod::Exclusive => "exclusive",
+            QuartileMethod::Inclusive => "inclusive",
+        }),
+        FormatKey::ParentLabelLayout => text_value(match appearance.parent_labels? {
+            ParentLabels::Overlapping => "overlapping",
+            ParentLabels::Banner => "banner",
+            ParentLabels::None => "none",
+        }),
+    })
+}
+
+fn marker_name(style: MarkerStyle) -> &'static str {
+    match style {
+        MarkerStyle::Circle => "circle",
+        MarkerStyle::Dash => "dash",
+        MarkerStyle::Diamond => "diamond",
+        MarkerStyle::Dot => "dot",
+        MarkerStyle::None => "none",
+        MarkerStyle::Plus => "plus",
+        MarkerStyle::Square => "square",
+        MarkerStyle::Star => "star",
+        MarkerStyle::Triangle => "triangle",
+        MarkerStyle::X => "x",
+        MarkerStyle::Auto => "auto",
+        _ => "auto",
+    }
+}
+
+/// A chart part whose projection is read on first use: a path that only
+/// edits the chart (a title `set`) never decodes it twice.
+#[derive(Debug)]
+pub(crate) struct LazySummary {
+    xml: Vec<u8>,
+    summary: std::sync::OnceLock<std::sync::Arc<Summary>>,
+}
+
+#[cfg_attr(
+    not(feature = "xlsx"),
+    allow(dead_code, reason = "only worksheet charts are resolved lazily")
+)]
+impl LazySummary {
+    pub(crate) const fn new(xml: Vec<u8>) -> Self {
+        Self {
+            xml,
+            summary: std::sync::OnceLock::new(),
+        }
+    }
+
+    /// The projection, read once.
+    pub(crate) fn get(&self) -> Result<&std::sync::Arc<Summary>> {
+        if let Some(summary) = self.summary.get() {
+            return Ok(summary);
+        }
+        let summary = std::sync::Arc::new(Summary::read(&self.xml)?);
+        Ok(self.summary.get_or_init(|| summary))
+    }
 }
 
 /// Join numbers the way OfficeCLI prints a series' values.
+#[cfg_attr(
+    not(any(feature = "pptx", feature = "xlsx")),
+    allow(dead_code, reason = "DOCX charts have no series or axis nodes yet")
+)]
 pub(crate) fn join_values(values: &[f64]) -> String {
     let mut out = String::new();
     for (index, value) in values.iter().enumerate() {
@@ -1135,8 +1653,11 @@ pub(crate) fn join_values(values: &[f64]) -> String {
     out
 }
 
-/// What one chart, series or axis `set` changes, applied in one
-/// source-preserving chart edit.
+/// What one chart, series or axis `set` changes, applied in one chart edit:
+/// source-preserving for titles, the legend, names, values, categories,
+/// series colors and axis ranges; a rebuild from the chart's spec for a
+/// changed family, replaced data, formatting keys, and every edit of an
+/// extended chart (record 0283).
 #[derive(Debug, Default)]
 pub(crate) struct ChartEdit {
     pub(crate) title: Option<Option<String>>,
@@ -1144,13 +1665,23 @@ pub(crate) struct ChartEdit {
     pub(crate) categories: Option<Vec<String>>,
     pub(crate) series_names: Vec<(u32, Option<String>)>,
     pub(crate) series_values: Vec<(u32, Vec<f64>)>,
+    pub(crate) series_colors: Vec<(u32, Option<String>)>,
     pub(crate) axis_titles: Vec<(u32, Option<String>)>,
+    /// `(axis id, minimum, maximum)`: the complete new range.
+    pub(crate) axis_ranges: Vec<(u32, Option<f64>, Option<f64>)>,
+    /// The spec a rebuild writes, once a key needs one.
+    pub(crate) rebuild: Option<Spec>,
+    /// Whether the rebuild replaced the series (`data`).
+    pub(crate) data_replaced: bool,
 }
 
 /// The result of applying a [`ChartEdit`].
 #[cfg_attr(
-    not(feature = "pptx"),
-    allow(dead_code, reason = "only PPTX charts carry an embedded workbook")
+    not(any(feature = "pptx", feature = "docx")),
+    allow(
+        dead_code,
+        reason = "only PPTX and DOCX charts carry an embedded workbook"
+    )
 )]
 pub(crate) struct Edited {
     /// The new chart-space XML.
@@ -1161,6 +1692,9 @@ pub(crate) struct Edited {
     /// Whether the edit renamed a series, which an embedded workbook's
     /// header row may follow.
     pub(crate) names_changed: bool,
+    /// The spec of a rebuilt part, from which an embedded workbook is
+    /// regenerated.
+    pub(crate) spec: Option<Spec>,
 }
 
 fn native(error: litchi_drawingml::Error, property: &'static str) -> Error {
@@ -1172,8 +1706,88 @@ fn native(error: litchi_drawingml::Error, property: &'static str) -> Error {
     Error::new(code, error.to_string()).with_property(property)
 }
 
+fn not_authored(property: &'static str) -> Error {
+    Error::new(
+        Code::UnsupportedCapability,
+        "this change rebuilds the chart, and the chart has content its spec cannot carry",
+    )
+    .with_property(property)
+    .with_suggestion("remove the chart and add it again with the new values")
+}
+
 impl ChartEdit {
-    /// Admit a chart-level `series{N}.name` or `series{N}.values` set: the
+    /// The spec a rebuild starts from: the chart's own, read from its part.
+    pub(crate) fn rebuild(
+        &mut self,
+        summary: &Summary,
+        property: &'static str,
+    ) -> Result<&mut Spec> {
+        if self.rebuild.is_none() {
+            let spec = summary
+                .spec()
+                .cloned()
+                .ok_or_else(|| not_authored(property))?;
+            self.rebuild = Some(spec);
+        }
+        Ok(self
+            .rebuild
+            .get_or_insert_with(|| unreachable!("set above")))
+    }
+
+    /// Admit a `chartType` set: the same part family (ordinary or extended).
+    pub(crate) fn chart_type(&mut self, summary: &Summary, text: &str) -> Result<()> {
+        let variant = parse_variant(text)?;
+        if variant.kind.is_extended() != summary.extended {
+            return Err(Error::new(
+                Code::UnsupportedCapability,
+                "an ordinary chart and an extended chart are different parts",
+            )
+            .with_property("chartType")
+            .with_suggestion("remove the chart and add it again as the new type"));
+        }
+        let spec = self.rebuild(summary, "chartType")?;
+        let next = spec.clone().with_variant(variant);
+        *spec = if variant.kind == Kind::Combo || spec.variant().kind == Kind::Combo {
+            next.with_series_kinds(Vec::new())
+        } else {
+            next
+        };
+        Ok(())
+    }
+
+    /// Admit a `data` set: the series replaced; the categories kept unless
+    /// the edit sets them too.
+    pub(crate) fn data(&mut self, summary: &Summary, text: &str) -> Result<()> {
+        let series = parse_data(text)?;
+        let spec = self.rebuild(summary, "data")?;
+        let categories = spec.categories().to_vec();
+        *spec = spec.clone().with_data(categories, series);
+        self.data_replaced = true;
+        Ok(())
+    }
+
+    /// Admit a formatting key set.
+    pub(crate) fn format(
+        &mut self,
+        summary: &Summary,
+        key: FormatKey,
+        property: &'static str,
+        value: Option<Scalar<'_>>,
+    ) -> Result<()> {
+        let spec = self.rebuild(summary, property)?;
+        let mut props = AddProps {
+            appearance: spec.appearance().clone(),
+            ..AddProps::default()
+        };
+        props.format(key, value)?;
+        if let Some(kinds) = props.combo_types {
+            *spec = spec.clone().with_series_kinds(kinds);
+        }
+        *spec.appearance_mut() = props.appearance;
+        Ok(())
+    }
+
+    /// Admit a chart-level `series{N}.name`, `.values` or `.color` set: the
     /// `N`th series of the chart in reading order (the `series[N]` node).
     pub(crate) fn dotted_series(
         &mut self,
@@ -1202,18 +1816,64 @@ impl ChartEdit {
                     .push((index, parse_values(&text, property)?));
             },
             SeriesField::Color => {
-                return Err(Error::new(
-                    Code::UnsupportedProperty,
-                    "a series color can be given on add only",
-                )
-                .with_property(property));
+                let color = text.map(|text| argb(&text, property)).transpose()?;
+                self.series_colors.push((index, color));
             },
         }
         Ok(())
     }
 
+    /// Admit an axis `min` or `max` set; the other bound keeps its value.
+    #[cfg_attr(
+        not(any(feature = "pptx", feature = "xlsx")),
+        allow(dead_code, reason = "DOCX charts have no series or axis nodes yet")
+    )]
+    pub(crate) fn axis_bound(
+        &mut self,
+        axis: &AxisSummary,
+        maximum: bool,
+        value: Option<f64>,
+    ) -> Result<()> {
+        if !axis.numeric {
+            return Err(Error::new(
+                Code::UnsupportedCapability,
+                "only a value axis has a numeric range",
+            )
+            .with_property(if maximum { "max" } else { "min" }));
+        }
+        let entry = match self
+            .axis_ranges
+            .iter_mut()
+            .find(|(id, _, _)| *id == axis.id)
+        {
+            Some(entry) => entry,
+            None => {
+                self.axis_ranges.push((axis.id, axis.min, axis.max));
+                self.axis_ranges
+                    .last_mut()
+                    .unwrap_or_else(|| unreachable!("pushed"))
+            },
+        };
+        if maximum {
+            entry.2 = value;
+        } else {
+            entry.1 = value;
+        }
+        Ok(())
+    }
+
     /// Apply the edit to a chart part; `None` when nothing changes.
-    pub(crate) fn apply(self, xml: Vec<u8>) -> Result<Option<Edited>> {
+    /// `embedded` says whether the host keeps the chart's data in an
+    /// embedded workbook; without one, replaced data is written inline.
+    pub(crate) fn apply(mut self, xml: Vec<u8>, embedded: bool) -> Result<Option<Edited>> {
+        let extended = litchi_drawingml::chart::chartex::is_chartex(&xml);
+        if extended && self.rebuild.is_none() && !self.is_empty() {
+            let summary = Summary::read(&xml)?;
+            self.rebuild(&summary, "chart")?;
+        }
+        if self.rebuild.is_some() {
+            return self.apply_rebuild(&xml, embedded);
+        }
         let snapshot = litchi_drawingml::chart::edit::Snapshot::from_xml(xml)
             .map_err(|error| native(error, "chart"))?;
         let mut edit = snapshot.edit();
@@ -1239,9 +1899,17 @@ impl ChartEdit {
             edit.set_series_values(*index, values)
                 .map_err(|error| native(error, "values"))?;
         }
+        for (index, color) in &self.series_colors {
+            edit.set_series_color(*index, color.as_deref())
+                .map_err(|error| native(error, "color"))?;
+        }
         for (id, title) in self.axis_titles {
             edit.set_axis_title(id, title.map(TitleText::from_string))
                 .map_err(|error| native(error, "title"))?;
+        }
+        for (id, min, max) in self.axis_ranges {
+            edit.set_axis_range(id, min, max)
+                .map_err(|error| native(error, "min"))?;
         }
         if !edit.is_changed() {
             return Ok(None);
@@ -1254,11 +1922,127 @@ impl ChartEdit {
             xml: snapshot.xml_bytes().to_vec(),
             data_changed,
             names_changed,
+            spec: None,
+        }))
+    }
+
+    fn is_empty(&self) -> bool {
+        self.title.is_none()
+            && self.legend.is_none()
+            && self.categories.is_none()
+            && self.series_names.is_empty()
+            && self.series_values.is_empty()
+            && self.series_colors.is_empty()
+            && self.axis_titles.is_empty()
+            && self.axis_ranges.is_empty()
+            && self.rebuild.is_none()
+    }
+
+    /// Rebuild the part from the edited spec, after checking that the part
+    /// is exactly what its spec writes (so the rebuild loses nothing).
+    fn apply_rebuild(self, xml: &[u8], embedded: bool) -> Result<Option<Edited>> {
+        let parsed = litchi_drawingml::chart::authoring::read(xml)
+            .map_err(|error| Error::new(Code::CorruptFile, format!("chart part: {error}")))?;
+        if !parsed.is_authored(xml) {
+            return Err(not_authored("chart"));
+        }
+        let mut spec = self.rebuild.unwrap_or_else(|| parsed.spec.clone());
+        let original = parsed.spec;
+        if let Some(title) = self.title {
+            spec = match title {
+                Some(title) => spec.with_title(title),
+                None => spec.without_title(),
+            };
+        }
+        if let Some(legend) = self.legend {
+            spec = spec.with_legend(legend);
+        }
+        let mut data_changed = self.data_replaced || spec.variant() != original.variant();
+        if let Some(categories) = self.categories {
+            let series = spec.series().to_vec();
+            spec = spec.with_data(categories, series);
+            data_changed = true;
+        }
+        let position = |summary_index: u32, spec: &Spec| -> Option<usize> {
+            // Extended charts number series by position; ordinary authored
+            // charts write `c:idx` = position too.
+            (usize::try_from(summary_index).ok()).filter(|index| *index < spec.series().len())
+        };
+        let names_changed = !self.series_names.is_empty();
+        for (index, name) in self.series_names {
+            let index = position(index, &spec).ok_or_else(|| missing_series("name"))?;
+            spec.series_mut()[index].name = name.unwrap_or_default();
+        }
+        for (index, values) in self.series_values {
+            let index = position(index, &spec).ok_or_else(|| missing_series("values"))?;
+            spec.series_mut()[index].values = values;
+            data_changed = true;
+        }
+        for (index, color) in self.series_colors {
+            let index = position(index, &spec).ok_or_else(|| missing_series("color"))?;
+            spec.series_mut()[index].color = color;
+        }
+        for (id, title) in self.axis_titles {
+            let category = original.variant().kind.is_extended() && id == 0
+                || (!original.variant().kind.is_extended() && id == CATEGORY_AXIS_ID);
+            spec = match (category, title) {
+                (true, Some(title)) => spec.with_category_axis_title(title),
+                (false, Some(title)) => spec.with_value_axis_title(title),
+                (_, None) => {
+                    return Err(Error::new(
+                        Code::UnsupportedCapability,
+                        "an axis title of a rebuilt chart can be replaced, not cleared",
+                    )
+                    .with_property("title"));
+                },
+            };
+        }
+        for (id, min, max) in self.axis_ranges {
+            let value_axis = if original.variant().kind.is_extended() {
+                1
+            } else {
+                CATEGORY_AXIS_ID + 1
+            };
+            if id != value_axis {
+                return Err(Error::new(
+                    Code::UnsupportedCapability,
+                    "a rebuilt chart sets the range of its value axis only",
+                )
+                .with_property("min"));
+            }
+            let appearance = spec.appearance_mut();
+            appearance.axis_min = min;
+            appearance.axis_max = max;
+        }
+        if self.data_replaced && !embedded {
+            spec = spec.with_binding(litchi_drawingml::chart::authoring::Binding::Literal);
+        }
+        let rebuilt = spec
+            .to_xml(parsed.external_data.as_deref())
+            .map_err(|error| {
+                Error::new(Code::InvalidValue, error.to_string()).with_property("chart")
+            })?;
+        if rebuilt == xml {
+            return Ok(None);
+        }
+        Ok(Some(Edited {
+            xml: rebuilt,
+            data_changed,
+            names_changed,
+            spec: Some(spec),
         }))
     }
 }
 
-#[cfg(feature = "pptx")]
+/// The authored value axis id of an ordinary chart (`litchi-drawingml`'s
+/// authoring constants: category 500000001, value 500000002).
+const CATEGORY_AXIS_ID: u32 = 500_000_001;
+
+fn missing_series(property: &'static str) -> Error {
+    Error::new(Code::PathNotFound, "the series is missing").with_property(property)
+}
+
+#[cfg(any(feature = "pptx", feature = "docx"))]
 /// Rebuild the spec an authored chart was made from, bound to an embedded
 /// workbook's `Sheet1`, when the chart's references are exactly that
 /// layout; `None` otherwise. A data edit regenerates the embedded workbook
@@ -1266,7 +2050,7 @@ impl ChartEdit {
 pub(crate) fn embedded_spec(xml: &[u8]) -> Option<Spec> {
     use litchi_drawingml::chart::authoring::Binding;
     let chart = litchi_drawingml::chart::reader::read(xml).ok()?;
-    let summary = Summary::of(&chart);
+    let summary = Summary::of(chart.clone());
     let variant = summary.variant?;
     let mut spec = Spec::new(variant).with_binding(Binding::sheet("Sheet1"));
     if let Some(title) = &summary.title {
@@ -1289,7 +2073,7 @@ pub(crate) fn embedded_spec(xml: &[u8]) -> Option<Spec> {
 }
 
 /// Whether two charts' series refer to the same cells.
-#[cfg(feature = "pptx")]
+#[cfg(any(feature = "pptx", feature = "docx"))]
 fn same_references(left: &Chart, right: &Chart) -> bool {
     let formulas = |chart: &Chart| -> Vec<Option<String>> {
         chart
@@ -1365,8 +2149,10 @@ mod tests {
             Code::InvalidValue
         );
         assert_eq!(parse_variant("combo").unwrap().kind, Kind::Combo);
+        assert_eq!(parse_variant("waterfall").unwrap().kind, Kind::Waterfall);
+        assert_eq!(parse_variant("boxWhisker").unwrap().kind, Kind::BoxWhisker);
         assert_eq!(
-            parse_variant("waterfall").unwrap_err().code(),
+            parse_variant("pieOfPie").unwrap_err().code(),
             Code::UnsupportedCapability
         );
         assert_eq!(
@@ -1573,7 +2359,7 @@ mod tests {
             (error.code(), error.property()),
             (Code::OutOfRange, Some("series3.name"))
         );
-        let edited = edit.apply(xml).unwrap().unwrap();
+        let edited = edit.apply(xml, true).unwrap().unwrap();
         let after = Summary::read(&edited.xml).unwrap();
         assert_eq!(after.series[1].name.as_deref(), Some("North"));
         assert_eq!(after.series[0].values, [7.0, 8.0]);
@@ -1603,7 +2389,7 @@ mod tests {
         assert_eq!(summary.series[1].name.as_deref(), Some("West"));
         let category = summary.axis(Role::Category).unwrap();
         assert_eq!(category.title.as_deref(), Some("Quarter"));
-        #[cfg(feature = "pptx")]
+        #[cfg(any(feature = "pptx", feature = "docx"))]
         assert!(embedded_spec(&xml).is_some());
 
         let edited = ChartEdit {
@@ -1614,7 +2400,7 @@ mod tests {
             axis_titles: vec![(category.id, Some("Period".into()))],
             ..ChartEdit::default()
         }
-        .apply(xml.clone())
+        .apply(xml.clone(), true)
         .unwrap()
         .unwrap();
         assert!(edited.data_changed);
@@ -1628,9 +2414,9 @@ mod tests {
         );
         // The workbook layout still matches, but series 0 now has fewer
         // points than the categories: the spec rebuild reflects the chart.
-        #[cfg(feature = "pptx")]
+        #[cfg(any(feature = "pptx", feature = "docx"))]
         assert!(embedded_spec(&edited.xml).is_some());
         // An exact no-op.
-        assert!(ChartEdit::default().apply(xml).unwrap().is_none());
+        assert!(ChartEdit::default().apply(xml, true).unwrap().is_none());
     }
 }

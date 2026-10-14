@@ -590,7 +590,7 @@ fn query_diagnostics_and_refusals() {
     let unknown = Query::parse("p[colour=red]").unwrap();
     let plan = Plan::compile(&unknown, FileFormat::Docx).unwrap();
     assert_eq!(plan.diagnostics().len(), 1);
-    let gap = Query::parse("chart").unwrap();
+    let gap = Query::parse("ole").unwrap();
     assert_eq!(
         Plan::compile(&gap, FileFormat::Docx).unwrap_err().code(),
         Code::UnsupportedCapability
@@ -1052,11 +1052,21 @@ fn capabilities_match_live_paths_queries_and_views() {
         )
         .expect("add a picture")
         .into_file();
+    // And charts (record 0283).
+    let charted = file
+        .add(
+            "/body/p[1]",
+            crate::NewNode::new("chart").prop("data", "A:1,2"),
+        )
+        .expect("add a chart")
+        .into_file();
     let file_for = |name: &str| {
         if matches!(name, "comments" | "comment") {
             &commented
         } else if name == "picture" {
             &pictured
+        } else if name == "chart" {
+            &charted
         } else {
             &file
         }

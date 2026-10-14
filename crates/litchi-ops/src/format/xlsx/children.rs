@@ -267,7 +267,7 @@ impl<'f> Children<'f> {
                     cursor: Box::new(Cursor::new(range.rect, false)),
                 },
             },
-            Item::Chart(chart) => chart_parts(node, chart, true, true),
+            Item::Chart(chart) => chart_parts(node, chart, true, true)?,
             Item::Cell(_)
             | Item::Table(_)
             | Item::NamedRange(_)
@@ -305,12 +305,12 @@ impl<'f> Children<'f> {
                 let count = file.sheet_chart_count(sheet.position)?;
                 let mut items = Vec::with_capacity(count);
                 for index in 0..count {
-                    if let Some(summary) = file.sheet_chart(sheet.position, index)? {
+                    if let Some(part) = file.sheet_chart(sheet.position, index)? {
                         items.push((
                             Kind::Chart,
                             ChartItem {
                                 chart: u32::try_from(index).unwrap_or(u32::MAX),
-                                summary,
+                                part,
                                 child: 0,
                             },
                         ));
@@ -336,7 +336,7 @@ impl<'f> Children<'f> {
                 chart,
                 kinds.contains(Kind::Series),
                 kinds.contains(Kind::Axis),
-            ),
+            )?,
             // Rows, columns and ranges hold cells when a query is scoped to
             // them; the spec's walk tree does not enter them otherwise.
             Item::Row(row) if cells => State::Cells {
@@ -382,7 +382,7 @@ impl<'f> Children<'f> {
                     return Ok(items.next().map(|(kind, item)| match kind {
                         Kind::Chart => {
                             let index = item.chart as usize;
-                            Node::new_chart(file, *sheet, index, item.summary)
+                            Node::new_chart(file, *sheet, index, item.part)
                         },
                         kind => Node::new_chart_part(file, *sheet, kind, item),
                     }));
@@ -813,20 +813,18 @@ fn dense_too_large(cells: u64, budget: u32) -> Error {
 }
 
 /// A chart's series and axes, as wanted.
-fn chart_parts(node: &Node<'_>, chart: &ChartItem, series: bool, axes: bool) -> State {
+fn chart_parts(node: &Node<'_>, chart: &ChartItem, series: bool, axes: bool) -> Result<State> {
+    let summary = chart.summary()?;
     let mut items = Vec::new();
     if series {
-        items.extend(
-            (0..chart.summary.series.len()).map(|index| (Kind::Series, chart.with_child(index))),
-        );
+        items
+            .extend((0..summary.series.len()).map(|index| (Kind::Series, chart.with_child(index))));
     }
     if axes {
-        items.extend(
-            (0..chart.summary.axes.len()).map(|index| (Kind::Axis, chart.with_child(index))),
-        );
+        items.extend((0..summary.axes.len()).map(|index| (Kind::Axis, chart.with_child(index))));
     }
-    State::Charts {
+    Ok(State::Charts {
         sheet: node.sheet_position(),
         items: items.into_iter(),
-    }
+    })
 }

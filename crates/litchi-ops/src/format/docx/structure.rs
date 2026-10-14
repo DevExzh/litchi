@@ -143,7 +143,8 @@ impl Docx {
                 | NewKind::Row
                 | NewKind::Hyperlink
                 | NewKind::Comment
-                | NewKind::Picture,
+                | NewKind::Picture
+                | NewKind::Chart,
                 _,
             ) => {
                 return self.add_nested(editor, &parent, kind, &node);
@@ -334,6 +335,7 @@ pub(super) enum NewKind {
     Hyperlink,
     Comment,
     Picture,
+    Chart,
 }
 
 enum PlannedNode {
@@ -375,6 +377,8 @@ fn new_kind(name: &str) -> Result<NewKind> {
         .any(|kind| name.eq_ignore_ascii_case(kind))
     {
         Ok(NewKind::Picture)
+    } else if name.eq_ignore_ascii_case("chart") {
+        Ok(NewKind::Chart)
     } else {
         Err(Error::new(
             Code::UnsupportedElement,

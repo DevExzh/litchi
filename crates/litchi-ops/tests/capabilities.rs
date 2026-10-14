@@ -155,6 +155,8 @@ fn ordinary_reports_hide_native_selection_fields() {
             "table" | "row" | "comment" => (false, true, true),
             // Record 0251d: pictures are added.
             "picture" => (false, true, false),
+            // Record 0283: charts are added, set and removed.
+            "chart" => (true, true, true),
             "sdt" => (false, false, true),
             _ => (false, false, false),
         };
@@ -266,6 +268,14 @@ fn ordinary_reports_hide_native_selection_fields() {
                 assert!(property.get(), "comment {}", property.name());
                 assert!(!property.set(), "comment {}", property.name());
                 assert!(property.add(), "comment {}", property.name());
+            } else if element.name() == "chart" {
+                // Record 0283: chart keys seed a new chart and most are
+                // also settable; the registry declares each.
+                assert!(
+                    property.set() || property.add() || property.get(),
+                    "chart {}",
+                    property.name()
+                );
             } else if property.name() == "text" {
                 // `text` of a hyperlink or cell is write-only.
                 assert!(!property.get(), "{} text", element.name());

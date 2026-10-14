@@ -282,6 +282,10 @@
         {
           "element": "hyperlink",
           "pathSegment": "hyperlink"
+        },
+        {
+          "element": "chart",
+          "pathSegment": "chart"
         }
       ],
       "properties": {
@@ -2497,24 +2501,800 @@
     {
       "format": "docx",
       "element": "chart",
-      "parent": "paragraph",
+      "parent": [
+        "paragraph",
+        "document"
+      ],
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
-          "/chart[N]"
+          "/body/p[N]/chart[M]",
+          "/chart[N]",
+          "/body/chart[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "R4x",
-        "reason": "charts have no located reader yet"
+      "properties": {
+        "chartType": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "title": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "legend": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "categories": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "catTitle": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "seriesCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "width": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "data": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "axisTitle": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "colors": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "dataLabels": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "labelPos": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "varyColors": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "gapWidth": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "overlap": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "holeSize": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "firstSliceAngle": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "scatterStyle": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "radarStyle": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "smooth": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "explosion": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "legend.overlay": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "autoTitleDeleted": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "axisMin": {
+          "type": "number",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "axisMax": {
+          "type": "number",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "majorUnit": {
+          "type": "number",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "gridlines": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "minorGridlines": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "comboTypes": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "comboSplit": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "marker": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "markerSize": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "showMarkers": {
+          "type": "bool",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "lineWidth": {
+          "type": "number",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "view3d": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "increaseColor": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "decreaseColor": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "totalColor": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "binCount": {
+          "type": "int",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "binSize": {
+          "type": "number",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "intervalClosed": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "overflowBin": {
+          "type": "number",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "underflowBin": {
+          "type": "number",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "quartileMethod": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "parentLabelLayout": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "series1": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series2": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series3": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series4": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series5": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series6": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series7": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series8": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series9": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series10": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series11": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series12": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series13": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series14": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series15": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series16": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series17": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series18": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series19": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series20": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series1.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series1.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series1.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series2.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series2.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series2.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series3.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series3.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series3.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series4.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series4.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series4.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series5.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series5.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series5.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series6.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series6.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series6.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series7.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series7.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series7.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series8.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series8.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series8.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series9.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series9.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series9.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series10.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series10.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series10.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series11.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series11.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series11.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series12.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series12.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series12.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series13.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series13.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series13.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series14.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series14.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series14.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series15.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series15.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series15.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series16.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series16.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series16.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series17.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series17.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series17.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series18.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series18.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series18.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series19.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series19.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series19.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series20.name": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series20.values": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        },
+        "series20.color": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -2833,13 +3613,6 @@
       "code": "unsupported_capability",
       "followUp": "R4x",
       "reason": "legacy form fields have no located reader yet"
-    },
-    {
-      "subject": "element",
-      "element": "chart",
-      "code": "unsupported_capability",
-      "followUp": "R4x",
-      "reason": "charts have no located reader yet"
     },
     {
       "subject": "element",

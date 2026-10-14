@@ -292,7 +292,8 @@ impl<'a> Slide<'a> {
         package::slide_charts(self.package, &self.part)
     }
 
-    /// The chart-space XML of the ordinary chart this slide relates through
+    /// The chart-space XML of the ordinary (`c:chartSpace`) or extended
+    /// (`cx:chartSpace`) chart this slide relates through
     /// `relationship_id` (a chart frame's payload relationship), or `None`
     /// when the slide has no such chart relationship.
     ///
@@ -304,11 +305,15 @@ impl<'a> Slide<'a> {
         let Some(relationship) = self.part.part().rels().get(relationship_id) else {
             return Ok(None);
         };
-        if !crate::parts::is_relationship_type(
-            relationship.reltype(),
-            litchi_opc::constants::relationship_type::CHART,
-            "chart",
-        ) {
+        let extended =
+            relationship.reltype() == litchi_drawingml::chart::chartex::RELATIONSHIP_TYPE;
+        if !extended
+            && !crate::parts::is_relationship_type(
+                relationship.reltype(),
+                litchi_opc::constants::relationship_type::CHART,
+                "chart",
+            )
+        {
             return Ok(None);
         }
         if relationship.is_external() {
@@ -317,6 +322,16 @@ impl<'a> Slide<'a> {
             ));
         }
         let target = relationship.target_partname()?;
+        if extended {
+            let part = self.package.get_part(&target)?;
+            if part.content_type() != litchi_drawingml::chart::chartex::CONTENT_TYPE {
+                return Err(crate::Error::Relationship(
+                    "an extended chart relationship targets a part that is not a chartex part"
+                        .to_owned(),
+                ));
+            }
+            return Ok(Some(part.blob()));
+        }
         let part = crate::chart::Part::from_part(self.package.get_part(&target)?)?;
         Ok(Some(part.part().blob()))
     }

@@ -136,6 +136,10 @@ impl Docx {
                 let commit = edit.commit(self)?;
                 Ok((commit, path_with(parent, Some((Kind::Picture, ordinal)))))
             },
+            (NewKind::Chart, Kind::Paragraph) => {
+                super::chart::placement_run(placement)?;
+                self.add_chart(editor, parent, node, None)
+            },
             (NewKind::Comment, Kind::Paragraph | Kind::Run) => {
                 // A paragraph parent comments the whole paragraph; a run
                 // parent comments that direct run.
@@ -211,6 +215,9 @@ impl Docx {
     /// controls. Descendants of a removed node are subsumed, and removals
     /// run in reverse raw order so no removal shifts a later one.
     pub(super) fn remove_nested(&self, editor: DocxEditor, nodes: &[Node<'_>]) -> Result<Commit> {
+        if !nodes.is_empty() && nodes.iter().all(|node| node.element_kind() == Kind::Chart) {
+            return self.remove_charts(editor, nodes);
+        }
         let mut paths = Vec::with_capacity(nodes.len());
         let mut comments = Vec::new();
         for node in nodes {
@@ -573,7 +580,7 @@ fn sibling_position(
 
 /// The document-order sort key of an element path: the raw position of
 /// each step, ranked by element name.
-fn order_key(path: &ElementPath) -> Vec<(u8, usize)> {
+pub(super) fn order_key(path: &ElementPath) -> Vec<(u8, usize)> {
     path.steps()
         .iter()
         .map(|step| {

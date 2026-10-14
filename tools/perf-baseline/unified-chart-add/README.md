@@ -37,3 +37,18 @@ before timing). Route names: `pptx_chart_add_dotted_v1`,
 ```sh
 taskset -c 7 "$BUILD/release/unified-chart-add-baseline" --compare dotted --rounds 15 > dotted.json
 ```
+
+`--formats pptx,xlsx,docx` (record 0283) adds the DOCX route
+`docx_chart_add_v1`: native `document::Edit::insert_chart_at` on the first
+paragraph plus one commit, versus `File::add("/body/p[1]", chart{...})`.
+
+`--compare set` (record 0283) pairs the native chart retitle (the
+source-preserving chart editor's `set_title` and the host's chart-part
+replacement, one commit) with `File::set(<chart[1]>, {title})` on owners
+holding `max(N, 1)` charts. Routes `pptx_chart_set_v1`, `xlsx_chart_set_v1`,
+`docx_chart_set_v1`.
+
+```sh
+taskset -c 13 "$BUILD/release/unified-chart-add-baseline" --formats pptx,xlsx,docx --rounds 15 > add.json
+taskset -c 13 "$BUILD/release/unified-chart-add-baseline" --compare set --formats pptx,xlsx,docx --counts 1,10,100 --rounds 15 > set.json
+```

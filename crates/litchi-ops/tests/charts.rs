@@ -231,9 +231,15 @@ fn pptx_chart_noops_and_refusals_leave_the_input_unchanged() {
         ),
         (
             NewNode::new("chart")
-                .prop("chartType", "waterfall")
+                .prop("chartType", "pieOfPie")
                 .prop("data", "A:1"),
             Code::UnsupportedCapability,
+        ),
+        (
+            NewNode::new("chart")
+                .prop("chartType", "waterfall")
+                .prop("data", "A:1,2;B:3,4"),
+            Code::InvalidValue,
         ),
         (
             NewNode::new("chart")
@@ -250,8 +256,15 @@ fn pptx_chart_noops_and_refusals_leave_the_input_unchanged() {
     ] {
         assert_eq!(file.add("/slide[1]", node).unwrap_err().code(), code);
     }
+    // An ordinary chart does not become an extended one in place.
     assert_eq!(
-        file.set("/slide[1]/chart[1]", props! { "chartType" => "bar" })
+        file.set("/slide[1]/chart[1]", props! { "chartType" => "funnel" })
+            .unwrap_err()
+            .code(),
+        Code::UnsupportedCapability
+    );
+    assert_eq!(
+        file.set("/slide[1]/chart[1]", props! { "name" => "Renamed" })
             .unwrap_err()
             .code(),
         Code::UnsupportedProperty
@@ -490,16 +503,25 @@ fn chart_capabilities_report_the_registry() {
         assert!(chart.operations().remove, "{format:?}");
         assert!(chart.gap().is_none(), "{format:?}");
         let data = chart.property("data").expect("data");
-        assert!(data.add() && !data.set() && !data.get());
+        assert!(data.add() && data.set() && !data.get());
         let title = chart.property("title").expect("title");
         assert!(title.add() && title.set() && title.get());
         let chart_type = chart.property("chartType").expect("chartType");
-        assert!(chart_type.add() && !chart_type.set() && chart_type.get());
+        assert!(chart_type.add() && chart_type.set() && chart_type.get());
+        // Formatting keys are read back and rebuilt on set (record 0283).
+        let gap = chart.property("gapWidth").expect("gapWidth");
+        assert!(gap.add() && gap.set() && gap.get());
+        let split = chart.property("comboSplit").expect("comboSplit");
+        assert!(split.add() && split.set() && !split.get());
         let series = caps.element("series").expect("series element");
         let values = series.property("values").expect("values");
         assert!(values.set() && values.get() && !values.add());
+        let color = series.property("color").expect("color");
+        assert!(color.set() && color.get());
         let axis = caps.element("axis").expect("axis element");
         assert!(axis.property("title").expect("title").set());
+        let max = axis.property("max").expect("max");
+        assert!(max.set() && max.get());
     }
 }
 
@@ -707,8 +729,8 @@ fn dotted_series_keys_set_series_names_and_values_on_the_chart() {
                 "series3.name",
             ),
             (
-                props! { "series1.color" => "C00000" },
-                Code::UnsupportedProperty,
+                props! { "series1.color" => "red" },
+                Code::InvalidValue,
                 "series1.color",
             ),
         ] {

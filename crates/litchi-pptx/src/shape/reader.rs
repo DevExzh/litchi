@@ -2130,7 +2130,9 @@ fn is_dml(namespace: &ResolveResult<'_>, local_name: &[u8], local: &[u8]) -> boo
 #[inline(always)]
 fn is_chart(namespace: &ResolveResult<'_>, local_name: &[u8], local: &[u8]) -> bool {
     local_name == local
-        && matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == DRAWINGML_CHART_NAMESPACE || *value == STRICT_DRAWINGML_CHART_NAMESPACE)
+        && matches!(namespace, ResolveResult::Bound(Namespace(value)) if *value == DRAWINGML_CHART_NAMESPACE
+            || *value == STRICT_DRAWINGML_CHART_NAMESPACE
+            || *value == litchi_drawingml::chart::chartex::NAMESPACE.as_bytes())
 }
 
 #[inline(always)]

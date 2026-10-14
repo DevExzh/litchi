@@ -818,7 +818,7 @@ impl SourceSlide {
         })
     }
 
-    /// The chart-space XML of the ordinary chart this slide relates through
+    /// The chart-space XML of the ordinary or extended chart this slide relates through
     /// `relationship_id` (a chart frame's payload relationship), or `None`
     /// when the slide has no such chart relationship.
     ///
@@ -830,7 +830,9 @@ impl SourceSlide {
             let Some(relationship) = slide_part.rels().get(relationship_id) else {
                 return Ok(None);
             };
-            if !is_relationship_type(relationship.reltype(), CHART_REL, "chart") {
+            let extended =
+                relationship.reltype() == litchi_drawingml::chart::chartex::RELATIONSHIP_TYPE;
+            if !extended && !is_relationship_type(relationship.reltype(), CHART_REL, "chart") {
                 return Ok(None);
             }
             if relationship.target_mode() == TargetMode::External {
@@ -839,7 +841,12 @@ impl SourceSlide {
                 ));
             }
             let target = relationship.target_partname()?;
-            let part = load_part(&self.owner, &target, CT_CHART, MAX_CHART_XML)?;
+            let content_type = if extended {
+                litchi_drawingml::chart::chartex::CONTENT_TYPE
+            } else {
+                CT_CHART
+            };
+            let part = load_part(&self.owner, &target, content_type, MAX_CHART_XML)?;
             Ok(Some(part.blob().to_vec()))
         })
     }

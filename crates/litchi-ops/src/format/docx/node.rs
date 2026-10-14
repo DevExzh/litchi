@@ -86,6 +86,8 @@ pub(super) enum Value {
     Picture(Arc<litchi_docx::image::InlineImage>),
     /// One comment of the comments part.
     Comment(Arc<litchi_docx::comment::Comment>),
+    /// A chart of a paragraph, with its paragraph.
+    Chart(Arc<super::chart::ChartValue>),
 }
 
 /// One direct child of a block container: the container's index and the

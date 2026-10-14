@@ -1285,6 +1285,87 @@ impl Edit {
         Ok(Position::new(before))
     }
 
+    /// Insert a run holding an inline chart into the paragraph at
+    /// `paragraph`, before its direct run `at` (after its last child for
+    /// `None`), and return the chart's position among the paragraph's
+    /// charts. `relationship` is the chart relationship the caller stages.
+    pub(crate) fn insert_chart_markup_at(
+        &mut self,
+        paragraph: &ElementPath,
+        at: Option<Position>,
+        relationship: &str,
+        chart: &ChartMarkup<'_>,
+    ) -> Result<Position> {
+        self.ensure_unmanaged("insert_chart_at")?;
+        if paragraph.steps().last().map(|step| step.local()) != Some(b"p".as_slice()) {
+            return Err(not_found());
+        }
+        let conformance = self.projected.conformance;
+        self.insert_inline_counted(paragraph, at, b"r", false, |prefix| {
+            chart_markup(prefix, conformance, relationship, chart)
+        })?;
+        let located = locate(&self.projected, paragraph.steps())?;
+        let bytes = self.element_bytes(located)?;
+        let spans = crate::chart::inline::chart_spans(&bytes).map_err(Error::Document)?;
+        spans
+            .iter()
+            .position(|span| span.chart.relationship_id() == relationship)
+            .map(Position::new)
+            .ok_or_else(|| invalid("the inserted chart did not read back"))
+    }
+
+    /// Resize (`Some((width, height))`, in EMUs) or remove (`None`) the
+    /// chart at `ordinal` among the paragraph's charts. A removed chart
+    /// takes its run with it when the run holds nothing else.
+    pub(crate) fn rewrite_chart_at(
+        &mut self,
+        paragraph: &ElementPath,
+        ordinal: Position,
+        extent: Option<(i64, i64)>,
+    ) -> Result<bool> {
+        self.ensure_unmanaged("rewrite_chart_at")?;
+        if paragraph.steps().last().map(|step| step.local()) != Some(b"p".as_slice()) {
+            return Err(not_found());
+        }
+        let located = locate(&self.projected, paragraph.steps())?;
+        let before = self.element_bytes(located)?;
+        let spans = crate::chart::inline::chart_spans(&before).map_err(Error::Document)?;
+        let span = spans
+            .get(ordinal.get())
+            .ok_or_else(|| refusal(Refusal::RunNotFound))?;
+        let mut after = before.as_ref().clone();
+        match extent {
+            Some((width, height)) => {
+                let range = span
+                    .extent
+                    .clone()
+                    .ok_or_else(|| invalid("the chart drawing has no extent"))?;
+                let tag = String::from_utf8_lossy(&before[range.clone()]).into_owned();
+                let prefix = tag
+                    .strip_prefix('<')
+                    .and_then(|rest| rest.split_whitespace().next())
+                    .unwrap_or("wp:extent")
+                    .trim_end_matches("/>")
+                    .to_owned();
+                let replacement = format!(r#"<{prefix} cx="{width}" cy="{height}"/>"#);
+                if tag == replacement {
+                    return Ok(false);
+                }
+                after.splice(range, replacement.bytes());
+                // A floating frame's own transform, when it has one, follows.
+            },
+            None => {
+                let range = span
+                    .sole_run
+                    .clone()
+                    .unwrap_or_else(|| span.drawing.clone());
+                after.drain(range);
+            },
+        }
+        self.replace_element(paragraph, &before, &Arc::new(after))?;
+        Ok(true)
+    }
+
     /// The largest drawing object identifier (`wp:docPr/@id`) of the main
     /// document, if any.
     pub(crate) fn max_drawing_id(&self) -> Result<Option<u32>> {
@@ -2210,6 +2291,79 @@ fn picture_markup(
     let relationships = relationships_namespace(conformance);
     let drawing = format!(
         r#"<wp:inline xmlns:wp="{wordprocessing}" distT="0" distB="0" distL="0" distR="0"><wp:extent cx="{width}" cy="{height}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="{id}" name="{name}" descr="{description}"/><wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="{main}" noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic xmlns:a="{main}"><a:graphicData uri="{pic}"><pic:pic xmlns:pic="{pic}"><pic:nvPicPr><pic:cNvPr id="0" name="{name}" descr="{description}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip xmlns:r="{relationships}" r:embed="{relationship_id}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="{width}" cy="{height}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline>"#
+    );
+    let mut xml = buffer(staging_add(drawing.len(), 128)?)?;
+    open(&mut xml, prefix, "r");
+    if declare {
+        xml.extend_from_slice(b" xmlns:");
+        xml.extend_from_slice(prefix);
+        xml.extend_from_slice(b"=\"");
+        xml.extend_from_slice(conformance.namespace().as_bytes());
+        xml.push(b'"');
+    }
+    xml.push(b'>');
+    open(&mut xml, prefix, "drawing");
+    xml.push(b'>');
+    xml.extend_from_slice(drawing.as_bytes());
+    close(&mut xml, prefix, "drawing");
+    close(&mut xml, prefix, "r");
+    Ok(xml)
+}
+
+/// The drawing of a new inline chart: its extent in EMUs, its drawing
+/// object identifier, its name and description, and whether it is an
+/// extended (`cx:chart`) one.
+pub(crate) struct ChartMarkup<'a> {
+    pub(crate) width: i64,
+    pub(crate) height: i64,
+    pub(crate) id: u32,
+    pub(crate) name: &'a str,
+    pub(crate) description: &'a str,
+    pub(crate) extended: bool,
+}
+
+/// The markup of a run holding an inline chart, declaring every namespace
+/// it uses where it is used.
+fn chart_markup(
+    prefix: &[u8],
+    conformance: Conformance,
+    relationship: &str,
+    chart: &ChartMarkup<'_>,
+) -> Result<Vec<u8>> {
+    let (prefix, declare) = if prefix.is_empty() {
+        (b"w".as_slice(), true)
+    } else {
+        (prefix, false)
+    };
+    let (wordprocessing, main, classic) = match conformance {
+        Conformance::Strict => (
+            "http://purl.oclc.org/ooxml/drawingml/wordprocessingDrawing",
+            "http://purl.oclc.org/ooxml/drawingml/main",
+            crate::chart::inline::STRICT_CHART_URI,
+        ),
+        Conformance::Transitional => (
+            "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing",
+            "http://schemas.openxmlformats.org/drawingml/2006/main",
+            crate::chart::inline::CHART_URI,
+        ),
+    };
+    let (uri, element) = if chart.extended {
+        (litchi_drawingml::chart::chartex::GRAPHIC_DATA_URI, "cx")
+    } else {
+        (classic, "c")
+    };
+    let escaped = |text: &str| -> Result<String> {
+        let mut out = Vec::new();
+        super::super::append_literal_escaped_xml(&mut out, text);
+        String::from_utf8(out).map_err(|_| refusal(Refusal::InvalidPropertyValue))
+    };
+    let name = escaped(chart.name)?;
+    let description = escaped(chart.description)?;
+    let relationship_id = escaped(relationship)?;
+    let relationships = relationships_namespace(conformance);
+    let (width, height, id) = (chart.width, chart.height, chart.id);
+    let drawing = format!(
+        r#"<wp:inline xmlns:wp="{wordprocessing}" distT="0" distB="0" distL="0" distR="0"><wp:extent cx="{width}" cy="{height}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="{id}" name="{name}" descr="{description}"/><wp:cNvGraphicFramePr/><a:graphic xmlns:a="{main}"><a:graphicData uri="{uri}"><{element}:chart xmlns:{element}="{uri}" xmlns:r="{relationships}" r:id="{relationship_id}"/></a:graphicData></a:graphic></wp:inline>"#
     );
     let mut xml = buffer(staging_add(drawing.len(), 128)?)?;
     open(&mut xml, prefix, "r");

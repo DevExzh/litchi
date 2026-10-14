@@ -1,6 +1,6 @@
 use super::model::{Chart, Kind};
 use crate::Result;
-use litchi_drawingml::chart::authoring::{Cell, Spec};
+use litchi_drawingml::chart::authoring::Spec;
 use litchi_opc::PackURI;
 use litchi_opc::phys_pkg::PhysPkgWriter;
 use std::fmt::Write;
@@ -37,64 +37,21 @@ pub fn generate(chart: &Chart) -> Result<Vec<u8>> {
 }
 
 /// Generate a minimal workbook holding the worksheet layout an authored
-/// chart spec refers to ([`Spec::sheet_layout`]), on `Sheet1`.
+/// chart spec refers to ([`Spec::sheet_layout`]), on `Sheet1`: the members
+/// of [`Spec::workbook_members`], zipped.
 ///
 /// # Errors
 ///
 /// Returns an error if the spec is invalid or the package cannot be written.
 pub(crate) fn generate_spec(spec: &Spec) -> Result<Vec<u8>> {
-    spec.validate()
+    let members = spec
+        .workbook_members()
         .map_err(|error| crate::Error::Invalid(error.to_string()))?;
     let mut writer = PhysPkgWriter::new();
-    write_part(
-        &mut writer,
-        "/[Content_Types].xml",
-        content_types().as_bytes(),
-    )?;
-    write_part(&mut writer, "/_rels/.rels", root_relationships().as_bytes())?;
-    write_part(&mut writer, "/xl/workbook.xml", workbook().as_bytes())?;
-    write_part(
-        &mut writer,
-        "/xl/_rels/workbook.xml.rels",
-        workbook_relationships().as_bytes(),
-    )?;
-    write_part(&mut writer, "/xl/styles.xml", styles().as_bytes())?;
-    let worksheet = layout_worksheet(&spec.sheet_layout());
-    write_part(
-        &mut writer,
-        "/xl/worksheets/sheet1.xml",
-        worksheet.as_bytes(),
-    )?;
+    for (name, bytes) in members {
+        write_part(&mut writer, name, &bytes)?;
+    }
     Ok(writer.finish()?)
-}
-
-fn layout_worksheet(cells: &[(usize, usize, Cell<'_>)]) -> String {
-    let mut xml = String::with_capacity(4096);
-    xml.push_str(r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>"#);
-    let mut row = None;
-    for (index, column_index, cell) in cells {
-        if row != Some(*index) {
-            if row.is_some() {
-                xml.push_str("</row>");
-            }
-            let _result = write!(xml, r#"<row r="{}">"#, index + 1);
-            row = Some(*index);
-        }
-        let reference = format!("{}{}", column(*column_index), index + 1);
-        let _result = match cell {
-            Cell::Text(text) => write!(
-                xml,
-                r#"<c r="{reference}" t="inlineStr"><is><t>{}</t></is></c>"#,
-                escape(text)
-            ),
-            Cell::Number(value) => write!(xml, r#"<c r="{reference}"><v>{value}</v></c>"#),
-        };
-    }
-    if row.is_some() {
-        xml.push_str("</row>");
-    }
-    xml.push_str("</sheetData></worksheet>");
-    xml
 }
 
 fn write_part(writer: &mut PhysPkgWriter, name: &str, bytes: &[u8]) -> Result<()> {

@@ -115,15 +115,20 @@ pub(super) enum Item {
 #[derive(Clone)]
 pub(crate) struct ChartItem {
     pub(super) chart: u32,
-    pub(super) summary: Arc<crate::format::chart::Summary>,
+    pub(super) part: Arc<crate::format::chart::LazySummary>,
     pub(super) child: u32,
 }
 
 impl ChartItem {
+    /// The chart part's projection, read on first use.
+    pub(super) fn summary(&self) -> Result<&Arc<crate::format::chart::Summary>> {
+        self.part.get()
+    }
+
     pub(super) fn with_child(&self, child: usize) -> Self {
         Self {
             chart: self.chart,
-            summary: Arc::clone(&self.summary),
+            part: Arc::clone(&self.part),
             child: position_u32(child),
         }
     }
@@ -693,11 +698,11 @@ impl<'f> Node<'f> {
         file: &'f Xlsx,
         sheet: usize,
         index: usize,
-        summary: Arc<crate::format::chart::Summary>,
+        part: Arc<crate::format::chart::LazySummary>,
     ) -> Self {
         let item = Item::Chart(ChartItem {
             chart: position_u32(index),
-            summary,
+            part,
             child: 0,
         });
         Self::in_sheet(file, sheet, item)
@@ -985,8 +990,11 @@ impl<'f> Node<'f> {
             ),
             Item::Table(table) => (TABLE_PROPS, Props::Table(table.part.table())),
             Item::Chart(chart) => (
-                super::chart::CHART_PROPS,
-                Props::Chart(Arc::clone(&chart.summary)),
+                super::chart::CHART_CAPABILITY_PROPS,
+                Props::Chart(
+                    Arc::clone(chart.summary()?),
+                    file.sheet_chart_cells(self.sheet_position(), chart.chart as usize)?,
+                ),
             ),
             Item::Series(chart) => (super::chart::SERIES_PROPS, Props::Series(chart.clone())),
             Item::Axis(chart) => (super::chart::AXIS_PROPS, Props::Axis(chart.clone())),
@@ -1213,7 +1221,7 @@ impl<'f> Project<'f> for Node<'f> {
                     .filter(|name| !name.reference.is_empty())
                     .map(|name| Preview::Text(Cow::Borrowed(name.reference.as_str()))),
                 Item::Chart(chart) => chart
-                    .summary
+                    .summary()?
                     .title
                     .as_deref()
                     .map(|title| Preview::Text(Cow::Borrowed(title))),
@@ -1234,7 +1242,10 @@ impl<'f> Project<'f> for Node<'f> {
                 | Item::NamedRange(_)
                 | Item::Series(_)
                 | Item::Axis(_) => 0,
-                Item::Chart(chart) => chart.summary.series.len() + chart.summary.axes.len(),
+                Item::Chart(chart) => {
+                    let summary = chart.summary()?;
+                    summary.series.len() + summary.axes.len()
+                },
                 Item::Sheet(_) | Item::Row(_) | Item::Column(_) | Item::Range(_) => {
                     Children::count(self, options)?
                 },
@@ -1386,7 +1397,8 @@ pub(crate) enum Props<'a> {
         name: &'a xlsx::raw::DefinedName,
         scope: Option<&'a str>,
     },
-    Chart(Arc<crate::format::chart::Summary>),
+    /// A chart: its part's projection and its anchor's cell geometry.
+    Chart(Arc<crate::format::chart::Summary>, Option<[u32; 4]>),
     Series(ChartItem),
     Axis(ChartItem),
 }
@@ -1409,7 +1421,7 @@ impl fmt::Debug for Props<'_> {
             Self::Column(_) => "Column",
             Self::Table(_) => "Table",
             Self::NamedRange { .. } => "NamedRange",
-            Self::Chart(_) => "Chart",
+            Self::Chart(..) => "Chart",
             Self::Series(_) => "Series",
             Self::Axis(_) => "Axis",
         };
@@ -1440,9 +1452,7 @@ impl<'a> Props<'a> {
             Self::Row(row) => row_value(row, RowKey::at(index)?),
             Self::Column(column) => column_value(column, ColumnKey::at(index)?),
             Self::Table(table) => table_value(table, TableKey::at(index)?),
-            Self::Chart(ref summary) => {
-                super::chart::chart_value(summary, super::chart::ChartKey::at(index)?)
-            },
+            Self::Chart(ref summary, cells) => super::chart::chart_value_at(summary, cells, index),
             Self::Series(ref item) => super::chart::series_value(item, index).map(owned),
             Self::Axis(ref item) => super::chart::axis_value(item, index).map(owned),
             Self::NamedRange { name, scope } => match NamedRangeKey::at(index)? {

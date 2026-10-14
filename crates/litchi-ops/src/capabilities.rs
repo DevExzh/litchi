@@ -2740,7 +2740,10 @@ impl Element {
             {
                 self.adapter == Adapter::Docx
                     && self.retains_source != Some(false)
-                    && matches!(self.data().canonical, "p" | "r" | "hyperlink" | "tc")
+                    && matches!(
+                        self.data().canonical,
+                        "p" | "r" | "hyperlink" | "tc" | "chart"
+                    )
                     && readable
             }
             #[cfg(not(feature = "docx"))]
@@ -2860,12 +2863,13 @@ impl Element {
                 && readable);
         #[cfg(not(feature = "pptx"))]
         let add = structural;
-        // DOCX pictures are addable but not yet removable (record 0251d).
+        // DOCX pictures are addable but not yet removable (record 0251d);
+        // charts are both (record 0283).
         #[cfg(feature = "docx")]
         let add = add
             || (self.adapter == Adapter::Docx
                 && self.retains_source != Some(false)
-                && self.data().canonical == "picture"
+                && matches!(self.data().canonical, "picture" | "chart")
                 && readable);
         #[cfg(feature = "xlsb")]
         let add = add
@@ -2944,7 +2948,7 @@ impl Element {
         let remove = remove
             || (self.adapter == Adapter::Docx
                 && self.retains_source != Some(false)
-                && matches!(self.data().canonical, "tc" | "sdt")
+                && matches!(self.data().canonical, "tc" | "sdt" | "chart")
                 && readable);
         #[cfg(feature = "xlsb")]
         let remove = remove
