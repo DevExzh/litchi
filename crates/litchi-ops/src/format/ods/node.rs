@@ -457,6 +457,12 @@ pub(super) fn sheet_index(file: &Ods, position: u32) -> Result<&SheetIndex> {
     file.cache().sheet(sheets, position as usize)
 }
 
+/// The row-run ends of the worksheet at `position`.
+pub(super) fn row_ends(file: &Ods, position: u32) -> Result<&super::index::RowEnds> {
+    let sheets = file.worksheets()?;
+    file.cache().rows(sheets, position as usize)
+}
+
 pub(super) fn missing_sheet() -> Error {
     Error::new(
         Code::PathNotFound,

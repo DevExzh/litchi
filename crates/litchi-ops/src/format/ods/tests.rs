@@ -228,3 +228,60 @@ fn cell_only_walks_match_the_phased_sheet_walk() {
         assert_eq!(direct, phased, "{name}");
     }
 }
+
+/// Record 0287: the binary-searched row runs find exactly the run
+/// `Sheet::cell` finds, at every run boundary of every fixture sheet
+/// (including the huge padding runs producers write).
+#[test]
+fn row_ends_find_the_runs_sheet_cell_finds() {
+    let mut fixtures: Vec<&str> = FIXTURES.to_vec();
+    fixtures.extend([
+        "odf/corpus/calc-cell-styles.ods",
+        "odf/ods/grid-padding-package.ods",
+        "odfdo/tests/samples/simple_table_named_range.ods",
+    ]);
+    for name in fixtures {
+        let file =
+            crate::open_bytes(std::fs::read(fixture(name)).expect("fixture")).expect("open ODS");
+        let crate::File::Ods(ods) = &file else {
+            panic!("{name}: expected ODS");
+        };
+        for (position, sheet) in ods.worksheets().expect("sheets").iter().enumerate() {
+            let ends = node::row_ends(ods, position as u32).expect("row ends");
+            let mut rows = vec![0_usize];
+            let mut end = 0_usize;
+            for row in &sheet.rows {
+                rows.extend([end.saturating_sub(1), end, end.saturating_add(1)]);
+                end = end.saturating_add(row.repeat());
+            }
+            rows.extend([
+                end.saturating_sub(1),
+                end,
+                end.saturating_add(7),
+                usize::MAX,
+            ]);
+            let mut columns = vec![0_usize, 1, 2, 3, 1023, 1024, 16_383, 16_384];
+            if let Some(row) = sheet.rows.first() {
+                let mut end = 0_usize;
+                for cell in &row.cells {
+                    columns.extend([end.saturating_sub(1), end, end.saturating_add(1)]);
+                    end = end.saturating_add(cell.repeat());
+                }
+            }
+            for &row in &rows {
+                for &column in &columns {
+                    let expected = sheet.cell(row, column);
+                    let found = ends.cell(sheet, row, column);
+                    assert!(
+                        match (expected, found) {
+                            (Some(expected), Some(found)) => std::ptr::eq(expected, found),
+                            (None, None) => true,
+                            _ => false,
+                        },
+                        "{name} sheet {position}: ({row}, {column})"
+                    );
+                }
+            }
+        }
+    }
+}

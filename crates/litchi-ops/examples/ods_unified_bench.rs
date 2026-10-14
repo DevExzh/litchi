@@ -170,6 +170,7 @@ mod enabled {
         (row, column, path)
     }
 
+    #[inline(never)]
     fn leaf_set(package: &Package, count: usize) -> Package {
         let mut edit = package.edit().expect("leaf edit");
         edit.worksheets(|worksheets| {
@@ -197,6 +198,7 @@ mod enabled {
         edit.commit().expect("leaf commit").into_package()
     }
 
+    #[inline(never)]
     fn unified_batch(file: &File, items: &[BatchItem<'static>]) -> File {
         let commit = file
             .batch(items.iter().cloned(), BatchMode::Atomic)
