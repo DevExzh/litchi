@@ -250,7 +250,6 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
   - D3: tiers stay strict. Phase F (RTF/ODF/iWork) waits until tiers 1–2 reach P0 CRUD; the RTF work already landed is kept.
   - D4: earlier provisional decisions remain provisional.
   - D5: budget misses get engineering first. Explanations come only after a fix attempt.
-- Record 0267 (merged, provisional): an early-stopping query (`first()`, `limit(n)`) on a sheet with a defect past the rows it reads returns the leading matches. Trunk used to refuse the whole sheet. This is in the class of the 2026-09-16 decision 8. The alternative, validating every sheet whole before a cold early query, removes most of the 8–21× gain.
 
 ## Wave R1 (2026-10-13, coordinator restart)
 Branches `uo2/*` cut from `908f9cccdd`; records 0249–0255:
@@ -393,7 +392,7 @@ Added later in R3: `corpus-parity` (0269) and `s19-charts` (0270), then follow-u
 - Merged `stream-cursor` (0267, `48bd7bedc4`):
   - cell cursors for early-stopping queries; cold first match is 21× faster on XLSX, 17.7× on XLSB and 7.9× on XLS (50k rows);
   - 396 query digests byte-identical; the XLSB node is now 88 bytes.
-  - Provisional: early queries may return leading matches on a sheet broken past them (see "Awaiting owner confirmation").
+  - **Owner decision (2026-10-14): accepted.** On a sheet broken past the rows read, an early query (`first()`, `limit(n)`) returns the leading matches, and the refusal is reported only if the walk reaches the defect.
 - Merged `s22-odf-w3` (0268, `fd49666493`):
   - ODT/ODS/ODP each have an immutable `Package` plus read-only projections;
   - every ODF whole-package save is atomic; typed `SourceLimits`/`SemanticLimits`/`OpenOptions`;
@@ -433,7 +432,7 @@ Cut from `395d0ffa9f`:
   - writes cover cells, named styles, merges, sheets, rows, named ranges, comments, `/metadata`, `create` and atomic save;
   - leaf: LibreOffice-produced ODS is now editable without losing untouched bytes;
   - 1.00–1.02× the leaf, and 1.42× for 10k batches (within 2×).
-  - Provisional: the leaf's `Edit::set_metadata` is not the glossary's `metadata` family (follow-up M1).
+  - Owner decision (2026-10-14): the current ODS shape (`Edit::set_metadata`) stays; the glossary `metadata` family is recorded as follow-up M1.
   - Sheet and row structure edits are refused on LibreOffice-saved files (leaf rule R1).
 - Merged `s20-find` (0273):
   - `find=`/`replace=` (with `matchCase`, `wholeWord`) on `set` for DOCX, PPTX, XLSX and RTF; regex refused (record 0010 Q3);

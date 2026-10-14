@@ -116,7 +116,8 @@ after the batch; XLS — a shared-string index or `STRING` result that only
 value decoding refuses (framing, parse and XF checks are validated up
 front). This is the class the owner accepted for the XLSX read gate on
 2026-09-16 (decision 8, "the timing of the error return moves") and is
-flagged for the coordinator; no corpus file shows it.
+flagged for the coordinator; no corpus file shows it. **Owner decision
+(2026-10-14): accepted** — the delayed damage report stands.
 
 ## 3. The per-match source check on file sources (F1)
 

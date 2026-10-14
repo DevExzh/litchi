@@ -216,7 +216,9 @@ parse, a row splice and a typed readback reparse: about 62 ms here).
 - **F1 flat writes.** `.fods` is read-only; the leaf flat transaction
   admits scalar cell writes only.
 - **F2 flat annotations and definitions** are not projected.
-- **M1 metadata family.** ADR 0034's `Package::edit_metadata` +
+- **M1 metadata family** (owner decision 2026-10-14: the current
+  `Edit::set_metadata` shape stays; the family is a recorded improvement).
+  ADR 0034's `Package::edit_metadata` +
   `metadata::{Edit, …}` family is not built; `document::Edit::set_metadata`
   covers the five owned fields (glossary row annotated). `lastModifiedBy`,
   `created`, `modified`, `language`, revision, template and custom
