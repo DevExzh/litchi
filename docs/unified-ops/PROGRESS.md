@@ -511,6 +511,13 @@ Cut from `80e24f8745`:
   - 1k-heading TOC 1.02×, current TOC 0.89×, 6k XLSX caches 1.005×.
   - Open: F1–F8.
   - Finding for 0273: a DOCX find over `/body` rewrites a TOC whose field spans paragraphs (fix queued).
+- Merged `charts-docx` (0283):
+  - DOCX charts at `/body/p[N]/chart[M]` (also `/chart[N]`) with add/get/query/set/remove;
+  - deterministic chartex parts for waterfall, funnel, treemap, sunburst, histogram, Pareto and box-whisker on PPTX, XLSX and DOCX;
+  - chart `set` covers type, data, geometry, axis range, series color and formatting keys, guarded by `Parsed::is_authored`;
+  - corpus 3,847 passed, 779 gap, 0 bugs; new delta D10.
+  - Miss: XLSX chart `set` 1.12–1.13× at 10 charts and 1.35× at 100 (an extra drawing-inventory read; cache it).
+  - LibreOffice draws the extended charts as plain charts, and DOCX extended charts not at all.
 - **Owner decision (2026-10-14):** keep the per-match file-source freshness check in queries (record 0280 G1, raised by 0281 F3). A once-per-walk check is rejected because it would break "the next pull after a source change fails". Per-check cost work (0280's lock-free `fstat`) stays.
 - Environment: a session restart wiped `/tmp`, which held the gate scripts and `TMPDIR`. Gate scripts now live in the session scratchpad and create their `TMPDIR`.
 
