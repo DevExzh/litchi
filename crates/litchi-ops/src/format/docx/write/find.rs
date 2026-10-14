@@ -79,6 +79,8 @@ impl Docx {
         let mut staged = 0usize;
         let mut rewrites = Vec::new();
         let mut scratch = Scratch::default();
+        // One piece buffer for every paragraph (record 0281).
+        let mut spare: Vec<Piece<'static>> = Vec::new();
         for scope in &scopes {
             let nodes = both!(&work, |edit| edit
                 .text_nodes(&scope.path)
@@ -86,18 +88,16 @@ impl Docx {
             if nodes.is_empty() {
                 continue;
             }
-            let pieces: Vec<Piece<'_>> = nodes
-                .iter()
-                .map(|node| Piece {
-                    text: node.text.as_str(),
-                    group: node.group,
-                    scoped: scope.within.as_ref().is_none_or(|within| {
-                        node.run
-                            .as_ref()
-                            .is_some_and(|run| within.iter().any(|path| starts_with(run, path)))
-                    }),
-                })
-                .collect();
+            let mut pieces = recycle(std::mem::take(&mut spare));
+            pieces.extend(nodes.iter().map(|node| Piece {
+                text: node.text.as_str(),
+                group: node.group,
+                scoped: scope.within.as_ref().is_none_or(|within| {
+                    node.run
+                        .as_ref()
+                        .is_some_and(|run| within.iter().any(|path| starts_with(run, path)))
+                }),
+            }));
             let planned = plan_with(
                 &mut scratch,
                 &pieces,
@@ -107,6 +107,7 @@ impl Docx {
                 limits.max_staged_bytes().saturating_sub(staged),
             )?;
             if planned.matches == 0 {
+                spare = recycle(pieces);
                 continue;
             }
             matches = matches.saturating_add(planned.matches);
@@ -141,6 +142,13 @@ impl Docx {
     }
 }
 
+/// An empty piece buffer that keeps `pieces`' allocation for pieces of
+/// another lifetime (the in-place collection reuses it: same layout).
+fn recycle<'b>(mut pieces: Vec<Piece<'_>>) -> Vec<Piece<'b>> {
+    pieces.clear();
+    pieces.into_iter().map(|_| unreachable!()).collect()
+}
+
 /// Whether `path` is `prefix` or below it.
 fn starts_with(path: &ElementPath, prefix: &ElementPath) -> bool {
     path.steps().starts_with(prefix.steps())
@@ -150,11 +158,19 @@ fn starts_with(path: &ElementPath, prefix: &ElementPath) -> bool {
 fn scopes(nodes: &[Node<'_>]) -> Result<Vec<Scope>> {
     let mut scopes: Vec<Scope> = Vec::new();
     let mut index: HashMap<ElementPath, usize> = HashMap::new();
+    // One target node names each paragraph at most once: only several
+    // targets need the deduplicating index (record 0281).
+    let dedupe = nodes.len() > 1;
     let mut body_index = None;
-    let mut add =
-        |path: ElementPath, within: Option<ElementPath>, scopes: &mut Vec<Scope>| match index
-            .get(&path)
-        {
+    let mut add = |path: ElementPath, within: Option<ElementPath>, scopes: &mut Vec<Scope>| {
+        if !dedupe {
+            scopes.push(Scope {
+                path,
+                within: within.map(|run| vec![run]),
+            });
+            return;
+        }
+        match index.get(&path) {
             Some(&at) => match (&mut scopes[at].within, within) {
                 (Some(runs), Some(run)) => runs.push(run),
                 (slot, None) => *slot = None,
@@ -167,7 +183,8 @@ fn scopes(nodes: &[Node<'_>]) -> Result<Vec<Scope>> {
                     within: within.map(|run| vec![run]),
                 });
             },
-        };
+        }
+    };
     for node in nodes {
         match node.element_kind() {
             Kind::Document | Kind::Body => {

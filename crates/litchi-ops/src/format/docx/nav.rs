@@ -416,7 +416,22 @@ impl<'f> Navigate<'f> for Nav<'f> {
                     None => Lookup::NotApplicable,
                 })
             },
-            (Value::Table(_), Kind::Row) => {
+            (Value::Table(block), Kind::Row) => {
+                if let Select::Ordinal(position) = step.select {
+                    // Read the table only up to the addressed row (record 0281).
+                    let row = match block.indexed()?.table() {
+                        Some(table) => table.row(position.get())?,
+                        None => None,
+                    };
+                    return Ok(row.map_or(Lookup::Missing, |row| {
+                        Lookup::Found(Node::new(
+                            self.docx,
+                            Kind::Row,
+                            Value::Row(Arc::new(row)),
+                            address.with(Step::new(Kind::Row, ordinal(position.get()))),
+                        ))
+                    }));
+                }
                 let rows = Self::rows(parent)?;
                 Ok(match pick_index(rows.len(), &step.select) {
                     Some(Some(index)) => {
@@ -433,6 +448,16 @@ impl<'f> Navigate<'f> for Nav<'f> {
                 })
             },
             (Value::Row(row), Kind::Cell) => {
+                if let Select::Ordinal(position) = step.select {
+                    return Ok(row.cell(position.get())?.map_or(Lookup::Missing, |cell| {
+                        Lookup::Found(Node::new(
+                            self.docx,
+                            Kind::Cell,
+                            Value::Cell(cell),
+                            address.with(Step::new(Kind::Cell, ordinal(position.get()))),
+                        ))
+                    }));
+                }
                 let cells = row.cells()?;
                 Ok(match pick_index(cells.len(), &step.select) {
                     Some(Some(index)) => {
