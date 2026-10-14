@@ -10,10 +10,14 @@
 //! parts it changed and the [`Diagnostics`]; [`Package::apply_charts`]
 //! replays a patch onto an equal package. The source package never changes.
 //!
-//! Charts are numbered per worksheet in drawing order, counting the ordinary
-//! `c:chart` frames only ([`Package::chart_count`], [`Package::chart_xml`]).
-//! Chart XML is validated by the `DrawingML` chart reader before it is
-//! staged. A changed edit of a signed workbook is refused with
+//! Charts are numbered per worksheet in drawing order, counting the
+//! ordinary `c:chart` frames and the extended `cx:chart` frames
+//! ([`Package::chart_count`], [`Package::chart_xml`],
+//! [`Package::chart_anchor`]). An extended chart part
+//! (`litchi_drawingml::chart::chartex`) is staged with its chart-style and
+//! color-style companions; [`Edit::set`] keeps a part's family, and
+//! [`Edit::set_anchor`] moves or resizes a frame. Chart XML is validated by
+//! the `DrawingML` chart (or `ChartEx`) reader before it is staged. A changed edit of a signed workbook is refused with
 //! [`Error::Signed`]; an exact no-op keeps every byte.
 //!
 //! ```
@@ -53,6 +57,7 @@ use crate::Package;
 use crate::error::invalid;
 
 use super::Anchor;
+use litchi_drawingml::chart::chartex;
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -317,7 +322,24 @@ struct Inventory {
 }
 
 fn is_chart_namespace(namespace: &ResolveResult<'_>) -> bool {
-    matches!(namespace, ResolveResult::Bound(ns) if ns.as_ref() == CHART_NS || ns.as_ref() == STRICT_CHART_NS)
+    matches!(namespace, ResolveResult::Bound(ns) if ns.as_ref() == CHART_NS
+        || ns.as_ref() == STRICT_CHART_NS
+        || ns.as_ref() == chartex::NAMESPACE.as_bytes())
+}
+
+/// Whether a drawing relationship names a chart: an ordinary one, or an
+/// extended (`cx:chartSpace`) one.
+fn is_chart_relationship(reltype: &str) -> bool {
+    matches!(reltype, rt::CHART | rt::STRICT_CHART) || reltype == chartex::RELATIONSHIP_TYPE
+}
+
+/// The content type a chart relationship's target must have.
+fn chart_content_type(reltype: &str) -> &'static str {
+    if reltype == chartex::RELATIONSHIP_TYPE {
+        chartex::CONTENT_TYPE
+    } else {
+        ct::DML_CHART
+    }
 }
 
 fn is_relationship_namespace(namespace: &ResolveResult<'_>) -> bool {
@@ -421,6 +443,140 @@ fn inventory(xml: &[u8]) -> Result<Inventory> {
     })
 }
 
+/// The two-cell anchor of a frame: its value, and the byte spans and
+/// qualified names of its `from` and `to` markers within the fragment.
+struct Marker {
+    anchor: Anchor,
+    from: std::ops::Range<usize>,
+    to: std::ops::Range<usize>,
+    prefix: String,
+}
+
+/// Read the two-cell anchor of one anchor fragment; `None` for a one-cell
+/// or absolute anchor.
+fn marker_of(fragment: &[u8]) -> Result<Option<Marker>> {
+    use litchi_core::xml::ReaderOrigin;
+    let mut reader = NsReader::from_reader(fragment);
+    let origin = ReaderOrigin::of(fragment);
+    reader.config_mut().trim_text(true);
+    let position = |reader: &NsReader<&[u8]>| {
+        origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("chart anchor position overflow"))
+    };
+    let mut depth = 0_usize;
+    let mut root_is_two_cell = false;
+    let mut marker: Option<(bool, usize)> = None;
+    let mut field: Option<String> = None;
+    let mut values = [[0_i64; 4]; 2];
+    let mut spans = [None, None];
+    let mut prefix = String::new();
+    loop {
+        let start = position(&reader)?;
+        let event = reader
+            .read_event()
+            .map_err(|error| invalid(format!("chart anchor XML: {error}")))?;
+        let end = position(&reader)?;
+        match event {
+            Event::Start(element) => {
+                let local = element.local_name();
+                if depth == 0 {
+                    root_is_two_cell = local.as_ref() == b"twoCellAnchor";
+                } else if depth == 1 && matches!(local.as_ref(), b"from" | b"to") {
+                    let name = String::from_utf8_lossy(element.name().as_ref()).into_owned();
+                    prefix = name
+                        .split_once(':')
+                        .map(|(p, _)| p.to_owned())
+                        .unwrap_or_default();
+                    marker = Some((local.as_ref() == b"to", start));
+                } else if depth == 2 && marker.is_some() {
+                    field = Some(String::from_utf8_lossy(local.as_ref()).into_owned());
+                }
+                depth += 1;
+            },
+            Event::Text(text) => {
+                if let (Some((to, _)), Some(name)) = (marker, &field) {
+                    let text = text
+                        .decode()
+                        .map_err(|error| invalid(format!("chart anchor text: {error}")))?;
+                    let slot = match name.as_str() {
+                        "col" => 0,
+                        "colOff" => 1,
+                        "row" => 2,
+                        "rowOff" => 3,
+                        _ => continue,
+                    };
+                    values[usize::from(to)][slot] = text
+                        .trim()
+                        .parse::<i64>()
+                        .map_err(|_| invalid("chart anchor marker is not a number"))?;
+                }
+            },
+            Event::End(_) => {
+                depth = depth.saturating_sub(1);
+                if depth == 2 {
+                    field = None;
+                } else if depth == 1
+                    && let Some((to, begin)) = marker.take()
+                {
+                    spans[usize::from(to)] = Some(begin..end);
+                }
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    let (Some(from), Some(to)) = (spans[0].clone(), spans[1].clone()) else {
+        return Ok(None);
+    };
+    if !root_is_two_cell {
+        return Ok(None);
+    }
+    let cell =
+        |value: i64| u32::try_from(value).map_err(|_| invalid("chart anchor cell is out of range"));
+    let [f, t] = values;
+    Ok(Some(Marker {
+        anchor: Anchor {
+            from_col: cell(f[0])?,
+            from_col_offset: f[1],
+            from_row: cell(f[2])?,
+            from_row_offset: f[3],
+            to_col: cell(t[0])?,
+            to_col_offset: t[1],
+            to_row: cell(t[2])?,
+            to_row_offset: t[3],
+        },
+        from,
+        to,
+        prefix,
+    }))
+}
+
+fn marker_xml(
+    prefix: &str,
+    element: &str,
+    col: u32,
+    col_offset: i64,
+    row: u32,
+    row_offset: i64,
+) -> String {
+    let q = |local: &str| {
+        if prefix.is_empty() {
+            local.to_owned()
+        } else {
+            format!("{prefix}:{local}")
+        }
+    };
+    format!(
+        "<{e}><{c}>{col}</{c}><{co}>{col_offset}</{co}><{r}>{row}</{r}><{ro}>{row_offset}</{ro}></{e}>",
+        e = q(element),
+        c = q("col"),
+        co = q("colOff"),
+        r = q("row"),
+        ro = q("rowOff"),
+    )
+}
+
 fn validate_anchor(anchor: &Anchor) -> Result<()> {
     if anchor.to_row < anchor.from_row || anchor.to_col < anchor.from_col {
         return Err(invalid("chart anchor cannot be descending"));
@@ -467,14 +623,13 @@ fn chart_uri(package: &OpcPackage, drawing: &PackURI, relationship_id: &str) -> 
         .rels()
         .get(relationship_id)
         .ok_or_else(|| invalid("drawing chart relationship is missing"))?;
-    if relationship.is_external() || !matches!(relationship.reltype(), rt::CHART | rt::STRICT_CHART)
-    {
+    if relationship.is_external() || !is_chart_relationship(relationship.reltype()) {
         return Err(invalid(
             "drawing chart relationship is not an internal chart",
         ));
     }
     let target = relationship.target_partname()?;
-    if package.get_part(&target)?.content_type() != ct::DML_CHART {
+    if package.get_part(&target)?.content_type() != chart_content_type(relationship.reltype()) {
         return Err(invalid("drawing chart target is not a chart part"));
     }
     Ok(target)
@@ -491,10 +646,15 @@ fn free_name(package: &OpcPackage, prefix: &str, suffix: &str) -> Result<PackURI
     Err(invalid("no free part name is left"))
 }
 
-fn check_chart(xml: &[u8]) -> Result<()> {
+/// Validate a chart part; `true` for an extended (`cx:chartSpace`) one.
+fn check_chart(xml: &[u8]) -> Result<bool> {
     LimitKind::ChartBytes.check(xml.len())?;
+    if chartex::is_chartex(xml) {
+        chartex::read(xml)?;
+        return Ok(true);
+    }
     litchi_drawingml::chart::reader::read(xml)?;
-    Ok(())
+    Ok(false)
 }
 
 /// The drawing part named by a worksheet's relationships, if any.
@@ -540,6 +700,25 @@ fn source_frames(
     Ok(Some((drawing, frames)))
 }
 
+/// The two-cell anchor of the chart at `index` on a source-backed
+/// worksheet part.
+pub(crate) fn source_chart_anchor(
+    package: &litchi_opc::SourceBackedPackage,
+    worksheet: &PackURI,
+    index: usize,
+) -> Result<Option<Anchor>> {
+    package.check_execution()?;
+    let Some(drawing) = drawing_in(package.part(worksheet)?.rels())? else {
+        return Ok(None);
+    };
+    let xml = source_bytes(package, &drawing)?;
+    let frames = inventory(&xml)?.frames;
+    let Some(frame) = frames.get(index) else {
+        return Ok(None);
+    };
+    Ok(marker_of(&xml[frame.anchor.clone()])?.map(|marker| marker.anchor))
+}
+
 /// The number of ordinary charts on a source-backed worksheet part.
 pub(crate) fn source_chart_count(
     package: &litchi_opc::SourceBackedPackage,
@@ -567,14 +746,13 @@ pub(crate) fn source_chart_xml(
         .rels()
         .get(&frame.relationship_id)
         .ok_or_else(|| invalid("drawing chart relationship is missing"))?;
-    if relationship.is_external() || !matches!(relationship.reltype(), rt::CHART | rt::STRICT_CHART)
-    {
+    if relationship.is_external() || !is_chart_relationship(relationship.reltype()) {
         return Err(invalid(
             "drawing chart relationship is not an internal chart",
         ));
     }
     let chart = relationship.target_partname()?;
-    if package.part(&chart)?.content_type() != ct::DML_CHART {
+    if package.part(&chart)?.content_type() != chart_content_type(relationship.reltype()) {
         return Err(invalid("drawing chart target is not a chart part"));
     }
     source_bytes(package, &chart).map(Some)
@@ -615,6 +793,27 @@ impl Package {
         };
         let chart = chart_uri(self.opc(), &drawing, &frame.relationship_id)?;
         Ok(Some(self.opc().get_part(&chart)?.blob()))
+    }
+
+    /// The two-cell anchor of the chart at `index` (drawing order) on a
+    /// worksheet; `None` past the last chart or for a chart placed by a
+    /// one-cell or absolute anchor.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing sheet, a chartsheet, or a malformed
+    /// drawing.
+    pub fn chart_anchor(&self, sheet: usize, index: usize) -> Result<Option<Anchor>> {
+        let worksheet = worksheet_uri(self, sheet)?;
+        let Some(drawing) = drawing_uri(self.opc(), &worksheet)? else {
+            return Ok(None);
+        };
+        let xml = self.opc().get_part(&drawing)?.blob();
+        let frames = inventory(xml)?.frames;
+        let Some(frame) = frames.get(index) else {
+            return Ok(None);
+        };
+        Ok(marker_of(&xml[frame.anchor.clone()])?.map(|marker| marker.anchor))
     }
 
     /// Start a worksheet chart edit.
@@ -679,7 +878,7 @@ impl Edit<'_> {
     /// workbook.
     pub fn add(&mut self, sheet: usize, anchor: &Anchor, name: &str, xml: &[u8]) -> Result<usize> {
         validate_anchor(anchor)?;
-        check_chart(xml)?;
+        let extended = check_chart(xml)?;
         if name.contains('\0') {
             return Err(invalid("chart frame name contains a NUL character"));
         }
@@ -713,20 +912,52 @@ impl Edit<'_> {
         };
         let inventory = inventory(staged.get_part(&drawing)?.blob())?;
         LimitKind::Charts.check(inventory.frames.len() + 1)?;
-        let chart = free_name(&staged, "/xl/charts/chart", ".xml")?;
-        staged.add_part(Box::new(BlobPart::new(
-            chart.clone(),
-            ct::DML_CHART.to_owned(),
-            xml.to_vec(),
-        )));
+        let (stem, content_type, relationship_type) = if extended {
+            (
+                "/xl/charts/chartEx",
+                chartex::CONTENT_TYPE,
+                chartex::RELATIONSHIP_TYPE,
+            )
+        } else {
+            ("/xl/charts/chart", ct::DML_CHART, rt::CHART)
+        };
+        let chart = free_name(&staged, stem, ".xml")?;
+        let mut chart_part = BlobPart::new(chart.clone(), content_type.to_owned(), xml.to_vec());
+        if extended {
+            // An extended chart needs its style and color companions.
+            for (stem, content_type, relationship_type, bytes) in [
+                (
+                    "/xl/charts/style",
+                    chartex::STYLE_CONTENT_TYPE,
+                    chartex::STYLE_RELATIONSHIP_TYPE,
+                    chartex::style_xml(),
+                ),
+                (
+                    "/xl/charts/colors",
+                    chartex::COLORS_CONTENT_TYPE,
+                    chartex::COLORS_RELATIONSHIP_TYPE,
+                    chartex::colors_xml(),
+                ),
+            ] {
+                let companion = free_name(&staged, stem, ".xml")?;
+                chart_part.relate_to(&companion.relative_ref(chart.base_uri()), relationship_type);
+                staged.add_part(Box::new(BlobPart::new(
+                    companion.clone(),
+                    content_type.to_owned(),
+                    bytes,
+                )));
+                self.touch(&companion);
+            }
+        }
+        staged.add_part(Box::new(chart_part));
         let target = chart.relative_ref(drawing.base_uri());
         let part = staged.get_part_mut(&drawing)?;
-        let relationship_id = part.relate_to(&target, rt::CHART);
+        let relationship_id = part.relate_to(&target, relationship_type);
         let id = inventory
             .max_id
             .checked_add(1)
             .ok_or_else(|| invalid("drawing shape ids are exhausted"))?;
-        let fragment = anchor_xml(anchor, id, name, &relationship_id);
+        let fragment = anchor_xml(anchor, id, name, &relationship_id, extended);
         let mut bytes = part.blob().to_vec();
         bytes.splice(inventory.root_close..inventory.root_close, fragment.bytes());
         part.set_blob(bytes);
@@ -766,19 +997,77 @@ impl Edit<'_> {
     /// Returns an error for a missing sheet or chart, XML that is not a
     /// chart, or a changed edit of a signed workbook.
     pub fn set(&mut self, sheet: usize, index: usize, xml: Vec<u8>) -> Result<bool> {
-        check_chart(&xml)?;
+        let extended = check_chart(&xml)?;
         let (_, drawing, inventory) = self.frames(sheet)?;
         let frame = inventory
             .frames
             .get(index)
             .ok_or_else(|| invalid(format!("chart {index} does not exist")))?;
         let chart = chart_uri(&self.staged, &drawing, &frame.relationship_id)?;
+        if (self.staged.get_part(&chart)?.content_type() == chartex::CONTENT_TYPE) != extended {
+            return Err(invalid(
+                "a chart part keeps its family: ordinary and extended charts do not replace each other",
+            ));
+        }
         if self.staged.get_part(&chart)?.blob() == xml.as_slice() {
             return Ok(false);
         }
         crate::signature_policy::ensure_unsigned(&self.staged)?;
         self.staged.get_part_mut(&chart)?.set_blob(xml);
         self.touch(&chart);
+        Ok(true)
+    }
+
+    /// Move or resize the chart at `index` on a worksheet: replace the cells
+    /// and offsets of its two-cell anchor. Returns whether anything changed;
+    /// the frame, its name and its chart part are kept.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing sheet or chart, an invalid anchor, a
+    /// chart placed by a one-cell or absolute anchor, or a changed edit of
+    /// a signed workbook.
+    pub fn set_anchor(&mut self, sheet: usize, index: usize, anchor: &Anchor) -> Result<bool> {
+        validate_anchor(anchor)?;
+        let (_, drawing, inventory) = self.frames(sheet)?;
+        let frame = inventory
+            .frames
+            .get(index)
+            .ok_or_else(|| invalid(format!("chart {index} does not exist")))?;
+        let xml = self.staged.get_part(&drawing)?.blob();
+        let fragment = &xml[frame.anchor.clone()];
+        let marker = marker_of(fragment)?
+            .ok_or_else(|| invalid("only a two-cell chart anchor can be moved"))?;
+        if marker.anchor == *anchor {
+            return Ok(false);
+        }
+        crate::signature_policy::ensure_unsigned(&self.staged)?;
+        let from = marker_xml(
+            &marker.prefix,
+            "from",
+            anchor.from_col,
+            anchor.from_col_offset,
+            anchor.from_row,
+            anchor.from_row_offset,
+        );
+        let to = marker_xml(
+            &marker.prefix,
+            "to",
+            anchor.to_col,
+            anchor.to_col_offset,
+            anchor.to_row,
+            anchor.to_row_offset,
+        );
+        let base = frame.anchor.start;
+        let mut bytes = xml.to_vec();
+        // The `to` marker follows the `from` one: replace it first.
+        bytes.splice(base + marker.to.start..base + marker.to.end, to.bytes());
+        bytes.splice(
+            base + marker.from.start..base + marker.from.end,
+            from.bytes(),
+        );
+        self.staged.get_part_mut(&drawing)?.set_blob(bytes);
+        self.touch(&drawing);
         Ok(true)
     }
 
@@ -878,8 +1167,22 @@ fn is_referenced(package: &OpcPackage, name: &PackURI) -> bool {
     })
 }
 
-fn anchor_xml(anchor: &Anchor, id: u32, name: &str, relationship_id: &str) -> String {
+fn anchor_xml(
+    anchor: &Anchor,
+    id: u32,
+    name: &str,
+    relationship_id: &str,
+    extended: bool,
+) -> String {
     use litchi_core::xml::escape_xml;
+    let (uri, prefix) = if extended {
+        (chartex::GRAPHIC_DATA_URI, "cx")
+    } else {
+        (
+            "http://schemas.openxmlformats.org/drawingml/2006/chart",
+            "c",
+        )
+    };
     format!(
         concat!(
             r#"<xdr:twoCellAnchor xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" "#,
@@ -888,8 +1191,8 @@ fn anchor_xml(anchor: &Anchor, id: u32, name: &str, relationship_id: &str) -> St
             "<xdr:to><xdr:col>{tc}</xdr:col><xdr:colOff>{tco}</xdr:colOff><xdr:row>{tr}</xdr:row><xdr:rowOff>{tro}</xdr:rowOff></xdr:to>",
             r#"<xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="{id}" name="{name}"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr>"#,
             r#"<xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm>"#,
-            r#"<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart">"#,
-            r#"<c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" "#,
+            r#"<a:graphic><a:graphicData uri="{uri}">"#,
+            r#"<{prefix}:chart xmlns:{prefix}="{uri}" "#,
             r#"xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:id="{rel}"/>"#,
             "</a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:twoCellAnchor>"
         ),
@@ -901,6 +1204,8 @@ fn anchor_xml(anchor: &Anchor, id: u32, name: &str, relationship_id: &str) -> St
         tco = anchor.to_col_offset,
         tr = anchor.to_row,
         tro = anchor.to_row_offset,
+        uri = uri,
+        prefix = prefix,
         id = id,
         name = escape_xml(name),
         rel = escape_xml(relationship_id),
@@ -1010,5 +1315,82 @@ mod tests {
                 .is_err()
         );
         assert!(edit.remove(0, 0).is_err());
+    }
+
+    #[test]
+    fn extended_charts_and_anchor_moves_round_trip() {
+        let package = Package::new().unwrap();
+        let xml = Spec::new(Variant::new(Kind::Funnel))
+            .with_title("Pipeline")
+            .with_categories(["Leads", "Won"])
+            .with_series(Series::new("Count", vec![10.0, 2.0]))
+            .to_xml(None)
+            .unwrap();
+        let mut edit = package.edit_charts().unwrap();
+        let classic = edit
+            .add(0, &Anchor::new(0, 0, 4, 8), "Classic", &chart("A"))
+            .unwrap();
+        let extended = edit
+            .add(0, &Anchor::new(5, 0, 9, 8), "Funnel", &xml)
+            .unwrap();
+        assert_eq!((classic, extended), (0, 1));
+        let after = edit.commit().unwrap().into_package();
+        let reopened = Package::from_bytes(&after.to_bytes().unwrap()).unwrap();
+        assert_eq!(reopened.chart_count(0).unwrap(), 2);
+        assert_eq!(reopened.chart_xml(0, 1).unwrap().unwrap(), xml.as_slice());
+        let types: Vec<String> = reopened
+            .opc()
+            .iter_parts()
+            .map(|part| part.content_type().to_owned())
+            .collect();
+        for expected in [
+            chartex::CONTENT_TYPE,
+            chartex::STYLE_CONTENT_TYPE,
+            chartex::COLORS_CONTENT_TYPE,
+        ] {
+            assert!(types.iter().any(|ct| ct == expected), "{expected}");
+        }
+        assert_eq!(
+            reopened.chart_anchor(0, 1).unwrap(),
+            Some(Anchor::new(5, 0, 9, 8))
+        );
+        // A part keeps its family.
+        let mut edit = reopened.edit_charts().unwrap();
+        assert!(edit.set(0, 1, chart("B")).is_err());
+        assert!(edit.set(0, 0, xml.clone()).is_err());
+        // Moving keeps the frame and its chart.
+        assert!(!edit.set_anchor(0, 1, &Anchor::new(5, 0, 9, 8)).unwrap());
+        assert!(edit.set_anchor(0, 1, &Anchor::new(2, 3, 12, 20)).unwrap());
+        assert!(edit.set_anchor(0, 1, &Anchor::new(9, 0, 2, 8)).is_err());
+        let moved = edit.commit().unwrap().into_package();
+        assert_eq!(
+            moved.chart_anchor(0, 1).unwrap(),
+            Some(Anchor::new(2, 3, 12, 20))
+        );
+        assert_eq!(moved.chart_xml(0, 1).unwrap().unwrap(), xml.as_slice());
+        let source = crate::SourceBackedWorkbook::from_reader(std::io::Cursor::new(
+            moved.to_bytes().unwrap(),
+        ))
+        .unwrap();
+        let sheet = source.sheet(0).unwrap().unwrap();
+        assert_eq!(sheet.chart_count().unwrap(), 2);
+        assert_eq!(
+            sheet.chart_anchor(1).unwrap(),
+            Some(Anchor::new(2, 3, 12, 20))
+        );
+        assert_eq!(sheet.chart_xml(1).unwrap().unwrap(), xml);
+        // Removing the extended chart drops its companions.
+        let mut edit = moved.edit_charts().unwrap();
+        edit.remove(0, 1).unwrap();
+        let removed = edit.commit().unwrap().into_package();
+        assert!(!removed.opc().iter_parts().any(|part| {
+            [
+                chartex::CONTENT_TYPE,
+                chartex::STYLE_CONTENT_TYPE,
+                chartex::COLORS_CONTENT_TYPE,
+            ]
+            .contains(&part.content_type())
+        }));
+        assert_eq!(removed.chart_count(0).unwrap(), 1);
     }
 }

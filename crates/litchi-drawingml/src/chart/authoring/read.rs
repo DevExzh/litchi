@@ -59,23 +59,6 @@ impl Parsed {
     }
 }
 
-/// Whether a part's root element is a `cx:chartSpace`.
-fn is_chartex(xml: &[u8]) -> bool {
-    let head = &xml[..xml.len().min(4096)];
-    let text = String::from_utf8_lossy(head);
-    text.contains(crate::chart::chartex::NAMESPACE)
-        && text
-            .split('<')
-            .find(|tag| !tag.starts_with('?') && !tag.starts_with('!') && !tag.trim().is_empty())
-            .is_some_and(|tag| {
-                let name = tag
-                    .split(|character: char| character.is_whitespace() || character == '>')
-                    .next()
-                    .unwrap_or_default();
-                name.rsplit(':').next() == Some("chartSpace") && !name.starts_with("c:")
-            })
-}
-
 /// Read a chart part — `c:chartSpace`, or `cx:chartSpace` for an extended
 /// family — back into the spec that writes it.
 ///
@@ -99,7 +82,7 @@ fn is_chartex(xml: &[u8]) -> bool {
 /// Returns the chart reader's errors, and [`Error::Invalid`] for a chart
 /// with no authoring form (a surface, bar-of-pie or region-map chart).
 pub fn read(xml: &[u8]) -> Result<Parsed> {
-    if is_chartex(xml) {
+    if crate::chart::chartex::is_chartex(xml) {
         return crate::chart::chartex::read(xml);
     }
     let chart = crate::chart::reader::read(xml)?;

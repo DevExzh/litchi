@@ -330,7 +330,7 @@ impl Edit<Package> {
     }
 
     /// The folder of the main document part, with a trailing slash.
-    fn main_folder(&self) -> Result<String> {
+    pub(super) fn main_folder(&self) -> Result<String> {
         let main = self
             .package
             .opc_package()
@@ -341,7 +341,7 @@ impl Edit<Package> {
     }
 
     /// Every part name, staged parts included.
-    fn part_names(&self) -> Result<BTreeSet<String>> {
+    pub(super) fn part_names(&self) -> Result<BTreeSet<String>> {
         let mut names: BTreeSet<String> = self
             .package
             .opc_package()
@@ -355,7 +355,7 @@ impl Edit<Package> {
     }
 
     /// The first `rIdN` the main part and the staged changes do not use.
-    fn next_relationship_id(&self) -> Result<String> {
+    pub(super) fn next_relationship_id(&self) -> Result<String> {
         let main = self
             .package
             .opc_package()

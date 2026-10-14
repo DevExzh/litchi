@@ -4,6 +4,7 @@
 //! the DOCX placement, relationship graph, companion parts, and opaque bytes.
 
 mod codec;
+pub(crate) mod inline;
 mod model;
 mod package;
 mod transaction;
@@ -11,6 +12,7 @@ mod transaction;
 #[cfg(test)]
 mod tests;
 
+pub use inline::InlineChart;
 pub use model::{
     Companion, Conformance, EmbeddedWorkbook, EmbeddedWorkbookContentType, Graph, Resource,
 };

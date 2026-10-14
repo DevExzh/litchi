@@ -8,11 +8,13 @@ use super::{
 use crate::Package;
 use litchi_core::Position;
 
+mod chart;
 mod comments;
 mod graph;
 mod numbering;
 mod picture;
 mod substitute;
+pub use chart::NewChart;
 pub use comments::NewComment;
 pub use graph::HyperlinkTarget;
 pub use picture::NewPicture;

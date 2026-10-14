@@ -475,6 +475,37 @@ pub(crate) fn write(spec: &Spec, external_data: Option<&str>) -> Result<Vec<u8>>
     Ok(xml.into_bytes())
 }
 
+/// Whether a chart part's root element is a `cx:chartSpace` (an extended
+/// chart) rather than a `c:chartSpace`. Only the start of the part is
+/// inspected.
+///
+/// ```
+/// use litchi_drawingml::chart::chartex;
+///
+/// assert!(chartex::is_chartex(
+///     br#"<cx:chartSpace xmlns:cx="http://schemas.microsoft.com/office/drawing/2014/chartex"/>"#
+/// ));
+/// assert!(!chartex::is_chartex(
+///     br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"/>"#
+/// ));
+/// ```
+#[must_use]
+pub fn is_chartex(xml: &[u8]) -> bool {
+    let mut reader = NsReader::from_reader(&xml[..xml.len().min(64 * 1024)]);
+    loop {
+        match reader.read_event() {
+            Ok(Event::Start(element) | Event::Empty(element)) => {
+                let (namespace, local) = reader.resolver().resolve_element(element.name());
+                return local.as_ref() == b"chartSpace"
+                    && matches!(namespace, ResolveResult::Bound(namespace)
+                        if namespace.as_ref() == NAMESPACE.as_bytes());
+            },
+            Ok(Event::Eof) | Err(_) => return false,
+            Ok(_) => {},
+        }
+    }
+}
+
 /// A deterministic chart-style companion part (`cs:chartStyle`): every
 /// entry the schema requires, with theme references only.
 #[must_use]

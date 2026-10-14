@@ -43,8 +43,8 @@ use crate::properties;
 type Result<T, E = Error> = std::result::Result<T, E>;
 
 mod element;
-pub(crate) use element::PictureMarkup;
 pub(in crate::document::transaction) use element::locate_element;
+pub(crate) use element::{ChartMarkup, PictureMarkup};
 pub use element::{
     ElementAnchor, ElementPath, ElementStep, MAX_NEW_TABLE_DIMENSION, NewTable, ParagraphRewrite,
     TextNode, TextNodeRewrite,

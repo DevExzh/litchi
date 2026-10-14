@@ -100,6 +100,28 @@ impl Paragraph {
         parse_inline_images(self.xml_bytes())
     }
 
+    /// The charts drawn in this paragraph (`w:drawing` elements holding a
+    /// `c:chart` or an extended `cx:chart`), in document order.
+    ///
+    /// ```
+    /// use litchi_docx::Package;
+    ///
+    /// let mut builder = litchi_docx::Builder::new()?;
+    /// builder.document()?.add_paragraph_with_text("No chart here");
+    /// let package = builder.build()?;
+    /// let paragraphs = package.document()?.paragraphs()?;
+    /// assert!(paragraphs[0].charts()?.is_empty());
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed paragraph XML.
+    pub fn charts(&self) -> Result<SmallVec<[crate::chart::InlineChart; 2]>> {
+        let _parser_admission = self.parser_admission()?;
+        crate::chart::inline::parse_inline_charts(self.xml_bytes())
+    }
+
     /// Extract all drawing objects (shapes, text boxes) from this paragraph.
     ///
     /// Returns a vector of [`Object`] values found in `<w:drawing>` elements

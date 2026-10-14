@@ -7,7 +7,7 @@ mod durable;
 #[cfg(test)]
 mod element_tests;
 mod formatting;
-pub(crate) use formatting::PictureMarkup;
+pub(crate) use formatting::{ChartMarkup, PictureMarkup};
 #[cfg(test)]
 mod formatting_tests;
 #[cfg(test)]

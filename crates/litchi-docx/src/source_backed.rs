@@ -1010,6 +1010,40 @@ impl Package {
         crate::comment::Comment::extract_from_payload(&payload)
     }
 
+    /// The chart part (a `c:chartSpace` or `cx:chartSpace`) the main
+    /// document relates through `relationship_id` — an
+    /// [`InlineChart`](crate::chart::InlineChart)'s — or `None` when the main
+    /// document has no chart relationship of that ID. Only the main part's
+    /// relationships and the chart part are read.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source changed, for an external chart
+    /// relationship, or for a target that is not a chart part.
+    pub fn chart_xml(&self, relationship_id: &str) -> Result<Option<Vec<u8>>> {
+        let package = self.source_backed_package()?;
+        let main = package.main_document_part()?;
+        let Some(relationship) = main.rels().get(relationship_id) else {
+            return Ok(None);
+        };
+        let Some(content_type) = crate::chart::inline::chart_content_type(relationship.reltype())
+        else {
+            return Ok(None);
+        };
+        if relationship.is_external() {
+            return Err(Error::InvalidFormat(
+                "a chart relationship cannot be external".into(),
+            ));
+        }
+        let part = package.part(&relationship.target_partname()?)?;
+        if part.content_type() != content_type {
+            return Err(Error::InvalidFormat(
+                "a chart relationship targets a part that is not a chart".into(),
+            ));
+        }
+        Ok(Some(part.data()?.as_bytes().to_vec()))
+    }
+
     /// Read relationship-selected OOXML core properties without loading the
     /// main document or unrelated package members. Retained owners resolve the
     /// effective graph, including edited relationships and property payloads.

@@ -5841,3 +5841,77 @@ fn authored_charts_carry_a_deterministic_embedded_workbook_and_edit_in_place() -
     );
     Ok(())
 }
+
+#[test]
+fn extended_charts_are_chartex_parts_with_their_companions() -> Result<()> {
+    use litchi_drawingml::chart::authoring::{self, Kind, Series, Spec, Variant};
+    use litchi_drawingml::chart::chartex;
+    let package = opened_two_slide_package()?;
+    let source = package.opened_presentation()?;
+    let spec = Spec::new(Variant::new(Kind::Waterfall))
+        .with_title("Cash")
+        .with_categories(["Start", "Q1", "End"])
+        .with_series(Series::new("Cash", vec![100.0, -30.0, 70.0]));
+    let mut edit = source.edit();
+    let id = edit.add_chart(0_usize, &spec, "Cash", (10, 20, 3_000_000, 2_000_000))?;
+    let mut committed = edit.commit()?.into_package();
+    let mut again = source.edit();
+    again.add_chart(0_usize, &spec, "Cash", (10, 20, 3_000_000, 2_000_000))?;
+    assert_eq!(
+        committed.to_bytes()?,
+        again.commit()?.into_package().to_bytes()?
+    );
+
+    let reopened = Package::from_bytes(&committed.to_bytes()?)?;
+    let content_types: Vec<String> = reopened
+        .opc
+        .iter_parts()
+        .map(|part| part.content_type().to_owned())
+        .collect();
+    for expected in [
+        chartex::CONTENT_TYPE,
+        chartex::STYLE_CONTENT_TYPE,
+        chartex::COLORS_CONTENT_TYPE,
+    ] {
+        assert!(content_types.iter().any(|ct| ct == expected), "{expected}");
+    }
+    let root = reopened.opened_presentation()?;
+    let slide = reopened.opc.get_part(root.slides()[0].part_name())?;
+    let scene = crate::shape::Scene::read(slide.blob())?;
+    let position = scene
+        .iter()
+        .position(|shape| shape.id() == Some(id))
+        .expect("chart frame");
+    assert!(matches!(
+        scene.at(position).expect("frame"),
+        crate::shape::Shape::Chart(_)
+    ));
+    let mut edit = root.edit();
+    let (xml, workbook) = edit.chart(0_usize, position)?;
+    assert!(workbook.expect("embedded workbook").starts_with(b"PK"));
+    let parsed = authoring::read(&xml).map_err(|error| Error::Invalid(error.to_string()))?;
+    assert_eq!(parsed.spec.variant().kind, Kind::Waterfall);
+    assert!(parsed.is_authored(&xml));
+    // A rebuilt part replaces the old one; a classic part does not.
+    let retitled = parsed
+        .spec
+        .clone()
+        .with_title("Cash flow")
+        .to_xml(parsed.external_data.as_deref())
+        .map_err(|error| Error::Invalid(error.to_string()))?;
+    assert!(edit.set_chart(0_usize, position, retitled, None)?);
+    let classic = authored_chart("x", &["a"], vec![1.0])
+        .to_xml(None)
+        .map_err(|error| Error::Invalid(error.to_string()))?;
+    assert!(edit.set_chart(0_usize, position, classic, None).is_err());
+    edit.remove_shape(0_usize, position)?;
+    let removed = edit.commit()?.into_package();
+    assert!(
+        !removed
+            .opc
+            .iter_parts()
+            .any(|part| part.partname().as_str().starts_with("/ppt/charts/")
+                || part.partname().as_str().starts_with("/ppt/embeddings/"))
+    );
+    Ok(())
+}

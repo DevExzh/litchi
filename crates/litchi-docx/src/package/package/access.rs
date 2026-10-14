@@ -141,6 +141,38 @@ impl Package {
         crate::chart::load(&self.opc, &document)
     }
 
+    /// The chart part (a `c:chartSpace` or `cx:chartSpace`) the main
+    /// document relates through `relationship_id` — an
+    /// [`InlineChart`](crate::chart::InlineChart)'s — or `None` when the main
+    /// document has no chart relationship of that ID.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an external chart relationship or a target that
+    /// is not a chart part.
+    pub fn chart_xml(&self, relationship_id: &str) -> Result<Option<Vec<u8>>> {
+        let main = self.opc.main_document_part()?;
+        let Some(relationship) = main.rels().get(relationship_id) else {
+            return Ok(None);
+        };
+        let Some(content_type) = crate::chart::inline::chart_content_type(relationship.reltype())
+        else {
+            return Ok(None);
+        };
+        if relationship.is_external() {
+            return Err(Error::InvalidFormat(
+                "a chart relationship cannot be external".into(),
+            ));
+        }
+        let part = self.opc.get_part(&relationship.target_partname()?)?;
+        if part.content_type() != content_type {
+            return Err(Error::InvalidFormat(
+                "a chart relationship targets a part that is not a chart".into(),
+            ));
+        }
+        Ok(Some(part.blob().to_vec()))
+    }
+
     /// Load the typed, inert `SmartArt` (`DrawingML` diagram) inventory anchored
     /// in the main document.
     ///

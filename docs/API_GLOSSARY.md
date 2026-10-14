@@ -2105,5 +2105,10 @@ generator so DOCX shares it.
 | `litchi_drawingml::chart::authoring::Spec::{category_axis_title, value_axis_title, series_kinds, with_variant, without_title, with_data, series_mut, appearance_mut, workbook_members}` | adopted (0283) |
 | `litchi_drawingml::chart::chartex::{read, style_xml, colors_xml, NAMESPACE, CONTENT_TYPE, RELATIONSHIP_TYPE, GRAPHIC_DATA_URI, STYLE_CONTENT_TYPE, STYLE_RELATIONSHIP_TYPE, COLORS_CONTENT_TYPE, COLORS_RELATIONSHIP_TYPE, MAX_XML_BYTES}` | adopted (0283) |
 | `litchi_drawingml::chart::edit::Transaction::set_series_color` | adopted (0283) |
+| `litchi_drawingml::chart::chartex::is_chartex` | adopted (0283) |
+| `litchi_pptx::opened::Edit::add_chart` with an extended `Spec` (a `cx:chartSpace` part, its companions and a `cx:chart` frame); `Slide::chart_xml`, `SourceSlide::chart_xml` and `chart`/`set_chart` read and replace extended parts too | adopted (0283) |
+| `litchi_xlsx::chart::edit::Edit::set_anchor`, `litchi_xlsx::Package::chart_anchor`, `litchi_xlsx::SourceWorksheet::chart_anchor`; `Edit::add` stages extended parts; `chart::Anchor` gains `PartialEq`/`Eq` | adopted (0283) |
+| `litchi_docx::chart::InlineChart`, `Paragraph::charts`, `Package::chart_xml`, `source_backed::Package::chart_xml` | adopted (0283) |
+| `litchi_docx::document::NewChart`, `Edit::{insert_chart_at, chart_parts, set_chart, set_chart_extent_at, remove_chart_at}` | adopted (0283) |
 
 See [0283](unified-ops/0283-docx-charts-and-chartex.md).
