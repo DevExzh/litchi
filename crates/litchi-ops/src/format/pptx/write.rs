@@ -3,6 +3,7 @@ pub(crate) mod coalesce;
 mod find;
 pub(crate) mod merge;
 mod notes;
+pub(crate) mod refresh;
 mod slides;
 pub(super) mod text;
 mod transition;

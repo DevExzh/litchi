@@ -2055,6 +2055,46 @@ owning package once for these writes (`Docx` keeps the promotion).
 
 See [0274](unified-ops/0274-template-merge.md).
 
+## Field and table-of-contents refresh (record 0279)
+
+`File::refresh(&refresh::Options)` and `File::refresh_with_limits` recompute
+the derived results a document caches, as one mutation and at most one native
+commit, returning `transaction::Commit<refresh::Summary>`;
+`transaction::Edit::refresh` is the same mutation inside a closure
+transaction. `refresh` is the design §13 verb name (OfficeCLI's command).
+Options are one `refresh::Options` (`clock`, `page_numbers`, `mark_dirty`,
+`write_cache`, and `calc` with the `eval` feature) with `refresh::Clock` (an
+explicit date and time; the system clock is never read) and
+`refresh::PageNumbers::{Keep, Require}`; limits are the transaction's
+`SemanticLimits`. The report is `refresh::Summary` of `refresh::Field`s, each
+with a `refresh::Status` (`Refreshed`, `Unchanged`, `Stale`, `NeedsLayout`,
+`NeedsClock`, `Locked`, `Unresolved`, `Unsupported`). A table of contents
+whose page numbers are required but unknown is `refresh_failed`.
+
+Leaf primitives for recomputing derived field results. The DOCX leaf indexes
+the main story's paragraphs, simple and complex fields (instruction, cached
+result, nesting, lock and dirty state) and bookmarks, and rewrites field
+results without evaluating anything: `document::Edit::{fields,
+refresh_fields}` over the `document::fields` module (`Fields`, `Paragraph`,
+`Field`, `Bookmark`, `Update::{Text, Toc, Bookmark}`, `TocEntry`, `Outcome`).
+The XLSX worksheet edit stores a formula's cached result while keeping its
+formula markup (`WorksheetEdit::set_cached`). PPTX run-text edits accept a
+field run (`a:fld`) as their target, writing its cached result.
+
+| Name | Status |
+|---|---|
+| `File::{refresh, refresh_with_limits}`, `transaction::Edit::refresh` | adopted (0279) |
+| `refresh::{Options, Clock, PageNumbers, Summary, Field, Status}` | adopted (0279) |
+| `capabilities::Verb::Refresh` | adopted (0279) |
+| `litchi_docx::document::Edit::{fields, refresh_fields}` (snapshot and package edits) | adopted (0279) |
+| `litchi_docx::styles::Style::declares_outline` | adopted (0279) |
+| `litchi_pptx::{Package, source::Package}::first_slide_number` | adopted (0279) |
+| `litchi_docx::document::fields::{Fields, Paragraph, Field, Bookmark, Update, TocEntry, Outcome}` | adopted (0279) |
+| `litchi_xlsx::WorksheetEdit::set_cached` | adopted (0279) |
+| `litchi_pptx::opened::TextTarget::Run` text on `a:fld` runs | adopted (0279) |
+
+See [0279](unified-ops/0279-field-refresh.md).
+
 ## Formatting-aware find/replace (record 0273)
 
 Find/replace is not a verb: as OfficeCLI's `set --find`, a `File::set`

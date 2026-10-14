@@ -153,6 +153,16 @@ impl Package {
         Ok(package)
     }
 
+    /// The number of the first slide, `p:presentation/@firstSlideNum`
+    /// (1 when absent), from the current presentation part (record 0279).
+    ///
+    /// # Errors
+    ///
+    /// Returns an XML error for a malformed root or attribute.
+    pub fn first_slide_number(&self) -> Result<u32> {
+        crate::presentation::first_slide_number(self.root.as_bytes())
+    }
+
     /// Retained reference-compatible read repairs.
     pub fn tolerance_report(&self) -> &crate::leniency::ToleranceReport {
         &self.tolerance

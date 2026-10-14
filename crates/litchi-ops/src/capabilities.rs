@@ -240,7 +240,8 @@ impl State {
 /// assert!(Verb::Import.is_edit() && !Verb::Evaluate.is_edit());
 /// assert!(Verb::Merge.is_edit());
 /// assert!(Verb::Replace.is_edit());
-/// assert_eq!(Verb::ALL.len(), 17);
+/// assert!(Verb::Refresh.is_edit());
+/// assert_eq!(Verb::ALL.len(), 18);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
@@ -279,6 +280,8 @@ pub enum Verb {
     /// properties, OfficeCLI's spelling (record 0273). The match count is
     /// [`crate::Applied::matched`].
     Replace,
+    /// Field and table-of-contents refresh, [`File::refresh`] (record 0279).
+    Refresh,
     /// Save in the same format (W4).
     Save,
     /// Create a new package of this format (W4).
@@ -288,7 +291,7 @@ pub enum Verb {
 impl Verb {
     /// Every verb, in declaration order: the reads, then the edits,
     /// publication and creation.
-    pub const ALL: [Self; 17] = [
+    pub const ALL: [Self; 18] = [
         Self::Get,
         Self::Find,
         Self::Query,
@@ -304,6 +307,7 @@ impl Verb {
         Self::Import,
         Self::Merge,
         Self::Replace,
+        Self::Refresh,
         Self::Save,
         Self::Create,
     ];
@@ -327,6 +331,7 @@ impl Verb {
             Self::Import => "import",
             Self::Merge => "merge",
             Self::Replace => "replace",
+            Self::Refresh => "refresh",
             Self::Save => "save",
             Self::Create => "create",
         }
@@ -348,7 +353,8 @@ impl Verb {
             | Self::Batch
             | Self::Import
             | Self::Merge
-            | Self::Replace => true,
+            | Self::Replace
+            | Self::Refresh => true,
             Self::Get
             | Self::Find
             | Self::Query
@@ -714,6 +720,9 @@ impl Capabilities {
         if verb == Verb::Replace {
             return self.replace_support();
         }
+        if verb == Verb::Refresh {
+            return self.refresh_support();
+        }
         if verb == Verb::Create {
             return self.creation_support();
         }
@@ -952,6 +961,7 @@ impl Capabilities {
             Verb::Import | Verb::Evaluate => self.m4_support(verb),
             Verb::Merge => self.merge_support(),
             Verb::Replace => self.replace_support(),
+            Verb::Refresh => self.refresh_support(),
         }
     }
 
@@ -4073,5 +4083,6 @@ impl fmt::Display for Support {
 mod find;
 mod m4;
 mod merge;
+mod refresh;
 #[cfg(test)]
 mod tests;

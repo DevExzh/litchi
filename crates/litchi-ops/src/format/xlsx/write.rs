@@ -2637,6 +2637,8 @@ fn property_error(error: Error, key: &crate::props::Key<'_>) -> Error {
 mod find;
 pub(crate) mod import;
 pub(crate) mod merge;
+#[cfg(feature = "eval")]
+pub(crate) mod refresh;
 
 pub(crate) mod coalesce {
     use super::{CellOperation, CellTarget, Xlsx, admit_properties_with_limits, native_error};

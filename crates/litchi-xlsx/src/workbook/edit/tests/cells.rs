@@ -5813,3 +5813,53 @@ fn protection_alignment_and_quote_facets_join_when_disjoint_and_conflict_when_ov
         &[address]
     );
 }
+
+/// Record 0279: a formula cache write keeps the formula markup (shared
+/// members included), sets the cell type from the value, and inverts exactly.
+#[test]
+fn formula_cache_writes_keep_formula_markup() {
+    let baseline = crate::Package::new().expect("baseline");
+    let mut package = baseline.inner.package.clone();
+    let uri = baseline.inner.sheets[0].part_uri.clone();
+    package
+        .get_part_mut(&uri)
+        .expect("worksheet part")
+        .set_blob(
+            br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1"><v>2</v></c><c r="B1"><f t="shared" ref="B1:B2" si="0">A1*2</f><v>0</v></c><c r="C1" t="str"><f>"x"&amp;A1</f><v>old</v></c><c r="D1"><v>5</v></c></row><row r="2"><c r="B2"><f t="shared" si="0"/></c></row></sheetData></worksheet>"#
+                .to_vec(),
+        );
+    let source = crate::Package::from_opc(package).expect("source");
+    let source_bytes = source.to_bytes().expect("source bytes");
+    let mut edit = source.edit().expect("edit");
+    {
+        let mut sheet = edit.sheet("Sheet1").expect("lookup").expect("sheet");
+        sheet
+            .set_cached("B1", Value::Number(Number::new("4").expect("number")))
+            .expect("B1");
+        sheet.set_cached("B2", Value::Bool(true)).expect("B2");
+        sheet.set_cached("C1", Value::text("x2")).expect("C1");
+        assert!(sheet.set_cached("D1", Value::Bool(false)).is_err());
+    }
+    let committed = edit.commit().expect("commit");
+    let xml = part_text(committed.package(), uri.as_str());
+    assert!(
+        xml.contains(r#"<c r="B1"><f t="shared" ref="B1:B2" si="0">A1*2</f><v>4</v></c>"#),
+        "{xml}"
+    );
+    assert!(
+        xml.contains(r#"<c r="B2" t="b"><f t="shared" si="0"/><v>1</v></c>"#),
+        "{xml}"
+    );
+    assert!(
+        xml.contains(r#"<c r="C1" t="str"><f>"x"&amp;A1</f><v>x2</v></c>"#),
+        "{xml}"
+    );
+    let restored = committed
+        .package()
+        .apply(&committed.patch().inverse())
+        .expect("inverse");
+    assert_eq!(
+        restored.package().to_bytes().expect("restored"),
+        source_bytes
+    );
+}

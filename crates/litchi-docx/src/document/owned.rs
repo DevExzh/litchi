@@ -9,6 +9,7 @@ use crate::Package;
 use litchi_core::Position;
 
 mod comments;
+mod fields;
 mod graph;
 mod numbering;
 mod picture;

@@ -80,6 +80,10 @@ impl State {
             Some(Payload::SharedFormula { formula: None, .. }) => {
                 before.map_or(Cell::Empty, |stored| stored.cell.clone())
             },
+            Some(Payload::Cache(value)) => match before.map(|stored| &stored.cell) {
+                Some(Cell::Formula(formula)) => Cell::Formula(formula.with_cache(value.clone())),
+                _ => before.map_or(Cell::Empty, |stored| stored.cell.clone()),
+            },
             Some(Payload::Clear | Payload::ClearIfPresent) => Cell::Empty,
             None => before.map_or(Cell::Empty, |stored| stored.cell.clone()),
         };
@@ -106,6 +110,7 @@ impl State {
             Some(
                 Payload::Set(_)
                 | Payload::SharedFormula { .. }
+                | Payload::Cache(_)
                 | Payload::Clear
                 | Payload::ClearIfPresent,
             ) => None,
@@ -428,7 +433,12 @@ fn has_content_after(before: Option<&Cell>, action: Option<&Action>) -> bool {
         Some(Action::Remove) => false,
         Some(Action::Update {
             payload:
-                Some(Payload::Set(_) | Payload::SharedString { .. } | Payload::SharedFormula { .. }),
+                Some(
+                    Payload::Set(_)
+                    | Payload::SharedString { .. }
+                    | Payload::SharedFormula { .. }
+                    | Payload::Cache(_),
+                ),
             ..
         }) => true,
         Some(Action::Update {

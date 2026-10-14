@@ -134,6 +134,7 @@ fn clone_payload(payload: &Payload) -> Payload {
             reference: reference.clone(),
             formula: formula.clone(),
         },
+        Payload::Cache(value) => Payload::Cache(value.clone()),
         Payload::Clear => Payload::Clear,
         Payload::ClearIfPresent => Payload::ClearIfPresent,
     }
