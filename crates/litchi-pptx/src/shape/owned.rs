@@ -279,6 +279,31 @@ impl Scene {
             preorder: true,
         }
     }
+    /// Borrow every shape's typed leaf view in depth-first pre-order, as
+    /// [`Handle::view`] would for each item of [`Self::iter`], without
+    /// retaining the scene per shape (record 0286).
+    ///
+    /// ```
+    /// use litchi_pptx::shape::owned::Scene;
+    ///
+    /// let xml = br#"<p:spTree xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:sp><p:nvSpPr><p:cNvPr id="2" name="Title"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr/></p:sp></p:spTree>"#;
+    /// let scene = Scene::read(xml.to_vec())?;
+    /// assert_eq!(scene.views().count(), scene.iter().count());
+    /// # Ok::<(), litchi_pptx::Error>(())
+    /// ```
+    pub fn views(&self) -> impl ExactSizeIterator<Item = Shape<'_>> + '_ {
+        let data = &*self.data;
+        (0..data.records.len()).map(move |index| {
+            Shape::from_common(Common {
+                xml: data.xml.bytes(),
+                records: &data.records,
+                strings: &data.strings,
+                limits: data.limits,
+                record: &data.records[index],
+                index,
+            })
+        })
+    }
     /// Iterate only direct children of the owner shape tree.
     #[must_use]
     pub fn roots(&self) -> Handles {
