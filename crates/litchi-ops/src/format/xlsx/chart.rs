@@ -405,13 +405,17 @@ fn int(value: Option<Scalar<'_>>) -> u32 {
 
 /// The value of the chart write table's entry at `index`: a chart key, the
 /// anchor's cell geometry, or a formatting key read back from the chart.
-pub(crate) fn chart_value_at(summary: &Summary, index: usize) -> Option<Value<'static>> {
+pub(crate) fn chart_value_at(
+    summary: &Summary,
+    cells: Option<[u32; 4]>,
+    index: usize,
+) -> Option<Value<'static>> {
     if let Some(key) = ChartKey::at(index) {
         return chart_value(summary, key);
     }
     match index {
         10..=13 => {
-            let cells = summary.cells?;
+            let cells = cells?;
             Some(Value::Int(i64::from(cells[index - 10])))
         },
         _ => {
@@ -450,7 +454,7 @@ pub(crate) fn chart_value(summary: &Summary, key: ChartKey) -> Option<Value<'sta
 
 /// The value of a series node's key (`name`, `values`, `categories`).
 pub(crate) fn series_value(item: &ChartItem, index: usize) -> Option<Value<'_>> {
-    let series = item.summary.series.get(item.child as usize)?;
+    let series = item.summary().ok()?.series.get(item.child as usize)?;
     let key = [
         SeriesKey::Name,
         SeriesKey::Values,
@@ -475,7 +479,7 @@ pub(crate) fn series_value(item: &ChartItem, index: usize) -> Option<Value<'_>> 
 
 /// The value of an axis node's key (`role`, `title`).
 pub(crate) fn axis_value(item: &ChartItem, index: usize) -> Option<Value<'_>> {
-    let axis = item.summary.axes.get(item.child as usize)?;
+    let axis = item.summary().ok()?.axes.get(item.child as usize)?;
     match index {
         0 => Some(Value::Text(Cow::Borrowed(axis.role.name()))),
         1 => axis
@@ -510,42 +514,58 @@ impl Xlsx {
     }
 
     /// The chart at `index` on the worksheet at `sheet`, read from its part.
-    pub(super) fn sheet_chart(&self, sheet: usize, index: usize) -> Result<Option<Arc<Summary>>> {
-        let read = self.0.owner.finish(|| {
+    pub(super) fn sheet_chart(
+        &self,
+        sheet: usize,
+        index: usize,
+    ) -> Result<Option<Arc<shared::LazySummary>>> {
+        let xml = self.0.owner.finish(|| {
             Ok(match &self.0.owner {
                 super::XlsxOwner::Source(workbook) => match workbook.sheet(sheet)? {
                     Some(worksheet) if worksheet.kind() == xlsx::WorksheetKind::Worksheet => {
-                        match worksheet.chart_xml(index)? {
-                            Some(xml) => Some((xml, worksheet.chart_anchor(index)?)),
-                            None => None,
-                        }
+                        worksheet.chart_xml(index)?
                     },
                     _ => None,
                 },
                 super::XlsxOwner::Eager(package) => match package.workbook_ref().sheet(sheet)? {
                     Some(worksheet) if worksheet.kind() == xlsx::WorksheetKind::Worksheet => {
-                        match package.chart_xml(sheet, index)? {
-                            Some(xml) => Some((xml.to_vec(), package.chart_anchor(sheet, index)?)),
-                            None => None,
-                        }
+                        package.chart_xml(sheet, index)?.map(<[u8]>::to_vec)
                     },
                     _ => None,
                 },
             })
         })?;
-        let Some((xml, anchor)) = read else {
-            return Ok(None);
-        };
-        let mut summary = Summary::read(&xml)?;
-        summary.cells = anchor.map(|anchor| {
+        Ok(xml.map(|xml| Arc::new(shared::LazySummary::new(xml))))
+    }
+
+    /// The two-cell anchor of the chart at `index` on the worksheet at
+    /// `sheet`, as OfficeCLI's cell geometry `[x, y, width, height]`; read
+    /// only when a view or a geometry `set` needs it.
+    pub(super) fn sheet_chart_cells(&self, sheet: usize, index: usize) -> Result<Option<[u32; 4]>> {
+        let anchor = self.0.owner.finish(|| {
+            Ok(match &self.0.owner {
+                super::XlsxOwner::Source(workbook) => match workbook.sheet(sheet)? {
+                    Some(worksheet) if worksheet.kind() == xlsx::WorksheetKind::Worksheet => {
+                        worksheet.chart_anchor(index)?
+                    },
+                    _ => None,
+                },
+                super::XlsxOwner::Eager(package) => match package.workbook_ref().sheet(sheet)? {
+                    Some(worksheet) if worksheet.kind() == xlsx::WorksheetKind::Worksheet => {
+                        package.chart_anchor(sheet, index)?
+                    },
+                    _ => None,
+                },
+            })
+        })?;
+        Ok(anchor.map(|anchor| {
             [
                 anchor.from_col,
                 anchor.from_row,
                 anchor.to_col.saturating_sub(anchor.from_col),
                 anchor.to_row.saturating_sub(anchor.from_row),
             ]
-        });
-        Ok(Some(Arc::new(summary)))
+        }))
     }
 
     /// Add a chart to a worksheet.
@@ -781,7 +801,7 @@ impl Xlsx {
         };
         let mut edit = ChartEdit::default();
         let mut geometry = [None::<u32>; 4];
-        let summary = &item.summary;
+        let summary = || item.summary();
         for (key, value) in props.iter() {
             match node.item() {
                 Item::Chart(_) => {
@@ -808,6 +828,7 @@ impl Xlsx {
                                 } else {
                                     Role::Value
                                 };
+                                let summary = summary()?;
                                 let axis = summary.axis(role).ok_or_else(|| {
                                     error(Code::UnsupportedCapability, "the chart has no such axis")
                                         .with_property(name)
@@ -815,18 +836,20 @@ impl Xlsx {
                                 edit.axis_titles.push((axis.id, text(scalar)));
                             },
                             ChartSetter::Dotted(number, field) => edit.dotted_series(
-                                summary,
+                                summary()?,
                                 usize::from(number) + 1,
                                 field,
                                 text(scalar),
                             )?,
                             ChartSetter::ChartType => {
-                                edit.chart_type(summary, &text(scalar).unwrap_or_default())?;
+                                edit.chart_type(summary()?, &text(scalar).unwrap_or_default())?;
                             },
                             ChartSetter::Data => {
-                                edit.data(summary, &text(scalar).unwrap_or_default())?;
+                                edit.data(summary()?, &text(scalar).unwrap_or_default())?;
                             },
-                            ChartSetter::Format(key) => edit.format(summary, key, name, scalar)?,
+                            ChartSetter::Format(key) => {
+                                edit.format(summary()?, key, name, scalar)?
+                            },
                             ChartSetter::X => geometry[0] = Some(int(scalar)),
                             ChartSetter::Y => geometry[1] = Some(int(scalar)),
                             ChartSetter::Width => geometry[2] = Some(int(scalar)),
@@ -842,7 +865,7 @@ impl Xlsx {
                 },
                 Item::Series(_) => {
                     let index = item
-                        .summary
+                        .summary()?
                         .series
                         .get(item.child as usize)
                         .map(|series| series.index)
@@ -869,7 +892,7 @@ impl Xlsx {
                 },
                 _ => {
                     let axis = item
-                        .summary
+                        .summary()?
                         .axes
                         .get(item.child as usize)
                         .ok_or_else(|| error(Code::PathNotFound, "the axis is missing"))?;
@@ -894,13 +917,15 @@ impl Xlsx {
         let source = self.editor()?;
         let mut native = source.edit_charts()?;
         if geometry.iter().any(Option::is_some) {
-            let current = item.summary.cells.ok_or_else(|| {
-                error(
-                    Code::UnsupportedCapability,
-                    "only a chart placed by a two-cell anchor can be moved",
-                )
-                .with_property("x")
-            })?;
+            let current = self
+                .sheet_chart_cells(sheet, item.chart as usize)?
+                .ok_or_else(|| {
+                    error(
+                        Code::UnsupportedCapability,
+                        "only a chart placed by a two-cell anchor can be moved",
+                    )
+                    .with_property("x")
+                })?;
             let [x, y, width, height] =
                 [0, 1, 2, 3].map(|slot| geometry[slot].unwrap_or(current[slot]));
             let (to_col, to_row) = (x.saturating_add(width), y.saturating_add(height));

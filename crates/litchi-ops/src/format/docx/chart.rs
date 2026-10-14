@@ -525,9 +525,13 @@ impl Docx {
         let Value::Chart(chart) = &nodes[0].value else {
             return Err(error(Code::InternalError, "the chart node holds no chart"));
         };
-        let summary = chart
-            .summary(self)?
-            .ok_or_else(|| error(Code::CorruptFile, "the chart names no chart part"))?;
+        // The chart part is read only when a key needs it (a title or a
+        // size does not).
+        let summary = || -> Result<Arc<Summary>> {
+            chart
+                .summary(self)?
+                .ok_or_else(|| error(Code::CorruptFile, "the chart names no chart part"))
+        };
         let mut edit = ChartEdit::default();
         let mut size = (None, None);
         for (key, value) in props.iter() {
@@ -554,20 +558,26 @@ impl Docx {
                         } else {
                             Role::Value
                         };
+                        let summary = summary()?;
                         let axis = summary.axis(role).ok_or_else(|| {
                             error(Code::UnsupportedCapability, "the chart has no such axis")
                                 .with_property(name)
                         })?;
                         edit.axis_titles.push((axis.id, text(scalar)));
                     },
-                    ChartSetter::Dotted(number, field) => {
-                        edit.dotted_series(&summary, usize::from(number) + 1, field, text(scalar))?
-                    },
+                    ChartSetter::Dotted(number, field) => edit.dotted_series(
+                        &*summary()?,
+                        usize::from(number) + 1,
+                        field,
+                        text(scalar),
+                    )?,
                     ChartSetter::ChartType => {
-                        edit.chart_type(&summary, &text(scalar).unwrap_or_default())?;
+                        edit.chart_type(&*summary()?, &text(scalar).unwrap_or_default())?;
                     },
-                    ChartSetter::Data => edit.data(&summary, &text(scalar).unwrap_or_default())?,
-                    ChartSetter::Format(key) => edit.format(&summary, key, name, scalar)?,
+                    ChartSetter::Data => {
+                        edit.data(&*summary()?, &text(scalar).unwrap_or_default())?
+                    },
+                    ChartSetter::Format(key) => edit.format(&*summary()?, key, name, scalar)?,
                     ChartSetter::Width => size.0 = emu(scalar),
                     ChartSetter::Height => size.1 = emu(scalar),
                     ChartSetter::Name | ChartSetter::Alt | ChartSetter::Numbered(_) => {

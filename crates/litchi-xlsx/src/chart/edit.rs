@@ -365,15 +365,17 @@ fn inventory(xml: &[u8]) -> Result<Inventory> {
     let mut root_close = None;
     loop {
         let start = position(&reader)?;
-        let (namespace, event) = reader
-            .read_resolved_event()
-            .map_err(|error| invalid(format!("worksheet drawing XML: {error}")))?;
-        let in_chart_namespace = is_chart_namespace(&namespace);
-        let event = event.into_owned();
+        // The event borrows the input, not the reader: no copy is needed.
+        let (in_chart_namespace, event) = {
+            let (namespace, event) = reader
+                .read_resolved_event()
+                .map_err(|error| invalid(format!("worksheet drawing XML: {error}")))?;
+            (is_chart_namespace(&namespace), event)
+        };
         let end = position(&reader)?;
         let (element, empty) = match &event {
-            Event::Start(element) => (Some(element.clone()), false),
-            Event::Empty(element) => (Some(element.clone()), true),
+            Event::Start(element) => (Some(element), false),
+            Event::Empty(element) => (Some(element), true),
             _ => (None, false),
         };
         if let Some(element) = element {

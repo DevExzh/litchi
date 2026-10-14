@@ -1218,7 +1218,7 @@ pub(crate) struct AxisSummary {
 }
 
 /// The read projection of one chart part.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub(crate) struct Summary {
     pub(crate) variant: Option<Variant>,
     pub(crate) title: Option<String>,
@@ -1226,13 +1226,13 @@ pub(crate) struct Summary {
     pub(crate) series: Vec<SeriesSummary>,
     pub(crate) axes: Vec<AxisSummary>,
     /// The authoring spec the part reads as, when it has one; the source of
-    /// the formatting keys' values and of rebuilt parts.
-    pub(crate) spec: Option<Spec>,
+    /// the formatting keys' values and of rebuilt parts. Built on first use
+    /// from the typed chart (an extended chart's is built at once).
+    spec: std::sync::OnceLock<Option<Spec>>,
+    /// The typed chart of an ordinary part, kept for [`Self::spec`].
+    chart: Option<std::sync::Arc<Chart>>,
     /// Whether the part is an extended (`cx:chartSpace`) chart.
     pub(crate) extended: bool,
-    /// A worksheet chart's two-cell anchor as OfficeCLI's cell geometry
-    /// `[x, y, width, height]`, filled in by the XLSX host.
-    pub(crate) cells: Option<[u32; 4]>,
 }
 
 fn title_text(title: Option<&TitleText>) -> Option<String> {
@@ -1263,7 +1263,7 @@ impl Summary {
         }
         let chart = litchi_drawingml::chart::reader::read(xml)
             .map_err(|error| Error::new(Code::CorruptFile, format!("chart part: {error}")))?;
-        Ok(Self::of(&chart))
+        Ok(Self::of(chart))
     }
 
     /// The projection of an extended chart's spec: its series by position,
@@ -1316,13 +1316,13 @@ impl Summary {
             legend: spec.legend(),
             series,
             axes,
-            spec: Some(spec),
+            spec: std::sync::OnceLock::from(Some(spec)),
+            chart: None,
             extended: true,
-            cells: None,
         }
     }
 
-    pub(crate) fn of(chart: &Chart) -> Self {
+    pub(crate) fn of(chart: Chart) -> Self {
         let series = chart
             .plot_area
             .type_groups
@@ -1375,15 +1375,22 @@ impl Summary {
             first.role = Role::Category;
         }
         Self {
-            variant: Variant::of(chart),
+            variant: Variant::of(&chart),
             title: title_text(chart.title.as_ref()),
             legend: chart.legend.as_ref().map(|legend| legend.position),
             series,
             axes,
-            spec: Spec::of(chart).ok(),
+            spec: std::sync::OnceLock::new(),
+            chart: Some(std::sync::Arc::new(chart)),
             extended: false,
-            cells: None,
         }
+    }
+
+    /// The authoring spec the part reads as, when it has one.
+    pub(crate) fn spec(&self) -> Option<&Spec> {
+        self.spec
+            .get_or_init(|| self.chart.as_deref().and_then(|chart| Spec::of(chart).ok()))
+            .as_ref()
     }
 
     /// The chart's category labels: those of its first series.
@@ -1407,7 +1414,7 @@ impl Summary {
     /// The value of a formatting key, read from the chart's spec; `None`
     /// when the chart does not set it (the application default applies).
     pub(crate) fn format(&self, key: FormatKey) -> Option<crate::node::Value<'static>> {
-        format_value(self.spec.as_ref()?, key)
+        format_value(self.spec()?, key)
     }
 }
 
@@ -1600,6 +1607,36 @@ fn marker_name(style: MarkerStyle) -> &'static str {
     }
 }
 
+/// A chart part whose projection is read on first use: a path that only
+/// edits the chart (a title `set`) never decodes it twice.
+#[derive(Debug)]
+pub(crate) struct LazySummary {
+    xml: Vec<u8>,
+    summary: std::sync::OnceLock<std::sync::Arc<Summary>>,
+}
+
+#[cfg_attr(
+    not(feature = "xlsx"),
+    allow(dead_code, reason = "only worksheet charts are resolved lazily")
+)]
+impl LazySummary {
+    pub(crate) const fn new(xml: Vec<u8>) -> Self {
+        Self {
+            xml,
+            summary: std::sync::OnceLock::new(),
+        }
+    }
+
+    /// The projection, read once.
+    pub(crate) fn get(&self) -> Result<&std::sync::Arc<Summary>> {
+        if let Some(summary) = self.summary.get() {
+            return Ok(summary);
+        }
+        let summary = std::sync::Arc::new(Summary::read(&self.xml)?);
+        Ok(self.summary.get_or_init(|| summary))
+    }
+}
+
 /// Join numbers the way OfficeCLI prints a series' values.
 #[cfg_attr(
     not(any(feature = "pptx", feature = "xlsx")),
@@ -1686,7 +1723,10 @@ impl ChartEdit {
         property: &'static str,
     ) -> Result<&mut Spec> {
         if self.rebuild.is_none() {
-            let spec = summary.spec.clone().ok_or_else(|| not_authored(property))?;
+            let spec = summary
+                .spec()
+                .cloned()
+                .ok_or_else(|| not_authored(property))?;
             self.rebuild = Some(spec);
         }
         Ok(self
@@ -2010,7 +2050,7 @@ fn missing_series(property: &'static str) -> Error {
 pub(crate) fn embedded_spec(xml: &[u8]) -> Option<Spec> {
     use litchi_drawingml::chart::authoring::Binding;
     let chart = litchi_drawingml::chart::reader::read(xml).ok()?;
-    let summary = Summary::of(&chart);
+    let summary = Summary::of(chart.clone());
     let variant = summary.variant?;
     let mut spec = Spec::new(variant).with_binding(Binding::sheet("Sheet1"));
     if let Some(title) = &summary.title {
