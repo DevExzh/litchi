@@ -552,6 +552,13 @@ Cut from `9fe45629ab`:
   - New delta F5b: `/body` is the main story only.
   - Open: XLSX rich-text cells, `mc:AlternateContent` documents, PPTX masters and layouts.
 
+- Merged `perf-query2` (0287):
+  - unified `Node` 408 → 184 bytes (compact DOC/RTF/ODT paths); the walker moves each match once (XLSX query −8%, PPTX large query −16% in instructions);
+  - ODS warm query 36× → 21–23×, batch 10k 1.39× → 1.30×;
+  - RTF fan-out 1.27–1.48× → 1.22–1.37×;
+  - XLS cell reads use 2 leaf source checks instead of 5, keeping the per-match check.
+  - The 0280 6% regression is about 1% in work, the rest attributed to layout.
+
 Coordinator scripts and agent scratch now live in `/home/zhuhe/code/litchi-worktrees/.coord/` (outside the repository), so they survive `/tmp` wipes.
 
 Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-pptx-w4` 9474e2b6ce, `uo/m2-l-xlsb-w1` 876588a23c, `uo/m1-r4-perf` 012fd509ff.
