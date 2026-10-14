@@ -30,7 +30,7 @@ use pyo3::types::{PyBytes, PyDict, PyList, PyModule, PyString};
 use crate::common::FileFormat;
 use crate::errors::Failure;
 use crate::write::{self, Commit, Edit, Items, Where};
-use crate::{m4, merge, nodes, props, pyser};
+use crate::{m4, merge, nodes, props, pyser, refresh};
 
 /// Registers `File`, `open` and `open_bytes`.
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -852,6 +852,77 @@ impl File {
                 .map_err(|error| Failure::read(&error))
         })?;
         merge::commit(py, commit)
+    }
+
+    /// Recompute the document's derived field results; return the Commit.
+    ///
+    /// DOCX: tables of contents (from the headings), SEQ, REF, DATE/TIME,
+    /// document-property and count fields; PPTX: slide-number and date
+    /// fields; workbooks: formula results (written back as cached values
+    /// only with ``write_cache``, XLSX only). Page numbers need a layout
+    /// engine Litchi does not have: PAGE-like fields keep their cached
+    /// result, and a table of contents keeps each entry's cached page
+    /// number. The file is unchanged; a document whose results are current
+    /// gives an unchanged Commit. The GIL is released while refreshing.
+    ///
+    /// Args:
+    ///     clock: The date and time date fields show: "YYYY-MM-DD[THH:MM[:SS]]",
+    ///         a datetime.datetime (its wall time) or a datetime.date. Without
+    ///         it date fields keep their cached result; the system clock is
+    ///         never read
+    ///     write_cache: Write recalculated XLSX formula results back
+    ///     page_numbers: "keep" (the default) keeps cached page numbers;
+    ///         "require" refuses ("refresh_failed") a table of contents whose
+    ///         page numbers are unknown
+    ///     mark_dirty: Mark a table of contents with unknown page numbers for
+    ///         its word processor to update
+    ///     max_changes: The largest number of changed results (default 65,536)
+    ///     max_bytes: The largest changed payload in bytes (default 16 MiB)
+    ///
+    /// Returns:
+    ///     A Commit whose ``value`` is the summary dict: ``refreshed``,
+    ///     ``bookmarks``, ``missing_page_numbers`` and ``fields`` (each
+    ///     ``type``, ``path``, ``status``, ``reason``)
+    ///
+    /// Raises:
+    ///     PropertyError: (a ValueError) If the clock or an option is invalid
+    ///     UnsupportedError: (a ValueError) If the format has no refresh
+    ///     LitchiError: If page numbers are required but unknown
+    ///         ("refresh_failed") or a limit is exceeded ("limit_exceeded")
+    #[pyo3(signature = (
+        *,
+        clock = None,
+        write_cache = false,
+        page_numbers = "keep",
+        mark_dirty = true,
+        max_changes = None,
+        max_bytes = None
+    ))]
+    fn refresh(
+        &self,
+        py: Python<'_>,
+        clock: Option<Bound<'_, PyAny>>,
+        write_cache: bool,
+        page_numbers: &str,
+        mark_dirty: bool,
+        max_changes: Option<usize>,
+        max_bytes: Option<usize>,
+    ) -> PyResult<Commit> {
+        let file = self.handle()?;
+        let clock = clock.as_ref().map(refresh::clock_text).transpose()?;
+        let (options, limits) = refresh::options(
+            clock.as_deref(),
+            write_cache,
+            page_numbers,
+            mark_dirty,
+            max_changes,
+            max_bytes,
+        )?;
+        let commit = py.detach(|| {
+            file.refresh_with_limits(&options, &limits)
+                .map_err(|error| Failure::read(&error))
+        })?;
+        refresh::commit(py, commit)
     }
 
     /// Evaluate one workbook cell.

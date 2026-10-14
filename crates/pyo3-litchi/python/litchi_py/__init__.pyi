@@ -761,6 +761,31 @@ class _MergeSummary(TypedDict):
     unresolved: List[str]
     """The keys the template uses and the record lacks, sorted."""
 
+class _RefreshField(TypedDict):
+    """One entry of ``_RefreshSummary.fields`` (stub-only type)."""
+
+    type: str
+    """The field type in upper case: "TOC", "SEQ", "PAGE", "SLIDENUM", "FORMULA", ..."""
+    path: Optional[str]
+    """Where the field is ("/body/p[3]", "/slide[2]", "Sheet1!B4"), when it has an address."""
+    status: str
+    """"refreshed", "unchanged", "stale", "needs_layout", "needs_clock",
+    "locked", "unresolved" or "unsupported"."""
+    reason: Optional[str]
+    """Why the field was not refreshed, when there is more to say."""
+
+class _RefreshSummary(TypedDict):
+    """``File.refresh``'s ``Commit.value`` (stub-only type)."""
+
+    refreshed: int
+    """Fields whose result was written."""
+    bookmarks: int
+    """Bookmarks added for table of contents entries."""
+    missing_page_numbers: int
+    """Table of contents entries left without a page number."""
+    fields: List[_RefreshField]
+    """Every field met, in document order."""
+
 class _Evaluated(TypedDict):
     """``File.evaluate``'s result (stub-only type)."""
 
@@ -1318,6 +1343,38 @@ class File:
             UnsupportedError: (a ValueError) If the format is not DOCX, PPTX
                 or XLSX
             LitchiError: If a limit is exceeded ("limit_exceeded")
+        """
+        ...
+
+    def refresh(
+        self,
+        *,
+        clock: Union[None, str, Any] = None,
+        write_cache: bool = False,
+        page_numbers: str = "keep",
+        mark_dirty: bool = True,
+        max_changes: Optional[int] = None,
+        max_bytes: Optional[int] = None,
+    ) -> Commit:
+        """Recompute the document's derived field results; return the
+        Commit.
+
+        DOCX: tables of contents (from the headings), SEQ, REF, DATE/TIME,
+        document-property and count fields; PPTX: slide-number and date
+        fields; workbooks: formula results (written back as cached values
+        only with ``write_cache``, XLSX only). Page-number fields keep their
+        cached result and a table of contents keeps each entry's cached page
+        number (``page_numbers="require"`` refuses unknown ones). ``clock``
+        is "YYYY-MM-DD[THH:MM[:SS]]", a datetime.datetime or a
+        datetime.date; without it date fields keep their cached result (the
+        system clock is never read). ``Commit.value`` is the summary dict
+        (``_RefreshSummary``). The GIL is released while refreshing.
+
+        Raises:
+            PropertyError: (a ValueError) If the clock or an option is invalid
+            UnsupportedError: (a ValueError) If the format has no refresh
+            LitchiError: If page numbers are required but unknown
+                ("refresh_failed") or a limit is exceeded ("limit_exceeded")
         """
         ...
 

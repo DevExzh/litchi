@@ -21,6 +21,7 @@
 //! | `capabilities (<file> \| --format T)` | `File::capabilities` or `Capabilities::of` |
 //! | `schema <type>` | `litchi_ops::schema` |
 //! | `merge <template> <data> --out <file> [--format json\|csv\|tsv] [--missing keep\|empty] [--no-fields] [--force]`, or OfficeCLI's `merge <template> <output> --data <json\|file>` | `merge::Data::from_json`/`from_csv`, then `File::merge` and `File::save_with` per record (refusing existing outputs unless `--force`); several records need `{n}` in the output name |
+//! | `refresh <file> [--clock DATETIME] [--write-cache] [--require-page-numbers] [--no-dirty] [--out F]` | `File::refresh_with_limits`, then `File::save` (in place, as OfficeCLI) or `File::save_as`; nothing is written when every result is current |
 //!
 //! `--at` is accepted as another name of `--index`.
 //!
@@ -100,6 +101,7 @@ mod exit;
 mod formats;
 mod m4;
 mod merge;
+mod refresh;
 mod render;
 mod run;
 

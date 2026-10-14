@@ -1577,3 +1577,69 @@ fn merge_fills_templates_per_record() {
     let other = dir.path().join("other.xlsb");
     expect(5, ["merge", arg(&workbook), arg(&other), "--data", "{}"]);
 }
+
+#[test]
+fn refresh_saves_only_changed_documents() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let document = dir.path().join("toc.docx");
+    std::fs::copy(
+        fixture("libreoffice-core/sw/qa/extras/ooxmlexport/data/multi-page-toc.docx"),
+        &document,
+    )
+    .expect("copy");
+    let before = std::fs::read(&document).expect("read");
+    let report = expect(0, ["--json", "refresh", arg(&document)]).json();
+    assert_eq!(report["changed"], false);
+    assert_eq!(report["output"], Value::Null);
+    assert_eq!(report["fields"][0]["type"], "TOC");
+    assert_eq!(report["fields"][0]["status"], "unchanged");
+    assert_eq!(std::fs::read(&document).expect("read"), before);
+    expect(
+        0,
+        [
+            "set",
+            arg(&document),
+            // The heading only: a find over `/body` would also change the
+            // table's entry, which spans paragraphs.
+            "/body/p[3]",
+            "--find",
+            "Chapter 2",
+            "--replace",
+            "Chapter Two",
+        ],
+    );
+    let run = expect(0, ["refresh", arg(&document)]);
+    assert!(run.stdout.starts_with("Refreshed: "), "{}", run.stdout);
+    assert!(run.stdout.contains("refreshed TOC"), "{}", run.stdout);
+    let text = litchi_ops::open(&document)
+        .expect("open")
+        .text()
+        .expect("text");
+    assert_eq!(text.matches("Chapter Two").count(), 2, "{text}");
+
+    let workbook = dir.path().join("book.xlsx");
+    expect(0, ["create", arg(&workbook)]);
+    expect(
+        0,
+        ["set", arg(&workbook), "/Sheet1/A1", "--prop", "value=4"],
+    );
+    expect(
+        0,
+        [
+            "set",
+            arg(&workbook),
+            "/Sheet1/A2",
+            "--prop",
+            "formula=A1*A1",
+        ],
+    );
+    let report = expect(0, ["--json", "refresh", arg(&workbook)]).json();
+    assert_eq!(report["fields"][0]["status"], "stale");
+    assert_eq!(report["fields"][0]["path"], "Sheet1!A2");
+    let report = expect(0, ["--json", "refresh", arg(&workbook), "--write-cache"]).json();
+    assert_eq!(report["refreshed"], 1);
+    let report = expect(0, ["--json", "refresh", arg(&workbook), "--write-cache"]).json();
+    assert_eq!(report["changed"], false);
+    let run = expect(4, ["refresh", arg(&workbook), "--clock", "2026-02-30"]);
+    assert!(run.stderr.contains("invalid_value"), "{}", run.stderr);
+}

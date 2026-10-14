@@ -76,6 +76,10 @@ pub(crate) enum Command {
     /// merge fields from JSON or CSV data, one output per record
     /// (record 0274).
     Merge(crate::merge::Merge),
+    /// Recompute derived field results: DOCX tables of contents and
+    /// fields, PPTX slide numbers and dates, workbook formula caches
+    /// (record 0279).
+    Refresh(crate::refresh::Refresh),
 }
 
 /// What `set`, `add` and `batch` do with a property the target does not

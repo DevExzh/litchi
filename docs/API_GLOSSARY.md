@@ -2086,6 +2086,7 @@ field run (`a:fld`) as their target, writing its cached result.
 | `File::{refresh, refresh_with_limits}`, `transaction::Edit::refresh` | adopted (0279) |
 | `refresh::{Options, Clock, PageNumbers, Summary, Field, Status}` | adopted (0279) |
 | `capabilities::Verb::Refresh` | adopted (0279) |
+| CLI `litchi refresh`, Python `File.refresh` | adopted (0279) |
 | `litchi_docx::document::Edit::{fields, refresh_fields}` (snapshot and package edits) | adopted (0279) |
 | `litchi_docx::styles::Style::declares_outline` | adopted (0279) |
 | `litchi_pptx::{Package, source::Package}::first_slide_number` | adopted (0279) |
