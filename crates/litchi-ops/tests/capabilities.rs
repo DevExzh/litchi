@@ -148,6 +148,8 @@ fn ordinary_reports_hide_native_selection_fields() {
             "table" | "row" | "comment" => (false, true, true),
             // Record 0251d: pictures are added.
             "picture" => (false, true, false),
+            // Record 0283: charts are added, set and removed.
+            "chart" => (true, true, true),
             "sdt" => (false, false, true),
             _ => (false, false, false),
         };

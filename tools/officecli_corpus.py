@@ -379,6 +379,15 @@ RULES: list[Rule] = [
         and c.detail == "labelPos",
     ),
     When(
+        "D10", "delta", "A property given twice in one chart `add`",
+        "the later value wins (a shared option array like `DASH` sets `dataLabels=false` "
+        "and the line sets `dataLabels=true` again)",
+        "`invalid_argument`: one command assigns each property once, so no value is "
+        "silently dropped (records 0270, 0283)",
+        lambda c, e: c.verb == "add" and c.kind.lower() == "chart"
+        and c.result == "invalid_argument",
+    ),
+    When(
         "G1", "gap", "Missing verbs",
         "`validate`, `raw-set`, `raw`, `add-part`, `dump` (and `import`, `merge`, "
         "`refresh`, `help`, ...)",
