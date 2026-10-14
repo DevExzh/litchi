@@ -84,6 +84,38 @@ pub enum TextTarget {
         /// Position among the row's `a:tc` cells.
         column: Position,
     },
+    /// One run (`a:r`, `a:br` or `a:fld`) of a paragraph of a table cell's
+    /// text body, as [`Self::Run`] is one of a shape's (record 0285).
+    CellRun {
+        /// Positional scene index of the table frame.
+        shape: Position,
+        /// Position among the table's `a:tr` rows.
+        row: Position,
+        /// Position among the row's `a:tc` cells.
+        column: Position,
+        /// Position among the cell body's `a:p` children.
+        paragraph: Position,
+        /// Position among the paragraph's run children.
+        run: Position,
+    },
+    /// Bytes `start..end` of the text of one text run of a table cell,
+    /// split out as [`Self::RunSpan`] splits a shape's run (record 0285).
+    CellRunSpan {
+        /// Positional scene index of the table frame.
+        shape: Position,
+        /// Position among the table's `a:tr` rows.
+        row: Position,
+        /// Position among the row's `a:tc` cells.
+        column: Position,
+        /// Position among the cell body's `a:p` children.
+        paragraph: Position,
+        /// Position among the paragraph's run children.
+        run: Position,
+        /// First byte of the span in the run's text.
+        start: usize,
+        /// End byte of the span in the run's text.
+        end: usize,
+    },
 }
 
 /// An RGB colour written as `a:srgbClr@val`.
@@ -300,17 +332,45 @@ pub(crate) fn stage_text_properties(
             let span = shape.common().span()?.range(current.len())?;
             let is_table = matches!(shape, crate::shape::Shape::Table(_));
             let element = &current[span.clone()];
-            let replacement = match edit.target {
-                TextTarget::Cell { row, column, .. } => {
+            let cell = match edit.target {
+                TextTarget::Cell { row, column, .. }
+                | TextTarget::CellRun { row, column, .. }
+                | TextTarget::CellRunSpan { row, column, .. } => Some((row.get(), column.get())),
+                _ => None,
+            };
+            let replacement = match cell {
+                Some((row, column)) => {
                     if !is_table {
                         return Err(Error::UnsafeEdit {
                             operation: "set_text_properties",
                             reason: "a table cell edit requires a table graphic frame",
                         });
                     }
-                    rewrite_cell_frame(element, row.get(), column.get(), &edit.properties)?
+                    rewrite_cell_frame(element, row, column, |cell| match edit.target {
+                        TextTarget::CellRun { paragraph, run, .. } => rewrite_cell_run(
+                            cell,
+                            paragraph.get(),
+                            run.get(),
+                            None,
+                            &edit.properties,
+                        ),
+                        TextTarget::CellRunSpan {
+                            paragraph,
+                            run,
+                            start,
+                            end,
+                            ..
+                        } => rewrite_cell_run(
+                            cell,
+                            paragraph.get(),
+                            run.get(),
+                            Some(start..end),
+                            &edit.properties,
+                        ),
+                        _ => rewrite_cell(cell, &edit.properties),
+                    })?
                 },
-                _ => {
+                None => {
                     if is_table || edit.properties.fill.is_some() {
                         return Err(Error::UnsafeEdit {
                             operation: "set_text_properties",
@@ -373,7 +433,9 @@ const fn shape_position(target: TextTarget) -> Position {
         | TextTarget::Paragraph { shape, .. }
         | TextTarget::Run { shape, .. }
         | TextTarget::RunSpan { shape, .. }
-        | TextTarget::Cell { shape, .. } => shape,
+        | TextTarget::Cell { shape, .. }
+        | TextTarget::CellRun { shape, .. }
+        | TextTarget::CellRunSpan { shape, .. } => shape,
     }
 }
 
@@ -407,7 +469,10 @@ fn validate(edit: &TextEdit<'_>) -> Result<()> {
         check_characters(text)?;
         if matches!(
             edit.target,
-            TextTarget::Run { .. } | TextTarget::RunSpan { .. }
+            TextTarget::Run { .. }
+                | TextTarget::RunSpan { .. }
+                | TextTarget::CellRun { .. }
+                | TextTarget::CellRunSpan { .. }
         ) && text.contains(['\n', '\r'])
         {
             return Err(Error::Invalid(
@@ -415,7 +480,8 @@ fn validate(edit: &TextEdit<'_>) -> Result<()> {
             ));
         }
     }
-    if let TextTarget::RunSpan { start, end, .. } = edit.target
+    if let TextTarget::RunSpan { start, end, .. } | TextTarget::CellRunSpan { start, end, .. } =
+        edit.target
         && start >= end
     {
         return Err(Error::Invalid("a run span is empty".into()));
@@ -1426,7 +1492,9 @@ fn rewrite_shape(
             end,
             ..
         } => (Some(paragraph.get()), Some(run.get()), Some(start..end)),
-        TextTarget::Cell { .. } => unreachable!("cells are rewritten through their frame"),
+        TextTarget::Cell { .. } | TextTarget::CellRun { .. } | TextTarget::CellRunSpan { .. } => {
+            unreachable!("cells are rewritten through their frame")
+        },
     };
     let element = &shape[body.span.clone()];
     let replaced = match (target, properties.text) {
@@ -1461,7 +1529,7 @@ fn rewrite_cell_frame(
     frame: &[u8],
     row: usize,
     column: usize,
-    properties: &TextProperties<'_>,
+    rewrite: impl FnOnce(&[u8]) -> Result<Vec<u8>>,
 ) -> Result<Vec<u8>> {
     let node = root(frame)?;
     let graphic = descend(frame, &node, b"graphic")?;
@@ -1483,10 +1551,39 @@ fn rewrite_cell_frame(
         index: column,
         len: cells.len(),
     })?;
-    let replaced = rewrite_cell(&frame[tc.span.clone()], properties)?;
+    let replaced = rewrite(&frame[tc.span.clone()])?;
     let mut splices = Splices::new();
     splices.replace(tc.span.clone(), replaced);
     splices.apply(frame)
+}
+
+/// Rewrite one run of a cell's text body, as a shape's run is rewritten.
+fn rewrite_cell_run(
+    cell: &[u8],
+    paragraph: usize,
+    run: usize,
+    span: Option<Range<usize>>,
+    properties: &TextProperties<'_>,
+) -> Result<Vec<u8>> {
+    let node = root(cell)?;
+    if node.empty {
+        return Err(invalid("an empty a:tc has no runs"));
+    }
+    let kids = children(cell, &node)?;
+    let body = child(cell, &kids, b"txBody").ok_or(Error::UnsafeEdit {
+        operation: "set_text_properties",
+        reason: "the table cell has no text body",
+    })?;
+    let rewritten = rewrite_body(
+        &cell[body.span.clone()],
+        Some(paragraph),
+        Some(run),
+        span,
+        properties,
+    )?;
+    let mut splices = Splices::new();
+    splices.replace(body.span.clone(), rewritten);
+    splices.apply(cell)
 }
 
 fn rewrite_cell(cell: &[u8], properties: &TextProperties<'_>) -> Result<Vec<u8>> {

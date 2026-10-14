@@ -1080,6 +1080,49 @@ impl Edit {
         Ok(shape_id)
     }
 
+    /// Apply a bounded batch of rich text edits to the shapes of one slide's
+    /// notes page, in order, as [`Self::set_text_properties`] applies them to
+    /// a slide (record 0285): targets address the notes page's own shapes by
+    /// their positional scene index. Returns the number of edits whose bytes
+    /// changed.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::UnsafeEdit`] for a slide without a notes page, and
+    /// the errors of [`Self::set_text_properties`]. A failed batch leaves
+    /// the transaction unchanged.
+    pub fn set_notes_text_properties<'s>(
+        &mut self,
+        slide: impl Into<crate::slide::Selector<'s>>,
+        edits: &[super::TextEdit<'_>],
+    ) -> Result<usize> {
+        let selected_slide = self.resolve_slide(slide.into())?;
+        let source = crate::notes::load_snapshot(&self.working, &self.source.presentation_name)?;
+        let Some(note) = source.as_ref().and_then(|source| {
+            source
+                .slides()
+                .iter()
+                .find(|note| note.owner() == selected_slide.part_name.as_str())
+        }) else {
+            return Err(Error::UnsafeEdit {
+                operation: "set_notes_text_properties",
+                reason: "the slide has no notes page",
+            });
+        };
+        let part_name = PackURI::new(note.part())
+            .map_err(|_error| invalid("opened-presentation notes part name is invalid"))?;
+        let (xml, changed) = super::stage_text_properties(
+            note.xml(),
+            edits,
+            self.source.limits.max_text_bytes(),
+            crate::shape::Limits::DEFAULT.output_bytes(),
+        )?;
+        if let Some(xml) = xml {
+            self.working.get_part_mut(&part_name)?.set_blob(xml);
+        }
+        Ok(changed)
+    }
+
     /// Replace the notes text owned by one checked slide, creating the
     /// slide's notes page from the presentation's notes master when it has
     /// none (an empty text on a slide without notes is a no-op).

@@ -534,3 +534,46 @@ fn data_errors_are_typed() {
     let error = Data::from_csv(b"a\n\"open").unwrap_err();
     assert_eq!(error.code(), Code::InvalidInput);
 }
+
+/// Record 0285 (0274 follow-ups F2, F3): table cells and speaker notes are
+/// merged run by run through the text bodies find/replace reads.
+#[cfg(feature = "pptx")]
+#[test]
+fn pptx_table_cells_and_notes_are_merged() {
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    let presentation = builder.presentation().unwrap();
+    let slide = presentation.add_slide().unwrap();
+    slide.add_text_box("To {{name}}", 0, 0, 1_828_800, 914_400);
+    slide.set_notes("Call {{name}} in {{city}}");
+    let package = builder.build().unwrap();
+    let mut edit = package.edit().unwrap();
+    edit.add_table(
+        0usize,
+        &[vec!["{{city}}".to_owned(), "fixed".to_owned()]],
+        (0, 1_000_000, 2_000_000, 600_000),
+    )
+    .unwrap();
+    let bytes = edit.commit().unwrap().into_package().to_bytes().unwrap();
+    for mode in [SourceMode::Eager, SourceMode::Auto] {
+        let template =
+            litchi_ops::open_bytes_with(bytes.clone(), &OpenOptions::new().source_mode(mode))
+                .unwrap();
+        let commit = template
+            .merge(
+                &record(&[("name", "Ada"), ("city", "Paris")]),
+                &Options::new(),
+            )
+            .unwrap();
+        let file = &commit.file;
+        assert_eq!(commit.value.replacements(), 4);
+        assert_eq!(text(file, "/slide[1]/shape[1]"), "To Ada");
+        assert_eq!(text(file, "/slide[1]/table[1]/tr[1]/tc[1]"), "Paris");
+        assert_eq!(text(file, "/slide[1]/table[1]/tr[1]/tc[2]"), "fixed");
+        assert_eq!(text(file, "/slide[1]/notes"), "Call Ada in Paris");
+        let restored = commit.patch.inverse().apply(file).unwrap();
+        assert_eq!(
+            text(&restored, "/slide[1]/notes"),
+            "Call {{name}} in {{city}}"
+        );
+    }
+}

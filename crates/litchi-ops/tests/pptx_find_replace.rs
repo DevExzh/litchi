@@ -1,22 +1,23 @@
 //! PPTX find/replace through `set` with `find=` (record 0273), on both
 //! native owners: cross-run matches collapse into the run where they start,
 //! format properties apply to exactly the replaced or matched text, the
-//! scope is the target's subtree, zero matches are an exact no-op, and a
-//! table cell that would match is refused rather than skipped.
+//! scope is the target's subtree, zero matches are an exact no-op, and
+//! table cells and speaker notes are searched run by run (record 0285).
 #![cfg(feature = "pptx")]
 
 use litchi_core::Position;
-use litchi_ops::{BatchItem, Code, File, OpenOptions, Props, SourceMode, props};
+use litchi_ops::{BatchItem, File, OpenOptions, Props, SourceMode, props};
 use litchi_pptx::opened::{TextEdit, TextProperties, TextTarget};
 
-/// Slide 1: "draft one, dra" + bold "ft two", and "Draft notes".
-/// Slide 2: a table whose first cell reads "draft".
+/// Slide 1: "draft one, dra" + bold "ft two", "Draft notes", and speaker
+/// notes "Speaker draft". Slide 2: a table whose first cell reads "draft".
 fn fixture() -> Vec<u8> {
     let mut builder = litchi_pptx::builder::Builder::new().unwrap();
     let presentation = builder.presentation().unwrap();
     let slide = presentation.add_slide().unwrap();
     slide.add_text_box("draft one, draft two", 0, 0, 1_828_800, 914_400);
     slide.add_text_box("Draft notes", 0, 1_000_000, 1_828_800, 914_400);
+    slide.set_notes("Speaker draft");
     presentation.add_slide().unwrap();
     let package = builder.build().unwrap();
     let mut edit = package.edit().unwrap();
@@ -230,22 +231,78 @@ fn zero_matches_are_an_exact_no_op() {
 }
 
 #[test]
-fn a_matching_table_cell_is_refused_not_skipped() {
-    let file = open(&fixture(), true);
-    let error = find(
-        &file,
-        "/",
-        Props::new().with("find", "draft").with("replace", "final"),
-    )
-    .unwrap_err();
-    assert_eq!(error.code(), Code::UnsupportedCapability);
-    assert_eq!(error.property(), Some("find"));
-    // A table without a match does not block the find.
-    let (_, matched) = find(
-        &file,
-        "/",
-        Props::new().with("find", "two").with("replace", "2"),
-    )
-    .unwrap();
-    assert_eq!(matched, Some(1));
+fn table_cells_and_speaker_notes_are_searched() {
+    for eager in [false, true] {
+        let file = open(&fixture(), eager);
+        let cell = "/slide[2]/table[1]/tr[1]/tc[1]";
+        // The presentation reaches slides, their tables and their notes.
+        let (after, matched) = find(
+            &file,
+            "/",
+            Props::new().with("find", "draft").with("replace", "final"),
+        )
+        .unwrap();
+        assert_eq!(matched, Some(4));
+        assert_eq!(text(&after, cell), "final");
+        assert_eq!(text(&after, "/slide[2]/table[1]/tr[1]/tc[2]"), "b1");
+        assert_eq!(text(&after, "/slide[1]/notes"), "Speaker final");
+        // A slide is its shapes and tables, not its notes.
+        let (after, matched) = find(
+            &file,
+            "/slide[1]",
+            Props::new().with("find", "draft").with("replace", "final"),
+        )
+        .unwrap();
+        assert_eq!(matched, Some(2));
+        assert_eq!(text(&after, "/slide[1]/notes"), "Speaker draft");
+        // The notes page alone.
+        let (after, matched) = find(
+            &file,
+            "/slide[1]/notes",
+            Props::new().with("find", "draft").with("replace", "final"),
+        )
+        .unwrap();
+        assert_eq!(matched, Some(1));
+        assert_eq!(text(&after, "/slide[1]/notes"), "Speaker final");
+        assert_eq!(text(&after, "/slide[1]/shape[1]"), "draft one, draft two");
+        // A cell, formatted in place: the run splits around the match.
+        let (after, matched) = find(
+            &file,
+            cell,
+            Props::new().with("find", "raf").with("bold", true),
+        )
+        .unwrap();
+        assert_eq!(matched, Some(1));
+        assert_eq!(text(&after, cell), "draft");
+        let slide = {
+            use std::io::Read as _;
+            let bytes = after.to_bytes().unwrap();
+            let mut archive = zip::ZipArchive::new(std::io::Cursor::new(bytes)).unwrap();
+            let mut member = archive.by_name("ppt/slides/slide2.xml").unwrap();
+            let mut xml = String::new();
+            member.read_to_string(&mut xml).unwrap();
+            xml
+        };
+        let tail = &slide[slide.find(">d</a:t></a:r>").expect("the split run")..];
+        let bold = &tail[..tail.find(">raf</a:t>").expect("the matched run")];
+        assert!(bold.contains(r#"b="1""#), "{slide}");
+        let reopened = open(&after.to_bytes().unwrap(), eager);
+        assert_eq!(text(&reopened, cell), "draft");
+        let (_, matched) = find(
+            &reopened,
+            "/slide[2]/table[1]",
+            Props::new().with("find", "draft").with("replace", "x"),
+        )
+        .unwrap();
+        assert_eq!(matched, Some(1));
+        // A table without a match changes nothing.
+        let (after, matched) = find(
+            &file,
+            "/slide[2]",
+            Props::new().with("find", "absent").with("replace", "x"),
+        )
+        .unwrap();
+        assert_eq!(matched, Some(0));
+        assert_eq!(after.to_bytes().unwrap(), file.to_bytes().unwrap());
+    }
 }

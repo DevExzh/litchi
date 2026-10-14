@@ -2141,12 +2141,17 @@ element paths names; `Edit::substitute_formatted` and
 `Edit<Package>::story_parts` lists `StoryPart`s (`name`, `kind`:
 `StoryKind::{Header, Footer, Footnotes, Endnotes, Comments}`). The
 record-0273 text-node API is removed. PPTX find and merge share one run
-rewrite in `litchi-ops`.
+rewrite and one text-body walk in `litchi-ops`; PPTX text edits address
+table-cell runs (`opened::TextTarget::{CellRun, CellRunSpan}`, read through
+`table::Cell::text_body`) and notes-page shapes
+(`opened::Edit::set_notes_text_properties`).
 
 | Name | Status |
 |---|---|
 | `litchi_docx::document::Edit::{story_within, substitute_formatted}` (snapshot and package edits); `Edit<Package>::substitute_part_formatted` | adopted (0285) |
 | `litchi_docx::document::substitute::{Segment, StoryKind, StoryPart}`; `Replacement::{keep, formatted, text}`; `Outcome::formatted`; `Paragraph::{segments, item}` | adopted (0285) |
+| `litchi_pptx::opened::TextTarget::{CellRun, CellRunSpan}`, `litchi_pptx::table::Cell::text_body` | adopted (0285) |
+| `litchi_pptx::opened::Edit::set_notes_text_properties` | adopted (0285) |
 
 See [0285](unified-ops/0285-find-merge-consolidation.md).
 

@@ -518,10 +518,35 @@ impl Pptx {
         &self,
         groups: &[(usize, Vec<TextEdit<'_>>)],
     ) -> Result<Commit> {
+        self.commit_story_text_edits(groups, &[])
+    }
+
+    /// Publish slide-grouped text edits and notes-page text edits through
+    /// one native edit. Notes pages are edited on the eager package: a
+    /// source-backed presentation with notes edits is materialized first,
+    /// as a notes text write is (record 0285).
+    pub(super) fn commit_story_text_edits(
+        &self,
+        groups: &[(usize, Vec<TextEdit<'_>>)],
+        notes: &[(usize, Vec<TextEdit<'_>>)],
+    ) -> Result<Commit> {
         let capacity = litchi_pptx::opened::MAX_SHAPE_PROPERTIES_REPLACEMENTS;
         let source = self.editable_owner()?;
         let mut operations = 0;
-        let (target, proof, changed) = match &source {
+        let materialized = match (&source, notes.is_empty()) {
+            (Editable::Source(package), false) => {
+                let bytes = package.to_bytes()?;
+                Some(Arc::new(litchi_pptx::Package::from_reader(
+                    std::io::Cursor::new(bytes),
+                )?))
+            },
+            _ => None,
+        };
+        let owner = match &materialized {
+            Some(package) => Editable::Eager(Arc::clone(package)),
+            None => source.clone(),
+        };
+        let (target, proof, changed) = match &owner {
             Editable::Source(package) => {
                 let mut edit = package.edit()?;
                 for (slide, edits) in groups {
@@ -538,6 +563,11 @@ impl Pptx {
                 for (slide, edits) in groups {
                     for chunk in edits.chunks(capacity) {
                         operations += edit.set_text_properties(*slide, chunk)?;
+                    }
+                }
+                for (slide, edits) in notes {
+                    for chunk in edits.chunks(capacity) {
+                        operations += edit.set_notes_text_properties(*slide, chunk)?;
                     }
                 }
                 let (target, patch) = edit.commit()?.into_parts();

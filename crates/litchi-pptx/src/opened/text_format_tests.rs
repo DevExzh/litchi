@@ -421,3 +421,129 @@ fn field_results_take_run_text() -> Result<()> {
     assert!(super::text_format::rewrite_run(b"<a:br/>", &text, Some("7")).is_err());
     Ok(())
 }
+
+/// Record 0285: table-cell runs take run text and spans as shape runs do,
+/// and the cell's text body reads with the positions they address.
+#[test]
+fn cell_runs_and_spans_edit_one_run() -> Result<()> {
+    let package = deck()?;
+    let cell = |run| TextTarget::CellRun {
+        shape: at(1),
+        row: at(1),
+        column: at(1),
+        paragraph: at(0),
+        run: at(run),
+    };
+    let text = TextProperties::default().with_text("B2");
+    let (after, changed) = apply(&package, &[TextEdit::new(cell(0), text)])?;
+    assert_eq!(changed, 1);
+    let xml = slide_xml(&after)?;
+    let scene = crate::shape::Scene::read(&xml)?;
+    let frame = scene.at(1)?.xml()?.to_vec();
+    let table = crate::table::Table::from_graphic_frame(&frame)?;
+    assert_eq!(table.cell(1, 1)?.expect("cell").text()?, "B2");
+    assert_eq!(table.cell(0, 1)?.expect("cell").text()?, "b1");
+    let body = table.cell(1, 1)?.expect("cell").text_body()?.expect("body");
+    assert_eq!(body.paragraphs[0].runs[0].text, "B2");
+    // A span splits the cell's run and formats only itself.
+    let span = TextTarget::CellRunSpan {
+        shape: at(1),
+        row: at(0),
+        column: at(0),
+        paragraph: at(0),
+        run: at(0),
+        start: 1,
+        end: 2,
+    };
+    let bold = TextProperties::default()
+        .with_text("ONE")
+        .with_bold(Some(true));
+    let (after, _) = apply(&package, &[TextEdit::new(span, bold)])?;
+    let xml = slide_xml(&after)?;
+    let scene = crate::shape::Scene::read(&xml)?;
+    let frame = scene.at(1)?.xml()?.to_vec();
+    let table = crate::table::Table::from_graphic_frame(&frame)?;
+    let body = table.cell(0, 0)?.expect("cell").text_body()?.expect("body");
+    let runs: Vec<&str> = body.paragraphs[0]
+        .runs
+        .iter()
+        .map(|run| run.text.as_str())
+        .collect();
+    assert_eq!(runs, ["a", "ONE"]);
+    // Out-of-range runs, line breaks and a non-table shape are refused.
+    assert!(apply(&package, &[TextEdit::new(cell(4), text)]).is_err());
+    let broken = TextProperties::default().with_text("a\nb");
+    assert!(apply(&package, &[TextEdit::new(cell(0), broken)]).is_err());
+    let not_a_table = TextTarget::CellRun {
+        shape: at(0),
+        row: at(0),
+        column: at(0),
+        paragraph: at(0),
+        run: at(0),
+    };
+    assert!(apply(&package, &[TextEdit::new(not_a_table, text)]).is_err());
+    Ok(())
+}
+
+/// Record 0285: a notes page's shapes take the same run edits as a slide's.
+#[test]
+fn notes_pages_take_run_edits() -> Result<()> {
+    let package = deck()?;
+    let mut edit = package.edit()?;
+    assert!(edit.set_notes_text(0usize, "Speaker draft")?);
+    let package = edit.commit()?.into_package();
+    let notes = package.notes()?.expect("notes");
+    let note = notes.slides().first().expect("note").clone();
+    let scene = crate::shape::Scene::read(note.xml())?;
+    let (index, _) = (0..scene.len())
+        .map(|index| (index, scene.at(index)))
+        .find(|(_, shape)| {
+            shape
+                .as_ref()
+                .is_ok_and(|shape| shape.text() == Some("Speaker draft"))
+        })
+        .expect("the notes body");
+    let span = TextTarget::RunSpan {
+        shape: at(index),
+        paragraph: at(0),
+        run: at(0),
+        start: 8,
+        end: 13,
+    };
+    let mut edit = package.edit()?;
+    let changed = edit.set_notes_text_properties(
+        0usize,
+        &[TextEdit::new(
+            span,
+            TextProperties::default()
+                .with_text("final")
+                .with_italic(Some(true)),
+        )],
+    )?;
+    assert_eq!(changed, 1);
+    let (after, patch) = edit.commit()?.into_parts();
+    let notes_text = |package: &Package| -> Result<Option<String>> {
+        let notes = package.notes()?.expect("notes");
+        let note = notes.slides().first().expect("note");
+        let scene = crate::shape::Scene::read(note.xml())?;
+        Ok(scene.at(index)?.text().map(str::to_owned))
+    };
+    assert_eq!(notes_text(&after)?.as_deref(), Some("Speaker final"));
+    assert_eq!(
+        notes_text(&after.apply(&patch.inverse())?)?.as_deref(),
+        Some("Speaker draft")
+    );
+    // A slide without notes refuses.
+    let mut edit = deck()?.edit()?;
+    assert!(
+        edit.set_notes_text_properties(
+            0usize,
+            &[TextEdit::new(
+                span,
+                TextProperties::default().with_bold(Some(true))
+            )]
+        )
+        .is_err()
+    );
+    Ok(())
+}
