@@ -1,6 +1,7 @@
 //! PPTX template merge (record 0274): placeholders in every slide
 //! paragraph, rewritten run by run through the native text edits, so each
-//! run keeps its formatting; one native commit.
+//! run keeps its formatting; one native commit. The run rewrite is the one
+//! find/replace uses (`find::rewrite_ranges`, record 0285).
 
 use std::ops::Range;
 
@@ -9,9 +10,10 @@ use litchi_drawingml::text::body::RunKind;
 use litchi_pptx::opened::{TextEdit, TextProperties, TextTarget};
 
 use super::{Commit, Pptx};
+use crate::find::{Piece, Values, rewrite_ranges};
 use crate::format::pptx::Nav;
 use crate::format::pptx::node::Item;
-use crate::merge::{Options, Planner, Record, Summary, validate_value};
+use crate::merge::{Options, Planner, Record, Summary};
 use crate::transaction::SemanticLimits;
 use crate::{Code, Error, Result};
 
@@ -46,25 +48,30 @@ pub(crate) fn merge(
         let Some(paragraph) = item.paragraph() else {
             continue;
         };
-        // The paragraph text; breaks and fields are fixed characters.
+        // The paragraph text; breaks and fields are fixed characters, one
+        // piece each, so every run is one piece of the shared rewrite.
         let mut text = String::new();
-        let mut spans: Vec<(usize, Range<usize>)> = Vec::new();
         let mut fixed: Vec<Range<usize>> = Vec::new();
-        for (index, run) in paragraph.runs.iter().enumerate() {
+        let mut pieces: Vec<Piece<'_>> = Vec::with_capacity(paragraph.runs.len());
+        for run in &paragraph.runs {
             let start = text.len();
-            match run.kind {
-                RunKind::Text => {
-                    text.push_str(&run.text);
-                    spans.push((index, start..text.len()));
-                },
-                RunKind::Break => text.push('\n'),
-                _ => text.push('\u{FFFC}'),
-            }
+            let piece = match run.kind {
+                RunKind::Text => run.text.as_str(),
+                RunKind::Break => "\n",
+                _ => "\u{FFFC}",
+            };
+            text.push_str(piece);
             if !matches!(run.kind, RunKind::Text) {
                 fixed.push(start..text.len());
             }
+            pieces.push(Piece {
+                text: piece,
+                group: 0,
+                scoped: true,
+            });
         }
-        let mut planned: Vec<(Range<usize>, &str)> = Vec::new();
+        let mut ranges: Vec<Range<usize>> = Vec::new();
+        let mut values: Vec<&str> = Vec::new();
         planner.text(
             &text,
             |range| {
@@ -73,13 +80,15 @@ pub(crate) fn merge(
                     .any(|fixed| fixed.start < range.end && range.start < fixed.end)
             },
             &[],
-            |range, value| planned.push((range, value)),
+            |range, value| {
+                ranges.push(range);
+                values.push(value);
+            },
         )?;
-        if planned.is_empty() {
+        if ranges.is_empty() {
             continue;
         }
-        for (_, value) in &planned {
-            validate_value(value)?;
+        for value in &values {
             if value.contains(['\n', '\r']) {
                 return Err(Error::new(
                     Code::InvalidValue,
@@ -89,8 +98,16 @@ pub(crate) fn merge(
                 .with_suggestion("remove line breaks from the data or split the paragraph"));
             }
         }
-        for (index, span) in &spans {
-            let Some(content) = rewrite(&text, span.clone(), &planned) else {
+        // The run rewrite find/replace uses (record 0285): a value takes the
+        // place of its placeholder's first character, in that run.
+        let rewrites = rewrite_ranges(
+            &pieces,
+            &ranges,
+            Values::Each(&values),
+            limits.max_staged_bytes(),
+        )?;
+        for rewrite in rewrites {
+            let Some(content) = rewrite.text else {
                 continue;
             };
             runs.push(RunText {
@@ -98,7 +115,7 @@ pub(crate) fn merge(
                 target: TextTarget::Run {
                     shape: item.shape.handle.position(),
                     paragraph: Position::new(item.paragraph as usize),
-                    run: Position::new(*index),
+                    run: Position::new(rewrite.piece),
                 },
                 text: content,
             });
@@ -123,28 +140,4 @@ pub(crate) fn merge(
     }
     let commit = file.commit_text_edits(&groups)?;
     Ok((Some(commit), summary))
-}
-
-/// The new text of the run covering `span`, or `None` when no replacement
-/// touches it. A value goes to the run holding its placeholder's first
-/// character.
-fn rewrite(text: &str, span: Range<usize>, planned: &[(Range<usize>, &str)]) -> Option<String> {
-    let mut overlapping = planned
-        .iter()
-        .filter(|(range, _)| range.start < span.end && range.end > span.start)
-        .peekable();
-    overlapping.peek()?;
-    let mut content = String::new();
-    let mut cursor = span.start;
-    for (range, value) in overlapping {
-        if range.start >= cursor {
-            content.push_str(&text[cursor..range.start]);
-        }
-        if range.start >= span.start {
-            content.push_str(value);
-        }
-        cursor = range.end.min(span.end);
-    }
-    content.push_str(&text[cursor..span.end]);
-    Some(content)
 }

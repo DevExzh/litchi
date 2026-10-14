@@ -751,7 +751,10 @@ impl<'a> Planner<'a> {
     pub(crate) fn value(&mut self, key: &str) -> Result<Option<&'a str>> {
         let value = match self.record.entries.get_key_value(key) {
             Some((key, value)) => {
-                self.keys.insert(key.as_str());
+                // Each value is checked once, when its key is first used.
+                if self.keys.insert(key.as_str()) {
+                    validate_value(value)?;
+                }
                 value.as_str()
             },
             None => {
@@ -771,7 +774,8 @@ impl<'a> Planner<'a> {
 
     /// Plan the placeholders of `text`: `is_text` says whether a range may
     /// be replaced, `outside` lists ranges already taken (sorted). Each
-    /// accepted placeholder is passed to `accept` with its value.
+    /// accepted placeholder is passed to `accept` with its value, which
+    /// [`validate_value`] has accepted.
     pub(crate) fn text(
         &mut self,
         text: &str,

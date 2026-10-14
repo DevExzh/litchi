@@ -10,7 +10,7 @@ use super::super::Xlsx;
 use super::{Commit, native_error};
 use crate::error::{Code, Error, Result};
 use crate::import::MAX_CELL_CHARS;
-use crate::merge::{Options, Planner, Record, Summary, normalize_breaks, validate_value};
+use crate::merge::{Options, Planner, Record, Summary, normalize_breaks};
 use crate::transaction::SemanticLimits;
 
 /// Fill `record` into every text cell. `None` means nothing matched.
@@ -52,7 +52,6 @@ pub(crate) fn merge(
                 let mut content = String::with_capacity(text.len());
                 let mut cursor = 0;
                 for (range, value) in &planned {
-                    validate_value(value)?;
                     content.push_str(&text[cursor..range.start]);
                     content.push_str(&normalize_breaks(value));
                     cursor = range.end;

@@ -113,12 +113,50 @@ pub(crate) fn plan_with(
     max_bytes: usize,
 ) -> Result<Plan> {
     let mut result = Plan::default();
+    let mut staged = 0usize;
+    let values = replacement.map_or(Values::Format, Values::Same);
+    matches_with(
+        scratch,
+        pieces,
+        matcher,
+        |members, starts, text, found, first| {
+            result.matches = result.matches.saturating_add(found.len());
+            rewrite_group(
+                members,
+                starts,
+                text,
+                found,
+                values,
+                marks,
+                first,
+                &mut result.rewrites,
+                &mut staged,
+                max_bytes,
+            )
+        },
+    )?;
+    Ok(result)
+}
+
+/// Find the matches of every group of `pieces`, calling `each` for a
+/// group with at least one: its pieces, their offsets in its joined text,
+/// that text, the matches (ranges of it) and the index of its first piece.
+/// A match is kept only when every non-empty piece it touches is scoped.
+///
+/// # Errors
+///
+/// The errors of `each`, and `internal_error` on allocation failure.
+pub(crate) fn matches_with(
+    scratch: &mut Scratch,
+    pieces: &[Piece<'_>],
+    matcher: &Matcher<'_>,
+    mut each: impl FnMut(&[Piece<'_>], &[usize], &str, &[Range<usize>], usize) -> Result<()>,
+) -> Result<()> {
     let Scratch {
         joined,
         starts,
         found,
     } = scratch;
-    let mut staged = 0usize;
     let mut first = 0;
     while first < pieces.len() {
         let group = pieces[first].group;
@@ -155,23 +193,69 @@ pub(crate) fn plan_with(
             }
         }
         if !found.is_empty() {
-            result.matches = result.matches.saturating_add(found.len());
-            rewrite_group(
-                members,
-                starts,
-                &text,
-                found,
-                replacement,
-                marks,
-                first,
-                &mut result.rewrites,
-                &mut staged,
-                max_bytes,
-            )?;
+            each(members, starts, &text, found, first)?;
         }
         first = end;
     }
-    Ok(result)
+    Ok(())
+}
+
+/// The new text of the ranges a rewrite changes.
+#[derive(Clone, Copy)]
+pub(crate) enum Values<'v> {
+    /// Keep the matched text: only formatting changes.
+    Format,
+    /// One replacement for every range.
+    Same(&'v str),
+    /// One replacement per range, in order.
+    Each(&'v [&'v str]),
+}
+
+impl<'v> Values<'v> {
+    fn at(self, index: usize) -> Option<&'v str> {
+        match self {
+            Self::Format => None,
+            Self::Same(text) => Some(text),
+            Self::Each(texts) => texts.get(index).copied(),
+        }
+    }
+}
+
+/// Rewrite `pieces` (contiguous text: each piece follows the previous one)
+/// for `ranges` of their joined text, each replaced by its value: a range
+/// collapses into the piece where it starts, as a find does. Template merge
+/// plans its placeholders through this (record 0285).
+///
+/// # Errors
+///
+/// `limit_exceeded` beyond `max_bytes` of rewritten text.
+pub(crate) fn rewrite_ranges(
+    pieces: &[Piece<'_>],
+    ranges: &[Range<usize>],
+    values: Values<'_>,
+    max_bytes: usize,
+) -> Result<Vec<Rewrite>> {
+    let mut starts = Vec::with_capacity(pieces.len());
+    let mut text = String::new();
+    for piece in pieces {
+        starts.push(text.len());
+        text.push_str(piece.text);
+    }
+    let mut rewrites = Vec::new();
+    let mut staged = 0usize;
+    rewrite_group(
+        pieces,
+        &starts,
+        &text,
+        ranges,
+        values,
+        false,
+        0,
+        &mut rewrites,
+        &mut staged,
+        max_bytes,
+    )?;
+    Ok(rewrites)
 }
 
 #[allow(
@@ -183,7 +267,7 @@ fn rewrite_group(
     starts: &[usize],
     text: &str,
     found: &[Range<usize>],
-    replacement: Option<&str>,
+    values: Values<'_>,
     marks: bool,
     offset: usize,
     rewrites: &mut Vec<Rewrite>,
@@ -203,10 +287,15 @@ fn rewrite_group(
         let mut output = String::new();
         let mut covered = Vec::new();
         let mut cursor = start;
-        for range in found[next..].iter().take_while(|range| range.start < end) {
+        for (at, range) in found
+            .iter()
+            .enumerate()
+            .skip(next)
+            .take_while(|(_, range)| range.start < end)
+        {
             let from = range.start.max(start);
             output.push_str(&text[cursor..from]);
-            match replacement {
+            match values.at(at) {
                 Some(replacement) => {
                     if range.start >= start {
                         if marks && !replacement.is_empty() {

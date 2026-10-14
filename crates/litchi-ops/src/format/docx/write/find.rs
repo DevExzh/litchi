@@ -1,39 +1,64 @@
-//! DOCX find/replace (record 0273): `set` with `find=`.
+//! DOCX find/replace (records 0273, 0285): `set` with `find=`.
 //!
-//! The scope is the target's subtree: the document root and the body search
-//! every paragraph of the main story, including table cells and block
-//! content controls; a table, row, cell or content control searches its
-//! paragraphs; a paragraph searches itself; a hyperlink or a run searches
-//! only its own text, as OfficeCLI's run scope does. Each paragraph's text
-//! nodes come from the leaf ([`litchi_docx::document::Edit::text_nodes`]),
-//! the shared engine plans the rewrite, and one leaf call
-//! ([`litchi_docx::document::Edit::rewrite_text_nodes`]) writes every
-//! changed paragraph. Format properties then go through the ordinary run
-//! setters on the runs the rewrite isolated.
-
-use std::collections::HashMap;
+//! The scope is the target's subtree. The document root searches the main
+//! story and, as OfficeCLI's root find does, every header, footer, footnote
+//! and endnote; the body searches the main story; a table, row, cell or
+//! content control searches its paragraphs (text boxes included); a
+//! paragraph searches itself; a hyperlink or a run searches only its own
+//! text, as OfficeCLI's run scope does; the comments part and one comment
+//! search their paragraphs.
+//!
+//! Every story is read and rewritten by the leaf's one substitution
+//! primitive ([`litchi_docx::document::substitute`], shared with template
+//! merge): the leaf lists each paragraph's text segments in groups, the
+//! shared matcher finds the matches of each group, and one leaf call per
+//! story replaces them. Format properties are applied by the leaf to the
+//! runs the replacement splits out, through the ordinary DOCX run setters.
 
 use litchi_core::FileFormat;
-use litchi_docx::document::{ElementPath, ElementStep, ParagraphRewrite, TextNodeRewrite};
+use litchi_docx::document::ElementPath;
+use litchi_docx::document::substitute::{Replacement, Story, StoryKind};
 
 use super::super::Docx;
-use super::super::Nav;
 use super::super::element;
+use super::super::merge::owning_editor;
 use super::super::node::{Node, WriteSelection};
 use super::super::spec::Kind;
-use super::{Commit, Selection, Target, TargetKind, WorkEdit, admit_assignments};
+use super::{Assignment, Commit, TargetKind, WorkEdit, admit_assignments, property_error};
 use crate::error::{Code, Error, Result};
-use crate::find::{Piece, Scratch, Spec, plan_with};
-use crate::path::navigate::{KindSet, Navigate};
+use crate::find::{Matcher, Piece, Scratch, Spec, matches_with};
+use crate::registry::Operation;
 use crate::target::TargetArg;
 use crate::transaction::SemanticLimits;
 
-/// One paragraph to search: everything, or only the text of some runs.
-struct Scope {
-    path: ElementPath,
-    /// `None` searches the whole paragraph; otherwise the paths of the runs
-    /// (or hyperlinks) whose text is in scope.
-    within: Option<Vec<ElementPath>>,
+/// What a find reads.
+#[derive(Default)]
+struct Reach {
+    /// The whole main story.
+    body: bool,
+    /// Elements of the main story, when not all of it.
+    paths: Vec<ElementPath>,
+    /// Headers, footers, footnotes and endnotes.
+    parts: bool,
+    /// The comments part: `Some(None)` every comment, else the items.
+    comments: Option<Option<Vec<usize>>>,
+}
+
+impl Reach {
+    fn main(&self) -> bool {
+        self.body || !self.paths.is_empty()
+    }
+
+    fn stories(&self) -> bool {
+        self.parts || self.comments.is_some()
+    }
+}
+
+/// The running totals of one find.
+struct Totals {
+    matches: usize,
+    staged: usize,
+    max_bytes: usize,
 }
 
 impl Docx {
@@ -57,7 +82,6 @@ impl Docx {
         spec: &Spec<'_>,
         limits: &SemanticLimits,
     ) -> Result<(Commit, usize)> {
-        let editor = self.edit()?;
         if spec.format().get("text").is_some() {
             return Err(Error::new(
                 Code::InvalidArgument,
@@ -65,239 +89,231 @@ impl Docx {
             )
             .with_property("text"));
         }
-        // Admit the format properties as run properties before reading.
+        // Admit the format properties as run properties, values included,
+        // before reading.
         let assignments = if spec.formats() {
-            admit_assignments(TargetKind::Run, spec.format())?
+            let assignments = admit_assignments(TargetKind::Run, spec.format())?;
+            let mut failure = None;
+            format_run(
+                &assignments,
+                &mut litchi_docx::properties::Run::default(),
+                &mut failure,
+            );
+            if let Some(error) = failure {
+                return Err(error);
+            }
+            assignments
         } else {
             Vec::new()
         };
         let nodes = self.resolve_targets(target)?;
-        let scopes = scopes(&nodes)?;
+        let reach = reach(&nodes)?;
+        // Header, footer, note and comment stories publish only through
+        // the owning package's editor.
+        let editor = if reach.stories() {
+            owning_editor(self)?
+        } else {
+            self.edit()?
+        };
         let mut work = WorkEdit::from(editor)?;
         let matcher = spec.matcher();
-        let mut matches = 0usize;
-        let mut staged = 0usize;
-        let mut rewrites = Vec::new();
+        let mut totals = Totals {
+            matches: 0,
+            staged: 0,
+            max_bytes: limits.max_staged_bytes(),
+        };
         let mut scratch = Scratch::default();
-        // One piece buffer for every paragraph (record 0281).
-        let mut spare: Vec<Piece<'static>> = Vec::new();
-        for scope in &scopes {
-            let nodes = both!(&work, |edit| edit
-                .text_nodes(&scope.path)
-                .map_err(Error::from))?;
-            if nodes.is_empty() {
-                continue;
+        let mut failure = None;
+        let mut format = |run: &mut litchi_docx::properties::Run| {
+            format_run(&assignments, run, &mut failure);
+        };
+        if reach.main() {
+            let story = both!(&work, |edit| if reach.body {
+                edit.story()
+            } else {
+                edit.story_within(&reach.paths)
             }
-            let mut pieces = recycle(std::mem::take(&mut spare));
-            pieces.extend(nodes.iter().map(|node| Piece {
-                text: node.text.as_str(),
-                group: node.group,
-                scoped: scope.within.as_ref().is_none_or(|within| {
-                    node.run
-                        .as_ref()
-                        .is_some_and(|run| within.iter().any(|path| starts_with(run, path)))
-                }),
-            }));
-            let planned = plan_with(
-                &mut scratch,
-                &pieces,
-                &matcher,
-                spec.replacement(),
-                spec.formats(),
-                limits.max_staged_bytes().saturating_sub(staged),
-            )?;
-            if planned.matches == 0 {
-                spare = recycle(pieces);
-                continue;
-            }
-            matches = matches.saturating_add(planned.matches);
-            let mut slots = Vec::with_capacity(planned.rewrites.len());
-            for rewrite in planned.rewrites {
-                let text = rewrite
-                    .text
-                    .unwrap_or_else(|| pieces[rewrite.piece].text.to_owned());
-                staged = staged.saturating_add(text.len());
-                slots.push(TextNodeRewrite::new(rewrite.piece, text).isolating(rewrite.marks));
-            }
-            if !slots.is_empty() {
-                rewrites.push(ParagraphRewrite::new(scope.path.clone(), slots));
-            }
-        }
-        if rewrites.is_empty() {
-            return Ok((work.commit(self)?, matches));
-        }
-        let isolated = both!(&mut work, |edit| edit
-            .rewrite_text_nodes(&rewrites)
             .map_err(Error::from))?;
-        for path in isolated {
-            let target = Target {
-                selection: Selection::Element(path),
-                kind: TargetKind::Run,
-            };
-            for assignment in &assignments {
-                work.apply(&target, assignment)?;
+            let replacements = plan(&story, None, &matcher, spec, &mut scratch, &mut totals)?;
+            if !replacements.is_empty() {
+                both!(&mut work, |edit| edit
+                    .substitute_formatted(&story, &replacements, &mut format)
+                    .map_err(Error::from))?;
             }
         }
-        Ok((work.commit(self)?, matches))
+        if reach.stories() {
+            let WorkEdit::Eager(edit) = &mut work else {
+                return Err(Error::new(
+                    Code::InternalError,
+                    "a DOCX story find needs the owning package editor",
+                ));
+            };
+            for part in edit.story_parts()? {
+                let items = match part.kind() {
+                    StoryKind::Comments => match &reach.comments {
+                        Some(items) => items.as_deref(),
+                        None => continue,
+                    },
+                    _ if reach.parts => None,
+                    _ => continue,
+                };
+                let story = edit.part_story(part.name())?;
+                let replacements = plan(&story, items, &matcher, spec, &mut scratch, &mut totals)?;
+                if !replacements.is_empty() {
+                    edit.substitute_part_formatted(&story, &replacements, &mut format)?;
+                }
+            }
+        }
+        if let Some(error) = failure {
+            return Err(error);
+        }
+        Ok((work.commit(self)?, totals.matches))
     }
 }
 
-/// An empty piece buffer that keeps `pieces`' allocation for pieces of
-/// another lifetime (the in-place collection reuses it: same layout).
-fn recycle<'b>(mut pieces: Vec<Piece<'_>>) -> Vec<Piece<'b>> {
-    pieces.clear();
-    pieces.into_iter().map(|_| unreachable!()).collect()
-}
-
-/// Whether `path` is `prefix` or below it.
-fn starts_with(path: &ElementPath, prefix: &ElementPath) -> bool {
-    path.steps().starts_with(prefix.steps())
-}
-
-/// The paragraphs the target nodes search, each once.
-fn scopes(nodes: &[Node<'_>]) -> Result<Vec<Scope>> {
-    let mut scopes: Vec<Scope> = Vec::new();
-    let mut index: HashMap<ElementPath, usize> = HashMap::new();
-    // One target node names each paragraph at most once: only several
-    // targets need the deduplicating index (record 0281).
-    let dedupe = nodes.len() > 1;
-    let mut body_index = None;
-    let mut add = |path: ElementPath, within: Option<ElementPath>, scopes: &mut Vec<Scope>| {
-        if !dedupe {
-            scopes.push(Scope {
-                path,
-                within: within.map(|run| vec![run]),
-            });
-            return;
-        }
-        match index.get(&path) {
-            Some(&at) => match (&mut scopes[at].within, within) {
-                (Some(runs), Some(run)) => runs.push(run),
-                (slot, None) => *slot = None,
-                (None, Some(_)) => {},
-            },
-            None => {
-                index.insert(path.clone(), scopes.len());
-                scopes.push(Scope {
-                    path,
-                    within: within.map(|run| vec![run]),
+/// Apply the format properties to one run's direct properties, keeping the
+/// first failure.
+fn format_run(
+    assignments: &[Assignment<'_>],
+    run: &mut litchi_docx::properties::Run,
+    failure: &mut Option<Error>,
+) {
+    for assignment in assignments {
+        let applied =
+            assignment
+                .entry
+                .prepare(Operation::Set, &assignment.value, |setter, value| {
+                    setter.apply_run(run, value)
                 });
-            },
+        if let Err(error) = applied {
+            failure.get_or_insert_with(|| property_error(error, &assignment.key));
         }
-    };
+    }
+}
+
+/// The replacements of a find over `story`: the paragraphs of `items` only,
+/// when given.
+fn plan(
+    story: &Story,
+    items: Option<&[usize]>,
+    matcher: &Matcher<'_>,
+    spec: &Spec<'_>,
+    scratch: &mut Scratch,
+    totals: &mut Totals,
+) -> Result<Vec<Replacement>> {
+    let mut replacements = Vec::new();
+    let mut pieces: Vec<Piece<'_>> = Vec::new();
+    let mut offsets: Vec<usize> = Vec::new();
+    for (index, paragraph) in story.paragraphs().iter().enumerate() {
+        if items.is_some_and(|items| paragraph.item().is_none_or(|item| !items.contains(&item))) {
+            continue;
+        }
+        let text = paragraph.text();
+        if !matcher.may_match(text) {
+            continue;
+        }
+        pieces.clear();
+        offsets.clear();
+        for segment in paragraph.segments() {
+            let range = segment.range();
+            offsets.push(range.start);
+            pieces.push(Piece {
+                text: &text[range],
+                group: segment.group(),
+                scoped: segment.is_scoped(),
+            });
+        }
+        matches_with(scratch, &pieces, matcher, |_, _, _, found, first| {
+            let base = offsets[first];
+            totals.matches = totals.matches.saturating_add(found.len());
+            for range in found {
+                let range = base + range.start..base + range.end;
+                let replacement = match spec.replacement() {
+                    Some(text) => {
+                        totals.staged = totals.staged.saturating_add(text.len());
+                        let replacement = Replacement::new(index, range, text);
+                        if spec.formats() {
+                            replacement.formatted()
+                        } else {
+                            replacement
+                        }
+                    },
+                    None => Replacement::keep(index, range),
+                };
+                if totals.staged > totals.max_bytes {
+                    return Err(Error::new(
+                        Code::LimitExceeded,
+                        format!(
+                            "find/replace would stage more than {} bytes of text",
+                            totals.max_bytes
+                        ),
+                    ));
+                }
+                replacements.try_reserve(1).map_err(|source| {
+                    Error::from(crate::transaction::Error::Allocation { source })
+                })?;
+                replacements.push(replacement);
+            }
+            Ok(())
+        })?;
+    }
+    Ok(replacements)
+}
+
+/// What the target nodes search.
+fn reach(nodes: &[Node<'_>]) -> Result<Reach> {
+    let mut reach = Reach::default();
+    let mut body_index = None;
     for node in nodes {
         match node.element_kind() {
-            Kind::Document | Kind::Body => {
-                // Direct body paragraphs come from the body's block index;
-                // only tables and content controls are walked as nodes.
-                let blocks = super::super::nav::load_body(node.docx)?;
-                let mut nested = false;
-                for block in blocks.iter() {
-                    match block.kind() {
-                        litchi_docx::BlockKind::Paragraph => add(
-                            ElementPath::new([ElementStep::Paragraph(
-                                block.transaction_position().map_err(Error::from)?,
-                            )]),
-                            None,
-                            &mut scopes,
-                        ),
-                        litchi_docx::BlockKind::Table | litchi_docx::BlockKind::ContentControl => {
-                            nested = true;
-                        },
-                        _ => {},
-                    }
-                }
-                if nested {
-                    let nav = Nav::new(node.docx);
-                    let body = if node.element_kind() == Kind::Body {
-                        node.clone()
-                    } else {
-                        nav.children(node, KindSet::of(Kind::Body))?
-                            .next()
-                            .transpose()?
-                            .ok_or_else(|| {
-                                Error::new(Code::InternalError, "the DOCX document has no body")
-                            })?
-                    };
-                    let mut paragraphs = Vec::new();
-                    for child in nav.children(&body, KindSet::of(Kind::Table).with(Kind::Sdt))? {
-                        descend(&child?, &mut paragraphs)?;
-                    }
-                    for paragraph in &paragraphs {
-                        add(
-                            paragraph_path(paragraph, &mut body_index)?,
-                            None,
-                            &mut scopes,
-                        );
-                    }
-                }
+            Kind::Document => {
+                reach.body = true;
+                reach.parts = true;
             },
-            Kind::Table | Kind::Row | Kind::Cell | Kind::Sdt => {
-                let mut paragraphs = Vec::new();
-                descend(node, &mut paragraphs)?;
-                for paragraph in &paragraphs {
-                    add(
-                        paragraph_path(paragraph, &mut body_index)?,
-                        None,
-                        &mut scopes,
-                    );
-                }
+            Kind::Body => reach.body = true,
+            Kind::Table | Kind::Row | Kind::Cell | Kind::Sdt | Kind::Run | Kind::Hyperlink => {
+                reach.paths.push(element::element_path(node)?);
             },
-            Kind::Paragraph => add(paragraph_path(node, &mut body_index)?, None, &mut scopes),
-            Kind::Run | Kind::Hyperlink => {
-                let path = element::element_path(node)?;
-                let paragraph = path
+            Kind::Paragraph => reach.paths.push(paragraph_path(node, &mut body_index)?),
+            Kind::Comments => reach.comments = Some(None),
+            Kind::Comment => {
+                let item = node
+                    .address
                     .steps()
-                    .iter()
-                    .rposition(|step| matches!(step, ElementStep::Paragraph(_)))
-                    .ok_or_else(|| {
-                        Error::new(Code::InternalError, "a DOCX run path names no paragraph")
-                    })?;
-                let paragraph = ElementPath::new(&path.steps()[..=paragraph]);
-                add(paragraph, Some(path), &mut scopes);
+                    .last()
+                    .map(|step| step.ordinal as usize)
+                    .ok_or_else(|| Error::new(Code::InternalError, "a comment has no address"))?;
+                match &mut reach.comments {
+                    Some(None) => {},
+                    Some(Some(items)) => items.push(item),
+                    None => reach.comments = Some(Some(vec![item])),
+                }
             },
             _ => {
                 return Err(Error::new(
                     Code::UnsupportedCapability,
-                    "find searches the document, the body, tables, rows, cells, content controls, paragraphs, hyperlinks and runs",
+                    "find searches the document, the body, tables, rows, cells, content controls, paragraphs, hyperlinks, runs and comments",
                 )
                 .with_property(crate::find::FIND)
-                .with_suggestion("headers, footers, notes and comments are not searched yet (record 0273)"));
+                .with_suggestion(
+                    "the document root also searches headers, footers, footnotes and endnotes (record 0285)",
+                ));
             },
         }
     }
-    Ok(scopes)
-}
-
-/// The paragraphs below `node`, in document order.
-fn descend<'f>(node: &Node<'f>, out: &mut Vec<Node<'f>>) -> Result<()> {
-    let nav = Nav::new(node.docx);
-    let kinds = match node.element_kind() {
-        Kind::Document => KindSet::of(Kind::Body),
-        Kind::Table => KindSet::of(Kind::Row),
-        Kind::Row => KindSet::of(Kind::Cell),
-        _ => KindSet::of(Kind::Paragraph)
-            .with(Kind::Table)
-            .with(Kind::Sdt),
-    };
-    for child in nav.children(node, kinds)? {
-        let child = child?;
-        if child.element_kind() == Kind::Paragraph {
-            out.push(child);
-        } else {
-            descend(&child, out)?;
-        }
+    if reach.body {
+        reach.paths.clear();
     }
-    Ok(())
+    Ok(reach)
 }
 
 /// The leaf path of a paragraph node: its body position when it is a direct
 /// body paragraph, else its element path.
 fn paragraph_path(node: &Node<'_>, body: &mut Option<litchi_docx::Blocks>) -> Result<ElementPath> {
     match node.write_selection_cached(body) {
-        Ok(WriteSelection::Paragraph(position)) => {
-            Ok(ElementPath::new([ElementStep::Paragraph(position)]))
-        },
+        Ok(WriteSelection::Paragraph(position)) => Ok(ElementPath::new([
+            litchi_docx::document::ElementStep::Paragraph(position),
+        ])),
         Ok(WriteSelection::Run { .. }) => Err(Error::new(
             Code::InternalError,
             "a DOCX paragraph resolved to a run",

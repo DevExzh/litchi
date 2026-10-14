@@ -122,9 +122,11 @@ fn a_changed_heading_rebuilds_the_table_and_keeps_page_numbers() {
             eager,
             fixture("sw/qa/extras/ooxmlexport/data/multi-page-toc.docx"),
         );
+        // Change the heading alone: a find over the body would also change
+        // the table's entry, a field result it searches (record 0285).
         let file = file
             .set(
-                "/body",
+                "/body/p[2]",
                 props! { "find" => "Chapter 1", "replace" => "Chapter One" },
             )
             .unwrap();

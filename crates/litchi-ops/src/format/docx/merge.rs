@@ -47,7 +47,7 @@ fn merge_inner(
     let replacements = plan(&story, &mut planner)?;
     let mut changed = edit.substitute(&story, &replacements)?.paragraphs() > 0;
     for part in edit.story_parts()? {
-        let story = edit.part_story(&part)?;
+        let story = edit.part_story(part.name())?;
         let replacements = plan(&story, &mut planner)?;
         if !replacements.is_empty() {
             changed |= edit.substitute_part(&story, &replacements)?.paragraphs() > 0;
@@ -101,7 +101,11 @@ fn plan(story: &Story, planner: &mut Planner<'_>) -> Result<Vec<Replacement>> {
             planned.sort_by_key(|(range, _)| range.start);
         }
         for (range, value) in planned {
-            validate_value(&value)?;
+            // Placeholder values were checked by the planner; a field's
+            // value carries its switches' text too.
+            if matches!(value, Cow::Owned(_)) {
+                validate_value(&value)?;
+            }
             let value = match normalize_breaks(&value) {
                 Cow::Borrowed(_) => value.into_owned(),
                 Cow::Owned(normalized) => normalized,

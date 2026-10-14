@@ -54,7 +54,7 @@ use std::borrow::Cow;
 pub(crate) use matcher::Matcher;
 #[cfg(test)]
 pub(crate) use plan::plan;
-pub(crate) use plan::{Piece, Scratch, plan_with};
+pub(crate) use plan::{Piece, Scratch, Values, matches_with, plan_with, rewrite_ranges};
 
 use crate::error::{Code, Error, Result};
 use crate::props::{PropValue, Props};

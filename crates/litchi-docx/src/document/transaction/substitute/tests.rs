@@ -1,6 +1,19 @@
 use std::sync::Arc;
 
-use super::{FieldKind, OBJECT, Replacement, Story, part_story, scan, substitute_part};
+use super::{FieldKind, OBJECT, Outcome, Replacement, Story, part_story, scan_paragraphs};
+use crate::document::Result;
+
+fn substitute_part(
+    story: &Story,
+    current: &[u8],
+    replacements: &[Replacement],
+) -> Result<(Option<Vec<u8>>, Outcome)> {
+    super::substitute_part(story, current, replacements, |_run| {})
+}
+
+fn scan(xml: &[u8], main: bool) -> Result<Vec<super::Paragraph>> {
+    scan_paragraphs(xml, main)
+}
 
 const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 
@@ -193,18 +206,18 @@ fn fields_with_other_content_are_not_replaceable() {
 }
 
 #[test]
-fn a_field_that_spans_paragraphs_is_not_listed() {
+fn a_field_that_spans_paragraphs_is_listed_but_never_replaceable() {
     let xml = header(concat!(
         r#"<w:p><w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText>TOC</w:instrText></w:r></w:p>"#,
         r#"<w:p><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p>"#,
     ));
     let story = story(&xml);
-    assert!(
-        story
-            .paragraphs()
-            .iter()
-            .all(|paragraph| paragraph.fields().is_empty())
-    );
+    let [field] = story.paragraphs()[0].fields() else {
+        panic!("the field is listed where it begins");
+    };
+    assert_eq!(field.instruction(), "TOC");
+    assert!(!field.is_replaceable());
+    assert!(story.paragraphs()[1].fields().is_empty());
 }
 
 #[test]
@@ -337,5 +350,306 @@ mod edits {
         let commit = edit.commit().unwrap();
         assert!(!commit.diagnostics().changed());
         assert!(commit.patch().is_noop());
+    }
+}
+
+/// Record 0285: one primitive for find and merge, field state across
+/// paragraphs, segments, scoped stories and formatted replacements.
+mod unified {
+    use litchi_core::Position;
+
+    use super::super::{Replacement, Segment, Story};
+    use super::{OBJECT, W};
+    use crate::document::{ElementPath, ElementStep, Snapshot};
+
+    fn snapshot(body: &str) -> Snapshot {
+        Snapshot::from_xml(format!(
+            r#"<w:document xmlns:w="{W}"><w:body>{body}<w:sectPr/></w:body></w:document>"#
+        ))
+        .unwrap()
+    }
+
+    fn body(position: usize) -> ElementPath {
+        ElementPath::new([ElementStep::Paragraph(Position::new(position))])
+    }
+
+    fn xml(snapshot: &Snapshot) -> String {
+        String::from_utf8(snapshot.xml_bytes().to_vec()).unwrap()
+    }
+
+    fn segments(story: &Story, paragraph: usize) -> Vec<(String, usize, bool)> {
+        let paragraph = &story.paragraphs()[paragraph];
+        paragraph
+            .segments()
+            .map(|segment: Segment| {
+                (
+                    paragraph.text()[segment.range()].to_owned(),
+                    segment.group(),
+                    segment.is_scoped(),
+                )
+            })
+            .collect()
+    }
+
+    /// A table of contents whose result spans three paragraphs, a heading
+    /// after it, and a nested field inside an instruction.
+    const TOC: &str = concat!(
+        r#"<w:p><w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> TOC \o "1-3" </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>Intro</w:t></w:r><w:r><w:tab/></w:r><w:r><w:t>1</w:t></w:r></w:p>"#,
+        r#"<w:p><w:r><w:t>Intro body</w:t></w:r></w:p>"#,
+        r#"<w:p><w:r><w:t>Intro end</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p>"#,
+        r#"<w:p><w:r><w:t>Intro</w:t></w:r></w:p>"#,
+    );
+
+    #[test]
+    fn field_results_read_as_text_in_every_paragraph_they_span() {
+        let snapshot = snapshot(TOC);
+        let story = snapshot.edit().story().unwrap();
+        let texts: Vec<&str> = story
+            .paragraphs()
+            .iter()
+            .map(|paragraph| paragraph.text())
+            .collect();
+        assert_eq!(
+            texts,
+            [
+                format!("{OBJECT}{OBJECT}Intro\t1").as_str(),
+                "Intro body",
+                format!("Intro end{OBJECT}").as_str(),
+                "Intro",
+            ]
+        );
+        // Every paragraph of the result reads the same through a scoped
+        // story, which starts inside the field.
+        for (position, text) in [(1, "Intro body"), (2, "Intro end")] {
+            let scoped = snapshot.edit().story_within(&[body(position)]).unwrap();
+            assert_eq!(scoped.paragraphs().len(), 1);
+            assert!(scoped.paragraphs()[0].text().starts_with(text));
+        }
+    }
+
+    #[test]
+    fn rewriting_a_result_that_spans_paragraphs_keeps_the_field() {
+        let snapshot = snapshot(TOC);
+        let mut edit = snapshot.edit();
+        let story = edit.story().unwrap();
+        let mut replacements = Vec::new();
+        for (index, paragraph) in story.paragraphs().iter().enumerate() {
+            let text = paragraph.text();
+            let mut from = 0;
+            while let Some(at) = text[from..].find("Intro").map(|at| at + from) {
+                replacements.push(Replacement::new(index, at..at + 5, "Preface"));
+                from = at + 5;
+            }
+        }
+        assert_eq!(replacements.len(), 4);
+        edit.substitute(&story, &replacements).unwrap();
+        let commit = edit.commit().unwrap();
+        let after = xml(commit.snapshot());
+        // Markers and the instruction are byte-for-byte where they were.
+        for marker in [
+            r#"<w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> TOC \o "1-3" </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>Preface</w:t></w:r>"#,
+            r#"<w:r><w:t>Preface end</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r>"#,
+        ] {
+            assert!(after.contains(marker), "{after}");
+        }
+        assert_eq!(after.matches("Intro").count(), 0);
+        let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+        assert_eq!(restored.xml_bytes(), snapshot.xml_bytes());
+    }
+
+    #[test]
+    fn text_inside_an_instruction_is_fixed_even_across_paragraphs() {
+        // An IF whose instruction holds a nested field result, and whose
+        // instruction continues into the next paragraph.
+        let snapshot = snapshot(concat!(
+            r#"<w:p><w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText>IF </w:instrText></w:r>"#,
+            r#"<w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText>MERGEFIELD a</w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>nested</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p>"#,
+            r#"<w:p><w:r><w:t>still code</w:t></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>shown</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p>"#,
+        ));
+        let edit = snapshot.edit();
+        let story = edit.story().unwrap();
+        assert!(story.paragraphs()[0].segments().next().is_none());
+        let shown: Vec<String> = segments(&story, 1)
+            .into_iter()
+            .map(|(text, _, _)| text)
+            .collect();
+        assert_eq!(shown, ["shown"]);
+        let scoped = edit.story_within(&[body(1)]).unwrap();
+        assert_eq!(segments(&scoped, 0)[0].0, "shown");
+        assert!(!scoped.paragraphs()[0].is_text(0..1));
+    }
+
+    #[test]
+    fn segments_group_text_that_no_boundary_separates() {
+        let snapshot = snapshot(
+            r#"<w:p><w:pPr><w:jc w:val="left"/></w:pPr><w:r><w:t>a</w:t></w:r><w:bookmarkStart w:id="0" w:name="x"/><w:proofErr w:type="spellStart"/><w:r><w:lastRenderedPageBreak/><w:t>b</w:t><w:tab/><w:t>c</w:t></w:r><w:bookmarkEnd w:id="0"/><w:hyperlink w:anchor="x"><w:r><w:t>d</w:t></w:r></w:hyperlink><w:r><w:t>e</w:t></w:r><w:fldSimple w:instr=" DATE "><w:r><w:t>today</w:t></w:r></w:fldSimple><w:del w:id="1" w:author="a"><w:r><w:delText>gone</w:delText></w:r></w:del><w:ins w:id="2" w:author="a"><w:r><w:t>new</w:t></w:r></w:ins></w:p>"#,
+        );
+        let story = snapshot.edit().story().unwrap();
+        let found = segments(&story, 0);
+        let texts: Vec<&str> = found.iter().map(|(text, _, _)| text.as_str()).collect();
+        assert_eq!(texts, ["a", "b", "c", "d", "e", "today", "new"]);
+        let group = |index: usize| found[index].1;
+        assert_eq!(group(0), group(1), "bookmarks and proofing marks join text");
+        assert_ne!(group(1), group(2), "a tab separates text");
+        assert_ne!(group(2), group(3), "a hyperlink starts a group");
+        assert_ne!(group(3), group(4), "a hyperlink ends a group");
+        assert_ne!(group(4), group(5), "a simple field starts a group");
+        assert_ne!(group(5), group(6), "deleted text and insertions separate");
+        assert!(found.iter().all(|(_, _, scoped)| *scoped));
+    }
+
+    #[test]
+    fn scoped_stories_list_only_what_the_paths_name() {
+        let snapshot = snapshot(concat!(
+            r#"<w:p><w:r><w:t>zero</w:t></w:r></w:p>"#,
+            r#"<w:p><w:r><w:t>one </w:t></w:r><w:hyperlink w:anchor="a"><w:r><w:t>link</w:t></w:r></w:hyperlink><w:r><w:t> two</w:t></w:r></w:p>"#,
+            r#"<w:tbl><w:tr><w:tc><w:p><w:r><w:t>cell</w:t></w:r></w:p><w:p><w:r><w:t>cell two</w:t></w:r></w:p></w:tc></w:tr></w:tbl>"#,
+        ));
+        let edit = snapshot.edit();
+        let hyperlink = body(1).child(ElementStep::Hyperlink(Position::new(0)));
+        let story = edit.story_within(&[hyperlink]).unwrap();
+        let scoped: Vec<(String, bool)> = segments(&story, 0)
+            .into_iter()
+            .map(|(text, _, scoped)| (text, scoped))
+            .collect();
+        assert_eq!(
+            scoped,
+            [
+                ("one ".to_owned(), false),
+                ("link".to_owned(), true),
+                (" two".to_owned(), false)
+            ]
+        );
+        let table = ElementPath::new([ElementStep::Table(Position::new(0))]);
+        let story = edit.story_within(&[table, body(0), body(0)]).unwrap();
+        let texts: Vec<&str> = story
+            .paragraphs()
+            .iter()
+            .map(|paragraph| paragraph.text())
+            .collect();
+        assert_eq!(texts, ["zero", "cell", "cell two"]);
+        let missing = edit.story_within(&[body(9)]);
+        assert!(missing.is_err());
+    }
+
+    #[test]
+    fn formatted_replacements_split_and_format_runs() {
+        let snapshot = snapshot(
+            r#"<w:p><w:r><w:t>one</w:t></w:r><w:r><w:rPr><w:i/></w:rPr><w:t>two three</w:t><w:tab/><w:t>four</w:t></w:r><w:hyperlink w:anchor="a"><w:r><w:t>link text</w:t></w:r></w:hyperlink><w:ins w:id="1" w:author="a"><w:r><w:t>last</w:t></w:r></w:ins></w:p><w:p><w:r><w:t>untouched</w:t></w:r></w:p>"#,
+        );
+        let mut edit = snapshot.edit();
+        let story = edit.story().unwrap();
+        let text = story.paragraphs()[0].text().to_owned();
+        let find = |needle: &str| {
+            let at = text.find(needle).unwrap();
+            at..at + needle.len()
+        };
+        let outcome = edit
+            .substitute_formatted(
+                &story,
+                &[
+                    Replacement::new(0, find("three"), "3").formatted(),
+                    Replacement::keep(0, find("fo")).formatted(),
+                    Replacement::keep(0, find("text")),
+                    Replacement::keep(0, find("last")),
+                ],
+                |run| run.bold = Some(true),
+            )
+            .unwrap();
+        assert_eq!(outcome.formatted(), 4);
+        assert_eq!(outcome.paragraphs(), 1);
+        let after = xml(edit.commit().unwrap().snapshot());
+        assert!(after.contains(concat!(
+            r#"<w:r><w:t>one</w:t></w:r><w:r><w:rPr><w:i/></w:rPr><w:t xml:space="preserve">two </w:t></w:r>"#,
+            r#"<w:r><w:rPr><w:b/><w:i/></w:rPr><w:t>3</w:t></w:r><w:r><w:rPr><w:i/></w:rPr><w:tab/></w:r>"#,
+            r#"<w:r><w:rPr><w:b/><w:i/></w:rPr><w:t>fo</w:t></w:r><w:r><w:rPr><w:i/></w:rPr><w:t>ur</w:t></w:r>"#,
+        )), "{after}");
+        assert!(after.contains(concat!(
+            r#"<w:hyperlink w:anchor="a"><w:r><w:t xml:space="preserve">link </w:t></w:r><w:r><w:rPr><w:b/></w:rPr><w:t>text</w:t></w:r></w:hyperlink>"#,
+            r#"<w:ins w:id="1" w:author="a"><w:r><w:rPr><w:b/></w:rPr><w:t>last</w:t></w:r></w:ins>"#,
+        )), "{after}");
+        assert!(after.contains("<w:p><w:r><w:t>untouched</w:t></w:r></w:p>"));
+    }
+
+    #[test]
+    fn nested_and_body_paragraphs_change_together_and_invert() {
+        let snapshot = snapshot(
+            r#"<w:p><w:r><w:t>alpha</w:t></w:r></w:p><w:tbl><w:tr><w:tc><w:p><w:r><w:t>beta</w:t></w:r></w:p></w:tc></w:tr></w:tbl><w:p><w:r><w:t>gamma</w:t></w:r><w:r><w:drawing><w:txbxContent><w:p><w:r><w:t>delta</w:t></w:r></w:p></w:txbxContent></w:drawing></w:r></w:p>"#,
+        );
+        let mut edit = snapshot.edit();
+        let story = edit.story().unwrap();
+        let replacements: Vec<Replacement> = story
+            .paragraphs()
+            .iter()
+            .enumerate()
+            .map(|(index, paragraph)| {
+                let end = paragraph.text().trim_end_matches(OBJECT).len();
+                Replacement::new(index, 0..end, paragraph.text()[..end].to_uppercase())
+            })
+            .collect();
+        assert_eq!(replacements.len(), 4);
+        edit.substitute(&story, &replacements).unwrap();
+        let commit = edit.commit().unwrap();
+        let text = xml(commit.snapshot());
+        for word in ["ALPHA", "BETA", "GAMMA", "DELTA"] {
+            assert!(text.contains(&format!("<w:t>{word}</w:t>")), "{text}");
+        }
+        let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+        assert_eq!(restored.xml_bytes(), snapshot.xml_bytes());
+    }
+
+    #[test]
+    fn part_stories_number_their_items_and_format_runs() {
+        let xml = format!(
+            r#"<w:comments xmlns:w="{W}"><w:comment w:id="4"><w:p><w:r><w:t>first note</w:t></w:r></w:p></w:comment><w:comment w:id="9"><w:p><w:r><w:t>second note</w:t></w:r></w:p><w:p><w:r><w:t>more</w:t></w:r></w:p></w:comment></w:comments>"#
+        );
+        let story = super::super::part_story(
+            "/word/comments.xml",
+            std::sync::Arc::new(xml.as_bytes().to_vec()),
+        )
+        .unwrap();
+        let items: Vec<Option<usize>> = story
+            .paragraphs()
+            .iter()
+            .map(|paragraph| paragraph.item())
+            .collect();
+        assert_eq!(items, [Some(0), Some(1), Some(1)]);
+        let (after, outcome) = super::super::substitute_part(
+            &story,
+            xml.as_bytes(),
+            &[Replacement::new(1, 0..6, "2nd").formatted()],
+            |run| run.italic = Some(true),
+        )
+        .unwrap();
+        assert_eq!(outcome.formatted(), 1);
+        let after = String::from_utf8(after.unwrap()).unwrap();
+        assert!(
+            after.contains(r#"<w:r><w:rPr><w:i/></w:rPr><w:t>2nd</w:t></w:r><w:r><w:t xml:space="preserve"> note</w:t></w:r>"#),
+            "{after}"
+        );
+    }
+
+    #[test]
+    fn malformed_requests_are_refused_without_change() {
+        let snapshot = snapshot(r#"<w:p><w:r><w:t>ab</w:t></w:r></w:p>"#);
+        let cases = [
+            vec![Replacement::new(0, 1..1, "x")],
+            vec![Replacement::new(0, 0..1, "\u{1}")],
+            vec![Replacement::new(1, 0..1, "x")],
+            vec![Replacement::new(0, 0..3, "x")],
+            vec![
+                Replacement::new(0, 1..2, "x"),
+                Replacement::new(0, 0..1, "y"),
+            ],
+        ];
+        for replacements in cases {
+            let mut edit = snapshot.edit();
+            let story = edit.story().unwrap();
+            assert!(edit.substitute(&story, &replacements).is_err());
+            assert_eq!(
+                edit.commit().unwrap().snapshot().xml_bytes(),
+                snapshot.xml_bytes()
+            );
+        }
     }
 }
