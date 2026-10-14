@@ -427,7 +427,7 @@ fn resolve_targets<'f>(
     if let Some(path) = target.path() {
         nodes.push(crate::path::resolve::get(&Nav::new(file), path)?);
     } else if let Some(query) = target.query() {
-        let walk = crate::query::run(Nav::new(file), query.clone())?;
+        let walk = crate::query::run(Nav::new(file), query)?;
         if !walk.plan().diagnostics().is_empty() {
             return Err(refusal(
                 Code::InvalidSelector,

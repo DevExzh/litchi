@@ -14,7 +14,8 @@ use crate::path::navigate::KindSet;
 
 /// The parent whose children are walked, with the native cursor of the axis
 /// being walked. The hot main-story axes keep only what they read; any other
-/// parent is boxed so the iterator stays small.
+/// parent is kept by value (record 0287: an RTF node is small enough to copy,
+/// which spares an allocation per walked container).
 enum State<'f> {
     None,
     Body {
@@ -29,7 +30,7 @@ enum State<'f> {
         anchors: std::ops::Range<usize>,
         runs: litchi_rtf::text::Runs<'f>,
     },
-    Other(Box<Node<'f>>),
+    Other(Node<'f>),
 }
 
 /// The children of one node, in the order of its kind's child table.
@@ -89,7 +90,7 @@ impl<'f> Children<'f> {
             // Header/footer paragraphs expose text only; runs, links and
             // pictures are main-story axes.
             (Kind::Paragraph, _, _) => State::None,
-            _ => State::Other(Box::new(*parent)),
+            _ => State::Other(*parent),
         };
         Self {
             state,

@@ -100,6 +100,23 @@ impl<'q> IntoQuery<'q> for QueryArg<'q> {
     }
 }
 
+/// A borrowed selector runs without copying it: a parsed query is compiled
+/// from the reference and a compiled plan is used in place (record 0287).
+impl<'a, 'q: 'a> IntoQuery<'a> for &'a QueryArg<'q> {
+    fn into_query(self) -> Result<QueryArg<'a>> {
+        Ok(QueryArg {
+            held: match &self.held {
+                Held::Query(query) => Held::QueryRef(query),
+                Held::QueryRef(query) => Held::QueryRef(query),
+                Held::Plan(plan) => Held::PlanRef(plan),
+                Held::PlanRef(plan) => Held::PlanRef(plan),
+            },
+            text: self.text,
+            raw: self.raw,
+        })
+    }
+}
+
 /// A selector ready to run: parsed text, a parsed [`Query`], or a compiled
 /// [`Plan`].
 ///
