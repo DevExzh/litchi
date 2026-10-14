@@ -503,6 +503,15 @@ Cut from `80e24f8745`:
     - no coalescing on the tree formats;
     - flat files;
     - the metadata family not adopted.
+- Merged `s20-refresh` (0279), the last of the three M4 engines:
+  - `File::refresh`/`Edit::refresh` and `Verb::Refresh`, with CLI `litchi refresh` and Python `File.refresh`;
+  - DOCX TOC (`\\o \\u \\t \\h \\n \\p`) and computable fields; PPTX slide-number and date fields; XLSX cache write-back;
+  - no layout engine: cached TOC page numbers are kept by anchor, and `PageNumbers::Require` refuses with `refresh_failed`;
+  - no clock is read by default;
+  - 1k-heading TOC 1.02×, current TOC 0.89×, 6k XLSX caches 1.005×.
+  - Open: F1–F8.
+  - Finding for 0273: a DOCX find over `/body` rewrites a TOC whose field spans paragraphs (fix queued).
+- **Owner decision (2026-10-14):** keep the per-match file-source freshness check in queries (record 0280 G1, raised by 0281 F3). A once-per-walk check is rejected because it would break "the next pull after a source change fails". Per-check cost work (0280's lock-free `fstat`) stays.
 - Environment: a session restart wiped `/tmp`, which held the gate scripts and `TMPDIR`. Gate scripts now live in the session scratchpad and create their `TMPDIR`.
 
 Not dispatched: iWork M6. It waits for owner decisions D1/D2, and the iWork crates belong to their owners.
