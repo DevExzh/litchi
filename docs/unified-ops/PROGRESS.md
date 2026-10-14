@@ -583,6 +583,21 @@ Cut from `9fe45629ab`:
 
 Coordinator scripts and agent scratch now live in `/home/zhuhe/code/litchi-worktrees/.coord/` (outside the repository), so they survive `/tmp` wipes.
 
+## Wave R7 (2026-10-14)
+Cut from `99cc3138eb`. It targets what Phase G (0289) found still open for the Definition of Done:
+- `checklist-fixes` (0290): checklist failures F1–F4, F6, F7, and metadata `language` reporting (the facade Markdown golden may change).
+- `perf-path` (0291): shared target/path/plan costs:
+  - DOCX single set 1.13×;
+  - an RTF plan cache;
+  - the walker fast path;
+  - selector copies;
+  - the ODB tree re-parse;
+  - nested XLS checks (the per-match check stays).
+- `odf-verbs` (0292): ODF object-format move/swap/add/remove; flat ODF open and writes.
+- `producer-structure` (0293): structural edits on producer files — XLS rows/columns, PPTX slide remove, RTF paragraph lifecycle — and the three editor-vs-reader admission gaps.
+- `acceptance2` (0294): Python mirror of the Phase G scenarios, fixtures for the 70 unreached cells, bench matrix extended to 0285+.
+- `m4-ext` (0295): find/merge/refresh on more formats, CSV import into ODS, DOCX SmartArt (0284a), XLSX rich-text find.
+
 Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-pptx-w4` 9474e2b6ce, `uo/m2-l-xlsb-w1` 876588a23c, `uo/m1-r4-perf` 012fd509ff.
 
 - M0a S10 (`docs/unified-ops/s10-measurement.md` §9). M0a landed on the strength of two explanations. If either is rejected, the chosen alternative becomes a harness follow-up; M0a is not reverted.
