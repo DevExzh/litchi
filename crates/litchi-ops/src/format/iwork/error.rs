@@ -54,6 +54,11 @@ pub enum LeafError {
     /// Writing the Numbers package to a sink failed.
     #[cfg(feature = "numbers")]
     NumbersWrite(litchi_numbers::WriteError),
+    /// A Numbers transaction other than the cell transaction failed: sheet
+    /// and table names, sheet order, table relocation, merges, comments,
+    /// display formats, formula text, or a fresh workbook build.
+    #[cfg(feature = "numbers")]
+    NumbersEdit(super::numbers::EditError),
 }
 
 impl fmt::Display for LeafError {
@@ -86,6 +91,8 @@ impl fmt::Display for LeafError {
             Self::NumbersCells(error) => error.fmt(formatter),
             #[cfg(feature = "numbers")]
             Self::NumbersWrite(error) => error.fmt(formatter),
+            #[cfg(feature = "numbers")]
+            Self::NumbersEdit(error) => error.fmt(formatter),
         }
     }
 }
@@ -120,6 +127,8 @@ impl std::error::Error for LeafError {
             Self::NumbersCells(error) => Some(error),
             #[cfg(feature = "numbers")]
             Self::NumbersWrite(error) => Some(error),
+            #[cfg(feature = "numbers")]
+            Self::NumbersEdit(error) => error.source_error(),
         }
     }
 }
@@ -166,6 +175,8 @@ impl LeafError {
             Self::KeynoteWrite(_) => Code::IoError,
             #[cfg(feature = "numbers")]
             Self::NumbersWrite(_) => Code::IoError,
+            #[cfg(feature = "numbers")]
+            Self::NumbersEdit(error) => error.code(),
         }
     }
 }

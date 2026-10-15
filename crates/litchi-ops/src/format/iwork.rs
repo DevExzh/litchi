@@ -70,7 +70,7 @@ pub(crate) mod write;
 #[cfg(feature = "keynote")]
 pub(crate) mod keynote;
 #[cfg(feature = "numbers")]
-pub(crate) mod numbers;
+pub mod numbers;
 #[cfg(feature = "pages")]
 pub(crate) mod pages;
 
@@ -146,7 +146,7 @@ impl Owner {
             #[cfg(feature = "keynote")]
             Self::Keynote(package) => keynote::build(package),
             #[cfg(feature = "numbers")]
-            Self::Numbers(package) => Ok(numbers::build(package)),
+            Self::Numbers(package) => numbers::build(package),
         }
     }
 
@@ -448,9 +448,16 @@ impl Iwork {
         Ok(written)
     }
 
-    /// A fresh package of `format`: refused, the iWork leaves have no
+    /// A fresh package of `format`: the Numbers leaf's `Package::new()`
+    /// (record 0297); refused for Pages and Keynote, whose leaves have no
     /// from-scratch builder yet (`IWORK_API_REQUESTS.md` request 1).
     pub(crate) fn create(format: FileFormat, options: &crate::CreateOptions) -> Result<Self> {
+        #[cfg(feature = "numbers")]
+        if format == FileFormat::Numbers {
+            return numbers::create(options)
+                .map(|package| Self::from_owner(Owner::Numbers(package), None))
+                .map_err(|error| error.with_format(format));
+        }
         let _ = options;
         Err(Error::new(
             crate::Code::UnsupportedCapability,

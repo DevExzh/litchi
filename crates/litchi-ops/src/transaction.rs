@@ -258,6 +258,9 @@ pub struct Edit {
     /// Coalesced object-format sets (record 0288).
     #[cfg(feature = "odf-objects")]
     odf_tree: Option<crate::format::odf_tree::coalesce::Run>,
+    /// Coalesced Numbers cell values and formulas (record 0297).
+    #[cfg(feature = "numbers")]
+    numbers_cells: Option<crate::format::iwork::numbers::coalesce::Run>,
     /// The match count of the last `find=` set (record 0273).
     matched: Option<usize>,
 }
@@ -353,6 +356,8 @@ impl File {
                 ods_cells: None,
                 #[cfg(feature = "odf-objects")]
                 odf_tree: None,
+                #[cfg(feature = "numbers")]
+                numbers_cells: None,
                 matched: None,
             };
             let value = f(&mut edit);
@@ -1910,6 +1915,59 @@ impl Edit {
             self.operations += 1;
             return Ok(Some(changed));
         }
+        #[cfg(feature = "numbers")]
+        if let File::Numbers(handle) = &self.current {
+            let planned = match &mut self.numbers_cells {
+                Some(run) => run.cell_plan(_target, _props),
+                None => handle.numbers_cell_plan(_target, _props, None),
+            };
+            if planned.is_err() {
+                self.flush_pending()?;
+            }
+            let Some(mut plan) = planned? else {
+                if self.numbers_cells.is_some() {
+                    self.flush_pending()?;
+                }
+                return Ok(None);
+            };
+            if self.operations >= self.limits.max_operations() {
+                return Err(Error::Limit {
+                    kind: LimitKind::Operations,
+                    observed: self.operations.saturating_add(1),
+                    maximum: self.limits.max_operations(),
+                }
+                .into());
+            }
+            if self
+                .numbers_cells
+                .as_ref()
+                .is_some_and(|run| run.requires_barrier(&plan))
+            {
+                self.flush_pending()?;
+                let File::Numbers(handle) = &self.current else {
+                    return Err(pending());
+                };
+                let Some(replanned) = handle.numbers_cell_plan(_target, _props, None)? else {
+                    return Ok(None);
+                };
+                plan = replanned;
+            }
+            if self.numbers_cells.is_none() {
+                let File::Numbers(handle) = &self.current else {
+                    return Err(pending());
+                };
+                self.numbers_cells = Some(crate::format::iwork::numbers::coalesce::Run::new(
+                    handle,
+                    &self.limits,
+                )?);
+            }
+            let run = self.numbers_cells.as_mut().ok_or_else(|| {
+                crate::Error::new(Code::InternalError, "Numbers cell run missing")
+            })?;
+            let changed = run.stage(plan, _index)?;
+            self.operations += 1;
+            return Ok(Some(changed));
+        }
         #[cfg(feature = "ods")]
         if let File::Ods(_) = &self.current {
             let planned = match &self.ods_cells {
@@ -2528,6 +2586,31 @@ impl Edit {
             })();
             result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
         }
+        #[cfg(feature = "numbers")]
+        if let Some(run) = self.numbers_cells.take() {
+            let index = run.first_index();
+            let result = (|| -> Result<()> {
+                let (base, commit) = run.commit()?;
+                let (step, ()) = wrap_iwork(&base, commit, ())?;
+                let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
+                if bytes > self.limits.max_snapshot_bytes() {
+                    return Err(Error::Limit {
+                        kind: LimitKind::SnapshotBytes,
+                        observed: bytes,
+                        maximum: self.limits.max_snapshot_bytes(),
+                    }
+                    .into());
+                }
+                self.steps
+                    .try_reserve(1)
+                    .map_err(|source| Error::Allocation { source })?;
+                self.current = step.after.clone();
+                self.steps.push(step);
+                self.snapshot_bytes = bytes;
+                Ok(())
+            })();
+            result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
+        }
         #[cfg(feature = "odf-objects")]
         if let Some(run) = self.odf_tree.take() {
             let index = run.first_index();
@@ -2647,6 +2730,10 @@ impl Edit {
                 #[cfg(feature = "ods")]
                 {
                     self.ods_cells = None;
+                }
+                #[cfg(feature = "numbers")]
+                {
+                    self.numbers_cells = None;
                 }
                 #[cfg(feature = "odp")]
                 {

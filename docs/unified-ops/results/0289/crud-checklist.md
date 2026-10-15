@@ -35,7 +35,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | odf | 2 | 18 | 18 | 0 | 0 | 6 | 2 | 0 | 0 |
 | pages | 4 | 25 | 25 | 0 | 0 | 20 | 7 | 0 | 0 |
 | keynote | 4 | 26 | 21 | 1 | 4 | 12 | 10 | 0 | 1 |
-| numbers | 4 | 22 | 22 | 0 | 0 | 20 | 10 | 0 | 0 |
+| numbers | 5 | 41 | 41 | 0 | 0 | 5 | 14 | 1 | 1 |
 
 ## docx
 
@@ -571,13 +571,14 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## numbers
 
-- fixtures: `iwork/numbers/basic.numbers`, `iwork/numbers/cell-value-native.numbers`
-- document views on `iwork/numbers/cell-value-native.numbers`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
+- fixtures: `create()`, `iwork/numbers/basic.numbers`, `iwork/numbers/cell-value-native.numbers`, `iwork/numbers/table-merges-native.numbers`, `iwork/numbers/table-relocation-native.numbers`, `create() + add mergeCell`
+- document views on `iwork/numbers/basic.numbers`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| workbook | ok | ok | n/a | ok | n/a | gap | gap | gap | gap | n/a | n/a | gap | ok |
-| sheet | ok | ok | ok | ok | n/a | gap | gap | gap | gap | n/a | n/a | gap | ok |
-| table | ok | ok | ok | ok | n/a | gap | gap | gap | gap | n/a | n/a | gap | ok |
-| cell | ok | ok | ok | ok | ok | gap | gap | gap | gap | ok | ok | gap | ok |
+| workbook | ok | ok | n/a | ok | n/a | n/a | n/a | no pair | gap | n/a | n/a | ok | ok |
+| sheet | ok | ok | ok | ok | ok | n/a | n/a | ok | gap | ok | ok | ok | ok |
+| table | ok | ok | ok | ok | ok | n/a | n/a | no pair | gap | ok | ok | ok | ok |
+| cell | ok | ok | ok | ok | ok | n/a | ok | refused | gap | ok | ok | ok | ok |
+| mergeCell | ok | ok | ok | ok | n/a | ok | ok | no pair | gap | n/a | n/a | ok | ok |
 

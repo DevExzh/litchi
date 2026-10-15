@@ -48,6 +48,8 @@ CREATABLE = (
     "docx", "xlsx", "pptx", "xlsb", "doc", "xls", "ppt", "rtf", "ods", "odt", "odp",
     # The remaining ODF formats (record 0282).
     "oth", "odm", "odg", "odc", "odi", "odb", "odf",
+    # Numbers builds a blank workbook (record 0297).
+    "numbers",
 )
 #: The formats File holds read-only, and a fixture of each: none since ODT
 #: (0276), ODS (0277) and ODP (0278) gained writers.

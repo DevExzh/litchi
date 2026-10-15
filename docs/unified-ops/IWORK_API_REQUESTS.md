@@ -155,3 +155,43 @@ makes `File::Pages`, `File::Keynote` and `File::Numbers` hold the leaf
 - **New 17 — Numbers formula writes through the unified registry.** The
   leaf authors formulas (`Edit::set_formula`); the unified `value` key does
   not map onto it yet (follow-up record 0299).
+
+## 2026-10-15 Numbers parity (record 0297)
+
+Record 0297 brings `litchi-numbers` to ADR 0034 W1 and wires its focused
+transactions through the unified layer. Status of the Numbers requests:
+
+- **1 (Numbers): done.** `litchi_numbers::Package::new()` returns a
+  deterministic blank workbook (one sheet, one 10 x 5 table) and
+  `litchi_numbers::Builder` names its sheet, table and identity; unified
+  `create(Format::Numbers)` uses it. Formula authoring on the blank refuses
+  (`table_cells::Error::UnsupportedDependency { kind: FormulaCache }`): the
+  embedded package has no formula-owner dependency record for its table.
+  **New 18:** emit a formula owner in the blank so formulas work on a
+  created workbook.
+- **4: rename done** (`edit_names().rename_sheet`), **sheet order done**
+  (`edit_sheet_order`; it now also accepts a package without sheet
+  previews). **Open:** sheet add and remove. The host editor in
+  `litchi-iwa` has both (`numbers/editor/sheet_delete.rs`,
+  `semantic/workbook.rs` `add_empty_sheet`), but ADR 0028 keeps
+  `litchi-ops` off `litchi-iwa`, and porting them means owning the
+  drawable, calculation-engine and view-state graphs in the leaf.
+- **5: rename done** (`edit_names().rename_table`), **cross-sheet move
+  done** (`edit_table_relocation`). **Open:** table add and remove, and a
+  table order within one sheet (relocation only appends).
+- **6: open.** Row and column insert and delete stay host-only
+  (`numbers/editor/row_insert.rs`, `column_insert.rs`); the leaf has only
+  the `RowDeletion`/`ColumnDeletion` value types.
+- **7: open.** Cell text styles (bold, italic, font, colour) have no leaf
+  transaction; the unified layer writes only the number and percentage
+  display formats (`numberFormat`).
+- **17: done.** `litchi_numbers::formula::Expression::parse` parses formula
+  text with local A1 references, ranges, whole rows and columns, the
+  operators and function calls; unified `set formula` uses it. References
+  to other tables still need source-bound table handles, so they are
+  refused.
+- **New 19 — cell comment writes on Numbers-authored files.** The leaf
+  comment transaction (`edit_table_cell_comments`) refuses every
+  Numbers-authored corpus file (`InvalidSource` or
+  `UnsupportedDependency`), and comments resolve per cell, so the unified
+  `comment` key (read and write) stays a typed gap.

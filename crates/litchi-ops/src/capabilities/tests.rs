@@ -344,6 +344,8 @@ fn every_format_has_one_answer_for_its_reads() {
                 || (format == FileFormat::Ods && cfg!(feature = "ods"))
                 || (format == FileFormat::Odt && cfg!(feature = "odt"))
                 || (format == FileFormat::Odp && cfg!(feature = "odp"))
+                // Record 0297: Numbers builds a blank workbook.
+                || (format == FileFormat::Numbers && cfg!(feature = "numbers"))
                 || (matches!(
                     format,
                     FileFormat::Oth

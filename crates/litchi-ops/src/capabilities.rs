@@ -1120,6 +1120,10 @@ impl Capabilities {
         if self.format == Some(FileFormat::Odp) && cfg!(feature = "odp") {
             return Support::Supported;
         }
+        // Record 0297: the Numbers leaf builds a minimal workbook.
+        if self.format == Some(FileFormat::Numbers) && self.adapter().is_some() {
+            return Support::Supported;
+        }
         if matches!(
             self.format,
             Some(FileFormat::Pages | FileFormat::Keynote | FileFormat::Numbers)
