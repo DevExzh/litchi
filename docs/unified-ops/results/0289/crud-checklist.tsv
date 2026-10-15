@@ -3990,15 +3990,15 @@ odg	layer	edit	n/a	edit not offered for this element	-
 odg	layer	batch	n/a	batch not offered for this element	-
 odg	layer	create	supported		ok format
 odg	layer	save	supported		ok format
-odc	chart	get	supported		ok 5 instances, first `odf/odc-producer-evidence/odfdom-created.odc` /
-odc	chart	find	supported		ok 5 instances, first `odf/odc-producer-evidence/odfdom-created.odc` /
+odc	chart	get	supported		ok 6 instances, first `odf/odc-producer-evidence/odfdom-created.odc` /
+odc	chart	find	supported		ok 6 instances, first `odf/odc-producer-evidence/odfdom-created.odc` /
 odc	chart	query	n/a	query not offered for this element	-
-odc	chart	view	supported		ok 5 instances, first `odf/odc-producer-evidence/odfdom-created.odc` /
+odc	chart	view	supported		ok 6 instances, first `odf/odc-producer-evidence/odfdom-created.odc` /
 odc	chart	set	supported		ok `create() + add axis` / title=Litchi
 odc	chart	add	n/a	add not offered for this element	-
 odc	chart	remove	n/a	remove not offered for this element	-
-odc	chart	move	gap	0282 ODF object-format structure	unreached
-odc	chart	swap	gap	0282 ODF object-format structure	unreached
+odc	chart	move	format-verb		unreached
+odc	chart	swap	format-verb		unreached
 odc	chart	edit	supported		ok tx.set
 odc	chart	batch	supported		ok set item
 odc	chart	create	supported		ok format
@@ -4010,8 +4010,8 @@ odc	axis	view	supported		ok 6 instances, first `odf/odc-producer-evidence/odfdom
 odc	axis	set	supported		ok `create() + add axis` /axis[1] name=Litchi
 odc	axis	add	supported		ok /axis[1] on `create()` under / [dimension]
 odc	axis	remove	supported		ok `create() + add axis` /axis[1]
-odc	axis	move	gap	0282 ODF object-format structure	refused unsupported_capability
-odc	axis	swap	gap	0282 ODF object-format structure	refused unsupported_capability
+odc	axis	move	format-verb		ok `create() + add axis` /axis[1] /axis[2]
+odc	axis	swap	format-verb		ok `create() + add axis` /axis[1] /axis[2]
 odc	axis	edit	supported		ok tx.set
 odc	axis	batch	supported		ok set item
 odc	axis	create	supported		ok format
@@ -4023,23 +4023,23 @@ odc	series	view	supported		ok 4 instances, first `odf/odc-producer-evidence/odfd
 odc	series	set	supported		ok `create() + add series` /series[1] values=Sheet1.B1:B3 (value unchanged: no-op only)
 odc	series	add	supported		ok /series[1] on `create()` under / [values]
 odc	series	remove	supported		ok `create() + add series` /series[1]
-odc	series	move	gap	0282 ODF object-format structure	refused unsupported_capability
-odc	series	swap	gap	0282 ODF object-format structure	refused unsupported_capability
+odc	series	move	format-verb		ok `create() + add series` /series[1] /series[2]
+odc	series	swap	format-verb		ok `create() + add series` /series[1] /series[2]
 odc	series	edit	supported		ok tx.set
 odc	series	batch	supported		ok set item
 odc	series	create	supported		ok format
 odc	series	save	supported		ok format
-odc	legend	get	supported		unreached
-odc	legend	find	supported		unreached
-odc	legend	query	supported		unreached
-odc	legend	view	supported		unreached
-odc	legend	set	n/a	set not offered for this element	unreached
-odc	legend	add	n/a	add not offered for this element	-
-odc	legend	remove	n/a	remove not offered for this element	unreached
-odc	legend	move	gap	0282 ODF object-format structure	unreached
-odc	legend	swap	gap	0282 ODF object-format structure	unreached
-odc	legend	edit	n/a	edit not offered for this element	-
-odc	legend	batch	n/a	batch not offered for this element	-
+odc	legend	get	supported		ok 1 instances, first `create() + add legend` /legend
+odc	legend	find	supported		ok 1 instances, first `create() + add legend` /legend
+odc	legend	query	supported		ok matches in create() + add legend
+odc	legend	view	supported		ok 1 instances, first `create() + add legend` /legend
+odc	legend	set	supported		ok `create() + add legend` /legend position=bottom (value unchanged: no-op only)
+odc	legend	add	supported		ok /legend on `create()` under / [position]
+odc	legend	remove	supported		ok `create() + add legend` /legend
+odc	legend	move	format-verb		unreached
+odc	legend	swap	format-verb		unreached
+odc	legend	edit	supported		ok tx.set
+odc	legend	batch	supported		ok set item
 odc	legend	create	supported		ok format
 odc	legend	save	supported		ok format
 odi	image	get	supported		ok 1 instances, first `create()` /
@@ -4047,10 +4047,10 @@ odi	image	find	supported		ok 1 instances, first `create()` /
 odi	image	query	n/a	query not offered for this element	-
 odi	image	view	supported		ok 1 instances, first `create()` /
 odi	image	set	n/a	set not offered for this element	-
-odi	image	add	gap	0282 ODF object-format structure	-
-odi	image	remove	gap	0282 ODF object-format structure	-
-odi	image	move	gap	0282 ODF object-format structure	unreached
-odi	image	swap	gap	0282 ODF object-format structure	unreached
+odi	image	add	n/a	add not offered for this element	-
+odi	image	remove	n/a	remove not offered for this element	-
+odi	image	move	format-verb		unreached
+odi	image	swap	format-verb		unreached
 odi	image	edit	n/a	edit not offered for this element	-
 odi	image	batch	n/a	batch not offered for this element	-
 odi	image	create	supported		ok format
@@ -4060,10 +4060,10 @@ odi	frame	find	supported		ok 1 instances, first `create()` /frame[1]
 odi	frame	query	supported		ok matches in create()
 odi	frame	view	supported		ok 1 instances, first `create()` /frame[1]
 odi	frame	set	supported		ok `create()` /frame[1] name=Litchi
-odi	frame	add	gap	0282 ODF object-format structure	-
-odi	frame	remove	gap	0282 ODF object-format structure	-
-odi	frame	move	gap	0282 ODF object-format structure	unreached
-odi	frame	swap	gap	0282 ODF object-format structure	unreached
+odi	frame	add	gap	0282 ODI single frame	-
+odi	frame	remove	gap	0282 ODI single frame	-
+odi	frame	move	format-verb		unreached
+odi	frame	swap	format-verb		unreached
 odi	frame	edit	supported		ok tx.set
 odi	frame	batch	supported		ok set item
 odi	frame	create	supported		ok format
@@ -4073,10 +4073,10 @@ odi	metadata	find	supported		ok 1 instances, first `create()` /metadata
 odi	metadata	query	supported		ok matches in create()
 odi	metadata	view	supported		ok 1 instances, first `create()` /metadata
 odi	metadata	set	supported		ok `create()` /metadata title=Litchi
-odi	metadata	add	gap	0282 ODF object-format structure	-
-odi	metadata	remove	gap	0282 ODF object-format structure	-
-odi	metadata	move	gap	0282 ODF object-format structure	unreached
-odi	metadata	swap	gap	0282 ODF object-format structure	unreached
+odi	metadata	add	n/a	add not offered for this element	-
+odi	metadata	remove	supported		ok `create()` /metadata
+odi	metadata	move	format-verb		unreached
+odi	metadata	swap	format-verb		unreached
 odi	metadata	edit	supported		ok tx.set
 odi	metadata	batch	supported		ok set item
 odi	metadata	create	supported		ok format
@@ -4088,8 +4088,8 @@ odb	database	view	supported		ok 4 instances, first `libreoffice-core/extras/sour
 odb	database	set	n/a	set not offered for this element	-
 odb	database	add	n/a	add not offered for this element	-
 odb	database	remove	n/a	remove not offered for this element	-
-odb	database	move	gap	0282 ODF object-format structure	unreached
-odb	database	swap	gap	0282 ODF object-format structure	unreached
+odb	database	move	format-verb		unreached
+odb	database	swap	format-verb		unreached
 odb	database	edit	n/a	edit not offered for this element	-
 odb	database	batch	n/a	batch not offered for this element	-
 odb	database	create	supported		ok format
@@ -4099,10 +4099,10 @@ odb	table	find	supported		ok 3 instances, first `libreoffice-core/extras/source/
 odb	table	query	supported		ok matches in libreoffice-core/extras/source/database/biblio.odb
 odb	table	view	supported		ok 3 instances, first `libreoffice-core/extras/source/database/biblio.odb` /table[1]
 odb	table	set	supported		ok `libreoffice-core/extras/source/database/biblio.odb` /table[1] name=Litchi
-odb	table	add	n/a	add not offered for this element	-
+odb	table	add	gap	0282 ODB typed table creation	-
 odb	table	remove	supported		ok `libreoffice-core/extras/source/database/biblio.odb` /table[1]
-odb	table	move	gap	0282 ODF object-format structure	refused unsupported_capability
-odb	table	swap	gap	0282 ODF object-format structure	refused unsupported_capability
+odb	table	move	format-verb		ok `libreoffice-core/extras/source/database/biblio.odb` /table[1] /table[2]
+odb	table	swap	format-verb		ok `libreoffice-core/extras/source/database/biblio.odb` /table[1] /table[2]
 odb	table	edit	supported		ok tx.set
 odb	table	batch	supported		ok set item
 odb	table	create	supported		ok format
@@ -4112,10 +4112,10 @@ odb	column	find	supported		ok 8 instances, first `libreoffice-core/extras/source
 odb	column	query	supported		ok matches in libreoffice-core/extras/source/database/biblio.odb
 odb	column	view	supported		ok 8 instances, first `libreoffice-core/extras/source/database/biblio.odb` /table[1]/column[1]
 odb	column	set	supported		ok `libreoffice-core/extras/source/database/biblio.odb` /table[1]/column[1] name=Litchi
-odb	column	add	n/a	add not offered for this element	-
+odb	column	add	gap	0282 ODB typed column creation	-
 odb	column	remove	supported		ok `libreoffice-core/extras/source/database/biblio.odb` /table[1]/column[1]
-odb	column	move	gap	0282 ODF object-format structure	refused unsupported_capability
-odb	column	swap	gap	0282 ODF object-format structure	refused unsupported_capability
+odb	column	move	format-verb		ok `libreoffice-core/extras/source/database/biblio.odb` /table[1]/column[1] /table[1]/column[2]
+odb	column	swap	format-verb		ok `libreoffice-core/extras/source/database/biblio.odb` /table[1]/column[1] /table[1]/column[2]
 odb	column	edit	supported		ok tx.set
 odb	column	batch	supported		ok set item
 odb	column	create	supported		ok format
@@ -4127,8 +4127,8 @@ odb	query	view	supported		ok 2 instances, first `libreoffice-core/dbaccess/qa/un
 odb	query	set	supported		ok `create() + add query` /query[1] command=7
 odb	query	add	supported		ok /query[1] on `create()` under / [name,command]
 odb	query	remove	supported		ok `create() + add query` /query[1]
-odb	query	move	gap	0282 ODF object-format structure	unreached
-odb	query	swap	gap	0282 ODF object-format structure	unreached
+odb	query	move	format-verb		unreached
+odb	query	swap	format-verb		unreached
 odb	query	edit	supported		ok tx.set
 odb	query	batch	supported		ok set item
 odb	query	create	supported		ok format
@@ -4705,15 +4705,15 @@ odm	metadata	edit	supported		ok tx.set
 odm	metadata	batch	supported		ok set item
 odm	metadata	create	supported		ok format
 odm	metadata	save	supported		ok format
-odf	math	get	supported		ok 3 instances, first `odf/native-resave/source/font-styles.odf` /
-odf	math	find	supported		ok 3 instances, first `odf/native-resave/source/font-styles.odf` /
+odf	math	get	supported		ok 4 instances, first `odf/native-resave/source/font-styles.odf` /
+odf	math	find	supported		ok 4 instances, first `odf/native-resave/source/font-styles.odf` /
 odf	math	query	n/a	query not offered for this element	-
-odf	math	view	supported		ok 3 instances, first `odf/native-resave/source/font-styles.odf` /
+odf	math	view	supported		ok 4 instances, first `odf/native-resave/source/font-styles.odf` /
 odf	math	set	supported		ok `odf/native-resave/source/font-styles.odf` / starmath=Litchi
-odf	math	add	gap	0282 ODF object-format structure	-
+odf	math	add	n/a	add not offered for this element	-
 odf	math	remove	n/a	remove not offered for this element	-
-odf	math	move	gap	0282 ODF object-format structure	unreached
-odf	math	swap	gap	0282 ODF object-format structure	unreached
+odf	math	move	format-verb		unreached
+odf	math	swap	format-verb		unreached
 odf	math	edit	supported		ok tx.set
 odf	math	batch	supported		ok set item
 odf	math	create	supported		ok format
@@ -4722,11 +4722,11 @@ odf	element	get	supported		ok 8 instances, first `odf/native-resave/source/font-
 odf	element	find	supported		ok 8 instances, first `odf/native-resave/source/font-styles.odf` /element[1]
 odf	element	query	supported		ok matches in create()
 odf	element	view	supported		ok 8 instances, first `odf/native-resave/source/font-styles.odf` /element[1]
-odf	element	set	supported		ok `libreoffice-core/starmath/qa/extras/data/tdf151842.odf` /element[1]/element[1] text=Litchi
-odf	element	add	gap	0282 ODF object-format structure	-
-odf	element	remove	supported		ok `create()` /element[1]
-odf	element	move	gap	0282 ODF object-format structure	refused unsupported_capability
-odf	element	swap	gap	0282 ODF object-format structure	refused unsupported_capability
+odf	element	set	supported		ok `create() + add element` /element[2] text=Litchi
+odf	element	add	supported		ok /element[2] on `create()` under / [tag,text]
+odf	element	remove	supported		ok `create() + add element` /element[1]
+odf	element	move	format-verb		ok `create() + add element` /element[1] /element[2]
+odf	element	swap	format-verb		ok `create() + add element` /element[1] /element[2]
 odf	element	edit	supported		ok tx.set
 odf	element	batch	supported		ok set item
 odf	element	create	supported		ok format

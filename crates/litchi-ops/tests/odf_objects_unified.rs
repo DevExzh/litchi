@@ -236,16 +236,46 @@ mod odg {
             text(&file, &format!("/page[2]/shape[{count}]")).as_deref(),
             Some("Front")
         );
-        let error = file
+        // A shape moves into another page, here the empty first page
+        // (record 0292), and swaps across pages.
+        let moved_text = text(&file, &format!("/page[2]/shape[{count}]"));
+        let file = file
             .move_to(
-                "/page[2]/shape[1]",
+                format!("/page[2]/shape[{count}]").as_str(),
                 litchi_ops::Placement::Into(
                     litchi_ops::IntoPath::into_path("/page[1]").unwrap(),
                     None,
                 ),
             )
-            .expect_err("cross-page move");
-        assert_eq!(error.code(), Code::UnsupportedCapability);
+            .expect("cross-page move");
+        let file = reopen(&file);
+        assert_eq!(prop(&file, "/page[1]", "shapeCount").as_deref(), Some("1"));
+        assert_eq!(text(&file, "/page[1]/shape[1]"), moved_text);
+        let other = text(&file, "/page[2]/shape[1]");
+        let file = file
+            .swap("/page[1]/shape[1]", "/page[2]/shape[1]")
+            .expect("cross-page swap");
+        let file = reopen(&file);
+        assert_eq!(text(&file, "/page[1]/shape[1]"), other);
+        assert_eq!(text(&file, "/page[2]/shape[1]"), moved_text);
+        let file = file
+            .move_to(
+                "/page[1]/shape[1]",
+                litchi_ops::Placement::Before(
+                    litchi_ops::IntoPath::into_path("/page[2]/shape[1]").unwrap(),
+                ),
+            )
+            .expect("anchored cross-page move");
+        let file = reopen(&file);
+        assert_eq!(prop(&file, "/page[1]", "shapeCount").as_deref(), Some("0"));
+        assert_eq!(text(&file, "/page[2]/shape[1]"), other);
+        let error = file
+            .move_to(
+                "/page[2]",
+                litchi_ops::Placement::Position(litchi_core::Position::new(9)),
+            )
+            .expect_err("out of range");
+        assert_eq!(error.code(), Code::OutOfRange);
     }
 
     /// A drawing with one page of `count` text rectangles.
@@ -579,6 +609,99 @@ mod odc {
     }
 
     #[test]
+    fn moves_and_swaps_series_and_axes_and_edits_the_legend() {
+        let mut file = create(FileFormat::Odc).expect("create");
+        for (values, label) in [
+            ("t.B2:B5", "t.B1"),
+            ("t.C2:C5", "t.C1"),
+            ("t.D2:D5", "t.D1"),
+        ] {
+            file = file
+                .add(
+                    "/",
+                    NewNode::new("series")
+                        .prop("values", values)
+                        .prop("label", label),
+                )
+                .expect("add series")
+                .file;
+        }
+        for (dimension, name) in [("x", "ax"), ("y", "ay")] {
+            file = file
+                .add(
+                    "/",
+                    NewNode::new("axis")
+                        .prop("dimension", dimension)
+                        .prop("name", name),
+                )
+                .expect("add axis")
+                .file;
+        }
+        let file = file
+            .move_to("/series[1]", litchi_ops::Placement::End)
+            .expect("move series");
+        let file = reopen(&file);
+        assert_eq!(
+            prop(&file, "/series[3]", "values").as_deref(),
+            Some("t.B2:B5")
+        );
+        assert_eq!(
+            prop(&file, "/series[1]", "values").as_deref(),
+            Some("t.C2:C5")
+        );
+        let file = file.swap("/series[1]", "/series[3]").expect("swap series");
+        let file = file.swap("/axis[1]", "/axis[2]").expect("swap axes");
+        let file = reopen(&file);
+        assert_eq!(
+            prop(&file, "/series[1]", "values").as_deref(),
+            Some("t.B2:B5")
+        );
+        assert_eq!(prop(&file, "/axis[1]", "name").as_deref(), Some("ay"));
+        let error = file
+            .swap("/series[1]", "/axis[1]")
+            .expect_err("mixed kinds");
+        assert_eq!(error.code(), Code::UnsupportedType);
+
+        // The legend: add, set, remove (record 0292).
+        assert!(file.find("/legend").unwrap().is_none());
+        let added = file
+            .add("/", NewNode::new("legend").prop("position", "bottom"))
+            .expect("add legend");
+        assert_eq!(added.path.to_string(), "/legend");
+        let file = reopen(&added.file);
+        assert_eq!(
+            prop(&file, "/legend", "position").as_deref(),
+            Some("bottom")
+        );
+        let error = file
+            .add("/", NewNode::new("legend"))
+            .expect_err("one legend");
+        assert_eq!(error.code(), Code::InvalidArgument);
+        let file = file
+            .set("/legend", props! { "position" => "top" })
+            .expect("legend position");
+        assert_eq!(
+            prop(&reopen(&file), "/legend", "position").as_deref(),
+            Some("top")
+        );
+        let error = file
+            .set("/legend", props! { "position" => "left" })
+            .expect_err("unknown position");
+        assert_eq!(error.code(), Code::InvalidValue);
+        let file = file.remove("/legend").expect("remove legend");
+        assert!(reopen(&file).find("/legend").unwrap().is_none());
+    }
+
+    #[test]
+    fn producer_chart_moves_are_typed_refusals() {
+        let file = read(CHART);
+        let error = file
+            .move_to("/axis[1]", litchi_ops::Placement::End)
+            .expect_err("producer chart reorder");
+        assert_eq!(error.code(), Code::UnsupportedCapability);
+    }
+
+    #[test]
     fn create_and_capabilities() {
         let file = create(FileFormat::Odc).expect("create");
         assert_eq!(reopen(&file).format(), Some(FileFormat::Odc));
@@ -652,9 +775,46 @@ mod odi {
             .remove("/frame[1]")
             .expect_err("frames are not removable");
         assert_eq!(error.code(), Code::UnsupportedCapability);
+        let error = file
+            .add("/", litchi_ops::NewNode::new("frame"))
+            .expect_err("one frame");
+        assert_eq!(error.code(), Code::UnsupportedCapability);
+        // The singletons move and swap only onto themselves (record 0292).
+        let same = file
+            .move_to("/frame[1]", litchi_ops::Placement::Start)
+            .expect("self move");
+        assert_eq!(same.to_bytes().unwrap(), file.to_bytes().unwrap());
+        let same = file.swap("/frame[1]", "/frame[1]").expect("self swap");
+        assert_eq!(same.to_bytes().unwrap(), file.to_bytes().unwrap());
+        let error = file
+            .move_to(
+                "/frame[1]",
+                litchi_ops::Placement::Position(litchi_core::Position::new(1)),
+            )
+            .expect_err("no second position");
+        assert_eq!(error.code(), Code::OutOfRange);
+        let error = file
+            .swap("/frame[1]", "/metadata")
+            .expect_err("different kinds");
+        assert_eq!(error.code(), Code::UnsupportedType);
+        // Removing `/metadata` clears its fields and keeps the frame.
+        let file = reopen(&file.remove("/metadata").expect("remove metadata"));
+        assert_eq!(prop(&file, "/metadata", "title"), None);
+        assert_eq!(prop(&file, "/metadata", "author"), None);
+        assert_eq!(prop(&file, "/frame[1]", "name").as_deref(), Some("Logo"));
         assert_supported(
             FileFormat::Odi,
-            &[Verb::Get, Verb::Query, Verb::Set, Verb::Save, Verb::Create],
+            &[
+                Verb::Get,
+                Verb::Query,
+                Verb::Set,
+                Verb::Add,
+                Verb::Remove,
+                Verb::Move,
+                Verb::Swap,
+                Verb::Save,
+                Verb::Create,
+            ],
         );
     }
 }
@@ -720,6 +880,64 @@ mod odb {
     }
 
     #[test]
+    fn moves_and_swaps_queries_tables_and_columns() {
+        let mut file = create(FileFormat::Odb).expect("create");
+        for index in 0..3 {
+            file = file
+                .add(
+                    "/",
+                    NewNode::new("query")
+                        .prop("name", format!("q{index}").as_str())
+                        .prop("command", format!("SELECT {index}").as_str()),
+                )
+                .expect("add query")
+                .file;
+        }
+        let names = |file: &File| -> Vec<String> {
+            (1..=3)
+                .map(|index| prop(file, &format!("/query[{index}]"), "name").unwrap())
+                .collect()
+        };
+        let file = file
+            .move_to("/query[q0]", litchi_ops::Placement::End)
+            .expect("move query");
+        assert_eq!(names(&reopen(&file)), ["q1", "q2", "q0"]);
+        let file = file
+            .move_to(
+                "/query[q0]",
+                litchi_ops::Placement::After(litchi_ops::IntoPath::into_path("/query[1]").unwrap()),
+            )
+            .expect("anchored move");
+        assert_eq!(names(&reopen(&file)), ["q1", "q0", "q2"]);
+        let file = file.swap("/query[1]", "/query[3]").expect("swap queries");
+        assert_eq!(names(&reopen(&file)), ["q2", "q0", "q1"]);
+        let same = file.swap("/query[2]", "/query[2]").expect("self swap");
+        assert_eq!(same.to_bytes().unwrap(), file.to_bytes().unwrap());
+
+        // A producer database: a column moves within its table.
+        let file = read(DATABASE);
+        let file = file
+            .move_to("/table[1]/column[2]", litchi_ops::Placement::Start)
+            .expect("move column");
+        let file = reopen(&file);
+        assert_eq!(
+            prop(&file, "/table[1]/column[1]", "name").as_deref(),
+            Some("tname")
+        );
+        let file = file
+            .swap("/table[1]/column[1]", "/table[1]/column[2]")
+            .expect("swap columns");
+        assert_eq!(
+            prop(&reopen(&file), "/table[1]/column[2]", "name").as_deref(),
+            Some("tname")
+        );
+        let error = file
+            .swap("/table[1]", "/query[1]")
+            .expect_err("mixed kinds");
+        assert_eq!(error.code(), Code::UnsupportedType);
+    }
+
+    #[test]
     fn query_command_batches_coalesce() {
         let mut file = create(FileFormat::Odb).expect("create");
         for index in 0..3 {
@@ -763,6 +981,8 @@ mod odb {
                 Verb::Set,
                 Verb::Add,
                 Verb::Remove,
+                Verb::Move,
+                Verb::Swap,
                 Verb::Save,
                 Verb::Create,
             ],
@@ -811,6 +1031,75 @@ mod formula {
     }
 
     #[test]
+    fn adds_moves_and_swaps_mathml_elements() {
+        use litchi_ops::NewNode;
+        let file = create(FileFormat::Odf).expect("create");
+        let added = file
+            .add("/", NewNode::new("element").prop("tag", "mrow"))
+            .expect("add row");
+        let row = added.path.to_string();
+        let mut file = added.file;
+        for (tag, content) in [("mi", "a"), ("mo", "+"), ("mi", "b")] {
+            file = file
+                .add(
+                    row.as_str(),
+                    NewNode::new("element")
+                        .prop("tag", tag)
+                        .prop("text", content),
+                )
+                .expect("add token")
+                .file;
+        }
+        let tokens = |file: &File| -> Vec<String> {
+            file.query("element[tag=mi], element[tag=mo]")
+                .unwrap()
+                .map(|node| node.unwrap().view().text().unwrap().unwrap().into_owned())
+                .collect()
+        };
+        let file = reopen(&file);
+        assert_eq!(tokens(&file), ["a", "+", "b"]);
+        let first = format!("{row}/element[1]");
+        let third = format!("{row}/element[3]");
+        let file = file.swap(first.as_str(), third.as_str()).expect("swap");
+        assert_eq!(tokens(&reopen(&file)), ["b", "+", "a"]);
+        let file = file
+            .move_to(first.as_str(), litchi_ops::Placement::End)
+            .expect("move");
+        assert_eq!(tokens(&reopen(&file)), ["+", "a", "b"]);
+        let added = file
+            .add(
+                row.as_str(),
+                NewNode::new("element")
+                    .prop("tag", "mn")
+                    .prop("text", "2")
+                    .at(litchi_ops::Placement::Start),
+            )
+            .expect("add first");
+        assert_eq!(added.path.to_string(), format!("{row}/element[1]"));
+        let error = added
+            .file
+            .add(
+                row.as_str(),
+                NewNode::new("element")
+                    .prop("tag", "mrow")
+                    .prop("text", "x"),
+            )
+            .expect_err("layout text");
+        assert_eq!(error.code(), Code::UnsupportedCapability);
+        let error = added
+            .file
+            .move_to(
+                row.as_str(),
+                litchi_ops::Placement::Into(
+                    litchi_ops::IntoPath::into_path(format!("{row}/element[2]").as_str()).unwrap(),
+                    None,
+                ),
+            )
+            .expect_err("into own subtree");
+        assert_eq!(error.code(), Code::InvalidArgument);
+    }
+
+    #[test]
     fn create_and_capabilities() {
         let file = create(FileFormat::Odf).expect("create");
         assert_eq!(reopen(&file).format(), Some(FileFormat::Odf));
@@ -820,7 +1109,10 @@ mod formula {
                 Verb::Get,
                 Verb::Query,
                 Verb::Set,
+                Verb::Add,
                 Verb::Remove,
+                Verb::Move,
+                Verb::Swap,
                 Verb::Save,
                 Verb::Create,
             ],

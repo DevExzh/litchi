@@ -457,12 +457,6 @@ const SIGNED: Refusal = Refusal {
     not(feature = "odf-objects"),
     allow(dead_code, reason = "read only when an object format is compiled in")
 )]
-const OBJECT_STRUCTURE: Refusal = Refusal {
-    code: Code::UnsupportedCapability,
-    follow_up: "0282 ODF object-format structure",
-    reason: "the format's leaf has no such structural operation",
-};
-
 const EDITS: Refusal = Refusal {
     code: Code::UnsupportedCapability,
     follow_up: "M2",
@@ -949,14 +943,14 @@ impl Capabilities {
                 return Support::Supported;
             }
             #[cfg(feature = "odf-objects")]
-            if let Some(writes) = self.adapter().and_then(crate::format::odf_tree::writes) {
-                return match verb {
-                    Verb::Set | Verb::Edit | Verb::Batch => Support::Supported,
-                    Verb::Add if !writes.addable.is_empty() => Support::Supported,
-                    Verb::Remove if !writes.removable.is_empty() => Support::Supported,
-                    Verb::Move | Verb::Swap if !writes.movable.is_empty() => Support::Supported,
-                    _ => OBJECT_STRUCTURE.support(),
-                };
+            // Every edit verb dispatches to the object format's leaf; what
+            // a format cannot do is an element-level gap (record 0292).
+            if self
+                .adapter()
+                .and_then(crate::format::odf_tree::writes)
+                .is_some()
+            {
+                return Support::Supported;
             }
             return EDITS.support();
         }

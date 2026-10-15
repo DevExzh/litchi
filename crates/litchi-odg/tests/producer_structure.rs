@@ -156,3 +156,79 @@ fn a_removal_next_to_an_insertion_joins_one_splice() {
     let next = edit.commit().unwrap().into_package();
     assert_eq!(names(&next), ["head", "page1", "page2", "tail"]);
 }
+
+/// Shape counts per page.
+fn shape_counts(package: &Package) -> Vec<usize> {
+    package
+        .drawing()
+        .pages()
+        .iter()
+        .map(|page| page.shapes().len())
+        .collect()
+}
+
+#[test]
+fn moves_a_shape_into_another_producer_page_and_back() {
+    let package = fixture(THREE_PAGES);
+    let mut edit = package.edit();
+    edit.add_shape(
+        0,
+        Shape::new(ShapeKind::Rectangle)
+            .with_geometry("1cm", "1cm", "4cm", "2cm")
+            .with_text("Travel"),
+    )
+    .unwrap();
+    let start = edit.commit().unwrap().into_package();
+    let counts = shape_counts(&start);
+    let from = counts[0] - 1;
+    let source = start.content_xml().to_owned();
+
+    // Append to the last page (record 0292).
+    let mut edit = start.edit();
+    edit.move_shape_to_page(0, from, 2, counts[2]).unwrap();
+    let moved = edit.commit().unwrap().into_package();
+    let after = shape_counts(&moved);
+    assert_eq!(after[0], counts[0] - 1);
+    assert_eq!(after[2], counts[2] + 1);
+    assert_eq!(
+        moved.drawing().pages()[2].shapes()[counts[2]].text(),
+        "Travel"
+    );
+    assert_eq!(moved.styles_xml(), start.styles_xml());
+    let reopened = Package::from_bytes(moved.as_bytes()).unwrap();
+    assert_eq!(shape_counts(&reopened), after);
+
+    // Moving it back restores the source part byte for byte when the
+    // destination page held shapes before; an expanded empty page keeps its
+    // open/close form, so compare semantically otherwise.
+    let mut edit = moved.edit();
+    edit.move_shape_to_page(2, counts[2], 0, from).unwrap();
+    let back = edit.commit().unwrap().into_package();
+    assert_eq!(shape_counts(&back), counts);
+    if counts[2] > 0 {
+        assert_eq!(back.content_xml(), source);
+    }
+
+    // Out-of-range destinations are refused.
+    let mut edit = start.edit();
+    assert!(edit.move_shape_to_page(0, from, 1, counts[1] + 1).is_err());
+    assert!(edit.move_shape_to_page(0, counts[0], 1, 0).is_err());
+}
+
+#[test]
+fn a_cross_page_move_refuses_identity_references() {
+    let content = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.3"><office:body><office:drawing><draw:page draw:name="a" draw:master-page-name="Default"><draw:rect draw:id="r1" xml:id="r1" svg:x="0cm" svg:y="0cm" svg:width="1cm" svg:height="1cm"/><draw:rect svg:x="2cm" svg:y="0cm" svg:width="1cm" svg:height="1cm"/><draw:connector draw:start-shape="r1" svg:x1="0cm" svg:y1="0cm" svg:x2="1cm" svg:y2="1cm"/></draw:page><draw:page draw:name="b" draw:master-page-name="Default"/></office:drawing></office:body></office:document-content>"#;
+    let package = litchi_odg::Builder::new()
+        .content_xml(content)
+        .build()
+        .unwrap();
+    let mut edit = package.edit();
+    // The rectangle a connector glues to stays on its page.
+    assert!(edit.move_shape_to_page(0, 0, 1, 0).is_err());
+    // The connector glued to it too.
+    assert!(edit.move_shape_to_page(0, 2, 1, 0).is_err());
+    // A free shape moves into the empty page.
+    edit.move_shape_to_page(0, 1, 1, 0).unwrap();
+    let next = edit.commit().unwrap().into_package();
+    assert_eq!(shape_counts(&next), [2, 1]);
+}

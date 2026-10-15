@@ -6,8 +6,8 @@
 use litchi_core::FileFormat;
 
 use super::{
-    CREATE_PENDING, Capabilities, EDITS, OBJECT_STRUCTURE, SAVE_PENDING, State, Support, Verb,
-    path_segment, positional, refused,
+    CREATE_PENDING, Capabilities, EDITS, SAVE_PENDING, State, Support, Verb, path_segment,
+    positional, refused,
 };
 use crate::Code;
 use crate::view::Mode;
@@ -235,27 +235,25 @@ fn every_format_has_one_answer_for_its_reads() {
                         | Verb::Edit
                         | Verb::Batch
                 );
-            // The object formats edit through their leaves and refuse the
-            // structural verbs their leaves lack (record 0282).
+            // The object formats edit through their leaves; what a leaf
+            // lacks is an element-level gap, never a verb refusal (record
+            // 0292).
             #[cfg(feature = "odf-objects")]
             let object_edit = crate::read::Adapter::of(format)
                 .and_then(crate::format::odf_tree::writes)
-                .is_some_and(|writes| match verb {
-                    Verb::Set | Verb::Edit | Verb::Batch => true,
-                    Verb::Add => !writes.addable.is_empty(),
-                    Verb::Remove => !writes.removable.is_empty(),
-                    Verb::Move | Verb::Swap => !writes.movable.is_empty(),
-                    _ => false,
-                });
+                .is_some()
+                && matches!(
+                    verb,
+                    Verb::Set
+                        | Verb::Add
+                        | Verb::Remove
+                        | Verb::Move
+                        | Verb::Swap
+                        | Verb::Edit
+                        | Verb::Batch
+                );
             #[cfg(not(feature = "odf-objects"))]
             let object_edit = false;
-            #[cfg(feature = "odf-objects")]
-            let object_refusal = crate::read::Adapter::of(format)
-                .and_then(crate::format::odf_tree::writes)
-                .is_some()
-                && !object_edit;
-            #[cfg(not(feature = "odf-objects"))]
-            let object_refusal = false;
             let odp_edit = format == FileFormat::Odp
                 && cfg!(feature = "odp")
                 && matches!(
@@ -296,8 +294,6 @@ fn every_format_has_one_answer_for_its_reads() {
                     || object_edit
                 {
                     Support::Supported
-                } else if object_refusal {
-                    OBJECT_STRUCTURE.support()
                 } else if get.is_supported() {
                     EDITS.support()
                 } else {

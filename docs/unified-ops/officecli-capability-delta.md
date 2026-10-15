@@ -31,11 +31,11 @@ differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `299bb82c87cfef0c27ecfe8bd4fb7df4982635a954c5fa57ac58897900e0e2fa` |
 | golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `73fafb3ba518137725602d97210ce5837886dff848671f143278fd3cb55063e3` |
 | golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `2038cde02828395f020df3d9b9732cc9350ce839bba5bc5aee3089cdd0e81fab` |
-| golden | `crates/litchi-ops/tests/golden/registry/odb.json` | `0453235e155865a3fe31dc4514173f6efdd2fe8f96ffaf90f5a26b628b1e8d37` |
-| golden | `crates/litchi-ops/tests/golden/registry/odc.json` | `05e776b5e0c2e18ff9818b559fc374c50af6d1448a587e673ee37e2f0a8912e9` |
-| golden | `crates/litchi-ops/tests/golden/registry/odf.json` | `4dea6fd9a84402435381507f54fc3e7691aed039323e46431b65c5f029b5ecb7` |
-| golden | `crates/litchi-ops/tests/golden/registry/odg.json` | `6b0ed2d65585fd5309dedbb3f8bc7d861f43a09bd4eca8c318151d0305c9a120` |
-| golden | `crates/litchi-ops/tests/golden/registry/odi.json` | `886ee7e379793fe77e01457c872a630ce9467f7bdacbc6da8c7c6a35b1d713ef` |
+| golden | `crates/litchi-ops/tests/golden/registry/odb.json` | `4f342b6f2149dc3284dd48cc71f4a7badb5a1632dc4183a7e9598cc12d5dca6a` |
+| golden | `crates/litchi-ops/tests/golden/registry/odc.json` | `c9004bc22d2c3964ef98a14a4feca6253166bf33f81b8211058cc88a1c8dd930` |
+| golden | `crates/litchi-ops/tests/golden/registry/odf.json` | `cabb51b0613549d02fc2406fa65ad81effaa77ab6d6a9efb35aec3f543672fa7` |
+| golden | `crates/litchi-ops/tests/golden/registry/odg.json` | `a6d4a2ac265c877e800a7be446d609d1b861f68984287766f89da53a207770cb` |
+| golden | `crates/litchi-ops/tests/golden/registry/odi.json` | `e0811c798a96bf746d25dd019c455d03b0567d87403e4e86b0651eea1f6258b6` |
 | golden | `crates/litchi-ops/tests/golden/registry/odm.json` | `7c8c5d4a61b73661fe047b7abe392e5942c3d7a529abd740b44b20fb7147de02` |
 | golden | `crates/litchi-ops/tests/golden/registry/odp.json` | `ebd7d17a818097117b0343558b54d6d853ccc2850415499d3e76204c337a6124` |
 | golden | `crates/litchi-ops/tests/golden/registry/ods.json` | `fb65bbebcd964b898a5fc2b4863dfa189ef8c53dfbab59e8552c929b190c72e0` |
@@ -7854,6 +7854,8 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | `add` | `table` | `a table definition (columns, keys and types)` | creating a table needs a typed column schema the unified registry does not have yet | 0282 ODB typed table creation |
 | `add` | `column` | `a column definition` | creating a column needs a typed data type the unified registry does not have yet | 0282 ODB typed column creation |
 | `set` | `query` | `the `name` property (renaming a query)` | the leaf has no query rename; remove and add the query instead | 0282 ODB query rename |
+| `move` | `column` | `a column into another table` | a column belongs to its table's schema; columns move and swap within their table | 0292 ODB cross-table column transfer |
+| `move` | `table` | `a database that mixes table representations and definitions` | representations and definitions order in separate collections, so one unified table order cannot be published | 0292 ODB mixed table collections |
 | `get` | `metadata` | `path-read` | `set("/metadata", ..)` writes meta.xml through the ODF metadata family; the path is set-only, and reads go through File::metadata() | 0288 ODF object metadata node |
 
 ## odc
@@ -7880,6 +7882,8 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 |---|---|---|---|---|
 | `set` | `chart` | `a chart outside the leaf's lossless typed definition surface` | title, type, size, series and axis writes replace the chart through its typed definition; a producer chart the leaf cannot project losslessly is refused rather than rewritten | 0288 ODC lossless producer definitions |
 | `set` | `series` | `data points, data labels, regressions and series styles` | the unified registry writes a series' ranges, label, class and axis; its data points, labels, regression curves and styles stay as authored | 0288 ODC series detail writes |
+| `move` | `series` | `a chart outside the leaf's lossless typed definition surface` | series and axes reorder, and the legend is added or removed, through the chart's typed definition; a producer chart the leaf cannot project losslessly is refused rather than rewritten | 0288 ODC lossless producer definitions |
+| `move` | `legend` | `the chart's single legend` | the legend has no siblings to reorder; set its `position` instead | none: a chart has at most one legend |
 | `get` | `metadata` | `path-read` | `set("/metadata", ..)` writes meta.xml through the ODF metadata family; the path is set-only, and reads go through File::metadata() | 0288 ODF object metadata node |
 
 ## odf
@@ -7902,7 +7906,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 
 | Verb | Element | Context | Reason | Follow-up |
 |---|---|---|---|---|
-| `add` | `element` | `a new MathML element` | inserting MathML needs a typed element value the unified registry does not have yet | 0282 formula element authoring |
+| `add` | `element` | `a MathML element with attributes other than `mathvariant`, or a subtree` | `add` creates one element from `tag`, `text` and `mathvariant`; nested subtrees are built by further adds, and other attributes need typed values | 0292 formula subtree authoring |
 | `set` | `element` | `the `text` of a layout (non-token) element` | only MathML token elements hold character data | 0282 formula layout text |
 | `get` | `metadata` | `path-read` | `set("/metadata", ..)` writes meta.xml through the ODF metadata family; the path is set-only, and reads go through File::metadata() | 0288 ODF object metadata node |
 
@@ -7929,7 +7933,8 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | Verb | Element | Context | Reason | Follow-up |
 |---|---|---|---|---|
 | `add` | `shape` | `a shape other than a text rectangle` | the adapter adds text rectangles; other geometries need typed shape values | 0282 ODG typed shape creation |
-| `move` | `shape` | `a shape into another page` | shapes move within their page; a move to another page needs the leaf's dependency-checked shape transfer | 0288 ODG cross-page shape transfer |
+| `move` | `shape` | `a group member, or a shape whose identity a connector or link on its page names, into another page` | a shape moves to another page with its bytes unchanged; group members move with their group, and an identity dependency that would cross pages is refused rather than left dangling | 0292 ODG cross-page reference rewriting |
+| `swap` | `shape` | `two groups on different pages` | a cross-page swap is two transfers addressed by position; two group subtrees shift each other's positions, so move them one at a time | 0292 ODG cross-page group swap |
 | `remove` | `page` | `a page another page's `draw:page-name` names` | the leaf refuses removing a page a link or thumbnail references rather than leaving it dangling | 0288 ODG reference rewriting |
 | `get` | `metadata` | `path-read` | `set("/metadata", ..)` writes meta.xml through the ODF metadata family; the path is set-only, and reads go through File::metadata() | 0288 ODF object metadata node |
 
@@ -7955,6 +7960,8 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | Verb | Element | Context | Reason | Follow-up |
 |---|---|---|---|---|
 | `add` | `frame` | `an ODI image holds exactly one frame` | the ODI leaf admits exactly one image frame | 0282 ODI single frame |
+| `remove` | `frame` | `an ODI image holds exactly one frame` | an image package without its frame is not an ODI image | 0282 ODI single frame |
+| `move` | `frame` | `a position other than the frame's own` | the frame and the metadata are singletons, so a move or swap names only their own position (an exact no-op) | none: an ODI image holds one frame |
 | `set` | `frame` | `the `source` property (the image payload)` | replacing the image payload needs a typed source value the unified registry does not have yet | 0282 ODI image payload writes |
 
 ## odm

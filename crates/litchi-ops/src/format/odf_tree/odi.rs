@@ -57,7 +57,7 @@ pub(crate) const METADATA_PROPS: &[PropSpec] = &[
     writable("keywords", ValueType::Text),
 ];
 
-static OPERATION_GAPS: [GapSpec; 2] = [
+static OPERATION_GAPS: [GapSpec; 4] = [
     GapSpec {
         subject: Subject::Operation {
             verb: "add",
@@ -67,6 +67,26 @@ static OPERATION_GAPS: [GapSpec; 2] = [
         code: Code::UnsupportedCapability,
         follow_up: "0282 ODI single frame",
         reason: "the ODI leaf admits exactly one image frame",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "remove",
+            element: "frame",
+            context: "an ODI image holds exactly one frame",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "0282 ODI single frame",
+        reason: "an image package without its frame is not an ODI image",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "move",
+            element: "frame",
+            context: "a position other than the frame's own",
+        },
+        code: Code::OutOfRange,
+        follow_up: "none: an ODI image holds one frame",
+        reason: "the frame and the metadata are singletons, so a move or swap names only their own position (an exact no-op)",
     },
     GapSpec {
         subject: Subject::Operation {
@@ -132,8 +152,7 @@ impl Flavor for Odi {
 pub(crate) static WRITES: super::Writes = super::Writes {
     settable: &["frame", "metadata"],
     addable: &[],
-    removable: &[],
-    movable: &[],
+    removable: &["metadata"],
     gaps: &OPERATION_GAPS,
 };
 
@@ -331,7 +350,7 @@ fn static_key(key: &str, props: &'static [PropSpec]) -> &'static str {
         .map_or("value", |prop| prop.name)
 }
 
-/// ODI images hold one frame: nothing can be added.
+/// ODI images hold one frame and one metadata node: nothing can be added.
 pub(crate) fn add(
     file: &OdfTree,
     package: &litchi_odi::Package,
@@ -339,23 +358,125 @@ pub(crate) fn add(
     node: &NewNode<'_>,
     limits: &SemanticLimits,
 ) -> Result<(Commit, Path<'static>)> {
-    let _ = (file, package, parent, node, limits);
-    Err(refusal(
-        Code::UnsupportedCapability,
-        "an ODI image holds exactly one frame; elements cannot be added",
-    ))
+    let _ = (package, limits);
+    super::write::parent::<Odi>(file, parent)?;
+    let kind = node.kind().to_ascii_lowercase();
+    Err(match kind.as_str() {
+        "frame" | "picture" => refusal(
+            Code::UnsupportedCapability,
+            "an ODI image holds exactly one frame; set the existing `/frame[1]` instead",
+        )
+        .with_suggestion("follow-up: 0282 ODI single frame"),
+        "metadata" => refusal(
+            Code::InvalidArgument,
+            "an ODI image always has `/metadata`; set its properties instead",
+        ),
+        _ => refusal(
+            Code::UnsupportedType,
+            format!("an ODI image has no `{}` elements", node.kind()),
+        ),
+    })
 }
 
-/// ODI frames and metadata cannot be removed.
+/// Remove `/metadata`: clear the fields it exposes (title, author,
+/// subject, description, keywords) through the ODF metadata family, which
+/// keeps every other `meta.xml` node. The image's one frame cannot be
+/// removed.
 pub(crate) fn remove(
     file: &OdfTree,
     package: &litchi_odi::Package,
     target: &TargetArg<'_>,
     limits: &SemanticLimits,
 ) -> Result<Commit> {
-    let _ = (file, package, target, limits);
-    Err(refusal(
-        Code::UnsupportedCapability,
-        "an ODI image's frame and metadata cannot be removed",
-    ))
+    use litchi_odf_common::metadata::Field;
+    let nodes = super::write::resolve::<Odi>(file, target, limits.max_expanded_targets())?;
+    bound(LimitKind::Operations, nodes.len(), limits.max_operations())?;
+    for node in &nodes {
+        match node.item().type_name() {
+            "metadata" => {},
+            "frame" => {
+                return Err(refusal(
+                    Code::UnsupportedCapability,
+                    "an ODI image holds exactly one frame, which cannot be removed",
+                )
+                .with_suggestion("follow-up: 0282 ODI single frame"));
+            },
+            _ => return Err(element_refusal("remove", node)),
+        }
+    }
+    let mut edit = litchi_odf_common::metadata::Edit::new(package);
+    for field in [
+        Field::Title,
+        Field::Author,
+        Field::Subject,
+        Field::Description,
+        Field::Keywords,
+    ] {
+        edit.set(field, None).map_err(|error| {
+            super::odf_error(error, FileFormat::Odi).caused_by_argument(Code::InvalidValue)
+        })?;
+    }
+    let (next, patch, changed) = crate::format::odf_metadata::commit(edit, FileFormat::Odi)?;
+    finish(
+        file,
+        changed,
+        Owner::Odi(next),
+        Patch::Metadata(super::write::MetadataPatch::Odi(patch)),
+        nodes.len(),
+        limits,
+    )
+}
+
+/// The image's elements are singletons: a move to the element's own
+/// position is an exact no-op; any other position is out of range.
+pub(crate) fn move_to(
+    file: &OdfTree,
+    path: &PathArg<'_>,
+    placement: &crate::Placement<'_>,
+    limits: &SemanticLimits,
+) -> Result<Commit> {
+    let node = super::write::parent::<Odi>(file, path)?;
+    if node.item().type_name() == "image" {
+        return Err(element_refusal("move", &node));
+    }
+    let siblings = super::write::siblings(file, &node)?;
+    match super::write::destination::<Odi>(file, &node, &siblings, placement)? {
+        super::write::Destination::Within(_) => finish_unchanged(file, limits),
+        super::write::Destination::Across { .. } => Err(refusal(
+            Code::UnsupportedType,
+            "an ODI frame stays in its image",
+        )),
+    }
+}
+
+/// Swapping an image element with itself is an exact no-op; an ODI image
+/// has no two elements of one kind to exchange.
+pub(crate) fn swap(
+    file: &OdfTree,
+    left: &PathArg<'_>,
+    right: &PathArg<'_>,
+    limits: &SemanticLimits,
+) -> Result<Commit> {
+    let (left, right) = super::write::swap_pair::<Odi>(file, left, right)?;
+    if left.index() != right.index() {
+        return Err(refusal(
+            Code::InternalError,
+            "an ODI image holds one element of each kind",
+        ));
+    }
+    if left.item().type_name() == "image" {
+        return Err(element_refusal("swap", &left));
+    }
+    finish_unchanged(file, limits)
+}
+
+fn finish_unchanged(file: &OdfTree, limits: &SemanticLimits) -> Result<Commit> {
+    let _ = limits;
+    Ok(Commit {
+        before: file.clone(),
+        after: file.clone(),
+        patch: Patch::Unchanged,
+        operations: 1,
+        snapshot_bytes: 0,
+    })
 }

@@ -597,7 +597,12 @@ pub(crate) const fn writable(
 }
 
 /// A readable property that `set` writes and `add` accepts.
-#[cfg(any(feature = "odg", feature = "odc", feature = "odb"))]
+#[cfg(any(
+    feature = "odg",
+    feature = "odc",
+    feature = "odb",
+    feature = "odf-formula"
+))]
 pub(crate) const fn addable(
     name: &'static str,
     ty: crate::value::ValueType,
@@ -761,7 +766,6 @@ pub(crate) struct Writes {
     pub(crate) settable: &'static [&'static str],
     pub(crate) addable: &'static [&'static str],
     pub(crate) removable: &'static [&'static str],
-    pub(crate) movable: &'static [&'static str],
     pub(crate) gaps: &'static [crate::node::spec::GapSpec],
 }
 

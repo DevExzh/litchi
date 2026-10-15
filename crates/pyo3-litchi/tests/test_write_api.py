@@ -517,8 +517,8 @@ class CapabilityAgreementTests(WriteAssertions):
                     self.assertEqual(error.code, verbs[verb]["code"])
         # DOC (0258), PPT (0260) and XLS (0259) support every write verb.
         # DOC (0258), PPT (0260), XLS (0259), ODS (0277), ODT (0276), ODP
-        # (0278), OTH and ODM (0282) support every write verb; the ODF object
-        # formats (0282) refuse their missing structural verbs, checked above.
+        # (0278), OTH and ODM (0282) and the ODF object formats (0292) support
+        # every write verb; object-format gaps are element-level.
 
     def test_read_only_formats_refuse_every_write(self):
         for relative, name in READ_ONLY:
