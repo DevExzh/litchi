@@ -461,6 +461,73 @@ fn odm_find_and_merge_runs() {
     odt_find_and_merge(FileFormat::Odm);
 }
 
+#[cfg(feature = "odp")]
+#[test]
+fn odp_find_and_merge() {
+    let file = create(FileFormat::Odp)
+        .unwrap()
+        .add(
+            "/slide[1]",
+            NewNode::new("shape")
+                .prop("text", "Dear {{name}}\nhello world")
+                .prop("width", "10cm")
+                .prop("height", "3cm"),
+        )
+        .unwrap()
+        .file
+        .add("/", NewNode::new("slide"))
+        .unwrap()
+        .file
+        .add(
+            "/slide[2]",
+            NewNode::new("shape")
+                .prop("text", "hello again")
+                .prop("width", "10cm")
+                .prop("height", "3cm"),
+        )
+        .unwrap()
+        .file;
+    let (after, matched) = find(&file, "/", "hello", "bye");
+    assert_eq!(matched, 2);
+    let after = reopen(&after);
+    assert_eq!(
+        text(&after, "/slide[1]/shape[1]"),
+        "Dear {{name}}\nbye world"
+    );
+    assert_eq!(text(&after, "/slide[2]/shape[1]"), "bye again");
+    let (scoped, matched) = find(&file, "/slide[2]", "hello", "x");
+    assert_eq!(matched, 1);
+    assert_eq!(
+        text(&scoped, "/slide[1]/shape[1]"),
+        "Dear {{name}}\nhello world"
+    );
+    let (scoped, matched) = find(&file, "/slide[1]/shape[1]/paragraph[2]", "hello", "x");
+    assert_eq!(matched, 1);
+    assert_eq!(text(&scoped, "/slide[2]/shape[1]"), "hello again");
+    let (same, matched) = find(&file, "/", "absent", "x");
+    assert_eq!(matched, 0);
+    assert_eq!(same.to_bytes().unwrap(), file.to_bytes().unwrap());
+    let error = file
+        .set("/", props! { "find" => "hello", "bold" => true })
+        .unwrap_err();
+    assert_eq!(error.code(), Code::UnsupportedProperty);
+
+    let commit = file
+        .merge(&record(&[("name", "Ada")]), &Options::new())
+        .unwrap();
+    assert_eq!(commit.value.replacements(), 1);
+    assert_eq!(
+        text(&reopen(&commit.file), "/slide[1]/shape[1]"),
+        "Dear Ada\nhello world"
+    );
+    assert!(
+        file.merge(&Record::new(), &Options::new())
+            .unwrap()
+            .patch
+            .is_noop()
+    );
+}
+
 #[test]
 fn formats_are_reported() {
     let _ = FileFormat::Doc;

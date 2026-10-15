@@ -264,6 +264,29 @@ pub(crate) fn merge(
     Ok(changes)
 }
 
+/// Whether the content of an ODF run (between its tags) holds only text,
+/// spaces (`text:s`), tabs, line breaks and soft page breaks: what a leaf
+/// text replacement re-encodes without losing markup.
+#[cfg(any(feature = "odt", feature = "odp"))]
+pub(crate) fn odf_text_only(content: &str) -> bool {
+    let mut rest = content;
+    while let Some(start) = rest.find('<') {
+        let tag = &rest[start + 1..];
+        let end = tag.find('>').unwrap_or(tag.len());
+        let name = tag[..end]
+            .trim_start_matches('/')
+            .split(|character: char| character.is_whitespace() || character == '/')
+            .next()
+            .unwrap_or("");
+        let local = name.rsplit(':').next().unwrap_or(name);
+        if !matches!(local, "s" | "tab" | "line-break" | "soft-page-break") {
+            return false;
+        }
+        rest = &tag[end..];
+    }
+    true
+}
+
 /// Call `push` with every node `target` selects: the node of a path, or
 /// each match of a query.
 ///

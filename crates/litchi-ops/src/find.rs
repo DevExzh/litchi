@@ -394,6 +394,11 @@ pub(crate) fn set(
             crate::format::odt::write::find::find_replace(handle, &target, &spec, &limits)
                 .map(|(commit, _)| commit.after.into_file())
         },
+        #[cfg(feature = "odp")]
+        crate::File::Odp(handle) => {
+            crate::format::odp::write::find::find_replace(handle, &target, &spec, &limits)
+                .map(|(commit, _)| crate::File::Odp(commit.after))
+        },
         #[cfg(feature = "ppt")]
         crate::File::Ppt(handle) => {
             crate::format::ppt::write::find::find_replace(handle, &target, &spec, &limits)

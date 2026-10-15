@@ -208,22 +208,7 @@ fn rewritable(run: LeafNode<'_>) -> bool {
     else {
         return false;
     };
-    let mut rest = content;
-    while let Some(start) = rest.find('<') {
-        let tag = &rest[start + 1..];
-        let end = tag.find('>').unwrap_or(tag.len());
-        let name = tag[..end]
-            .trim_start_matches('/')
-            .split(|character: char| character.is_whitespace() || character == '/')
-            .next()
-            .unwrap_or("");
-        let local = name.rsplit(':').next().unwrap_or(name);
-        if !matches!(local, "s" | "tab" | "line-break" | "soft-page-break") {
-            return false;
-        }
-        rest = &tag[end..];
-    }
-    true
+    surface::odf_text_only(content)
 }
 
 /// One leaf `set_text` per changed run, in one edit and one commit.

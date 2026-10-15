@@ -2738,6 +2738,12 @@ impl Edit {
                     crate::format::odt::write::find::find_replace(handle, target, &spec, &limits)?;
                 wrap_odt(handle, commit, matched)
             },
+            #[cfg(feature = "odp")]
+            File::Odp(handle) => {
+                let (commit, matched) =
+                    crate::format::odp::write::find::find_replace(handle, target, &spec, &limits)?;
+                wrap_odp(handle, commit, matched)
+            },
             #[cfg(feature = "ppt")]
             File::Ppt(handle) => {
                 let (commit, matched) =

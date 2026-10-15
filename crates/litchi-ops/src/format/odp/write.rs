@@ -8,6 +8,7 @@
 //! every other byte and member keeps its source.
 
 pub(crate) mod coalesce;
+pub(crate) mod find;
 
 use std::collections::HashSet;
 

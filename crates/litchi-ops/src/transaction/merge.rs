@@ -265,6 +265,15 @@ fn run(
                 None => Ok((None, summary)),
             }
         },
+        #[cfg(feature = "odp")]
+        File::Odp(handle) => {
+            let (commit, summary) =
+                crate::format::odp::write::find::merge(handle, record, options, limits)?;
+            match commit {
+                Some(commit) => Ok((Some(super::wrap_odp(handle, commit, ())?.0), summary)),
+                None => Ok((None, summary)),
+            }
+        },
         #[cfg(feature = "ppt")]
         File::Ppt(handle) => {
             let (commit, summary) =
