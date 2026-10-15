@@ -14,7 +14,8 @@ impl File {
     /// rules. The template is unchanged, so one handle fills any number of
     /// records.
     ///
-    /// Supported for DOCX, PPTX and XLSX. A template without a matching
+    /// Supported for DOCX, PPTX, XLSX, XLSB, DOC, PPT, XLS, RTF, ODT, OTH,
+    /// ODM, ODS and ODP (records 0274 and 0295). A template without a matching
     /// placeholder or field is an exact no-op: the returned file is the
     /// template and its patch is a no-op.
     ///
@@ -293,9 +294,11 @@ fn run(
 fn unsupported(file: &File) -> crate::Error {
     let error = crate::Error::new(
         Code::UnsupportedCapability,
-        "template merge fills DOCX, PPTX and XLSX templates",
+        "template merge fills word-processing, presentation and spreadsheet templates",
     )
-    .with_suggestion("convert the template to DOCX, PPTX or XLSX");
+    .with_suggestion(
+        "convert the template to a word-processing, presentation or spreadsheet format",
+    );
     match file.format() {
         Some(format) => error.with_format(format),
         None => error,

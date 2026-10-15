@@ -23,27 +23,27 @@ differs from the hash recorded below.
 |---|---|---|
 | golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `86e968845c303bf78b2f2f7ad0cecf24a277cb1ab77f87721fb2b86958bd89bd` |
 | golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `8b7d0fb6364c01a35f8e4ca4aa2b4d59214bb3be1144ae3c32804ff8211f1028` |
-| golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `85c16b486c3dadd7565c8855656c93f20bba6a09d62bf7dbee7e67603a0f6a54` |
-| golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `c48a379cc794c4ef21c52b5194f6a5c48cebb0f00f9e101e260415adfdbd8461` |
+| golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `50f8da9165f985c1e7c72a12aeb12e57c77ea6c93b68da89b56d2f85986d4e08` |
+| golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `7f0bb0d83ab8d8ab1f6951aebfb8d1b26516d7c5a1bb201e346bac315faa7d69` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `728daa474cf4f13235a7d82ad19802d4a051195be4bdc6b73dc462cabea8b957` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `d261a29c010985932815530391ff3b57dff5ebb7c490acc95fa955b1ccf57f7e` |
-| golden | `crates/litchi-ops/tests/golden/registry/xlsb.json` | `ed42211205eb0476cc90d02802f88c447b9bcf6ae4a28c54816704539152e06f` |
-| golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `299bb82c87cfef0c27ecfe8bd4fb7df4982635a954c5fa57ac58897900e0e2fa` |
+| golden | `crates/litchi-ops/tests/golden/registry/xlsb.json` | `17866e45cf525f14b60e55cfb5590014a980b5493350319f324adce9d5fabcf6` |
+| golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `1797c362ea6d2c866d70d7801e1bc625acfb1758440bbfcb0fcd19884ac4d07d` |
 | golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `73fafb3ba518137725602d97210ce5837886dff848671f143278fd3cb55063e3` |
-| golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `2038cde02828395f020df3d9b9732cc9350ce839bba5bc5aee3089cdd0e81fab` |
-| golden | `crates/litchi-ops/tests/golden/registry/keynote.json` | `ee5b6b3e8334322bd4b01dd29ff414e2848a4089b71eabe9f85c92f10079c528` |
-| golden | `crates/litchi-ops/tests/golden/registry/numbers.json` | `d0dc9b4ced609425f80a61cd43c63a60419bce7511b357439744be30489cb671` |
-| golden | `crates/litchi-ops/tests/golden/registry/odb.json` | `0453235e155865a3fe31dc4514173f6efdd2fe8f96ffaf90f5a26b628b1e8d37` |
-| golden | `crates/litchi-ops/tests/golden/registry/odc.json` | `05e776b5e0c2e18ff9818b559fc374c50af6d1448a587e673ee37e2f0a8912e9` |
-| golden | `crates/litchi-ops/tests/golden/registry/odf.json` | `4dea6fd9a84402435381507f54fc3e7691aed039323e46431b65c5f029b5ecb7` |
-| golden | `crates/litchi-ops/tests/golden/registry/odg.json` | `6b0ed2d65585fd5309dedbb3f8bc7d861f43a09bd4eca8c318151d0305c9a120` |
-| golden | `crates/litchi-ops/tests/golden/registry/odi.json` | `886ee7e379793fe77e01457c872a630ce9467f7bdacbc6da8c7c6a35b1d713ef` |
-| golden | `crates/litchi-ops/tests/golden/registry/odm.json` | `7c8c5d4a61b73661fe047b7abe392e5942c3d7a529abd740b44b20fb7147de02` |
-| golden | `crates/litchi-ops/tests/golden/registry/odp.json` | `ebd7d17a818097117b0343558b54d6d853ccc2850415499d3e76204c337a6124` |
-| golden | `crates/litchi-ops/tests/golden/registry/ods.json` | `fb65bbebcd964b898a5fc2b4863dfa189ef8c53dfbab59e8552c929b190c72e0` |
-| golden | `crates/litchi-ops/tests/golden/registry/odt.json` | `530031295ae44a24667d22c7270cebc1afe59c456466d71014d85fe657180b3a` |
-| golden | `crates/litchi-ops/tests/golden/registry/oth.json` | `b24208bdbf248ce4fdc63b644b214beb2d6d5273921ce5aa5dce7a1ddfbe43ae` |
-| golden | `crates/litchi-ops/tests/golden/registry/pages.json` | `6f74d52d7f771828d66318aa7157c589ba3a057b96578d91c4a1b7180598d783` |
+| golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `232e6d10bfb92c6f50d0b80e9206938030ffc468f48ef078c2e4d8a091b8c89a` |
+| golden | `crates/litchi-ops/tests/golden/registry/keynote.json` | `01497f55fe71995f16ec5ffd0c7b8516c91fa4c524b92a7affe10b10c774fcf4` |
+| golden | `crates/litchi-ops/tests/golden/registry/numbers.json` | `1544a8f5d70e284733fb87b113978f631755dd01d968652b707246be59f1fc43` |
+| golden | `crates/litchi-ops/tests/golden/registry/odb.json` | `b966d323ab2d9c9655409b78aed2d1b21439427a77dae5bb86e250d1f928b88e` |
+| golden | `crates/litchi-ops/tests/golden/registry/odc.json` | `9bd67fb18a11d3591c40c9e8eccb945dfbe2d8dd470d4d50829c52999ee57a1e` |
+| golden | `crates/litchi-ops/tests/golden/registry/odf.json` | `98288fee64d12cbea5e4cd932015cbb4309bbf9bfea5e09772b65bf5f957a45f` |
+| golden | `crates/litchi-ops/tests/golden/registry/odg.json` | `fc306998c6aaf41383a1ef8ec84ad89a6e4a92c51e4748ad274d28ab3b5e4526` |
+| golden | `crates/litchi-ops/tests/golden/registry/odi.json` | `d60aa42e885f4e5695227b0a5ff04437c3ff8279d4413730df5bca472b6d6da9` |
+| golden | `crates/litchi-ops/tests/golden/registry/odm.json` | `7767b3039e4cf093454f96104b0bd7f64060004e29985ee91c3d43ff83d06833` |
+| golden | `crates/litchi-ops/tests/golden/registry/odp.json` | `6a14cabd33f6f0f65d9397307fddea6917e0b5380d4921266cf0000ca3648929` |
+| golden | `crates/litchi-ops/tests/golden/registry/ods.json` | `0022bf814cced525c5dbc25dcd6326e7faa4b110d8450284bd83a8d289945eb4` |
+| golden | `crates/litchi-ops/tests/golden/registry/odt.json` | `2d1cd7d4f1d9245c2c7e05bb0764a9b991c62fba765a8be9a4f84618725df001` |
+| golden | `crates/litchi-ops/tests/golden/registry/oth.json` | `8967b0100498c749cf0d2971f54b55e714f3c42aefea918a1d299fabb9e70743` |
+| golden | `crates/litchi-ops/tests/golden/registry/pages.json` | `215f77a85b3abf87a74a38b93a31f36b9397e47739d56982cf916cdc584ce06f` |
 | officecli | `schemas/help` (152 files, OfficeCLI commit `dced0d74`) | `0bcd8cae45fabc0c5e45ff99d1994465fb213ac1b8db3f7eadd87339fb40ced4` |
 
 ## Statuses

@@ -1899,10 +1899,7 @@
   "setKeywords": {
     "verb": "replace",
     "support": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "record 0273 follow-up: a find adapter over the format's run-level text edits",
-      "reason": "ODP find/replace is not integrated; the leaf's scene run text changes can carry it"
+      "supported": true
     },
     "keywords": {
       "find": {

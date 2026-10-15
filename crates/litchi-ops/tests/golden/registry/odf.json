@@ -189,7 +189,7 @@
     "support": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "record 0273 follow-up: a find adapter over the format's run-level text edits",
+      "followUp": "record 0295 follow-up: a find adapter over the format's text edits",
       "reason": "find/replace is not integrated for this format"
     },
     "keywords": {
