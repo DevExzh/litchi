@@ -445,17 +445,26 @@ fn physical_shape_ordinal_maps_to_native_source_order_after_a_picture() {
     });
 }
 
+/// Record 0290 F4: a slide without slide-show information gains the atom
+/// when it is hidden; showing it is an exact no-op.
 #[test]
-fn absent_visibility_record_is_an_explicit_native_gap() {
+fn absent_visibility_record_is_inserted_when_hidden() {
     let mut builder = Builder::new();
     builder.add_slide().expect("slide without timing");
     let bytes = builder.build().expect("package").to_bytes().expect("bytes");
     each_owner(&bytes, |file| {
         assert!(property(&file, "/slide[1]", "hidden").is_none());
-        let error = file
+        let shown = file
+            .set("/slide[1]", props! { "hidden" => false })
+            .expect("showing a shown slide");
+        assert_eq!(shown.to_bytes().expect("unchanged"), bytes);
+        let hidden = file
             .set("/slide[1]", props! { "hidden" => true })
-            .expect_err("native timing insertion is not implemented");
-        assert_eq!(error.code(), Code::UnsupportedCapability);
+            .expect("native timing insertion");
+        assert_eq!(
+            property(&hidden, "/slide[1]", "hidden").as_deref(),
+            Some("true")
+        );
         assert_eq!(file.to_bytes().expect("unchanged"), bytes);
     });
 }

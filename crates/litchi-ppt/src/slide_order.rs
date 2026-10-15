@@ -894,9 +894,12 @@ impl Snapshot {
 
     /// Whether one slide is hidden during the slide show.
     ///
+    /// A slide without a `SlideShowSlideInfoAtom` is shown (`false`).
+    ///
     /// # Errors
     ///
-    /// Returns a typed refusal when the position is absent.
+    /// Returns a typed refusal when the position is absent or the slide has
+    /// several or a malformed slide-show information atom.
     pub fn slide_hidden(&self, position: Position) -> Result<bool> {
         self.require_position(position)?;
         inspect_slide_hidden(self, position)
@@ -1973,10 +1976,18 @@ impl Transaction {
     /// media changes and is carried by exact, inverse, durable, history, and
     /// merge surfaces.
     ///
+    /// A slide without a `SlideShowSlideInfoAtom` (producer slides, and
+    /// slides the PPT writer made without timing or a transition) gains one
+    /// directly after its `SlideAtom` ([MS-PPT] 2.5.1) when it is hidden: no
+    /// transition, no sound, manual advance, medium speed, `fHidden` set.
+    /// Showing such a slide is a no-op. Clearing the flag again later keeps
+    /// the atom; the exact inverse of the commit restores the source bytes.
+    ///
     /// # Errors
     ///
-    /// Returns a typed refusal when the position is absent or the slide has no
-    /// unique fixed-width slide-show information atom.
+    /// Returns a typed refusal when the position is absent, or the slide has
+    /// several or a malformed slide-show information atom, or no leading
+    /// `SlideAtom` to insert one after.
     pub fn set_slide_hidden(&mut self, position: Position, hidden: bool) -> Result<()> {
         self.require_position(position)?;
         let selected = self.document.slides()?[position.get()];
@@ -4867,23 +4878,47 @@ fn inspect_slide_hidden(snapshot: &Snapshot, position: Position) -> Result<bool>
         )
         .into());
     }
-    parse_slide_hidden_atom(unique_slide_hidden_atom(&root, position)?, position)
+    match optional_slide_hidden_atom(&root, position)? {
+        Some(atom) => parse_slide_hidden_atom(atom, position),
+        // A slide without slide-show information is shown ([MS-PPT] 2.5.1:
+        // the atom is optional; `fHidden` defaults to clear).
+        None => Ok(false),
+    }
 }
 
-fn unique_slide_hidden_atom(root: &crate::Record, position: Position) -> Result<&crate::Record> {
+/// The slide's unique `SlideShowSlideInfoAtom`, or `None` when it has none;
+/// several are a refusal.
+fn optional_slide_hidden_atom(
+    root: &crate::Record,
+    position: Position,
+) -> Result<Option<&crate::Record>> {
     let mut atoms = root
         .children
         .iter()
         .filter(|child| child.record_type == crate::RecordType::SSSlideInfoAtom);
-    let atom = atoms
-        .next()
-        .ok_or(Error::Refused(Refusal::UnsupportedSlideVisibility {
-            position,
-        }))?;
+    let atom = atoms.next();
     if atoms.next().is_some() {
         return Err(Error::Refused(Refusal::UnsupportedSlideVisibility {
             position,
         }));
+    }
+    Ok(atom)
+}
+
+/// A `SlideShowSlideInfoAtom` for a slide that had none: no transition, no
+/// sound, manual advance and medium speed, what the PPT writer emits for
+/// default slide timing. The caller sets `fHidden`.
+fn new_slide_hidden_atom(limits: SourceLimits) -> Result<crate::Record> {
+    let timing = crate::writer::slide_timing::SlideTiming::default();
+    let bytes = crate::writer::slide_timing::build_slide_timing(&timing).map_err(|error| {
+        PackageError::Corrupted(format!("PPT slide-show information atom: {error}"))
+    })?;
+    let (atom, consumed) = crate::Record::parse_with_limits(&bytes, 0, limits)?;
+    if consumed != bytes.len() {
+        return Err(PackageError::Corrupted(
+            "PPT slide-show information atom is not one complete record".into(),
+        )
+        .into());
     }
     Ok(atom)
 }
@@ -4933,16 +4968,39 @@ fn replace_slide_hidden(
         )
         .into());
     }
-    let atom_index = {
-        let _current =
-            parse_slide_hidden_atom(unique_slide_hidden_atom(&root, position)?, position)?;
-        root.children
-            .iter()
-            .position(|child| child.record_type == crate::RecordType::SSSlideInfoAtom)
-            .ok_or(Error::Refused(Refusal::UnsupportedSlideVisibility {
-                position,
-            }))?
+    let inserted = match optional_slide_hidden_atom(&root, position)? {
+        Some(atom) => {
+            let _current = parse_slide_hidden_atom(atom, position)?;
+            false
+        },
+        None => {
+            if !replacement {
+                // Absent slide-show information already reads as shown.
+                return Ok(snapshot.clone());
+            }
+            // [MS-PPT] 2.5.1 places the optional atom directly after the
+            // SlideAtom, which must be the container's first child.
+            if root
+                .children
+                .first()
+                .is_none_or(|child| child.record_type != crate::RecordType::SlideAtom)
+            {
+                return Err(Error::Refused(Refusal::UnsupportedSlideVisibility {
+                    position,
+                }));
+            }
+            let atom = new_slide_hidden_atom(snapshot.limits)?;
+            root.children.insert(1, atom);
+            true
+        },
     };
+    let atom_index = root
+        .children
+        .iter()
+        .position(|child| child.record_type == crate::RecordType::SSSlideInfoAtom)
+        .ok_or(Error::Refused(Refusal::UnsupportedSlideVisibility {
+            position,
+        }))?;
     let atom = &mut root.children[atom_index];
     let before = atom.data.clone();
     let mut flags = u16::from_le_bytes([atom.data[10], atom.data[11]]);
@@ -4959,9 +5017,12 @@ fn replace_slide_hidden(
         .into());
     }
     let rewritten_record = encode_record(&root)?;
-    if rewritten_record.len() != source_record.len() {
+    // An in-place flag change keeps the record length; an inserted atom adds
+    // exactly its 8-byte header and 16-byte payload.
+    let expected_len = source_record.len() + if inserted { 24 } else { 0 };
+    if rewritten_record.len() != expected_len {
         return Err(PackageError::Corrupted(
-            "PPT fixed-width slide visibility rewrite changed record length".into(),
+            "PPT slide visibility rewrite changed record length".into(),
         )
         .into());
     }
@@ -8830,6 +8891,59 @@ mod tests {
                 dependency: TransferDependency::AnimationBuildGraph
             }))
         ));
+    }
+
+    /// The slide container's child record types.
+    fn slide_children(snapshot: &Snapshot, position: usize) -> Vec<crate::RecordType> {
+        let slide = snapshot.document.slides()[position];
+        let bytes = persisted_record(snapshot, slide.persist_id()).unwrap();
+        let (root, _) = crate::Record::parse_with_limits(&bytes, 0, snapshot.limits).unwrap();
+        root.children
+            .iter()
+            .map(|child| child.record_type)
+            .collect()
+    }
+
+    /// Record 0290 F4: a slide without slide-show information (here, from
+    /// the PPT writer) gains a `SlideShowSlideInfoAtom` after its `SlideAtom`
+    /// when it is hidden; showing it is then a flag change, and the exact
+    /// patch and its inverse restore both states.
+    #[test]
+    fn slide_visibility_inserts_a_missing_slide_show_information_atom() {
+        let source = Snapshot::from_bytes(authored_fixture()).unwrap();
+        let atom = crate::RecordType::SSSlideInfoAtom;
+        assert!(!slide_children(&source, 0).contains(&atom));
+        assert!(!source.slide_hidden(Position::new(0)).unwrap());
+
+        let mut noop = source.edit().unwrap();
+        noop.set_slide_hidden(Position::new(0), false).unwrap();
+        assert_eq!(noop.commit().unwrap().snapshot().bytes(), source.bytes());
+
+        let mut edit = source.edit().unwrap();
+        edit.set_slide_hidden(Position::new(0), true).unwrap();
+        let commit = edit.commit().unwrap();
+        let hidden = commit.snapshot();
+        assert!(hidden.slide_hidden(Position::new(0)).unwrap());
+        assert!(!hidden.slide_hidden(Position::new(1)).unwrap());
+        let children = slide_children(hidden, 0);
+        assert_eq!(children[0], crate::RecordType::SlideAtom);
+        assert_eq!(children[1], atom);
+        assert_eq!(children.iter().filter(|kind| **kind == atom).count(), 1);
+        assert_eq!(slide_children(hidden, 1), slide_children(&source, 1));
+        assert_eq!(slide_texts(hidden.bytes()), slide_texts(source.bytes()));
+        // The inserted atom carries no transition, manual advance.
+        assert_eq!(
+            hidden.slide_advance(Position::new(0)).unwrap(),
+            SlideAdvance::on_click()
+        );
+        assert_eq!(commit.patch().apply(&source).unwrap(), *hidden);
+        assert_eq!(commit.patch().inverse().apply(hidden).unwrap(), source);
+
+        let mut shown = hidden.edit().unwrap();
+        shown.set_slide_hidden(Position::new(0), false).unwrap();
+        let shown = shown.commit().unwrap();
+        assert!(!shown.snapshot().slide_hidden(Position::new(0)).unwrap());
+        assert_eq!(slide_children(shown.snapshot(), 0), children);
     }
 
     #[test]
