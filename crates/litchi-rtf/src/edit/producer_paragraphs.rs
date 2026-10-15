@@ -106,8 +106,13 @@ pub(super) fn commit(source: Package, operation: &Operation) -> Result<Commit, E
             Error::UnsupportedSource("the spliced paragraph segments do not parse as RTF")
         })?;
     verify(&source, &snapshot, &order)?;
-    // The inverse edit must be plannable on the candidate the same way, so
-    // the patch is reversible through this seam too.
+    // The inverse move or swap must be plannable on the candidate the same
+    // way, so the edit is reversible through this seam too. (A removal's
+    // inverse is an insertion, which this seam does not plan.)
+    if matches!(operation, Operation::RemoveParagraph { .. }) {
+        let delta = semantic_changes(std::slice::from_ref(operation), &[]);
+        return Ok(Commit::new(source, snapshot, 1, delta));
+    }
     let candidate_input = std::str::from_utf8(&bytes).map_err(|_error| {
         Error::UnsupportedSource("the spliced paragraph segments are not UTF-8")
     })?;
