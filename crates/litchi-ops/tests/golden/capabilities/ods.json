@@ -17,8 +17,8 @@
     "evaluate": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "ODS adapter follow-up (record 0277): CSV import and OpenFormula evaluation",
-      "reason": "ODS worksheets are written cell by cell; CSV import and OpenFormula evaluation are not integrated"
+      "followUp": "record 0295 follow-up: OpenFormula translation for the litchi-eval engine",
+      "reason": "ODS formulas are OpenFormula; the evaluation engine reads Excel syntax"
     },
     "set": {
       "supported": true
@@ -42,10 +42,7 @@
       "supported": true
     },
     "import": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "ODS adapter follow-up (record 0277): CSV import and OpenFormula evaluation",
-      "reason": "ODS worksheets are written cell by cell; CSV import and OpenFormula evaluation are not integrated"
+      "supported": true
     },
     "merge": {
       "supported": true

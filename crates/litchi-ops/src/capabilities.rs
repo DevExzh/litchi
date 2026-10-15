@@ -520,7 +520,11 @@ const CREATE_PENDING: Refusal = Refusal {
     feature = "xlsx",
     feature = "pptx",
     feature = "xlsb",
-    feature = "xls"
+    feature = "xls",
+    feature = "rtf",
+    feature = "odt",
+    feature = "ods",
+    feature = "odp"
 ))]
 const RETAINED_SOURCE: Refusal = Refusal {
     code: Code::UnsupportedCapability,

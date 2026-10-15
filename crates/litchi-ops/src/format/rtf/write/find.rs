@@ -77,25 +77,7 @@ impl Rtf {
             }
             Ok(())
         };
-        if let Some(path) = target.path() {
-            collect(crate::path::resolve::get(&nav, path)?)?;
-        } else if let Some(query) = target.query() {
-            let walk = crate::query::run(&nav, query)?;
-            if !walk.plan().diagnostics().is_empty() {
-                return Err(Error::new(
-                    Code::InvalidSelector,
-                    "the mutation selector contains an unsupported predicate",
-                ));
-            }
-            for node in walk {
-                collect(node?)?;
-            }
-        } else {
-            return Err(Error::new(
-                Code::InvalidArgument,
-                "the mutation target is empty",
-            ));
-        }
+        surface::each_target(&nav, target, &mut collect)?;
         let mut paragraphs: Vec<(Node<'_>, Vec<Option<Position>>)> = Vec::new();
         let root = nav.root()?;
         for body in nav.children(&root, KindSet::of(Kind::Body))? {
