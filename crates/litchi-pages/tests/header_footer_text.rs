@@ -1201,7 +1201,10 @@ fn archive_limits_fail_before_publication() -> TestResult {
     let source = build_fixture()?;
     let archive_limits = litchi_iwa_core::Limits::default().with_header_fields(1)?;
     let limits = Limits::default().with_archive_limits(archive_limits)?;
-    if let Ok(package) = Package::from_bytes_with_limits(&source, limits) {
+    if let Ok(package) = Package::from_bytes_with_options(
+        &source,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    ) {
         let before = exact_bytes(&package)?;
         let result = package
             .edit_header_footer_text(selector(0, Template::First, Kind::Header))
@@ -1226,7 +1229,10 @@ fn output_ceiling_rejects_growth_after_ingress_and_preserves_source() -> TestRes
         defaults.max_total_bytes(),
         defaults.max_iwa_stream_bytes(),
     )?;
-    let package = Package::from_bytes_with_limits(&source, limits)?;
+    let package = Package::from_bytes_with_options(
+        &source,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    )?;
     let before = exact_bytes(&package)?;
     let mut state = 0x9e37_79b9_7f4a_7c15u64;
     let replacement: String = (0..65_536)
@@ -1276,11 +1282,23 @@ fn physical_entry_stream_total_and_nesting_limits_fail_closed() -> TestResult {
         )?,
     ];
     for limits in profiles {
-        assert!(Package::from_bytes_with_limits(&source, limits).is_err());
+        assert!(
+            Package::from_bytes_with_options(
+                &source,
+                litchi_pages::OpenOptions::new().__archive_limits(limits)
+            )
+            .is_err()
+        );
     }
     let archive_limits = litchi_iwa_core::Limits::default().with_header_nesting(1)?;
     let limits = Limits::default().with_archive_limits(archive_limits)?;
-    assert!(Package::from_bytes_with_limits(&source, limits).is_err());
+    assert!(
+        Package::from_bytes_with_options(
+            &source,
+            litchi_pages::OpenOptions::new().__archive_limits(limits)
+        )
+        .is_err()
+    );
     Ok(())
 }
 
@@ -1289,10 +1307,10 @@ fn public_transaction_types_are_send_sync_and_debug_redacted() -> TestResult {
     fn assert_send_sync_debug<T: Send + Sync + std::fmt::Debug>() {}
     assert_send_sync_debug::<Package>();
     assert_send_sync_debug::<HeaderFooterSelector<'static>>();
-    assert_send_sync_debug::<litchi_pages::HeaderFooterTextEdit<'static>>();
-    assert_send_sync_debug::<litchi_pages::HeaderFooterTextPatch>();
-    assert_send_sync_debug::<litchi_pages::HeaderFooterTextCommit>();
-    assert_send_sync_debug::<litchi_pages::HeaderFooterTextDiagnostics>();
+    assert_send_sync_debug::<litchi_pages::header_footer::text::Edit<'static>>();
+    assert_send_sync_debug::<litchi_pages::header_footer::text::Patch>();
+    assert_send_sync_debug::<litchi_pages::header_footer::text::Commit>();
+    assert_send_sync_debug::<litchi_pages::header_footer::text::Diagnostics>();
     let package = Package::from_bytes(&build_fixture()?)?;
     let edit = package.edit_header_footer_text(selector(0, Template::First, Kind::Header))?;
     let debug = format!("{edit:?}");

@@ -84,7 +84,7 @@ pub(crate) fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
             0,
         );
         return Ok(Commit::from_parts(
-            source.snapshot(),
+            source.clone(),
             patch,
             Diagnostics::unchanged(),
         ));
@@ -156,7 +156,7 @@ fn apply_patch(source: &Package, patch: &Patch) -> Result<Commit, Error> {
     }
     if patch.is_noop() {
         return Ok(Commit::from_parts(
-            source.snapshot(),
+            source.clone(),
             patch.clone(),
             Diagnostics::unchanged(),
         ));

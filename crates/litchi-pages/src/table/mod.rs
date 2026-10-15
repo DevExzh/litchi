@@ -1,5 +1,17 @@
 //! Archive-free semantic Pages table values.
 
+/// The ordered catalog of rooted body tables.
+pub mod catalog {
+    pub use crate::package::body_table_catalog::{Catalog, Error, LimitKind, Snapshot};
+}
+/// Typed failures of the body-table cell reader.
+pub mod cells {
+    pub use crate::package::table_cells::{Error, LimitKind};
+}
+/// Exact-source deletion of one rooted body table.
+pub mod deletion {
+    pub use crate::package::body_table_deletion::{Commit, Diagnostics, Error, LimitKind, Patch};
+}
 /// Effective style, gridline, banding, and row-sizing settings for a body table.
 pub mod appearance;
 /// Checked, archive-free row and column dimension values.
@@ -14,7 +26,11 @@ pub mod lock;
 pub mod merge;
 /// Archive-free table values together with sparse cell comments.
 pub mod read {
-    pub use litchi_iwa_common::table::read::*;
+    pub use litchi_iwa_common::table::cell::value::Value;
+    pub use litchi_iwa_common::table::read::{
+        Builder, CellComment, Comment, CommentAuthor, CommentReply, CommentTimestamp, Result,
+        TableRead,
+    };
 }
 /// Validated, archive-free names for Pages body tables.
 pub mod name;

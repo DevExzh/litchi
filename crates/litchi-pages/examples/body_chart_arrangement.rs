@@ -17,7 +17,10 @@ use std::ffi::{OsStr, OsString};
 use std::io;
 use std::path::{Path, PathBuf};
 
-use litchi_pages::{BodyChartArrangementError, BodyChartSelector, ChartArrangement, Package};
+use litchi_pages::{
+    BodyChartSelector, ChartArrangement, Package,
+    chart::arrangement::Error as BodyChartArrangementError,
+};
 use tempfile::NamedTempFile;
 
 const USAGE: &str = "usage: body_chart_arrangement <input.pages> <output.pages> \

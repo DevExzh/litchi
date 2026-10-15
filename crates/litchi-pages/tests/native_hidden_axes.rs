@@ -16,7 +16,8 @@ use litchi_iwa_archive::{
 };
 use litchi_iwa_core::ArchiveObject;
 use litchi_pages::{
-    BodyTableHiddenAxesError, BodyTableSelector, Package,
+    BodyTableSelector, Package,
+    table::hidden_axes::transaction::Error as BodyTableHiddenAxesError,
     table::hidden_axes::{AxisIndex, HiddenAxes},
 };
 
@@ -489,7 +490,10 @@ fn native_hidden_axes_resource_limits_are_atomic() -> TestResult {
         Limits::MAX_TOTAL_BYTES,
         Limits::MAX_IWA_STREAM_BYTES,
     )?;
-    let package = Package::from_bytes_with_limits(&source_without_previews, bounded)?;
+    let package = Package::from_bytes_with_options(
+        &source_without_previews,
+        litchi_pages::OpenOptions::new().__archive_limits(bounded),
+    )?;
     let before = exact_bytes(&package)?;
     let result = package
         .edit_body_table_hidden_axes(0usize)?
@@ -508,7 +512,13 @@ fn native_hidden_axes_resource_limits_are_atomic() -> TestResult {
         Limits::MAX_TOTAL_BYTES,
         Limits::MAX_IWA_STREAM_BYTES,
     )?;
-    assert!(Package::from_bytes_with_limits(&source, input_limited).is_err());
+    assert!(
+        Package::from_bytes_with_options(
+            &source,
+            litchi_pages::OpenOptions::new().__archive_limits(input_limited)
+        )
+        .is_err()
+    );
     Ok(())
 }
 

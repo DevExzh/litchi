@@ -344,7 +344,8 @@ fn plans_compile_for_xlsx_and_run_on_any_workbook() {
             ]
         );
     }
-    let other = crate::query::Plan::compile(&query, litchi_core::FileFormat::Pages).unwrap_err();
+    // Pages body tables have cells since record 0299; Keynote has none.
+    let other = crate::query::Plan::compile(&query, litchi_core::FileFormat::Keynote).unwrap_err();
     assert_eq!(other.code(), Code::UnsupportedCapability);
 }
 

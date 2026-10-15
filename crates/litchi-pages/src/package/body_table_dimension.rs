@@ -17,7 +17,7 @@ use litchi_iwa_archive::{LimitKind as ArchiveLimitKind, SourceCatalog, package::
 use litchi_iwa_core::LimitKind as CoreLimitKind;
 use litchi_iwa_core::{ArchiveObject, RawMessage};
 use litchi_iwa_protos::table_dimension_codec as codec;
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::{Package, PackageError, page_layout, table_lock};
 use crate::selector::BodyTableSelector;
@@ -31,7 +31,7 @@ const MAX_VARINT_BYTES: usize = 10;
 /// Finite resources charged by one body-table dimension transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum BodyTableDimensionLimitKind {
+pub enum LimitKind {
     /// Complete package input bytes.
     InputBytes,
     /// Complete candidate package output bytes.
@@ -68,7 +68,7 @@ pub enum BodyTableDimensionLimitKind {
     TransactionWork,
 }
 
-impl fmt::Display for BodyTableDimensionLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -93,9 +93,9 @@ impl fmt::Display for BodyTableDimensionLimitKind {
 }
 
 /// Failure from a body-table dimension read or exact-source transaction.
-#[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, ThisError, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum BodyTableDimensionError {
+pub enum Error {
     /// No rooted table matched the selector.
     #[error("the Pages body has no table matching the requested selector")]
     TableNotFound,
@@ -120,7 +120,7 @@ pub enum BodyTableDimensionError {
     )]
     LimitExceeded {
         /// Resource category.
-        kind: BodyTableDimensionLimitKind,
+        kind: LimitKind,
         /// Observed amount.
         observed: u64,
         /// Maximum configured amount.
@@ -141,7 +141,7 @@ pub enum BodyTableDimensionError {
 }
 
 /// Mutable selector-first body-table dimension edit.
-pub struct BodyTableDimensionEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
     target: table_lock::BodyTableTarget,
     dimension: Dimension,
@@ -149,10 +149,10 @@ pub struct BodyTableDimensionEdit<'a> {
     size: Size,
 }
 
-impl fmt::Debug for BodyTableDimensionEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("BodyTableDimensionEdit")
+            .debug_struct("Edit")
             .field("dimension", &self.dimension)
             .field("before", &self.before)
             .field("size", &self.size)
@@ -160,7 +160,7 @@ impl fmt::Debug for BodyTableDimensionEdit<'_> {
     }
 }
 
-impl BodyTableDimensionEdit<'_> {
+impl Edit<'_> {
     /// Return the staged size.
     #[must_use]
     pub const fn size(&self) -> Size {
@@ -187,7 +187,7 @@ impl BodyTableDimensionEdit<'_> {
     }
 
     /// Validate and publish this edit atomically.
-    pub fn commit(self) -> Result<BodyTableDimensionCommit, BodyTableDimensionError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         commit_edit(self)
     }
 }
@@ -206,7 +206,7 @@ struct DimensionEvidence {
 
 /// Exact-source reversible dimension patch.
 #[derive(Clone, PartialEq)]
-pub struct BodyTableDimensionPatch {
+pub struct Patch {
     source: Arc<[u8]>,
     target: Arc<[u8]>,
     source_fingerprint: u64,
@@ -220,10 +220,10 @@ pub struct BodyTableDimensionPatch {
     target_preview_count: usize,
 }
 
-impl fmt::Debug for BodyTableDimensionPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("BodyTableDimensionPatch")
+            .debug_struct("Patch")
             .field("dimension", &self.dimension)
             .field("before", &self.before)
             .field("after", &self.after)
@@ -231,7 +231,7 @@ impl fmt::Debug for BodyTableDimensionPatch {
     }
 }
 
-impl BodyTableDimensionPatch {
+impl Patch {
     /// Return the source semantic size.
     #[must_use]
     pub const fn before(&self) -> Size {
@@ -285,14 +285,14 @@ impl BodyTableDimensionPatch {
 
 /// Compact diagnostics from one dimension publication.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct BodyTableDimensionDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     deleted_previews: usize,
     full_reparse_performed: bool,
 }
 
-impl BodyTableDimensionDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -339,13 +339,13 @@ impl BodyTableDimensionDiagnostics {
 /// Fully reopened immutable result of a dimension transaction.
 #[must_use = "a body-table dimension commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct BodyTableDimensionCommit {
+pub struct Commit {
     package: Package,
-    patch: BodyTableDimensionPatch,
-    diagnostics: BodyTableDimensionDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl BodyTableDimensionCommit {
+impl Commit {
     /// Borrow the validated package.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -360,13 +360,13 @@ impl BodyTableDimensionCommit {
 
     /// Borrow the reversible patch.
     #[must_use]
-    pub const fn patch(&self) -> &BodyTableDimensionPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Borrow publication diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> &BodyTableDimensionDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -377,7 +377,7 @@ impl Package {
         &self,
         selector: impl Into<BodyTableSelector<'table>>,
         dimension: Dimension,
-    ) -> Result<Size, BodyTableDimensionError> {
+    ) -> Result<Size, Error> {
         let target = resolve_target(self, selector.into())?;
         let mut budget = transaction_budget(self)?;
         read_dimension(self, &target, dimension, &mut budget)
@@ -388,11 +388,11 @@ impl Package {
         &self,
         selector: impl Into<BodyTableSelector<'table>>,
         dimension: Dimension,
-    ) -> Result<BodyTableDimensionEdit<'_>, BodyTableDimensionError> {
+    ) -> Result<Edit<'_>, Error> {
         let target = resolve_target(self, selector.into())?;
         let mut budget = transaction_budget(self)?;
         let before = read_dimension(self, &target, dimension, &mut budget)?;
-        Ok(BodyTableDimensionEdit {
+        Ok(Edit {
             source: self,
             target,
             dimension,
@@ -402,38 +402,35 @@ impl Package {
     }
 
     /// Apply a reversible patch to its exact source package.
-    pub fn apply_body_table_dimension_size(
-        &self,
-        patch: &BodyTableDimensionPatch,
-    ) -> Result<BodyTableDimensionCommit, BodyTableDimensionError> {
+    pub fn apply_body_table_dimension_size(&self, patch: &Patch) -> Result<Commit, Error> {
         let source = self.state.source.source_bytes();
         if page_layout::fingerprint(source) != patch.source_fingerprint
             || source != patch.source.as_ref()
         {
-            return Err(BodyTableDimensionError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let mut budget = transaction_budget(self)?;
         if read_dimension(self, &patch.proof, patch.dimension, &mut budget)? != patch.before {
-            return Err(BodyTableDimensionError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if patch.is_noop() {
             if patch.source_preview_count != patch.target_preview_count {
-                return Err(BodyTableDimensionError::PatchConflict);
+                return Err(Error::PatchConflict);
             }
-            return Ok(BodyTableDimensionCommit {
-                package: self.snapshot(),
+            return Ok(Commit {
+                package: self.clone(),
                 patch: patch.clone(),
-                diagnostics: BodyTableDimensionDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         if !self.state.source.source_is_exact()
             || page_layout::fingerprint(&patch.target) != patch.target_fingerprint
         {
-            return Err(BodyTableDimensionError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let candidate = reopen_target(self, Arc::clone(&patch.target), &mut budget)?;
         if read_dimension(&candidate, &patch.proof, patch.dimension, &mut budget)? != patch.after {
-            return Err(BodyTableDimensionError::Verification);
+            return Err(Error::Verification);
         }
         verify_locality(
             self,
@@ -443,10 +440,10 @@ impl Package {
             patch.target_preview_count,
             &mut budget,
         )?;
-        Ok(BodyTableDimensionCommit {
+        Ok(Commit {
             package: candidate,
             patch: patch.clone(),
-            diagnostics: BodyTableDimensionDiagnostics::published(
+            diagnostics: Diagnostics::published(
                 patch
                     .source_preview_count
                     .saturating_sub(patch.target_preview_count),
@@ -455,9 +452,7 @@ impl Package {
     }
 }
 
-fn commit_edit(
-    edit: BodyTableDimensionEdit<'_>,
-) -> Result<BodyTableDimensionCommit, BodyTableDimensionError> {
+fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     let source = edit.source;
     let source_bytes: Arc<[u8]> = source.state.source.shared_source();
     let source_fingerprint = page_layout::fingerprint(source_bytes.as_ref());
@@ -465,9 +460,9 @@ fn commit_edit(
     let mut budget = transaction_budget(source)?;
     if edit.before == edit.size {
         let evidence = read_evidence(source, &edit.target, edit.dimension, &mut budget)?;
-        return Ok(BodyTableDimensionCommit {
-            package: source.snapshot(),
-            patch: BodyTableDimensionPatch {
+        return Ok(Commit {
+            package: source.clone(),
+            patch: Patch {
                 source: Arc::clone(&source_bytes),
                 target: source_bytes,
                 source_fingerprint,
@@ -480,24 +475,24 @@ fn commit_edit(
                 source_preview_count,
                 target_preview_count: source_preview_count,
             },
-            diagnostics: BodyTableDimensionDiagnostics::unchanged(),
+            diagnostics: Diagnostics::unchanged(),
         });
     }
     if !source.state.source.source_is_exact() {
-        return Err(BodyTableDimensionError::UnsupportedSource);
+        return Err(Error::UnsupportedSource);
     }
     let selected = select_dimension(source, &edit.target, edit.dimension, &mut budget)?;
     if selected.size != edit.before {
-        return Err(BodyTableDimensionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if edit.target.explicit_locked == Some(true) {
-        return Err(BodyTableDimensionError::TableLocked);
+        return Err(Error::TableLocked);
     }
     let previews = preview_names(source);
     let package = rewrite_dimension(source, selected, edit.size, &previews, &mut budget)?;
     let candidate_selected = select_dimension(&package, &edit.target, edit.dimension, &mut budget)?;
     if candidate_selected.size != edit.size {
-        return Err(BodyTableDimensionError::Verification);
+        return Err(Error::Verification);
     }
     verify_locality(
         source,
@@ -510,9 +505,9 @@ fn commit_edit(
     let target = package.state.source.shared_source();
     let target_fingerprint = page_layout::fingerprint(target.as_ref());
     let target_preview_count = preview_count(&package);
-    Ok(BodyTableDimensionCommit {
+    Ok(Commit {
         package,
-        patch: BodyTableDimensionPatch {
+        patch: Patch {
             source: source_bytes,
             target,
             source_fingerprint,
@@ -525,7 +520,7 @@ fn commit_edit(
             source_preview_count,
             target_preview_count,
         },
-        diagnostics: BodyTableDimensionDiagnostics::published(
+        diagnostics: Diagnostics::published(
             source_preview_count.saturating_sub(target_preview_count),
         ),
     })
@@ -534,13 +529,11 @@ fn commit_edit(
 fn resolve_target(
     package: &Package,
     selector: BodyTableSelector<'_>,
-) -> Result<table_lock::BodyTableTarget, BodyTableDimensionError> {
+) -> Result<table_lock::BodyTableTarget, Error> {
     package.resolve_body_table(selector).map_err(map_lock_error)
 }
 
-fn transaction_budget(
-    package: &Package,
-) -> Result<table_lock::WireBudget, BodyTableDimensionError> {
+fn transaction_budget(package: &Package) -> Result<table_lock::WireBudget, Error> {
     let mut budget =
         table_lock::WireBudget::new(package.state.source.limits()).map_err(map_lock_error)?;
     budget
@@ -562,7 +555,7 @@ fn select_dimension(
     target: &table_lock::BodyTableTarget,
     dimension: Dimension,
     budget: &mut table_lock::WireBudget,
-) -> Result<Selected, BodyTableDimensionError> {
+) -> Result<Selected, Error> {
     table_lock::validate_body_table_target(package, target, budget).map_err(map_lock_error)?;
     let message = model_message(package, target)?;
     let (model, report) = decode_model(&message.data, budget)?;
@@ -578,10 +571,9 @@ fn select_dimension(
         Dimension::Row(_) => model.number_of_rows(),
         Dimension::Column(_) => model.number_of_columns(),
     };
-    let index =
-        u32::try_from(dimension.index()).map_err(|_| BodyTableDimensionError::InvalidSource)?;
+    let index = u32::try_from(dimension.index()).map_err(|_| Error::InvalidSource)?;
     if index >= limit {
-        return Err(BodyTableDimensionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut collector = BucketCollector::default();
     let options = codec_options(budget, model.base_data_store().len());
@@ -599,23 +591,23 @@ fn select_dimension(
     let column_reference = store.column_headers();
     let column_id = column_reference.identifier();
     if column_id == 0 || column_reference.deprecated_is_external() == Some(true) {
-        return Err(BodyTableDimensionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let expected_rows =
         usize::try_from(u64::from(model.number_of_rows()).div_ceil(HEADER_BUCKET_ROWS as u64))
-            .map_err(|_| BodyTableDimensionError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?;
     if collector.references.len() != expected_rows {
-        return Err(BodyTableDimensionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut row_ids = Vec::new();
     row_ids
         .try_reserve_exact(collector.references.len())
-        .map_err(|_| BodyTableDimensionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: collector.references.len(),
         })?;
     for reference in &collector.references {
         if reference.identifier() == 0 || reference.deprecated_is_external() == Some(true) {
-            return Err(BodyTableDimensionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         row_ids.push(reference.identifier());
     }
@@ -623,7 +615,7 @@ fn select_dimension(
     if row_ids.windows(2).any(|pair| pair[0] == pair[1])
         || row_ids.binary_search(&column_id).is_ok()
     {
-        return Err(BodyTableDimensionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let model_object = package
         .state
@@ -631,7 +623,7 @@ fn select_dimension(
         .components()
         .get_index(target.model_component_index)
         .and_then(|component| component.archive().objects.get(target.model_object_index))
-        .ok_or(BodyTableDimensionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     validate_declared_references(
         model_object,
         target.model_message_index,
@@ -648,12 +640,7 @@ fn select_dimension(
         Dimension::Column(_) => (column_id, None),
         Dimension::Row(row) => {
             let slot = row / HEADER_BUCKET_ROWS;
-            (
-                *row_ids
-                    .get(slot)
-                    .ok_or(BodyTableDimensionError::InvalidSource)?,
-                Some(slot),
-            )
+            (*row_ids.get(slot).ok_or(Error::InvalidSource)?, Some(slot))
         },
     };
     for identifier in &row_ids {
@@ -689,7 +676,7 @@ fn select_dimension(
         .map_err(map_lock_error)?;
     reader.seen.sort_unstable();
     if reader.duplicate || reader.seen.windows(2).any(|pair| pair[0] == pair[1]) {
-        return Err(BodyTableDimensionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let size = reader
         .found
@@ -705,8 +692,7 @@ fn select_dimension(
             bucket_component: bucket.0,
             bucket_object: bucket.1,
             bucket_message: bucket.2,
-            bucket_identifier: NonZeroU64::new(bucket_id)
-                .ok_or(BodyTableDimensionError::InvalidSource)?,
+            bucket_identifier: NonZeroU64::new(bucket_id).ok_or(Error::InvalidSource)?,
         },
         dimension,
         size,
@@ -719,7 +705,7 @@ fn read_dimension(
     target: &table_lock::BodyTableTarget,
     dimension: Dimension,
     budget: &mut table_lock::WireBudget,
-) -> Result<Size, BodyTableDimensionError> {
+) -> Result<Size, Error> {
     Ok(select_dimension(package, target, dimension, budget)?.size)
 }
 
@@ -728,7 +714,7 @@ fn read_evidence(
     target: &table_lock::BodyTableTarget,
     dimension: Dimension,
     budget: &mut table_lock::WireBudget,
-) -> Result<DimensionEvidence, BodyTableDimensionError> {
+) -> Result<DimensionEvidence, Error> {
     Ok(select_dimension(package, target, dimension, budget)?.evidence)
 }
 
@@ -781,19 +767,19 @@ impl codec::StorageVisitor for HeaderReader {
     }
 }
 
-fn size_from_bits(bits: u32) -> Result<Size, BodyTableDimensionError> {
+fn size_from_bits(bits: u32) -> Result<Size, Error> {
     if bits == 0 {
         return Ok(Size::Default);
     }
     Points::new(f32::from_bits(bits))
         .map(Size::Points)
-        .map_err(|_| BodyTableDimensionError::InvalidSource)
+        .map_err(|_| Error::InvalidSource)
 }
 
 fn decode_model<'a>(
     source: &'a [u8],
     budget: &table_lock::WireBudget,
-) -> Result<(codec::TableModelSnapshot<'a>, codec::DecodeReport), BodyTableDimensionError> {
+) -> Result<(codec::TableModelSnapshot<'a>, codec::DecodeReport), Error> {
     codec::decode_table_model_with_report(source, codec_options(budget, source.len()))
         .map_err(|error| map_codec_error(error, budget))
 }
@@ -813,38 +799,35 @@ fn codec_options(budget: &table_lock::WireBudget, bytes: usize) -> codec::Decode
 fn model_message<'a>(
     package: &'a Package,
     target: &table_lock::BodyTableTarget,
-) -> Result<&'a RawMessage, BodyTableDimensionError> {
+) -> Result<&'a RawMessage, Error> {
     let component = package
         .state
         .source
         .components()
         .get_index(target.model_component_index)
-        .ok_or(BodyTableDimensionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let object = component
         .archive()
         .objects
         .get(target.model_object_index)
-        .ok_or(BodyTableDimensionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if object.archive_info.identifier != Some(target.model_identifier.get()) {
-        return Err(BodyTableDimensionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let message = object
         .messages
         .get(target.model_message_index)
         .filter(|message| message.type_ == target.model_message_type)
-        .ok_or(BodyTableDimensionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     object
         .archive_info
         .message_infos
         .get(target.model_message_index)
-        .ok_or(BodyTableDimensionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     Ok(message)
 }
 
-fn locate_bucket(
-    package: &Package,
-    identifier: u64,
-) -> Result<(usize, usize, usize), BodyTableDimensionError> {
+fn locate_bucket(package: &Package, identifier: u64) -> Result<(usize, usize, usize), Error> {
     let mut found = None;
     for (component_index, component) in package.state.source.components().iter().enumerate() {
         for (object_index, object) in component.archive().objects.iter().enumerate() {
@@ -852,7 +835,7 @@ fn locate_bucket(
                 continue;
             }
             if found.is_some() {
-                return Err(BodyTableDimensionError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             let mut message_index = None;
             for (index, message) in object.messages.iter().enumerate() {
@@ -860,21 +843,18 @@ fn locate_bucket(
                     continue;
                 }
                 if message_index.replace(index).is_some() {
-                    return Err(BodyTableDimensionError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
             }
-            let message_index = message_index.ok_or(BodyTableDimensionError::InvalidSource)?;
+            let message_index = message_index.ok_or(Error::InvalidSource)?;
             validate_message_metadata(object, message_index)?;
             found = Some((component_index, object_index, message_index));
         }
     }
-    found.ok_or(BodyTableDimensionError::InvalidSource)
+    found.ok_or(Error::InvalidSource)
 }
 
-fn bucket_message(
-    package: &Package,
-    location: (usize, usize, usize),
-) -> Result<&[u8], BodyTableDimensionError> {
+fn bucket_message(package: &Package, location: (usize, usize, usize)) -> Result<&[u8], Error> {
     package
         .state
         .source
@@ -884,22 +864,19 @@ fn bucket_message(
         .and_then(|object| object.messages.get(location.2))
         .filter(|message| message.type_ == HEADER_BUCKET_MESSAGE_TYPE)
         .map(|message| message.data.as_slice())
-        .ok_or(BodyTableDimensionError::InvalidSource)
+        .ok_or(Error::InvalidSource)
 }
 
-fn validate_message_metadata(
-    object: &ArchiveObject,
-    message_index: usize,
-) -> Result<(), BodyTableDimensionError> {
+fn validate_message_metadata(object: &ArchiveObject, message_index: usize) -> Result<(), Error> {
     let message = object
         .messages
         .get(message_index)
-        .ok_or(BodyTableDimensionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let info = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(BodyTableDimensionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if message.type_ != info.type_
         || object.archive_info.should_merge == Some(true)
         || info.base_message_index.is_some()
@@ -908,7 +885,7 @@ fn validate_message_metadata(
         || !info.fields_to_remove.is_empty()
         || !info.diff_read_version.is_empty()
     {
-        return Err(BodyTableDimensionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -918,19 +895,19 @@ fn validate_declared_references(
     message_index: usize,
     identifiers: &[u64],
     path: &[u32],
-) -> Result<(), BodyTableDimensionError> {
+) -> Result<(), Error> {
     let info = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(BodyTableDimensionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let mut has_declared_path = false;
     for field in &info.field_infos {
         if field.path.as_slice() == path {
             has_declared_path = true;
             for value in &field.object_references {
                 if !identifiers.contains(value) {
-                    return Err(BodyTableDimensionError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
             }
         } else if field
@@ -938,7 +915,7 @@ fn validate_declared_references(
             .iter()
             .any(|value| identifiers.contains(value))
         {
-            return Err(BodyTableDimensionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     for identifier in identifiers {
@@ -949,7 +926,7 @@ fn validate_declared_references(
             .count()
             != 1
         {
-            return Err(BodyTableDimensionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if has_declared_path
             && info
@@ -961,7 +938,7 @@ fn validate_declared_references(
                 .count()
                 != 1
         {
-            return Err(BodyTableDimensionError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(())
@@ -973,20 +950,20 @@ fn rewrite_dimension(
     after: Size,
     previews: &[&'static str],
     budget: &mut table_lock::WireBudget,
-) -> Result<Package, BodyTableDimensionError> {
+) -> Result<Package, Error> {
     let catalog = &source.state.source;
     let component = catalog
         .components()
         .get_index(selected.evidence.bucket_component)
-        .ok_or(BodyTableDimensionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let component_name = component.name();
     let entry = catalog
         .package()
         .iter()
         .find(|entry| entry.name() == component_name)
-        .ok_or(BodyTableDimensionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(BodyTableDimensionError::UnsupportedSource);
+        return Err(Error::UnsupportedSource);
     }
     budget
         .charge_payload_bytes(entry.data().len())
@@ -1008,7 +985,7 @@ fn rewrite_dimension(
     let bounds = preflight_dimension_rewrite(source, selected, entry, payload.len(), budget)?;
     let dimension_index = match selected.dimension {
         Dimension::Row(row) | Dimension::Column(row) => {
-            u32::try_from(row).map_err(|_| BodyTableDimensionError::InvalidSource)?
+            u32::try_from(row).map_err(|_| Error::InvalidSource)?
         },
     };
     let edit = match after {
@@ -1049,16 +1026,16 @@ fn rewrite_dimension(
         || report_result.work_bytes() > result_bound.work_bytes()
         || report_result.references() > result_bound.references()
     {
-        return Err(BodyTableDimensionError::Verification);
+        return Err(Error::Verification);
     }
     let (mut archive, archive_limits) =
         page_layout::editable_archive(source, component_name).map_err(map_page_layout_error)?;
     let object = archive
         .objects
         .get_mut(selected.evidence.bucket_object)
-        .ok_or(BodyTableDimensionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if object.archive_info.identifier != Some(selected.evidence.bucket_identifier.get()) {
-        return Err(BodyTableDimensionError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     validate_message_metadata(object, selected.evidence.bucket_message)?;
     object
@@ -1074,7 +1051,7 @@ fn rewrite_dimension(
     let compressed =
         page_layout::compress_archive(archive, archive_limits).map_err(map_page_layout_error)?;
     if compressed.len() > bounds.compressed_bound {
-        return Err(BodyTableDimensionError::Verification);
+        return Err(Error::Verification);
     }
     let edits = [EntryEdit::new(component_name, &compressed)];
     let prepared = catalog
@@ -1085,7 +1062,7 @@ fn rewrite_dimension(
     if requirements.output_bytes() > bounds.package_output_bound
         || requirements.retained_bytes() > bounds.package_output_bound
     {
-        return Err(BodyTableDimensionError::Verification);
+        return Err(Error::Verification);
     }
     // The broad output bound was charged before any codec/archive mutation.
     // Reassembly's exact scratch and allocation counts are additional work
@@ -1098,7 +1075,7 @@ fn rewrite_dimension(
         .execute(requirements.exact_limits())
         .map_err(map_archive_error)?;
     if output.len() != requirements.output_bytes() {
-        return Err(BodyTableDimensionError::Verification);
+        return Err(Error::Verification);
     }
     let candidate_source =
         SourceCatalog::from_shared_bytes_with_limits(output.into(), catalog.limits())
@@ -1118,12 +1095,12 @@ fn preflight_dimension_rewrite(
     entry: &litchi_iwa_archive::package::Entry,
     original_message_length: usize,
     budget: &mut table_lock::WireBudget,
-) -> Result<DimensionRewriteBounds, BodyTableDimensionError> {
+) -> Result<DimensionRewriteBounds, Error> {
     let catalog = &source.state.source;
     let component = catalog
         .components()
         .get_index(selected.evidence.bucket_component)
-        .ok_or(BodyTableDimensionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let stream_length = parsed_archive_source_length(component.archive())?;
     let message_count = component
         .archive()
@@ -1132,10 +1109,10 @@ fn preflight_dimension_rewrite(
         .try_fold(0usize, |count, object| {
             count.checked_add(object.messages.len())
         })
-        .ok_or(BodyTableDimensionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let rewritten_message_bound = original_message_length
         .checked_add(MAX_VARINT_BYTES.saturating_mul(4))
-        .ok_or(BodyTableDimensionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let archive_bound = stream_length
         .checked_sub(original_message_length)
         .and_then(|value| value.checked_add(rewritten_message_bound))
@@ -1146,29 +1123,26 @@ fn preflight_dimension_rewrite(
                     .checked_add(MAX_VARINT_BYTES.saturating_mul(2))?,
             )
         })
-        .ok_or(BodyTableDimensionError::InvalidSource)?;
-    let compressed_bound = table_lock::snappy_compressed_bound(archive_bound)
-        .ok_or(BodyTableDimensionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
+    let compressed_bound =
+        table_lock::snappy_compressed_bound(archive_bound).ok_or(Error::InvalidSource)?;
     let replacement_compressed_bound = match entry.metadata().central().compression_method() {
         0 => compressed_bound,
-        8 => table_lock::deflate_compressed_bound(compressed_bound)
-            .ok_or(BodyTableDimensionError::InvalidSource)?,
-        _ => return Err(BodyTableDimensionError::UnsupportedSource),
+        8 => table_lock::deflate_compressed_bound(compressed_bound).ok_or(Error::InvalidSource)?,
+        _ => return Err(Error::UnsupportedSource),
     };
     let old_compressed_size =
-        usize::try_from(entry.metadata().compressed_size()).map_err(|_| {
-            BodyTableDimensionError::LimitExceeded {
-                kind: BodyTableDimensionLimitKind::EntryBytes,
-                observed: u64::MAX,
-                maximum: catalog.limits().max_entry_bytes(),
-            }
+        usize::try_from(entry.metadata().compressed_size()).map_err(|_| Error::LimitExceeded {
+            kind: LimitKind::EntryBytes,
+            observed: u64::MAX,
+            maximum: catalog.limits().max_entry_bytes(),
         })?;
     let package_output_bound = catalog
         .source_bytes()
         .len()
         .checked_sub(old_compressed_size)
         .and_then(|value| value.checked_add(replacement_compressed_bound))
-        .ok_or(BodyTableDimensionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget
         .charge_output_bytes(rewritten_message_bound)
         .and_then(|_| budget.charge_output_bytes(archive_bound))
@@ -1200,23 +1174,21 @@ fn preflight_dimension_rewrite(
     })
 }
 
-fn parsed_archive_source_length(
-    archive: &litchi_iwa_core::Archive,
-) -> Result<usize, BodyTableDimensionError> {
+fn parsed_archive_source_length(archive: &litchi_iwa_core::Archive) -> Result<usize, Error> {
     let Some(last) = archive.objects.last() else {
         return Ok(0);
     };
     let length = last
         .data_offset
         .checked_add(last.data_length)
-        .ok_or(BodyTableDimensionError::InvalidSource)?;
-    usize::try_from(length).map_err(|_| BodyTableDimensionError::InvalidSource)
+        .ok_or(Error::InvalidSource)?;
+    usize::try_from(length).map_err(|_| Error::InvalidSource)
 }
 
 fn charge_report(
     budget: &mut table_lock::WireBudget,
     report: codec::DecodeReport,
-) -> Result<(), BodyTableDimensionError> {
+) -> Result<(), Error> {
     budget
         .charge_codec_report(
             report.fields(),
@@ -1230,7 +1202,7 @@ fn charge_report(
 fn charge_bound(
     budget: &mut table_lock::WireBudget,
     bound: codec::DecodeResourceUpperBound,
-) -> Result<(), BodyTableDimensionError> {
+) -> Result<(), Error> {
     budget
         .charge_codec_report(
             bound.fields(),
@@ -1264,7 +1236,7 @@ fn reopen_target(
     source: &Package,
     target: Arc<[u8]>,
     budget: &mut table_lock::WireBudget,
-) -> Result<Package, BodyTableDimensionError> {
+) -> Result<Package, Error> {
     budget
         .charge_input_source(target.as_ref())
         .map_err(map_lock_error)?;
@@ -1285,9 +1257,9 @@ fn verify_locality(
     source_previews: usize,
     target_previews: usize,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableDimensionError> {
+) -> Result<(), Error> {
     if preview_count(source) != source_previews || preview_count(candidate) != target_previews {
-        return Err(BodyTableDimensionError::Verification);
+        return Err(Error::Verification);
     }
     let before = &source.state.source;
     let after_source = &candidate.state.source;
@@ -1306,7 +1278,7 @@ fn verify_locality(
                     != before
                         .components()
                         .get_index(evidence.bucket_component)
-                        .ok_or(BodyTableDimensionError::Verification)?
+                        .ok_or(Error::Verification)?
                         .name()
                     && {
                         budget
@@ -1317,15 +1289,15 @@ fn verify_locality(
                         left.data() != right.data()
                     }
                 {
-                    return Err(BodyTableDimensionError::Verification);
+                    return Err(Error::Verification);
                 }
             },
             (None, None) => break,
-            _ => return Err(BodyTableDimensionError::Verification),
+            _ => return Err(Error::Verification),
         }
     }
     if before.components().len() != after_source.components().len() {
-        return Err(BodyTableDimensionError::Verification);
+        return Err(Error::Verification);
     }
     for (component_index, (left, right)) in before
         .components()
@@ -1336,7 +1308,7 @@ fn verify_locality(
         if left.name() != right.name()
             || left.archive().objects.len() != right.archive().objects.len()
         {
-            return Err(BodyTableDimensionError::Verification);
+            return Err(Error::Verification);
         }
         for (object_index, (left_object, right_object)) in left
             .archive()
@@ -1360,7 +1332,7 @@ fn verify_locality(
                     )
                     .map_err(map_lock_error)?;
                 if !left_object.same_content_ignoring_offsets(right_object) {
-                    return Err(BodyTableDimensionError::Verification);
+                    return Err(Error::Verification);
                 }
                 continue;
             }
@@ -1370,7 +1342,7 @@ fn verify_locality(
                 || left_object.archive_info.message_infos.len()
                     != right_object.archive_info.message_infos.len()
             {
-                return Err(BodyTableDimensionError::Verification);
+                return Err(Error::Verification);
             }
             for (message_index, (left_message, right_message)) in left_object
                 .messages
@@ -1382,17 +1354,17 @@ fn verify_locality(
                     .archive_info
                     .message_infos
                     .get(message_index)
-                    .ok_or(BodyTableDimensionError::Verification)?;
+                    .ok_or(Error::Verification)?;
                 let right_info = right_object
                     .archive_info
                     .message_infos
                     .get(message_index)
-                    .ok_or(BodyTableDimensionError::Verification)?;
+                    .ok_or(Error::Verification)?;
                 if message_index == evidence.bucket_message {
                     if right_message.type_ != HEADER_BUCKET_MESSAGE_TYPE
                         || !message_info_preserved_except_length(left_info, right_info)
                     {
-                        return Err(BodyTableDimensionError::Verification);
+                        return Err(Error::Verification);
                     }
                     budget
                         .charge_payload_work(
@@ -1403,7 +1375,7 @@ fn verify_locality(
                         )
                         .map_err(map_lock_error)?;
                     if right_message.data == left_message.data {
-                        return Err(BodyTableDimensionError::Verification);
+                        return Err(Error::Verification);
                     }
                 } else {
                     budget
@@ -1415,7 +1387,7 @@ fn verify_locality(
                         )
                         .map_err(map_lock_error)?;
                     if left_message != right_message || left_info != right_info {
-                        return Err(BodyTableDimensionError::Verification);
+                        return Err(Error::Verification);
                     }
                 }
             }
@@ -1440,235 +1412,176 @@ fn message_info_preserved_except_length(
         && source.diff_read_version == candidate.diff_read_version
 }
 
-fn map_codec_error(
-    error: codec::DecodeError,
-    _budget: &table_lock::WireBudget,
-) -> BodyTableDimensionError {
+fn map_codec_error(error: codec::DecodeError, _budget: &table_lock::WireBudget) -> Error {
     let Some(limit) = error.resource_limit() else {
-        return BodyTableDimensionError::InvalidSource;
+        return Error::InvalidSource;
     };
     match limit {
         codec::DecodeLimit::Bytes { observed, maximum } => {
-            limit_error(BodyTableDimensionLimitKind::WireBytes, observed, maximum)
+            limit_error(LimitKind::WireBytes, observed, maximum)
         },
-        codec::DecodeLimit::References { observed, maximum } => limit_error(
-            BodyTableDimensionLimitKind::PayloadReferences,
-            observed,
-            maximum,
-        ),
+        codec::DecodeLimit::References { observed, maximum } => {
+            limit_error(LimitKind::PayloadReferences, observed, maximum)
+        },
         codec::DecodeLimit::Text { observed, maximum } => {
-            limit_error(BodyTableDimensionLimitKind::PayloadBytes, observed, maximum)
+            limit_error(LimitKind::PayloadBytes, observed, maximum)
         },
         codec::DecodeLimit::Fields { observed, maximum } => {
-            limit_error(BodyTableDimensionLimitKind::WireFields, observed, maximum)
+            limit_error(LimitKind::WireFields, observed, maximum)
         },
         codec::DecodeLimit::Work { observed, maximum } => {
-            limit_error(BodyTableDimensionLimitKind::WireWork, observed, maximum)
+            limit_error(LimitKind::WireWork, observed, maximum)
         },
-        codec::DecodeLimit::Nesting { observed, maximum } => limit_error(
-            BodyTableDimensionLimitKind::WireNesting,
-            observed as usize,
-            maximum as usize,
-        ),
-        codec::DecodeLimit::Allocation { requested } => {
-            BodyTableDimensionError::Allocation { amount: requested }
+        codec::DecodeLimit::Nesting { observed, maximum } => {
+            limit_error(LimitKind::WireNesting, observed as usize, maximum as usize)
         },
-        _ => BodyTableDimensionError::InvalidSource,
+        codec::DecodeLimit::Allocation { requested } => Error::Allocation { amount: requested },
+        _ => Error::InvalidSource,
     }
 }
 
-fn limit_error(
-    kind: BodyTableDimensionLimitKind,
-    observed: usize,
-    maximum: usize,
-) -> BodyTableDimensionError {
-    BodyTableDimensionError::LimitExceeded {
+fn limit_error(kind: LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::LimitExceeded {
         kind,
         observed: observed as u64,
         maximum: maximum as u64,
     }
 }
 
-fn map_lock_error(error: table_lock::BodyTableLockError) -> BodyTableDimensionError {
+fn map_lock_error(error: table_lock::Error) -> Error {
     match error {
-        table_lock::BodyTableLockError::TableNotFound => BodyTableDimensionError::TableNotFound,
-        table_lock::BodyTableLockError::AmbiguousTableName => {
-            BodyTableDimensionError::AmbiguousTableName
-        },
-        table_lock::BodyTableLockError::AmbiguousSelector => {
-            BodyTableDimensionError::AmbiguousSelector
-        },
-        table_lock::BodyTableLockError::UnsupportedSource => {
-            BodyTableDimensionError::UnsupportedSource
-        },
-        table_lock::BodyTableLockError::LimitExceeded {
+        table_lock::Error::TableNotFound => Error::TableNotFound,
+        table_lock::Error::AmbiguousTableName => Error::AmbiguousTableName,
+        table_lock::Error::AmbiguousSelector => Error::AmbiguousSelector,
+        table_lock::Error::UnsupportedSource => Error::UnsupportedSource,
+        table_lock::Error::LimitExceeded {
             kind,
             observed,
             maximum,
-        } => BodyTableDimensionError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: match kind {
-                table_lock::BodyTableLockLimitKind::InputBytes => {
-                    BodyTableDimensionLimitKind::InputBytes
-                },
-                table_lock::BodyTableLockLimitKind::OutputBytes => {
-                    BodyTableDimensionLimitKind::OutputBytes
-                },
-                table_lock::BodyTableLockLimitKind::Entries => BodyTableDimensionLimitKind::Entries,
-                table_lock::BodyTableLockLimitKind::EntryBytes => {
-                    BodyTableDimensionLimitKind::EntryBytes
-                },
-                table_lock::BodyTableLockLimitKind::TotalEntryBytes => {
-                    BodyTableDimensionLimitKind::TotalEntryBytes
-                },
-                table_lock::BodyTableLockLimitKind::PayloadBytes => {
-                    BodyTableDimensionLimitKind::PayloadBytes
-                },
-                table_lock::BodyTableLockLimitKind::TotalPayloadBytes => {
-                    BodyTableDimensionLimitKind::TotalPayloadBytes
-                },
-                table_lock::BodyTableLockLimitKind::PayloadObjects => {
-                    BodyTableDimensionLimitKind::PayloadObjects
-                },
-                table_lock::BodyTableLockLimitKind::PayloadMessages => {
-                    BodyTableDimensionLimitKind::PayloadMessages
-                },
-                table_lock::BodyTableLockLimitKind::PayloadItems => {
-                    BodyTableDimensionLimitKind::PayloadItems
-                },
-                table_lock::BodyTableLockLimitKind::PayloadReferences => {
-                    BodyTableDimensionLimitKind::PayloadReferences
-                },
-                table_lock::BodyTableLockLimitKind::WireBytes => {
-                    BodyTableDimensionLimitKind::WireBytes
-                },
-                table_lock::BodyTableLockLimitKind::WireFields => {
-                    BodyTableDimensionLimitKind::WireFields
-                },
-                table_lock::BodyTableLockLimitKind::WireNesting => {
-                    BodyTableDimensionLimitKind::WireNesting
-                },
-                table_lock::BodyTableLockLimitKind::WireWork => {
-                    BodyTableDimensionLimitKind::WireWork
-                },
-                table_lock::BodyTableLockLimitKind::PackageBytes => {
-                    BodyTableDimensionLimitKind::PayloadItems
-                },
+                table_lock::LimitKind::InputBytes => LimitKind::InputBytes,
+                table_lock::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                table_lock::LimitKind::Entries => LimitKind::Entries,
+                table_lock::LimitKind::EntryBytes => LimitKind::EntryBytes,
+                table_lock::LimitKind::TotalEntryBytes => LimitKind::TotalEntryBytes,
+                table_lock::LimitKind::PayloadBytes => LimitKind::PayloadBytes,
+                table_lock::LimitKind::TotalPayloadBytes => LimitKind::TotalPayloadBytes,
+                table_lock::LimitKind::PayloadObjects => LimitKind::PayloadObjects,
+                table_lock::LimitKind::PayloadMessages => LimitKind::PayloadMessages,
+                table_lock::LimitKind::PayloadItems => LimitKind::PayloadItems,
+                table_lock::LimitKind::PayloadReferences => LimitKind::PayloadReferences,
+                table_lock::LimitKind::WireBytes => LimitKind::WireBytes,
+                table_lock::LimitKind::WireFields => LimitKind::WireFields,
+                table_lock::LimitKind::WireNesting => LimitKind::WireNesting,
+                table_lock::LimitKind::WireWork => LimitKind::WireWork,
+                table_lock::LimitKind::PackageBytes => LimitKind::PayloadItems,
             },
             observed,
             maximum,
         },
-        table_lock::BodyTableLockError::Allocation { amount } => {
-            BodyTableDimensionError::Allocation { amount }
-        },
-        table_lock::BodyTableLockError::InvalidSource => BodyTableDimensionError::InvalidSource,
-        table_lock::BodyTableLockError::Verification => BodyTableDimensionError::Verification,
-        table_lock::BodyTableLockError::PatchConflict => BodyTableDimensionError::PatchConflict,
+        table_lock::Error::Allocation { amount } => Error::Allocation { amount },
+        table_lock::Error::InvalidSource => Error::InvalidSource,
+        table_lock::Error::Verification => Error::Verification,
+        table_lock::Error::PatchConflict => Error::PatchConflict,
     }
 }
 
-fn map_page_layout_error(error: page_layout::PageLayoutError) -> BodyTableDimensionError {
+fn map_page_layout_error(error: page_layout::Error) -> Error {
     match error {
-        page_layout::PageLayoutError::Allocation { amount } => {
-            BodyTableDimensionError::Allocation { amount }
-        },
-        page_layout::PageLayoutError::LimitExceeded {
+        page_layout::Error::Allocation { amount } => Error::Allocation { amount },
+        page_layout::Error::LimitExceeded {
             observed, maximum, ..
-        } => BodyTableDimensionError::LimitExceeded {
-            kind: BodyTableDimensionLimitKind::PayloadBytes,
+        } => Error::LimitExceeded {
+            kind: LimitKind::PayloadBytes,
             observed,
             maximum,
         },
-        page_layout::PageLayoutError::UnsupportedSource => {
-            BodyTableDimensionError::UnsupportedSource
-        },
-        _ => BodyTableDimensionError::InvalidSource,
+        page_layout::Error::UnsupportedSource => Error::UnsupportedSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_archive_error(error: litchi_iwa_archive::Error) -> BodyTableDimensionError {
+fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     match error {
-        litchi_iwa_archive::Error::Allocation { amount, .. } => {
-            BodyTableDimensionError::Allocation { amount }
-        },
+        litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_archive::Error::Limit {
             kind,
             observed,
             maximum,
-        } => BodyTableDimensionError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: match kind {
-                ArchiveLimitKind::InputBytes => BodyTableDimensionLimitKind::InputBytes,
-                ArchiveLimitKind::OutputBytes => BodyTableDimensionLimitKind::OutputBytes,
-                ArchiveLimitKind::Entries => BodyTableDimensionLimitKind::Entries,
+                ArchiveLimitKind::InputBytes => LimitKind::InputBytes,
+                ArchiveLimitKind::OutputBytes => LimitKind::OutputBytes,
+                ArchiveLimitKind::Entries => LimitKind::Entries,
                 ArchiveLimitKind::MemberNameBytes | ArchiveLimitKind::MetadataBytes => {
-                    BodyTableDimensionLimitKind::PayloadItems
+                    LimitKind::PayloadItems
                 },
                 ArchiveLimitKind::CompressedEntryBytes | ArchiveLimitKind::EntryBytes => {
-                    BodyTableDimensionLimitKind::EntryBytes
+                    LimitKind::EntryBytes
                 },
-                ArchiveLimitKind::TotalBytes => BodyTableDimensionLimitKind::TotalEntryBytes,
-                ArchiveLimitKind::IwaStreamBytes => BodyTableDimensionLimitKind::PayloadBytes,
-                ArchiveLimitKind::IwaTotalBytes => BodyTableDimensionLimitKind::TotalPayloadBytes,
+                ArchiveLimitKind::TotalBytes => LimitKind::TotalEntryBytes,
+                ArchiveLimitKind::IwaStreamBytes => LimitKind::PayloadBytes,
+                ArchiveLimitKind::IwaTotalBytes => LimitKind::TotalPayloadBytes,
             },
             observed,
             maximum,
         },
-        _ => BodyTableDimensionError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_core_error(error: litchi_iwa_core::Error) -> BodyTableDimensionError {
+fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Allocation { requested, .. } => {
-            BodyTableDimensionError::Allocation { amount: requested }
+            Error::Allocation { amount: requested }
         },
         litchi_iwa_core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => BodyTableDimensionError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: match kind {
                 CoreLimitKind::ArchiveBytes
                 | CoreLimitKind::ObjectBytes
                 | CoreLimitKind::MessageBytes
                 | CoreLimitKind::SnappyChunkBytes
-                | CoreLimitKind::SnappyStreamBytes => BodyTableDimensionLimitKind::PayloadBytes,
-                CoreLimitKind::Objects => BodyTableDimensionLimitKind::PayloadObjects,
+                | CoreLimitKind::SnappyStreamBytes => LimitKind::PayloadBytes,
+                CoreLimitKind::Objects => LimitKind::PayloadObjects,
                 CoreLimitKind::Messages | CoreLimitKind::MessagesPerObject => {
-                    BodyTableDimensionLimitKind::PayloadMessages
+                    LimitKind::PayloadMessages
                 },
                 CoreLimitKind::HeaderBytes
                 | CoreLimitKind::HeaderMemoryBytes
                 | CoreLimitKind::SnappyCompressedChunkBytes
-                | CoreLimitKind::SnappyCompressedStreamBytes => {
-                    BodyTableDimensionLimitKind::WireBytes
-                },
-                CoreLimitKind::HeaderFields => BodyTableDimensionLimitKind::WireFields,
-                CoreLimitKind::HeaderNesting => BodyTableDimensionLimitKind::WireNesting,
+                | CoreLimitKind::SnappyCompressedStreamBytes => LimitKind::WireBytes,
+                CoreLimitKind::HeaderFields => LimitKind::WireFields,
+                CoreLimitKind::HeaderNesting => LimitKind::WireNesting,
                 CoreLimitKind::MetadataItems | CoreLimitKind::SnappyFrames => {
-                    BodyTableDimensionLimitKind::PayloadItems
+                    LimitKind::PayloadItems
                 },
             },
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        _ => BodyTableDimensionError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_package_error(error: PackageError) -> BodyTableDimensionError {
+fn map_package_error(error: PackageError) -> Error {
     match error {
         PackageError::Archive(error) => map_archive_error(error),
-        PackageError::Allocation { amount } => BodyTableDimensionError::Allocation { amount },
-        PackageError::ObjectLimit { observed, limit } => BodyTableDimensionError::LimitExceeded {
-            kind: BodyTableDimensionLimitKind::PayloadObjects,
+        PackageError::Allocation { amount } => Error::Allocation { amount },
+        PackageError::ObjectLimit { observed, limit } => Error::LimitExceeded {
+            kind: LimitKind::PayloadObjects,
             observed: observed as u64,
             maximum: limit as u64,
         },
-        PackageError::PayloadLimit { observed, limit } => BodyTableDimensionError::LimitExceeded {
-            kind: BodyTableDimensionLimitKind::PayloadBytes,
+        PackageError::PayloadLimit { observed, limit } => Error::LimitExceeded {
+            kind: LimitKind::PayloadBytes,
             observed: observed as u64,
             maximum: limit as u64,
         },
-        _ => BodyTableDimensionError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }

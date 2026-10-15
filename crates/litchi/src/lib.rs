@@ -458,49 +458,41 @@ pub mod formula {
 pub mod pages {
     pub use litchi_pages::*;
 
-    /// Archive-free, immutable Pages values.
+    /// Immutable Pages values: the read-only `Document` projection and its
+    /// sections, with the ingress limit profiles.
     ///
-    /// This namespace is the strict semantic reader surface. Package
-    /// preservation and editing remain available from [`crate::pages::Package`] but
-    /// are not part of this contract; no native archive, generated message, or
-    /// compatibility projection is re-exported here. The checked source and
-    /// semantic limit profiles are re-exported alongside
-    /// [`DocumentReadOptions`] so a caller can keep the complete reader API in
-    /// this namespace.
+    /// The readers here open a [`crate::pages::Package`] (a single-file
+    /// package or an app-authored package directory) and return its
+    /// read-only projection; no native archive, generated message, or
+    /// compatibility projection is re-exported here.
     pub mod semantic {
         pub use litchi_pages::{
-            Body, Document, DocumentReadOptions, DocumentSourceLimitKind, DocumentSourceLimits,
-            DocumentSourceLimitsError, DocumentStats, Error, IoKind, Position, ReadError,
-            ReadLimitKind, Result, Root, Section, SectionSelector, SectionType, SelectorError,
-            SelectorResult, SemanticLimitKind, SemanticLimits, SemanticLimitsError, TextPosition,
+            Body, Document, DocumentStats, Error, LimitKind, OpenOptions, PackageError, Position,
+            Result, Root, Section, SectionSelector, SectionType, SelectorError, SelectorResult,
+            SemanticLimitKind, SemanticLimits, SourceLimitKind, SourceLimits, TextPosition,
             TextSpan,
         };
 
-        /// Result returned by the archive-free Pages source readers.
+        /// Result returned by the Pages readers.
         ///
         /// This is separate from [`Result`], which is the leaf crate's
-        /// semantic-construction result. Keeping the source error visible at
+        /// semantic-construction result. Keeping the package error visible at
         /// this boundary preserves typed wrong-format, limit, and malformed
         /// input failures for callers.
-        pub type ReadResult<T> = std::result::Result<T, ReadError>;
+        pub type ReadResult<T> = std::result::Result<T, PackageError>;
 
-        /// Read one immutable Pages snapshot from a complete package or
+        /// Read one immutable Pages document from a complete package or an
         /// app-authored package directory.
         ///
-        /// The returned document contains only archive-free semantic values;
-        /// package members and native object identifiers remain below the
-        /// package API. A source belonging to another iWork family is
-        /// reported as [`ReadError::NotPages`].
+        /// A source belonging to another iWork family is reported as
+        /// [`PackageError::UnexpectedFormat`].
         pub fn open(path: impl AsRef<std::path::Path>) -> ReadResult<Document> {
-            Document::open(path)
+            litchi_pages::Package::open(path).map(|package| package.document())
         }
 
-        /// Read one immutable Pages snapshot from package bytes.
-        ///
-        /// The source is detected and routed by the Pages owner, so callers
-        /// do not need to inspect package markers or native identifiers.
+        /// Read one immutable Pages document from package bytes.
         pub fn from_bytes(bytes: &[u8]) -> ReadResult<Document> {
-            Document::from_bytes(bytes)
+            litchi_pages::Package::from_bytes(bytes).map(|package| package.document())
         }
     }
 }

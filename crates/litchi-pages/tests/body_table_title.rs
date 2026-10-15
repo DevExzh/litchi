@@ -2,12 +2,13 @@
 
 use std::error::Error as StdError;
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
 use litchi_iwa_common::{decode_varint_from_bytes, wire::WireView};
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tp, tsa, tsd, tsp, tss, tst, tswp};
 use litchi_pages::table::title::{Error, Settings};
-use litchi_pages::{BodyTableSelector, Limits, Package};
+use litchi_pages::{BodyTableSelector, Package};
 use prost::Message as _;
 
 const DOCUMENT_MEMBER: &str = "Index/Document.iwa";
@@ -580,7 +581,10 @@ fn aggregate_only_native_ownership_is_accepted_and_limits_fail_closed() -> TestR
 
     let archive_limits = litchi_iwa_core::Limits::default().with_header_fields(1)?;
     let limits = Limits::default().with_archive_limits(archive_limits)?;
-    let bounded = Package::from_bytes_with_limits(&source, limits);
+    let bounded = Package::from_bytes_with_options(
+        &source,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    );
     if let Ok(bounded) = bounded {
         assert!(matches!(
             bounded.body_table_title_settings(0usize),
@@ -596,12 +600,12 @@ fn public_transaction_values_are_send_sync_and_redacted() -> TestResult {
 
     assert_send_sync_debug::<Package>();
     assert_send_sync_debug::<Settings>();
-    assert_send_sync_debug::<litchi_pages::BodyTableTitleEdit<'static>>();
-    assert_send_sync_debug::<litchi_pages::BodyTableTitlePatch>();
-    assert_send_sync_debug::<litchi_pages::BodyTableTitleCommit>();
-    assert_send_sync_debug::<litchi_pages::BodyTableTitleDiagnostics>();
+    assert_send_sync_debug::<litchi_pages::table::title::Edit<'static>>();
+    assert_send_sync_debug::<litchi_pages::table::title::Patch>();
+    assert_send_sync_debug::<litchi_pages::table::title::Commit>();
+    assert_send_sync_debug::<litchi_pages::table::title::Diagnostics>();
     assert_send_sync_debug::<Error>();
-    assert_send_sync_debug::<litchi_pages::BodyTableTitleLimitKind>();
+    assert_send_sync_debug::<litchi_pages::table::title::LimitKind>();
     let package = Package::from_bytes(&synthetic_package(["Revenue", "Costs"])?)?;
     let edit = package.edit_body_table_title(0usize)?;
     assert!(format!("{edit:?}").contains("settings"));

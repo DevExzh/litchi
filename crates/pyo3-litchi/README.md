@@ -78,8 +78,10 @@ The unified reader covers .docx, .xlsx, .pptx, .xlsb, .doc, .xls, .ppt and
 `capabilities()`, while their `get`, `find`, `query` and `view` raise
 `UnsupportedError` (`unsupported_capability`) until their readers land, as
 `capabilities()` reports. Apple Pages, Keynote and Numbers packages open as
-`File` too (record 0296); an app-authored iWork package directory is read by
-the family classes below.
+`File` too (record 0296). An app-authored Pages package directory opens as a
+`File` holding its single-file form (record 0299; it has no origin, so save it
+with `save_as`); a Keynote or Numbers package directory is read by the family
+classes below.
 
 ### Editing
 

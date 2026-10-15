@@ -7,12 +7,13 @@
 
 use std::error::Error as StdError;
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
 use litchi_iwa_common::{decode_varint_from_bytes, wire::WireView};
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tp, tsa, tsd, tsp, tst, tswp};
 use litchi_pages::table::headers::{Count, Settings};
-use litchi_pages::{BodyTableHeaderSettingsError as Error, BodyTableSelector, Limits, Package};
+use litchi_pages::{BodyTableSelector, Package, table::headers::transaction::Error};
 use prost::Message as _;
 
 const DOCUMENT_MEMBER: &str = "Index/Document.iwa";
@@ -631,7 +632,10 @@ fn finite_limits_fail_closed_before_publication() -> TestResult<()> {
     for fields in 1..=4_096 {
         let archive_limits = litchi_iwa_core::Limits::default().with_header_fields(fields)?;
         let limits = Limits::default().with_archive_limits(archive_limits)?;
-        let Ok(package) = Package::from_bytes_with_limits(&source, limits) else {
+        let Ok(package) = Package::from_bytes_with_options(
+            &source,
+            litchi_pages::OpenOptions::new().__archive_limits(limits),
+        ) else {
             continue;
         };
         let before = package.exact_bytes();
@@ -657,12 +661,12 @@ fn public_transaction_types_are_send_sync_debug_and_redacted() -> TestResult<()>
 
     assert_send_sync_debug::<Package>();
     assert_send_sync_debug::<Settings>();
-    assert_send_sync_debug::<litchi_pages::BodyTableHeaderSettingsEdit<'static>>();
-    assert_send_sync_debug::<litchi_pages::BodyTableHeaderSettingsPatch>();
-    assert_send_sync_debug::<litchi_pages::BodyTableHeaderSettingsCommit>();
-    assert_send_sync_debug::<litchi_pages::BodyTableHeaderSettingsDiagnostics>();
+    assert_send_sync_debug::<litchi_pages::table::headers::transaction::Edit<'static>>();
+    assert_send_sync_debug::<litchi_pages::table::headers::transaction::Patch>();
+    assert_send_sync_debug::<litchi_pages::table::headers::transaction::Commit>();
+    assert_send_sync_debug::<litchi_pages::table::headers::transaction::Diagnostics>();
     assert_send_sync_debug::<Error>();
-    assert_send_sync_debug::<litchi_pages::BodyTableHeaderSettingsLimitKind>();
+    assert_send_sync_debug::<litchi_pages::table::headers::transaction::LimitKind>();
     let package = Package::from_bytes(&synthetic_package(["Revenue", "Costs"], None)?)?;
     let edit = package.edit_body_table_header_settings(0usize)?;
     assert!(format!("{edit:?}").contains("settings"));

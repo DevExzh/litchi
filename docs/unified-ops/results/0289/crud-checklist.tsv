@@ -4731,58 +4731,149 @@ odf	element	edit	supported		ok tx.set
 odf	element	batch	supported		ok set item
 odf	element	create	supported		ok format
 odf	element	save	supported		ok format
-pages	document	get	supported		ok 2 instances, first `iwork/pages/body-sections-unicode.pages` /
-pages	document	find	supported		ok 2 instances, first `iwork/pages/body-sections-unicode.pages` /
+pages	document	get	supported		ok 6 instances, first `iwork/pages/body-sections-unicode.pages` /
+pages	document	find	supported		ok 6 instances, first `iwork/pages/body-sections-unicode.pages` /
 pages	document	query	n/a	query not offered for this element	-
-pages	document	view	supported		ok 2 instances, first `iwork/pages/body-sections-unicode.pages` /
+pages	document	view	supported		ok 6 instances, first `iwork/pages/body-sections-unicode.pages` /
 pages	document	set	n/a	set not offered for this element	-
-pages	document	add	gap	IWORK_API_REQUESTS.md	-
-pages	document	remove	gap	IWORK_API_REQUESTS.md	-
-pages	document	move	gap	IWORK_API_REQUESTS.md	unreached
-pages	document	swap	gap	IWORK_API_REQUESTS.md	unreached
+pages	document	add	n/a	add not offered for this element	-
+pages	document	remove	n/a	remove not offered for this element	-
+pages	document	move	format-verb		unreached
+pages	document	swap	format-verb		unreached
 pages	document	edit	n/a	edit not offered for this element	-
 pages	document	batch	n/a	batch not offered for this element	-
-pages	document	create	gap	IWORK_API_REQUESTS.md request 1	refused unsupported_capability
+pages	document	create	supported		ok format
 pages	document	save	supported		ok format
-pages	body	get	supported		ok 2 instances, first `iwork/pages/body-sections-unicode.pages` /body
-pages	body	find	supported		ok 2 instances, first `iwork/pages/body-sections-unicode.pages` /body
-pages	body	query	supported		ok matches in iwork/pages/body-sections-unicode.pages
-pages	body	view	supported		ok 2 instances, first `iwork/pages/body-sections-unicode.pages` /body
+pages	body	get	supported		ok 6 instances, first `iwork/pages/body-sections-unicode.pages` /body
+pages	body	find	supported		ok 6 instances, first `iwork/pages/body-sections-unicode.pages` /body
+pages	body	query	supported		ok matches in create()
+pages	body	view	supported		ok 6 instances, first `iwork/pages/body-sections-unicode.pages` /body
 pages	body	set	n/a	set not offered for this element	-
-pages	body	add	gap	IWORK_API_REQUESTS.md	-
-pages	body	remove	gap	IWORK_API_REQUESTS.md	-
-pages	body	move	gap	IWORK_API_REQUESTS.md	unreached
-pages	body	swap	gap	IWORK_API_REQUESTS.md	unreached
+pages	body	add	n/a	add not offered for this element	-
+pages	body	remove	n/a	remove not offered for this element	-
+pages	body	move	format-verb		unreached
+pages	body	swap	format-verb		unreached
 pages	body	edit	n/a	edit not offered for this element	-
 pages	body	batch	n/a	batch not offered for this element	-
-pages	body	create	gap	IWORK_API_REQUESTS.md request 1	refused unsupported_capability
+pages	body	create	supported		ok format
 pages	body	save	supported		ok format
-pages	paragraph	get	supported		ok 6 instances, first `iwork/pages/body-sections-unicode.pages` /body/p[1]
-pages	paragraph	find	supported		ok 6 instances, first `iwork/pages/body-sections-unicode.pages` /body/p[1]
-pages	paragraph	query	supported		ok matches in iwork/pages/body-sections-unicode.pages
-pages	paragraph	view	supported		ok 6 instances, first `iwork/pages/body-sections-unicode.pages` /body/p[1]
-pages	paragraph	set	supported		ok `iwork/pages/body-sections-unicode.pages` /body/p[1] text=Litchi
-pages	paragraph	add	gap	IWORK_API_REQUESTS.md	-
-pages	paragraph	remove	gap	IWORK_API_REQUESTS.md	-
-pages	paragraph	move	gap	IWORK_API_REQUESTS.md	refused unsupported_capability
-pages	paragraph	swap	gap	IWORK_API_REQUESTS.md	refused unsupported_capability
+pages	paragraph	get	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /body/p[1]
+pages	paragraph	find	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /body/p[1]
+pages	paragraph	query	supported		ok matches in create()
+pages	paragraph	view	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /body/p[1]
+pages	paragraph	set	supported		ok `create() + add paragraph` /body/p[1] text=Litchi
+pages	paragraph	add	supported		ok /body/p[2] on `create()` under /body []
+pages	paragraph	remove	supported		ok `create() + add paragraph` /body/p[1]
+pages	paragraph	move	format-verb		ok `create() + add paragraph` /body/p[1] /body/p[2]
+pages	paragraph	swap	format-verb		ok `create() + add paragraph` /body/p[1] /body/p[2]
 pages	paragraph	edit	supported		ok tx.set
 pages	paragraph	batch	supported		ok set item
-pages	paragraph	create	gap	IWORK_API_REQUESTS.md request 1	refused unsupported_capability
+pages	paragraph	create	supported		ok format
 pages	paragraph	save	supported		ok format
-pages	section	get	supported		ok 3 instances, first `iwork/pages/body-sections-unicode.pages` /section[1]
-pages	section	find	supported		ok 3 instances, first `iwork/pages/body-sections-unicode.pages` /section[1]
-pages	section	query	supported		ok matches in iwork/pages/body-sections-unicode.pages
-pages	section	view	supported		ok 3 instances, first `iwork/pages/body-sections-unicode.pages` /section[1]
-pages	section	set	supported		ok `iwork/pages/body-sections-unicode.pages` /section[1] text=Litchi
-pages	section	add	gap	IWORK_API_REQUESTS.md	-
-pages	section	remove	gap	IWORK_API_REQUESTS.md	-
-pages	section	move	gap	IWORK_API_REQUESTS.md	refused unsupported_capability
-pages	section	swap	gap	IWORK_API_REQUESTS.md	refused unsupported_capability
+pages	section	get	supported		ok 7 instances, first `iwork/pages/body-sections-unicode.pages` /section[1]
+pages	section	find	supported		ok 7 instances, first `iwork/pages/body-sections-unicode.pages` /section[1]
+pages	section	query	supported		ok matches in create()
+pages	section	view	supported		ok 7 instances, first `iwork/pages/body-sections-unicode.pages` /section[1]
+pages	section	set	supported		ok `create() + add paragraph` /section[1] name=Litchi
+pages	section	add	n/a	add not offered for this element	-
+pages	section	remove	n/a	remove not offered for this element	-
+pages	section	move	format-verb		refused invalid_argument
+pages	section	swap	format-verb		refused invalid_argument
 pages	section	edit	supported		ok tx.set
 pages	section	batch	supported		ok set item
-pages	section	create	gap	IWORK_API_REQUESTS.md request 1	refused unsupported_capability
+pages	section	create	supported		ok format
 pages	section	save	supported		ok format
+pages	table	get	supported		ok 2 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]
+pages	table	find	supported		ok 2 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]
+pages	table	query	supported		ok matches in iwork/pages/body-table-read-native.pages
+pages	table	view	supported		ok 2 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]
+pages	table	set	n/a	set not offered for this element	-
+pages	table	add	n/a	add not offered for this element	-
+pages	table	remove	supported		ok `iwork/pages/body-table-read-native.pages` /body/tbl[1]
+pages	table	move	format-verb		refused invalid_argument
+pages	table	swap	format-verb		refused invalid_argument
+pages	table	edit	n/a	edit not offered for this element	-
+pages	table	batch	n/a	batch not offered for this element	-
+pages	table	create	supported		ok format
+pages	table	save	supported		ok format
+pages	row	get	supported		ok 6 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]/tr[1]
+pages	row	find	supported		ok 6 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]/tr[1]
+pages	row	query	supported		ok matches in iwork/pages/body-table-read-native.pages
+pages	row	view	supported		ok 6 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]/tr[1]
+pages	row	set	n/a	set not offered for this element	-
+pages	row	add	n/a	add not offered for this element	-
+pages	row	remove	n/a	remove not offered for this element	-
+pages	row	move	format-verb		refused invalid_argument
+pages	row	swap	format-verb		refused invalid_argument
+pages	row	edit	n/a	edit not offered for this element	-
+pages	row	batch	n/a	batch not offered for this element	-
+pages	row	create	supported		ok format
+pages	row	save	supported		ok format
+pages	cell	get	supported		ok 6 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]/tr[1]/tc[1]
+pages	cell	find	supported		ok 6 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]/tr[1]/tc[1]
+pages	cell	query	supported		ok matches in iwork/pages/body-table-read-native.pages
+pages	cell	view	supported		ok 6 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]/tr[1]/tc[1]
+pages	cell	set	n/a	set not offered for this element	-
+pages	cell	add	n/a	add not offered for this element	-
+pages	cell	remove	n/a	remove not offered for this element	-
+pages	cell	move	format-verb		refused invalid_argument
+pages	cell	swap	format-verb		refused invalid_argument
+pages	cell	edit	n/a	edit not offered for this element	-
+pages	cell	batch	n/a	batch not offered for this element	-
+pages	cell	create	supported		ok format
+pages	cell	save	supported		ok format
+pages	header	get	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /section[1]/header[1]
+pages	header	find	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /section[1]/header[1]
+pages	header	query	supported		ok matches in create()
+pages	header	view	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /section[1]/header[1]
+pages	header	set	supported		ok `create() + add paragraph` /section[1]/header[1] text=Litchi
+pages	header	add	n/a	add not offered for this element	-
+pages	header	remove	n/a	remove not offered for this element	-
+pages	header	move	format-verb		refused invalid_argument
+pages	header	swap	format-verb		refused invalid_argument
+pages	header	edit	supported		ok tx.set
+pages	header	batch	supported		ok set item
+pages	header	create	supported		ok format
+pages	header	save	supported		ok format
+pages	footer	get	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /section[1]/footer[1]
+pages	footer	find	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /section[1]/footer[1]
+pages	footer	query	supported		ok matches in create()
+pages	footer	view	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /section[1]/footer[1]
+pages	footer	set	supported		ok `create() + add paragraph` /section[1]/footer[1] text=Litchi
+pages	footer	add	n/a	add not offered for this element	-
+pages	footer	remove	n/a	remove not offered for this element	-
+pages	footer	move	format-verb		refused invalid_argument
+pages	footer	swap	format-verb		refused invalid_argument
+pages	footer	edit	supported		ok tx.set
+pages	footer	batch	supported		ok set item
+pages	footer	create	supported		ok format
+pages	footer	save	supported		ok format
+pages	footnotes	get	supported		ok 6 instances, first `iwork/pages/body-sections-unicode.pages` /footnotes
+pages	footnotes	find	supported		ok 6 instances, first `iwork/pages/body-sections-unicode.pages` /footnotes
+pages	footnotes	query	supported		ok matches in create()
+pages	footnotes	view	supported		ok 6 instances, first `iwork/pages/body-sections-unicode.pages` /footnotes
+pages	footnotes	set	n/a	set not offered for this element	-
+pages	footnotes	add	n/a	add not offered for this element	-
+pages	footnotes	remove	n/a	remove not offered for this element	-
+pages	footnotes	move	format-verb		unreached
+pages	footnotes	swap	format-verb		unreached
+pages	footnotes	edit	n/a	edit not offered for this element	-
+pages	footnotes	batch	n/a	batch not offered for this element	-
+pages	footnotes	create	supported		ok format
+pages	footnotes	save	supported		ok format
+pages	footnote	get	supported		ok 2 instances, first `create() + add paragraph + add footnote` /footnotes/footnote[1]
+pages	footnote	find	supported		ok 2 instances, first `create() + add paragraph + add footnote` /footnotes/footnote[1]
+pages	footnote	query	supported		ok matches in create() + add paragraph + add footnote
+pages	footnote	view	supported		ok 2 instances, first `create() + add paragraph + add footnote` /footnotes/footnote[1]
+pages	footnote	set	supported		ok `create() + add paragraph + add footnote` /footnotes/footnote[1] text=Litchi
+pages	footnote	add	supported		ok /footnotes/footnote[1] on `create() + add paragraph` under /footnotes []
+pages	footnote	remove	supported		ok `create() + add paragraph + add footnote` /footnotes/footnote[1]
+pages	footnote	move	format-verb		refused invalid_argument
+pages	footnote	swap	format-verb		refused invalid_argument
+pages	footnote	edit	supported		ok tx.set
+pages	footnote	batch	supported		ok set item
+pages	footnote	create	supported		ok format
+pages	footnote	save	supported		ok format
 keynote	presentation	get	supported		ok 1 instances, first `iwork/keynote/basic.key` /
 keynote	presentation	find	supported		ok 1 instances, first `iwork/keynote/basic.key` /
 keynote	presentation	query	n/a	query not offered for this element	-

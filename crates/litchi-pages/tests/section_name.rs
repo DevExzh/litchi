@@ -1,11 +1,13 @@
 use std::io;
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::{WireLimits, decode_varint_from_bytes, encode_varint_into, wire::WireView};
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tp, tsp, tswp};
 use litchi_pages::{
-    Limits, Package, Position, SectionNameError, SectionNameLimitKind, SectionSelector,
+    Package, Position, SectionSelector, section::name::Error as SectionNameError,
+    section::name::LimitKind as SectionNameLimitKind,
 };
 use prost::Message as _;
 
@@ -669,7 +671,10 @@ fn changed_name_respects_retained_tight_output_limit() -> TestResult<()> {
     let bytes = synthetic_package("Alpha", "Beta")?;
     let input_bytes = u64::try_from(bytes.len())?;
     let limits = Limits::new(input_bytes, 8, 1_024 * 1_024, 1_024 * 1_024, 1_024 * 1_024)?;
-    let package = Package::from_bytes_with_limits(&bytes, limits)?;
+    let package = Package::from_bytes_with_options(
+        &bytes,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    )?;
     let replacement = expansive_name();
     let mut edit = package.edit_section_name(SectionSelector::index(0))?;
     edit.set_name(Some(&replacement))?;

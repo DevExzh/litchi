@@ -15,7 +15,7 @@ use litchi_iwa_common::wire::{WireView, append_length_delimited_field, append_va
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tp, tsa, tsp, tswp};
 use litchi_pages::footnote::body::{Footnote, Position, Selector};
-use litchi_pages::{BodyFootnoteError, Package};
+use litchi_pages::{Package, footnote::body::transaction::Error as BodyFootnoteError};
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -1380,16 +1380,19 @@ fn output_limit_rejects_lifecycle_candidate_without_mutating_source() -> TestRes
         source_limit.saturating_mul(2),
         Limits::MAX_IWA_STREAM_BYTES,
     )?;
-    let package = Package::from_bytes_with_limits(&no_previews, limits)?;
+    let package = Package::from_bytes_with_options(
+        &no_previews,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    )?;
     let source = exact_bytes(&package)?;
     let result = package.insert_body_footnote(Position::ZERO, "limit", None);
     assert!(matches!(
         result,
         Err(BodyFootnoteError::LimitExceeded {
-            kind: litchi_pages::BodyFootnoteLimitKind::InputBytes
-                | litchi_pages::BodyFootnoteLimitKind::OutputBytes
-                | litchi_pages::BodyFootnoteLimitKind::EntryBytes
-                | litchi_pages::BodyFootnoteLimitKind::TotalBytes,
+            kind: litchi_pages::footnote::body::transaction::LimitKind::InputBytes
+                | litchi_pages::footnote::body::transaction::LimitKind::OutputBytes
+                | litchi_pages::footnote::body::transaction::LimitKind::EntryBytes
+                | litchi_pages::footnote::body::transaction::LimitKind::TotalBytes,
             ..
         })
     ));

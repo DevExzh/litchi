@@ -26,9 +26,10 @@ use litchi_iwa_protos::{
 };
 use litchi_pages::table::hidden_axes::{AxisIndex, HiddenAxes};
 use litchi_pages::{
-    BodyTableHiddenAxesError as Error, BodyTableHiddenAxesLimitKind, BodyTableSelector, Limits,
+    table::hidden_axes::transaction::Error as Error, table::hidden_axes::transaction::LimitKind as BodyTableHiddenAxesLimitKind, BodyTableSelector,
     Package, PackageError,
 };
+use litchi_iwa_archive::Limits;
 use prost::Message as _;
 
 const DOCUMENT_MEMBER: &str = "Index/Document.iwa";
@@ -1797,7 +1798,7 @@ fn exercise_native_existing_owner(descriptor: &[u8]) {
         2 * 1024 * 1024,
     )
     .expect("finite native fixture limits");
-    let package = Package::from_bytes_with_limits(source, limits)
+    let package = Package::from_bytes_with_options(source, litchi_pages::OpenOptions::new().__archive_limits(limits))
         .expect("qualified native hidden-axis source");
     let before = package.body_table_hidden_axes(0usize).expect("native read");
     let expected_before = if starts_hidden {
@@ -1838,7 +1839,7 @@ fn exercise_native_existing_owner(descriptor: &[u8]) {
         package.text().expect("source text")
     );
     let target_bytes = commit.package().exact_bytes();
-    let reopened = Package::from_bytes_with_limits(&target_bytes, limits).expect("native reopen");
+    let reopened = Package::from_bytes_with_options(&target_bytes, litchi_pages::OpenOptions::new().__archive_limits(limits)).expect("native reopen");
     assert_eq!(
         reopened
             .body_table_hidden_axes(0usize)
@@ -3277,7 +3278,7 @@ fn assert_existing_owner_wire_state_preserved(
 
 fn assert_reopen_and_patch_invariants(
     source: &Package,
-    commit: &litchi_pages::BodyTableHiddenAxesCommit,
+    commit: &litchi_pages::table::hidden_axes::transaction::Commit,
     selector: BodyTableSelector<'static>,
     before: &HiddenAxes,
     after: &HiddenAxes,
@@ -3632,7 +3633,7 @@ fn exercise_data_dependent_limits(source: &[u8], descriptor: &[u8]) {
         FIXTURE_STREAM_CEILING,
     )
     .unwrap_or_else(|error| panic!("bounded limit profile must be valid: {error}"));
-    let package = match Package::from_bytes_with_limits(source, limits) {
+    let package = match Package::from_bytes_with_options(source, litchi_pages::OpenOptions::new().__archive_limits(limits)) {
         Ok(package) => {
             assert!(
                 maximum >= source_length,
@@ -3707,7 +3708,7 @@ fn exercise_limit_boundaries(source: &[u8]) {
             FIXTURE_STREAM_CEILING,
         )
         .unwrap_or_else(|error| panic!("limit-boundary profile must be valid: {error}"));
-        let package = match Package::from_bytes_with_limits(source, limits) {
+        let package = match Package::from_bytes_with_options(source, litchi_pages::OpenOptions::new().__archive_limits(limits)) {
             Ok(package) => {
                 assert!(
                     maximum >= length,

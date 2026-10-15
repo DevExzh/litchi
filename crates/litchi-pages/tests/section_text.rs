@@ -1,13 +1,14 @@
 use std::io;
 use std::sync::{Arc, Barrier};
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::{decode_varint_from_bytes, encode_varint_into, wire::WireView};
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tp, tsa, tsp, tswp};
 use litchi_pages::{
-    Limits, Package, PackageError, Position, SectionSelector, SectionTextError,
-    SectionTextLimitKind, TextPosition, TextSpan,
+    Package, PackageError, Position, SectionSelector, TextPosition, TextSpan,
+    section::text::Error as SectionTextError, section::text::LimitKind as SectionTextLimitKind,
 };
 use prost::Message as _;
 
@@ -1234,7 +1235,10 @@ fn changed_text_respects_retained_output_limit() -> TestResult<()> {
     let bytes = synthetic_package()?;
     let input_bytes = u64::try_from(bytes.len())?;
     let limits = Limits::new(input_bytes, 8, 1_024 * 1_024, 1_024 * 1_024, 1_024 * 1_024)?;
-    let package = Package::from_bytes_with_limits(&bytes, limits)?;
+    let package = Package::from_bytes_with_options(
+        &bytes,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    )?;
     let mut edit = package.edit_section_text(SectionSelector::index(1))?;
     edit.insert(TextPosition::ZERO, &"expanded".repeat(1_024))?;
     assert!(matches!(
@@ -1267,7 +1271,10 @@ fn changed_text_replays_exact_public_output_limit_and_is_atomic() -> TestResult<
         defaults.max_total_bytes(),
         defaults.max_iwa_stream_bytes(),
     )?;
-    let exact_package = Package::from_bytes_with_limits(&bytes, exact_limits)?;
+    let exact_package = Package::from_bytes_with_options(
+        &bytes,
+        litchi_pages::OpenOptions::new().__archive_limits(exact_limits),
+    )?;
     let exact_commit = exact_package.set_section_text(SectionSelector::index(1), replacement)?;
     assert_eq!(exact_bytes(exact_commit.package())?, target_bytes);
 
@@ -1278,7 +1285,10 @@ fn changed_text_replays_exact_public_output_limit_and_is_atomic() -> TestResult<
         defaults.max_total_bytes(),
         defaults.max_iwa_stream_bytes(),
     )?;
-    let limited_package = Package::from_bytes_with_limits(&bytes, limited_limits)?;
+    let limited_package = Package::from_bytes_with_options(
+        &bytes,
+        litchi_pages::OpenOptions::new().__archive_limits(limited_limits),
+    )?;
     let source_before = exact_bytes(&limited_package)?;
     let mut limited_edit = limited_package.edit_section_text(SectionSelector::index(1))?;
     limited_edit.set(replacement)?;
@@ -1336,7 +1346,13 @@ fn public_physical_read_limits_fail_closed_without_mutating_source_bytes() -> Te
         )?,
     ];
     for limits in profiles {
-        assert!(Package::from_bytes_with_limits(&bytes, limits).is_err());
+        assert!(
+            Package::from_bytes_with_options(
+                &bytes,
+                litchi_pages::OpenOptions::new().__archive_limits(limits)
+            )
+            .is_err()
+        );
         assert_eq!(bytes, source_snapshot);
     }
     Ok(())

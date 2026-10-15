@@ -13,6 +13,7 @@ use std::error::Error as StdError;
 use std::sync::Arc;
 use std::thread;
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
 use litchi_iwa_common::{
     decode_varint_from_bytes,
@@ -22,8 +23,8 @@ use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, 
 use litchi_iwa_protos::{tp, tsa, tsce, tsd, tsp, tst, tswp};
 use litchi_pages::table::hidden_axes::{AxisIndex, HiddenAxes};
 use litchi_pages::{
-    BodyTableHiddenAxesError as Error, BodyTableHiddenAxesLimitKind, BodyTableSelector, Limits,
-    Package,
+    BodyTableSelector, Package, table::hidden_axes::transaction::Error,
+    table::hidden_axes::transaction::LimitKind as BodyTableHiddenAxesLimitKind,
 };
 use prost::Message as _;
 
@@ -3534,7 +3535,10 @@ fn output_and_wire_limits_reject_before_publication() -> TestResult {
         1024 * 1024,
         1024 * 1024,
     )?;
-    let bounded_package = Package::from_bytes_with_limits(&source, bounded)?;
+    let bounded_package = Package::from_bytes_with_options(
+        &source,
+        litchi_pages::OpenOptions::new().__archive_limits(bounded),
+    )?;
     let before = bounded_package.exact_bytes();
     let result = bounded_package
         .edit_body_table_hidden_axes(0usize)?
@@ -3548,7 +3552,10 @@ fn output_and_wire_limits_reject_before_publication() -> TestResult {
     for fields in 1..=4_096 {
         let archive_limits = litchi_iwa_core::Limits::default().with_header_fields(fields)?;
         let limits = Limits::default().with_archive_limits(archive_limits)?;
-        match Package::from_bytes_with_limits(&normal_source, limits) {
+        match Package::from_bytes_with_options(
+            &normal_source,
+            litchi_pages::OpenOptions::new().__archive_limits(limits),
+        ) {
             Ok(package) => {
                 let result = package
                     .edit_body_table_hidden_axes(0usize)
@@ -3572,7 +3579,10 @@ fn output_and_wire_limits_reject_before_publication() -> TestResult {
     assert!(exact_fields > 1);
     let archive_limits = litchi_iwa_core::Limits::default().with_header_fields(exact_fields - 1)?;
     let limits = Limits::default().with_archive_limits(archive_limits)?;
-    match Package::from_bytes_with_limits(&normal_source, limits) {
+    match Package::from_bytes_with_options(
+        &normal_source,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    ) {
         Ok(package) => {
             let before = package.exact_bytes();
             let result = package
@@ -3637,10 +3647,10 @@ fn public_hidden_axis_transactions_are_send_sync_debug_and_redacted() -> TestRes
     assert_send_sync_debug::<Package>();
     assert_send_sync_debug::<AxisIndex>();
     assert_send_sync_debug::<HiddenAxes>();
-    assert_send_sync_debug::<litchi_pages::BodyTableHiddenAxesEdit<'static>>();
-    assert_send_sync_debug::<litchi_pages::BodyTableHiddenAxesPatch>();
-    assert_send_sync_debug::<litchi_pages::BodyTableHiddenAxesCommit>();
-    assert_send_sync_debug::<litchi_pages::BodyTableHiddenAxesDiagnostics>();
+    assert_send_sync_debug::<litchi_pages::table::hidden_axes::transaction::Edit<'static>>();
+    assert_send_sync_debug::<litchi_pages::table::hidden_axes::transaction::Patch>();
+    assert_send_sync_debug::<litchi_pages::table::hidden_axes::transaction::Commit>();
+    assert_send_sync_debug::<litchi_pages::table::hidden_axes::transaction::Diagnostics>();
     assert_send_sync_debug::<Error>();
     assert_send_sync_debug::<BodyTableHiddenAxesLimitKind>();
 
@@ -5652,7 +5662,10 @@ fn ownerless_creation_output_limit_is_atomic() -> TestResult {
         64 * 1024 * 1024,
         64 * 1024 * 1024,
     )?;
-    let bounded = Package::from_bytes_with_limits(&source, limits)?;
+    let bounded = Package::from_bytes_with_options(
+        &source,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    )?;
     let before = bounded.exact_bytes();
     let result = bounded
         .edit_body_table_hidden_axes(0usize)?
