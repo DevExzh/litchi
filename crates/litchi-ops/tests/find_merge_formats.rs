@@ -341,6 +341,12 @@ fn xls_merge_chains_native_edits() {
     assert_eq!(text(&found, "/Sheet1/A1499"), "w");
 }
 
+#[cfg(feature = "ods")]
+#[test]
+fn ods_find_and_merge() {
+    spreadsheet_find_and_merge(FileFormat::Ods);
+}
+
 #[test]
 fn formats_are_reported() {
     let _ = FileFormat::Doc;

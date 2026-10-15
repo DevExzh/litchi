@@ -11,6 +11,7 @@
 //! leaf commit publishes a new package; this handle never changes.
 
 pub(crate) mod coalesce;
+pub(crate) mod find;
 
 use std::collections::BTreeMap;
 use std::num::NonZeroUsize;

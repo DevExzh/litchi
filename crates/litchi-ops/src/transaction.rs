@@ -2726,6 +2726,12 @@ impl Edit {
                     crate::format::xlsb::write::find::find_replace(handle, target, &spec, &limits)?;
                 wrap_xlsb(handle, commit, matched)
             },
+            #[cfg(feature = "ods")]
+            File::Ods(handle) => {
+                let (commit, matched) =
+                    crate::format::ods::write::find::find_replace(handle, target, &spec, &limits)?;
+                wrap_ods(handle, commit, matched)
+            },
             #[cfg(feature = "ppt")]
             File::Ppt(handle) => {
                 let (commit, matched) =

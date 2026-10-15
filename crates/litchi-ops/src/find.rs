@@ -384,6 +384,11 @@ pub(crate) fn set(
                     .map_or_else(|| handle.clone(), |commit| commit.after.clone()),
             )
         }),
+        #[cfg(feature = "ods")]
+        crate::File::Ods(handle) => {
+            crate::format::ods::write::find::find_replace(handle, &target, &spec, &limits)
+                .map(|(commit, _)| crate::File::Ods(commit.after))
+        },
         #[cfg(feature = "ppt")]
         crate::File::Ppt(handle) => {
             crate::format::ppt::write::find::find_replace(handle, &target, &spec, &limits)
