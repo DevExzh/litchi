@@ -519,6 +519,19 @@ docx	tab	edit	gap	R4x	-
 docx	tab	batch	gap	R4x	-
 docx	tab	create	gap	R4x	ok format
 docx	tab	save	gap	R4x	ok format
+docx	smartart	get	supported		ok 5 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /smartart[1]
+docx	smartart	find	supported		ok 5 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /smartart[1]
+docx	smartart	query	supported		ok matches in libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx
+docx	smartart	view	supported		ok 5 instances, first `libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx` /smartart[1]
+docx	smartart	set	n/a	set not offered for this element	-
+docx	smartart	add	supported		ok /smartart[1] on `seed` under /body/p[1] [layout,text]
+docx	smartart	remove	n/a	remove not offered for this element	-
+docx	smartart	move	format-verb		refused unsupported_capability
+docx	smartart	swap	format-verb		refused unsupported_capability
+docx	smartart	edit	n/a	edit not offered for this element	-
+docx	smartart	batch	n/a	batch not offered for this element	-
+docx	smartart	create	supported		ok format
+docx	smartart	save	supported		ok format
 xlsx	workbook	get	supported		ok 8 instances, first `ooxml/xlsx/DataValidationListTooLong.xlsx` /
 xlsx	workbook	find	supported		ok 8 instances, first `ooxml/xlsx/DataValidationListTooLong.xlsx` /
 xlsx	workbook	query	n/a	query not offered for this element	-
