@@ -6,6 +6,14 @@
 //! bytes. The corpus-wide picture is in `corpus_fidelity.rs` (structure
 //! columns) and the ignored `structure_census.rs`.
 
+#![cfg(all(
+    feature = "xls",
+    feature = "pptx",
+    feature = "rtf",
+    feature = "docx",
+    feature = "doc"
+))]
+
 use std::path::{Path, PathBuf};
 
 use litchi_ops::{File, NewNode, Placement, Props, open};
@@ -21,7 +29,6 @@ fn input(relative: &str) -> (File, Vec<u8>) {
     (open(&path).unwrap(), std::fs::read(&path).unwrap())
 }
 
-#[cfg(feature = "xls")]
 mod xls {
     use super::*;
 
@@ -67,14 +74,13 @@ mod xls {
         let (file, _) = input("ole/xls/WithConditionalFormatting.xls");
         let error = file
             .add("/sheet[1]", NewNode::new("row").at(Placement::Start))
-            .err()
-            .expect("conditional formats are not shifted");
+            .map(drop)
+            .expect_err("conditional formats are not shifted");
         assert_eq!(error.code().as_str(), "unsupported_capability");
         assert!(error.message().contains("0x01B0"), "{}", error.message());
     }
 }
 
-#[cfg(feature = "pptx")]
 mod pptx {
     use super::*;
 
@@ -101,7 +107,7 @@ mod pptx {
     #[test]
     fn slides_owning_notes_stay_typed_refusals() {
         let (file, _) = input("ooxml/pptx/sample.pptx");
-        let error = file.remove("/slide[2]").err().unwrap();
+        let error = file.remove("/slide[2]").map(drop).unwrap_err();
         assert_eq!(error.code().as_str(), "unsupported_capability");
         assert!(
             error.message().contains("notesSlide"),
@@ -122,7 +128,6 @@ mod pptx {
     }
 }
 
-#[cfg(feature = "rtf")]
 mod rtf {
     use super::*;
 
@@ -167,7 +172,6 @@ mod rtf {
     }
 }
 
-#[cfg(feature = "docx")]
 #[test]
 fn docx_alt_chunk_after_the_final_section_is_editable() {
     let relative = "libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx";
@@ -192,7 +196,6 @@ fn docx_alt_chunk_after_the_final_section_is_editable() {
     );
 }
 
-#[cfg(feature = "doc")]
 #[test]
 fn doc_word_padded_papx_is_editable() {
     let (file, bytes) = input("poi/test-data/document/test.doc");

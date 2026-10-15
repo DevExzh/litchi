@@ -285,3 +285,16 @@ fn empty_edit_probe() {
         Err(error) => println!("{relative}: {error}"),
     }
 }
+
+/// Prints the number of `cell` query matches per sheet of
+/// `CENSUS_CELLS=<relative path>`.
+#[test]
+#[ignore = "diagnostic probe"]
+fn cell_count_probe() {
+    let Ok(relative) = std::env::var("CENSUS_CELLS") else {
+        return;
+    };
+    let file = open(test_data().join(&relative)).unwrap();
+    let cells = file.query("cell").map(|matches| matches.count());
+    println!("{relative}: {cells:?}");
+}
