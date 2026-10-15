@@ -287,13 +287,15 @@ impl OdfTree {
         let bytes = parts
             .merge_package(flat, owner.as_bytes())
             .map_err(|error| core_error(error, format))?;
-        #[cfg(feature = "odg")]
-        if format == FileFormat::Odg {
-            let next = Self::from_flat(bytes, &OpenOptions::default())?;
-            return Ok(next.with_origin(self.origin().cloned()));
-        }
-        let _ = bytes;
-        Err(Error::unsupported_format(Some(format)))
+        // The edited package holds exactly the parts the republished flat
+        // document splits into, so it stays the projection; its tree is
+        // built on the first read.
+        Ok(Self(Arc::new(State {
+            owner,
+            tree: std::sync::OnceLock::new(),
+            origin: self.origin().cloned(),
+            flat: Some(bytes.into_boxed_slice()),
+        })))
     }
 
     /// The bytes this handle publishes: the flat document, or the package.
@@ -306,14 +308,11 @@ impl OdfTree {
 
     /// Adopt a package a leaf commit published and verified. The object
     /// tree is built on the first read, so a write (or a batch of writes)
-    /// does not pay for a projection nobody reads. Only the drawing, chart,
+    /// does not pay for a projection nobody reads. The drawing, chart,
     /// image and formula trees build infallibly; a database tree parses its
-    /// catalog, which can fail, so it is still built here.
+    /// catalog, which the ODB commit already parsed on the published
+    /// snapshot before returning it, so it is deferred too (record 0292).
     pub(crate) fn from_commit(owner: Owner, origin: Option<Arc<Path>>) -> Result<Self> {
-        #[cfg(feature = "odb")]
-        if matches!(owner, Owner::Odb(_)) {
-            return Self::from_owner(owner, origin);
-        }
         Ok(Self(Arc::new(State {
             owner,
             tree: std::sync::OnceLock::new(),
@@ -353,8 +352,9 @@ impl OdfTree {
     /// The object tree built at open.
     pub(crate) fn tree(&self) -> &Tree {
         self.0.tree.get_or_init(|| {
-            // Only infallible builders are deferred (`from_commit`); a
-            // failure would still leave the root rather than panic.
+            // Only builders that cannot fail on a committed package are
+            // deferred (`from_commit`); a failure would still leave the
+            // root rather than panic.
             self.0.owner.tree().unwrap_or_else(|_| Tree::root_only())
         })
     }

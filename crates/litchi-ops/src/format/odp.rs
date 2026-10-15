@@ -229,11 +229,15 @@ impl Odp {
                 .merge_package(flat.as_bytes(), package.as_bytes())
                 .map_err(core_error)?;
             let flat = litchi_odp::FlatPresentation::from_bytes(bytes).map_err(core_error)?;
-            return Ok(Self::from_owner(
+            let next = Self::from_owner(
                 OdpOwner::Flat(flat),
                 self.0.origin.clone(),
                 self.0.odf_options,
-            ));
+            );
+            // The edited package holds exactly the parts the republished
+            // flat document splits into: it is the next projection.
+            let _ = next.0.materialized.set(package);
+            return Ok(next);
         }
         Self::from_package(package, self.0.origin.clone(), self.0.odf_options)
     }

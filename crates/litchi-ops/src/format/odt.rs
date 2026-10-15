@@ -207,7 +207,18 @@ impl Odt {
         match self.flat() {
             Some(flat) => {
                 let republished = flat.republish(&package).map_err(odf_error)?;
-                Self::from_flat_document(republished, self.origin().cloned())
+                // The edited package holds exactly the parts the republished
+                // flat document splits into, so it stays the projection.
+                let document = package.document().map_err(core_error)?;
+                Ok(Self(Arc::new(OdtState {
+                    owner: OdtOwner::Eager(document),
+                    format: FileFormat::Odt,
+                    package: OnceLock::from(package),
+                    tree: OnceLock::new(),
+                    kinds: OnceLock::new(),
+                    origin: self.origin().cloned(),
+                    flat: Some(republished),
+                })))
             },
             None => Self::from_package(package, self.origin().cloned(), self.format()),
         }

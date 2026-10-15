@@ -94,6 +94,16 @@ mod odt {
             .expect("flat paragraph text");
         let published = edited.to_bytes().unwrap();
         assert_local(&source, &published, "body text".len());
+        // A second edit of the edited handle, without a reopen.
+        let chained = edited
+            .set(path.as_str(), props! { "text" => "third body" })
+            .expect("chained flat edit");
+        assert_eq!(
+            String::from_utf8(chained.to_bytes().unwrap()).unwrap(),
+            String::from_utf8(source.clone())
+                .unwrap()
+                .replace(">body text<", ">third body<")
+        );
         let reopened = open_bytes(published.clone()).expect("reopen");
         assert_eq!(text(&reopened, &path).as_deref(), Some("new body"));
         assert_eq!(
@@ -172,6 +182,10 @@ mod odg {
             .expect("flat page rename");
         let published = edited.to_bytes().unwrap();
         assert_local(&source, &published, 64);
+        let chained = edited
+            .set("/page[1]", props! { "name" => "Again" })
+            .expect("chained flat edit");
+        assert_local(&source, &chained.to_bytes().unwrap(), 64);
         let reopened = open_bytes(published).expect("reopen");
         assert_eq!(
             reopened
