@@ -45,6 +45,7 @@ use crate::transaction::{Error as TransactionError, LimitKind, SemanticLimits};
 use crate::value::{Base, Color, Length, Scalar, ValueType};
 
 pub(crate) mod coalesce;
+pub(crate) mod find;
 
 /// The leaf proof and immutable endpoints of one ODT write.
 pub(crate) struct Commit {

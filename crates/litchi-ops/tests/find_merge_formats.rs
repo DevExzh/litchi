@@ -347,6 +347,120 @@ fn ods_find_and_merge() {
     spreadsheet_find_and_merge(FileFormat::Ods);
 }
 
+/// A text document of `format`: a paragraph of two runs (the second bold)
+/// with a placeholder across them, a hyperlink, a footnote and a comment.
+#[cfg(feature = "odt")]
+fn text_document(format: FileFormat) -> File {
+    let file = create(format).unwrap();
+    let file = file
+        .add("/body", NewNode::new("paragraph").prop("text", "Dear {{na"))
+        .unwrap()
+        .file;
+    let file = file
+        .add(
+            "/body/p[1]",
+            NewNode::new("r")
+                .prop("text", "me}}, hello  world")
+                .prop("bold", true),
+        )
+        .unwrap()
+        .file;
+    // A master document's created body refuses a hyperlink add; the other
+    // two take one.
+    let file = if format == FileFormat::Odm {
+        file.add("/body/p[1]", NewNode::new("r").prop("text", "hello link"))
+            .unwrap()
+            .file
+    } else {
+        file.add(
+            "/body/p[1]",
+            NewNode::new("hyperlink")
+                .prop("url", "https://example.org/")
+                .prop("text", "hello link"),
+        )
+        .unwrap()
+        .file
+    };
+    let file = file
+        .add(
+            "/body",
+            NewNode::new("paragraph").prop("text", "hello again"),
+        )
+        .unwrap()
+        .file;
+    let file = file
+        .add(
+            "/body/p[2]",
+            NewNode::new("footnote").prop("text", "hello note"),
+        )
+        .unwrap()
+        .file;
+    file.add(
+        "/body/p[2]",
+        NewNode::new("comment").prop("text", "hello comment"),
+    )
+    .unwrap()
+    .file
+}
+
+#[cfg(feature = "odt")]
+fn odt_find_and_merge(format: FileFormat) {
+    let file = text_document(format);
+    let (after, matched) = find(&file, "/", "hello", "bye");
+    // The run, the link, the second paragraph and the note; not the comment.
+    assert_eq!(matched, 4);
+    let after = reopen(&after);
+    assert_eq!(after.format(), Some(format));
+    assert_eq!(text(&after, "/body/p[1]/r[2]"), "me}}, bye  world");
+    assert_eq!(
+        prop(&after, "/body/p[1]/r[2]", "bold").as_deref(),
+        Some("true")
+    );
+    assert!(text(&after, "/body/p[1]").contains("bye link"));
+    assert!(text(&after, "/body/p[2]").starts_with("bye again"));
+    let comments = after.query("comment").unwrap().count();
+    assert_eq!(comments, 1);
+    // A run scope.
+    let (scoped, matched) = find(&file, "/body/p[1]/r[2]", "hello", "x");
+    assert_eq!(matched, 1);
+    assert!(text(&scoped, "/body/p[2]").starts_with("hello again"));
+    let (same, matched) = find(&file, "/", "absent", "x");
+    assert_eq!(matched, 0);
+    assert_eq!(same.to_bytes().unwrap(), file.to_bytes().unwrap());
+    let error = file
+        .set("/", props! { "find" => "hello", "bold" => true })
+        .unwrap_err();
+    assert_eq!(error.code(), Code::UnsupportedProperty);
+
+    let commit = file
+        .merge(&record(&[("name", "Ada\nLovelace")]), &Options::new())
+        .unwrap();
+    assert_eq!(commit.value.replacements(), 1);
+    let merged = reopen(&commit.file);
+    assert_eq!(text(&merged, "/body/p[1]/r[1]"), "Dear Ada\nLovelace");
+    assert_eq!(text(&merged, "/body/p[1]/r[2]"), ", hello  world");
+    let none = file.merge(&Record::new(), &Options::new()).unwrap();
+    assert!(none.patch.is_noop());
+}
+
+#[cfg(feature = "odt")]
+#[test]
+fn odt_find_and_merge_runs() {
+    odt_find_and_merge(FileFormat::Odt);
+}
+
+#[cfg(feature = "oth")]
+#[test]
+fn oth_find_and_merge_runs() {
+    odt_find_and_merge(FileFormat::Oth);
+}
+
+#[cfg(feature = "odm")]
+#[test]
+fn odm_find_and_merge_runs() {
+    odt_find_and_merge(FileFormat::Odm);
+}
+
 #[test]
 fn formats_are_reported() {
     let _ = FileFormat::Doc;

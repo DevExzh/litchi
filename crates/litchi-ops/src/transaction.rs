@@ -2732,6 +2732,12 @@ impl Edit {
                     crate::format::ods::write::find::find_replace(handle, target, &spec, &limits)?;
                 wrap_ods(handle, commit, matched)
             },
+            #[cfg(feature = "odt")]
+            File::Odt(handle) | File::Oth(handle) | File::Odm(handle) => {
+                let (commit, matched) =
+                    crate::format::odt::write::find::find_replace(handle, target, &spec, &limits)?;
+                wrap_odt(handle, commit, matched)
+            },
             #[cfg(feature = "ppt")]
             File::Ppt(handle) => {
                 let (commit, matched) =
