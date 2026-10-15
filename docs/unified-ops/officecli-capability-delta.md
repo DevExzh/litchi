@@ -43,7 +43,7 @@ differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/registry/ods.json` | `11c617b55cbd890049be50ab3c408c731b68aae700a62f62e161b1f1a0d02a17` |
 | golden | `crates/litchi-ops/tests/golden/registry/odt.json` | `786e46c288409010e4a4d53512ae56dae60423eec63c4c404a2ee3551473cf73` |
 | golden | `crates/litchi-ops/tests/golden/registry/oth.json` | `d2bf72f03e8ac9b8dbce6db3625e34e6ebe2be45ad62798154d39f869f2fc737` |
-| golden | `crates/litchi-ops/tests/golden/registry/pages.json` | `6f74d52d7f771828d66318aa7157c589ba3a057b96578d91c4a1b7180598d783` |
+| golden | `crates/litchi-ops/tests/golden/registry/pages.json` | `add1c4298a7e4dfc5afde7516418c0f754d1b4e747b0840f89f0883a2d63d722` |
 | officecli | `schemas/help` (152 files, OfficeCLI commit `dced0d74`) | `0bcd8cae45fabc0c5e45ff99d1994465fb213ac1b8db3f7eadd87339fb40ced4` |
 
 ## Statuses
@@ -101,7 +101,7 @@ Elements:
 | ods | 8 | 30 | 0 | 0 | 1 | 2 | 1 |
 | odt | 19 | 12 | 0 | 0 | 13 | 2 | 5 |
 | oth | 0 | 0 | 0 | 0 | 0 | 0 | 22 |
-| pages | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
+| pages | 0 | 0 | 0 | 0 | 0 | 0 | 11 |
 
 Property reads:
 
@@ -10826,6 +10826,13 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 |  | body | litchi-only |  |
 |  | paragraph | litchi-only |  |
 |  | section | litchi-only |  |
+|  | table | litchi-only |  |
+|  | row | litchi-only |  |
+|  | cell | litchi-only |  |
+|  | header | litchi-only |  |
+|  | footer | litchi-only |  |
+|  | footnotes | litchi-only |  |
+|  | footnote | litchi-only |  |
 
 ### Properties
 
@@ -10838,7 +10845,10 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 
 | Verb | Element | Context | Reason | Follow-up |
 |---|---|---|---|---|
-| `add` | `p` | `a new paragraph` | the Pages leaf has no paragraph insertion transaction | IWORK_API_REQUESTS.md request 12 |
-| `remove` | `p` | `a paragraph` | the Pages leaf has no paragraph removal transaction | IWORK_API_REQUESTS.md request 12 |
-| `add` | `section` | `a new section` | the Pages leaf has no section lifecycle transaction | IWORK_API_REQUESTS.md request 11 |
-| `create` | `document` | `a document from scratch` | the Pages leaf has no from-scratch package builder | IWORK_API_REQUESTS.md request 1 |
+| `get` | `metadata` | `path-read` | `set("/metadata", ..)` writes the document properties through the leaf metadata family; the path is set-only, and reads go through File::metadata() | record 0299 Pages metadata node |
+| `add` | `section` | `a new section` | the Pages leaf has no section lifecycle transaction (a section break plus a new native section object) | IWORK_API_REQUESTS.md request 11 |
+| `remove` | `section` | `a section` | the Pages leaf has no section lifecycle transaction | IWORK_API_REQUESTS.md request 11 |
+| `set` | `tc` | `a body-table cell` | the Pages leaf reads body-table cells but has no cell-write transaction (the Numbers cell writer is not shared with Pages) | record 0299 follow-up: Pages body-table cell writes |
+| `add` | `tbl` | `a new body table` | the Pages leaf deletes body tables but has no table-creation transaction | record 0299 follow-up: Pages body-table creation |
+| `remove` | `p` | `a paragraph that anchors an object` | removing or moving the paragraph would delete or move the inline table, chart, image or footnote it anchors | remove the anchored object (`tbl`) itself |
+| `create` | `document` | `a document with a fresh identity` | `create` returns the deterministic minimal Pages document (`Package::new`); a fresh document identity is an explicit leaf builder input | litchi_pages::builder::Builder with Identity::generate |

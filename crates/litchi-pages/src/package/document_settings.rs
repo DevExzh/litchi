@@ -181,7 +181,7 @@ impl Edit<'_> {
         let source_fingerprint = page_layout::fingerprint(&source);
         if self.before == self.settings {
             return Ok(Commit {
-                package: self.source.snapshot(),
+                package: self.source.clone(),
                 patch: Patch {
                     source: Arc::clone(&source),
                     target: source,
@@ -481,7 +481,7 @@ impl Package {
         }
         if patch.is_noop() {
             return Ok(Commit {
-                package: self.snapshot(),
+                package: self.clone(),
                 patch: patch.clone(),
                 diagnostics: Diagnostics::unchanged(),
             });
@@ -970,10 +970,10 @@ fn try_owned(source: &str) -> Result<String, Error> {
     page_layout::try_owned(source).map_err(map_page_layout_error)
 }
 
-fn map_page_layout_error(error: page_layout::PageLayoutError) -> Error {
+fn map_page_layout_error(error: page_layout::Error) -> Error {
     match error {
-        page_layout::PageLayoutError::UnsupportedSource => Error::UnsupportedSource,
-        page_layout::PageLayoutError::LimitExceeded {
+        page_layout::Error::UnsupportedSource => Error::UnsupportedSource,
+        page_layout::Error::LimitExceeded {
             kind,
             observed,
             maximum,
@@ -982,31 +982,31 @@ fn map_page_layout_error(error: page_layout::PageLayoutError) -> Error {
             observed,
             maximum,
         },
-        page_layout::PageLayoutError::Allocation { amount } => Error::Allocation { amount },
-        page_layout::PageLayoutError::Verification => Error::Verification,
-        page_layout::PageLayoutError::InvalidLayout(_)
-        | page_layout::PageLayoutError::InvalidSource
-        | page_layout::PageLayoutError::PatchConflict => Error::InvalidSource,
+        page_layout::Error::Allocation { amount } => Error::Allocation { amount },
+        page_layout::Error::Verification => Error::Verification,
+        page_layout::Error::InvalidLayout(_)
+        | page_layout::Error::InvalidSource
+        | page_layout::Error::PatchConflict => Error::InvalidSource,
     }
 }
 
-fn map_page_layout_limit(kind: page_layout::PageLayoutLimitKind) -> LimitKind {
+fn map_page_layout_limit(kind: page_layout::LimitKind) -> LimitKind {
     match kind {
-        page_layout::PageLayoutLimitKind::InputBytes => LimitKind::InputBytes,
-        page_layout::PageLayoutLimitKind::OutputBytes => LimitKind::OutputBytes,
-        page_layout::PageLayoutLimitKind::Entries => LimitKind::Entries,
-        page_layout::PageLayoutLimitKind::EntryBytes => LimitKind::EntryBytes,
-        page_layout::PageLayoutLimitKind::TotalEntryBytes => LimitKind::TotalEntryBytes,
-        page_layout::PageLayoutLimitKind::PackageBytes => LimitKind::PackageBytes,
-        page_layout::PageLayoutLimitKind::PayloadBytes => LimitKind::PayloadBytes,
-        page_layout::PageLayoutLimitKind::TotalPayloadBytes => LimitKind::TotalPayloadBytes,
-        page_layout::PageLayoutLimitKind::PayloadObjects => LimitKind::PayloadObjects,
-        page_layout::PageLayoutLimitKind::PayloadMessages => LimitKind::PayloadMessages,
-        page_layout::PageLayoutLimitKind::PayloadItems => LimitKind::PayloadItems,
-        page_layout::PageLayoutLimitKind::WireBytes => LimitKind::WireBytes,
-        page_layout::PageLayoutLimitKind::WireFields => LimitKind::WireFields,
-        page_layout::PageLayoutLimitKind::WireNesting => LimitKind::WireNesting,
-        page_layout::PageLayoutLimitKind::WireWork => LimitKind::WireWork,
+        page_layout::LimitKind::InputBytes => LimitKind::InputBytes,
+        page_layout::LimitKind::OutputBytes => LimitKind::OutputBytes,
+        page_layout::LimitKind::Entries => LimitKind::Entries,
+        page_layout::LimitKind::EntryBytes => LimitKind::EntryBytes,
+        page_layout::LimitKind::TotalEntryBytes => LimitKind::TotalEntryBytes,
+        page_layout::LimitKind::PackageBytes => LimitKind::PackageBytes,
+        page_layout::LimitKind::PayloadBytes => LimitKind::PayloadBytes,
+        page_layout::LimitKind::TotalPayloadBytes => LimitKind::TotalPayloadBytes,
+        page_layout::LimitKind::PayloadObjects => LimitKind::PayloadObjects,
+        page_layout::LimitKind::PayloadMessages => LimitKind::PayloadMessages,
+        page_layout::LimitKind::PayloadItems => LimitKind::PayloadItems,
+        page_layout::LimitKind::WireBytes => LimitKind::WireBytes,
+        page_layout::LimitKind::WireFields => LimitKind::WireFields,
+        page_layout::LimitKind::WireNesting => LimitKind::WireNesting,
+        page_layout::LimitKind::WireWork => LimitKind::WireWork,
     }
 }
 
@@ -1018,7 +1018,11 @@ fn map_package_error(error: PackageError) -> Error {
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
-        PackageError::NotPages => Error::UnsupportedSource,
+        PackageError::UnexpectedFormat { .. }
+        | PackageError::NotOfficeFile
+        | PackageError::MissingIdentity
+        | PackageError::InvalidLimit { .. }
+        | PackageError::Limit { .. } => Error::UnsupportedSource,
         PackageError::PayloadLimit { observed, limit } => Error::LimitExceeded {
             kind: LimitKind::PayloadBytes,
             observed: usize_to_u64(observed),

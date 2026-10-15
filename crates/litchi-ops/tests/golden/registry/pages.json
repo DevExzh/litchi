@@ -24,6 +24,10 @@
         {
           "element": "section",
           "pathSegment": "section"
+        },
+        {
+          "element": "footnotes",
+          "pathSegment": "footnotes"
         }
       ],
       "properties": {
@@ -34,6 +38,12 @@
           "get": true
         },
         "paragraphCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "tableCount": {
           "type": "int",
           "add": false,
           "set": false,
@@ -61,6 +71,10 @@
         {
           "element": "paragraph",
           "pathSegment": "p"
+        },
+        {
+          "element": "table",
+          "pathSegment": "tbl"
         }
       ],
       "properties": {
@@ -87,11 +101,11 @@
         "p"
       ],
       "operations": {
-        "add": false,
+        "add": true,
         "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -101,11 +115,17 @@
       "properties": {
         "text": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "section": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "objects": {
           "type": "int",
           "add": false,
           "set": false,
@@ -136,11 +156,21 @@
           "/section[N]"
         ]
       },
+      "children": [
+        {
+          "element": "header",
+          "pathSegment": "header"
+        },
+        {
+          "element": "footer",
+          "pathSegment": "footer"
+        }
+      ],
       "properties": {
         "name": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "text": {
@@ -163,6 +193,305 @@
           "type"
         ]
       }
+    },
+    {
+      "format": "pages",
+      "element": "table",
+      "parent": "body",
+      "elementAliases": [
+        "tbl"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/body/tbl[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "row",
+          "pathSegment": "tr"
+        }
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "rows": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "columns": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "pages",
+      "element": "row",
+      "parent": "table",
+      "elementAliases": [
+        "tr"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/tbl[N]/tr[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "cell",
+          "pathSegment": "tc"
+        }
+      ],
+      "properties": {
+        "cellCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "pages",
+      "element": "cell",
+      "parent": "row",
+      "elementAliases": [
+        "tc"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/tbl[N]/tr[N]/tc[N]"
+        ]
+      },
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "type": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "pages",
+      "element": "header",
+      "parent": "section",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/section[N]/header[N]"
+        ]
+      },
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "template": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "slot": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "pages",
+      "element": "footer",
+      "parent": "section",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/section[N]/footer[N]"
+        ]
+      },
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "template": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "slot": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "pages",
+      "element": "footnotes",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/footnotes"
+        ]
+      },
+      "children": [
+        {
+          "element": "footnote",
+          "pathSegment": "footnote"
+        }
+      ],
+      "properties": {
+        "count": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "pages",
+      "element": "footnote",
+      "parent": "footnotes",
+      "operations": {
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/footnotes/footnote[N]"
+        ]
+      },
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "mark": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
     }
   ],
   "gaps": [
@@ -170,40 +499,17 @@
       "subject": "element",
       "element": "r",
       "code": "unsupported_capability",
-      "followUp": "0297 Pages text runs (IWORK_API_REQUESTS.md request 13)",
-      "reason": "the Pages leaf exposes body text as plain section text; character runs and their formatting have no public model yet"
+      "followUp": "IWORK_API_REQUESTS.md request 13 (Pages text runs and formatting)",
+      "reason": "the Pages leaf reads and writes body text as plain section text; character runs and their styles have no transaction yet"
     },
     {
-      "subject": "element",
-      "element": "tbl",
-      "code": "unsupported_capability",
-      "followUp": "0297 Pages body tables",
-      "reason": "the Pages leaf's body-table catalog and cell APIs are not wired into the unified tree yet"
-    },
-    {
-      "subject": "element",
+      "subject": "operation",
+      "verb": "get",
       "element": "metadata",
+      "context": "path-read",
       "code": "unsupported_capability",
-      "followUp": "IWORK_API_REQUESTS.md request 14",
-      "reason": "Pages document properties are read through File::metadata(); the leaf has no metadata write transaction"
-    },
-    {
-      "subject": "operation",
-      "verb": "add",
-      "element": "p",
-      "context": "a new paragraph",
-      "code": "unsupported_capability",
-      "followUp": "IWORK_API_REQUESTS.md request 12",
-      "reason": "the Pages leaf has no paragraph insertion transaction"
-    },
-    {
-      "subject": "operation",
-      "verb": "remove",
-      "element": "p",
-      "context": "a paragraph",
-      "code": "unsupported_capability",
-      "followUp": "IWORK_API_REQUESTS.md request 12",
-      "reason": "the Pages leaf has no paragraph removal transaction"
+      "followUp": "record 0299 Pages metadata node",
+      "reason": "`set(\"/metadata\", ..)` writes the document properties through the leaf metadata family; the path is set-only, and reads go through File::metadata()"
     },
     {
       "subject": "operation",
@@ -212,16 +518,52 @@
       "context": "a new section",
       "code": "unsupported_capability",
       "followUp": "IWORK_API_REQUESTS.md request 11",
+      "reason": "the Pages leaf has no section lifecycle transaction (a section break plus a new native section object)"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "section",
+      "context": "a section",
+      "code": "unsupported_capability",
+      "followUp": "IWORK_API_REQUESTS.md request 11",
       "reason": "the Pages leaf has no section lifecycle transaction"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "tc",
+      "context": "a body-table cell",
+      "code": "unsupported_capability",
+      "followUp": "record 0299 follow-up: Pages body-table cell writes",
+      "reason": "the Pages leaf reads body-table cells but has no cell-write transaction (the Numbers cell writer is not shared with Pages)"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "tbl",
+      "context": "a new body table",
+      "code": "unsupported_capability",
+      "followUp": "record 0299 follow-up: Pages body-table creation",
+      "reason": "the Pages leaf deletes body tables but has no table-creation transaction"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "p",
+      "context": "a paragraph that anchors an object",
+      "code": "unsupported_capability",
+      "followUp": "remove the anchored object (`tbl`) itself",
+      "reason": "removing or moving the paragraph would delete or move the inline table, chart, image or footnote it anchors"
     },
     {
       "subject": "operation",
       "verb": "create",
       "element": "document",
-      "context": "a document from scratch",
+      "context": "a document with a fresh identity",
       "code": "unsupported_capability",
-      "followUp": "IWORK_API_REQUESTS.md request 1",
-      "reason": "the Pages leaf has no from-scratch package builder"
+      "followUp": "litchi_pages::builder::Builder with Identity::generate",
+      "reason": "`create` returns the deterministic minimal Pages document (`Package::new`); a fresh document identity is an explicit leaf builder input"
     },
     {
       "subject": "view",

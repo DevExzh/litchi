@@ -77,8 +77,8 @@ fn verify_package(path: &Path, expected: Application) -> Result<(), Box<dyn Erro
     match expected {
         Application::Pages => {
             PagesEditor::open(path)?;
-            let specialized = PagesSemanticDocument::open(path)?;
-            let snapshot = specialized.snapshot();
+            let specialized = litchi_pages::Package::open(path)?.document();
+            let snapshot = specialized.clone();
             let specialized_stats = specialized
                 .stats()
                 .expect("a source-backed Pages document has ingress statistics");
@@ -99,7 +99,7 @@ fn verify_package(path: &Path, expected: Application) -> Result<(), Box<dyn Erro
             let directory_path = path.with_file_name("generated-directory.pages");
             fs::create_dir(&directory_path)?;
             fs::copy(path, directory_path.join("Index.zip"))?;
-            let directory_document = PagesSemanticDocument::open(&directory_path)?;
+            let directory_document = litchi_pages::Package::open(&directory_path)?.document();
             assert_eq!(
                 directory_document.plain_text(),
                 specialized.plain_text(),

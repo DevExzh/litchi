@@ -83,6 +83,7 @@ impl<'f, F: Flavor> Navigate<'f> for Nav<'f, F> {
         if let Some(gap) = F::SPEC.elements[usize::from(kind.ordinal())].gap {
             return Ok(Lookup::Gap(gap));
         }
+        self.file.expand(parent.index());
         let parent_kind = kind_of::<F>(parent);
         if !F::SPEC.elements[usize::from(parent_kind.ordinal())]
             .children
@@ -99,7 +100,23 @@ impl<'f, F: Flavor> Navigate<'f> for Nav<'f, F> {
             .filter(|child| tree.item(*child).kind() == kind.ordinal());
         let found = match step.select {
             Select::None => of_kind.next(),
-            Select::Ordinal(position) => of_kind.nth(position.get()),
+            Select::Ordinal(position) => {
+                // Children of one kind are usually contiguous: try the slot
+                // `position` past the first of them before counting.
+                let children = tree.item(parent.index()).children();
+                let candidate = children
+                    .iter()
+                    .position(|child| tree.item(*child).kind() == kind.ordinal())
+                    .and_then(|first| children.get(first + position.get()))
+                    .copied()
+                    .filter(|child| {
+                        let item = tree.item(*child);
+                        item.kind() == kind.ordinal()
+                            && usize::try_from(item.ordinal())
+                                .is_ok_and(|ordinal| ordinal == position.get())
+                    });
+                candidate.or_else(|| of_kind.nth(position.get()))
+            },
             Select::Last => of_kind.last(),
             Select::Name { name, case } => of_kind.find(|child| {
                 tree.item(*child)
@@ -130,6 +147,7 @@ impl<'f, F: Flavor> Navigate<'f> for Nav<'f, F> {
     }
 
     fn children(&self, parent: &Node<'f>, kinds: KindSet<F::Kind>) -> Result<Children<'f>> {
+        self.file.expand(parent.index());
         let mut mask = 0_u128;
         for element in F::SPEC.elements {
             if kinds.contains(element.kind) {

@@ -289,6 +289,15 @@ pub(crate) const PAGES: &[&str] = &[
     "section[paragraphCount>1]",
     "p[last()]",
     "p:not(:empty)",
+    // Record 0299: anchored objects, body tables, headers, footers and
+    // footnotes.
+    "p[objects>0]",
+    "tbl",
+    "tbl > tr",
+    "tc[type=text]",
+    "header",
+    "footer[template=odd]",
+    "footnote",
 ];
 
 /// Apple Keynote selectors (record 0296).

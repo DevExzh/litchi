@@ -9,10 +9,7 @@
 /// configuration.
 pub mod transaction {
     pub use crate::package::body_table_sort::{
-        BodyTableSortCommit as Commit, BodyTableSortDiagnostics as Diagnostics,
-        BodyTableSortEdit as Edit, BodyTableSortError as Error,
-        BodyTableSortLimitKind as LimitKind, BodyTableSortPatch as Patch,
-        BodyTableSortPath as Path,
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path,
     };
 }
 

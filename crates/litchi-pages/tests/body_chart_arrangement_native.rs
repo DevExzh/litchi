@@ -11,7 +11,10 @@ use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::wire::WireView;
 use litchi_iwa_core::{Archive, SnappyStream};
 use litchi_iwa_protos::tsch;
-use litchi_pages::{BodyChartArrangementError, BodyChartSelector, ChartArrangement, Package};
+use litchi_pages::{
+    BodyChartSelector, ChartArrangement, Package,
+    chart::arrangement::Error as BodyChartArrangementError,
+};
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;

@@ -1,5 +1,6 @@
 use std::io;
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::{
     WireLimits, encode_varint_into,
@@ -8,7 +9,7 @@ use litchi_iwa_common::{
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tp, tsd, tsp, tswp};
 use litchi_pages::{
-    Limits, Package, Position, SectionSelector,
+    Package, Position, SectionSelector,
     section::{
         Background,
         background::{Error, LimitKind},
@@ -790,7 +791,10 @@ fn output_limits_are_atomic() -> TestResult<()> {
         1_024 * 1_024,
         1_024 * 1_024,
     )?;
-    let limited = Package::from_bytes_with_limits(&bytes, limits)?;
+    let limited = Package::from_bytes_with_options(
+        &bytes,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    )?;
     let mut limited_edit = limited.edit_section_background(SectionSelector::index(0))?;
     limited_edit.set_solid(match solid(0.1, 0.2, 0.3, 1.0) {
         Background::Solid(value) => value,

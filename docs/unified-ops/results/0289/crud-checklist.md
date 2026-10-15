@@ -33,7 +33,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | oth | 22 | 205 | 180 | 0 | 21 | 0 | 37 | 26 | 0 |
 | odm | 22 | 205 | 184 | 0 | 17 | 0 | 37 | 26 | 2 |
 | odf | 2 | 19 | 19 | 0 | 0 | 0 | 3 | 2 | 0 |
-| pages | 4 | 25 | 25 | 0 | 0 | 20 | 7 | 0 | 0 |
+| pages | 11 | 85 | 85 | 0 | 0 | 0 | 36 | 2 | 14 |
 | keynote | 4 | 26 | 21 | 1 | 4 | 12 | 10 | 0 | 1 |
 | numbers | 4 | 22 | 22 | 0 | 0 | 20 | 10 | 0 | 0 |
 
@@ -547,15 +547,22 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## pages
 
-- fixtures: `iwork/pages/body-sections-unicode.pages`, `iwork/pages/basic.pages`
-- document views on `iwork/pages/basic.pages`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
+- fixtures: `create()`, `iwork/pages/body-sections-unicode.pages`, `iwork/pages/basic.pages`, `iwork/pages/body-table-read-native.pages`, `create() + add paragraph`, `create() + add paragraph + add footnote`
+- document views on `iwork/pages/body-sections-unicode.pages`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| document | ok | ok | n/a | ok | n/a | gap | gap | gap | gap | n/a | n/a | gap | ok |
-| body | ok | ok | ok | ok | n/a | gap | gap | gap | gap | n/a | n/a | gap | ok |
-| paragraph | ok | ok | ok | ok | ok | gap | gap | gap | gap | ok | ok | gap | ok |
-| section | ok | ok | ok | ok | ok | gap | gap | gap | gap | ok | ok | gap | ok |
+| document | ok | ok | n/a | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| body | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| paragraph | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
+| section | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
+| table | ok | ok | ok | ok | n/a | n/a | ok | refused | refused | n/a | n/a | ok | ok |
+| row | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| cell | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| header | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
+| footer | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
+| footnotes | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| footnote | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 
 ## keynote
 

@@ -1,13 +1,19 @@
 use std::io;
 use std::sync::Arc;
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
 use litchi_iwa_common::{decode_varint_from_bytes, encode_varint_into, wire::WireView};
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tp, tsa, tsk, tsp, tswp};
 use litchi_pages::{
-    Limits, Package, PageLayoutCommit, PageLayoutDiagnostics, PageLayoutEdit, PageLayoutError,
-    PageLayoutLimitKind, PageLayoutPatch,
+    Package,
+    page_layout::transaction::Commit as PageLayoutCommit,
+    page_layout::transaction::Diagnostics as PageLayoutDiagnostics,
+    page_layout::transaction::Edit as PageLayoutEdit,
+    page_layout::transaction::Error as PageLayoutError,
+    page_layout::transaction::LimitKind as PageLayoutLimitKind,
+    page_layout::transaction::Patch as PageLayoutPatch,
     page_layout::{Layout, Orientation},
 };
 use prost::Message as _;
@@ -1035,7 +1041,10 @@ fn output_limit_is_typed_and_failure_atomic() -> TestResult {
         1024 * 1024,
         1024 * 1024,
     )?;
-    let package = Package::from_bytes_with_limits(&bytes, limits)?;
+    let package = Package::from_bytes_with_options(
+        &bytes,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    )?;
     let mut edit = package.edit_page_layout()?;
     edit.set_layout(full_layout()?)?;
     assert!(matches!(

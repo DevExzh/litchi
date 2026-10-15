@@ -37,6 +37,8 @@ pub(crate) struct Item {
     /// paragraph (Pages), slide and text role (Keynote), sheet, table, row
     /// and column (Numbers).
     leaf: [u32; 4],
+    /// The item's position among its parent's children of its kind.
+    ordinal: u32,
 }
 
 impl Item {
@@ -76,6 +78,10 @@ impl Item {
         self.leaf
     }
 
+    pub(crate) const fn ordinal(&self) -> u32 {
+        self.ordinal
+    }
+
     /// The value of the property `key`, if set.
     pub(crate) fn value(&self, key: &str) -> Option<&Value<'static>> {
         let index = self.props.iter().position(|prop| prop.name == key)?;
@@ -104,6 +110,7 @@ impl Tree {
                 children: Vec::new(),
                 path: Box::new([]),
                 leaf: [0; 4],
+                ordinal: 0,
             }],
         }
     }
@@ -126,6 +133,10 @@ pub(crate) struct TreeBuilder<K: 'static> {
     items: Vec<Item>,
     elements: &'static [ElementSpec<K>],
     singletons: &'static [K],
+    /// The children pushed so far, by parent and kind: a push's positional
+    /// step is its ordinal among them (counting would make building
+    /// quadratic in a large parent's child count).
+    ordinals: std::collections::HashMap<(u32, u8), usize>,
 }
 
 /// One item under construction, returned by [`TreeBuilder::push`].
@@ -148,11 +159,13 @@ impl<K: ElementKind> TreeBuilder<K> {
             children: Vec::new(),
             path: Box::new([]),
             leaf: [0; 4],
+            ordinal: 0,
         };
         Self {
             items: vec![item],
             elements,
             singletons,
+            ordinals: std::collections::HashMap::new(),
         }
     }
 
@@ -176,11 +189,11 @@ impl<K: ElementKind> TreeBuilder<K> {
     /// Append an item of `kind` under `parent`. A cell's path step is its
     /// A1 address (`step`); every other kind's is its positional step.
     pub(crate) fn push(&mut self, parent: u32, kind: K) -> Draft<'_, K> {
-        let ordinal = self.items[parent as usize]
-            .children
-            .iter()
-            .filter(|child| self.items[**child as usize].kind == kind.ordinal())
-            .count();
+        let ordinal = self
+            .ordinals
+            .get(&(parent, kind.ordinal()))
+            .copied()
+            .unwrap_or(0);
         let step = if self.singletons.contains(&kind) {
             PathStep::new(kind.name())
         } else {
@@ -211,8 +224,12 @@ impl<K: ElementKind> TreeBuilder<K> {
             children: Vec::new(),
             path: path.into_boxed_slice(),
             leaf: [0; 4],
+            ordinal: 0,
         });
         self.items[parent as usize].children.push(index);
+        let ordinal = self.ordinals.entry((parent, kind.ordinal())).or_insert(0);
+        self.items[index as usize].ordinal = u32::try_from(*ordinal).unwrap_or(u32::MAX);
+        *ordinal += 1;
         Draft {
             builder: self,
             index,

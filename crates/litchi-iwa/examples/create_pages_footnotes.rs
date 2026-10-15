@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("inserted footnote was not found")?;
     let mut edit = inserted
         .package()
-        .edit_body_footnote(Selector::At(footnote.position))?;
+        .edit_body_footnote(Selector::Anchor(footnote.position))?;
     edit.set(FOOTNOTE_TEXT)?;
     let commit = edit.commit()?;
     save_new(&output, commit.package())?;

@@ -13,7 +13,7 @@ use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::pages_page_layout_codec::{
     self, DecodeOptions as PageLayoutDecodeOptions, PageLayoutSnapshot, WireResourceLimit,
 };
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::{Package, PackageError};
 use crate::page_layout::{self, Layout, Orientation};
@@ -41,7 +41,7 @@ const ORIENTATION_FIELD: u32 = 42;
 /// A finite resource enforced while reading or publishing a page-layout edit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum PageLayoutLimitKind {
+pub enum LimitKind {
     /// Complete package input bytes.
     InputBytes,
     /// Complete edited package output bytes.
@@ -74,7 +74,7 @@ pub enum PageLayoutLimitKind {
     WireWork,
 }
 
-impl fmt::Display for PageLayoutLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -100,9 +100,9 @@ impl fmt::Display for PageLayoutLimitKind {
 ///
 /// Display output never exposes package bytes, member names, object
 /// identifiers, or retained patch artifacts.
-#[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, ThisError, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum PageLayoutError {
+pub enum Error {
     /// The requested value violates an archive-free page-layout invariant.
     #[error("invalid Pages page layout: {0}")]
     InvalidLayout(#[source] page_layout::Error),
@@ -116,7 +116,7 @@ pub enum PageLayoutError {
     #[error("Pages page-layout {kind} limit exceeded: observed {observed}, maximum {maximum}")]
     LimitExceeded {
         /// Resource category that exceeded its ceiling.
-        kind: PageLayoutLimitKind,
+        kind: LimitKind,
         /// Observed or requested resource amount.
         observed: u64,
         /// Configured maximum.
@@ -137,22 +137,22 @@ pub enum PageLayoutError {
 }
 
 /// A document-wide page layout staged against one immutable package snapshot.
-pub struct PageLayoutEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
     before: Layout,
     layout: Layout,
 }
 
-impl fmt::Debug for PageLayoutEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("PageLayoutEdit")
+            .debug_struct("Edit")
             .field("layout", &self.layout)
             .finish_non_exhaustive()
     }
 }
 
-impl PageLayoutEdit<'_> {
+impl Edit<'_> {
     /// Return the lossless layout that would be published.
     #[must_use]
     pub const fn layout(&self) -> Layout {
@@ -163,14 +163,14 @@ impl PageLayoutEdit<'_> {
     ///
     /// # Errors
     ///
-    /// Returns [`PageLayoutError::InvalidLayout`] without changing the staged
+    /// Returns [`Error::InvalidLayout`] without changing the staged
     /// value when `layout` violates an archive-free semantic invariant.
     ///
     /// # Costs
     ///
     /// Validation is constant-time and does not inspect the package.
-    pub fn set_layout(&mut self, layout: Layout) -> Result<&mut Self, PageLayoutError> {
-        layout.validate().map_err(PageLayoutError::InvalidLayout)?;
+    pub fn set_layout(&mut self, layout: Layout) -> Result<&mut Self, Error> {
+        layout.validate().map_err(Error::InvalidLayout)?;
         self.layout = layout;
         Ok(self)
     }
@@ -200,20 +200,18 @@ impl PageLayoutEdit<'_> {
     /// allocation. A changed commit scans the selected ownership graph,
     /// rewrites at most two component payloads, reassembles the package, and
     /// fully reopens and verifies the candidate under the source limits.
-    pub fn commit(self) -> Result<PageLayoutCommit, PageLayoutError> {
-        self.layout
-            .validate()
-            .map_err(PageLayoutError::InvalidLayout)?;
+    pub fn commit(self) -> Result<Commit, Error> {
+        self.layout.validate().map_err(Error::InvalidLayout)?;
         if page_layout(self.source)? != self.before {
-            return Err(PageLayoutError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let source_catalog = &self.source.state.source;
         let source = source_catalog.shared_source();
         let source_fingerprint = fingerprint(&source);
         if self.before == self.layout {
-            return Ok(PageLayoutCommit {
-                package: self.source.snapshot(),
-                patch: PageLayoutPatch {
+            return Ok(Commit {
+                package: self.source.clone(),
+                patch: Patch {
                     source: Arc::clone(&source),
                     target: source,
                     source_fingerprint,
@@ -226,11 +224,11 @@ impl PageLayoutEdit<'_> {
                     target_preview_count: 0,
                     touched_components: 0,
                 },
-                diagnostics: PageLayoutDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         if !source_catalog.source_is_exact() {
-            return Err(PageLayoutError::UnsupportedSource);
+            return Err(Error::UnsupportedSource);
         }
 
         let source_layout_state = view_state_layout_identifier(self.source)?;
@@ -243,9 +241,9 @@ impl PageLayoutEdit<'_> {
         let target_layout_state = view_state_layout_identifier(&package)?;
         let target_preview_count = preview_count(&package);
         let deleted_previews = source_preview_count.saturating_sub(target_preview_count);
-        Ok(PageLayoutCommit {
+        Ok(Commit {
             package,
-            patch: PageLayoutPatch {
+            patch: Patch {
                 source,
                 target,
                 source_fingerprint,
@@ -258,7 +256,7 @@ impl PageLayoutEdit<'_> {
                 target_preview_count,
                 touched_components,
             },
-            diagnostics: PageLayoutDiagnostics::published(touched_components, deleted_previews),
+            diagnostics: Diagnostics::published(touched_components, deleted_previews),
         })
     }
 }
@@ -268,7 +266,7 @@ impl PageLayoutEdit<'_> {
 /// Exact artifacts and ownership facts are retained privately. Exposed
 /// fingerprints are compact diagnostics, not a substitute for exact matching.
 #[derive(Clone, PartialEq)]
-pub struct PageLayoutPatch {
+pub struct Patch {
     source: Arc<[u8]>,
     target: Arc<[u8]>,
     source_fingerprint: u64,
@@ -282,17 +280,17 @@ pub struct PageLayoutPatch {
     touched_components: usize,
 }
 
-impl fmt::Debug for PageLayoutPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("PageLayoutPatch")
+            .debug_struct("Patch")
             .field("before", &self.before)
             .field("after", &self.after)
             .finish_non_exhaustive()
     }
 }
 
-impl PageLayoutPatch {
+impl Patch {
     /// Return the semantic layout required from the patch source.
     #[must_use]
     pub const fn before(&self) -> Layout {
@@ -347,14 +345,14 @@ impl PageLayoutPatch {
 
 /// Compact evidence describing one page-layout commit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct PageLayoutDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     deleted_previews: usize,
     full_reparse_performed: bool,
 }
 
-impl PageLayoutDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -401,13 +399,13 @@ impl PageLayoutDiagnostics {
 /// The fully verified result of one immutable page-layout transaction.
 #[must_use = "a Pages page-layout commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct PageLayoutCommit {
+pub struct Commit {
     package: Package,
-    patch: PageLayoutPatch,
-    diagnostics: PageLayoutDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl PageLayoutCommit {
+impl Commit {
     /// Borrow the fully reopened immutable package snapshot.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -422,13 +420,13 @@ impl PageLayoutCommit {
 
     /// Borrow the reversible exact-source patch.
     #[must_use]
-    pub const fn patch(&self) -> &PageLayoutPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Borrow compact publication diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> &PageLayoutDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -444,7 +442,7 @@ impl Package {
     /// # Costs
     ///
     /// Decodes one bounded document payload without modifying the package.
-    pub fn page_layout(&self) -> Result<Layout, PageLayoutError> {
+    pub fn page_layout(&self) -> Result<Layout, Error> {
         page_layout(self)
     }
 
@@ -458,9 +456,9 @@ impl Package {
     ///
     /// Decodes one bounded document payload and retains only semantic values
     /// plus a borrow of this immutable package.
-    pub fn edit_page_layout(&self) -> Result<PageLayoutEdit<'_>, PageLayoutError> {
+    pub fn edit_page_layout(&self) -> Result<Edit<'_>, Error> {
         let before = page_layout(self)?;
-        Ok(PageLayoutEdit {
+        Ok(Edit {
             source: self,
             before,
             layout: before,
@@ -475,7 +473,7 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`PageLayoutError::PatchConflict`] unless this package exactly
+    /// Returns [`Error::PatchConflict`] unless this package exactly
     /// matches the patch source, or another typed error if the retained target
     /// cannot be safely reopened and verified under the source limits.
     ///
@@ -484,34 +482,31 @@ impl Package {
     /// Exact matching scans package bytes unless allocations are shared. A
     /// changed apply also reopens the complete retained target and verifies its
     /// layout, cache invalidation, previews, and preserved document semantics.
-    pub fn apply_page_layout(
-        &self,
-        patch: &PageLayoutPatch,
-    ) -> Result<PageLayoutCommit, PageLayoutError> {
+    pub fn apply_page_layout(&self, patch: &Patch) -> Result<Commit, Error> {
         let source_catalog = &self.state.source;
         let source = source_catalog.shared_source();
         let exact_source = Arc::ptr_eq(&source, &patch.source)
             || (fingerprint(source_catalog.source_bytes()) == patch.source_fingerprint
                 && source_catalog.source_bytes() == patch.source.as_ref());
         if !exact_source || page_layout(self)? != patch.before {
-            return Err(PageLayoutError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if patch.is_noop() {
-            return Ok(PageLayoutCommit {
-                package: self.snapshot(),
+            return Ok(Commit {
+                package: self.clone(),
                 patch: patch.clone(),
-                diagnostics: PageLayoutDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         if view_state_layout_identifier(self)? != patch.source_layout_state
             || preview_count(self) != patch.source_preview_count
         {
-            return Err(PageLayoutError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if !source_catalog.source_is_exact()
             || fingerprint(&patch.target) != patch.target_fingerprint
         {
-            return Err(PageLayoutError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let candidate_source = SourceCatalog::from_shared_bytes_with_limits(
             Arc::clone(&patch.target),
@@ -530,13 +525,10 @@ impl Package {
         let deleted_previews = patch
             .source_preview_count
             .saturating_sub(patch.target_preview_count);
-        Ok(PageLayoutCommit {
+        Ok(Commit {
             package: candidate,
             patch: patch.clone(),
-            diagnostics: PageLayoutDiagnostics::published(
-                patch.touched_components,
-                deleted_previews,
-            ),
+            diagnostics: Diagnostics::published(patch.touched_components, deleted_previews),
         })
     }
 }
@@ -554,19 +546,19 @@ enum LayoutScalar {
     Varint(u64),
 }
 
-fn page_layout(package: &Package) -> Result<Layout, PageLayoutError> {
+fn page_layout(package: &Package) -> Result<Layout, Error> {
     let (_component_name, _object_identifier, payload) = document_payload(package)?;
     strict_layout(payload, wire_limits(package)?)
 }
 
-fn document_payload(package: &Package) -> Result<(&str, u64, &[u8]), PageLayoutError> {
+fn document_payload(package: &Package) -> Result<(&str, u64, &[u8]), Error> {
     let mut found = None;
     for component in package.state.source.components().iter() {
         let Some(object) = component.archive().object(DOCUMENT_IDENTIFIER) else {
             continue;
         };
         if found.is_some() {
-            return Err(PageLayoutError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let (_index, message) = unique_message(object, DOCUMENT_MESSAGE_TYPE)?;
         found = Some((
@@ -575,16 +567,15 @@ fn document_payload(package: &Package) -> Result<(&str, u64, &[u8]), PageLayoutE
             message.data.as_slice(),
         ));
     }
-    found.ok_or(PageLayoutError::InvalidSource)
+    found.ok_or(Error::InvalidSource)
 }
 
-fn strict_layout(payload: &[u8], limits: WireLimits) -> Result<Layout, PageLayoutError> {
-    let recursion =
-        u32::try_from(limits.max_nesting()).map_err(|_error| PageLayoutError::LimitExceeded {
-            kind: PageLayoutLimitKind::WireNesting,
-            observed: usize_to_u64(limits.max_nesting()),
-            maximum: u64::from(u32::MAX),
-        })?;
+fn strict_layout(payload: &[u8], limits: WireLimits) -> Result<Layout, Error> {
+    let recursion = u32::try_from(limits.max_nesting()).map_err(|_error| Error::LimitExceeded {
+        kind: LimitKind::WireNesting,
+        observed: usize_to_u64(limits.max_nesting()),
+        maximum: u64::from(u32::MAX),
+    })?;
     let projected = pages_page_layout_codec::decode_page_layout(
         payload,
         PageLayoutDecodeOptions::new(
@@ -598,7 +589,7 @@ fn strict_layout(payload: &[u8], limits: WireLimits) -> Result<Layout, PageLayou
     projected_layout(projected)
 }
 
-fn projected_layout(snapshot: PageLayoutSnapshot) -> Result<Layout, PageLayoutError> {
+fn projected_layout(snapshot: PageLayoutSnapshot) -> Result<Layout, Error> {
     Layout::new(
         snapshot.page_width(),
         snapshot.page_height(),
@@ -612,25 +603,23 @@ fn projected_layout(snapshot: PageLayoutSnapshot) -> Result<Layout, PageLayoutEr
         snapshot.orientation().map(Orientation::from_raw),
         snapshot.lays_out_body_vertically(),
     )
-    .map_err(PageLayoutError::InvalidLayout)
+    .map_err(Error::InvalidLayout)
 }
 
-fn strict_varint(field: WireFieldView<'_>) -> Result<u64, PageLayoutError> {
+fn strict_varint(field: WireFieldView<'_>) -> Result<u64, Error> {
     field.validate_canonical_key().map_err(map_wire_error)?;
-    let (value, consumed) = decode_varint_from_bytes(field.payload())
-        .map_err(|_error| PageLayoutError::InvalidSource)?;
+    let (value, consumed) =
+        decode_varint_from_bytes(field.payload()).map_err(|_error| Error::InvalidSource)?;
     if consumed != field.payload().len() || encoded_len(value) != consumed {
-        return Err(PageLayoutError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(value)
 }
 
-pub(super) fn view_state_location(
-    package: &Package,
-) -> Result<Option<ViewStateLocation>, PageLayoutError> {
+pub(super) fn view_state_location(package: &Package) -> Result<Option<ViewStateLocation>, Error> {
     let limits = wire_limits(package)?;
     let (_document_component, document_object) =
-        object_location(package, DOCUMENT_IDENTIFIER)?.ok_or(PageLayoutError::InvalidSource)?;
+        object_location(package, DOCUMENT_IDENTIFIER)?.ok_or(Error::InvalidSource)?;
     let (document_message_index, document_message) =
         unique_message(document_object, DOCUMENT_MESSAGE_TYPE)?;
     validate_selected_metadata(document_object, document_message_index)?;
@@ -640,10 +629,10 @@ pub(super) fn view_state_location(
         || singular_reference(&document_view, DOCUMENT_DEPRECATED_VIEW_STATE_FIELD, limits)?
             .is_some()
     {
-        return Err(PageLayoutError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
-    let super_payload = singular_bytes(&document_view, DOCUMENT_SUPER_FIELD, true)?
-        .ok_or(PageLayoutError::InvalidSource)?;
+    let super_payload =
+        singular_bytes(&document_view, DOCUMENT_SUPER_FIELD, true)?.ok_or(Error::InvalidSource)?;
     let shared_document =
         WireView::parse_with_limits(super_payload, limits).map_err(map_wire_error)?;
     let Some(view_state_identifier) =
@@ -663,27 +652,27 @@ pub(super) fn view_state_location(
         &[DOCUMENT_SUPER_FIELD, SHARED_DOCUMENT_VIEW_STATE_FIELD],
     )?;
     let (_component, view_state) =
-        object_location(package, view_state_identifier)?.ok_or(PageLayoutError::InvalidSource)?;
+        object_location(package, view_state_identifier)?.ok_or(Error::InvalidSource)?;
     let (view_state_message_index, view_state_message) =
         unique_message(view_state, SHARED_VIEW_STATE_MESSAGE_TYPE)?;
     let view_state_payload =
         WireView::parse_with_limits(&view_state_message.data, limits).map_err(map_wire_error)?;
     let view_state_root_identifier =
         singular_reference(&view_state_payload, SHARED_VIEW_STATE_ROOT_FIELD, limits)?
-            .ok_or(PageLayoutError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     validate_reference_metadata(
         view_state,
         view_state_message_index,
         view_state_root_identifier,
         &[SHARED_VIEW_STATE_ROOT_FIELD],
     )?;
-    let (component_name, root) = object_location(package, view_state_root_identifier)?
-        .ok_or(PageLayoutError::InvalidSource)?;
+    let (component_name, root) =
+        object_location(package, view_state_root_identifier)?.ok_or(Error::InvalidSource)?;
     let (root_message_index, root_message) = unique_message(root, VIEW_STATE_ROOT_MESSAGE_TYPE)?;
     validate_selected_metadata(root, root_message_index)?;
     let (layout_identifier, ui_identifier) = strict_view_state_root(&root_message.data, limits)?;
     if layout_identifier.is_some() && layout_identifier == ui_identifier {
-        return Err(PageLayoutError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let Some(selected_layout_identifier) = layout_identifier else {
         reject_stale_field_references(root, root_message_index, &[VIEW_STATE_LAYOUT_FIELD])?;
@@ -706,14 +695,14 @@ pub(super) fn view_state_location(
 pub(super) fn object_location(
     package: &Package,
     identifier: u64,
-) -> Result<Option<(&str, &ArchiveObject)>, PageLayoutError> {
+) -> Result<Option<(&str, &ArchiveObject)>, Error> {
     let mut found = None;
     for component in package.state.source.components().iter() {
         let Some(object) = component.archive().object(identifier) else {
             continue;
         };
         if found.is_some() {
-            return Err(PageLayoutError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         found = Some((component.name(), object));
     }
@@ -724,17 +713,17 @@ fn singular_bytes<'a>(
     view: &WireView<'a>,
     field_number: u32,
     required: bool,
-) -> Result<Option<&'a [u8]>, PageLayoutError> {
+) -> Result<Option<&'a [u8]>, Error> {
     let mut selected = None;
     for field in view.fields().filter(|field| field.number() == field_number) {
         if selected.is_some() || field.wire_type() != 2 {
-            return Err(PageLayoutError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field.validate_canonical_framing().map_err(map_wire_error)?;
         selected = Some(field.payload());
     }
     if required && selected.is_none() {
-        return Err(PageLayoutError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(selected)
 }
@@ -743,22 +732,20 @@ fn singular_reference(
     view: &WireView<'_>,
     field_number: u32,
     limits: WireLimits,
-) -> Result<Option<u64>, PageLayoutError> {
+) -> Result<Option<u64>, Error> {
     singular_bytes(view, field_number, false)?
         .map(|payload| strict_reference(payload, limits))
         .transpose()
 }
 
-pub(super) fn view_state_layout_identifier(
-    package: &Package,
-) -> Result<Option<u64>, PageLayoutError> {
+pub(super) fn view_state_layout_identifier(package: &Package) -> Result<Option<u64>, Error> {
     Ok(view_state_location(package)?.map(|location| location.layout_identifier))
 }
 
 fn strict_view_state_root(
     payload: &[u8],
     limits: WireLimits,
-) -> Result<(Option<u64>, Option<u64>), PageLayoutError> {
+) -> Result<(Option<u64>, Option<u64>), Error> {
     let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
     let mut layout = None;
     let mut ui = None;
@@ -769,7 +756,7 @@ fn strict_view_state_root(
             _ => continue,
         };
         if destination.is_some() || field.wire_type() != 2 {
-            return Err(PageLayoutError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field.validate_canonical_framing().map_err(map_wire_error)?;
         *destination = Some(strict_reference(field.payload(), limits)?);
@@ -777,7 +764,7 @@ fn strict_view_state_root(
     Ok((layout, ui))
 }
 
-fn strict_reference(payload: &[u8], limits: WireLimits) -> Result<u64, PageLayoutError> {
+fn strict_reference(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
     let view = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
     let mut identifier = None;
     let mut deprecated_type_seen = false;
@@ -786,29 +773,29 @@ fn strict_reference(payload: &[u8], limits: WireLimits) -> Result<u64, PageLayou
         match field.number() {
             REFERENCE_IDENTIFIER_FIELD => {
                 if identifier.is_some() || field.wire_type() != 0 {
-                    return Err(PageLayoutError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 identifier = Some(strict_varint(field)?);
             },
             REFERENCE_TYPE_FIELD => {
                 if std::mem::replace(&mut deprecated_type_seen, true) || field.wire_type() != 0 {
-                    return Err(PageLayoutError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 strict_varint(field)?;
             },
             REFERENCE_EXTERNAL_FIELD => {
                 if std::mem::replace(&mut external_seen, true) || field.wire_type() != 0 {
-                    return Err(PageLayoutError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 if strict_varint(field)? != 0 {
-                    return Err(PageLayoutError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
             },
             _ => {},
         }
     }
     match identifier {
-        Some(0) | None => Err(PageLayoutError::InvalidSource),
+        Some(0) | None => Err(Error::InvalidSource),
         Some(selected_identifier) => Ok(selected_identifier),
     }
 }
@@ -818,12 +805,12 @@ fn rewrite_page_layout(
     before: Layout,
     after: Layout,
     source_layout_state: Option<u64>,
-) -> Result<(Package, usize), PageLayoutError> {
+) -> Result<(Package, usize), Error> {
     let source_catalog = &source.state.source;
     let root_component = try_owned(document_payload(source)?.0)?;
     let view_location = view_state_location(source)?;
     if view_location.as_ref().map(|value| value.layout_identifier) != source_layout_state {
-        return Err(PageLayoutError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let shared_component = view_location
         .as_ref()
@@ -847,7 +834,7 @@ fn rewrite_page_layout(
     let mut compressed = Vec::new();
     compressed
         .try_reserve_exact(usize::from(view_compressed.is_some()) + 1)
-        .map_err(|_allocation| PageLayoutError::Allocation { amount: 2 })?;
+        .map_err(|_allocation| Error::Allocation { amount: 2 })?;
     compressed.push((root_component, root_compressed));
     if let (Some(location), Some(bytes)) = (view_location, view_compressed) {
         compressed.push((location.component_name, bytes));
@@ -855,7 +842,7 @@ fn rewrite_page_layout(
     let mut edits = Vec::new();
     edits
         .try_reserve_exact(compressed.len())
-        .map_err(|_allocation| PageLayoutError::Allocation {
+        .map_err(|_allocation| Error::Allocation {
             amount: compressed.len(),
         })?;
     for (name, bytes) in &compressed {
@@ -864,7 +851,7 @@ fn rewrite_page_layout(
     let mut deleted_previews = Vec::new();
     deleted_previews
         .try_reserve_exact(PREVIEW_ENTRY_NAMES.len())
-        .map_err(|_allocation| PageLayoutError::Allocation {
+        .map_err(|_allocation| Error::Allocation {
             amount: PREVIEW_ENTRY_NAMES.len(),
         })?;
     for name in PREVIEW_ENTRY_NAMES {
@@ -898,20 +885,20 @@ fn rewrite_document_component(
     before: Layout,
     after: Layout,
     view_location: Option<&ViewStateLocation>,
-) -> Result<Vec<u8>, PageLayoutError> {
+) -> Result<Vec<u8>, Error> {
     let (mut archive, limits) = editable_archive(source, component_name)?;
     {
         let object = archive
             .object_mut(DOCUMENT_IDENTIFIER)
-            .ok_or(PageLayoutError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let (message_index, message) = unique_message(object, DOCUMENT_MESSAGE_TYPE)?;
         validate_selected_metadata(object, message_index)?;
         if strict_layout(&message.data, wire_limits(source)?)? != before {
-            return Err(PageLayoutError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let rewritten = rewrite_layout_payload(&message.data, before, after, wire_limits(source)?)?;
         if strict_layout(&rewritten, wire_limits(source)?)? != after {
-            return Err(PageLayoutError::Verification);
+            return Err(Error::Verification);
         }
         object
             .replace_message_preserving_header_with_limits(
@@ -933,7 +920,7 @@ fn rewrite_document_component(
 fn rewrite_view_state_component(
     source: &Package,
     location: &ViewStateLocation,
-) -> Result<Vec<u8>, PageLayoutError> {
+) -> Result<Vec<u8>, Error> {
     let (mut archive, limits) = editable_archive(source, &location.component_name)?;
     invalidate_view_state_in_archive(source, &mut archive, location, limits)?;
     compress_archive(archive, limits)
@@ -944,15 +931,15 @@ pub(super) fn invalidate_view_state_in_archive(
     archive: &mut Archive,
     location: &ViewStateLocation,
     limits: litchi_iwa_core::Limits,
-) -> Result<(), PageLayoutError> {
+) -> Result<(), Error> {
     let object = archive
         .object_mut(location.object_identifier)
-        .ok_or(PageLayoutError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let (message_index, message) = unique_message(object, VIEW_STATE_ROOT_MESSAGE_TYPE)?;
     validate_selected_metadata(object, message_index)?;
     let (layout, ui) = strict_view_state_root(&message.data, wire_limits(source)?)?;
     if layout != Some(location.layout_identifier) || ui == layout {
-        return Err(PageLayoutError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     validate_reference_metadata(
         object,
@@ -967,7 +954,7 @@ pub(super) fn invalidate_view_state_in_archive(
         .0
         .is_some()
     {
-        return Err(PageLayoutError::Verification);
+        return Err(Error::Verification);
     }
     object
         .replace_message_pruning_object_references_preserving_header_with_limits(
@@ -988,7 +975,7 @@ fn rewrite_layout_payload(
     before: Layout,
     after: Layout,
     limits: WireLimits,
-) -> Result<Vec<u8>, PageLayoutError> {
+) -> Result<Vec<u8>, Error> {
     let view = WireView::parse_with_limits(source, limits).map_err(map_wire_error)?;
     let mut output_length = source.len();
     let mut output_fields = view.len();
@@ -1001,7 +988,7 @@ fn rewrite_layout_payload(
             continue;
         };
         if selected_lengths[index].replace(field.raw().len()).is_some() {
-            return Err(PageLayoutError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     for (index, field_number) in selected_layout_fields().into_iter().enumerate() {
@@ -1013,26 +1000,22 @@ fn rewrite_layout_payload(
         if let Some(field_length) = selected_lengths[index] {
             output_length = output_length
                 .checked_sub(field_length)
-                .ok_or(PageLayoutError::InvalidSource)?;
-            output_fields = output_fields
-                .checked_sub(1)
-                .ok_or(PageLayoutError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
+            output_fields = output_fields.checked_sub(1).ok_or(Error::InvalidSource)?;
         }
         if let Some(value) = after_value {
             output_length = output_length
                 .checked_add(encoded_layout_scalar_length(field_number, value))
                 .ok_or_else(|| output_limit_error(usize::MAX, limits))?;
-            output_fields = output_fields
-                .checked_add(1)
-                .ok_or(PageLayoutError::InvalidSource)?;
+            output_fields = output_fields.checked_add(1).ok_or(Error::InvalidSource)?;
         }
     }
     if output_length > limits.max_output_bytes() {
         return Err(output_limit_error(output_length, limits));
     }
     if output_fields > limits.max_fields() {
-        return Err(PageLayoutError::LimitExceeded {
-            kind: PageLayoutLimitKind::WireFields,
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::WireFields,
             observed: usize_to_u64(output_fields),
             maximum: usize_to_u64(limits.max_fields()),
         });
@@ -1050,7 +1033,7 @@ fn rewrite_layout_payload(
     let mut output = Vec::new();
     output
         .try_reserve_exact(output_length)
-        .map_err(|_allocation| PageLayoutError::Allocation {
+        .map_err(|_allocation| Error::Allocation {
             amount: output_length,
         })?;
     let mut emitted = [false; 11];
@@ -1079,7 +1062,7 @@ fn rewrite_layout_payload(
         }
     }
     if output.len() != output_length {
-        return Err(PageLayoutError::Verification);
+        return Err(Error::Verification);
     }
     Ok(output)
 }
@@ -1132,17 +1115,17 @@ fn append_layout_scalar(output: &mut Vec<u8>, field_number: u32, scalar: LayoutS
     }
 }
 
-fn output_limit_error(observed: usize, limits: WireLimits) -> PageLayoutError {
-    PageLayoutError::LimitExceeded {
-        kind: PageLayoutLimitKind::OutputBytes,
+fn output_limit_error(observed: usize, limits: WireLimits) -> Error {
+    Error::LimitExceeded {
+        kind: LimitKind::OutputBytes,
         observed: usize_to_u64(observed),
         maximum: usize_to_u64(limits.max_output_bytes()),
     }
 }
 
-fn work_limit_error(observed: usize, limits: WireLimits) -> PageLayoutError {
-    PageLayoutError::LimitExceeded {
-        kind: PageLayoutLimitKind::WireWork,
+fn work_limit_error(observed: usize, limits: WireLimits) -> Error {
+    Error::LimitExceeded {
+        kind: LimitKind::WireWork,
         observed: usize_to_u64(observed),
         maximum: usize_to_u64(limits.max_rewrite_work()),
     }
@@ -1165,15 +1148,15 @@ fn layout_float_values(layout: Layout) -> [Option<f32>; 9] {
 pub(super) fn editable_archive(
     package: &Package,
     component_name: &str,
-) -> Result<(Archive, litchi_iwa_core::Limits), PageLayoutError> {
+) -> Result<(Archive, litchi_iwa_core::Limits), Error> {
     let source = &package.state.source;
     let entry = source
         .package()
         .iter()
         .find(|entry| entry.name() == component_name)
-        .ok_or(PageLayoutError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(PageLayoutError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let limits = source
         .limits()
@@ -1192,7 +1175,7 @@ pub(super) fn editable_archive(
 pub(super) fn compress_archive(
     archive: Archive,
     limits: litchi_iwa_core::Limits,
-) -> Result<Vec<u8>, PageLayoutError> {
+) -> Result<Vec<u8>, Error> {
     let bytes = archive
         .to_bytes_with_limits(limits)
         .map_err(map_core_error)?;
@@ -1203,15 +1186,15 @@ pub(super) fn compress_archive(
 pub(super) fn unique_message(
     object: &ArchiveObject,
     message_type: u32,
-) -> Result<(usize, &RawMessage), PageLayoutError> {
+) -> Result<(usize, &RawMessage), Error> {
     let mut matches = object
         .messages
         .iter()
         .enumerate()
         .filter(|(_index, message)| message.type_ == message_type);
-    let result = matches.next().ok_or(PageLayoutError::InvalidSource)?;
+    let result = matches.next().ok_or(Error::InvalidSource)?;
     if matches.next().is_some() {
-        return Err(PageLayoutError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(result)
 }
@@ -1219,12 +1202,12 @@ pub(super) fn unique_message(
 pub(super) fn validate_selected_metadata(
     object: &ArchiveObject,
     message_index: usize,
-) -> Result<(), PageLayoutError> {
+) -> Result<(), Error> {
     let message = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(PageLayoutError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if object.archive_info.should_merge == Some(true)
         || message.base_message_index.is_some()
         || !message.diff_merge_version.is_empty()
@@ -1232,7 +1215,7 @@ pub(super) fn validate_selected_metadata(
         || !message.fields_to_remove.is_empty()
         || !message.diff_read_version.is_empty()
     {
-        return Err(PageLayoutError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -1242,20 +1225,20 @@ pub(super) fn validate_reference_metadata(
     message_index: usize,
     identifier: u64,
     accepted_path: &[u32],
-) -> Result<(), PageLayoutError> {
+) -> Result<(), Error> {
     validate_selected_metadata(object, message_index)?;
     let info = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(PageLayoutError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let aggregate_occurrences = info
         .object_references
         .iter()
         .filter(|candidate| **candidate == identifier)
         .count();
     if aggregate_occurrences != 1 {
-        return Err(PageLayoutError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut field_declaration_seen = false;
     for field in &info.field_infos {
@@ -1271,7 +1254,7 @@ pub(super) fn validate_reference_metadata(
             || std::mem::replace(&mut field_declaration_seen, true)
             || field.path.as_slice() != accepted_path
         {
-            return Err(PageLayoutError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(())
@@ -1281,19 +1264,19 @@ fn reject_stale_field_references(
     object: &ArchiveObject,
     message_index: usize,
     path: &[u32],
-) -> Result<(), PageLayoutError> {
+) -> Result<(), Error> {
     validate_selected_metadata(object, message_index)?;
     let info = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(PageLayoutError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if info
         .field_infos
         .iter()
         .any(|field| field.path.as_slice() == path && !field.object_references.is_empty())
     {
-        return Err(PageLayoutError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -1302,23 +1285,23 @@ fn validate_layout_absent_metadata(
     object: &ArchiveObject,
     message_index: usize,
     ui_identifier: Option<u64>,
-) -> Result<(), PageLayoutError> {
+) -> Result<(), Error> {
     let info = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(PageLayoutError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if info
         .object_references
         .iter()
         .any(|identifier| Some(*identifier) != ui_identifier)
     {
-        return Err(PageLayoutError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if let Some(identifier) = ui_identifier {
         validate_reference_metadata(object, message_index, identifier, &[VIEW_STATE_UI_FIELD])?;
     } else if !info.object_references.is_empty() {
-        return Err(PageLayoutError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -1326,39 +1309,37 @@ fn validate_layout_absent_metadata(
 fn validate_canonical_object_length_prefixes(
     source: &[u8],
     archive: &Archive,
-) -> Result<(), PageLayoutError> {
+) -> Result<(), Error> {
     for object in &archive.objects {
-        let offset = usize::try_from(object.header_offset)
-            .map_err(|_error| PageLayoutError::InvalidSource)?;
-        let remaining = source.get(offset..).ok_or(PageLayoutError::InvalidSource)?;
+        let offset =
+            usize::try_from(object.header_offset).map_err(|_error| Error::InvalidSource)?;
+        let remaining = source.get(offset..).ok_or(Error::InvalidSource)?;
         let (header_bytes, prefix_bytes) =
-            decode_varint_from_bytes(remaining).map_err(|_error| PageLayoutError::InvalidSource)?;
+            decode_varint_from_bytes(remaining).map_err(|_error| Error::InvalidSource)?;
         if prefix_bytes != encoded_len(header_bytes) {
-            return Err(PageLayoutError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let framed_header_bytes = header_bytes
-            .checked_add(
-                u64::try_from(prefix_bytes).map_err(|_error| PageLayoutError::InvalidSource)?,
-            )
-            .ok_or(PageLayoutError::InvalidSource)?;
+            .checked_add(u64::try_from(prefix_bytes).map_err(|_error| Error::InvalidSource)?)
+            .ok_or(Error::InvalidSource)?;
         if framed_header_bytes != object.header_length
             || object
                 .header_offset
                 .checked_add(object.header_length)
-                .ok_or(PageLayoutError::InvalidSource)?
+                .ok_or(Error::InvalidSource)?
                 != object.data_offset
         {
-            return Err(PageLayoutError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(())
 }
 
-pub(super) fn try_owned(source: &str) -> Result<String, PageLayoutError> {
+pub(super) fn try_owned(source: &str) -> Result<String, Error> {
     let mut value = String::new();
     value
         .try_reserve_exact(source.len())
-        .map_err(|_allocation| PageLayoutError::Allocation {
+        .map_err(|_allocation| Error::Allocation {
             amount: source.len(),
         })?;
     value.push_str(source);
@@ -1385,14 +1366,14 @@ fn verify_candidate(
     expected: Layout,
     expected_layout_state: Option<u64>,
     expected_preview_count: usize,
-) -> Result<(), PageLayoutError> {
+) -> Result<(), Error> {
     if page_layout(candidate)? != expected
         || view_state_layout_identifier(candidate)? != expected_layout_state
         || preview_count(candidate) != expected_preview_count
         || source.stats() != candidate.stats()
         || source.sections().len() != candidate.sections().len()
     {
-        return Err(PageLayoutError::Verification);
+        return Err(Error::Verification);
     }
     for (before, after) in source.sections().iter().zip(candidate.sections()) {
         if before.name() != after.name()
@@ -1402,13 +1383,13 @@ fn verify_candidate(
             || before.text_storages() != after.text_storages()
             || before.page_count() != after.page_count()
         {
-            return Err(PageLayoutError::Verification);
+            return Err(Error::Verification);
         }
     }
     Ok(())
 }
 
-pub(super) fn wire_limits(package: &Package) -> Result<WireLimits, PageLayoutError> {
+pub(super) fn wire_limits(package: &Package) -> Result<WireLimits, Error> {
     let maximum = package
         .state
         .source
@@ -1422,30 +1403,34 @@ pub(super) fn wire_limits(package: &Package) -> Result<WireLimits, PageLayoutErr
         .map_err(map_wire_error)
 }
 
-fn map_package_error(error: PackageError) -> PageLayoutError {
+fn map_package_error(error: PackageError) -> Error {
     match error {
         PackageError::Archive(archive_error) => map_archive_error(archive_error),
-        PackageError::SectionNamesTooLarge { observed, limit } => PageLayoutError::LimitExceeded {
-            kind: PageLayoutLimitKind::PayloadBytes,
+        PackageError::SectionNamesTooLarge { observed, limit } => Error::LimitExceeded {
+            kind: LimitKind::PayloadBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
-        PackageError::NotPages => PageLayoutError::UnsupportedSource,
-        PackageError::PayloadLimit { observed, limit } => PageLayoutError::LimitExceeded {
-            kind: PageLayoutLimitKind::PayloadBytes,
+        PackageError::UnexpectedFormat { .. }
+        | PackageError::NotOfficeFile
+        | PackageError::MissingIdentity
+        | PackageError::InvalidLimit { .. }
+        | PackageError::Limit { .. } => Error::UnsupportedSource,
+        PackageError::PayloadLimit { observed, limit } => Error::LimitExceeded {
+            kind: LimitKind::PayloadBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
-        PackageError::ObjectLimit { observed, limit } => PageLayoutError::LimitExceeded {
-            kind: PageLayoutLimitKind::PayloadObjects,
+        PackageError::ObjectLimit { observed, limit } => Error::LimitExceeded {
+            kind: LimitKind::PayloadObjects,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
-        PackageError::Allocation { amount } => PageLayoutError::Allocation { amount },
+        PackageError::Allocation { amount } => Error::Allocation { amount },
         PackageError::Io(_)
         | PackageError::Detection(_)
         | PackageError::InvalidFormat(_)
-        | PackageError::Semantic(_) => PageLayoutError::InvalidSource,
+        | PackageError::Semantic(_) => Error::InvalidSource,
     }
 }
 
@@ -1453,64 +1438,60 @@ fn map_package_error(error: PackageError) -> PageLayoutError {
     clippy::needless_pass_by_value,
     reason = "Result::map_err supplies the owned codec error directly."
 )]
-fn map_layout_codec_error(error: pages_page_layout_codec::DecodeError) -> PageLayoutError {
+fn map_layout_codec_error(error: pages_page_layout_codec::DecodeError) -> Error {
     if let Some((observed, maximum)) = error.field_limit_values() {
-        return PageLayoutError::LimitExceeded {
-            kind: PageLayoutLimitKind::WireFields,
+        return Error::LimitExceeded {
+            kind: LimitKind::WireFields,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     if let Some((observed, maximum)) = error.work_limit_values() {
-        return PageLayoutError::LimitExceeded {
-            kind: PageLayoutLimitKind::WireWork,
+        return Error::LimitExceeded {
+            kind: LimitKind::WireWork,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         };
     }
     match error.wire_resource_limit() {
-        Some(WireResourceLimit::Bytes { observed, maximum }) => PageLayoutError::LimitExceeded {
-            kind: PageLayoutLimitKind::WireBytes,
+        Some(WireResourceLimit::Bytes { observed, maximum }) => Error::LimitExceeded {
+            kind: LimitKind::WireBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         },
-        Some(WireResourceLimit::Nesting { observed, maximum }) => PageLayoutError::LimitExceeded {
-            kind: PageLayoutLimitKind::WireNesting,
+        Some(WireResourceLimit::Nesting { observed, maximum }) => Error::LimitExceeded {
+            kind: LimitKind::WireNesting,
             observed: u64::from(observed),
             maximum: u64::from(maximum),
         },
-        _ => PageLayoutError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_archive_error(error: litchi_iwa_archive::Error) -> PageLayoutError {
+fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     match error {
         litchi_iwa_archive::Error::Limit {
             kind,
             observed,
             maximum,
-        } => PageLayoutError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: match kind {
-                litchi_iwa_archive::LimitKind::InputBytes => PageLayoutLimitKind::InputBytes,
-                litchi_iwa_archive::LimitKind::OutputBytes => PageLayoutLimitKind::OutputBytes,
-                litchi_iwa_archive::LimitKind::Entries => PageLayoutLimitKind::Entries,
+                litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
+                litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_archive::LimitKind::Entries => LimitKind::Entries,
                 litchi_iwa_archive::LimitKind::MemberNameBytes
-                | litchi_iwa_archive::LimitKind::MetadataBytes => PageLayoutLimitKind::PackageBytes,
+                | litchi_iwa_archive::LimitKind::MetadataBytes => LimitKind::PackageBytes,
                 litchi_iwa_archive::LimitKind::CompressedEntryBytes
-                | litchi_iwa_archive::LimitKind::EntryBytes => PageLayoutLimitKind::EntryBytes,
-                litchi_iwa_archive::LimitKind::TotalBytes => PageLayoutLimitKind::TotalEntryBytes,
-                litchi_iwa_archive::LimitKind::IwaStreamBytes => PageLayoutLimitKind::PayloadBytes,
-                litchi_iwa_archive::LimitKind::IwaTotalBytes => {
-                    PageLayoutLimitKind::TotalPayloadBytes
-                },
+                | litchi_iwa_archive::LimitKind::EntryBytes => LimitKind::EntryBytes,
+                litchi_iwa_archive::LimitKind::TotalBytes => LimitKind::TotalEntryBytes,
+                litchi_iwa_archive::LimitKind::IwaStreamBytes => LimitKind::PayloadBytes,
+                litchi_iwa_archive::LimitKind::IwaTotalBytes => LimitKind::TotalPayloadBytes,
             },
             observed,
             maximum,
         },
-        litchi_iwa_archive::Error::Allocation { amount, .. } => {
-            PageLayoutError::Allocation { amount }
-        },
-        litchi_iwa_archive::Error::Reassembly(_) => PageLayoutError::UnsupportedSource,
+        litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        litchi_iwa_archive::Error::Reassembly(_) => Error::UnsupportedSource,
         litchi_iwa_archive::Error::Iwa(core_error) => map_core_error(core_error),
         litchi_iwa_archive::Error::Io(_)
         | litchi_iwa_archive::Error::Zip { .. }
@@ -1518,7 +1499,7 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> PageLayoutError {
         | litchi_iwa_archive::Error::Encrypted
         | litchi_iwa_archive::Error::SourceChanged { .. }
         | litchi_iwa_archive::Error::DirectoryChanged { .. }
-        | litchi_iwa_archive::Error::InvalidBundle(_) => PageLayoutError::InvalidSource,
+        | litchi_iwa_archive::Error::InvalidBundle(_) => Error::InvalidSource,
     }
 }
 
@@ -1526,23 +1507,21 @@ fn map_archive_error(error: litchi_iwa_archive::Error) -> PageLayoutError {
     clippy::needless_pass_by_value,
     reason = "Result::map_err supplies the owned component error directly."
 )]
-fn map_core_error(error: litchi_iwa_core::Error) -> PageLayoutError {
+fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => PageLayoutError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: match kind {
-                litchi_iwa_core::LimitKind::Objects => PageLayoutLimitKind::PayloadObjects,
+                litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
                 litchi_iwa_core::LimitKind::Messages
-                | litchi_iwa_core::LimitKind::MessagesPerObject => {
-                    PageLayoutLimitKind::PayloadMessages
-                },
+                | litchi_iwa_core::LimitKind::MessagesPerObject => LimitKind::PayloadMessages,
                 litchi_iwa_core::LimitKind::HeaderFields
                 | litchi_iwa_core::LimitKind::MetadataItems
-                | litchi_iwa_core::LimitKind::SnappyFrames => PageLayoutLimitKind::PayloadItems,
-                litchi_iwa_core::LimitKind::HeaderNesting => PageLayoutLimitKind::WireNesting,
+                | litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::PayloadItems,
+                litchi_iwa_core::LimitKind::HeaderNesting => LimitKind::WireNesting,
                 litchi_iwa_core::LimitKind::ArchiveBytes
                 | litchi_iwa_core::LimitKind::ObjectBytes
                 | litchi_iwa_core::LimitKind::MessageBytes
@@ -1552,20 +1531,20 @@ fn map_core_error(error: litchi_iwa_core::Error) -> PageLayoutError {
                 | litchi_iwa_core::LimitKind::SnappyStreamBytes
                 | litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
                 | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes => {
-                    PageLayoutLimitKind::PayloadBytes
+                    LimitKind::PayloadBytes
                 },
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         },
         litchi_iwa_core::Error::Allocation { requested, .. } => {
-            PageLayoutError::Allocation { amount: requested }
+            Error::Allocation { amount: requested }
         },
         litchi_iwa_core::Error::InvalidArchive { .. }
         | litchi_iwa_core::Error::InvalidLimits { .. }
         | litchi_iwa_core::Error::HeaderCodec { .. }
         | litchi_iwa_core::Error::Io(_)
-        | litchi_iwa_core::Error::Snappy { .. } => PageLayoutError::InvalidSource,
+        | litchi_iwa_core::Error::Snappy { .. } => Error::InvalidSource,
     }
 }
 
@@ -1573,34 +1552,30 @@ fn map_core_error(error: litchi_iwa_core::Error) -> PageLayoutError {
     clippy::needless_pass_by_value,
     reason = "Result::map_err supplies the owned wire error directly."
 )]
-fn map_wire_error(error: litchi_iwa_common::Error) -> PageLayoutError {
+fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
     match error {
         litchi_iwa_common::Error::LimitExceeded {
             kind,
             observed,
             limit,
-        } => PageLayoutError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: match kind {
-                litchi_iwa_common::LimitKind::InputBytes => PageLayoutLimitKind::WireBytes,
-                litchi_iwa_common::LimitKind::OutputBytes => PageLayoutLimitKind::OutputBytes,
-                litchi_iwa_common::LimitKind::Fields => PageLayoutLimitKind::WireFields,
-                litchi_iwa_common::LimitKind::Nesting => PageLayoutLimitKind::WireNesting,
-                litchi_iwa_common::LimitKind::RewriteWork => PageLayoutLimitKind::WireWork,
+                litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
+                litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_common::LimitKind::Fields => LimitKind::WireFields,
+                litchi_iwa_common::LimitKind::Nesting => LimitKind::WireNesting,
+                litchi_iwa_common::LimitKind::RewriteWork => LimitKind::WireWork,
                 litchi_iwa_common::LimitKind::TableRows
                 | litchi_iwa_common::LimitKind::TableColumns
                 | litchi_iwa_common::LimitKind::TableCells
-                | litchi_iwa_common::LimitKind::MaterializedCells => {
-                    PageLayoutLimitKind::PayloadItems
-                },
+                | litchi_iwa_common::LimitKind::MaterializedCells => LimitKind::PayloadItems,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
-        litchi_iwa_common::Error::Allocation { amount, .. } => {
-            PageLayoutError::Allocation { amount }
-        },
+        litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_common::Error::InvalidFormat(_)
-        | litchi_iwa_common::Error::InvalidLimit { .. } => PageLayoutError::InvalidSource,
+        | litchi_iwa_common::Error::InvalidLimit { .. } => Error::InvalidSource,
     }
 }
 

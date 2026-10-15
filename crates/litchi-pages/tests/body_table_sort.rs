@@ -7,6 +7,7 @@
 
 use std::error::Error as StdError;
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
 use litchi_iwa_common::wire::{
     append_length_delimited_field, append_varint_field, repeated_length_delimited_payloads,
@@ -15,7 +16,7 @@ use litchi_iwa_common::wire::{
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tp, tsa, tsd, tsp, tst, tswp};
 use litchi_pages::table::sort::{ColumnIndex, Direction, Order, Rule, Scope};
-use litchi_pages::{BodyTableSelector, Limits, Package};
+use litchi_pages::{BodyTableSelector, Package};
 use prost::Message as _;
 
 const DOCUMENT_MEMBER: &str = "Index/Document.iwa";
@@ -635,12 +636,12 @@ fn transaction_values_are_typed_and_redacted() {
     assert_send_sync_debug::<Order>();
     assert_send_sync_debug::<Rule>();
     assert_send_sync_debug::<Scope>();
-    assert_send_sync_debug::<litchi_pages::BodyTableSortEdit<'static>>();
-    assert_send_sync_debug::<litchi_pages::BodyTableSortPatch>();
-    assert_send_sync_debug::<litchi_pages::BodyTableSortCommit>();
-    assert_send_sync_debug::<litchi_pages::BodyTableSortDiagnostics>();
-    assert_send_sync_debug::<litchi_pages::BodyTableSortError>();
-    assert_send_sync_debug::<litchi_pages::BodyTableSortLimitKind>();
+    assert_send_sync_debug::<litchi_pages::table::sort::transaction::Edit<'static>>();
+    assert_send_sync_debug::<litchi_pages::table::sort::transaction::Patch>();
+    assert_send_sync_debug::<litchi_pages::table::sort::transaction::Commit>();
+    assert_send_sync_debug::<litchi_pages::table::sort::transaction::Diagnostics>();
+    assert_send_sync_debug::<litchi_pages::table::sort::transaction::Error>();
+    assert_send_sync_debug::<litchi_pages::table::sort::transaction::LimitKind>();
 }
 
 #[test]
@@ -961,7 +962,10 @@ fn public_input_and_archive_field_limits_fail_before_publication() -> TestResult
     let source = source_without_sort()?;
     let archive_limits = litchi_iwa_core::Limits::default().with_header_fields(1)?;
     let limits = Limits::default().with_archive_limits(archive_limits)?;
-    if let Ok(package) = Package::from_bytes_with_limits(&source, limits) {
+    if let Ok(package) = Package::from_bytes_with_options(
+        &source,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    ) {
         let before = package.exact_bytes();
         assert!(package.body_table_sort_order(0usize).is_err());
         assert_eq!(package.exact_bytes(), before);

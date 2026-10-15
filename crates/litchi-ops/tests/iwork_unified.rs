@@ -151,22 +151,22 @@ mod pages {
     }
 
     #[test]
-    fn creation_and_structure_are_typed_gaps() {
-        let error = create(FileFormat::Pages).unwrap_err();
-        assert_eq!(error.code(), Code::UnsupportedCapability);
+    fn section_lifecycle_is_a_typed_gap() {
+        // Record 0299: creation and paragraph structure are supported; the
+        // section lifecycle (request 11) stays a typed gap.
+        assert!(create(FileFormat::Pages).is_ok());
         let file = read("pages/basic.pages");
-        let error = file.remove("/body/p[1]").unwrap_err();
+        let error = file
+            .add("/", litchi_ops::NewNode::new("section"))
+            .unwrap_err();
         assert_eq!(error.code(), Code::UnsupportedCapability);
         let capabilities = Capabilities::of(FileFormat::Pages);
         assert!(capabilities.verb(Verb::Get).is_supported());
         assert!(capabilities.verb(Verb::Set).is_supported());
         assert!(capabilities.verb(Verb::Save).is_supported());
-        assert!(matches!(
+        assert!(!matches!(
             capabilities.verb(Verb::Create),
-            Support::Unsupported {
-                code: Code::UnsupportedCapability,
-                ..
-            }
+            Support::Unsupported { .. }
         ));
     }
 

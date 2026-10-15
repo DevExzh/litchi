@@ -464,8 +464,9 @@ const IWORK_STRUCTURE: Refusal = Refusal {
     reason: "the iWork leaf has no such structural transaction yet",
 };
 
-/// iWork documents cannot be created from scratch yet: the leaves have no
-/// package builder (`IWORK_API_REQUESTS.md` request 1).
+/// Keynote and Numbers documents cannot be created from scratch yet: those
+/// leaves have no package builder (`IWORK_API_REQUESTS.md` request 1; Pages
+/// creates its minimal document since record 0299).
 #[cfg_attr(
     not(feature = "iwork-adapter"),
     allow(dead_code, reason = "read only when an iWork format is compiled in")
@@ -965,6 +966,12 @@ impl Capabilities {
                     Verb::Add if !writes.addable.is_empty() => Support::Supported,
                     Verb::Remove if !writes.removable.is_empty() => Support::Supported,
                     Verb::Move if !writes.movable.is_empty() => Support::Supported,
+                    // Pages exchanges paragraphs (record 0299).
+                    Verb::Swap
+                        if self.format == Some(FileFormat::Pages) && !writes.movable.is_empty() =>
+                    {
+                        Support::Supported
+                    },
                     _ => IWORK_STRUCTURE.support(),
                 };
             }
@@ -1093,10 +1100,12 @@ impl Capabilities {
         if self.format == Some(FileFormat::Odp) && cfg!(feature = "odp") {
             return Support::Supported;
         }
-        if matches!(
-            self.format,
-            Some(FileFormat::Pages | FileFormat::Keynote | FileFormat::Numbers)
-        ) && self.adapter().is_some()
+        // Pages creates its minimal document (record 0299).
+        if self.format == Some(FileFormat::Pages) && self.adapter().is_some() {
+            return Support::Supported;
+        }
+        if matches!(self.format, Some(FileFormat::Keynote | FileFormat::Numbers))
+            && self.adapter().is_some()
         {
             return IWORK_CREATE.support();
         }

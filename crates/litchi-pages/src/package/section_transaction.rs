@@ -794,7 +794,7 @@ pub(super) fn resolve_position<'selector>(
 ) -> Result<Position, Error> {
     let selector = selector.into();
     let selected = package
-        .semantic_document()
+        .document_ref()
         .select_section(selector)
         .map_err(|selection_error| match selection_error {
             crate::SelectorError::EmptySectionName => Error::NameNotFound,
@@ -1359,7 +1359,11 @@ pub(super) fn map_package_error(error: PackageError) -> Error {
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
-        PackageError::NotPages => Error::UnsupportedSource {
+        PackageError::UnexpectedFormat { .. }
+        | PackageError::NotOfficeFile
+        | PackageError::MissingIdentity
+        | PackageError::InvalidLimit { .. }
+        | PackageError::Limit { .. } => Error::UnsupportedSource {
             path: Path::Package,
         },
         PackageError::PayloadLimit { observed, limit } => Error::LimitExceeded {
@@ -1473,14 +1477,14 @@ pub(super) fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
     }
 }
 
-fn map_page_layout_error(error: page_layout::PageLayoutError) -> Error {
+fn map_page_layout_error(error: page_layout::Error) -> Error {
     match error {
-        page_layout::PageLayoutError::UnsupportedSource => Error::UnsupportedDependency {
+        page_layout::Error::UnsupportedSource => Error::UnsupportedDependency {
             path: Path::Package,
             kind: DependencyKind::LayoutCache,
         },
-        page_layout::PageLayoutError::Allocation { amount } => Error::Allocation { amount },
-        page_layout::PageLayoutError::LimitExceeded {
+        page_layout::Error::Allocation { amount } => Error::Allocation { amount },
+        page_layout::Error::LimitExceeded {
             observed, maximum, ..
         } => Error::LimitExceeded {
             path: Path::Package,
@@ -1488,7 +1492,7 @@ fn map_page_layout_error(error: page_layout::PageLayoutError) -> Error {
             observed,
             maximum,
         },
-        page_layout::PageLayoutError::Verification => Error::Verification {
+        page_layout::Error::Verification => Error::Verification {
             path: Path::Package,
         },
         _ => Error::InvalidSource {

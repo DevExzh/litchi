@@ -216,8 +216,18 @@ fn iwork_packages_open_as_file_variants_on_every_route() {
 #[cfg(any(feature = "pages", feature = "keynote", feature = "numbers"))]
 #[test]
 fn iwork_package_directories_are_refused_with_their_format() {
-    for (format, _, directory) in iwork_fixtures() {
+    for (format, package, directory) in iwork_fixtures() {
         assert!(directory.is_dir(), "{}", directory.display());
+        if format == FileFormat::Pages {
+            // Record 0299: a Pages directory opens as its single-file form.
+            let file = litchi::open(&directory).expect("a Pages directory opens");
+            assert_eq!(file.format(), Some(FileFormat::Pages));
+            assert_eq!(
+                file.text().unwrap(),
+                litchi::open(&package).unwrap().text().unwrap()
+            );
+            continue;
+        }
         let error = litchi::open(&directory).unwrap_err();
         assert_iwork_refused(&error, format);
         #[cfg(feature = "iwork")]
