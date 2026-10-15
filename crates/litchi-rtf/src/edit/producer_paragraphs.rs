@@ -85,14 +85,14 @@ pub(super) fn commit(source: Package, operation: &Operation) -> Result<Commit, E
     let input = std::str::from_utf8(source_bytes).map_err(|_error| {
         Error::UnsupportedSource("producer paragraph splicing requires an ASCII or UTF-8 transport")
     })?;
-    let segments = segments(&source, input)?;
-    if segments.ranges.len() != count {
+    let cut = segments(&source, input)?;
+    if cut.ranges.len() != count {
         return Err(Error::UnsupportedSource(
             "the body's paragraphs are not delimited by root-level \\par controls",
         ));
     }
     let last = count.saturating_sub(1);
-    if segments.unterminated_last
+    if cut.unterminated_last
         && touched.contains(&last)
         && !matches!(operation, Operation::RemoveParagraph { .. })
     {
@@ -100,12 +100,22 @@ pub(super) fn commit(source: Package, operation: &Operation) -> Result<Commit, E
             "the last paragraph has no \\par of its own and cannot move",
         ));
     }
-    let bytes = splice(source_bytes, &segments.ranges, operation, source.limits())?;
+    let bytes = splice(source_bytes, &cut.ranges, operation, source.limits())?;
     let snapshot =
         Package::from_bytes_with_options(&bytes, source.options()).map_err(|_error| {
             Error::UnsupportedSource("the spliced paragraph segments do not parse as RTF")
         })?;
     verify(&source, &snapshot, &order)?;
+    // The inverse edit must be plannable on the candidate the same way, so
+    // the patch is reversible through this seam too.
+    let candidate_input = std::str::from_utf8(&bytes).map_err(|_error| {
+        Error::UnsupportedSource("the spliced paragraph segments are not UTF-8")
+    })?;
+    if segments(&snapshot, candidate_input)?.ranges.len() != snapshot.paragraph_count() {
+        return Err(Error::UnsupportedSource(
+            "the spliced paragraphs would not be delimited by root-level \\par controls",
+        ));
+    }
     let delta = semantic_changes(std::slice::from_ref(operation), &[]);
     Ok(Commit::new(source, snapshot, 1, delta))
 }
@@ -182,6 +192,10 @@ fn segments(source: &Package, input: &str) -> Result<Segments, Error> {
                 first_start = Some(span.start);
             },
             Token::Control(ControlWord::Par) if depth == 1 => {
+                if boundaries.is_empty() && first_start.is_none() && first_fallback.is_none() {
+                    // An empty first paragraph is its `\par` alone.
+                    first_fallback = Some(span.start);
+                }
                 boundaries.push(boundary_end(input, span.end));
             },
             Token::Text(text) if depth == 1 && first_start.is_none() && !text.trim().is_empty() => {

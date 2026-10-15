@@ -98,3 +98,19 @@ fn a_paragraph_holding_a_field_is_not_removed() {
     edit.remove_paragraph(Position::new(0)).unwrap();
     assert!(matches!(edit.commit(), Err(Error::UnsupportedSource(_))));
 }
+
+#[test]
+fn an_empty_first_paragraph_moves_and_moves_back() {
+    let input = "{\\rtf1\n\\fs50 one \\par \\par two \\par\n}";
+    let source = Package::parse(input).unwrap();
+    let mut edit = source.edit();
+    edit.move_paragraph(Position::new(0), Position::new(1))
+        .unwrap();
+    let moved = edit.commit().unwrap().into_package();
+    assert_eq!(texts(&moved)[..2], ["", "one "]);
+    let mut edit = moved.edit();
+    edit.move_paragraph(Position::new(1), Position::new(0))
+        .unwrap();
+    let back = edit.commit().unwrap().into_package();
+    assert_eq!(back.to_bytes().unwrap(), input.as_bytes());
+}
