@@ -826,6 +826,29 @@ impl Package {
         Ok(Catalog::read(self)?.layouts())
     }
 
+    /// List the layout each slide was made from, in show order: `None` for a
+    /// slide whose template slide the theme does not list.
+    ///
+    /// ```no_run
+    /// use litchi_keynote::Package;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let package = Package::open("deck.key")?;
+    /// for (slide, layout) in package.slide_layout_list()?.iter().enumerate() {
+    ///     println!("slide {slide}: {:?}", layout.as_ref().and_then(|layout| layout.name()));
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidSource`] when the theme's layout list or a
+    /// slide record is malformed.
+    pub fn slide_layout_list(&self) -> Result<Box<[Option<Layout>]>, Error> {
+        Catalog::read(self)?.assignments(self)
+    }
+
     /// Return the layout the theme records as its default, if any.
     ///
     /// ```no_run

@@ -368,3 +368,176 @@ pub(super) fn move_to(
     fields.replace_all(SLIDE_Z_ORDER, LENGTH_DELIMITED, &encoded);
     replace_payload(workspace, slide, index, SLIDE, fields.encode()).map_err(lift)
 }
+
+/// The changed middles of `before` and `after`: what is left of each once
+/// their common prefix and suffix (whole characters) are removed.
+pub(super) fn changed_middle<'a, 'b>(before: &'a str, after: &'b str) -> (&'a str, &'b str) {
+    let prefix = before
+        .char_indices()
+        .zip(after.chars())
+        .find(|((_, left), right)| left != right)
+        .map_or_else(|| before.len().min(after.len()), |((index, _), _)| index);
+    // `prefix` is a character boundary of both (the characters before it are
+    // equal).
+    let (before_rest, after_rest) = (&before[prefix..], &after[prefix..]);
+    let suffix = before_rest
+        .chars()
+        .rev()
+        .zip(after_rest.chars().rev())
+        .take_while(|(left, right)| left == right)
+        .map(|(left, _)| left.len_utf8())
+        .sum::<usize>();
+    (
+        &before_rest[..before_rest.len() - suffix],
+        &after_rest[..after_rest.len() - suffix],
+    )
+}
+
+/// Rewrite the text of one text box or shape: only the changed span of its
+/// own storage, which no object but the drawable may reference.
+pub(super) fn set_text(
+    workspace: &mut Workspace<'_>,
+    slide: u64,
+    drawable: u64,
+    storage: u64,
+    text: &str,
+    source: &super::Package,
+) -> Result<(), Error> {
+    let wire = workspace.wire;
+    let member = workspace.component_of(slide).ok_or(Error::InvalidSource)?;
+    if workspace.component_of(drawable).as_deref() != Some(member.as_str())
+        || workspace.component_of(storage).as_deref() != Some(member.as_str())
+    {
+        return Err(Error::Unsupported {
+            reason: Unsupported::ForeignComponent,
+        });
+    }
+    // The storage is the drawable's own: no other object of the component
+    // and no other component references it.
+    for identifier in workspace.member_objects(&member) {
+        if identifier == drawable || identifier == storage {
+            continue;
+        }
+        if outgoing(workspace, identifier)
+            .map_err(lift)?
+            .contains(&storage)
+        {
+            return Err(Error::Unsupported {
+                reason: Unsupported::ExternalReferences,
+            });
+        }
+    }
+    let component_id = workspace
+        .registry
+        .component_for_member(&member)
+        .ok_or(Error::InvalidSource)?
+        .identifier;
+    for other in workspace.registry.components() {
+        if other.identifier != component_id
+            && other.external_references().iter().any(|reference| {
+                reference.component == component_id && reference.object == Some(storage)
+            })
+        {
+            return Err(Error::Unsupported {
+                reason: Unsupported::ExternalReferences,
+            });
+        }
+    }
+    let before = inventory::storage_text(workspace, storage, wire).map_err(lift)?;
+    let (removed, inserted) = changed_middle(&before, text);
+    if [removed, inserted]
+        .iter()
+        .any(|middle| middle.contains(['\u{fffc}', '\u{000e}']))
+    {
+        return Err(Error::Unsupported {
+            reason: Unsupported::InlineObjects,
+        });
+    }
+    // UTF-16 offsets of the changed span in the storage text.
+    let prefix_bytes = removed.as_ptr() as usize - before.as_ptr() as usize;
+    let start = before[..prefix_bytes].encode_utf16().count();
+    let end = start + removed.encode_utf16().count();
+    let object = workspace.require(storage).map_err(lift)?;
+    let (index, payload) = unique_message(object, inventory::STORAGE).map_err(lift)?;
+    let limits = rewrite_limits(source, workspace.archive_limits().max_message_bytes())?;
+    let rewrite = litchi_iwa_text_wire::rewrite_storage_text_with_behavior_and_limits(
+        payload,
+        start..end,
+        inserted,
+        litchi_iwa_text_wire::RewriteBehavior::PreserveOnEqualText,
+        limits,
+    )
+    .map_err(map_rewrite_error)?;
+    if !rewrite.removed_object_references().is_empty()
+        || !rewrite.removed_object_references_by_field().is_empty()
+        || rewrite.object_reference_occurrences_before()
+            != rewrite.object_reference_occurrences_after()
+    {
+        return Err(Error::Unsupported {
+            reason: Unsupported::InlineObjects,
+        });
+    }
+    replace_payload(
+        workspace,
+        storage,
+        index,
+        inventory::STORAGE,
+        rewrite.into_bytes(),
+    )
+    .map_err(lift)
+}
+
+/// The text-rewrite bounds: the wire defaults narrowed by the package's
+/// semantic text limits and the archive's message ceiling.
+fn rewrite_limits(
+    source: &super::Package,
+    max_message_bytes: usize,
+) -> Result<litchi_iwa_text_wire::RewriteLimits, Error> {
+    let defaults = litchi_iwa_text_wire::RewriteLimits::default();
+    let message_bytes = defaults.max_message_bytes().min(max_message_bytes);
+    let semantic = source.semantic_limits();
+    litchi_iwa_text_wire::RewriteLimits::new(
+        message_bytes,
+        defaults.max_fields(),
+        defaults.max_nesting(),
+        defaults.max_fragments().min(semantic.max_text_fragments()),
+        defaults
+            .max_text_bytes()
+            .min(semantic.max_text_bytes())
+            .min(message_bytes),
+        defaults.max_table_entries(),
+        defaults.max_object_references(),
+        defaults.max_output_bytes().min(message_bytes),
+        defaults.max_rewrite_work(),
+    )
+    .map_err(map_rewrite_error)
+}
+
+fn map_rewrite_error(error: litchi_iwa_text_wire::RewriteError) -> Error {
+    use litchi_iwa_text_wire::RewriteError;
+    match error {
+        RewriteError::LimitExceeded {
+            resource,
+            observed,
+            limit,
+        } => Error::LimitExceeded {
+            kind: match resource {
+                "text bytes" => super::LimitKind::TextBytes,
+                "text fragments" => super::LimitKind::TextFragments,
+                "fields" | "aggregate field count" | "generated text fields" => {
+                    super::LimitKind::WireFields
+                },
+                "nesting" => super::LimitKind::WireNesting,
+                "rewrite work" | "aggregate nested scan bytes" => super::LimitKind::Work,
+                "output bytes" | "rewritten storage bytes" | "appended text field" => {
+                    super::LimitKind::OutputBytes
+                },
+                _ => super::LimitKind::WireBytes,
+            },
+            observed: observed as u64,
+            maximum: limit as u64,
+        },
+        RewriteError::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
+    }
+}

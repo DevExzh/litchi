@@ -550,3 +550,146 @@ fn corpus_inventories_read_or_refuse_and_identity_geometry_is_a_no_op() -> TestR
     assert!(removed >= 2 && added >= 10);
     Ok(())
 }
+
+#[test]
+fn set_text_rewrites_the_changed_span_and_reads_back() -> TestResult {
+    let package = open("basic.key")?;
+    let slide = SlideSelector::index(0);
+    let mut edit = package.edit_slide_drawables();
+    edit.set_text(slide, DrawableSelector::index(0), "2026-10-15\nSecond line")?;
+    let commit = edit.commit()?;
+    assert!(commit.diagnostics().changed());
+    let edited = reopen(commit.package())?;
+    let drawables = list(&edited, 0)?;
+    assert_eq!(drawables[0].text(), Some("2026-10-15\nSecond line"));
+    // Every other drawable reads back unchanged.
+    assert_eq!(drawables[1..], list(&package, 0)?[1..]);
+    // The inverse restores the exact source bytes.
+    let (edited, patch) = commit.into_parts();
+    let restored = edited.apply_slide_drawables(&patch.inverse())?;
+    assert_eq!(bytes(restored.package())?, bytes(&package)?);
+    Ok(())
+}
+
+#[test]
+fn set_text_of_the_current_text_is_a_no_op_and_the_last_set_wins() -> TestResult {
+    let package = open("basic.key")?;
+    let slide = SlideSelector::index(0);
+    let mut edit = package.edit_slide_drawables();
+    edit.set_text(slide, DrawableSelector::index(0), "2026-08-07")?;
+    let commit = edit.commit()?;
+    assert!(commit.patch().is_noop());
+    assert_eq!(bytes(commit.package())?, bytes(&package)?);
+
+    let mut edit = package.edit_slide_drawables();
+    edit.set_text(slide, DrawableSelector::index(0), "first")?
+        .set_text(slide, DrawableSelector::index(0), "second")?
+        .set_geometry(
+            slide,
+            DrawableSelector::index(0),
+            Geometry::new(10.0, 20.0, 300.0, 40.0),
+        )?;
+    let commit = edit.commit()?;
+    let drawables = list(commit.package(), 0)?;
+    assert_eq!(drawables[0].text(), Some("second"));
+    assert_eq!(
+        drawables[0].geometry(),
+        Some(Geometry::new(10.0, 20.0, 300.0, 40.0).with_rotation(0.0))
+    );
+    Ok(())
+}
+
+#[test]
+fn set_text_refuses_placeholders_images_and_inline_markers() -> TestResult {
+    let package = open("basic.key")?;
+    let slide = SlideSelector::index(0);
+    let mut edit = package.edit_slide_drawables();
+    assert!(matches!(
+        edit.set_text(slide, DrawableSelector::index(1), "Title"),
+        Err(Error::Unsupported {
+            reason: Unsupported::Kind {
+                kind: Kind::TitlePlaceholder
+            }
+        })
+    ));
+    assert!(matches!(
+        edit.set_text(slide, DrawableSelector::index(0), "object \u{fffc} marker"),
+        Err(Error::Unsupported {
+            reason: Unsupported::InlineObjects
+        })
+    ));
+    assert!(matches!(
+        edit.set_text(slide, DrawableSelector::index(7), "x"),
+        Err(Error::DrawablePositionNotFound { .. })
+    ));
+    // A new image has no text storage.
+    let mut edit = package.edit_slide_drawables();
+    edit.add_image(
+        slide,
+        &PNG,
+        "pixel.png",
+        Geometry::new(0.0, 0.0, 20.0, 30.0),
+    )?;
+    let with_image = edit.commit()?.into_package();
+    let image = list(&with_image, 0)?.len() - 1;
+    let mut edit = with_image.edit_slide_drawables();
+    assert!(matches!(
+        edit.set_text(slide, DrawableSelector::index(image), "x"),
+        Err(Error::Unsupported {
+            reason: Unsupported::Kind { kind: Kind::Image }
+        })
+    ));
+    Ok(())
+}
+
+#[test]
+fn set_text_on_a_new_shape_and_on_every_corpus_text_box() -> TestResult {
+    let package = open("multi-slide.key")?;
+    let slide = SlideSelector::index(1);
+    let mut edit = package.edit_slide_drawables();
+    edit.add_shape(
+        slide,
+        Preset::Ellipse,
+        Geometry::new(100.0, 100.0, 200.0, 200.0),
+        "Old",
+    )?;
+    let created = edit.commit()?.into_package();
+    let shape = list(&created, 1)?.len() - 1;
+    let mut edit = created.edit_slide_drawables();
+    edit.set_text(slide, DrawableSelector::index(shape), "New\ntext")?;
+    let edited = reopen(edit.commit()?.package())?;
+    assert_eq!(list(&edited, 1)?[shape].text(), Some("New\ntext"));
+
+    for entry in std::fs::read_dir(keynote_dir())? {
+        let path = entry?.path();
+        if path.extension().and_then(|extension| extension.to_str()) != Some("key")
+            || !path.is_file()
+        {
+            continue;
+        }
+        let package = Package::open(&path)?;
+        let Ok(drawables) = package.slide_drawable_list(SlideSelector::index(0)) else {
+            continue;
+        };
+        let Some(index) = drawables
+            .iter()
+            .position(|drawable| drawable.kind() == Kind::TextBox && drawable.text().is_some())
+        else {
+            continue;
+        };
+        let mut edit = package.edit_slide_drawables();
+        edit.set_text(
+            SlideSelector::index(0),
+            DrawableSelector::index(index),
+            "Changed",
+        )?;
+        let commit = edit.commit()?;
+        assert_eq!(
+            list(commit.package(), 0)?[index].text(),
+            Some("Changed"),
+            "{}",
+            path.display()
+        );
+    }
+    Ok(())
+}

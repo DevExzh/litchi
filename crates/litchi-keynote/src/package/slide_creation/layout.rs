@@ -226,6 +226,41 @@ impl Catalog {
         }
     }
 
+    /// The layout each slide of the show was made from, in show order:
+    /// its template slide (`KN.SlideArchive.template_slide`) matched against
+    /// this catalog; `None` for a slide without one or with a template the
+    /// theme no longer lists.
+    pub(in crate::package) fn assignments(
+        &self,
+        package: &Package,
+    ) -> Result<Box<[Option<Layout>]>, Error> {
+        let limits = package
+            .wire_limits()
+            .map_err(|_error| Error::InvalidSource)?;
+        let nodes = package
+            .private_slide_node_order()
+            .map_err(|_error| Error::InvalidSource)?;
+        let mut layouts = Vec::with_capacity(nodes.len());
+        for node in &nodes {
+            let fields = Fields::parse(
+                unique_payload(package, *node, SLIDE_NODE_MESSAGE_TYPE)?,
+                limits,
+            )
+            .lift()?;
+            let slide = reference(&fields, 2)?.ok_or(Error::InvalidSource)?;
+            let slide = Fields::parse(unique_payload(package, slide, SLIDE_MESSAGE_TYPE)?, limits)
+                .lift()?;
+            let template = reference(&slide, SLIDE_TEMPLATE)?;
+            layouts.push(template.and_then(|template| {
+                self.records
+                    .iter()
+                    .position(|record| record.slide == template)
+                    .map(|index| self.layout(index))
+            }));
+        }
+        Ok(layouts.into_boxed_slice())
+    }
+
     pub(in crate::package) fn record(&self, index: usize) -> Result<&Record, Error> {
         self.records.get(index).ok_or(Error::InvalidSource)
     }

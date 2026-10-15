@@ -29,6 +29,8 @@
 //! ```
 //!
 //! Supported: geometry of text boxes, shapes, images and placeholders;
+//! plain text of text boxes and shapes ([`Edit::set_text`], a minimal-span
+//! rewrite of the drawable's own storage);
 //! removal of text boxes, shapes, lines and images with their private
 //! objects (registry UUIDs and data owners are dropped; data items stay);
 //! z-order moves; new text boxes, rectangle / rounded-rectangle / ellipse

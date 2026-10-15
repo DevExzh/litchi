@@ -489,3 +489,26 @@ fn multi_slide_fixture_is_reproducible() -> TestResult {
     assert!(std::fs::metadata(&path)?.len() < 1024 * 1024);
     Ok(())
 }
+
+#[test]
+fn slide_layout_list_names_each_slides_layout() -> TestResult {
+    let package = basic()?;
+    let layouts = package.slide_layouts()?;
+    let assigned = package.slide_layout_list()?;
+    assert_eq!(assigned.len(), 1);
+    let first = assigned[0].as_ref().ok_or("basic.key slide has a layout")?;
+    assert!(layouts.contains(first));
+    // A slide added from a layout reports that layout.
+    let last = layouts.last().ok_or("layouts")?;
+    let mut edit = package.edit_slide_creation();
+    edit.add_slide(last, Position::new(1))?;
+    let added = edit.commit()?.into_package();
+    let assigned = added.slide_layout_list()?;
+    assert_eq!(assigned.len(), 2);
+    assert_eq!(assigned[1].as_ref(), Some(last));
+    // A duplicate keeps its source's layout.
+    let duplicated = duplicate(&package, 0, 1)?;
+    let assigned = duplicated.slide_layout_list()?;
+    assert_eq!(assigned[0], assigned[1]);
+    Ok(())
+}

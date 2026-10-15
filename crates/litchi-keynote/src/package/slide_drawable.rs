@@ -287,6 +287,10 @@ pub enum Unsupported {
     UnmodelledContent,
     /// A package-registry record uses an unmodelled shape.
     RegistryShape,
+    /// The text change would consume or introduce an inline object,
+    /// footnote or attachment marker (`U+FFFC`, `U+000E`), which the plain
+    /// text write cannot keep consistent.
+    InlineObjects,
 }
 
 impl fmt::Display for Unsupported {
@@ -300,6 +304,7 @@ impl fmt::Display for Unsupported {
             Self::TextStyling => f.write_str("character-style writes"),
             Self::UnmodelledContent => f.write_str("unmodelled native content with references"),
             Self::RegistryShape => f.write_str("an unmodelled package-registry shape"),
+            Self::InlineObjects => f.write_str("text with inline object markers"),
         }
     }
 }
@@ -473,6 +478,12 @@ enum Operation {
         bytes: Arc<[u8]>,
         file_name: Box<str>,
         geometry: Geometry,
+    },
+    Text {
+        slide: u64,
+        drawable: u64,
+        storage: u64,
+        text: Box<str>,
     },
 }
 
@@ -752,7 +763,7 @@ impl<'a> Edit<'a> {
             return Err(Error::ZPositionOutOfRange { position, count });
         }
         let untouched = !self.operations.iter().any(|operation| match operation {
-            Operation::Geometry { .. } => false,
+            Operation::Geometry { .. } | Operation::Text { .. } => false,
             Operation::Remove { slide, .. }
             | Operation::Move { slide, .. }
             | Operation::AddText { slide, .. }
@@ -952,6 +963,91 @@ impl<'a> Edit<'a> {
             bytes: Arc::from(bytes),
             file_name: file_name.into(),
             geometry,
+        });
+        Ok(self)
+    }
+
+    /// Stage new plain text for one text box or shape.
+    ///
+    /// The commit rewrites only the changed span of the drawable's own text
+    /// storage (the common prefix and suffix keep their paragraph and
+    /// character attributes); paragraphs are separated by `\n`. Setting the
+    /// current text stages nothing, and a later `set_text` of the same
+    /// drawable in this edit replaces the earlier one. Placeholder text is
+    /// written by [`Package::edit_slide_text`] instead.
+    ///
+    /// # Errors
+    ///
+    /// Returns typed selector errors, [`Error::Unsupported`] for drawables
+    /// other than text boxes and shapes and, with
+    /// [`Unsupported::InlineObjects`], for a change that would consume or
+    /// introduce an inline object marker, and [`Error::LimitExceeded`] past
+    /// the semantic text limit. A storage shared with other objects is
+    /// refused by [`Self::commit`] ([`Unsupported::ExternalReferences`]).
+    ///
+    /// ```no_run
+    /// use litchi_keynote::{DrawableSelector, Package, SlideSelector};
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let package = Package::open("deck.key")?;
+    /// let mut edit = package.edit_slide_drawables();
+    /// edit.set_text(SlideSelector::index(0), DrawableSelector::index(0), "Q3 review")?;
+    /// let commit = edit.commit()?;
+    /// let list = commit.package().slide_drawable_list(SlideSelector::index(0))?;
+    /// assert_eq!(list[0].text(), Some("Q3 review"));
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn set_text<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        text: &str,
+    ) -> Result<&mut Self, Error> {
+        let maximum = self.source.semantic_limits().max_text_bytes();
+        if text.len() > maximum {
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::TextBytes,
+                observed: text.len() as u64,
+                maximum: maximum as u64,
+            });
+        }
+        let (selected, item) = self.drawable(slide.into(), drawable.into())?;
+        let (Kind::TextBox | Kind::Shape, Some(storage), Some(current)) =
+            (item.kind, item.storage, item.text.as_deref())
+        else {
+            return Err(Error::Unsupported {
+                reason: Unsupported::Kind { kind: item.kind },
+            });
+        };
+        let earlier = self
+            .operations
+            .iter_mut()
+            .find_map(|operation| match operation {
+                Operation::Text { drawable, text, .. } if *drawable == item.identifier => {
+                    Some(text)
+                },
+                _ => None,
+            });
+        let base = earlier.as_deref().map_or(current, |text| &**text);
+        if text_change_touches_markers(base, text) {
+            return Err(Error::Unsupported {
+                reason: Unsupported::InlineObjects,
+            });
+        }
+        if let Some(earlier) = earlier {
+            *earlier = text.into();
+            return Ok(self);
+        }
+        if current == text {
+            // Already in place: staging nothing keeps the patch a no-op.
+            return Ok(self);
+        }
+        self.operations.push(Operation::Text {
+            slide: selected.identifier,
+            drawable: item.identifier,
+            storage,
+            text: text.into(),
         });
         Ok(self)
     }
@@ -1525,6 +1621,19 @@ fn commit_operations(
                 created.push((*slide_position, *slide, drawable));
                 touched.entry(*slide).or_default().insert(drawable);
             },
+            Operation::Text {
+                slide,
+                drawable,
+                storage,
+                text,
+            } => {
+                stage::set_text(&mut workspace, *slide, *drawable, *storage, text, source)?;
+                let staged = read_inventory(&workspace, *slide, limits)?;
+                if staged.item(*drawable).and_then(|item| item.text.as_deref()) != Some(&**text) {
+                    return Err(Error::Verification);
+                }
+                touched.entry(*slide).or_default().insert(*drawable);
+            },
             Operation::AddImage {
                 slide,
                 slide_position,
@@ -1617,6 +1726,16 @@ fn commit_operations(
         diagnostics,
         created: public_created.into_boxed_slice(),
     })
+}
+
+/// Whether replacing `before` with `after` would consume or introduce an
+/// inline object marker: the changed middle (after the common prefix and
+/// suffix) of either side holds one.
+fn text_change_touches_markers(before: &str, after: &str) -> bool {
+    let (before, after) = stage::changed_middle(before, after);
+    [before, after]
+        .iter()
+        .any(|text| text.contains(['\u{fffc}', '\u{000e}']))
 }
 
 fn check_object_limit(source: &Package, workspace: &Workspace<'_>) -> Result<(), Error> {
