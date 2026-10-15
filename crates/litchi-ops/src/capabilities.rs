@@ -1098,8 +1098,7 @@ impl Capabilities {
         if matches!(
             self.format,
             Some(FileFormat::Pages | FileFormat::Keynote | FileFormat::Numbers)
-        )
-            && self.adapter().is_some()
+        ) && self.adapter().is_some()
         {
             return Support::Supported;
         }

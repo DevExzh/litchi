@@ -6,8 +6,8 @@
 use litchi_core::FileFormat;
 
 use super::{
-    CREATE_PENDING, Capabilities, EDITS, IWORK_STRUCTURE, SAVE_PENDING, State,
-    Support, Verb, path_segment, positional, refused,
+    CREATE_PENDING, Capabilities, EDITS, IWORK_STRUCTURE, SAVE_PENDING, State, Support, Verb,
+    path_segment, positional, refused,
 };
 use crate::Code;
 use crate::view::Mode;
