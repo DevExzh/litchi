@@ -17,9 +17,16 @@ use litchi_iwa_common::wire::{WireView, append_length_delimited_field, append_va
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsd, tsk, tsp, tst, tswp};
 use litchi_keynote::{
-    OpenOptions, Package, SemanticLimits, SlideSelector, SlideTableName, SlideTableNameCommit,
-    SlideTableNameDiagnostics, SlideTableNameEdit, SlideTableNameError, SlideTableNameLimitKind,
-    SlideTableNamePatch, SlideTableNamePath, SlideTableNameValueError, SourceLimits, TableSelector,
+    OpenOptions, Package, SemanticLimits, SlideSelector, SourceLimits, TableSelector,
+    slide::table::name::Error as SlideTableNameValueError,
+    slide::table::name::Name as SlideTableName,
+    slide::table::name::transaction::Commit as SlideTableNameCommit,
+    slide::table::name::transaction::Diagnostics as SlideTableNameDiagnostics,
+    slide::table::name::transaction::Edit as SlideTableNameEdit,
+    slide::table::name::transaction::Error as SlideTableNameError,
+    slide::table::name::transaction::LimitKind as SlideTableNameLimitKind,
+    slide::table::name::transaction::Patch as SlideTableNamePatch,
+    slide::table::name::transaction::Path as SlideTableNamePath,
 };
 use prost::Message as _;
 

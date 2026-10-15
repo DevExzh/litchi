@@ -24,8 +24,8 @@ use litchi_iwa_common::wire::{append_length_delimited_field, append_varint_field
 use litchi_iwa_core::{Archive, SnappyStream};
 use litchi_iwa_protos::{tsd, tsp};
 use litchi_keynote::{
-    DrawableSelector, DrawableSummary, OpenOptions, Package, ReplySelector, SemanticLimits,
-    SlideSelector, SourceLimits,
+    DrawableSelector, OpenOptions, Package, ReplySelector, SemanticLimits, SlideSelector,
+    SourceLimits, slide::comment::transaction::DrawableSummary,
 };
 use prost::Message as _;
 

@@ -17,8 +17,9 @@ use std::{fmt::Debug, fmt::Display, hint::black_box, sync::OnceLock};
 
 use libfuzzer_sys::fuzz_target;
 use litchi_keynote::{
-    MediaPart, MovieKind, MovieSelector, OpenOptions, Package, SemanticLimits,
-    SlideMediaPropertiesError, SlideSelector, SourceLimits, slide::media::MediaProperties,
+    MovieKind, MovieSelector, OpenOptions, Package, SemanticLimits, SlideSelector, SourceLimits,
+    slide::media::MediaProperties, slide::media::data::MediaPart,
+    slide::media::properties::Error as SlideMediaPropertiesError,
 };
 
 const MAX_INPUT_BYTES: u64 = 1024 * 1024;

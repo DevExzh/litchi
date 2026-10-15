@@ -1160,7 +1160,7 @@ fn no_op_is_exact_and_apply_conflict_is_source_bound() -> TestResult {
     let unrelated_package = Package::from_bytes(&unrelated)?;
     assert!(matches!(
         unrelated_package.apply_slide_table_appearance(changed.patch()),
-        Err(litchi_keynote::SlideTableAppearanceError::PatchConflict)
+        Err(Error::PatchConflict)
     ));
     Ok(())
 }
@@ -1686,10 +1686,7 @@ fn finite_semantic_limits_refuse_before_candidate_publication() -> TestResult {
         let result = package
             .edit_slide_table_appearance(0usize, 0usize)
             .and_then(|edit| edit.set(custom_appearance()).commit());
-        if matches!(
-            result,
-            Err(litchi_keynote::SlideTableAppearanceError::LimitExceeded { .. })
-        ) {
+        if matches!(result, Err(Error::LimitExceeded { .. })) {
             assert_eq!(exact_bytes(&package)?, before);
             saw_limit = true;
             break;

@@ -507,9 +507,9 @@ fn control(data: &[u8], index: usize) -> u8 {
 
 fn package_bytes(package: &Package) -> Vec<u8> {
     let mut bytes = Vec::new();
-    package
-        .write_to(&mut bytes)
-        .unwrap_or_else(|error| panic!("writing a Numbers package to memory must succeed: {error}"));
+    package.write_to(&mut bytes).unwrap_or_else(|error| {
+        panic!("writing a Numbers package to memory must succeed: {error}")
+    });
     bytes
 }
 

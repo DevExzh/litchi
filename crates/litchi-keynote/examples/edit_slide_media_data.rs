@@ -20,7 +20,7 @@ use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::path::PathBuf;
 
-use litchi_keynote::{MediaPart, MovieSelector, Package, SlideSelector};
+use litchi_keynote::{MovieSelector, Package, SlideSelector, slide::media::data::MediaPart};
 
 const USAGE: &str = "usage: edit_slide_media_data <input.key> <output.key> \
                      <index:N|name:TEXT> <movie-index> <content|poster> \

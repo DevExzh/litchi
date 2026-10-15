@@ -7,8 +7,8 @@ use std::sync::OnceLock;
 
 use libfuzzer_sys::fuzz_target;
 use litchi::keynote::{
-    ChartSelector, ChartTitleError, OpenOptions, Package, ReadError, SemanticLimits, SlideSelector,
-    SourceLimits,
+    ChartSelector, OpenOptions, Package, ReadError, SemanticLimits, SlideSelector, SourceLimits,
+    chart::title::Error as ChartTitleError,
 };
 
 const MAX_INPUT_BYTES: u64 = 1024 * 1024;
@@ -225,7 +225,7 @@ fn publish_and_reverse(
     chart_position: usize,
     before: Option<String>,
     after: Option<String>,
-    commit: litchi::keynote::ChartTitleCommit,
+    commit: litchi::keynote::chart::title::Commit,
     source_bytes: Vec<u8>,
 ) {
     let patch = commit.patch().clone();

@@ -8307,12 +8307,1170 @@
         },
         {
           "name": "read_options",
-          "scope": "litchi_keynote::MergeReader",
+          "scope": "litchi_keynote::slide::table::merge::transaction::MergeReader",
           "replacement": "use MergeReader::options (record 0298)",
+          "recursive": false
+        },
+        {
+          "name": "ChartArrangementCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::arrangement::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartArrangementDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::arrangement::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartArrangementEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::arrangement::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartArrangementError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::arrangement::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartArrangementLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::arrangement::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartArrangementPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::arrangement::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartAxisTitleCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::axis_title::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartAxisTitleDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::axis_title::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartAxisTitleEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::axis_title::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartAxisTitleError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::axis_title::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartAxisTitleLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::axis_title::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartAxisTitlePatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::axis_title::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartCaptionCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::caption::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartCaptionDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::caption::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartCaptionEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::caption::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartCaptionError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::caption::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartCaptionLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::caption::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartCaptionPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::caption::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartLegendVisibilityCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::legend::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartLegendVisibilityDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::legend::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartLegendVisibilityEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::legend::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartLegendVisibilityError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::legend::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartLegendVisibilityLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::legend::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartLegendVisibilityPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::legend::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartTitleCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::title::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartTitleDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::title::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartTitleEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::title::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartTitleError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::title::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartTitleLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::title::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartTitlePatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::title::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartValueAxisCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::value_axis::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartValueAxisDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::value_axis::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartValueAxisEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::value_axis::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartValueAxisError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::value_axis::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartValueAxisLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::value_axis::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartValueAxisPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::value_axis::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "EditError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::edit::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideAudioCreationCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::audio::creation::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideAudioCreationDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::audio::creation::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideAudioCreationError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::audio::creation::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideAudioCreationLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::audio::creation::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideAudioCreationPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::audio::creation::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideAudioPositionCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::audio::position::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideAudioPositionDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::audio::position::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideAudioPositionEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::audio::position::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideAudioPositionError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::audio::position::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideAudioPositionLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::audio::position::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideAudioPositionPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::audio::position::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideBackgroundCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::background::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideBackgroundDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::background::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideBackgroundEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::background::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideBackgroundError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::background::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideBackgroundLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::background::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideBackgroundPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::background::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideBuildOrderCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::build::order::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideBuildOrderDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::build::order::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideBuildOrderEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::build::order::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideBuildOrderError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::build::order::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideBuildOrderLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::build::order::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideBuildOrderPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::build::order::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideChartDataCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::data::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideChartDataDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::data::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideChartDataEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::data::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideChartDataError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::data::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideChartDataLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::data::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideChartDataPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::data::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideChartMetadataError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::metadata::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideChartMetadataLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::metadata::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideDrawableCommentCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::comment::transaction::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideDrawableCommentDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::comment::transaction::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideDrawableCommentEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::comment::transaction::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideDrawableCommentError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::comment::transaction::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideDrawableCommentLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::comment::transaction::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideDrawableCommentPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::comment::transaction::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideImageAdjustmentsCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::image::adjustments::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideImageAdjustmentsDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::image::adjustments::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideImageAdjustmentsEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::image::adjustments::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideImageAdjustmentsError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::image::adjustments::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideImageAdjustmentsLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::image::adjustments::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideImageAdjustmentsPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::image::adjustments::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaData",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::data::Data (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaDataCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::data::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaDataDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::data::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaDataEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::data::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaDataError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::data::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaDataLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::data::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaDataPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::data::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaLifecycleCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::lifecycle::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaLifecycleDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::lifecycle::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaLifecycleError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::lifecycle::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaLifecycleLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::lifecycle::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaLifecyclePatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::lifecycle::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaPropertiesCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::properties::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaPropertiesDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::properties::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaPropertiesEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::properties::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaPropertiesError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::properties::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaPropertiesLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::properties::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaPropertiesPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::properties::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieCaptionCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::caption::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieCaptionDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::caption::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieCaptionEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::caption::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieCaptionError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::caption::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieCaptionLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::caption::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieCaptionPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::caption::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieCreationCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::creation::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieCreationDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::creation::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieCreationError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::creation::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieCreationLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::creation::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieCreationPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::creation::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieGeometryCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::geometry::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieGeometryDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::geometry::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieGeometryEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::geometry::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieGeometryError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::geometry::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieGeometryLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::geometry::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieGeometryPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::geometry::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMoviePlaybackCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::playback::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMoviePlaybackDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::playback::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMoviePlaybackEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::playback::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMoviePlaybackError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::playback::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMoviePlaybackLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::playback::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMoviePlaybackPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::playback::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieTitleCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::title::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieTitleDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::title::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieTitleEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::title::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieTitleError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::title::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieTitleLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::title::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieTitlePatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::title::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideNotesCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::notes::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideNotesDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::notes::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideNotesEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::notes::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideNotesError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::notes::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideNotesLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::notes::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideNotesPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::notes::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideOrderCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::order::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideOrderDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::order::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideOrderEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::order::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideOrderError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::order::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideOrderLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::order::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideOrderPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::order::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableAppearanceCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::appearance::transaction::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableAppearanceDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::appearance::transaction::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableAppearanceEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::appearance::transaction::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableAppearanceError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::appearance::transaction::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableAppearanceLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::appearance::transaction::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableAppearancePatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::appearance::transaction::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableAppearancePath",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::appearance::transaction::Path (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableCellNumberFormatCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::number_format::transaction::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableCellNumberFormatDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::number_format::transaction::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableCellNumberFormatEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::number_format::transaction::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableCellNumberFormatError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::number_format::transaction::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableCellNumberFormatLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::number_format::transaction::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableCellNumberFormatPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::number_format::transaction::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableCellNumberFormatPath",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::number_format::transaction::Path (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableCellsError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::cells::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableCellsLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::cells::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableCellsPath",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::cells::Path (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableDimensionCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::dimension::transaction::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableDimensionDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::dimension::transaction::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableDimensionEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::dimension::transaction::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableDimensionError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::dimension::transaction::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableDimensionLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::dimension::transaction::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableDimensionPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::dimension::transaction::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableDimensionPath",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::dimension::transaction::Path (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableHeaderCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::headers::transaction::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableHeaderDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::headers::transaction::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableHeaderEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::headers::transaction::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableHeaderError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::headers::transaction::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableHeaderInvalidReason",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::headers::transaction::InvalidReason (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableHeaderLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::headers::transaction::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableHeaderPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::headers::transaction::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableHeaderPath",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::headers::transaction::Path (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableLockStateCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::lock::transaction::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableLockStateDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::lock::transaction::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableLockStateEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::lock::transaction::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableLockStateError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::lock::transaction::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableLockStateLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::lock::transaction::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableLockStatePatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::lock::transaction::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableLockStatePath",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::lock::transaction::Path (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableMergesCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::merge::transaction::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableMergesDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::merge::transaction::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableMergesEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::merge::transaction::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableMergesError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::merge::transaction::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableMergesLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::merge::transaction::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableMergesPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::merge::transaction::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableMergesPath",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::merge::transaction::Path (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableName",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::name::Name (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableNameCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::name::transaction::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableNameDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::name::transaction::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableNameEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::name::transaction::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableNameError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::name::transaction::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableNameLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::name::transaction::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableNamePatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::name::transaction::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableNamePath",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::name::transaction::Path (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableNameValueError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::name::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTablePhysicalSortCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::physical_sort::transaction::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTablePhysicalSortDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::physical_sort::transaction::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTablePhysicalSortEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::physical_sort::transaction::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTablePhysicalSortError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::physical_sort::transaction::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTablePhysicalSortLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::physical_sort::transaction::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTablePhysicalSortPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::physical_sort::transaction::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTablePhysicalSortPath",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::physical_sort::transaction::Path (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableSortCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::sort::transaction::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableSortDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::sort::transaction::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableSortEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::sort::transaction::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableSortError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::sort::transaction::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableSortLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::sort::transaction::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableSortPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::sort::transaction::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableSortPath",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::sort::transaction::Path (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableTitleCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::title::transaction::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableTitleDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::title::transaction::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableTitleEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::title::transaction::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableTitleError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::title::transaction::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableTitleLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::title::transaction::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableTitlePatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::title::transaction::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTextCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::text::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTextDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::text::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTextEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::text::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTextError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::text::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTextLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::text::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTextPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::text::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "transaction",
+          "scope": "litchi_keynote::slide::audio",
+          "replacement": "the family lives in slide::audio::position / slide::movie::{geometry, playback} (record 0298)",
+          "recursive": false
+        },
+        {
+          "name": "transaction",
+          "scope": "litchi_keynote::slide::media::geometry",
+          "replacement": "the family lives in slide::audio::position / slide::movie::{geometry, playback} (record 0298)",
+          "recursive": false
+        },
+        {
+          "name": "transaction",
+          "scope": "litchi_keynote::slide::media::playback",
+          "replacement": "the family lives in slide::audio::position / slide::movie::{geometry, playback} (record 0298)",
           "recursive": false
         }
       ],
-      "families": []
+      "families": [
+        "litchi_keynote::edit",
+        "litchi_keynote::chart::arrangement",
+        "litchi_keynote::chart::axis_title",
+        "litchi_keynote::chart::caption",
+        "litchi_keynote::chart::legend",
+        "litchi_keynote::chart::title",
+        "litchi_keynote::chart::value_axis",
+        "litchi_keynote::chart::data",
+        "litchi_keynote::background",
+        "litchi_keynote::build::order",
+        "litchi_keynote::slide::image::adjustments",
+        "litchi_keynote::slide::movie::caption",
+        "litchi_keynote::slide::movie::geometry",
+        "litchi_keynote::slide::movie::playback",
+        "litchi_keynote::slide::movie::title",
+        "litchi_keynote::slide::audio::position",
+        "litchi_keynote::slide::notes",
+        "litchi_keynote::slide::order",
+        "litchi_keynote::slide::text",
+        "litchi_keynote::slide::comment::transaction",
+        "litchi_keynote::slide::media::data",
+        "litchi_keynote::slide::media::properties",
+        "litchi_keynote::slide::table::appearance::transaction",
+        "litchi_keynote::slide::table::dimension::transaction",
+        "litchi_keynote::slide::table::lock::transaction",
+        "litchi_keynote::slide::table::name::transaction",
+        "litchi_keynote::slide::table::sort::transaction",
+        "litchi_keynote::slide::table::title::transaction",
+        "litchi_keynote::slide::table::number_format::transaction",
+        "litchi_keynote::slide::table::merge::transaction",
+        "litchi_keynote::slide::table::headers::transaction",
+        "litchi_keynote::slide::table::physical_sort::transaction",
+        "litchi_keynote::slide::delete",
+        "litchi_keynote::transition",
+        "litchi_keynote::show",
+        "litchi_keynote::soundtrack",
+        "litchi_keynote::soundtrack::order",
+        "litchi_keynote::soundtrack::items",
+        "litchi_keynote::slide::placeholder"
+      ]
     },
     {
       "id": "keynote-full",
@@ -8477,12 +9635,1170 @@
         },
         {
           "name": "read_options",
-          "scope": "litchi_keynote::MergeReader",
+          "scope": "litchi_keynote::slide::table::merge::transaction::MergeReader",
           "replacement": "use MergeReader::options (record 0298)",
+          "recursive": false
+        },
+        {
+          "name": "ChartArrangementCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::arrangement::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartArrangementDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::arrangement::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartArrangementEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::arrangement::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartArrangementError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::arrangement::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartArrangementLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::arrangement::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartArrangementPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::arrangement::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartAxisTitleCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::axis_title::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartAxisTitleDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::axis_title::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartAxisTitleEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::axis_title::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartAxisTitleError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::axis_title::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartAxisTitleLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::axis_title::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartAxisTitlePatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::axis_title::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartCaptionCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::caption::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartCaptionDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::caption::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartCaptionEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::caption::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartCaptionError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::caption::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartCaptionLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::caption::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartCaptionPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::caption::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartLegendVisibilityCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::legend::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartLegendVisibilityDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::legend::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartLegendVisibilityEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::legend::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartLegendVisibilityError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::legend::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartLegendVisibilityLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::legend::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartLegendVisibilityPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::legend::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartTitleCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::title::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartTitleDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::title::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartTitleEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::title::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartTitleError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::title::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartTitleLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::title::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartTitlePatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::title::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartValueAxisCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::value_axis::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartValueAxisDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::value_axis::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartValueAxisEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::value_axis::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartValueAxisError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::value_axis::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartValueAxisLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::value_axis::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "ChartValueAxisPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::value_axis::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "EditError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::edit::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideAudioCreationCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::audio::creation::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideAudioCreationDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::audio::creation::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideAudioCreationError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::audio::creation::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideAudioCreationLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::audio::creation::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideAudioCreationPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::audio::creation::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideAudioPositionCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::audio::position::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideAudioPositionDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::audio::position::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideAudioPositionEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::audio::position::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideAudioPositionError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::audio::position::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideAudioPositionLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::audio::position::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideAudioPositionPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::audio::position::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideBackgroundCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::background::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideBackgroundDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::background::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideBackgroundEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::background::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideBackgroundError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::background::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideBackgroundLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::background::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideBackgroundPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::background::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideBuildOrderCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::build::order::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideBuildOrderDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::build::order::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideBuildOrderEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::build::order::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideBuildOrderError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::build::order::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideBuildOrderLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::build::order::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideBuildOrderPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::build::order::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideChartDataCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::data::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideChartDataDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::data::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideChartDataEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::data::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideChartDataError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::data::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideChartDataLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::data::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideChartDataPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::data::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideChartMetadataError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::metadata::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideChartMetadataLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::chart::metadata::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideDrawableCommentCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::comment::transaction::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideDrawableCommentDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::comment::transaction::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideDrawableCommentEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::comment::transaction::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideDrawableCommentError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::comment::transaction::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideDrawableCommentLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::comment::transaction::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideDrawableCommentPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::comment::transaction::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideImageAdjustmentsCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::image::adjustments::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideImageAdjustmentsDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::image::adjustments::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideImageAdjustmentsEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::image::adjustments::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideImageAdjustmentsError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::image::adjustments::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideImageAdjustmentsLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::image::adjustments::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideImageAdjustmentsPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::image::adjustments::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaData",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::data::Data (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaDataCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::data::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaDataDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::data::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaDataEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::data::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaDataError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::data::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaDataLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::data::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaDataPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::data::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaLifecycleCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::lifecycle::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaLifecycleDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::lifecycle::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaLifecycleError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::lifecycle::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaLifecycleLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::lifecycle::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaLifecyclePatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::lifecycle::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaPropertiesCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::properties::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaPropertiesDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::properties::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaPropertiesEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::properties::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaPropertiesError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::properties::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaPropertiesLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::properties::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMediaPropertiesPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::media::properties::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieCaptionCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::caption::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieCaptionDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::caption::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieCaptionEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::caption::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieCaptionError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::caption::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieCaptionLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::caption::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieCaptionPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::caption::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieCreationCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::creation::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieCreationDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::creation::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieCreationError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::creation::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieCreationLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::creation::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieCreationPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::creation::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieGeometryCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::geometry::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieGeometryDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::geometry::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieGeometryEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::geometry::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieGeometryError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::geometry::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieGeometryLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::geometry::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieGeometryPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::geometry::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMoviePlaybackCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::playback::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMoviePlaybackDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::playback::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMoviePlaybackEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::playback::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMoviePlaybackError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::playback::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMoviePlaybackLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::playback::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMoviePlaybackPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::playback::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieTitleCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::title::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieTitleDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::title::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieTitleEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::title::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieTitleError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::title::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieTitleLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::title::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideMovieTitlePatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::movie::title::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideNotesCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::notes::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideNotesDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::notes::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideNotesEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::notes::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideNotesError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::notes::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideNotesLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::notes::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideNotesPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::notes::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideOrderCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::order::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideOrderDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::order::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideOrderEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::order::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideOrderError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::order::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideOrderLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::order::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideOrderPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::order::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableAppearanceCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::appearance::transaction::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableAppearanceDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::appearance::transaction::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableAppearanceEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::appearance::transaction::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableAppearanceError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::appearance::transaction::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableAppearanceLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::appearance::transaction::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableAppearancePatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::appearance::transaction::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableAppearancePath",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::appearance::transaction::Path (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableCellNumberFormatCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::number_format::transaction::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableCellNumberFormatDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::number_format::transaction::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableCellNumberFormatEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::number_format::transaction::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableCellNumberFormatError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::number_format::transaction::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableCellNumberFormatLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::number_format::transaction::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableCellNumberFormatPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::number_format::transaction::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableCellNumberFormatPath",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::number_format::transaction::Path (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableCellsError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::cells::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableCellsLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::cells::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableCellsPath",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::cells::Path (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableDimensionCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::dimension::transaction::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableDimensionDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::dimension::transaction::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableDimensionEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::dimension::transaction::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableDimensionError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::dimension::transaction::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableDimensionLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::dimension::transaction::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableDimensionPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::dimension::transaction::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableDimensionPath",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::dimension::transaction::Path (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableHeaderCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::headers::transaction::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableHeaderDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::headers::transaction::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableHeaderEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::headers::transaction::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableHeaderError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::headers::transaction::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableHeaderInvalidReason",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::headers::transaction::InvalidReason (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableHeaderLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::headers::transaction::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableHeaderPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::headers::transaction::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableHeaderPath",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::headers::transaction::Path (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableLockStateCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::lock::transaction::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableLockStateDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::lock::transaction::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableLockStateEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::lock::transaction::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableLockStateError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::lock::transaction::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableLockStateLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::lock::transaction::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableLockStatePatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::lock::transaction::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableLockStatePath",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::lock::transaction::Path (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableMergesCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::merge::transaction::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableMergesDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::merge::transaction::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableMergesEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::merge::transaction::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableMergesError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::merge::transaction::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableMergesLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::merge::transaction::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableMergesPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::merge::transaction::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableMergesPath",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::merge::transaction::Path (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableName",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::name::Name (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableNameCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::name::transaction::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableNameDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::name::transaction::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableNameEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::name::transaction::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableNameError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::name::transaction::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableNameLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::name::transaction::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableNamePatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::name::transaction::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableNamePath",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::name::transaction::Path (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableNameValueError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::name::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTablePhysicalSortCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::physical_sort::transaction::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTablePhysicalSortDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::physical_sort::transaction::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTablePhysicalSortEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::physical_sort::transaction::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTablePhysicalSortError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::physical_sort::transaction::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTablePhysicalSortLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::physical_sort::transaction::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTablePhysicalSortPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::physical_sort::transaction::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTablePhysicalSortPath",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::physical_sort::transaction::Path (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableSortCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::sort::transaction::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableSortDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::sort::transaction::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableSortEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::sort::transaction::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableSortError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::sort::transaction::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableSortLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::sort::transaction::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableSortPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::sort::transaction::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableSortPath",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::sort::transaction::Path (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableTitleCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::title::transaction::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableTitleDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::title::transaction::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableTitleEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::title::transaction::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableTitleError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::title::transaction::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableTitleLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::title::transaction::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTableTitlePatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::table::title::transaction::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTextCommit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::text::Commit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTextDiagnostics",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::text::Diagnostics (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTextEdit",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::text::Edit (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTextError",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::text::Error (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTextLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::text::LimitKind (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "SlideTextPatch",
+          "scope": "litchi_keynote",
+          "replacement": "use litchi_keynote::slide::text::Patch (ADR 0034 §2, record 0298)"
+        },
+        {
+          "name": "transaction",
+          "scope": "litchi_keynote::slide::audio",
+          "replacement": "the family lives in slide::audio::position / slide::movie::{geometry, playback} (record 0298)",
+          "recursive": false
+        },
+        {
+          "name": "transaction",
+          "scope": "litchi_keynote::slide::media::geometry",
+          "replacement": "the family lives in slide::audio::position / slide::movie::{geometry, playback} (record 0298)",
+          "recursive": false
+        },
+        {
+          "name": "transaction",
+          "scope": "litchi_keynote::slide::media::playback",
+          "replacement": "the family lives in slide::audio::position / slide::movie::{geometry, playback} (record 0298)",
           "recursive": false
         }
       ],
-      "families": []
+      "families": [
+        "litchi_keynote::edit",
+        "litchi_keynote::chart::arrangement",
+        "litchi_keynote::chart::axis_title",
+        "litchi_keynote::chart::caption",
+        "litchi_keynote::chart::legend",
+        "litchi_keynote::chart::title",
+        "litchi_keynote::chart::value_axis",
+        "litchi_keynote::chart::data",
+        "litchi_keynote::background",
+        "litchi_keynote::build::order",
+        "litchi_keynote::slide::image::adjustments",
+        "litchi_keynote::slide::movie::caption",
+        "litchi_keynote::slide::movie::geometry",
+        "litchi_keynote::slide::movie::playback",
+        "litchi_keynote::slide::movie::title",
+        "litchi_keynote::slide::audio::position",
+        "litchi_keynote::slide::notes",
+        "litchi_keynote::slide::order",
+        "litchi_keynote::slide::text",
+        "litchi_keynote::slide::comment::transaction",
+        "litchi_keynote::slide::media::data",
+        "litchi_keynote::slide::media::properties",
+        "litchi_keynote::slide::table::appearance::transaction",
+        "litchi_keynote::slide::table::dimension::transaction",
+        "litchi_keynote::slide::table::lock::transaction",
+        "litchi_keynote::slide::table::name::transaction",
+        "litchi_keynote::slide::table::sort::transaction",
+        "litchi_keynote::slide::table::title::transaction",
+        "litchi_keynote::slide::table::number_format::transaction",
+        "litchi_keynote::slide::table::merge::transaction",
+        "litchi_keynote::slide::table::headers::transaction",
+        "litchi_keynote::slide::table::physical_sort::transaction",
+        "litchi_keynote::slide::delete",
+        "litchi_keynote::transition",
+        "litchi_keynote::show",
+        "litchi_keynote::soundtrack",
+        "litchi_keynote::soundtrack::order",
+        "litchi_keynote::soundtrack::items",
+        "litchi_keynote::slide::placeholder"
+      ]
     }
   ]
 }

@@ -10,8 +10,8 @@ use litchi_iwa_core::{
 };
 use litchi_iwa_protos::{kn, tsa, tsch, tsd, tsk, tsp, tswp};
 use litchi_keynote::{
-    ChartCaptionError, ChartCaptionLimitKind, ChartSelector, OpenOptions, Package, Position,
-    SemanticLimits, SlideSelector, SourceLimits,
+    ChartSelector, OpenOptions, Package, Position, SemanticLimits, SlideSelector, SourceLimits,
+    chart::caption::Error as ChartCaptionError, chart::caption::LimitKind as ChartCaptionLimitKind,
 };
 use prost::Message as _;
 
@@ -784,7 +784,7 @@ fn run_caption_create_with_options(
 
 fn run_caption_apply_with_options(
     source: &[u8],
-    patch: &litchi_keynote::ChartCaptionPatch,
+    patch: &litchi_keynote::chart::caption::Patch,
     options: OpenOptions,
 ) -> TestResult<Result<Vec<u8>, ChartCaptionError>> {
     let package = Package::from_bytes_with_options(source, options)?;

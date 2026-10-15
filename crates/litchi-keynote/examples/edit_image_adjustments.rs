@@ -15,7 +15,8 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use litchi_keynote::{
-    ImageSelector, Package, SlideImageAdjustmentsError, SlideSelector,
+    ImageSelector, Package, SlideSelector,
+    slide::image::adjustments,
     slide::image::{ImageAdjustment, ImageAdjustments, ImageEnhancement},
 };
 use tempfile::NamedTempFile;
@@ -203,7 +204,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             commit
                 .package()
                 .apply_slide_image_adjustments(commit.patch()),
-            Err(SlideImageAdjustmentsError::PatchConflict)
+            Err(adjustments::Error::PatchConflict)
         )
     {
         return Err(invalid_input(

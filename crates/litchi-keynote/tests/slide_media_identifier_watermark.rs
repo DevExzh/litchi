@@ -13,7 +13,10 @@ use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::wire::{WireView, append_length_delimited_field};
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsd, tsp};
-use litchi_keynote::{MovieSelector, Package, SlideMediaLifecycleError, SlideSelector};
+use litchi_keynote::{
+    MovieSelector, Package, SlideSelector,
+    slide::media::lifecycle::Error as SlideMediaLifecycleError,
+};
 use prost::Message as _;
 
 #[path = "support/slide_media_fixture.rs"]

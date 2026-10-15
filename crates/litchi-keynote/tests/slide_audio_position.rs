@@ -386,12 +386,12 @@ fn strict_native_saved_readback(expected: Point) -> TestResult {
             saved.slide_media_data(
                 SlideSelector::index(0),
                 MovieSelector::index(index),
-                litchi_keynote::MediaPart::Content,
+                litchi_keynote::slide::media::data::MediaPart::Content,
             )?,
             baseline.slide_media_data(
                 SlideSelector::index(0),
                 MovieSelector::index(index),
-                litchi_keynote::MediaPart::Content,
+                litchi_keynote::slide::media::data::MediaPart::Content,
             )?,
             "saved media content changed at source position {index}"
         );
@@ -400,12 +400,12 @@ fn strict_native_saved_readback(expected: Point) -> TestResult {
                 saved.slide_media_data(
                     SlideSelector::index(0),
                     MovieSelector::index(index),
-                    litchi_keynote::MediaPart::Poster,
+                    litchi_keynote::slide::media::data::MediaPart::Poster,
                 )?,
                 baseline.slide_media_data(
                     SlideSelector::index(0),
                     MovieSelector::index(index),
-                    litchi_keynote::MediaPart::Poster,
+                    litchi_keynote::slide::media::data::MediaPart::Poster,
                 )?,
                 "saved movie poster changed at source position {index}"
             );
@@ -749,12 +749,12 @@ fn native_ui_position_oracle_reads_back_without_losing_siblings() -> TestResult 
             oracle.slide_media_data(
                 SlideSelector::index(0),
                 MovieSelector::index(index),
-                litchi_keynote::MediaPart::Content,
+                litchi_keynote::slide::media::data::MediaPart::Content,
             )?,
             baseline.slide_media_data(
                 SlideSelector::index(0),
                 MovieSelector::index(index),
-                litchi_keynote::MediaPart::Content,
+                litchi_keynote::slide::media::data::MediaPart::Content,
             )?,
             "native UI position oracle changed media bytes at source position {index}"
         );
@@ -940,12 +940,12 @@ fn native_audio_position_preserves_unselected_graph_and_invalidates_previews() -
     let before_audio = package.slide_media_data(
         SlideSelector::index(0),
         MovieSelector::index(0),
-        litchi_keynote::MediaPart::Content,
+        litchi_keynote::slide::media::data::MediaPart::Content,
     )?;
     let before_audio_b = package.slide_media_data(
         SlideSelector::index(0),
         MovieSelector::index(1),
-        litchi_keynote::MediaPart::Content,
+        litchi_keynote::slide::media::data::MediaPart::Content,
     )?;
     let before_objects = object_payloads(NATIVE_BASELINE)?;
     let audio_id = *native_audio_ids(NATIVE_BASELINE)?
@@ -973,7 +973,7 @@ fn native_audio_position_preserves_unselected_graph_and_invalidates_previews() -
         commit.package().slide_media_data(
             SlideSelector::index(0),
             MovieSelector::index(0),
-            litchi_keynote::MediaPart::Content,
+            litchi_keynote::slide::media::data::MediaPart::Content,
         )?,
         before_audio
     );
@@ -981,7 +981,7 @@ fn native_audio_position_preserves_unselected_graph_and_invalidates_previews() -
         commit.package().slide_media_data(
             SlideSelector::index(0),
             MovieSelector::index(1),
-            litchi_keynote::MediaPart::Content,
+            litchi_keynote::slide::media::data::MediaPart::Content,
         )?,
         before_audio_b
     );

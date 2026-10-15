@@ -20,7 +20,8 @@ use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tsd, tsp};
 use litchi_keynote::{
     DrawableSelector, MovieInfo, OpenOptions, Package, ReplySelector, SemanticLimits,
-    SlideDrawableCommentError, SlideDrawableCommentLimitKind, SlideSelector, SourceLimits,
+    SlideSelector, SourceLimits, slide::comment::transaction::Error as SlideDrawableCommentError,
+    slide::comment::transaction::LimitKind as SlideDrawableCommentLimitKind,
 };
 use prost::Message as _;
 

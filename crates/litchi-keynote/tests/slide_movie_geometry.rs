@@ -12,7 +12,9 @@ use litchi_keynote::slide::media::{
     Point, Size,
     geometry::{MovieFlipAxis, MovieGeometry, MovieTransform},
 };
-use litchi_keynote::{OpenOptions, Package, SlideMovieGeometryError, SourceLimits};
+use litchi_keynote::{
+    OpenOptions, Package, SourceLimits, slide::movie::geometry::Error as SlideMovieGeometryError,
+};
 use prost::Message as _;
 
 const DOCUMENT: &str = "Index/Document.iwa";

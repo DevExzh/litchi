@@ -1970,7 +1970,7 @@ mod tests {
         let focused = litchi_keynote::Package::from_bytes(&source).unwrap();
         assert!(matches!(
             focused.slide_table_merges(0, 0),
-            Err(litchi_keynote::SlideTableMergesError::UnsupportedDependency)
+            Err(litchi_keynote::slide::table::merge::transaction::Error::UnsupportedDependency)
         ));
 
         let legacy = KeynoteEditor::from_bytes(&source).unwrap();

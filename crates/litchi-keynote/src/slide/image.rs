@@ -142,6 +142,13 @@ fn validate_size(size: Size) -> Result<()> {
     Ok(())
 }
 
+/// Exact-source transactions for one image's adjustments.
+pub mod adjustments {
+    pub use crate::package::image_adjustments::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch,
+    };
+}
+
 #[cfg(test)]
 mod tests {
     use std::mem::size_of;

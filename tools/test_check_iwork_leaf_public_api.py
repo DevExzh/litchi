@@ -135,11 +135,11 @@ def keynote_selector_error_bridge() -> dict:
         "inner": {"enum": {"variants": [], "impls": ["7"]}},
     }
     value["paths"]["6"] = {
-        "path": ["litchi_keynote", "package", "edit", "EditError"],
+        "path": ["litchi_keynote", "package", "edit", "Error"],
         "kind": "enum",
     }
     value["index"]["6"] = {
-        "name": "EditError",
+        "name": "Error",
         "crate_id": 0,
         "inner": {"enum": {"variants": [], "impls": []}},
     }

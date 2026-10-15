@@ -3,8 +3,9 @@
 use std::error::Error as StdError;
 
 use litchi_keynote::{
-    OpenOptions, Package, SemanticLimits, SlideSelector, SlideTableMergesError,
-    SlideTableMergesLimitKind, TableSelector, slide::table::merge::Region,
+    OpenOptions, Package, SemanticLimits, SlideSelector, TableSelector,
+    slide::table::merge::Region, slide::table::merge::transaction::Error as SlideTableMergesError,
+    slide::table::merge::transaction::LimitKind as SlideTableMergesLimitKind,
 };
 
 const NATIVE_SOURCE: &[u8] =

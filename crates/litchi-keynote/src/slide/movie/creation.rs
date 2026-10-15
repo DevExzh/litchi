@@ -8,7 +8,7 @@ use std::fmt;
 
 use litchi_core::Position;
 use litchi_iwa_archive::package::ExactArtifacts;
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::Options;
 use crate::Package;
@@ -16,7 +16,7 @@ use crate::Package;
 /// Finite resources consumed by one movie-creation transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum SlideMovieCreationLimitKind {
+pub enum LimitKind {
     /// Source package bytes.
     InputBytes,
     /// Candidate package bytes.
@@ -45,7 +45,7 @@ pub enum SlideMovieCreationLimitKind {
     Allocations,
 }
 
-impl fmt::Display for SlideMovieCreationLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "source package bytes",
@@ -66,9 +66,9 @@ impl fmt::Display for SlideMovieCreationLimitKind {
 }
 
 /// Content-redacted failures from fresh slide-movie creation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum SlideMovieCreationError {
+pub enum Error {
     /// The package has no exact physical source suitable for this transaction.
     #[error("this Keynote source does not support slide movie creation")]
     UnsupportedSource,
@@ -102,7 +102,7 @@ pub enum SlideMovieCreationError {
     /// A configured finite resource ceiling was exceeded.
     #[error("slide movie creation {kind} limit exceeded: observed {observed}, maximum {maximum}")]
     LimitExceeded {
-        kind: SlideMovieCreationLimitKind,
+        kind: LimitKind,
         observed: u64,
         maximum: u64,
     },
@@ -120,7 +120,7 @@ pub enum SlideMovieCreationError {
 /// Exact source and target artifacts for creating one slide-owned movie.
 #[must_use]
 #[derive(Clone)]
-pub struct SlideMovieCreationPatch {
+pub struct Patch {
     pub(crate) artifacts: ExactArtifacts,
     pub(crate) slide_position: Position,
     pub(crate) movie_position: Position,
@@ -141,10 +141,10 @@ pub struct SlideMovieCreationPatch {
     pub(crate) restored_previews: usize,
 }
 
-impl fmt::Debug for SlideMovieCreationPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SlideMovieCreationPatch")
+            .debug_struct("Patch")
             .field("slide_position", &self.slide_position)
             .field("movie_position", &self.movie_position)
             .field("source_media_count", &self.source_media_count)
@@ -163,7 +163,7 @@ impl fmt::Debug for SlideMovieCreationPatch {
     }
 }
 
-impl SlideMovieCreationPatch {
+impl Patch {
     /// Return the diagnostic fingerprint of the exact source artifact.
     #[must_use]
     pub const fn source_fingerprint(&self) -> u64 {
@@ -299,7 +299,7 @@ impl SlideMovieCreationPatch {
 
 /// Resource and topology evidence for a verified creation or its inverse.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SlideMovieCreationDiagnostics {
+pub struct Diagnostics {
     pub(crate) changed: bool,
     pub(crate) source_media_count: usize,
     pub(crate) target_media_count: usize,
@@ -312,8 +312,8 @@ pub struct SlideMovieCreationDiagnostics {
     pub(crate) restored_previews: usize,
 }
 
-impl SlideMovieCreationDiagnostics {
-    pub(crate) fn for_patch(patch: &SlideMovieCreationPatch) -> Self {
+impl Diagnostics {
+    pub(crate) fn for_patch(patch: &Patch) -> Self {
         Self {
             changed: !patch.is_noop(),
             source_media_count: patch.source_media_count,
@@ -392,13 +392,13 @@ impl SlideMovieCreationDiagnostics {
 /// A reopened package and its exact-source reversible creation patch.
 #[must_use]
 #[derive(Debug)]
-pub struct SlideMovieCreationCommit {
+pub struct Commit {
     pub(crate) package: Package,
-    pub(crate) patch: SlideMovieCreationPatch,
-    pub(crate) diagnostics: SlideMovieCreationDiagnostics,
+    pub(crate) patch: Patch,
+    pub(crate) diagnostics: Diagnostics,
 }
 
-impl SlideMovieCreationCommit {
+impl Commit {
     /// Borrow the verified package.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -412,13 +412,13 @@ impl SlideMovieCreationCommit {
     }
 
     /// Borrow the exact-source patch.
-    pub const fn patch(&self) -> &SlideMovieCreationPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Borrow the creation diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> &SlideMovieCreationDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }

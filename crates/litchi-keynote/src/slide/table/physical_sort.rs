@@ -562,8 +562,5 @@ pub type TransactionError = Error;
 /// remains below the archive boundary.
 pub mod transaction {
     pub use super::{Diagnostics, Error, LimitKind, Path, TransactionError, UnsupportedFeature};
-    pub use crate::{
-        SlideTablePhysicalSortCommit as Commit, SlideTablePhysicalSortEdit as Edit,
-        SlideTablePhysicalSortPatch as Patch,
-    };
+    pub use crate::package::slide_table_physical_sort::{Commit, Edit, Patch};
 }

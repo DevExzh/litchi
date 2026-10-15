@@ -4,7 +4,10 @@ use litchi_iwa_archive::{Limits, package::Catalog};
 use litchi_iwa_common::wire::{WireView, append_length_delimited_field, append_varint_field};
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsd, tsk, tsp, tswp};
-use litchi_keynote::{MovieSelector, Package, SlideMovieTitleError, SlideSelector, SourceLimits};
+use litchi_keynote::{
+    MovieSelector, Package, SlideSelector, SourceLimits,
+    slide::movie::title::Error as SlideMovieTitleError,
+};
 use prost::Message as _;
 
 const DOCUMENT_MEMBER: &str = "Index/Document.iwa";

@@ -21,9 +21,14 @@ use litchi_iwa_core::{
 use litchi_iwa_protos::{kn, tsa, tsd, tsk, tsp, tst, tswp};
 use litchi_keynote::slide::table::sort::{ColumnIndex, Direction, Order, Rule, Scope};
 use litchi_keynote::{
-    OpenOptions, Package, SlideSelector, SlideTableSortCommit, SlideTableSortDiagnostics,
-    SlideTableSortEdit, SlideTableSortError, SlideTableSortLimitKind, SlideTableSortPatch,
-    SlideTableSortPath, SourceLimits, TableSelector,
+    OpenOptions, Package, SlideSelector, SourceLimits, TableSelector,
+    slide::table::sort::transaction::Commit as SlideTableSortCommit,
+    slide::table::sort::transaction::Diagnostics as SlideTableSortDiagnostics,
+    slide::table::sort::transaction::Edit as SlideTableSortEdit,
+    slide::table::sort::transaction::Error as SlideTableSortError,
+    slide::table::sort::transaction::LimitKind as SlideTableSortLimitKind,
+    slide::table::sort::transaction::Patch as SlideTableSortPatch,
+    slide::table::sort::transaction::Path as SlideTableSortPath,
 };
 use prost::Message as _;
 

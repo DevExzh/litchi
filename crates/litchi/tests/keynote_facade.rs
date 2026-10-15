@@ -8,7 +8,8 @@ use litchi::keynote::show::{
 };
 use litchi::keynote::slide::placeholder::Kind;
 use litchi::keynote::{
-    Package, Position, SlideNotesError, SlideSelector, SlideTextError, TextSpan,
+    Package, Position, SlideSelector, TextSpan, slide::notes::Error as SlideNotesError,
+    slide::text::Error as SlideTextError,
 };
 
 trait ExactPackageBytes {

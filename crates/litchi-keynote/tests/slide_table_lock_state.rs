@@ -22,9 +22,14 @@ use litchi_iwa_core::{
 use litchi_iwa_protos::{kn, tsa, tsd, tsk, tsp, tst, tswp};
 use litchi_keynote::slide::table::lock::State;
 use litchi_keynote::{
-    OpenOptions, Package, SemanticLimits, SlideSelector, SlideTableLockStateCommit,
-    SlideTableLockStateDiagnostics, SlideTableLockStateEdit, SlideTableLockStateError,
-    SlideTableLockStateLimitKind, SlideTableLockStatePatch, SlideTableLockStatePath, TableSelector,
+    OpenOptions, Package, SemanticLimits, SlideSelector, TableSelector,
+    slide::table::lock::transaction::Commit as SlideTableLockStateCommit,
+    slide::table::lock::transaction::Diagnostics as SlideTableLockStateDiagnostics,
+    slide::table::lock::transaction::Edit as SlideTableLockStateEdit,
+    slide::table::lock::transaction::Error as SlideTableLockStateError,
+    slide::table::lock::transaction::LimitKind as SlideTableLockStateLimitKind,
+    slide::table::lock::transaction::Patch as SlideTableLockStatePatch,
+    slide::table::lock::transaction::Path as SlideTableLockStatePath,
 };
 use prost::Message as _;
 

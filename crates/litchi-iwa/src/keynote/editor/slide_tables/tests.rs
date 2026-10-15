@@ -109,9 +109,9 @@ fn set_focused_table_name(
     let commit = match result {
         Ok(commit) => commit,
         Err(
-            litchi_keynote::SlideTableNameError::InvalidSource { .. }
-            | litchi_keynote::SlideTableNameError::UnsupportedDependency
-            | litchi_keynote::SlideTableNameError::UnsupportedSource,
+            litchi_keynote::slide::table::name::transaction::Error::InvalidSource { .. }
+            | litchi_keynote::slide::table::name::transaction::Error::UnsupportedDependency
+            | litchi_keynote::slide::table::name::transaction::Error::UnsupportedSource,
         ) => {
             assert_eq!(editor.to_bytes()?, before);
             assert_eq!(
@@ -210,7 +210,7 @@ fn assert_focused_table_dimension_rejected(
     assert!(
         matches!(
             result,
-            Err(litchi_keynote::SlideTableDimensionError::UnsupportedDependency)
+            Err(litchi_keynote::slide::table::dimension::transaction::Error::UnsupportedDependency)
         ),
         "focused Keynote dimension edit unexpectedly admitted builder snapshot: {result:?}"
     );

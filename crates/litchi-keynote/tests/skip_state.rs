@@ -10,7 +10,9 @@ use litchi_iwa_common::{
 };
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsk, tsp};
-use litchi_keynote::{EditError, Package, ReadError, SlideSelector, SlideSelectorError};
+use litchi_keynote::{
+    Package, ReadError, SlideSelector, SlideSelectorError, edit::Error as EditError,
+};
 use prost::Message;
 
 const DOCUMENT_MEMBER: &str = "Index/Document.iwa";
@@ -510,9 +512,9 @@ fn malformed_required_skip_field_and_payload_ambiguity_are_rejected()
 #[test]
 fn public_transaction_values_are_send_sync() {
     fn assert_send_sync<T: Send + Sync>() {}
-    assert_send_sync::<litchi_keynote::Commit>();
-    assert_send_sync::<litchi_keynote::Patch>();
-    assert_send_sync::<litchi_keynote::Diagnostics>();
+    assert_send_sync::<litchi_keynote::edit::Commit>();
+    assert_send_sync::<litchi_keynote::edit::Patch>();
+    assert_send_sync::<litchi_keynote::edit::Diagnostics>();
     assert_send_sync::<EditError>();
 
     // Keep the exact-source Arc implementation observable to the compiler:

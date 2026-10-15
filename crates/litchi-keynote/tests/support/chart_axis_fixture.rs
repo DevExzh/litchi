@@ -21,8 +21,9 @@ use litchi_iwa_core::{
 };
 use litchi_iwa_protos::{kn, tsa, tsch, tsd, tsk, tsp, tss};
 use litchi_keynote::{
-    Axis, ChartAxisTitleError, ChartAxisTitleLimitKind, ChartSelector, Package, Position,
-    SemanticLimits, SlideSelector,
+    Axis, ChartSelector, Package, Position, SemanticLimits, SlideSelector,
+    chart::axis_title::Error as ChartAxisTitleError,
+    chart::axis_title::LimitKind as ChartAxisTitleLimitKind,
 };
 use prost::Message as _;
 

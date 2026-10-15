@@ -12,7 +12,9 @@ use litchi_iwa_archive::{
 };
 use litchi_iwa_common::shape::geometry::{Point, Size};
 use litchi_iwa_core::{Archive, FieldInfo, SnappyStream};
-use litchi_keynote::{MediaPart, MovieSelector, Package, SlideSelector, slide::movie::Options};
+use litchi_keynote::{
+    MovieSelector, Package, SlideSelector, slide::media::data::MediaPart, slide::movie::Options,
+};
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 

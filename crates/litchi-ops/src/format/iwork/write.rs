@@ -36,11 +36,11 @@ pub(crate) enum LeafPatch {
     #[cfg(feature = "pages")]
     PagesText(litchi_pages::SectionTextPatch),
     #[cfg(feature = "keynote")]
-    KeynoteText(litchi_keynote::SlideTextPatch),
+    KeynoteText(litchi_keynote::slide::text::Patch),
     #[cfg(feature = "keynote")]
-    KeynoteSkip(litchi_keynote::Patch),
+    KeynoteSkip(litchi_keynote::edit::Patch),
     #[cfg(feature = "keynote")]
-    KeynoteOrder(litchi_keynote::SlideOrderPatch),
+    KeynoteOrder(litchi_keynote::slide::order::Patch),
     #[cfg(feature = "keynote")]
     KeynoteDeletion(
         #[allow(

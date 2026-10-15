@@ -411,6 +411,7 @@ mod time;
 pub mod background;
 pub mod build;
 pub mod chart;
+pub mod edit;
 pub mod limits;
 pub mod presentation;
 pub mod show;
@@ -455,111 +456,20 @@ pub use package::{__decode_image_adjustments_payload, ImageAdjustmentsError};
 #[doc(hidden)]
 pub use package::{__invalidate_slide_preview, SlidePreviewInvalidationError};
 pub use package::{
-    ChartArrangementCommit, ChartArrangementDiagnostics, ChartArrangementEdit,
-    ChartArrangementError, ChartArrangementLimitKind, ChartArrangementPatch, ChartAxisTitleCommit,
-    ChartAxisTitleDiagnostics, ChartAxisTitleEdit, ChartAxisTitleError, ChartAxisTitleLimitKind,
-    ChartAxisTitlePatch, ChartCaptionCommit, ChartCaptionDiagnostics, ChartCaptionEdit,
-    ChartCaptionError, ChartCaptionLimitKind, ChartCaptionPatch, ChartLegendVisibilityCommit,
-    ChartLegendVisibilityDiagnostics, ChartLegendVisibilityEdit, ChartLegendVisibilityError,
-    ChartLegendVisibilityLimitKind, ChartLegendVisibilityPatch, ChartTitleCommit,
-    ChartTitleDiagnostics, ChartTitleEdit, ChartTitleError, ChartTitleLimitKind, ChartTitlePatch,
-    Commit, Diagnostics, Edit, EditError, KEYNOTE_PHYSICAL_SORT_OWNER_ACTIVE, Package, Patch,
-    PayloadLimitKind, ReadError, SaveError, SemanticPath, SlideBackgroundCommit,
-    SlideBackgroundDiagnostics, SlideBackgroundEdit, SlideBackgroundError,
-    SlideBackgroundLimitKind, SlideBackgroundPatch, SlideBuildOrderCommit,
-    SlideBuildOrderDiagnostics, SlideBuildOrderEdit, SlideBuildOrderError,
-    SlideBuildOrderLimitKind, SlideBuildOrderPatch, SlideImageAdjustmentsCommit,
-    SlideImageAdjustmentsDiagnostics, SlideImageAdjustmentsEdit, SlideImageAdjustmentsError,
-    SlideImageAdjustmentsLimitKind, SlideImageAdjustmentsPatch, SlideMovieCaptionCommit,
-    SlideMovieCaptionDiagnostics, SlideMovieCaptionEdit, SlideMovieCaptionError,
-    SlideMovieCaptionLimitKind, SlideMovieCaptionPatch, SlideMovieGeometryCommit,
-    SlideMovieGeometryDiagnostics, SlideMovieGeometryEdit, SlideMovieGeometryError,
-    SlideMovieGeometryLimitKind, SlideMovieGeometryPatch, SlideMoviePlaybackCommit,
-    SlideMoviePlaybackDiagnostics, SlideMoviePlaybackEdit, SlideMoviePlaybackError,
-    SlideMoviePlaybackLimitKind, SlideMoviePlaybackPatch, SlideMovieTitleCommit,
-    SlideMovieTitleDiagnostics, SlideMovieTitleEdit, SlideMovieTitleError,
-    SlideMovieTitleLimitKind, SlideMovieTitlePatch, SlideNotesCommit, SlideNotesDiagnostics,
-    SlideNotesEdit, SlideNotesError, SlideNotesLimitKind, SlideNotesPatch, SlideOrderCommit,
-    SlideOrderDiagnostics, SlideOrderEdit, SlideOrderError, SlideOrderLimitKind, SlideOrderPatch,
-    SlideTableAppearanceCommit, SlideTableAppearanceDiagnostics, SlideTableAppearanceEdit,
-    SlideTableAppearanceError, SlideTableAppearanceLimitKind, SlideTableAppearancePatch,
-    SlideTableAppearancePath, SlideTableDimensionCommit, SlideTableDimensionDiagnostics,
-    SlideTableDimensionEdit, SlideTableDimensionError, SlideTableDimensionLimitKind,
-    SlideTableDimensionPatch, SlideTableDimensionPath, SlideTableHeaderCommit,
-    SlideTableHeaderDiagnostics, SlideTableHeaderEdit, SlideTableHeaderError,
-    SlideTableHeaderInvalidReason, SlideTableHeaderLimitKind, SlideTableHeaderPatch,
-    SlideTableHeaderPath, SlideTableLockStateCommit, SlideTableLockStateDiagnostics,
-    SlideTableLockStateEdit, SlideTableLockStateError, SlideTableLockStateLimitKind,
-    SlideTableLockStatePatch, SlideTableLockStatePath, SlideTableNameCommit,
-    SlideTableNameDiagnostics, SlideTableNameEdit, SlideTableNameError, SlideTableNameLimitKind,
-    SlideTableNamePatch, SlideTableNamePath, SlideTablePhysicalSortCommit,
-    SlideTablePhysicalSortDiagnostics, SlideTablePhysicalSortEdit, SlideTablePhysicalSortError,
-    SlideTablePhysicalSortLimitKind, SlideTablePhysicalSortPatch, SlideTablePhysicalSortPath,
-    SlideTableSortCommit, SlideTableSortDiagnostics, SlideTableSortEdit, SlideTableSortError,
-    SlideTableSortLimitKind, SlideTableSortPatch, SlideTableSortPath, SlideTableTitleCommit,
-    SlideTableTitleDiagnostics, SlideTableTitleEdit, SlideTableTitleError,
-    SlideTableTitleLimitKind, SlideTableTitlePatch, SlideTextCommit, SlideTextDiagnostics,
-    SlideTextEdit, SlideTextError, SlideTextLimitKind, SlideTextPatch, Stats, TextStorageFailure,
-    WriteError,
+    KEYNOTE_PHYSICAL_SORT_OWNER_ACTIVE, Package, PayloadLimitKind, ReadError, SaveError,
+    SemanticPath, Stats, TextStorageFailure, WriteError,
 };
-pub use package::{
-    ChartValueAxisCommit, ChartValueAxisDiagnostics, ChartValueAxisEdit, ChartValueAxisError,
-    ChartValueAxisLimitKind, ChartValueAxisPatch,
-};
-pub use package::{
-    DrawableSummary, SlideDrawableCommentCommit, SlideDrawableCommentDiagnostics,
-    SlideDrawableCommentEdit, SlideDrawableCommentError, SlideDrawableCommentLimitKind,
-    SlideDrawableCommentPatch,
-};
-pub use package::{
-    MediaPart, SlideMediaData, SlideMediaDataCommit, SlideMediaDataDiagnostics, SlideMediaDataEdit,
-    SlideMediaDataError, SlideMediaDataLimitKind, SlideMediaDataPatch, SlideMediaPropertiesCommit,
-    SlideMediaPropertiesDiagnostics, SlideMediaPropertiesEdit, SlideMediaPropertiesError,
-    SlideMediaPropertiesLimitKind, SlideMediaPropertiesPatch,
-};
-pub use package::{
-    MergeReader, SlideTableMergesCommit, SlideTableMergesDiagnostics, SlideTableMergesEdit,
-    SlideTableMergesError, SlideTableMergesLimitKind, SlideTableMergesPatch, SlideTableMergesPath,
-};
-pub use package::{
-    SlideAudioPositionCommit, SlideAudioPositionDiagnostics, SlideAudioPositionEdit,
-    SlideAudioPositionError, SlideAudioPositionLimitKind, SlideAudioPositionPatch,
-};
-pub use package::{
-    SlideChartDataCommit, SlideChartDataDiagnostics, SlideChartDataEdit, SlideChartDataError,
-    SlideChartDataLimitKind, SlideChartDataPatch,
-};
-pub use package::{SlideChartMetadataError, SlideChartMetadataLimitKind};
-pub use package::{
-    SlideMediaLifecycleCommit, SlideMediaLifecycleDiagnostics, SlideMediaLifecycleError,
-    SlideMediaLifecycleLimitKind, SlideMediaLifecyclePatch,
-};
-pub use package::{
-    SlideTableCellNumberFormatCommit, SlideTableCellNumberFormatDiagnostics,
-    SlideTableCellNumberFormatEdit, SlideTableCellNumberFormatError,
-    SlideTableCellNumberFormatLimitKind, SlideTableCellNumberFormatPatch,
-    SlideTableCellNumberFormatPath,
-};
-pub use package::{SlideTableCellsError, SlideTableCellsLimitKind, SlideTableCellsPath};
+
 pub use presentation::Presentation;
 pub use selector::{
     DrawableSelector, ReplySelector, SlideSelector, SlideSelectorError, SlideSelectorResult,
-};
-pub use slide::audio::creation::{
-    SlideAudioCreationCommit, SlideAudioCreationDiagnostics, SlideAudioCreationError,
-    SlideAudioCreationLimitKind, SlideAudioCreationPatch,
 };
 pub use slide::comment::{Comment, CommentAuthor, CommentTimestamp, DrawableKind, Reply};
 pub use slide::image::ImageSelector;
 pub use slide::media::{MediaInfo, MediaProperties, MovieInfo, MovieKind};
 pub use slide::movie::MovieSelector;
-pub use slide::movie::creation::{
-    SlideMovieCreationCommit, SlideMovieCreationDiagnostics, SlideMovieCreationError,
-    SlideMovieCreationLimitKind, SlideMovieCreationPatch,
-};
 pub use slide::table::TableSelector;
 pub use slide::table::merge::Region;
-pub use slide::table::name::{Error as SlideTableNameValueError, Name as SlideTableName};
 pub use slide::table::number_format::{
     CellPosition, CellPositionError, DecimalPlaces, FixedDecimalPlaces, NegativeStyle, Number,
     NumberError, ThousandsSeparator,

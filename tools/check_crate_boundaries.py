@@ -457,10 +457,21 @@ IWA_KEYNOTE_CHART_TITLE_IDENTIFIER_POSITION_FALLBACK = re.compile(
 KEYNOTE_CHART_LEGEND_OWNER_SOURCE = (
     KEYNOTE_SOURCE_ROOT / "package" / "slide_chart_legend.rs"
 )
+# ADR 0034 W1 (record 0298): focused Keynote families use the unprefixed
+# transaction vocabulary inside their own modules.  These generic names no
+# longer identify one family, so the facade-leak filters of the crate-root and
+# package seams ignore them and look for family-specific names instead.
+KEYNOTE_FAMILY_GENERIC_NAMES = frozenset(
+    {"Edit", "Patch", "Commit", "Diagnostics", "Error", "LimitKind", "Path", "InvalidReason", "Data"}
+)
 KEYNOTE_CHART_LEGEND_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
+# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# module, which re-exports the unprefixed transaction names.
+KEYNOTE_CHART_LEGEND_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "chart.rs"
+KEYNOTE_CHART_LEGEND_FAMILY_MODULE = 'legend'
 KEYNOTE_CHART_LEGEND_PACKAGE_MODULE = "slide_chart_legend"
 KEYNOTE_CHART_LEGEND_PACKAGE_METHODS = frozenset(
     {
@@ -471,12 +482,12 @@ KEYNOTE_CHART_LEGEND_PACKAGE_METHODS = frozenset(
 )
 KEYNOTE_CHART_LEGEND_CANONICAL_TYPES = frozenset(
     {
-        "ChartLegendVisibilityCommit",
-        "ChartLegendVisibilityDiagnostics",
-        "ChartLegendVisibilityEdit",
-        "ChartLegendVisibilityError",
-        "ChartLegendVisibilityLimitKind",
-        "ChartLegendVisibilityPatch",
+        "Commit",
+        "Diagnostics",
+        "Edit",
+        "Error",
+        "LimitKind",
+        "Patch",
     }
 )
 KEYNOTE_CHART_LEGEND_RAW_ID_TOKEN = re.compile(
@@ -513,6 +524,10 @@ KEYNOTE_CHART_ARRANGEMENT_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
+# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# module, which re-exports the unprefixed transaction names.
+KEYNOTE_CHART_ARRANGEMENT_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "chart.rs"
+KEYNOTE_CHART_ARRANGEMENT_FAMILY_MODULE = 'arrangement'
 KEYNOTE_CHART_ARRANGEMENT_PACKAGE_MODULE = "slide_chart_arrangement"
 KEYNOTE_CHART_ARRANGEMENT_PACKAGE_METHODS = frozenset(
     {
@@ -536,12 +551,12 @@ KEYNOTE_CHART_ARRANGEMENT_EDIT_METHODS = frozenset(
 )
 KEYNOTE_CHART_ARRANGEMENT_CANONICAL_TYPES = frozenset(
     {
-        "ChartArrangementCommit",
-        "ChartArrangementDiagnostics",
-        "ChartArrangementEdit",
-        "ChartArrangementError",
-        "ChartArrangementLimitKind",
-        "ChartArrangementPatch",
+        "Commit",
+        "Diagnostics",
+        "Edit",
+        "Error",
+        "LimitKind",
+        "Patch",
     }
 )
 KEYNOTE_CHART_ARRANGEMENT_SEMANTIC_TYPES = frozenset({"ChartArrangement"})
@@ -1001,14 +1016,18 @@ KEYNOTE_CHART_CAPTION_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
+# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# module, which re-exports the unprefixed transaction names.
+KEYNOTE_CHART_CAPTION_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "chart.rs"
+KEYNOTE_CHART_CAPTION_FAMILY_MODULE = 'caption'
 KEYNOTE_CHART_CAPTION_CANONICAL_TYPES = frozenset(
     {
-        "ChartCaptionCommit",
-        "ChartCaptionDiagnostics",
-        "ChartCaptionEdit",
-        "ChartCaptionError",
-        "ChartCaptionLimitKind",
-        "ChartCaptionPatch",
+        "Commit",
+        "Diagnostics",
+        "Edit",
+        "Error",
+        "LimitKind",
+        "Patch",
     }
 )
 KEYNOTE_CHART_CAPTION_PACKAGE_METHODS = frozenset(
@@ -1034,14 +1053,18 @@ KEYNOTE_CHART_AXIS_TITLE_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
+# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# module, which re-exports the unprefixed transaction names.
+KEYNOTE_CHART_AXIS_TITLE_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "chart.rs"
+KEYNOTE_CHART_AXIS_TITLE_FAMILY_MODULE = 'axis_title'
 KEYNOTE_CHART_AXIS_TITLE_CANONICAL_TYPES = frozenset(
     {
-        "ChartAxisTitleCommit",
-        "ChartAxisTitleDiagnostics",
-        "ChartAxisTitleEdit",
-        "ChartAxisTitleError",
-        "ChartAxisTitleLimitKind",
-        "ChartAxisTitlePatch",
+        "Commit",
+        "Diagnostics",
+        "Edit",
+        "Error",
+        "LimitKind",
+        "Patch",
     }
 )
 KEYNOTE_CHART_AXIS_TITLE_SEMANTIC_TYPES = frozenset({"Axis"})
@@ -1339,14 +1362,18 @@ KEYNOTE_MOVIE_CAPTION_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
+# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# module, which re-exports the unprefixed transaction names.
+KEYNOTE_MOVIE_CAPTION_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "movie.rs"
+KEYNOTE_MOVIE_CAPTION_FAMILY_MODULE = 'caption'
 KEYNOTE_MOVIE_CAPTION_CANONICAL_TYPES = frozenset(
     {
-        "SlideMovieCaptionCommit",
-        "SlideMovieCaptionDiagnostics",
-        "SlideMovieCaptionEdit",
-        "SlideMovieCaptionError",
-        "SlideMovieCaptionLimitKind",
-        "SlideMovieCaptionPatch",
+        "Commit",
+        "Diagnostics",
+        "Edit",
+        "Error",
+        "LimitKind",
+        "Patch",
     }
 )
 KEYNOTE_MOVIE_CAPTION_SELECTOR_TYPES = frozenset({"MovieSelector"})
@@ -1570,14 +1597,18 @@ KEYNOTE_MOVIE_TITLE_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
+# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# module, which re-exports the unprefixed transaction names.
+KEYNOTE_MOVIE_TITLE_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "movie.rs"
+KEYNOTE_MOVIE_TITLE_FAMILY_MODULE = 'title'
 KEYNOTE_MOVIE_TITLE_CANONICAL_TYPES = frozenset(
     {
-        "SlideMovieTitleCommit",
-        "SlideMovieTitleDiagnostics",
-        "SlideMovieTitleEdit",
-        "SlideMovieTitleError",
-        "SlideMovieTitleLimitKind",
-        "SlideMovieTitlePatch",
+        "Commit",
+        "Diagnostics",
+        "Edit",
+        "Error",
+        "LimitKind",
+        "Patch",
     }
 )
 KEYNOTE_MOVIE_TITLE_SELECTOR_TYPES = frozenset({"MovieSelector"})
@@ -1864,14 +1895,18 @@ KEYNOTE_MOVIE_PLAYBACK_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
+# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# module, which re-exports the unprefixed transaction names.
+KEYNOTE_MOVIE_PLAYBACK_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "movie.rs"
+KEYNOTE_MOVIE_PLAYBACK_FAMILY_MODULE = 'playback'
 KEYNOTE_MOVIE_PLAYBACK_CANONICAL_TYPES = frozenset(
     {
-        "SlideMoviePlaybackCommit",
-        "SlideMoviePlaybackDiagnostics",
-        "SlideMoviePlaybackEdit",
-        "SlideMoviePlaybackError",
-        "SlideMoviePlaybackLimitKind",
-        "SlideMoviePlaybackPatch",
+        "Commit",
+        "Diagnostics",
+        "Edit",
+        "Error",
+        "LimitKind",
+        "Patch",
     }
 )
 KEYNOTE_MOVIE_PLAYBACK_SEMANTIC_TYPES = frozenset(
@@ -2134,7 +2169,7 @@ IWA_MEDIA_PLAYBACK_OWNER_EXPORT_SOURCES = {
 }
 IWA_MEDIA_PLAYBACK_OWNER_MODULES = {
     "Keynote": re.compile(
-        r"(?m)^[ \t]*mod[ \t]+(?:r#)?slide_movie_playback\s*;"
+        r"(?m)^[ \t]*(?:pub\(crate\)[ \t]+)?mod[ \t]+(?:r#)?slide_movie_playback\s*;"
     ),
     "Pages": re.compile(
         r"(?ms)^[ \t]*#\s*\[\s*cfg\s*\(\s*feature\s*=\s*"
@@ -2225,13 +2260,13 @@ IWA_IMAGE_ADJUSTMENTS_OWNER_MODULES = {
     # Only the raw host bridge below is feature-gated; keeping the module
     # itself behind that feature would make the supported API disappear from
     # a normal format-crate build.
-    ecosystem: re.compile(r"(?m)^\s*mod\s+(?:r#)?image_adjustments\s*;")
+    ecosystem: re.compile(r"(?m)^\s*(?:pub\(crate\)\s+)?mod\s+(?:r#)?image_adjustments\s*;")
     for ecosystem in ("Keynote", "Pages", "Numbers")
 }
 IWA_IMAGE_ADJUSTMENTS_FEATURE_GATED_MODULE = re.compile(
     r"(?ms)^\s*#\s*\[\s*cfg\s*\(\s*feature\s*=\s*"
     r'"internal-iwork-source"\s*\)\s*\]\s*\n'
-    r"\s*mod\s+(?:r#)?image_adjustments\s*;"
+    r"\s*(?:pub\(crate\)[ \t]+)?mod\s+(?:r#)?image_adjustments\s*;"
 )
 IWA_IMAGE_ADJUSTMENTS_OWNER_SEAMS = (
     "__decode_image_adjustments_payload",
@@ -2275,11 +2310,11 @@ IWA_IMAGE_ADJUSTMENTS_SEMANTIC_SELECTORS = {
 }
 IWA_IMAGE_ADJUSTMENTS_SEMANTIC_TYPES = {
     "Keynote": (
-        "SlideImageAdjustmentsError",
-        "SlideImageAdjustmentsEdit",
-        "SlideImageAdjustmentsCommit",
-        "SlideImageAdjustmentsPatch",
-        "SlideImageAdjustmentsDiagnostics",
+        "Error",
+        "Edit",
+        "Commit",
+        "Patch",
+        "Diagnostics",
     ),
     "Pages": (
         "BodyImageAdjustmentsError",
@@ -2415,14 +2450,18 @@ KEYNOTE_MOVIE_GEOMETRY_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
+# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# module, which re-exports the unprefixed transaction names.
+KEYNOTE_MOVIE_GEOMETRY_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "movie.rs"
+KEYNOTE_MOVIE_GEOMETRY_FAMILY_MODULE = 'geometry'
 KEYNOTE_MOVIE_GEOMETRY_CANONICAL_TYPES = frozenset(
     {
-        "SlideMovieGeometryCommit",
-        "SlideMovieGeometryDiagnostics",
-        "SlideMovieGeometryEdit",
-        "SlideMovieGeometryError",
-        "SlideMovieGeometryLimitKind",
-        "SlideMovieGeometryPatch",
+        "Commit",
+        "Diagnostics",
+        "Edit",
+        "Error",
+        "LimitKind",
+        "Patch",
     }
 )
 KEYNOTE_MOVIE_GEOMETRY_SEMANTIC_TYPES = frozenset({"MovieGeometry"})
@@ -2736,6 +2775,10 @@ KEYNOTE_AUDIO_POSITION_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
+# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# module, which re-exports the unprefixed transaction names.
+KEYNOTE_AUDIO_POSITION_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "audio.rs"
+KEYNOTE_AUDIO_POSITION_FAMILY_MODULE = 'position'
 KEYNOTE_AUDIO_POSITION_CODEC_SOURCE = KEYNOTE_MOVIE_GEOMETRY_CODEC_SOURCE
 KEYNOTE_AUDIO_POSITION_CODEC_PUBLIC_SOURCE = KEYNOTE_MOVIE_GEOMETRY_CODEC_PUBLIC_SOURCE
 KEYNOTE_AUDIO_POSITION_CODEC_MODULE = KEYNOTE_MOVIE_GEOMETRY_CODEC_MODULE
@@ -2744,17 +2787,17 @@ KEYNOTE_AUDIO_POSITION_OWNER_MODULE = re.compile(
     r"(?:r#)?slide_audio_position[ \t]*;"
 )
 KEYNOTE_AUDIO_POSITION_PUBLIC_MODULE = re.compile(
-    r"(?m)^[ \t]*pub(?:\([^()]*\))?[ \t]+mod[ \t]+"
+    r"(?m)^[ \t]*pub(?![ \t]*\([ \t]*crate[ \t]*\))(?:\([^()]*\))?[ \t]+mod[ \t]+"
     r"(?:r#)?slide_audio_position\b"
 )
 KEYNOTE_AUDIO_POSITION_CANONICAL_TYPES = frozenset(
     {
-        "SlideAudioPositionCommit",
-        "SlideAudioPositionDiagnostics",
-        "SlideAudioPositionEdit",
-        "SlideAudioPositionError",
-        "SlideAudioPositionLimitKind",
-        "SlideAudioPositionPatch",
+        "Commit",
+        "Diagnostics",
+        "Edit",
+        "Error",
+        "LimitKind",
+        "Patch",
     }
 )
 KEYNOTE_AUDIO_POSITION_SELECTOR_TYPES = frozenset({"SlideSelector", "MovieSelector"})
@@ -2920,22 +2963,26 @@ KEYNOTE_MEDIA_PROPERTIES_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
+# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# module, which re-exports the unprefixed transaction names.
+KEYNOTE_MEDIA_PROPERTIES_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "media" / "properties.rs"
+KEYNOTE_MEDIA_PROPERTIES_FAMILY_MODULE = None
 KEYNOTE_MEDIA_PROPERTIES_OWNER_MODULE = re.compile(
     r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?mod[ \t]+"
     r"(?:r#)?slide_media_properties[ \t]*;"
 )
 KEYNOTE_MEDIA_PROPERTIES_PUBLIC_MODULE = re.compile(
-    r"(?m)^[ \t]*pub(?:\([^()]*\))?[ \t]+mod[ \t]+"
+    r"(?m)^[ \t]*pub(?![ \t]*\([ \t]*crate[ \t]*\))(?:\([^()]*\))?[ \t]+mod[ \t]+"
     r"(?:r#)?slide_media_properties\b"
 )
 KEYNOTE_MEDIA_PROPERTIES_CANONICAL_TYPES = frozenset(
     {
-        "SlideMediaPropertiesCommit",
-        "SlideMediaPropertiesDiagnostics",
-        "SlideMediaPropertiesEdit",
-        "SlideMediaPropertiesError",
-        "SlideMediaPropertiesLimitKind",
-        "SlideMediaPropertiesPatch",
+        "Commit",
+        "Diagnostics",
+        "Edit",
+        "Error",
+        "LimitKind",
+        "Patch",
     }
 )
 KEYNOTE_MEDIA_PROPERTIES_SEMANTIC_TYPES = frozenset({"MediaProperties"})
@@ -3204,26 +3251,30 @@ KEYNOTE_SLIDE_MEDIA_DATA_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
+# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# module, which re-exports the unprefixed transaction names.
+KEYNOTE_SLIDE_MEDIA_DATA_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "media.rs"
+KEYNOTE_SLIDE_MEDIA_DATA_FAMILY_MODULE = 'data'
 KEYNOTE_SLIDE_MEDIA_DATA_SEMANTIC_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "media.rs"
 KEYNOTE_SLIDE_MEDIA_DATA_PACKAGE_MODULE = re.compile(
-    r"(?m)^[ \t]*mod[ \t]+(?:r#)?slide_media_replacement\s*;"
+    r"(?m)^[ \t]*(?:pub\(crate\)[ \t]+)?mod[ \t]+(?:r#)?slide_media_replacement\s*;"
 )
 KEYNOTE_SLIDE_MEDIA_DATA_PUBLIC_MODULE = re.compile(
-    r"(?m)^[ \t]*pub(?:\([^()]*\))?[ \t]+mod[ \t]+"
+    r"(?m)^[ \t]*pub(?![ \t]*\([ \t]*crate[ \t]*\))(?:\([^()]*\))?[ \t]+mod[ \t]+"
     r"(?:r#)?slide_media_replacement\b"
 )
 KEYNOTE_SLIDE_MEDIA_DATA_CANONICAL_TYPES = frozenset(
     {
-        "SlideMediaDataCommit",
-        "SlideMediaDataDiagnostics",
-        "SlideMediaDataEdit",
-        "SlideMediaDataError",
-        "SlideMediaDataLimitKind",
-        "SlideMediaDataPatch",
+        "Commit",
+        "Diagnostics",
+        "Edit",
+        "Error",
+        "LimitKind",
+        "Patch",
     }
 )
 KEYNOTE_SLIDE_MEDIA_DATA_SEMANTIC_TYPES = frozenset(
-    {"MediaPart", "SlideMediaData"}
+    {"MediaPart", "Data"}
 )
 KEYNOTE_SLIDE_MEDIA_DATA_SELECTOR_TYPES = frozenset(
     {"SlideSelector", "MovieSelector"}
@@ -3596,12 +3647,16 @@ KEYNOTE_SLIDE_MEDIA_LIFECYCLE_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
+# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# module, which re-exports the unprefixed transaction names.
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "media.rs"
+KEYNOTE_SLIDE_MEDIA_LIFECYCLE_FAMILY_MODULE = 'lifecycle'
 KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PACKAGE_MODULE = re.compile(
     r"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?mod[ \t]+"
     r"(?:r#)?slide_media_lifecycle[ \t]*;"
 )
 KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PUBLIC_MODULE = re.compile(
-    r"(?m)^[ \t]*pub(?:\([^()]*\))?[ \t]+mod[ \t]+"
+    r"(?m)^[ \t]*pub(?![ \t]*\([ \t]*crate[ \t]*\))(?:\([^()]*\))?[ \t]+mod[ \t]+"
     r"(?:r#)?slide_media_lifecycle\b"
 )
 KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PUBLIC_CHILD_MODULE = re.compile(
@@ -3642,9 +3697,9 @@ KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PATCH_METHODS = frozenset(
 # forms.  Existing Keynote owners use the prefixed form, while the lifecycle
 # module may keep a concise internal semantic spelling before re-exporting it.
 KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CANONICAL_TYPE_ALTERNATIVES = {
-    "commit": frozenset({"LifecycleCommit", "SlideMediaLifecycleCommit"}),
-    "patch": frozenset({"LifecyclePatch", "SlideMediaLifecyclePatch"}),
-    "error": frozenset({"LifecycleError", "SlideMediaLifecycleError"}),
+    "commit": frozenset({"LifecycleCommit", "Commit"}),
+    "patch": frozenset({"LifecyclePatch", "Patch"}),
+    "error": frozenset({"LifecycleError", "Error"}),
 }
 KEYNOTE_SLIDE_MEDIA_LIFECYCLE_SELECTOR_TYPES = frozenset(
     {"SlideSelector", "MovieSelector"}
@@ -3719,11 +3774,15 @@ KEYNOTE_SLIDE_DRAWABLE_COMMENT_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
+# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# module, which re-exports the unprefixed transaction names.
+KEYNOTE_SLIDE_DRAWABLE_COMMENT_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "comment.rs"
+KEYNOTE_SLIDE_DRAWABLE_COMMENT_FAMILY_MODULE = 'transaction'
 KEYNOTE_SLIDE_DRAWABLE_COMMENT_PACKAGE_MODULE = re.compile(
-    r"(?m)^[ \t]*mod[ \t]+(?:r#)?slide_drawable_comments[ \t]*;"
+    r"(?m)^[ \t]*(?:pub\(crate\)[ \t]+)?mod[ \t]+(?:r#)?slide_drawable_comments[ \t]*;"
 )
 KEYNOTE_SLIDE_DRAWABLE_COMMENT_PUBLIC_MODULE = re.compile(
-    r"(?m)^[ \t]*pub(?:\([^()]*\))?[ \t]+mod[ \t]+"
+    r"(?m)^[ \t]*pub(?![ \t]*\([ \t]*crate[ \t]*\))(?:\([^()]*\))?[ \t]+mod[ \t]+"
     r"(?:r#)?slide_drawable_comments\b"
 )
 KEYNOTE_SLIDE_DRAWABLE_COMMENT_PUBLIC_CHILD_MODULE = re.compile(
@@ -3759,12 +3818,12 @@ KEYNOTE_SLIDE_DRAWABLE_COMMENT_EDIT_METHODS = frozenset(
 KEYNOTE_SLIDE_DRAWABLE_COMMENT_CANONICAL_TYPES = frozenset(
     {
         "DrawableSummary",
-        "SlideDrawableCommentCommit",
-        "SlideDrawableCommentDiagnostics",
-        "SlideDrawableCommentEdit",
-        "SlideDrawableCommentError",
-        "SlideDrawableCommentLimitKind",
-        "SlideDrawableCommentPatch",
+        "Commit",
+        "Diagnostics",
+        "Edit",
+        "Error",
+        "LimitKind",
+        "Patch",
     }
 )
 KEYNOTE_SLIDE_DRAWABLE_COMMENT_SEMANTIC_TYPES = frozenset(
@@ -4346,7 +4405,7 @@ KEYNOTE_SLIDE_MEDIA_LIFECYCLE_IDENTIFIER_WATERMARK_MARKER_GROUPS = {
         "budget.charge_entries",
         "budget.charge_wire_work",
         "maximum_remaining != new_last_identifier",
-        "SlideMediaLifecycleError::Verification",
+        "Error::Verification",
     ),
 }
 KEYNOTE_SLIDE_MEDIA_LIFECYCLE_METADATA_IDENTIFIER_MARKERS = (
@@ -4397,14 +4456,18 @@ KEYNOTE_SLIDE_TABLE_TITLE_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
+# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# module, which re-exports the unprefixed transaction names.
+KEYNOTE_SLIDE_TABLE_TITLE_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "table" / "title.rs"
+KEYNOTE_SLIDE_TABLE_TITLE_FAMILY_MODULE = 'transaction'
 KEYNOTE_SLIDE_TABLE_TITLE_CANONICAL_TYPES = frozenset(
     {
-        "SlideTableTitleCommit",
-        "SlideTableTitleDiagnostics",
-        "SlideTableTitleEdit",
-        "SlideTableTitleError",
-        "SlideTableTitleLimitKind",
-        "SlideTableTitlePatch",
+        "Commit",
+        "Diagnostics",
+        "Edit",
+        "Error",
+        "LimitKind",
+        "Patch",
     }
 )
 KEYNOTE_SLIDE_TABLE_TITLE_SEMANTIC_TYPES = frozenset({"Settings"})
@@ -4493,15 +4556,19 @@ KEYNOTE_SLIDE_TABLE_SORT_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
+# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# module, which re-exports the unprefixed transaction names.
+KEYNOTE_SLIDE_TABLE_SORT_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "table" / "sort.rs"
+KEYNOTE_SLIDE_TABLE_SORT_FAMILY_MODULE = 'transaction'
 KEYNOTE_SLIDE_TABLE_SORT_CANONICAL_TYPES = frozenset(
     {
-        "SlideTableSortCommit",
-        "SlideTableSortDiagnostics",
-        "SlideTableSortEdit",
-        "SlideTableSortError",
-        "SlideTableSortLimitKind",
-        "SlideTableSortPatch",
-        "SlideTableSortPath",
+        "Commit",
+        "Diagnostics",
+        "Edit",
+        "Error",
+        "LimitKind",
+        "Patch",
+        "Path",
     }
 )
 KEYNOTE_SLIDE_TABLE_SORT_SEMANTIC_TYPES = frozenset(
@@ -4671,15 +4738,19 @@ KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
+# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# module, which re-exports the unprefixed transaction names.
+KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "table" / "physical_sort.rs"
+KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_FAMILY_MODULE = 'transaction'
 KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_CANONICAL_TYPES = frozenset(
     {
-        "SlideTablePhysicalSortCommit",
-        "SlideTablePhysicalSortDiagnostics",
-        "SlideTablePhysicalSortEdit",
-        "SlideTablePhysicalSortError",
-        "SlideTablePhysicalSortLimitKind",
-        "SlideTablePhysicalSortPatch",
-        "SlideTablePhysicalSortPath",
+        "Commit",
+        "Diagnostics",
+        "Edit",
+        "Error",
+        "LimitKind",
+        "Patch",
+        "Path",
     }
 )
 KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_SELECTOR_TYPES = frozenset(
@@ -5112,15 +5183,19 @@ KEYNOTE_SLIDE_TABLE_LOCK_STATE_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
+# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# module, which re-exports the unprefixed transaction names.
+KEYNOTE_SLIDE_TABLE_LOCK_STATE_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "table" / "lock.rs"
+KEYNOTE_SLIDE_TABLE_LOCK_STATE_FAMILY_MODULE = 'transaction'
 KEYNOTE_SLIDE_TABLE_LOCK_STATE_CANONICAL_TYPES = frozenset(
     {
-        "SlideTableLockStateCommit",
-        "SlideTableLockStateDiagnostics",
-        "SlideTableLockStateEdit",
-        "SlideTableLockStateError",
-        "SlideTableLockStateLimitKind",
-        "SlideTableLockStatePatch",
-        "SlideTableLockStatePath",
+        "Commit",
+        "Diagnostics",
+        "Edit",
+        "Error",
+        "LimitKind",
+        "Patch",
+        "Path",
     }
 )
 KEYNOTE_SLIDE_TABLE_LOCK_STATE_SEMANTIC_TYPES = frozenset({"State"})
@@ -5212,15 +5287,19 @@ KEYNOTE_SLIDE_TABLE_DIMENSION_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
+# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# module, which re-exports the unprefixed transaction names.
+KEYNOTE_SLIDE_TABLE_DIMENSION_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "table" / "dimension.rs"
+KEYNOTE_SLIDE_TABLE_DIMENSION_FAMILY_MODULE = 'transaction'
 KEYNOTE_SLIDE_TABLE_DIMENSION_CANONICAL_TYPES = frozenset(
     {
-        "SlideTableDimensionCommit",
-        "SlideTableDimensionDiagnostics",
-        "SlideTableDimensionEdit",
-        "SlideTableDimensionError",
-        "SlideTableDimensionLimitKind",
-        "SlideTableDimensionPatch",
-        "SlideTableDimensionPath",
+        "Commit",
+        "Diagnostics",
+        "Edit",
+        "Error",
+        "LimitKind",
+        "Patch",
+        "Path",
     }
 )
 KEYNOTE_SLIDE_TABLE_DIMENSION_SEMANTIC_TYPES = frozenset(
@@ -5345,15 +5424,19 @@ KEYNOTE_SLIDE_TABLE_NAME_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
+# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# module, which re-exports the unprefixed transaction names.
+KEYNOTE_SLIDE_TABLE_NAME_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "table" / "name.rs"
+KEYNOTE_SLIDE_TABLE_NAME_FAMILY_MODULE = 'transaction'
 KEYNOTE_SLIDE_TABLE_NAME_CANONICAL_TYPES = frozenset(
     {
-        "SlideTableNameCommit",
-        "SlideTableNameDiagnostics",
-        "SlideTableNameEdit",
-        "SlideTableNameError",
-        "SlideTableNameLimitKind",
-        "SlideTableNamePatch",
-        "SlideTableNamePath",
+        "Commit",
+        "Diagnostics",
+        "Edit",
+        "Error",
+        "LimitKind",
+        "Patch",
+        "Path",
     }
 )
 KEYNOTE_SLIDE_TABLE_NAME_SEMANTIC_TYPES = frozenset({"Error", "Name"})
@@ -5569,16 +5652,20 @@ KEYNOTE_SLIDE_TABLE_HEADERS_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
+# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# module, which re-exports the unprefixed transaction names.
+KEYNOTE_SLIDE_TABLE_HEADERS_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "table" / "headers.rs"
+KEYNOTE_SLIDE_TABLE_HEADERS_FAMILY_MODULE = 'transaction'
 KEYNOTE_SLIDE_TABLE_HEADERS_CANONICAL_TYPES = frozenset(
     {
-        "SlideTableHeaderCommit",
-        "SlideTableHeaderDiagnostics",
-        "SlideTableHeaderEdit",
-        "SlideTableHeaderError",
-        "SlideTableHeaderInvalidReason",
-        "SlideTableHeaderLimitKind",
-        "SlideTableHeaderPatch",
-        "SlideTableHeaderPath",
+        "Commit",
+        "Diagnostics",
+        "Edit",
+        "Error",
+        "InvalidReason",
+        "LimitKind",
+        "Patch",
+        "Path",
     }
 )
 KEYNOTE_SLIDE_TABLE_HEADERS_SEMANTIC_TYPES = frozenset(
@@ -5854,15 +5941,19 @@ KEYNOTE_SLIDE_TABLE_APPEARANCE_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
+# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# module, which re-exports the unprefixed transaction names.
+KEYNOTE_SLIDE_TABLE_APPEARANCE_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "slide" / "table" / "appearance.rs"
+KEYNOTE_SLIDE_TABLE_APPEARANCE_FAMILY_MODULE = 'transaction'
 KEYNOTE_SLIDE_TABLE_APPEARANCE_CANONICAL_TYPES = frozenset(
     {
-        "SlideTableAppearanceCommit",
-        "SlideTableAppearanceDiagnostics",
-        "SlideTableAppearanceEdit",
-        "SlideTableAppearanceError",
-        "SlideTableAppearanceLimitKind",
-        "SlideTableAppearancePatch",
-        "SlideTableAppearancePath",
+        "Commit",
+        "Diagnostics",
+        "Edit",
+        "Error",
+        "LimitKind",
+        "Patch",
+        "Path",
     }
 )
 KEYNOTE_SLIDE_TABLE_APPEARANCE_SEMANTIC_TYPES = frozenset(
@@ -6049,7 +6140,7 @@ KEYNOTE_SLIDE_TABLE_APPEARANCE_OWNER_MARKER_GROUPS = {
         "execute",
     ),
     "exact artifacts and inverse": (
-        "SlideTableAppearancePatch",
+        "Patch",
         "source_fingerprint",
         "inverse",
         "is_noop",
@@ -23678,6 +23769,45 @@ def _is_keynote_placeholder_visibility_public_declaration(
             | {"slide_number"}
         )
     ) or _keynote_placeholder_visibility_owner_declaration(declaration)
+
+
+
+def _keynote_family_view(
+    root: Path, path: Path, sources: dict, module: str | None
+) -> str:
+    """Return the Rust scope that publishes one focused Keynote family.
+
+    ADR 0034 W1 (record 0298) moved every Keynote transaction family into a
+    focused public module (``chart::arrangement``,
+    ``slide::table::sort::transaction``, ...).  ``path`` is either the private
+    owner source (returned unchanged) or the semantic module file; for the
+    latter the body of the inline ``pub mod <module>`` is returned, or the
+    whole file when the family is re-exported at its top level.
+    """
+
+    if path in sources:
+        return sources[path]
+    absolute = path if path.is_absolute() else root / path
+    source = (
+        _mask_rust_cfg_test_items(absolute.read_text(encoding="utf-8"))
+        if absolute.is_file()
+        else ""
+    )
+    if module is None:
+        return source
+    match = re.search(
+        rf"(?m)^[ \t]*pub[ \t]+mod[ \t]+{re.escape(module)}[ \t]*\{{", source
+    )
+    if match is None:
+        return ""
+    depth, cursor = 1, match.end()
+    while cursor < len(source) and depth:
+        if source[cursor] == "{":
+            depth += 1
+        elif source[cursor] == "}":
+            depth -= 1
+        cursor += 1
+    return source[match.end() : cursor - 1]
 
 
 def _rust_canonical_exports(
@@ -47859,7 +47989,7 @@ def _keynote_slide_table_appearance_public_declaration(
     return bool(
         identifiers
         & (
-            KEYNOTE_SLIDE_TABLE_APPEARANCE_CANONICAL_TYPES
+            (KEYNOTE_SLIDE_TABLE_APPEARANCE_CANONICAL_TYPES - KEYNOTE_FAMILY_GENERIC_NAMES)
             | KEYNOTE_SLIDE_TABLE_APPEARANCE_SEMANTIC_TYPES
             | KEYNOTE_SLIDE_TABLE_APPEARANCE_SELECTOR_TYPES
             | KEYNOTE_SLIDE_TABLE_APPEARANCE_PACKAGE_METHODS
@@ -48011,9 +48141,9 @@ def audit_keynote_slide_table_appearance_facade_source_topology(
         )
 
     for name in sorted(KEYNOTE_SLIDE_TABLE_APPEARANCE_CANONICAL_TYPES):
-        for path in (owner_path, package_path, lib_path):
+        for path in (owner_path, root / KEYNOTE_SLIDE_TABLE_APPEARANCE_FAMILY_SOURCE):
             if name not in _rust_canonical_exports(
-                sources[path], KEYNOTE_SLIDE_TABLE_APPEARANCE_CANONICAL_TYPES
+                _keynote_family_view(root, path, sources, KEYNOTE_SLIDE_TABLE_APPEARANCE_FAMILY_MODULE), KEYNOTE_SLIDE_TABLE_APPEARANCE_CANONICAL_TYPES
             ):
                 violations.append(
                     "focused litchi-keynote slide-table appearance public API is missing canonical "
@@ -48092,15 +48222,15 @@ def audit_keynote_slide_table_appearance_facade_source_topology(
                         f"{KEYNOTE_SLIDE_TABLE_APPEARANCE_OWNER_SOURCE}"
                     )
     apply_declaration = owner_methods.get("apply_slide_table_appearance")
-    if apply_declaration is not None and "SlideTableAppearancePatch" not in apply_declaration:
+    if apply_declaration is not None and "Patch" not in apply_declaration:
         violations.append(
             "focused litchi-keynote slide-table appearance apply method must accept "
-            f"SlideTableAppearancePatch: {KEYNOTE_SLIDE_TABLE_APPEARANCE_OWNER_SOURCE}"
+            f"Patch: {KEYNOTE_SLIDE_TABLE_APPEARANCE_OWNER_SOURCE}"
         )
 
     edit_methods = {
         name
-        for edit_type in ("SlideTableAppearanceEdit", "Edit")
+        for edit_type in ("Edit", "Edit")
         for name, _declaration, _line_number in _rust_public_methods_in_impl(
             sources[owner_path], edit_type
         )
@@ -52722,7 +52852,10 @@ def audit_keynote_chart_legend_visibility_facade_source_topology(
             "focused litchi-keynote chart-legend visibility public API is missing "
             f"private package owner module: {KEYNOTE_CHART_LEGEND_EXPORT_SOURCES[0]}"
         )
-    elif any(match.group("public") for match in module_matches):
+    elif any(
+        match.group("public") and match.group("public").strip() != "pub(crate)"
+        for match in module_matches
+    ):
         line_number = package_code.count("\n", 0, module_matches[0].start()) + 1
         violations.append(
             "focused litchi-keynote chart-legend visibility owner module must remain "
@@ -52749,7 +52882,7 @@ def audit_keynote_chart_legend_visibility_facade_source_topology(
             )
             continue
         if name == "apply_slide_chart_legend":
-            required = "ChartLegendVisibilityPatch"
+            required = "Patch"
             if re.search(rf"\b{re.escape(required)}\b", declaration) is None:
                 violations.append(
                     "focused litchi-keynote chart-legend visibility apply method must "
@@ -52802,23 +52935,28 @@ def audit_keynote_chart_legend_visibility_facade_source_topology(
                 f"{line_number}"
             )
 
-    for path in (package_path, lib_path):
+    family_path = root / KEYNOTE_CHART_LEGEND_FAMILY_SOURCE
+    family_exports = _rust_canonical_exports(
+        _keynote_family_view(root, family_path, {}, KEYNOTE_CHART_LEGEND_FAMILY_MODULE),
+        KEYNOTE_CHART_LEGEND_CANONICAL_TYPES,
+    )
+    for name in sorted(KEYNOTE_CHART_LEGEND_CANONICAL_TYPES - family_exports):
+        violations.append(
+            "focused litchi-keynote chart-legend visibility public API is missing "
+            f"canonical type {name}: {family_path.relative_to(root)}"
+        )
+    for path in (package_path, lib_path, family_path):
         if not path.is_file():
             continue
         source = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
-        exported = _rust_canonical_exports(source, KEYNOTE_CHART_LEGEND_CANONICAL_TYPES)
-        for name in sorted(KEYNOTE_CHART_LEGEND_CANONICAL_TYPES - exported):
-            violations.append(
-                "focused litchi-keynote chart-legend visibility public API is missing "
-                f"canonical type {name}: {path.relative_to(root)}"
-            )
         for declaration, line_number in _rust_public_declarations(source):
             identifiers = {
                 match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
             }
             if not (
                 "slide_chart_legend" in declaration
-                or identifiers & KEYNOTE_CHART_LEGEND_CANONICAL_TYPES
+                or identifiers
+                & (KEYNOTE_CHART_LEGEND_CANONICAL_TYPES - KEYNOTE_FAMILY_GENERIC_NAMES)
             ):
                 continue
             for match in KEYNOTE_CHART_LEGEND_RAW_ID_TOKEN.finditer(declaration):
@@ -53524,7 +53662,10 @@ def audit_keynote_chart_arrangement_facade_source_topology(
             "focused litchi-keynote chart-arrangement facade is missing private "
             f"owner module: {KEYNOTE_CHART_ARRANGEMENT_EXPORT_SOURCES[0]}"
         )
-    elif any(match.group("public") for match in module_matches):
+    elif any(
+        match.group("public") and match.group("public").strip() != "pub(crate)"
+        for match in module_matches
+    ):
         line_number = package_code.count("\n", 0, module_matches[0].start()) + 1
         violations.append(
             "focused litchi-keynote chart-arrangement owner module must remain "
@@ -53597,10 +53738,10 @@ def audit_keynote_chart_arrangement_facade_source_topology(
             continue
         declaration, line_number = record
         if name == "apply_slide_chart_arrangement":
-            if re.search(r"\bChartArrangementPatch\b", declaration) is None:
+            if re.search(r"\bPatch\b", declaration) is None:
                 violations.append(
                     "focused litchi-keynote chart-arrangement apply method must accept "
-                    f"ChartArrangementPatch: {KEYNOTE_CHART_ARRANGEMENT_OWNER_SOURCE}:"
+                    f"Patch: {KEYNOTE_CHART_ARRANGEMENT_OWNER_SOURCE}:"
                     f"{line_number}"
                 )
         elif name == "slide_chart_arrangements":
@@ -53649,7 +53790,7 @@ def audit_keynote_chart_arrangement_facade_source_topology(
     edit_methods = {
         name
         for name, _declaration, _line_number in _rust_public_methods_in_impl(
-            sources[owner_path], "ChartArrangementEdit"
+            sources[owner_path], "Edit"
         )
     }
     for name in sorted(KEYNOTE_CHART_ARRANGEMENT_EDIT_METHODS):
@@ -53660,9 +53801,9 @@ def audit_keynote_chart_arrangement_facade_source_topology(
             )
 
     for name in sorted(KEYNOTE_CHART_ARRANGEMENT_CANONICAL_TYPES):
-        for path in (owner_path, package_path, lib_path):
+        for path in (owner_path, root / KEYNOTE_CHART_ARRANGEMENT_FAMILY_SOURCE):
             if name not in _rust_canonical_exports(
-                sources[path], KEYNOTE_CHART_ARRANGEMENT_CANONICAL_TYPES
+                _keynote_family_view(root, path, sources, KEYNOTE_CHART_ARRANGEMENT_FAMILY_MODULE), KEYNOTE_CHART_ARRANGEMENT_CANONICAL_TYPES
             ):
                 violations.append(
                     "focused litchi-keynote chart-arrangement public API is missing "
@@ -53691,7 +53832,7 @@ def audit_keynote_chart_arrangement_facade_source_topology(
                 KEYNOTE_CHART_ARRANGEMENT_SELECTOR_TYPES
             ):
                 continue
-            if not dedicated and not identifiers.intersection(facade_names):
+            if not dedicated and not identifiers.intersection(facade_names - KEYNOTE_FAMILY_GENERIC_NAMES):
                 continue
             canonical_common_reexport = (
                 path == semantic_path and common_reexport.fullmatch(declaration)
@@ -54413,9 +54554,9 @@ def audit_keynote_chart_axis_title_facade_source_topology(
         )
 
     for name in sorted(KEYNOTE_CHART_AXIS_TITLE_CANONICAL_TYPES):
-        for path in (owner_path, package_path, lib_path):
+        for path in (owner_path, root / KEYNOTE_CHART_AXIS_TITLE_FAMILY_SOURCE):
             if name not in _rust_canonical_exports(
-                sources[path], KEYNOTE_CHART_AXIS_TITLE_CANONICAL_TYPES
+                _keynote_family_view(root, path, sources, KEYNOTE_CHART_AXIS_TITLE_FAMILY_MODULE), KEYNOTE_CHART_AXIS_TITLE_CANONICAL_TYPES
             ):
                 violations.append(
                     "focused litchi-keynote chart-axis-title public API is missing canonical "
@@ -54462,16 +54603,16 @@ def audit_keynote_chart_axis_title_facade_source_topology(
                         f"{name} must accept selector-first {selector}: "
                         f"{KEYNOTE_CHART_AXIS_TITLE_OWNER_SOURCE}"
                     )
-        elif "ChartAxisTitlePatch" not in declaration:
+        elif "Patch" not in declaration:
             violations.append(
                 "focused litchi-keynote chart-axis-title apply method must accept "
-                f"ChartAxisTitlePatch: {KEYNOTE_CHART_AXIS_TITLE_OWNER_SOURCE}"
+                f"Patch: {KEYNOTE_CHART_AXIS_TITLE_OWNER_SOURCE}"
             )
 
     edit_methods = {
         name
         for name, _declaration, _line in _rust_public_methods_in_impl(
-            sources[owner_path], "ChartAxisTitleEdit"
+            sources[owner_path], "Edit"
         )
     }
     for name in sorted(KEYNOTE_CHART_AXIS_TITLE_EDIT_METHODS - edit_methods):
@@ -54494,7 +54635,7 @@ def audit_keynote_chart_axis_title_facade_source_topology(
             identifiers = {
                 match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
             }
-            if not dedicated and not identifiers.intersection(facade_names):
+            if not dedicated and not identifiers.intersection(facade_names - KEYNOTE_FAMILY_GENERIC_NAMES):
                 continue
             for identifier in sorted(identifiers):
                 if identifier == "litchi_iwa_common":
@@ -54740,14 +54881,18 @@ KEYNOTE_CHART_AXIS_VALUE_SETTINGS_EXPORT_SOURCES = (
     KEYNOTE_SOURCE_ROOT / "package.rs",
     KEYNOTE_SOURCE_ROOT / "lib.rs",
 )
+# ADR 0034 W1 (record 0298): the family's public home is its focused semantic
+# module, which re-exports the unprefixed transaction names.
+KEYNOTE_CHART_AXIS_VALUE_SETTINGS_FAMILY_SOURCE = KEYNOTE_SOURCE_ROOT / "chart.rs"
+KEYNOTE_CHART_AXIS_VALUE_SETTINGS_FAMILY_MODULE = 'value_axis'
 KEYNOTE_CHART_AXIS_VALUE_SETTINGS_CANONICAL_TYPES = frozenset(
     {
-        "ChartValueAxisCommit",
-        "ChartValueAxisDiagnostics",
-        "ChartValueAxisEdit",
-        "ChartValueAxisError",
-        "ChartValueAxisLimitKind",
-        "ChartValueAxisPatch",
+        "Commit",
+        "Diagnostics",
+        "Edit",
+        "Error",
+        "LimitKind",
+        "Patch",
     }
 )
 KEYNOTE_CHART_AXIS_VALUE_SETTINGS_SEMANTIC_TYPES = frozenset(
@@ -55722,9 +55867,9 @@ def audit_keynote_chart_axis_value_settings_facade_source_topology(
         )
 
     for name in sorted(KEYNOTE_CHART_AXIS_VALUE_SETTINGS_CANONICAL_TYPES):
-        for path in (owner_path, package_path, lib_path):
+        for path in (owner_path, root / KEYNOTE_CHART_AXIS_VALUE_SETTINGS_FAMILY_SOURCE):
             if name not in _rust_canonical_exports(
-                sources[path], KEYNOTE_CHART_AXIS_VALUE_SETTINGS_CANONICAL_TYPES
+                _keynote_family_view(root, path, sources, KEYNOTE_CHART_AXIS_VALUE_SETTINGS_FAMILY_MODULE), KEYNOTE_CHART_AXIS_VALUE_SETTINGS_CANONICAL_TYPES
             ):
                 violations.append(
                     "focused litchi-keynote chart value-axis settings public API is "
@@ -55762,16 +55907,16 @@ def audit_keynote_chart_axis_value_settings_facade_source_topology(
                     f"{name} must expose ValueAxisSettings: "
                     f"{KEYNOTE_CHART_AXIS_VALUE_SETTINGS_OWNER_SOURCE}"
                 )
-        elif "ChartValueAxisPatch" not in declaration:
+        elif "Patch" not in declaration:
             violations.append(
                 "focused litchi-keynote chart value-axis settings apply method must accept "
-                f"ChartValueAxisPatch: {KEYNOTE_CHART_AXIS_VALUE_SETTINGS_OWNER_SOURCE}"
+                f"Patch: {KEYNOTE_CHART_AXIS_VALUE_SETTINGS_OWNER_SOURCE}"
             )
 
     edit_methods = {
         name
         for name, _declaration, _line in _rust_public_methods_in_impl(
-            sources[owner_path], "ChartValueAxisEdit"
+            sources[owner_path], "Edit"
         )
     }
     for name in sorted(KEYNOTE_CHART_AXIS_VALUE_SETTINGS_EDIT_METHODS - edit_methods):
@@ -55794,7 +55939,7 @@ def audit_keynote_chart_axis_value_settings_facade_source_topology(
             identifiers = {
                 match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
             }
-            if not dedicated and not identifiers.intersection(facade_names):
+            if not dedicated and not identifiers.intersection(facade_names - KEYNOTE_FAMILY_GENERIC_NAMES):
                 continue
             for identifier in sorted(identifiers):
                 if identifier == "litchi_iwa_common":
@@ -56305,7 +56450,7 @@ def audit_keynote_chart_caption_facade_source_topology(
     )
     package_code = _mask_rust_non_code(package)
     package_library_code = _mask_rust_non_code(package + library)
-    if re.search(r"(?m)^mod[ \t]+slide_chart_caption[ \t]*;", package_code) is None:
+    if re.search(r"(?m)^(?:pub\(crate\)[ \t]+)?mod[ \t]+slide_chart_caption[ \t]*;", package_code) is None:
         violations.append(
             "focused litchi-keynote chart-caption owner module is missing: "
             f"{KEYNOTE_CHART_CAPTION_EXPORT_SOURCES[0]}"
@@ -56320,9 +56465,14 @@ def audit_keynote_chart_caption_facade_source_topology(
     package_exports = _rust_canonical_exports(
         package, canonical_names
     )
-    lib_exports = _rust_canonical_exports(library, canonical_names)
+    lib_exports = _rust_canonical_exports(
+        _keynote_family_view(
+            root, root / KEYNOTE_CHART_CAPTION_FAMILY_SOURCE, {}, KEYNOTE_CHART_CAPTION_FAMILY_MODULE
+        ),
+        canonical_names,
+    )
     for name in sorted(KEYNOTE_CHART_CAPTION_CANONICAL_TYPES):
-        if name not in owner_exports or name not in package_exports or name not in lib_exports:
+        if name not in owner_exports or name not in lib_exports:
             violations.append(
                 "focused litchi-keynote chart-caption public API is missing canonical type "
                 f"{name}: {KEYNOTE_CHART_CAPTION_OWNER_SOURCE}"
@@ -56713,11 +56863,11 @@ def audit_keynote_chart_caption_facade_source_topology(
             f"{name}: {KEYNOTE_CHART_CAPTION_OWNER_SOURCE}"
         )
 
-    # Require the complete edit lifecycle on ChartCaptionEdit itself.  A
+    # Require the complete edit lifecycle on Edit itself.  A
     # similarly named Package helper must not satisfy this check accidentally.
     edit_impl = re.search(
         r"(?<![A-Za-z0-9_#])impl(?:[ \t\r\n]*<[^>{}]*>)?[ \t\r\n]+"
-        r"(?:'[^ ]+[ \t\r\n]+)?ChartCaptionEdit\b",
+        r"(?:'[^ ]+[ \t\r\n]+)?Edit\b",
         owner_code,
     )
     if edit_impl is None:
@@ -56743,7 +56893,7 @@ def audit_keynote_chart_caption_facade_source_topology(
         }
     for name in sorted(KEYNOTE_CHART_CAPTION_EDIT_METHODS - edit_names):
         violations.append(
-            "focused litchi-keynote chart-caption ChartCaptionEdit method is missing "
+            "focused litchi-keynote chart-caption Edit method is missing "
             f"{name}: {KEYNOTE_CHART_CAPTION_OWNER_SOURCE}"
         )
 
@@ -56764,10 +56914,10 @@ def audit_keynote_chart_caption_facade_source_topology(
             if source_path != owner_path and not (
                 identifiers
                 & (
-                    canonical_names
+                    (canonical_names - KEYNOTE_FAMILY_GENERIC_NAMES)
                     | KEYNOTE_CHART_CAPTION_FLAT_ALIASES
                     | KEYNOTE_CHART_CAPTION_PACKAGE_METHODS
-                    | {"slide_chart_caption", "ChartCaptionEdit"}
+                    | {"slide_chart_caption"}
                 )
             ):
                 # package.rs/lib.rs contain many unrelated public archive
@@ -56900,7 +57050,7 @@ def audit_keynote_movie_caption_facade_source_topology(
     violations: list[str] = []
     package_code = _mask_rust_non_code(package)
     package_library_code = _mask_rust_non_code(package + library)
-    if re.search(r"(?m)^mod[ \t]+slide_movie_caption[ \t]*;", package_code) is None:
+    if re.search(r"(?m)^(?:pub\(crate\)[ \t]+)?mod[ \t]+slide_movie_caption[ \t]*;", package_code) is None:
         violations.append(
             "focused litchi-keynote movie-caption owner module is missing: "
             f"{KEYNOTE_MOVIE_CAPTION_EXPORT_SOURCES[0]}"
@@ -56914,9 +57064,14 @@ def audit_keynote_movie_caption_facade_source_topology(
     canonical_names = frozenset(KEYNOTE_MOVIE_CAPTION_CANONICAL_TYPES)
     owner_exports = _rust_canonical_exports(owner, canonical_names)
     package_exports = _rust_canonical_exports(package, canonical_names)
-    lib_exports = _rust_canonical_exports(library, canonical_names)
+    lib_exports = _rust_canonical_exports(
+        _keynote_family_view(
+            root, root / KEYNOTE_MOVIE_CAPTION_FAMILY_SOURCE, {}, KEYNOTE_MOVIE_CAPTION_FAMILY_MODULE
+        ),
+        canonical_names,
+    )
     for name in sorted(canonical_names):
-        if name not in owner_exports or name not in package_exports or name not in lib_exports:
+        if name not in owner_exports or name not in lib_exports:
             violations.append(
                 "focused litchi-keynote movie-caption public API is missing canonical type "
                 f"{name}: {KEYNOTE_MOVIE_CAPTION_OWNER_SOURCE}"
@@ -56956,7 +57111,7 @@ def audit_keynote_movie_caption_facade_source_topology(
     # silently fall back to a raw graph helper.
     edit_impl = re.search(
         r"(?<![A-Za-z0-9_#])impl(?:[ \t\r\n]*<[^>{}]*>)?[ \t\r\n]+"
-        r"(?:'[^ ]+[ \t\r\n]+)?SlideMovieCaptionEdit\b",
+        r"(?:'[^ ]+[ \t\r\n]+)?Edit\b",
         owner_code,
     )
     if edit_impl is None:
@@ -56982,7 +57137,7 @@ def audit_keynote_movie_caption_facade_source_topology(
         }
     for name in sorted(KEYNOTE_MOVIE_CAPTION_EDIT_METHODS - edit_names):
         violations.append(
-            "focused litchi-keynote movie-caption SlideMovieCaptionEdit method is missing "
+            "focused litchi-keynote movie-caption Edit method is missing "
             f"{name}: {KEYNOTE_MOVIE_CAPTION_OWNER_SOURCE}"
         )
 
@@ -56994,7 +57149,7 @@ def audit_keynote_movie_caption_facade_source_topology(
         | selector_names
         | KEYNOTE_MOVIE_CAPTION_PACKAGE_METHODS
         | KEYNOTE_MOVIE_CAPTION_FLAT_ALIASES
-        | {"SlideMovieCaptionEdit"}
+        | {"Edit"}
     )
     for source, source_path in (
         (owner, owner_path),
@@ -57009,7 +57164,7 @@ def audit_keynote_movie_caption_facade_source_topology(
             identifiers = {
                 match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
             }
-            if not dedicated and not (identifiers & facade_names):
+            if not dedicated and not (identifiers & (facade_names - KEYNOTE_FAMILY_GENERIC_NAMES)):
                 continue
             for identifier in sorted(identifiers):
                 if identifier in KEYNOTE_MOVIE_CAPTION_PROTO_ORIGINS:
@@ -57114,7 +57269,7 @@ def audit_keynote_movie_title_facade_source_topology(
     violations: list[str] = []
     package_code = _mask_rust_non_code(package)
     package_library_code = _mask_rust_non_code(package + library)
-    if re.search(r"(?m)^mod[ \t]+slide_movie_title[ \t]*;", package_code) is None:
+    if re.search(r"(?m)^(?:pub\(crate\)[ \t]+)?mod[ \t]+slide_movie_title[ \t]*;", package_code) is None:
         violations.append(
             "focused litchi-keynote movie-title owner module is missing: "
             f"{KEYNOTE_MOVIE_TITLE_EXPORT_SOURCES[0]}"
@@ -57128,9 +57283,14 @@ def audit_keynote_movie_title_facade_source_topology(
     canonical_names = frozenset(KEYNOTE_MOVIE_TITLE_CANONICAL_TYPES)
     owner_exports = _rust_canonical_exports(_mask_rust_non_code(owner), canonical_names)
     package_exports = _rust_canonical_exports(package, canonical_names)
-    library_exports = _rust_canonical_exports(library, canonical_names)
+    library_exports = _rust_canonical_exports(
+        _keynote_family_view(
+            root, root / KEYNOTE_MOVIE_TITLE_FAMILY_SOURCE, {}, KEYNOTE_MOVIE_TITLE_FAMILY_MODULE
+        ),
+        canonical_names,
+    )
     for name in sorted(canonical_names):
-        if name not in owner_exports or name not in package_exports or name not in library_exports:
+        if name not in owner_exports or name not in library_exports:
             violations.append(
                 "focused litchi-keynote movie-title public API is missing canonical type "
                 f"{name}: {KEYNOTE_MOVIE_TITLE_OWNER_SOURCE}"
@@ -57165,7 +57325,7 @@ def audit_keynote_movie_title_facade_source_topology(
 
     edit_impl = re.search(
         r"(?<![A-Za-z0-9_#])impl(?:[ \t\r\n]*<[^>{}]*>)?[ \t\r\n]+"
-        r"(?:'[^ ]+[ \t\r\n]+)?SlideMovieTitleEdit\b",
+        r"(?:'[^ ]+[ \t\r\n]+)?Edit\b",
         owner_code,
     )
     edit_body = ""
@@ -57191,7 +57351,7 @@ def audit_keynote_movie_title_facade_source_topology(
     }
     for name in sorted(KEYNOTE_MOVIE_TITLE_EDIT_METHODS - edit_names):
         violations.append(
-            "focused litchi-keynote movie-title SlideMovieTitleEdit method is missing "
+            "focused litchi-keynote movie-title Edit method is missing "
             f"{name}: {KEYNOTE_MOVIE_TITLE_OWNER_SOURCE}"
         )
 
@@ -57200,7 +57360,7 @@ def audit_keynote_movie_title_facade_source_topology(
         | selector_names
         | KEYNOTE_MOVIE_TITLE_PACKAGE_METHODS
         | KEYNOTE_MOVIE_TITLE_FLAT_ALIASES
-        | {"SlideMovieTitleEdit"}
+        | {"Edit"}
     )
     for source, source_path in (
         (owner, owner_path),
@@ -57215,7 +57375,7 @@ def audit_keynote_movie_title_facade_source_topology(
             identifiers = {
                 match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
             }
-            if not dedicated and not (identifiers & facade_names):
+            if not dedicated and not (identifiers & (facade_names - KEYNOTE_FAMILY_GENERIC_NAMES)):
                 continue
             for identifier in sorted(identifiers):
                 if identifier in KEYNOTE_MOVIE_TITLE_PROTO_ORIGINS:
@@ -58071,7 +58231,7 @@ def _keynote_movie_playback_owner_present(root: Path) -> bool:
     return (
         owner_path.is_file()
         and codec_path.is_file()
-        and re.search(r"(?m)^mod[ \t]+slide_movie_playback\s*;", package_source)
+        and re.search(r"(?m)^(?:pub\(crate\)[ \t]+)?mod[ \t]+slide_movie_playback\s*;", package_source)
         is not None
     )
 
@@ -58122,14 +58282,16 @@ def audit_keynote_movie_playback_facade_source_topology(
             "focused litchi-keynote movie-playback owner module must remain private: "
             f"{KEYNOTE_MOVIE_PLAYBACK_EXPORT_SOURCES[0]}"
         )
-    if re.search(r"(?m)^mod[ \t]+slide_movie_playback\s*;", package_code) is None:
+    if re.search(r"(?m)^(?:pub\(crate\)[ \t]+)?mod[ \t]+slide_movie_playback\s*;", package_code) is None:
         violations.append(
             "focused litchi-keynote movie-playback owner module is missing: "
             f"{KEYNOTE_MOVIE_PLAYBACK_EXPORT_SOURCES[0]}"
         )
 
+    family_path = root / KEYNOTE_MOVIE_PLAYBACK_FAMILY_SOURCE
+    family = _keynote_family_view(root, family_path, {}, KEYNOTE_MOVIE_PLAYBACK_FAMILY_MODULE)
     for name in sorted(KEYNOTE_MOVIE_PLAYBACK_CANONICAL_TYPES):
-        for source, path in ((owner, owner_path), (package, package_path), (library, lib_path)):
+        for source, path in ((owner, owner_path), (family, family_path)):
             if name not in _rust_canonical_exports(source, KEYNOTE_MOVIE_PLAYBACK_CANONICAL_TYPES):
                 violations.append(
                     "focused litchi-keynote movie-playback public API is missing canonical "
@@ -58141,10 +58303,10 @@ def audit_keynote_movie_playback_facade_source_topology(
                 "focused litchi-keynote movie-playback semantic API is missing "
                 f"{name}: {KEYNOTE_MOVIE_PLAYBACK_SEMANTIC_SOURCE}"
             )
-    if not KEYNOTE_MOVIE_PLAYBACK_TRANSACTION_MODULE.search(semantic_code + owner_code):
+    if not family.strip():
         violations.append(
             "focused litchi-keynote movie-playback semantic API is missing public transaction module: "
-            f"{KEYNOTE_MOVIE_PLAYBACK_SEMANTIC_SOURCE}"
+            f"{KEYNOTE_MOVIE_PLAYBACK_FAMILY_SOURCE}"
         )
     for name in sorted(KEYNOTE_MOVIE_PLAYBACK_SELECTOR_TYPES):
         if name not in _rust_canonical_exports(semantic + library, KEYNOTE_MOVIE_PLAYBACK_SELECTOR_TYPES):
@@ -58176,7 +58338,7 @@ def audit_keynote_movie_playback_facade_source_topology(
 
     edit_impl = re.search(
         r"(?<![A-Za-z0-9_#])impl(?:[ \t\r\n]*<[^>{}]*>)?[ \t\r\n]+"
-        r"(?:'[^ ]+[ \t\r\n]+)?SlideMoviePlaybackEdit\b",
+        r"(?:'[^ ]+[ \t\r\n]+)?Edit\b",
         owner_code,
     )
     edit_body = owner_code if edit_impl is None else owner_code[edit_impl.end() :]
@@ -58193,7 +58355,7 @@ def audit_keynote_movie_playback_facade_source_topology(
         | KEYNOTE_MOVIE_PLAYBACK_SELECTOR_TYPES
         | KEYNOTE_MOVIE_PLAYBACK_PACKAGE_METHODS
         | KEYNOTE_MOVIE_PLAYBACK_FLAT_ALIASES
-        | {"SlideMoviePlaybackEdit"}
+        | {"Edit"}
     )
     for source, source_path in (
         (owner, owner_path),
@@ -58206,7 +58368,7 @@ def audit_keynote_movie_playback_facade_source_topology(
         dedicated = source_path in {owner_path, semantic_path}
         for declaration, line_number in _rust_public_declarations(source):
             identifiers = {match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)}
-            if not dedicated and not (identifiers & facade_names):
+            if not dedicated and not (identifiers & (facade_names - KEYNOTE_FAMILY_GENERIC_NAMES)):
                 continue
             for identifier in sorted(identifiers):
                 if identifier in KEYNOTE_MOVIE_PLAYBACK_PROTO_ORIGINS:
@@ -58598,11 +58760,12 @@ def audit_keynote_slide_media_data_facade_source_topology(
             f"{KEYNOTE_SLIDE_MEDIA_DATA_EXPORT_SOURCES[0]}"
         )
 
+    family_path = root / KEYNOTE_SLIDE_MEDIA_DATA_FAMILY_SOURCE
+    family = _keynote_family_view(root, family_path, {}, KEYNOTE_SLIDE_MEDIA_DATA_FAMILY_MODULE)
     for name in sorted(KEYNOTE_SLIDE_MEDIA_DATA_CANONICAL_TYPES):
         for source, path in (
             (owner, owner_path),
-            (package, package_path),
-            (library, lib_path),
+            (family, family_path),
         ):
             if name not in _rust_canonical_exports(
                 source, KEYNOTE_SLIDE_MEDIA_DATA_CANONICAL_TYPES
@@ -58613,7 +58776,7 @@ def audit_keynote_slide_media_data_facade_source_topology(
                 )
 
     semantic_exports = _rust_canonical_exports(
-        owner + semantic + package + library,
+        owner + semantic + family,
         KEYNOTE_SLIDE_MEDIA_DATA_SEMANTIC_TYPES,
     )
     for name in sorted(KEYNOTE_SLIDE_MEDIA_DATA_SEMANTIC_TYPES - semantic_exports):
@@ -58660,7 +58823,7 @@ def audit_keynote_slide_media_data_facade_source_topology(
 
     edit_impl = re.search(
         r"(?<![A-Za-z0-9_#])impl(?:[ \t\r\n]*<[^>{}]*>)?[ \t\r\n]+"
-        r"(?:'[^ ]+[ \t\r\n]+)?SlideMediaDataEdit\b",
+        r"(?:'[^ ]+[ \t\r\n]+)?Edit\b",
         owner_code,
     )
     edit_body = owner_code if edit_impl is None else owner_code[edit_impl.end() :]
@@ -58680,7 +58843,7 @@ def audit_keynote_slide_media_data_facade_source_topology(
         | KEYNOTE_SLIDE_MEDIA_DATA_SELECTOR_TYPES
         | KEYNOTE_SLIDE_MEDIA_DATA_PACKAGE_METHODS
         | KEYNOTE_SLIDE_MEDIA_DATA_FLAT_ALIASES
-        | {"SlideMediaDataEdit", "MediaPart"}
+        | {"Edit", "MediaPart"}
     )
     for source, source_path in (
         (owner, owner_path),
@@ -58695,7 +58858,7 @@ def audit_keynote_slide_media_data_facade_source_topology(
             identifiers = {
                 match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
             }
-            if not dedicated and not (identifiers & facade_names):
+            if not dedicated and not (identifiers & (facade_names - KEYNOTE_FAMILY_GENERIC_NAMES)):
                 continue
             for identifier in sorted(identifiers):
                 if identifier in KEYNOTE_SLIDE_MEDIA_DATA_PROTO_ORIGINS:
@@ -59168,7 +59331,7 @@ def audit_keynote_slide_media_data_transaction_source_topology(
             )
         for variant in sorted(KEYNOTE_SLIDE_MEDIA_DATA_LIMIT_VARIANTS):
             if not re.search(
-                rf"\bSlideMediaDataLimitKind\s*::\s*{re.escape(variant)}\b",
+                rf"\bLimitKind\s*::\s*{re.escape(variant)}\b",
                 budget_code,
             ):
                 violations.append(
@@ -59334,7 +59497,7 @@ def audit_keynote_slide_media_data_transaction_source_topology(
             qualifier = match.group("qualifier").replace(" ", "").replace("\t", "")
             if qualifier:
                 qualifier_type = qualifier.rstrip(":").split("::")[-1]
-                if qualifier_type not in {"Self", "SlideMediaDataEdit"}:
+                if qualifier_type not in {"Self", "Edit"}:
                     continue
             called.add(name)
         return called
@@ -59353,7 +59516,7 @@ def audit_keynote_slide_media_data_transaction_source_topology(
 
     # Each public operation root owns exactly one ledger. A public method may
     # delegate its root construction to one immediate private operation helper
-    # (for example edit -> SlideMediaDataEdit::new); the reachable call graph
+    # (for example edit -> Edit::new); the reachable call graph
     # must still contain exactly one factory call. set is also a public staging
     # root because it bounds a caller-provided allocation.
     budget_roots = set(KEYNOTE_SLIDE_MEDIA_DATA_PACKAGE_METHODS) | {"commit", "set"}
@@ -59625,7 +59788,7 @@ def audit_keynote_slide_media_lifecycle_facade_source_topology(
                 # owner, but if it exists it is still part of the typed facade.
                 continue
             continue
-        if not re.search(r"\b(?:LifecyclePatch|SlideMediaLifecyclePatch)\b", declaration):
+        if not re.search(r"\b(?:LifecyclePatch|Patch)\b", declaration):
             violations.append(
                 "focused litchi-keynote slide-media lifecycle apply method must accept "
                 f"its typed patch ({name}): {KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE}"
@@ -59683,7 +59846,7 @@ def audit_keynote_slide_media_lifecycle_facade_source_topology(
             identifiers = {
                 match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
             }
-            if not dedicated and not (identifiers & facade_names):
+            if not dedicated and not (identifiers & (facade_names - KEYNOTE_FAMILY_GENERIC_NAMES)):
                 continue
             for identifier in sorted(identifiers):
                 if identifier in KEYNOTE_SLIDE_MEDIA_LIFECYCLE_SEMANTIC_IDENTIFIERS:
@@ -61511,11 +61674,14 @@ def audit_keynote_slide_drawable_comment_source_topology(
             f"{metadata_path.relative_to(root)}"
         )
 
+    family_path = root / KEYNOTE_SLIDE_DRAWABLE_COMMENT_FAMILY_SOURCE
+    family = _keynote_family_view(
+        root, family_path, {}, KEYNOTE_SLIDE_DRAWABLE_COMMENT_FAMILY_MODULE
+    )
     for name in sorted(KEYNOTE_SLIDE_DRAWABLE_COMMENT_CANONICAL_TYPES):
         for source, path in (
             (owner, owner_path),
-            (package, package_path),
-            (library, lib_path),
+            (family, family_path),
         ):
             if name not in _rust_canonical_exports(
                 source, KEYNOTE_SLIDE_DRAWABLE_COMMENT_CANONICAL_TYPES
@@ -61567,7 +61733,7 @@ def audit_keynote_slide_drawable_comment_source_topology(
                         f"{KEYNOTE_SLIDE_DRAWABLE_COMMENT_OWNER_SOURCE}"
                     )
         if name == "apply_slide_drawable_comment" and not re.search(
-            r"\bSlideDrawableCommentPatch\b", declaration
+            r"\bPatch\b", declaration
         ):
             violations.append(
                 "focused Keynote drawable-comment apply method must accept its typed patch: "
@@ -61590,7 +61756,7 @@ def audit_keynote_slide_drawable_comment_source_topology(
     edit_methods = {
         name: declaration
         for name, declaration, _line in _rust_public_methods_in_impl(
-            owner, "SlideDrawableCommentEdit"
+            owner, "Edit"
         )
     }
     for name in sorted(KEYNOTE_SLIDE_DRAWABLE_COMMENT_EDIT_METHODS):
@@ -61620,7 +61786,7 @@ def audit_keynote_slide_drawable_comment_source_topology(
             identifiers = {
                 match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
             }
-            if not dedicated and not (identifiers & facade_names):
+            if not dedicated and not (identifiers & (facade_names - KEYNOTE_FAMILY_GENERIC_NAMES)):
                 continue
             # Private fields are intentionally physical inside the owner. Only
             # inspect a public item header, where a leaked type is observable.
@@ -61968,7 +62134,7 @@ def _keynote_movie_geometry_owner_present(root: Path) -> bool:
     return (
         owner_path.is_file()
         and codec_path.is_file()
-        and re.search(r"(?m)^mod[ \t]+slide_movie_geometry\s*;", package_source)
+        and re.search(r"(?m)^(?:pub\(crate\)[ \t]+)?mod[ \t]+slide_movie_geometry\s*;", package_source)
         is not None
     )
 
@@ -62013,14 +62179,16 @@ def audit_keynote_movie_geometry_facade_source_topology(
             "focused litchi-keynote movie-geometry owner module must remain private: "
             f"{KEYNOTE_MOVIE_GEOMETRY_EXPORT_SOURCES[0]}"
         )
-    if re.search(r"(?m)^mod[ \t]+slide_movie_geometry\s*;", package_code) is None:
+    if re.search(r"(?m)^(?:pub\(crate\)[ \t]+)?mod[ \t]+slide_movie_geometry\s*;", package_code) is None:
         violations.append(
             "focused litchi-keynote movie-geometry owner module is missing: "
             f"{KEYNOTE_MOVIE_GEOMETRY_EXPORT_SOURCES[0]}"
         )
 
+    family_path = root / KEYNOTE_MOVIE_GEOMETRY_FAMILY_SOURCE
+    family = _keynote_family_view(root, family_path, {}, KEYNOTE_MOVIE_GEOMETRY_FAMILY_MODULE)
     for name in sorted(KEYNOTE_MOVIE_GEOMETRY_CANONICAL_TYPES):
-        for source, path in ((owner, owner_path), (package, package_path), (library, lib_path)):
+        for source, path in ((owner, owner_path), (family, family_path)):
             if name not in _rust_canonical_exports(source, KEYNOTE_MOVIE_GEOMETRY_CANONICAL_TYPES):
                 violations.append(
                     "focused litchi-keynote movie-geometry public API is missing canonical "
@@ -62037,19 +62205,12 @@ def audit_keynote_movie_geometry_facade_source_topology(
             "focused litchi-keynote movie-geometry semantic API is missing geometry module: "
             f"{KEYNOTE_MOVIE_GEOMETRY_SEMANTIC_SOURCE}"
         )
-    elif re.search(
-        r"pub\s+mod\s+geometry\s*\{.*?pub\s+mod\s+transaction\b",
-        semantic_code,
-        re.DOTALL,
-    ) is None:
-        violations.append(
-            "focused litchi-keynote movie-geometry transaction module must remain under "
-            f"slide::media::geometry: {KEYNOTE_MOVIE_GEOMETRY_SEMANTIC_SOURCE}"
-        )
-    if not KEYNOTE_MOVIE_GEOMETRY_TRANSACTION_MODULE.search(semantic_code + owner_code):
+    # ADR 0034 W1 (record 0298): the transaction family moved from
+    # `slide::media::geometry::transaction` to `slide::movie::geometry`.
+    if not family.strip():
         violations.append(
             "focused litchi-keynote movie-geometry semantic API is missing public transaction module: "
-            f"{KEYNOTE_MOVIE_GEOMETRY_SEMANTIC_SOURCE}"
+            f"{KEYNOTE_MOVIE_GEOMETRY_FAMILY_SOURCE}"
         )
     for name in sorted(KEYNOTE_MOVIE_GEOMETRY_SELECTOR_TYPES):
         if name not in _rust_canonical_exports(semantic + library, KEYNOTE_MOVIE_GEOMETRY_SELECTOR_TYPES):
@@ -62081,7 +62242,7 @@ def audit_keynote_movie_geometry_facade_source_topology(
 
     edit_impl = re.search(
         r"(?<![A-Za-z0-9_#])impl(?:[ \t\r\n]*<[^>{}]*>)?[ \t\r\n]+"
-        r"(?:'[^ ]+[ \t\r\n]+)?SlideMovieGeometryEdit\b",
+        r"(?:'[^ ]+[ \t\r\n]+)?Edit\b",
         owner_code,
     )
     edit_body = owner_code if edit_impl is None else owner_code[edit_impl.end() :]
@@ -62098,7 +62259,7 @@ def audit_keynote_movie_geometry_facade_source_topology(
         | KEYNOTE_MOVIE_GEOMETRY_SELECTOR_TYPES
         | KEYNOTE_MOVIE_GEOMETRY_PACKAGE_METHODS
         | KEYNOTE_MOVIE_GEOMETRY_FLAT_ALIASES
-        | {"SlideMovieGeometryEdit"}
+        | {"Edit"}
     )
     for source, source_path in (
         (owner, owner_path),
@@ -62111,7 +62272,7 @@ def audit_keynote_movie_geometry_facade_source_topology(
         dedicated = source_path in {owner_path, semantic_path}
         for declaration, line_number in _rust_public_declarations(source):
             identifiers = {match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)}
-            if not dedicated and not (identifiers & facade_names):
+            if not dedicated and not (identifiers & (facade_names - KEYNOTE_FAMILY_GENERIC_NAMES)):
                 continue
             for identifier in sorted(identifiers):
                 if identifier in KEYNOTE_MOVIE_GEOMETRY_PROTO_ORIGINS:
@@ -62681,10 +62842,10 @@ def audit_keynote_audio_position_facade_source_topology(
                     "focused litchi-keynote audio-position Package method must use the "
                     f"semantic Point value ({name}): {KEYNOTE_AUDIO_POSITION_OWNER_SOURCE}"
                 )
-        elif "SlideAudioPositionPatch" not in declaration:
+        elif "Patch" not in declaration:
             violations.append(
                 "focused litchi-keynote audio-position apply method must accept "
-                f"SlideAudioPositionPatch: {KEYNOTE_AUDIO_POSITION_OWNER_SOURCE}"
+                f"Patch: {KEYNOTE_AUDIO_POSITION_OWNER_SOURCE}"
             )
         if re.search(r"\b(?:u64|u32|usize)\b|&\s*\[\s*u8\s*\]|Vec\s*<\s*u8\s*>", declaration):
             violations.append(
@@ -62722,7 +62883,7 @@ def audit_keynote_audio_position_facade_source_topology(
             if not dedicated and not (
                 identifiers
                 & (
-                    KEYNOTE_AUDIO_POSITION_CANONICAL_TYPES
+                    (KEYNOTE_AUDIO_POSITION_CANONICAL_TYPES - KEYNOTE_FAMILY_GENERIC_NAMES)
                     | KEYNOTE_AUDIO_POSITION_SELECTOR_TYPES
                     | KEYNOTE_AUDIO_POSITION_PACKAGE_METHODS
                     | {"Point"}
@@ -62759,8 +62920,16 @@ def audit_keynote_audio_position_facade_source_topology(
 
     for path, source, names in (
         (owner_path, owner, KEYNOTE_AUDIO_POSITION_CANONICAL_TYPES),
-        (package_path, package, KEYNOTE_AUDIO_POSITION_CANONICAL_TYPES),
-        (lib_path, library, KEYNOTE_AUDIO_POSITION_CANONICAL_TYPES),
+        (
+            root / KEYNOTE_AUDIO_POSITION_FAMILY_SOURCE,
+            _keynote_family_view(
+                root,
+                root / KEYNOTE_AUDIO_POSITION_FAMILY_SOURCE,
+                {},
+                KEYNOTE_AUDIO_POSITION_FAMILY_MODULE,
+            ),
+            KEYNOTE_AUDIO_POSITION_CANONICAL_TYPES,
+        ),
     ):
         exported = _rust_canonical_exports(source, names)
         for name in sorted(names - exported):
@@ -63082,11 +63251,14 @@ def audit_keynote_media_properties_facade_source_topology(
             f"{KEYNOTE_MEDIA_PROPERTIES_EXPORT_SOURCES[0]}"
         )
 
+    family_path = root / KEYNOTE_MEDIA_PROPERTIES_FAMILY_SOURCE
+    family = _keynote_family_view(
+        root, family_path, {}, KEYNOTE_MEDIA_PROPERTIES_FAMILY_MODULE
+    )
     for name in sorted(KEYNOTE_MEDIA_PROPERTIES_CANONICAL_TYPES):
         for source, path in (
             (owner, owner_path),
-            (package, package_path),
-            (library, lib_path),
+            (family, family_path),
         ):
             if name not in _rust_canonical_exports(
                 source, KEYNOTE_MEDIA_PROPERTIES_CANONICAL_TYPES
@@ -63175,7 +63347,7 @@ def audit_keynote_media_properties_facade_source_topology(
             )
     apply_declaration = owner_methods.get("apply_slide_media_properties")
     if apply_declaration is not None and not re.search(
-        r"\b(?:SlideMediaPropertiesPatch|MediaPropertiesPatch)\b", apply_declaration
+        r"\b(?:Patch|MediaPropertiesPatch)\b", apply_declaration
     ):
         violations.append(
             "focused litchi-keynote media-properties apply method must accept its typed patch: "
@@ -63185,7 +63357,7 @@ def audit_keynote_media_properties_facade_source_topology(
     edit_methods = {
         name
         for name, _declaration, _line in _rust_public_methods_in_impl(
-            owner, "SlideMediaPropertiesEdit"
+            owner, "Edit"
         )
     }
     for name in sorted(KEYNOTE_MEDIA_PROPERTIES_EDIT_METHODS - edit_methods):
@@ -63213,7 +63385,7 @@ def audit_keynote_media_properties_facade_source_topology(
             identifiers = {
                 match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
             }
-            if not dedicated and not (identifiers & facade_names):
+            if not dedicated and not (identifiers & (facade_names - KEYNOTE_FAMILY_GENERIC_NAMES)):
                 continue
             for identifier in sorted(identifiers):
                 if identifier in KEYNOTE_MEDIA_PROPERTIES_PROTO_ORIGINS:
@@ -63476,7 +63648,7 @@ def _keynote_slide_table_title_owner_present(root: Path) -> bool:
         else ""
     )
     return owner_path.is_file() and re.search(
-        r"(?m)^mod[ \t]+slide_table_title\s*;", package_source
+        r"(?m)^(?:pub\(crate\)[ \t]+)?mod[ \t]+slide_table_title\s*;", package_source
     ) is not None
 
 
@@ -63511,16 +63683,16 @@ def audit_keynote_slide_table_title_facade_source_topology(
             "focused litchi-keynote slide-table title owner module must remain private: "
             f"{KEYNOTE_SLIDE_TABLE_TITLE_EXPORT_SOURCES[0]}"
         )
-    if re.search(r"(?m)^mod[ \t]+slide_table_title\s*;", code[package_path]) is None:
+    if re.search(r"(?m)^(?:pub\(crate\)[ \t]+)?mod[ \t]+slide_table_title\s*;", code[package_path]) is None:
         violations.append(
             "focused litchi-keynote slide-table title owner module is missing: "
             f"{KEYNOTE_SLIDE_TABLE_TITLE_EXPORT_SOURCES[0]}"
         )
 
     for name in sorted(KEYNOTE_SLIDE_TABLE_TITLE_CANONICAL_TYPES):
-        for path in (owner_path, package_path, lib_path):
+        for path in (owner_path, root / KEYNOTE_SLIDE_TABLE_TITLE_FAMILY_SOURCE):
             if name not in _rust_canonical_exports(
-                sources[path], KEYNOTE_SLIDE_TABLE_TITLE_CANONICAL_TYPES
+                _keynote_family_view(root, path, sources, KEYNOTE_SLIDE_TABLE_TITLE_FAMILY_MODULE), KEYNOTE_SLIDE_TABLE_TITLE_CANONICAL_TYPES
             ):
                 violations.append(
                     "focused litchi-keynote slide-table title public API is missing canonical "
@@ -63571,7 +63743,7 @@ def audit_keynote_slide_table_title_facade_source_topology(
 
     edit_impl = re.search(
         r"(?<![A-Za-z0-9_#])impl(?:[ \t\r\n]*<[^>{}]*>)?[ \t\r\n]+"
-        r"(?:'[^ ]+[ \t\r\n]+)?SlideTableTitleEdit\b",
+        r"(?:'[^ ]+[ \t\r\n]+)?Edit\b",
         code[owner_path],
     )
     edit_body = code[owner_path] if edit_impl is None else code[owner_path][edit_impl.end() :]
@@ -63593,7 +63765,7 @@ def audit_keynote_slide_table_title_facade_source_topology(
         dedicated = path in {owner_path, semantic_path}
         for declaration, line_number in _rust_public_declarations(sources[path]):
             identifiers = {match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)}
-            if not dedicated and not identifiers.intersection(facade_names):
+            if not dedicated and not identifiers.intersection(facade_names - KEYNOTE_FAMILY_GENERIC_NAMES):
                 continue
             for identifier in sorted(identifiers):
                 if identifier == "litchi_iwa_common":
@@ -63715,9 +63887,9 @@ def audit_keynote_slide_table_sort_facade_source_topology(
         )
 
     for name in sorted(KEYNOTE_SLIDE_TABLE_SORT_CANONICAL_TYPES):
-        for path in (owner_path, package_path, lib_path):
+        for path in (owner_path, root / KEYNOTE_SLIDE_TABLE_SORT_FAMILY_SOURCE):
             if name not in _rust_canonical_exports(
-                sources[path], KEYNOTE_SLIDE_TABLE_SORT_CANONICAL_TYPES
+                _keynote_family_view(root, path, sources, KEYNOTE_SLIDE_TABLE_SORT_FAMILY_MODULE), KEYNOTE_SLIDE_TABLE_SORT_CANONICAL_TYPES
             ):
                 violations.append(
                     "focused litchi-keynote slide-table sort public API is missing canonical "
@@ -63798,10 +63970,10 @@ def audit_keynote_slide_table_sort_facade_source_topology(
                 f"legacy RowRange: {KEYNOTE_SLIDE_TABLE_SORT_OWNER_SOURCE}"
             )
     apply_declaration = owner_methods.get("apply_slide_table_sort_order")
-    if apply_declaration is not None and "SlideTableSortPatch" not in apply_declaration:
+    if apply_declaration is not None and "Patch" not in apply_declaration:
         violations.append(
             "focused litchi-keynote slide-table sort apply method must accept "
-            f"SlideTableSortPatch: {KEYNOTE_SLIDE_TABLE_SORT_OWNER_SOURCE}"
+            f"Patch: {KEYNOTE_SLIDE_TABLE_SORT_OWNER_SOURCE}"
         )
     for method_name, declaration in owner_methods.items():
         if "RowRange" in declaration:
@@ -63813,7 +63985,7 @@ def audit_keynote_slide_table_sort_facade_source_topology(
     edit_methods = {
         name
         for name, _declaration, _line_number in _rust_public_methods_in_impl(
-            sources[owner_path], "SlideTableSortEdit"
+            sources[owner_path], "Edit"
         )
     }
     for name in sorted(KEYNOTE_SLIDE_TABLE_SORT_EDIT_METHODS - edit_methods):
@@ -63836,7 +64008,7 @@ def audit_keynote_slide_table_sort_facade_source_topology(
             identifiers = {
                 match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
             }
-            if not dedicated and not identifiers.intersection(facade_names):
+            if not dedicated and not identifiers.intersection(facade_names - KEYNOTE_FAMILY_GENERIC_NAMES):
                 continue
             for identifier in sorted(identifiers):
                 if identifier == "litchi_iwa_common":
@@ -64136,7 +64308,10 @@ def audit_keynote_slide_table_physical_sort_facade_source_topology(
             "focused litchi-keynote physical slide-table sort is missing private "
             f"owner module: {KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_EXPORT_SOURCES[0]}"
         )
-    elif any(match.group("public") for match in module_matches):
+    elif any(
+        match.group("public") and match.group("public").strip() != "pub(crate)"
+        for match in module_matches
+    ):
         line_number = package_code.count("\n", 0, module_matches[0].start()) + 1
         violations.append(
             "focused litchi-keynote physical slide-table sort owner module must remain "
@@ -64151,9 +64326,14 @@ def audit_keynote_slide_table_physical_sort_facade_source_topology(
     semantic_code = code[semantic_path]
 
     for name in sorted(KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_CANONICAL_TYPES):
-        for path in (owner_path, package_path, lib_path):
+        for path in (owner_path, root / KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_FAMILY_SOURCE):
+            # The value-free Diagnostics/Error/LimitKind/Path vocabulary is
+            # owned by the semantic module; the package owner defines only the
+            # package-bearing Edit/Patch/Commit (record 0298).
+            if path == owner_path and name not in {"Edit", "Patch", "Commit"}:
+                continue
             if name not in _rust_canonical_exports(
-                sources[path], KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_CANONICAL_TYPES
+                _keynote_family_view(root, path, sources, KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_FAMILY_MODULE), KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_CANONICAL_TYPES
             ):
                 violations.append(
                     "focused litchi-keynote physical slide-table sort public API is "
@@ -64208,10 +64388,10 @@ def audit_keynote_slide_table_physical_sort_facade_source_topology(
             continue
         declaration, line_number = record
         if name == "apply_slide_table_physical_sort":
-            if "SlideTablePhysicalSortPatch" not in declaration:
+            if "Patch" not in declaration:
                 violations.append(
                     "focused litchi-keynote physical slide-table sort apply method must "
-                    "accept SlideTablePhysicalSortPatch: "
+                    "accept Patch: "
                     f"{KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_OWNER_SOURCE}:{line_number}"
                 )
         else:
@@ -64249,7 +64429,7 @@ def audit_keynote_slide_table_physical_sort_facade_source_topology(
     edit_methods = {
         name
         for name, _declaration, _line_number in _rust_public_methods_in_impl(
-            owner_source, "SlideTablePhysicalSortEdit"
+            owner_source, "Edit"
         )
     }
     for name in sorted(KEYNOTE_SLIDE_TABLE_PHYSICAL_SORT_EDIT_METHODS - edit_methods):
@@ -64288,7 +64468,7 @@ def audit_keynote_slide_table_physical_sort_facade_source_topology(
                 is not None
             )
             if not dedicated and not physical_reexport and not identifiers.intersection(
-                facade_names
+                facade_names - KEYNOTE_FAMILY_GENERIC_NAMES
             ):
                 continue
             for identifier in sorted(identifiers):
@@ -64791,9 +64971,9 @@ def audit_keynote_slide_table_lock_state_facade_source_topology(
         )
 
     for name in sorted(KEYNOTE_SLIDE_TABLE_LOCK_STATE_CANONICAL_TYPES):
-        for path in (owner_path, package_path, lib_path):
+        for path in (owner_path, root / KEYNOTE_SLIDE_TABLE_LOCK_STATE_FAMILY_SOURCE):
             if name not in _rust_canonical_exports(
-                sources[path], KEYNOTE_SLIDE_TABLE_LOCK_STATE_CANONICAL_TYPES
+                _keynote_family_view(root, path, sources, KEYNOTE_SLIDE_TABLE_LOCK_STATE_FAMILY_MODULE), KEYNOTE_SLIDE_TABLE_LOCK_STATE_CANONICAL_TYPES
             ):
                 violations.append(
                     "focused litchi-keynote slide-table lock public API is missing "
@@ -64875,17 +65055,17 @@ def audit_keynote_slide_table_lock_state_facade_source_topology(
                         f"{KEYNOTE_SLIDE_TABLE_LOCK_STATE_OWNER_SOURCE}"
                     )
         if name == "apply_slide_table_lock_state" and (
-            "SlideTableLockStatePatch" not in declaration
+            "Patch" not in declaration
         ):
             violations.append(
                 "focused litchi-keynote slide-table lock apply method must accept "
-                f"SlideTableLockStatePatch: {KEYNOTE_SLIDE_TABLE_LOCK_STATE_OWNER_SOURCE}"
+                f"Patch: {KEYNOTE_SLIDE_TABLE_LOCK_STATE_OWNER_SOURCE}"
             )
 
     edit_methods = {
         name
         for name, _declaration, _line_number in _rust_public_methods_in_impl(
-            sources[owner_path], "SlideTableLockStateEdit"
+            sources[owner_path], "Edit"
         )
     }
     for name in sorted(
@@ -64910,7 +65090,7 @@ def audit_keynote_slide_table_lock_state_facade_source_topology(
             identifiers = {
                 match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
             }
-            if not dedicated and not identifiers.intersection(facade_names):
+            if not dedicated and not identifiers.intersection(facade_names - KEYNOTE_FAMILY_GENERIC_NAMES):
                 continue
             for identifier in sorted(identifiers):
                 if identifier == "litchi_iwa_common":
@@ -65017,9 +65197,9 @@ def audit_keynote_slide_table_dimension_facade_source_topology(
         )
 
     for name in sorted(KEYNOTE_SLIDE_TABLE_DIMENSION_CANONICAL_TYPES):
-        for path in (owner_path, package_path, lib_path):
+        for path in (owner_path, root / KEYNOTE_SLIDE_TABLE_DIMENSION_FAMILY_SOURCE):
             if name not in _rust_canonical_exports(
-                sources[path], KEYNOTE_SLIDE_TABLE_DIMENSION_CANONICAL_TYPES
+                _keynote_family_view(root, path, sources, KEYNOTE_SLIDE_TABLE_DIMENSION_FAMILY_MODULE), KEYNOTE_SLIDE_TABLE_DIMENSION_CANONICAL_TYPES
             ):
                 violations.append(
                     "focused litchi-keynote slide-table dimension public API is missing "
@@ -65105,16 +65285,16 @@ def audit_keynote_slide_table_dimension_facade_source_topology(
                     "focused litchi-keynote slide-table dimension Package method "
                     f"{name} must accept Dimension: {KEYNOTE_SLIDE_TABLE_DIMENSION_OWNER_SOURCE}"
                 )
-        elif "SlideTableDimensionPatch" not in declaration:
+        elif "Patch" not in declaration:
             violations.append(
                 "focused litchi-keynote slide-table dimension apply method must accept "
-                f"SlideTableDimensionPatch: {KEYNOTE_SLIDE_TABLE_DIMENSION_OWNER_SOURCE}"
+                f"Patch: {KEYNOTE_SLIDE_TABLE_DIMENSION_OWNER_SOURCE}"
             )
 
     edit_methods = {
         name
         for name, _declaration, _line_number in _rust_public_methods_in_impl(
-            sources[owner_path], "SlideTableDimensionEdit"
+            sources[owner_path], "Edit"
         )
     }
     for name in sorted(KEYNOTE_SLIDE_TABLE_DIMENSION_EDIT_METHODS - edit_methods):
@@ -65142,7 +65322,7 @@ def audit_keynote_slide_table_dimension_facade_source_topology(
             identifiers = {
                 match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
             }
-            if not dedicated and not identifiers.intersection(selection_names):
+            if not dedicated and not identifiers.intersection(selection_names - KEYNOTE_FAMILY_GENERIC_NAMES):
                 continue
             if "pub use" in declaration and "*" in declaration:
                 violations.append(
@@ -65367,9 +65547,9 @@ def audit_keynote_slide_table_name_facade_source_topology(
         )
 
     for name in sorted(KEYNOTE_SLIDE_TABLE_NAME_CANONICAL_TYPES):
-        for path in (owner_path, package_path, lib_path):
+        for path in (owner_path, root / KEYNOTE_SLIDE_TABLE_NAME_FAMILY_SOURCE):
             if name not in _rust_canonical_exports(
-                sources[path], KEYNOTE_SLIDE_TABLE_NAME_CANONICAL_TYPES
+                _keynote_family_view(root, path, sources, KEYNOTE_SLIDE_TABLE_NAME_FAMILY_MODULE), KEYNOTE_SLIDE_TABLE_NAME_CANONICAL_TYPES
             ):
                 violations.append(
                     "focused litchi-keynote slide-table name public API is missing canonical "
@@ -65446,16 +65626,16 @@ def audit_keynote_slide_table_name_facade_source_topology(
                         f"{name} must accept selector-first {selector}: "
                         f"{KEYNOTE_SLIDE_TABLE_NAME_OWNER_SOURCE}"
                     )
-        elif "SlideTableNamePatch" not in declaration:
+        elif "Patch" not in declaration:
             violations.append(
                 "focused litchi-keynote slide-table name apply method must accept "
-                f"SlideTableNamePatch: {KEYNOTE_SLIDE_TABLE_NAME_OWNER_SOURCE}"
+                f"Patch: {KEYNOTE_SLIDE_TABLE_NAME_OWNER_SOURCE}"
             )
 
     edit_methods = {
         name
         for name, _declaration, _line_number in _rust_public_methods_in_impl(
-            sources[owner_path], "SlideTableNameEdit"
+            sources[owner_path], "Edit"
         )
     }
     for name in sorted(KEYNOTE_SLIDE_TABLE_NAME_EDIT_METHODS - edit_methods):
@@ -65482,7 +65662,7 @@ def audit_keynote_slide_table_name_facade_source_topology(
             identifiers = {
                 match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
             }
-            if not dedicated and not identifiers.intersection(selection_names):
+            if not dedicated and not identifiers.intersection(selection_names - KEYNOTE_FAMILY_GENERIC_NAMES):
                 continue
             if "pub use" in declaration and "*" in declaration:
                 violations.append(
@@ -65628,7 +65808,7 @@ def _keynote_slide_table_headers_public_declaration(
     return bool(
         identifiers
         & (
-            KEYNOTE_SLIDE_TABLE_HEADERS_CANONICAL_TYPES
+            (KEYNOTE_SLIDE_TABLE_HEADERS_CANONICAL_TYPES - KEYNOTE_FAMILY_GENERIC_NAMES)
             | KEYNOTE_SLIDE_TABLE_HEADERS_SELECTOR_TYPES
             | KEYNOTE_SLIDE_TABLE_HEADERS_PACKAGE_METHODS
             | KEYNOTE_SLIDE_TABLE_HEADERS_FLAT_ALIASES
@@ -65850,9 +66030,9 @@ def audit_keynote_slide_table_headers_facade_source_topology(
         )
 
     for name in sorted(KEYNOTE_SLIDE_TABLE_HEADERS_CANONICAL_TYPES):
-        for path in (owner_path, package_path, lib_path):
+        for path in (owner_path, root / KEYNOTE_SLIDE_TABLE_HEADERS_FAMILY_SOURCE):
             if name not in _rust_canonical_exports(
-                sources[path], KEYNOTE_SLIDE_TABLE_HEADERS_CANONICAL_TYPES
+                _keynote_family_view(root, path, sources, KEYNOTE_SLIDE_TABLE_HEADERS_FAMILY_MODULE), KEYNOTE_SLIDE_TABLE_HEADERS_CANONICAL_TYPES
             ):
                 violations.append(
                     "focused litchi-keynote slide-table headers public API is missing canonical "
@@ -65925,16 +66105,16 @@ def audit_keynote_slide_table_headers_facade_source_topology(
                         f"{KEYNOTE_SLIDE_TABLE_HEADERS_OWNER_SOURCE}"
                     )
     apply_declaration = owner_methods.get("apply_slide_table_headers")
-    if apply_declaration is not None and "SlideTableHeaderPatch" not in apply_declaration:
+    if apply_declaration is not None and "Patch" not in apply_declaration:
         violations.append(
             "focused litchi-keynote slide-table headers apply method must accept "
-            f"SlideTableHeaderPatch: {KEYNOTE_SLIDE_TABLE_HEADERS_OWNER_SOURCE}"
+            f"Patch: {KEYNOTE_SLIDE_TABLE_HEADERS_OWNER_SOURCE}"
         )
 
     edit_methods = {
         name
         for name, _declaration, _line_number in _rust_public_methods_in_impl(
-            sources[owner_path], "SlideTableHeaderEdit"
+            sources[owner_path], "Edit"
         )
     }
     for name in sorted(KEYNOTE_SLIDE_TABLE_HEADERS_EDIT_METHODS - edit_methods):
@@ -69982,10 +70162,13 @@ IWA_TABLE_MERGE_TRANSACTION_SPECS = (
             "crates/litchi-keynote/src/package/slide_table_merges/transaction.rs"
         ),
         "package_path": KEYNOTE_TABLE_MERGE_PACKAGE_SOURCE,
-        "library_path": Path("crates/litchi-keynote/src/lib.rs"),
+        # ADR 0034 W1 (record 0298): the family's public home is
+        # `slide::table::merge::transaction` with unprefixed names.
+        "package_export_path": Path("crates/litchi-keynote/src/slide/table/merge.rs"),
+        "library_path": Path("crates/litchi-keynote/src/slide/table/merge.rs"),
         "module_name": "slide_table_merges",
         "transaction_module": "transaction",
-        "prefix": "SlideTableMerges",
+        "prefix": "",
         "edit_method": "edit_slide_table_merges",
         "apply_method": "apply_slide_table_merges",
         "selector_types": frozenset({"SlideSelector", "TableSelector"}),
@@ -70587,7 +70770,8 @@ IWA_TABLE_MERGE_HOST_FOCUSED_CALL = re.compile(
     r"\b(?P<method>body_table_merges|slide_table_merges)\s*\("
 )
 IWA_KEYNOTE_TABLE_MERGE_ALLOWED_FALLBACK_ARM = re.compile(
-    r"\bErr\s*\(\s*litchi_keynote\s*::\s*SlideTableMergesError"
+    r"\bErr\s*\(\s*litchi_keynote\s*::\s*slide\s*::\s*table\s*::\s*merge"
+    r"\s*::\s*transaction\s*::\s*Error"
     r"\s*::\s*UnsupportedDependency\s*\)\s*=>"
 )
 
@@ -72622,7 +72806,8 @@ def audit_iwa_table_merge_host_read_delegation_source_topology(
     to the Numbers editor while preventing a raw-ID compatibility helper from
     becoming an accidental read route again. Keynote has one reviewed
     compatibility exception: only its exact
-    ``SlideTableMergesError::UnsupportedDependency`` arm may use that helper
+    ``slide::table::merge::transaction::Error::UnsupportedDependency`` arm
+    may use that helper
     for legacy sources that the focused reader cannot represent.
     """
 
@@ -72984,12 +73169,21 @@ def _audit_table_merge_transaction_source_topology(
                 f"focused {format_name} table-merge transaction child is missing "
                 f"canonical type {name}: {child_path}"
             )
-    if package_source:
-        package_exports = _rust_canonical_exports(package_source, canonical_names)
+    # A format whose focused family module is the public home (ADR 0034 W1,
+    # Keynote record 0298) checks that module instead of the package facade.
+    export_path = spec.get("package_export_path", package_path)
+    export_absolute = root / export_path
+    export_source = (
+        _mask_rust_cfg_test_items(export_absolute.read_text(encoding="utf-8"))
+        if export_path != package_path and export_absolute.is_file()
+        else package_source
+    )
+    if export_source:
+        package_exports = _rust_canonical_exports(export_source, canonical_names)
         for name in sorted(canonical_names - package_exports):
             violations.append(
                 f"focused {format_name} table-merge package facade is missing "
-                f"canonical export {name}: {package_path}"
+                f"canonical export {name}: {export_path}"
             )
     if library_source:
         library_exports = _rust_canonical_exports(library_source, canonical_names)

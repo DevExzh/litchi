@@ -874,7 +874,7 @@ The focused `litchi-keynote` owner now exposes
 aliases `duplicate_slide_movie`, `duplicate_slide_audio`, `remove_slide_movie`,
 and `remove_slide_audio`. `SlideSelector` plus source-order `MovieSelector`
 keep native identifiers, UUIDs, component paths, `DataInfo` keys, and ZIP
-members private. The returned `SlideMediaLifecyclePatch` is bound to the exact
+members private. The returned `slide::media::lifecycle::Patch` is bound to the exact
 source, supports `inverse()` and `is_noop()`, and is replayed through
 `Package::apply_slide_media_lifecycle` only after bounded candidate readback.
 

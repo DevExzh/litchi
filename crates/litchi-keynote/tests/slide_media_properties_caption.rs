@@ -11,7 +11,10 @@ use litchi_iwa_core::{
     Archive, ArchiveObject, FieldInfo, FieldPath, FieldType, RawMessage, SnappyStream,
 };
 use litchi_iwa_protos::{kn, tsa, tsd, tsk, tsp};
-use litchi_keynote::{MovieSelector, Package, SlideMediaPropertiesError, SlideSelector};
+use litchi_keynote::{
+    MovieSelector, Package, SlideSelector,
+    slide::media::properties::Error as SlideMediaPropertiesError,
+};
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;

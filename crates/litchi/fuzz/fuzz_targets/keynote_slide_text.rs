@@ -10,8 +10,8 @@ use litchi::keynote::slide::placeholder::{
     Commit as VisibilityCommit, Error as VisibilityError, Kind, State,
 };
 use litchi::keynote::{
-    OpenOptions, Package, SemanticLimits, SlideSelector, SlideTextCommit, SlideTextError,
-    SourceLimits, TextPosition, TextSpan,
+    OpenOptions, Package, SemanticLimits, SlideSelector, SourceLimits, TextPosition, TextSpan,
+    slide::text::Commit as SlideTextCommit, slide::text::Error as SlideTextError,
 };
 
 const MAX_INPUT_BYTES: u64 = 1024 * 1024;

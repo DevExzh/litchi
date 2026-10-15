@@ -13,8 +13,8 @@ use litchi_iwa_common::wire::append_length_delimited_field;
 use litchi_iwa_protos::{tsd, tsp};
 use litchi_keynote::slide::media::{Point, Size};
 use litchi_keynote::{
-    MediaPart, MovieKind, MovieSelector, OpenOptions, Package, SlideMediaDataError, SlideSelector,
-    SourceLimits,
+    MovieKind, MovieSelector, OpenOptions, Package, SlideSelector, SourceLimits,
+    slide::media::data::Error as SlideMediaDataError, slide::media::data::MediaPart,
 };
 use prost::Message as _;
 

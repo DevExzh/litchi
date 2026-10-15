@@ -21,10 +21,14 @@ use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, 
 use litchi_iwa_protos::{kn, tsa, tsd, tsk, tsp, tst, tswp};
 use litchi_keynote::slide::table::dimension::{Dimension, Points, Size};
 use litchi_keynote::{
-    OpenOptions, Package, SemanticLimits, SlideSelector, SlideTableDimensionCommit,
-    SlideTableDimensionDiagnostics, SlideTableDimensionEdit, SlideTableDimensionError,
-    SlideTableDimensionLimitKind, SlideTableDimensionPatch, SlideTableDimensionPath, SourceLimits,
-    TableSelector,
+    OpenOptions, Package, SemanticLimits, SlideSelector, SourceLimits, TableSelector,
+    slide::table::dimension::transaction::Commit as SlideTableDimensionCommit,
+    slide::table::dimension::transaction::Diagnostics as SlideTableDimensionDiagnostics,
+    slide::table::dimension::transaction::Edit as SlideTableDimensionEdit,
+    slide::table::dimension::transaction::Error as SlideTableDimensionError,
+    slide::table::dimension::transaction::LimitKind as SlideTableDimensionLimitKind,
+    slide::table::dimension::transaction::Patch as SlideTableDimensionPatch,
+    slide::table::dimension::transaction::Path as SlideTableDimensionPath,
 };
 use prost::Message as _;
 

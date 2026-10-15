@@ -13,9 +13,13 @@ use litchi_iwa_common::wire::{WireView, append_length_delimited_field, append_va
 use litchi_iwa_core::{Archive, RawMessage};
 use litchi_iwa_protos::{kn, tsch, tsd, tsp};
 use litchi_keynote::{
-    ChartArrangement, ChartArrangementCommit, ChartArrangementDiagnostics, ChartArrangementEdit,
-    ChartArrangementError, ChartArrangementLimitKind, ChartArrangementPatch, ChartSelector,
-    OpenOptions, Package, Position, SemanticLimits, SlideSelector, SourceLimits,
+    ChartArrangement, ChartSelector, OpenOptions, Package, Position, SemanticLimits, SlideSelector,
+    SourceLimits, chart::arrangement::Commit as ChartArrangementCommit,
+    chart::arrangement::Diagnostics as ChartArrangementDiagnostics,
+    chart::arrangement::Edit as ChartArrangementEdit,
+    chart::arrangement::Error as ChartArrangementError,
+    chart::arrangement::LimitKind as ChartArrangementLimitKind,
+    chart::arrangement::Patch as ChartArrangementPatch,
 };
 
 use prost::Message as _;

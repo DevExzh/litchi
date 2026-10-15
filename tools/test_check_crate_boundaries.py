@@ -1427,6 +1427,24 @@ def add_iwa_numbers_formula_table_scaffold(
     )
 
 
+
+def add_keynote_family_module(
+    root: Path, family: str, extra: tuple[str, ...] = ()
+) -> None:
+    """Publish one scaffolded Keynote family from its focused module (record 0298)."""
+
+    path = root / getattr(boundaries, f"KEYNOTE_{family}_FAMILY_SOURCE")
+    module = getattr(boundaries, f"KEYNOTE_{family}_FAMILY_MODULE")
+    names = ", ".join(
+        sorted(set(getattr(boundaries, f"KEYNOTE_{family}_CANONICAL_TYPES")) | set(extra))
+    )
+    body = f"pub use crate::package::family::{{{names}}};\n"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    existing = path.read_text(encoding="utf-8") if path.is_file() else ""
+    published = f"pub mod {module} {{\n    {body}}}\n" if module else body
+    path.write_text(existing + published, encoding="utf-8")
+
+
 def add_keynote_slide_transition_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.KEYNOTE_SLIDE_TRANSITION_IMPLEMENTATION_SOURCES[0]
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -3976,10 +3994,10 @@ def add_keynote_movie_playback_canonical_scaffold(root: Path) -> None:
         + "fn movie_playback_codec_route() { movie_playback_codec; }\n"
         + "impl Package {\n"
         + "pub fn slide_movie_playback_settings<'slide, 'movie>(&self, slide: SlideSelector<'slide>, movie: MovieSelector) -> Result<MediaPlaybackSettings, Error> { let _ = (slide, movie); todo!() }\n"
-        + "pub fn edit_slide_movie_playback_settings<'slide, 'movie>(&self, slide: SlideSelector<'slide>, movie: MovieSelector, value: MediaPlaybackSettings) -> Result<SlideMoviePlaybackEdit, Error> { let _ = (slide, movie, value); todo!() }\n"
-        + "pub fn apply_slide_movie_playback_settings(&self, patch: &SlideMoviePlaybackPatch) -> Result<SlideMoviePlaybackCommit, Error> { let _ = patch; todo!() }\n"
+        + "pub fn edit_slide_movie_playback_settings<'slide, 'movie>(&self, slide: SlideSelector<'slide>, movie: MovieSelector, value: MediaPlaybackSettings) -> Result<Edit, Error> { let _ = (slide, movie, value); todo!() }\n"
+        + "pub fn apply_slide_movie_playback_settings(&self, patch: &Patch) -> Result<Commit, Error> { let _ = patch; todo!() }\n"
         + "}\n"
-        + "impl SlideMoviePlaybackEdit { pub fn set(self, value: MediaPlaybackSettings) -> Self { let _ = value; self } pub fn commit(self) -> Result<SlideMoviePlaybackCommit, Error> { todo!() } }\n",
+        + "impl Edit { pub fn set(self, value: MediaPlaybackSettings) -> Self { let _ = value; self } pub fn commit(self) -> Result<Commit, Error> { todo!() } }\n",
         encoding="utf-8",
     )
     package_export = root / boundaries.KEYNOTE_MOVIE_PLAYBACK_EXPORT_SOURCES[0]
@@ -4033,7 +4051,7 @@ def add_keynote_movie_playback_canonical_scaffold(root: Path) -> None:
         )
     for corpus in boundaries.KEYNOTE_MOVIE_PLAYBACK_FUZZ_CORPORA:
         (root / corpus).mkdir(parents=True, exist_ok=True)
-
+    add_keynote_family_module(root, "MOVIE_PLAYBACK")
 
 def add_iwa_keynote_media_reader_native_evidence(root: Path) -> None:
     test_path = root / boundaries.IWA_KEYNOTE_MEDIA_READER_NATIVE_TEST_SOURCE
@@ -4084,10 +4102,10 @@ def add_keynote_movie_geometry_canonical_scaffold(root: Path) -> None:
         + "fn keynote_movie_geometry_codec_route() { keynote_movie_geometry_codec; }\n"
         + "impl Package {\n"
         + "pub fn slide_movie_geometry<'slide, 'movie>(&self, slide: SlideSelector<'slide>, movie: MovieSelector) -> Result<MovieGeometry, Error> { let _ = (slide, movie); todo!() }\n"
-        + "pub fn edit_slide_movie_geometry<'slide, 'movie>(&self, slide: SlideSelector<'slide>, movie: MovieSelector, value: MovieGeometry) -> Result<SlideMovieGeometryEdit, Error> { let _ = (slide, movie, value); todo!() }\n"
-        + "pub fn apply_slide_movie_geometry(&self, patch: &SlideMovieGeometryPatch) -> Result<SlideMovieGeometryCommit, Error> { let _ = patch; todo!() }\n"
+        + "pub fn edit_slide_movie_geometry<'slide, 'movie>(&self, slide: SlideSelector<'slide>, movie: MovieSelector, value: MovieGeometry) -> Result<Edit, Error> { let _ = (slide, movie, value); todo!() }\n"
+        + "pub fn apply_slide_movie_geometry(&self, patch: &Patch) -> Result<Commit, Error> { let _ = patch; todo!() }\n"
         + "}\n"
-        + "impl SlideMovieGeometryEdit { pub fn set(self, value: MovieGeometry) -> Self { let _ = value; self } pub fn restore_original_size(self) -> Result<Self, Error> { Ok(self) } pub fn set_transform(self, value: MovieTransform) -> Result<Self, Error> { let _ = value; Ok(self) } pub fn flip(self, axis: MovieFlipAxis) -> Result<Self, Error> { let _ = axis; Ok(self) } pub fn commit(self) -> Result<SlideMovieGeometryCommit, Error> { todo!() } }\n",
+        + "impl Edit { pub fn set(self, value: MovieGeometry) -> Self { let _ = value; self } pub fn restore_original_size(self) -> Result<Self, Error> { Ok(self) } pub fn set_transform(self, value: MovieTransform) -> Result<Self, Error> { let _ = value; Ok(self) } pub fn flip(self, axis: MovieFlipAxis) -> Result<Self, Error> { let _ = axis; Ok(self) } pub fn commit(self) -> Result<Commit, Error> { todo!() } }\n",
         encoding="utf-8",
     )
     package_export = root / boundaries.KEYNOTE_MOVIE_GEOMETRY_EXPORT_SOURCES[0]
@@ -4141,7 +4159,7 @@ def add_keynote_movie_geometry_canonical_scaffold(root: Path) -> None:
         )
     for corpus in boundaries.KEYNOTE_MOVIE_GEOMETRY_FUZZ_CORPORA:
         (root / corpus).mkdir(parents=True, exist_ok=True)
-
+    add_keynote_family_module(root, "MOVIE_GEOMETRY")
 
 def add_keynote_audio_position_canonical_scaffold(root: Path) -> None:
     """Create the focused selector-first audio-position admission fixture."""
@@ -4168,11 +4186,11 @@ def add_keynote_audio_position_canonical_scaffold(root: Path) -> None:
         + "fn codec_position_route() { decode_movie_position_with_report; prepare_movie_position_rewrite; }\n"
         + "fn execute_prepared() { let prepared = prepare_movie_position_rewrite(); let output = prepared.execute(); let _ = output; }\n"
         + "impl Package {\n"
-        + "    pub fn slide_audio_position<'slide, 'movie>(&self, slide: SlideSelector<'slide>, movie: MovieSelector) -> Result<Point, SlideAudioPositionError> { let _ = (slide, movie); todo!() }\n"
-        + "    pub fn edit_slide_audio_position<'slide, 'movie>(&self, slide: SlideSelector<'slide>, movie: MovieSelector, position: Point) -> Result<SlideAudioPositionEdit, SlideAudioPositionError> { let _ = (slide, movie, position); todo!() }\n"
-        + "    pub fn apply_slide_audio_position(&self, patch: &SlideAudioPositionPatch) -> Result<SlideAudioPositionCommit, SlideAudioPositionError> { let _ = patch; todo!() }\n"
+        + "    pub fn slide_audio_position<'slide, 'movie>(&self, slide: SlideSelector<'slide>, movie: MovieSelector) -> Result<Point, Error> { let _ = (slide, movie); todo!() }\n"
+        + "    pub fn edit_slide_audio_position<'slide, 'movie>(&self, slide: SlideSelector<'slide>, movie: MovieSelector, position: Point) -> Result<Edit, Error> { let _ = (slide, movie, position); todo!() }\n"
+        + "    pub fn apply_slide_audio_position(&self, patch: &Patch) -> Result<Commit, Error> { let _ = patch; todo!() }\n"
         + "}\n"
-        + "impl SlideAudioPositionEdit { pub fn set(self, value: Point) -> Self { let _ = value; self } pub fn commit(self) -> Result<SlideAudioPositionCommit, SlideAudioPositionError> { todo!() } }\n",
+        + "impl Edit { pub fn set(self, value: Point) -> Self { let _ = value; self } pub fn commit(self) -> Result<Commit, Error> { todo!() } }\n",
         encoding="utf-8",
     )
     package_export = root / boundaries.KEYNOTE_AUDIO_POSITION_EXPORT_SOURCES[0]
@@ -4234,7 +4252,7 @@ def add_keynote_audio_position_canonical_scaffold(root: Path) -> None:
         encoding="utf-8",
     )
     (root / boundaries.KEYNOTE_AUDIO_POSITION_FUZZ_CORPUS).mkdir(parents=True, exist_ok=True)
-
+    add_keynote_family_module(root, "AUDIO_POSITION")
 
 def add_keynote_media_properties_canonical_scaffold(root: Path) -> None:
     """Create the focused selector-first media-properties admission fixture."""
@@ -4270,11 +4288,11 @@ def add_keynote_media_properties_canonical_scaffold(root: Path) -> None:
         + "fn codec_properties_route() { decode_movie_properties_with_report; prepare_movie_properties_rewrite; }\n"
         + "fn execute_prepared() { let prepared = prepare_movie_properties_rewrite(); let requirements = prepared.execution_requirements(); let output = prepared.execute(requirements); let _ = output; }\n"
         + "impl Package {\n"
-        + "    pub fn slide_media_properties<'slide, 'movie>(&self, slide: SlideSelector<'slide>, movie: MovieSelector) -> Result<MediaProperties, SlideMediaPropertiesError> { let _ = (slide, movie); todo!() }\n"
-        + "    pub fn edit_slide_media_properties<'slide, 'movie>(&self, slide: SlideSelector<'slide>, movie: MovieSelector, value: MediaProperties) -> Result<SlideMediaPropertiesEdit, SlideMediaPropertiesError> { let _ = (slide, movie, value); todo!() }\n"
-        + "    pub fn apply_slide_media_properties(&self, patch: &SlideMediaPropertiesPatch) -> Result<SlideMediaPropertiesCommit, SlideMediaPropertiesError> { let _ = patch; todo!() }\n"
+        + "    pub fn slide_media_properties<'slide, 'movie>(&self, slide: SlideSelector<'slide>, movie: MovieSelector) -> Result<MediaProperties, Error> { let _ = (slide, movie); todo!() }\n"
+        + "    pub fn edit_slide_media_properties<'slide, 'movie>(&self, slide: SlideSelector<'slide>, movie: MovieSelector, value: MediaProperties) -> Result<Edit, Error> { let _ = (slide, movie, value); todo!() }\n"
+        + "    pub fn apply_slide_media_properties(&self, patch: &Patch) -> Result<Commit, Error> { let _ = patch; todo!() }\n"
         + "}\n"
-        + "impl SlideMediaPropertiesEdit { pub fn set(self, value: MediaProperties) -> Self { let _ = value; self } pub fn commit(self) -> Result<SlideMediaPropertiesCommit, SlideMediaPropertiesError> { todo!() } }\n",
+        + "impl Edit { pub fn set(self, value: MediaProperties) -> Self { let _ = value; self } pub fn commit(self) -> Result<Commit, Error> { todo!() } }\n",
         encoding="utf-8",
     )
 
@@ -4350,7 +4368,7 @@ def add_keynote_media_properties_canonical_scaffold(root: Path) -> None:
         fixture_path = root / fixture
         fixture_path.parent.mkdir(parents=True, exist_ok=True)
         fixture_path.write_bytes(b"synthetic-native-keynote-fixture")
-
+    add_keynote_family_module(root, "MEDIA_PROPERTIES")
 
 def add_keynote_movie_geometry_completion_scaffold(root: Path) -> None:
     """Activate the Wave111 geometry handoff with a complete fake bridge."""
@@ -4372,7 +4390,7 @@ def add_keynote_movie_geometry_completion_scaffold(root: Path) -> None:
         owner.read_text(encoding="utf-8")
         + "const MOVIE_GEOMETRY_COMPLETE: () = ();\n"
         + "impl Package { pub fn slide_movie_transform(&self, slide: SlideSelector, movie: MovieSelector) {} }\n"
-        + "impl SlideMovieGeometryEdit { pub fn set_transform(self, value: MovieTransform) -> Self { let _ = value; self } pub fn flip(self, axis: MovieFlipAxis) -> Self { let _ = axis; self } }\n"
+        + "impl Edit { pub fn set_transform(self, value: MovieTransform) -> Self { let _ = value; self } pub fn flip(self, axis: MovieFlipAxis) -> Self { let _ = axis; self } }\n"
         + "fn complete_geometry_codec_flow() {\n"
         + "    let options = DecodeOptions::residual();\n"
         + "    let prepared = prepare_movie_transform_rewrite(bytes, write, options);\n"
@@ -4470,16 +4488,16 @@ def add_keynote_slide_media_data_canonical_scaffold(root: Path) -> None:
         + "fn rewrite_media(budget: &mut MediaBudget) { rewrite_metadata_entry(budget); }\n"
         + "fn commit_edit(budget: &mut MediaBudget) { rewrite_media(budget); }\n"
         + "impl Package {\n"
-        + "    pub fn slide_media_data<'slide, 'movie>(&self, slide: SlideSelector<'slide>, movie: MovieSelector, part: MediaPart) -> Result<SlideMediaData<'_>, SlideMediaDataError> { let mut budget = MediaBudget::for_package(self)?; select_media(&mut budget); read_selected_media(&mut budget); let _ = (slide, movie, part); todo!() }\n"
-        + "    pub fn edit_slide_media_data<'slide, 'movie>(&self, slide: SlideSelector<'slide>, movie: MovieSelector, part: MediaPart) -> Result<SlideMediaDataEdit<'_>, SlideMediaDataError> { let mut budget = MediaBudget::for_package(self)?; SlideMediaDataEdit::new(&mut budget); let _ = (slide, movie, part); todo!() }\n"
-        + "    pub fn apply_slide_media_data(&self, patch: &SlideMediaDataPatch) -> Result<SlideMediaDataCommit, SlideMediaDataError> { let mut budget = MediaBudget::for_package(self)?; select_media(&mut budget); read_selected_media(&mut budget); let _ = patch; todo!() }\n"
+        + "    pub fn slide_media_data<'slide, 'movie>(&self, slide: SlideSelector<'slide>, movie: MovieSelector, part: MediaPart) -> Result<SlideMediaData<'_>, Error> { let mut budget = MediaBudget::for_package(self)?; select_media(&mut budget); read_selected_media(&mut budget); let _ = (slide, movie, part); todo!() }\n"
+        + "    pub fn edit_slide_media_data<'slide, 'movie>(&self, slide: SlideSelector<'slide>, movie: MovieSelector, part: MediaPart) -> Result<Edit<'_>, Error> { let mut budget = MediaBudget::for_package(self)?; Edit::new(&mut budget); let _ = (slide, movie, part); todo!() }\n"
+        + "    pub fn apply_slide_media_data(&self, patch: &Patch) -> Result<Commit, Error> { let mut budget = MediaBudget::for_package(self)?; select_media(&mut budget); read_selected_media(&mut budget); let _ = patch; todo!() }\n"
         + "}\n"
-        + "impl SlideMediaDataEdit {\n"
+        + "impl Edit {\n"
         + "    pub const fn before(&self) -> &[u8] { &[] }\n"
         + "    pub const fn after(&self) -> Option<&[u8]> { None }\n"
         + "    pub const fn part(&self) -> MediaPart { MediaPart::Content }\n"
-        + "    pub fn set(self, replacement: &[u8]) -> Result<Self, SlideMediaDataError> { let mut budget = MediaBudget::for_package(self.source)?; budget.entry_bytes(replacement.len()); let _ = replacement; Ok(self) }\n"
-        + "    pub fn commit(self) -> Result<SlideMediaDataCommit, SlideMediaDataError> { let mut budget = MediaBudget::for_package(self.source)?; commit_edit(&mut budget); todo!() }\n"
+        + "    pub fn set(self, replacement: &[u8]) -> Result<Self, Error> { let mut budget = MediaBudget::for_package(self.source)?; budget.entry_bytes(replacement.len()); let _ = replacement; Ok(self) }\n"
+        + "    pub fn commit(self) -> Result<Commit, Error> { let mut budget = MediaBudget::for_package(self.source)?; commit_edit(&mut budget); todo!() }\n"
         + "}\n",
         encoding="utf-8",
     )
@@ -4493,7 +4511,7 @@ def add_keynote_slide_media_data_canonical_scaffold(root: Path) -> None:
         "    fn charges() {\n"
         + "        "
         + "; ".join(
-            f"SlideMediaDataLimitKind::{variant}"
+            f"LimitKind::{variant}"
             for variant in sorted(boundaries.KEYNOTE_SLIDE_MEDIA_DATA_LIMIT_VARIANTS)
         )
         + ";\n"
@@ -4597,7 +4615,7 @@ def add_keynote_slide_media_data_canonical_scaffold(root: Path) -> None:
         "pub mod package_metadata_media_codec;\n",
         encoding="utf-8",
     )
-
+    add_keynote_family_module(root, "SLIDE_MEDIA_DATA", ("Data", "MediaPart"))
 
 def add_keynote_slide_media_lifecycle_canonical_scaffold(root: Path) -> None:
     """Create the focused Keynote duplicate/remove boundary fixture."""
@@ -4772,14 +4790,14 @@ def add_keynote_slide_media_lifecycle_canonical_scaffold(root: Path) -> None:
             "impl MetadataSnapshot { fn metadata_identifier_maximum(&self) -> u64 { self.metadata_identifier_maximum } }\n"
         ),
         "identifier_watermark.rs": (
-            "fn plan_release(source: &Package, removed_ids: &[u64], expected_last_identifier: u64, budget: &mut LifecycleBudget) -> Result<Option<u64>, SlideMediaLifecycleError> {\n"
+            "fn plan_release(source: &Package, removed_ids: &[u64], expected_last_identifier: u64, budget: &mut LifecycleBudget) -> Result<Option<u64>, Error> {\n"
             "    budget.charge_entries(1); budget.charge_wire_work(1); if removed_ids.binary_search(&expected_last_identifier).is_err() { return Ok(None); }\n"
             "    for component in source.state.source.components().iter() { let objects = &component.archive().objects; for object in objects { let identifier = object.archive_info.identifier; if removed_ids.binary_search(&identifier.unwrap_or(0)).is_ok() { continue; } } }\n"
             "    let maximum_remaining = 0; Ok(Some(maximum_remaining))\n"
             "}\n"
-            "fn verify_release(candidate: &Package, new_last_identifier: u64, budget: &mut LifecycleBudget) -> Result<(), SlideMediaLifecycleError> {\n"
+            "fn verify_release(candidate: &Package, new_last_identifier: u64, budget: &mut LifecycleBudget) -> Result<(), Error> {\n"
             "    let mut maximum_remaining = 0; for component in candidate.state.source.components().iter() { let objects = &component.archive().objects; budget.charge_entries(objects.len()); budget.charge_wire_work(objects.len().max(1)); for object in objects { let identifier = object.archive_info.identifier.unwrap_or(0); maximum_remaining = maximum_remaining.max(identifier); } }\n"
-            "    if maximum_remaining != new_last_identifier { return Err(SlideMediaLifecycleError::Verification); } Ok(())\n"
+            "    if maximum_remaining != new_last_identifier { return Err(Error::Verification); } Ok(())\n"
             "}\n"
         ),
         "node_cache.rs": (
@@ -4925,17 +4943,17 @@ def add_keynote_chart_axis_title_canonical_scaffold(root: Path) -> None:
         + "fn strict_prepared() { keynote_chart_axis_title_codec; decode_axis_titles_with_report(); prepare_axis_title_rewrite(); let prepared = prepared; let requirements = prepared.execution_requirements(); let output = prepared.execute(requirements); let _ = output; }\n"
         + "fn exact_source_authority() { ExactArtifacts; source_fingerprint; inverse; PatchConflict; is_noop; candidate; reopen; verify_locality; same_content; authority; root_preview_deletions; deleted_previews; }\n"
         + "impl Package {\n"
-        + "    pub fn slide_chart_axis_title<'slide, 'chart>(&self, slide: SlideSelector<'slide>, chart: ChartSelector<'chart>, axis: Axis) -> Result<Option<String>, ChartAxisTitleError> { let _ = (slide, chart, axis); todo!() }\n"
-        + "    pub fn edit_slide_chart_axis_title<'slide, 'chart>(&self, slide: SlideSelector<'slide>, chart: ChartSelector<'chart>, axis: Axis) -> Result<ChartAxisTitleEdit, ChartAxisTitleError> { let _ = (slide, chart, axis); todo!() }\n"
-        + "    pub fn apply_slide_chart_axis_title(&self, patch: &ChartAxisTitlePatch) -> Result<ChartAxisTitleCommit, ChartAxisTitleError> { let _ = patch; todo!() }\n"
+        + "    pub fn slide_chart_axis_title<'slide, 'chart>(&self, slide: SlideSelector<'slide>, chart: ChartSelector<'chart>, axis: Axis) -> Result<Option<String>, Error> { let _ = (slide, chart, axis); todo!() }\n"
+        + "    pub fn edit_slide_chart_axis_title<'slide, 'chart>(&self, slide: SlideSelector<'slide>, chart: ChartSelector<'chart>, axis: Axis) -> Result<Edit, Error> { let _ = (slide, chart, axis); todo!() }\n"
+        + "    pub fn apply_slide_chart_axis_title(&self, patch: &Patch) -> Result<Commit, Error> { let _ = patch; todo!() }\n"
         + "}\n"
-        + "impl ChartAxisTitleEdit {\n"
+        + "impl Edit {\n"
         + "    pub fn axis(self) -> Axis { Axis::Category }\n"
         + "    pub fn before(&self) -> Option<&str> { None }\n"
         + "    pub fn after(&self) -> Option<&str> { None }\n"
-        + "    pub fn set(self, title: impl AsRef<str>) -> Result<Self, ChartAxisTitleError> { let _ = title; Ok(self) }\n"
-        + "    pub fn clear(self) -> Result<Self, ChartAxisTitleError> { Ok(self) }\n"
-        + "    pub fn commit(self) -> Result<ChartAxisTitleCommit, ChartAxisTitleError> { todo!() }\n"
+        + "    pub fn set(self, title: impl AsRef<str>) -> Result<Self, Error> { let _ = title; Ok(self) }\n"
+        + "    pub fn clear(self) -> Result<Self, Error> { Ok(self) }\n"
+        + "    pub fn commit(self) -> Result<Commit, Error> { todo!() }\n"
         + "}\n",
         encoding="utf-8",
     )
@@ -5013,7 +5031,7 @@ def add_keynote_chart_axis_title_canonical_scaffold(root: Path) -> None:
         )
     for corpus in boundaries.KEYNOTE_CHART_AXIS_TITLE_FUZZ_CORPORA:
         (root / corpus).mkdir(parents=True, exist_ok=True)
-
+    add_keynote_family_module(root, "CHART_AXIS_TITLE")
 
 def add_keynote_chart_arrangement_canonical_scaffold(root: Path) -> None:
     """Install the focused chart Arrange owner and its private codec seam."""
@@ -5057,18 +5075,18 @@ def add_keynote_chart_arrangement_canonical_scaffold(root: Path) -> None:
             for name in boundaries.KEYNOTE_CHART_ARRANGEMENT_CANONICAL_TYPES
         )
         + "impl Package {\n"
-        + "    pub fn slide_chart_arrangement(&self, slide: SlideSelector, chart: ChartSelector) -> Result<ChartArrangement, ChartArrangementError> { let _ = (slide, chart); todo!() }\n"
-        + "    pub fn slide_chart_arrangements(&self, slide: SlideSelector) -> Result<Box<[ChartArrangement]>, ChartArrangementError> { let _ = slide; todo!() }\n"
-        + "    pub fn edit_slide_chart_arrangement(&self, slide: SlideSelector, chart: ChartSelector) -> Result<ChartArrangementEdit, ChartArrangementError> { let _ = (slide, chart); todo!() }\n"
-        + "    pub fn apply_slide_chart_arrangement(&self, patch: &ChartArrangementPatch) -> Result<ChartArrangementCommit, ChartArrangementError> { let _ = patch; todo!() }\n"
+        + "    pub fn slide_chart_arrangement(&self, slide: SlideSelector, chart: ChartSelector) -> Result<ChartArrangement, Error> { let _ = (slide, chart); todo!() }\n"
+        + "    pub fn slide_chart_arrangements(&self, slide: SlideSelector) -> Result<Box<[ChartArrangement]>, Error> { let _ = slide; todo!() }\n"
+        + "    pub fn edit_slide_chart_arrangement(&self, slide: SlideSelector, chart: ChartSelector) -> Result<Edit, Error> { let _ = (slide, chart); todo!() }\n"
+        + "    pub fn apply_slide_chart_arrangement(&self, patch: &Patch) -> Result<Commit, Error> { let _ = patch; todo!() }\n"
         + "}\n"
-        + "impl ChartArrangementEdit {\n"
+        + "impl Edit {\n"
         + "    pub fn before(&self) -> ChartArrangement { self.before }\n"
         + "    pub fn after(&self) -> ChartArrangement { self.after }\n"
         + "    pub fn set(self, arrangement: ChartArrangement) -> Self { let _ = arrangement; self }\n"
         + "    pub fn set_locked(self, locked: bool) -> Self { let _ = locked; self }\n"
         + "    pub fn set_constrain_proportions(self, constrain_proportions: bool) -> Self { let _ = constrain_proportions; self }\n"
-        + "    pub fn commit(self) -> Result<ChartArrangementCommit, ChartArrangementError> { todo!() }\n"
+        + "    pub fn commit(self) -> Result<Commit, Error> { todo!() }\n"
         + "}\n",
         encoding="utf-8",
     )
@@ -5162,7 +5180,7 @@ def add_keynote_chart_arrangement_canonical_scaffold(root: Path) -> None:
         "}\n",
         encoding="utf-8",
     )
-
+    add_keynote_family_module(root, "CHART_ARRANGEMENT")
 
 def add_focused_chart_arrangement_owner_scaffolds(root: Path) -> None:
     """Install minimal Numbers/Pages focused Arrange owner fixtures."""
@@ -5178,10 +5196,10 @@ def add_focused_chart_arrangement_owner_scaffolds(root: Path) -> None:
         "    pub fn sheet_chart_arrangements<'sheet>(&self, sheet_selector: impl Into<SheetSelector<'sheet>>) -> Result<Box<[ChartArrangement]>, Error> {\n"
         "        discover_sheet_charts(self, resolve_sheet_position(self, sheet_selector.into()))\n"
         "    }\n"
-        "    pub fn edit_sheet_chart_arrangement<'sheet>(&self, sheet_selector: impl Into<SheetSelector<'sheet>>, chart_selector: impl Into<ChartSelector>) -> Result<ChartArrangementEdit, Error> {\n"
+        "    pub fn edit_sheet_chart_arrangement<'sheet>(&self, sheet_selector: impl Into<SheetSelector<'sheet>>, chart_selector: impl Into<ChartSelector>) -> Result<Edit, Error> {\n"
         "        ChartArrangementEdit::new(self, sheet_selector.into(), chart_selector.into())\n"
         "    }\n"
-        "    pub fn apply_sheet_chart_arrangement(&self, patch: &ChartArrangementPatch) -> Result<ChartArrangementCommit, Error> {\n"
+        "    pub fn apply_sheet_chart_arrangement(&self, patch: &Patch) -> Result<Commit, Error> {\n"
         "        let selected = select_chart_with_budget(self, SheetSelector::position(patch.position()), ChartSelector::position(patch.position()));\n"
         "        verify_locality(self, selected)\n"
         "    }\n"
@@ -5189,7 +5207,7 @@ def add_focused_chart_arrangement_owner_scaffolds(root: Path) -> None:
         "fn select_chart_with_budget(_: &Package, _: SheetSelector<'_>, _: ChartSelector) -> Result<ChartArrangement, Error> { todo!() }\n"
         "fn resolve_sheet_position(_: &Package, _: SheetSelector<'_>) -> usize { 0 }\n"
         "fn discover_sheet_charts(_: &Package, _: usize) -> Result<Box<[ChartArrangement]>, Error> { todo!() }\n"
-        "fn verify_locality(_: &Package, _: Result<ChartArrangement, Error>) -> Result<ChartArrangementCommit, Error> { todo!() }\n"
+        "fn verify_locality(_: &Package, _: Result<ChartArrangement, Error>) -> Result<Commit, Error> { todo!() }\n"
         "fn codec_path() {\n"
         "    codec::decode_chart_arrangement_with_report();\n"
         "    codec::prepare_chart_arrangement_rewrite();\n"
@@ -5301,27 +5319,27 @@ def add_keynote_chart_axis_value_settings_canonical_scaffold(root: Path) -> None
         + "impl Package {\n"
         + "    pub fn slide_chart_value_axis_settings<'slide, 'chart>(&self, "
         "slide: SlideSelector, chart: ChartSelector) -> "
-        "Result<ValueAxisSettings, ChartValueAxisError> { let _ = (slide, chart); todo!() }\n"
+        "Result<ValueAxisSettings, Error> { let _ = (slide, chart); todo!() }\n"
         + "    pub fn edit_slide_chart_value_axis_settings<'slide, 'chart>(&self, "
         "slide: SlideSelector, chart: ChartSelector) -> "
-        "Result<ChartValueAxisEdit, ChartValueAxisError> { let _ = (slide, chart); todo!() }\n"
+        "Result<Edit, Error> { let _ = (slide, chart); todo!() }\n"
         + "    pub fn apply_slide_chart_value_axis_settings(&self, patch: "
-        "&ChartValueAxisPatch) -> Result<ChartValueAxisCommit, "
-        "ChartValueAxisError> { let _ = patch; todo!() }\n"
+        "&Patch) -> Result<Commit, "
+        "Error> { let _ = patch; todo!() }\n"
         + "}\n"
-        + "impl ChartValueAxisEdit {\n"
+        + "impl Edit {\n"
         + "    pub fn before(&self) -> ValueAxisSettings { todo!() }\n"
         + "    pub fn after(&self) -> ValueAxisSettings { todo!() }\n"
         + "    pub fn set(self, value: ValueAxisSettings) -> Result<Self, "
-        "ChartValueAxisError> { let _ = value; Ok(self) }\n"
+        "Error> { let _ = value; Ok(self) }\n"
         + "    pub fn set_bounds(self, value: Bounds) -> Result<Self, "
-        "ChartValueAxisError> { let _ = value; Ok(self) }\n"
+        "Error> { let _ = value; Ok(self) }\n"
         + "    pub fn set_steps(self, value: Steps) -> Result<Self, "
-        "ChartValueAxisError> { let _ = value; Ok(self) }\n"
+        "Error> { let _ = value; Ok(self) }\n"
         + "    pub fn set_scale(self, value: Scale) -> Result<Self, "
-        "ChartValueAxisError> { let _ = value; Ok(self) }\n"
-        + "    pub fn commit(self) -> Result<ChartValueAxisCommit, "
-        "ChartValueAxisError> { todo!() }\n"
+        "Error> { let _ = value; Ok(self) }\n"
+        + "    pub fn commit(self) -> Result<Commit, "
+        "Error> { todo!() }\n"
         + "}\n",
         encoding="utf-8",
     )
@@ -5457,7 +5475,7 @@ def add_keynote_chart_axis_value_settings_canonical_scaffold(root: Path) -> None
         "}\n",
         encoding="utf-8",
     )
-
+    add_keynote_family_module(root, "CHART_AXIS_VALUE_SETTINGS")
 
 def add_keynote_slide_table_title_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.KEYNOTE_SLIDE_TABLE_TITLE_SEMANTIC_SOURCE
@@ -5485,11 +5503,11 @@ def add_keynote_slide_table_title_canonical_scaffold(root: Path) -> None:
         + "fn publish() { prepare_reassembly_with_deletions; root_preview_deletions; }\n"
         + "fn verify() { candidate.validate; verify_locality; }\n"
         + "impl Package {\n"
-        + "pub fn slide_table_title_settings<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>) -> Result<Settings, SlideTableTitleError> { let _ = (slide, table); todo!() }\n"
-        + "pub fn edit_slide_table_title<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>) -> Result<SlideTableTitleEdit, SlideTableTitleError> { let _ = (slide, table); todo!() }\n"
-        + "pub fn apply_slide_table_title(&self, patch: &SlideTableTitlePatch) -> Result<SlideTableTitleCommit, SlideTableTitleError> { let _ = patch; todo!() }\n"
+        + "pub fn slide_table_title_settings<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>) -> Result<Settings, Error> { let _ = (slide, table); todo!() }\n"
+        + "pub fn edit_slide_table_title<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>) -> Result<Edit, Error> { let _ = (slide, table); todo!() }\n"
+        + "pub fn apply_slide_table_title(&self, patch: &Patch) -> Result<Commit, Error> { let _ = patch; todo!() }\n"
         + "}\n"
-        + "impl SlideTableTitleEdit { pub fn set(self, settings: Settings) -> Self { let _ = settings; self } pub fn commit(self) -> Result<SlideTableTitleCommit, SlideTableTitleError> { todo!() } }\n",
+        + "impl Edit { pub fn set(self, settings: Settings) -> Self { let _ = settings; self } pub fn commit(self) -> Result<Commit, Error> { todo!() } }\n",
         encoding="utf-8",
     )
     package_export = root / boundaries.KEYNOTE_SLIDE_TABLE_TITLE_EXPORT_SOURCES[0]
@@ -5512,7 +5530,7 @@ def add_keynote_slide_table_title_canonical_scaffold(root: Path) -> None:
         "pub use slide::table::title::Settings;\n",
         encoding="utf-8",
     )
-
+    add_keynote_family_module(root, "SLIDE_TABLE_TITLE")
 
 def add_keynote_slide_table_sort_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.KEYNOTE_SLIDE_TABLE_SORT_SEMANTIC_SOURCE
@@ -5550,11 +5568,11 @@ def add_keynote_slide_table_sort_canonical_scaffold(root: Path) -> None:
         + "fn shared_graph() { select_table(); same_target(); verify_locality(); Budget; }\n"
         + "fn transaction() { residual; budget; ExactArtifacts; inverse; is_noop; prepare_reassembly; candidate; reopen; validate; same_content; let deleted_previews: usize = 0; }\n"
         + "impl Package {\n"
-        + "pub fn slide_table_sort_order<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>) -> Result<Option<Order>, SlideTableSortError> { let _ = (slide, table); todo!() }\n"
-        + "pub fn edit_slide_table_sort_order<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>) -> Result<SlideTableSortEdit, SlideTableSortError> { let _ = (slide, table); todo!() }\n"
-        + "pub fn apply_slide_table_sort_order(&self, patch: &SlideTableSortPatch) -> Result<SlideTableSortCommit, SlideTableSortError> { let _ = patch; todo!() }\n"
+        + "pub fn slide_table_sort_order<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>) -> Result<Option<Order>, Error> { let _ = (slide, table); todo!() }\n"
+        + "pub fn edit_slide_table_sort_order<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>) -> Result<Edit, Error> { let _ = (slide, table); todo!() }\n"
+        + "pub fn apply_slide_table_sort_order(&self, patch: &Patch) -> Result<Commit, Error> { let _ = patch; todo!() }\n"
         + "}\n"
-        + "impl SlideTableSortEdit { pub fn order(&self) -> Option<&Order> { todo!() } pub fn set(self, order: Order) -> Self { let _ = order; self } pub fn clear(self) -> Self { self } pub fn reset(self) -> Self { self } pub fn commit(self) -> Result<SlideTableSortCommit, SlideTableSortError> { todo!() } }\n",
+        + "impl Edit { pub fn order(&self) -> Option<&Order> { todo!() } pub fn set(self, order: Order) -> Self { let _ = order; self } pub fn clear(self) -> Self { self } pub fn reset(self) -> Self { self } pub fn commit(self) -> Result<Commit, Error> { todo!() } }\n",
         encoding="utf-8",
     )
     package_export = root / boundaries.KEYNOTE_SLIDE_TABLE_SORT_EXPORT_SOURCES[0]
@@ -5682,14 +5700,14 @@ def add_keynote_slide_table_physical_sort_canonical_scaffold(
         + "    let _ = (numbers_table_physical_sort_codec, table_physical_sort_codec, Buffa, WireView, BncCellView, lazy, borrowed);\n"
         + "}\n"
         + "impl Package {\n"
-        + "    pub fn execute_slide_table_sort_order<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>) -> Result<SlideTablePhysicalSortCommit, SlideTablePhysicalSortError> { let _ = (slide, table); todo!() }\n"
-        + "    pub fn execute_slide_table_sort_order_to_rows<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>, rows: RowRange) -> Result<SlideTablePhysicalSortCommit, SlideTablePhysicalSortError> { let _ = (slide, table, rows); todo!() }\n"
-        + "    pub fn apply_slide_table_physical_sort(&self, patch: &SlideTablePhysicalSortPatch) -> Result<SlideTablePhysicalSortCommit, SlideTablePhysicalSortError> { let _ = patch; todo!() }\n"
+        + "    pub fn execute_slide_table_sort_order<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>) -> Result<Commit, Error> { let _ = (slide, table); todo!() }\n"
+        + "    pub fn execute_slide_table_sort_order_to_rows<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>, rows: RowRange) -> Result<Commit, Error> { let _ = (slide, table, rows); todo!() }\n"
+        + "    pub fn apply_slide_table_physical_sort(&self, patch: &Patch) -> Result<Commit, Error> { let _ = patch; todo!() }\n"
         + "}\n"
-        + "impl SlideTablePhysicalSortEdit {\n"
+        + "impl Edit {\n"
         + "    pub fn rows(&self) -> Option<RowRange> { todo!() }\n"
         + "    pub fn order(&self) -> Option<&Order> { todo!() }\n"
-        + "    pub fn commit(self) -> Result<SlideTablePhysicalSortCommit, SlideTablePhysicalSortError> { todo!() }\n"
+        + "    pub fn commit(self) -> Result<Commit, Error> { todo!() }\n"
         + "}\n",
         encoding="utf-8",
     )
@@ -5828,13 +5846,13 @@ def add_keynote_slide_table_lock_state_canonical_scaffold(root: Path) -> None:
         "pub use litchi_iwa_common::table::lock::State;\n"
         "pub mod transaction {\n"
         "    pub use crate::package::slide_table_lock_state::{\n"
-        "        SlideTableLockStateCommit as Commit,\n"
-        "        SlideTableLockStateDiagnostics as Diagnostics,\n"
-        "        SlideTableLockStateEdit as Edit,\n"
-        "        SlideTableLockStateError as Error,\n"
-        "        SlideTableLockStateLimitKind as LimitKind,\n"
-        "        SlideTableLockStatePatch as Patch,\n"
-        "        SlideTableLockStatePath as Path,\n"
+        "        Commit as Commit,\n"
+        "        Diagnostics as Diagnostics,\n"
+        "        Edit as Edit,\n"
+        "        Error as Error,\n"
+        "        LimitKind as LimitKind,\n"
+        "        Patch as Patch,\n"
+        "        Path as Path,\n"
         "    };\n"
         "}\n",
         encoding="utf-8",
@@ -5861,14 +5879,14 @@ def add_keynote_slide_table_lock_state_canonical_scaffold(root: Path) -> None:
         + "fn strict() { table_info_codec; WireLimits; ExactArtifacts; }\n"
         + "fn transaction() { budget; residual; candidate; reopen; verify_locality; inverse; let deleted_previews: usize = 0; }\n"
         + "impl Package {\n"
-        + "pub fn slide_table_lock_state<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>) -> Result<State, SlideTableLockStateError> { let _ = (slide, table); todo!() }\n"
-        + "pub fn edit_slide_table_lock_state<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>) -> Result<SlideTableLockStateEdit, SlideTableLockStateError> { let _ = (slide, table); todo!() }\n"
-        + "pub fn apply_slide_table_lock_state(&self, patch: &SlideTableLockStatePatch) -> Result<SlideTableLockStateCommit, SlideTableLockStateError> { let _ = patch; todo!() }\n"
+        + "pub fn slide_table_lock_state<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>) -> Result<State, Error> { let _ = (slide, table); todo!() }\n"
+        + "pub fn edit_slide_table_lock_state<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>) -> Result<Edit, Error> { let _ = (slide, table); todo!() }\n"
+        + "pub fn apply_slide_table_lock_state(&self, patch: &Patch) -> Result<Commit, Error> { let _ = patch; todo!() }\n"
         + "}\n"
-        + "impl SlideTableLockStateEdit {\n"
+        + "impl Edit {\n"
         + "pub fn before(&self) -> State { todo!() } pub fn after(&self) -> State { todo!() } pub fn state(&self) -> State { todo!() }\n"
         + "pub fn set(self, state: State) -> Self { let _ = state; self } pub fn set_state(&mut self, state: State) -> &mut Self { let _ = state; self }\n"
-        + "pub fn lock(&mut self) -> &mut Self { self } pub fn unlock(&mut self) -> &mut Self { self } pub fn commit(self) -> Result<SlideTableLockStateCommit, SlideTableLockStateError> { todo!() }\n"
+        + "pub fn lock(&mut self) -> &mut Self { self } pub fn unlock(&mut self) -> &mut Self { self } pub fn commit(self) -> Result<Commit, Error> { todo!() }\n"
         + "}\n",
         encoding="utf-8",
     )
@@ -5907,13 +5925,13 @@ def add_keynote_slide_table_dimension_canonical_scaffold(root: Path) -> None:
         "pub use litchi_iwa_common::table::dimension::{Dimension, Error, Points, Size};\n"
         "pub mod transaction {\n"
         "    pub use crate::package::slide_table_dimension::{\n"
-        "        SlideTableDimensionCommit as Commit,\n"
-        "        SlideTableDimensionDiagnostics as Diagnostics,\n"
-        "        SlideTableDimensionEdit as Edit,\n"
-        "        SlideTableDimensionError as Error,\n"
-        "        SlideTableDimensionLimitKind as LimitKind,\n"
-        "        SlideTableDimensionPatch as Patch,\n"
-        "        SlideTableDimensionPath as Path,\n"
+        "        Commit as Commit,\n"
+        "        Diagnostics as Diagnostics,\n"
+        "        Edit as Edit,\n"
+        "        Error as Error,\n"
+        "        LimitKind as LimitKind,\n"
+        "        Patch as Patch,\n"
+        "        Path as Path,\n"
         "    };\n"
         "}\n",
         encoding="utf-8",
@@ -5940,16 +5958,16 @@ def add_keynote_slide_table_dimension_canonical_scaffold(root: Path) -> None:
         + "fn strict() { table_dimension_codec; ExactArtifacts; }\n"
         + "fn transaction() { budget; residual; prepare; execute; candidate; reopen; verify_locality; inverse; let deleted_previews: usize = 0; }\n"
         + "impl Package {\n"
-        + "pub fn slide_table_dimension_size<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>, dimension: Dimension) -> Result<Size, SlideTableDimensionError> { let _ = (slide, table, dimension); todo!() }\n"
-        + "pub fn edit_slide_table_dimension_size<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>, dimension: Dimension) -> Result<SlideTableDimensionEdit, SlideTableDimensionError> { let _ = (slide, table, dimension); todo!() }\n"
-        + "pub fn apply_slide_table_dimension_size(&self, patch: &SlideTableDimensionPatch) -> Result<SlideTableDimensionCommit, SlideTableDimensionError> { let _ = patch; todo!() }\n"
+        + "pub fn slide_table_dimension_size<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>, dimension: Dimension) -> Result<Size, Error> { let _ = (slide, table, dimension); todo!() }\n"
+        + "pub fn edit_slide_table_dimension_size<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>, dimension: Dimension) -> Result<Edit, Error> { let _ = (slide, table, dimension); todo!() }\n"
+        + "pub fn apply_slide_table_dimension_size(&self, patch: &Patch) -> Result<Commit, Error> { let _ = patch; todo!() }\n"
         + "}\n"
-        + "impl SlideTableDimensionEdit {\n"
+        + "impl Edit {\n"
         + "pub fn size(&self) -> Size { todo!() }\n"
         + "pub fn set(self, size: Size) -> Self { let _ = size; self }\n"
         + "pub fn set_points(self, points: Points) -> Self { let _ = points; self }\n"
         + "pub fn reset(self) -> Self { self }\n"
-        + "pub fn commit(self) -> Result<SlideTableDimensionCommit, SlideTableDimensionError> { todo!() }\n"
+        + "pub fn commit(self) -> Result<Commit, Error> { todo!() }\n"
         + "}\n",
         encoding="utf-8",
     )
@@ -5989,13 +6007,13 @@ def add_keynote_slide_table_name_canonical_scaffold(root: Path) -> None:
         "pub struct Name;\n"
         "pub mod transaction {\n"
         "    pub use crate::package::slide_table_name::{\n"
-        "        SlideTableNameCommit as Commit,\n"
-        "        SlideTableNameDiagnostics as Diagnostics,\n"
-        "        SlideTableNameEdit as Edit,\n"
-        "        SlideTableNameError as Error,\n"
-        "        SlideTableNameLimitKind as LimitKind,\n"
-        "        SlideTableNamePatch as Patch,\n"
-        "        SlideTableNamePath as Path,\n"
+        "        Commit as Commit,\n"
+        "        Diagnostics as Diagnostics,\n"
+        "        Edit as Edit,\n"
+        "        Error as Error,\n"
+        "        LimitKind as LimitKind,\n"
+        "        Patch as Patch,\n"
+        "        Path as Path,\n"
         "    };\n"
         "}\n",
         encoding="utf-8",
@@ -6025,17 +6043,17 @@ def add_keynote_slide_table_name_canonical_scaffold(root: Path) -> None:
         + "fn publish() { ExactArtifacts; source_fingerprint; inverse; is_noop; PatchConflict; prepare_reassembly; EntryEdit; candidate; reopen; validate; verify_locality; same_content_ignoring_offsets; let deleted_previews = root_preview_deletions(); let diagnostics = Diagnostics { deleted_previews }; }\n"
         + "fn no_op() { if patch.is_noop() { let diagnostics = Diagnostics { deleted_previews: 0 }; } }\n"
         + "impl Package {\n"
-        + "pub fn slide_table_name<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>) -> Result<Name, SlideTableNameError> { let _ = (slide, table); todo!() }\n"
-        + "pub fn edit_slide_table_name<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>) -> Result<SlideTableNameEdit, SlideTableNameError> { let _ = (slide, table); todo!() }\n"
-        + "pub fn apply_slide_table_name(&self, patch: &SlideTableNamePatch) -> Result<SlideTableNameCommit, SlideTableNameError> { let _ = patch; todo!() }\n"
+        + "pub fn slide_table_name<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>) -> Result<Name, Error> { let _ = (slide, table); todo!() }\n"
+        + "pub fn edit_slide_table_name<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>) -> Result<Edit, Error> { let _ = (slide, table); todo!() }\n"
+        + "pub fn apply_slide_table_name(&self, patch: &Patch) -> Result<Commit, Error> { let _ = patch; todo!() }\n"
         + "}\n"
-        + "impl SlideTableNameEdit {\n"
-        + "pub fn path(&self) -> SlideTableNamePath { todo!() }\n"
+        + "impl Edit {\n"
+        + "pub fn path(&self) -> Path { todo!() }\n"
         + "pub fn before(&self) -> &Name { todo!() }\n"
         + "pub fn name(&self) -> &Name { todo!() }\n"
         + "pub fn set(self, name: Name) -> Self { let _ = name; self }\n"
-        + "pub fn set_name(self, name: &str) -> Result<Self, SlideTableNameError> { let _ = name; todo!() }\n"
-        + "pub fn commit(self) -> Result<SlideTableNameCommit, SlideTableNameError> { todo!() }\n"
+        + "pub fn set_name(self, name: &str) -> Result<Self, Error> { let _ = name; todo!() }\n"
+        + "pub fn commit(self) -> Result<Commit, Error> { todo!() }\n"
         + "}\n",
         encoding="utf-8",
     )
@@ -6143,14 +6161,14 @@ def add_keynote_slide_table_headers_canonical_scaffold(
     semantic.write_text(
         "pub mod transaction {\n"
         "    pub use crate::package::slide_table_headers::{\n"
-        "        SlideTableHeaderCommit as Commit,\n"
-        "        SlideTableHeaderDiagnostics as Diagnostics,\n"
-        "        SlideTableHeaderEdit as Edit,\n"
-        "        SlideTableHeaderError as Error,\n"
-        "        SlideTableHeaderInvalidReason as InvalidReason,\n"
-        "        SlideTableHeaderLimitKind as LimitKind,\n"
-        "        SlideTableHeaderPatch as Patch,\n"
-        "        SlideTableHeaderPath as Path,\n"
+        "        Commit as Commit,\n"
+        "        Diagnostics as Diagnostics,\n"
+        "        Edit as Edit,\n"
+        "        Error as Error,\n"
+        "        InvalidReason as InvalidReason,\n"
+        "        LimitKind as LimitKind,\n"
+        "        Patch as Patch,\n"
+        "        Path as Path,\n"
         "    };\n"
         "}\n"
         "pub use litchi_iwa_common::table::headers::{Count, Error, Settings};\n",
@@ -6186,19 +6204,19 @@ def add_keynote_slide_table_headers_canonical_scaffold(
         + "fn candidate_checks() { candidate.validate; reopen; verify_locality; same_selection; }\n"
         + "fn preserve_previews() { let diagnostics = Diagnostics { deleted_previews: 0 }; }\n"
         + "impl Package {\n"
-        + "    pub fn slide_table_header_settings<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>) -> Result<Settings, SlideTableHeaderError> { let _ = (slide, table); todo!() }\n"
-        + "    pub fn edit_slide_table_headers<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>) -> Result<SlideTableHeaderEdit, SlideTableHeaderError> { let _ = (slide, table); todo!() }\n"
-        + "    pub fn apply_slide_table_headers(&self, patch: &SlideTableHeaderPatch) -> Result<SlideTableHeaderCommit, SlideTableHeaderError> { let _ = patch; todo!() }\n"
+        + "    pub fn slide_table_header_settings<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>) -> Result<Settings, Error> { let _ = (slide, table); todo!() }\n"
+        + "    pub fn edit_slide_table_headers<'slide>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector>) -> Result<Edit, Error> { let _ = (slide, table); todo!() }\n"
+        + "    pub fn apply_slide_table_headers(&self, patch: &Patch) -> Result<Commit, Error> { let _ = patch; todo!() }\n"
         + "}\n"
-        + "impl SlideTableHeaderEdit {\n"
+        + "impl Edit {\n"
         + "    pub fn slide_position(&self) -> Position { todo!() }\n"
         + "    pub fn table_position(&self) -> Position { todo!() }\n"
-        + "    pub fn path(&self) -> SlideTableHeaderPath { todo!() }\n"
+        + "    pub fn path(&self) -> Path { todo!() }\n"
         + "    pub fn before(&self) -> Settings { todo!() }\n"
         + "    pub fn after(&self) -> Settings { todo!() }\n"
         + "    pub fn settings(&self) -> Settings { todo!() }\n"
         + "    pub fn set(self, settings: Settings) -> Self { let _ = settings; self }\n"
-        + "    pub fn commit(self) -> Result<SlideTableHeaderCommit, SlideTableHeaderError> { todo!() }\n"
+        + "    pub fn commit(self) -> Result<Commit, Error> { todo!() }\n"
         + "}\n",
         encoding="utf-8",
     )
@@ -6413,13 +6431,13 @@ def add_keynote_slide_table_appearance_canonical_scaffold(
     semantic.write_text(
         "pub mod transaction {\n"
         "    pub use crate::package::slide_table_appearance::{\n"
-        "        SlideTableAppearanceCommit as Commit,\n"
-        "        SlideTableAppearanceDiagnostics as Diagnostics,\n"
-        "        SlideTableAppearanceEdit as Edit,\n"
-        "        SlideTableAppearanceError as Error,\n"
-        "        SlideTableAppearanceLimitKind as LimitKind,\n"
-        "        SlideTableAppearancePatch as Patch,\n"
-        "        SlideTableAppearancePath as Path,\n"
+        "        Commit as Commit,\n"
+        "        Diagnostics as Diagnostics,\n"
+        "        Edit as Edit,\n"
+        "        Error as Error,\n"
+        "        LimitKind as LimitKind,\n"
+        "        Patch as Patch,\n"
+        "        Path as Path,\n"
         "    };\n"
         "}\n"
         "pub use litchi_iwa_common::table::appearance::{Appearance, Banding, "
@@ -6450,15 +6468,15 @@ def add_keynote_slide_table_appearance_canonical_scaffold(
         )
         + "fn preserve_previews() { let deleted_previews = 0; }\n"
         + "impl Package {\n"
-        + "    pub fn slide_table_appearance<'slide, 'table>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector<'table>>) -> Result<Appearance, SlideTableAppearanceError> { let _ = (slide, table); todo!() }\n"
-        + "    pub fn edit_slide_table_appearance<'slide, 'table>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector<'table>>) -> Result<SlideTableAppearanceEdit, SlideTableAppearanceError> { let _ = (slide, table); todo!() }\n"
-        + "    pub fn apply_slide_table_appearance(&self, patch: &SlideTableAppearancePatch) -> Result<SlideTableAppearanceCommit, SlideTableAppearanceError> { let _ = patch; todo!() }\n"
+        + "    pub fn slide_table_appearance<'slide, 'table>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector<'table>>) -> Result<Appearance, Error> { let _ = (slide, table); todo!() }\n"
+        + "    pub fn edit_slide_table_appearance<'slide, 'table>(&self, slide: impl Into<SlideSelector<'slide>>, table: impl Into<TableSelector<'table>>) -> Result<Edit, Error> { let _ = (slide, table); todo!() }\n"
+        + "    pub fn apply_slide_table_appearance(&self, patch: &Patch) -> Result<Commit, Error> { let _ = patch; todo!() }\n"
         + "}\n"
-        + "impl SlideTableAppearanceEdit {\n"
-        + "    pub fn path(&self) -> SlideTableAppearancePath { todo!() }\n"
+        + "impl Edit {\n"
+        + "    pub fn path(&self) -> Path { todo!() }\n"
         + "    pub fn appearance(&self) -> Appearance { todo!() }\n"
         + "    pub fn set(self, appearance: Appearance) -> Self { let _ = appearance; self }\n"
-        + "    pub fn commit(self) -> Result<SlideTableAppearanceCommit, SlideTableAppearanceError> { todo!() }\n"
+        + "    pub fn commit(self) -> Result<Commit, Error> { todo!() }\n"
         + "}\n",
         encoding="utf-8",
     )
@@ -14036,7 +14054,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                 "    pub fn edit_slide_background(&self) {}\n"
                 "    pub fn apply_slide_background(&self) {}\n"
                 "}\n"
-                "impl SlideBackgroundEdit<'_> {\n"
+                "impl Edit<'_> {\n"
                 "    pub fn set(self) {}\n"
                 "    pub fn clear(self) {}\n"
                 "}\n"
@@ -14056,7 +14074,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                 "    pub fn edit_slide_background(&self) {}\n"
                 "    pub fn apply_slide_background(&self) {}\n"
                 "}\n"
-                "impl SlideBackgroundEdit<'_> {\n"
+                "impl Edit<'_> {\n"
                 "    pub fn set(self) {}\n"
                 "    pub fn clear(self) {}\n"
                 "}\n"
@@ -20235,6 +20253,7 @@ class BoundaryPolicyTests(unittest.TestCase):
             owner = root / boundaries.KEYNOTE_CHART_CAPTION_OWNER_SOURCE
             package = root / boundaries.KEYNOTE_CHART_CAPTION_EXPORT_SOURCES[0]
             library = root / boundaries.KEYNOTE_CHART_CAPTION_EXPORT_SOURCES[1]
+            add_keynote_family_module(root, "CHART_CAPTION")
             owner.parent.mkdir(parents=True)
             canonical = sorted(boundaries.KEYNOTE_CHART_CAPTION_CANONICAL_TYPES)
             owner.write_text(
@@ -20257,7 +20276,7 @@ class BoundaryPolicyTests(unittest.TestCase):
             )
             owner.write_text(
                 owner.read_text(encoding="utf-8")
-                + "impl ChartCaptionEdit {\n"
+                + "impl Edit {\n"
                 "    pub fn set(self) {}\n"
                 "    pub fn clear(self) {}\n"
                 "    pub fn commit(self) {\n"
@@ -20346,7 +20365,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                 "        verify_caption_candidate(&mut budget);\n"
                 "    }\n"
                 "}\n"
-                "impl ChartCaptionEdit {\n"
+                "impl Edit {\n"
                 "    pub fn set(self) {}\n"
                 "    pub fn clear(self) {}\n"
                 "    pub fn commit(self) {}\n"
@@ -20358,7 +20377,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                 "    pub archive: ArchiveObject,\n"
                 "}\n"
                 "pub use litchi_iwa_protos::WireView;\n"
-                "pub type LeakedCaption = ChartCaptionEdit;\n",
+                "pub type LeakedCaption = Edit;\n",
                 encoding="utf-8",
             )
             violations = boundaries.audit_keynote_chart_caption_facade_source_topology(root)
@@ -20376,6 +20395,7 @@ class BoundaryPolicyTests(unittest.TestCase):
             owner = root / boundaries.KEYNOTE_CHART_CAPTION_OWNER_SOURCE
             package = root / boundaries.KEYNOTE_CHART_CAPTION_EXPORT_SOURCES[0]
             library = root / boundaries.KEYNOTE_CHART_CAPTION_EXPORT_SOURCES[1]
+            add_keynote_family_module(root, "CHART_CAPTION")
             owner.parent.mkdir(parents=True)
             canonical = sorted(boundaries.KEYNOTE_CHART_CAPTION_CANONICAL_TYPES)
             helper = (
@@ -20432,7 +20452,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                 "        verify_caption_candidate(&mut budget);\n"
                 "    }\n"
                 "}\n"
-                "impl ChartCaptionEdit {\n"
+                "impl Edit {\n"
                 "    pub fn set(self) {}\n"
                 "    pub fn clear(self) {}\n"
                 "    pub fn commit(self) {\n"
@@ -20545,13 +20565,13 @@ class BoundaryPolicyTests(unittest.TestCase):
             "\n".join(f"pub struct {name};" for name in canonical)
             + "\nimpl Package {\n"
             "    pub fn slide_movie_caption(&self, selector: MovieSelector) -> Option<String> { let _ = selector; None }\n"
-            "    pub fn edit_slide_movie_caption(&self, selector: MovieSelector) -> SlideMovieCaptionEdit { let _ = selector; SlideMovieCaptionEdit }\n"
-            "    pub fn apply_slide_movie_caption(&self, patch: SlideMovieCaptionPatch) -> SlideMovieCaptionCommit { let _ = patch; SlideMovieCaptionCommit }\n"
+            "    pub fn edit_slide_movie_caption(&self, selector: MovieSelector) -> Edit { let _ = selector; Edit }\n"
+            "    pub fn apply_slide_movie_caption(&self, patch: Patch) -> Commit { let _ = patch; Commit }\n"
             "}\n"
-            "impl SlideMovieCaptionEdit {\n"
+            "impl Edit {\n"
             "    pub fn set(self, caption: &str) -> Self { let _ = caption; self }\n"
             "    pub fn clear(self) -> Self { self }\n"
-            "    pub fn commit(self) -> SlideMovieCaptionCommit { let _ = self; SlideMovieCaptionCommit }\n"
+            "    pub fn commit(self) -> Commit { let _ = self; Commit }\n"
             "}\n",
             encoding="utf-8",
         )
@@ -20574,6 +20594,7 @@ class BoundaryPolicyTests(unittest.TestCase):
             "pub use slide::movie::MovieSelector;\n",
             encoding="utf-8",
         )
+        add_keynote_family_module(root, "MOVIE_CAPTION")
         return owner, selector, package, library
 
     def test_focused_keynote_movie_caption_facade_requires_selector_owner_shape(
@@ -20597,7 +20618,7 @@ class BoundaryPolicyTests(unittest.TestCase):
                 owner.read_text(encoding="utf-8")
                 + "pub fn raw_movie_caption(bytes: &[u8]) -> MovieCaptionSnapshot<'_> { todo!() }\n"
                 + "pub use litchi_iwa_protos::WireView;\n"
-                + "pub type MovieCaptionEdit = SlideMovieCaptionEdit;\n",
+                + "pub type MovieCaptionEdit = Edit;\n",
                 encoding="utf-8",
             )
             violations = boundaries.audit_keynote_movie_caption_facade_source_topology(root)
@@ -20766,11 +20787,11 @@ class BoundaryPolicyTests(unittest.TestCase):
 
             source = owner.read_text(encoding="utf-8")
             source = source.replace(
-                "pub fn apply_slide_movie_caption(&self, patch: SlideMovieCaptionPatch) -> SlideMovieCaptionCommit { let _ = patch; SlideMovieCaptionCommit }",
-                "pub fn apply_slide_movie_caption(&self, patch: SlideMovieCaptionPatch) -> SlideMovieCaptionCommit { let budget = MovieCaptionBudget; let _ = (patch, budget); SlideMovieCaptionCommit }",
+                "pub fn apply_slide_movie_caption(&self, patch: Patch) -> Commit { let _ = patch; Commit }",
+                "pub fn apply_slide_movie_caption(&self, patch: Patch) -> Commit { let budget = MovieCaptionBudget; let _ = (patch, budget); Commit }",
             ).replace(
-                "pub fn commit(self) -> SlideMovieCaptionCommit { let _ = self; SlideMovieCaptionCommit }",
-                "pub fn commit(self) -> SlideMovieCaptionCommit { let budget = MovieCaptionBudget; let _ = (self, budget); SlideMovieCaptionCommit }",
+                "pub fn commit(self) -> Commit { let _ = self; Commit }",
+                "pub fn commit(self) -> Commit { let budget = MovieCaptionBudget; let _ = (self, budget); Commit }",
             )
             source += """
 struct MovieCaptionBudget;
@@ -20829,13 +20850,13 @@ fn rewrite_movie_caption_operation(
             "\n".join(f"pub struct {name};" for name in canonical)
             + "\nimpl Package {\n"
             "    pub fn slide_movie_title(&self, selector: MovieSelector) -> Option<String> { let _ = selector; None }\n"
-            "    pub fn edit_slide_movie_title(&self, selector: MovieSelector) -> SlideMovieTitleEdit { let _ = selector; SlideMovieTitleEdit }\n"
-            "    pub fn apply_slide_movie_title(&self, patch: SlideMovieTitlePatch) -> SlideMovieTitleCommit { let _ = patch; SlideMovieTitleCommit }\n"
+            "    pub fn edit_slide_movie_title(&self, selector: MovieSelector) -> Edit { let _ = selector; Edit }\n"
+            "    pub fn apply_slide_movie_title(&self, patch: Patch) -> Commit { let _ = patch; Commit }\n"
             "}\n"
-            "impl SlideMovieTitleEdit {\n"
+            "impl Edit {\n"
             "    pub fn set(self, title: &str) -> Self { let _ = title; self }\n"
             "    pub fn clear(self) -> Self { self }\n"
-            "    pub fn commit(self) -> SlideMovieTitleCommit { let _ = self; SlideMovieTitleCommit }\n"
+            "    pub fn commit(self) -> Commit { let _ = self; Commit }\n"
             "}\n",
             encoding="utf-8",
         )
@@ -20855,6 +20876,7 @@ fn rewrite_movie_caption_operation(
             "pub use slide::movie::MovieSelector;\n",
             encoding="utf-8",
         )
+        add_keynote_family_module(root, "MOVIE_TITLE")
         return owner, selector, package, library
 
     def test_focused_keynote_movie_title_facade_requires_selector_and_hides_physical_types(
@@ -20871,7 +20893,7 @@ fn rewrite_movie_caption_operation(
                 owner.read_text(encoding="utf-8")
                 + "pub fn raw_movie_title(bytes: &[u8], movie_id: u64) -> MovieTitleSnapshot<'static> { todo!() }\n"
                 + "pub use litchi_iwa_protos::WireView;\n"
-                + "pub type MovieTitleEdit = SlideMovieTitleEdit;\n",
+                + "pub type MovieTitleEdit = Edit;\n",
                 encoding="utf-8",
             )
             violations = boundaries.audit_keynote_movie_title_facade_source_topology(root)
@@ -21190,7 +21212,7 @@ fn rewrite_movie_title_operation(
             owner.write_text(
                 owner.read_text(encoding="utf-8")
                 + "#[cfg(test)]\npub fn decoy(movie_id: u64, bytes: &[u8]) {}\n"
-                + "pub use self::SlideMoviePlaybackEdit as PlaybackEdit;\n",
+                + "pub use self::Edit as PlaybackEdit;\n",
                 encoding="utf-8",
             )
             violations = boundaries.audit_keynote_movie_playback_facade_source_topology(root)
@@ -21570,12 +21592,12 @@ fn rewrite_movie_title_operation(
 
             owner.write_text(
                 owner.read_text(encoding="utf-8").replace(
-                    "pub struct SlideMediaPropertiesPatch;\n", ""
+                    "pub struct Patch;\n", ""
                 ),
                 encoding="utf-8",
             )
             violations = boundaries.audit_keynote_media_properties_facade_source_topology(root)
-            self.assertTrue(any("SlideMediaPropertiesPatch" in item for item in violations), violations)
+            self.assertTrue(any("Patch" in item for item in violations), violations)
 
     def test_keynote_media_properties_codec_rejects_eager_or_public_generated_views(
         self,
@@ -21735,7 +21757,7 @@ fn rewrite_movie_title_operation(
             owner.write_text(
                 owner.read_text(encoding="utf-8")
                 + "#[cfg(test)]\npub fn decoy(movie_id: u64, bytes: &[u8]) {}\n"
-                + "pub use self::SlideMovieGeometryEdit as GeometryEdit;\n",
+                + "pub use self::Edit as GeometryEdit;\n",
                 encoding="utf-8",
             )
             violations = boundaries.audit_keynote_movie_geometry_facade_source_topology(root)
@@ -21882,7 +21904,7 @@ fn rewrite_movie_title_operation(
                 owner.read_text(encoding="utf-8")
                 + "pub fn raw_media(bytes: &[u8], movie_id: u64, archive: Archive, wire: WireView) { let _ = (bytes, movie_id, archive, wire); }\n"
                 + "#[cfg(test)]\npub fn decoy(movie_id: u64) {}\n"
-                + "pub use self::SlideMediaDataEdit as MediaDataEdit;\n",
+                + "pub use self::Edit as MediaDataEdit;\n",
                 encoding="utf-8",
             )
             violations = boundaries.audit_keynote_slide_media_data_facade_source_topology(
@@ -23450,7 +23472,7 @@ fn rewrite_movie_title_operation(
             owner.write_text(
                 owner.read_text(encoding="utf-8")
                 + "#[cfg(test)]\npub fn decoy(table_id: u64, bytes: &[u8]) {}\n"
-                + "pub use self::SlideTableTitleEdit as TitleEdit;\n",
+                + "pub use self::Edit as TitleEdit;\n",
                 encoding="utf-8",
             )
             violations = boundaries.audit_keynote_slide_table_title_facade_source_topology(root)
@@ -23764,7 +23786,7 @@ fn rewrite_movie_title_operation(
                 owner.read_text(encoding="utf-8")
                 + "pub fn raw_sort(bytes: &[u8], model_id: u64, rows: RowRange) -> ArchiveObject { todo!() }\n"
                 + "#[cfg(test)]\npub fn decoy(model_id: u64, bytes: &[u8]) {}\n"
-                + "pub use self::SlideTableSortEdit as SortEdit;\n",
+                + "pub use self::Edit as SortEdit;\n",
                 encoding="utf-8",
             )
             owner.write_text(
@@ -24080,7 +24102,7 @@ fn rewrite_movie_title_operation(
             source = source.replace("TableSelector>", "u64>")
             source = source.replace(", rows: RowRange", "")
             source = source.replace(
-                "&SlideTablePhysicalSortPatch",
+                "&Patch",
                 "&[u8]",
             )
             owner.write_text(source, encoding="utf-8")
@@ -24102,7 +24124,7 @@ fn rewrite_movie_title_operation(
                 violations,
             )
             self.assertTrue(
-                any("SlideTablePhysicalSortPatch" in item for item in violations),
+                any("Patch" in item for item in violations),
                 violations,
             )
 
@@ -24326,7 +24348,7 @@ fn rewrite_movie_title_operation(
             owner.write_text(
                 owner.read_text(encoding="utf-8")
                 + "pub fn raw_lock(bytes: &[u8], model_id: u64) -> ArchiveObject { todo!() }\n"
-                + "pub use self::SlideTableLockStateEdit as LockStateEdit;\n"
+                + "pub use self::Edit as LockStateEdit;\n"
                 + "#[cfg(test)]\npub fn decoy(model_id: u64, bytes: &[u8]) {}\n",
                 encoding="utf-8",
             )
@@ -24452,7 +24474,7 @@ fn rewrite_movie_title_operation(
             owner.write_text(
                 owner.read_text(encoding="utf-8")
                 + "pub fn raw_dimension(bytes: &[u8], model_id: u64, wire: WireView, generated: GeneratedProjection, prost: prost_types::MessageInfo) -> ArchiveObject { todo!() }\n"
-                + "pub use self::SlideTableDimensionEdit as DimensionEdit;\n"
+                + "pub use self::Edit as DimensionEdit;\n"
                 + "#[cfg(test)]\npub fn decoy(model_id: u64, bytes: &[u8]) {}\n",
                 encoding="utf-8",
             )
@@ -24589,13 +24611,13 @@ fn rewrite_movie_title_operation(
             boundaries.KEYNOTE_SLIDE_TABLE_NAME_CANONICAL_TYPES,
             frozenset(
                 {
-                    "SlideTableNameCommit",
-                    "SlideTableNameDiagnostics",
-                    "SlideTableNameEdit",
-                    "SlideTableNameError",
-                    "SlideTableNameLimitKind",
-                    "SlideTableNamePatch",
-                    "SlideTableNamePath",
+                    "Commit",
+                    "Diagnostics",
+                    "Edit",
+                    "Error",
+                    "LimitKind",
+                    "Patch",
+                    "Path",
                 }
             ),
         )
@@ -24667,7 +24689,7 @@ fn rewrite_movie_title_operation(
             owner.write_text(
                 owner.read_text(encoding="utf-8")
                 + "pub fn raw_name(model_id: u64, source_bytes: &[u8], wire: WireView, generated: GeneratedProjection, prost: prost_types::MessageInfo) -> ArchiveObject { todo!() }\n"
-                + "pub use self::SlideTableNameEdit as NameEdit;\n"
+                + "pub use self::Edit as NameEdit;\n"
                 + "#[cfg(test)]\npub fn decoy(model_id: u64, bytes: &[u8]) {}\n",
                 encoding="utf-8",
             )
@@ -25006,7 +25028,7 @@ fn rewrite_movie_title_operation(
             owner.write_text(
                 owner.read_text(encoding="utf-8")
                 + "pub fn raw_header(bytes: &[u8], model_id: u64) -> ArchiveObject { todo!() }\n"
-                + "pub use self::SlideTableHeaderEdit as HeaderEdit;\n"
+                + "pub use self::Edit as HeaderEdit;\n"
                 + "#[cfg(test)]\n"
                 + "pub fn decoy(model_id: u64, bytes: &[u8]) {}\n",
                 encoding="utf-8",
@@ -26195,6 +26217,7 @@ fn rewrite_movie_title_operation(
             owner = root / boundaries.KEYNOTE_CHART_CAPTION_OWNER_SOURCE
             package = root / boundaries.KEYNOTE_CHART_CAPTION_EXPORT_SOURCES[0]
             library = root / boundaries.KEYNOTE_CHART_CAPTION_EXPORT_SOURCES[1]
+            add_keynote_family_module(root, "CHART_CAPTION")
             owner.parent.mkdir(parents=True)
             canonical = sorted(boundaries.KEYNOTE_CHART_CAPTION_CANONICAL_TYPES)
             owner.write_text(
@@ -26223,7 +26246,7 @@ fn rewrite_movie_title_operation(
                 "        verify_caption_candidate(&mut budget);\n"
                 "    }\n"
                 "}\n"
-                "impl ChartCaptionEdit {\n"
+                "impl Edit {\n"
                 "    pub fn set(self) {}\n"
                 "    pub fn clear(self) {}\n"
                 "    pub fn commit(self) {\n"
@@ -26316,7 +26339,7 @@ fn rewrite_movie_title_operation(
             )
             owner.write_text(
                 owner.read_text(encoding="utf-8")
-                + "pub fn raw_caption(native_resource_id: Option<u64>) -> ChartCaptionEdit { todo!() }\n",
+                + "pub fn raw_caption(native_resource_id: Option<u64>) -> Edit { todo!() }\n",
                 encoding="utf-8",
             )
             violations = boundaries.audit_keynote_chart_caption_facade_source_topology(root)
@@ -26327,7 +26350,7 @@ fn rewrite_movie_title_operation(
 
             owner.write_text(
                 owner.read_text(encoding="utf-8").replace(
-                    "pub fn raw_caption(native_resource_id: Option<u64>) -> ChartCaptionEdit { todo!() }\n",
+                    "pub fn raw_caption(native_resource_id: Option<u64>) -> Edit { todo!() }\n",
                     "",
                 ),
                 encoding="utf-8",
@@ -42444,7 +42467,7 @@ fn rewrite_movie_title_operation(
 
             owner = root / boundaries.KEYNOTE_CHART_AXIS_TITLE_OWNER_SOURCE
             owner.parent.mkdir(parents=True, exist_ok=True)
-            owner.write_text("pub struct ChartAxisTitlePatch;\n", encoding="utf-8")
+            owner.write_text("pub struct Patch;\n", encoding="utf-8")
             package = root / boundaries.KEYNOTE_CHART_AXIS_TITLE_EXPORT_SOURCES[0]
             package.parent.mkdir(parents=True, exist_ok=True)
             package.write_text("mod slide_chart_axis_title;\n", encoding="utf-8")
@@ -42458,7 +42481,7 @@ fn rewrite_movie_title_operation(
             root = Path(directory)
             owner = root / boundaries.KEYNOTE_CHART_AXIS_TITLE_OWNER_SOURCE
             owner.parent.mkdir(parents=True, exist_ok=True)
-            owner.write_text("pub struct ChartAxisTitlePatch;\n", encoding="utf-8")
+            owner.write_text("pub struct Patch;\n", encoding="utf-8")
             package = root / boundaries.KEYNOTE_CHART_AXIS_TITLE_EXPORT_SOURCES[0]
             package.parent.mkdir(parents=True, exist_ok=True)
             package.write_text(
@@ -42659,12 +42682,12 @@ fn rewrite_movie_title_operation(
             boundaries.KEYNOTE_CHART_AXIS_VALUE_SETTINGS_CANONICAL_TYPES,
             frozenset(
                 {
-                    "ChartValueAxisCommit",
-                    "ChartValueAxisDiagnostics",
-                    "ChartValueAxisEdit",
-                    "ChartValueAxisError",
-                    "ChartValueAxisLimitKind",
-                    "ChartValueAxisPatch",
+                    "Commit",
+                    "Diagnostics",
+                    "Edit",
+                    "Error",
+                    "LimitKind",
+                    "Patch",
                 }
             ),
         )
@@ -42714,7 +42737,7 @@ fn rewrite_movie_title_operation(
 
             owner = root / boundaries.KEYNOTE_CHART_AXIS_VALUE_SETTINGS_OWNER_SOURCE
             owner.parent.mkdir(parents=True, exist_ok=True)
-            owner.write_text("pub struct ChartValueAxisPatch;\n", encoding="utf-8")
+            owner.write_text("pub struct Patch;\n", encoding="utf-8")
             self.assertEqual(
                 boundaries.audit_iwa_keynote_chart_axis_value_settings_source_topology(
                     root
@@ -42932,10 +42955,19 @@ fn rewrite_movie_title_operation(
         """
 
         owner_path = boundaries.KEYNOTE_CHART_LEGEND_OWNER_SOURCE
-        package_path, lib_path = boundaries.KEYNOTE_CHART_LEGEND_EXPORT_SOURCES
-        paths = tuple(
-            boundaries.ROOT / path for path in (owner_path, package_path, lib_path)
-        )
+        # ADR 0034 W1 (record 0298): the family's public home is the focused
+        # `chart::legend` module rather than the package/crate-root facades.
+        family_path = boundaries.KEYNOTE_CHART_LEGEND_FAMILY_SOURCE
+        paths = tuple(boundaries.ROOT / path for path in (owner_path, family_path))
+
+        def scope(index: int, path: Path) -> str:
+            if not index:
+                return boundaries._mask_rust_cfg_test_items(
+                    path.read_text(encoding="utf-8")
+                )
+            return boundaries._keynote_family_view(
+                boundaries.ROOT, path, {}, boundaries.KEYNOTE_CHART_LEGEND_FAMILY_MODULE
+            )
         for path in paths:
             self.assertTrue(path.is_file(), f"missing focused legend source: {path}")
 
@@ -42958,9 +42990,7 @@ fn rewrite_movie_title_operation(
                 if declaration is None:
                     continue
                 if method == "apply_slide_chart_legend":
-                    self.assertRegex(
-                        declaration, r"\bChartLegendVisibilityPatch\b"
-                    )
+                    self.assertRegex(declaration, r"\bPatch\b")
                 else:
                     self.assertRegex(declaration, r"\bSlideSelector\b")
                     self.assertRegex(declaration, r"\bChartSelector\b")
@@ -42979,9 +43009,7 @@ fn rewrite_movie_title_operation(
         # the assertion resilient to private implementation refactors.
         public_declarations = []
         for index, path in enumerate(paths):
-            source = boundaries._mask_rust_cfg_test_items(
-                path.read_text(encoding="utf-8")
-            )
+            source = scope(index, path)
             if index:
                 # package.rs/lib.rs contain many unrelated public package and
                 # error declarations.  Only inspect the explicit legend
@@ -43020,10 +43048,8 @@ fn rewrite_movie_title_operation(
 
         canonical_types = boundaries.KEYNOTE_CHART_LEGEND_CANONICAL_TYPES
         exported_identifiers = set()
-        for path in paths:
-            source = boundaries._mask_rust_cfg_test_items(
-                path.read_text(encoding="utf-8")
-            )
+        for index, path in enumerate(paths):
+            source = scope(index, path)
             exported_identifiers.update(
                 boundaries._rust_canonical_exports(source, canonical_types)
             )
@@ -43033,9 +43059,7 @@ fn rewrite_movie_title_operation(
             f"{sorted(canonical_types - exported_identifiers)}",
         )
         for path in paths[1:]:
-            source = boundaries._mask_rust_cfg_test_items(
-                path.read_text(encoding="utf-8")
-            )
+            source = scope(1, path)
             missing = canonical_types - boundaries._rust_canonical_exports(
                 source, canonical_types
             )
@@ -43096,7 +43120,7 @@ fn rewrite_movie_title_operation(
             owner = root / boundaries.KEYNOTE_CHART_LEGEND_OWNER_SOURCE
             owner.parent.mkdir(parents=True, exist_ok=True)
             owner.write_text(
-                "pub struct ChartLegendVisibilityPatch;\n"
+                "pub struct Patch;\n"
                 "impl Package {\n"
                 "    pub fn slide_chart_legend_visible(&self, object_id: u64, chart: u64) {}\n"
                 "}\n",
@@ -43136,7 +43160,7 @@ fn rewrite_movie_title_operation(
 
             owner = root / boundaries.KEYNOTE_CHART_LEGEND_OWNER_SOURCE
             owner.parent.mkdir(parents=True, exist_ok=True)
-            owner.write_text("pub struct ChartLegendVisibilityPatch;\n", encoding="utf-8")
+            owner.write_text("pub struct Patch;\n", encoding="utf-8")
             self.assertEqual(
                 boundaries.audit_iwa_keynote_chart_legend_source_topology(root), []
             )
@@ -43154,7 +43178,7 @@ fn rewrite_movie_title_operation(
             root = Path(directory)
             owner = root / boundaries.KEYNOTE_CHART_LEGEND_OWNER_SOURCE
             owner.parent.mkdir(parents=True, exist_ok=True)
-            owner.write_text("pub struct ChartLegendVisibilityPatch;\n", encoding="utf-8")
+            owner.write_text("pub struct Patch;\n", encoding="utf-8")
             package = root / boundaries.KEYNOTE_CHART_LEGEND_EXPORT_SOURCES[0]
             package.parent.mkdir(parents=True, exist_ok=True)
             package.write_text("mod slide_chart_legend;\n", encoding="utf-8")
@@ -43201,7 +43225,7 @@ fn rewrite_movie_title_operation(
 
             owner.write_text(
                 owner_source.replace(
-                    "    pub fn slide_chart_arrangements(&self, slide: SlideSelector) -> Result<Box<[ChartArrangement]>, ChartArrangementError> { let _ = slide; todo!() }\n",
+                    "    pub fn slide_chart_arrangements(&self, slide: SlideSelector) -> Result<Box<[ChartArrangement]>, Error> { let _ = slide; todo!() }\n",
                     "",
                 ),
                 encoding="utf-8",
@@ -43703,7 +43727,7 @@ fn rewrite_movie_title_operation(
             host.write_text(
                 host.read_text(encoding="utf-8")
                 + "pub fn chart_arrangement_by_id(&self, chart_id: u64) {}\n"
-                + "pub struct ChartArrangementEdit;\n"
+                + "pub struct Edit;\n"
                 + "pub use crate::charts::ChartArrangement;\n",
                 encoding="utf-8",
             )
@@ -48287,7 +48311,7 @@ fn rewrite_movie_title_operation(
             )
 
             unsupported_arm = (
-                "Err(litchi_keynote::SlideTableMergesError::UnsupportedDependency) => {"
+                "Err(litchi_keynote::slide::table::merge::transaction::Error::UnsupportedDependency) => {"
             )
             self.assertIn(unsupported_arm, reader_source)
             reader_path.write_text(
@@ -48319,7 +48343,7 @@ fn rewrite_movie_title_operation(
             (
                 keynote,
                 """
-            Err(litchi_keynote::SlideTableMergesError::UnsupportedDependency) =>
+            Err(litchi_keynote::slide::table::merge::transaction::Error::UnsupportedDependency) =>
                 Err(map_focused_keynote_merges_error(error)),
             Err(error) =>
                 crate::numbers::editor::table_cell_merges_in_package(
@@ -48330,7 +48354,7 @@ fn rewrite_movie_title_operation(
             (
                 pages,
                 """
-            Err(litchi_keynote::SlideTableMergesError::UnsupportedDependency) =>
+            Err(litchi_keynote::slide::table::merge::transaction::Error::UnsupportedDependency) =>
                 crate::numbers::editor::table_cell_merges_in_package(
                     self.package(), model_object_id,
                 ),

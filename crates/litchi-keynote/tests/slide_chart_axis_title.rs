@@ -12,8 +12,9 @@ use litchi_iwa_archive::Limits;
 use litchi_iwa_common::wire::WireView;
 use litchi_iwa_protos::{tsd, tsp};
 use litchi_keynote::{
-    Axis, ChartAxisTitleError, ChartAxisTitleLimitKind, ChartSelector, OpenOptions, Package,
-    Position, SlideSelector, SourceLimits,
+    Axis, ChartSelector, OpenOptions, Package, Position, SlideSelector, SourceLimits,
+    chart::axis_title::Error as ChartAxisTitleError,
+    chart::axis_title::LimitKind as ChartAxisTitleLimitKind,
 };
 use prost::Message as _;
 

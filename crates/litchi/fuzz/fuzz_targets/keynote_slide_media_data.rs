@@ -14,7 +14,8 @@ use std::{fmt::Debug, fmt::Display, hint::black_box, sync::OnceLock};
 
 use libfuzzer_sys::fuzz_target;
 use litchi::keynote::{
-    MediaPart, MovieSelector, OpenOptions, Package, SemanticLimits, SlideSelector, SourceLimits,
+    MovieSelector, OpenOptions, Package, SemanticLimits, SlideSelector, SourceLimits,
+    slide::media::data::MediaPart,
 };
 
 use keynote_slide_media_data_seed as seed;

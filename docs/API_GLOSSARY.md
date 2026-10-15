@@ -43,7 +43,7 @@ transaction is the bare `Package::edit()`.
 | Concept | Canonical | Banned | Notes / status |
 |---|---|---|---|
 | Edit entry, primary transaction | `Package::edit()` | `edit_document()` (docx), `opened_presentation_transaction()` (pptx), `Workbook::edit()` (xlsx — moves to `Package`) | ✅ docx eager/source entry name (0018; eager package-bound commit 0022, source 0031) · ✅ iWork/xlsx-name · ✅ pptx eager entry (0116) · ✅ xlsx `Package::edit()` (0250) · ✅ odt/ods/odp `Package::edit()` (0268) |
-| Edit entry, scoped family | `Package::edit_x()` | — | ✅ numbers/keynote/pages families |
+| Edit entry, scoped family | `Package::edit_x()` | — | ✅ numbers/keynote/pages families; ✅ keynote family types live in focused modules (`slide::text::Edit`, `chart::caption::Edit`, …), prefixed root names deleted (0298) |
 | PPTX slide metadata | `Edit::{set_slide_name, set_slide_hidden}` | — | Eager/source primary edits and unified slide `name`/`hidden` setters; eager, source primary and focused source edits accept combined `set_slide_properties` (0162–0163) |
 | PPTX combined shape properties | `Edit::set_shape_properties`, `ShapePropertiesReplacement` | — | Eager/source primary edits share checked `Position` targets and optional text/bounds in one atomic operation (0153); broader shape properties remain pending |
 | PPTX chunked shape publication | `Edit::{set_shape_text_chunks, set_shape_property_chunks}` | — | Eager/source primary and focused source edits admit bounded, globally disjoint chunks together for one same-slide publication (0158); single-chunk setter limits are retained |
@@ -51,7 +51,7 @@ transaction is the bare `Package::edit()`.
 | ODP checked scene splices | `Edit::{scene, splice_scene}`, `scene::{Scene, Change}` | — | ✅ paragraph/run/story text, object attributes, text-box/object/page insertion, removal, move and swap as checked `content.xml` source splices on the primary `Package::edit()` (0278) |
 | ODG checked structure splices | `edit::Edit::{insert_page, add_page, remove_page, move_page, insert_shape, add_shape, remove_shape, move_shape}` | — | ✅ page and text-rectangle insertion, page and shape removal, and page/shape moves publish as checked `content.xml` source splices, so LibreOffice drawings (non-compact XML) keep every byte outside the touched elements; adjacent markup splices join (0288) |
 | ODP retained metadata edit | `Edit::{metadata, set_metadata}` | — | ✅ title/author/subject/description/keywords patched into the retained `meta.xml`; other fields refused (0278) |
-| Transaction type | `Edit` | `Transaction` (pptx), `WorkbookEdit` (xlsb) | ✅ pptx primary `opened::Edit` (0116), XLSB structural and cell-value `Edit/Commit/Patch` families, diagnostics and Package commit triads (0165–0171); ✅ XLSB `cell_values`, `cell_values::structure` and `cell_values::worksheet` complete with `Error` and `LimitKind` and registered (0261); ✅ XLS scoped families (`sheet_visibility`, `ole_object`, `real_time_data`, `revision_records`, `user_names`, `picture_compression`, `chart_area`, `web_pub`, `external_link`) (0259); ✅ scoped PPTX families renamed `Edit` (0252); ✅ ODP `Transaction`→`Edit`, ODT/ODS primary `Edit` on `Package` (0268); 🔴 remaining XLSB scoped mutators and scoped PPTX families (W2) |
+| Transaction type | `Edit` | `Transaction` (pptx), `WorkbookEdit` (xlsb) | ✅ keynote: every scoped family is a focused `module::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` with unprefixed type definitions, 39 families registered in `keynote-minimal`/`keynote-full` (0298); ✅ pptx primary `opened::Edit` (0116), XLSB structural and cell-value `Edit/Commit/Patch` families, diagnostics and Package commit triads (0165–0171); ✅ XLSB `cell_values`, `cell_values::structure` and `cell_values::worksheet` complete with `Error` and `LimitKind` and registered (0261); ✅ XLS scoped families (`sheet_visibility`, `ole_object`, `real_time_data`, `revision_records`, `user_names`, `picture_compression`, `chart_area`, `web_pub`, `external_link`) (0259); ✅ scoped PPTX families renamed `Edit` (0252); ✅ ODP `Transaction`→`Edit`, ODT/ODS primary `Edit` on `Package` (0268); 🔴 remaining XLSB scoped mutators and scoped PPTX families (W2) |
 | Commit | `Edit::commit() -> Result<Commit>` | — | ✅ everywhere; shape fixed by the rows below |
 | New snapshot accessor | `Commit::package()` / `Commit::into_package()` | `Commit::snapshot()` (docx/pptx), `Commit::{workbook, into_workbook}` (xlsx) | ✅ iWork/docx eager (0022) and source (0031), PPTX eager (0118), XLSX primary (0250), ODT/ODS/ODP primary (0268), OTH/ODM/ODG/ODC/ODI/ODB/ODF-formula primary (0282) · 🔴 other W2 |
 | Diagnostics on every commit | `Commit::diagnostics()` | commits without diagnostics (xlsx, pptx) | ✅ docx/iWork/PPTX eager (0118), XLSX primary `workbook::edit::Diagnostics` (0250), ODT/ODS/ODP primary (0268), the other seven ODF primary families (0282) · 🔴 remaining owners (W2) |
@@ -2274,3 +2274,32 @@ ADR 0034 W1 for `litchi-keynote`, part 1 (Presentation projection and limits):
   (`internal-iwork-source`; the hidden archive seams legitimately take the
   neutral IWA `Limits`, so only `keynote-minimal` bans that name).
   `Package::new()`, `Builder` and `Identity` are not part of this step.
+
+ADR 0034 W1 for `litchi-keynote`, part 2 (focused transaction families):
+
+- The primary transaction is `litchi_keynote::edit::{Edit, Patch, Commit,
+  Diagnostics, Error, LimitKind}` (`EditError` → `edit::Error`; the new
+  `edit::LimitKind` names no dimension because the one-operation skip/include
+  rewrite bounds no resource of its own).
+- Every prefixed family moved to a focused module with renamed type
+  definitions: `chart::{arrangement, axis_title, caption, legend, title,
+  value_axis, data, metadata}`, `background`, `build::order`,
+  `slide::image::adjustments`, `slide::movie::{caption, geometry, playback,
+  title, creation}`, `slide::audio::{position, creation}`,
+  `slide::{notes, order, text}`, `slide::comment::transaction`
+  (+`DrawableSummary`), `slide::media::{data (+Data, MediaPart), properties,
+  lifecycle}`, `slide::table::{appearance, dimension, lock, name, sort, title,
+  number_format, merge (+MergeReader), headers (+InvalidReason),
+  physical_sort}::transaction` and `slide::table::cells::{Error, LimitKind,
+  Path}`. The alias modules `slide::audio::transaction` and
+  `slide::media::{geometry, playback}::transaction` are folded into
+  `slide::audio::position` and `slide::movie::{geometry, playback}`; the root
+  value aliases `SlideTableName`/`SlideTableNameValueError` are deleted in
+  favour of `slide::table::name::{Name, Error}`.
+- Every deleted prefixed name is banned under `litchi_keynote`. The 39
+  registered families include the already-canonical `slide::delete`,
+  `slide::placeholder`, `transition`, `show`, `soundtrack`,
+  `soundtrack::{order, items}`. Not registered (no `Edit`, by design):
+  `slide::media::lifecycle` and `slide::{audio, movie}::creation` (package
+  operations return the commit directly), `chart::metadata` and
+  `slide::table::cells` (shared error vocabularies, not transactions).

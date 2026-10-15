@@ -14,7 +14,7 @@ use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::wire::WireView;
 use litchi_iwa_core::{Archive, SnappyStream};
 use litchi_iwa_protos::{kn, package_metadata_media_codec, tsa, tsd, tsp, tswp};
-use litchi_keynote::{MediaPart, MovieSelector, Package, SlideSelector};
+use litchi_keynote::{MovieSelector, Package, SlideSelector, slide::media::data::MediaPart};
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -420,7 +420,7 @@ fn native_lifecycle_oracles_expose_strict_source_order_and_shared_bytes() -> Tes
             MovieSelector::index(0),
             MediaPart::Poster,
         ),
-        Err(litchi_keynote::SlideMediaDataError::AudioPoster)
+        Err(litchi_keynote::slide::media::data::Error::AudioPoster)
     ));
     assert!(matches!(
         removed.slide_media_data(
@@ -428,7 +428,7 @@ fn native_lifecycle_oracles_expose_strict_source_order_and_shared_bytes() -> Tes
             MovieSelector::index(2),
             MediaPart::Content,
         ),
-        Err(litchi_keynote::SlideMediaDataError::MoviePositionNotFound { .. })
+        Err(litchi_keynote::slide::media::data::Error::MoviePositionNotFound { .. })
     ));
     Ok(())
 }

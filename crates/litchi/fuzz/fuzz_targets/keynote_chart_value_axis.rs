@@ -18,11 +18,11 @@ use std::sync::OnceLock;
 
 use libfuzzer_sys::fuzz_target;
 use litchi::keynote::{
-    ChartSelector, ChartValueAxisCommit, OpenOptions, Package, ReadError, SemanticLimits,
-    SlideSelector, SourceLimits,
+    ChartSelector, OpenOptions, Package, ReadError, SemanticLimits, SlideSelector, SourceLimits,
     chart::axis::{
         Axis, Bound, Bounds, MajorStepCount, MinorStepCount, Scale, Steps, ValueAxisSettings,
     },
+    chart::value_axis::Commit as ChartValueAxisCommit,
 };
 use litchi_iwa_archive::{Limits as ArchiveLimits, package::Catalog};
 use litchi_iwa_common::wire::{append_length_delimited_field, append_varint_field};

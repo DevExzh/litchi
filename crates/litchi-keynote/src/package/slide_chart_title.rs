@@ -38,7 +38,7 @@ use litchi_iwa_protos::keynote_chart_title_codec::{
     DecodeOptions, WireResourceLimit as ChartTitleWireResourceLimit, decode_visible_chart_title,
     rewrite_chart_title as rewrite_chart_title_payload,
 };
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::chart_axis_support::{self, AxisSupportBudget, AxisSupportError};
 use super::{
@@ -66,7 +66,7 @@ const MAX_CHART_TITLE_BYTES: usize = 64 * 1024 * 1024;
 /// published.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum ChartTitleLimitKind {
+pub enum LimitKind {
     /// Complete input package bytes.
     InputBytes,
     /// Complete rewritten package or payload bytes.
@@ -99,7 +99,7 @@ pub enum ChartTitleLimitKind {
     TitleBytes,
 }
 
-impl fmt::Display for ChartTitleLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -122,9 +122,9 @@ impl fmt::Display for ChartTitleLimitKind {
 }
 
 /// A content-redacted failure raised by a chart-title transaction.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum ChartTitleError {
+pub enum Error {
     /// The source was prepared without an exact physical package artifact.
     #[error("this Keynote source does not support physical chart-title edits")]
     UnsupportedSource,
@@ -163,7 +163,7 @@ pub enum ChartTitleError {
     #[error("Keynote chart-title {kind} limit exceeded: observed {observed}, maximum {maximum}")]
     LimitExceeded {
         /// Resource category that exceeded its limit.
-        kind: ChartTitleLimitKind,
+        kind: LimitKind,
         /// Observed or requested amount.
         observed: u64,
         /// Configured maximum.
@@ -184,7 +184,7 @@ pub enum ChartTitleError {
 }
 
 /// One mutable chart-title value staged against an immutable package snapshot.
-pub struct ChartTitleEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
     slide_position: Position,
     chart_position: Position,
@@ -195,10 +195,10 @@ pub struct ChartTitleEdit<'a> {
     after: Option<String>,
 }
 
-impl fmt::Debug for ChartTitleEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("ChartTitleEdit")
+            .debug_struct("Edit")
             .field("slide_position", &self.slide_position)
             .field("chart_position", &self.chart_position)
             .field("has_before", &self.before.is_some())
@@ -207,12 +207,12 @@ impl fmt::Debug for ChartTitleEdit<'_> {
     }
 }
 
-impl<'a> ChartTitleEdit<'a> {
+impl<'a> Edit<'a> {
     fn new<'slide, 'chart>(
         source: &'a Package,
         slide_selector: impl Into<SlideSelector<'slide>>,
         chart_selector: impl Into<ChartSelector<'chart>>,
-    ) -> Result<Self, ChartTitleError> {
+    ) -> Result<Self, Error> {
         let selection = select_chart(source, slide_selector.into(), chart_selector.into(), true)?;
         let before = selection.title;
         let after = before.as_deref().map(copy_title).transpose()?;
@@ -257,19 +257,19 @@ impl<'a> ChartTitleEdit<'a> {
     /// The input is copied into bounded edit-owned storage immediately, so a
     /// caller may pass either a borrowed string slice or an owned `String`
     /// without changing the transaction's source ownership or wire behavior.
-    pub fn set(mut self, title: impl AsRef<str>) -> Result<Self, ChartTitleError> {
+    pub fn set(mut self, title: impl AsRef<str>) -> Result<Self, Error> {
         self.after = Some(copy_title(title.as_ref())?);
         Ok(self)
     }
 
     /// Stage removal of the visible chart title.
-    pub fn clear(mut self) -> Result<Self, ChartTitleError> {
+    pub fn clear(mut self) -> Result<Self, Error> {
         self.after = None;
         Ok(self)
     }
 
     /// Validate and atomically publish the staged immutable candidate.
-    pub fn commit(self) -> Result<ChartTitleCommit, ChartTitleError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         let catalog = physical_catalog(self.source)?;
         let source_bytes = catalog.shared_source();
         let mut budget = ChartGraphScanBudget::new(self.source)?;
@@ -289,14 +289,14 @@ impl<'a> ChartTitleEdit<'a> {
             || source_selection.slide_identifier != self.slide_identifier
             || source_selection.title != self.before
         {
-            return Err(ChartTitleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
 
         if self.before == self.after {
             self.source.validate().map_err(map_read_error)?;
-            return Ok(ChartTitleCommit {
+            return Ok(Commit {
                 package: self.source.snapshot(),
-                patch: ChartTitlePatch {
+                patch: Patch {
                     artifacts: ExactArtifacts::new(Arc::clone(&source_bytes), source_bytes),
                     slide_position: self.slide_position,
                     chart_position: self.chart_position,
@@ -311,12 +311,12 @@ impl<'a> ChartTitleEdit<'a> {
                     before_message: Arc::from(Vec::<u8>::new()),
                     after_message: Arc::from(Vec::<u8>::new()),
                 },
-                diagnostics: ChartTitleDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
 
         if !catalog.source_is_exact() {
-            return Err(ChartTitleError::UnsupportedSource);
+            return Err(Error::UnsupportedSource);
         }
         self.source.validate().map_err(map_read_error)?;
         validate_chart_title_reference_metadata(self.source, &mut budget)?;
@@ -345,7 +345,7 @@ impl<'a> ChartTitleEdit<'a> {
             || candidate_selection.slide_identifier != self.slide_identifier
             || candidate_selection.title != self.after
         {
-            return Err(ChartTitleError::Verification);
+            return Err(Error::Verification);
         }
         verify_chart_candidate(
             self.source,
@@ -365,9 +365,9 @@ impl<'a> ChartTitleEdit<'a> {
             deleted_previews,
         } = rewrite;
         let after_message: Arc<[u8]> = Arc::from(selected_message);
-        Ok(ChartTitleCommit {
+        Ok(Commit {
             package,
-            patch: ChartTitlePatch {
+            patch: Patch {
                 artifacts: ExactArtifacts::new(source_bytes, Arc::clone(&target)),
                 slide_position: self.slide_position,
                 chart_position: self.chart_position,
@@ -382,14 +382,14 @@ impl<'a> ChartTitleEdit<'a> {
                 before_message,
                 after_message,
             },
-            diagnostics: ChartTitleDiagnostics::published(deleted_previews),
+            diagnostics: Diagnostics::published(deleted_previews),
         })
     }
 }
 
 /// An exact-source-checked reversible semantic chart-title patch.
 #[derive(Clone, PartialEq, Eq)]
-pub struct ChartTitlePatch {
+pub struct Patch {
     artifacts: ExactArtifacts,
     slide_position: Position,
     chart_position: Position,
@@ -405,10 +405,10 @@ pub struct ChartTitlePatch {
     after_message: Arc<[u8]>,
 }
 
-impl fmt::Debug for ChartTitlePatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("ChartTitlePatch")
+            .debug_struct("Patch")
             .field("slide_position", &self.slide_position)
             .field("chart_position", &self.chart_position)
             .field("has_before", &self.before.is_some())
@@ -417,7 +417,7 @@ impl fmt::Debug for ChartTitlePatch {
     }
 }
 
-impl ChartTitlePatch {
+impl Patch {
     /// Return the selected semantic slide position.
     #[must_use]
     pub const fn slide_position(&self) -> Position {
@@ -488,14 +488,14 @@ impl ChartTitlePatch {
 
 /// Compact evidence describing one chart-title commit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ChartTitleDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     deleted_previews: usize,
     full_reparse_performed: bool,
 }
 
-impl ChartTitleDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -542,13 +542,13 @@ impl ChartTitleDiagnostics {
 /// The fully verified result of one immutable chart-title transaction.
 #[must_use = "a Keynote chart-title commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct ChartTitleCommit {
+pub struct Commit {
     package: Package,
-    patch: ChartTitlePatch,
-    diagnostics: ChartTitleDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl ChartTitleCommit {
+impl Commit {
     /// Borrow the fully reopened immutable package snapshot.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -563,13 +563,13 @@ impl ChartTitleCommit {
 
     /// Borrow the reversible exact-source patch.
     #[must_use]
-    pub const fn patch(&self) -> &ChartTitlePatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Borrow compact publication diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> &ChartTitleDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -579,12 +579,12 @@ impl Package {
     pub fn slide_chart_catalog<'selector>(
         &self,
         selector: impl Into<SlideSelector<'selector>>,
-    ) -> Result<ChartCatalog, ChartTitleError> {
+    ) -> Result<ChartCatalog, Error> {
         let position = resolve_slide_position(self, selector.into())?;
         let graphs = chart_graphs(self, position, true)?;
         let count = graphs.len();
         ChartCatalog::try_from_owned_titles(graphs.into_iter().map(|graph| graph.title))
-            .map_err(|_error| ChartTitleError::Allocation { amount: count })
+            .map_err(|_error| Error::Allocation { amount: count })
     }
 
     /// Read the visible title of one selected chart.
@@ -592,7 +592,7 @@ impl Package {
         &self,
         slide_selector: impl Into<SlideSelector<'slide>>,
         chart_selector: impl Into<ChartSelector<'chart>>,
-    ) -> Result<Option<String>, ChartTitleError> {
+    ) -> Result<Option<String>, Error> {
         Ok(select_chart(self, slide_selector.into(), chart_selector.into(), true)?.title)
     }
 
@@ -601,19 +601,16 @@ impl Package {
         &self,
         slide_selector: impl Into<SlideSelector<'slide>>,
         chart_selector: impl Into<ChartSelector<'chart>>,
-    ) -> Result<ChartTitleEdit<'_>, ChartTitleError> {
-        ChartTitleEdit::new(self, slide_selector, chart_selector)
+    ) -> Result<Edit<'_>, Error> {
+        Edit::new(self, slide_selector, chart_selector)
     }
 
     /// Apply an exact-source-checked chart-title patch.
-    pub fn apply_slide_chart_title(
-        &self,
-        patch: &ChartTitlePatch,
-    ) -> Result<ChartTitleCommit, ChartTitleError> {
+    pub fn apply_slide_chart_title(&self, patch: &Patch) -> Result<Commit, Error> {
         let catalog = physical_catalog(self)?;
         let source = catalog.shared_source();
         if !patch.artifacts.authorizes_source(&source) {
-            return Err(ChartTitleError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let mut budget = ChartGraphScanBudget::new(self)?;
         budget
@@ -632,18 +629,18 @@ impl Package {
             || source_selection.slide_identifier != patch.slide_identifier
             || source_selection.title != patch.before
         {
-            return Err(ChartTitleError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if patch.is_noop() {
             self.validate().map_err(map_read_error)?;
-            return Ok(ChartTitleCommit {
+            return Ok(Commit {
                 package: self.snapshot(),
                 patch: patch.clone(),
-                diagnostics: ChartTitleDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         if !catalog.source_is_exact() {
-            return Err(ChartTitleError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         validate_chart_title_reference_metadata(self, &mut budget)?;
         verify_selected_chart_title_message(
@@ -674,7 +671,7 @@ impl Package {
             || candidate_selection.slide_identifier != patch.slide_identifier
             || candidate_selection.title != patch.after
         {
-            return Err(ChartTitleError::Verification);
+            return Err(Error::Verification);
         }
         verify_chart_candidate(
             self,
@@ -687,10 +684,10 @@ impl Package {
             &mut budget,
         )
         .map_err(map_candidate_verification_error)?;
-        Ok(ChartTitleCommit {
+        Ok(Commit {
             package: candidate,
             patch: patch.clone(),
-            diagnostics: ChartTitleDiagnostics::published(patch.deleted_previews),
+            diagnostics: Diagnostics::published(patch.deleted_previews),
         })
     }
 }
@@ -725,16 +722,16 @@ pub(super) fn select_chart(
     slide_selector: SlideSelector<'_>,
     chart_selector: ChartSelector<'_>,
     mutation_guards: bool,
-) -> Result<ChartSelection, ChartTitleError> {
+) -> Result<ChartSelection, Error> {
     let slide_position = resolve_slide_position(package, slide_selector)?;
     let graphs = chart_graphs(package, slide_position, mutation_guards)?;
     let catalog = ChartCatalog::try_from_titles(graphs.iter().map(|graph| graph.title.as_deref()))
-        .map_err(|_error| ChartTitleError::Allocation {
+        .map_err(|_error| Error::Allocation {
             amount: graphs.len(),
         })?;
     let chart_position = match chart_selector {
         ChartSelector::Index(index) => graphs.get(index).map(|_graph| Position::new(index)).ok_or(
-            ChartTitleError::ChartPositionNotFound {
+            Error::ChartPositionNotFound {
                 position: Position::new(index),
             },
         )?,
@@ -742,13 +739,13 @@ pub(super) fn select_chart(
             let selected = catalog
                 .select_position(name)
                 .map_err(map_chart_selector_error)?
-                .ok_or(ChartTitleError::ChartNameNotFound)?;
+                .ok_or(Error::ChartNameNotFound)?;
             Position::new(selected)
         },
     };
     let graph = graphs
         .get(chart_position.get())
-        .ok_or(ChartTitleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let title = graph.title.as_deref().map(copy_title).transpose()?;
     Ok(ChartSelection {
         slide_position,
@@ -772,13 +769,13 @@ pub(super) fn select_charts(
     package: &Package,
     slide_selector: SlideSelector<'_>,
     mutation_guards: bool,
-) -> Result<Box<[ChartSelection]>, ChartTitleError> {
+) -> Result<Box<[ChartSelection]>, Error> {
     let slide_position = resolve_slide_position(package, slide_selector)?;
     let graphs = chart_graphs(package, slide_position, mutation_guards)?;
     let mut selections = Vec::new();
     selections
         .try_reserve_exact(graphs.len())
-        .map_err(|_error| ChartTitleError::Allocation {
+        .map_err(|_error| Error::Allocation {
             amount: graphs.len(),
         })?;
     for (chart_position, graph) in graphs.into_iter().enumerate() {
@@ -815,14 +812,14 @@ pub(super) fn select_chart_with_budget(
     charge_chart_catalog(&graphs, budget)?;
     let catalog = ChartCatalog::try_from_titles(graphs.iter().map(|graph| graph.title.as_deref()))
         .map_err(|_error| {
-            chart_axis_support::map_chart_title_error(ChartTitleError::Allocation {
+            chart_axis_support::map_chart_title_error(Error::Allocation {
                 amount: graphs.len(),
             })
         })?;
     charge_chart_catalog_selection(&graphs, chart_selector, budget)?;
     let chart_position = match chart_selector {
         ChartSelector::Index(index) => graphs.get(index).map(|_graph| Position::new(index)).ok_or(
-            chart_axis_support::map_chart_title_error(ChartTitleError::ChartPositionNotFound {
+            chart_axis_support::map_chart_title_error(Error::ChartPositionNotFound {
                 position: Position::new(index),
             }),
         )?,
@@ -832,7 +829,7 @@ pub(super) fn select_chart_with_budget(
                 .map_err(map_chart_selector_error)
                 .map_err(chart_axis_support::map_chart_title_error)?
                 .ok_or_else(|| {
-                    chart_axis_support::map_chart_title_error(ChartTitleError::ChartNameNotFound)
+                    chart_axis_support::map_chart_title_error(Error::ChartNameNotFound)
                 })?;
             Position::new(selected)
         },
@@ -979,97 +976,67 @@ fn charge_chart_catalog_selection(
     )
 }
 
-fn chart_graph_error(error: ChartTitleError) -> AxisSupportError {
+fn chart_graph_error(error: Error) -> AxisSupportError {
     chart_axis_support::map_chart_title_error(error)
 }
 
-pub(super) fn map_axis_support_error(error: AxisSupportError) -> ChartTitleError {
+pub(super) fn map_axis_support_error(error: AxisSupportError) -> Error {
     match error {
         AxisSupportError::Selector(selector) => match selector {
             chart_axis_support::AxisSupportSelectorError::UnsupportedSource => {
-                ChartTitleError::UnsupportedSource
+                Error::UnsupportedSource
             },
             chart_axis_support::AxisSupportSelectorError::AmbiguousSelector => {
-                ChartTitleError::AmbiguousSelector
+                Error::AmbiguousSelector
             },
-            chart_axis_support::AxisSupportSelectorError::EmptySlideName => {
-                ChartTitleError::EmptySlideName
-            },
+            chart_axis_support::AxisSupportSelectorError::EmptySlideName => Error::EmptySlideName,
             chart_axis_support::AxisSupportSelectorError::SlideNameNotFound => {
-                ChartTitleError::SlideNameNotFound
+                Error::SlideNameNotFound
             },
             chart_axis_support::AxisSupportSelectorError::SlidePositionNotFound { position } => {
-                ChartTitleError::SlidePositionNotFound { position }
+                Error::SlidePositionNotFound { position }
             },
             chart_axis_support::AxisSupportSelectorError::ChartNameNotFound => {
-                ChartTitleError::ChartNameNotFound
+                Error::ChartNameNotFound
             },
             chart_axis_support::AxisSupportSelectorError::ChartPositionNotFound { position } => {
-                ChartTitleError::ChartPositionNotFound { position }
+                Error::ChartPositionNotFound { position }
             },
-            chart_axis_support::AxisSupportSelectorError::EmptyChartName => {
-                ChartTitleError::EmptyChartName
-            },
+            chart_axis_support::AxisSupportSelectorError::EmptyChartName => Error::EmptyChartName,
         },
         AxisSupportError::LimitExceeded {
             kind,
             observed,
             maximum,
-        } => ChartTitleError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: match kind {
-                chart_axis_support::AxisSupportLimitKind::InputBytes => {
-                    ChartTitleLimitKind::InputBytes
-                },
-                chart_axis_support::AxisSupportLimitKind::OutputBytes => {
-                    ChartTitleLimitKind::OutputBytes
-                },
-                chart_axis_support::AxisSupportLimitKind::WireBytes => {
-                    ChartTitleLimitKind::WireBytes
-                },
-                chart_axis_support::AxisSupportLimitKind::Entries => ChartTitleLimitKind::Entries,
-                chart_axis_support::AxisSupportLimitKind::EntryBytes => {
-                    ChartTitleLimitKind::EntryBytes
-                },
-                chart_axis_support::AxisSupportLimitKind::TotalBytes => {
-                    ChartTitleLimitKind::TotalBytes
-                },
-                chart_axis_support::AxisSupportLimitKind::Slides => ChartTitleLimitKind::Slides,
-                chart_axis_support::AxisSupportLimitKind::References => {
-                    ChartTitleLimitKind::References
-                },
-                chart_axis_support::AxisSupportLimitKind::TextStorages => {
-                    ChartTitleLimitKind::TextStorages
-                },
-                chart_axis_support::AxisSupportLimitKind::TextFragments => {
-                    ChartTitleLimitKind::TextFragments
-                },
-                chart_axis_support::AxisSupportLimitKind::TextBytes => {
-                    ChartTitleLimitKind::TextBytes
-                },
-                chart_axis_support::AxisSupportLimitKind::WireFields => {
-                    ChartTitleLimitKind::WireFields
-                },
-                chart_axis_support::AxisSupportLimitKind::WireNesting => {
-                    ChartTitleLimitKind::WireNesting
-                },
-                chart_axis_support::AxisSupportLimitKind::WireWork => ChartTitleLimitKind::WireWork,
-                chart_axis_support::AxisSupportLimitKind::TitleBytes => {
-                    ChartTitleLimitKind::TitleBytes
-                },
+                chart_axis_support::AxisSupportLimitKind::InputBytes => LimitKind::InputBytes,
+                chart_axis_support::AxisSupportLimitKind::OutputBytes => LimitKind::OutputBytes,
+                chart_axis_support::AxisSupportLimitKind::WireBytes => LimitKind::WireBytes,
+                chart_axis_support::AxisSupportLimitKind::Entries => LimitKind::Entries,
+                chart_axis_support::AxisSupportLimitKind::EntryBytes => LimitKind::EntryBytes,
+                chart_axis_support::AxisSupportLimitKind::TotalBytes => LimitKind::TotalBytes,
+                chart_axis_support::AxisSupportLimitKind::Slides => LimitKind::Slides,
+                chart_axis_support::AxisSupportLimitKind::References => LimitKind::References,
+                chart_axis_support::AxisSupportLimitKind::TextStorages => LimitKind::TextStorages,
+                chart_axis_support::AxisSupportLimitKind::TextFragments => LimitKind::TextFragments,
+                chart_axis_support::AxisSupportLimitKind::TextBytes => LimitKind::TextBytes,
+                chart_axis_support::AxisSupportLimitKind::WireFields => LimitKind::WireFields,
+                chart_axis_support::AxisSupportLimitKind::WireNesting => LimitKind::WireNesting,
+                chart_axis_support::AxisSupportLimitKind::WireWork => LimitKind::WireWork,
+                chart_axis_support::AxisSupportLimitKind::TitleBytes => LimitKind::TitleBytes,
             },
             observed,
             maximum,
         },
-        AxisSupportError::Allocation { amount } => ChartTitleError::Allocation { amount },
-        AxisSupportError::InvalidSource => ChartTitleError::InvalidSource,
+        AxisSupportError::Allocation { amount } => Error::Allocation { amount },
+        AxisSupportError::InvalidSource => Error::InvalidSource,
     }
 }
 
-fn map_candidate_verification_error(error: ChartTitleError) -> ChartTitleError {
+fn map_candidate_verification_error(error: Error) -> Error {
     match error {
-        ChartTitleError::InvalidSource | ChartTitleError::Verification => {
-            ChartTitleError::Verification
-        },
+        Error::InvalidSource | Error::Verification => Error::Verification,
         other => other,
     }
 }
@@ -1077,13 +1044,13 @@ fn map_candidate_verification_error(error: ChartTitleError) -> ChartTitleError {
 fn resolve_slide_position(
     package: &Package,
     selector: SlideSelector<'_>,
-) -> Result<Position, ChartTitleError> {
+) -> Result<Position, Error> {
     match selector {
         SlideSelector::Position(position) => package
             .slide_record_at(position.get())
             .map_err(map_read_error)?
             .map(|_record| position)
-            .ok_or(ChartTitleError::SlidePositionNotFound { position }),
+            .ok_or(Error::SlidePositionNotFound { position }),
         SlideSelector::Name(name) => {
             let selector = SlideSelector::try_name(name).map_err(map_slide_selector_error)?;
             package
@@ -1092,7 +1059,7 @@ fn resolve_slide_position(
                 .select_slide(selector)
                 .map_err(map_slide_selector_error)?
                 .map(|slide| Position::new(slide.index()))
-                .ok_or(ChartTitleError::SlideNameNotFound)
+                .ok_or(Error::SlideNameNotFound)
         },
     }
 }
@@ -1101,25 +1068,25 @@ fn chart_graphs(
     package: &Package,
     slide_position: Position,
     mutation_guards: bool,
-) -> Result<Vec<ChartGraph>, ChartTitleError> {
+) -> Result<Vec<ChartGraph>, Error> {
     let record = package
         .slide_record_at(slide_position.get())
         .map_err(map_read_error)?
-        .ok_or(ChartTitleError::SlidePositionNotFound {
+        .ok_or(Error::SlidePositionNotFound {
             position: slide_position,
         })?;
     let (slide_component_name, slide) = package
         .object_with_component(record.slide_identifier)
-        .ok_or(ChartTitleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let slide_payload = unique_payload(&slide.messages, &[SLIDE_MESSAGE_TYPE], "Keynote slide")
-        .map_err(|_error| ChartTitleError::InvalidSource)?;
+        .map_err(|_error| Error::InvalidSource)?;
     let limits = package.wire_limits().map_err(map_wire_error)?;
     let owned = repeated_references(slide_payload, SLIDE_OWNED_DRAWABLES_FIELD, limits)?;
     let z_order = repeated_references(slide_payload, SLIDE_DRAWABLES_Z_ORDER_FIELD, limits)?;
     let mut graphs = Vec::new();
     graphs
         .try_reserve(z_order.len())
-        .map_err(|_error| ChartTitleError::Allocation {
+        .map_err(|_error| Error::Allocation {
             amount: z_order.len(),
         })?;
     let reference_counts = ChartGraphReferenceCounts::new(&owned, &z_order)?;
@@ -1130,7 +1097,7 @@ fn chart_graphs(
     let mut graph_owners = None;
     for identifier in z_order.iter().copied() {
         let Some((component_name, drawable)) = package.object_with_component(identifier) else {
-            return Err(ChartTitleError::InvalidSource);
+            return Err(Error::InvalidSource);
         };
         let mut chart_message = None;
         for message in &drawable.messages {
@@ -1138,14 +1105,14 @@ fn chart_graphs(
                 continue;
             }
             if chart_message.replace(message).is_some() {
-                return Err(ChartTitleError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
         let Some(chart_message) = chart_message else {
             continue;
         };
         if component_name != slide_component_name {
-            return Err(ChartTitleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let graph = chart_graph(
             package,
@@ -1159,21 +1126,19 @@ fn chart_graphs(
             if graph_owners.is_none() {
                 graph_owners = Some(scan_chart_graph_owners(package)?);
             }
-            let owners = graph_owners
-                .as_ref()
-                .ok_or(ChartTitleError::InvalidSource)?;
+            let owners = graph_owners.as_ref().ok_or(Error::InvalidSource)?;
             if owners.non_style.get(&graph.non_style_identifier).copied() != Some(1)
                 || owners.title_standin.get(&graph.title_identifier).copied() != Some(1)
                 || graph.chart_identifier == 0
             {
-                return Err(ChartTitleError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             if owners
                 .non_style_metadata
                 .get(&graph.non_style_identifier)
                 .is_some_and(|references| !references.is_fully_allowed())
             {
-                return Err(ChartTitleError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
         graphs.push(graph);
@@ -1191,7 +1156,7 @@ fn chart_graphs_with_budget(
         .slide_record_at(slide_position.get())
         .map_err(map_read_error)
         .map_err(chart_graph_error)?
-        .ok_or(ChartTitleError::SlidePositionNotFound {
+        .ok_or(Error::SlidePositionNotFound {
             position: slide_position,
         })
         .map_err(chart_graph_error)?;
@@ -1299,24 +1264,24 @@ fn chart_graph(
     reference_counts: &ChartGraphReferenceCounts,
     chart_data: &[u8],
     chart_identifier: u64,
-) -> Result<ChartGraph, ChartTitleError> {
+) -> Result<ChartGraph, Error> {
     if reference_counts.owned.get(&chart_identifier).copied() != Some(1)
         || reference_counts.z_order.get(&chart_identifier).copied() != Some(1)
     {
-        return Err(ChartTitleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let limits = package.wire_limits().map_err(map_wire_error)?;
     let outer = parse_wire_fields_with_limits(chart_data, limits).map_err(map_wire_error)?;
     let super_payload = unique_length_delimited_field(&outer, chart_data, DRAWABLE_SUPER_FIELD)?
-        .ok_or(ChartTitleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let chart_payload = unique_length_delimited_field(&outer, chart_data, CHART_EXTENSION_FIELD)?
-        .ok_or(ChartTitleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let drawable = parse_wire_fields_with_limits(super_payload, limits).map_err(map_wire_error)?;
     let parent = required_reference_field(&drawable, super_payload, DRAWABLE_PARENT_FIELD, limits)?;
     let title_identifier =
         required_reference_field(&drawable, super_payload, DRAWABLE_TITLE_FIELD, limits)?;
     if parent != record.slide_identifier || title_identifier == 0 {
-        return Err(ChartTitleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let chart_fields =
         parse_wire_fields_with_limits(chart_payload, limits).map_err(map_wire_error)?;
@@ -1327,7 +1292,7 @@ fn chart_graph(
             .map_err(map_wire_error)?
             != 0
         {
-            return Err(ChartTitleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     let non_style_identifier =
@@ -1337,16 +1302,16 @@ fn chart_graph(
         || title_identifier == non_style_identifier
         || non_style_identifier == chart_identifier
     {
-        return Err(ChartTitleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let (title_component, title_object) = package
         .object_with_component(title_identifier)
-        .ok_or(ChartTitleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let (non_style_component, non_style_object) = package
         .object_with_component(non_style_identifier)
-        .ok_or(ChartTitleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if title_component != slide_component_name {
-        return Err(ChartTitleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let (title_message_index, _) =
         exactly_one_message_with_index(title_object, STANDIN_MESSAGE_TYPE)?;
@@ -1361,9 +1326,9 @@ fn chart_graph(
     .map_err(map_axis_support_error)?;
     let (chart_component, chart_object) = package
         .object_with_component(chart_identifier)
-        .ok_or(ChartTitleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if chart_component != slide_component_name {
-        return Err(ChartTitleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let (chart_message_index, _) =
         exactly_one_message_with_index(chart_object, CHART_MESSAGE_TYPE)?;
@@ -1510,18 +1475,18 @@ struct ChartGraphReferenceCounts {
 }
 
 impl ChartGraphReferenceCounts {
-    fn new(owned: &[u64], z_order: &[u64]) -> Result<Self, ChartTitleError> {
+    fn new(owned: &[u64], z_order: &[u64]) -> Result<Self, Error> {
         let mut counts = Self::default();
         counts
             .owned
             .try_reserve(owned.len())
-            .map_err(|_error| ChartTitleError::Allocation {
+            .map_err(|_error| Error::Allocation {
                 amount: owned.len(),
             })?;
         counts
             .z_order
             .try_reserve(z_order.len())
-            .map_err(|_error| ChartTitleError::Allocation {
+            .map_err(|_error| Error::Allocation {
                 amount: z_order.len(),
             })?;
         for &identifier in owned {
@@ -1572,9 +1537,9 @@ impl ChartGraphReferenceCounts {
 fn increment_chart_reference_count(
     counts: &mut HashMap<u64, usize>,
     identifier: u64,
-) -> Result<(), ChartTitleError> {
+) -> Result<(), Error> {
     let count = counts.entry(identifier).or_insert(0);
-    *count = count.checked_add(1).ok_or(ChartTitleError::InvalidSource)?;
+    *count = count.checked_add(1).ok_or(Error::InvalidSource)?;
     Ok(())
 }
 
@@ -1613,12 +1578,12 @@ fn repeated_references(
     payload: &[u8],
     field_number: u32,
     limits: WireLimits,
-) -> Result<Vec<u64>, ChartTitleError> {
+) -> Result<Vec<u64>, Error> {
     let fields = WireView::parse_with_limits(payload, limits).map_err(map_wire_error)?;
     let mut references = Vec::new();
     references
         .try_reserve(fields.len())
-        .map_err(|_error| ChartTitleError::Allocation {
+        .map_err(|_error| Error::Allocation {
             amount: fields.len(),
         })?;
     for field in fields.fields() {
@@ -1626,7 +1591,7 @@ fn repeated_references(
             continue;
         }
         if field.wire_type() != 2 {
-            return Err(ChartTitleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field.validate_canonical_framing().map_err(map_wire_error)?;
         references.push(
@@ -1641,7 +1606,7 @@ fn unique_length_delimited_field<'a>(
     fields: &[WireField],
     source: &'a [u8],
     number: u32,
-) -> Result<Option<&'a [u8]>, ChartTitleError> {
+) -> Result<Option<&'a [u8]>, Error> {
     let mut selected = None;
     for field in fields
         .iter()
@@ -1649,7 +1614,7 @@ fn unique_length_delimited_field<'a>(
         .filter(|field| field.number() == number)
     {
         if selected.is_some() || field.wire_type() != 2 {
-            return Err(ChartTitleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field
             .validate_canonical_framing(source)
@@ -1664,9 +1629,9 @@ fn required_reference_field(
     source: &[u8],
     number: u32,
     limits: WireLimits,
-) -> Result<u64, ChartTitleError> {
-    let payload = unique_length_delimited_field(fields, source, number)?
-        .ok_or(ChartTitleError::InvalidSource)?;
+) -> Result<u64, Error> {
+    let payload =
+        unique_length_delimited_field(fields, source, number)?.ok_or(Error::InvalidSource)?;
     super::validate_reference_payload(payload, limits, "Keynote chart reference")
         .map_err(map_wire_error)
 }
@@ -1674,17 +1639,17 @@ fn required_reference_field(
 fn exactly_one_message_with_index(
     object: &ArchiveObject,
     message_type: u32,
-) -> Result<(usize, &RawMessage), ChartTitleError> {
+) -> Result<(usize, &RawMessage), Error> {
     let mut selected = None;
     for (index, message) in object.messages.iter().enumerate() {
         if message.type_ != message_type {
             continue;
         }
         if selected.replace((index, message)).is_some() {
-            return Err(ChartTitleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
-    selected.ok_or(ChartTitleError::InvalidSource)
+    selected.ok_or(Error::InvalidSource)
 }
 
 pub(super) struct ChartGraphScanBudget {
@@ -1694,26 +1659,23 @@ pub(super) struct ChartGraphScanBudget {
 }
 
 impl ChartGraphScanBudget {
-    pub(super) fn new(package: &Package) -> Result<Self, ChartTitleError> {
+    pub(super) fn new(package: &Package) -> Result<Self, Error> {
         let limits = package.wire_limits().map_err(map_wire_error)?;
         Ok(Self {
             maximum_work: limits
                 .max_rewrite_work()
                 .checked_mul(16)
-                .ok_or(ChartTitleError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
             limits,
             work: 0,
         })
     }
 
-    fn charge(&mut self, amount: usize) -> Result<(), ChartTitleError> {
-        let observed = self
-            .work
-            .checked_add(amount)
-            .ok_or(ChartTitleError::InvalidSource)?;
+    fn charge(&mut self, amount: usize) -> Result<(), Error> {
+        let observed = self.work.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > self.maximum_work {
-            return Err(ChartTitleError::LimitExceeded {
-                kind: ChartTitleLimitKind::WireWork,
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::WireWork,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(self.maximum_work),
             });
@@ -1725,7 +1687,7 @@ impl ChartGraphScanBudget {
     pub(super) fn charge_chart_metadata_report(
         &mut self,
         report: litchi_iwa_protos::chart_metadata_codec::DecodeReport,
-    ) -> Result<(), ChartTitleError> {
+    ) -> Result<(), Error> {
         let amount = report
             .source_bytes()
             .checked_add(report.fields())
@@ -1736,7 +1698,7 @@ impl ChartGraphScanBudget {
             .and_then(|value| value.checked_add(report.text_bytes()))
             .and_then(|value| value.checked_add(report.allocations()))
             .and_then(|value| value.checked_add(report.retained_bytes()))
-            .ok_or(ChartTitleError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         self.charge(amount)
     }
 
@@ -1744,7 +1706,7 @@ impl ChartGraphScanBudget {
         (self.limits, self.maximum_work.saturating_sub(self.work))
     }
 
-    fn parse(&mut self, payload: &[u8]) -> Result<Vec<WireField>, ChartTitleError> {
+    fn parse(&mut self, payload: &[u8]) -> Result<Vec<WireField>, Error> {
         self.charge(payload.len())?;
         let fields = parse_wire_fields_with_limits(payload, self.limits).map_err(map_wire_error)?;
         self.charge(fields.len())?;
@@ -1756,18 +1718,18 @@ impl ChartGraphScanBudget {
         compressed: usize,
         decompressed: usize,
         objects: usize,
-    ) -> Result<(), ChartTitleError> {
+    ) -> Result<(), Error> {
         self.charge(
             compressed
                 .checked_add(decompressed)
-                .ok_or(ChartTitleError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         self.charge(
             decompressed
                 .checked_mul(2)
                 .and_then(|value| value.checked_add(objects))
                 .and_then(|value| value.checked_add(2))
-                .ok_or(ChartTitleError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )
     }
 
@@ -1776,21 +1738,21 @@ impl ChartGraphScanBudget {
         archive: &Archive,
         archive_limits: litchi_iwa_core::Limits,
         snappy_limits: litchi_iwa_core::SnappyLimits,
-    ) -> Result<(), ChartTitleError> {
+    ) -> Result<(), Error> {
         let encoded = archive
             .encoded_len_with_limits(archive_limits)
             .map_err(map_core_error)?;
         let compressed = SnappyStream::maximum_compressed_len(encoded).map_err(map_core_error)?;
         if compressed > snappy_limits.max_compressed_stream() {
-            return Err(ChartTitleError::LimitExceeded {
-                kind: ChartTitleLimitKind::EntryBytes,
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::EntryBytes,
                 observed: usize_to_u64(compressed),
                 maximum: usize_to_u64(snappy_limits.max_compressed_stream()),
             });
         }
         let total = encoded
             .checked_add(compressed)
-            .ok_or(ChartTitleError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         self.charge(total)?;
         self.charge(total)
     }
@@ -1800,21 +1762,21 @@ impl ChartGraphScanBudget {
         source: &Package,
         candidate_bytes: usize,
         replacement: Option<(&str, &Archive)>,
-    ) -> Result<(), ChartTitleError> {
+    ) -> Result<(), Error> {
         let physical_limits = source.state.options.archive();
         let candidate_u64 =
-            u64::try_from(candidate_bytes).map_err(|_error| ChartTitleError::InvalidSource)?;
+            u64::try_from(candidate_bytes).map_err(|_error| Error::InvalidSource)?;
         if candidate_u64 > physical_limits.max_input_bytes() {
-            return Err(ChartTitleError::LimitExceeded {
-                kind: ChartTitleLimitKind::InputBytes,
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::InputBytes,
                 observed: candidate_u64,
                 maximum: physical_limits.max_input_bytes(),
             });
         }
         let catalog = physical_catalog(source)?.package();
         if catalog.len() > physical_limits.max_entries() {
-            return Err(ChartTitleError::LimitExceeded {
-                kind: ChartTitleLimitKind::Entries,
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::Entries,
                 observed: usize_to_u64(catalog.len()),
                 maximum: usize_to_u64(physical_limits.max_entries()),
             });
@@ -1836,39 +1798,39 @@ impl ChartGraphScanBudget {
                 .encoded_len_with_limits(archive_limits)
                 .map_err(map_core_error)?;
             if bytes > physical_limits.max_iwa_stream_bytes() {
-                return Err(ChartTitleError::LimitExceeded {
-                    kind: ChartTitleLimitKind::EntryBytes,
+                return Err(Error::LimitExceeded {
+                    kind: LimitKind::EntryBytes,
                     observed: usize_to_u64(bytes),
                     maximum: usize_to_u64(physical_limits.max_iwa_stream_bytes()),
                 });
             }
             decompressed = decompressed
                 .checked_add(bytes)
-                .ok_or(ChartTitleError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             largest_component = largest_component.max(bytes);
             objects = objects
                 .checked_add(archive.objects.len())
-                .ok_or(ChartTitleError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             for object in &archive.objects {
                 messages = messages
                     .checked_add(object.messages.len())
-                    .ok_or(ChartTitleError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
                 metadata_fields = metadata_fields
                     .checked_add(object.archive_info.message_infos.len())
-                    .ok_or(ChartTitleError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
                 for info in &object.archive_info.message_infos {
                     references = references
                         .checked_add(info.object_references.len())
                         .and_then(|value| value.checked_add(info.data_references.len()))
-                        .ok_or(ChartTitleError::InvalidSource)?;
+                        .ok_or(Error::InvalidSource)?;
                     metadata_fields = metadata_fields
                         .checked_add(info.field_infos.len())
-                        .ok_or(ChartTitleError::InvalidSource)?;
+                        .ok_or(Error::InvalidSource)?;
                     for field in &info.field_infos {
                         references = references
                             .checked_add(field.object_references.len())
                             .and_then(|value| value.checked_add(field.data_references.len()))
-                            .ok_or(ChartTitleError::InvalidSource)?;
+                            .ok_or(Error::InvalidSource)?;
                     }
                 }
             }
@@ -1877,24 +1839,20 @@ impl ChartGraphScanBudget {
             .checked_mul(3 * size_of::<usize>())
             .and_then(|value| value.checked_add(messages.checked_mul(size_of::<RawMessage>())?))
             .and_then(|value| value.checked_add(references.checked_mul(size_of::<u64>())?))
-            .ok_or(ChartTitleError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let catalog_index = catalog
             .len()
             .checked_mul(size_of::<[usize; 8]>())
-            .ok_or(ChartTitleError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let retained = candidate_bytes
-            .checked_add(
-                decompressed
-                    .checked_mul(2)
-                    .ok_or(ChartTitleError::InvalidSource)?,
-            )
+            .checked_add(decompressed.checked_mul(2).ok_or(Error::InvalidSource)?)
             .and_then(|value| value.checked_add(logical))
             .and_then(|value| value.checked_add(catalog_index))
-            .ok_or(ChartTitleError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let scratch = largest_component
             .checked_add(candidate_bytes)
             .and_then(|value| value.checked_add(catalog_index))
-            .ok_or(ChartTitleError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let allocations = catalog
             .len()
             .checked_mul(2)
@@ -1903,14 +1861,14 @@ impl ChartGraphScanBudget {
             .and_then(|value| value.checked_add(messages.checked_mul(3)?))
             .and_then(|value| value.checked_add(metadata_fields))
             .and_then(|value| value.checked_add(4))
-            .ok_or(ChartTitleError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let work = candidate_bytes
             .checked_add(decompressed)
             .and_then(|value| value.checked_add(objects))
             .and_then(|value| value.checked_add(messages))
             .and_then(|value| value.checked_add(metadata_fields))
             .and_then(|value| value.checked_add(references))
-            .ok_or(ChartTitleError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         self.charge(work)?;
         self.charge(retained)?;
         self.charge(scratch)?;
@@ -2055,7 +2013,7 @@ impl MetadataReferenceCount {
     }
 }
 
-fn scan_chart_graph_owners(package: &Package) -> Result<ChartGraphOwners, ChartTitleError> {
+fn scan_chart_graph_owners(package: &Package) -> Result<ChartGraphOwners, Error> {
     let mut budget = ChartGraphScanBudget::new(package)?;
     let mut owners = ChartGraphOwners::default();
     for component in package.state.source.components().iter() {
@@ -2073,7 +2031,7 @@ fn scan_chart_graph_owners(package: &Package) -> Result<ChartGraphOwners, ChartT
                     message.data.as_slice(),
                     DRAWABLE_SUPER_FIELD,
                 )?
-                .ok_or(ChartTitleError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
                 let drawable_fields = budget.parse(drawable_payload)?;
                 let title_identifier = required_reference_field(
                     &drawable_fields,
@@ -2087,7 +2045,7 @@ fn scan_chart_graph_owners(package: &Package) -> Result<ChartGraphOwners, ChartT
                     CHART_EXTENSION_FIELD,
                 )?
                 else {
-                    return Err(ChartTitleError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 };
                 let chart_fields = budget.parse(chart_payload)?;
                 let non_style_identifier = required_reference_field(
@@ -2111,7 +2069,7 @@ fn scan_chart_graph_owners(package: &Package) -> Result<ChartGraphOwners, ChartT
 fn validate_chart_title_reference_metadata(
     package: &Package,
     budget: &mut ChartGraphScanBudget,
-) -> Result<(), ChartTitleError> {
+) -> Result<(), Error> {
     for component in package.state.source.components().iter() {
         budget.charge(1)?;
         for object in &component.archive().objects {
@@ -2126,7 +2084,7 @@ fn scan_non_style_metadata_owners(
     package: &Package,
     owners: &mut ChartGraphOwners,
     budget: &mut ChartGraphScanBudget,
-) -> Result<(), ChartTitleError> {
+) -> Result<(), Error> {
     for component in package.state.source.components().iter() {
         budget.charge(1)?;
         for object in &component.archive().objects {
@@ -2137,24 +2095,20 @@ fn scan_non_style_metadata_owners(
                     .archive_info
                     .message_infos
                     .get(message_index)
-                    .ok_or(ChartTitleError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
                 let mut metadata_slots = info
                     .object_references
                     .len()
                     .checked_add(info.data_references.len())
                     .and_then(|value| value.checked_add(info.field_infos.len()))
-                    .ok_or(ChartTitleError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
                 for field in &info.field_infos {
                     metadata_slots = metadata_slots
                         .checked_add(field.object_references.len())
                         .and_then(|value| value.checked_add(field.data_references.len()))
-                        .ok_or(ChartTitleError::InvalidSource)?;
+                        .ok_or(Error::InvalidSource)?;
                 }
-                budget.charge(
-                    metadata_slots
-                        .checked_mul(2)
-                        .ok_or(ChartTitleError::InvalidSource)?,
-                )?;
+                budget.charge(metadata_slots.checked_mul(2).ok_or(Error::InvalidSource)?)?;
                 let expected_chart_non_style = if message.type_ == CHART_MESSAGE_TYPE {
                     let fields = budget.parse(message.data.as_slice())?;
                     let chart_payload = unique_length_delimited_field(
@@ -2162,7 +2116,7 @@ fn scan_non_style_metadata_owners(
                         message.data.as_slice(),
                         CHART_EXTENSION_FIELD,
                     )?
-                    .ok_or(ChartTitleError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
                     Some(required_reference_field(
                         &budget.parse(chart_payload)?,
                         chart_payload,
@@ -2179,7 +2133,7 @@ fn scan_non_style_metadata_owners(
                     {
                         expected_aggregate_matches = expected_aggregate_matches
                             .checked_add(1)
-                            .ok_or(ChartTitleError::InvalidSource)?;
+                            .ok_or(Error::InvalidSource)?;
                     }
                 }
                 let mut data_matches = false;
@@ -2196,7 +2150,7 @@ fn scan_non_style_metadata_owners(
                         if expected_chart_non_style == Some(*identifier) {
                             expected_field_matches = expected_field_matches
                                 .checked_add(1)
-                                .ok_or(ChartTitleError::InvalidSource)?;
+                                .ok_or(Error::InvalidSource)?;
                         } else {
                             foreign_field_matches = true;
                         }
@@ -2290,7 +2244,7 @@ fn is_chart_stylesheet_registration(
     identifier: u64,
     limits: WireLimits,
     budget: &mut ChartGraphScanBudget,
-) -> Result<bool, ChartTitleError> {
+) -> Result<bool, Error> {
     let Some(object_identifier) = object.archive_info.identifier else {
         return Ok(false);
     };
@@ -2309,18 +2263,14 @@ fn is_chart_stylesheet_registration(
         .len()
         .checked_add(info.data_references.len())
         .and_then(|value| value.checked_add(info.field_infos.len()))
-        .ok_or(ChartTitleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     for field in &info.field_infos {
         metadata_scan = metadata_scan
             .checked_add(field.object_references.len())
             .and_then(|value| value.checked_add(field.data_references.len()))
-            .ok_or(ChartTitleError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
-    budget.charge(
-        metadata_scan
-            .checked_mul(2)
-            .ok_or(ChartTitleError::InvalidSource)?,
-    )?;
+    budget.charge(metadata_scan.checked_mul(2).ok_or(Error::InvalidSource)?)?;
     if info
         .object_references
         .iter()
@@ -2338,7 +2288,7 @@ fn is_chart_stylesheet_registration(
     let message = object
         .messages
         .get(message_index)
-        .ok_or(ChartTitleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let fields = budget.parse(message.data.as_slice())?;
     let mut matches = 0usize;
     for field in fields
@@ -2347,7 +2297,7 @@ fn is_chart_stylesheet_registration(
         .filter(|field| field.number() == STYLESHEET_STYLES_FIELD)
     {
         if field.wire_type() != 2 {
-            return Err(ChartTitleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field
             .validate_canonical_framing(message.data.as_slice())
@@ -2359,9 +2309,7 @@ fn is_chart_stylesheet_registration(
             .map_err(map_axis_support_error)?
             == identifier
         {
-            matches = matches
-                .checked_add(1)
-                .ok_or(ChartTitleError::InvalidSource)?;
+            matches = matches.checked_add(1).ok_or(Error::InvalidSource)?;
         }
     }
     Ok(matches == 1)
@@ -2455,31 +2403,26 @@ fn record_non_style_metadata_reference(
     identifier: u64,
     allowed_chart_message: bool,
     allowed_chart_registry: bool,
-) -> Result<(), ChartTitleError> {
+) -> Result<(), Error> {
     if !owners.contains_key(&identifier) {
         owners
             .try_reserve(1)
-            .map_err(|_error| ChartTitleError::Allocation { amount: 1 })?;
+            .map_err(|_error| Error::Allocation { amount: 1 })?;
         owners.insert(identifier, MetadataReferenceCount::default());
     }
-    let entry = owners
-        .get_mut(&identifier)
-        .ok_or(ChartTitleError::InvalidSource)?;
-    entry.total = entry
-        .total
-        .checked_add(1)
-        .ok_or(ChartTitleError::InvalidSource)?;
+    let entry = owners.get_mut(&identifier).ok_or(Error::InvalidSource)?;
+    entry.total = entry.total.checked_add(1).ok_or(Error::InvalidSource)?;
     if allowed_chart_message {
         entry.allowed_chart_message = entry
             .allowed_chart_message
             .checked_add(1)
-            .ok_or(ChartTitleError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     if allowed_chart_registry {
         entry.allowed_chart_registry = entry
             .allowed_chart_registry
             .checked_add(1)
-            .ok_or(ChartTitleError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     Ok(())
 }
@@ -2750,16 +2693,13 @@ fn record_non_style_metadata_reference_with_budget(
     Ok(())
 }
 
-fn increment_graph_owner(
-    owners: &mut HashMap<u64, usize>,
-    identifier: u64,
-) -> Result<(), ChartTitleError> {
+fn increment_graph_owner(owners: &mut HashMap<u64, usize>, identifier: u64) -> Result<(), Error> {
     if let Some(count) = owners.get_mut(&identifier) {
-        *count = count.checked_add(1).ok_or(ChartTitleError::InvalidSource)?;
+        *count = count.checked_add(1).ok_or(Error::InvalidSource)?;
     } else {
         owners
             .try_reserve(1)
-            .map_err(|_error| ChartTitleError::Allocation { amount: 1 })?;
+            .map_err(|_error| Error::Allocation { amount: 1 })?;
         owners.insert(identifier, 1);
     }
     Ok(())
@@ -2796,24 +2736,24 @@ fn verify_selected_chart_title_message(
     selection: &ChartSelection,
     expected: &[u8],
     budget: &mut ChartGraphScanBudget,
-) -> Result<(), ChartTitleError> {
+) -> Result<(), Error> {
     let (_component_name, object) = source
         .object_with_component(selection.non_style_identifier)
-        .ok_or(ChartTitleError::PatchConflict)?;
+        .ok_or(Error::PatchConflict)?;
     let message = object
         .messages
         .get(selection.non_style_message_index)
         .filter(|message| message.type_ == CHART_NON_STYLE_MESSAGE_TYPE)
-        .ok_or(ChartTitleError::PatchConflict)?;
+        .ok_or(Error::PatchConflict)?;
     budget.charge(
         message
             .data
             .len()
             .checked_add(expected.len())
-            .ok_or(ChartTitleError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     if message.data.as_slice() != expected {
-        return Err(ChartTitleError::PatchConflict);
+        return Err(Error::PatchConflict);
     }
     Ok(())
 }
@@ -2821,12 +2761,12 @@ fn verify_selected_chart_title_message(
 fn clone_payload_with_budget(
     data: &[u8],
     budget: &mut ChartGraphScanBudget,
-) -> Result<Vec<u8>, ChartTitleError> {
+) -> Result<Vec<u8>, Error> {
     budget.charge(data.len())?;
     let mut owned = Vec::new();
     owned
         .try_reserve_exact(data.len())
-        .map_err(|_error| ChartTitleError::Allocation { amount: data.len() })?;
+        .map_err(|_error| Error::Allocation { amount: data.len() })?;
     owned.extend_from_slice(data);
     Ok(owned)
 }
@@ -2836,15 +2776,15 @@ fn rewrite_chart_title(
     selection: &ChartSelection,
     after: Option<&str>,
     budget: &mut ChartGraphScanBudget,
-) -> Result<ChartTitleRewrite, ChartTitleError> {
+) -> Result<ChartTitleRewrite, Error> {
     let catalog = physical_catalog(source)?;
     let entry = catalog
         .package()
         .iter()
         .find(|entry| entry.name() == selection.non_style_component_name)
-        .ok_or(ChartTitleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(ChartTitleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let archive_limits = source
         .state
@@ -2864,7 +2804,7 @@ fn rewrite_chart_title(
         .components()
         .iter()
         .find(|component| component.name() == selection.non_style_component_name)
-        .ok_or(ChartTitleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let decompressed_bound = parsed_component
         .archive()
         .encoded_len_with_limits(archive_limits)
@@ -2882,17 +2822,17 @@ fn rewrite_chart_title(
     let (message_index, message_data) = {
         let object = archive
             .object(selection.non_style_identifier)
-            .ok_or(ChartTitleError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let (message_index, message) =
             exactly_one_message_with_index(object, CHART_NON_STYLE_MESSAGE_TYPE)?;
         if message_index != selection.non_style_message_index {
-            return Err(ChartTitleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         budget.charge(message.data.len())?;
         let mut message_data = Vec::new();
         message_data
             .try_reserve_exact(message.data.len())
-            .map_err(|_error| ChartTitleError::Allocation {
+            .map_err(|_error| Error::Allocation {
                 amount: message.data.len(),
             })?;
         message_data.extend_from_slice(&message.data);
@@ -2904,7 +2844,7 @@ fn rewrite_chart_title(
     let selected_message = clone_payload_with_budget(&patched, budget)?;
     archive
         .object_mut(selection.non_style_identifier)
-        .ok_or(ChartTitleError::InvalidSource)?
+        .ok_or(Error::InvalidSource)?
         .replace_message_preserving_header_with_limits(
             message_index,
             RawMessage {
@@ -2920,7 +2860,7 @@ fn rewrite_chart_title(
         .map_err(map_core_error)?;
     let compressed = SnappyStream::compress(&bytes).map_err(map_core_error)?;
     let previews = super::rendering_invalidation::root_preview_deletions(catalog.package())
-        .map_err(|_error| ChartTitleError::InvalidSource)?;
+        .map_err(|_error| Error::InvalidSource)?;
     let edit = EntryEdit::new(
         selection.non_style_component_name.as_str(),
         compressed.as_slice(),
@@ -2944,7 +2884,7 @@ fn rewrite_chart_title(
             .output_bytes()
             .checked_add(requirements.scratch_bytes())
             .and_then(|value| value.checked_add(requirements.offset_count()))
-            .ok_or(ChartTitleError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     let output = prepared
         .execute(requirements.exact_limits())
@@ -2962,43 +2902,39 @@ fn rewrite_chart_title(
 fn validate_canonical_object_length_prefixes(
     source: &[u8],
     archive: &Archive,
-) -> Result<(), ChartTitleError> {
+) -> Result<(), Error> {
     for object in &archive.objects {
-        let offset = usize::try_from(object.header_offset)
-            .map_err(|_error| ChartTitleError::InvalidSource)?;
-        let remaining = source.get(offset..).ok_or(ChartTitleError::InvalidSource)?;
+        let offset =
+            usize::try_from(object.header_offset).map_err(|_error| Error::InvalidSource)?;
+        let remaining = source.get(offset..).ok_or(Error::InvalidSource)?;
         let (header_bytes, prefix_bytes) =
-            decode_varint_from_bytes(remaining).map_err(|_error| ChartTitleError::InvalidSource)?;
+            decode_varint_from_bytes(remaining).map_err(|_error| Error::InvalidSource)?;
         if prefix_bytes != encoded_len(header_bytes) {
-            return Err(ChartTitleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let framed_header_bytes = header_bytes
-            .checked_add(
-                u64::try_from(prefix_bytes).map_err(|_error| ChartTitleError::InvalidSource)?,
-            )
-            .ok_or(ChartTitleError::InvalidSource)?;
+            .checked_add(u64::try_from(prefix_bytes).map_err(|_error| Error::InvalidSource)?)
+            .ok_or(Error::InvalidSource)?;
         if framed_header_bytes != object.header_length
             || object
                 .header_offset
                 .checked_add(object.header_length)
-                .ok_or(ChartTitleError::InvalidSource)?
+                .ok_or(Error::InvalidSource)?
                 != object.data_offset
         {
-            return Err(ChartTitleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(())
 }
 
-fn read_chart_title(data: &[u8], limits: WireLimits) -> Result<Option<String>, ChartTitleError> {
+fn read_chart_title(data: &[u8], limits: WireLimits) -> Result<Option<String>, Error> {
     let fields = parse_wire_fields_with_limits(data, limits).map_err(map_wire_error)?;
     let mut extension_field = None;
     let mut extension_count = 0usize;
     for field in &fields {
         if field.number() == GENERATED_CHART_NON_STYLE_EXTENSION_FIELD {
-            extension_count = extension_count
-                .checked_add(1)
-                .ok_or(ChartTitleError::InvalidSource)?;
+            extension_count = extension_count.checked_add(1).ok_or(Error::InvalidSource)?;
             extension_field = Some(*field);
         }
     }
@@ -3006,7 +2942,7 @@ fn read_chart_title(data: &[u8], limits: WireLimits) -> Result<Option<String>, C
         return Ok(None);
     };
     if extension_count != 1 || field.wire_type() != 2 {
-        return Err(ChartTitleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     field
         .validate_canonical_framing(data)
@@ -3090,9 +3026,9 @@ fn verify_chart_candidate(
     expected_selected_message: &[u8],
     target_requires_invalidated_previews: bool,
     budget: &mut ChartGraphScanBudget,
-) -> Result<(), ChartTitleError> {
+) -> Result<(), Error> {
     if source.state.total_objects != candidate.state.total_objects {
-        return Err(ChartTitleError::Verification);
+        return Err(Error::Verification);
     }
     budget.charge(2)?;
     let source_graphs = chart_graphs_with_budget(source, slide_position, true, budget)
@@ -3100,7 +3036,7 @@ fn verify_chart_candidate(
     let candidate_graphs = chart_graphs_with_budget(candidate, slide_position, true, budget)
         .map_err(map_axis_support_error)?;
     if source_graphs.len() != candidate_graphs.len() {
-        return Err(ChartTitleError::Verification);
+        return Err(Error::Verification);
     }
     for (index, (source_graph, candidate_graph)) in source_graphs
         .iter()
@@ -3114,7 +3050,7 @@ fn verify_chart_candidate(
             || source_graph.slide_component_name != candidate_graph.slide_component_name
             || source_graph.non_style_component_name != candidate_graph.non_style_component_name
         {
-            return Err(ChartTitleError::Verification);
+            return Err(Error::Verification);
         }
         let expected = if index == chart_position.get() {
             expected_title
@@ -3122,17 +3058,17 @@ fn verify_chart_candidate(
             source_graph.title.as_deref()
         };
         if candidate_graph.title.as_deref() != expected {
-            return Err(ChartTitleError::Verification);
+            return Err(Error::Verification);
         }
     }
     let source_show = source.show().map_err(map_read_error)?;
     let candidate_show = candidate.show().map_err(map_read_error)?;
     if source_show != candidate_show {
-        return Err(ChartTitleError::Verification);
+        return Err(Error::Verification);
     }
     let selected = source_graphs
         .get(chart_position.get())
-        .ok_or(ChartTitleError::Verification)?;
+        .ok_or(Error::Verification)?;
     chart_axis_support::verify_package_locality_for_component(
         source,
         candidate,
@@ -3152,7 +3088,7 @@ fn patch_chart_title(
     title: Option<&str>,
     limits: WireLimits,
     budget: &mut ChartGraphScanBudget,
-) -> Result<Vec<u8>, ChartTitleError> {
+) -> Result<Vec<u8>, Error> {
     let fields = budget.parse(data)?;
     let extension_field = fields
         .iter()
@@ -3164,11 +3100,11 @@ fn patch_chart_title(
         .count()
         > 1
     {
-        return Err(ChartTitleError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if let Some(field) = extension_field {
         if field.wire_type() != 2 {
-            return Err(ChartTitleError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field
             .validate_canonical_framing(data)
@@ -3197,12 +3133,7 @@ fn patch_chart_title(
     };
 
     if title.is_none() {
-        budget.charge(
-            extension
-                .len()
-                .checked_mul(4)
-                .ok_or(ChartTitleError::InvalidSource)?,
-        )?;
+        budget.charge(extension.len().checked_mul(4).ok_or(Error::InvalidSource)?)?;
         if decode_visible_chart_title(extension, chart_title_decode_options(limits)?)
             .map_err(map_chart_title_codec_error)?
             .is_none()
@@ -3223,7 +3154,7 @@ fn precharge_chart_title_rewrite(
     write: ChartTitleWrite<'_>,
     limits: WireLimits,
     budget: &mut ChartGraphScanBudget,
-) -> Result<(), ChartTitleError> {
+) -> Result<(), Error> {
     let fields = budget.parse(source)?;
     let mut output_length = 0usize;
     let mut saw_visible = false;
@@ -3235,53 +3166,52 @@ fn precharge_chart_title_rewrite(
         let replacement_length = match field.number() {
             21 => {
                 if field.wire_type() != 0 || saw_visible {
-                    return Err(ChartTitleError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 saw_visible = true;
                 write.title_visible().map_or(Ok(0), |value| {
                     encoded_len(21_u64 << 3)
                         .checked_add(encoded_len(u64::from(value)))
-                        .ok_or(ChartTitleError::InvalidSource)
+                        .ok_or(Error::InvalidSource)
                 })?
             },
             23 => {
                 if field.wire_type() != 2 || saw_title {
-                    return Err(ChartTitleError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 saw_title = true;
                 write.title().map_or(Ok(0), |value| {
-                    let length = u64::try_from(value.len())
-                        .map_err(|_error| ChartTitleError::InvalidSource)?;
+                    let length =
+                        u64::try_from(value.len()).map_err(|_error| Error::InvalidSource)?;
                     encoded_len((23_u64 << 3) | 2)
                         .checked_add(encoded_len(length))
                         .and_then(|length| length.checked_add(value.len()))
-                        .ok_or(ChartTitleError::InvalidSource)
+                        .ok_or(Error::InvalidSource)
                 })?
             },
             _ => field.end() - field.start(),
         };
         output_length = output_length
             .checked_add(replacement_length)
-            .ok_or(ChartTitleError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     if !saw_visible && let Some(value) = write.title_visible() {
         output_length = output_length
             .checked_add(encoded_len(21_u64 << 3))
             .and_then(|length| length.checked_add(encoded_len(u64::from(value))))
-            .ok_or(ChartTitleError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     if !saw_title && let Some(value) = write.title() {
-        let title_length =
-            u64::try_from(value.len()).map_err(|_error| ChartTitleError::InvalidSource)?;
+        let title_length = u64::try_from(value.len()).map_err(|_error| Error::InvalidSource)?;
         output_length = output_length
             .checked_add(encoded_len((23_u64 << 3) | 2))
             .and_then(|length| length.checked_add(encoded_len(title_length)))
             .and_then(|length| length.checked_add(value.len()))
-            .ok_or(ChartTitleError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     if output_length > limits.max_output_bytes() {
-        return Err(ChartTitleError::LimitExceeded {
-            kind: ChartTitleLimitKind::OutputBytes,
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::OutputBytes,
             observed: usize_to_u64(output_length),
             maximum: usize_to_u64(limits.max_output_bytes()),
         });
@@ -3294,7 +3224,7 @@ fn precharge_chart_title_rewrite(
                 .checked_mul(4)
                 .and_then(|output| value.checked_add(output))
         })
-        .ok_or(ChartTitleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.charge(codec_work)
 }
 
@@ -3304,9 +3234,9 @@ fn rewrite_chart_non_style_extension(
     replacement: &[u8],
     limits: WireLimits,
     budget: &mut ChartGraphScanBudget,
-) -> Result<Vec<u8>, ChartTitleError> {
+) -> Result<Vec<u8>, Error> {
     let replacement_length =
-        u64::try_from(replacement.len()).map_err(|_error| ChartTitleError::InvalidSource)?;
+        u64::try_from(replacement.len()).map_err(|_error| Error::InvalidSource)?;
     let key_length = extension_field.map_or_else(
         || encoded_len((u64::from(GENERATED_CHART_NON_STYLE_EXTENSION_FIELD) << 3) | 2),
         |field| field.key_end() - field.start(),
@@ -3314,7 +3244,7 @@ fn rewrite_chart_non_style_extension(
     let replacement_field_length = key_length
         .checked_add(encoded_len(replacement_length))
         .and_then(|length| length.checked_add(replacement.len()))
-        .ok_or(ChartTitleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let output_length = extension_field
         .map_or_else(
             || data.len().checked_add(replacement_field_length),
@@ -3324,10 +3254,10 @@ fn rewrite_chart_non_style_extension(
                     .and_then(|length| length.checked_add(replacement_field_length))
             },
         )
-        .ok_or(ChartTitleError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if output_length > limits.max_output_bytes() {
-        return Err(ChartTitleError::LimitExceeded {
-            kind: ChartTitleLimitKind::OutputBytes,
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::OutputBytes,
             observed: usize_to_u64(output_length),
             maximum: usize_to_u64(limits.max_output_bytes()),
         });
@@ -3336,7 +3266,7 @@ fn rewrite_chart_non_style_extension(
     let mut output = Vec::new();
     output
         .try_reserve_exact(output_length)
-        .map_err(|_error| ChartTitleError::Allocation {
+        .map_err(|_error| Error::Allocation {
             amount: output_length,
         })?;
     match extension_field {
@@ -3365,10 +3295,10 @@ fn clone_title_source(
     data: &[u8],
     limits: WireLimits,
     budget: &mut ChartGraphScanBudget,
-) -> Result<Vec<u8>, ChartTitleError> {
+) -> Result<Vec<u8>, Error> {
     if data.len() > limits.max_output_bytes() {
-        return Err(ChartTitleError::LimitExceeded {
-            kind: ChartTitleLimitKind::OutputBytes,
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::OutputBytes,
             observed: usize_to_u64(data.len()),
             maximum: usize_to_u64(limits.max_output_bytes()),
         });
@@ -3377,15 +3307,15 @@ fn clone_title_source(
     let mut output = Vec::new();
     output
         .try_reserve_exact(data.len())
-        .map_err(|_error| ChartTitleError::Allocation { amount: data.len() })?;
+        .map_err(|_error| Error::Allocation { amount: data.len() })?;
     output.extend_from_slice(data);
     Ok(output)
 }
 
-fn chart_title_decode_options(limits: WireLimits) -> Result<DecodeOptions, ChartTitleError> {
+fn chart_title_decode_options(limits: WireLimits) -> Result<DecodeOptions, Error> {
     let recursion_limit =
-        u32::try_from(limits.max_nesting()).map_err(|_error| ChartTitleError::LimitExceeded {
-            kind: ChartTitleLimitKind::WireNesting,
+        u32::try_from(limits.max_nesting()).map_err(|_error| Error::LimitExceeded {
+            kind: LimitKind::WireNesting,
             observed: usize_to_u64(limits.max_nesting()),
             maximum: u64::from(u32::MAX),
         })?;
@@ -3399,10 +3329,10 @@ fn chart_title_decode_options(limits: WireLimits) -> Result<DecodeOptions, Chart
     .with_max_title_bytes(MAX_CHART_TITLE_BYTES.min(limits.max_output_bytes())))
 }
 
-fn copy_title(title: &str) -> Result<String, ChartTitleError> {
+fn copy_title(title: &str) -> Result<String, Error> {
     if title.len() > MAX_CHART_TITLE_BYTES {
-        return Err(ChartTitleError::LimitExceeded {
-            kind: ChartTitleLimitKind::TitleBytes,
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::TitleBytes,
             observed: usize_to_u64(title.len()),
             maximum: usize_to_u64(MAX_CHART_TITLE_BYTES),
         });
@@ -3410,112 +3340,106 @@ fn copy_title(title: &str) -> Result<String, ChartTitleError> {
     let mut owned = String::new();
     owned
         .try_reserve_exact(title.len())
-        .map_err(|_error| ChartTitleError::Allocation {
+        .map_err(|_error| Error::Allocation {
             amount: title.len(),
         })?;
     owned.push_str(title);
     Ok(owned)
 }
 
-fn map_chart_title_codec_error(error: ChartTitleDecodeError) -> ChartTitleError {
+fn map_chart_title_codec_error(error: ChartTitleDecodeError) -> Error {
     if let Some(limit) = error.resource_limit() {
         return match limit {
-            ChartTitleDecodeLimit::Bytes { observed, maximum } => ChartTitleError::LimitExceeded {
-                kind: ChartTitleLimitKind::WireBytes,
+            ChartTitleDecodeLimit::Bytes { observed, maximum } => Error::LimitExceeded {
+                kind: LimitKind::WireBytes,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(maximum),
             },
-            ChartTitleDecodeLimit::Fields { observed, maximum } => ChartTitleError::LimitExceeded {
-                kind: ChartTitleLimitKind::WireFields,
+            ChartTitleDecodeLimit::Fields { observed, maximum } => Error::LimitExceeded {
+                kind: LimitKind::WireFields,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(maximum),
             },
-            ChartTitleDecodeLimit::Work { observed, maximum } => ChartTitleError::LimitExceeded {
-                kind: ChartTitleLimitKind::WireWork,
+            ChartTitleDecodeLimit::Work { observed, maximum } => Error::LimitExceeded {
+                kind: LimitKind::WireWork,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(maximum),
             },
-            ChartTitleDecodeLimit::Output { observed, maximum } => ChartTitleError::LimitExceeded {
-                kind: ChartTitleLimitKind::OutputBytes,
+            ChartTitleDecodeLimit::Output { observed, maximum } => Error::LimitExceeded {
+                kind: LimitKind::OutputBytes,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(maximum),
             },
-            ChartTitleDecodeLimit::Title { observed, maximum } => ChartTitleError::LimitExceeded {
-                kind: ChartTitleLimitKind::TitleBytes,
+            ChartTitleDecodeLimit::Title { observed, maximum } => Error::LimitExceeded {
+                kind: LimitKind::TitleBytes,
                 observed: usize_to_u64(observed),
                 maximum: usize_to_u64(maximum),
             },
-            ChartTitleDecodeLimit::Nesting { observed, maximum } => {
-                ChartTitleError::LimitExceeded {
-                    kind: ChartTitleLimitKind::WireNesting,
-                    observed: u64::from(observed),
-                    maximum: u64::from(maximum),
-                }
+            ChartTitleDecodeLimit::Nesting { observed, maximum } => Error::LimitExceeded {
+                kind: LimitKind::WireNesting,
+                observed: u64::from(observed),
+                maximum: u64::from(maximum),
             },
-            _ => ChartTitleError::InvalidSource,
+            _ => Error::InvalidSource,
         };
     }
     if let Some(limit) = error.wire_resource_limit() {
         return match limit {
-            ChartTitleWireResourceLimit::Bytes { observed, maximum } => {
-                ChartTitleError::LimitExceeded {
-                    kind: ChartTitleLimitKind::WireBytes,
-                    observed: usize_to_u64(observed),
-                    maximum: usize_to_u64(maximum),
-                }
+            ChartTitleWireResourceLimit::Bytes { observed, maximum } => Error::LimitExceeded {
+                kind: LimitKind::WireBytes,
+                observed: usize_to_u64(observed),
+                maximum: usize_to_u64(maximum),
             },
-            ChartTitleWireResourceLimit::Nesting { observed, maximum } => {
-                ChartTitleError::LimitExceeded {
-                    kind: ChartTitleLimitKind::WireNesting,
-                    observed: u64::from(observed),
-                    maximum: u64::from(maximum),
-                }
+            ChartTitleWireResourceLimit::Nesting { observed, maximum } => Error::LimitExceeded {
+                kind: LimitKind::WireNesting,
+                observed: u64::from(observed),
+                maximum: u64::from(maximum),
             },
-            _ => ChartTitleError::InvalidSource,
+            _ => Error::InvalidSource,
         };
     }
     if let Some(amount) = error.allocation_amount() {
-        return ChartTitleError::Allocation { amount };
+        return Error::Allocation { amount };
     }
-    ChartTitleError::InvalidSource
+    Error::InvalidSource
 }
 
-fn map_chart_selector_error(error: ChartSelectorError) -> ChartTitleError {
+fn map_chart_selector_error(error: ChartSelectorError) -> Error {
     match error {
-        ChartSelectorError::EmptyName => ChartTitleError::EmptyChartName,
-        ChartSelectorError::DuplicateChartTitle { .. } => ChartTitleError::AmbiguousSelector,
+        ChartSelectorError::EmptyName => Error::EmptyChartName,
+        ChartSelectorError::DuplicateChartTitle { .. } => Error::AmbiguousSelector,
     }
 }
 
-fn map_slide_selector_error(error: SlideSelectorError) -> ChartTitleError {
+fn map_slide_selector_error(error: SlideSelectorError) -> Error {
     match error {
-        SlideSelectorError::EmptySlideName => ChartTitleError::EmptySlideName,
-        SlideSelectorError::DuplicateSlideName { .. } => ChartTitleError::AmbiguousSelector,
+        SlideSelectorError::EmptySlideName => Error::EmptySlideName,
+        SlideSelectorError::DuplicateSlideName { .. } => Error::AmbiguousSelector,
     }
 }
 
-fn physical_catalog(package: &Package) -> Result<&SourceCatalog, ChartTitleError> {
+fn physical_catalog(package: &Package) -> Result<&SourceCatalog, Error> {
     match &package.state.source {
         PhysicalSource::Package(source) => Ok(source),
-        PhysicalSource::Semantic(_) => Err(ChartTitleError::UnsupportedSource),
+        PhysicalSource::Semantic(_) => Err(Error::UnsupportedSource),
     }
 }
 
-fn map_read_error(error: ReadError) -> ChartTitleError {
+fn map_read_error(error: ReadError) -> Error {
     match error {
         ReadError::SemanticLimit {
             kind,
             observed,
             maximum,
             ..
-        } => ChartTitleError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: match kind {
-                SemanticLimitKind::Objects => ChartTitleLimitKind::Entries,
-                SemanticLimitKind::Slides => ChartTitleLimitKind::Slides,
-                SemanticLimitKind::References => ChartTitleLimitKind::References,
-                SemanticLimitKind::TextStorages => ChartTitleLimitKind::TextStorages,
-                SemanticLimitKind::TextFragments => ChartTitleLimitKind::TextFragments,
-                SemanticLimitKind::TextBytes => ChartTitleLimitKind::TextBytes,
+                SemanticLimitKind::Objects => LimitKind::Entries,
+                SemanticLimitKind::Slides => LimitKind::Slides,
+                SemanticLimitKind::References => LimitKind::References,
+                SemanticLimitKind::TextStorages => LimitKind::TextStorages,
+                SemanticLimitKind::TextFragments => LimitKind::TextFragments,
+                SemanticLimitKind::TextBytes => LimitKind::TextBytes,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
@@ -3525,17 +3449,17 @@ fn map_read_error(error: ReadError) -> ChartTitleError {
             observed,
             maximum,
             ..
-        } => ChartTitleError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: match kind {
-                super::PayloadLimitKind::Bytes => ChartTitleLimitKind::WireBytes,
-                super::PayloadLimitKind::Fields => ChartTitleLimitKind::WireFields,
-                super::PayloadLimitKind::Nesting => ChartTitleLimitKind::WireNesting,
-                super::PayloadLimitKind::Work => ChartTitleLimitKind::WireWork,
+                super::PayloadLimitKind::Bytes => LimitKind::WireBytes,
+                super::PayloadLimitKind::Fields => LimitKind::WireFields,
+                super::PayloadLimitKind::Nesting => LimitKind::WireNesting,
+                super::PayloadLimitKind::Work => LimitKind::WireWork,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         },
-        ReadError::Allocation { amount, .. } => ChartTitleError::Allocation { amount },
+        ReadError::Allocation { amount, .. } => Error::Allocation { amount },
         ReadError::Archive(_)
         | ReadError::Detection(_)
         | ReadError::UnexpectedFormat { .. }
@@ -3543,48 +3467,46 @@ fn map_read_error(error: ReadError) -> ChartTitleError {
         | ReadError::Decode(_)
         | ReadError::TextStorage { .. }
         | ReadError::Metadata(_)
-        | ReadError::Io(_) => ChartTitleError::InvalidSource,
+        | ReadError::Io(_) => Error::InvalidSource,
     }
 }
 
-fn map_archive_error(error: litchi_iwa_archive::Error) -> ChartTitleError {
+fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     match error {
         litchi_iwa_archive::Error::Limit {
             kind,
             observed,
             maximum,
-        } => ChartTitleError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: match kind {
-                litchi_iwa_archive::LimitKind::InputBytes => ChartTitleLimitKind::InputBytes,
-                litchi_iwa_archive::LimitKind::OutputBytes => ChartTitleLimitKind::OutputBytes,
-                litchi_iwa_archive::LimitKind::Entries => ChartTitleLimitKind::Entries,
-                litchi_iwa_archive::LimitKind::EntryBytes => ChartTitleLimitKind::EntryBytes,
-                litchi_iwa_archive::LimitKind::TotalBytes => ChartTitleLimitKind::TotalBytes,
-                _ => ChartTitleLimitKind::WireBytes,
+                litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
+                litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_archive::LimitKind::Entries => LimitKind::Entries,
+                litchi_iwa_archive::LimitKind::EntryBytes => LimitKind::EntryBytes,
+                litchi_iwa_archive::LimitKind::TotalBytes => LimitKind::TotalBytes,
+                _ => LimitKind::WireBytes,
             },
             observed,
             maximum,
         },
-        litchi_iwa_archive::Error::Allocation { amount, .. } => {
-            ChartTitleError::Allocation { amount }
-        },
-        _ => ChartTitleError::InvalidSource,
+        litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_core_error(error: litchi_iwa_core::Error) -> ChartTitleError {
+fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => ChartTitleError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: match kind {
-                litchi_iwa_core::LimitKind::ArchiveBytes => ChartTitleLimitKind::TotalBytes,
+                litchi_iwa_core::LimitKind::ArchiveBytes => LimitKind::TotalBytes,
                 litchi_iwa_core::LimitKind::Objects
                 | litchi_iwa_core::LimitKind::Messages
                 | litchi_iwa_core::LimitKind::MessagesPerObject
-                | litchi_iwa_core::LimitKind::MetadataItems => ChartTitleLimitKind::Entries,
+                | litchi_iwa_core::LimitKind::MetadataItems => LimitKind::Entries,
                 litchi_iwa_core::LimitKind::ObjectBytes
                 | litchi_iwa_core::LimitKind::MessageBytes
                 | litchi_iwa_core::LimitKind::HeaderBytes
@@ -3592,51 +3514,45 @@ fn map_core_error(error: litchi_iwa_core::Error) -> ChartTitleError {
                 | litchi_iwa_core::LimitKind::SnappyChunkBytes
                 | litchi_iwa_core::LimitKind::SnappyStreamBytes
                 | litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
-                | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes => {
-                    ChartTitleLimitKind::WireBytes
-                },
-                litchi_iwa_core::LimitKind::HeaderFields => ChartTitleLimitKind::WireFields,
-                litchi_iwa_core::LimitKind::HeaderNesting => ChartTitleLimitKind::WireNesting,
-                litchi_iwa_core::LimitKind::SnappyFrames => ChartTitleLimitKind::WireWork,
+                | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes => LimitKind::WireBytes,
+                litchi_iwa_core::LimitKind::HeaderFields => LimitKind::WireFields,
+                litchi_iwa_core::LimitKind::HeaderNesting => LimitKind::WireNesting,
+                litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::WireWork,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(maximum),
         },
         litchi_iwa_core::Error::Allocation { requested, .. } => {
-            ChartTitleError::Allocation { amount: requested }
+            Error::Allocation { amount: requested }
         },
-        _ => ChartTitleError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_wire_error(error: litchi_iwa_common::Error) -> ChartTitleError {
+fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
     match error {
         litchi_iwa_common::Error::LimitExceeded {
             kind,
             observed,
             limit,
-        } => ChartTitleError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: match kind {
-                litchi_iwa_common::LimitKind::InputBytes => ChartTitleLimitKind::WireBytes,
-                litchi_iwa_common::LimitKind::OutputBytes => ChartTitleLimitKind::OutputBytes,
+                litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
+                litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,
                 litchi_iwa_common::LimitKind::Fields
                 | litchi_iwa_common::LimitKind::TableRows
                 | litchi_iwa_common::LimitKind::TableColumns
                 | litchi_iwa_common::LimitKind::TableCells
-                | litchi_iwa_common::LimitKind::MaterializedCells => {
-                    ChartTitleLimitKind::WireFields
-                },
-                litchi_iwa_common::LimitKind::Nesting => ChartTitleLimitKind::WireNesting,
-                litchi_iwa_common::LimitKind::RewriteWork => ChartTitleLimitKind::WireWork,
+                | litchi_iwa_common::LimitKind::MaterializedCells => LimitKind::WireFields,
+                litchi_iwa_common::LimitKind::Nesting => LimitKind::WireNesting,
+                litchi_iwa_common::LimitKind::RewriteWork => LimitKind::WireWork,
             },
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
-        litchi_iwa_common::Error::Allocation { amount, .. } => {
-            ChartTitleError::Allocation { amount }
-        },
+        litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_common::Error::InvalidFormat(_)
-        | litchi_iwa_common::Error::InvalidLimit { .. } => ChartTitleError::InvalidSource,
+        | litchi_iwa_common::Error::InvalidLimit { .. } => Error::InvalidSource,
     }
 }
 

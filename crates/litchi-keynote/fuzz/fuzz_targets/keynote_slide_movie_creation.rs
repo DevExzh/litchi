@@ -15,8 +15,8 @@ use std::{sync::OnceLock, time::Duration};
 use libfuzzer_sys::fuzz_target;
 use litchi_iwa_common::shape::geometry::{Point, Size};
 use litchi_keynote::{
-    MediaPart, MovieSelector, OpenOptions, Package, SemanticLimits, SlideSelector,
-    slide::movie::Options,
+    MovieSelector, OpenOptions, Package, SemanticLimits, SlideSelector,
+    slide::media::data::MediaPart, slide::movie::Options,
 };
 
 use self::support::{
@@ -222,7 +222,7 @@ fn native_assets_without_cache(package: &Package) -> (Vec<u8>, Vec<u8>) {
 
 fn assert_media_payloads(
     package: &Package,
-    patch: &litchi_keynote::SlideMovieCreationPatch,
+    patch: &litchi_keynote::slide::movie::creation::Patch,
     movie: &[u8],
     poster: &[u8],
 ) {

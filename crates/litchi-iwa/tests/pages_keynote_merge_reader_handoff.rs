@@ -222,7 +222,8 @@ fn pages_merge_handoff_matches_focused_reader_and_preserves_native_bytes() -> Te
 #[test]
 fn keynote_merge_handoff_matches_focused_reader_and_preserves_native_bytes() -> TestResult {
     let expected = keynote_merges();
-    let reader = litchi_keynote::MergeReader::from_bytes(KEYNOTE)?;
+    let reader =
+        litchi_keynote::slide::table::merge::transaction::MergeReader::from_bytes(KEYNOTE)?;
     assert_eq!(reader.slide_table_merges(0usize, 0usize)?, expected);
     let focused = litchi_keynote::Package::from_bytes(KEYNOTE)?;
     assert_eq!(focused.slide_table_merges(0usize, 0usize)?, expected);
@@ -282,7 +283,8 @@ fn pages_merge_handoff_does_not_materialize_unneeded_bnc_tiles() -> TestResult {
 #[test]
 fn keynote_merge_handoff_does_not_materialize_unneeded_bnc_tiles() -> TestResult {
     let malformed = malformed_merge_tile(KEYNOTE)?;
-    let reader = litchi_keynote::MergeReader::from_bytes(&malformed)?;
+    let reader =
+        litchi_keynote::slide::table::merge::transaction::MergeReader::from_bytes(&malformed)?;
     assert_eq!(reader.slide_table_merges(0usize, 0usize)?, keynote_merges());
     let focused = litchi_keynote::Package::from_bytes(&malformed)?;
     assert!(
@@ -341,7 +343,7 @@ fn keynote_merge_handoff_retains_source_after_input_path_is_removed() -> TestRes
     let path = directory.path().join("native.key");
     std::fs::write(&path, KEYNOTE)?;
     let host = KeynoteEditor::open(&path)?;
-    let reader = litchi_keynote::MergeReader::open(&path)?;
+    let reader = litchi_keynote::slide::table::merge::transaction::MergeReader::open(&path)?;
     std::fs::remove_file(&path)?;
 
     let table = host
@@ -388,7 +390,7 @@ fn keynote_selected_merge_graph_errors_are_terminal_and_source_preserving() -> T
     assert!(
         matches!(
             focused.slide_table_merges(0usize, 0usize),
-            Err(litchi_keynote::SlideTableMergesError::InvalidSource)
+            Err(litchi_keynote::slide::table::merge::transaction::Error::InvalidSource)
         ),
         "the focused Keynote reader must reject the malformed selected graph"
     );

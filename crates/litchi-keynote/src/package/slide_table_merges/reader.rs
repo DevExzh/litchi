@@ -14,7 +14,7 @@ use litchi_iwa_archive::ComponentCatalog;
 use litchi_iwa_archive::{Error as ArchiveError, LimitKind as ArchiveLimitKind, SourceCatalog};
 
 use super::super::{Package, PayloadLimitKind, Profile, ReadError, read_source};
-use super::SlideTableMergesError;
+use super::Error;
 use crate::limits::{OpenOptions, SemanticLimitKind};
 
 /// A lazy, metadata-only Keynote merged-cell reader.
@@ -35,7 +35,8 @@ use crate::limits::{OpenOptions, SemanticLimitKind};
 /// unrelated malformed cell or slide does not force a full semantic decode.
 ///
 /// ```no_run
-/// use litchi_keynote::{MergeReader, SlideSelector, TableSelector};
+/// use litchi_keynote::slide::table::merge::transaction::MergeReader;
+/// use litchi_keynote::{SlideSelector, TableSelector};
 ///
 /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let reader = MergeReader::open("deck.key")?;
@@ -76,7 +77,7 @@ impl MergeReader {
     ///
     /// Returns a typed merge error when the path cannot be read, physical
     /// ingress exceeds a limit, or the source is not a valid Keynote package.
-    pub fn open(path: impl AsRef<Path>) -> Result<Self, SlideTableMergesError> {
+    pub fn open(path: impl AsRef<Path>) -> Result<Self, Error> {
         Self::open_with_options(path, OpenOptions::default())
     }
 
@@ -91,10 +92,7 @@ impl MergeReader {
     ///
     /// Returns a typed merge error when bounded filesystem or package ingress
     /// fails.
-    pub fn open_with_options(
-        path: impl AsRef<Path>,
-        options: OpenOptions,
-    ) -> Result<Self, SlideTableMergesError> {
+    pub fn open_with_options(path: impl AsRef<Path>, options: OpenOptions) -> Result<Self, Error> {
         let profile = Profile::from_options(options).map_err(map_read_error)?;
         let source = read_source(path.as_ref(), profile.archive()).map_err(map_read_error)?;
         Self::from_shared_bytes_with_options(source, options)
@@ -111,7 +109,7 @@ impl MergeReader {
     ///
     /// Returns a typed merge error when physical ingress or Keynote root
     /// validation fails.
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, SlideTableMergesError> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, Error> {
         Self::from_bytes_with_options(bytes, OpenOptions::default())
     }
 
@@ -121,16 +119,12 @@ impl MergeReader {
     ///
     /// Returns a typed merge error when the source is malformed, belongs to a
     /// different iWork format, or exceeds the configured profile.
-    pub fn from_bytes_with_options(
-        bytes: &[u8],
-        options: OpenOptions,
-    ) -> Result<Self, SlideTableMergesError> {
+    pub fn from_bytes_with_options(bytes: &[u8], options: OpenOptions) -> Result<Self, Error> {
         let options = Profile::from_options(options).map_err(map_read_error)?;
-        let length =
-            u64::try_from(bytes.len()).map_err(|_| SlideTableMergesError::InvalidSource)?;
+        let length = u64::try_from(bytes.len()).map_err(|_| Error::InvalidSource)?;
         if length > options.archive().max_input_bytes() {
-            return Err(SlideTableMergesError::LimitExceeded {
-                kind: super::SlideTableMergesLimitKind::InputBytes,
+            return Err(Error::LimitExceeded {
+                kind: super::LimitKind::InputBytes,
                 observed: length,
                 maximum: options.archive().max_input_bytes(),
             });
@@ -153,7 +147,7 @@ impl MergeReader {
     /// # Errors
     ///
     /// Returns the same typed merge failures as [`Self::from_bytes_with_options`].
-    pub fn from_shared_bytes(bytes: Arc<[u8]>) -> Result<Self, SlideTableMergesError> {
+    pub fn from_shared_bytes(bytes: Arc<[u8]>) -> Result<Self, Error> {
         Self::from_shared_bytes_with_options(bytes, OpenOptions::default())
     }
 
@@ -166,7 +160,7 @@ impl MergeReader {
     pub fn from_shared_bytes_with_options(
         bytes: Arc<[u8]>,
         options: OpenOptions,
-    ) -> Result<Self, SlideTableMergesError> {
+    ) -> Result<Self, Error> {
         let options = Profile::from_options(options).map_err(map_read_error)?;
         let source = SourceCatalog::from_shared_bytes_with_limits(bytes, options.archive())
             .map_err(map_archive_error)?;
@@ -185,7 +179,7 @@ impl MergeReader {
     pub fn __from_shared_catalog(
         catalog: Arc<ComponentCatalog>,
         options: OpenOptions,
-    ) -> Result<Self, SlideTableMergesError> {
+    ) -> Result<Self, Error> {
         let options = Profile::from_options(options).map_err(map_read_error)?;
         let package = Package::from_merge_components(catalog, options).map_err(map_read_error)?;
         Ok(Self { package })
@@ -206,7 +200,7 @@ impl MergeReader {
         &self,
         slide: impl Into<crate::SlideSelector<'slide>>,
         table: impl Into<crate::TableSelector>,
-    ) -> Result<Vec<crate::slide::table::merge::Region>, SlideTableMergesError> {
+    ) -> Result<Vec<crate::slide::table::merge::Region>, Error> {
         self.package
             .slide_table_merges_from_components(slide, table)
     }
@@ -217,16 +211,16 @@ impl MergeReader {
     }
 }
 
-fn map_read_error(error: ReadError) -> SlideTableMergesError {
+fn map_read_error(error: ReadError) -> Error {
     match error {
-        ReadError::UnexpectedFormat { .. } => SlideTableMergesError::UnsupportedSource,
+        ReadError::UnexpectedFormat { .. } => Error::UnsupportedSource,
         ReadError::Archive(error) => map_archive_error(error),
         ReadError::SemanticLimit {
             kind,
             observed,
             maximum,
             ..
-        } => SlideTableMergesError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: map_semantic_limit(kind),
             observed: observed as u64,
             maximum: maximum as u64,
@@ -236,33 +230,33 @@ fn map_read_error(error: ReadError) -> SlideTableMergesError {
             observed,
             maximum,
             ..
-        } => SlideTableMergesError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: map_payload_limit(kind),
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        ReadError::Allocation { amount, .. } => SlideTableMergesError::Allocation { amount },
+        ReadError::Allocation { amount, .. } => Error::Allocation { amount },
         ReadError::Io(_)
         | ReadError::Detection(_)
         | ReadError::InvalidFormat(_)
         | ReadError::Decode(_)
         | ReadError::TextStorage { .. }
-        | ReadError::Metadata(_) => SlideTableMergesError::InvalidSource,
+        | ReadError::Metadata(_) => Error::InvalidSource,
     }
 }
 
-fn map_archive_error(error: ArchiveError) -> SlideTableMergesError {
+fn map_archive_error(error: ArchiveError) -> Error {
     match error {
         ArchiveError::Limit {
             kind,
             observed,
             maximum,
-        } => SlideTableMergesError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: map_archive_limit(kind),
             observed,
             maximum,
         },
-        ArchiveError::Allocation { amount, .. } => SlideTableMergesError::Allocation { amount },
+        ArchiveError::Allocation { amount, .. } => Error::Allocation { amount },
         ArchiveError::Io(_)
         | ArchiveError::Zip { .. }
         | ArchiveError::Iwa(_)
@@ -271,54 +265,48 @@ fn map_archive_error(error: ArchiveError) -> SlideTableMergesError {
         | ArchiveError::SourceChanged { .. }
         | ArchiveError::DirectoryChanged { .. }
         | ArchiveError::Reassembly(_)
-        | ArchiveError::InvalidBundle(_) => SlideTableMergesError::InvalidSource,
+        | ArchiveError::InvalidBundle(_) => Error::InvalidSource,
     }
 }
 
-fn map_archive_limit(
-    kind: ArchiveLimitKind,
-) -> super::super::slide_table_merges::SlideTableMergesLimitKind {
-    use super::super::slide_table_merges::SlideTableMergesLimitKind;
+fn map_archive_limit(kind: ArchiveLimitKind) -> super::super::slide_table_merges::LimitKind {
+    use super::super::slide_table_merges::LimitKind;
 
     match kind {
-        ArchiveLimitKind::InputBytes => SlideTableMergesLimitKind::InputBytes,
-        ArchiveLimitKind::OutputBytes => SlideTableMergesLimitKind::OutputBytes,
-        ArchiveLimitKind::Entries => SlideTableMergesLimitKind::Entries,
-        ArchiveLimitKind::MemberNameBytes => SlideTableMergesLimitKind::EntryBytes,
-        ArchiveLimitKind::MetadataBytes => SlideTableMergesLimitKind::TotalBytes,
-        ArchiveLimitKind::CompressedEntryBytes => SlideTableMergesLimitKind::EntryBytes,
-        ArchiveLimitKind::EntryBytes => SlideTableMergesLimitKind::EntryBytes,
-        ArchiveLimitKind::TotalBytes => SlideTableMergesLimitKind::TotalBytes,
-        ArchiveLimitKind::IwaStreamBytes => SlideTableMergesLimitKind::PayloadObjects,
-        ArchiveLimitKind::IwaTotalBytes => SlideTableMergesLimitKind::TotalBytes,
+        ArchiveLimitKind::InputBytes => LimitKind::InputBytes,
+        ArchiveLimitKind::OutputBytes => LimitKind::OutputBytes,
+        ArchiveLimitKind::Entries => LimitKind::Entries,
+        ArchiveLimitKind::MemberNameBytes => LimitKind::EntryBytes,
+        ArchiveLimitKind::MetadataBytes => LimitKind::TotalBytes,
+        ArchiveLimitKind::CompressedEntryBytes => LimitKind::EntryBytes,
+        ArchiveLimitKind::EntryBytes => LimitKind::EntryBytes,
+        ArchiveLimitKind::TotalBytes => LimitKind::TotalBytes,
+        ArchiveLimitKind::IwaStreamBytes => LimitKind::PayloadObjects,
+        ArchiveLimitKind::IwaTotalBytes => LimitKind::TotalBytes,
     }
 }
 
-fn map_semantic_limit(
-    kind: SemanticLimitKind,
-) -> super::super::slide_table_merges::SlideTableMergesLimitKind {
-    use super::super::slide_table_merges::SlideTableMergesLimitKind;
+fn map_semantic_limit(kind: SemanticLimitKind) -> super::super::slide_table_merges::LimitKind {
+    use super::super::slide_table_merges::LimitKind;
 
     match kind {
-        SemanticLimitKind::Objects => SlideTableMergesLimitKind::PayloadObjects,
-        SemanticLimitKind::Slides => SlideTableMergesLimitKind::Components,
-        SemanticLimitKind::References => SlideTableMergesLimitKind::References,
-        SemanticLimitKind::TextStorages => SlideTableMergesLimitKind::PayloadMessages,
-        SemanticLimitKind::TextFragments => SlideTableMergesLimitKind::PayloadItems,
-        SemanticLimitKind::TextBytes => SlideTableMergesLimitKind::Retained,
+        SemanticLimitKind::Objects => LimitKind::PayloadObjects,
+        SemanticLimitKind::Slides => LimitKind::Components,
+        SemanticLimitKind::References => LimitKind::References,
+        SemanticLimitKind::TextStorages => LimitKind::PayloadMessages,
+        SemanticLimitKind::TextFragments => LimitKind::PayloadItems,
+        SemanticLimitKind::TextBytes => LimitKind::Retained,
     }
 }
 
-fn map_payload_limit(
-    kind: PayloadLimitKind,
-) -> super::super::slide_table_merges::SlideTableMergesLimitKind {
-    use super::super::slide_table_merges::SlideTableMergesLimitKind;
+fn map_payload_limit(kind: PayloadLimitKind) -> super::super::slide_table_merges::LimitKind {
+    use super::super::slide_table_merges::LimitKind;
 
     match kind {
-        PayloadLimitKind::Bytes => SlideTableMergesLimitKind::InputBytes,
-        PayloadLimitKind::Fields => SlideTableMergesLimitKind::WireFields,
-        PayloadLimitKind::Nesting => SlideTableMergesLimitKind::WireNesting,
-        PayloadLimitKind::Work => SlideTableMergesLimitKind::WireWork,
+        PayloadLimitKind::Bytes => LimitKind::InputBytes,
+        PayloadLimitKind::Fields => LimitKind::WireFields,
+        PayloadLimitKind::Nesting => LimitKind::WireNesting,
+        PayloadLimitKind::Work => LimitKind::WireWork,
     }
 }
 
@@ -377,7 +365,7 @@ mod tests {
         );
         assert!(matches!(
             reader.slide_table_merges(SlideSelector::name("missing"), TableSelector::index(0)),
-            Err(super::super::SlideTableMergesError::SlideNameNotFound)
+            Err(super::super::Error::SlideNameNotFound)
         ));
         assert_eq!(
             reader
@@ -575,8 +563,8 @@ mod tests {
         )?;
         assert!(matches!(
             reader.slide_table_merges(SlideSelector::name("missing"), TableSelector::index(0)),
-            Err(super::super::SlideTableMergesError::LimitExceeded {
-                kind: super::super::SlideTableMergesLimitKind::References,
+            Err(super::super::Error::LimitExceeded {
+                kind: super::super::LimitKind::References,
                 observed: 6,
                 maximum: 5,
             })
@@ -599,7 +587,7 @@ mod tests {
         .expect("semantic-only Keynote package");
         assert!(matches!(
             package.slide_table_merges(SlideSelector::index(0), TableSelector::index(0)),
-            Err(super::super::SlideTableMergesError::UnsupportedSource)
+            Err(super::super::Error::UnsupportedSource)
         ));
     }
 }

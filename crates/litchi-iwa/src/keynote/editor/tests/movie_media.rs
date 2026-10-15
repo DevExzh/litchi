@@ -23,7 +23,8 @@ mod cases {
     };
     use litchi_keynote::slide::movie::Options as SlideMovieOptions;
     use litchi_keynote::{
-        MediaPart, MovieSelector, Package as FocusedKeynotePackage, SlideSelector,
+        MovieSelector, Package as FocusedKeynotePackage, SlideSelector,
+        slide::media::data::MediaPart,
     };
     use prost::Message as _;
 

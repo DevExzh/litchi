@@ -12,8 +12,8 @@ use std::{collections::BTreeMap, env, fs, io, path::PathBuf, time::Duration};
 use litchi_iwa_archive::{Limits, package::Catalog};
 use litchi_iwa_common::shape::geometry::{Point, Size};
 use litchi_keynote::{
-    MediaPart, MovieKind, MovieSelector, OpenOptions, Package, SlideSelector, SourceLimits,
-    slide::movie::Options,
+    MovieKind, MovieSelector, OpenOptions, Package, SlideSelector, SourceLimits,
+    slide::media::data::MediaPart, slide::movie::Options,
 };
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -162,7 +162,7 @@ fn create_movie(
     poster_filename: &str,
     poster: &[u8],
     requested: Options,
-) -> TestResult<litchi_keynote::SlideMovieCreationCommit> {
+) -> TestResult<litchi_keynote::slide::movie::creation::Commit> {
     Ok(source.add_slide_movie(
         SlideSelector::index(0),
         movie_filename,
@@ -457,7 +457,7 @@ fn mixed_new_and_reused_assets_register_only_one_record() -> TestResult {
 
 #[test]
 fn oversized_filenames_retain_movie_and_poster_error_provenance() -> TestResult {
-    use litchi_keynote::SlideMovieCreationError;
+    use litchi_keynote::slide::movie::creation::Error as SlideMovieCreationError;
 
     let source = Package::from_bytes(NATIVE_SOURCE)?;
     let (movie, poster) = source_assets(&source)?;

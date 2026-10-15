@@ -6,8 +6,10 @@ use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::shape::geometry::Point;
 use litchi_keynote::{
-    MediaPart, MovieKind, MovieSelector, OpenOptions, Package, SlideAudioCreationError,
-    SlideAudioCreationLimitKind, SlideSelector, SourceLimits, slide::audio::Options,
+    MovieKind, MovieSelector, OpenOptions, Package, SlideSelector, SourceLimits,
+    slide::audio::Options, slide::audio::creation::Error as SlideAudioCreationError,
+    slide::audio::creation::LimitKind as SlideAudioCreationLimitKind,
+    slide::media::data::MediaPart,
 };
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;

@@ -37,7 +37,9 @@ fn pages_merge_reader_is_available_without_the_migration_host() {
 #[cfg(feature = "keynote")]
 #[test]
 fn keynote_merge_reader_is_available_without_the_migration_host() {
-    use litchi::keynote::{MergeReader, SlideSelector, TableSelector};
+    use litchi::keynote::{
+        SlideSelector, TableSelector, slide::table::merge::transaction::MergeReader,
+    };
     let source = include_bytes!("../../../test-data/iwork/keynote/slide-table-merges-native.key");
     let reader = MergeReader::from_bytes(source).unwrap();
     let regions = reader

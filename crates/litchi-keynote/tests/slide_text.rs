@@ -6,9 +6,11 @@ use litchi_iwa_common::{decode_varint_from_bytes, encode_varint_into, wire::Wire
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsk, tsp, tswp};
 use litchi_keynote::{
-    OpenOptions, Package, Position, SemanticLimits, SlideSelector, SlideTextCommit,
-    SlideTextDiagnostics, SlideTextEdit, SlideTextError, SlideTextLimitKind, SlideTextPatch,
-    SourceLimits, TextPosition, TextSpan, slide::placeholder::Kind,
+    OpenOptions, Package, Position, SemanticLimits, SlideSelector, SourceLimits, TextPosition,
+    TextSpan, slide::placeholder::Kind, slide::text::Commit as SlideTextCommit,
+    slide::text::Diagnostics as SlideTextDiagnostics, slide::text::Edit as SlideTextEdit,
+    slide::text::Error as SlideTextError, slide::text::LimitKind as SlideTextLimitKind,
+    slide::text::Patch as SlideTextPatch,
 };
 use prost::Message as _;
 

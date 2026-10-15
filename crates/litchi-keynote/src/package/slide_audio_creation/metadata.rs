@@ -23,7 +23,9 @@ use litchi_iwa_protos::{
 };
 use sha1::{Digest, Sha1};
 
-use crate::slide::audio::creation::{SlideAudioCreationError, SlideAudioCreationLimitKind};
+use crate::slide::audio::creation::{
+    Error as SlideAudioCreationError, LimitKind as SlideAudioCreationLimitKind,
+};
 use crate::soundtrack::items::MAX_FILENAME_BYTES;
 
 use super::super::{Package, PhysicalSource};

@@ -18,8 +18,9 @@ use litchi_iwa_protos::{
     keynote_media_lifecycle_codec as lifecycle_codec, kn, tsa, tsd, tsp, tswp,
 };
 use litchi_keynote::{
-    MediaPart, MovieSelector, OpenOptions, Package, SlideMediaLifecycleError,
-    SlideMediaLifecycleLimitKind, SlideSelector, SourceLimits,
+    MovieSelector, OpenOptions, Package, SlideSelector, SourceLimits,
+    slide::media::data::MediaPart, slide::media::lifecycle::Error as SlideMediaLifecycleError,
+    slide::media::lifecycle::LimitKind as SlideMediaLifecycleLimitKind,
 };
 use prost::Message as _;
 

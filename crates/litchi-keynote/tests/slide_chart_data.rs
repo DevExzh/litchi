@@ -3,7 +3,8 @@
 use std::path::PathBuf;
 
 use litchi_keynote::{
-    ChartData, ChartSelector, Package, Position, SlideChartDataError, SlideSelector,
+    ChartData, ChartSelector, Package, Position, SlideSelector,
+    chart::data::Error as SlideChartDataError,
 };
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;

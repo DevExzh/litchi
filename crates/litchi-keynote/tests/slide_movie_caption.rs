@@ -7,7 +7,10 @@ use litchi_iwa_common::{
 };
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsd, tsk, tsp, tswp};
-use litchi_keynote::{MovieSelector, Package, SlideMovieCaptionError, SlideSelector, SourceLimits};
+use litchi_keynote::{
+    MovieSelector, Package, SlideSelector, SourceLimits,
+    slide::movie::caption::Error as SlideMovieCaptionError,
+};
 use prost::Message as _;
 
 const DOCUMENT_MEMBER: &str = "Index/Document.iwa";

@@ -16,8 +16,9 @@ use std::sync::OnceLock;
 
 use libfuzzer_sys::fuzz_target;
 use litchi::keynote::{
-    Axis, ChartAxisTitleError, ChartAxisTitleLimitKind, ChartSelector, OpenOptions, Package,
-    ReadError, SemanticLimits, SlideSelector, SourceLimits,
+    Axis, ChartSelector, OpenOptions, Package, ReadError, SemanticLimits, SlideSelector,
+    SourceLimits, chart::axis_title::Error as ChartAxisTitleError,
+    chart::axis_title::LimitKind as ChartAxisTitleLimitKind,
 };
 use litchi_iwa_archive::{Limits as ArchiveLimits, package::Catalog};
 use litchi_iwa_common::wire::{append_length_delimited_field, append_varint_field};
@@ -340,7 +341,7 @@ fn publish_and_reverse(
     selected_style_before: Option<Vec<u8>>,
     opposite_message_before: Option<Vec<u8>>,
     secondary_before: Option<Vec<u8>>,
-    commit: litchi::keynote::ChartAxisTitleCommit,
+    commit: litchi::keynote::chart::axis_title::Commit,
     source: &[u8],
 ) {
     let patch = commit.patch().clone();

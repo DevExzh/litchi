@@ -25,8 +25,8 @@ use std::sync::OnceLock;
 
 use libfuzzer_sys::fuzz_target;
 use litchi::keynote::{
-    OpenOptions, Package, SemanticLimits, SlideSelector, SlideTablePhysicalSortCommit,
-    SourceLimits,
+    OpenOptions, Package, SemanticLimits, SlideSelector, SourceLimits,
+    slide::table::physical_sort::transaction::Commit as SlideTablePhysicalSortCommit,
     slide::table::{
         TableSelector,
         sort::{ColumnIndex, Direction, Order, RowRange, Rule, Scope},

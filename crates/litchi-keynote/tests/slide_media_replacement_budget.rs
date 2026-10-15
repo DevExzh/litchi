@@ -11,8 +11,9 @@ use std::io;
 
 use litchi_iwa_archive::package::Catalog;
 use litchi_keynote::{
-    MediaPart, MovieSelector, OpenOptions, Package, SemanticLimits, SlideMediaDataError,
-    SlideMediaDataLimitKind, SlideSelector,
+    MovieSelector, OpenOptions, Package, SemanticLimits, SlideSelector,
+    slide::media::data::Error as SlideMediaDataError,
+    slide::media::data::LimitKind as SlideMediaDataLimitKind, slide::media::data::MediaPart,
 };
 
 const NATIVE_SOURCE: &[u8] =

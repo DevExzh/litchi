@@ -275,13 +275,14 @@ def _is_keynote_selector_error_bridge(
 ) -> bool:
     """Ignore Keynote's generated selector-to-package error bridge.
 
-    ``EditError::Selector(#[from])`` generates an ``automatically_derived``
-    ``From<SlideSelectorError> for EditError`` implementation.  Rustdoc emits
+    ``edit::Error::Selector(#[from])`` (``EditError`` before record 0298)
+    generates an ``automatically_derived``
+    ``From<SlideSelectorError> for edit::Error`` implementation.  Rustdoc emits
     that implementation without a path entry, so a semantic graph walk that
     follows all local implementation IDs can reach the physical package error
     even though no document method has that error in its signature.  Keep this
     exception exact: only this generated implementation in the Keynote crate
-    is outside the semantic-reader graph.  A direct ``EditError`` reference
+    is outside the semantic-reader graph.  A direct ``edit::Error`` reference
     still goes through normal path validation.
     """
     if crate_name != "litchi_keynote" or not isinstance(item, dict):
@@ -331,7 +332,7 @@ def _is_keynote_selector_error_bridge(
         crate_name,
         "package",
         "edit",
-        "EditError",
+        "Error",
     )
 
 

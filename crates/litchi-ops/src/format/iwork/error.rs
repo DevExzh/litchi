@@ -29,13 +29,13 @@ pub enum LeafError {
     Keynote(litchi_keynote::ReadError),
     /// A Keynote slide title or body transaction failed.
     #[cfg(feature = "keynote")]
-    KeynoteText(litchi_keynote::SlideTextError),
+    KeynoteText(litchi_keynote::slide::text::Error),
     /// A Keynote slide skip transaction failed.
     #[cfg(feature = "keynote")]
-    KeynoteEdit(litchi_keynote::EditError),
+    KeynoteEdit(litchi_keynote::edit::Error),
     /// A Keynote slide order transaction failed.
     #[cfg(feature = "keynote")]
-    KeynoteOrder(litchi_keynote::SlideOrderError),
+    KeynoteOrder(litchi_keynote::slide::order::Error),
     /// A Keynote slide deletion failed.
     #[cfg(feature = "keynote")]
     KeynoteDeletion(litchi_keynote::slide::delete::Error),
@@ -224,8 +224,8 @@ fn keynote_code(error: &litchi_keynote::ReadError) -> Code {
 }
 
 #[cfg(feature = "keynote")]
-fn keynote_text_code(error: &litchi_keynote::SlideTextError) -> Code {
-    use litchi_keynote::SlideTextError as E;
+fn keynote_text_code(error: &litchi_keynote::slide::text::Error) -> Code {
+    use litchi_keynote::slide::text::Error as E;
     match error {
         E::SlideNameNotFound | E::SlidePositionNotFound { .. } | E::TextStorageNotFound { .. } => {
             Code::PathNotFound
@@ -244,8 +244,8 @@ fn keynote_text_code(error: &litchi_keynote::SlideTextError) -> Code {
 }
 
 #[cfg(feature = "keynote")]
-fn keynote_edit_code(error: &litchi_keynote::EditError) -> Code {
-    use litchi_keynote::EditError as E;
+fn keynote_edit_code(error: &litchi_keynote::edit::Error) -> Code {
+    use litchi_keynote::edit::Error as E;
     match error {
         E::SlideNameNotFound | E::SlidePositionNotFound { .. } => Code::PathNotFound,
         _ => Code::InternalError,
@@ -253,8 +253,8 @@ fn keynote_edit_code(error: &litchi_keynote::EditError) -> Code {
 }
 
 #[cfg(feature = "keynote")]
-fn keynote_order_code(error: &litchi_keynote::SlideOrderError) -> Code {
-    use litchi_keynote::SlideOrderError as E;
+fn keynote_order_code(error: &litchi_keynote::slide::order::Error) -> Code {
+    use litchi_keynote::slide::order::Error as E;
     match error {
         E::SlideNameNotFound | E::SlidePositionNotFound { .. } => Code::PathNotFound,
         E::DestinationOutOfRange { .. } => Code::OutOfRange,

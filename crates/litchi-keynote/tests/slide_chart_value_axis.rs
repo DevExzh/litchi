@@ -26,7 +26,10 @@ mod value_axis {
     use litchi_iwa_common::chart::axis::{
         Bound, Bounds, MajorStepCount, MinorStepCount, Scale, Steps, ValueAxisSettings,
     };
-    use litchi_keynote::{ChartValueAxisError, ChartValueAxisLimitKind};
+    use litchi_keynote::{
+        chart::value_axis::Error as ChartValueAxisError,
+        chart::value_axis::LimitKind as ChartValueAxisLimitKind,
+    };
 
     const VALUE_MAJOR_FIELD: u32 = 5;
     const VALUE_MINOR_FIELD: u32 = 6;
@@ -197,7 +200,7 @@ mod value_axis {
     fn commit_settings(
         package: &Package,
         target: ValueAxisSettings,
-    ) -> TestResult<litchi_keynote::ChartValueAxisCommit> {
+    ) -> TestResult<litchi_keynote::chart::value_axis::Commit> {
         Ok(package
             .edit_slide_chart_value_axis_settings(
                 SlideSelector::name("Charts"),

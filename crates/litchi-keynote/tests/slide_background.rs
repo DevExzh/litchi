@@ -812,18 +812,18 @@ fn unsupported_backgrounds_are_preserved_and_refuse_changed_edits_atomically() -
         package
             .edit_slide_background(0usize)?
             .set(Background::Unsupported),
-        Err(litchi_keynote::SlideBackgroundError::UnsupportedSource)
+        Err(litchi_keynote::background::Error::UnsupportedSource)
     ));
     assert!(matches!(
         package
             .edit_slide_background(0usize)?
             .set_solid(green_color())?
             .commit(),
-        Err(litchi_keynote::SlideBackgroundError::UnsupportedSource)
+        Err(litchi_keynote::background::Error::UnsupportedSource)
     ));
     assert!(matches!(
         package.edit_slide_background(0usize)?.clear()?.commit(),
-        Err(litchi_keynote::SlideBackgroundError::UnsupportedSource)
+        Err(litchi_keynote::background::Error::UnsupportedSource)
     ));
     assert_eq!(exact_bytes(&package)?, source);
     Ok(())

@@ -12,11 +12,11 @@
 use litchi_core::Position;
 
 use super::super::slide_media_replacement::{
-    MediaBudget, MediaBudgetUsage, MediaPart, SlideMediaDataError, SlideMediaDataLimitKind,
-    read_selected_media, select_media,
+    Error as SlideMediaDataError, LimitKind as SlideMediaDataLimitKind, MediaBudget,
+    MediaBudgetUsage, MediaPart, read_selected_media, select_media,
 };
 use super::super::slide_movie_geometry::GeometryBudget;
-use super::{Package, SlideMediaPropertiesError, SlideMediaPropertiesLimitKind};
+use super::{Error, LimitKind, Package};
 use crate::{MovieSelector, SlideSelector};
 
 /// Borrowed materialized assets belonging to one selected MovieArchive.
@@ -43,7 +43,7 @@ pub(super) fn validate_selected_media_assets<'a>(
     slide: Position,
     movie: Position,
     operation_budget: &mut GeometryBudget,
-) -> Result<MediaAssets<'a>, SlideMediaPropertiesError> {
+) -> Result<MediaAssets<'a>, Error> {
     let wire = operation_budget.residual(package)?;
     let retained = operation_budget.remaining_retained()?;
     let scratch = operation_budget.remaining_scratch()?;
@@ -91,7 +91,7 @@ pub(super) fn validate_selected_media_assets<'a>(
         ) {
             Ok(poster_selection) => {
                 if !content_selection.same_identity(&poster_selection) {
-                    return Err(SlideMediaPropertiesError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 Some(
                     read_selected_media(
@@ -106,7 +106,7 @@ pub(super) fn validate_selected_media_assets<'a>(
             // A poster edge on an audio control is malformed.  An audio
             // control with no edge never enters this branch and is accepted.
             Err(SlideMediaDataError::AudioPoster) => {
-                return Err(SlideMediaPropertiesError::InvalidSource);
+                return Err(Error::InvalidSource);
             },
             Err(error) => return Err(map_media_error(error)),
         }
@@ -119,7 +119,7 @@ pub(super) fn validate_selected_media_assets<'a>(
 fn debit_geometry_budget(
     operation_budget: &mut GeometryBudget,
     usage: MediaBudgetUsage,
-) -> Result<(), SlideMediaPropertiesError> {
+) -> Result<(), Error> {
     let mut next = *operation_budget;
     next.source(usage.input_bytes)?;
     next.fields(usage.fields)?;
@@ -137,28 +137,24 @@ fn debit_geometry_budget(
     Ok(())
 }
 
-fn map_media_error(error: SlideMediaDataError) -> SlideMediaPropertiesError {
+fn map_media_error(error: SlideMediaDataError) -> Error {
     match error {
-        SlideMediaDataError::UnsupportedSource => SlideMediaPropertiesError::UnsupportedSource,
+        SlideMediaDataError::UnsupportedSource => Error::UnsupportedSource,
         SlideMediaDataError::LimitExceeded {
             kind,
             observed,
             maximum,
-        } => SlideMediaPropertiesError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: map_limit_kind(kind),
             observed,
             maximum,
         },
-        SlideMediaDataError::Allocation { amount } => {
-            SlideMediaPropertiesError::Allocation { amount }
-        },
+        SlideMediaDataError::Allocation { amount } => Error::Allocation { amount },
         SlideMediaDataError::EmptySlideName
         | SlideMediaDataError::SlideNameNotFound
         | SlideMediaDataError::SlidePositionNotFound { .. }
         | SlideMediaDataError::AmbiguousSelector
-        | SlideMediaDataError::MoviePositionNotFound { .. } => {
-            SlideMediaPropertiesError::InvalidSource
-        },
+        | SlideMediaDataError::MoviePositionNotFound { .. } => Error::InvalidSource,
         SlideMediaDataError::AudioPoster
         | SlideMediaDataError::InvalidSource
         | SlideMediaDataError::Read
@@ -166,23 +162,23 @@ fn map_media_error(error: SlideMediaDataError) -> SlideMediaPropertiesError {
         | SlideMediaDataError::ReplacementTooLarge
         | SlideMediaDataError::ReplacementType
         | SlideMediaDataError::Verification
-        | SlideMediaDataError::PatchConflict => SlideMediaPropertiesError::InvalidSource,
+        | SlideMediaDataError::PatchConflict => Error::InvalidSource,
     }
 }
 
-fn map_limit_kind(kind: SlideMediaDataLimitKind) -> SlideMediaPropertiesLimitKind {
+fn map_limit_kind(kind: SlideMediaDataLimitKind) -> LimitKind {
     match kind {
-        SlideMediaDataLimitKind::InputBytes => SlideMediaPropertiesLimitKind::InputBytes,
-        SlideMediaDataLimitKind::OutputBytes => SlideMediaPropertiesLimitKind::OutputBytes,
-        SlideMediaDataLimitKind::Entries => SlideMediaPropertiesLimitKind::Entries,
-        SlideMediaDataLimitKind::EntryBytes => SlideMediaPropertiesLimitKind::EntryBytes,
-        SlideMediaDataLimitKind::TotalBytes => SlideMediaPropertiesLimitKind::TotalBytes,
-        SlideMediaDataLimitKind::Slides => SlideMediaPropertiesLimitKind::Slides,
-        SlideMediaDataLimitKind::References => SlideMediaPropertiesLimitKind::References,
-        SlideMediaDataLimitKind::MediaBytes => SlideMediaPropertiesLimitKind::Scratch,
-        SlideMediaDataLimitKind::WireFields => SlideMediaPropertiesLimitKind::WireFields,
-        SlideMediaDataLimitKind::WireNesting => SlideMediaPropertiesLimitKind::WireNesting,
-        SlideMediaDataLimitKind::WireWork => SlideMediaPropertiesLimitKind::WireWork,
-        SlideMediaDataLimitKind::Allocations => SlideMediaPropertiesLimitKind::Allocations,
+        SlideMediaDataLimitKind::InputBytes => LimitKind::InputBytes,
+        SlideMediaDataLimitKind::OutputBytes => LimitKind::OutputBytes,
+        SlideMediaDataLimitKind::Entries => LimitKind::Entries,
+        SlideMediaDataLimitKind::EntryBytes => LimitKind::EntryBytes,
+        SlideMediaDataLimitKind::TotalBytes => LimitKind::TotalBytes,
+        SlideMediaDataLimitKind::Slides => LimitKind::Slides,
+        SlideMediaDataLimitKind::References => LimitKind::References,
+        SlideMediaDataLimitKind::MediaBytes => LimitKind::Scratch,
+        SlideMediaDataLimitKind::WireFields => LimitKind::WireFields,
+        SlideMediaDataLimitKind::WireNesting => LimitKind::WireNesting,
+        SlideMediaDataLimitKind::WireWork => LimitKind::WireWork,
+        SlideMediaDataLimitKind::Allocations => LimitKind::Allocations,
     }
 }

@@ -7,8 +7,8 @@ use litchi_iwa_common::wire::{WireView, append_varint_field};
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsk, tsp};
 use litchi_keynote::{
-    OpenOptions, Package, Position, ReadError, SemanticLimits, SlideOrderError,
-    SlideOrderLimitKind, SlideSelector,
+    OpenOptions, Package, Position, ReadError, SemanticLimits, SlideSelector,
+    slide::order::Error as SlideOrderError, slide::order::LimitKind as SlideOrderLimitKind,
 };
 use prost::Message as _;
 
@@ -834,9 +834,9 @@ fn concurrent_edits_publish_independent_immutable_snapshots() -> TestResult<()> 
 #[test]
 fn public_slide_order_values_are_send_sync() {
     fn assert_send_sync<T: Send + Sync>() {}
-    assert_send_sync::<litchi_keynote::SlideOrderCommit>();
-    assert_send_sync::<litchi_keynote::SlideOrderPatch>();
-    assert_send_sync::<litchi_keynote::SlideOrderDiagnostics>();
+    assert_send_sync::<litchi_keynote::slide::order::Commit>();
+    assert_send_sync::<litchi_keynote::slide::order::Patch>();
+    assert_send_sync::<litchi_keynote::slide::order::Diagnostics>();
     assert_send_sync::<SlideOrderError>();
     assert_send_sync::<Arc<[u8]>>();
 }

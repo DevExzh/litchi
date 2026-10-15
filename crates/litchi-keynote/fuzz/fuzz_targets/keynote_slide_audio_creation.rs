@@ -14,8 +14,8 @@ use std::{fmt::Debug, fmt::Display, hint::black_box, sync::OnceLock, time::Durat
 use libfuzzer_sys::fuzz_target;
 use litchi_iwa_common::shape::geometry::Point;
 use litchi_keynote::{
-    MediaPart, MovieSelector, OpenOptions, Package, SemanticLimits, SlideSelector, SourceLimits,
-    slide::audio::Options,
+    MovieSelector, OpenOptions, Package, SemanticLimits, SlideSelector, SourceLimits,
+    slide::audio::Options, slide::media::data::MediaPart,
 };
 
 const MAX_INPUT_BYTES: u64 = 1024 * 1024;

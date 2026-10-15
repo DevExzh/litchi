@@ -7,35 +7,35 @@
 #[cfg(feature = "internal-iwork-source")]
 mod catalog_table_appearance;
 mod chart_axis_support;
-mod edit;
-mod image_adjustments;
+pub(crate) mod edit;
+pub(crate) mod image_adjustments;
 mod rendering_invalidation;
 mod save;
 pub(crate) mod show_settings;
 mod slide_audio_creation;
-mod slide_audio_position;
-mod slide_background;
-mod slide_build_order;
-mod slide_chart_arrangement;
-mod slide_chart_axis_title;
-mod slide_chart_caption;
-mod slide_chart_data;
-mod slide_chart_legend;
-mod slide_chart_metadata;
-mod slide_chart_title;
-mod slide_chart_value_axis;
+pub(crate) mod slide_audio_position;
+pub(crate) mod slide_background;
+pub(crate) mod slide_build_order;
+pub(crate) mod slide_chart_arrangement;
+pub(crate) mod slide_chart_axis_title;
+pub(crate) mod slide_chart_caption;
+pub(crate) mod slide_chart_data;
+pub(crate) mod slide_chart_legend;
+pub(crate) mod slide_chart_metadata;
+pub(crate) mod slide_chart_title;
+pub(crate) mod slide_chart_value_axis;
 pub(crate) mod slide_delete;
-mod slide_drawable_comments;
-mod slide_media_lifecycle;
-mod slide_media_properties;
-mod slide_media_replacement;
-mod slide_movie_caption;
+pub(crate) mod slide_drawable_comments;
+pub(crate) mod slide_media_lifecycle;
+pub(crate) mod slide_media_properties;
+pub(crate) mod slide_media_replacement;
+pub(crate) mod slide_movie_caption;
 mod slide_movie_creation;
-mod slide_movie_geometry;
-mod slide_movie_playback;
-mod slide_movie_title;
-mod slide_notes;
-mod slide_order;
+pub(crate) mod slide_movie_geometry;
+pub(crate) mod slide_movie_playback;
+pub(crate) mod slide_movie_title;
+pub(crate) mod slide_notes;
+pub(crate) mod slide_order;
 pub(crate) mod slide_table_appearance;
 pub(crate) mod slide_table_cell_number_format;
 pub(crate) mod slide_table_cells;
@@ -45,13 +45,13 @@ pub(crate) mod slide_table_headers;
 pub(crate) mod slide_table_lock_state;
 pub(crate) mod slide_table_merges;
 pub(crate) mod slide_table_name;
-mod slide_table_physical_sort;
+pub(crate) mod slide_table_physical_sort;
 pub(crate) mod slide_table_sort_order;
-mod slide_table_title;
+pub(crate) mod slide_table_title;
 
 pub(crate) mod slide_placeholder_visibility;
 mod slide_preview;
-mod slide_text;
+pub(crate) mod slide_text;
 pub(crate) mod slide_transition;
 pub(crate) mod soundtrack_items;
 pub(crate) mod soundtrack_order;
@@ -112,146 +112,10 @@ pub use image_adjustments::{__decode_image_adjustments_payload, ImageAdjustments
 pub use slide_preview::{__invalidate_slide_preview, SlidePreviewInvalidationError};
 
 use crate::presentation::{Presentation, Stats as PresentationStats};
-pub use edit::{Commit, Diagnostics, Edit, EditError, Patch};
-pub use image_adjustments::{
-    SlideImageAdjustmentsCommit, SlideImageAdjustmentsDiagnostics, SlideImageAdjustmentsEdit,
-    SlideImageAdjustmentsError, SlideImageAdjustmentsLimitKind, SlideImageAdjustmentsPatch,
-};
+pub(crate) use edit::Edit;
 pub use save::SaveError;
-pub use slide_audio_position::{
-    SlideAudioPositionCommit, SlideAudioPositionDiagnostics, SlideAudioPositionEdit,
-    SlideAudioPositionError, SlideAudioPositionLimitKind, SlideAudioPositionPatch,
-};
-pub use slide_background::{
-    SlideBackgroundCommit, SlideBackgroundDiagnostics, SlideBackgroundEdit, SlideBackgroundError,
-    SlideBackgroundLimitKind, SlideBackgroundPatch,
-};
-pub use slide_build_order::{
-    SlideBuildOrderCommit, SlideBuildOrderDiagnostics, SlideBuildOrderEdit, SlideBuildOrderError,
-    SlideBuildOrderLimitKind, SlideBuildOrderPatch,
-};
-pub use slide_chart_arrangement::{
-    ChartArrangementCommit, ChartArrangementDiagnostics, ChartArrangementEdit,
-    ChartArrangementError, ChartArrangementLimitKind, ChartArrangementPatch,
-};
-pub use slide_chart_axis_title::{
-    ChartAxisTitleCommit, ChartAxisTitleDiagnostics, ChartAxisTitleEdit, ChartAxisTitleError,
-    ChartAxisTitleLimitKind, ChartAxisTitlePatch,
-};
-pub use slide_chart_caption::{
-    ChartCaptionCommit, ChartCaptionDiagnostics, ChartCaptionEdit, ChartCaptionError,
-    ChartCaptionLimitKind, ChartCaptionPatch,
-};
-pub use slide_chart_data::{
-    SlideChartDataCommit, SlideChartDataDiagnostics, SlideChartDataEdit, SlideChartDataError,
-    SlideChartDataLimitKind, SlideChartDataPatch,
-};
-pub use slide_chart_legend::{
-    ChartLegendVisibilityCommit, ChartLegendVisibilityDiagnostics, ChartLegendVisibilityEdit,
-    ChartLegendVisibilityError, ChartLegendVisibilityLimitKind, ChartLegendVisibilityPatch,
-};
-pub use slide_chart_metadata::{SlideChartMetadataError, SlideChartMetadataLimitKind};
-pub use slide_chart_title::{
-    ChartTitleCommit, ChartTitleDiagnostics, ChartTitleEdit, ChartTitleError, ChartTitleLimitKind,
-    ChartTitlePatch,
-};
-pub use slide_chart_value_axis::{
-    ChartValueAxisCommit, ChartValueAxisDiagnostics, ChartValueAxisEdit, ChartValueAxisError,
-    ChartValueAxisLimitKind, ChartValueAxisPatch,
-};
-pub use slide_drawable_comments::{
-    DrawableSummary, SlideDrawableCommentCommit, SlideDrawableCommentDiagnostics,
-    SlideDrawableCommentEdit, SlideDrawableCommentError, SlideDrawableCommentLimitKind,
-    SlideDrawableCommentPatch,
-};
-pub use slide_media_lifecycle::{
-    SlideMediaLifecycleCommit, SlideMediaLifecycleDiagnostics, SlideMediaLifecycleError,
-    SlideMediaLifecycleLimitKind, SlideMediaLifecyclePatch,
-};
-pub use slide_media_properties::{
-    SlideMediaPropertiesCommit, SlideMediaPropertiesDiagnostics, SlideMediaPropertiesEdit,
-    SlideMediaPropertiesError, SlideMediaPropertiesLimitKind, SlideMediaPropertiesPatch,
-};
-pub use slide_media_replacement::{
-    MediaPart, SlideMediaData, SlideMediaDataCommit, SlideMediaDataDiagnostics, SlideMediaDataEdit,
-    SlideMediaDataError, SlideMediaDataLimitKind, SlideMediaDataPatch,
-};
-pub use slide_movie_caption::{
-    SlideMovieCaptionCommit, SlideMovieCaptionDiagnostics, SlideMovieCaptionEdit,
-    SlideMovieCaptionError, SlideMovieCaptionLimitKind, SlideMovieCaptionPatch,
-};
-pub use slide_movie_geometry::{
-    SlideMovieGeometryCommit, SlideMovieGeometryDiagnostics, SlideMovieGeometryEdit,
-    SlideMovieGeometryError, SlideMovieGeometryLimitKind, SlideMovieGeometryPatch,
-};
-pub use slide_movie_playback::{
-    SlideMoviePlaybackCommit, SlideMoviePlaybackDiagnostics, SlideMoviePlaybackEdit,
-    SlideMoviePlaybackError, SlideMoviePlaybackLimitKind, SlideMoviePlaybackPatch,
-};
-pub use slide_movie_title::{
-    SlideMovieTitleCommit, SlideMovieTitleDiagnostics, SlideMovieTitleEdit, SlideMovieTitleError,
-    SlideMovieTitleLimitKind, SlideMovieTitlePatch,
-};
-pub use slide_notes::{
-    SlideNotesCommit, SlideNotesDiagnostics, SlideNotesEdit, SlideNotesError, SlideNotesLimitKind,
-    SlideNotesPatch,
-};
-pub use slide_order::{
-    SlideOrderCommit, SlideOrderDiagnostics, SlideOrderEdit, SlideOrderError, SlideOrderLimitKind,
-    SlideOrderPatch,
-};
-pub use slide_table_appearance::{
-    SlideTableAppearanceCommit, SlideTableAppearanceDiagnostics, SlideTableAppearanceEdit,
-    SlideTableAppearanceError, SlideTableAppearanceLimitKind, SlideTableAppearancePatch,
-    SlideTableAppearancePath,
-};
-pub use slide_table_cell_number_format::{
-    SlideTableCellNumberFormatCommit, SlideTableCellNumberFormatDiagnostics,
-    SlideTableCellNumberFormatEdit, SlideTableCellNumberFormatError,
-    SlideTableCellNumberFormatLimitKind, SlideTableCellNumberFormatPatch,
-    SlideTableCellNumberFormatPath,
-};
-pub use slide_table_cells::{SlideTableCellsError, SlideTableCellsLimitKind, SlideTableCellsPath};
-pub use slide_table_dimension::{
-    SlideTableDimensionCommit, SlideTableDimensionDiagnostics, SlideTableDimensionEdit,
-    SlideTableDimensionError, SlideTableDimensionLimitKind, SlideTableDimensionPatch,
-    SlideTableDimensionPath,
-};
-pub use slide_table_headers::{
-    SlideTableHeaderCommit, SlideTableHeaderDiagnostics, SlideTableHeaderEdit,
-    SlideTableHeaderError, SlideTableHeaderInvalidReason, SlideTableHeaderLimitKind,
-    SlideTableHeaderPatch, SlideTableHeaderPath,
-};
-pub use slide_table_lock_state::{
-    SlideTableLockStateCommit, SlideTableLockStateDiagnostics, SlideTableLockStateEdit,
-    SlideTableLockStateError, SlideTableLockStateLimitKind, SlideTableLockStatePatch,
-    SlideTableLockStatePath,
-};
-pub use slide_table_merges::{
-    MergeReader, SlideTableMergesCommit, SlideTableMergesDiagnostics, SlideTableMergesEdit,
-    SlideTableMergesError, SlideTableMergesLimitKind, SlideTableMergesPatch, SlideTableMergesPath,
-};
-pub use slide_table_name::{
-    SlideTableNameCommit, SlideTableNameDiagnostics, SlideTableNameEdit, SlideTableNameError,
-    SlideTableNameLimitKind, SlideTableNamePatch, SlideTableNamePath,
-};
-pub use slide_table_physical_sort::{
-    KEYNOTE_PHYSICAL_SORT_OWNER_ACTIVE, SlideTablePhysicalSortCommit,
-    SlideTablePhysicalSortDiagnostics, SlideTablePhysicalSortEdit, SlideTablePhysicalSortError,
-    SlideTablePhysicalSortLimitKind, SlideTablePhysicalSortPatch, SlideTablePhysicalSortPath,
-};
-pub use slide_table_sort_order::{
-    SlideTableSortCommit, SlideTableSortDiagnostics, SlideTableSortEdit, SlideTableSortError,
-    SlideTableSortLimitKind, SlideTableSortPatch, SlideTableSortPath,
-};
-pub use slide_table_title::{
-    SlideTableTitleCommit, SlideTableTitleDiagnostics, SlideTableTitleEdit, SlideTableTitleError,
-    SlideTableTitleLimitKind, SlideTableTitlePatch,
-};
-pub use slide_text::{
-    SlideTextCommit, SlideTextDiagnostics, SlideTextEdit, SlideTextError, SlideTextLimitKind,
-    SlideTextPatch,
-};
+pub(crate) use slide_order::Error as SlideOrderError;
+pub use slide_table_physical_sort::KEYNOTE_PHYSICAL_SORT_OWNER_ACTIVE;
 
 /// The checked physical and semantic profiles retained by one package.
 ///

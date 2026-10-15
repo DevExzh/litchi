@@ -12,8 +12,9 @@ use litchi_iwa_common::wire::{WireView, append_length_delimited_field, append_va
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsd};
 use litchi_keynote::{
-    MediaPart, MediaProperties, MovieKind, MovieSelector, OpenOptions, Package, SemanticLimits,
-    SlideAudioPositionError, SlideMediaPropertiesError, SlideSelector,
+    MediaProperties, MovieKind, MovieSelector, OpenOptions, Package, SemanticLimits, SlideSelector,
+    slide::audio::position::Error as SlideAudioPositionError, slide::media::data::MediaPart,
+    slide::media::properties::Error as SlideMediaPropertiesError,
 };
 use prost::Message as _;
 
@@ -50,7 +51,7 @@ fn edit_properties(
     package: &Package,
     movie: usize,
     replacement: MediaProperties,
-) -> TestResult<litchi_keynote::SlideMediaPropertiesCommit> {
+) -> TestResult<litchi_keynote::slide::media::properties::Commit> {
     Ok(package
         .edit_slide_media_properties(SlideSelector::index(0), MovieSelector::index(movie))?
         .set(replacement)?
