@@ -477,7 +477,7 @@ impl Pptx {
         if let Some(path) = target.path() {
             append(crate::path::resolve::get(&nav, path)?)?;
         } else if let Some(query) = target.query() {
-            let walk = crate::query::run(nav, query.clone())?;
+            let walk = crate::query::run(nav, query)?;
             if !walk.plan().diagnostics().is_empty() {
                 return Err(error(
                     Code::InvalidSelector,

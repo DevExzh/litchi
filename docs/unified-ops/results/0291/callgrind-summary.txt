@@ -1,0 +1,28 @@
+# Record 0291 callgrind instruction counts (Ir), base 99cc3138eb vs after b2187dd6c1.
+# Produced by measure.sh; the .out files are not committed (each 2-40 MB).
+
+DOCX single paragraph set (docx_fanout_bench, DOCX_FANOUT_SIZES=1, per call = (Ir@3000 - Ir@1000) / 2000)
+  base   unified 134503  leaf 125392  over leaf 9111
+  after  unified 132725  leaf 124982  over leaf 7743
+  per-call inclusive, base -> after:
+    <&str as IntoTarget>::into_target   1674 -> 1424
+    path::resolve::get                  3316 -> 2147
+      Vocabulary::canonical (2 calls)    790 ->  204
+      resolve::rule (2 calls)            592 ->  116 (root rule and step rules)
+    target::has_query_syntax             489 ->  238
+    Docx::resolve_targets               3428 -> 2259
+    Commit::into_file (adapter, unchanged) 1584 -> 1588
+
+ODS warm full cell query, 1000 x 10 (ods_unified_bench, query_warm, 2 samples, --toggle-collect=*unified_query*)
+  base 33733367  after 27076541  (-19.7%)
+
+ODT query iteration, all sizes (odt_paired_bench, --toggle-collect=*Matches*Iterator*next*)
+  base 206973507  after 175823516  (-15.1%)
+
+XLS eager owner (xls_read_bench, LITCHI_XLS_BENCH_OWNER=eager)
+  positional get + text (--toggle-collect=*read*File*get*)  base 1155556277  after 885394749 (-23.4%)
+  compiled cell query + text (--toggle-collect=*Matches*Iterator*next*)  base 555765237  after 525943620 (-5.4%)
+
+RTF selector compile, whole rtf_destination_bench run
+  base compile_with_raw inclusive 1046629
+  after query::cache::compile inclusive 190117 (of which compile_with_raw 77837: first sightings and admissions)

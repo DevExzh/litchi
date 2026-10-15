@@ -235,14 +235,15 @@ impl OdfTree {
 
     /// Adopt a package a leaf commit published and verified. The object
     /// tree is built on the first read, so a write (or a batch of writes)
-    /// does not pay for a projection nobody reads. Only the drawing, chart,
-    /// image and formula trees build infallibly; a database tree parses its
-    /// catalog, which can fail, so it is still built here.
+    /// does not pay for a projection nobody reads. The drawing, chart, image
+    /// and formula trees build infallibly. A database tree parses its
+    /// catalog, which can fail, but not on a committed package: the ODB
+    /// leaf's commit parses the new catalog with the same default limits
+    /// before it publishes, and a metadata commit leaves the catalog's
+    /// `content.xml` as it was (record 0291; before, a database tree was
+    /// built here and a single `set` on a 1,000-query database parsed the
+    /// catalog twice).
     pub(crate) fn from_commit(owner: Owner, origin: Option<Arc<Path>>) -> Result<Self> {
-        #[cfg(feature = "odb")]
-        if matches!(owner, Owner::Odb(_)) {
-            return Self::from_owner(owner, origin);
-        }
         Ok(Self(Arc::new(State {
             owner,
             tree: std::sync::OnceLock::new(),
@@ -281,8 +282,9 @@ impl OdfTree {
     /// The object tree built at open.
     pub(crate) fn tree(&self) -> &Tree {
         self.0.tree.get_or_init(|| {
-            // Only infallible builders are deferred (`from_commit`); a
-            // failure would still leave the root rather than panic.
+            // Only builders that cannot fail on a committed package are
+            // deferred (`from_commit`); a failure would still leave the
+            // root rather than panic.
             self.0.owner.tree().unwrap_or_else(|_| Tree::root_only())
         })
     }
@@ -783,5 +785,46 @@ pub(crate) const fn writes(adapter: crate::read::Adapter) -> Option<&'static Wri
             reason = "the other adapters write through their own tables"
         )]
         _ => None,
+    }
+}
+
+#[cfg(all(test, feature = "odb"))]
+mod tests {
+    use litchi_core::detection::FileFormat;
+
+    use crate::{File, NewNode, props};
+
+    fn tree(file: &File) -> &super::OdfTree {
+        match file {
+            File::Odb(tree) => tree,
+            _ => panic!("not a database"),
+        }
+    }
+
+    /// Record 0291: a database handle committed by `set` builds its tree on
+    /// the first read, and that tree is the one a fresh open builds. (`add`
+    /// reads the new tree to report the added node's path.)
+    #[test]
+    fn committed_database_trees_are_built_on_first_read() {
+        let mut file = crate::create(FileFormat::Odb).expect("create");
+        for index in 0..3 {
+            file = file
+                .add(
+                    "/",
+                    NewNode::new("query")
+                        .prop("name", format!("q{index}").as_str())
+                        .prop("command", format!("SELECT {index}").as_str()),
+                )
+                .expect("add query")
+                .file;
+        }
+        let file = file
+            .set("/query[2]", props! { "command" => "SELECT 20" })
+            .expect("set");
+        assert!(tree(&file).0.tree.get().is_none(), "set built the tree");
+        let lazy = format!("{:?}", tree(&file).tree());
+        let reopened = crate::open_bytes(file.to_bytes().expect("bytes")).expect("reopen");
+        assert_eq!(lazy, format!("{:?}", tree(&reopened).tree()));
+        assert!(lazy.contains("SELECT 20"));
     }
 }

@@ -248,7 +248,7 @@ fn sheet_removal_target(file: &Xls, target: &TargetArg<'_>) -> Result<Option<usi
     let Some(query) = target.query() else {
         return Ok(None);
     };
-    let walk = crate::query::run(Nav::new(file), query.clone())?;
+    let walk = crate::query::run(Nav::new(file), query)?;
     if !walk.plan().diagnostics().is_empty() {
         return Err(refusal(
             Code::InvalidSelector,

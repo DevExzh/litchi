@@ -1,7 +1,6 @@
 //! [`IntoQuery`]: the one way `query` takes a selector, as text, as a parsed
 //! [`Query`], or as a compiled [`Plan`] (record 0010 §8.1, decision D9).
 
-use super::compile::compile_with_raw;
 use super::inspect::Inspect;
 use super::plan::Plan;
 use super::walk::PlanRef;
@@ -13,7 +12,9 @@ use litchi_core::selector::Query;
 /// Text is parsed once, borrowing from the input; a parsed [`Query`] is
 /// compiled for the document's format when the query runs; a compiled
 /// [`Plan`] is used as is, so a selector run on many documents of one format
-/// is parsed and compiled once.
+/// is parsed and compiled once. A query the same thread runs repeatedly for
+/// one format is also compiled once: its plan is kept in a small per-thread
+/// cache from its second run on (record 0291).
 ///
 /// ```
 /// use litchi_ops::query::{IntoQuery, Query};
@@ -190,15 +191,12 @@ impl<'q> QueryArg<'q> {
     }
 
     /// The plan to run on documents the adapter `N` reads: compiled now
-    /// unless the caller passed one.
+    /// unless the caller passed one, or taken from this thread's plan
+    /// cache when it compiled the same query for `N` recently (record 0291).
     pub(crate) fn into_plan<'f, N: Inspect<'f>>(self) -> Result<PlanRef<'q>> {
         match self.held {
-            Held::Query(query) => {
-                compile_with_raw::<N>(&query, self.raw).map(|plan| PlanRef::Owned(Box::new(plan)))
-            },
-            Held::QueryRef(query) => {
-                compile_with_raw::<N>(query, self.raw).map(|plan| PlanRef::Owned(Box::new(plan)))
-            },
+            Held::Query(query) => super::cache::compile::<N>(&query, self.raw).map(PlanRef::from),
+            Held::QueryRef(query) => super::cache::compile::<N>(query, self.raw).map(PlanRef::from),
             Held::Plan(mut plan) => {
                 plan.raw |= self.raw;
                 Ok(PlanRef::Owned(Box::new(plan)))
