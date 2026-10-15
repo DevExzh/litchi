@@ -11,6 +11,15 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 
+// The fixture is shared with litchi-keynote, whose workspace lint table
+// allows collapsible_if; litchi-iwa has no [lints] table, so clippy's
+// defaults apply here. Record 0298 clears the other two in the fixture.
+#[allow(
+    clippy::collapsible_if,
+    clippy::clone_on_copy,
+    clippy::needless_question_mark,
+    reason = "shared litchi-keynote fixture, linted by its owning crate"
+)]
 #[path = "../../litchi-keynote/tests/support/drawable_comment_fixtures.rs"]
 mod fixtures;
 
@@ -255,10 +264,10 @@ fn selected_thread_author_payloads(
 ) -> TestResult<Vec<Vec<u8>>> {
     let editor = IWorkDrawableCommentEditor::from_bytes(source)?;
     let mut identifiers = Vec::new();
-    if let Some(comment) = editor.comment(DrawableId::from_raw(target.identifier)?)? {
-        if let Some(identifier) = comment.comment.author_id {
-            identifiers.push(identifier);
-        }
+    if let Some(comment) = editor.comment(DrawableId::from_raw(target.identifier)?)?
+        && let Some(identifier) = comment.comment.author_id
+    {
+        identifiers.push(identifier);
     }
     identifiers.extend(
         editor
@@ -657,10 +666,10 @@ fn assert_metadata_watermark(source: &[u8]) -> TestResult<()> {
 }
 
 fn archive_snapshots(source: &[u8]) -> TestResult<BTreeMap<String, Vec<u8>>> {
-    Ok(fixtures::component_archives(source)?
+    fixtures::component_archives(source)?
         .into_iter()
         .map(|(name, archive)| Ok((name, archive.to_bytes()?)))
-        .collect::<TestResult<BTreeMap<_, _>>>()?)
+        .collect::<TestResult<BTreeMap<_, _>>>()
 }
 
 fn native_object_ids(source: &[u8]) -> TestResult<BTreeSet<u64>> {
