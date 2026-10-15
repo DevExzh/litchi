@@ -44,6 +44,7 @@
         feature = "docx",
         feature = "xlsx",
         feature = "pptx",
+        feature = "xlsx",
         feature = "rtf",
         feature = "doc",
         feature = "ppt",
@@ -59,6 +60,7 @@
 mod matcher;
 mod plan;
 #[cfg(any(
+    feature = "xlsx",
     feature = "rtf",
     feature = "doc",
     feature = "ppt",
@@ -95,6 +97,7 @@ pub(crate) use plan::plan_with;
 pub(crate) use plan::{Piece, Scratch};
 #[cfg(any(
     feature = "pptx",
+    feature = "xlsx",
     feature = "rtf",
     feature = "doc",
     feature = "ppt",

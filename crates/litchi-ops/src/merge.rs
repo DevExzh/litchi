@@ -41,7 +41,7 @@
 //! |---|---|---|
 //! | DOCX | every paragraph of the body (tables, content controls and text boxes included), headers, footers, footnotes, endnotes and comments | A placeholder may span runs. Its value takes the formatting of the placeholder's first character; the rest of the placeholder is removed from the runs it spans, which keep their own formatting. Tabs and line feeds in values become `w:tab` and `w:br`. |
 //! | PPTX | every paragraph of every slide's shapes (group members included) | As DOCX, run by run; a value may not hold a line break. |
-//! | XLSX | every text cell of every worksheet; formulas are never touched | The cell keeps its style; a rich-text cell becomes plain text. |
+//! | XLSX | every text cell of every worksheet; formulas are never touched | The cell keeps its style; a rich-text cell is filled run by run and keeps each run's formatting (record 0295). |
 //! | XLSB, XLS, ODS | as XLSX (record 0295) | The cell keeps its style. An XLSB rich-text cell (inline or a formatted shared string) and an ODS cell holding hyperlinks are fixed content; an XLS cell showing a formatted shared string becomes plain text. |
 //! | DOC, RTF | every main-story paragraph, run by run (record 0295) | As DOCX; runs holding fields or drawings are fixed content, DOC tables are not merged; a value may not hold a line break. |
 //! | PPT | every text shape and notes page, paragraph by paragraph (record 0295) | The native editor replaces a shape's text whole, keeping a single-run body's formatting; a value may not hold a line break. |

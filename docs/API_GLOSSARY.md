@@ -2245,3 +2245,24 @@ generator so DOCX shares it.
 | `litchi_docx::document::{NewChart, chart_workbook}`, `Edit::{insert_chart_at, chart_parts, set_chart, set_chart_extent_at, remove_chart_at}` | adopted (0283) |
 
 See [0283](unified-ops/0283-docx-charts-and-chartex.md).
+
+## Find/replace and merge on every text format (record 0295)
+
+Find/replace (`set` with `find=`) and template merge (`File::merge`) cover
+XLSB, DOC, PPT, XLS, RTF, ODT, OTH, ODM, ODS and ODP through one
+crate-private text-surface engine (`find::surface`) and per-format adapters
+over their existing native text and cell edits; no new unified verb or
+option. XLSX rich-text cells are rewritten run by run through a new leaf
+read and write pair: `Worksheet::rich_text` reads a cell's runs (a formatted
+shared-string item or an inline rich string) with each run's properties as
+stored, `RichText::set_run_text` changes one run's text, and
+`WorksheetEdit::set_rich_text` writes the runs as the cell's own inline rich
+string.
+
+| Name | Status |
+|---|---|
+| `litchi_xlsx::{RichText, RichRun}` (`RichText::{plain, runs, text, set_run_text}`, `RichRun::{text, is_formatted}`) | adopted (0295) |
+| `litchi_xlsx::Worksheet::rich_text` | adopted (0295) |
+| `litchi_xlsx::WorksheetEdit::set_rich_text` | adopted (0295) |
+
+See [0295](unified-ops/0295-m4-engines-on-more-formats.md).

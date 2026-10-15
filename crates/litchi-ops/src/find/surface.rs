@@ -17,6 +17,20 @@
 //! adapter stages one native replacement per change in one native edit.
 //! Untouched runs are never written.
 
+#![cfg_attr(
+    not(any(
+        feature = "rtf",
+        feature = "doc",
+        feature = "ppt",
+        feature = "xls",
+        feature = "xlsb",
+        feature = "odt",
+        feature = "ods",
+        feature = "odp"
+    )),
+    allow(dead_code, reason = "XLSX merges rich-text runs only")
+)]
+
 use std::borrow::Cow;
 use std::ops::Range;
 

@@ -175,7 +175,15 @@ fn formatting_and_bare_finds_are_refused() {
     assert_eq!(error.code(), Code::MissingProperty);
 }
 
-fn rich_package() -> Vec<u8> {
+fn rich_package(inline: bool) -> Vec<u8> {
+    let inline = if inline {
+        r#"<c r="C1" t="inlineStr"><is><r><rPr><i/></rPr><t>draft</t></r></is></c>"#
+    } else {
+        ""
+    };
+    let sheet = format!(
+        r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c>{inline}</row></sheetData></worksheet>"#
+    );
     let parts = [
         (
             "[Content_Types].xml",
@@ -197,10 +205,7 @@ fn rich_package() -> Vec<u8> {
             "xl/sharedStrings.xml",
             r#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="2" uniqueCount="2"><si><t>plain draft</t></si><si><r><rPr><b/></rPr><t>rich </t></r><r><t>draft</t></r></si></sst>"#,
         ),
-        (
-            "xl/worksheets/sheet1.xml",
-            r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c></row></sheetData></worksheet>"#,
-        ),
+        ("xl/worksheets/sheet1.xml", sheet.as_str()),
     ];
     let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));
     let options =
@@ -212,30 +217,85 @@ fn rich_package() -> Vec<u8> {
     zip.finish().unwrap().into_inner()
 }
 
+/// The worksheet part of a published workbook.
+fn sheet_xml(file: &File) -> String {
+    let mut archive = zip::ZipArchive::new(Cursor::new(file.to_bytes().unwrap())).unwrap();
+    let mut part = archive.by_name("xl/worksheets/sheet1.xml").unwrap();
+    let mut xml = String::new();
+    std::io::Read::read_to_string(&mut part, &mut xml).unwrap();
+    xml
+}
+
+/// Record 0295: a formatted shared string or an inline rich string is
+/// rewritten run by run, each run keeping its properties.
 #[test]
-fn a_rich_text_cell_is_refused_when_it_would_change() {
-    let file = litchi_ops::open_bytes(rich_package()).unwrap();
+fn a_rich_text_cell_keeps_its_runs() {
+    let file = litchi_ops::open_bytes(rich_package(false)).unwrap();
     let (after, matched) = find(
         &file,
-        "/Sheet1/A1",
+        "/Sheet1",
         Props::new().with("find", "draft").with("replace", "final"),
     )
     .unwrap();
-    assert_eq!(matched, Some(1));
+    assert_eq!(matched, Some(2));
     assert_eq!(value(&after, "/Sheet1/A1"), "plain final");
-    let error = find(
+    assert_eq!(value(&after, "/Sheet1/B1"), "rich final");
+    let xml = sheet_xml(&after);
+    assert!(
+        xml.contains(r#"<r><rPr><b/></rPr><t xml:space="preserve">rich </t></r><r><t xml:space="preserve">final</t></r>"#),
+        "{xml}"
+    );
+    let reopened = litchi_ops::open_bytes(after.to_bytes().unwrap()).unwrap();
+    assert_eq!(value(&reopened, "/Sheet1/B1"), "rich final");
+    // A match across runs collapses into the run where it starts.
+    let (after, matched) = find(
         &file,
-        "/Sheet1",
-        Props::new().with("find", "draft").with("replace", "final"),
-    )
-    .unwrap_err();
-    assert_eq!(error.code(), Code::UnsupportedCapability);
-    // A rich cell without a match is no obstacle.
-    let (_, matched) = find(
-        &file,
-        "/Sheet1",
-        Props::new().with("find", "plain").with("replace", "simple"),
+        "/Sheet1/B1",
+        Props::new()
+            .with("find", "rich draft")
+            .with("replace", "one"),
     )
     .unwrap();
     assert_eq!(matched, Some(1));
+    assert_eq!(value(&after, "/Sheet1/B1"), "one");
+    assert!(sheet_xml(&after).contains(r#"<r><rPr><b/></rPr><t xml:space="preserve">one</t></r>"#));
+
+    // An inline rich string keeps its runs too.
+    let inline = litchi_ops::open_bytes(rich_package(true)).unwrap();
+    let (after, matched) = find(
+        &inline,
+        "/Sheet1/C1",
+        Props::new().with("find", "draft").with("replace", "final"),
+    )
+    .unwrap();
+    assert_eq!(matched, Some(1));
+    assert_eq!(value(&after, "/Sheet1/C1"), "final");
+    assert!(
+        sheet_xml(&after).contains(r#"<r><rPr><i/></rPr><t xml:space="preserve">final</t></r>"#)
+    );
+}
+
+/// Record 0295: merge fills a formatted shared string run by run.
+#[test]
+fn merge_keeps_rich_runs() {
+    let file = litchi_ops::open_bytes(rich_package(false))
+        .unwrap()
+        .set("/Sheet1/A1", litchi_ops::props! { "value" => "{{a}}" })
+        .unwrap();
+    let file = find(
+        &file,
+        "/Sheet1/B1",
+        Props::new()
+            .with("find", "draft")
+            .with("replace", "{{name}}"),
+    )
+    .unwrap()
+    .0;
+    let mut record = litchi_ops::merge::Record::new();
+    record.insert("name", "Ada");
+    let commit = file
+        .merge(&record, &litchi_ops::merge::Options::new())
+        .unwrap();
+    assert_eq!(value(&commit.file, "/Sheet1/B1"), "rich Ada");
+    assert!(sheet_xml(&commit.file).contains(r#"<r><rPr><b/></rPr>"#));
 }

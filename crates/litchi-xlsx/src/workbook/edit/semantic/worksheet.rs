@@ -367,6 +367,32 @@ impl WorksheetEdit<'_> {
         Ok(self)
     }
 
+    /// Write `text` as the cell's own inline rich string: each run keeps
+    /// its run properties (`rPr`) as read by
+    /// [`Worksheet::rich_text`](crate::Worksheet::rich_text) (record 0295).
+    /// The cell's style and other children are kept, as by [`Self::set`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an invalid-input error for empty or over-long rich text.
+    pub fn set_rich_text<'a>(
+        &mut self,
+        at: impl Into<At<'a>>,
+        text: crate::RichText,
+    ) -> Result<&mut Self> {
+        let address = at.into().resolve()?;
+        text.validate_for_write()?;
+        match self.edit.actions(self.position).entry(address) {
+            Entry::Vacant(entry) => {
+                entry.insert(Action::rich(text));
+            },
+            Entry::Occupied(mut entry) => {
+                entry.get_mut().set_payload(Payload::Rich(Box::new(text)))
+            },
+        }
+        Ok(self)
+    }
+
     /// Store `value` as the cached result of an existing scalar formula
     /// cell, keeping its formula markup (shared-formula members included)
     /// byte for byte; the cell type follows the value (record 0279).
@@ -442,7 +468,12 @@ impl WorksheetEdit<'_> {
         let create = actions.get(&address).is_some_and(|action| {
             matches!(
                 action.payload(),
-                Some(Payload::Set(_) | Payload::SharedString { .. } | Payload::Clear)
+                Some(
+                    Payload::Set(_)
+                        | Payload::SharedString { .. }
+                        | Payload::Rich(_)
+                        | Payload::Clear
+                )
             )
         });
         match actions.entry(address) {
@@ -1064,7 +1095,12 @@ impl NewSheet<'_> {
         let create = actions.get(&address).is_some_and(|action| {
             matches!(
                 action.payload(),
-                Some(Payload::Set(_) | Payload::SharedString { .. } | Payload::Clear)
+                Some(
+                    Payload::Set(_)
+                        | Payload::SharedString { .. }
+                        | Payload::Rich(_)
+                        | Payload::Clear
+                )
             )
         });
         match actions.entry(address) {

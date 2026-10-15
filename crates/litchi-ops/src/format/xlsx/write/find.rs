@@ -3,10 +3,12 @@
 //! As OfficeCLI's `ExcelHandler.FindAndReplace`, the workbook root searches
 //! every worksheet and a sheet its own cells; Litchi also accepts a cell, a
 //! range, a row or a column. Each stored text value is one search group.
-//! Formula cells and non-text values are not searched. A cell whose text
-//! carries rich-text runs is refused when it would change: a plain value
-//! would drop the runs' formatting. Every changed cell is staged in one
-//! native workbook edit.
+//! Formula cells and non-text values are not searched. A cell showing a
+//! formatted shared string is rewritten run by run as its own inline rich
+//! string, each run keeping its properties (record 0295); an inline rich
+//! string or an item with phonetic runs is refused when it would change. A
+//! match spanning runs collapses into the run where it starts. Every
+//! changed cell is staged in one native workbook edit.
 
 use std::collections::HashSet;
 
@@ -74,7 +76,7 @@ impl Xlsx {
         let mut matches = 0usize;
         let mut scratch = Scratch::default();
         let mut staged = 0usize;
-        let mut changes: Vec<(usize, Address, String)> = Vec::new();
+        let mut changes: Vec<(usize, Address, CellText)> = Vec::new();
         let mut seen: HashSet<(usize, Address)> = HashSet::new();
         for (position, worksheet) in workbook.sheets().enumerate() {
             let areas: Vec<Rect> = scopes
@@ -124,17 +126,44 @@ impl Xlsx {
                     else {
                         continue;
                     };
-                    if worksheet.has_rich_text(address).map_err(native_error)? {
-                        return Err(Error::new(
-                            Code::UnsupportedCapability,
-                            "find/replace in rich-text XLSX cells is not integrated",
-                        )
-                        .with_property(crate::find::FIND)
-                        .with_suggestion(
-                            "a plain value would drop the cell's rich-text runs (record 0273 follow-up)",
-                        ));
-                    }
-                    validate_xml_text(&output, crate::find::REPLACE)?;
+                    let content = if worksheet.has_rich_text(address).map_err(native_error)? {
+                        // Record 0295: rewrite the runs of the cell's
+                        // shared string, each keeping its properties.
+                        let Some(mut rich) = worksheet.rich_text(address).map_err(native_error)?
+                        else {
+                            return Err(rich_refusal());
+                        };
+                        let pieces: Vec<Piece<'_>> = rich
+                            .runs()
+                            .iter()
+                            .map(|run| Piece {
+                                text: run.text(),
+                                group: 0,
+                                scoped: true,
+                            })
+                            .collect();
+                        let rewrites = plan_with(
+                            &mut scratch,
+                            &pieces,
+                            &matcher,
+                            Some(replacement),
+                            false,
+                            limits.max_staged_bytes(),
+                        )?
+                        .rewrites;
+                        drop(pieces);
+                        for rewrite in rewrites {
+                            if let Some(text) = rewrite.text {
+                                validate_xml_text(&text, crate::find::REPLACE)?;
+                                rich.set_run_text(rewrite.piece, text)
+                                    .map_err(native_error)?;
+                            }
+                        }
+                        CellText::Rich(rich)
+                    } else {
+                        validate_xml_text(&output, crate::find::REPLACE)?;
+                        CellText::Plain(output.clone())
+                    };
                     staged = staged.saturating_add(output.len());
                     if staged > limits.max_staged_bytes() {
                         return Err(Error::new(
@@ -143,7 +172,7 @@ impl Xlsx {
                         ));
                     }
                     changes.try_reserve(1).map_err(allocation)?;
-                    changes.push((position, address, output));
+                    changes.push((position, address, content));
                 }
             }
         }
@@ -160,15 +189,40 @@ impl Xlsx {
             while let Some((_, address, text)) =
                 changes.get(index).filter(|change| change.0 == sheet)
             {
-                worksheet
-                    .set(*address, xlsx::cell::Value::text(text.as_str()))
-                    .map_err(native_error)?;
+                match text {
+                    CellText::Plain(text) => worksheet
+                        .set(*address, xlsx::cell::Value::text(text.as_str()))
+                        .map_err(native_error)?,
+                    CellText::Rich(rich) => worksheet
+                        .set_rich_text(*address, rich.clone())
+                        .map_err(native_error)?,
+                };
                 index += 1;
             }
         }
         let native = edit.commit().map_err(native_error)?;
         Ok((Commit::from_native(self, source, native)?, matches))
     }
+}
+
+/// The new text of a changed cell.
+pub(super) enum CellText {
+    Plain(String),
+    /// The cell's rich runs with new texts (record 0295).
+    Rich(xlsx::RichText),
+}
+
+/// A rich-text cell whose runs a rewrite cannot keep (an inline rich
+/// string, phonetic runs).
+pub(super) fn rich_refusal() -> Error {
+    Error::new(
+        Code::UnsupportedCapability,
+        "this XLSX rich-text cell cannot be rewritten run by run",
+    )
+    .with_property(crate::find::FIND)
+    .with_suggestion(
+        "an inline rich string or phonetic runs would be lost by a plain value (record 0295 follow-up)",
+    )
 }
 
 /// The worksheet areas the target nodes search.

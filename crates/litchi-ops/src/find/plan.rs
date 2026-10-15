@@ -277,6 +277,7 @@ pub(crate) enum Values<'v> {
     #[cfg_attr(
         not(any(
             feature = "pptx",
+            feature = "xlsx",
             feature = "rtf",
             feature = "doc",
             feature = "ppt",
@@ -324,6 +325,7 @@ impl<'v> Values<'v> {
 /// `limit_exceeded` beyond `max_bytes` of rewritten text.
 #[cfg(any(
     feature = "pptx",
+    feature = "xlsx",
     feature = "rtf",
     feature = "doc",
     feature = "ppt",
