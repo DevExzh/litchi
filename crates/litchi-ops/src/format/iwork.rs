@@ -334,7 +334,16 @@ impl Iwork {
         {
             self.expand_all();
         }
-        #[cfg(not(feature = "pages"))]
+        // Keynote character runs join the tree under their paragraphs
+        // (record 0298).
+        #[cfg(feature = "keynote")]
+        if self.0.full.get().is_none()
+            && matches!(self.0.owner, Owner::Keynote(_))
+            && self.tree().item(parent).type_name() == "paragraph"
+        {
+            self.expand_all();
+        }
+        #[cfg(not(any(feature = "pages", feature = "keynote")))]
         let _ = parent;
     }
 
@@ -348,9 +357,21 @@ impl Iwork {
                     error: None,
                 });
             },
+            #[cfg(feature = "keynote")]
+            Owner::Keynote(package) => {
+                self.0
+                    .full
+                    .get_or_init(|| match keynote::build_full(package) {
+                        Ok(tree) => Built { tree, error: None },
+                        Err(error) => Built {
+                            tree: Tree::root_only(),
+                            error: Some(error),
+                        },
+                    });
+            },
             #[allow(
                 unreachable_patterns,
-                reason = "only the Pages tree builds children on demand"
+                reason = "only the Pages and Keynote trees build children on demand"
             )]
             _ => {},
         }

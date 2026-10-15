@@ -300,7 +300,7 @@ pub(crate) const PAGES: &[&str] = &[
     "footnote",
 ];
 
-/// Apple Keynote selectors (record 0296).
+/// Apple Keynote selectors (records 0296 and 0298).
 #[cfg(feature = "keynote")]
 pub(crate) const KEYNOTE: &[&str] = &[
     "slide",
@@ -311,6 +311,19 @@ pub(crate) const KEYNOTE: &[&str] = &[
     "slide > placeholder",
     "placeholder:contains(a)",
     "slide[last()]",
+    // Record 0298: paragraphs, runs, drawables, tables and layouts.
+    "paragraph",
+    "placeholder > p",
+    "notes > p",
+    "shape",
+    "shape:contains(a)",
+    "picture",
+    "video",
+    "table",
+    "tc",
+    "run",
+    "shape[zorder>0]",
+    "slide[layout]",
 ];
 
 /// Apple Numbers selectors (record 0296).

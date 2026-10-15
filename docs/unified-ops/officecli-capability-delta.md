@@ -31,7 +31,7 @@ differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `299bb82c87cfef0c27ecfe8bd4fb7df4982635a954c5fa57ac58897900e0e2fa` |
 | golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `73fafb3ba518137725602d97210ce5837886dff848671f143278fd3cb55063e3` |
 | golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `2038cde02828395f020df3d9b9732cc9350ce839bba5bc5aee3089cdd0e81fab` |
-| golden | `crates/litchi-ops/tests/golden/registry/keynote.json` | `ee5b6b3e8334322bd4b01dd29ff414e2848a4089b71eabe9f85c92f10079c528` |
+| golden | `crates/litchi-ops/tests/golden/registry/keynote.json` | `e56b1957228e9c295f5611568e97098f27010a64d468d1edcb4e012b7c0affed` |
 | golden | `crates/litchi-ops/tests/golden/registry/numbers.json` | `d0dc9b4ced609425f80a61cd43c63a60419bce7511b357439744be30489cb671` |
 | golden | `crates/litchi-ops/tests/golden/registry/odb.json` | `4f342b6f2149dc3284dd48cc71f4a7badb5a1632dc4183a7e9598cc12d5dca6a` |
 | golden | `crates/litchi-ops/tests/golden/registry/odc.json` | `c9004bc22d2c3964ef98a14a4feca6253166bf33f81b8211058cc88a1c8dd930` |
@@ -89,7 +89,7 @@ Elements:
 | xls | 7 | 31 | 0 | 0 | 1 | 2 | 1 |
 | pptx | 25 | 8 | 0 | 0 | 0 | 1 | 9 |
 | ppt | 15 | 18 | 0 | 0 | 0 | 1 | 8 |
-| keynote | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
+| keynote | 0 | 0 | 0 | 0 | 0 | 0 | 16 |
 | numbers | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
 | odb | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
 | odc | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
@@ -7851,6 +7851,18 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 |  | slide | litchi-only |  |
 |  | placeholder | litchi-only |  |
 |  | notes | litchi-only |  |
+|  | paragraph | litchi-only |  |
+|  | run | litchi-only |  |
+|  | shape | litchi-only |  |
+|  | picture | litchi-only |  |
+|  | connector | litchi-only |  |
+|  | video | litchi-only |  |
+|  | audio | litchi-only |  |
+|  | table | litchi-only |  |
+|  | tr | litchi-only |  |
+|  | tc | litchi-only |  |
+|  | chart | litchi-only |  |
+|  | group | litchi-only |  |
 
 ### Properties
 

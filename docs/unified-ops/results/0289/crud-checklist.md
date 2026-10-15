@@ -34,7 +34,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | odm | 22 | 205 | 184 | 0 | 17 | 0 | 37 | 26 | 2 |
 | odf | 2 | 19 | 19 | 0 | 0 | 0 | 3 | 2 | 0 |
 | pages | 11 | 85 | 85 | 0 | 0 | 0 | 36 | 2 | 14 |
-| keynote | 4 | 26 | 21 | 1 | 4 | 12 | 10 | 0 | 1 |
+| keynote | 16 | 86 | 45 | 1 | 40 | 48 | 58 | 0 | 1 |
 | numbers | 4 | 22 | 22 | 0 | 0 | 20 | 10 | 0 | 0 |
 
 ## docx
@@ -575,6 +575,18 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | slide | ok | ok | ok | ok | ok | gap | FAIL | no pair | gap | ok | ok | gap | ok |
 | placeholder | ok | ok | ok | ok | ok | gap | n/a | refused | gap | ok | ok | gap | ok |
 | notes | unreached | unreached | unreached | unreached | n/a | gap | n/a | no pair | gap | n/a | n/a | gap | ok |
+| paragraph | ok | ok | ok | ok | n/a | gap | n/a | no pair | gap | n/a | n/a | gap | ok |
+| run | ok | ok | ok | ok | n/a | gap | n/a | no pair | gap | n/a | n/a | gap | ok |
+| shape | ok | ok | ok | ok | n/a | gap | n/a | no pair | gap | n/a | n/a | gap | ok |
+| picture | unreached | unreached | unreached | unreached | n/a | gap | n/a | no pair | gap | n/a | n/a | gap | ok |
+| connector | unreached | unreached | unreached | unreached | n/a | gap | n/a | no pair | gap | n/a | n/a | gap | ok |
+| video | unreached | unreached | unreached | unreached | n/a | gap | n/a | no pair | gap | n/a | n/a | gap | ok |
+| audio | unreached | unreached | unreached | unreached | n/a | gap | n/a | no pair | gap | n/a | n/a | gap | ok |
+| table | unreached | unreached | unreached | unreached | n/a | gap | n/a | no pair | gap | n/a | n/a | gap | ok |
+| tr | unreached | unreached | unreached | unreached | n/a | gap | n/a | no pair | gap | n/a | n/a | gap | ok |
+| tc | unreached | unreached | unreached | unreached | n/a | gap | n/a | no pair | gap | n/a | n/a | gap | ok |
+| chart | unreached | unreached | unreached | unreached | n/a | gap | n/a | no pair | gap | n/a | n/a | gap | ok |
+| group | unreached | unreached | unreached | unreached | n/a | gap | n/a | no pair | gap | n/a | n/a | gap | ok |
 
 ## numbers
 
