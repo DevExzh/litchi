@@ -15,7 +15,9 @@ use litchi_rtf::edit::{EditOptions, RunTextReplacement, SemanticLimits as Native
 use super::super::{Kind, Nav, Node, Rtf};
 use super::{Commit, patch_snapshot_bytes, snapshot_limit};
 use crate::error::{Code, Error, Result};
-use crate::find::{Piece, Scratch, Spec, plan_with};
+use crate::find::Spec;
+use crate::find::surface::{self, Run};
+use crate::merge::{Options, Planner, Record, Summary};
 use crate::path::navigate::{KindSet, Navigate};
 use crate::target::TargetArg;
 use crate::transaction::{Error as TransactionError, SemanticLimits};
@@ -44,24 +46,11 @@ impl Rtf {
         limits: &SemanticLimits,
     ) -> Result<(Commit, usize)> {
         self.admit_edit()?;
-        if spec.formats() {
-            let key = spec
-                .format()
-                .iter()
-                .next()
-                .map_or(crate::find::FIND, |(key, _)| key.as_str());
-            return Err(Error::new(
-                Code::UnsupportedProperty,
-                "an RTF find replaces text; formatting the replacement needs a native run split (record 0273 follow-up)",
-            )
-            .with_property(key.to_owned()));
-        }
-        let Some(replacement) = spec.replacement() else {
-            return Err(
-                Error::new(Code::MissingProperty, "an RTF find needs `replace`")
-                    .with_property(crate::find::REPLACE),
-            );
-        };
+        let replacement = surface::text_only(
+            spec,
+            FileFormat::Rtf,
+            "formatting the replacement needs a native RTF run split",
+        )?;
         let nav = Nav::new(self);
         // `None`: every paragraph; else the paragraphs to search, each with
         // an optional run scope (`None` searches the whole paragraph).
@@ -130,54 +119,44 @@ impl Rtf {
             }
         }
 
-        let matcher = spec.matcher();
-        let mut matches = 0usize;
-        let mut scratch = Scratch::default();
-        let mut staged = 0usize;
-        let mut updates: Vec<RunTextReplacement> = Vec::new();
-        for (paragraph, scopes) in &paragraphs {
+        let mut runs: Vec<Run<'_>> = Vec::new();
+        let mut keys: Vec<(Position, Position)> = Vec::new();
+        for (group, (paragraph, scopes)) in paragraphs.iter().enumerate() {
             let Some(position) = paragraph.paragraph_position() else {
                 continue;
             };
-            let runs: Vec<Node<'_>> = nav
-                .children(paragraph, KindSet::of(Kind::Run))?
-                .collect::<Result<_>>()?;
-            let texts: Vec<std::borrow::Cow<'_, str>> = runs
-                .iter()
-                .map(|run| Ok(run.text()?.unwrap_or_default()))
-                .collect::<Result<_>>()?;
-            let pieces: Vec<Piece<'_>> = runs
-                .iter()
-                .zip(&texts)
-                .map(|(run, text)| Piece {
-                    text,
-                    group: 0,
-                    scoped: scopes
-                        .iter()
-                        .any(|scope| scope.is_none_or(|wanted| run.run_position() == Some(wanted))),
-                })
-                .collect();
-            let planned = plan_with(
-                &mut scratch,
-                &pieces,
-                &matcher,
-                Some(replacement),
-                false,
-                limits.max_staged_bytes().saturating_sub(staged),
-            )?;
-            matches = matches.saturating_add(planned.matches);
-            for rewrite in planned.rewrites {
-                let (Some(text), Some(run)) = (rewrite.text, runs[rewrite.piece].run_position())
-                else {
+            for run in nav.children(paragraph, KindSet::of(Kind::Run))? {
+                let run = run?;
+                let Some(at) = run.run_position() else {
                     continue;
                 };
-                staged = staged.saturating_add(text.len());
-                updates
-                    .try_reserve(1)
+                let scoped = scopes
+                    .iter()
+                    .any(|scope| scope.is_none_or(|wanted| at == wanted));
+                runs.try_reserve(1)
                     .map_err(|source| TransactionError::Allocation { source })?;
-                updates.push(RunTextReplacement::new(position, run, text));
+                runs.push(Run::new(run.text()?.unwrap_or_default(), group).scoped(scoped));
+                keys.push((position, at));
             }
         }
+        let (changes, matches) = surface::find(&runs, spec, replacement, FileFormat::Rtf, limits)?;
+        let updates: Vec<RunTextReplacement> = changes
+            .into_iter()
+            .map(|change| {
+                let (paragraph, run) = keys[change.run];
+                RunTextReplacement::new(paragraph, run, change.text)
+            })
+            .collect();
+        Ok((self.commit_run_texts(&updates, limits)?, matches))
+    }
+
+    /// Commit run-text replacements in one native edit (none: an exact
+    /// no-op commit).
+    fn commit_run_texts(
+        &self,
+        updates: &[RunTextReplacement],
+        limits: &SemanticLimits,
+    ) -> Result<Commit> {
         let native_limits = NativeLimits::builder()
             .max_operations(limits.max_operations())
             .map_err(Error::from)?
@@ -190,7 +169,7 @@ impl Rtf {
             .package
             .edit_with_options(EditOptions::new().semantic_limits(native_limits));
         if !updates.is_empty() {
-            edit.replace_body_run_texts(&updates).map_err(Error::from)?;
+            edit.replace_body_run_texts(updates).map_err(Error::from)?;
         }
         let native = edit.commit().map_err(Error::from)?;
         let changed = native.diagnostics().changed();
@@ -205,15 +184,69 @@ impl Rtf {
         } else {
             self.clone()
         };
-        Ok((
-            Commit {
-                before: self.clone(),
-                after,
-                patch,
-                operations,
-                snapshot_bytes,
-            },
-            matches,
-        ))
+        Ok(Commit {
+            before: self.clone(),
+            after,
+            patch,
+            operations,
+            snapshot_bytes,
+        })
+    }
+
+    /// Template merge (record 0295): placeholders in every main-story
+    /// paragraph, rewritten run by run so each run keeps its formatting;
+    /// one native commit. `None` means nothing matched.
+    pub(crate) fn merge(
+        &self,
+        record: &Record,
+        options: &Options,
+        limits: &SemanticLimits,
+    ) -> Result<(Option<Commit>, Summary)> {
+        self.check_source()?;
+        let result = (|| {
+            self.admit_edit()?;
+            let nav = Nav::new(self);
+            let root = nav.root()?;
+            let mut runs: Vec<Run<'_>> = Vec::new();
+            let mut keys: Vec<(Position, Position)> = Vec::new();
+            let mut group = 0usize;
+            for body in nav.children(&root, KindSet::of(Kind::Body))? {
+                for paragraph in nav.children(&body?, KindSet::of(Kind::Paragraph))? {
+                    let paragraph = paragraph?;
+                    group += 1;
+                    let Some(position) = paragraph.paragraph_position() else {
+                        continue;
+                    };
+                    for run in nav.children(&paragraph, KindSet::of(Kind::Run))? {
+                        let run = run?;
+                        let Some(at) = run.run_position() else {
+                            continue;
+                        };
+                        runs.push(Run::new(
+                            run.text()?.unwrap_or_default().into_owned(),
+                            group,
+                        ));
+                        keys.push((position, at));
+                    }
+                }
+            }
+            let mut planner = Planner::new(record, options, limits);
+            let changes = surface::merge(&runs, &mut planner, false, FileFormat::Rtf, limits)?;
+            let summary = planner.finish();
+            if changes.is_empty() {
+                return Ok((None, summary));
+            }
+            let updates: Vec<RunTextReplacement> = changes
+                .into_iter()
+                .map(|change| {
+                    let (paragraph, run) = keys[change.run];
+                    RunTextReplacement::new(paragraph, run, change.text)
+                })
+                .collect();
+            Ok((Some(self.commit_run_texts(&updates, limits)?), summary))
+        })()
+        .map_err(|error: Error| error.with_format(FileFormat::Rtf));
+        self.check_source()?;
+        result
     }
 }

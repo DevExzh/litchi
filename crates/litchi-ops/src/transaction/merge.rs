@@ -205,6 +205,22 @@ fn run(
                 None => Ok((None, summary)),
             }
         },
+        #[cfg(feature = "rtf")]
+        File::Rtf(handle) => {
+            let (commit, summary) = handle.merge(record, options, limits)?;
+            match commit {
+                Some(commit) => Ok((Some(super::wrap_rtf(handle, commit, ())?.0), summary)),
+                None => Ok((None, summary)),
+            }
+        },
+        #[cfg(feature = "doc")]
+        File::Doc(handle) => {
+            let (commit, summary) = handle.merge(record, options, limits)?;
+            match commit {
+                Some(commit) => Ok((Some(super::wrap_doc(handle, commit, ())?.0), summary)),
+                None => Ok((None, summary)),
+            }
+        },
         _ => {
             let _ = (record, options, limits);
             Err(unsupported(file))

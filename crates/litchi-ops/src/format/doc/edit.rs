@@ -409,7 +409,7 @@ impl Doc {
         })
     }
 
-    fn native_edit(&self, limits: &SemanticLimits) -> Result<litchi_doc::Edit> {
+    pub(super) fn native_edit(&self, limits: &SemanticLimits) -> Result<litchi_doc::Edit> {
         Ok(self
             .edit_source()?
             .edit_with_options(super::edit_options(super::body_transaction_limits(*limits)))?)
@@ -417,7 +417,7 @@ impl Doc {
 
     /// Commit a staged native edit into a write step. An edit that changed
     /// no byte keeps this handle.
-    fn publish(
+    pub(super) fn publish(
         &self,
         edit: litchi_doc::Edit,
         operations: usize,

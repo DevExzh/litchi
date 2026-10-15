@@ -24,6 +24,7 @@ use crate::{IntoProps, OpenOptions, Result, TargetArg};
 // knows how to answer.
 pub(crate) mod children;
 mod edit;
+mod find;
 mod metadata;
 mod nav;
 mod node;

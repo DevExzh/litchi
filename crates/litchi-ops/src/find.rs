@@ -40,12 +40,35 @@
 //! [`crate::Applied::matched`].
 
 #![cfg_attr(
-    not(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "rtf")),
+    not(any(
+        feature = "docx",
+        feature = "xlsx",
+        feature = "pptx",
+        feature = "rtf",
+        feature = "doc",
+        feature = "ppt",
+        feature = "xls",
+        feature = "xlsb",
+        feature = "odt",
+        feature = "ods",
+        feature = "odp"
+    )),
     allow(dead_code, unused_imports, unused_variables)
 )]
 
 mod matcher;
 mod plan;
+#[cfg(any(
+    feature = "rtf",
+    feature = "doc",
+    feature = "ppt",
+    feature = "xls",
+    feature = "xlsb",
+    feature = "odt",
+    feature = "ods",
+    feature = "odp"
+))]
+pub(crate) mod surface;
 #[cfg(test)]
 mod tests;
 
@@ -56,10 +79,31 @@ pub(crate) use matcher::Matcher;
 pub(crate) use plan::matches_with;
 #[cfg(test)]
 pub(crate) use plan::plan;
-#[cfg(any(feature = "pptx", feature = "xlsx", feature = "rtf"))]
+#[cfg(any(
+    feature = "pptx",
+    feature = "xlsx",
+    feature = "rtf",
+    feature = "doc",
+    feature = "ppt",
+    feature = "xls",
+    feature = "xlsb",
+    feature = "odt",
+    feature = "ods",
+    feature = "odp"
+))]
 pub(crate) use plan::plan_with;
 pub(crate) use plan::{Piece, Scratch};
-#[cfg(feature = "pptx")]
+#[cfg(any(
+    feature = "pptx",
+    feature = "rtf",
+    feature = "doc",
+    feature = "ppt",
+    feature = "xls",
+    feature = "xlsb",
+    feature = "odt",
+    feature = "ods",
+    feature = "odp"
+))]
 pub(crate) use plan::{Values, rewrite_ranges};
 
 use crate::error::{Code, Error, Result};
@@ -301,9 +345,8 @@ pub(crate) fn set(
     props: &Props<'_>,
 ) -> Result<crate::File> {
     let spec = Spec::admit(props)?;
-    #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "rtf"))]
     let limits = crate::transaction::SemanticLimits::default();
-    let _ = &target;
+    let _ = (&target, &limits);
     match file {
         #[cfg(feature = "docx")]
         crate::File::Docx(handle) => handle
@@ -321,6 +364,10 @@ pub(crate) fn set(
         crate::File::Rtf(handle) => handle
             .find_replace(&target, &spec, &limits)
             .map(|(commit, _)| crate::File::Rtf(commit.after)),
+        #[cfg(feature = "doc")]
+        crate::File::Doc(handle) => handle
+            .find_replace(&target, &spec, &limits)
+            .map(|(commit, _)| crate::File::Doc(commit.after)),
         _ => Err(unsupported(file)),
     }
 }

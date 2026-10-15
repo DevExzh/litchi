@@ -2680,10 +2680,8 @@ impl Edit {
                 return Err(error);
             },
         };
-        #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "rtf"))]
         let limits = self.limits;
-        #[cfg(not(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "rtf")))]
-        let _ = (target, &spec);
+        let _ = (target, &spec, &limits);
         self.execute(|file| match file {
             #[cfg(feature = "docx")]
             File::Docx(handle) => {
@@ -2704,6 +2702,11 @@ impl Edit {
             File::Rtf(handle) => {
                 let (commit, matched) = handle.find_replace(target, &spec, &limits)?;
                 wrap_rtf(handle, commit, matched)
+            },
+            #[cfg(feature = "doc")]
+            File::Doc(handle) => {
+                let (commit, matched) = handle.find_replace(target, &spec, &limits)?;
+                wrap_doc(handle, commit, matched)
             },
             _ => Err(crate::find::unsupported(file)),
         })

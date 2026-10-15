@@ -906,7 +906,19 @@ fn apply_case(value: &str, switches: &[litchi_docx::field::Switch]) -> String {
 
 /// Text values keep tabs and line feeds; a carriage return (alone or before
 /// a line feed) becomes a line feed.
-#[cfg(any(feature = "docx", feature = "xlsx", test))]
+#[cfg(any(
+    feature = "docx",
+    feature = "xlsx",
+    feature = "rtf",
+    feature = "doc",
+    feature = "ppt",
+    feature = "xls",
+    feature = "xlsb",
+    feature = "odt",
+    feature = "ods",
+    feature = "odp",
+    test
+))]
 pub(crate) fn normalize_breaks(value: &str) -> std::borrow::Cow<'_, str> {
     if value.contains('\r') {
         std::borrow::Cow::Owned(value.replace("\r\n", "\n").replace('\r', "\n"))
