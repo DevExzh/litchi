@@ -96,6 +96,9 @@ struct State {
     /// Built at open; after a write, on the first read (record 0288).
     tree: std::sync::OnceLock<Tree>,
     origin: Option<Arc<Path>>,
+    /// The flat single-XML bytes (`.fodg`) a flat handle publishes; its
+    /// owner is the leaf's packaged read projection (record 0292).
+    flat: Option<Box<[u8]>>,
 }
 
 const fn assert_handle<T: Send + Sync + Clone>() {}
@@ -230,7 +233,77 @@ impl OdfTree {
             owner,
             tree: std::sync::OnceLock::from(tree),
             origin,
+            flat: None,
         })))
+    }
+
+    /// Open a flat single-XML drawing (`.fodg`) detection recognized: the
+    /// leaf reads the flat parts as a package projection; publication
+    /// writes the flat bytes unchanged (record 0292).
+    #[cfg(feature = "odg")]
+    pub(crate) fn from_flat(bytes: Vec<u8>, options: &OpenOptions) -> Result<Self> {
+        let format = FileFormat::Odg;
+        if let Some(maximum) = options.max_input_bytes
+            && u64::try_from(bytes.len()).unwrap_or(u64::MAX) > maximum
+        {
+            return Err(core_error(
+                litchi_core::Error::ResourceLimit(litchi_core::ResourceLimit {
+                    resource: litchi_core::Resource::InputBytes,
+                    observed: u64::try_from(bytes.len()).unwrap_or(u64::MAX),
+                    limit: maximum,
+                    scope: Arc::from("flat ODG input"),
+                }),
+                format,
+            ));
+        }
+        let parts = litchi_odf_common::flat::Parts::split(&bytes)
+            .map_err(|error| core_error(error, format))?;
+        let package = parts
+            .to_bytes()
+            .map_err(|error| core_error(error, format))
+            .and_then(|zip| {
+                litchi_odg::Package::from_bytes(&zip).map_err(|error| odf_error(error, format))
+            })?;
+        let owner = Owner::Odg(package);
+        let tree = owner.tree()?;
+        Ok(Self(Arc::new(State {
+            owner,
+            tree: std::sync::OnceLock::from(tree),
+            origin: None,
+            flat: Some(bytes.into_boxed_slice()),
+        })))
+    }
+
+    /// The handle over a committed leaf owner: a packaged file adopts it;
+    /// a flat drawing republishes the edit of its packaged projection into
+    /// its flat bytes, element by element (record 0292).
+    pub(crate) fn republish(&self, owner: Owner) -> Result<Self> {
+        let Some(flat) = self.0.flat.as_deref() else {
+            return Self::from_commit(owner, self.origin().cloned());
+        };
+        let format = self.format();
+        let parts = litchi_odf_common::flat::Parts::split(flat)
+            .map_err(|error| core_error(error, format))?;
+        let bytes = parts
+            .merge_package(flat, owner.as_bytes())
+            .map_err(|error| core_error(error, format))?;
+        // The edited package holds exactly the parts the republished flat
+        // document splits into, so it stays the projection; its tree is
+        // built on the first read.
+        Ok(Self(Arc::new(State {
+            owner,
+            tree: std::sync::OnceLock::new(),
+            origin: self.origin().cloned(),
+            flat: Some(bytes.into_boxed_slice()),
+        })))
+    }
+
+    /// The bytes this handle publishes: the flat document, or the package.
+    fn published(&self) -> &[u8] {
+        self.0
+            .flat
+            .as_deref()
+            .unwrap_or_else(|| self.0.owner.as_bytes())
     }
 
     /// Adopt a package a leaf commit published and verified. The object
@@ -240,7 +313,7 @@ impl OdfTree {
     /// catalog, which can fail, but not on a committed package: the ODB
     /// leaf's commit parses the new catalog with the same default limits
     /// before it publishes, and a metadata commit leaves the catalog's
-    /// `content.xml` as it was (record 0291; before, a database tree was
+    /// `content.xml` as it was (records 0291 and 0292 made the same change independently; before, a database tree was
     /// built here and a single `set` on a 1,000-query database parsed the
     /// catalog twice).
     pub(crate) fn from_commit(owner: Owner, origin: Option<Arc<Path>>) -> Result<Self> {
@@ -248,6 +321,7 @@ impl OdfTree {
             owner,
             tree: std::sync::OnceLock::new(),
             origin,
+            flat: None,
         })))
     }
 
@@ -367,7 +441,7 @@ impl OdfTree {
 
     /// Whether two handles retain the same package bytes.
     pub(crate) fn same_snapshot(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.0, &other.0) || self.0.owner.as_bytes() == other.0.owner.as_bytes()
+        Arc::ptr_eq(&self.0, &other.0) || self.published() == other.published()
     }
 
     /// Whether two handles publish the same package bytes.
@@ -392,14 +466,14 @@ impl OdfTree {
 
     /// Publish the package bytes into `sink`.
     pub(crate) fn write_to(&self, mut sink: impl std::io::Write) -> Result<()> {
-        sink.write_all(self.0.owner.as_bytes()).map_err(|error| {
+        sink.write_all(self.published()).map_err(|error| {
             Error::from(litchi_core::Error::from(error)).with_format(self.format())
         })
     }
 
     /// Atomically save the package to `path`.
     pub(crate) fn save_to(&self, path: &Path, options: &crate::SaveOptions) -> Result<u64> {
-        let bytes = self.0.owner.as_bytes();
+        let bytes = self.published();
         let overwrite = match options.overwrite {
             crate::Overwrite::Replace => litchi_core::atomic::Overwrite::Replace,
             crate::Overwrite::Refuse => litchi_core::atomic::Overwrite::Refuse,
@@ -599,7 +673,12 @@ pub(crate) const fn writable(
 }
 
 /// A readable property that `set` writes and `add` accepts.
-#[cfg(any(feature = "odg", feature = "odc", feature = "odb"))]
+#[cfg(any(
+    feature = "odg",
+    feature = "odc",
+    feature = "odb",
+    feature = "odf-formula"
+))]
 pub(crate) const fn addable(
     name: &'static str,
     ty: crate::value::ValueType,
@@ -763,7 +842,6 @@ pub(crate) struct Writes {
     pub(crate) settable: &'static [&'static str],
     pub(crate) addable: &'static [&'static str],
     pub(crate) removable: &'static [&'static str],
-    pub(crate) movable: &'static [&'static str],
     pub(crate) gaps: &'static [crate::node::spec::GapSpec],
 }
 

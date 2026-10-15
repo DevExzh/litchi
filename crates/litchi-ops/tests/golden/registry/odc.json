@@ -200,11 +200,11 @@
       "element": "legend",
       "parent": "chart",
       "operations": {
-        "add": false,
-        "set": false,
+        "add": true,
+        "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "stable": [
@@ -214,8 +214,8 @@
       "properties": {
         "position": {
           "type": "string",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         }
       },
@@ -246,6 +246,24 @@
       "code": "unsupported_capability",
       "followUp": "0288 ODC series detail writes",
       "reason": "the unified registry writes a series' ranges, label, class and axis; its data points, labels, regression curves and styles stay as authored"
+    },
+    {
+      "subject": "operation",
+      "verb": "move",
+      "element": "series",
+      "context": "a chart outside the leaf's lossless typed definition surface",
+      "code": "unsupported_capability",
+      "followUp": "0288 ODC lossless producer definitions",
+      "reason": "series and axes reorder, and the legend is added or removed, through the chart's typed definition; a producer chart the leaf cannot project losslessly is refused rather than rewritten"
+    },
+    {
+      "subject": "operation",
+      "verb": "move",
+      "element": "legend",
+      "context": "the chart's single legend",
+      "code": "unsupported_capability",
+      "followUp": "none: a chart has at most one legend",
+      "reason": "the legend has no siblings to reorder; set its `position` instead"
     },
     {
       "subject": "operation",

@@ -20,7 +20,9 @@
 //! record 0296, printed by the iWork object-tree adapter's reads. Record 0290
 //! re-blessed `pptx placeholder` (0 → 4,644 matches) when a bare
 //! `placeholder` selector started matching the shapes with a placeholder
-//! binding. Each digest covers, file by file, every match's kind,
+//! binding. The flat ODT and flat ODG digests were added by record 0292,
+//! printed by the build that first opened `.fodt` and `.fodg`, before any
+//! flat write landed. Each digest covers, file by file, every match's kind,
 //! path, positional path and text, and every error, so a changed result set
 //! on any file changes it. Set `LITCHI_BLESS_GOLDEN=1` to write the current
 //! build's digests instead, after showing that a change of results is
@@ -87,6 +89,8 @@ fn corpus_queries_return_what_they_returned_before() {
         ("fods", query_corpus::ODS),
         #[cfg(feature = "odt")]
         ("odt", query_corpus::ODT),
+        #[cfg(feature = "odt")]
+        ("fodt", query_corpus::ODT),
         #[cfg(feature = "odp")]
         ("odp", query_corpus::ODP),
         #[cfg(feature = "pages")]

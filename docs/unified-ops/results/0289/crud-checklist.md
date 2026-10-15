@@ -27,12 +27,12 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | ods | 26 | 78 | 78 | 0 | 0 | 221 | 21 | 2 | 8 |
 | odp | 30 | 170 | 166 | 0 | 4 | 143 | 39 | 6 | 10 |
 | odg | 4 | 33 | 29 | 0 | 4 | 0 | 11 | 4 | 0 |
-| odc | 4 | 36 | 32 | 0 | 4 | 8 | 8 | 0 | 0 |
-| odi | 3 | 23 | 23 | 0 | 0 | 12 | 4 | 0 | 0 |
-| odb | 4 | 36 | 36 | 0 | 0 | 8 | 8 | 0 | 0 |
+| odc | 4 | 41 | 41 | 0 | 0 | 0 | 3 | 4 | 0 |
+| odi | 3 | 24 | 24 | 0 | 0 | 2 | 7 | 0 | 0 |
+| odb | 4 | 36 | 36 | 0 | 0 | 2 | 6 | 4 | 0 |
 | oth | 22 | 205 | 180 | 0 | 21 | 0 | 37 | 26 | 0 |
 | odm | 22 | 205 | 184 | 0 | 17 | 0 | 37 | 26 | 2 |
-| odf | 2 | 18 | 18 | 0 | 0 | 6 | 2 | 0 | 0 |
+| odf | 2 | 19 | 19 | 0 | 0 | 0 | 3 | 2 | 0 |
 | pages | 4 | 25 | 25 | 0 | 0 | 20 | 7 | 0 | 0 |
 | keynote | 4 | 26 | 21 | 1 | 4 | 12 | 10 | 0 | 1 |
 | numbers | 4 | 22 | 22 | 0 | 0 | 20 | 10 | 0 | 0 |
@@ -442,15 +442,15 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## odc
 
-- fixtures: `create()`, `odf/odc-producer-evidence/odfdom-created.odc`, `odf/odc-producer-evidence/odfdom-resaved.odc`, `create() + add axis`, `create() + add series`
+- fixtures: `create()`, `odf/odc-producer-evidence/odfdom-created.odc`, `odf/odc-producer-evidence/odfdom-resaved.odc`, `create() + add axis`, `create() + add series`, `create() + add legend`
 - document views on `odf/odc-producer-evidence/odfdom-created.odc`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| chart | ok | ok | n/a | ok | ok | n/a | n/a | gap | gap | ok | ok | ok | ok |
-| axis | ok | ok | ok | ok | ok | ok | ok | gap | gap | ok | ok | ok | ok |
-| series | ok | ok | ok | ok | ok | ok | ok | gap | gap | ok | ok | ok | ok |
-| legend | unreached | unreached | unreached | unreached | n/a | n/a | n/a | gap | gap | n/a | n/a | ok | ok |
+| chart | ok | ok | n/a | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
+| axis | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
+| series | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
+| legend | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
 
 ## odi
 
@@ -459,9 +459,9 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| image | ok | ok | n/a | ok | n/a | gap | gap | gap | gap | n/a | n/a | ok | ok |
-| frame | ok | ok | ok | ok | ok | gap | gap | gap | gap | ok | ok | ok | ok |
-| metadata | ok | ok | ok | ok | ok | gap | gap | gap | gap | ok | ok | ok | ok |
+| image | ok | ok | n/a | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| frame | ok | ok | ok | ok | ok | gap | gap | no pair | no pair | ok | ok | ok | ok |
+| metadata | ok | ok | ok | ok | ok | n/a | ok | no pair | no pair | ok | ok | ok | ok |
 
 ## odb
 
@@ -470,10 +470,10 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| database | ok | ok | n/a | ok | n/a | n/a | n/a | gap | gap | n/a | n/a | ok | ok |
-| table | ok | ok | ok | ok | ok | n/a | ok | gap | gap | ok | ok | ok | ok |
-| column | ok | ok | ok | ok | ok | n/a | ok | gap | gap | ok | ok | ok | ok |
-| query | ok | ok | ok | ok | ok | ok | ok | gap | gap | ok | ok | ok | ok |
+| database | ok | ok | n/a | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| table | ok | ok | ok | ok | ok | gap | ok | ok | ok | ok | ok | ok | ok |
+| column | ok | ok | ok | ok | ok | gap | ok | ok | ok | ok | ok | ok | ok |
+| query | ok | ok | ok | ok | ok | ok | ok | no pair | no pair | ok | ok | ok | ok |
 
 ## oth
 
@@ -537,13 +537,13 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## odf
 
-- fixtures: `create()`, `odf/native-resave/source/font-styles.odf`, `libreoffice-core/starmath/qa/extras/data/tdf151842.odf`
+- fixtures: `create()`, `odf/native-resave/source/font-styles.odf`, `libreoffice-core/starmath/qa/extras/data/tdf151842.odf`, `create() + add element`
 - document views on `odf/native-resave/source/font-styles.odf`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| math | ok | ok | n/a | ok | ok | gap | n/a | gap | gap | ok | ok | ok | ok |
-| element | ok | ok | ok | ok | ok | gap | ok | gap | gap | ok | ok | ok | ok |
+| math | ok | ok | n/a | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
+| element | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 
 ## pages
 

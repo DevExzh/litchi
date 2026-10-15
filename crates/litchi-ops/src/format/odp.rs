@@ -71,7 +71,8 @@ pub(crate) enum OdpOwner {
     /// Filesystem-backed, with deferred package data (path route).
     #[cfg(any(unix, windows))]
     Source(litchi_odp::SourceBackedPresentation),
-    /// A flat (single XML document) presentation; read-only.
+    /// A flat (single XML document) presentation; edits go through its
+    /// packaged projection (record 0292).
     Flat(litchi_odp::FlatPresentation),
 }
 
@@ -198,8 +199,46 @@ impl Odp {
         self.0.origin.as_ref()
     }
 
-    /// Adopt the package one checked edit published, keeping the origin.
+    /// Whether this is a flat (single XML) document.
+    pub(crate) fn is_flat(&self) -> bool {
+        matches!(self.0.owner, OdpOwner::Flat(_))
+    }
+
+    /// A projection refusal of a flat presentation: the flat reader admitted
+    /// the document, so a part the packaged reader or editor refuses is a
+    /// gap of the edit, not a corrupt file (record 0292).
+    pub(crate) fn flat_refusal(&self, error: Error) -> Error {
+        if self.is_flat() && error.code() == Code::CorruptFile {
+            return error
+                .caused_by_argument(Code::UnsupportedCapability)
+                .with_suggestion(
+                    "follow-up: 0292 flat ODF projection admission; the packaged reader refuses this flat document's parts",
+                );
+        }
+        error
+    }
+
+    /// Adopt the package one checked edit published, keeping the origin. A
+    /// flat presentation republishes the edit of its projection into its
+    /// flat bytes, element by element (record 0292).
     pub(crate) fn with_package(&self, package: litchi_odp::Package) -> Result<Self> {
+        if let OdpOwner::Flat(flat) = &self.0.owner {
+            let parts =
+                litchi_odf_common::flat::Parts::split(flat.as_bytes()).map_err(core_error)?;
+            let bytes = parts
+                .merge_package(flat.as_bytes(), package.as_bytes())
+                .map_err(core_error)?;
+            let flat = litchi_odp::FlatPresentation::from_bytes(bytes).map_err(core_error)?;
+            let next = Self::from_owner(
+                OdpOwner::Flat(flat),
+                self.0.origin.clone(),
+                self.0.odf_options,
+            );
+            // The edited package holds exactly the parts the republished
+            // flat document splits into: it is the next projection.
+            let _ = next.0.materialized.set(package);
+            return Ok(next);
+        }
         Self::from_package(package, self.0.origin.clone(), self.0.odf_options)
     }
 
@@ -365,23 +404,42 @@ impl Odp {
                         .map_err(odf_error)?;
                 Ok(self.0.materialized.get_or_init(|| package))
             },
-            OdpOwner::Flat(_) => Err(flat_write()),
+            // A flat presentation edits its packaged projection and
+            // republishes the edit into its flat bytes (record 0292).
+            OdpOwner::Flat(flat) => {
+                if let Some(package) = self.0.materialized.get() {
+                    return Ok(package);
+                }
+                let parts =
+                    litchi_odf_common::flat::Parts::split(flat.as_bytes()).map_err(core_error)?;
+                let bytes = parts.to_bytes().map_err(core_error)?;
+                // The flat reader admitted the document; a projection the
+                // packaged reader refuses is a gap of the edit, not a
+                // corrupt file.
+                let package =
+                    litchi_odp::Package::from_bytes_with_options(&bytes, self.0.odf_options)
+                        .map_err(|error| self.flat_refusal(odf_error(error)))?;
+                Ok(self.0.materialized.get_or_init(|| package))
+            },
         }
-    }
-
-    /// Whether this is a flat (single XML) document.
-    pub(crate) fn is_flat(&self) -> bool {
-        matches!(self.0.owner, OdpOwner::Flat(_))
     }
 
     /// Admit a write: the snapshot must have an editable package. A signed
     /// or encrypted package reports the refusal its leaf edit gives.
     pub(crate) fn admit_edit(&self) -> Result<()> {
         let package = self.package()?;
-        if package.security_policy().map_err(core_error)?.is_editable() {
+        if package
+            .security_policy()
+            .map_err(|error| self.flat_refusal(core_error(error)))?
+            .is_editable()
+        {
             return Ok(());
         }
-        drop(package.edit().map_err(odf_error)?);
+        drop(
+            package
+                .edit()
+                .map_err(|error| self.flat_refusal(odf_error(error)))?,
+        );
         Ok(())
     }
 
@@ -402,6 +460,9 @@ impl Odp {
     pub(crate) fn same_content(&self, other: &Self) -> Result<bool> {
         if self.same_snapshot(other) {
             return Ok(true);
+        }
+        if let (OdpOwner::Flat(left), OdpOwner::Flat(right)) = (&self.0.owner, &other.0.owner) {
+            return Ok(left.as_bytes() == right.as_bytes());
         }
         Ok(self.package()?.as_bytes() == other.package()?.as_bytes())
     }
@@ -629,15 +690,6 @@ impl Odp {
             || self.check_source(),
         )
     }
-}
-
-fn flat_write() -> Error {
-    Error::new(
-        Code::UnsupportedCapability,
-        "flat OpenDocument presentations (.fodp) are read-only in the unified API",
-    )
-    .with_format(FileFormat::Odp)
-    .with_suggestion("follow-up: M6 flat ODF writes; convert to a packaged .odp to edit")
 }
 
 impl fmt::Debug for Odp {

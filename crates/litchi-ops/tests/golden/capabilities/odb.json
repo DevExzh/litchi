@@ -30,16 +30,10 @@
       "supported": true
     },
     "move": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "0282 ODF object-format structure",
-      "reason": "the format's leaf has no such structural operation"
+      "supported": true
     },
     "swap": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "0282 ODF object-format structure",
-      "reason": "the format's leaf has no such structural operation"
+      "supported": true
     },
     "edit": {
       "supported": true
@@ -342,6 +336,24 @@
       "code": "unsupported_capability",
       "followUp": "0282 ODB query rename",
       "reason": "the leaf has no query rename; remove and add the query instead"
+    },
+    {
+      "subject": "operation",
+      "verb": "move",
+      "element": "column",
+      "context": "a column into another table",
+      "code": "unsupported_capability",
+      "followUp": "0292 ODB cross-table column transfer",
+      "reason": "a column belongs to its table's schema; columns move and swap within their table"
+    },
+    {
+      "subject": "operation",
+      "verb": "move",
+      "element": "table",
+      "context": "a database that mixes table representations and definitions",
+      "code": "unsupported_capability",
+      "followUp": "0292 ODB mixed table collections",
+      "reason": "representations and definitions order in separate collections, so one unified table order cannot be published"
     },
     {
       "subject": "operation",

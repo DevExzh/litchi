@@ -142,7 +142,7 @@ impl Odp {
         props: &Props<'_>,
         limits: &SemanticLimits,
     ) -> Result<Option<Plan>> {
-        if self.is_flat() || crate::format::odf_metadata::is_target(target) {
+        if crate::format::odf_metadata::is_target(target) {
             return Ok(None);
         }
         let Some(path) = target.path() else {

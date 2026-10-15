@@ -93,7 +93,7 @@ pub(crate) fn finish(
         limits.max_snapshot_bytes(),
     )?;
     let after = if changed {
-        Odt::from_package(package, file.origin().cloned(), file.format())?
+        file.adopt(package)?
     } else {
         file.clone()
     };
@@ -560,7 +560,7 @@ fn set_metadata(file: &Odt, props: &Props<'_>, limits: &SemanticLimits) -> Resul
         limits.max_snapshot_bytes(),
     )?;
     let after = if changed {
-        Odt::from_package(package, file.origin().cloned(), file.format())?
+        file.adopt(package)?
     } else {
         file.clone()
     };

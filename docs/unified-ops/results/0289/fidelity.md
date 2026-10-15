@@ -25,11 +25,11 @@ was refused (typed), `none` nothing to move.
 | odb | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | odc | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | odf | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| odg | 9 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 9 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| odg | 12 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 9 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 |
 | odm | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| odp | 15 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 13 | 0 | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| ods | 13 | 0 | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 10 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| odt | 23 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 20 | 0 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| odp | 20 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 13 | 0 | 2 | 2 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
+| ods | 26 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 6 | 0 | 0 | 19 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| odt | 70 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 27 | 38 | 0 | 0 | 4 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
 | pages | 32 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 16 | 0 | 0 | 0 | 16 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | ppt | 27 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 27 | 0 | 0 | 0 | 0 | 0 | 0 |
 | pptx | 80 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 52 | 24 | 8 | 0 | 0 | 0 | 3 | 69 |
@@ -37,7 +37,7 @@ was refused (typed), `none` nothing to move.
 | xls | 119 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 100 | 3 | 0 | 0 | 16 | 0 | 58 | 2 | 0 | 0 | 59 | 0 |
 | xlsb | 18 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 18 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | xlsx | 179 | 0 | 0 | 0 | 2 | 0 | 0 | 1 | 0 | 173 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| **all** | 899 | 0 | 19 | 0 | 7 | 0 | 0 | 14 | 166 | 398 | 0 | 4 | 172 | 159 | 81 | 12 | 0 | 0 | 111 | 157 |
+| **all** | 967 | 0 | 1 | 0 | 7 | 0 | 0 | 14 | 197 | 419 | 0 | 4 | 184 | 163 | 81 | 12 | 0 | 0 | 111 | 157 |
 
 ## Office-extension files the unified layer does not open
 
@@ -45,36 +45,17 @@ was refused (typed), `none` nothing to move.
 |---|---|
 | doc | corrupt_file ×5, unsupported_format ×5 |
 | docx | corrupt_file ×3 |
-| fodg | unsupported_capability ×5 |
+| fodg | corrupt_file ×2 |
 | fodp | corrupt_file ×3 |
 | fods | corrupt_file ×2 |
-| fodt | unsupported_capability ×46 |
 | odt | corrupt_file ×1 |
 | rtf | corrupt_file ×14, unsupported_format ×1 |
 | xls | corrupt_file ×2, unsupported_format ×2 |
 
 ## Every no-op that is not exact, and every revert that is not exact
 
-- `libreoffice-core/sc/qa/unit/data/draw-image-link.fods` (ods): refused edit: unsupported_capability: flat ODS (.fods) opens read-only through the unified layer; save-only exact
-- `libreoffice-core/sc/qa/unit/data/draw-object-link.fods` (ods): refused edit: unsupported_capability: flat ODS (.fods) opens read-only through the unified layer; save-only exact
-- `libreoffice-core/sc/qa/unit/data/functions/financial/fods/couppcd.fods` (ods): refused edit: unsupported_capability: flat ODS (.fods) opens read-only through the unified layer; save-only exact
-- `libreoffice-core/sc/qa/unit/data/functions/financial/fods/yielddisc.fods` (ods): refused edit: unsupported_capability: flat ODS (.fods) opens read-only through the unified layer; save-only exact
-- `libreoffice-core/sc/qa/unit/data/functions/text/fods/encodeurl.fods` (ods): refused edit: unsupported_capability: flat ODS (.fods) opens read-only through the unified layer; save-only exact
-- `libreoffice-core/sd/qa/unit/data/draw-image-link.fodp` (odp): refused edit: unsupported_capability: flat OpenDocument presentations (.fodp) are read-only in the unified API; save-only exact
-- `libreoffice-core/sd/qa/unit/data/draw-object-link.fodp` (odp): refused edit: unsupported_capability: flat OpenDocument presentations (.fodp) are read-only in the unified API; save-only exact
-- `libreoffice-core/sd/qa/unit/data/odp/Math.fodp` (odp): refused edit: unsupported_capability: flat OpenDocument presentations (.fodp) are read-only in the unified API; save-only exact
-- `libreoffice-core/sd/qa/unit/tiledrendering/data/slide-background-link.fodp` (odp): refused edit: unsupported_capability: flat OpenDocument presentations (.fodp) are read-only in the unified API; save-only exact
 - `libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx` (docx): refused edit: unsupported_capability: unsafe DOCX edit 'edit' rejected: source-backed document transactions do not support markup-compatibility b...
 - `libreoffice-core/sw/qa/extras/rtfexport/data/tdf107480.rtf` (rtf): exact ; revert one-way: /body/p[1] text: the set back is refused: unsupported_capability: unsupported RTF edit source: candidate body text did not survive RTF va...
-- `libreoffice-core/xmloff/qa/unit/data/tdf162686_3D_metal_type_ODF.fods` (ods): refused edit: unsupported_capability: flat ODS (.fods) opens read-only through the unified layer; save-only exact
-- `odf/drawing/fill-image-linked.fodp` (odp): refused edit: unsupported_capability: flat OpenDocument presentations (.fodp) are read-only in the unified API; save-only exact
-- `odf/drawing/marker-flat.fods` (ods): refused edit: unsupported_capability: flat ODS (.fods) opens read-only through the unified layer; save-only exact
 - `odf/native-resave/libreoffice-resaved/tdf169979-litchi.odp` (odp): exact ; revert one-way: /slide[1] name: the set back is refused: unsupported_capability: Unsupported feature: the ODP page name is referenced by links or custom ...
 - `odf/native-resave/litchi-changed/tdf169979-litchi.odp` (odp): exact ; revert one-way: /slide[1] name: the set back is refused: unsupported_capability: Unsupported feature: the ODP page name is referenced by links or custom ...
-- `odf/ods/conditional-formats.fods` (ods): refused edit: unsupported_capability: flat ODS (.fods) opens read-only through the unified layer; save-only exact
-- `odf/ods/grid-padding.fods` (ods): refused edit: unsupported_capability: flat ODS (.fods) opens read-only through the unified layer; save-only exact
-- `odf/ods/rich-text-hyperlinks.fods` (ods): refused edit: unsupported_capability: flat ODS (.fods) opens read-only through the unified layer; save-only exact
-- `odf/ods/sheet-shapes.fods` (ods): refused edit: unsupported_capability: flat ODS (.fods) opens read-only through the unified layer; save-only exact
-- `odf/ods/sparklines.fods` (ods): refused edit: unsupported_capability: flat ODS (.fods) opens read-only through the unified layer; save-only exact
-- `odfdo/tests/samples/test_flat_lo.fods` (ods): refused edit: unsupported_capability: flat ODS (.fods) opens read-only through the unified layer; save-only exact
 - `poi/test-data/spreadsheet/49609.xlsx` (xlsx): exact ; revert one-way: /sheet[1] name: the set back is refused: unsupported_capability: OPC package error: owned OPC source preservation is unavailable: source ...

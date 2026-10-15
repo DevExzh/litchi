@@ -54,6 +54,18 @@ pub(super) fn open<T: ZipTail>(
                 bytes, options,
             )?));
         }
+        #[cfg(feature = "odt")]
+        if format == FileFormat::Odt {
+            return Ok(File::Odt(crate::format::odt::Odt::from_flat(
+                bytes, options,
+            )?));
+        }
+        #[cfg(feature = "odg")]
+        if format == FileFormat::Odg {
+            return Ok(File::Odg(crate::format::odf_tree::OdfTree::from_flat(
+                bytes, options,
+            )?));
+        }
         return Err(super::flat_odf_unsupported(format));
     }
 

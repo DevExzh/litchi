@@ -784,7 +784,7 @@ pub(crate) static WRITE_GAPS: [GapSpec; 12] = [
         "set",
         "workbook",
         "flat-odf",
-        "flat single-XML spreadsheets (.fods) open read-only; their leaf transaction admits scalar cell writes only and is not integrated",
+        "flat single-XML spreadsheets (.fods) are edited through the leaf's packaged projection and republished element by element (record 0292); an edit that adds a package member or changes a part's root has no flat form and is refused, as is a projection the packaged reader refuses",
     ),
     operation_gap(
         "batch",

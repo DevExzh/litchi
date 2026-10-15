@@ -41,8 +41,7 @@ impl Ods {
         let Some(path) = target.path() else {
             return Ok(None);
         };
-        if self.is_flat()
-            || props.is_empty()
+        if props.is_empty()
             || super::super::metadata::is_target(target)
             || props.len() > limits.max_operations()
         {

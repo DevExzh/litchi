@@ -66,7 +66,7 @@ const LAYER_PROPS: &[PropSpec] = &[
     PropSpec::new("display", ValueType::Text),
 ];
 
-static OPERATION_GAPS: [GapSpec; 4] = [
+static OPERATION_GAPS: [GapSpec; 5] = [
     GapSpec {
         subject: Subject::Operation {
             verb: "add",
@@ -81,11 +81,21 @@ static OPERATION_GAPS: [GapSpec; 4] = [
         subject: Subject::Operation {
             verb: "move",
             element: "shape",
-            context: "a shape into another page",
+            context: "a group member, or a shape whose identity a connector or link on its page names, into another page",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "0288 ODG cross-page shape transfer",
-        reason: "shapes move within their page; a move to another page needs the leaf's dependency-checked shape transfer",
+        follow_up: "0292 ODG cross-page reference rewriting",
+        reason: "a shape moves to another page with its bytes unchanged; group members move with their group, and an identity dependency that would cross pages is refused rather than left dangling",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "swap",
+            element: "shape",
+            context: "two groups on different pages",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "0292 ODG cross-page group swap",
+        reason: "a cross-page swap is two transfers addressed by position; two group subtrees shift each other's positions, so move them one at a time",
     },
     GapSpec {
         subject: Subject::Operation {
@@ -162,7 +172,6 @@ pub(crate) static WRITES: super::Writes = super::Writes {
     settable: &["page", "shape"],
     addable: &["page", "shape"],
     removable: &["page", "shape"],
-    movable: &["page", "shape"],
     gaps: &OPERATION_GAPS,
 };
 
@@ -558,41 +567,8 @@ fn anchor(file: &OdfTree, path: &PathArg<'_>, kind: Kind) -> Result<usize> {
     }
 }
 
-/// The final position a move placement names for the element at `from`
-/// among `count` siblings.
-fn destination(
-    file: &OdfTree,
-    from: usize,
-    count: usize,
-    placement: &crate::Placement<'_>,
-    kind: Kind,
-) -> Result<usize> {
-    use crate::Placement;
-    let last = count.saturating_sub(1);
-    let to = match placement {
-        Placement::Start => 0,
-        Placement::End => last,
-        Placement::Position(position) => position.get(),
-        Placement::Before(path) => {
-            let anchor = anchor(file, path, kind)?;
-            if from < anchor { anchor - 1 } else { anchor }
-        },
-        Placement::After(path) => {
-            let anchor = anchor(file, path, kind)?;
-            if from < anchor { anchor } else { anchor + 1 }
-        },
-        Placement::Into(_, position) => position.map_or(last, Position::get),
-    };
-    if to >= count {
-        return Err(refusal(
-            Code::OutOfRange,
-            "the ODG move position is outside its parent",
-        ));
-    }
-    Ok(to)
-}
-
-/// Move a page within the drawing, or a shape within its page.
+/// Move a page within the drawing, or a shape within its page or into
+/// another page (record 0292).
 pub(crate) fn move_to(
     file: &OdfTree,
     package: &litchi_odg::Package,
@@ -600,45 +576,55 @@ pub(crate) fn move_to(
     placement: &crate::Placement<'_>,
     limits: &SemanticLimits,
 ) -> Result<Commit> {
+    use super::write::Destination;
     let node = super::write::parent::<Odg>(file, path)?;
     let [page, shape] = node.item().leaf();
-    let drawing = package.drawing();
+    let kind = node.item().type_name();
+    if !matches!(kind, "page" | "shape") {
+        return Err(element_refusal("move", &node));
+    }
+    let siblings = super::write::siblings(file, &node)?;
+    let destination = super::write::destination::<Odg>(file, &node, &siblings, placement)?;
     let mut edit = package.edit();
-    match node.item().type_name() {
-        "page" => {
-            if matches!(placement, crate::Placement::Into(..)) {
-                return Err(refusal(
-                    Code::UnsupportedCapability,
-                    "an ODG page moves among the drawing's pages",
-                ));
-            }
-            let to = destination(file, page, drawing.pages().len(), placement, Kind::Page)?;
-            edit.move_page(page, to).map_err(staging)?;
-        },
-        "shape" => {
-            if let crate::Placement::Into(parent, _) = placement {
-                let target = super::write::parent::<Odg>(file, parent)?;
-                if target.item().type_name() != "page" || target.item().leaf()[0] != page {
-                    return Err(refusal(
-                        Code::UnsupportedCapability,
-                        "an ODG shape moves within its own page",
-                    )
-                    .with_suggestion("follow-up: 0288 ODG cross-page shape transfer"));
-                }
-            }
-            let count = drawing
-                .pages()
-                .get(page)
-                .map_or(0, |value| value.shapes().len());
-            let to = destination(file, shape, count, placement, Kind::Shape)?;
+    match (kind, destination) {
+        ("page", Destination::Within(to)) => edit.move_page(page, to).map_err(staging)?,
+        ("shape", Destination::Within(to)) => {
             edit.move_shape(page, shape, to).map_err(staging)?;
         },
-        _ => return Err(element_refusal("move", &node)),
+        ("shape", Destination::Across { parent, position }) => {
+            if parent.item().type_name() != "page" {
+                return Err(refusal(
+                    Code::UnsupportedType,
+                    "an ODG shape moves into a page",
+                ));
+            }
+            let to_page = parent.item().leaf()[0];
+            let count = package
+                .drawing()
+                .pages()
+                .get(to_page)
+                .map_or(0, |value| value.shapes().len());
+            let to = position.unwrap_or(count);
+            if to > count {
+                return Err(refusal(
+                    Code::OutOfRange,
+                    "the ODG move position is outside the destination page",
+                ));
+            }
+            edit.move_shape_to_page(page, shape, to_page, to)
+                .map_err(staging)?;
+        },
+        _ => {
+            return Err(refusal(
+                Code::UnsupportedType,
+                "an ODG page moves among the drawing's pages",
+            ));
+        },
     }
     commit(file, edit, 1, limits)
 }
 
-/// Exchange two pages, or two shapes of one page.
+/// Exchange two pages, or two shapes (of one page or of two pages).
 pub(crate) fn swap(
     file: &OdfTree,
     package: &litchi_odg::Package,
@@ -646,20 +632,19 @@ pub(crate) fn swap(
     right: &PathArg<'_>,
     limits: &SemanticLimits,
 ) -> Result<Commit> {
-    let left = super::write::parent::<Odg>(file, left)?;
-    let right = super::write::parent::<Odg>(file, right)?;
+    let (left, right) = super::write::swap_pair::<Odg>(file, left, right)?;
     let [left_page, left_shape] = left.item().leaf();
     let [right_page, right_shape] = right.item().leaf();
     let mut edit = package.edit();
-    match (left.item().type_name(), right.item().type_name()) {
-        ("page", "page") => {
+    match left.item().type_name() {
+        "page" => {
             let (first, second) = (left_page.min(right_page), left_page.max(right_page));
             if first != second {
                 edit.move_page(first, second).map_err(staging)?;
                 edit.move_page(second - 1, first).map_err(staging)?;
             }
         },
-        ("shape", "shape") if left_page == right_page => {
+        "shape" if left_page == right_page => {
             let (first, second) = (left_shape.min(right_shape), left_shape.max(right_shape));
             if first != second {
                 edit.move_shape(left_page, first, second).map_err(staging)?;
@@ -667,12 +652,32 @@ pub(crate) fn swap(
                     .map_err(staging)?;
             }
         },
-        _ => {
-            return Err(refusal(
-                Code::UnsupportedCapability,
-                "ODG swap exchanges two pages or two shapes of one page",
-            ));
+        "shape" => {
+            // The first transfer lands just before the other shape, which
+            // shifts by one; a group would shift it by its whole subtree.
+            let is_group = |node: &super::Node<'_>| {
+                node.item()
+                    .value("shapeType")
+                    .and_then(crate::node::Value::as_str)
+                    == Some("group")
+            };
+            let ((a_page, a_shape), (b_page, b_shape)) = if !is_group(&left) {
+                ((left_page, left_shape), (right_page, right_shape))
+            } else if !is_group(&right) {
+                ((right_page, right_shape), (left_page, left_shape))
+            } else {
+                return Err(refusal(
+                    Code::UnsupportedCapability,
+                    "swapping two ODG groups across pages is not supported; move them one at a time",
+                )
+                .with_suggestion("follow-up: 0292 ODG cross-page group swap"));
+            };
+            edit.move_shape_to_page(a_page, a_shape, b_page, b_shape)
+                .map_err(staging)?;
+            edit.move_shape_to_page(b_page, b_shape + 1, a_page, a_shape)
+                .map_err(staging)?;
         },
+        _ => return Err(element_refusal("swap", &left)),
     }
     commit(file, edit, 2, limits)
 }

@@ -167,7 +167,7 @@ pub(crate) fn finish(
         snapshot_bytes,
         limits.max_snapshot_bytes(),
     )?;
-    let after = OdfTree::from_commit(owner, file.origin().cloned())?;
+    let after = file.republish(owner)?;
     Ok(Commit {
         before: file.clone(),
         after,
@@ -214,13 +214,17 @@ pub(crate) fn resolve<'f, F: Flavor>(
     Ok(nodes)
 }
 
-#[cfg(any(feature = "odg", feature = "odc", feature = "odb"))]
-/// Resolve the parent of an `add`.
+/// Resolve the parent of an `add` (or any single element path).
 pub(crate) fn parent<'f, F: Flavor>(file: &'f OdfTree, path: &PathArg<'_>) -> Result<Node<'f>> {
     crate::path::resolve::get(&Nav::<F>::new(file), path)
 }
 
-#[cfg(any(feature = "odg", feature = "odc", feature = "odb"))]
+#[cfg(any(
+    feature = "odg",
+    feature = "odc",
+    feature = "odb",
+    feature = "odf-formula"
+))]
 /// The path of the `ordinal`th child of `kind` under `parent` in `file`'s
 /// tree, after an add committed.
 pub(crate) fn added_path(
@@ -535,16 +539,15 @@ pub(crate) fn move_to<'p, 'q>(
     match file.owner() {
         #[cfg(feature = "odg")]
         Owner::Odg(package) => super::odg::move_to(file, package, &path, &placement, limits),
-        #[allow(
-            unreachable_patterns,
-            reason = "only the drawing leaf orders its elements"
-        )]
-        _ => {
-            let _ = (path, placement, limits);
-            Err(refusal(
-                Code::UnsupportedCapability,
-                "moving elements is not supported for this OpenDocument format",
-            ))
+        #[cfg(feature = "odc")]
+        Owner::Odc(package) => super::odc::move_to(file, package, &path, &placement, limits),
+        #[cfg(feature = "odi")]
+        Owner::Odi(_) => super::odi::move_to(file, &path, &placement, limits),
+        #[cfg(feature = "odb")]
+        Owner::Odb(package) => super::odb::move_to(file, package, &path, &placement, limits),
+        #[cfg(feature = "odf-formula")]
+        Owner::Formula(package) => {
+            super::formula::move_to(file, package, &path, &placement, limits)
         },
     }
 }
@@ -559,18 +562,168 @@ pub(crate) fn swap<'p, 'q>(
     match file.owner() {
         #[cfg(feature = "odg")]
         Owner::Odg(package) => super::odg::swap(file, package, &left, &right, limits),
-        #[allow(
-            unreachable_patterns,
-            reason = "only the drawing leaf orders its elements"
-        )]
-        _ => {
-            let _ = (left, right, limits);
-            Err(refusal(
+        #[cfg(feature = "odc")]
+        Owner::Odc(package) => super::odc::swap(file, package, &left, &right, limits),
+        #[cfg(feature = "odi")]
+        Owner::Odi(_) => super::odi::swap(file, &left, &right, limits),
+        #[cfg(feature = "odb")]
+        Owner::Odb(package) => super::odb::swap(file, package, &left, &right, limits),
+        #[cfg(feature = "odf-formula")]
+        Owner::Formula(package) => super::formula::swap(file, package, &left, &right, limits),
+    }
+}
+
+/// The same-kind siblings of one element: its parent item, the sibling
+/// items in document order, and the element's position among them.
+pub(crate) struct Siblings {
+    pub(crate) parent: u32,
+    pub(crate) items: Vec<u32>,
+    pub(crate) from: usize,
+}
+
+/// The same-kind siblings of `node` in `file`'s tree.
+pub(crate) fn siblings(file: &OdfTree, node: &Node<'_>) -> Result<Siblings> {
+    let tree = file.tree();
+    let kind = node.item().type_name();
+    let parent = (0..tree.len())
+        .map(|index| u32::try_from(index).unwrap_or(u32::MAX))
+        .find(|index| tree.item(*index).children().contains(&node.index()))
+        .ok_or_else(|| {
+            refusal(
                 Code::UnsupportedCapability,
-                "swapping elements is not supported for this OpenDocument format",
-            ))
+                format!("the root `{kind}` element has no siblings to reorder"),
+            )
+        })?;
+    let items: Vec<u32> = tree
+        .item(parent)
+        .children()
+        .iter()
+        .copied()
+        .filter(|child| tree.item(*child).type_name() == kind)
+        .collect();
+    let from = items
+        .iter()
+        .position(|child| *child == node.index())
+        .ok_or_else(|| refusal(Code::InternalError, "the moved element is not a child"))?;
+    Ok(Siblings {
+        parent,
+        items,
+        from,
+    })
+}
+
+/// Where a move places an element: among its own siblings (its final
+/// sibling position), or under another parent.
+#[cfg_attr(
+    not(any(feature = "odg", feature = "odf-formula")),
+    allow(
+        dead_code,
+        reason = "only the drawing and formula flavors move elements across parents"
+    )
+)]
+pub(crate) enum Destination<'f> {
+    /// The final position among the element's current siblings.
+    #[cfg_attr(
+        not(any(
+            feature = "odg",
+            feature = "odc",
+            feature = "odb",
+            feature = "odf-formula"
+        )),
+        allow(dead_code, reason = "a single-element image has no other position")
+    )]
+    Within(usize),
+    /// Under `parent` (another item), before the same-kind sibling at
+    /// `position` of that parent's children (`None`: last).
+    Across {
+        parent: Node<'f>,
+        position: Option<usize>,
+    },
+}
+
+/// Resolve `placement` for the element at `siblings.from`.
+pub(crate) fn destination<'f, F: Flavor>(
+    file: &'f OdfTree,
+    node: &Node<'f>,
+    siblings: &Siblings,
+    placement: &crate::Placement<'_>,
+) -> Result<Destination<'f>> {
+    use crate::Placement;
+    let count = siblings.items.len();
+    let last = count.saturating_sub(1);
+    let kind = node.item().type_name();
+    let within = |to: usize| -> Result<Destination<'f>> {
+        if to >= count {
+            return Err(refusal(
+                Code::OutOfRange,
+                format!("the move position is outside the `{kind}` siblings"),
+            ));
+        }
+        Ok(Destination::Within(to))
+    };
+    let anchored = |path: &PathArg<'_>, after: bool| -> Result<Destination<'f>> {
+        let anchor = parent::<F>(file, path)?;
+        if anchor.item().type_name() != kind {
+            return Err(refusal(
+                Code::UnsupportedType,
+                format!("the placement anchor is not a `{kind}` element"),
+            ));
+        }
+        if let Some(index) = siblings
+            .items
+            .iter()
+            .position(|item| *item == anchor.index())
+        {
+            let from = siblings.from;
+            let to = match (after, from < index) {
+                (false, true) => index - 1,
+                (false, false) | (true, true) => index,
+                (true, false) => index + 1,
+            };
+            return within(to);
+        }
+        let anchor_siblings = self::siblings(file, &anchor)?;
+        let position = anchor_siblings.from + usize::from(after);
+        Ok(Destination::Across {
+            parent: Node::new(file, anchor_siblings.parent),
+            position: Some(position),
+        })
+    };
+    match placement {
+        Placement::Start => within(0),
+        Placement::End => within(last),
+        Placement::Position(position) => within(position.get()),
+        Placement::Before(path) => anchored(path, false),
+        Placement::After(path) => anchored(path, true),
+        Placement::Into(path, position) => {
+            let target = parent::<F>(file, path)?;
+            if target.index() == siblings.parent {
+                within(position.map_or(last, litchi_core::Position::get))
+            } else {
+                Ok(Destination::Across {
+                    parent: target,
+                    position: position.map(litchi_core::Position::get),
+                })
+            }
         },
     }
+}
+
+/// Resolve both sides of a swap; they must be distinct elements of one kind.
+pub(crate) fn swap_pair<'f, F: Flavor>(
+    file: &'f OdfTree,
+    left: &PathArg<'_>,
+    right: &PathArg<'_>,
+) -> Result<(Node<'f>, Node<'f>)> {
+    let left = parent::<F>(file, left)?;
+    let right = parent::<F>(file, right)?;
+    if left.item().type_name() != right.item().type_name() {
+        return Err(refusal(
+            Code::UnsupportedType,
+            "a swap exchanges two elements of the same kind",
+        ));
+    }
+    Ok((left, right))
 }
 
 /// A fresh minimal package of `format`, with create-time metadata where

@@ -451,20 +451,6 @@ const SIGNED: Refusal = Refusal {
     reason: "editing requires explicit signature consumption",
 };
 
-/// The refusal of every edit verb in M1.
-/// The structural verbs the ODF object-format leaves do not offer
-/// (record 0282): moving and swapping elements, and adding or removing
-/// where the format has no such operation.
-#[cfg_attr(
-    not(feature = "odf-objects"),
-    allow(dead_code, reason = "read only when an object format is compiled in")
-)]
-const OBJECT_STRUCTURE: Refusal = Refusal {
-    code: Code::UnsupportedCapability,
-    follow_up: "0282 ODF object-format structure",
-    reason: "the format's leaf has no such structural operation",
-};
-
 /// The structural verbs the iWork leaves do not offer yet (record 0296):
 /// element creation, and removal, moving and swapping where the leaf has
 /// no such transaction (`IWORK_API_REQUESTS.md`).
@@ -490,6 +476,7 @@ const IWORK_CREATE: Refusal = Refusal {
     reason: "the iWork leaves have no from-scratch package builder",
 };
 
+/// The refusal of every edit verb in M1.
 const EDITS: Refusal = Refusal {
     code: Code::UnsupportedCapability,
     follow_up: "M2",
@@ -536,15 +523,6 @@ const PPTX_SHAPE_ADD: Refusal = Refusal {
     code: Code::UnsupportedCapability,
     follow_up: "OpenOptions::retain_source(true)",
     reason: "this PPTX owner cannot add a slide or top-level text-box shape",
-};
-
-/// The refusal of edits on a flat (single-XML) OpenDocument presentation,
-/// which the unified API reads but does not edit.
-#[cfg(feature = "odp")]
-const ODP_FLAT: Refusal = Refusal {
-    code: Code::UnsupportedCapability,
-    follow_up: "M6 flat ODF writes; convert to a packaged .odp to edit",
-    reason: "flat OpenDocument presentations (.fodp) are read-only in the unified API",
 };
 
 /// The refusal of a locked OOXML package whose format its name does not
@@ -968,22 +946,17 @@ impl Capabilities {
                     | Verb::Batch
             ) && self.adapter() == Some(Adapter::Odp)
             {
-                // A flat (single-XML) document reports that it retained no
-                // editable package.
-                if self.retains_source == Some(false) {
-                    return ODP_FLAT.support();
-                }
                 return Support::Supported;
             }
             #[cfg(feature = "odf-objects")]
-            if let Some(writes) = self.adapter().and_then(crate::format::odf_tree::writes) {
-                return match verb {
-                    Verb::Set | Verb::Edit | Verb::Batch => Support::Supported,
-                    Verb::Add if !writes.addable.is_empty() => Support::Supported,
-                    Verb::Remove if !writes.removable.is_empty() => Support::Supported,
-                    Verb::Move | Verb::Swap if !writes.movable.is_empty() => Support::Supported,
-                    _ => OBJECT_STRUCTURE.support(),
-                };
+            // Every edit verb dispatches to the object format's leaf; what
+            // a format cannot do is an element-level gap (record 0292).
+            if self
+                .adapter()
+                .and_then(crate::format::odf_tree::writes)
+                .is_some()
+            {
+                return Support::Supported;
             }
             #[cfg(feature = "iwork-adapter")]
             if let Some(writes) = self.adapter().and_then(crate::format::iwork::writes) {
@@ -1316,8 +1289,6 @@ fn retains_source(file: &File) -> Option<bool> {
         File::Xls(handle) => Some(handle.retains_source()),
         #[cfg(feature = "ppt")]
         File::Ppt(handle) => Some(handle.retains_source()),
-        #[cfg(feature = "odp")]
-        File::Odp(handle) if handle.is_flat() => Some(false),
         File::Signed(signed) => retains_source(signed.file()),
         _ => None,
     }
