@@ -8340,7 +8340,13 @@ fn scan_document_with_context(xml: &[u8], context: Option<&ExecutionContext>) ->
                     let is_table = is_word && local == b"tbl";
                     let is_control = is_word && local == b"sdt";
                     let is_section = is_word && local == b"sectPr";
-                    if final_section_start.is_some() {
+                    // A child after the body-final section properties is
+                    // refused only when it is body content; producers write
+                    // `w:altChunk` imports there (record 0293), which stay an
+                    // untouched tail outside the editable content region.
+                    if final_section_start.is_some()
+                        && (is_paragraph || is_table || is_control || is_section)
+                    {
                         return Err(crate::Error::InvalidFormat(
                             "body-final section properties are not the final body child".into(),
                         )
@@ -8369,7 +8375,7 @@ fn scan_document_with_context(xml: &[u8], context: Option<&ExecutionContext>) ->
                     let (prefix, local) = split_qualified_name(element.name().into_inner());
                     let is_word = is_classified_body_child(local)
                         && is_wordprocessing_namespace(&tracker.resolve_prefix_bytes(prefix));
-                    if final_section_start.is_some() {
+                    if final_section_start.is_some() && is_word {
                         return Err(crate::Error::InvalidFormat(
                             "body-final section properties are not the final body child".into(),
                         )
@@ -8649,7 +8655,9 @@ fn scan_document_with_context_nsreader_oracle(
                     let is_table = is_word && local.as_ref() == b"tbl";
                     let is_control = is_word && local.as_ref() == b"sdt";
                     let is_section = is_word && local.as_ref() == b"sectPr";
-                    if final_section_start.is_some() {
+                    if final_section_start.is_some()
+                        && (is_paragraph || is_table || is_control || is_section)
+                    {
                         return Err(crate::Error::InvalidFormat(
                             "body-final section properties are not the final body child".into(),
                         )
@@ -8672,7 +8680,10 @@ fn scan_document_with_context_nsreader_oracle(
                 if body_depth.is_some_and(|body| child_depth == body + 1) {
                     let is_word = is_wordprocessing_namespace(&namespace);
                     let local = element.local_name();
-                    if final_section_start.is_some() {
+                    if final_section_start.is_some()
+                        && is_word
+                        && is_classified_body_child(local.as_ref())
+                    {
                         return Err(crate::Error::InvalidFormat(
                             "body-final section properties are not the final body child".into(),
                         )
