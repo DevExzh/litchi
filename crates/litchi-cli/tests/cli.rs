@@ -1026,6 +1026,95 @@ fn iwork_writes_save_in_place() {
     );
 }
 
+/// Keynote structure from the command line (record 0298): slides are
+/// created, added (from a layout and as a copy), moved, swapped and removed;
+/// text boxes and paragraphs are added; a fresh presentation is created.
+#[test]
+fn keynote_structure_from_the_command_line() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let deck = scratch(dir.path(), "m.key", Some("iwork/keynote/multi-slide.key"));
+    let file = arg(&deck);
+    expect(
+        0,
+        [
+            "add",
+            file,
+            "/",
+            "--type",
+            "slide",
+            "--prop",
+            "from=/slide[2]",
+            "--index",
+            "0",
+        ],
+    );
+    assert_eq!(text_of(&deck, "/slide[1]/placeholder[title]"), "Agenda");
+    expect(0, ["remove", file, "/slide[1]"]);
+    assert_eq!(
+        text_of(&deck, "/slide[1]/placeholder[title]"),
+        "Litchi multi-slide fixture"
+    );
+    expect(0, ["swap", file, "/slide[1]", "/slide[2]"]);
+    assert_eq!(text_of(&deck, "/slide[1]/placeholder[title]"), "Agenda");
+    expect(0, ["move", file, "/slide[2]", "--index", "0"]);
+    assert_eq!(
+        text_of(&deck, "/slide[1]/placeholder[title]"),
+        "Litchi multi-slide fixture"
+    );
+    expect(
+        0,
+        [
+            "add",
+            file,
+            "/slide[1]",
+            "--type",
+            "textbox",
+            "--prop",
+            "text=From the CLI",
+        ],
+    );
+    assert_eq!(text_of(&deck, "/slide[1]/shape[2]"), "From the CLI");
+    expect(
+        0,
+        [
+            "add",
+            file,
+            "/slide[2]/placeholder[body]",
+            "--type",
+            "paragraph",
+            "--prop",
+            "text=Fourth topic",
+        ],
+    );
+    assert_eq!(
+        text_of(&deck, "/slide[2]/placeholder[body]/paragraph[4]"),
+        "Fourth topic"
+    );
+    expect(
+        0,
+        [
+            "set",
+            file,
+            "/slide[1]/notes",
+            "--prop",
+            "text=Notes from the CLI",
+        ],
+    );
+    assert_eq!(text_of(&deck, "/slide[1]/notes"), "Notes from the CLI");
+    let run = expect(5, ["remove", file, "/slide[1]/placeholder[title]"]);
+    assert!(
+        run.stderr.contains("unsupported_capability"),
+        "{}",
+        run.stderr
+    );
+
+    let blank = dir.path().join("blank.key");
+    expect(0, ["create", arg(&blank)]);
+    expect(0, ["add", arg(&blank), "/", "--type", "slide"]);
+    let query = expect(0, ["query", arg(&blank), "slide", "--json"]).json();
+    assert!(query.to_string().contains("/slide[2]"), "{query}");
+}
+
 const ITEMS: &str = r#"[
   {"command":"add","parent":"/body","type":"paragraph","props":{"text":"B1"}},
   {"command":"set","path":"/body/p[1]/r[1]","props":{"bold":true}},

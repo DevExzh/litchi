@@ -507,9 +507,10 @@ impl Iwork {
         Ok(written)
     }
 
-    /// A fresh package of `format`. Pages documents come from the leaf's
-    /// deterministic `Package::new()` (record 0299); Keynote and Numbers
-    /// have no from-scratch builder yet (`IWORK_API_REQUESTS.md` request 1).
+    /// A fresh package of `format`. Pages documents (record 0299) and Keynote
+    /// presentations (record 0298) come from the leaf's deterministic
+    /// `Package::new()`; Numbers has no from-scratch builder yet
+    /// (`IWORK_API_REQUESTS.md` request 1).
     pub(crate) fn create(format: FileFormat, options: &crate::CreateOptions) -> Result<Self> {
         let _ = options;
         #[cfg(feature = "pages")]
@@ -518,9 +519,14 @@ impl Iwork {
                 .map_err(|error| leaf_error(LeafError::Pages(error), FileFormat::Pages))?;
             return Ok(Self::from_owner(Owner::Pages(package), None));
         }
+        #[cfg(feature = "keynote")]
+        if format == FileFormat::Keynote {
+            let package = litchi_keynote::Package::new();
+            return Ok(Self::from_owner(Owner::Keynote(package), None));
+        }
         Err(Error::new(
             crate::Code::UnsupportedCapability,
-            "creating a Keynote or Numbers document from scratch needs a leaf `Package::new()`, which those owners do not have yet",
+            "creating a Numbers document from scratch needs a leaf `Package::new()`, which that owner does not have yet",
         )
         .with_format(format)
         .with_suggestion("open an existing package and edit it"))

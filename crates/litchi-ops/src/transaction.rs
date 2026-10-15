@@ -261,6 +261,9 @@ pub struct Edit {
     /// Coalesced Pages paragraph text sets (record 0299).
     #[cfg(feature = "pages")]
     pages: Option<crate::format::iwork::pages::Run>,
+    /// Coalesced Keynote sets, new drawables and new slides (record 0298).
+    #[cfg(feature = "keynote")]
+    keynote: Option<crate::format::iwork::keynote::Run>,
     /// The match count of the last `find=` set (record 0273).
     matched: Option<usize>,
 }
@@ -358,6 +361,8 @@ impl File {
                 odf_tree: None,
                 #[cfg(feature = "pages")]
                 pages: None,
+                #[cfg(feature = "keynote")]
+                keynote: None,
                 matched: None,
             };
             let value = f(&mut edit);
@@ -606,6 +611,10 @@ impl Edit {
         _parent: impl IntoPath<'p>,
         _node: impl IntoNode<'n>,
     ) -> Result<Path<'static>> {
+        #[cfg(feature = "keynote")]
+        if matches!(self.current, File::Keynote(_)) {
+            return self.add_keynote(_parent, _node);
+        }
         #[cfg(any(
             feature = "doc",
             feature = "pptx",
@@ -1642,6 +1651,40 @@ impl Edit {
             self.operations += 1;
             return Ok(Some(changed));
         }
+        #[cfg(feature = "keynote")]
+        if let File::Keynote(handle) = self.current.clone() {
+            // Direct text, paragraph, frame and visibility sets join one
+            // run: one slide-drawable commit plus one commit per text
+            // (record 0298). A run holding new slides publishes first.
+            let plan = self
+                .keynote
+                .as_ref()
+                .is_none_or(crate::format::iwork::keynote::Run::accepts_sets)
+                .then(|| {
+                    crate::format::iwork::keynote::coalesce::plan_set(&handle, _target, _props)
+                })
+                .flatten();
+            let Some(node) = plan else {
+                if self.keynote.is_some() {
+                    self.flush_pending()?;
+                }
+                return Ok(None);
+            };
+            if self.operations >= self.limits.max_operations() {
+                return Err(Error::Limit {
+                    kind: LimitKind::Operations,
+                    observed: self.operations.saturating_add(1),
+                    maximum: self.limits.max_operations(),
+                }
+                .into());
+            }
+            let run = self.keynote.get_or_insert_with(|| {
+                crate::format::iwork::keynote::Run::new(&handle, &self.limits)
+            });
+            run.stage_set(node, _props, _index)?;
+            self.operations += 1;
+            return Ok(Some(true));
+        }
         #[cfg(feature = "odt")]
         if let Some(handle) = self.current.odt_family().cloned() {
             // A run plans every set against its base handle (the current
@@ -2390,6 +2433,37 @@ impl Edit {
             })();
             result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
         }
+        #[cfg(feature = "keynote")]
+        if let Some(run) = self.keynote.take() {
+            let first = run.first_index();
+            let result = (|| -> std::result::Result<(), (crate::Error, Option<usize>)> {
+                let (base, commit) = run
+                    .commit()
+                    .map_err(|(error, index)| (error, Some(index)))?;
+                let (step, ()) = wrap_iwork(&base, commit, ()).map_err(|error| (error, first))?;
+                let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
+                if bytes > self.limits.max_snapshot_bytes() {
+                    return Err((
+                        Error::Limit {
+                            kind: LimitKind::SnapshotBytes,
+                            observed: bytes,
+                            maximum: self.limits.max_snapshot_bytes(),
+                        }
+                        .into(),
+                        first,
+                    ));
+                }
+                self.steps
+                    .try_reserve(1)
+                    .map_err(|source| (Error::Allocation { source }.into(), first))?;
+                self.current = step.after.clone();
+                self.steps.push(step);
+                self.snapshot_bytes = bytes;
+                Ok(())
+            })();
+            result
+                .map_err(|(error, index)| self.poison(error, index.unwrap_or(self.operations)))?;
+        }
         #[cfg(feature = "odt")]
         if let Some(run) = self.odt.take() {
             let index = run.first_index();
@@ -2689,6 +2763,10 @@ impl Edit {
                 {
                     self.pages = None;
                 }
+                #[cfg(feature = "keynote")]
+                {
+                    self.keynote = None;
+                }
                 #[cfg(feature = "xlsx")]
                 {
                     self.cells = None;
@@ -2772,6 +2850,75 @@ impl Edit {
                 wrap_rtf(handle, commit, matched)
             },
             _ => Err(crate::find::unsupported(file)),
+        })
+    }
+
+    /// Add to a Keynote presentation: a new slide, text box, shape or
+    /// picture joins the transaction's Keynote run (record 0298); anything
+    /// else publishes the run and runs alone.
+    #[cfg(feature = "keynote")]
+    fn add_keynote<'p, 'n>(
+        &mut self,
+        parent: impl IntoPath<'p>,
+        node: impl IntoNode<'n>,
+    ) -> Result<Path<'static>> {
+        self.check()?;
+        let index = self.operations;
+        let staged = (|| {
+            let (parent, node) = match (parent.into_path(), node.into_node()) {
+                (Ok(parent), Ok(node)) => (parent, node),
+                (Err(error), _) | (_, Err(error)) => {
+                    self.flush_pending()?;
+                    return Err(error);
+                },
+            };
+            let File::Keynote(handle) = self.current.clone() else {
+                return Err(pending());
+            };
+            if index >= self.limits.max_operations() {
+                self.flush_pending()?;
+                return Err(Error::Limit {
+                    kind: LimitKind::Operations,
+                    observed: index.saturating_add(1),
+                    maximum: self.limits.max_operations(),
+                }
+                .into());
+            }
+            let staged = match self.keynote.as_mut() {
+                Some(run) => run.stage_add(&parent, &node, index),
+                None => {
+                    let mut run = crate::format::iwork::keynote::Run::new(&handle, &self.limits);
+                    let staged = run.stage_add(&parent, &node, index);
+                    if matches!(staged, Ok(Some(_))) {
+                        self.keynote = Some(run);
+                    }
+                    staged
+                },
+            };
+            match staged {
+                Ok(Some(path)) => {
+                    self.operations += 1;
+                    Ok(Ok(path))
+                },
+                Ok(None) => Ok(Err((parent, node))),
+                Err(error) => {
+                    self.flush_pending()?;
+                    Err(error)
+                },
+            }
+        })();
+        let (parent, node) = match staged {
+            Ok(Ok(path)) => return Ok(path),
+            Ok(Err(request)) => request,
+            Err(error) => return Err(self.poison(error, index)),
+        };
+        let limits = self.limits;
+        self.execute(|file| match file {
+            File::Keynote(handle) => {
+                let (commit, path) = handle.add_with_limits(parent, node, &limits)?;
+                wrap_iwork(handle, commit, path)
+            },
+            _ => Err(pending()),
         })
     }
 

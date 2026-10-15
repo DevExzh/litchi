@@ -464,9 +464,9 @@ const IWORK_STRUCTURE: Refusal = Refusal {
     reason: "the iWork leaf has no such structural transaction yet",
 };
 
-/// Keynote and Numbers documents cannot be created from scratch yet: those
-/// leaves have no package builder (`IWORK_API_REQUESTS.md` request 1; Pages
-/// creates its minimal document since record 0299).
+/// Numbers documents cannot be created from scratch yet: that leaf has no
+/// package builder (`IWORK_API_REQUESTS.md` request 1; Pages and Keynote
+/// create their minimal documents since records 0299 and 0298).
 #[cfg_attr(
     not(feature = "iwork-adapter"),
     allow(dead_code, reason = "read only when an iWork format is compiled in")
@@ -966,9 +966,11 @@ impl Capabilities {
                     Verb::Add if !writes.addable.is_empty() => Support::Supported,
                     Verb::Remove if !writes.removable.is_empty() => Support::Supported,
                     Verb::Move if !writes.movable.is_empty() => Support::Supported,
-                    // Pages exchanges paragraphs (record 0299).
+                    // Pages exchanges paragraphs (record 0299); Keynote slides,
+                    // paragraphs and drawables (record 0298).
                     Verb::Swap
-                        if self.format == Some(FileFormat::Pages) && !writes.movable.is_empty() =>
+                        if matches!(self.format, Some(FileFormat::Pages | FileFormat::Keynote))
+                            && !writes.movable.is_empty() =>
                     {
                         Support::Supported
                     },
@@ -1100,13 +1102,14 @@ impl Capabilities {
         if self.format == Some(FileFormat::Odp) && cfg!(feature = "odp") {
             return Support::Supported;
         }
-        // Pages creates its minimal document (record 0299).
-        if self.format == Some(FileFormat::Pages) && self.adapter().is_some() {
-            return Support::Supported;
-        }
-        if matches!(self.format, Some(FileFormat::Keynote | FileFormat::Numbers))
+        // Pages (record 0299) and Keynote (record 0298) create their
+        // minimal documents.
+        if matches!(self.format, Some(FileFormat::Pages | FileFormat::Keynote))
             && self.adapter().is_some()
         {
+            return Support::Supported;
+        }
+        if self.format == Some(FileFormat::Numbers) && self.adapter().is_some() {
             return IWORK_CREATE.support();
         }
 

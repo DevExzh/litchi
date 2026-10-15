@@ -71,8 +71,9 @@ Each request is described by intent. The signatures are suggestions; the owners 
    `Package::{slide_layouts, default_slide_layout, apply_slide_creation}`,
    exact-source `Patch::{is_noop, inverse}`; typed
    `Error::UnsupportedContent` for slides whose content lives in other
-   components (tables, charts, comments). The unified adapter is the
-   coordinator's follow-up.
+   components (tables, charts, comments). `Package::slide_layout_list()`
+   names each slide's layout. Wired into `File::Keynote` (record 0298,
+   unified part).
 9. **Shape and text-box CRUD:** add, remove, and change geometry. *Landed in 0298:*
    `litchi_keynote::slide::drawable` — `Package::slide_drawable_list(slide)`
    (kind, `Geometry`, text, name, lock, z-order position, in
@@ -85,6 +86,10 @@ Each request is described by intent. The signatures are suggestions; the owners 
    `slide::media::lifecycle`) and placeholders; removing a drawable referenced
    by builds or other objects; geometry of tables, charts, groups, lines and
    movies. Removed images keep their data items in the package.
+   `Edit::set_text(slide, drawable, text)` writes a text box's or shape's
+   plain text as a minimal-span storage rewrite (record 0298, unified part;
+   `Unsupported::InlineObjects` for a change touching an inline object
+   marker). Wired into `File::Keynote`.
 10. **Text formatting** on slide text spans. *Partially landed in 0298:*
    read-only `Package::slide_drawable_text_runs(slide, drawable)` (character
    runs with bold, italic, underline, size, font and RGB colour where the
@@ -165,13 +170,17 @@ makes `File::Pages`, `File::Keynote` and `File::Numbers` hold the leaf
   `Identity::BLANK`), `litchi_keynote::Builder` (`builder` module; title,
   subtitle, notes, slide size; `build()` without an `Identity` is
   `builder::Error::MissingIdentity`) and `litchi_keynote::Identity`
-  (`generate()`, `from_bytes`). The unified `create(Format::Keynote)` arm is
-  pending; Pages and Numbers remain open.
+  (`generate()`, `from_bytes`). Unified `create(Format::Keynote)` uses
+  `Package::new()` (record 0298); Pages landed in 0299; Numbers remains
+  open.
 - 3: typed encrypted state (no `Locked` for iWork yet).
 - 4–6: Numbers sheet, table, row and column lifecycle.
 - 7, 10, 13: text styling (Numbers cells, Keynote spans, Pages spans).
-- 9: Keynote shape CRUD (8, slide add/duplicate, landed in the leaf in
-  0298; the unified arm is pending).
+  Keynote character runs are read (`run`); their writes stay
+  `Unsupported::TextStyling` in the leaf.
+- 8, 9: closed for Keynote in 0298 (slide add/duplicate, shape, text box
+  and picture CRUD, frames, z-order, drawable text), wired into
+  `File::Keynote`.
 - 11, 12: Pages section add/remove and paragraph insert/remove/move.
 - 14: Pages metadata set.
 - **New 15 — public prepared-source ingress.** The unified layer uses the
@@ -226,3 +235,41 @@ cell-write transaction; the Numbers writer is not shared), directory
 save-back to the bundle form, and `litchi::iwork::Document` removal
 (blocked on the Keynote and Numbers directory and table gaps, records
 0297–0298).
+
+## 2026-10-15 Keynote to parity (record 0298, unified part)
+
+`File::Keynote` now reads slides with their `layout`, title/body
+placeholders with frames, speaker notes, `paragraph`s and character `run`s,
+and the drawables a slide owns (`shape` for text boxes and shapes,
+`picture`, `connector`, `video`, `audio`, `table`/`tr`/`tc`, `chart`,
+`group`), and writes through `slide::text`, `slide::notes`, `edit` (skip),
+`slide::order`, `slide::delete`, `slide::creation` and `slide::drawable`.
+Consecutive batch items coalesce into one slide-drawable commit, one
+commit per changed text, or one slide-creation commit.
+
+Leaf changes in this record: `slide::drawable::Edit::set_text`,
+`Package::slide_layout_list`, and `slide::delete` removing the registry's
+stale data-owner records of a slide whose preview was invalidated (the
+first slide of `multi-slide.key` could not be deleted before; Phase G F8).
+
+**Still open for Keynote:**
+
+- 10 — character-style writes (`run` properties, `Unsupported::TextStyling`).
+- Slide-table cell writes and table creation through the unified layer
+  (the leaf's table families are wired for reads only).
+- Removing tables, charts and groups (the drawable family refuses them);
+  removing movies and audio (`slide::media::lifecycle`, not wired); adding
+  movies and audio (`slide::movie`/`slide::audio` creation, not wired);
+  frames of movies (`slide::movie::geometry`, not wired), lines, tables,
+  charts and groups.
+- Slide-number and object placeholders have no unified element; title and
+  body placeholders are hidden, not removed (`slide::placeholder`
+  visibility, not wired).
+- Duplicating slides whose content lives in other components (tables,
+  charts, comments; `slide::creation` `Error::UnsupportedContent`): 42 of
+  the 56 corpus decks refuse the structural round trip for this reason.
+- 16 (Keynote) — package directories: `File` still refuses them; the facade
+  reader `litchi::iwork::Document` stays their reader.
+- Slide-preview invalidation (slide text and notes edits) leaves the
+  registry's data-owner record of the dropped thumbnail; deletion now
+  tolerates it, the writers do not yet remove it.

@@ -31,7 +31,7 @@ differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `299bb82c87cfef0c27ecfe8bd4fb7df4982635a954c5fa57ac58897900e0e2fa` |
 | golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `73fafb3ba518137725602d97210ce5837886dff848671f143278fd3cb55063e3` |
 | golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `2038cde02828395f020df3d9b9732cc9350ce839bba5bc5aee3089cdd0e81fab` |
-| golden | `crates/litchi-ops/tests/golden/registry/keynote.json` | `e56b1957228e9c295f5611568e97098f27010a64d468d1edcb4e012b7c0affed` |
+| golden | `crates/litchi-ops/tests/golden/registry/keynote.json` | `5bc19d57d8e7686cf6681f46772df3c30a693e5fb2565d24dce5043ea038308b` |
 | golden | `crates/litchi-ops/tests/golden/registry/numbers.json` | `d0dc9b4ced609425f80a61cd43c63a60419bce7511b357439744be30489cb671` |
 | golden | `crates/litchi-ops/tests/golden/registry/odb.json` | `4f342b6f2149dc3284dd48cc71f4a7badb5a1632dc4183a7e9598cc12d5dca6a` |
 | golden | `crates/litchi-ops/tests/golden/registry/odc.json` | `c9004bc22d2c3964ef98a14a4feca6253166bf33f81b8211058cc88a1c8dd930` |
@@ -7875,9 +7875,16 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 
 | Verb | Element | Context | Reason | Follow-up |
 |---|---|---|---|---|
-| `set` | `notes` | `speaker notes text` | speaker notes are read-only here; the leaf's slide-notes transaction is not wired yet | 0298 Keynote notes writes |
-| `add` | `slide` | `a new slide` | the Keynote leaf has no slide creation transaction | IWORK_API_REQUESTS.md request 8 |
-| `create` | `presentation` | `a presentation from scratch` | the Keynote leaf has no from-scratch package builder | IWORK_API_REQUESTS.md request 1 |
+| `set` | `run` | `character formatting` | the leaf reads character runs and refuses character-style writes (slide::drawable Unsupported::TextStyling) | IWORK_API_REQUESTS.md request 10 (Keynote character-style writes) |
+| `add` | `run` | `a new character run` | a run is a styled span of a paragraph; add a paragraph or set its text | IWORK_API_REQUESTS.md request 10 (Keynote character-style writes) |
+| `set` | `tc` | `table cell values` | the unified layer reads slide-table cells; their leaf write families are not wired yet | record 0298 follow-up: wire the Keynote slide-table cell transactions |
+| `add` | `table` | `a new slide table` | the Keynote leaf has no slide-table creation transaction | record 0298 follow-up: Keynote slide-table creation |
+| `remove` | `table` | `a slide table, chart or group` | the leaf's drawable removal refuses tables, charts and groups | record 0298 follow-up: structural removal of tables, charts and groups |
+| `remove` | `video` | `a movie or audio clip` | movies and audio are removed through the leaf's media lifecycle family, not wired yet | record 0298 follow-up: wire slide::media lifecycle removal |
+| `add` | `video` | `a new movie or audio clip` | the leaf's movie and audio creation families are not wired yet | record 0298 follow-up: wire slide::movie and slide::audio creation |
+| `set` | `video` | `the frame of a movie, audio clip, line, table, chart or group` | the leaf's drawable geometry refuses tables, charts, groups, lines and movies | record 0298 follow-up: wire slide::movie::geometry; the drawable family refuses the others |
+| `remove` | `placeholder` | `a title or body placeholder` | placeholders are hidden, not removed; set the text to empty instead | record 0298 follow-up: Keynote placeholder visibility through the unified layer |
+| `add` | `placeholder` | `a new placeholder` | a slide's placeholders come from its layout; add a slide from a layout instead | record 0298 follow-up: Keynote placeholder visibility through the unified layer |
 
 ## numbers
 

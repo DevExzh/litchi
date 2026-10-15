@@ -63,6 +63,15 @@ pub enum LeafError {
     /// Writing the Keynote package to a sink failed.
     #[cfg(feature = "keynote")]
     KeynoteWrite(litchi_keynote::WriteError),
+    /// A Keynote speaker-notes transaction failed.
+    #[cfg(feature = "keynote")]
+    KeynoteNotes(litchi_keynote::slide::notes::Error),
+    /// A Keynote slide-drawable transaction failed.
+    #[cfg(feature = "keynote")]
+    KeynoteDrawables(litchi_keynote::slide::drawable::Error),
+    /// A Keynote slide-creation transaction failed.
+    #[cfg(feature = "keynote")]
+    KeynoteCreation(litchi_keynote::slide::creation::Error),
     /// The Numbers package could not be read.
     #[cfg(feature = "numbers")]
     Numbers(litchi_numbers::PackageError),
@@ -113,6 +122,12 @@ impl fmt::Display for LeafError {
             Self::KeynoteDeletion(error) => error.fmt(formatter),
             #[cfg(feature = "keynote")]
             Self::KeynoteWrite(error) => error.fmt(formatter),
+            #[cfg(feature = "keynote")]
+            Self::KeynoteNotes(error) => error.fmt(formatter),
+            #[cfg(feature = "keynote")]
+            Self::KeynoteDrawables(error) => error.fmt(formatter),
+            #[cfg(feature = "keynote")]
+            Self::KeynoteCreation(error) => error.fmt(formatter),
             #[cfg(feature = "numbers")]
             Self::Numbers(error) => error.fmt(formatter),
             #[cfg(feature = "numbers")]
@@ -161,6 +176,12 @@ impl std::error::Error for LeafError {
             Self::KeynoteDeletion(error) => Some(error),
             #[cfg(feature = "keynote")]
             Self::KeynoteWrite(error) => Some(error),
+            #[cfg(feature = "keynote")]
+            Self::KeynoteNotes(error) => Some(error),
+            #[cfg(feature = "keynote")]
+            Self::KeynoteDrawables(error) => Some(error),
+            #[cfg(feature = "keynote")]
+            Self::KeynoteCreation(error) => Some(error),
             #[cfg(feature = "numbers")]
             Self::Numbers(error) => Some(error),
             #[cfg(feature = "numbers")]
@@ -214,6 +235,12 @@ impl LeafError {
             Self::KeynoteOrder(error) => keynote_order_code(error),
             #[cfg(feature = "keynote")]
             Self::KeynoteDeletion(error) => keynote_deletion_code(error),
+            #[cfg(feature = "keynote")]
+            Self::KeynoteNotes(error) => keynote_notes_code(error),
+            #[cfg(feature = "keynote")]
+            Self::KeynoteDrawables(error) => keynote_drawables_code(error),
+            #[cfg(feature = "keynote")]
+            Self::KeynoteCreation(error) => keynote_creation_code(error),
             #[cfg(feature = "numbers")]
             Self::Numbers(error) => numbers_code(error),
             #[cfg(feature = "numbers")]
@@ -426,6 +453,61 @@ fn keynote_deletion_code(error: &litchi_keynote::slide::delete::Error) -> Code {
         E::SlideNameNotFound | E::SlidePositionNotFound { .. } => Code::PathNotFound,
         E::CannotDeleteFinalSlide => Code::InvalidArgument,
         _ => Code::UnsupportedCapability,
+    }
+}
+
+#[cfg(feature = "keynote")]
+fn keynote_notes_code(error: &litchi_keynote::slide::notes::Error) -> Code {
+    use litchi_keynote::slide::notes::Error as E;
+    match error {
+        E::SlideNameNotFound | E::SlidePositionNotFound { .. } | E::NotesStorageNotFound => {
+            Code::PathNotFound
+        },
+        E::AmbiguousSelector | E::EmptySlideName => Code::InvalidPath,
+        E::SpanOutOfBounds { .. } | E::SurrogateBoundary { .. } => Code::OutOfRange,
+        E::UnsupportedSource | E::ObjectMarkerReplacement | E::DependentContent => {
+            Code::UnsupportedCapability
+        },
+        E::LimitExceeded { .. } => Code::LimitExceeded,
+        E::InvalidSource | E::PatchConflict => Code::InvalidInput,
+        _ => Code::InternalError,
+    }
+}
+
+#[cfg(feature = "keynote")]
+fn keynote_drawables_code(error: &litchi_keynote::slide::drawable::Error) -> Code {
+    use litchi_keynote::slide::drawable::Error as E;
+    match error {
+        E::SlideNameNotFound
+        | E::SlidePositionNotFound { .. }
+        | E::DrawablePositionNotFound { .. } => Code::PathNotFound,
+        E::AmbiguousSelector | E::EmptySlideName => Code::InvalidPath,
+        E::ZPositionOutOfRange { .. } => Code::OutOfRange,
+        E::InvalidGeometry | E::InvalidImage | E::InvalidSpan => Code::InvalidValue,
+        E::DrawableRemoved => Code::InvalidArgument,
+        E::UnsupportedSource | E::Unsupported { .. } => Code::UnsupportedCapability,
+        E::LimitExceeded { .. } => Code::LimitExceeded,
+        E::InvalidSource | E::PatchConflict => Code::InvalidInput,
+        _ => Code::InternalError,
+    }
+}
+
+#[cfg(feature = "keynote")]
+fn keynote_creation_code(error: &litchi_keynote::slide::creation::Error) -> Code {
+    use litchi_keynote::slide::creation::Error as E;
+    match error {
+        E::SlideNameNotFound | E::SlidePositionNotFound { .. } => Code::PathNotFound,
+        E::AmbiguousSelector | E::EmptySlideName => Code::InvalidPath,
+        E::LayoutNameNotFound | E::AmbiguousLayout | E::LayoutPositionNotFound { .. } => {
+            Code::InvalidValue
+        },
+        E::PositionOutOfRange { .. } => Code::OutOfRange,
+        E::UnsupportedSource | E::UnsupportedTopology | E::UnsupportedContent { .. } => {
+            Code::UnsupportedCapability
+        },
+        E::LimitExceeded { .. } => Code::LimitExceeded,
+        E::InvalidSource | E::PatchConflict => Code::InvalidInput,
+        _ => Code::InternalError,
     }
 }
 

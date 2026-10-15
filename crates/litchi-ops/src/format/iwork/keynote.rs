@@ -16,26 +16,26 @@
 //! boundaries and join the tree the first time a read reaches a paragraph's
 //! children (reading them decodes each drawable's character-style table).
 
-use litchi_core::{FileFormat, Position};
+use litchi_core::FileFormat;
 use litchi_keynote::slide::drawable::{Drawable, Kind as DrawableKind, TextRun};
 use litchi_keynote::slide::placeholder::Kind as Role;
 use litchi_keynote::{Package, SlideSelector, TableSelector};
 
 use super::tree::{ROOT, count, text};
-use super::write::{
-    Chain, Commit, LeafPatch, bound, destination, element_refusal, finish, key_refusal,
-    leaf_refusal, node_at, refusal, resolve,
-};
-use super::{Flavor, Iwork, LeafError, Owner, TreeBuilder, element, writable};
+use super::write::leaf_refusal;
+use super::{Flavor, LeafError, TreeBuilder, element, writable};
 use crate::Result;
 use crate::error::Code;
 use crate::node::Value;
 use crate::node::spec::{FormatSpec, GapSpec, PropSpec, Subject};
-use crate::path::PathArg;
-use crate::props::Props;
-use crate::target::TargetArg;
-use crate::transaction::{LimitKind, SemanticLimits};
 use crate::value::{Color, ColorContext, Length, LengthSpec, ValueType};
+
+pub(crate) mod coalesce;
+mod source;
+mod write;
+
+pub(crate) use coalesce::Run;
+pub(crate) use write::{add, move_to, remove, set, swap};
 
 kinds! {
     /// The element kinds of a Keynote presentation.
@@ -64,29 +64,52 @@ const EXTENT: ValueType = ValueType::Length(LengthSpec::EXTENT);
 const FONT_SIZE: ValueType = ValueType::Length(LengthSpec::FONT_SIZE);
 const COLOR: ValueType = ValueType::Color(ColorContext::Drawing);
 
+/// A property `set` writes and `add` accepts.
+const fn addable(name: &'static str, ty: ValueType) -> PropSpec {
+    let mut spec = writable(name, ty);
+    spec.access.add = true;
+    spec
+}
+
+/// A property only `add` accepts, read back under no key.
+const fn add_only(name: &'static str, ty: ValueType) -> PropSpec {
+    let mut spec = PropSpec::new(name, ty);
+    spec.access.get = false;
+    spec.access.add = true;
+    spec
+}
+
+/// A readable property `add` also accepts.
+const fn readable_add(name: &'static str, ty: ValueType) -> PropSpec {
+    let mut spec = PropSpec::new(name, ty);
+    spec.access.add = true;
+    spec
+}
+
 const PRESENTATION_PROPS: &[PropSpec] = &[PropSpec::new("slideCount", ValueType::Int)];
 
 pub(crate) const SLIDE_PROPS: &[PropSpec] = &[
     PropSpec::new("name", ValueType::Text),
     PropSpec::new("title", ValueType::Text),
     writable("hidden", ValueType::Bool),
-    PropSpec::new("layout", ValueType::Text),
+    readable_add("layout", ValueType::Text),
+    add_only("from", ValueType::Text),
 ];
 
 pub(crate) const PLACEHOLDER_PROPS: &[PropSpec] = &[
     PropSpec::new("type", ValueType::Text),
     writable("text", ValueType::Text),
-    PropSpec::new("x", POSITION),
-    PropSpec::new("y", POSITION),
-    PropSpec::new("width", EXTENT),
-    PropSpec::new("height", EXTENT),
-    PropSpec::new("rotation", ValueType::Number),
+    writable("x", POSITION),
+    writable("y", POSITION),
+    writable("width", EXTENT),
+    writable("height", EXTENT),
+    writable("rotation", ValueType::Number),
     PropSpec::new("zorder", ValueType::Int),
 ];
 
-const NOTES_PROPS: &[PropSpec] = &[PropSpec::new("text", ValueType::Text)];
+const NOTES_PROPS: &[PropSpec] = &[writable("text", ValueType::Text)];
 
-const PARAGRAPH_PROPS: &[PropSpec] = &[PropSpec::new("text", ValueType::Text)];
+const PARAGRAPH_PROPS: &[PropSpec] = &[addable("text", ValueType::Text)];
 
 const RUN_PROPS: &[PropSpec] = &[
     PropSpec::new("bold", ValueType::Bool),
@@ -99,23 +122,25 @@ const RUN_PROPS: &[PropSpec] = &[
 
 const SHAPE_PROPS: &[PropSpec] = &[
     PropSpec::new("name", ValueType::Text),
-    PropSpec::new("text", ValueType::Text),
-    PropSpec::new("x", POSITION),
-    PropSpec::new("y", POSITION),
-    PropSpec::new("width", EXTENT),
-    PropSpec::new("height", EXTENT),
-    PropSpec::new("rotation", ValueType::Number),
+    addable("text", ValueType::Text),
+    addable("x", POSITION),
+    addable("y", POSITION),
+    addable("width", EXTENT),
+    addable("height", EXTENT),
+    addable("rotation", ValueType::Number),
     PropSpec::new("zorder", ValueType::Int),
+    add_only("preset", ValueType::Text),
 ];
 
 const PICTURE_PROPS: &[PropSpec] = &[
-    PropSpec::new("name", ValueType::Text),
-    PropSpec::new("x", POSITION),
-    PropSpec::new("y", POSITION),
-    PropSpec::new("width", EXTENT),
-    PropSpec::new("height", EXTENT),
-    PropSpec::new("rotation", ValueType::Number),
+    readable_add("name", ValueType::Text),
+    addable("x", POSITION),
+    addable("y", POSITION),
+    addable("width", EXTENT),
+    addable("height", EXTENT),
+    addable("rotation", ValueType::Number),
     PropSpec::new("zorder", ValueType::Int),
+    add_only("src", ValueType::Text),
 ];
 
 /// The frame of a drawable no write reaches: lines, movies, audio, charts
@@ -149,38 +174,99 @@ const CELL_PROPS: &[PropSpec] = &[
     PropSpec::new("type", ValueType::Text),
 ];
 
-static GAPS: [GapSpec; 1] = [GapSpec {
-    subject: Subject::Operation {
-        verb: "set",
-        element: "notes",
-        context: "speaker notes text",
-    },
-    code: Code::UnsupportedCapability,
-    follow_up: "0298 Keynote notes writes",
-    reason: "speaker notes are read-only here; the leaf's slide-notes transaction is not wired yet",
-}];
+static GAPS: [GapSpec; 0] = [];
 
-static OPERATION_GAPS: [GapSpec; 2] = [
+/// A conditional operation the Keynote leaf does not offer yet.
+const fn operation_gap(
+    verb: &'static str,
+    element: &'static str,
+    context: &'static str,
+    follow_up: &'static str,
+    reason: &'static str,
+) -> GapSpec {
     GapSpec {
         subject: Subject::Operation {
-            verb: "add",
-            element: "slide",
-            context: "a new slide",
+            verb,
+            element,
+            context,
         },
         code: Code::UnsupportedCapability,
-        follow_up: "IWORK_API_REQUESTS.md request 8",
-        reason: "the Keynote leaf has no slide creation transaction",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "create",
-            element: "presentation",
-            context: "a presentation from scratch",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "IWORK_API_REQUESTS.md request 1",
-        reason: "the Keynote leaf has no from-scratch package builder",
-    },
+        follow_up,
+        reason,
+    }
+}
+
+static OPERATION_GAPS: [GapSpec; 10] = [
+    operation_gap(
+        "set",
+        "run",
+        "character formatting",
+        "IWORK_API_REQUESTS.md request 10 (Keynote character-style writes)",
+        "the leaf reads character runs and refuses character-style writes (slide::drawable Unsupported::TextStyling)",
+    ),
+    operation_gap(
+        "add",
+        "run",
+        "a new character run",
+        "IWORK_API_REQUESTS.md request 10 (Keynote character-style writes)",
+        "a run is a styled span of a paragraph; add a paragraph or set its text",
+    ),
+    operation_gap(
+        "set",
+        "tc",
+        "table cell values",
+        "record 0298 follow-up: wire the Keynote slide-table cell transactions",
+        "the unified layer reads slide-table cells; their leaf write families are not wired yet",
+    ),
+    operation_gap(
+        "add",
+        "table",
+        "a new slide table",
+        "record 0298 follow-up: Keynote slide-table creation",
+        "the Keynote leaf has no slide-table creation transaction",
+    ),
+    operation_gap(
+        "remove",
+        "table",
+        "a slide table, chart or group",
+        "record 0298 follow-up: structural removal of tables, charts and groups",
+        "the leaf's drawable removal refuses tables, charts and groups",
+    ),
+    operation_gap(
+        "remove",
+        "video",
+        "a movie or audio clip",
+        "record 0298 follow-up: wire slide::media lifecycle removal",
+        "movies and audio are removed through the leaf's media lifecycle family, not wired yet",
+    ),
+    operation_gap(
+        "add",
+        "video",
+        "a new movie or audio clip",
+        "record 0298 follow-up: wire slide::movie and slide::audio creation",
+        "the leaf's movie and audio creation families are not wired yet",
+    ),
+    operation_gap(
+        "set",
+        "video",
+        "the frame of a movie, audio clip, line, table, chart or group",
+        "record 0298 follow-up: wire slide::movie::geometry; the drawable family refuses the others",
+        "the leaf's drawable geometry refuses tables, charts, groups, lines and movies",
+    ),
+    operation_gap(
+        "remove",
+        "placeholder",
+        "a title or body placeholder",
+        "record 0298 follow-up: Keynote placeholder visibility through the unified layer",
+        "placeholders are hidden, not removed; set the text to empty instead",
+    ),
+    operation_gap(
+        "add",
+        "placeholder",
+        "a new placeholder",
+        "record 0298 follow-up: Keynote placeholder visibility through the unified layer",
+        "a slide's placeholders come from its layout; add a slide from a layout instead",
+    ),
 ];
 
 /// The Keynote spec table.
@@ -366,12 +452,67 @@ impl Flavor for Keynote {
     const SINGLETONS: &'static [Kind] = &[Kind::Notes];
 }
 
+/// The proof of one Keynote leaf transaction.
+#[allow(
+    clippy::large_enum_variant,
+    reason = "a write holds its proofs once; boxing would add an allocation per commit"
+)]
+pub(crate) enum Patch {
+    Text(litchi_keynote::slide::text::Patch),
+    Notes(litchi_keynote::slide::notes::Patch),
+    Skip(litchi_keynote::edit::Patch),
+    Order(litchi_keynote::slide::order::Patch),
+    Deletion(
+        #[allow(
+            dead_code,
+            reason = "retained as the leaf's reversible proof; a committed deletion is never a no-op"
+        )]
+        litchi_keynote::slide::delete::Patch,
+    ),
+    Drawables(litchi_keynote::slide::drawable::Patch),
+    Creation(litchi_keynote::slide::creation::Patch),
+}
+
+impl Patch {
+    pub(crate) fn is_noop(&self) -> bool {
+        match self {
+            Self::Text(patch) => patch.is_noop(),
+            Self::Notes(patch) => patch.is_noop(),
+            Self::Skip(patch) => patch.is_noop(),
+            Self::Order(patch) => patch.is_noop(),
+            // A committed deletion always removes one slide.
+            Self::Deletion(_) => false,
+            Self::Drawables(patch) => patch.is_noop(),
+            Self::Creation(patch) => patch.is_noop(),
+        }
+    }
+}
+
 /// The elements `set` writes, `remove` deletes and `move` reorders.
 pub(crate) static WRITES: super::Writes = super::Writes {
-    settable: &["placeholder", "slide"],
-    addable: &[],
-    removable: &["slide"],
-    movable: &["slide"],
+    settable: &[
+        "slide",
+        "placeholder",
+        "notes",
+        "paragraph",
+        "shape",
+        "picture",
+    ],
+    addable: &["slide", "paragraph", "shape", "picture"],
+    removable: &["slide", "paragraph", "shape", "picture", "connector"],
+    movable: &[
+        "slide",
+        "paragraph",
+        "placeholder",
+        "shape",
+        "picture",
+        "connector",
+        "video",
+        "audio",
+        "table",
+        "chart",
+        "group",
+    ],
     gaps: &OPERATION_GAPS,
 };
 
@@ -726,177 +867,4 @@ fn value_type(value: &litchi_keynote::slide::table::cells::Value) -> &'static st
         V::Error(_) => "error",
         V::Empty => "empty",
     }
-}
-
-/// Set slide visibility or placeholder text on every target.
-pub(crate) fn set(
-    file: &Iwork,
-    package: &Package,
-    target: &TargetArg<'_>,
-    props: &Props<'_>,
-    limits: &SemanticLimits,
-) -> Result<Commit> {
-    let nodes = resolve::<Keynote>(file, target, limits.max_expanded_targets())?;
-    let mut chain = Chain::new(package.clone());
-    let mut operations = 0_usize;
-    for node in &nodes {
-        for (key, value) in props.iter() {
-            operations += 1;
-            bound(LimitKind::Operations, operations, limits.max_operations())?;
-            let key = key.as_str();
-            let [slide, slot, _, _] = node.item().leaf().map(|value| value as usize);
-            let selector = SlideSelector::index(slide);
-            match (node.item().type_name(), key) {
-                ("slide", "hidden") => {
-                    let hidden = super::write::boolean(value, "hidden")?;
-                    let error =
-                        |error| leaf_refusal(LeafError::KeynoteEdit(error), FileFormat::Keynote);
-                    let mut edit = chain.package.edit();
-                    edit.set_slide_skipped(selector, hidden).map_err(error)?;
-                    let commit = edit.commit().map_err(error)?;
-                    let patch = commit.patch().clone();
-                    let changed = !patch.is_noop();
-                    chain.push(
-                        commit.into_package(),
-                        LeafPatch::KeynoteSkip(patch),
-                        changed,
-                    );
-                },
-                ("placeholder", "text") => {
-                    let value = super::write::text(value, "text")?.unwrap_or_default();
-                    let role = if slot == TITLE {
-                        Role::Title
-                    } else {
-                        Role::Body
-                    };
-                    let error =
-                        |error| leaf_refusal(LeafError::KeynoteText(error), FileFormat::Keynote);
-                    let mut edit = chain
-                        .package
-                        .edit_slide_text(selector, role)
-                        .map_err(error)?;
-                    edit.set(&value).map_err(error)?;
-                    let commit = edit.commit().map_err(error)?;
-                    let patch = commit.patch().clone();
-                    let changed = !patch.is_noop();
-                    chain.push(
-                        commit.into_package(),
-                        LeafPatch::KeynoteText(patch),
-                        changed,
-                    );
-                },
-                ("slide" | "placeholder", _) => return Err(key_refusal(node, key)),
-                _ => return Err(element_refusal("set", node)),
-            }
-        }
-    }
-    finish(
-        file,
-        chain.changed,
-        Owner::Keynote(chain.package),
-        chain.patches,
-        operations,
-        limits,
-    )
-}
-
-/// Remove slides. Several targets are removed from the last to the first,
-/// so each one's position still holds when its deletion runs.
-pub(crate) fn remove(
-    file: &Iwork,
-    package: &Package,
-    target: &TargetArg<'_>,
-    limits: &SemanticLimits,
-) -> Result<Commit> {
-    let nodes = resolve::<Keynote>(file, target, limits.max_expanded_targets())?;
-    let mut slides = Vec::with_capacity(nodes.len());
-    for node in &nodes {
-        if node.item().type_name() != "slide" {
-            return Err(element_refusal("remove", node));
-        }
-        slides.push(node.item().leaf()[0] as usize);
-    }
-    slides.sort_unstable();
-    slides.dedup();
-    let mut chain = Chain::new(package.clone());
-    let error = |error| leaf_refusal(LeafError::KeynoteDeletion(error), FileFormat::Keynote);
-    for (operations, slide) in slides.iter().rev().enumerate() {
-        bound(
-            LimitKind::Operations,
-            operations + 1,
-            limits.max_operations(),
-        )?;
-        let mut edit = chain.package.edit_slide_deletion();
-        edit.remove_slide(SlideSelector::index(*slide))
-            .map_err(error)?;
-        let commit = edit.commit().map_err(error)?;
-        let patch = commit.patch().clone();
-        chain.push(
-            commit.into_package(),
-            LeafPatch::KeynoteDeletion(patch),
-            true,
-        );
-    }
-    finish(
-        file,
-        chain.changed,
-        Owner::Keynote(chain.package),
-        chain.patches,
-        slides.len(),
-        limits,
-    )
-}
-
-/// Move one slide among the presentation's slides.
-pub(crate) fn move_to(
-    file: &Iwork,
-    package: &Package,
-    path: &PathArg<'_>,
-    placement: &crate::Placement<'_>,
-    limits: &SemanticLimits,
-) -> Result<Commit> {
-    let node = node_at::<Keynote>(file, path)?;
-    if node.item().type_name() != "slide" {
-        return Err(element_refusal("move", &node));
-    }
-    if matches!(placement, crate::Placement::Into(..)) {
-        return Err(refusal(
-            Code::UnsupportedCapability,
-            "a Keynote slide moves among the presentation's slides",
-        ));
-    }
-    let from = node.item().leaf()[0] as usize;
-    let slides = file.tree().item(ROOT).children().len();
-    let to = destination(from, slides, placement, |anchor| {
-        let anchor = node_at::<Keynote>(file, anchor)?;
-        if anchor.item().type_name() == "slide" {
-            Ok(anchor.item().leaf()[0] as usize)
-        } else {
-            Err(refusal(
-                Code::InvalidArgument,
-                "a slide moves before or after another slide",
-            ))
-        }
-    })?;
-    let error = |error| leaf_refusal(LeafError::KeynoteOrder(error), FileFormat::Keynote);
-    let mut edit = package.edit_slide_order();
-    edit.move_slide(SlideSelector::index(from), Position::new(to))
-        .map_err(error)?;
-    let commit = edit.commit().map_err(error)?;
-    let patch = commit.patch().clone();
-    let changed = !patch.is_noop();
-    let mut chain = Chain::new(package.clone());
-    chain.push(
-        commit.into_package(),
-        LeafPatch::KeynoteOrder(patch),
-        changed,
-    );
-    finish(
-        file,
-        chain.changed,
-        Owner::Keynote(chain.package),
-        chain.patches,
-        1,
-        limits,
-    )
 }

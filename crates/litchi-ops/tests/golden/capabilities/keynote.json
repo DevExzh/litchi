@@ -24,10 +24,7 @@
       "supported": true
     },
     "add": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "IWORK_API_REQUESTS.md",
-      "reason": "the iWork leaf has no such structural transaction yet"
+      "supported": true
     },
     "remove": {
       "supported": true
@@ -36,10 +33,7 @@
       "supported": true
     },
     "swap": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "IWORK_API_REQUESTS.md",
-      "reason": "the iWork leaf has no such structural transaction yet"
+      "supported": true
     },
     "edit": {
       "supported": true
@@ -75,10 +69,7 @@
       "supported": true
     },
     "create": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "IWORK_API_REQUESTS.md request 1",
-      "reason": "the iWork leaves have no from-scratch package builder"
+      "supported": true
     }
   },
   "views": {
@@ -167,7 +158,7 @@
       "element": "slide",
       "parent": "presentation",
       "operations": {
-        "add": false,
+        "add": true,
         "set": true,
         "get": true,
         "query": true,
@@ -241,9 +232,15 @@
         },
         "layout": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
+        },
+        "from": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
         }
       },
       "predicates": {
@@ -296,31 +293,31 @@
         "x": {
           "type": "length",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "y": {
           "type": "length",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "width": {
           "type": "length",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "height": {
           "type": "length",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "rotation": {
           "type": "number",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "zorder": {
@@ -344,7 +341,7 @@
       "parent": "slide",
       "operations": {
         "add": false,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
         "remove": false
@@ -364,7 +361,7 @@
         "text": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         }
       },
@@ -388,11 +385,11 @@
         "p"
       ],
       "operations": {
-        "add": false,
-        "set": false,
+        "add": true,
+        "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -410,8 +407,8 @@
       "properties": {
         "text": {
           "type": "string",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         }
       },
@@ -496,11 +493,11 @@
         "textbox"
       ],
       "operations": {
-        "add": false,
-        "set": false,
+        "add": true,
+        "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -522,38 +519,38 @@
         },
         "text": {
           "type": "string",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "x": {
           "type": "length",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "y": {
           "type": "length",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "width": {
           "type": "length",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "height": {
           "type": "length",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "rotation": {
           "type": "number",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "zorder": {
@@ -561,6 +558,12 @@
           "add": false,
           "set": false,
           "get": true
+        },
+        "preset": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
         }
       },
       "predicates": {
@@ -581,11 +584,11 @@
         "pic"
       ],
       "operations": {
-        "add": false,
-        "set": false,
+        "add": true,
+        "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -595,38 +598,38 @@
       "properties": {
         "name": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "x": {
           "type": "length",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "y": {
           "type": "length",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "width": {
           "type": "length",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "height": {
           "type": "length",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "rotation": {
           "type": "number",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "zorder": {
@@ -634,6 +637,12 @@
           "add": false,
           "set": false,
           "get": true
+        },
+        "src": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
         }
       },
       "predicates": {
@@ -656,7 +665,7 @@
         "set": false,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -1153,29 +1162,92 @@
     {
       "subject": "operation",
       "verb": "set",
-      "element": "notes",
-      "context": "speaker notes text",
+      "element": "run",
+      "context": "character formatting",
       "code": "unsupported_capability",
-      "followUp": "0298 Keynote notes writes",
-      "reason": "speaker notes are read-only here; the leaf's slide-notes transaction is not wired yet"
+      "followUp": "IWORK_API_REQUESTS.md request 10 (Keynote character-style writes)",
+      "reason": "the leaf reads character runs and refuses character-style writes (slide::drawable Unsupported::TextStyling)"
     },
     {
       "subject": "operation",
       "verb": "add",
-      "element": "slide",
-      "context": "a new slide",
+      "element": "run",
+      "context": "a new character run",
       "code": "unsupported_capability",
-      "followUp": "IWORK_API_REQUESTS.md request 8",
-      "reason": "the Keynote leaf has no slide creation transaction"
+      "followUp": "IWORK_API_REQUESTS.md request 10 (Keynote character-style writes)",
+      "reason": "a run is a styled span of a paragraph; add a paragraph or set its text"
     },
     {
       "subject": "operation",
-      "verb": "create",
-      "element": "presentation",
-      "context": "a presentation from scratch",
+      "verb": "set",
+      "element": "tc",
+      "context": "table cell values",
       "code": "unsupported_capability",
-      "followUp": "IWORK_API_REQUESTS.md request 1",
-      "reason": "the Keynote leaf has no from-scratch package builder"
+      "followUp": "record 0298 follow-up: wire the Keynote slide-table cell transactions",
+      "reason": "the unified layer reads slide-table cells; their leaf write families are not wired yet"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "table",
+      "context": "a new slide table",
+      "code": "unsupported_capability",
+      "followUp": "record 0298 follow-up: Keynote slide-table creation",
+      "reason": "the Keynote leaf has no slide-table creation transaction"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "table",
+      "context": "a slide table, chart or group",
+      "code": "unsupported_capability",
+      "followUp": "record 0298 follow-up: structural removal of tables, charts and groups",
+      "reason": "the leaf's drawable removal refuses tables, charts and groups"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "video",
+      "context": "a movie or audio clip",
+      "code": "unsupported_capability",
+      "followUp": "record 0298 follow-up: wire slide::media lifecycle removal",
+      "reason": "movies and audio are removed through the leaf's media lifecycle family, not wired yet"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "video",
+      "context": "a new movie or audio clip",
+      "code": "unsupported_capability",
+      "followUp": "record 0298 follow-up: wire slide::movie and slide::audio creation",
+      "reason": "the leaf's movie and audio creation families are not wired yet"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "video",
+      "context": "the frame of a movie, audio clip, line, table, chart or group",
+      "code": "unsupported_capability",
+      "followUp": "record 0298 follow-up: wire slide::movie::geometry; the drawable family refuses the others",
+      "reason": "the leaf's drawable geometry refuses tables, charts, groups, lines and movies"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "placeholder",
+      "context": "a title or body placeholder",
+      "code": "unsupported_capability",
+      "followUp": "record 0298 follow-up: Keynote placeholder visibility through the unified layer",
+      "reason": "placeholders are hidden, not removed; set the text to empty instead"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "placeholder",
+      "context": "a new placeholder",
+      "code": "unsupported_capability",
+      "followUp": "record 0298 follow-up: Keynote placeholder visibility through the unified layer",
+      "reason": "a slide's placeholders come from its layout; add a slide from a layout instead"
     },
     {
       "subject": "view",
