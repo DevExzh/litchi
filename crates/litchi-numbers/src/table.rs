@@ -39,14 +39,6 @@ pub use litchi_iwa_common::table::model::{
     Cell, Dimensions, Error, Grid, GridBudget, GridIter, InsertError, InsertResult, Result, View,
 };
 
-/// Narrow migration name for [`CellPosition`] used by existing archive
-/// adapters. New semantic code should use the focused name.
-pub type Position = CellPosition;
-
-/// Narrow migration name for [`CellRange`] used by existing archive adapters.
-/// New semantic code should use the focused name.
-pub type Range = CellRange;
-
 /// The format-independent table representation used by Numbers.
 ///
 /// Numbers keeps this small facade so existing callers retain the exact-name
@@ -125,7 +117,7 @@ impl Table {
 
     /// Borrows a materialized value at a coordinate.
     #[must_use]
-    pub fn get(&self, position: Position) -> Option<&Value> {
+    pub fn get(&self, position: CellPosition) -> Option<&Value> {
         self.0.get(position)
     }
 
@@ -141,12 +133,12 @@ impl Table {
 
     /// Returns the compact stored/missing view for a coordinate.
     #[must_use]
-    pub fn view(&self, position: Position) -> View<'_> {
+    pub fn view(&self, position: CellPosition) -> View<'_> {
         self.0.view(position)
     }
 
     /// Iterates over sparse cells in row-major order within a range.
-    pub fn cells(&self, range: Range) -> Result<impl Iterator<Item = &Cell> + '_> {
+    pub fn cells(&self, range: CellRange) -> Result<impl Iterator<Item = &Cell> + '_> {
         self.0.cells(range)
     }
 
@@ -192,7 +184,7 @@ impl Table {
     }
 
     /// Creates a dense view only when it fits the caller's budget.
-    pub fn grid(&self, range: Range, budget: GridBudget) -> Result<Grid<'_>> {
+    pub fn grid(&self, range: CellRange, budget: GridBudget) -> Result<Grid<'_>> {
         self.0.grid(range, budget)
     }
 
@@ -257,7 +249,7 @@ impl Builder {
 
     /// Borrows a materialized value at a coordinate.
     #[must_use]
-    pub fn get(&self, position: Position) -> Option<&Value> {
+    pub fn get(&self, position: CellPosition) -> Option<&Value> {
         self.0.get(position)
     }
 
@@ -282,7 +274,7 @@ impl Builder {
     /// Replaces or inserts one checked sparse value.
     pub fn set(
         &mut self,
-        position: Position,
+        position: CellPosition,
         value: Value,
     ) -> std::result::Result<(), InsertError<Value>> {
         self.0.set(position, value)
