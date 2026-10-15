@@ -646,6 +646,15 @@ The coordinator's Claude process stalled and exited while seven agents (wave R7 
     - Keynote slide remove has no multi-slide fixture (known failure F8);
     - `litchi-numbers` test-target lints predate this change.
 
+- Merged `iwork-pages` (0299):
+  - Pages ADR 0034 W1: focused families, `SourceLimits`/`SemanticLimits`/`OpenOptions`, `Package` owner with a read-only `Document`, `Package::new()` plus a `Builder` with explicit identity, a `pages` glossary profile;
+  - leaf paragraph transactions, metadata writes and package-directory open;
+  - unified paragraphs add/remove/move/swap/set, sections, headers/footers, footnotes, table read/remove, `/metadata`, `create(Pages)` and Pages directories;
+  - 85/85 checklist cells, 32/32 files byte-identical; single ops within 1–2%.
+  - Miss: 10k batch 2.64× (the fixed tree build).
+  - Open: section add/remove, text runs, table-cell writes.
+- `iwork-numbers` (0297) was sent back to its agent to merge trunk: 14 shared-adapter conflicts with 0299.
+
 Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-pptx-w4` 9474e2b6ce, `uo/m2-l-xlsb-w1` 876588a23c, `uo/m1-r4-perf` 012fd509ff.
 
 - M0a S10 (`docs/unified-ops/s10-measurement.md` §9). M0a landed on the strength of two explanations. If either is rejected, the chosen alternative becomes a harness follow-up; M0a is not reverted.
