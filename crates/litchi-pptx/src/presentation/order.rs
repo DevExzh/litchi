@@ -1167,12 +1167,40 @@ fn reject_root_features(xml: &[u8], context: Option<&ExecutionContext>) -> Resul
     let mut depth = 0usize;
     let mut nodes = 0usize;
     let mut roots = 0usize;
+    // Whether the root's `p:extLst` is open: its `p:ext` children must name
+    // non-positional extensions.
+    let mut extension_list = false;
     loop {
         let event = reader
             .read_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
         let resolver = reader.resolver();
         let (namespace, event) = resolver.resolve_event(event);
+        if let Event::Start(element) | Event::Empty(element) = &event {
+            if depth == 1 && element.name().local_name().as_ref() == b"extLst" {
+                extension_list = matches!(event, Event::Start(_));
+            } else if depth == 2 && extension_list {
+                let uri = litchi_ooxml_common::xml::unqualified_attribute_value(
+                    element,
+                    b"uri",
+                    reader.decoder(),
+                )?;
+                if !is_presentation_namespace(&namespace)
+                    || element.name().local_name().as_ref() != b"ext"
+                    || !uri
+                        .as_deref()
+                        .is_some_and(|uri| crate::opened::NON_POSITIONAL_EXTENSIONS.contains(&uri))
+                {
+                    return Err(refusal(
+                        SlideOrderRefusal::PositionalOwner,
+                        "presentation root extension may own slide positions",
+                    ));
+                }
+            }
+        }
+        if matches!(event, Event::End(_)) && depth == 2 {
+            extension_list = false;
+        }
         match event {
             Event::Start(element) => {
                 bump_xml(&mut nodes)?;
@@ -1358,10 +1386,12 @@ fn reject_root_child(namespace: &ResolveResult<'_>, local_name: &[u8]) -> Result
             SlideOrderRefusal::ModifyVerifier,
             "presentation modify verifier is a positional semantic owner",
         )),
-        b"extLst" | b"photoAlbum" => Err(refusal(
+        b"photoAlbum" => Err(refusal(
             SlideOrderRefusal::PositionalOwner,
-            "presentation root extension or photo-album metadata may own slide positions",
+            "presentation photo-album metadata may own slide positions",
         )),
+        // Each extension is admitted by name in `reject_root_features`.
+        b"extLst" => Ok(()),
         b"sldMasterIdLst"
         | b"notesMasterIdLst"
         | b"handoutMasterIdLst"

@@ -8,8 +8,8 @@ use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use super::copy_plan::{
-    has_signature_infrastructure, reject_mce, reject_unknown_non_part_members, resolve_slide,
-    validate_registered_layout, validate_slide_surface,
+    has_signature_infrastructure, reject_unknown_non_part_members, resolve_slide,
+    validate_registered_layout,
 };
 use super::model::{Slide, Snapshot, invalid};
 use super::patch::Patch;
@@ -320,7 +320,7 @@ impl Snapshot {
 
         let presentation = self.package.get_part(&self.presentation_name)?;
         crate::parts::validate_content_type(presentation, ct::PML_PRESENTATION_MAIN)?;
-        map_copy_refusal(reject_mce(presentation.blob(), "presentation owner"))?;
+        reject_presentation_mce_use(presentation.blob())?;
         let presentation_text = std::str::from_utf8(presentation.blob())
             .map_err(|error| Error::Xml(format!("presentation XML is not UTF-8: {error}")))?;
         if crate::presentation_properties::metadata::protection::Settings::parse_xml(
@@ -548,30 +548,70 @@ fn build_candidate(snapshot: &Snapshot, selected: &Slide) -> Result<OpcPackage> 
     Ok(candidate)
 }
 
-fn dependency_free_layout(package: &OpcPackage, slide: &dyn Part) -> Result<PackURI> {
-    if slide.rels().len() != 1 {
-        return refusal(
-            SlideRemovalRefusal::UnsupportedRelationship,
-            "the selected slide must have only one layout relationship",
-        );
-    }
-    let relationship = slide
-        .rels()
-        .iter()
-        .next()
-        .ok_or_else(|| invalid("slide-removal relationship count changed"))?;
-    if relationship.is_external()
-        || !crate::parts::is_relationship_type(
+/// The removed slide's one layout edge, after admitting its other edges.
+///
+/// Removal deletes the slide Part with its relationship Part, so an edge
+/// whose target outlives the slide without depending on it is admitted:
+/// external targets (hyperlinks, linked media) and internal jumps to slides
+/// (`slide` relationships, which other slides keep owning). An internal edge
+/// of any other type points at a Part the slide may own exclusively (a notes
+/// slide, a picture, a chart, comments); removal cannot prove whether that
+/// Part becomes an orphan, so it stays a typed refusal naming the type.
+pub(crate) fn removal_layout_edge(
+    relationships: &litchi_opc::Relationships,
+) -> Result<&litchi_opc::Relationship> {
+    let mut layout = None;
+    for relationship in relationships.iter() {
+        if relationship.is_external() {
+            continue;
+        }
+        if crate::parts::is_relationship_type(
             relationship.reltype(),
             rt::SLIDE_LAYOUT,
             "slideLayout",
-        )
-    {
+        ) {
+            if layout.replace(relationship).is_some() {
+                return refusal(
+                    SlideRemovalRefusal::UnsupportedRelationship,
+                    "the selected slide has more than one layout relationship",
+                );
+            }
+            continue;
+        }
+        if crate::parts::is_relationship_type(relationship.reltype(), rt::SLIDE, "slide") {
+            if relationship.target_query().is_some() || relationship.target_fragment().is_some() {
+                return refusal(
+                    SlideRemovalRefusal::AmbiguousTopology,
+                    "a slide jump of the selected slide contains a query or fragment",
+                );
+            }
+            continue;
+        }
+        let kind = relationship
+            .reltype()
+            .rsplit('/')
+            .next()
+            .unwrap_or_else(|| relationship.reltype());
         return refusal(
             SlideRemovalRefusal::UnsupportedRelationship,
-            "the selected slide has a non-layout or external relationship",
+            format!(
+                "the selected slide owns a dependent `{kind}` part, which removal does not delete"
+            ),
         );
     }
+    layout.map_or_else(
+        || {
+            refusal(
+                SlideRemovalRefusal::UnsupportedRelationship,
+                "the selected slide has no internal layout relationship",
+            )
+        },
+        Ok,
+    )
+}
+
+fn dependency_free_layout(package: &OpcPackage, slide: &dyn Part) -> Result<PackURI> {
+    let relationship = removal_layout_edge(slide.rels())?;
     if relationship.target_query().is_some() || relationship.target_fragment().is_some() {
         return refusal(
             SlideRemovalRefusal::AmbiguousTopology,
@@ -675,8 +715,98 @@ pub(crate) fn validate_removal_presentation_owner(xml: &[u8], relationship_id: &
     validate_presentation_bindings(xml, relationship_id, 1, false)
 }
 
+const MCE: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2006";
+
+/// Refuse markup-compatibility content in the presentation root. A bare
+/// namespace declaration (LibreOffice declares it on every root) carries no
+/// alternate content and is admitted, as on the source-backed path.
+fn reject_presentation_mce_use(xml: &[u8]) -> Result<()> {
+    let mut reader = NsReader::from_reader(xml);
+    reader.config_mut().trim_text(false);
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                if matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == MCE) {
+                    return refusal(
+                        SlideRemovalRefusal::MarkupCompatibility,
+                        "the presentation contains markup-compatibility markup",
+                    );
+                }
+                for attribute in element.checked_attributes() {
+                    let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+                    let key = attribute.key.as_ref();
+                    if key == b"xmlns" || key.starts_with(b"xmlns:") {
+                        continue;
+                    }
+                    if matches!(
+                        reader.resolver().resolve_attribute(attribute.key).0,
+                        ResolveResult::Bound(Namespace(value)) if value == MCE
+                    ) {
+                        return refusal(
+                            SlideRemovalRefusal::MarkupCompatibility,
+                            "the presentation contains a markup-compatibility attribute",
+                        );
+                    }
+                }
+            },
+            Event::Eof => return Ok(()),
+            _ => {},
+        }
+    }
+}
+
+/// Admit the XML of a slide that removal deletes whole.
+///
+/// The removed Part and its relationship Part leave together and an inverse
+/// restores their exact bytes, so the slide's own content (extensions,
+/// tables, markup compatibility) cannot outlive it or be misread. Only its
+/// document element is checked: a `p:sld` in the transitional or strict
+/// PresentationML namespace, with no document type or processing
+/// instruction. Edges out of the slide are admitted by
+/// [`removal_layout_edge`]; edges into it by the incoming-owner proof.
 pub(crate) fn validate_removal_slide_surface(xml: &[u8]) -> Result<()> {
-    map_copy_refusal(validate_slide_surface(xml))
+    let mut reader = NsReader::from_reader(xml);
+    reader.config_mut().trim_text(false);
+    let mut root_seen = false;
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        match event {
+            Event::Start(element) | Event::Empty(element) if !root_seen => {
+                let pml = matches!(
+                    namespace,
+                    ResolveResult::Bound(Namespace(value)) if value == PML || value == STRICT_PML
+                );
+                if !pml || element.local_name().as_ref() != b"sld" {
+                    return refusal(
+                        SlideRemovalRefusal::UnknownSemanticSurface,
+                        "the selected slide has an unexpected document element",
+                    );
+                }
+                root_seen = true;
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return refusal(
+                    SlideRemovalRefusal::UnknownSemanticSurface,
+                    "the selected slide contains a document type or processing instruction",
+                );
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    if root_seen {
+        Ok(())
+    } else {
+        refusal(
+            SlideRemovalRefusal::UnknownSemanticSurface,
+            "the selected slide has no document element",
+        )
+    }
 }
 
 // Insertion must not activate an existing XML binding or shift a positional
@@ -688,6 +818,16 @@ pub(crate) fn validate_insertion_owner(xml: &[u8], relationship_id: &str) -> Res
 }
 
 const P14: &[u8] = b"http://schemas.microsoft.com/office/powerpoint/2010/main";
+/// Presentation-level extensions that hold no slide identity or position:
+/// slide and notes drawing guides (p15), image editing and DPI defaults
+/// (p14) and chart data tracking (p15).
+pub(crate) const NON_POSITIONAL_EXTENSIONS: &[&str] = &[
+    "{EFAFB233-063F-42B5-8137-9DF3F51BA10A}",
+    "{2D200454-40CA-4A62-9FC3-DE9A4176ACB9}",
+    "{E76CE94A-603C-4142-B9EB-6D1370010A27}",
+    "{D31A062A-798A-4329-ABDD-BBA856620510}",
+    "{FD5EFAAD-0ECE-453E-9831-46B23BE46B34}",
+];
 const SECTION_EXTENSION_URI: &str = "{521415D9-36F7-43E2-AB2F-B90AF26B5E84}";
 
 fn validate_presentation_bindings(
@@ -699,11 +839,39 @@ fn validate_presentation_bindings(
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
     let mut selected_bindings = 0_usize;
+    // Depth inside a subtree that cannot name slides: the default text style
+    // (DrawingML paragraph formatting) or a non-positional presentation
+    // extension. Only its relationship attributes are still checked.
+    let mut opaque_depth = 0_usize;
     loop {
         let (namespace, event) = reader
             .read_resolved_event()
             .map_err(|error| Error::Xml(error.to_string()))?;
+        let empty = matches!(event, Event::Empty(_));
         match event {
+            Event::Start(element) | Event::Empty(element) if opaque_depth > 0 => {
+                if !empty {
+                    opaque_depth += 1;
+                }
+                for attribute in element.checked_attributes() {
+                    let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+                    if matches!(
+                        reader.resolver().resolve_attribute(attribute.key).0,
+                        ResolveResult::Bound(Namespace(value)) if value == REL || value == STRICT_REL
+                    ) {
+                        let value = attribute
+                            .decoded_and_normalized_value(XmlVersion::Implicit1_0, reader.decoder())
+                            .map_err(|error| Error::Xml(error.to_string()))?;
+                        if value.as_ref() == relationship_id {
+                            return refusal(
+                                SlideRemovalRefusal::SharedOwner,
+                                "a presentation feature also references the selected slide",
+                            );
+                        }
+                    }
+                }
+            },
+            Event::End(_) if opaque_depth > 0 => opaque_depth -= 1,
             Event::Start(element) | Event::Empty(element) => {
                 let section_namespace = sections
                     && matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == P14);
@@ -732,6 +900,24 @@ fn validate_presentation_bindings(
                         );
                     },
                 };
+                if !drawingml && !section_namespace && !empty {
+                    let local = element.local_name();
+                    let opaque = match local.as_ref() {
+                        b"defaultTextStyle" => true,
+                        b"ext" => litchi_ooxml_common::xml::unqualified_attribute_value(
+                            &element,
+                            b"uri",
+                            reader.decoder(),
+                        )?
+                        .as_deref()
+                        .is_some_and(|uri| NON_POSITIONAL_EXTENSIONS.contains(&uri)),
+                        _ => false,
+                    };
+                    if opaque {
+                        opaque_depth = 1;
+                        continue;
+                    }
+                }
                 let element_local = element.local_name();
                 // The p14 section list and its PresentationML extension
                 // wrapper, whose membership insertion maintains.
@@ -888,6 +1074,7 @@ fn known_presentation_element(element: &[u8]) -> bool {
             | b"sld"
             | b"showPr"
             | b"sldRg"
+            | b"extLst"
     )
 }
 
