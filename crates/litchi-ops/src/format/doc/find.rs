@@ -97,7 +97,8 @@ impl Doc {
             } else {
                 Scope::Some(wanted)
             };
-            let (runs, keys) = self.surface(&scope)?;
+            let matcher = spec.matcher();
+            let (runs, keys) = self.surface(&scope, |text| matcher.may_match(text))?;
             let (changes, matches) =
                 surface::find(&runs, spec, replacement, FileFormat::Doc, limits)?;
             Ok((self.commit_changes(&keys, changes, limits)?, matches))
@@ -117,7 +118,7 @@ impl Doc {
     ) -> Result<(Option<WriteCommit>, Summary)> {
         self.check_source()?;
         let result = (|| {
-            let (runs, keys) = self.surface(&Scope::Every)?;
+            let (runs, keys) = self.surface(&Scope::Every, |text| text.contains("{{"))?;
             let mut planner = Planner::new(record, options, limits);
             let changes = surface::merge(&runs, &mut planner, false, FileFormat::Doc, limits)?;
             let summary = planner.finish();
@@ -131,8 +132,15 @@ impl Doc {
         result
     }
 
-    /// The main story's runs in `scope`, and their native keys.
-    fn surface(&self, scope: &Scope) -> Result<(Vec<Run<'static>>, Vec<Key>)> {
+    /// The main story's runs in `scope`, and their native keys. A
+    /// paragraph whose visible text `wanted` rejects contributes nothing:
+    /// its runs are not read (every match or placeholder lies inside one
+    /// paragraph, and the visible text holds every run's text).
+    fn surface(
+        &self,
+        scope: &Scope,
+        wanted: impl Fn(&str) -> bool,
+    ) -> Result<(Vec<Run<'static>>, Vec<Key>)> {
         let nav = Nav::new(self);
         let root = nav.root()?;
         let mut runs = Vec::new();
@@ -146,7 +154,10 @@ impl Doc {
                 if block.element_kind() == Kind::Table {
                     // Cells are searched as fixed text when the whole body is.
                     if matches!(scope, Scope::Every) {
-                        for text in table_texts(&nav, &block)? {
+                        for text in table_texts(&nav, &block)?
+                            .into_iter()
+                            .filter(|text| wanted(text))
+                        {
                             runs.push(Run::new(text, group).editable(false));
                             keys.push(Key::Fixed);
                             group += 1;
@@ -165,7 +176,7 @@ impl Doc {
                         .map(|(_, run)| *run)
                         .collect(),
                 };
-                if scopes.is_empty() {
+                if scopes.is_empty() || !block.paragraph_text()?.is_some_and(|text| wanted(&text)) {
                     continue;
                 }
                 for run in nav.children(&block, KindSet::of(Kind::Run))? {

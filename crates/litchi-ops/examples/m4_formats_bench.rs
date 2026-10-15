@@ -4,13 +4,16 @@
 //! - `odt_find_M`: a body of N one-run paragraphs, `needle` in M of them
 //!   (1, or every one). Leaf leg: walk the body index, rewrite each
 //!   character-data run that holds the needle with `Edit::set_text`, commit.
-//!   Unified leg: `set /` with `find=needle`, `replace=done`.
+//!   Unified leg: `File::set("/", {find: needle, replace: done})` (the
+//!   match count is checked through `File::apply` outside the clock).
 //! - `odt_merge`: the same body with one `{{key}}` placeholder per
 //!   paragraph. Leaf leg: the same walk with a plain `{{key}}` replace.
 //!   Unified leg: `File::merge`.
-//! - `doc_find_M`: N paragraphs, the needle in M. Leaf leg: one
-//!   `replace_paragraph` per matching paragraph, knowing which they are (a
-//!   lower bound). Unified leg: `set /` with `find=`.
+//! - `doc_find_M`: N paragraphs, the needle in M. Leaf leg: scan the warm
+//!   reader's main-story paragraph texts (`Document::body_paragraphs`) and
+//!   stage one `replace_paragraph` per matching paragraph (whole paragraphs
+//!   of one run: a lower bound for run-level rewrites). Unified leg: `set /`
+//!   with `find=`.
 //! - `ods_import`: N rows of four fields (text, number, boolean, text) into
 //!   an empty sheet. Leaf leg: split the CSV by hand and stage the typed
 //!   cells with one `set_cells` per 1,024 changes. Unified leg:
@@ -139,7 +142,27 @@ mod bench {
             }));
         };
 
+        // For a profiler: `M4_ONLY=doc*` runs one family, `M4_ONLY=doc_find_1`
+        // one scenario; `M4_SIZE=5000` one size.
+        let only = std::env::var("M4_ONLY").ok();
+        let size = std::env::var("M4_SIZE")
+            .ok()
+            .and_then(|size| size.parse::<usize>().ok());
+        let wanted = |name: &str| {
+            only.as_deref().is_none_or(|only| {
+                only == name
+                    || only
+                        .strip_suffix('*')
+                        .is_some_and(|prefix| name.starts_with(prefix))
+            })
+        };
+        let sized = |value: usize| size.is_none_or(|size| size == value);
         for paragraphs in [1_000usize, 10_000] {
+            if !wanted("odt_find_1") && !wanted("odt_merge") && !wanted("odt*")
+                || !sized(paragraphs)
+            {
+                continue;
+            }
             for matches in [1usize, paragraphs] {
                 let every = paragraphs / matches;
                 let bytes = odt(paragraphs, |index| {
@@ -152,14 +175,14 @@ mod bench {
                 let package = litchi_odt::Package::from_bytes(&bytes)?;
                 let file = open_bytes(bytes)?;
                 let item = find_item("needle", "done");
+                assert_eq!(file.apply(&item)?.value.matched(), Some(matches));
+                let props = Props::new().with("find", "needle").with("replace", "done");
                 let result = paired(
                     || {
                         black_box(odt_leaf(&package, "needle", "done"));
                     },
                     || {
-                        let commit = file.apply(&item).expect("unified find");
-                        assert_eq!(commit.value.matched(), Some(matches));
-                        black_box(commit.file);
+                        black_box(file.set("/", props.clone()).expect("unified find"));
                     },
                 );
                 report(format!("odt_find_{matches}"), paragraphs, result);
@@ -187,7 +210,13 @@ mod bench {
         }
 
         for paragraphs in [1_000usize, 5_000] {
+            if !sized(paragraphs) {
+                continue;
+            }
             for matches in [1usize, 100] {
+                if !wanted(&format!("doc_find_{matches}")) {
+                    continue;
+                }
                 let every = paragraphs / matches;
                 let line = |index: usize| {
                     if index % every == 0 {
@@ -198,14 +227,20 @@ mod bench {
                 };
                 let bytes = doc(paragraphs, line);
                 let package = litchi_doc::Package::from_bytes(&bytes)?;
+                let reader = package.document();
                 let file: File = open_bytes(bytes)?;
                 let item = find_item("needle", "done");
-                let targets: Vec<(usize, String)> = (0..paragraphs)
-                    .filter(|index| index % every == 0)
-                    .map(|index| (index, line(index).replace("needle", "done")))
-                    .collect();
+                assert_eq!(file.apply(&item)?.value.matched(), Some(matches));
+                let props = Props::new().with("find", "needle").with("replace", "done");
                 let result = paired(
                     || {
+                        let mut targets = Vec::new();
+                        for (index, text) in reader.body_paragraphs().enumerate() {
+                            let text = text.expect("paragraph");
+                            if text.contains("needle") {
+                                targets.push((index, text.replace("needle", "done")));
+                            }
+                        }
                         let mut edit = package.edit().expect("leaf edit");
                         for (index, text) in targets.iter().rev() {
                             edit.replace_paragraph(Position::new(*index), text)
@@ -214,9 +249,7 @@ mod bench {
                         black_box(edit.commit().expect("commit").into_package());
                     },
                     || {
-                        let commit = file.apply(&item).expect("unified find");
-                        assert_eq!(commit.value.matched(), Some(matches));
-                        black_box(commit.file);
+                        black_box(file.set("/", props.clone()).expect("unified find"));
                     },
                 );
                 report(format!("doc_find_{matches}"), paragraphs, result);
@@ -224,6 +257,9 @@ mod bench {
         }
 
         for rows_count in [1_000usize, 10_000] {
+            if !wanted("ods_import") || !sized(rows_count) {
+                continue;
+            }
             let mut csv = String::new();
             for row in 0..rows_count {
                 csv.push_str(&format!("name{row},{row}.5,TRUE,note {row}\n"));
