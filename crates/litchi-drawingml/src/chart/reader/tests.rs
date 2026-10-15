@@ -2550,3 +2550,50 @@ fn chart_fragment_roots_of_many_repeated_names_are_refused_as_before() {
         "{error}"
     );
 }
+
+/// Record 0290 F2: PowerPoint and Excel write axis IDs at or above 2^31 as
+/// negative signed integers (`ooxml/pptx/radar-chart.pptx`). The reader takes
+/// them as the same 32 bits, so the bindings still match, and the writer
+/// spells them as the schema's unsigned decimals.
+#[test]
+fn reads_negative_producer_axis_ids_as_the_same_bits() {
+    let xml = br#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">
+        <c:chart><c:plotArea>
+            <c:radarChart><c:radarStyle val="marker"/><c:axId val="-1884094432"/><c:axId val="-1884097184"/></c:radarChart>
+            <c:catAx><c:axId val="-1884094432"/><c:scaling/><c:axPos val="b"/><c:crossAx val="-1884097184"/></c:catAx>
+            <c:valAx><c:axId val="-1884097184"/><c:scaling/><c:axPos val="l"/><c:crossAx val="-1884094432"/></c:valAx>
+        </c:plotArea></c:chart>
+    </c:chartSpace>"#;
+    let chart = read(xml.as_slice()).unwrap();
+    let first = (-1_884_094_432_i32).cast_unsigned();
+    let second = (-1_884_097_184_i32).cast_unsigned();
+    let TypeGroup::Radar(radar) = &chart.plot_area.type_groups[0] else {
+        panic!("expected radar chart");
+    };
+    assert_eq!(radar.common.axis_ids, [first, second]);
+    assert_eq!(chart.plot_area.axes[0].common().axis_id, first);
+    assert_eq!(chart.plot_area.axes[0].common().cross_axis_id, second);
+    assert_eq!(chart.plot_area.axes[1].common().axis_id, second);
+
+    let mut written = Vec::new();
+    crate::chart::writer::write(&mut written, &chart).unwrap();
+    let written = String::from_utf8(written).unwrap();
+    assert!(
+        written.contains(&format!(r#"<c:axId val="{first}"/>"#)),
+        "{written}"
+    );
+    assert!(!written.contains("val=\"-"), "{written}");
+    assert_eq!(
+        read(written.as_bytes()).unwrap().plot_area.axes[0]
+            .common()
+            .axis_id,
+        first
+    );
+
+    for invalid in ["-2147483649", "4294967296", "x"] {
+        let xml = format!(
+            r#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart><c:plotArea><c:valAx><c:axId val="{invalid}"/><c:scaling/><c:axPos val="l"/><c:crossAx val="1"/></c:valAx></c:plotArea></c:chart></c:chartSpace>"#
+        );
+        assert!(read(xml.as_bytes()).is_err(), "{invalid}");
+    }
+}

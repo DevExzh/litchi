@@ -239,6 +239,16 @@ pub(super) fn required_u32_attr(element: &BytesStart<'_>, description: &str) -> 
         .ok_or_else(|| invalid_attribute(description, &value))
 }
 
+/// A required axis ID attribute, read leniently by
+/// [`crate::chart::axis::parse_axis_id`] (negative producer spellings).
+pub(super) fn required_axis_id_attr(element: &BytesStart<'_>, description: &str) -> Result<u32> {
+    let value = get_attr(element, b"val").ok_or_else(|| missing_attribute(description))?;
+    std::str::from_utf8(&value)
+        .ok()
+        .and_then(crate::chart::axis::parse_axis_id)
+        .ok_or_else(|| invalid_attribute(description, &value))
+}
+
 pub(super) fn required_string_attr(
     element: &BytesStart<'_>,
     name: &[u8],

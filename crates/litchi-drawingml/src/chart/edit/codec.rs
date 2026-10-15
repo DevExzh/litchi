@@ -344,10 +344,11 @@ impl Document {
             let Some(id) = self.child(candidate, b"axId", NamespaceKind::Chart)? else {
                 continue;
             };
-            if self
-                .attribute_from(xml, id, b"val")?
-                .and_then(|value| parse_u32(&value).ok())
-                == Some(axis_id)
+            if self.attribute_from(xml, id, b"val")?.and_then(|value| {
+                std::str::from_utf8(&value)
+                    .ok()
+                    .and_then(crate::chart::axis::parse_axis_id)
+            }) == Some(axis_id)
             {
                 matches.push(candidate);
             }
