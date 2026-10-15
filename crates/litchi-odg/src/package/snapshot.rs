@@ -2723,6 +2723,106 @@ impl Edit {
         Ok(())
     }
 
+    /// Moves the top-level shape at `from` of `page` into page `to_page`, so
+    /// it ends at position `to` of that page's shape order. The shape's bytes
+    /// move unchanged; on a producer drawing both edits stay exact-source
+    /// splices, and an empty destination page element is expanded.
+    ///
+    /// A shape that is part of a group, an anchor inside a group, and any
+    /// identity dependency that would cross pages (an `xml:id`/`draw:id` of
+    /// the moved subtree referenced from outside it, or a connector in the
+    /// subtree glued to a shape outside it) are refused rather than left
+    /// dangling.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a selector out of bounds, a missing span, a
+    /// group member, or a cross-page dependency.
+    pub fn move_shape_to_page(
+        &mut self,
+        page: usize,
+        from: usize,
+        to_page: usize,
+        to: usize,
+    ) -> Result<()> {
+        if page == to_page {
+            let count = parse_content(&self.content)?
+                .shape_spans
+                .get(page)
+                .map_or(0, Vec::len);
+            if to >= count {
+                return invalid("ODG shape move position is out of bounds");
+            }
+            return self.move_shape(page, from, to);
+        }
+        let parsed = parse_content(&self.content)?;
+        let spans = parsed
+            .shape_spans
+            .get(page)
+            .ok_or_else(|| Error::InvalidFormat("ODG page selector is out of bounds".into()))?;
+        let targets = parsed.shape_spans.get(to_page).ok_or_else(|| {
+            Error::InvalidFormat("ODG destination page selector is out of bounds".into())
+        })?;
+        let moved = spans
+            .get(from)
+            .ok_or_else(|| Error::InvalidFormat("ODG shape selector is out of bounds".into()))?
+            .clone()
+            .ok_or_else(|| Error::InvalidFormat("ODG shape span is missing".into()))?;
+        let nested = |spans: &[Option<Range<usize>>], span: &Range<usize>| {
+            spans
+                .iter()
+                .flatten()
+                .any(|outer| outer != span && outer.start <= span.start && span.end <= outer.end)
+        };
+        if nested(spans, &moved) {
+            return Err(Error::Unsupported(
+                "ODG group members move with their group".into(),
+            ));
+        }
+        let at = match targets.get(to) {
+            Some(anchor) => {
+                let anchor = anchor
+                    .as_ref()
+                    .ok_or_else(|| Error::InvalidFormat("ODG shape span is missing".into()))?;
+                if nested(targets, anchor) {
+                    return Err(Error::Unsupported(
+                        "ODG shape move position lies inside a group".into(),
+                    ));
+                }
+                anchor.start
+            },
+            None if to == targets.len() => {
+                parsed.page_insert_positions[to_page].ok_or_else(|| {
+                    Error::InvalidFormat("ODG page insertion point is missing".into())
+                })?
+            },
+            None => return invalid("ODG shape move position is out of bounds"),
+        };
+        check_shape_identity(&self.content, &moved)?;
+        let bytes = self
+            .content
+            .get(moved.clone())
+            .ok_or_else(|| Error::InvalidFormat("ODG relocated span is invalid".into()))?
+            .to_owned();
+        if at >= moved.end {
+            self.insert_content_child(at, &bytes)?;
+            self.splice_content(&moved, "")?;
+        } else if at <= moved.start {
+            self.splice_content(&moved, "")?;
+            self.insert_content_child(at, &bytes)?;
+        } else {
+            return invalid("ODG relocation target lies inside the moved element");
+        }
+        self.changes
+            .push(Change::Structure(StructureChange::ShapeTransferred {
+                page,
+                from,
+                to_page,
+                to,
+            }));
+        Ok(())
+    }
+
     /// Move the staged bytes of `span` to the insertion point `at` (outside
     /// the span), as a removal and an insertion.
     fn relocate_content(&mut self, span: Range<usize>, at: usize) -> Result<()> {
@@ -4354,6 +4454,14 @@ pub enum StructureChange {
     ShapeMoved {
         page: usize,
         from: usize,
+        to: usize,
+    },
+    /// A top-level shape moved from position `from` of `page` to position
+    /// `to` of another page, `to_page`.
+    ShapeTransferred {
+        page: usize,
+        from: usize,
+        to_page: usize,
         to: usize,
     },
     PageRemoved {
@@ -12252,6 +12360,17 @@ fn inverse_change(change: &Change) -> Change {
                 from: *to,
                 to: *from,
             },
+            StructureChange::ShapeTransferred {
+                page,
+                from,
+                to_page,
+                to,
+            } => StructureChange::ShapeTransferred {
+                page: *to_page,
+                from: *to,
+                to_page: *page,
+                to: *from,
+            },
             StructureChange::ShapeAdvancedGeometryChanged { page, shape } => {
                 StructureChange::ShapeAdvancedGeometryChanged {
                     page: *page,
@@ -13047,6 +13166,78 @@ fn classify(namespace: &ResolveResult<'_>) -> NamespaceKind {
             NamespaceKind::Other
         },
     }
+}
+
+/// Refuse a cross-page move of the subtree at `span` when an identity
+/// dependency would cross the page boundary: an `xml:id`/`draw:id` the
+/// subtree declares that any attribute outside it names, or a connector
+/// end (`draw:start-shape`/`draw:end-shape`) inside it that names an
+/// identity declared outside it.
+fn check_shape_identity(xml: &str, span: &Range<usize>) -> Result<()> {
+    validate_raw_xml_events(xml, "ODG dependency event")?;
+    let mut reader = NsReader::from_str(xml);
+    reader.config_mut().check_end_names = true;
+    let mut inside_ids = Vec::new();
+    let mut inside_refs = Vec::new();
+    let mut outside_values = Vec::new();
+    loop {
+        let start = usize::try_from(reader.buffer_position()).unwrap_or(usize::MAX);
+        let (_namespace, event) = reader.read_resolved_event().map_err(|error| {
+            Error::InvalidFormat(format!("invalid ODG dependency XML: {error}"))
+        })?;
+        validate_borrowed_xml_event(&event, "ODG dependency event")?;
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                let inside = span.start <= start && start < span.end;
+                for raw in element.attributes() {
+                    let parsed = raw.map_err(|error| {
+                        Error::InvalidFormat(format!("invalid ODG attribute: {error}"))
+                    })?;
+                    let value = String::from_utf8_lossy(parsed.value.as_ref()).into_owned();
+                    let (namespace, local) = reader.resolver().resolve_attribute(parsed.key);
+                    let is_id = (parsed.key.as_ref() == b"xml:id")
+                        || (resolved_bound(&namespace, DRAW) && local.as_ref() == b"id");
+                    let is_glue = resolved_bound(&namespace, DRAW)
+                        && matches!(local.as_ref(), b"start-shape" | b"end-shape");
+                    if inside {
+                        if is_id {
+                            inside_ids.push(value);
+                        } else if is_glue {
+                            inside_refs.push(value);
+                        }
+                    } else if !is_id {
+                        outside_values.push(value);
+                    }
+                }
+            },
+            Event::GeneralRef(reference) => {
+                reference_value(&reference)?;
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return invalid("active XML is prohibited in ODG dependencies");
+            },
+            Event::Eof => break,
+            Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::End(_)
+            | Event::Text(_) => {},
+        }
+    }
+    if inside_ids
+        .iter()
+        .any(|id| outside_values.iter().any(|value| value == id))
+    {
+        return Err(Error::Unsupported(
+            "ODG shape move to another page is blocked by a reference to its identity".into(),
+        ));
+    }
+    if inside_refs.iter().any(|value| !inside_ids.contains(value)) {
+        return Err(Error::Unsupported(
+            "ODG connector move to another page is blocked by its glued shapes".into(),
+        ));
+    }
+    Ok(())
 }
 
 fn resolved_bound(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {

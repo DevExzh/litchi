@@ -60,7 +60,7 @@
         "node"
       ],
       "operations": {
-        "add": false,
+        "add": true,
         "set": true,
         "get": true,
         "query": true,
@@ -81,19 +81,19 @@
       "properties": {
         "tag": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "text": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "mathvariant": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
@@ -118,10 +118,10 @@
       "subject": "operation",
       "verb": "add",
       "element": "element",
-      "context": "a new MathML element",
+      "context": "a MathML element with attributes other than `mathvariant`, or a subtree",
       "code": "unsupported_capability",
-      "followUp": "0282 formula element authoring",
-      "reason": "inserting MathML needs a typed element value the unified registry does not have yet"
+      "followUp": "0292 formula subtree authoring",
+      "reason": "`add` creates one element from `tag`, `text` and `mathvariant`; nested subtrees are built by further adds, and other attributes need typed values"
     },
     {
       "subject": "operation",

@@ -233,6 +233,10 @@ impl<'f> Navigate<'f> for Nav<'f> {
         self.file.check_source()
     }
 
+    fn fence_key(&self) -> usize {
+        self.file.fence_key()
+    }
+
     fn root(&self) -> Result<Node<'f>> {
         finish(self.file, || Ok(Node::new_workbook(self.file)))
     }

@@ -357,7 +357,7 @@ fn resolve_nodes<'f>(
             limits,
         )?;
     } else if let Some(query) = target.query() {
-        let walk = crate::query::run(nav, query.clone())?;
+        let walk = crate::query::run(nav, query)?;
         if !walk.plan().diagnostics().is_empty() {
             return Err(invalid_query());
         }
@@ -393,7 +393,7 @@ fn resolve_slide_targets(
             limits,
         )?;
     } else if let Some(query) = target.query() {
-        let walk = crate::query::run(nav, query.clone())?;
+        let walk = crate::query::run(nav, query)?;
         if !walk.plan().diagnostics().is_empty() {
             return Err(invalid_query());
         }

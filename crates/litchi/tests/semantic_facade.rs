@@ -6,23 +6,19 @@ fn assert_send_sync_static<T: Send + Sync + 'static>() {}
 #[test]
 fn pages_semantic_namespace_is_concrete_and_archive_free() {
     use litchi::pages::semantic::{
-        Document, DocumentReadOptions, DocumentSourceLimitKind, DocumentSourceLimits,
-        DocumentSourceLimitsError, DocumentStats, Error, IoKind, Position, ReadError,
-        ReadLimitKind, Result, Root, Section, SectionSelector, SectionType, SelectorError,
-        SelectorResult, SemanticLimitKind, SemanticLimits, SemanticLimitsError, TextPosition,
-        TextSpan,
+        Document, DocumentStats, Error, LimitKind, OpenOptions, PackageError, Position, Result,
+        Root, Section, SectionSelector, SectionType, SelectorError, SelectorResult,
+        SemanticLimitKind, SemanticLimits, SourceLimitKind, SourceLimits, TextPosition, TextSpan,
     };
 
     assert_send_sync_static::<Document>();
-    assert_send_sync_static::<DocumentReadOptions>();
-    assert_send_sync_static::<DocumentSourceLimitKind>();
-    assert_send_sync_static::<DocumentSourceLimits>();
-    assert_send_sync_static::<DocumentSourceLimitsError>();
+    assert_send_sync_static::<OpenOptions>();
+    assert_send_sync_static::<SourceLimitKind>();
+    assert_send_sync_static::<SourceLimits>();
+    assert_send_sync_static::<LimitKind>();
     assert_send_sync_static::<DocumentStats>();
     assert_send_sync_static::<Error>();
-    assert_send_sync_static::<IoKind>();
-    assert_send_sync_static::<ReadError>();
-    assert_send_sync_static::<ReadLimitKind>();
+    assert_send_sync_static::<PackageError>();
     assert_send_sync_static::<Result<()>>();
     assert_send_sync_static::<Root>();
     assert_send_sync_static::<Section>();
@@ -30,17 +26,17 @@ fn pages_semantic_namespace_is_concrete_and_archive_free() {
     assert_send_sync_static::<SectionType>();
     assert_send_sync_static::<SemanticLimitKind>();
     assert_send_sync_static::<SemanticLimits>();
-    assert_send_sync_static::<SemanticLimitsError>();
     assert_send_sync_static::<SelectorError>();
     assert_send_sync_static::<SelectorResult<()>>();
     assert_send_sync_static::<TextPosition>();
     assert_send_sync_static::<TextSpan>();
     assert_send_sync_static::<Position>();
 
-    let options =
-        DocumentReadOptions::new(DocumentSourceLimits::default(), SemanticLimits::default());
-    assert_eq!(options.source(), DocumentSourceLimits::default());
-    assert_eq!(options.semantic(), SemanticLimits::default());
+    let options = OpenOptions::new()
+        .source_limits(SourceLimits::default())
+        .semantic_limits(SemanticLimits::default());
+    assert_eq!(options.source_limits_value(), SourceLimits::default());
+    assert_eq!(options.semantic_limits_value(), SemanticLimits::default());
 
     let selector = SectionSelector::name("Introduction");
     assert!(matches!(selector, SectionSelector::Name("Introduction")));

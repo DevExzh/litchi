@@ -2,12 +2,13 @@
 
 use std::error::Error as StdError;
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
 use litchi_iwa_common::{decode_varint_from_bytes, wire::WireView};
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tp, tsa, tsd, tsp, tst, tswp};
 use litchi_pages::table::dimension::{Dimension, Points, Size};
-use litchi_pages::{BodyTableDimensionError as Error, BodyTableSelector, Limits, Package};
+use litchi_pages::{BodyTableSelector, Package, table::dimension::transaction::Error};
 use prost::Message as _;
 
 const DOCUMENT_MEMBER: &str = "Index/Document.iwa";
@@ -683,7 +684,10 @@ fn output_limit_rejects_growth_before_publication() -> TestResult {
         1024 * 1024,
         1024 * 1024,
     )?;
-    let bounded = Package::from_bytes_with_limits(&source, limits)?;
+    let bounded = Package::from_bytes_with_options(
+        &source,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    )?;
     let before = bounded.exact_bytes();
     let error = bounded
         .edit_body_table_dimension_size(0usize, Dimension::Row(0))?
@@ -703,7 +707,10 @@ fn header_field_limit_has_a_prepublication_boundary() -> TestResult {
     for fields in 1..=4_096 {
         let archive_limits = litchi_iwa_core::Limits::default().with_header_fields(fields)?;
         let limits = Limits::default().with_archive_limits(archive_limits)?;
-        let Ok(package) = Package::from_bytes_with_limits(&source, limits) else {
+        let Ok(package) = Package::from_bytes_with_options(
+            &source,
+            litchi_pages::OpenOptions::new().__archive_limits(limits),
+        ) else {
             continue;
         };
         let result = package
@@ -718,7 +725,10 @@ fn header_field_limit_has_a_prepublication_boundary() -> TestResult {
     assert!(exact_fields > 1);
     let archive_limits = litchi_iwa_core::Limits::default().with_header_fields(exact_fields - 1)?;
     let limits = Limits::default().with_archive_limits(archive_limits)?;
-    if let Ok(package) = Package::from_bytes_with_limits(&source, limits) {
+    if let Ok(package) = Package::from_bytes_with_options(
+        &source,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    ) {
         let before = package.exact_bytes();
         let result = package
             .edit_body_table_dimension_size(0usize, Dimension::Row(1))
@@ -771,16 +781,19 @@ fn limits_and_public_values_are_typed_and_redacted() -> TestResult {
     assert_send_sync_debug::<Dimension>();
     assert_send_sync_debug::<Points>();
     assert_send_sync_debug::<Size>();
-    assert_send_sync_debug::<litchi_pages::BodyTableDimensionEdit<'static>>();
-    assert_send_sync_debug::<litchi_pages::BodyTableDimensionPatch>();
-    assert_send_sync_debug::<litchi_pages::BodyTableDimensionCommit>();
-    assert_send_sync_debug::<litchi_pages::BodyTableDimensionDiagnostics>();
-    assert_send_sync_debug::<litchi_pages::BodyTableDimensionLimitKind>();
+    assert_send_sync_debug::<litchi_pages::table::dimension::transaction::Edit<'static>>();
+    assert_send_sync_debug::<litchi_pages::table::dimension::transaction::Patch>();
+    assert_send_sync_debug::<litchi_pages::table::dimension::transaction::Commit>();
+    assert_send_sync_debug::<litchi_pages::table::dimension::transaction::Diagnostics>();
+    assert_send_sync_debug::<litchi_pages::table::dimension::transaction::LimitKind>();
     assert_send_sync_debug::<Error>();
     let source = synthetic_package()?;
     let archive_limits = litchi_iwa_core::Limits::default().with_header_fields(1)?;
     let limits = Limits::default().with_archive_limits(archive_limits)?;
-    if let Ok(package) = Package::from_bytes_with_limits(&source, limits) {
+    if let Ok(package) = Package::from_bytes_with_options(
+        &source,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    ) {
         let error = package
             .edit_body_table_dimension_size(0usize, Dimension::Row(0))?
             .set_points(Points::new(31.0)?)

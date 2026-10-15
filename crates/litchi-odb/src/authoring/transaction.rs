@@ -1188,6 +1188,67 @@ impl<'source> Edit<'source> {
         self.record(ChangeAction::Remove, ChangeKind::Query, name)
     }
 
+    /// Moves a stored query so it ends at position `to` among the queries of
+    /// its collection. The query's bytes move unchanged; every other byte of
+    /// the content stays in place. A move to the current position is an
+    /// exact no-op.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the query does not exist, its name is
+    /// ambiguous, or `to` is outside the collection.
+    pub fn move_query(&mut self, name: &str, to: usize) -> Result<()> {
+        let nodes = scan(&self.content)?;
+        let site = find_named_node(&nodes, "query", name)?
+            .ok_or_else(|| Error::InvalidFormat("ODB query does not exist".to_string()))?;
+        if relocate_sibling(&mut self.content, &nodes, site, to)? {
+            self.record(ChangeAction::Update, ChangeKind::Query, name)?;
+        }
+        Ok(())
+    }
+
+    /// Moves a table declaration so it ends at position `to` among the
+    /// declarations of the same kind in its collection (representations
+    /// among representations, definitions among definitions). The
+    /// declaration's bytes move unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the table does not exist, its name is
+    /// ambiguous, or `to` is outside its collection.
+    pub fn move_table(&mut self, name: &str, to: usize) -> Result<()> {
+        let nodes = scan(&self.content)?;
+        let site = find_named_table(&nodes, name)?
+            .ok_or_else(|| Error::InvalidFormat("ODB table does not exist".to_string()))?;
+        if relocate_sibling(&mut self.content, &nodes, site, to)? {
+            self.record(ChangeAction::Update, ChangeKind::Table, name)?;
+        }
+        Ok(())
+    }
+
+    /// Moves a column so it ends at position `to` among the columns of its
+    /// table. The column's bytes move unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the table or column does not exist, a name is
+    /// ambiguous, or `to` is outside the table's columns.
+    pub fn move_column(&mut self, table: &str, name: &str, to: usize) -> Result<()> {
+        let nodes = scan(&self.content)?;
+        let table_site = find_named_table(&nodes, table)?
+            .ok_or_else(|| Error::InvalidFormat("ODB table does not exist".to_string()))?;
+        let site = find_named_child(&nodes, table_site, column_element(table_site), name)?
+            .ok_or_else(|| Error::InvalidFormat("ODB column does not exist".to_string()))?;
+        if relocate_sibling(&mut self.content, &nodes, site, to)? {
+            self.record(
+                ChangeAction::Update,
+                ChangeKind::Column,
+                &child_target(table, name),
+            )?;
+        }
+        Ok(())
+    }
+
     /// Replaces the inert command text stored for one exactly named query.
     pub fn set_query_command(&mut self, name: &str, value: impl Into<String>) -> Result<()> {
         let value = value.into();
@@ -3855,6 +3916,44 @@ fn apply_edits(source: &mut String, mut edits: Vec<TextEdit>) -> Result<()> {
         replace_span(source, edit.range, &edit.value)?;
     }
     Ok(())
+}
+
+/// Move `site`'s bytes so it ends at position `to` among its same-named
+/// siblings under the same parent. Returns whether anything moved.
+fn relocate_sibling(source: &mut String, nodes: &[Node], site: &Node, to: usize) -> Result<bool> {
+    let siblings = nodes
+        .iter()
+        .filter(|node| {
+            node.parent == site.parent
+                && node.namespace == site.namespace
+                && node.local == site.local
+        })
+        .collect::<Vec<_>>();
+    let from = siblings
+        .iter()
+        .position(|node| node.id == site.id)
+        .ok_or_else(|| Error::InvalidFormat("ODB moved element is missing".to_string()))?;
+    if to >= siblings.len() {
+        return invalid("ODB move position is out of bounds");
+    }
+    if from == to {
+        return Ok(false);
+    }
+    let span = site.full.clone();
+    let bytes = source
+        .get(span.clone())
+        .ok_or_else(|| Error::InvalidFormat("ODB moved span is invalid".to_string()))?
+        .to_owned();
+    if to > from {
+        let at = siblings[to].full.end;
+        replace_span(source, at..at, &bytes)?;
+        replace_span(source, span, "")?;
+    } else {
+        let at = siblings[to].full.start;
+        replace_span(source, span, "")?;
+        replace_span(source, at..at, &bytes)?;
+    }
+    Ok(true)
 }
 
 fn replace_span(source: &mut String, range: Range<usize>, value: &str) -> Result<()> {

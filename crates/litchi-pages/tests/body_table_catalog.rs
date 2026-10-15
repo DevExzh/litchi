@@ -7,13 +7,15 @@
 
 use std::error::Error as StdError;
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::{Limits as ArchiveLimits, package::EntryEdit};
 use litchi_iwa_core::{
     Archive, ArchiveLimits as CoreArchiveLimits, FieldInfo, FieldPath, RawMessage, SnappyStream,
 };
 use litchi_iwa_protos::{tp, tst};
 use litchi_pages::{
-    BodyTableCatalogError, BodyTableCatalogLimitKind, BodyTableSelector, Limits, Package,
+    BodyTableSelector, Package, table::catalog::Error as BodyTableCatalogError,
+    table::catalog::LimitKind as BodyTableCatalogLimitKind,
 };
 use prost::Message as _;
 
@@ -466,7 +468,10 @@ fn catalog_resource_limit_is_reported_after_successful_package_ingress() -> Test
         Limits::MAX_IWA_STREAM_BYTES,
     )?
     .with_archive_limits(archive_limits)?;
-    let package = Package::from_bytes_with_limits(NATIVE_MULTI, limits)?;
+    let package = Package::from_bytes_with_options(
+        NATIVE_MULTI,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    )?;
     let before = exact_bytes(&package)?;
     match package.body_tables() {
         Err(BodyTableCatalogError::LimitExceeded {
@@ -493,6 +498,12 @@ fn catalog_input_limit_rejects_before_projection() -> TestResult {
         Limits::MAX_TOTAL_BYTES,
         Limits::MAX_IWA_STREAM_BYTES,
     )?;
-    assert!(Package::from_bytes_with_limits(NATIVE_MULTI, limits).is_err());
+    assert!(
+        Package::from_bytes_with_options(
+            NATIVE_MULTI,
+            litchi_pages::OpenOptions::new().__archive_limits(limits)
+        )
+        .is_err()
+    );
     Ok(())
 }

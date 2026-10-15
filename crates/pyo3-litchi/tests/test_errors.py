@@ -47,9 +47,12 @@ ACCEPTED = (
     ("iwork/numbers/basic.numbers", "Numbers", L.Workbook),
 )
 
-#: Flat ODF the unified opener refuses; flat ODS opens (record 0277).
-FLAT_ODF = ("odf/odt/form-controls.fodt", "odf/drawing/multicolor-gradient.fodp")
+#: Flat ODF the unified opener refuses: a flat formula (no flat reader) and
+#: a flat ODP whose drawing body the leaf refuses. Flat ODS (record 0277) and
+#: flat ODT (record 0292) open.
+FLAT_ODF = ("odf/flat/minimal-formula.fodf", "odf/drawing/multicolor-gradient.fodp")
 FLAT_ODS = "odf/ods/grid-padding.fods"
+FLAT_ODT = "odf/odt/form-controls.fodt"
 
 #: ODF object formats no family opener reads: ``litchi_py.open`` holds them
 #: as ``File`` (record 0282), but they are neither documents,
@@ -155,6 +158,15 @@ class UnsupportedInputTests(unittest.TestCase):
                 # see test_known_drift).
                 with self.assertRaises(Exception):
                     L.Workbook.open(path)
+
+    def test_flat_odt_opens_as_a_document(self):
+        # Record 0292: flat text documents read through the ODT adapter.
+        document = L.Document.open(fixture(FLAT_ODT))
+        self.assertIsInstance(document.text(), str)
+        for opener in (L.Presentation, L.Workbook):
+            with self.subTest(opener=opener.__name__):
+                with self.assertRaises(ValueError):
+                    opener.open(fixture(FLAT_ODT))
 
     def test_flat_ods_opens_as_a_workbook(self):
         names = L.Workbook.open(fixture(FLAT_ODS)).worksheet_names()
@@ -290,7 +302,7 @@ class MessageSnapshotTests(unittest.TestCase):
                  "Word 6.0 documents (nFib 0x0065) predate the Word 97 binary format and"
                  " are not supported"),
             ]
-            for relative, name in zip(FLAT_ODF[:1], ("Odt",)):
+            for relative, name in zip(FLAT_ODF[:1], ("Odf",)):
                 rows += [(opener, fixture(relative), self.FLAT.format(name)) for opener in OPENERS]
             # Flat ODP opens through the leaf's flat reader (record 0278),
             # which refuses this drawing-bodied fixture.

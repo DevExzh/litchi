@@ -17,7 +17,8 @@ use litchi_iwa_common::{WireLimits, decode_varint_from_bytes};
 use litchi_iwa_protos::table_info_codec::{self, WireResourceLimit};
 use litchi_numbers::table::merge::Region;
 use litchi_pages::{
-    BodyTableMergesError, BodyTableMergesLimitKind, BodyTableSelector, MergeReader,
+    BodyTableSelector, MergeReader, table::merge::transaction::Error as BodyTableMergesError,
+    table::merge::transaction::LimitKind as BodyTableMergesLimitKind,
 };
 
 use super::super::PagesEditor;

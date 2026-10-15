@@ -1709,7 +1709,7 @@ mod odt {
     }
 
     #[test]
-    fn flat_odt_detection_and_reading_is_explicitly_unsupported() {
+    fn flat_odt_opens_through_its_read_projection() {
         const FLAT_ODT: &[u8] = br#"<?xml version="1.0" encoding="UTF-8"?>
 <office:document
   xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
@@ -1718,15 +1718,18 @@ mod odt {
   office:mimetype="application/vnd.oasis.opendocument.text">
   <office:body><office:text><text:h>Title</text:h><text:p>Hello flat text</text:p></office:text></office:body>
 </office:document>"#;
-        let error = crate::open_bytes(FLAT_ODT.to_vec()).expect_err("flat ODT is not opened");
-        assert_eq!(error.code(), Code::UnsupportedCapability);
-        assert_eq!(error.format(), Some(litchi_core::FileFormat::Odt));
+        // Record 0292: flat ODT reads through the leaf's packaged projection
+        // and publishes its flat bytes.
+        let file = crate::open_bytes(FLAT_ODT.to_vec()).expect("flat ODT opens");
+        assert_eq!(file.format(), Some(litchi_core::FileFormat::Odt));
+        assert_eq!(file.text().unwrap(), "Title\nHello flat text");
+        assert_eq!(file.to_bytes().unwrap(), FLAT_ODT);
 
         #[cfg(any(unix, windows))]
         {
             let temporary = super::super::temporary_with(FLAT_ODT, ".fodt");
-            let error = crate::open(temporary.path()).expect_err("flat ODT path is not opened");
-            assert_eq!(error.code(), Code::UnsupportedCapability);
+            let file = crate::open(temporary.path()).expect("flat ODT path opens");
+            assert_eq!(file.to_bytes().unwrap(), FLAT_ODT);
         }
     }
 

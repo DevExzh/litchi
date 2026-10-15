@@ -173,22 +173,10 @@ pub(super) fn leaf(error: litchi_core::Error, code: Code) -> Error {
 }
 
 impl Ods {
-    /// The refusal of a write to a flat single-XML spreadsheet.
-    fn flat_write_refusal() -> Error {
-        refusal(
-            Code::UnsupportedCapability,
-            "flat ODS (.fods) opens read-only through the unified layer",
-        )
-        .with_suggestion("follow-up: flat ODS writes (record 0277 gap F1); save a packaged .ods")
-    }
-
-    /// Admit a primary edit: the source is current and the owner editable.
+    /// Admit an edit: the source is current. A flat spreadsheet edits its
+    /// packaged projection (record 0292).
     pub(crate) fn admit_edit(&self) -> Result<()> {
-        self.check_source()?;
-        if self.is_flat() {
-            return Err(Self::flat_write_refusal());
-        }
-        Ok(())
+        self.check_source()
     }
 
     /// The package one edit starts from.
@@ -203,7 +191,17 @@ impl Ods {
     }
 
     /// A new handle over a committed package, keeping this handle's origin.
+    /// A flat spreadsheet republishes the edit of its projection into its
+    /// flat bytes, element by element (record 0292).
     pub(crate) fn with_package(&self, package: Package) -> Result<Self> {
+        if let Some(flat) = self.flat_bytes() {
+            let parts = litchi_odf_common::flat::Parts::split(flat).map_err(core_error)?;
+            let bytes = parts
+                .merge_package(flat, package.as_bytes())
+                .map_err(core_error)?;
+            let next = Self::from_flat(bytes, &crate::OpenOptions::default())?;
+            return Ok(next.with_origin(self.origin()));
+        }
         Self::from_package(package, self.origin())
     }
 
@@ -216,6 +214,9 @@ impl Ods {
     pub(crate) fn same_content(&self, other: &Self) -> Result<bool> {
         if self.same_inner(other) {
             return Ok(true);
+        }
+        if let (Some(left), Some(right)) = (self.flat_bytes(), other.flat_bytes()) {
+            return Ok(left == right);
         }
         Ok(self.materialized()?.as_bytes() == other.materialized()?.as_bytes())
     }
@@ -722,19 +723,13 @@ fn cell_coordinates(
     Ok(sheets)
 }
 
-fn set_cells(
+/// The per-sheet cell replacements `assignments` make on `targets`.
+fn cell_changes(
     file: &Ods,
     targets: &[Target],
-    props: &Props<'_>,
+    assignments: &CellAssignments,
     limits: &SemanticLimits,
-) -> Result<Commit> {
-    let ranges = targets
-        .iter()
-        .any(|target| matches!(target, Target::Range { .. }));
-    let assignments = CellAssignments::admit(props, ranges)?;
-    if let Some(style) = assignments.style.as_ref().and_then(Option::as_deref) {
-        validate_style(file, style)?;
-    }
+) -> Result<BTreeMap<u32, BTreeMap<(u32, u32), Cell>>> {
     let sheets = file.worksheets()?;
     let mut changes: BTreeMap<u32, BTreeMap<(u32, u32), Cell>> = BTreeMap::new();
     let mut staged = 0_usize;
@@ -768,6 +763,23 @@ fn set_cells(
             }
         }
     }
+    Ok(changes)
+}
+
+fn set_cells(
+    file: &Ods,
+    targets: &[Target],
+    props: &Props<'_>,
+    limits: &SemanticLimits,
+) -> Result<Commit> {
+    let ranges = targets
+        .iter()
+        .any(|target| matches!(target, Target::Range { .. }));
+    let assignments = CellAssignments::admit(props, ranges)?;
+    if let Some(style) = assignments.style.as_ref().and_then(Option::as_deref) {
+        validate_style(file, style)?;
+    }
+    let changes = cell_changes(file, targets, &assignments, limits)?;
     if changes.values().all(BTreeMap::is_empty) {
         return no_op(file, limits);
     }

@@ -48,6 +48,8 @@ CREATABLE = (
     "docx", "xlsx", "pptx", "xlsb", "doc", "xls", "ppt", "rtf", "ods", "odt", "odp",
     # The remaining ODF formats (record 0282).
     "oth", "odm", "odg", "odc", "odi", "odb", "odf",
+    # Pages builds its minimal document (record 0299).
+    "pages",
 )
 #: The formats File holds read-only, and a fixture of each: none since ODT
 #: (0276), ODS (0277) and ODP (0278) gained writers.
@@ -146,7 +148,7 @@ class CreateTests(WriteAssertions):
         self.assertError(raised(lambda: L.create(5)), L.PropertyError, "invalid_argument")
 
     def test_formats_without_a_builder_are_unsupported(self):
-        for name in ("pages",):
+        for name in ("numbers",):
             with self.subTest(format=name):
                 error = raised(lambda: L.create(name))
                 self.assertIsInstance(error, L.UnsupportedError)
@@ -458,6 +460,33 @@ class OdpVerbTests(WriteAssertions):
             self.assertEqual(L.open(target).get(path, 0)["text"], "Box")
 
 
+class FlatOdfTests(WriteAssertions):
+    """Flat ODF (record 0292): .fodt opens, and every flat family edits its
+    packaged projection and republishes into the flat bytes."""
+
+    def test_flat_text_paragraph_round_trip(self):
+        source = L.open(fixture("odf/odt/title-field-invalidate.fodt"))
+        before = source.to_bytes()
+        paths = [node["path"] for node in source.query("p")]
+        target = next(p for p in paths if source.get(p, 0)["text"] == "body text")
+        edited = source.set(target, {"text": "new body"})
+        published = edited.to_bytes()
+        self.assertEqual(published, before.replace(b">body text<", b">new body<"))
+        self.assertEqual(L.open_bytes(published).get(target, 0)["text"], "new body")
+        self.assertUnchanged(source, before)
+
+    def test_flat_drawing_and_moves_across_object_formats(self):
+        drawing = L.open(fixture("libreoffice-core/xmloff/qa/unit/data/tdf161327_LatheEndAngle.fodg"))
+        renamed = drawing.set("/page[1]", {"name": "Flat"})
+        self.assertEqual(L.open_bytes(renamed.to_bytes()).get("/page[1]", 0)["format"]["name"], "Flat")
+        # Record 0292: object-format verbs are element-level.
+        chart = L.create("odc")
+        for values in ("t.B2:B5", "t.C2:C5"):
+            chart, _ = chart.add("/", "series", {"values": values})
+        swapped = chart.swap("/series[1]", "/series[2]")
+        self.assertEqual(swapped.get("/series[1]", 0)["format"]["values"], "t.C2:C5")
+
+
 class OdfObjectTests(WriteAssertions):
     """ODF object formats (record 0288): producer drawing structure, the
     metadata family and typed chart writes."""
@@ -530,8 +559,8 @@ class CapabilityAgreementTests(WriteAssertions):
                     self.assertEqual(error.code, verbs[verb]["code"])
         # DOC (0258), PPT (0260) and XLS (0259) support every write verb.
         # DOC (0258), PPT (0260), XLS (0259), ODS (0277), ODT (0276), ODP
-        # (0278), OTH and ODM (0282) support every write verb; the ODF object
-        # formats (0282) refuse their missing structural verbs, checked above.
+        # (0278), OTH and ODM (0282) and the ODF object formats (0292) support
+        # every write verb; object-format gaps are element-level.
 
     def test_read_only_formats_refuse_every_write(self):
         for relative, name in READ_ONLY:

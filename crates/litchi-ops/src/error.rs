@@ -1640,7 +1640,9 @@ impl Classify for litchi_xls::package::edit::Error {
 impl From<litchi_xls::package::edit::Error> for Error {
     fn from(error: litchi_xls::package::edit::Error) -> Self {
         let class = error.classify();
-        let message = class.code.summary();
+        // The leaf names the exact refusal (the dependency record, the
+        // reader check); the code summary alone would hide it (record 0293).
+        let message = error.to_string();
         Self::from_class(
             class,
             message,

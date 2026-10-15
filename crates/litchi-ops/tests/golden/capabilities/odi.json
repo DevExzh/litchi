@@ -24,28 +24,16 @@
       "supported": true
     },
     "add": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "0282 ODF object-format structure",
-      "reason": "the format's leaf has no such structural operation"
+      "supported": true
     },
     "remove": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "0282 ODF object-format structure",
-      "reason": "the format's leaf has no such structural operation"
+      "supported": true
     },
     "move": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "0282 ODF object-format structure",
-      "reason": "the format's leaf has no such structural operation"
+      "supported": true
     },
     "swap": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "0282 ODF object-format structure",
-      "reason": "the format's leaf has no such structural operation"
+      "supported": true
     },
     "edit": {
       "supported": true
@@ -297,7 +285,7 @@
         "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "stable": [
@@ -354,6 +342,24 @@
       "code": "unsupported_capability",
       "followUp": "0282 ODI single frame",
       "reason": "the ODI leaf admits exactly one image frame"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "frame",
+      "context": "an ODI image holds exactly one frame",
+      "code": "unsupported_capability",
+      "followUp": "0282 ODI single frame",
+      "reason": "an image package without its frame is not an ODI image"
+    },
+    {
+      "subject": "operation",
+      "verb": "move",
+      "element": "frame",
+      "context": "a position other than the frame's own",
+      "code": "out_of_range",
+      "followUp": "none: an ODI image holds one frame",
+      "reason": "the frame and the metadata are singletons, so a move or swap names only their own position (an exact no-op)"
     },
     {
       "subject": "operation",

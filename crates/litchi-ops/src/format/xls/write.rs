@@ -645,7 +645,7 @@ fn resolve_sheet_targets(
         let node = crate::path::resolve::get(&Nav::new(file), path)?;
         append_sheet(&mut positions, &mut seen, node, limits)?;
     } else if let Some(query) = target.query() {
-        let walk = crate::query::run(Nav::new(file), query.clone())?;
+        let walk = crate::query::run(Nav::new(file), query)?;
         if !walk.plan().diagnostics().is_empty() {
             return Err(invalid_query());
         }
@@ -705,7 +705,7 @@ fn resolve_cell_targets(
         let node = crate::path::resolve::get(&Nav::new(file), path)?;
         append_cell_node(&mut targets, &mut seen, &mut non_cell, node, limits)?;
     } else if let Some(query) = target.query() {
-        let walk = crate::query::run(Nav::new(file), query.clone())?;
+        let walk = crate::query::run(Nav::new(file), query)?;
         if !walk.plan().diagnostics().is_empty() {
             return Err(invalid_query());
         }

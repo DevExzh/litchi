@@ -8662,7 +8662,7 @@ fn enforce_pages_native_message_provenance(proto_directory: &Path) -> Result<(),
         ),
         (
             "../litchi-pages/src/package/footnote_text.rs",
-            "let body =\n        find_object(components, body_identifier.get())",
+            "let body = find_object(components, body_identifier.get())",
             1,
         ),
         (

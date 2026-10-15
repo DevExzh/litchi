@@ -9,7 +9,7 @@ use litchi_iwa_archive::ComponentCatalog;
 use litchi_iwa_core::RawMessage;
 use litchi_numbers_wire::table_merges::{self, ReadLimits};
 use std::fmt;
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::{Package, page_layout, table_lock};
 use crate::selector::BodyTableSelector;
@@ -19,14 +19,12 @@ mod reader;
 mod transaction;
 
 pub use reader::MergeReader;
-pub use transaction::{
-    BodyTableMergesCommit, BodyTableMergesDiagnostics, BodyTableMergesEdit, BodyTableMergesPatch,
-};
+pub use transaction::{Commit, Diagnostics, Edit, Patch};
 
 /// A finite resource governed by one body-table merge read.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum BodyTableMergesLimitKind {
+pub enum LimitKind {
     /// Complete package input bytes.
     InputBytes,
     /// Complete candidate package output bytes (unused by this read).
@@ -63,7 +61,7 @@ pub enum BodyTableMergesLimitKind {
     WireWork,
 }
 
-impl fmt::Display for BodyTableMergesLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -88,9 +86,9 @@ impl fmt::Display for BodyTableMergesLimitKind {
 }
 
 /// Failure while reading one Pages body table's merged-cell geometry.
-#[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, ThisError, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum BodyTableMergesError {
+pub enum Error {
     /// No rooted body table matched the selector.
     #[error("the Pages body has no table matching the requested selector")]
     TableNotFound,
@@ -118,7 +116,7 @@ pub enum BodyTableMergesError {
     )]
     LimitExceeded {
         /// Resource category.
-        kind: BodyTableMergesLimitKind,
+        kind: LimitKind,
         /// Observed or requested amount.
         observed: u64,
         /// Configured maximum.
@@ -142,14 +140,14 @@ fn select_reader_target(
     targets: Vec<table_lock::BodyTableTarget>,
     selector: BodyTableSelector<'_>,
     budget: &mut table_lock::WireBudget,
-) -> Result<table_lock::BodyTableTarget, table_lock::BodyTableLockError> {
+) -> Result<table_lock::BodyTableTarget, table_lock::Error> {
     match selector {
         BodyTableSelector::Position(position) => {
             budget.charge_payload_work(position.get().saturating_add(1).min(targets.len()))?;
             targets
                 .into_iter()
                 .nth(position.get())
-                .ok_or(table_lock::BodyTableLockError::TableNotFound)
+                .ok_or(table_lock::Error::TableNotFound)
         },
         BodyTableSelector::Name(name) => {
             let mut first = None;
@@ -159,10 +157,10 @@ fn select_reader_target(
                     continue;
                 }
                 if first.replace(target).is_some() {
-                    return Err(table_lock::BodyTableLockError::AmbiguousTableName);
+                    return Err(table_lock::Error::AmbiguousTableName);
                 }
             }
-            first.ok_or(table_lock::BodyTableLockError::TableNotFound)
+            first.ok_or(table_lock::Error::TableNotFound)
         },
     }
 }
@@ -178,13 +176,10 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns [`BodyTableMergesError::InvalidSource`] when a merge formula is
+    /// Returns [`Error::InvalidSource`] when a merge formula is
     /// malformed, references another table, overlaps another region, or
     /// extends outside the selected table dimensions.
-    pub fn body_table_merges<'table, S>(
-        &self,
-        selector: S,
-    ) -> Result<Vec<Region>, BodyTableMergesError>
+    pub fn body_table_merges<'table, S>(&self, selector: S) -> Result<Vec<Region>, Error>
     where
         S: Into<BodyTableSelector<'table>>,
     {
@@ -201,7 +196,7 @@ fn read_regions(
     package: &Package,
     target: &table_lock::BodyTableTarget,
     budget: &mut table_lock::WireBudget,
-) -> Result<Vec<Region>, BodyTableMergesError> {
+) -> Result<Vec<Region>, Error> {
     table_lock::validate_body_table_target(package, target, budget).map_err(map_lock_error)?;
     let message = model_message(package, target)?;
     let limits = read_limits(budget)?;
@@ -220,7 +215,7 @@ fn read_regions(
 
     for region in &read.regions {
         if region.end_row() >= target.table_rows || region.end_column() >= target.table_columns {
-            return Err(BodyTableMergesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(read.regions)
@@ -229,51 +224,51 @@ fn read_regions(
 fn model_message<'source>(
     package: &'source Package,
     target: &table_lock::BodyTableTarget,
-) -> Result<&'source RawMessage, BodyTableMergesError> {
+) -> Result<&'source RawMessage, Error> {
     model_message_from_components(package.state.source.components(), target)
 }
 
 fn model_message_from_components<'source>(
     components: &'source ComponentCatalog,
     target: &table_lock::BodyTableTarget,
-) -> Result<&'source RawMessage, BodyTableMergesError> {
+) -> Result<&'source RawMessage, Error> {
     let component = components
         .get_index(target.model_component_index)
-        .ok_or(BodyTableMergesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let object = component
         .archive()
         .objects
         .get(target.model_object_index)
-        .ok_or(BodyTableMergesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if object.archive_info.identifier != Some(target.model_identifier.get()) {
-        return Err(BodyTableMergesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let message = object
         .messages
         .get(target.model_message_index)
         .filter(|message| message.type_ == target.model_message_type)
-        .ok_or(BodyTableMergesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     object
         .archive_info
         .message_infos
         .get(target.model_message_index)
-        .ok_or(BodyTableMergesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     Ok(message)
 }
 
-fn read_limits(budget: &table_lock::WireBudget) -> Result<ReadLimits, BodyTableMergesError> {
+fn read_limits(budget: &table_lock::WireBudget) -> Result<ReadLimits, Error> {
     let fields = budget.remaining_wire_fields();
     if fields == 0 {
-        return Err(BodyTableMergesError::LimitExceeded {
-            kind: BodyTableMergesLimitKind::WireFields,
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::WireFields,
             observed: 1,
             maximum: 0,
         });
     }
     let work = budget.remaining_wire_work();
     if work == 0 {
-        return Err(BodyTableMergesError::LimitExceeded {
-            kind: BodyTableMergesLimitKind::WireWork,
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::WireWork,
             observed: 1,
             maximum: 0,
         });
@@ -297,96 +292,86 @@ fn read_limits(budget: &table_lock::WireBudget) -> Result<ReadLimits, BodyTableM
     })
 }
 
-fn map_merge_error(error: table_merges::MergeReadError) -> BodyTableMergesError {
+fn map_merge_error(error: table_merges::MergeReadError) -> Error {
     map_common_error(error.error().clone())
 }
 
-fn map_package_error(error: super::PackageError) -> BodyTableMergesError {
+fn map_package_error(error: super::PackageError) -> Error {
     map_lock_error(table_lock::map_package_error(error))
 }
 
-fn map_common_error(error: litchi_iwa_common::Error) -> BodyTableMergesError {
+fn map_common_error(error: litchi_iwa_common::Error) -> Error {
     match error {
         litchi_iwa_common::Error::LimitExceeded {
             kind,
             observed,
             limit,
-        } => BodyTableMergesError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: map_common_limit(kind),
             observed: observed as u64,
             maximum: limit as u64,
         },
-        litchi_iwa_common::Error::Allocation { amount, .. } => {
-            BodyTableMergesError::Allocation { amount }
-        },
+        litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_common::Error::InvalidFormat(_)
-        | litchi_iwa_common::Error::InvalidLimit { .. } => BodyTableMergesError::InvalidSource,
+        | litchi_iwa_common::Error::InvalidLimit { .. } => Error::InvalidSource,
     }
 }
 
-fn map_lock_error(error: table_lock::BodyTableLockError) -> BodyTableMergesError {
+fn map_lock_error(error: table_lock::Error) -> Error {
     match error {
-        table_lock::BodyTableLockError::TableNotFound => BodyTableMergesError::TableNotFound,
-        table_lock::BodyTableLockError::AmbiguousTableName => {
-            BodyTableMergesError::AmbiguousTableName
-        },
-        table_lock::BodyTableLockError::AmbiguousSelector => {
-            BodyTableMergesError::AmbiguousSelector
-        },
-        table_lock::BodyTableLockError::UnsupportedSource => {
-            BodyTableMergesError::UnsupportedSource
-        },
-        table_lock::BodyTableLockError::LimitExceeded {
+        table_lock::Error::TableNotFound => Error::TableNotFound,
+        table_lock::Error::AmbiguousTableName => Error::AmbiguousTableName,
+        table_lock::Error::AmbiguousSelector => Error::AmbiguousSelector,
+        table_lock::Error::UnsupportedSource => Error::UnsupportedSource,
+        table_lock::Error::LimitExceeded {
             kind,
             observed,
             maximum,
-        } => BodyTableMergesError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: map_lock_limit(kind),
             observed,
             maximum,
         },
-        table_lock::BodyTableLockError::Allocation { amount } => {
-            BodyTableMergesError::Allocation { amount }
-        },
-        table_lock::BodyTableLockError::InvalidSource
-        | table_lock::BodyTableLockError::Verification
-        | table_lock::BodyTableLockError::PatchConflict => BodyTableMergesError::InvalidSource,
+        table_lock::Error::Allocation { amount } => Error::Allocation { amount },
+        table_lock::Error::InvalidSource
+        | table_lock::Error::Verification
+        | table_lock::Error::PatchConflict => Error::InvalidSource,
     }
 }
 
-const fn map_common_limit(kind: litchi_iwa_common::LimitKind) -> BodyTableMergesLimitKind {
+const fn map_common_limit(kind: litchi_iwa_common::LimitKind) -> LimitKind {
     use litchi_iwa_common::LimitKind as Common;
     match kind {
-        Common::InputBytes => BodyTableMergesLimitKind::WireBytes,
-        Common::Fields => BodyTableMergesLimitKind::WireFields,
-        Common::OutputBytes => BodyTableMergesLimitKind::WireOutputBytes,
-        Common::Nesting => BodyTableMergesLimitKind::WireNesting,
-        Common::RewriteWork => BodyTableMergesLimitKind::WireWork,
+        Common::InputBytes => LimitKind::WireBytes,
+        Common::Fields => LimitKind::WireFields,
+        Common::OutputBytes => LimitKind::WireOutputBytes,
+        Common::Nesting => LimitKind::WireNesting,
+        Common::RewriteWork => LimitKind::WireWork,
         Common::TableRows
         | Common::TableColumns
         | Common::TableCells
-        | Common::MaterializedCells => BodyTableMergesLimitKind::PayloadItems,
+        | Common::MaterializedCells => LimitKind::PayloadItems,
     }
 }
 
-const fn map_lock_limit(kind: table_lock::BodyTableLockLimitKind) -> BodyTableMergesLimitKind {
-    use table_lock::BodyTableLockLimitKind as Lock;
+const fn map_lock_limit(kind: table_lock::LimitKind) -> LimitKind {
+    use table_lock::LimitKind as Lock;
     match kind {
-        Lock::InputBytes => BodyTableMergesLimitKind::InputBytes,
-        Lock::OutputBytes => BodyTableMergesLimitKind::OutputBytes,
-        Lock::Entries => BodyTableMergesLimitKind::Entries,
-        Lock::EntryBytes => BodyTableMergesLimitKind::EntryBytes,
-        Lock::TotalEntryBytes => BodyTableMergesLimitKind::TotalEntryBytes,
-        Lock::PackageBytes => BodyTableMergesLimitKind::PackageBytes,
-        Lock::PayloadBytes => BodyTableMergesLimitKind::PayloadBytes,
-        Lock::TotalPayloadBytes => BodyTableMergesLimitKind::TotalPayloadBytes,
-        Lock::PayloadObjects => BodyTableMergesLimitKind::PayloadObjects,
-        Lock::PayloadMessages => BodyTableMergesLimitKind::PayloadMessages,
-        Lock::PayloadItems => BodyTableMergesLimitKind::PayloadItems,
-        Lock::PayloadReferences => BodyTableMergesLimitKind::PayloadReferences,
-        Lock::WireBytes => BodyTableMergesLimitKind::WireBytes,
-        Lock::WireFields => BodyTableMergesLimitKind::WireFields,
-        Lock::WireNesting => BodyTableMergesLimitKind::WireNesting,
-        Lock::WireWork => BodyTableMergesLimitKind::WireWork,
+        Lock::InputBytes => LimitKind::InputBytes,
+        Lock::OutputBytes => LimitKind::OutputBytes,
+        Lock::Entries => LimitKind::Entries,
+        Lock::EntryBytes => LimitKind::EntryBytes,
+        Lock::TotalEntryBytes => LimitKind::TotalEntryBytes,
+        Lock::PackageBytes => LimitKind::PackageBytes,
+        Lock::PayloadBytes => LimitKind::PayloadBytes,
+        Lock::TotalPayloadBytes => LimitKind::TotalPayloadBytes,
+        Lock::PayloadObjects => LimitKind::PayloadObjects,
+        Lock::PayloadMessages => LimitKind::PayloadMessages,
+        Lock::PayloadItems => LimitKind::PayloadItems,
+        Lock::PayloadReferences => LimitKind::PayloadReferences,
+        Lock::WireBytes => LimitKind::WireBytes,
+        Lock::WireFields => LimitKind::WireFields,
+        Lock::WireNesting => LimitKind::WireNesting,
+        Lock::WireWork => LimitKind::WireWork,
     }
 }

@@ -13,6 +13,7 @@ pub(crate) struct Children<'f> {
 
 impl<'f> Children<'f> {
     pub(crate) fn filtered(file: &'f Iwork, parent: u32, mask: u128) -> Self {
+        file.expand(parent);
         Self {
             file,
             children: file.tree().item(parent).children().iter(),

@@ -20,7 +20,7 @@ use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::pages_drawable_order_codec::{
     self as drawable_order_codec, DecodeError, DecodeOptions, DrawableOrderWrite, WireResourceLimit,
 };
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::Package;
 use crate::drawable_order::{BodyDrawableHandle, BodyDrawableSelector, DrawableLayerMove};
@@ -40,7 +40,7 @@ const DRAWABLE_ORDER_WORK_MULTIPLIER: usize = 64;
 /// transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum BodyDrawableOrderLimitKind {
+pub enum LimitKind {
     /// Complete package input bytes.
     InputBytes,
     /// Complete edited package output bytes.
@@ -73,7 +73,7 @@ pub enum BodyDrawableOrderLimitKind {
     References,
 }
 
-impl fmt::Display for BodyDrawableOrderLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -96,9 +96,9 @@ impl fmt::Display for BodyDrawableOrderLimitKind {
 }
 
 /// Failure from a Pages body drawable-order read or immutable transaction.
-#[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, ThisError, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum BodyDrawableOrderError {
+pub enum Error {
     /// The rooted Pages document has no drawable-order payload.
     #[error("the Pages document has no readable body drawable order")]
     MissingOrder,
@@ -131,7 +131,7 @@ pub enum BodyDrawableOrderError {
     )]
     LimitExceeded {
         /// Resource category that exceeded its ceiling.
-        kind: BodyDrawableOrderLimitKind,
+        kind: LimitKind,
         /// Observed or requested resource amount.
         observed: u64,
         /// Configured maximum.
@@ -160,23 +160,23 @@ struct OrderLocation {
 
 /// A mutable semantic body drawable-order edit staged against one immutable
 /// package snapshot.
-pub struct BodyDrawableOrderEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
     before: Vec<BodyDrawableHandle>,
     after: Vec<BodyDrawableHandle>,
 }
 
-impl fmt::Debug for BodyDrawableOrderEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("BodyDrawableOrderEdit")
+            .debug_struct("Edit")
             .field("before_positions", &positions(&self.before))
             .field("after_positions", &positions(&self.after))
             .finish_non_exhaustive()
     }
 }
 
-impl BodyDrawableOrderEdit<'_> {
+impl Edit<'_> {
     /// Borrow the source order captured when this edit began.
     #[must_use]
     pub fn before(&self) -> &[BodyDrawableHandle] {
@@ -191,10 +191,7 @@ impl BodyDrawableOrderEdit<'_> {
 
     /// Replace the staged order with an exact permutation of the handles
     /// issued by this source package.
-    pub fn set_order(
-        &mut self,
-        requested: &[BodyDrawableHandle],
-    ) -> Result<&mut Self, BodyDrawableOrderError> {
+    pub fn set_order(&mut self, requested: &[BodyDrawableHandle]) -> Result<&mut Self, Error> {
         let current = handles_to_identities(&self.before, &self.source_bytes())?;
         let desired = handles_to_identities(requested, &self.source_bytes())?;
         validate_exact_permutation(&current, &desired)?;
@@ -212,13 +209,13 @@ impl BodyDrawableOrderEdit<'_> {
         &mut self,
         selector: impl Into<BodyDrawableSelector>,
         movement: DrawableLayerMove,
-    ) -> Result<bool, BodyDrawableOrderError> {
+    ) -> Result<bool, Error> {
         let index = resolve_staged_selector(&self.after, selector.into())?;
         let final_index = self
             .after
             .len()
             .checked_sub(1)
-            .ok_or(BodyDrawableOrderError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let target_index = match movement {
             DrawableLayerMove::ToBack => 0,
             DrawableLayerMove::Backward => index.saturating_sub(1),
@@ -238,12 +235,12 @@ impl BodyDrawableOrderEdit<'_> {
         &mut self,
         selector: impl Into<BodyDrawableSelector>,
         movement: DrawableLayerMove,
-    ) -> Result<bool, BodyDrawableOrderError> {
+    ) -> Result<bool, Error> {
         self.move_drawable(selector, movement)
     }
 
     /// Validate and atomically publish the staged immutable candidate.
-    pub fn commit(self) -> Result<BodyDrawableOrderCommit, BodyDrawableOrderError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         commit_edit(self)
     }
 
@@ -254,7 +251,7 @@ impl BodyDrawableOrderEdit<'_> {
 
 /// A reversible exact-source patch for one body drawable-order edit.
 #[derive(Clone, PartialEq, Eq)]
-pub struct BodyDrawableOrderPatch {
+pub struct Patch {
     source: Arc<[u8]>,
     target: Arc<[u8]>,
     source_fingerprint: u64,
@@ -264,17 +261,17 @@ pub struct BodyDrawableOrderPatch {
     after: Vec<BodyDrawableHandle>,
 }
 
-impl fmt::Debug for BodyDrawableOrderPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("BodyDrawableOrderPatch")
+            .debug_struct("Patch")
             .field("before_positions", &positions(&self.before))
             .field("after_positions", &positions(&self.after))
             .finish_non_exhaustive()
     }
 }
 
-impl BodyDrawableOrderPatch {
+impl Patch {
     /// Borrow the semantic order required before this patch can apply.
     #[must_use]
     pub fn before(&self) -> &[BodyDrawableHandle] {
@@ -314,7 +311,7 @@ impl BodyDrawableOrderPatch {
     /// Fallibly construct the exact inverse when the patch contains a large
     /// order.  This is the allocation-aware counterpart to [`Self::inverse`]
     /// for callers that cannot tolerate an infallible vector clone.
-    pub fn try_inverse(&self) -> Result<Self, BodyDrawableOrderError> {
+    pub fn try_inverse(&self) -> Result<Self, Error> {
         let mut before = allocate_vec(self.after.len())?;
         before.extend(self.after.iter().cloned());
         let mut after = allocate_vec(self.before.len())?;
@@ -333,14 +330,14 @@ impl BodyDrawableOrderPatch {
 
 /// Compact evidence describing one body drawable-order commit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct BodyDrawableOrderDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     full_reparse_performed: bool,
     deleted_previews: usize,
 }
 
-impl BodyDrawableOrderDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -387,13 +384,13 @@ impl BodyDrawableOrderDiagnostics {
 /// Fully reopened immutable result of one body drawable-order transaction.
 #[must_use = "a Pages body drawable-order commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct BodyDrawableOrderCommit {
+pub struct Commit {
     package: Package,
-    patch: BodyDrawableOrderPatch,
-    diagnostics: BodyDrawableOrderDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl BodyDrawableOrderCommit {
+impl Commit {
     /// Borrow the fully reopened package snapshot.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -408,13 +405,13 @@ impl BodyDrawableOrderCommit {
 
     /// Borrow the reversible exact-source patch.
     #[must_use]
-    pub const fn patch(&self) -> &BodyDrawableOrderPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Borrow compact publication diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> &BodyDrawableOrderDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -425,7 +422,7 @@ impl Package {
     /// Each returned handle is source-bound to this exact immutable package
     /// snapshot.  The handle's only public fact is its checked source
     /// position; native identity remains private to the package adapter.
-    pub fn body_drawable_order(&self) -> Result<Vec<BodyDrawableHandle>, BodyDrawableOrderError> {
+    pub fn body_drawable_order(&self) -> Result<Vec<BodyDrawableHandle>, Error> {
         let (_location, identifiers) = read_order(self)?;
         handles_for_order(self, &identifiers)
     }
@@ -434,24 +431,19 @@ impl Package {
     pub fn body_drawable(
         &self,
         selector: impl Into<BodyDrawableSelector>,
-    ) -> Result<BodyDrawableHandle, BodyDrawableOrderError> {
+    ) -> Result<BodyDrawableHandle, Error> {
         let handles = self.body_drawable_order()?;
         let index = resolve_staged_selector(&handles, selector.into())?;
-        handles
-            .get(index)
-            .cloned()
-            .ok_or(BodyDrawableOrderError::InvalidSource)
+        handles.get(index).cloned().ok_or(Error::InvalidSource)
     }
 
     /// Start a selector-first immutable edit of the complete body drawable
     /// order.
-    pub fn edit_body_drawable_order(
-        &self,
-    ) -> Result<BodyDrawableOrderEdit<'_>, BodyDrawableOrderError> {
+    pub fn edit_body_drawable_order(&self) -> Result<Edit<'_>, Error> {
         let before = self.body_drawable_order()?;
         let mut after = allocate_vec(before.len())?;
         after.extend(before.iter().cloned());
-        Ok(BodyDrawableOrderEdit {
+        Ok(Edit {
             source: self,
             before,
             after,
@@ -459,33 +451,30 @@ impl Package {
     }
 
     /// Apply an exact-source-checked reversible body drawable-order patch.
-    pub fn apply_body_drawable_order(
-        &self,
-        patch: &BodyDrawableOrderPatch,
-    ) -> Result<BodyDrawableOrderCommit, BodyDrawableOrderError> {
+    pub fn apply_body_drawable_order(&self, patch: &Patch) -> Result<Commit, Error> {
         let source = self.state.source.shared_source();
         if patch.source_fingerprint != fingerprint(source.as_ref())
             || source.as_ref() != patch.source.as_ref()
             || !handles_belong_to_source(&patch.before, &source)
         {
-            return Err(BodyDrawableOrderError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let (location, current) = read_order(self)?;
         let before = handles_to_identities(&patch.before, &source)?;
         if current != before || location != patch.proof {
-            return Err(BodyDrawableOrderError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if patch.is_noop() {
-            return Ok(BodyDrawableOrderCommit {
-                package: self.snapshot(),
+            return Ok(Commit {
+                package: self.clone(),
                 patch: patch.clone(),
-                diagnostics: BodyDrawableOrderDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         if !self.state.source.source_is_exact()
             || fingerprint(patch.target.as_ref()) != patch.target_fingerprint
         {
-            return Err(BodyDrawableOrderError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let candidate_source = SourceCatalog::from_shared_bytes_with_limits(
             Arc::clone(&patch.target),
@@ -498,34 +487,32 @@ impl Package {
         let target_source = candidate.state.source.shared_source();
         let after = handles_to_identities(&patch.after, &target_source)?;
         if candidate_location != patch.proof || candidate_order != after {
-            return Err(BodyDrawableOrderError::Verification);
+            return Err(Error::Verification);
         }
         verify_locality(self, &candidate, patch.proof)?;
         let deleted_previews = preview_count(self).saturating_sub(preview_count(&candidate));
-        Ok(BodyDrawableOrderCommit {
+        Ok(Commit {
             package: candidate,
             patch: patch.clone(),
-            diagnostics: BodyDrawableOrderDiagnostics::published(deleted_previews),
+            diagnostics: Diagnostics::published(deleted_previews),
         })
     }
 }
 
-fn commit_edit(
-    edit: BodyDrawableOrderEdit<'_>,
-) -> Result<BodyDrawableOrderCommit, BodyDrawableOrderError> {
+fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     let source = edit.source.state.source.shared_source();
     let (location, current) = read_order(edit.source)?;
     let before = handles_to_identities(&edit.before, &source)?;
     let after = handles_to_identities(&edit.after, &source)?;
     if current != before {
-        return Err(BodyDrawableOrderError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     validate_exact_permutation(&before, &after)?;
     let source_fingerprint = fingerprint(source.as_ref());
     if before == after {
-        return Ok(BodyDrawableOrderCommit {
-            package: edit.source.snapshot(),
-            patch: BodyDrawableOrderPatch {
+        return Ok(Commit {
+            package: edit.source.clone(),
+            patch: Patch {
                 source: Arc::clone(&source),
                 target: source,
                 source_fingerprint,
@@ -534,25 +521,25 @@ fn commit_edit(
                 before: edit.before,
                 after: edit.after,
             },
-            diagnostics: BodyDrawableOrderDiagnostics::unchanged(),
+            diagnostics: Diagnostics::unchanged(),
         });
     }
     if !edit.source.state.source.source_is_exact() {
-        return Err(BodyDrawableOrderError::UnsupportedSource);
+        return Err(Error::UnsupportedSource);
     }
 
     let candidate = rewrite_order(edit.source, location, &current, &after)?;
     let (candidate_location, candidate_order) = read_order(&candidate)?;
     if candidate_location != location || candidate_order != after {
-        return Err(BodyDrawableOrderError::Verification);
+        return Err(Error::Verification);
     }
     verify_locality(edit.source, &candidate, location)?;
     let deleted_previews = preview_count(edit.source).saturating_sub(preview_count(&candidate));
     let target = candidate.state.source.shared_source();
     let target_handles = handles_for_order(&candidate, &candidate_order)?;
-    Ok(BodyDrawableOrderCommit {
+    Ok(Commit {
         package: candidate,
-        patch: BodyDrawableOrderPatch {
+        patch: Patch {
             source,
             target: Arc::clone(&target),
             source_fingerprint,
@@ -561,53 +548,51 @@ fn commit_edit(
             before: edit.before,
             after: target_handles,
         },
-        diagnostics: BodyDrawableOrderDiagnostics::published(deleted_previews),
+        diagnostics: Diagnostics::published(deleted_previews),
     })
 }
 
-fn read_order(
-    package: &Package,
-) -> Result<(OrderLocation, Vec<NonZeroU64>), BodyDrawableOrderError> {
+fn read_order(package: &Package) -> Result<(OrderLocation, Vec<NonZeroU64>), Error> {
     let source = &package.state.source;
     let components = source.components();
     let locations = object_locations(components)?;
     let component_index = components
         .iter()
         .position(|component| component.name() == DOCUMENT_MEMBER)
-        .ok_or(BodyDrawableOrderError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let component = components
         .get_index(component_index)
-        .ok_or(BodyDrawableOrderError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let root_object_index = component
         .archive()
         .objects
         .iter()
         .position(|object| object.archive_info.identifier == Some(ROOT_OBJECT_IDENTIFIER))
-        .ok_or(BodyDrawableOrderError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let root = component
         .archive()
         .objects
         .get(root_object_index)
-        .ok_or(BodyDrawableOrderError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let root_message_index = unique_message_index(root, ROOT_MESSAGE_TYPE)?;
     let root_message = root
         .messages
         .get(root_message_index)
-        .ok_or(BodyDrawableOrderError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     validate_message_metadata(root, root_message_index)?;
     let root_view =
         WireView::parse_with_limits(root_message.data.as_slice(), wire_limits(package)?)
-            .map_err(|_| BodyDrawableOrderError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?;
     let mut zorder_identifier = None;
     let mut body_storage_identifier = None;
     for field in root_view.fields() {
         field
             .validate_canonical_framing()
-            .map_err(|_| BodyDrawableOrderError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?;
         match field.number() {
             ROOT_DRAWABLES_Z_ORDER_FIELD => {
                 if zorder_identifier.is_some() || field.wire_type() != 2 {
-                    return Err(BodyDrawableOrderError::AmbiguousOrder);
+                    return Err(Error::AmbiguousOrder);
                 }
                 zorder_identifier = Some(strict_reference(field.payload(), package)?);
             },
@@ -616,32 +601,32 @@ fn read_order(
             // as an opaque drawable handle.
             4 => {
                 if body_storage_identifier.is_some() || field.wire_type() != 2 {
-                    return Err(BodyDrawableOrderError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 body_storage_identifier = Some(strict_reference(field.payload(), package)?);
             },
             _ => {},
         }
     }
-    let zorder_identifier = zorder_identifier.ok_or(BodyDrawableOrderError::MissingOrder)?;
+    let zorder_identifier = zorder_identifier.ok_or(Error::MissingOrder)?;
     let (zorder_component_index, zorder_object_index) = locations
         .get(&zorder_identifier.get())
         .copied()
-        .ok_or(BodyDrawableOrderError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let zorder_component = components
         .get_index(zorder_component_index)
-        .ok_or(BodyDrawableOrderError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let zorder_object = zorder_component
         .archive()
         .objects
         .get(zorder_object_index)
-        .ok_or(BodyDrawableOrderError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let message_index = unique_message_index(zorder_object, DRAWABLE_ORDER_MESSAGE_TYPE)?;
     validate_message_metadata(zorder_object, message_index)?;
     let message = zorder_object
         .messages
         .get(message_index)
-        .ok_or(BodyDrawableOrderError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let options = codec_options(package, message.data.as_slice(), false)?;
     let (snapshot, _report) =
         drawable_order_codec::decode_drawable_order_with_report(&message.data, options)
@@ -652,32 +637,31 @@ fn read_order(
             || body_storage_identifier == zorder_identifier
             || !locations.contains_key(&body_storage_identifier.get()))
     {
-        return Err(BodyDrawableOrderError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut identifiers = allocate_vec(snapshot.len())?;
     let mut seen = HashSet::new();
     seen.try_reserve(snapshot.len())
-        .map_err(|_| BodyDrawableOrderError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: snapshot.len(),
         })?;
     let mut body_storage_position = None;
     for (position, identifier) in snapshot.identifiers().enumerate() {
-        let identifier =
-            NonZeroU64::new(identifier).ok_or(BodyDrawableOrderError::InvalidSource)?;
+        let identifier = NonZeroU64::new(identifier).ok_or(Error::InvalidSource)?;
         if !locations.contains_key(&identifier.get()) {
-            return Err(BodyDrawableOrderError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if body_storage_identifier == Some(identifier) {
             if body_storage_position.replace(position).is_some() {
-                return Err(BodyDrawableOrderError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             continue;
         }
         if identifier.get() == ROOT_OBJECT_IDENTIFIER || identifier == zorder_identifier {
-            return Err(BodyDrawableOrderError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if !seen.insert(identifier) {
-            return Err(BodyDrawableOrderError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         identifiers.push(identifier);
     }
@@ -695,7 +679,7 @@ fn read_order(
 fn handles_for_order(
     package: &Package,
     identifiers: &[NonZeroU64],
-) -> Result<Vec<BodyDrawableHandle>, BodyDrawableOrderError> {
+) -> Result<Vec<BodyDrawableHandle>, Error> {
     let source = package.state.source.shared_source();
     let mut handles = allocate_vec(identifiers.len())?;
     for (index, &identifier) in identifiers.iter().enumerate() {
@@ -711,22 +695,22 @@ fn handles_for_order(
 fn handles_to_identities(
     handles: &[BodyDrawableHandle],
     source: &Arc<[u8]>,
-) -> Result<Vec<NonZeroU64>, BodyDrawableOrderError> {
+) -> Result<Vec<NonZeroU64>, Error> {
     let mut identities = allocate_vec(handles.len())?;
     for handle in handles {
         if !source_matches(&handle.source, source) {
-            return Err(BodyDrawableOrderError::HandleSourceMismatch);
+            return Err(Error::HandleSourceMismatch);
         }
         identities.push(handle.identity);
     }
     Ok(identities)
 }
 
-fn allocate_vec<T>(amount: usize) -> Result<Vec<T>, BodyDrawableOrderError> {
+fn allocate_vec<T>(amount: usize) -> Result<Vec<T>, Error> {
     let mut values = Vec::new();
     values
         .try_reserve_exact(amount)
-        .map_err(|_| BodyDrawableOrderError::Allocation { amount })?;
+        .map_err(|_| Error::Allocation { amount })?;
     Ok(values)
 }
 
@@ -743,12 +727,12 @@ fn source_matches(left: &Arc<[u8]>, right: &Arc<[u8]>) -> bool {
 fn resolve_staged_selector(
     handles: &[BodyDrawableHandle],
     selector: BodyDrawableSelector,
-) -> Result<usize, BodyDrawableOrderError> {
+) -> Result<usize, Error> {
     match selector {
         BodyDrawableSelector::Position(position) => handles
             .get(position.get())
             .map(|_| position.get())
-            .ok_or(BodyDrawableOrderError::PositionNotFound { position }),
+            .ok_or(Error::PositionNotFound { position }),
         BodyDrawableSelector::Handle(handle) => handles
             .iter()
             .position(|candidate| candidate == &handle)
@@ -757,9 +741,9 @@ fn resolve_staged_selector(
                     .first()
                     .is_some_and(|candidate| !source_matches(&candidate.source, &handle.source))
                 {
-                    BodyDrawableOrderError::HandleSourceMismatch
+                    Error::HandleSourceMismatch
                 } else {
-                    BodyDrawableOrderError::HandleNotFound
+                    Error::HandleNotFound
                 }
             }),
     }
@@ -791,9 +775,9 @@ fn positions(handles: &[BodyDrawableHandle]) -> Positions<'_> {
 fn validate_exact_permutation(
     current: &[NonZeroU64],
     requested: &[NonZeroU64],
-) -> Result<(), BodyDrawableOrderError> {
+) -> Result<(), Error> {
     if current.len() != requested.len() {
-        return Err(BodyDrawableOrderError::InvalidOrder);
+        return Err(Error::InvalidOrder);
     }
     // An empty order is a valid Pages state.  It is also the only valid
     // empty permutation, so return before constructing validation scratch.
@@ -803,19 +787,19 @@ fn validate_exact_permutation(
     let mut current_set = HashSet::new();
     current_set
         .try_reserve(current.len())
-        .map_err(|_| BodyDrawableOrderError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: current.len(),
         })?;
     if current
         .iter()
         .any(|identifier| !current_set.insert(*identifier))
     {
-        return Err(BodyDrawableOrderError::InvalidOrder);
+        return Err(Error::InvalidOrder);
     }
     let mut requested_set = HashSet::new();
     requested_set
         .try_reserve(requested.len())
-        .map_err(|_| BodyDrawableOrderError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: requested.len(),
         })?;
     if requested
@@ -823,7 +807,7 @@ fn validate_exact_permutation(
         .any(|identifier| !requested_set.insert(*identifier))
         || requested_set != current_set
     {
-        return Err(BodyDrawableOrderError::InvalidOrder);
+        return Err(Error::InvalidOrder);
     }
     Ok(())
 }
@@ -833,20 +817,20 @@ fn rewrite_order(
     location: OrderLocation,
     current: &[NonZeroU64],
     requested: &[NonZeroU64],
-) -> Result<Package, BodyDrawableOrderError> {
+) -> Result<Package, Error> {
     let catalog = &source.state.source;
     let component = catalog
         .components()
         .get_index(location.component_index)
-        .ok_or(BodyDrawableOrderError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let component_name = component.name().to_owned();
     let entry = catalog
         .package()
         .iter()
         .find(|entry| entry.name() == component_name)
-        .ok_or(BodyDrawableOrderError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(BodyDrawableOrderError::UnsupportedSource);
+        return Err(Error::UnsupportedSource);
     }
     let archive_limits = catalog
         .limits()
@@ -866,15 +850,15 @@ fn rewrite_order(
     let object = archive
         .objects
         .get(location.object_index)
-        .ok_or(BodyDrawableOrderError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if object.archive_info.identifier != Some(location.object_identifier.get()) {
-        return Err(BodyDrawableOrderError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let message = object
         .messages
         .get(location.message_index)
         .filter(|message| message.type_ == DRAWABLE_ORDER_MESSAGE_TYPE)
-        .ok_or(BodyDrawableOrderError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let options = codec_options(source, &message.data, true)?;
     let (decoded, _report) =
         drawable_order_codec::decode_drawable_order_with_report(&message.data, options)
@@ -883,18 +867,17 @@ fn rewrite_order(
     let mut decoded_identifiers = allocate_vec(decoded.len())?;
     let mut body_storage_position = None;
     for (position, identifier) in decoded.identifiers().enumerate() {
-        let identifier =
-            NonZeroU64::new(identifier).ok_or(BodyDrawableOrderError::InvalidSource)?;
+        let identifier = NonZeroU64::new(identifier).ok_or(Error::InvalidSource)?;
         if location.body_storage_identifier == Some(identifier) {
             if body_storage_position.replace(position).is_some() {
-                return Err(BodyDrawableOrderError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             continue;
         }
         decoded_identifiers.push(identifier);
     }
     if decoded_identifiers != current || body_storage_position != location.body_storage_position {
-        return Err(BodyDrawableOrderError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let raw_requested = complete_native_order(requested, location)?;
     let (rewritten, _report) = drawable_order_codec::rewrite_drawable_order_with_report(
@@ -910,12 +893,12 @@ fn rewrite_order(
     .map_err(map_codec_error)?;
     reject_external_references(verified)?;
     if verified.identifiers().ne(raw_requested.iter().copied()) {
-        return Err(BodyDrawableOrderError::Verification);
+        return Err(Error::Verification);
     }
     archive
         .objects
         .get_mut(location.object_index)
-        .ok_or(BodyDrawableOrderError::InvalidSource)?
+        .ok_or(Error::InvalidSource)?
         .replace_message_preserving_header_with_limits(
             location.message_index,
             RawMessage {
@@ -932,7 +915,7 @@ fn rewrite_order(
     let mut deleted_previews = Vec::new();
     deleted_previews
         .try_reserve_exact(ROOT_PREVIEW_NAMES.len())
-        .map_err(|_| BodyDrawableOrderError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: ROOT_PREVIEW_NAMES.len(),
         })?;
     for name in ROOT_PREVIEW_NAMES {
@@ -960,12 +943,12 @@ fn rewrite_order(
 fn complete_native_order(
     requested: &[NonZeroU64],
     location: OrderLocation,
-) -> Result<Vec<u64>, BodyDrawableOrderError> {
+) -> Result<Vec<u64>, Error> {
     let extra = usize::from(location.body_storage_position.is_some());
     let amount = requested
         .len()
         .checked_add(extra)
-        .ok_or(BodyDrawableOrderError::Allocation { amount: usize::MAX })?;
+        .ok_or(Error::Allocation { amount: usize::MAX })?;
     let mut complete = allocate_vec(amount)?;
     let mut requested = requested.iter();
     for position in 0..amount {
@@ -973,22 +956,17 @@ fn complete_native_order(
             complete.push(
                 location
                     .body_storage_identifier
-                    .ok_or(BodyDrawableOrderError::InvalidSource)?
+                    .ok_or(Error::InvalidSource)?
                     .get(),
             );
         } else {
-            complete.push(
-                requested
-                    .next()
-                    .ok_or(BodyDrawableOrderError::InvalidSource)?
-                    .get(),
-            );
+            complete.push(requested.next().ok_or(Error::InvalidSource)?.get());
         }
     }
     if requested.next().is_some()
         || (location.body_storage_identifier.is_none() && location.body_storage_position.is_some())
     {
-        return Err(BodyDrawableOrderError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(complete)
 }
@@ -997,11 +975,11 @@ fn verify_locality(
     source: &Package,
     candidate: &Package,
     location: OrderLocation,
-) -> Result<(), BodyDrawableOrderError> {
+) -> Result<(), Error> {
     let left = source.state.source.package();
     let right = candidate.state.source.package();
     if source.state.source.components().len() != candidate.state.source.components().len() {
-        return Err(BodyDrawableOrderError::Verification);
+        return Err(Error::Verification);
     }
     let changed_component_name = source
         .state
@@ -1009,16 +987,16 @@ fn verify_locality(
         .components()
         .get_index(location.component_index)
         .map(|component| component.name())
-        .ok_or(BodyDrawableOrderError::Verification)?;
+        .ok_or(Error::Verification)?;
     let mut right_by_name = HashMap::new();
     right_by_name
         .try_reserve(right.len())
-        .map_err(|_| BodyDrawableOrderError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: right.len(),
         })?;
     for entry in right.iter() {
         if right_by_name.insert(entry.name(), entry).is_some() {
-            return Err(BodyDrawableOrderError::Verification);
+            return Err(Error::Verification);
         }
     }
     for before in left.iter() {
@@ -1031,14 +1009,14 @@ fn verify_locality(
                     || before.raw_record().central_directory_record()
                         != after.raw_record().central_directory_record()
                 {
-                    return Err(BodyDrawableOrderError::Verification);
+                    return Err(Error::Verification);
                 }
             }
             continue;
         }
-        let after = after.ok_or(BodyDrawableOrderError::Verification)?;
+        let after = after.ok_or(Error::Verification)?;
         if before.raw_name() != after.raw_name() {
-            return Err(BodyDrawableOrderError::Verification);
+            return Err(Error::Verification);
         }
         if before.name() != changed_component_name {
             if before.data() != after.data()
@@ -1046,7 +1024,7 @@ fn verify_locality(
                 || before.raw_record().central_directory_record()
                     != after.raw_record().central_directory_record()
             {
-                return Err(BodyDrawableOrderError::Verification);
+                return Err(Error::Verification);
             }
         }
     }
@@ -1054,24 +1032,24 @@ fn verify_locality(
         .keys()
         .any(|name| !ROOT_PREVIEW_NAMES.contains(name))
     {
-        return Err(BodyDrawableOrderError::Verification);
+        return Err(Error::Verification);
     }
     let before_component = source
         .state
         .source
         .components()
         .get_index(location.component_index)
-        .ok_or(BodyDrawableOrderError::Verification)?;
+        .ok_or(Error::Verification)?;
     let after_component = candidate
         .state
         .source
         .components()
         .get_index(location.component_index)
-        .ok_or(BodyDrawableOrderError::Verification)?;
+        .ok_or(Error::Verification)?;
     if before_component.name() != after_component.name()
         || before_component.archive().objects.len() != after_component.archive().objects.len()
     {
-        return Err(BodyDrawableOrderError::Verification);
+        return Err(Error::Verification);
     }
     for (object_index, (before, after)) in before_component
         .archive()
@@ -1082,7 +1060,7 @@ fn verify_locality(
     {
         if object_index != location.object_index {
             if !before.same_content_ignoring_offsets(after) {
-                return Err(BodyDrawableOrderError::Verification);
+                return Err(Error::Verification);
             }
             continue;
         }
@@ -1091,16 +1069,16 @@ fn verify_locality(
             || before.data_length != after.data_length
             || before.messages.len() != after.messages.len()
         {
-            return Err(BodyDrawableOrderError::Verification);
+            return Err(Error::Verification);
         }
         for (message_index, (before, after)) in
             before.messages.iter().zip(&after.messages).enumerate()
         {
             if message_index != location.message_index && before != after {
-                return Err(BodyDrawableOrderError::Verification);
+                return Err(Error::Verification);
             }
             if message_index == location.message_index && before.type_ != after.type_ {
-                return Err(BodyDrawableOrderError::Verification);
+                return Err(Error::Verification);
             }
         }
     }
@@ -1123,7 +1101,7 @@ fn preview_count(package: &Package) -> usize {
 
 fn object_locations(
     components: &litchi_iwa_archive::ComponentCatalog,
-) -> Result<HashMap<u64, (usize, usize)>, BodyDrawableOrderError> {
+) -> Result<HashMap<u64, (usize, usize)>, Error> {
     // Build one bounded lookup for the complete component catalog.  The old
     // per-reference scan made a large order repeatedly walk every object and
     // also silently selected the first copy of a duplicated native ID.
@@ -1132,11 +1110,11 @@ fn object_locations(
         .try_fold(0usize, |count, component| {
             count.checked_add(component.archive().objects.len())
         })
-        .ok_or(BodyDrawableOrderError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let mut locations = HashMap::new();
     locations
         .try_reserve(object_count)
-        .map_err(|_| BodyDrawableOrderError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: object_count,
         })?;
     for (component_index, component) in components.iter().enumerate() {
@@ -1149,39 +1127,33 @@ fn object_locations(
                     .insert(identifier, (component_index, object_index))
                     .is_some()
             {
-                return Err(BodyDrawableOrderError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
     }
     Ok(locations)
 }
 
-fn unique_message_index(
-    object: &ArchiveObject,
-    message_type: u32,
-) -> Result<usize, BodyDrawableOrderError> {
+fn unique_message_index(object: &ArchiveObject, message_type: u32) -> Result<usize, Error> {
     let mut indexes = object
         .messages
         .iter()
         .enumerate()
         .filter(|(_, message)| message.type_ == message_type)
         .map(|(index, _)| index);
-    let index = indexes.next().ok_or(BodyDrawableOrderError::MissingOrder)?;
+    let index = indexes.next().ok_or(Error::MissingOrder)?;
     if indexes.next().is_some() {
-        return Err(BodyDrawableOrderError::AmbiguousOrder);
+        return Err(Error::AmbiguousOrder);
     }
     Ok(index)
 }
 
-fn validate_message_metadata(
-    object: &ArchiveObject,
-    message_index: usize,
-) -> Result<(), BodyDrawableOrderError> {
+fn validate_message_metadata(object: &ArchiveObject, message_index: usize) -> Result<(), Error> {
     let message = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(BodyDrawableOrderError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if object.archive_info.should_merge == Some(true)
         || message.base_message_index.is_some()
         || !message.diff_merge_version.is_empty()
@@ -1189,80 +1161,73 @@ fn validate_message_metadata(
         || !message.fields_to_remove.is_empty()
         || !message.diff_read_version.is_empty()
     {
-        return Err(BodyDrawableOrderError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
 
-fn strict_reference(
-    source: &[u8],
-    package: &Package,
-) -> Result<NonZeroU64, BodyDrawableOrderError> {
+fn strict_reference(source: &[u8], package: &Package) -> Result<NonZeroU64, Error> {
     strict_reference_with_limits(source, wire_limits(package)?)
 }
 
-fn strict_reference_with_limits(
-    source: &[u8],
-    limits: WireLimits,
-) -> Result<NonZeroU64, BodyDrawableOrderError> {
+fn strict_reference_with_limits(source: &[u8], limits: WireLimits) -> Result<NonZeroU64, Error> {
     // TSP.Reference is proto2: known optional fields have presence, so a
     // duplicate is ambiguous even when both values happen to agree.  Keep
     // this parser independent from the generated value path and reject the
     // external-reference marker before it can become a local object handle.
-    let view = WireView::parse_with_limits(source, limits)
-        .map_err(|_| BodyDrawableOrderError::InvalidSource)?;
+    let view = WireView::parse_with_limits(source, limits).map_err(|_| Error::InvalidSource)?;
     let mut identifier = None;
     let mut deprecated_type_seen = false;
     let mut deprecated_external_seen = false;
     for field in view.fields() {
         field
             .validate_canonical_framing()
-            .map_err(|_| BodyDrawableOrderError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?;
         match field.number() {
             1 => {
                 if identifier.is_some() || field.wire_type() != 0 {
-                    return Err(BodyDrawableOrderError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
-                let (value, consumed) = decode_varint_from_bytes(field.payload())
-                    .map_err(|_| BodyDrawableOrderError::InvalidSource)?;
+                let (value, consumed) =
+                    decode_varint_from_bytes(field.payload()).map_err(|_| Error::InvalidSource)?;
                 if consumed != field.payload().len() || encoded_len(value) != consumed {
-                    return Err(BodyDrawableOrderError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 identifier = NonZeroU64::new(value);
             },
             2 => {
                 if deprecated_type_seen || field.wire_type() != 0 {
-                    return Err(BodyDrawableOrderError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 deprecated_type_seen = true;
-                let (value, consumed) = decode_varint_from_bytes(field.payload())
-                    .map_err(|_| BodyDrawableOrderError::InvalidSource)?;
+                let (value, consumed) =
+                    decode_varint_from_bytes(field.payload()).map_err(|_| Error::InvalidSource)?;
                 if consumed != field.payload().len()
                     || encoded_len(value) != consumed
                     || !is_canonical_int32(value)
                 {
-                    return Err(BodyDrawableOrderError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
             },
             3 => {
                 if deprecated_external_seen || field.wire_type() != 0 {
-                    return Err(BodyDrawableOrderError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 deprecated_external_seen = true;
-                let (value, consumed) = decode_varint_from_bytes(field.payload())
-                    .map_err(|_| BodyDrawableOrderError::InvalidSource)?;
+                let (value, consumed) =
+                    decode_varint_from_bytes(field.payload()).map_err(|_| Error::InvalidSource)?;
                 if consumed != field.payload().len()
                     || encoded_len(value) != consumed
                     || value > 1
                     || value == 1
                 {
-                    return Err(BodyDrawableOrderError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
             },
             _ => {},
         }
     }
-    identifier.ok_or(BodyDrawableOrderError::InvalidSource)
+    identifier.ok_or(Error::InvalidSource)
 }
 
 fn is_canonical_int32(value: u64) -> bool {
@@ -1271,17 +1236,17 @@ fn is_canonical_int32(value: u64) -> bool {
 
 fn reject_external_references(
     snapshot: drawable_order_codec::DrawableOrderSnapshot<'_>,
-) -> Result<(), BodyDrawableOrderError> {
+) -> Result<(), Error> {
     if snapshot
         .references()
         .any(|reference| reference.deprecated_is_external() == Some(true))
     {
-        return Err(BodyDrawableOrderError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
 
-fn wire_limits(package: &Package) -> Result<WireLimits, BodyDrawableOrderError> {
+fn wire_limits(package: &Package) -> Result<WireLimits, Error> {
     let maximum = package
         .state
         .source
@@ -1294,14 +1259,10 @@ fn wire_limits(package: &Package) -> Result<WireLimits, BodyDrawableOrderError> 
     WireLimits::default()
         .with_input_bytes(maximum)
         .and_then(|limits| limits.with_output_bytes(maximum.min(defaults.max_output_bytes())))
-        .map_err(|_| BodyDrawableOrderError::InvalidSource)
+        .map_err(|_| Error::InvalidSource)
 }
 
-fn codec_options(
-    package: &Package,
-    source: &[u8],
-    rewrite: bool,
-) -> Result<DecodeOptions, BodyDrawableOrderError> {
+fn codec_options(package: &Package, source: &[u8], rewrite: bool) -> Result<DecodeOptions, Error> {
     let limits = wire_limits(package)?;
     let max_fields = source
         .len()
@@ -1312,8 +1273,8 @@ fn codec_options(
         .saturating_mul(DRAWABLE_ORDER_WORK_MULTIPLIER)
         .clamp(1, limits.max_rewrite_work());
     let max_references = source.len().clamp(1, limits.max_fields());
-    let recursion_limit = u32::try_from(limits.max_nesting().min(64))
-        .map_err(|_| BodyDrawableOrderError::InvalidSource)?;
+    let recursion_limit =
+        u32::try_from(limits.max_nesting().min(64)).map_err(|_| Error::InvalidSource)?;
     Ok(DecodeOptions::new(
         source.len().max(1).min(limits.max_input_bytes()),
         if rewrite {
@@ -1331,31 +1292,26 @@ fn codec_options(
 fn validate_canonical_object_length_prefixes(
     source: &[u8],
     archive: &Archive,
-) -> Result<(), BodyDrawableOrderError> {
+) -> Result<(), Error> {
     for object in &archive.objects {
-        let offset = usize::try_from(object.header_offset)
-            .map_err(|_| BodyDrawableOrderError::InvalidSource)?;
-        let remaining = source
-            .get(offset..)
-            .ok_or(BodyDrawableOrderError::InvalidSource)?;
-        let (header_bytes, prefix_bytes) = decode_varint_from_bytes(remaining)
-            .map_err(|_| BodyDrawableOrderError::InvalidSource)?;
+        let offset = usize::try_from(object.header_offset).map_err(|_| Error::InvalidSource)?;
+        let remaining = source.get(offset..).ok_or(Error::InvalidSource)?;
+        let (header_bytes, prefix_bytes) =
+            decode_varint_from_bytes(remaining).map_err(|_| Error::InvalidSource)?;
         if prefix_bytes != encoded_len(header_bytes) {
-            return Err(BodyDrawableOrderError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let framed_header_bytes = header_bytes
-            .checked_add(
-                u64::try_from(prefix_bytes).map_err(|_| BodyDrawableOrderError::InvalidSource)?,
-            )
-            .ok_or(BodyDrawableOrderError::InvalidSource)?;
+            .checked_add(u64::try_from(prefix_bytes).map_err(|_| Error::InvalidSource)?)
+            .ok_or(Error::InvalidSource)?;
         if framed_header_bytes != object.header_length
             || object
                 .header_offset
                 .checked_add(object.header_length)
-                .ok_or(BodyDrawableOrderError::InvalidSource)?
+                .ok_or(Error::InvalidSource)?
                 != object.data_offset
         {
-            return Err(BodyDrawableOrderError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(())
@@ -1370,155 +1326,123 @@ fn fingerprint(bytes: &[u8]) -> u64 {
     value
 }
 
-fn map_codec_error(error: DecodeError) -> BodyDrawableOrderError {
+fn map_codec_error(error: DecodeError) -> Error {
     if let Some(amount) = error.allocation_amount() {
-        return BodyDrawableOrderError::Allocation { amount };
+        return Error::Allocation { amount };
     }
     match error.resource_limit() {
-        Some(WireResourceLimit::InputBytes { observed, maximum }) => {
-            BodyDrawableOrderError::LimitExceeded {
-                kind: BodyDrawableOrderLimitKind::WireBytes,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        Some(WireResourceLimit::InputBytes { observed, maximum }) => Error::LimitExceeded {
+            kind: LimitKind::WireBytes,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        Some(WireResourceLimit::OutputBytes { observed, maximum }) => {
-            BodyDrawableOrderError::LimitExceeded {
-                kind: BodyDrawableOrderLimitKind::OutputBytes,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        Some(WireResourceLimit::OutputBytes { observed, maximum }) => Error::LimitExceeded {
+            kind: LimitKind::OutputBytes,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        Some(WireResourceLimit::Fields { observed, maximum }) => {
-            BodyDrawableOrderError::LimitExceeded {
-                kind: BodyDrawableOrderLimitKind::WireFields,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        Some(WireResourceLimit::Fields { observed, maximum }) => Error::LimitExceeded {
+            kind: LimitKind::WireFields,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        Some(WireResourceLimit::WorkBytes { observed, maximum }) => {
-            BodyDrawableOrderError::LimitExceeded {
-                kind: BodyDrawableOrderLimitKind::WireWork,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        Some(WireResourceLimit::WorkBytes { observed, maximum }) => Error::LimitExceeded {
+            kind: LimitKind::WireWork,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        Some(WireResourceLimit::Nesting { observed, maximum }) => {
-            BodyDrawableOrderError::LimitExceeded {
-                kind: BodyDrawableOrderLimitKind::WireNesting,
-                observed: u64::from(observed),
-                maximum: u64::from(maximum),
-            }
+        Some(WireResourceLimit::Nesting { observed, maximum }) => Error::LimitExceeded {
+            kind: LimitKind::WireNesting,
+            observed: u64::from(observed),
+            maximum: u64::from(maximum),
         },
-        Some(WireResourceLimit::References { observed, maximum }) => {
-            BodyDrawableOrderError::LimitExceeded {
-                kind: BodyDrawableOrderLimitKind::References,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        Some(WireResourceLimit::References { observed, maximum }) => Error::LimitExceeded {
+            kind: LimitKind::References,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        Some(_) => BodyDrawableOrderError::InvalidSource,
-        None => BodyDrawableOrderError::InvalidSource,
+        Some(_) => Error::InvalidSource,
+        None => Error::InvalidSource,
     }
 }
 
-fn map_package_error(error: super::PackageError) -> BodyDrawableOrderError {
+fn map_package_error(error: super::PackageError) -> Error {
     match error {
         super::PackageError::Archive(error) => map_archive_error(error),
-        super::PackageError::Detection(_) => BodyDrawableOrderError::InvalidSource,
-        super::PackageError::Allocation { amount } => BodyDrawableOrderError::Allocation { amount },
-        super::PackageError::ObjectLimit { observed, limit } => {
-            BodyDrawableOrderError::LimitExceeded {
-                kind: BodyDrawableOrderLimitKind::PayloadObjects,
-                observed: observed as u64,
-                maximum: limit as u64,
-            }
+        super::PackageError::Detection(_) => Error::InvalidSource,
+        super::PackageError::Allocation { amount } => Error::Allocation { amount },
+        super::PackageError::ObjectLimit { observed, limit } => Error::LimitExceeded {
+            kind: LimitKind::PayloadObjects,
+            observed: observed as u64,
+            maximum: limit as u64,
         },
-        super::PackageError::PayloadLimit { observed, limit } => {
-            BodyDrawableOrderError::LimitExceeded {
-                kind: BodyDrawableOrderLimitKind::PayloadBytes,
-                observed: observed as u64,
-                maximum: limit as u64,
-            }
+        super::PackageError::PayloadLimit { observed, limit } => Error::LimitExceeded {
+            kind: LimitKind::PayloadBytes,
+            observed: observed as u64,
+            maximum: limit as u64,
         },
-        super::PackageError::NotPages
+        super::PackageError::UnexpectedFormat { .. }
+        | super::PackageError::NotOfficeFile
+        | super::PackageError::MissingIdentity
+        | super::PackageError::InvalidLimit { .. }
+        | super::PackageError::Limit { .. }
         | super::PackageError::Io(_)
         | super::PackageError::InvalidFormat(_)
         | super::PackageError::Semantic(_)
-        | super::PackageError::SectionNamesTooLarge { .. } => BodyDrawableOrderError::InvalidSource,
+        | super::PackageError::SectionNamesTooLarge { .. } => Error::InvalidSource,
     }
 }
 
-fn map_archive_error(error: litchi_iwa_archive::Error) -> BodyDrawableOrderError {
+fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     match error {
         litchi_iwa_archive::Error::Limit {
             kind,
             observed,
             maximum,
-        } => BodyDrawableOrderError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: match kind {
-                litchi_iwa_archive::LimitKind::InputBytes => BodyDrawableOrderLimitKind::InputBytes,
-                litchi_iwa_archive::LimitKind::OutputBytes => {
-                    BodyDrawableOrderLimitKind::OutputBytes
-                },
-                litchi_iwa_archive::LimitKind::Entries => BodyDrawableOrderLimitKind::Entries,
+                litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
+                litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_archive::LimitKind::Entries => LimitKind::Entries,
                 litchi_iwa_archive::LimitKind::MemberNameBytes
-                | litchi_iwa_archive::LimitKind::MetadataBytes => {
-                    BodyDrawableOrderLimitKind::PayloadItems
-                },
+                | litchi_iwa_archive::LimitKind::MetadataBytes => LimitKind::PayloadItems,
                 litchi_iwa_archive::LimitKind::CompressedEntryBytes
-                | litchi_iwa_archive::LimitKind::EntryBytes => {
-                    BodyDrawableOrderLimitKind::EntryBytes
-                },
-                litchi_iwa_archive::LimitKind::TotalBytes => {
-                    BodyDrawableOrderLimitKind::TotalEntryBytes
-                },
-                litchi_iwa_archive::LimitKind::IwaStreamBytes => {
-                    BodyDrawableOrderLimitKind::PayloadBytes
-                },
-                litchi_iwa_archive::LimitKind::IwaTotalBytes => {
-                    BodyDrawableOrderLimitKind::TotalPayloadBytes
-                },
+                | litchi_iwa_archive::LimitKind::EntryBytes => LimitKind::EntryBytes,
+                litchi_iwa_archive::LimitKind::TotalBytes => LimitKind::TotalEntryBytes,
+                litchi_iwa_archive::LimitKind::IwaStreamBytes => LimitKind::PayloadBytes,
+                litchi_iwa_archive::LimitKind::IwaTotalBytes => LimitKind::TotalPayloadBytes,
             },
             observed,
             maximum,
         },
-        litchi_iwa_archive::Error::Allocation { amount, .. } => {
-            BodyDrawableOrderError::Allocation { amount }
-        },
+        litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_archive::Error::Iwa(error) => map_core_error(error),
-        litchi_iwa_archive::Error::Reassembly(_) => BodyDrawableOrderError::UnsupportedSource,
+        litchi_iwa_archive::Error::Reassembly(_) => Error::UnsupportedSource,
         litchi_iwa_archive::Error::Io(_)
         | litchi_iwa_archive::Error::Zip { .. }
         | litchi_iwa_archive::Error::InvalidLimits(_)
         | litchi_iwa_archive::Error::Encrypted
         | litchi_iwa_archive::Error::SourceChanged { .. }
         | litchi_iwa_archive::Error::DirectoryChanged { .. }
-        | litchi_iwa_archive::Error::InvalidBundle(_) => BodyDrawableOrderError::InvalidSource,
+        | litchi_iwa_archive::Error::InvalidBundle(_) => Error::InvalidSource,
     }
 }
 
-fn map_core_error(error: litchi_iwa_core::Error) -> BodyDrawableOrderError {
+fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => BodyDrawableOrderError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: match kind {
-                litchi_iwa_core::LimitKind::Objects => BodyDrawableOrderLimitKind::PayloadObjects,
+                litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
                 litchi_iwa_core::LimitKind::Messages
-                | litchi_iwa_core::LimitKind::MessagesPerObject => {
-                    BodyDrawableOrderLimitKind::PayloadMessages
-                },
+                | litchi_iwa_core::LimitKind::MessagesPerObject => LimitKind::PayloadMessages,
                 litchi_iwa_core::LimitKind::HeaderFields
                 | litchi_iwa_core::LimitKind::MetadataItems
-                | litchi_iwa_core::LimitKind::SnappyFrames => {
-                    BodyDrawableOrderLimitKind::PayloadItems
-                },
-                litchi_iwa_core::LimitKind::HeaderNesting => {
-                    BodyDrawableOrderLimitKind::WireNesting
-                },
+                | litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::PayloadItems,
+                litchi_iwa_core::LimitKind::HeaderNesting => LimitKind::WireNesting,
                 litchi_iwa_core::LimitKind::ArchiveBytes
                 | litchi_iwa_core::LimitKind::ObjectBytes
                 | litchi_iwa_core::LimitKind::MessageBytes
@@ -1528,20 +1452,20 @@ fn map_core_error(error: litchi_iwa_core::Error) -> BodyDrawableOrderError {
                 | litchi_iwa_core::LimitKind::SnappyStreamBytes
                 | litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
                 | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes => {
-                    BodyDrawableOrderLimitKind::PayloadBytes
+                    LimitKind::PayloadBytes
                 },
             },
             observed: observed as u64,
             maximum: maximum as u64,
         },
         litchi_iwa_core::Error::Allocation { requested, .. } => {
-            BodyDrawableOrderError::Allocation { amount: requested }
+            Error::Allocation { amount: requested }
         },
         litchi_iwa_core::Error::InvalidArchive { .. }
         | litchi_iwa_core::Error::InvalidLimits { .. }
         | litchi_iwa_core::Error::HeaderCodec { .. }
         | litchi_iwa_core::Error::Io(_)
-        | litchi_iwa_core::Error::Snappy { .. } => BodyDrawableOrderError::InvalidSource,
+        | litchi_iwa_core::Error::Snappy { .. } => Error::InvalidSource,
     }
 }
 
@@ -1594,11 +1518,11 @@ mod tests {
         let current = [NonZeroU64::new(1).unwrap(), NonZeroU64::new(2).unwrap()];
         assert_eq!(
             validate_exact_permutation(&current, &[current[0], current[0]]),
-            Err(BodyDrawableOrderError::InvalidOrder)
+            Err(Error::InvalidOrder)
         );
         assert_eq!(
             validate_exact_permutation(&current, &[current[0], NonZeroU64::new(3).unwrap()]),
-            Err(BodyDrawableOrderError::InvalidOrder)
+            Err(Error::InvalidOrder)
         );
     }
 
@@ -1607,7 +1531,7 @@ mod tests {
         assert_eq!(validate_exact_permutation(&[], &[]), Ok(()));
         assert_eq!(
             validate_exact_permutation(&[], &[NonZeroU64::new(1).unwrap()]),
-            Err(BodyDrawableOrderError::InvalidOrder)
+            Err(Error::InvalidOrder)
         );
     }
 
@@ -1617,14 +1541,14 @@ mod tests {
         let duplicate_type = [0x08, 0x2a, 0x10, 0x01, 0x10, 0x01];
         assert_eq!(
             strict_reference_with_limits(&duplicate_type, WireLimits::default()),
-            Err(BodyDrawableOrderError::InvalidSource)
+            Err(Error::InvalidSource)
         );
 
         // identifier = 42, deprecated_is_external = false twice.
         let duplicate_external = [0x08, 0x2a, 0x18, 0x00, 0x18, 0x00];
         assert_eq!(
             strict_reference_with_limits(&duplicate_external, WireLimits::default()),
-            Err(BodyDrawableOrderError::InvalidSource)
+            Err(Error::InvalidSource)
         );
     }
 
@@ -1634,14 +1558,14 @@ mod tests {
         let noncanonical_type = [0x08, 0x2a, 0x10, 0x81, 0x00];
         assert_eq!(
             strict_reference_with_limits(&noncanonical_type, WireLimits::default()),
-            Err(BodyDrawableOrderError::InvalidSource)
+            Err(Error::InvalidSource)
         );
 
         // Bool values are canonical only when they are exactly zero or one.
         let noncanonical_external = [0x08, 0x2a, 0x18, 0x02];
         assert_eq!(
             strict_reference_with_limits(&noncanonical_external, WireLimits::default()),
-            Err(BodyDrawableOrderError::InvalidSource)
+            Err(Error::InvalidSource)
         );
     }
 
@@ -1650,7 +1574,7 @@ mod tests {
         let root_external = [0x08, 0x2a, 0x18, 0x01];
         assert_eq!(
             strict_reference_with_limits(&root_external, WireLimits::default()),
-            Err(BodyDrawableOrderError::InvalidSource)
+            Err(Error::InvalidSource)
         );
 
         // drawables = [TSP.Reference(identifier: 42, deprecated_is_external: true)].
@@ -1662,7 +1586,7 @@ mod tests {
         .expect("the generic codec should preserve the external marker");
         assert_eq!(
             reject_external_references(snapshot),
-            Err(BodyDrawableOrderError::InvalidSource)
+            Err(Error::InvalidSource)
         );
     }
 }

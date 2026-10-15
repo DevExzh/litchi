@@ -201,3 +201,8 @@ required-features = ["docx", "xlsx", "eval"]
 [[example]]
 name              = "iwork_bench"
 required-features = ["pages", "keynote", "numbers"]
+
+# Paired leaf-vs-unified Pages write measurements (record 0299).
+[[example]]
+name              = "pages_bench"
+required-features = ["pages"]

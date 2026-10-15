@@ -2,7 +2,7 @@
 //! reader.
 
 use litchi_core::Position;
-use litchi_pages::{BodyChartDataError, BodyChartSelector, Package};
+use litchi_pages::{BodyChartSelector, Package, chart::data::Error as BodyChartDataError};
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 

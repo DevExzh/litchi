@@ -609,6 +609,31 @@ The coordinator's Claude process stalled and exited while seven agents (wave R7 
   - the coordinator watches `MemAvailable` (alert below 16 GB) and free disk.
 - Resumed: `iwork-found` (0296), `checklist-fixes` (0290), `perf-path` (0291), `producer-structure` (0293). Held: `odf-verbs` (0292), `acceptance2` (0294), `m4-ext` (0295).
 
+- Merged `checklist-fixes` (0290):
+  - Phase G checklist failures F1 (bare `placeholder` query), F2 (negative `c:axId` read leniently), F4 (PPT `hidden` inserts the slide info atom), F6 (OTH/ODM `meta.xml` created on demand) and F7 (RTF picture remove on mismatched payloads) are fixed;
+  - `File::metadata()` reports `dc:language` for every ODF format (six Markdown golden rows updated);
+  - F3 (PPTX OLE remove under markup compatibility) remains, with the cross-layer cause recorded.
+- Merged `producer-structure` (0293):
+  - XLS row/column insert and remove on producer workbooks: 176 row and 165 column round trips are byte-exact;
+  - the full XLS reader no longer stops at embedded charts, so 89 XLS query digests now see more cells;
+  - PPTX slide removal admits common producer constructs; owned notes, pictures and diagrams stay refused, naming the dependency;
+  - RTF paragraph remove/move/swap uses an exact source splice: removal works on 60 of 147 producer files;
+  - empty-edit refusals 21 → 19; no regressions.
+- Disk incidents (free disk at 22 GB and then 13 GB): agent and gate build directories are pruned aggressively. Most of the disk is held by the performance program's build directory in the main checkout, outside this program.
+
+- Merged `perf-path` (0291):
+  - ODB single set 1.35× → 1.00×;
+  - compile-time path-lookup index;
+  - per-thread RTF plan cache (fan-out 1.13–1.28×);
+  - walker fast path and borrowed selectors: ODS warm cell −20%, ODT −15%, XLS get −23% instructions.
+  - Miss: DOCX single set 1.11–1.12×. The remaining 7.7 K instructions are in `litchi-core` `Path::parse`, DOCX handle allocation and admission.
+  - Fix at merge: the 0296 NUMBERS vocabulary gains the alias index.
+- Merged `odf-verbs` (0292):
+  - ODG/ODC/ODI/ODB/formula move/swap/add/remove are element-level (new leaf `move_shape_to_page`, `move_{table,column,query}`);
+  - `.fodt`/`.fodg` open (46/46 and 3/5);
+  - flat ODT/ODS/ODP/ODG edits write back only the changed elements; flat fidelity refusals 71 → 0.
+  - Open: G-ODP-1, flat member-adding edits, flat ODC/ODI/ODB/formula.
+
 ## M6 — iWork (2026-10-15)
 - Merged `iwork-found` (0296, owner decisions D1/D2):
   - the iWork-free gate is removed; the `pages`, `keynote` and `numbers` features carry their leaf edges (ADR 0024 amendment), and `litchi-ops`/`litchi-cli` leave the non-iWork bulk lane (48 → 46);
@@ -620,6 +645,15 @@ The coordinator's Claude process stalled and exited while seven agents (wave R7 
     - `create`/structural verbs are typed gaps (`IWORK_API_REQUESTS.md`, requests 15–17);
     - Keynote slide remove has no multi-slide fixture (known failure F8);
     - `litchi-numbers` test-target lints predate this change.
+
+- Merged `iwork-pages` (0299):
+  - Pages ADR 0034 W1: focused families, `SourceLimits`/`SemanticLimits`/`OpenOptions`, `Package` owner with a read-only `Document`, `Package::new()` plus a `Builder` with explicit identity, a `pages` glossary profile;
+  - leaf paragraph transactions, metadata writes and package-directory open;
+  - unified paragraphs add/remove/move/swap/set, sections, headers/footers, footnotes, table read/remove, `/metadata`, `create(Pages)` and Pages directories;
+  - 85/85 checklist cells, 32/32 files byte-identical; single ops within 1–2%.
+  - Miss: 10k batch 2.64× (the fixed tree build).
+  - Open: section add/remove, text runs, table-cell writes.
+- `iwork-numbers` (0297) was sent back to its agent to merge trunk: 14 shared-adapter conflicts with 0299.
 
 Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-pptx-w4` 9474e2b6ce, `uo/m2-l-xlsb-w1` 876588a23c, `uo/m1-r4-perf` 012fd509ff.
 

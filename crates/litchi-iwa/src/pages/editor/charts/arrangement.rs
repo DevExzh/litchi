@@ -63,7 +63,7 @@ fn focused_chart_arrangement_package(editor: &PagesEditor) -> Result<FocusedPage
     })
 }
 
-fn map_focused_chart_arrangement_error(error: litchi_pages::BodyChartArrangementError) -> Error {
+fn map_focused_chart_arrangement_error(error: litchi_pages::chart::arrangement::Error) -> Error {
     Error::InvalidFormat(format!(
         "focused Pages chart arrangement operation failed: {error}"
     ))

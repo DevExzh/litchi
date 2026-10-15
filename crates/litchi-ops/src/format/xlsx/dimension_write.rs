@@ -163,7 +163,7 @@ fn resolve_targets(
                 .with_format(FileFormat::Xlsx),
         );
     };
-    let walk = crate::query::run(nav, query.clone())?;
+    let walk = crate::query::run(nav, query)?;
     if !walk.plan().diagnostics().is_empty() {
         return Err(Error::new(
             Code::InvalidSelector,

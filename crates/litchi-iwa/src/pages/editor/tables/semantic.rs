@@ -97,26 +97,26 @@ impl PagesTable {
     }
 }
 
-fn map_focused_cells_error(error: litchi_pages::BodyTableCellsError) -> Error {
+fn map_focused_cells_error(error: litchi_pages::table::cells::Error) -> Error {
     match error {
-        litchi_pages::BodyTableCellsError::LimitExceeded {
+        litchi_pages::table::cells::Error::LimitExceeded {
             kind,
             observed,
             maximum,
         } => map_focused_cells_limit(kind, observed, maximum),
-        litchi_pages::BodyTableCellsError::Allocation { amount } => {
+        litchi_pages::table::cells::Error::Allocation { amount } => {
             Error::IwaCommon(litchi_iwa_common::Error::Allocation {
                 resource: "Pages body-table cell read",
                 amount,
             })
         },
-        litchi_pages::BodyTableCellsError::TableNotFound
-        | litchi_pages::BodyTableCellsError::AmbiguousTableName
-        | litchi_pages::BodyTableCellsError::AmbiguousSelector => {
+        litchi_pages::table::cells::Error::TableNotFound
+        | litchi_pages::table::cells::Error::AmbiguousTableName
+        | litchi_pages::table::cells::Error::AmbiguousSelector => {
             Error::ParseError(error.to_string())
         },
-        litchi_pages::BodyTableCellsError::UnsupportedSource
-        | litchi_pages::BodyTableCellsError::InvalidSource => {
+        litchi_pages::table::cells::Error::UnsupportedSource
+        | litchi_pages::table::cells::Error::InvalidSource => {
             Error::InvalidFormat(format!("focused Pages table cells: {error}"))
         },
         error => Error::InvalidFormat(format!("focused Pages table cells: {error}")),
@@ -124,7 +124,7 @@ fn map_focused_cells_error(error: litchi_pages::BodyTableCellsError) -> Error {
 }
 
 fn map_focused_cells_limit(
-    kind: litchi_pages::BodyTableCellsLimitKind,
+    kind: litchi_pages::table::cells::LimitKind,
     observed: u64,
     maximum: u64,
 ) -> Error {
@@ -145,19 +145,19 @@ fn map_focused_cells_limit(
     })
 }
 
-fn map_focused_deletion_error(error: litchi_pages::BodyTableDeletionError) -> Error {
+fn map_focused_deletion_error(error: litchi_pages::table::deletion::Error) -> Error {
     let message = error.to_string();
     match error {
-        litchi_pages::BodyTableDeletionError::TableNotFound
-        | litchi_pages::BodyTableDeletionError::AmbiguousTableName
-        | litchi_pages::BodyTableDeletionError::AmbiguousSelector => Error::ParseError(message),
-        litchi_pages::BodyTableDeletionError::Allocation { amount } => {
+        litchi_pages::table::deletion::Error::TableNotFound
+        | litchi_pages::table::deletion::Error::AmbiguousTableName
+        | litchi_pages::table::deletion::Error::AmbiguousSelector => Error::ParseError(message),
+        litchi_pages::table::deletion::Error::Allocation { amount } => {
             Error::IwaCommon(litchi_iwa_common::Error::Allocation {
                 resource: "Pages body-table deletion",
                 amount,
             })
         },
-        litchi_pages::BodyTableDeletionError::LimitExceeded {
+        litchi_pages::table::deletion::Error::LimitExceeded {
             kind,
             observed,
             maximum,
@@ -175,19 +175,19 @@ fn map_focused_deletion_error(error: litchi_pages::BodyTableDeletionError) -> Er
                 limit: maximum,
             })
         },
-        litchi_pages::BodyTableDeletionError::UnsupportedSource
-        | litchi_pages::BodyTableDeletionError::InvalidSource
-        | litchi_pages::BodyTableDeletionError::Verification
-        | litchi_pages::BodyTableDeletionError::PatchConflict => {
+        litchi_pages::table::deletion::Error::UnsupportedSource
+        | litchi_pages::table::deletion::Error::InvalidSource
+        | litchi_pages::table::deletion::Error::Verification
+        | litchi_pages::table::deletion::Error::PatchConflict => {
             Error::InvalidFormat(format!("focused Pages table deletion: {message}"))
         },
-        litchi_pages::BodyTableDeletionError::UnsupportedDependency => Error::ParseError(message),
+        litchi_pages::table::deletion::Error::UnsupportedDependency => Error::ParseError(message),
         _ => Error::InvalidFormat(format!("focused Pages table deletion: {message}")),
     }
 }
 
-fn map_focused_deletion_limit(kind: litchi_pages::BodyTableDeletionLimitKind) -> Option<LimitKind> {
-    use litchi_pages::BodyTableDeletionLimitKind as Focused;
+fn map_focused_deletion_limit(kind: litchi_pages::table::deletion::LimitKind) -> Option<LimitKind> {
+    use litchi_pages::table::deletion::LimitKind as Focused;
     match kind {
         Focused::InputBytes | Focused::WireBytes => Some(LimitKind::InputBytes),
         Focused::OutputBytes | Focused::WireOutputBytes => Some(LimitKind::OutputBytes),
@@ -218,7 +218,7 @@ trait IntoWireLimitKind {
     fn into_wire_limit_kind(self) -> Option<LimitKind>;
 }
 
-impl IntoWireLimitKind for litchi_pages::BodyTableCellsLimitKind {
+impl IntoWireLimitKind for litchi_pages::table::cells::LimitKind {
     fn into_wire_limit_kind(self) -> Option<LimitKind> {
         match self {
             Self::InputBytes | Self::WireBytes => Some(LimitKind::InputBytes),
@@ -257,20 +257,26 @@ pub(super) fn focused_body_table_source(
         .ok_or_else(|| body_table_not_attached_error(model_object_id))?;
     let bytes = editor.package().to_bytes()?;
     let package_limits = editor.package().limits();
-    let archive_limits = package_limits.effective_archive_limits()?;
-    let focused_limits = litchi_pages::Limits::new(
-        package_limits.max_input_bytes(),
-        package_limits.max_entries(),
-        package_limits.max_entry_bytes(),
-        package_limits.max_total_bytes(),
-        package_limits.max_iwa_stream_bytes(),
-    )
-    .map_err(|error| Error::InvalidFormat(format!("Pages table limits: {error}")))?
-    .with_archive_limits(archive_limits)
-    .map_err(|error| Error::InvalidFormat(format!("Pages table archive limits: {error}")))?;
-    let focused = FocusedPagesPackage::from_bytes_with_limits(&bytes, focused_limits)
+    let focused_limits = focused_options(package_limits)?;
+    let focused = FocusedPagesPackage::from_bytes_with_options(&bytes, focused_limits)
         .map_err(|error| Error::InvalidFormat(format!("focused Pages table source: {error}")))?;
     Ok((focused, table_position, info))
+}
+
+/// The focused Pages ingress profile matching the legacy package limits.
+fn focused_options(limits: crate::package::PackageLimits) -> Result<litchi_pages::OpenOptions> {
+    let error = |error: litchi_pages::PackageError| {
+        Error::InvalidFormat(format!("Pages table limits: {error}"))
+    };
+    let source = litchi_pages::SourceLimits::builder()
+        .max_input_bytes(limits.max_input_bytes())
+        .and_then(|builder| builder.max_members(limits.max_entries()))
+        .and_then(|builder| builder.max_entry_bytes(limits.max_entry_bytes()))
+        .and_then(|builder| builder.max_aggregate_bytes(limits.max_total_bytes()))
+        .and_then(|builder| builder.max_component_bytes(limits.max_iwa_stream_bytes()))
+        .and_then(litchi_pages::SourceLimitsBuilder::build)
+        .map_err(error)?;
+    Ok(litchi_pages::OpenOptions::new().source_limits(source))
 }
 
 fn focused_body_table_package(editor: &PagesEditor) -> Result<FocusedPagesPackage> {
@@ -278,18 +284,8 @@ fn focused_body_table_package(editor: &PagesEditor) -> Result<FocusedPagesPackag
         Error::InvalidFormat("focused Pages table source is not exact".to_owned())
     })?;
     let package_limits = editor.package().limits();
-    let archive_limits = package_limits.effective_archive_limits()?;
-    let focused_limits = litchi_pages::Limits::new(
-        package_limits.max_input_bytes(),
-        package_limits.max_entries(),
-        package_limits.max_entry_bytes(),
-        package_limits.max_total_bytes(),
-        package_limits.max_iwa_stream_bytes(),
-    )
-    .map_err(|error| Error::InvalidFormat(format!("Pages table limits: {error}")))?
-    .with_archive_limits(archive_limits)
-    .map_err(|error| Error::InvalidFormat(format!("Pages table archive limits: {error}")))?;
-    FocusedPagesPackage::from_bytes_with_limits(source, focused_limits)
+    let focused_limits = focused_options(package_limits)?;
+    FocusedPagesPackage::from_bytes_with_options(source, focused_limits)
         .map_err(|error| Error::InvalidFormat(format!("focused Pages table source: {error}")))
 }
 

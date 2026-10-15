@@ -367,7 +367,7 @@ fn pages_selected_merge_graph_errors_are_terminal_and_source_preserving() -> Tes
     assert!(
         matches!(
             focused.body_table_merges(litchi_pages::BodyTableSelector::index(0)),
-            Err(litchi_pages::BodyTableMergesError::InvalidSource)
+            Err(litchi_pages::table::merge::transaction::Error::InvalidSource)
         ),
         "the focused Pages reader must reject the malformed selected graph"
     );

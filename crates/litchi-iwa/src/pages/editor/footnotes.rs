@@ -1349,8 +1349,8 @@ mod tests {
             .body_footnotes()
             .map_err(|error| Error::InvalidFormat(format!("Pages footnote readback: {error}")))?;
         let updated = match selector {
-            Selector::Index(index) => updated_footnotes.get(index).cloned(),
-            Selector::At(position) => updated_footnotes
+            Selector::Position(position) => updated_footnotes.get(position.get()).cloned(),
+            Selector::Anchor(position) => updated_footnotes
                 .into_iter()
                 .find(|footnote| footnote.position == position),
         }
@@ -1495,7 +1495,7 @@ mod tests {
             focused_body_footnotes(&edited).unwrap()[0].text.as_ref(),
             "Native"
         );
-        rewrite_body_footnote_text_via_pages(&mut edited, Selector::Index(0), "Updated").unwrap();
+        rewrite_body_footnote_text_via_pages(&mut edited, Selector::index(0), "Updated").unwrap();
         let marker_archive = find_object_archive(edited.package(), graph.marker_id).unwrap();
         let marker_archive_data = edited.package().archive(&marker_archive).unwrap();
         let marker = marker_archive_data.object(graph.marker_id).unwrap();
@@ -1535,7 +1535,7 @@ mod tests {
         let mut malformed = PagesEditor::from_package(package).unwrap();
         let baseline = malformed.to_bytes().unwrap();
         assert!(
-            rewrite_body_footnote_text_via_pages(&mut malformed, Selector::Index(0), "Updated")
+            rewrite_body_footnote_text_via_pages(&mut malformed, Selector::index(0), "Updated")
                 .is_err()
         );
         assert_eq!(malformed.to_bytes().unwrap(), baseline);
@@ -1578,7 +1578,7 @@ mod tests {
             focused_body_footnotes(&edited).unwrap()[0].text.as_ref(),
             "Native"
         );
-        rewrite_body_footnote_text_via_pages(&mut edited, Selector::Index(0), "Updated").unwrap();
+        rewrite_body_footnote_text_via_pages(&mut edited, Selector::index(0), "Updated").unwrap();
         let reference_archive = find_object_archive(edited.package(), reference_id).unwrap();
         let reference_archive_data = edited.package().archive(&reference_archive).unwrap();
         let reference = reference_archive_data.object(reference_id).unwrap();
@@ -1619,7 +1619,7 @@ mod tests {
         let mut malformed = PagesEditor::from_package(package).unwrap();
         let baseline = malformed.to_bytes().unwrap();
         assert!(
-            rewrite_body_footnote_text_via_pages(&mut malformed, Selector::Index(0), "Updated")
+            rewrite_body_footnote_text_via_pages(&mut malformed, Selector::index(0), "Updated")
                 .is_err()
         );
         assert_eq!(malformed.to_bytes().unwrap(), baseline);
@@ -1687,7 +1687,7 @@ mod tests {
             focused_body_footnotes(&edited).unwrap()[0].text.as_ref(),
             "Native"
         );
-        rewrite_body_footnote_text_via_pages(&mut edited, Selector::Index(0), "Updated").unwrap();
+        rewrite_body_footnote_text_via_pages(&mut edited, Selector::index(0), "Updated").unwrap();
         let body_archive = find_object_archive(edited.package(), body_storage_id).unwrap();
         let body_archive_data = edited.package().archive(&body_archive).unwrap();
         let body = body_archive_data.object(body_storage_id).unwrap();
@@ -1766,7 +1766,7 @@ mod tests {
         let mut malformed = PagesEditor::from_package(package).unwrap();
         let baseline = malformed.to_bytes().unwrap();
         assert!(
-            rewrite_body_footnote_text_via_pages(&mut malformed, Selector::Index(0), "Updated")
+            rewrite_body_footnote_text_via_pages(&mut malformed, Selector::index(0), "Updated")
                 .is_err()
         );
         assert_eq!(malformed.to_bytes().unwrap(), baseline);

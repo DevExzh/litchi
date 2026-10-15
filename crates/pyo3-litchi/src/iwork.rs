@@ -47,15 +47,39 @@ macro_rules! failure {
     }};
 }
 
-/// Open a Pages document.
+/// Open a Pages document: the read-only projection of its package (a
+/// single-file package or a package directory).
 pub(crate) fn open_pages(path: &Path) -> Result<litchi::pages::semantic::Document, Failure> {
-    litchi::pages::semantic::Document::open(path).map_err(pages_failure)
+    litchi::pages::semantic::open(path).map_err(pages_failure)
 }
 
-/// Classify a Pages read error.
-fn pages_failure(error: litchi::pages::semantic::ReadError) -> Failure {
-    use litchi::pages::semantic::{IoKind, ReadError};
-    failure!(error, IoKind::NotFound, ReadError::NotPages)
+/// Classify a Pages package error.
+fn pages_failure(error: litchi::pages::semantic::PackageError) -> Failure {
+    use litchi::pages::semantic::{Error as SemanticError, PackageError};
+    let message = error.to_string();
+    let code = match &error {
+        PackageError::Io(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            Code::FileNotFound
+        },
+        PackageError::Io(_) => Code::IoError,
+        PackageError::UnexpectedFormat { .. } | PackageError::NotOfficeFile => {
+            Code::UnsupportedFormat
+        },
+        PackageError::Limit { .. }
+        | PackageError::PayloadLimit { .. }
+        | PackageError::ObjectLimit { .. }
+        | PackageError::SectionNamesTooLarge { .. }
+        | PackageError::Semantic(
+            SemanticError::TooManySections { .. }
+            | SemanticError::TextTooLarge { .. }
+            | SemanticError::TooManyBodyStorages { .. },
+        ) => Code::LimitExceeded,
+        PackageError::Allocation { .. } => Code::InternalError,
+        // `InvalidFormat`, and any variant added later: a malformed input,
+        // as the unified classifiers treat unnamed leaf variants.
+        _ => Code::CorruptFile,
+    };
+    Failure::new(code, message)
 }
 
 /// Open a Keynote presentation.

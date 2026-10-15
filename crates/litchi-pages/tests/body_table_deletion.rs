@@ -4,9 +4,10 @@
 use std::error::Error as StdError;
 
 use litchi_iwa_archive::Limits as PhysicalLimits;
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
 use litchi_iwa_core::Limits as ArchiveLimits;
-use litchi_pages::{BodyTableDeletionError, BodyTableSelector, Limits, Package};
+use litchi_pages::{BodyTableSelector, Package, table::deletion::Error as BodyTableDeletionError};
 
 type TestResult<T = ()> = Result<T, Box<dyn StdError>>;
 
@@ -72,7 +73,10 @@ fn lowered_transaction_budget_fails_atomically() -> TestResult {
         let fields = lower + (upper - lower) / 2;
         let archive_limits = ArchiveLimits::default().with_header_fields(fields)?;
         let limits = Limits::default().with_archive_limits(archive_limits)?;
-        match Package::from_bytes_with_limits(SOURCE, limits) {
+        match Package::from_bytes_with_options(
+            SOURCE,
+            litchi_pages::OpenOptions::new().__archive_limits(limits),
+        ) {
             Ok(package) => {
                 smallest_success = Some(package);
                 upper = fields.saturating_sub(1);

@@ -632,8 +632,10 @@ def add_iwa_shared_image_adjustments_scaffold(
                 "    codec::rewrite_image_adjustments(source, write, limits)\n"
                 "}\n"
             )
+        w1_family = ecosystem == "Pages"
         source = (
-            f"pub enum {semantic_error} {{ Error }}\n"
+            ("pub enum LimitKind { InputBytes }\n" if w1_family else "")
+            + f"pub enum {semantic_error} {{ Error }}\n"
             f"pub struct {semantic_types[1]}<'a> {{ source: &'a Package }}\n"
             f"pub struct {semantic_types[2]} {{}}\n"
             f"pub struct {semantic_types[3]} {{}}\n"
@@ -699,12 +701,17 @@ def add_iwa_shared_image_adjustments_scaffold(
         ):
             hidden_bridge_exports.append("__rewrite_image_adjustments_payload")
         hidden_bridge_exports.append("ImageAdjustmentsError")
+        # ADR 0034 W1: the Pages owner is ``pub(crate)`` and its short names
+        # are published only by ``image::adjustments``.
+        semantic_reexport = (
+            ""
+            if w1_family
+            else "pub use image_adjustments::{" + ", ".join(semantic_types) + "};\n"
+        )
         package.write_text(
             ("#[cfg(feature = \"internal-iwork-source\")]\n" if semantic_module_gate else "")
-            + "mod image_adjustments;\n"
-            + "pub use image_adjustments::{"
-            + ", ".join(semantic_types)
-            + "};\n"
+            + ("pub(crate) mod image_adjustments;\n" if w1_family else "mod image_adjustments;\n")
+            + semantic_reexport
             + ("" if missing_hidden_gate else '#[cfg(feature = "internal-iwork-source")]\n')
             + ("" if missing_hidden_gate else "#[doc(hidden)]\n")
             + "pub use image_adjustments::{"
@@ -715,9 +722,11 @@ def add_iwa_shared_image_adjustments_scaffold(
         export = root / boundaries.IWA_IMAGE_ADJUSTMENTS_OWNER_EXPORT_SOURCES[ecosystem]
         export.parent.mkdir(parents=True, exist_ok=True)
         export.write_text(
-            "pub use package::{"
-            + ", ".join(semantic_types)
-            + "};\n"
+            (
+                "pub mod image;\n"
+                if w1_family
+                else "pub use package::{" + ", ".join(semantic_types) + "};\n"
+            )
             + ("" if missing_hidden_gate else '#[cfg(feature = "internal-iwork-source")]\n')
             + ("" if missing_hidden_gate else "#[doc(hidden)]\n")
             + "pub use package::{"
@@ -725,6 +734,16 @@ def add_iwa_shared_image_adjustments_scaffold(
             + "};\n",
             encoding="utf-8",
         )
+        if w1_family:
+            image = export.parent / "image.rs"
+            image.write_text(
+                "pub mod adjustments {\n"
+                "    pub use crate::package::image_adjustments::{\n"
+                "        Commit, Diagnostics, Edit, Error, LimitKind, Patch,\n"
+                "    };\n"
+                "}\n",
+                encoding="utf-8",
+            )
 
     for ecosystem, relative_root in boundaries.IWA_IMAGE_ADJUSTMENTS_HOST_ROOTS.items():
         path = root / relative_root / "image_adjustments.rs"
@@ -5241,17 +5260,17 @@ def add_focused_chart_arrangement_owner_scaffolds(root: Path) -> None:
         "    pub fn body_chart_arrangements(&self) -> Result<Box<[ChartArrangement]>, Error> {\n"
         "        resolve_targets(self)\n"
         "    }\n"
-        "    pub fn edit_body_chart_arrangement(&self, selector: impl Into<BodyChartSelector>) -> Result<BodyChartArrangementEdit, Error> {\n"
+        "    pub fn edit_body_chart_arrangement(&self, selector: impl Into<BodyChartSelector>) -> Result<Edit, Error> {\n"
         "        resolve_target(self, selector.into())\n"
         "    }\n"
-        "    pub fn apply_body_chart_arrangement(&self, patch: &BodyChartArrangementPatch) -> Result<BodyChartArrangementCommit, Error> {\n"
+        "    pub fn apply_body_chart_arrangement(&self, patch: &Patch) -> Result<Commit, Error> {\n"
         "        let selected = resolve_target(self, BodyChartSelector::position(patch.position()));\n"
         "        verify_locality(self, selected)\n"
         "    }\n"
         "}\n"
         "fn resolve_target(_: &Package, _: BodyChartSelector) -> Result<ChartArrangement, Error> { todo!() }\n"
         "fn resolve_targets(_: &Package) -> Result<Box<[ChartArrangement]>, Error> { todo!() }\n"
-        "fn verify_locality(_: &Package, _: Result<ChartArrangement, Error>) -> Result<BodyChartArrangementCommit, Error> { todo!() }\n"
+        "fn verify_locality(_: &Package, _: Result<ChartArrangement, Error>) -> Result<Commit, Error> { todo!() }\n"
         "fn codec_path() {\n"
         "    codec::decode_chart_arrangement_with_report();\n"
         "    codec::prepare_chart_arrangement_rewrite();\n"
@@ -5263,16 +5282,17 @@ def add_focused_chart_arrangement_owner_scaffolds(root: Path) -> None:
     pages_package.parent.mkdir(parents=True, exist_ok=True)
     pages_package.write_text(
         "mod body_chart_arrangement;\n"
-        "pub use body_chart_arrangement::{BodyChartArrangementCommit, BodyChartArrangementDiagnostics, BodyChartArrangementEdit, BodyChartArrangementError, BodyChartArrangementLimitKind, BodyChartArrangementPatch};\n",
+        "pub use body_chart_arrangement::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};\n",
         encoding="utf-8",
     )
     pages_public = root / (boundaries.PAGES_SOURCE_ROOT / "lib.rs")
     pages_public.parent.mkdir(parents=True, exist_ok=True)
     pages_public.write_text(
         "pub use litchi_iwa_common::chart::arrangement::ChartArrangement;\n"
-        "pub use package::{BodyChartArrangementCommit, BodyChartArrangementDiagnostics, BodyChartArrangementEdit, BodyChartArrangementError, BodyChartArrangementLimitKind, BodyChartArrangementPatch};\n",
+        "pub use package::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};\n",
         encoding="utf-8",
     )
+    add_pages_transaction_family_scaffold(root, "body_chart_arrangement")
 
 
 def add_keynote_chart_axis_value_settings_canonical_scaffold(root: Path) -> None:
@@ -6676,6 +6696,118 @@ def add_numbers_formula_canonical_scaffold(root: Path) -> None:
     lib.write_text("pub mod formula;\n", encoding="utf-8")
 
 
+# ADR 0034 W1 Pages transaction families: modules whose canonical re-export is
+# the whole file rather than an inline ``pub mod`` (see the Rust sources).
+PAGES_TRANSACTION_FILE_SCOPED_OWNERS = frozenset({"table_lock", "body_table_title"})
+
+
+def _remove_rust_statements(source: str, pattern: str) -> str:
+    return re.sub(pattern, "", source, flags=re.DOTALL)
+
+
+def _remove_inline_rust_module(source: str, name: str) -> str:
+    match = re.search(rf"(?m)^[ \t]*pub[ \t]+mod[ \t]+{re.escape(name)}[ \t]*\{{", source)
+    if match is None:
+        return source
+    depth = 0
+    for index in range(match.end() - 1, len(source)):
+        if source[index] == "{":
+            depth += 1
+        elif source[index] == "}":
+            depth -= 1
+            if depth == 0:
+                end = index + 1
+                if end < len(source) and source[end] == "\n":
+                    end += 1
+                return source[: match.start()] + source[end:]
+    return source
+
+
+def add_pages_transaction_family_scaffold(root: Path, owner: str) -> None:
+    """Install the ADR 0034 W1 layout of one Pages transaction family.
+
+    ``package.rs`` declares ``pub(crate) mod <owner>;``, the owner defines the
+    canonical short names, and only the family's public module re-exports them
+    with ``pub use crate::package::<owner>::{...};``.  Prefixed root/package
+    re-exports written by older scaffolds are removed.
+    """
+
+    _, _, segments, shorts, _ = boundaries.PAGES_TRANSACTION_FAMILY_BY_OWNER[owner]
+    legacy = boundaries._pages_transaction_legacy_names(owner)
+    source_root = root / boundaries.PAGES_SOURCE_ROOT
+    source_root.mkdir(parents=True, exist_ok=True)
+
+    package = root / boundaries.PAGES_PACKAGE_SOURCE
+    text = package.read_text(encoding="utf-8") if package.is_file() else ""
+    text = _remove_rust_statements(
+        text, rf"(?m)^[ \t]*(?:pub(?:\([^()]*\))?[ \t]+)?mod[ \t]+{owner}[ \t]*;\n?"
+    )
+    for statement in re.findall(
+        rf"pub[ \t]+use[ \t]+(?:crate::package::)?{owner}::[^;]*;\n?", text
+    ):
+        names = set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", statement)) - {
+            "pub",
+            "use",
+            "crate",
+            "package",
+            "as",
+            owner,
+        }
+        if names and names <= set(shorts) | legacy:
+            text = text.replace(statement, "", 1)
+    package.write_text(f"pub(crate) mod {owner};\n" + text, encoding="utf-8")
+
+    lib = source_root / "lib.rs"
+    text = lib.read_text(encoding="utf-8") if lib.is_file() else ""
+    for statement in re.findall(r"pub[ \t]+use[ \t]+package::[^;]*;\n?", text):
+        names = set(re.findall(r"[A-Za-z_][A-Za-z0-9_]*", statement)) - {
+            "pub",
+            "use",
+            "package",
+            "as",
+        }
+        if names & legacy or (names and names <= set(shorts)):
+            text = text.replace(statement, "", 1)
+    lib.write_text(text, encoding="utf-8")
+
+    owner_path = root / boundaries.PAGES_SOURCE_ROOT / "package" / f"{owner}.rs"
+    owner_path.parent.mkdir(parents=True, exist_ok=True)
+    text = owner_path.read_text(encoding="utf-8") if owner_path.is_file() else ""
+    missing = [
+        name
+        for name in shorts
+        if re.search(rf"\b(?:struct|enum|type|union|trait)[ \t]+{name}\b", text) is None
+    ]
+    owner_path.write_text(
+        "".join(f"pub struct {name};\n" for name in missing) + text, encoding="utf-8"
+    )
+
+    file_segments = (
+        segments if owner in PAGES_TRANSACTION_FILE_SCOPED_OWNERS else segments[:-1]
+    )
+    current = lib
+    directory = source_root
+    for segment in file_segments:
+        text = current.read_text(encoding="utf-8") if current.is_file() else ""
+        if re.search(rf"(?m)^[ \t]*pub[ \t]+mod[ \t]+{segment}[ \t]*[;{{]", text) is None:
+            current.write_text(text + f"pub mod {segment};\n", encoding="utf-8")
+        nested = directory / segment / "mod.rs"
+        current = nested if nested.is_file() or segment == "table" else directory / f"{segment}.rs"
+        directory = directory / segment
+        current.parent.mkdir(parents=True, exist_ok=True)
+    text = current.read_text(encoding="utf-8") if current.is_file() else ""
+    text = _remove_rust_statements(
+        text, rf"pub[ \t]+use[ \t]+crate::package::{owner}::[^;]*;\n?"
+    )
+    statement = f"pub use crate::package::{owner}::{{{', '.join(shorts)}}};\n"
+    if owner in PAGES_TRANSACTION_FILE_SCOPED_OWNERS:
+        text += statement
+    else:
+        text = _remove_inline_rust_module(text, segments[-1])
+        text += f"pub mod {segments[-1]} {{\n    {statement}}}\n"
+    current.write_text(text, encoding="utf-8")
+
+
 def add_pages_section_settings_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.PAGES_SECTION_SETTINGS_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
@@ -6780,8 +6912,7 @@ def add_pages_table_lock_canonical_scaffold(root: Path) -> None:
     semantic = root / boundaries.PAGES_TABLE_LOCK_SEMANTIC_SOURCE
     semantic.parent.mkdir(parents=True, exist_ok=True)
     semantic.write_text(
-        "pub use litchi_iwa_common::table::lock::State;\n"
-        "pub type BodyTableLockState = State;\n",
+        "pub use litchi_iwa_common::table::lock::State;\n",
         encoding="utf-8",
     )
     owner = root / boundaries.PAGES_TABLE_LOCK_OWNER_SOURCE
@@ -6805,22 +6936,23 @@ def add_pages_table_lock_canonical_scaffold(root: Path) -> None:
     lib_export.parent.mkdir(parents=True, exist_ok=True)
     lib_export.write_text(
         "pub mod table;\n"
-        "pub use package::{BodyTableLockCommit, BodyTableLockDiagnostics, "
-        "BodyTableLockEdit, BodyTableLockError, BodyTableLockLimitKind, "
-        "BodyTableLockPatch};\n",
+        "pub use package::{Commit, Diagnostics, "
+        "Edit, Error, LimitKind, "
+        "Patch};\n",
         encoding="utf-8",
     )
     package_export.parent.mkdir(parents=True, exist_ok=True)
     package_export.write_text(
         "mod table_lock;\n"
-        "pub use table_lock::{BodyTableLockCommit, BodyTableLockDiagnostics, "
-        "BodyTableLockEdit, BodyTableLockError, BodyTableLockLimitKind, "
-        "BodyTableLockPatch};\n",
+        "pub use table_lock::{Commit, Diagnostics, "
+        "Edit, Error, LimitKind, "
+        "Patch};\n",
         encoding="utf-8",
     )
     table_export.write_text(
         "pub mod lock;\n", encoding="utf-8"
     )
+    add_pages_transaction_family_scaffold(root, "table_lock")
 
 
 def add_pages_table_title_canonical_scaffold(root: Path) -> None:
@@ -6828,9 +6960,9 @@ def add_pages_table_title_canonical_scaffold(root: Path) -> None:
     semantic.parent.mkdir(parents=True, exist_ok=True)
     semantic.write_text(
         "pub use crate::package::body_table_title::{"
-        "BodyTableTitleCommit as Commit, BodyTableTitleDiagnostics as Diagnostics, "
-        "BodyTableTitleEdit as Edit, BodyTableTitleError as Error, "
-        "BodyTableTitleLimitKind as LimitKind, BodyTableTitlePatch as Patch};\n"
+        "Commit as Commit, Diagnostics as Diagnostics, "
+        "Edit as Edit, Error as Error, "
+        "LimitKind as LimitKind, Patch as Patch};\n"
         "pub use litchi_iwa_common::table::title::Settings;\n",
         encoding="utf-8",
     )
@@ -6857,21 +6989,22 @@ def add_pages_table_title_canonical_scaffold(root: Path) -> None:
     lib_export.write_text(
         "pub mod table;\n"
         "pub use selector::BodyTableSelector;\n"
-        "pub use package::{BodyTableTitleCommit, BodyTableTitleDiagnostics, "
-        "BodyTableTitleEdit, BodyTableTitleError, BodyTableTitleLimitKind, "
-        "BodyTableTitlePatch};\n",
+        "pub use package::{Commit, Diagnostics, "
+        "Edit, Error, LimitKind, "
+        "Patch};\n",
         encoding="utf-8",
     )
     package_export.parent.mkdir(parents=True, exist_ok=True)
     package_export.write_text(
         "mod body_table_title;\n"
-        "pub use body_table_title::{BodyTableTitleCommit, BodyTableTitleDiagnostics, "
-        "BodyTableTitleEdit, BodyTableTitleError, BodyTableTitleLimitKind, "
-        "BodyTableTitlePatch};\n",
+        "pub use body_table_title::{Commit, Diagnostics, "
+        "Edit, Error, LimitKind, "
+        "Patch};\n",
         encoding="utf-8",
     )
     table_export.write_text("pub mod title;\n", encoding="utf-8")
     selector.write_text("pub enum BodyTableSelector<'a> { Name(&'a str) }\n", encoding="utf-8")
+    add_pages_transaction_family_scaffold(root, "body_table_title")
 
 
 def add_pages_table_name_owner_scaffold(root: Path) -> None:
@@ -6905,9 +7038,9 @@ def add_pages_table_headers_canonical_scaffold(root: Path) -> None:
     semantic.parent.mkdir(parents=True, exist_ok=True)
     semantic.write_text(
         "pub use crate::package::body_table_headers::{"
-        "BodyTableHeaderSettingsCommit as Commit, BodyTableHeaderSettingsDiagnostics as Diagnostics, "
-        "BodyTableHeaderSettingsEdit as Edit, BodyTableHeaderSettingsError as Error, "
-        "BodyTableHeaderSettingsLimitKind as LimitKind, BodyTableHeaderSettingsPatch as Patch};\n"
+        "Commit as Commit, Diagnostics as Diagnostics, "
+        "Edit as Edit, Error as Error, "
+        "LimitKind as LimitKind, Patch as Patch};\n"
         "pub use litchi_iwa_common::table::headers::{Count, Error, Settings};\n",
         encoding="utf-8",
     )
@@ -6934,21 +7067,22 @@ def add_pages_table_headers_canonical_scaffold(root: Path) -> None:
     lib_export.write_text(
         "pub mod table;\n"
         "pub use selector::BodyTableSelector;\n"
-        "pub use package::{BodyTableHeaderSettingsCommit, BodyTableHeaderSettingsDiagnostics, "
-        "BodyTableHeaderSettingsEdit, BodyTableHeaderSettingsError, BodyTableHeaderSettingsLimitKind, "
-        "BodyTableHeaderSettingsPatch};\n",
+        "pub use package::{Commit, Diagnostics, "
+        "Edit, Error, LimitKind, "
+        "Patch};\n",
         encoding="utf-8",
     )
     package_export.parent.mkdir(parents=True, exist_ok=True)
     package_export.write_text(
         "mod body_table_headers;\n"
-        "pub use body_table_headers::{BodyTableHeaderSettingsCommit, "
-        "BodyTableHeaderSettingsDiagnostics, BodyTableHeaderSettingsEdit, BodyTableHeaderSettingsError, "
-        "BodyTableHeaderSettingsLimitKind, BodyTableHeaderSettingsPatch};\n",
+        "pub use body_table_headers::{Commit, "
+        "Diagnostics, Edit, Error, "
+        "LimitKind, Patch};\n",
         encoding="utf-8",
     )
     table_export.write_text("pub mod headers;\n", encoding="utf-8")
     selector.write_text("pub struct BodyTableSelector;\n", encoding="utf-8")
+    add_pages_transaction_family_scaffold(root, "body_table_headers")
 
 
 def add_pages_table_dimension_canonical_scaffold(root: Path) -> None:
@@ -6956,9 +7090,9 @@ def add_pages_table_dimension_canonical_scaffold(root: Path) -> None:
     semantic.parent.mkdir(parents=True, exist_ok=True)
     semantic.write_text(
         "pub use crate::package::body_table_dimension::{"
-        "BodyTableDimensionCommit as Commit, BodyTableDimensionDiagnostics as Diagnostics, "
-        "BodyTableDimensionEdit as Edit, BodyTableDimensionError as Error, "
-        "BodyTableDimensionLimitKind as LimitKind, BodyTableDimensionPatch as Patch};\n"
+        "Commit as Commit, Diagnostics as Diagnostics, "
+        "Edit as Edit, Error as Error, "
+        "LimitKind as LimitKind, Patch as Patch};\n"
         "pub use litchi_iwa_common::table::dimension::{Dimension, Points, Size};\n",
         encoding="utf-8",
     )
@@ -6985,21 +7119,22 @@ def add_pages_table_dimension_canonical_scaffold(root: Path) -> None:
     lib_export.write_text(
         "pub mod table;\n"
         "pub use selector::BodyTableSelector;\n"
-        "pub use package::{BodyTableDimensionCommit, BodyTableDimensionDiagnostics, "
-        "BodyTableDimensionEdit, BodyTableDimensionError, BodyTableDimensionLimitKind, "
-        "BodyTableDimensionPatch};\n",
+        "pub use package::{Commit, Diagnostics, "
+        "Edit, Error, LimitKind, "
+        "Patch};\n",
         encoding="utf-8",
     )
     package_export.parent.mkdir(parents=True, exist_ok=True)
     package_export.write_text(
         "mod body_table_dimension;\n"
-        "pub use body_table_dimension::{BodyTableDimensionCommit, "
-        "BodyTableDimensionDiagnostics, BodyTableDimensionEdit, BodyTableDimensionError, "
-        "BodyTableDimensionLimitKind, BodyTableDimensionPatch};\n",
+        "pub use body_table_dimension::{Commit, "
+        "Diagnostics, Edit, Error, "
+        "LimitKind, Patch};\n",
         encoding="utf-8",
     )
     table_export.write_text("pub mod dimension;\n", encoding="utf-8")
     selector.write_text("pub struct BodyTableSelector;\n", encoding="utf-8")
+    add_pages_transaction_family_scaffold(root, "body_table_dimension")
 
 
 def add_pages_table_sort_canonical_scaffold(root: Path) -> None:
@@ -7008,9 +7143,9 @@ def add_pages_table_sort_canonical_scaffold(root: Path) -> None:
     semantic.write_text(
         "pub mod transaction {\n"
         "pub use crate::package::body_table_sort::{"
-        "BodyTableSortCommit as Commit, BodyTableSortDiagnostics as Diagnostics, "
-        "BodyTableSortEdit as Edit, BodyTableSortError as Error, "
-        "BodyTableSortLimitKind as LimitKind, BodyTableSortPatch as Patch};\n}\n"
+        "Commit as Commit, Diagnostics as Diagnostics, "
+        "Edit as Edit, Error as Error, "
+        "LimitKind as LimitKind, Patch as Patch};\n}\n"
         "pub use litchi_iwa_common::table::sort::{"
         + ", ".join(boundaries.PAGES_TABLE_SORT_SEMANTIC_TYPES)
         + "};\n",
@@ -7039,17 +7174,17 @@ def add_pages_table_sort_canonical_scaffold(root: Path) -> None:
     lib_export.write_text(
         "pub mod table;\n"
         "pub use selector::BodyTableSelector;\n"
-        "pub use package::{BodyTableSortCommit, BodyTableSortDiagnostics, "
-        "BodyTableSortEdit, BodyTableSortError, BodyTableSortLimitKind, "
-        "BodyTableSortPatch};\n",
+        "pub use package::{Commit, Diagnostics, "
+        "Edit, Error, LimitKind, "
+        "Patch};\n",
         encoding="utf-8",
     )
     package_export.parent.mkdir(parents=True, exist_ok=True)
     package_export.write_text(
         "mod body_table_sort;\n"
-        "pub use body_table_sort::{BodyTableSortCommit, BodyTableSortDiagnostics, "
-        "BodyTableSortEdit, BodyTableSortError, BodyTableSortLimitKind, "
-        "BodyTableSortPatch};\n",
+        "pub use body_table_sort::{Commit, Diagnostics, "
+        "Edit, Error, LimitKind, "
+        "Patch};\n",
         encoding="utf-8",
     )
     table_export.write_text("pub mod sort;\n", encoding="utf-8")
@@ -7085,6 +7220,7 @@ def add_pages_table_sort_canonical_scaffold(root: Path) -> None:
         boundaries.PAGES_TABLE_SORT_FUZZ_CORPUS,
     ):
         (root / corpus).mkdir(parents=True, exist_ok=True)
+    add_pages_transaction_family_scaffold(root, "body_table_sort")
 
 
 def add_pages_table_appearance_canonical_scaffold(
@@ -7101,13 +7237,13 @@ def add_pages_table_appearance_canonical_scaffold(
     semantic.write_text(
         "pub mod transaction {\n"
         "    pub use crate::package::body_table_appearance::{\n"
-        "        BodyTableAppearanceCommit as Commit,\n"
-        "        BodyTableAppearanceDiagnostics as Diagnostics,\n"
-        "        BodyTableAppearanceEdit as Edit,\n"
-        "        BodyTableAppearanceError as Error,\n"
-        "        BodyTableAppearanceLimitKind as LimitKind,\n"
-        "        BodyTableAppearancePatch as Patch,\n"
-        "        BodyTableAppearancePath as Path,\n"
+        "        Commit as Commit,\n"
+        "        Diagnostics as Diagnostics,\n"
+        "        Edit as Edit,\n"
+        "        Error as Error,\n"
+        "        LimitKind as LimitKind,\n"
+        "        Patch as Patch,\n"
+        "        Path as Path,\n"
         "    };\n"
         "}\n"
         "pub use litchi_iwa_common::table::appearance::{Appearance, Banding, "
@@ -7137,13 +7273,13 @@ def add_pages_table_appearance_canonical_scaffold(
         + marker_functions
         + "fn preserve_previews() { let deleted_previews = 0; let root_preview_deletions = (); }\n"
         + "impl Package {\n"
-        + "    pub fn body_table_appearance<'table>(&self, table: impl Into<BodyTableSelector<'table>>) -> Result<Appearance, BodyTableAppearanceError> { let _ = table; todo!() }\n"
-        + "    pub fn edit_body_table_appearance<'table>(&self, table: impl Into<BodyTableSelector<'table>>) -> Result<BodyTableAppearanceEdit, BodyTableAppearanceError> { let _ = table; todo!() }\n"
-        + "    pub fn apply_body_table_appearance(&self, patch: &BodyTableAppearancePatch) -> Result<BodyTableAppearanceCommit, BodyTableAppearanceError> { let _ = patch; todo!() }\n"
+        + "    pub fn body_table_appearance<'table>(&self, table: impl Into<BodyTableSelector<'table>>) -> Result<Appearance, Error> { let _ = table; todo!() }\n"
+        + "    pub fn edit_body_table_appearance<'table>(&self, table: impl Into<BodyTableSelector<'table>>) -> Result<Edit, Error> { let _ = table; todo!() }\n"
+        + "    pub fn apply_body_table_appearance(&self, patch: &Patch) -> Result<Commit, Error> { let _ = patch; todo!() }\n"
         + "}\n"
-        + "impl BodyTableAppearanceEdit {\n"
+        + "impl Edit {\n"
         + "    pub fn set(self, appearance: Appearance) -> Self { let _ = appearance; self }\n"
-        + "    pub fn commit(self) -> Result<BodyTableAppearanceCommit, BodyTableAppearanceError> { todo!() }\n"
+        + "    pub fn commit(self) -> Result<Commit, Error> { todo!() }\n"
         + "}\n",
         encoding="utf-8",
     )
@@ -7214,6 +7350,7 @@ def add_pages_table_appearance_canonical_scaffold(
             )
         for corpus in boundaries.PAGES_TABLE_APPEARANCE_FUZZ_CORPORA:
             (root / corpus).mkdir(parents=True, exist_ok=True)
+    add_pages_transaction_family_scaffold(root, "body_table_appearance")
 
 
 def add_pages_table_hidden_axes_canonical_scaffold(
@@ -7230,13 +7367,13 @@ def add_pages_table_hidden_axes_canonical_scaffold(
     semantic.write_text(
         "pub mod transaction {\n"
         "    pub use crate::package::body_table_hidden_axes::{\n"
-        "        BodyTableHiddenAxesCommit as Commit,\n"
-        "        BodyTableHiddenAxesDiagnostics as Diagnostics,\n"
-        "        BodyTableHiddenAxesEdit as Edit,\n"
-        "        BodyTableHiddenAxesError as Error,\n"
-        "        BodyTableHiddenAxesLimitKind as LimitKind,\n"
-        "        BodyTableHiddenAxesPatch as Patch,\n"
-        "        BodyTableHiddenAxesPath as Path,\n"
+        "        Commit as Commit,\n"
+        "        Diagnostics as Diagnostics,\n"
+        "        Edit as Edit,\n"
+        "        Error as Error,\n"
+        "        LimitKind as LimitKind,\n"
+        "        Patch as Patch,\n"
+        "        Path as Path,\n"
         "    };\n"
         "}\n"
         "pub use litchi_iwa_common::table::axis::{AxisIndex, Error, HiddenAxes, Result};\n",
@@ -7263,15 +7400,15 @@ def add_pages_table_hidden_axes_canonical_scaffold(
         "    let _ = (message_type, allow_legacy, UID_MAP_MESSAGE_TYPE);\n"
         "}\n"
         + "impl Package {\n"
-        "    pub fn body_table_hidden_axes<'table>(&self, selector: impl Into<BodyTableSelector<'table>>) -> Result<HiddenAxes, BodyTableHiddenAxesError> { let _ = selector; todo!() }\n"
-        "    pub fn edit_body_table_hidden_axes<'table>(&self, selector: impl Into<BodyTableSelector<'table>>) -> Result<BodyTableHiddenAxesEdit, BodyTableHiddenAxesError> { let _ = selector; todo!() }\n"
-        "    pub fn apply_body_table_hidden_axes(&self, patch: &BodyTableHiddenAxesPatch) -> Result<BodyTableHiddenAxesCommit, BodyTableHiddenAxesError> { let _ = patch; todo!() }\n"
+        "    pub fn body_table_hidden_axes<'table>(&self, selector: impl Into<BodyTableSelector<'table>>) -> Result<HiddenAxes, Error> { let _ = selector; todo!() }\n"
+        "    pub fn edit_body_table_hidden_axes<'table>(&self, selector: impl Into<BodyTableSelector<'table>>) -> Result<Edit, Error> { let _ = selector; todo!() }\n"
+        "    pub fn apply_body_table_hidden_axes(&self, patch: &Patch) -> Result<Commit, Error> { let _ = patch; todo!() }\n"
         "}\n"
-        "impl BodyTableHiddenAxesEdit {\n"
+        "impl Edit {\n"
         "    pub fn set(self, hidden: HiddenAxes) -> Self { let _ = hidden; self }\n"
         "    pub fn clear(self) -> Self { self }\n"
         "    pub fn reset(self) -> Self { self }\n"
-        "    pub fn commit(self) -> Result<BodyTableHiddenAxesCommit, BodyTableHiddenAxesError> { todo!() }\n"
+        "    pub fn commit(self) -> Result<Commit, Error> { todo!() }\n"
         "}\n",
         encoding="utf-8",
     )
@@ -7413,6 +7550,7 @@ def add_pages_table_hidden_axes_canonical_scaffold(
             )
         for corpus in boundaries.PAGES_TABLE_HIDDEN_AXES_FUZZ_CORPORA:
             (root / corpus).mkdir(parents=True, exist_ok=True)
+    add_pages_transaction_family_scaffold(root, "body_table_hidden_axes")
 
 
 def add_pages_table_hidden_axes_shared_helper_scaffold(root: Path) -> None:
@@ -7650,17 +7788,17 @@ def add_pages_header_footer_canonical_scaffold(root: Path) -> None:
     lib_export.write_text(
         "pub mod header_footer;\n"
         "pub use header_footer::HeaderFooterSelector;\n"
-        "pub use package::{HeaderFooterTextCommit, HeaderFooterTextDiagnostics, "
-        "HeaderFooterTextEdit, HeaderFooterTextError, HeaderFooterTextLimitKind, "
-        "HeaderFooterTextPatch};\n",
+        "pub use package::{Commit, Diagnostics, "
+        "Edit, Error, LimitKind, "
+        "Patch};\n",
         encoding="utf-8",
     )
     package_export.parent.mkdir(parents=True, exist_ok=True)
     package_export.write_text(
         "mod header_footer_text;\n"
-        "pub use header_footer_text::{HeaderFooterTextCommit, "
-        "HeaderFooterTextDiagnostics, HeaderFooterTextEdit, HeaderFooterTextError, "
-        "HeaderFooterTextLimitKind, HeaderFooterTextPatch};\n",
+        "pub use header_footer_text::{Commit, "
+        "Diagnostics, Edit, Error, "
+        "LimitKind, Patch};\n",
         encoding="utf-8",
     )
     semantic_export.write_text(
@@ -7670,6 +7808,7 @@ def add_pages_header_footer_canonical_scaffold(root: Path) -> None:
         "pub struct HeaderFooterSelector<'a> { section: &'a str }\n",
         encoding="utf-8",
     )
+    add_pages_transaction_family_scaffold(root, "header_footer_text")
 
 
 def add_pages_section_text_canonical_scaffold(root: Path) -> None:
@@ -7701,21 +7840,22 @@ def add_pages_section_text_canonical_scaffold(root: Path) -> None:
     lib_export.write_text(
         "pub mod selector;\n"
         "pub use selector::SectionSelector;\n"
-        "pub use package::{SectionTextCommit, SectionTextDiagnostics, SectionTextEdit, "
-        "SectionTextError, SectionTextLimitKind, SectionTextPatch};\n",
+        "pub use package::{Commit, Diagnostics, Edit, "
+        "Error, LimitKind, Patch};\n",
         encoding="utf-8",
     )
     package_export.parent.mkdir(parents=True, exist_ok=True)
     package_export.write_text(
         "mod section_text;\n"
-        "pub use section_text::{SectionTextCommit, SectionTextDiagnostics, SectionTextEdit, "
-        "SectionTextError, SectionTextLimitKind, SectionTextPatch};\n",
+        "pub use section_text::{Commit, Diagnostics, Edit, "
+        "Error, LimitKind, Patch};\n",
         encoding="utf-8",
     )
     selector_export.write_text(
         "pub enum SectionSelector { Index(usize), Name(String) }\n",
         encoding="utf-8",
     )
+    add_pages_transaction_family_scaffold(root, "section_text")
 
 
 def add_pages_footnote_lifecycle_canonical_scaffold(root: Path) -> None:
@@ -7726,9 +7866,9 @@ def add_pages_footnote_lifecycle_canonical_scaffold(root: Path) -> None:
         "pub enum Selector { At(Position), Index(usize) }\n"
         "pub struct Footnote { position: Position }\n"
         "pub use crate::package::body_footnote::{"
-        "BodyFootnoteCommit as Commit, BodyFootnoteDiagnostics as Diagnostics, "
-        "BodyFootnoteEdit as Edit, BodyFootnoteError as Error, "
-        "BodyFootnoteLimitKind as LimitKind, BodyFootnotePatch as Patch};\n",
+        "Commit as Commit, Diagnostics as Diagnostics, "
+        "Edit as Edit, Error as Error, "
+        "LimitKind as LimitKind, Patch as Patch};\n",
         encoding="utf-8",
     )
     owner = root / boundaries.PAGES_FOOTNOTE_LIFECYCLE_OWNER_SOURCE
@@ -7752,20 +7892,21 @@ def add_pages_footnote_lifecycle_canonical_scaffold(root: Path) -> None:
     lib_export.parent.mkdir(parents=True, exist_ok=True)
     lib_export.write_text(
         "pub mod footnote;\n"
-        "pub use package::{BodyFootnoteCommit, BodyFootnoteDiagnostics, "
-        "BodyFootnoteEdit, BodyFootnoteError, BodyFootnoteLimitKind, "
-        "BodyFootnotePatch};\n",
+        "pub use package::{Commit, Diagnostics, "
+        "Edit, Error, LimitKind, "
+        "Patch};\n",
         encoding="utf-8",
     )
     package_export.parent.mkdir(parents=True, exist_ok=True)
     package_export.write_text(
         "mod body_footnote;\n"
-        "pub use body_footnote::{BodyFootnoteCommit, BodyFootnoteDiagnostics, "
-        "BodyFootnoteEdit, BodyFootnoteError, BodyFootnoteLimitKind, "
-        "BodyFootnotePatch};\n",
+        "pub use body_footnote::{Commit, Diagnostics, "
+        "Edit, Error, LimitKind, "
+        "Patch};\n",
         encoding="utf-8",
     )
     footnote_export.write_text("pub mod body;\n", encoding="utf-8")
+    add_pages_transaction_family_scaffold(root, "body_footnote")
 
 
 def add_iwa_drawable_container_scaffold(
@@ -9847,9 +9988,10 @@ class BoundaryPolicyTests(unittest.TestCase):
             facade = root / boundaries.FACADE_SOURCE_ROOT / "lib.rs"
             facade.parent.mkdir(parents=True)
             source = Path("crates/litchi/src/lib.rs").read_text(encoding="utf-8")
+            self.assertIn("Error, LimitKind, OpenOptions, PackageError", source)
             source = source.replace(
-                "Body, Document, DocumentReadOptions",
-                "Body, Document, RemovedReadOptions",
+                "Error, LimitKind, OpenOptions, PackageError",
+                "Error, LimitKind, RemovedOptions, PackageError",
                 1,
             )
             facade.write_text(source, encoding="utf-8")
@@ -9859,7 +10001,7 @@ class BoundaryPolicyTests(unittest.TestCase):
             self.assertTrue(
                 any(
                     "pages semantic facade is missing exports" in violation
-                    and "DocumentReadOptions" in violation
+                    and "OpenOptions" in violation
                     for violation in violations
                 ),
                 violations,
@@ -9897,6 +10039,288 @@ class BoundaryPolicyTests(unittest.TestCase):
                     for violation in violations),
                 violations,
             )
+
+    def test_litchi_pages_semantic_facade_allows_reader_ingress_only(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            facade = root / boundaries.FACADE_SOURCE_ROOT / "lib.rs"
+            facade.parent.mkdir(parents=True)
+            original = Path("crates/litchi/src/lib.rs").read_text(encoding="utf-8")
+            self.assertIn("litchi_pages::Package::open(path)", original)
+            facade.write_text(original, encoding="utf-8")
+            self.assertEqual(
+                boundaries.audit_litchi_semantic_facade_source_topology(root), []
+            )
+
+            # A package return type or a retired W1 ingress name is rejected
+            # even though the delegating reader call is accepted.
+            source = original.replace(
+                "pub fn from_bytes(bytes: &[u8]) -> ReadResult<Document> {",
+                "pub fn from_bytes(bytes: &[u8]) -> ReadResult<litchi_pages::Package> {",
+                1,
+            ).replace(
+                "Error, LimitKind, OpenOptions, PackageError",
+                "Error, LimitKind, OpenOptions, PackageError, ReadError, PackageResult",
+                1,
+            )
+            self.assertNotEqual(source, original)
+            facade.write_text(source, encoding="utf-8")
+
+            violations = boundaries.audit_litchi_semantic_facade_source_topology(root)
+
+            for expected in ("`Package`", "`ReadError`", "`PackageResult`"):
+                self.assertTrue(
+                    any(
+                        "pages semantic facade exposes forbidden " + expected
+                        in violation
+                        for violation in violations
+                    ),
+                    violations,
+                )
+            self.assertFalse(
+                any("`PackageError`" in violation for violation in violations),
+                violations,
+            )
+
+    def _write_pages_transaction_families(self, root: Path) -> None:
+        for family in boundaries.PAGES_TRANSACTION_FAMILIES:
+            add_pages_transaction_family_scaffold(root, family[0])
+
+    def test_pages_transaction_families_accept_w1_layout_and_dispatch(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_pages_transaction_families(root)
+            self.assertEqual(
+                boundaries.audit_pages_transaction_family_source_topology(root), []
+            )
+        self.assertIn(
+            "+ audit_pages_transaction_family_source_topology()",
+            inspect.getsource(boundaries.main),
+        )
+        # Every legacy spelling of every family is banned.
+        self.assertIn("BodyTableLockState", boundaries.PAGES_TRANSACTION_RETIRED_NAMES)
+        self.assertIn("BodyTableSnapshot", boundaries.PAGES_TRANSACTION_RETIRED_NAMES)
+        self.assertIn("SectionTextEdit", boundaries.PAGES_TRANSACTION_RETIRED_NAMES)
+        self.assertIn("DocumentSourceLimits", boundaries.PAGES_TRANSACTION_RETIRED_NAMES)
+
+    def test_pages_transaction_families_reject_public_owner_and_missing_exports(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_pages_transaction_families(root)
+            package = root / boundaries.PAGES_PACKAGE_SOURCE
+            package.write_text(
+                package.read_text(encoding="utf-8")
+                .replace("pub(crate) mod section_text;", "pub mod section_text;", 1)
+                .replace("pub(crate) mod table_lock;", "mod table_lock;", 1),
+                encoding="utf-8",
+            )
+            section = root / boundaries.PAGES_SOURCE_ROOT / "section.rs"
+            section.write_text(
+                section.read_text(encoding="utf-8").replace(
+                    "pub use crate::package::section_name::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};",
+                    "pub use crate::package::section_name::{Commit, Diagnostics, Edit, Error, LimitKind};",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            chart = root / boundaries.PAGES_SOURCE_ROOT / "chart.rs"
+            chart.write_text(
+                chart.read_text(encoding="utf-8").replace(
+                    "pub mod data {", "pub(crate) mod data {", 1
+                ),
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_pages_transaction_family_source_topology(root)
+
+            for fragment in (
+                "section_text transaction family owner module must be declared "
+                "`pub(crate) mod section_text;` (found `pub mod`)",
+                "table_lock transaction family owner module must be declared "
+                "`pub(crate) mod table_lock;` (found `private mod`)",
+                "public module section::name is missing canonical export Patch",
+                "transaction module chart::data must be declared `pub mod`",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_pages_transaction_families_reject_retired_names_aliases_and_globs(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_pages_transaction_families(root)
+            lock = root / boundaries.PAGES_SOURCE_ROOT / "table" / "lock.rs"
+            lock.write_text(
+                lock.read_text(encoding="utf-8")
+                + "pub type BodyTableLockState = State;\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.PAGES_SOURCE_ROOT / "lib.rs"
+            lib.write_text(
+                lib.read_text(encoding="utf-8")
+                + "pub use crate::package::section_text::{Edit as SectionTextEdit};\n"
+                + "pub use crate::package::table_cells::*;\n"
+                + "pub use crate::table::catalog::Snapshot as BodyTableSnapshot;\n"
+                + "pub struct DocumentSourceLimits;\n"
+                + "#[cfg(test)]\npub struct ReadError;\n",
+                encoding="utf-8",
+            )
+            owner = root / boundaries.PAGES_SOURCE_ROOT / "package" / "body_chart_data.rs"
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                # A private alias inside another owner is implementation detail.
+                + "use super::body_chart_arrangement::Error as BodyChartArrangementError;\n"
+                + "pub fn leak(object_id: u64, source: &[u8]) {}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_pages_transaction_family_source_topology(root)
+
+            for fragment in (
+                "defines retired name BodyTableLockState: crates/litchi-pages/src/table/lock.rs",
+                "publicly re-exports retired name SectionTextEdit",
+                "owner section_text has alternate public alias SectionTextEdit for Edit",
+                "owner section_text has 2 public re-export paths",
+                "owner table_cells is glob re-exported",
+                "publicly re-exports retired name BodyTableSnapshot",
+                "defines retired name DocumentSourceLimits",
+                "body_chart_data transaction public API exposes raw identifier object_id",
+                "body_chart_data transaction public API exposes raw byte slice",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+            self.assertFalse(
+                any("ReadError" in item for item in violations), violations
+            )
+            self.assertFalse(
+                any("BodyChartArrangementError" in item for item in violations),
+                violations,
+            )
+
+    def test_pages_table_lock_rejects_retired_state_alias(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_lock_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_pages_table_lock_facade_source_topology(root), []
+            )
+            semantic = root / boundaries.PAGES_TABLE_LOCK_SEMANTIC_SOURCE
+            semantic.write_text(
+                semantic.read_text(encoding="utf-8")
+                + "pub type BodyTableLockState = State;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_pages_table_lock_facade_source_topology(root)
+            self.assertTrue(
+                any("defines retired name BodyTableLockState" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any(
+                    "alternate alias BodyTableLockState for State" in item
+                    for item in violations
+                ),
+                violations,
+            )
+
+    def test_pages_focused_facades_reject_public_owner_and_prefixed_exports(
+        self,
+    ) -> None:
+        cases = (
+            (
+                add_pages_header_footer_canonical_scaffold,
+                boundaries.audit_pages_header_footer_facade_source_topology,
+                "header_footer_text",
+                "HeaderFooterTextPatch",
+            ),
+            (
+                add_pages_section_text_canonical_scaffold,
+                boundaries.audit_pages_section_text_facade_source_topology,
+                "section_text",
+                "SectionTextEdit",
+            ),
+            (
+                add_pages_table_headers_canonical_scaffold,
+                boundaries.audit_pages_table_headers_facade_source_topology,
+                "body_table_headers",
+                "BodyTableHeaderSettings",
+            ),
+            (
+                add_pages_table_sort_canonical_scaffold,
+                boundaries.audit_pages_table_sort_facade_source_topology,
+                "body_table_sort",
+                "BodyTableSortPatch",
+            ),
+            (
+                add_pages_table_appearance_canonical_scaffold,
+                boundaries.audit_pages_table_appearance_facade_source_topology,
+                "body_table_appearance",
+                "BodyTableAppearanceEdit",
+            ),
+            (
+                add_pages_table_hidden_axes_canonical_scaffold,
+                boundaries.audit_pages_table_hidden_axes_facade_source_topology,
+                "body_table_hidden_axes",
+                "BodyTableHiddenAxesPath",
+            ),
+            (
+                add_pages_footnote_lifecycle_canonical_scaffold,
+                boundaries.audit_pages_footnote_lifecycle_facade_source_topology,
+                "body_footnote",
+                "BodyFootnoteCommit",
+            ),
+            (
+                add_pages_table_title_canonical_scaffold,
+                boundaries.audit_pages_table_title_facade_source_topology,
+                "body_table_title",
+                "BodyTableTitleError",
+            ),
+            (
+                add_pages_table_dimension_canonical_scaffold,
+                boundaries.audit_pages_table_dimension_facade_source_topology,
+                "body_table_dimension",
+                "BodyTableDimensionLimitKind",
+            ),
+        )
+        for scaffold, audit, owner, legacy in cases:
+            with self.subTest(owner=owner), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                scaffold(root)
+                package = root / boundaries.PAGES_PACKAGE_SOURCE
+                package.write_text(
+                    package.read_text(encoding="utf-8").replace(
+                        f"pub(crate) mod {owner};", f"pub mod {owner};", 1
+                    ),
+                    encoding="utf-8",
+                )
+                lib = root / boundaries.PAGES_SOURCE_ROOT / "lib.rs"
+                lib.write_text(
+                    lib.read_text(encoding="utf-8")
+                    + f"pub use package::{{{legacy}}};\n",
+                    encoding="utf-8",
+                )
+                violations = audit(root)
+                self.assertTrue(
+                    any(
+                        f"`pub(crate) mod {owner};` (found `pub mod`)" in item
+                        for item in violations
+                    ),
+                    violations,
+                )
+                self.assertTrue(
+                    any(
+                        f"publicly re-exports retired name {legacy}" in item
+                        for item in violations
+                    ),
+                    violations,
+                )
 
     def test_iwork_examples_reject_legacy_editor_and_native_id_calls(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -19613,7 +20037,7 @@ class BoundaryPolicyTests(unittest.TestCase):
             )
             export = root / boundaries.PAGES_DOCUMENT_PUBLIC_API_SOURCES[1]
             export.write_text(
-                "pub type DocumentReadOptions = litchi_iwa_core::RawObject;\n",
+                "pub type OpenOptions = litchi_iwa_core::RawObject;\n",
                 encoding="utf-8",
             )
 
@@ -31369,7 +31793,12 @@ fn rewrite_movie_title_operation(
                 violations,
             )
             self.assertTrue(
-                any("missing canonical package type BodyFootnotePatch" in item for item in violations),
+                any("missing canonical package type Patch" in item for item in violations),
+                violations,
+            )
+            # ADR 0034 W1: a reintroduced prefixed spelling is rejected.
+            self.assertTrue(
+                any("defines retired name BodyFootnoteEdit" in item for item in violations),
                 violations,
             )
             self.assertTrue(
@@ -31807,8 +32236,21 @@ fn rewrite_movie_title_operation(
                 Path("crates/litchi-pages/src/table/mod.rs"),
             ),
         )
+        # ADR 0034 W1: canonical short names; the prefixed spellings are
+        # retained only as legacy markers and are banned from the crate.
         self.assertEqual(
             boundaries.PAGES_TABLE_LOCK_CANONICAL_TYPES,
+            (
+                "Edit",
+                "Patch",
+                "Commit",
+                "Diagnostics",
+                "Error",
+                "LimitKind",
+            ),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_LOCK_LEGACY_CANONICAL_TYPES,
             (
                 "BodyTableLockEdit",
                 "BodyTableLockPatch",
@@ -31996,7 +32438,10 @@ fn rewrite_movie_title_operation(
                         [
                             "focused litchi-pages table-lock public API is missing "
                             f"canonical package table-lock type {missing}: "
-                            "crates/litchi-pages/src/package/table_lock.rs"
+                            "crates/litchi-pages/src/package/table_lock.rs",
+                            "focused litchi-pages table-lock public API owner is missing "
+                            f"canonical type {missing}: "
+                            "crates/litchi-pages/src/package/table_lock.rs",
                         ],
                     )
 
@@ -32227,9 +32672,11 @@ fn rewrite_movie_title_operation(
             boundaries.PAGES_TABLE_HEADERS_SEMANTIC_TYPES,
             ("Count", "Error", "Settings"),
         )
+        self.assertIn("Patch", boundaries.PAGES_TABLE_HEADERS_CANONICAL_TYPES)
+        self.assertIn("BodyTableHeaderSettingsPatch", boundaries.PAGES_TABLE_HEADERS_LEGACY_CANONICAL_TYPES)
         self.assertIn(
             "BodyTableHeaderSettingsPatch",
-            boundaries.PAGES_TABLE_HEADERS_CANONICAL_TYPES,
+            boundaries._pages_transaction_legacy_names("body_table_headers"),
         )
 
     def test_retired_iwa_pages_table_headers_surface_cannot_return(self) -> None:
@@ -33566,8 +34013,22 @@ fn rewrite_movie_title_operation(
                 "apply_body_table_hidden_axes",
             ),
         )
+        # ADR 0034 W1: canonical short names; the prefixed spellings are
+        # retained only as legacy markers and are banned from the crate.
         self.assertEqual(
             boundaries.PAGES_TABLE_HIDDEN_AXES_CANONICAL_TYPES,
+            (
+                "Edit",
+                "Patch",
+                "Commit",
+                "Diagnostics",
+                "Error",
+                "LimitKind",
+                "Path",
+            ),
+        )
+        self.assertEqual(
+            boundaries.PAGES_TABLE_HIDDEN_AXES_LEGACY_CANONICAL_TYPES,
             (
                 "BodyTableHiddenAxesEdit",
                 "BodyTableHiddenAxesPatch",
@@ -33916,15 +34377,15 @@ fn rewrite_movie_title_operation(
                 "pub fn edit_body_table_hidden_axes<'table>(&self, model_object_id: u64)",
             )
             source = source.replace(
-                "pub fn apply_body_table_hidden_axes(&self, patch: &BodyTableHiddenAxesPatch)",
                 "pub fn apply_body_table_hidden_axes(&self, patch: &Patch)",
+                "pub fn apply_body_table_hidden_axes(&self, patch: &HiddenAxesValue)",
             )
             source = source.replace("    pub fn clear(self)", "    pub fn clear_hidden_axes(self)")
             owner.write_text(source, encoding="utf-8")
             violations = boundaries.audit_pages_table_hidden_axes_facade_source_topology(root)
             self.assertTrue(any("body_table_hidden_axes must accept selector-first" in item for item in violations), violations)
             self.assertTrue(any("edit_body_table_hidden_axes must accept selector-first" in item for item in violations), violations)
-            self.assertTrue(any("apply method must accept BodyTableHiddenAxesPatch" in item for item in violations), violations)
+            self.assertTrue(any("apply method must accept Patch" in item for item in violations), violations)
             self.assertTrue(any("edit is missing clear" in item for item in violations), violations)
 
     def test_focused_pages_table_hidden_axes_rejects_numbers_uid_map_message(self) -> None:
@@ -34320,9 +34781,11 @@ fn rewrite_movie_title_operation(
             boundaries.PAGES_HEADER_FOOTER_SELECTOR_TYPES,
             ("HeaderFooterSelector",),
         )
+        self.assertIn("Patch", boundaries.PAGES_HEADER_FOOTER_CANONICAL_TYPES)
+        self.assertIn("HeaderFooterTextPatch", boundaries.PAGES_HEADER_FOOTER_LEGACY_CANONICAL_TYPES)
         self.assertIn(
             "HeaderFooterTextPatch",
-            boundaries.PAGES_HEADER_FOOTER_CANONICAL_TYPES,
+            boundaries._pages_transaction_legacy_names("header_footer_text"),
         )
 
     def test_focused_pages_header_footer_requires_canonical_types_and_methods(
@@ -34673,9 +35136,11 @@ fn rewrite_movie_title_operation(
             boundaries.PAGES_SECTION_TEXT_SEMANTIC_TYPES,
             ("SectionSelector",),
         )
+        self.assertIn("Patch", boundaries.PAGES_SECTION_TEXT_CANONICAL_TYPES)
+        self.assertIn("SectionTextPatch", boundaries.PAGES_SECTION_TEXT_LEGACY_CANONICAL_TYPES)
         self.assertIn(
             "SectionTextPatch",
-            boundaries.PAGES_SECTION_TEXT_CANONICAL_TYPES,
+            boundaries._pages_transaction_legacy_names("section_text"),
         )
 
     def test_focused_pages_section_text_requires_canonical_types_and_methods(self) -> None:
@@ -35053,7 +35518,12 @@ fn rewrite_movie_title_operation(
             boundaries.PAGES_TABLE_TITLE_SEMANTIC_TYPES,
             ("Settings",),
         )
-        self.assertIn("BodyTableTitlePatch", boundaries.PAGES_TABLE_TITLE_CANONICAL_TYPES)
+        self.assertIn("Patch", boundaries.PAGES_TABLE_TITLE_CANONICAL_TYPES)
+        self.assertIn("BodyTableTitlePatch", boundaries.PAGES_TABLE_TITLE_LEGACY_CANONICAL_TYPES)
+        self.assertIn(
+            "BodyTableTitlePatch",
+            boundaries._pages_transaction_legacy_names("body_table_title"),
+        )
 
     def test_retired_iwa_pages_table_title_surface_cannot_return(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -43397,7 +43867,7 @@ fn rewrite_movie_title_operation(
             pages_package = root / boundaries.PAGES_PACKAGE_SOURCE
             pages_package.write_text(
                 pages_package.read_text(encoding="utf-8").replace(
-                    "mod body_chart_arrangement;",
+                    "pub(crate) mod body_chart_arrangement;",
                     "pub mod body_chart_arrangement;",
                 ),
                 encoding="utf-8",
@@ -47697,6 +48167,34 @@ fn rewrite_movie_title_operation(
                 boundaries.audit_iwa_shared_image_adjustments_source_topology(root), []
             )
 
+    def test_iwa_shared_image_adjustments_pages_owner_uses_w1_module(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_shared_image_adjustments_scaffold(root)
+            package = root / boundaries.IWA_IMAGE_ADJUSTMENTS_OWNER_PACKAGE_SOURCES["Pages"]
+            package.write_text(
+                package.read_text(encoding="utf-8").replace(
+                    "pub(crate) mod image_adjustments;", "pub mod image_adjustments;", 1
+                ),
+                encoding="utf-8",
+            )
+            owner = root / boundaries.IWA_IMAGE_ADJUSTMENTS_OWNER_SOURCES["Pages"]
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub type BodyImageAdjustmentsError = Error;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_shared_image_adjustments_source_topology(root)
+            for fragment in (
+                "image-adjustments owner module is missing its default semantic declaration",
+                "`pub(crate) mod image_adjustments;` (found `pub mod`)",
+                "defines retired name BodyImageAdjustmentsError",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
     def test_iwa_shared_image_adjustments_boundary_rejects_resurrection_and_leaks(
         self,
     ) -> None:
@@ -48740,7 +49238,9 @@ fn rewrite_movie_title_operation(
                         self.assertTrue(any(expected in item for item in violations), violations)
 
                 if format_name == "Pages":
-                    before, after, expected = "limits: Limits,", "limits: (),", "limits ingress"
+                    # Match the signature whether rustfmt keeps it on one line
+                    # (``limits: Limits)``) or splits it (``limits: Limits,``).
+                    before, after, expected = "limits: Limits", "limits: ()", "limits ingress"
                     method_start = source.index("pub fn open_with_limits")
                 else:
                     before, after, expected = "options: OpenOptions,", "options: (),", "options ingress"
@@ -49942,32 +50442,32 @@ fn rewrite_movie_title_operation(
             "mod metadata;\n"
             "mod formula;\n"
             "mod text;\n"
-            "pub enum BodyTableDeletionError { InvalidSource }\n"
-            "pub enum BodyTableDeletionLimitKind { Work }\n"
-            "pub struct BodyTableDeletionPatch { removed: BodyTableSnapshot }\n"
-            "pub struct BodyTableDeletionDiagnostics { changed: bool }\n"
-            "pub struct BodyTableDeletionCommit { patch: BodyTableDeletionPatch }\n"
-            "impl BodyTableDeletionCommit {\n"
+            "pub enum Error { InvalidSource }\n"
+            "pub enum LimitKind { Work }\n"
+            "pub struct Patch { removed: Snapshot }\n"
+            "pub struct Diagnostics { changed: bool }\n"
+            "pub struct Commit { patch: Patch }\n"
+            "impl Commit {\n"
             "    pub fn package(&self) -> &Package { todo!() }\n"
             "    pub fn into_package(self) -> Package { todo!() }\n"
-            "    pub fn patch(&self) -> &BodyTableDeletionPatch { todo!() }\n"
-            "    pub fn diagnostics(&self) -> &BodyTableDeletionDiagnostics { todo!() }\n"
-            "    pub fn removed_table(&self) -> &BodyTableSnapshot { todo!() }\n"
+            "    pub fn patch(&self) -> &Patch { todo!() }\n"
+            "    pub fn diagnostics(&self) -> &Diagnostics { todo!() }\n"
+            "    pub fn removed_table(&self) -> &Snapshot { todo!() }\n"
             "}\n"
             "impl Package {\n"
             "    pub fn remove_body_table(\n"
             "        &self, selector: impl Into<BodyTableSelector<'_>>\n"
-            "    ) -> Result<BodyTableDeletionCommit, BodyTableDeletionError> {\n"
+            "    ) -> Result<Commit, Error> {\n"
             "        let selected = resolve_body_table(selector);\n"
-            "        let staged = BodyTableDeletionPatch { removed: BodyTableSnapshot };\n"
+            "        let staged = Patch { removed: Snapshot };\n"
             "        let candidate = reassemble(staged);\n"
             "        let reopened = reopen(candidate);\n"
             "        verify(reopened)\n"
             "    }\n"
             "    pub fn apply_body_table_deletion(\n"
-            "        &self, patch: &BodyTableDeletionPatch\n"
-            "    ) -> Result<BodyTableDeletionCommit, BodyTableDeletionError> {\n"
-            "        if !patch.authorizes_source() { return Err(BodyTableDeletionError::PatchConflict); }\n"
+            "        &self, patch: &Patch\n"
+            "    ) -> Result<Commit, Error> {\n"
+            "        if !patch.authorizes_source() { return Err(Error::PatchConflict); }\n"
             "        validate_patch(patch);\n"
             "        let candidate = reassemble(patch);\n"
             "        reopen(candidate)\n"
@@ -49976,8 +50476,8 @@ fn rewrite_movie_title_operation(
             "fn resolve_body_table(selector: BodyTableSelector<'_>) { let _ = selector; }\n"
             "fn reassemble(value: impl Sized) -> impl Sized { value }\n"
             "fn reopen(value: impl Sized) -> impl Sized { value }\n"
-            "fn verify(value: impl Sized) -> Result<BodyTableDeletionCommit, BodyTableDeletionError> { let _ = value; todo!() }\n"
-            "fn validate_patch(value: &BodyTableDeletionPatch) { let _ = value; }\n"
+            "fn verify(value: impl Sized) -> Result<Commit, Error> { let _ = value; todo!() }\n"
+            "fn validate_patch(value: &Patch) { let _ = value; }\n"
             "fn exact_source() { let _ = (PatchConflict, source_fingerprint, inverse); }\n"
             "fn bounded() { let _ = (Budget, Limits, limit, checked_add, checked_mul, try_reserve); }\n",
             encoding="utf-8",
@@ -50018,15 +50518,16 @@ fn rewrite_movie_title_operation(
         package.parent.mkdir(parents=True, exist_ok=True)
         package.write_text(
             "mod body_table_deletion;\n"
-            "pub use body_table_deletion::{BodyTableDeletionCommit, BodyTableDeletionDiagnostics, BodyTableDeletionError, BodyTableDeletionLimitKind, BodyTableDeletionPatch};\n",
+            "pub use body_table_deletion::{Commit, Diagnostics, Error, LimitKind, Patch};\n",
             encoding="utf-8",
         )
         library = root / boundaries.IWA_PAGES_BODY_TABLE_DELETION_LIBRARY_SOURCE
         library.parent.mkdir(parents=True, exist_ok=True)
         library.write_text(
-            "pub use package::{BodyTableDeletionCommit, BodyTableDeletionDiagnostics, BodyTableDeletionError, BodyTableDeletionLimitKind, BodyTableDeletionPatch};\n",
+            "pub use package::{Commit, Diagnostics, Error, LimitKind, Patch};\n",
             encoding="utf-8",
         )
+        add_pages_transaction_family_scaffold(root, "body_table_deletion")
 
     def _write_component_removal_codec_fixture(
         self, root: Path, *, dependency: bool = False
@@ -50144,7 +50645,7 @@ fn rewrite_movie_title_operation(
             owner = root / boundaries.IWA_PAGES_BODY_TABLE_DELETION_OWNER_SOURCE
             owner.write_text(
                 owner.read_text(encoding="utf-8")
-                + "impl BodyTableDeletionCommit { pub fn leaked(&self, object_id: u64, bytes: &[u8]) -> Result<Archive, BodyTableDeletionError> { todo!() } }\n",
+                + "impl Commit { pub fn leaked(&self, object_id: u64, bytes: &[u8]) -> Result<Archive, Error> { todo!() } }\n",
                 encoding="utf-8",
             )
             violations = boundaries.audit_pages_body_table_deletion_source_topology(root)
@@ -50155,11 +50656,11 @@ fn rewrite_movie_title_operation(
             owner.write_text(
                 owner.read_text(encoding="utf-8").replace(
                     "let selected = resolve_body_table(selector);\n"
-                    "        let staged = BodyTableDeletionPatch",
-                    "let staged = BodyTableDeletionPatch"
-                    " { removed: BodyTableSnapshot };\n"
+                    "        let staged = Patch",
+                    "let staged = Patch"
+                    " { removed: Snapshot };\n"
                     "        let selected = resolve_body_table(selector);\n"
-                    "        let staged_again = BodyTableDeletionPatch",
+                    "        let staged_again = Patch",
                     1,
                 ),
                 encoding="utf-8",
@@ -50174,6 +50675,36 @@ fn rewrite_movie_title_operation(
             violations = boundaries.audit_pages_body_table_deletion_source_topology(root)
             self.assertTrue(any("child module must remain private" in item for item in violations), violations)
 
+    def test_pages_body_table_deletion_rejects_prefixed_spellings_and_root_exports(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_pages_body_table_deletion_fixture(root)
+            owner = root / boundaries.IWA_PAGES_BODY_TABLE_DELETION_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub type BodyTableDeletionPatch = Patch;\n",
+                encoding="utf-8",
+            )
+            library = root / boundaries.IWA_PAGES_BODY_TABLE_DELETION_LIBRARY_SOURCE
+            library.write_text(
+                library.read_text(encoding="utf-8")
+                + "pub use crate::package::body_table_deletion::Commit;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_pages_body_table_deletion_source_topology(root)
+            self.assertTrue(
+                any("defines retired name BodyTableDeletionPatch" in item for item in violations),
+                violations,
+            )
+            violations = boundaries.audit_pages_transaction_family_source_topology(root)
+            self.assertTrue(
+                any(
+                    "owner body_table_deletion has 2 public re-export paths" in item
+                    for item in violations
+                ),
+                violations,
+            )
+
     def test_pages_body_table_deletion_requires_all_private_children_and_semantic_removed_table(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -50187,14 +50718,14 @@ fn rewrite_movie_title_operation(
             owner = root / boundaries.IWA_PAGES_BODY_TABLE_DELETION_OWNER_SOURCE
             owner.write_text(
                 owner.read_text(encoding="utf-8").replace(
-                    "pub fn removed_table(&self) -> &BodyTableSnapshot",
+                    "pub fn removed_table(&self) -> &Snapshot",
                     "pub fn removed_table(&self) -> Vec<u8>",
                     1,
                 ),
                 encoding="utf-8",
             )
             violations = boundaries.audit_pages_body_table_deletion_source_topology(root)
-            self.assertTrue(any("removed_table must return semantic BodyTableSnapshot" in item for item in violations), violations)
+            self.assertTrue(any("removed_table must return semantic table::catalog::Snapshot" in item for item in violations), violations)
             self.assertTrue(any("public method exposes raw bytes" in item for item in violations), violations)
 
     def test_component_removal_codec_boundaries_require_private_buffa_children_and_inventory(self) -> None:
@@ -50315,8 +50846,19 @@ fn rewrite_movie_title_operation(
     def _copy_table_merge_transaction_fixture(
         self, root: Path, spec: dict
     ) -> None:
-        for key in ("owner_path", "transaction_path", "package_path", "library_path"):
-            relative = spec[key]
+        relatives = [
+            spec[key]
+            for key in ("owner_path", "transaction_path", "package_path", "library_path")
+        ]
+        if spec.get("transaction_family_owner") is not None:
+            # ADR 0034 W1: the public ``table::merge::transaction`` chain.
+            relatives.extend(
+                (
+                    boundaries.PAGES_SOURCE_ROOT / "table" / "mod.rs",
+                    boundaries.PAGES_SOURCE_ROOT / "table" / "merge.rs",
+                )
+            )
+        for relative in relatives:
             source = boundaries.ROOT / relative
             self.assertTrue(source.is_file(), source)
             destination = root / relative
@@ -50333,16 +50875,39 @@ fn rewrite_movie_title_operation(
                     [],
                 )
 
+    def test_pages_table_merge_transaction_rejects_prefixed_root_exports(self) -> None:
+        spec = boundaries.IWA_TABLE_MERGE_TRANSACTION_SPECS[1]
+        self.assertEqual(spec["format_name"], "Pages")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._copy_table_merge_transaction_fixture(root, spec)
+            library = root / spec["library_path"]
+            library.write_text(
+                library.read_text(encoding="utf-8")
+                + "pub use crate::package::body_table_merges::{Edit as BodyTableMergesEdit};\n",
+                encoding="utf-8",
+            )
+            violations = boundaries._audit_table_merge_transaction_source_topology(
+                root, spec
+            )
+            self.assertTrue(
+                any(
+                    "publicly re-exports retired name BodyTableMergesEdit" in item
+                    for item in violations
+                ),
+                violations,
+            )
+
     def test_table_merge_transaction_boundaries_reject_public_native_surface(self) -> None:
         for spec in boundaries.IWA_TABLE_MERGE_TRANSACTION_SPECS:
             with self.subTest(format=spec["format_name"]), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 self._copy_table_merge_transaction_fixture(root, spec)
                 transaction = root / spec["transaction_path"]
-                prefix = spec["prefix"]
+                edit_type = spec.get("type_names", {}).get("Edit", f"{spec['prefix']}Edit")
                 transaction.write_text(
                     transaction.read_text(encoding="utf-8")
-                    + f"\nimpl {prefix}Edit<'_> {{\n"
+                    + f"\nimpl {edit_type}<'_> {{\n"
                     + "    pub fn leaked(&self, object_id: u64, bytes: &[u8]) "
                     + "-> Result<Archive, Error> { todo!() }\n"
                     + "}\n",

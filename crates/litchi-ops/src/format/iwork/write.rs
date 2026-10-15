@@ -7,7 +7,7 @@
 //! package becomes a new handle whose tree is built on its first read; an
 //! exact no-op returns the source handle.
 
-#[cfg(feature = "keynote")]
+#[cfg(any(feature = "keynote", feature = "pages"))]
 use litchi_core::Position;
 use litchi_core::selector::Path;
 
@@ -34,7 +34,7 @@ use crate::value::{Scalar, ValueType};
 )]
 pub(crate) enum LeafPatch {
     #[cfg(feature = "pages")]
-    PagesText(litchi_pages::SectionTextPatch),
+    Pages(super::pages::Patch),
     #[cfg(feature = "keynote")]
     KeynoteText(litchi_keynote::slide::text::Patch),
     #[cfg(feature = "keynote")]
@@ -57,7 +57,7 @@ impl LeafPatch {
     fn is_noop(&self) -> bool {
         match self {
             #[cfg(feature = "pages")]
-            Self::PagesText(patch) => patch.is_noop(),
+            Self::Pages(patch) => patch.is_noop(),
             #[cfg(feature = "keynote")]
             Self::KeynoteText(patch) => patch.is_noop(),
             #[cfg(feature = "keynote")]
@@ -236,7 +236,7 @@ pub(crate) fn resolve<'f, F: Flavor>(
 }
 
 /// Resolve one element by path.
-#[cfg(any(feature = "keynote", feature = "numbers"))]
+#[cfg(any(feature = "keynote", feature = "numbers", feature = "pages"))]
 pub(crate) fn node_at<'f, F: Flavor>(file: &'f Iwork, path: &PathArg<'_>) -> Result<Node<'f>> {
     file.checked_tree()?;
     crate::path::resolve::get(&Nav::<F>::new(file), path)
@@ -314,7 +314,7 @@ pub(crate) fn element_refusal(verb: &'static str, node: &Node<'_>) -> Error {
 /// The zero-based destination of a move among `count` siblings, for an
 /// element now at `from`; `anchor` resolves a `before`/`after` path to its
 /// sibling position.
-#[cfg(feature = "keynote")]
+#[cfg(any(feature = "keynote", feature = "pages"))]
 pub(crate) fn destination(
     from: usize,
     count: usize,
@@ -370,28 +370,35 @@ pub(crate) fn set<'p, 'v>(
     }
 }
 
-/// Add one element: no iWork leaf creates elements yet.
+/// Add one element (Pages paragraphs).
 pub(crate) fn add<'p, 'n>(
     file: &Iwork,
     parent: PathArg<'p>,
     node: NewNode<'n>,
     limits: &SemanticLimits,
 ) -> Result<(Commit, Path<'static>)> {
-    let _ = (parent, node, limits);
-    Err(refusal(
-        Code::UnsupportedCapability,
-        match file.format() {
-            litchi_core::FileFormat::Keynote => {
-                "adding Keynote slides or shapes needs leaf slide-add and shape APIs (IWORK_API_REQUESTS.md requests 8 and 9)"
-            },
-            litchi_core::FileFormat::Numbers => {
-                "adding Numbers sheets, tables, rows or columns needs leaf lifecycle APIs (IWORK_API_REQUESTS.md requests 4 to 6)"
-            },
-            _ => {
-                "adding Pages paragraphs or sections needs leaf paragraph and section APIs (IWORK_API_REQUESTS.md requests 11 and 12)"
-            },
+    match file.owner() {
+        #[cfg(feature = "pages")]
+        Owner::Pages(package) => super::pages::add(file, package, &parent, &node, limits),
+        #[allow(
+            unreachable_patterns,
+            reason = "the Pages leaf adds elements; Keynote and Numbers do not yet"
+        )]
+        _ => {
+            let _ = (parent, node, limits);
+            Err(refusal(
+                Code::UnsupportedCapability,
+                match file.format() {
+                    litchi_core::FileFormat::Keynote => {
+                        "adding Keynote slides or shapes needs leaf slide-add and shape APIs (IWORK_API_REQUESTS.md requests 8 and 9)"
+                    },
+                    _ => {
+                        "adding Numbers sheets, tables, rows or columns needs leaf lifecycle APIs (IWORK_API_REQUESTS.md requests 4 to 6)"
+                    },
+                },
+            ))
         },
-    ))
+    }
 }
 
 /// Remove every target.
@@ -401,24 +408,20 @@ pub(crate) fn remove<'p>(
     limits: &SemanticLimits,
 ) -> Result<Commit> {
     match file.owner() {
+        #[cfg(feature = "pages")]
+        Owner::Pages(package) => super::pages::remove(file, package, &target, limits),
         #[cfg(feature = "keynote")]
         Owner::Keynote(package) => super::keynote::remove(file, package, &target, limits),
         #[allow(
             unreachable_patterns,
-            reason = "only the Keynote leaf removes elements today"
+            reason = "the Pages and Keynote leaves remove elements; Numbers does not yet"
         )]
         _ => {
             let _ = (target, limits);
+            let _ = file;
             Err(refusal(
                 Code::UnsupportedCapability,
-                match file.format() {
-                    litchi_core::FileFormat::Numbers => {
-                        "removing Numbers sheets, tables, rows or columns needs leaf lifecycle APIs (IWORK_API_REQUESTS.md requests 4 to 6); clear a cell with `set` and a null value"
-                    },
-                    _ => {
-                        "removing Pages paragraphs or sections needs leaf paragraph and section APIs (IWORK_API_REQUESTS.md requests 11 and 12)"
-                    },
-                },
+                "removing Numbers sheets, tables, rows or columns needs leaf lifecycle APIs (IWORK_API_REQUESTS.md requests 4 to 6); clear a cell with `set` and a null value",
             ))
         },
     }
@@ -432,34 +435,46 @@ pub(crate) fn move_to<'p, 'q>(
     limits: &SemanticLimits,
 ) -> Result<Commit> {
     match file.owner() {
+        #[cfg(feature = "pages")]
+        Owner::Pages(package) => super::pages::move_to(file, package, &path, &placement, limits),
         #[cfg(feature = "keynote")]
         Owner::Keynote(package) => {
             super::keynote::move_to(file, package, &path, &placement, limits)
         },
         #[allow(
             unreachable_patterns,
-            reason = "only the Keynote leaf orders its elements in this foundation"
+            reason = "the Pages and Keynote leaves order elements; Numbers does not yet"
         )]
         _ => {
             let _ = (path, placement, limits);
             Err(refusal(
                 Code::UnsupportedCapability,
-                "moving elements of this iWork format is not wired yet (follow-up: records 0297-0299)",
+                "moving Numbers elements is not wired yet (follow-up: record 0297)",
             ))
         },
     }
 }
 
-/// Exchange two elements: not wired for any iWork format yet.
+/// Exchange two elements (Pages paragraphs).
 pub(crate) fn swap<'p, 'q>(
     file: &Iwork,
     left: PathArg<'p>,
     right: PathArg<'q>,
     limits: &SemanticLimits,
 ) -> Result<Commit> {
-    let _ = (file, left, right, limits);
-    Err(refusal(
-        Code::UnsupportedCapability,
-        "swapping iWork elements is not wired yet (follow-up: records 0297-0299)",
-    ))
+    match file.owner() {
+        #[cfg(feature = "pages")]
+        Owner::Pages(package) => super::pages::swap(file, package, &left, &right, limits),
+        #[allow(
+            unreachable_patterns,
+            reason = "the Pages leaf exchanges paragraphs; Keynote and Numbers do not yet"
+        )]
+        _ => {
+            let _ = (left, right, limits);
+            Err(refusal(
+                Code::UnsupportedCapability,
+                "swapping Keynote or Numbers elements is not wired yet (follow-up: records 0297-0298)",
+            ))
+        },
+    }
 }

@@ -277,7 +277,7 @@ impl Docx {
         let nodes = if let Some(path) = target.path() {
             vec![crate::path::resolve::get(&nav, path)?]
         } else if let Some(query) = target.query() {
-            let walk = crate::query::run(nav, query.clone())?;
+            let walk = crate::query::run(nav, query)?;
             // Query diagnostics are harmless for reads because an unknown
             // predicate simply evaluates as absent.  A mutation must refuse
             // them: otherwise a typo could silently widen or empty a write.

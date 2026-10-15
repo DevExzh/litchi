@@ -319,7 +319,7 @@ fn admit_targets(
         matched = true;
         append_node(&mut targets, &mut seen, node, per_target_charge, limits)?;
     } else if let Some(query) = target.query() {
-        let walk = crate::query::run(nav, query.clone())?;
+        let walk = crate::query::run(nav, query)?;
         // A mutation must reject an unsupported predicate. Treating it as an
         // absent property could silently widen a cell write.
         if !walk.plan().diagnostics().is_empty() {

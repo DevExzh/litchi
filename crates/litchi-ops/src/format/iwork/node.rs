@@ -102,6 +102,7 @@ impl<'f> Project<'f> for Node<'f> {
     }
 
     fn child_count(&self, _: &ViewOptions) -> Result<Option<u32>> {
+        self.file.expand(self.index);
         Ok(Some(
             u32::try_from(self.item().children().len()).unwrap_or(u32::MAX),
         ))

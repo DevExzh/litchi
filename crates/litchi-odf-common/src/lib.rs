@@ -18,6 +18,7 @@ pub mod detect;
 pub mod drawing;
 pub mod embedded;
 mod error;
+pub mod flat;
 pub mod leniency;
 pub mod limits;
 pub mod media;

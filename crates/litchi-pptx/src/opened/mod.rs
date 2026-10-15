@@ -80,7 +80,8 @@ pub(crate) use properties::stage_shape_properties;
 pub(crate) use removal_proof::normalize_shape_removal_pair;
 pub(crate) use remove_plan::apply_patch as apply_removal_patch;
 pub(crate) use remove_plan::{
-    validate_insertion_owner, validate_removal_presentation_owner, validate_removal_slide_surface,
+    NON_POSITIONAL_EXTENSIONS, removal_layout_edge, validate_insertion_owner,
+    validate_removal_presentation_owner, validate_removal_slide_surface,
 };
 pub(crate) use slide_properties::{
     normalize_slide_properties, slide_properties_skeleton, stage_slide_properties,

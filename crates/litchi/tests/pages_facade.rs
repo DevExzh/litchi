@@ -7,11 +7,20 @@ use litchi::pages::document_settings::{
     Commit, Diagnostics, Edit, Error, LimitKind, Patch, Settings,
 };
 use litchi::pages::{
-    Package, PageLayoutCommit, PageLayoutDiagnostics, PageLayoutEdit, PageLayoutError,
-    PageLayoutLimitKind, PageLayoutPatch, SectionSelector, SectionTextCommit,
-    SectionTextDiagnostics, SectionTextEdit, SectionTextError, SectionTextLimitKind,
-    SectionTextPatch, TextPosition, TextSpan,
+    Package, SectionSelector, TextPosition, TextSpan,
+    page_layout::transaction::Commit as PageLayoutCommit,
+    page_layout::transaction::Diagnostics as PageLayoutDiagnostics,
+    page_layout::transaction::Edit as PageLayoutEdit,
+    page_layout::transaction::Error as PageLayoutError,
+    page_layout::transaction::LimitKind as PageLayoutLimitKind,
+    page_layout::transaction::Patch as PageLayoutPatch,
     page_layout::{Layout, Orientation},
+    section::text::Commit as SectionTextCommit,
+    section::text::Diagnostics as SectionTextDiagnostics,
+    section::text::Edit as SectionTextEdit,
+    section::text::Error as SectionTextError,
+    section::text::LimitKind as SectionTextLimitKind,
+    section::text::Patch as SectionTextPatch,
     section::{PageNumber, PageNumbering, Start},
 };
 
@@ -314,7 +323,7 @@ fn page_layout_transaction_reaches_pages_facade() -> Result<(), Box<dyn std::err
     assert_eq!(edit.layout(), before);
     edit.set_layout(after)?;
     let edit_debug = format!("{edit:?}");
-    assert!(edit_debug.contains("PageLayoutEdit"));
+    assert!(edit_debug.starts_with("Edit"));
     assert!(!edit_debug.contains("Index/"));
     assert!(!edit_debug.contains(".iwa"));
     assert!(!edit_debug.contains("identifier"));
@@ -330,7 +339,7 @@ fn page_layout_transaction_reaches_pages_facade() -> Result<(), Box<dyn std::err
     assert_ne!(package_bytes(changed.package())?, source);
 
     let patch_debug = format!("{:?}", changed.patch());
-    assert!(patch_debug.contains("PageLayoutPatch"));
+    assert!(patch_debug.starts_with("Patch"));
     assert!(!patch_debug.contains("Index/"));
     assert!(!patch_debug.contains(".iwa"));
     assert!(!patch_debug.contains("identifier"));

@@ -370,8 +370,12 @@ fn create_save_and_flat_refusals() {
         "libreoffice-core/sd/qa/unit/data/draw-image-link.fodp",
     ))
     .unwrap();
+    // Record 0292: a flat presentation edits its packaged projection and
+    // republishes the edit into its flat bytes (`flat_odf_unified.rs`).
+    // This producer file's empty master-page name passes the flat reader
+    // but not the packaged projection, so its edits are a typed refusal.
     let capabilities = flat.capabilities();
-    assert!(!capabilities.verb(Verb::Set).is_supported());
+    assert!(capabilities.verb(Verb::Set).is_supported());
     assert!(capabilities.verb(Verb::Get).is_supported());
     let error = flat.set("/slide[1]", props! { "name" => "x" }).unwrap_err();
     assert_eq!(error.code(), Code::UnsupportedCapability);

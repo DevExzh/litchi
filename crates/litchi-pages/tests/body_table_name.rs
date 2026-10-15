@@ -9,6 +9,7 @@
 use std::collections::BTreeMap;
 use std::error::Error as StdError;
 
+use litchi_iwa_archive::Limits as PackageLimits;
 use litchi_iwa_archive::{
     Limits,
     package::{Catalog, EntryEdit},
@@ -17,8 +18,8 @@ use litchi_iwa_common::{decode_varint_from_bytes, wire::WireView};
 use litchi_iwa_core::{Archive, FieldInfo, FieldPath, RawMessage, SnappyStream};
 use litchi_iwa_protos::tsp;
 use litchi_pages::{
-    BodyTableName, BodyTableNameError as Error, BodyTableNameValueError, BodyTableSelector,
-    Limits as PackageLimits, Package,
+    BodyTableSelector, Package, table::name::Error as BodyTableNameValueError,
+    table::name::Name as BodyTableName, table::name::transaction::Error,
 };
 use prost::Message as _;
 
@@ -545,7 +546,10 @@ fn empty_utf8_and_bounded_name_semantics_are_explicit() -> TestResult {
         1024 * 1024,
         1024 * 1024,
     )?;
-    let package = Package::from_bytes_with_limits(&source, limits)?;
+    let package = Package::from_bytes_with_options(
+        &source,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    )?;
     let before = package.exact_bytes();
     let error = package
         .edit_body_table_name(0usize)?
@@ -791,12 +795,12 @@ fn public_name_transaction_values_are_send_sync_debug_and_redacted() -> TestResu
 
     assert_send_sync_debug::<Package>();
     assert_send_sync_debug::<BodyTableName>();
-    assert_send_sync_debug::<litchi_pages::BodyTableNameEdit<'static>>();
-    assert_send_sync_debug::<litchi_pages::BodyTableNamePatch>();
-    assert_send_sync_debug::<litchi_pages::BodyTableNameCommit>();
-    assert_send_sync_debug::<litchi_pages::BodyTableNameDiagnostics>();
+    assert_send_sync_debug::<litchi_pages::table::name::transaction::Edit<'static>>();
+    assert_send_sync_debug::<litchi_pages::table::name::transaction::Patch>();
+    assert_send_sync_debug::<litchi_pages::table::name::transaction::Commit>();
+    assert_send_sync_debug::<litchi_pages::table::name::transaction::Diagnostics>();
     assert_send_sync_debug::<Error>();
-    assert_send_sync_debug::<litchi_pages::BodyTableNameLimitKind>();
+    assert_send_sync_debug::<litchi_pages::table::name::transaction::LimitKind>();
     let package = Package::from_bytes(&source_package(["Revenue", "Costs"])?)?;
     let edit = package.edit_body_table_name(0usize)?;
     let debug = format!("{edit:?}");

@@ -390,7 +390,7 @@ fn exit_statuses_follow_the_code_families() {
     let text = dir.path().join("plain.txt");
     std::fs::write(&text, "hello").expect("write");
     expect(5, ["get", arg(&text)]);
-    expect(5, ["create", arg(&dir.path().join("x.pages"))]);
+    expect(5, ["create", arg(&dir.path().join("x.numbers"))]);
     // 6: I/O.
     expect(6, ["get", arg(&dir.path().join("missing.docx"))]);
     expect(6, ["create", arg(&copy)]);
@@ -1003,8 +1003,22 @@ fn iwork_writes_save_in_place() {
     let query = expect(0, ["query", arg(&numbers), "cell", "--json"]).json();
     assert!(query.to_string().contains("CLI cell"), "{query}");
 
-    // Creation is a typed gap until the leaves can build a package.
-    let run = expect(5, ["create", arg(&dir.path().join("blank.pages"))]);
+    // Pages creates its minimal document (record 0299); Numbers creation is
+    // a typed gap until its leaf can build a package.
+    let blank = dir.path().join("blank.pages");
+    expect(0, ["create", arg(&blank)]);
+    expect(
+        0,
+        [
+            "set",
+            arg(&blank),
+            "/body/p[1]",
+            "--prop",
+            "text=Created by the CLI",
+        ],
+    );
+    assert_eq!(text_of(&blank, "/body/p[1]"), "Created by the CLI");
+    let run = expect(5, ["create", arg(&dir.path().join("blank.numbers"))]);
     assert!(
         run.stderr.contains("unsupported_capability"),
         "{}",

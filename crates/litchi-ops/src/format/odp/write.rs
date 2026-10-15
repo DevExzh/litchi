@@ -331,7 +331,9 @@ pub(crate) fn commit_changes(
 ) -> Result<WriteCommit> {
     let package = file.package()?;
     check_snapshot(package, limits)?;
-    let mut edit = package.edit().map_err(odf_error)?;
+    let mut edit = package
+        .edit()
+        .map_err(|error| file.flat_refusal(odf_error(error)))?;
     edit.splice_scene(changes).map_err(leaf_error)?;
     finish(file, edit, changes.len(), limits)
 }
@@ -350,7 +352,9 @@ fn finish(
     operations: usize,
     limits: &SemanticLimits,
 ) -> Result<WriteCommit> {
-    let commit = edit.commit().map_err(odf_error)?;
+    let commit = edit
+        .commit()
+        .map_err(|error| file.flat_refusal(odf_error(error)))?;
     let changed = commit.diagnostics().changed();
     let (package, patch) = commit.into_parts();
     let before_bytes = file.package()?.as_bytes().len();
@@ -851,7 +855,7 @@ pub(crate) fn resolve_nodes<'f>(
         Ok(())
     };
     if let Some(query) = target.query() {
-        let walk = crate::query::run(nav, query.clone())?;
+        let walk = crate::query::run(nav, query)?;
         if !walk.plan().diagnostics().is_empty() {
             return Err(Error::new(
                 Code::InvalidSelector,

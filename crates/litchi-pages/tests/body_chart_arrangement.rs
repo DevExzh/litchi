@@ -9,12 +9,14 @@
 
 use std::error::Error as StdError;
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
 use litchi_iwa_common::wire::{WireView, append_length_delimited_field, append_varint_field};
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tp, tsa, tsch, tsd, tsp, tswp};
 use litchi_pages::{
-    BodyChartArrangementError, BodyChartSelector, ChartArrangement, Limits, Package,
+    BodyChartSelector, ChartArrangement, Package,
+    chart::arrangement::Error as BodyChartArrangementError,
 };
 use prost::Message as _;
 
@@ -802,7 +804,13 @@ fn bounded_ingress_refuses_resource_exhaustion_before_chart_edit() -> TestResult
     let source = synthetic_package(FixtureOptions::default())?;
     let archive_limits = litchi_iwa_core::Limits::default().with_objects(1)?;
     let limits = Limits::default().with_archive_limits(archive_limits)?;
-    assert!(Package::from_bytes_with_limits(&source, limits).is_err());
+    assert!(
+        Package::from_bytes_with_options(
+            &source,
+            litchi_pages::OpenOptions::new().__archive_limits(limits)
+        )
+        .is_err()
+    );
     // The limit operation is read-only; reopening under normal limits still
     // yields the exact fixture and the chart remains editable.
     let package = Package::from_bytes(&source)?;
