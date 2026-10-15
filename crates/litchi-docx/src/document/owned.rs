@@ -14,11 +14,13 @@ mod fields;
 mod graph;
 mod numbering;
 mod picture;
+mod smartart;
 mod substitute;
 pub use chart::{NewChart, chart_workbook};
 pub use comments::NewComment;
 pub use graph::HyperlinkTarget;
 pub use picture::NewPicture;
+pub use smartart::NewSmartArt;
 pub(crate) use substitute::story_parts_of;
 
 /// An isolated main-document edit retaining its complete source package.

@@ -2266,6 +2266,8 @@ string.
 | `litchi_xlsx::WorksheetEdit::set_rich_text` | adopted (0295) |
 | `litchi_odt::body::{TextField, text_fields}` (`TextField::{name, range, attribute, text}`), `litchi_odt::transaction::Edit::set_field_text` | adopted (0295): ODT field refresh |
 | `litchi_odp::scene::Change::SetFieldText` | adopted (0295): ODP field refresh |
+| `litchi_docx::document::NewSmartArt` (`new`, `with_size`, `with_name`, `with_description`, `size`), `Edit::insert_smartart_at` | adopted (0295): DOCX SmartArt insertion |
+| DOCX `smartart` element (`/smartart[N]`, `/body/smartart[N]`; `layout`, `layoutId`, `nodeCount`, `text`; add-only `name`, `alt`, `width`, `height`) | adopted (0295) |
 | `litchi_xlsb` cell-value formula caches changing type (`set_formula_*_cache` across the four `BrtFmla*` families) | behaviour (0295): XLSB cache write-back |
 
 See [0295](unified-ops/0295-m4-engines-on-more-formats.md).

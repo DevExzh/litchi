@@ -140,6 +140,10 @@ impl Docx {
                 super::chart::placement_run(placement)?;
                 self.add_chart(editor, parent, node, None)
             },
+            (NewKind::SmartArt, Kind::Paragraph) => {
+                super::chart::placement_run(placement)?;
+                self.add_smartart(editor, parent, node)
+            },
             (NewKind::Comment, Kind::Paragraph | Kind::Run) => {
                 // A paragraph parent comments the whole paragraph; a run
                 // parent comments that direct run.

@@ -3,7 +3,7 @@
 //!
 //! | Parent | Children |
 //! |---|---|
-//! | `/` | `body` (its blocks are read when it is entered) |
+//! | `/` | `body` (its blocks are read when it is entered), the comments part, then the SmartArt graphics (record 0295) |
 //! | `body`, a cell, a content control | paragraphs, tables, content controls, display equations and (in the body) section breaks, in visible order; `w:customXml` wrappers flattened; `w:altChunk` anchors and unknown children skipped |
 //! | a table | rows |
 //! | a row | cells |
@@ -40,6 +40,13 @@ enum Source {
     Root,
     /// The root's comments part, when the document has one.
     CommentsRoot,
+    /// The root's SmartArt graphics, read when the first is needed
+    /// (record 0295).
+    SmartArtRoot,
+    SmartArts {
+        diagrams: vec::IntoIter<litchi_docx::smartart::Diagram>,
+        next: u32,
+    },
     /// The comments of the comments part.
     Comments {
         comments: vec::IntoIter<litchi_docx::comment::Comment>,
@@ -114,6 +121,7 @@ impl<'f> Children<'f> {
         let source = match &parent.value {
             Value::Document if kinds.contains(Kind::Body) => Source::Root,
             Value::Document if kinds.contains(Kind::Comments) => Source::CommentsRoot,
+            Value::Document if kinds.contains(Kind::SmartArt) => Source::SmartArtRoot,
             Value::Comments if kinds.contains(Kind::Comment) => Source::Comments {
                 comments: nav::comments(parent.docx)?.into_iter(),
                 next: 0,
@@ -182,7 +190,7 @@ impl<'f> Children<'f> {
                     )));
                 },
                 Source::CommentsRoot => {
-                    self.source = Source::Done;
+                    self.source = Source::SmartArtRoot;
                     if !self.kinds.contains(Kind::Comments) {
                         continue;
                     }
@@ -195,9 +203,35 @@ impl<'f> Children<'f> {
                                 self.address.with(Step::new(Kind::Comments, 0)),
                             )));
                         },
-                        Ok(false) => return None,
+                        Ok(false) => continue,
                         Err(error) => return Some(Err(error)),
                     }
+                },
+                Source::SmartArtRoot => {
+                    if !self.kinds.contains(Kind::SmartArt) {
+                        self.source = Source::Done;
+                        continue;
+                    }
+                    match super::smartart::document_smartarts(self.docx) {
+                        Ok(diagrams) => {
+                            self.source = Source::SmartArts {
+                                diagrams: diagrams.into_iter(),
+                                next: 0,
+                            };
+                        },
+                        Err(error) => {
+                            self.source = Source::Done;
+                            return Some(Err(error));
+                        },
+                    }
+                },
+                Source::SmartArts { diagrams, next } => {
+                    let diagram = diagrams.next()?;
+                    let ordinal = *next;
+                    *next += 1;
+                    return Some(Ok(super::smartart::smartart_node(
+                        self.docx, ordinal, diagram,
+                    )));
                 },
                 Source::Comments { comments, next } => {
                     let comment = comments.next()?;

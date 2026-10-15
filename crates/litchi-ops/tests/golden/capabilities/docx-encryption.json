@@ -137,6 +137,10 @@
         {
           "element": "comments",
           "pathSegment": "comments"
+        },
+        {
+          "element": "smartart",
+          "pathSegment": "smartart"
         }
       ],
       "properties": {
@@ -3491,6 +3495,84 @@
         "code": "unsupported_capability",
         "followUp": "R4x",
         "reason": "tab characters are read as run content, not addressed yet"
+      }
+    },
+    {
+      "format": "docx",
+      "element": "smartart",
+      "parent": "document",
+      "elementAliases": [
+        "diagram"
+      ],
+      "operations": {
+        "add": true,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/smartart[N]",
+          "/body/smartart[N]"
+        ]
+      },
+      "properties": {
+        "layout": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "layoutId": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "nodeCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "alt": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "width": {
+          "type": "length",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "height": {
+          "type": "length",
+          "add": true,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     }
   ],

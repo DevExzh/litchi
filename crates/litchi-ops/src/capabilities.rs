@@ -2944,7 +2944,7 @@ impl Element {
         let add = add
             || (self.adapter == Adapter::Docx
                 && self.retains_source != Some(false)
-                && matches!(self.data().canonical, "picture" | "chart")
+                && matches!(self.data().canonical, "picture" | "chart" | "smartart")
                 && readable);
         #[cfg(feature = "xlsb")]
         let add = add

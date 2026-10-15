@@ -634,8 +634,7 @@ impl Summary {
     /// A summary of `fields` without bookmarks or missing page numbers.
     #[cfg_attr(
         not(any(
-            feature = "xlsb",
-            feature = "xls",
+            all(feature = "eval", any(feature = "xlsb", feature = "xls")),
             feature = "doc",
             feature = "odt",
             feature = "odp"

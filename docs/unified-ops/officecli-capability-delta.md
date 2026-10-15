@@ -21,8 +21,8 @@ differs from the hash recorded below.
 
 | Input | File | SHA-256 |
 |---|---|---|
-| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `86e968845c303bf78b2f2f7ad0cecf24a277cb1ab77f87721fb2b86958bd89bd` |
-| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `8b7d0fb6364c01a35f8e4ca4aa2b4d59214bb3be1144ae3c32804ff8211f1028` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `fd582737d9fa05601f8c67fcb2836f038bc155abab1b56279d1adf998f8682b6` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `c664233c0915a9a7a82eaef5158fd814f49abb056ae4347107ed90a3ca269331` |
 | golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `50f8da9165f985c1e7c72a12aeb12e57c77ea6c93b68da89b56d2f85986d4e08` |
 | golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `7f0bb0d83ab8d8ab1f6951aebfb8d1b26516d7c5a1bb201e346bac315faa7d69` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `728daa474cf4f13235a7d82ad19802d4a051195be4bdc6b73dc462cabea8b957` |
@@ -81,7 +81,7 @@ Elements:
 
 | Format | supported | gap | folded | pending | missing | out of scope | litchi-only |
 |---|---|---|---|---|---|---|---|
-| docx | 14 | 21 | 0 | 0 | 9 | 2 | 5 |
+| docx | 15 | 21 | 0 | 0 | 8 | 2 | 5 |
 | doc | 15 | 11 | 0 | 0 | 18 | 2 | 1 |
 | rtf | 22 | 8 | 0 | 0 | 14 | 2 | 1 |
 | xlsx | 11 | 27 | 0 | 0 | 1 | 2 | 1 |
@@ -107,7 +107,7 @@ Property reads:
 
 | Format | supported | gap | element gap | pending | write-only | raw-only | missing | litchi-only |
 |---|---|---|---|---|---|---|---|---|
-| docx | 174 | 3 | 283 | 0 | 155 | 2 | 344 | 118 |
+| docx | 176 | 3 | 283 | 0 | 153 | 2 | 344 | 122 |
 | doc | 39 | 0 | 231 | 0 | 205 | 1 | 485 | 38 |
 | rtf | 68 | 0 | 143 | 0 | 203 | 1 | 546 | 34 |
 | xlsx | 135 | 16 | 328 | 0 | 69 | 1 | 142 | 152 |
@@ -133,7 +133,7 @@ Property writes:
 
 | Format | supported | partial | gap | pending | litchi-only | — |
 |---|---|---|---|---|---|---|
-| docx | 129 | 30 | 637 | 0 | 102 | 181 |
+| docx | 133 | 30 | 633 | 0 | 104 | 183 |
 | doc | 1 | 13 | 782 | 0 | 21 | 182 |
 | rtf | 12 | 15 | 769 | 0 | 22 | 177 |
 | xlsx | 54 | 42 | 448 | 0 | 156 | 143 |
@@ -169,7 +169,7 @@ Property writes:
 | chart-series |  | missing |  |
 | chart | chart | supported |  |
 | comment | comment | supported |  |
-| diagram |  | missing |  |
+| diagram | smartart | supported |  |
 | document | document | supported |  |
 | endnote | endnote | gap | L-DOCX-R5 |
 | equation | equation | supported |  |
@@ -489,16 +489,20 @@ Property writes:
 | comment | `initials` | string | asg | a-g | supported | partial |  |
 | comment | `author` | string | asg | a-g | supported | partial |  |
 | comment | `text` | string | asg | a-g | supported | partial |  |
-| diagram | `mermaid` | string | a-- |  | write-only | gap |  |
+| diagram | `mermaid` | string | a-- | a-g | supported | supported |  |
 | diagram | `src` | string | a-- |  | write-only | gap |  |
-| diagram | `width` | length | a-- |  | write-only | gap |  |
-| diagram | `height` | length | a-- |  | write-only | gap |  |
+| diagram | `width` | length | a-- | a-- | write-only | supported |  |
+| diagram | `height` | length | a-- | a-- | write-only | supported |  |
 | diagram | `render` | string | a-- |  | write-only | gap |  |
 | diagram | `poster` | boolean | a-- |  | write-only | gap |  |
 | diagram | `theme` | string | a-- |  | write-only | gap |  |
-| diagram | `layout` | string | a-- |  | write-only | gap |  |
+| diagram | `layout` | string | a-- | a-g | supported | supported |  |
 | diagram | `look` | string | a-- |  | write-only | gap |  |
 | diagram | `background` | string | a-- |  | write-only | gap |  |
+| diagram | `layoutId` | string |  | --g | litchi-only | — |  |
+| diagram | `nodeCount` | int |  | --g | litchi-only | — |  |
+| diagram | `name` | string |  | a-- | litchi-only | litchi-only |  |
+| diagram | `alt` | string |  | a-- | litchi-only | litchi-only |  |
 | document | `author` | string | -sg | --g | supported | gap |  |
 | document | `title` | string | -sg | --g | supported | gap |  |
 | document | `keywords` | string | -sg | --g | supported | gap |  |
