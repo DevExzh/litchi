@@ -371,11 +371,17 @@ impl<'f> Navigate<'f> for Nav<'f> {
 impl<'f> Inspect<'f> for Nav<'f> {
     const SPEC: &'static FormatSpec<Kind> = &SPEC;
     const TOP: &'static [Kind] = &[Kind::Slide];
+    const PLACEHOLDER_SHAPES: bool = true;
 
     fn kind(&self, node: &Node<'f>) -> Kind {
-        // As in PPTX, a placeholder is a shape to selectors; `placeholder`
-        // addresses one by path only.
+        // As in PPTX, a placeholder is a shape to selectors: `shape` matches
+        // it, and a bare `placeholder` selects the shapes with a
+        // presentation class (record 0290 F1).
         node.element()
+    }
+
+    fn is_placeholder(&self, node: &Node<'f>) -> bool {
+        node.semantic_kind() == Kind::Placeholder
     }
 
     fn type_name(&self, node: &Node<'f>) -> &'static str {

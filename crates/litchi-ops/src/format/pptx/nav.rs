@@ -901,9 +901,14 @@ fn available_unfenced<'f>(nav: Nav<'f>, parent: &Node<'f>, out: &mut Available) 
 impl<'f> Inspect<'f> for Nav<'f> {
     const SPEC: &'static FormatSpec<Kind> = &SPEC;
     const TOP: &'static [Kind] = &[Kind::Slide, Kind::SlideMaster, Kind::SlideLayout];
+    const PLACEHOLDER_SHAPES: bool = true;
 
     fn kind(&self, node: &Node<'f>) -> Kind {
         node.element()
+    }
+
+    fn is_placeholder(&self, node: &Node<'f>) -> bool {
+        node.is_placeholder()
     }
 
     fn type_name(&self, node: &Node<'f>) -> &'static str {

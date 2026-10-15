@@ -548,6 +548,11 @@ impl<'q, 'f, N: Inspect<'f>> Compiler<'q, 'f, N> {
             return Ok((bit_of(kind), None, Some(refine)));
         }
         if let Some(canonical) = vocabulary.canonical(name) {
+            if N::PLACEHOLDER_SHAPES && canonical == "placeholder" {
+                // Placeholders are walked as shapes (record 0290 F1).
+                let shape = self.model("shape")?;
+                return Ok((bit_of(shape), Some(Structural::Placeholder), None));
+            }
             return Ok((bit_of(self.model(canonical)?), None, None));
         }
         if let Some(other) = vocabulary::elsewhere(vocabulary, name) {

@@ -1136,6 +1136,7 @@ where
                 None => false,
             },
             Structural::Number(number) => self.nav.number(candidate.node) == Some(number),
+            Structural::Placeholder => self.nav.is_placeholder(candidate.node),
             Structural::Column(column) => self
                 .nav
                 .cell_at(candidate.node)

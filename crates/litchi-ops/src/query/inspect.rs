@@ -104,6 +104,21 @@ pub(crate) trait Inspect<'f>: Navigate<'f> {
         None
     }
 
+    /// Whether the format walks presentation placeholders as `shape` nodes
+    /// (PPTX `p:sp` with a `p:ph` binding, ODP shapes with a
+    /// `presentation:class`). A bare `placeholder` selector then compiles to
+    /// `shape` with the [`Inspect::is_placeholder`] test, so it matches the
+    /// same nodes `shape` does, at their `/shape[N]` addresses. A format
+    /// that walks placeholders as their own kind (PPT) keeps `false`.
+    const PLACEHOLDER_SHAPES: bool = false;
+
+    /// Whether `node` is a presentation placeholder, for formats with
+    /// [`Inspect::PLACEHOLDER_SHAPES`].
+    fn is_placeholder(&self, node: &Self::Node) -> bool {
+        let _ = node;
+        false
+    }
+
     /// The A1 coordinate of a cell node, for the column (`B`) and range
     /// (`A1:C5`) element filters of workbook selectors.
     fn cell(&self, node: &Self::Node) -> Option<CellRef> {
@@ -194,9 +209,14 @@ pub(crate) trait Inspect<'f>: Navigate<'f> {
 impl<'f, N: Inspect<'f>> Inspect<'f> for &N {
     const SPEC: &'static FormatSpec<Self::Kind> = N::SPEC;
     const TOP: &'static [Self::Kind] = N::TOP;
+    const PLACEHOLDER_SHAPES: bool = N::PLACEHOLDER_SHAPES;
 
     fn kind(&self, node: &Self::Node) -> Self::Kind {
         (**self).kind(node)
+    }
+
+    fn is_placeholder(&self, node: &Self::Node) -> bool {
+        (**self).is_placeholder(node)
     }
 
     fn type_name(&self, node: &Self::Node) -> &'static str {
