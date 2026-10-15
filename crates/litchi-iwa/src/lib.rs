@@ -245,6 +245,10 @@ pub enum Error {
     #[error(transparent)]
     IwaCommon(#[from] litchi_iwa_common::Error),
 
+    /// Chart data rejected by [`charts::ChartData::new`].
+    #[error(transparent)]
+    ChartData(#[from] litchi_iwa_common::chart::DataError),
+
     #[error(transparent)]
     PagesSemantic(#[from] litchi_pages::Error),
 

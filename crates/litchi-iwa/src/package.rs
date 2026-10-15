@@ -80,6 +80,7 @@ fn clone_error(error: &Error) -> Error {
         },
         Error::IwaCore(error) => Error::IwaCore(error.clone()),
         Error::IwaCommon(error) => Error::IwaCommon(error.clone()),
+        Error::ChartData(error) => Error::ChartData(*error),
         Error::PagesSemantic(error) => Error::PagesSemantic(error.clone()),
         Error::NumbersTableMerges(error) => Error::NumbersTableMerges(*error),
         Error::PagesTableMerges(error) => Error::PagesTableMerges(*error),
