@@ -18,8 +18,8 @@ use litchi_iwa_protos::{
     keynote_media_lifecycle_codec as lifecycle_codec, kn, tsa, tsd, tsp, tswp,
 };
 use litchi_keynote::{
-    MediaPart, MovieSelector, Package, ReadOptions, SemanticLimits, SlideMediaLifecycleError,
-    SlideMediaLifecycleLimitKind, SlideSelector,
+    MediaPart, MovieSelector, OpenOptions, Package, SlideMediaLifecycleError,
+    SlideMediaLifecycleLimitKind, SlideSelector, SourceLimits,
 };
 use prost::Message as _;
 
@@ -1922,17 +1922,15 @@ fn explicit_tiny_media_byte_ceiling_rejects_lifecycle_reads_atomically() -> Test
     let source = exact_bytes(replacement.package())?;
     let total = physical_uncompressed_total(&source)?;
     let defaults = Limits::default();
-    let tight = Limits::new(
-        defaults.max_input_bytes(),
-        defaults.max_entries(),
-        defaults.max_entry_bytes(),
-        total,
-        defaults.max_iwa_stream_bytes(),
-    )?;
-    let package = Package::from_bytes_with_options(
-        &source,
-        ReadOptions::new(tight, SemanticLimits::default()),
-    )?;
+    let tight = SourceLimits::builder()
+        .max_input_bytes(defaults.max_input_bytes())?
+        .max_entries(defaults.max_entries())?
+        .max_entry_bytes(defaults.max_entry_bytes())?
+        .max_aggregate_bytes(total)?
+        .max_component_bytes(defaults.max_iwa_stream_bytes())?
+        .build()?;
+    let package =
+        Package::from_bytes_with_options(&source, OpenOptions::new().source_limits(tight))?;
     let before = exact_bytes(&package)?;
     let error = package
         .remove_slide_media(SlideSelector::index(0), MovieSelector::index(2))

@@ -6,7 +6,7 @@ use litchi_iwa_common::wire::{append_length_delimited_field, append_varint_field
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsd, tsk, tsp};
 use litchi_keynote::slide::media::{MediaLoopMode, MediaPlaybackSettings, MediaVolume};
-use litchi_keynote::{MovieSelector, Package, SlideSelector};
+use litchi_keynote::{MovieSelector, Package, SlideSelector, SourceLimits};
 use prost::Message as _;
 
 const DOCUMENT_MEMBER: &str = "Index/Document.iwa";
@@ -704,17 +704,17 @@ fn missing_metadata_and_ingress_limits_are_atomic() -> TestResult<()> {
     assert_eq!(exact_bytes(restored.package())?, no_metadata);
 
     let defaults = Limits::default();
-    let tight = Limits::new(
-        u64::try_from(source.len().saturating_sub(1))?,
-        defaults.max_entries(),
-        defaults.max_entry_bytes(),
-        defaults.max_total_bytes(),
-        defaults.max_iwa_stream_bytes(),
-    )?;
+    let tight = SourceLimits::builder()
+        .max_input_bytes(u64::try_from(source.len().saturating_sub(1))?)?
+        .max_entries(defaults.max_entries())?
+        .max_entry_bytes(defaults.max_entry_bytes())?
+        .max_aggregate_bytes(defaults.max_total_bytes())?
+        .max_component_bytes(defaults.max_iwa_stream_bytes())?
+        .build()?;
     assert!(
         Package::from_bytes_with_options(
             &source,
-            litchi_keynote::ReadOptions::new(tight, litchi_keynote::SemanticLimits::default()),
+            litchi_keynote::OpenOptions::new().source_limits(tight),
         )
         .is_err()
     );

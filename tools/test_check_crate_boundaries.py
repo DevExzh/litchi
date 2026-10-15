@@ -25356,7 +25356,7 @@ fn rewrite_movie_title_operation(
                 package.read_text(encoding="utf-8")
                 + "#[cfg(feature = \"internal-iwork-source\")]\n"
                 + "#[doc(hidden)]\n"
-                + "pub fn __from_shared_source_with_options(source: Arc<[u8]>, options: ReadOptions) -> Result<Self, Error> { let _ = (source, options); todo!() }\n",
+                + "pub fn __from_shared_source_with_options(source: Arc<[u8]>, options: OpenOptions) -> Result<Self, Error> { let _ = (source, options); todo!() }\n",
                 encoding="utf-8",
             )
             shared_wrapper_source = package.read_text(encoding="utf-8")
@@ -25370,7 +25370,7 @@ fn rewrite_movie_title_operation(
                 "fn focused_handoff(package: &IWorkPackage) {\n"
                 "    let source = package.exact_source_owner().expect(\"source\");\n"
                 "    let focused = litchi_keynote::Package::__from_shared_source_with_options(\n"
-                "        Arc::clone(&source), ReadOptions::default());\n"
+                "        Arc::clone(&source), OpenOptions::default());\n"
                 "    let _ = focused.__slide_table_appearances(slide_index);\n"
                 "}\n",
                 encoding="utf-8",
@@ -25437,14 +25437,14 @@ fn rewrite_movie_title_operation(
                 package.read_text(encoding="utf-8")
                 + "#[cfg(feature = \"internal-iwork-source\")]\n"
                 + "#[doc(hidden)]\n"
-                + "pub fn __from_shared_source_with_options(source: Arc<[u8]>, options: ReadOptions) -> Result<Self, Error> { let _ = (source, options); todo!() }\n",
+                + "pub fn __from_shared_source_with_options(source: Arc<[u8]>, options: OpenOptions) -> Result<Self, Error> { let _ = (source, options); todo!() }\n",
                 encoding="utf-8",
             )
             host.write_text(
                 "fn focused_handoff(package: &IWorkPackage) {\n"
                 "    let source = package.exact_source_owner().expect(\"source\");\n"
                 "    let focused = litchi_keynote::Package::__from_shared_source_with_options(\n"
-                "        Arc::clone(&source), ReadOptions::default());\n"
+                "        Arc::clone(&source), OpenOptions::default());\n"
                 "    let _copy = litchi_keynote::Package::from_bytes(source);\n"
                 "    let _ = focused.__slide_table_appearances(slide_index);\n"
                 "}\n"
@@ -48719,7 +48719,7 @@ fn rewrite_movie_title_operation(
                     before, after, expected = "limits: Limits,", "limits: (),", "limits ingress"
                     method_start = source.index("pub fn open_with_limits")
                 else:
-                    before, after, expected = "options: ReadOptions,", "options: (),", "options ingress"
+                    before, after, expected = "options: OpenOptions,", "options: (),", "options ingress"
                     method_start = source.index("pub fn open_with_options")
                 parameter_start = source.index(before, method_start)
                 mutated = source[:parameter_start] + source[parameter_start:].replace(before, after, 1)

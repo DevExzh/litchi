@@ -173,7 +173,7 @@ fn verify_package(path: &Path, expected: Application) -> Result<(), Box<dyn Erro
                 specialized_stats.slide_count
             );
             assert_eq!(
-                specialized.semantic_snapshot()?.slides().len(),
+                specialized.presentation()?.slides().len(),
                 specialized_stats.slide_count
             );
             assert!(!specialized.text()?.is_empty());

@@ -6519,7 +6519,7 @@ KEYNOTE_SLIDE_TABLE_APPEARANCE_SHARED_SOURCE_SEAM_DECLARATION = re.compile(
 KEYNOTE_SLIDE_TABLE_APPEARANCE_SHARED_SOURCE_SEAM_SIGNATURE = re.compile(
     rf"(?ms)\bpub\s+fn\s+{re.escape(KEYNOTE_SLIDE_TABLE_APPEARANCE_SHARED_SOURCE_SEAM)}"
     r"\s*\([^{{}};]*\bArc\s*<\s*\[\s*u8\s*\]\s*>"
-    r"[^{{}};]*\bReadOptions\b"
+    r"[^{{}};]*\bOpenOptions\b"
 )
 KEYNOTE_SLIDE_TABLE_APPEARANCE_EXACT_SOURCE_OWNER = re.compile(
     r"\bexact_source_owner\s*\("
@@ -18813,21 +18813,20 @@ SEMANTIC_FACADE_REQUIRED_EXPORTS = {
             "TextSpan",
         }
     ),
+    # ADR 0034 W1 (record 0298): the deck projection is `Presentation`, its
+    # reader errors live in `presentation`, and the ingress envelope is the
+    # crate `OpenOptions` with checked source and semantic limits.
     "keynote": frozenset(
         {
             "Build",
-            "Document",
-            "DocumentIoKind",
-            "DocumentReadError",
-            "DocumentReadLimitKind",
-            "DocumentReadOptions",
-            "DocumentSemanticLimitKind",
-            "DocumentSemanticLimits",
-            "DocumentSemanticLimitsError",
-            "DocumentSourceLimitKind",
-            "DocumentSourceLimits",
-            "DocumentSourceLimitsError",
-            "DocumentStats",
+            "LimitKind",
+            "OpenOptions",
+            "Presentation",
+            "SemanticLimitKind",
+            "SemanticLimits",
+            "SourceLimitKind",
+            "SourceLimits",
+            "presentation",
             "Error",
             "Mode",
             "Position",
@@ -48364,7 +48363,7 @@ def audit_iwa_keynote_slide_table_appearance_source_topology(
         ):
             violations.append(
                 "focused litchi-keynote exact-source handoff seam must accept "
-                "Arc<[u8]> and ReadOptions: "
+                "Arc<[u8]> and OpenOptions: "
                 f"{KEYNOTE_SLIDE_TABLE_APPEARANCE_SHARED_SOURCE}"
             )
         if not batch_call_present:
@@ -69885,6 +69884,7 @@ FOCUSED_TABLE_MERGE_READER_ALLOWED_METHODS = frozenset(
         "body_table_merges",
         "slide_table_merges",
         "read_options",
+        "options",
         "__from_shared_catalog",
     }
 )
@@ -72278,7 +72278,7 @@ def _audit_focused_table_merge_reader_source_topology(
                 f"Region values: {relative_reader}:{line_number}"
                 )
 
-        if name not in {query_method, "read_options"} and re.search(
+        if name not in {query_method, "read_options", "options"} and re.search(
             r"\bResult[ \t]*<[ \t]*Self\b", return_type
         ) is None:
             violations.append(
@@ -72313,8 +72313,8 @@ def audit_keynote_table_merge_reader_source_topology(root: Path = ROOT) -> list[
         reader_path=KEYNOTE_TABLE_MERGE_READER_SOURCE,
         query_method="slide_table_merges",
         selector_types=KEYNOTE_TABLE_MERGE_SELECTOR_TYPES,
-        limits_type="ReadOptions",
-        options_type="ReadOptions",
+        limits_type="OpenOptions",
+        options_type="OpenOptions",
     )
 
 

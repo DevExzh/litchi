@@ -5,8 +5,9 @@ The concrete iWork crates intentionally have a physical ``Package`` API.  A
 whole-crate dependency scan would therefore reject the package boundary (for
 example its caller-selected archive limits) and would also classify semantic
 names such as ``identifier`` as native IDs.  This gate starts at each crate's
-public ``document`` module (or crate-root re-exports when that implementation
-module is private), follows the semantic types reachable from that module,
+public semantic projection module -- ``document`` for Numbers and Pages,
+``presentation`` for Keynote (ADR 0034 deck noun, record 0298) -- or at the
+crate-root re-exports when that implementation module is private, follows the semantic types reachable from that module,
 and checks the resulting rustdoc surface instead.
 
 Rustdoc JSON is used rather than source text so resolved aliases, re-exports,
@@ -39,6 +40,16 @@ LEAF_PACKAGES = (
 
 
 LEAF_CRATE_NAMES = {package: package.replace("-", "_") for package in LEAF_PACKAGES}
+
+
+# The read-only semantic projection module of each leaf crate (ADR 0034 §1:
+# `Document` for word processing, `Presentation` for decks).
+SEMANTIC_MODULES = {"litchi_keynote": "presentation"}
+
+
+def semantic_module(crate_name: str) -> str:
+    """Return the public semantic projection module name of one leaf crate."""
+    return SEMANTIC_MODULES.get(crate_name, "document")
 
 
 DEFAULT_JSON = {
@@ -386,8 +397,8 @@ def _semantic_path_violation(
 def _document_ids(
     index: Mapping[str, Any], paths: Mapping[str, Any], crate_name: str
 ) -> tuple[set[str], str | None]:
-    """Return the public document module and its root re-export targets."""
-    module_path = (crate_name, "document")
+    """Return the public semantic module and its root re-export targets."""
+    module_path = (crate_name, semantic_module(crate_name))
     roots = {
         item_id
         for item_id, entry in paths.items()
@@ -432,7 +443,7 @@ def _document_ids(
             roots.add(item_id)
 
     if not roots:
-        return set(), f"missing public module `{crate_name}::document`"
+        return set(), f"missing public module `{crate_name}::{semantic_module(crate_name)}`"
     return roots, None
 
 

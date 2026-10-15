@@ -17,9 +17,9 @@ use litchi_iwa_common::wire::{WireView, append_length_delimited_field, append_va
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsd, tsk, tsp, tst, tswp};
 use litchi_keynote::{
-    Package, ReadOptions, SemanticLimits, SlideSelector, SlideTableName, SlideTableNameCommit,
+    OpenOptions, Package, SemanticLimits, SlideSelector, SlideTableName, SlideTableNameCommit,
     SlideTableNameDiagnostics, SlideTableNameEdit, SlideTableNameError, SlideTableNameLimitKind,
-    SlideTableNamePatch, SlideTableNamePath, SlideTableNameValueError, TableSelector,
+    SlideTableNamePatch, SlideTableNamePath, SlideTableNameValueError, SourceLimits, TableSelector,
 };
 use prost::Message as _;
 
@@ -1502,29 +1502,26 @@ fn name_value_validation_accepts_unicode_and_rejects_invalid_values() -> TestRes
 #[test]
 fn finite_limits_refuse_before_publication_and_preserve_source() -> TestResult {
     let source = synthetic_package(false, false)?;
-    let input_limit = Limits::new(
-        u64::try_from(source.len().saturating_sub(1))?,
-        128,
-        4 * 1024 * 1024,
-        8 * 1024 * 1024,
-        8 * 1024 * 1024,
-    )?;
-    assert!(Package::from_bytes_with_limits(&source, input_limit).is_err());
+    let input_limit = SourceLimits::builder()
+        .max_input_bytes(u64::try_from(source.len().saturating_sub(1))?)?
+        .max_entries(128)?
+        .max_entry_bytes(4 * 1024 * 1024)?
+        .max_aggregate_bytes(8 * 1024 * 1024)?
+        .max_component_bytes(8 * 1024 * 1024)?
+        .build()?;
+    assert!(
+        Package::from_bytes_with_options(&source, OpenOptions::new().source_limits(input_limit))
+            .is_err()
+    );
 
     let mut found_semantic_limit = false;
     for references in 1..=128 {
-        let semantic = SemanticLimits::new(
-            1_000_000,
-            65_536,
-            references,
-            1_000_000,
-            1_000_000,
-            64 * 1024 * 1024,
-        )?;
-        let Ok(restricted) = Package::from_bytes_with_options(
-            &source,
-            ReadOptions::new(Limits::default(), semantic),
-        ) else {
+        let semantic = SemanticLimits::builder()
+            .max_references(references)?
+            .build()?;
+        let Ok(restricted) =
+            Package::from_bytes_with_options(&source, OpenOptions::new().semantic_limits(semantic))
+        else {
             continue;
         };
         let before = exact_bytes(&restricted)?;
@@ -1546,11 +1543,13 @@ fn finite_limits_refuse_before_publication_and_preserve_source() -> TestResult {
 
     let exact_fields = (1..=4_096)
         .find_map(|fields| {
-            let archive = litchi_iwa_core::Limits::default()
-                .with_header_fields(fields)
+            let limits = SourceLimits::builder()
+                .max_header_fields(fields)
+                .and_then(|limits| limits.build())
                 .ok()?;
-            let limits = Limits::default().with_archive_limits(archive).ok()?;
-            let package = Package::from_bytes_with_limits(&source, limits).ok()?;
+            let package =
+                Package::from_bytes_with_options(&source, OpenOptions::new().source_limits(limits))
+                    .ok()?;
             package
                 .slide_table_name("Tables", 0usize)
                 .is_ok()
@@ -1558,9 +1557,12 @@ fn finite_limits_refuse_before_publication_and_preserve_source() -> TestResult {
         })
         .ok_or_else(|| io::Error::other("no finite header-field boundary found"))?;
     assert!(exact_fields > 1);
-    let archive = litchi_iwa_core::Limits::default().with_header_fields(exact_fields - 1)?;
-    let limits = Limits::default().with_archive_limits(archive)?;
-    if let Ok(package) = Package::from_bytes_with_limits(&source, limits) {
+    let limits = SourceLimits::builder()
+        .max_header_fields(exact_fields - 1)?
+        .build()?;
+    if let Ok(package) =
+        Package::from_bytes_with_options(&source, OpenOptions::new().source_limits(limits))
+    {
         let before = exact_bytes(&package)?;
         assert!(matches!(
             package.slide_table_name("Tables", 0usize),

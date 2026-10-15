@@ -25,8 +25,7 @@ use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, 
 use litchi_iwa_protos::{kn, tsa, tsce, tsd, tsk, tsp, tss, tst, tswp};
 use litchi_keynote::slide::table::headers::{Count, Settings};
 use litchi_keynote::{
-    MAX_OBJECTS, MAX_SLIDES, MAX_TEXT_BYTES, MAX_TEXT_FRAGMENTS, MAX_TEXT_STORAGES, Package,
-    ReadOptions, SemanticLimits, SlideSelector, SlideTableHeaderCommit,
+    OpenOptions, Package, SemanticLimits, SlideSelector, SlideTableHeaderCommit,
     SlideTableHeaderDiagnostics, SlideTableHeaderEdit, SlideTableHeaderError,
     SlideTableHeaderLimitKind, SlideTableHeaderPatch, SlideTableHeaderPath, TableSelector,
 };
@@ -1486,15 +1485,10 @@ fn finite_resource_limits_reject_before_publication() -> TestResult {
     // one over the configured budget.  Every rejected attempt must leave the
     // immutable source exact.
     for references in 1..=64 {
-        let semantic = SemanticLimits::new(
-            MAX_OBJECTS,
-            MAX_SLIDES,
-            references,
-            MAX_TEXT_STORAGES,
-            MAX_TEXT_FRAGMENTS,
-            MAX_TEXT_BYTES,
-        )?;
-        let options = ReadOptions::new(Limits::default(), semantic);
+        let semantic = SemanticLimits::builder()
+            .max_references(references)?
+            .build()?;
+        let options = OpenOptions::new().semantic_limits(semantic);
         let Ok(package) = Package::from_bytes_with_options(&source, options) else {
             continue;
         };

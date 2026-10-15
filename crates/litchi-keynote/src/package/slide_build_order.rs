@@ -1661,7 +1661,7 @@ fn map_read_error(error: ReadError) -> SlideBuildOrderError {
         ReadError::Archive(archive_error) => map_archive_error(archive_error),
         ReadError::Io(_)
         | ReadError::Detection(_)
-        | ReadError::NotKeynote
+        | ReadError::UnexpectedFormat { .. }
         | ReadError::InvalidFormat(_)
         | ReadError::Decode(_)
         | ReadError::TextStorage { .. }
@@ -2052,7 +2052,7 @@ mod tests {
                 (DOCUMENT_MEMBER, document_component.as_slice()),
                 (SLIDE_MEMBER, slide_component.as_slice()),
             ],
-            super::super::Limits::default(),
+            litchi_iwa_archive::Limits::default(),
         )?)
     }
 

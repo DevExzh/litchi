@@ -194,13 +194,15 @@ fn decode(prepared: litchi_iwa_detect::PreparedSource, limits: SnapshotLimits) -
         },
         litchi_iwa_detect::Format::Keynote => {
             let semantic = keynote_limits(limits)?;
-            let document =
-                litchi_keynote::__semantic_document_from_prepared_source(prepared, semantic)
+            let presentation =
+                litchi_keynote::__presentation_from_prepared_source(prepared, semantic)
                     .map_err(map_keynote)?;
-            let data = litchi_iwa_structured::StructuredData::from_keynote_document_with_limits(
-                document, aggregate,
-            )
-            .map_err(|error| map_aggregate(error, Format::Keynote))?;
+            let data =
+                litchi_iwa_structured::StructuredData::from_keynote_presentation_with_limits(
+                    presentation,
+                    aggregate,
+                )
+                .map_err(|error| map_aggregate(error, Format::Keynote))?;
             Ok(Document::from_data(Format::Keynote, data))
         },
         litchi_iwa_detect::Format::Numbers => {
@@ -221,16 +223,11 @@ fn decode(prepared: litchi_iwa_detect::PreparedSource, limits: SnapshotLimits) -
 }
 
 fn keynote_limits(limits: SnapshotLimits) -> Result<litchi_keynote::SemanticLimits> {
-    let defaults = litchi_keynote::SemanticLimits::default();
-    litchi_keynote::SemanticLimits::new(
-        defaults.max_objects(),
-        limits.max_slides(),
-        defaults.max_references(),
-        defaults.max_text_storages(),
-        defaults.max_text_fragments(),
-        limits.max_text_bytes(),
-    )
-    .map_err(|_error| Error::invariant(Some(Format::Keynote), Stage::Validation))
+    litchi_keynote::SemanticLimits::builder()
+        .max_slides(limits.max_slides())
+        .and_then(|builder| builder.max_text_bytes(limits.max_text_bytes()))
+        .and_then(litchi_keynote::SemanticLimitsBuilder::build)
+        .map_err(|_error| Error::invariant(Some(Format::Keynote), Stage::Validation))
 }
 
 fn numbers_limits(limits: SnapshotLimits) -> Result<litchi_numbers::PackageSemanticLimits> {

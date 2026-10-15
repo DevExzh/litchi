@@ -7,7 +7,7 @@ use litchi_iwa_common::{
 };
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsd, tsk, tsp, tswp};
-use litchi_keynote::{MovieSelector, Package, SlideMovieCaptionError, SlideSelector};
+use litchi_keynote::{MovieSelector, Package, SlideMovieCaptionError, SlideSelector, SourceLimits};
 use prost::Message as _;
 
 const DOCUMENT_MEMBER: &str = "Index/Document.iwa";
@@ -1689,16 +1689,16 @@ fn duplicate_movie_build_registration_is_rejected() -> TestResult<()> {
 fn tight_input_limit_rejects_ingress_before_publication() -> TestResult<()> {
     let source = synthetic_package()?;
     let defaults = Limits::default();
-    let archive_limits = Limits::new(
-        u64::try_from(source.len().saturating_sub(1))?,
-        defaults.max_entries(),
-        defaults.max_entry_bytes(),
-        defaults.max_total_bytes(),
-        defaults.max_iwa_stream_bytes(),
-    )?;
+    let archive_limits = SourceLimits::builder()
+        .max_input_bytes(u64::try_from(source.len().saturating_sub(1))?)?
+        .max_entries(defaults.max_entries())?
+        .max_entry_bytes(defaults.max_entry_bytes())?
+        .max_aggregate_bytes(defaults.max_total_bytes())?
+        .max_component_bytes(defaults.max_iwa_stream_bytes())?
+        .build()?;
     let result = Package::from_bytes_with_options(
         &source,
-        litchi_keynote::ReadOptions::new(archive_limits, litchi_keynote::SemanticLimits::default()),
+        litchi_keynote::OpenOptions::new().source_limits(archive_limits),
     );
     assert!(result.is_err());
     Ok(())

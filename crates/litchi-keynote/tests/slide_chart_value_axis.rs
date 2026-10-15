@@ -12,7 +12,7 @@ use litchi_iwa_archive::{Limits, package::Catalog};
 use litchi_iwa_common::wire::{WireView, append_length_delimited_field, append_varint_field};
 use litchi_iwa_protos::{tsch, tsd, tsp};
 use litchi_keynote::{
-    ChartSelector, Package, Position, ReadOptions, SemanticLimits, SlideSelector,
+    ChartSelector, OpenOptions, Package, Position, SemanticLimits, SlideSelector, SourceLimits,
 };
 use prost::Message as _;
 
@@ -948,10 +948,17 @@ mod value_axis {
         // The package's semantic profile is checked at ingress.  A one-object
         // ceiling is intentionally below this graph and must fail before an
         // edit can clone or reassemble anything.
-        let limited_semantics = SemanticLimits::new(1, 1, 1, 1, 1, 1)?;
+        let limited_semantics = SemanticLimits::builder()
+            .max_objects(1)?
+            .max_slides(1)?
+            .max_references(1)?
+            .max_text_storages(1)?
+            .max_text_fragments(1)?
+            .max_text_bytes(1)?
+            .build()?;
         let limited = Package::from_bytes_with_options(
             &source,
-            ReadOptions::new(Limits::default(), limited_semantics),
+            OpenOptions::new().semantic_limits(limited_semantics),
         );
         let error = limited.expect_err("semantic limit must reject hostile graph");
         error_is_redacted(&error);
@@ -968,17 +975,15 @@ mod value_axis {
         assert!(candidate.len() > source.len());
 
         let defaults = Limits::default();
-        let limits = Limits::new(
-            u64::try_from(candidate.len() - 1)?,
-            defaults.max_entries(),
-            defaults.max_entry_bytes(),
-            defaults.max_total_bytes(),
-            defaults.max_iwa_stream_bytes(),
-        )?;
-        let package = Package::from_bytes_with_options(
-            &source,
-            ReadOptions::new(limits, SemanticLimits::default()),
-        )?;
+        let limits = SourceLimits::builder()
+            .max_input_bytes(u64::try_from(candidate.len() - 1)?)?
+            .max_entries(defaults.max_entries())?
+            .max_entry_bytes(defaults.max_entry_bytes())?
+            .max_aggregate_bytes(defaults.max_total_bytes())?
+            .max_component_bytes(defaults.max_iwa_stream_bytes())?
+            .build()?;
+        let package =
+            Package::from_bytes_with_options(&source, OpenOptions::new().source_limits(limits))?;
         let before = exact_bytes(&package)?;
         let error = package
             .edit_slide_chart_value_axis_settings(SlideSelector::index(0), ChartSelector::index(0))

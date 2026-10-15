@@ -21,9 +21,9 @@ use litchi_iwa_core::{
 use litchi_iwa_protos::{kn, tsa, tsd, tsk, tsp, tst, tswp};
 use litchi_keynote::slide::table::sort::{ColumnIndex, Direction, Order, Rule, Scope};
 use litchi_keynote::{
-    Package, ReadOptions, SemanticLimits, SlideSelector, SlideTableSortCommit,
-    SlideTableSortDiagnostics, SlideTableSortEdit, SlideTableSortError, SlideTableSortLimitKind,
-    SlideTableSortPatch, SlideTableSortPath, TableSelector,
+    OpenOptions, Package, SlideSelector, SlideTableSortCommit, SlideTableSortDiagnostics,
+    SlideTableSortEdit, SlideTableSortError, SlideTableSortLimitKind, SlideTableSortPatch,
+    SlideTableSortPath, SourceLimits, TableSelector,
 };
 use prost::Message as _;
 
@@ -1760,17 +1760,15 @@ fn tight_publication_limit_rejects_changed_sort_atomically() -> TestResult {
     let target = exact_bytes(baseline.package())?;
     assert!(target.len() > source.len());
     let defaults = Limits::default();
-    let limits = Limits::new(
-        u64::try_from(target.len() - 1)?,
-        defaults.max_entries(),
-        defaults.max_entry_bytes(),
-        defaults.max_total_bytes(),
-        defaults.max_iwa_stream_bytes(),
-    )?;
-    let package = Package::from_bytes_with_options(
-        &source,
-        ReadOptions::new(limits, SemanticLimits::default()),
-    )?;
+    let limits = SourceLimits::builder()
+        .max_input_bytes(u64::try_from(target.len() - 1)?)?
+        .max_entries(defaults.max_entries())?
+        .max_entry_bytes(defaults.max_entry_bytes())?
+        .max_aggregate_bytes(defaults.max_total_bytes())?
+        .max_component_bytes(defaults.max_iwa_stream_bytes())?
+        .build()?;
+    let package =
+        Package::from_bytes_with_options(&source, OpenOptions::new().source_limits(limits))?;
     let before = exact_bytes(&package)?;
     let result = package
         .edit_slide_table_sort_order(0usize, 0usize)

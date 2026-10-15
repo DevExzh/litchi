@@ -13,16 +13,15 @@ use std::{fmt, path::Path, sync::Arc};
 use litchi_iwa_archive::ComponentCatalog;
 use litchi_iwa_archive::{Error as ArchiveError, LimitKind as ArchiveLimitKind, SourceCatalog};
 
-use super::super::{
-    Package, PayloadLimitKind, ReadError, ReadOptions, SemanticLimitKind, read_source,
-};
+use super::super::{Package, PayloadLimitKind, Profile, ReadError, read_source};
 use super::SlideTableMergesError;
+use crate::limits::{OpenOptions, SemanticLimitKind};
 
 /// A lazy, metadata-only Keynote merged-cell reader.
 ///
 /// `MergeReader` retains one validated component catalog and the compact object
 /// index required to resolve rooted slide/table ownership. It does not retain
-/// a ZIP reassembly catalog, build a semantic [`crate::Document`], decode slide
+/// a ZIP reassembly catalog, build a semantic [`crate::Presentation`], decode slide
 /// values, or expose native object identifiers. Clones share the immutable
 /// package state and its parsed archive allocations.
 ///
@@ -53,7 +52,7 @@ impl fmt::Debug for MergeReader {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("MergeReader")
-            .field("options", &self.package.read_options())
+            .field("options", &self.package.options())
             .finish_non_exhaustive()
     }
 }
@@ -78,7 +77,7 @@ impl MergeReader {
     /// Returns a typed merge error when the path cannot be read, physical
     /// ingress exceeds a limit, or the source is not a valid Keynote package.
     pub fn open(path: impl AsRef<Path>) -> Result<Self, SlideTableMergesError> {
-        Self::open_with_options(path, ReadOptions::default())
+        Self::open_with_options(path, OpenOptions::default())
     }
 
     /// Open a Keynote package for lazy merged-cell queries under explicit
@@ -94,9 +93,10 @@ impl MergeReader {
     /// fails.
     pub fn open_with_options(
         path: impl AsRef<Path>,
-        options: ReadOptions,
+        options: OpenOptions,
     ) -> Result<Self, SlideTableMergesError> {
-        let source = read_source(path.as_ref(), options.archive()).map_err(map_read_error)?;
+        let profile = Profile::from_options(options).map_err(map_read_error)?;
+        let source = read_source(path.as_ref(), profile.archive()).map_err(map_read_error)?;
         Self::from_shared_bytes_with_options(source, options)
     }
 
@@ -104,7 +104,7 @@ impl MergeReader {
     ///
     /// The input is parsed into one immutable component catalog; the ZIP
     /// allocation is released after component validation because this reader
-    /// does not provide source-preserving writes. No semantic `Document` or
+    /// does not provide source-preserving writes. No semantic `Presentation` or
     /// slide snapshot is built.
     ///
     /// # Errors
@@ -112,7 +112,7 @@ impl MergeReader {
     /// Returns a typed merge error when physical ingress or Keynote root
     /// validation fails.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, SlideTableMergesError> {
-        Self::from_bytes_with_options(bytes, ReadOptions::default())
+        Self::from_bytes_with_options(bytes, OpenOptions::default())
     }
 
     /// Parse Keynote package bytes under explicit physical and semantic limits.
@@ -123,8 +123,9 @@ impl MergeReader {
     /// different iWork format, or exceeds the configured profile.
     pub fn from_bytes_with_options(
         bytes: &[u8],
-        options: ReadOptions,
+        options: OpenOptions,
     ) -> Result<Self, SlideTableMergesError> {
+        let options = Profile::from_options(options).map_err(map_read_error)?;
         let length =
             u64::try_from(bytes.len()).map_err(|_| SlideTableMergesError::InvalidSource)?;
         if length > options.archive().max_input_bytes() {
@@ -153,7 +154,7 @@ impl MergeReader {
     ///
     /// Returns the same typed merge failures as [`Self::from_bytes_with_options`].
     pub fn from_shared_bytes(bytes: Arc<[u8]>) -> Result<Self, SlideTableMergesError> {
-        Self::from_shared_bytes_with_options(bytes, ReadOptions::default())
+        Self::from_shared_bytes_with_options(bytes, OpenOptions::default())
     }
 
     /// Parse an already shared immutable source under explicit limits.
@@ -164,8 +165,9 @@ impl MergeReader {
     /// classification, or bounded object indexing fails.
     pub fn from_shared_bytes_with_options(
         bytes: Arc<[u8]>,
-        options: ReadOptions,
+        options: OpenOptions,
     ) -> Result<Self, SlideTableMergesError> {
+        let options = Profile::from_options(options).map_err(map_read_error)?;
         let source = SourceCatalog::from_shared_bytes_with_limits(bytes, options.archive())
             .map_err(map_archive_error)?;
         let components = Arc::new(source.into_components());
@@ -182,8 +184,9 @@ impl MergeReader {
     #[doc(hidden)]
     pub fn __from_shared_catalog(
         catalog: Arc<ComponentCatalog>,
-        options: ReadOptions,
+        options: OpenOptions,
     ) -> Result<Self, SlideTableMergesError> {
+        let options = Profile::from_options(options).map_err(map_read_error)?;
         let package = Package::from_merge_components(catalog, options).map_err(map_read_error)?;
         Ok(Self { package })
     }
@@ -208,16 +211,15 @@ impl MergeReader {
             .slide_table_merges_from_components(slide, table)
     }
 
-    /// Return the physical and semantic profiles retained by this reader.
-    #[must_use]
-    pub fn read_options(&self) -> ReadOptions {
-        self.package.read_options()
+    /// Return the ingress envelope retained by this reader.
+    pub fn options(&self) -> OpenOptions {
+        self.package.options()
     }
 }
 
 fn map_read_error(error: ReadError) -> SlideTableMergesError {
     match error {
-        ReadError::NotKeynote => SlideTableMergesError::UnsupportedSource,
+        ReadError::UnexpectedFormat { .. } => SlideTableMergesError::UnsupportedSource,
         ReadError::Archive(error) => map_archive_error(error),
         ReadError::SemanticLimit {
             kind,
@@ -355,7 +357,7 @@ mod tests {
     fn clones_share_the_reader_state_and_retain_options() {
         let reader = MergeReader::from_bytes(NATIVE_SOURCE).expect("native Keynote source");
         let clone = reader.clone();
-        assert_eq!(clone.read_options(), reader.read_options());
+        assert_eq!(clone.options(), reader.options());
         assert_eq!(
             clone.slide_table_merges(0, 0).expect("clone merge read"),
             [Region::new(3, 1, 2, 2).expect("checked region")]
@@ -419,7 +421,7 @@ mod tests {
         );
         let reader = MergeReader::__from_shared_catalog(
             std::sync::Arc::clone(&catalog),
-            crate::ReadOptions::default(),
+            crate::OpenOptions::default(),
         )
         .expect("shared catalog reader");
         assert_eq!(
@@ -474,10 +476,7 @@ mod tests {
     -> Result<(), Box<dyn std::error::Error>> {
         use std::sync::Arc;
 
-        use crate::{
-            MAX_OBJECTS, MAX_SLIDES, MAX_TEXT_BYTES, MAX_TEXT_FRAGMENTS, MAX_TEXT_STORAGES,
-            ReadOptions, SemanticLimits,
-        };
+        use crate::{OpenOptions, SemanticLimits};
         use litchi_iwa_archive::{ComponentCatalog, Limits};
         use litchi_iwa_core::{ArchiveObject, RawMessage};
         use litchi_iwa_protos::{kn, tsp};
@@ -569,17 +568,10 @@ mod tests {
                 .map(|(name, archive)| (name.as_str(), Arc::new(archive.clone()))),
             Limits::default(),
         )?);
-        let semantic = SemanticLimits::new(
-            MAX_OBJECTS,
-            MAX_SLIDES,
-            5,
-            MAX_TEXT_STORAGES,
-            MAX_TEXT_FRAGMENTS,
-            MAX_TEXT_BYTES,
-        )?;
+        let semantic = SemanticLimits::builder().max_references(5)?.build()?;
         let reader = MergeReader::__from_shared_catalog(
             catalog,
-            ReadOptions::new(Limits::default(), semantic),
+            OpenOptions::new().semantic_limits(semantic),
         )?;
         assert!(matches!(
             reader.slide_table_merges(SlideSelector::name("missing"), TableSelector::index(0)),
@@ -601,7 +593,7 @@ mod tests {
         );
         let package = Package::from_classified_components(
             components,
-            crate::Limits::default(),
+            litchi_iwa_archive::Limits::default(),
             crate::SemanticLimits::default(),
         )
         .expect("semantic-only Keynote package");

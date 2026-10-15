@@ -18,7 +18,7 @@ use litchi_iwa_core::{
     Archive, ArchiveObject, FieldInfo, FieldType, MessageInfo, RawMessage, SnappyStream,
 };
 use litchi_iwa_protos::{kn, tsa, tsd, tsk, tsp, tss};
-use litchi_keynote::{Background, Package, Position, SlideSelector};
+use litchi_keynote::{Background, OpenOptions, Package, Position, SlideSelector, SourceLimits};
 use prost::Message as _;
 
 const DOCUMENT_MEMBER: &str = "Index/Document.iwa";
@@ -1710,14 +1710,15 @@ fn output_limits_are_atomic() -> TestResult<()> {
         .set(green())?
         .commit()?;
     let target_length = exact_bytes(target.package())?.len();
-    let limits = Limits::new(
-        u64::try_from(target_length - 1)?,
-        32,
-        1_024 * 1_024,
-        1_024 * 1_024,
-        1_024 * 1_024,
-    )?;
-    let limited = Package::from_bytes_with_limits(&bytes, limits)?;
+    let limits = SourceLimits::builder()
+        .max_input_bytes(u64::try_from(target_length - 1)?)?
+        .max_entries(32)?
+        .max_entry_bytes(1_024 * 1_024)?
+        .max_aggregate_bytes(1_024 * 1_024)?
+        .max_component_bytes(1_024 * 1_024)?
+        .build()?;
+    let limited =
+        Package::from_bytes_with_options(&bytes, OpenOptions::new().source_limits(limits))?;
     let source_bytes = exact_bytes(&limited)?;
     let result = limited
         .edit_slide_background(0usize)?

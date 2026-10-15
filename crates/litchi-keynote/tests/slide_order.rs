@@ -1,12 +1,13 @@
 use std::io;
 use std::sync::Arc;
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::wire::{WireView, append_varint_field};
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsk, tsp};
 use litchi_keynote::{
-    Limits, Package, Position, ReadError, ReadOptions, SemanticLimits, SlideOrderError,
+    OpenOptions, Package, Position, ReadError, SemanticLimits, SlideOrderError,
     SlideOrderLimitKind, SlideSelector,
 };
 use prost::Message as _;
@@ -736,14 +737,14 @@ fn legacy_physical_source_allows_exact_noop_but_refuses_changed_reassembly() -> 
 #[test]
 fn signed_int32_is_strict_and_commit_retains_read_options() -> TestResult<()> {
     let bytes = package_bytes(Topology::Flat, NAMES, false)?;
-    let options = ReadOptions::default();
+    let options = OpenOptions::default();
     let package = Package::from_bytes_with_options(&bytes, options)?;
-    assert_eq!(package.read_options(), options);
+    assert_eq!(package.options(), options);
     package.validate()?;
     let mut edit = package.edit_slide_order();
     edit.move_slide(0usize, Position::new(3))?;
     let commit = edit.commit()?;
-    assert_eq!(commit.package().read_options(), options);
+    assert_eq!(commit.package().options(), options);
 
     let bad_bytes = package_bytes(Topology::Flat, NAMES, true)?;
     let bad_package = Package::from_bytes(&bad_bytes)?;
@@ -758,19 +759,14 @@ fn signed_int32_is_strict_and_commit_retains_read_options() -> TestResult<()> {
 fn slide_limit_is_inclusive_and_typed_for_transaction_staging() -> TestResult<()> {
     let bytes = package_bytes(Topology::Flat, NAMES, false)?;
     let semantic_limits = |slides| {
-        SemanticLimits::new(
-            SemanticLimits::MAX_OBJECTS,
-            slides,
-            SemanticLimits::MAX_REFERENCES,
-            SemanticLimits::MAX_TEXT_STORAGES,
-            SemanticLimits::MAX_TEXT_FRAGMENTS,
-            SemanticLimits::MAX_TEXT_BYTES,
-        )
+        SemanticLimits::builder()
+            .max_slides(slides)
+            .and_then(|limits| limits.build())
     };
 
     let exact = Package::from_bytes_with_options(
         &bytes,
-        ReadOptions::new(Limits::default(), semantic_limits(NAMES.len())?),
+        OpenOptions::new().semantic_limits(semantic_limits(NAMES.len())?),
     )?;
     let mut exact_edit = exact.edit_slide_order();
     exact_edit.move_slide(0usize, Position::new(NAMES.len() - 1))?;
@@ -781,7 +777,7 @@ fn slide_limit_is_inclusive_and_typed_for_transaction_staging() -> TestResult<()
 
     let one_under = Package::from_bytes_with_options(
         &bytes,
-        ReadOptions::new(Limits::default(), semantic_limits(NAMES.len() - 1)?),
+        OpenOptions::new().semantic_limits(semantic_limits(NAMES.len() - 1)?),
     )?;
     let mut limited_edit = one_under.edit_slide_order();
     assert!(matches!(

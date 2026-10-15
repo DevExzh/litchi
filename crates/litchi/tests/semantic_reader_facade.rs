@@ -34,7 +34,7 @@ fn pages_reader_helpers_keep_semantic_values_and_typed_routing() {
 #[cfg(feature = "keynote")]
 #[test]
 fn keynote_reader_helpers_keep_semantic_values_and_typed_routing() {
-    use litchi::keynote::semantic::{self, DocumentReadError};
+    use litchi::keynote::semantic::{self, presentation};
 
     let bytes = include_bytes!("../../../test-data/iwork/keynote/basic.key");
     let document = semantic::from_bytes(bytes).expect("Keynote fixture must decode");
@@ -49,7 +49,9 @@ fn keynote_reader_helpers_keep_semantic_values_and_typed_routing() {
     let pages = include_bytes!("../../../test-data/iwork/pages/basic.pages");
     assert_eq!(
         semantic::from_bytes(pages).expect_err("Pages must not route as Keynote"),
-        DocumentReadError::NotKeynote
+        presentation::Error::UnexpectedFormat {
+            detected: litchi::FileFormat::Pages
+        }
     );
 
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))

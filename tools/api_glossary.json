@@ -8139,6 +8139,350 @@
         }
       ],
       "families": []
+    },
+    {
+      "id": "keynote-minimal",
+      "package": "litchi-keynote",
+      "default_features": true,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "Document",
+          "scope": "litchi_keynote",
+          "replacement": "the read-only deck projection is presentation::Presentation (ADR 0034 §1, record 0298)"
+        },
+        {
+          "name": "DocumentStats",
+          "scope": "litchi_keynote",
+          "replacement": "use presentation::Stats (record 0298)"
+        },
+        {
+          "name": "DocumentIoKind",
+          "scope": "litchi_keynote",
+          "replacement": "use presentation::IoKind (record 0298)"
+        },
+        {
+          "name": "DocumentReadError",
+          "scope": "litchi_keynote",
+          "replacement": "use presentation::Error (record 0298)"
+        },
+        {
+          "name": "DocumentReadLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use presentation::LimitKind (record 0298)"
+        },
+        {
+          "name": "DocumentReadOptions",
+          "scope": "litchi_keynote",
+          "replacement": "use checked SourceLimits, SemanticLimits and OpenOptions (ADR 0034 §5, record 0298)"
+        },
+        {
+          "name": "DocumentSourceLimits",
+          "scope": "litchi_keynote",
+          "replacement": "use checked SourceLimits, SemanticLimits and OpenOptions (ADR 0034 §5, record 0298)"
+        },
+        {
+          "name": "DocumentSourceLimitsError",
+          "scope": "litchi_keynote",
+          "replacement": "use Error::InvalidLimit (ADR 0034 §5, record 0298)"
+        },
+        {
+          "name": "DocumentSourceLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use SourceLimitKind (record 0298)"
+        },
+        {
+          "name": "DocumentSemanticLimits",
+          "scope": "litchi_keynote",
+          "replacement": "use checked SourceLimits, SemanticLimits and OpenOptions (ADR 0034 §5, record 0298)"
+        },
+        {
+          "name": "DocumentSemanticLimitsError",
+          "scope": "litchi_keynote",
+          "replacement": "use Error::InvalidLimit (ADR 0034 §5, record 0298)"
+        },
+        {
+          "name": "DocumentSemanticLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use SemanticLimitKind (record 0298)"
+        },
+        {
+          "name": "ReadOptions",
+          "scope": "litchi_keynote",
+          "replacement": "use checked SourceLimits, SemanticLimits and OpenOptions (ADR 0034 §5, record 0298)"
+        },
+        {
+          "name": "SemanticLimitsError",
+          "scope": "litchi_keynote",
+          "replacement": "use Error::InvalidLimit (ADR 0034 §5, record 0298)"
+        },
+        {
+          "name": "NotKeynote",
+          "scope": "litchi_keynote",
+          "replacement": "use UnexpectedFormat { detected } (ADR 0034 §5, record 0298)"
+        },
+        {
+          "name": "document",
+          "scope": "litchi_keynote",
+          "replacement": "the read-only deck projection is presentation::Presentation (ADR 0034 §1, record 0298)",
+          "recursive": false
+        },
+        {
+          "name": "Limits",
+          "scope": "litchi_keynote",
+          "replacement": "use checked SourceLimits, SemanticLimits and OpenOptions (ADR 0034 §5, record 0298)",
+          "recursive": false
+        },
+        {
+          "name": "MAX_OBJECTS",
+          "scope": "litchi_keynote",
+          "replacement": "use the SemanticLimits associated constants (record 0298)",
+          "recursive": false
+        },
+        {
+          "name": "MAX_SLIDES",
+          "scope": "litchi_keynote",
+          "replacement": "use the SemanticLimits associated constants (record 0298)",
+          "recursive": false
+        },
+        {
+          "name": "MAX_REFERENCES",
+          "scope": "litchi_keynote",
+          "replacement": "use the SemanticLimits associated constants (record 0298)",
+          "recursive": false
+        },
+        {
+          "name": "MAX_TEXT_STORAGES",
+          "scope": "litchi_keynote",
+          "replacement": "use the SemanticLimits associated constants (record 0298)",
+          "recursive": false
+        },
+        {
+          "name": "MAX_TEXT_FRAGMENTS",
+          "scope": "litchi_keynote",
+          "replacement": "use the SemanticLimits associated constants (record 0298)",
+          "recursive": false
+        },
+        {
+          "name": "MAX_TEXT_BYTES",
+          "scope": "litchi_keynote",
+          "replacement": "use the SemanticLimits associated constants (record 0298)",
+          "recursive": false
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_keynote::Package",
+          "replacement": "use open_with_options/from_bytes_with_options with OpenOptions, Package::options and Package::source_limits (ADR 0034 §3, record 0298)",
+          "recursive": false
+        },
+        {
+          "name": "from_bytes_with_limits",
+          "scope": "litchi_keynote::Package",
+          "replacement": "use open_with_options/from_bytes_with_options with OpenOptions, Package::options and Package::source_limits (ADR 0034 §3, record 0298)",
+          "recursive": false
+        },
+        {
+          "name": "limits",
+          "scope": "litchi_keynote::Package",
+          "replacement": "use open_with_options/from_bytes_with_options with OpenOptions, Package::options and Package::source_limits (ADR 0034 §3, record 0298)",
+          "recursive": false
+        },
+        {
+          "name": "read_options",
+          "scope": "litchi_keynote::Package",
+          "replacement": "use open_with_options/from_bytes_with_options with OpenOptions, Package::options and Package::source_limits (ADR 0034 §3, record 0298)",
+          "recursive": false
+        },
+        {
+          "name": "semantic_snapshot",
+          "scope": "litchi_keynote::Package",
+          "replacement": "use Package::presentation (ADR 0034 §1, record 0298)",
+          "recursive": false
+        },
+        {
+          "name": "new",
+          "scope": "litchi_keynote::SemanticLimits",
+          "replacement": "use SemanticLimits::builder() (ADR 0034 §4, record 0298)",
+          "recursive": false
+        },
+        {
+          "name": "read_options",
+          "scope": "litchi_keynote::MergeReader",
+          "replacement": "use MergeReader::options (record 0298)",
+          "recursive": false
+        }
+      ],
+      "families": []
+    },
+    {
+      "id": "keynote-full",
+      "package": "litchi-keynote",
+      "default_features": true,
+      "features": [
+        "internal-iwork-source"
+      ],
+      "banned_names": [
+        {
+          "name": "Document",
+          "scope": "litchi_keynote",
+          "replacement": "the read-only deck projection is presentation::Presentation (ADR 0034 §1, record 0298)"
+        },
+        {
+          "name": "DocumentStats",
+          "scope": "litchi_keynote",
+          "replacement": "use presentation::Stats (record 0298)"
+        },
+        {
+          "name": "DocumentIoKind",
+          "scope": "litchi_keynote",
+          "replacement": "use presentation::IoKind (record 0298)"
+        },
+        {
+          "name": "DocumentReadError",
+          "scope": "litchi_keynote",
+          "replacement": "use presentation::Error (record 0298)"
+        },
+        {
+          "name": "DocumentReadLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use presentation::LimitKind (record 0298)"
+        },
+        {
+          "name": "DocumentReadOptions",
+          "scope": "litchi_keynote",
+          "replacement": "use checked SourceLimits, SemanticLimits and OpenOptions (ADR 0034 §5, record 0298)"
+        },
+        {
+          "name": "DocumentSourceLimits",
+          "scope": "litchi_keynote",
+          "replacement": "use checked SourceLimits, SemanticLimits and OpenOptions (ADR 0034 §5, record 0298)"
+        },
+        {
+          "name": "DocumentSourceLimitsError",
+          "scope": "litchi_keynote",
+          "replacement": "use Error::InvalidLimit (ADR 0034 §5, record 0298)"
+        },
+        {
+          "name": "DocumentSourceLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use SourceLimitKind (record 0298)"
+        },
+        {
+          "name": "DocumentSemanticLimits",
+          "scope": "litchi_keynote",
+          "replacement": "use checked SourceLimits, SemanticLimits and OpenOptions (ADR 0034 §5, record 0298)"
+        },
+        {
+          "name": "DocumentSemanticLimitsError",
+          "scope": "litchi_keynote",
+          "replacement": "use Error::InvalidLimit (ADR 0034 §5, record 0298)"
+        },
+        {
+          "name": "DocumentSemanticLimitKind",
+          "scope": "litchi_keynote",
+          "replacement": "use SemanticLimitKind (record 0298)"
+        },
+        {
+          "name": "ReadOptions",
+          "scope": "litchi_keynote",
+          "replacement": "use checked SourceLimits, SemanticLimits and OpenOptions (ADR 0034 §5, record 0298)"
+        },
+        {
+          "name": "SemanticLimitsError",
+          "scope": "litchi_keynote",
+          "replacement": "use Error::InvalidLimit (ADR 0034 §5, record 0298)"
+        },
+        {
+          "name": "NotKeynote",
+          "scope": "litchi_keynote",
+          "replacement": "use UnexpectedFormat { detected } (ADR 0034 §5, record 0298)"
+        },
+        {
+          "name": "document",
+          "scope": "litchi_keynote",
+          "replacement": "the read-only deck projection is presentation::Presentation (ADR 0034 §1, record 0298)",
+          "recursive": false
+        },
+        {
+          "name": "MAX_OBJECTS",
+          "scope": "litchi_keynote",
+          "replacement": "use the SemanticLimits associated constants (record 0298)",
+          "recursive": false
+        },
+        {
+          "name": "MAX_SLIDES",
+          "scope": "litchi_keynote",
+          "replacement": "use the SemanticLimits associated constants (record 0298)",
+          "recursive": false
+        },
+        {
+          "name": "MAX_REFERENCES",
+          "scope": "litchi_keynote",
+          "replacement": "use the SemanticLimits associated constants (record 0298)",
+          "recursive": false
+        },
+        {
+          "name": "MAX_TEXT_STORAGES",
+          "scope": "litchi_keynote",
+          "replacement": "use the SemanticLimits associated constants (record 0298)",
+          "recursive": false
+        },
+        {
+          "name": "MAX_TEXT_FRAGMENTS",
+          "scope": "litchi_keynote",
+          "replacement": "use the SemanticLimits associated constants (record 0298)",
+          "recursive": false
+        },
+        {
+          "name": "MAX_TEXT_BYTES",
+          "scope": "litchi_keynote",
+          "replacement": "use the SemanticLimits associated constants (record 0298)",
+          "recursive": false
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_keynote::Package",
+          "replacement": "use open_with_options/from_bytes_with_options with OpenOptions, Package::options and Package::source_limits (ADR 0034 §3, record 0298)",
+          "recursive": false
+        },
+        {
+          "name": "from_bytes_with_limits",
+          "scope": "litchi_keynote::Package",
+          "replacement": "use open_with_options/from_bytes_with_options with OpenOptions, Package::options and Package::source_limits (ADR 0034 §3, record 0298)",
+          "recursive": false
+        },
+        {
+          "name": "limits",
+          "scope": "litchi_keynote::Package",
+          "replacement": "use open_with_options/from_bytes_with_options with OpenOptions, Package::options and Package::source_limits (ADR 0034 §3, record 0298)",
+          "recursive": false
+        },
+        {
+          "name": "read_options",
+          "scope": "litchi_keynote::Package",
+          "replacement": "use open_with_options/from_bytes_with_options with OpenOptions, Package::options and Package::source_limits (ADR 0034 §3, record 0298)",
+          "recursive": false
+        },
+        {
+          "name": "semantic_snapshot",
+          "scope": "litchi_keynote::Package",
+          "replacement": "use Package::presentation (ADR 0034 §1, record 0298)",
+          "recursive": false
+        },
+        {
+          "name": "new",
+          "scope": "litchi_keynote::SemanticLimits",
+          "replacement": "use SemanticLimits::builder() (ADR 0034 §4, record 0298)",
+          "recursive": false
+        },
+        {
+          "name": "read_options",
+          "scope": "litchi_keynote::MergeReader",
+          "replacement": "use MergeReader::options (record 0298)",
+          "recursive": false
+        }
+      ],
+      "families": []
     }
   ]
 }

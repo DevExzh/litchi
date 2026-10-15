@@ -58,15 +58,17 @@ fn pages_failure(error: litchi::pages::semantic::ReadError) -> Failure {
     failure!(error, IoKind::NotFound, ReadError::NotPages)
 }
 
-/// Open a Keynote document.
-pub(crate) fn open_keynote(path: &Path) -> Result<litchi::keynote::semantic::Document, Failure> {
-    litchi::keynote::semantic::Document::open(path).map_err(keynote_failure)
+/// Open a Keynote presentation.
+pub(crate) fn open_keynote(
+    path: &Path,
+) -> Result<litchi::keynote::semantic::Presentation, Failure> {
+    litchi::keynote::semantic::Presentation::open(path).map_err(keynote_failure)
 }
 
 /// Classify a Keynote read error.
-pub(crate) fn keynote_failure(error: litchi::keynote::semantic::DocumentReadError) -> Failure {
-    use litchi::keynote::semantic::{DocumentIoKind, DocumentReadError as ReadError};
-    failure!(error, DocumentIoKind::NotFound, ReadError::NotKeynote)
+pub(crate) fn keynote_failure(error: litchi::keynote::semantic::presentation::Error) -> Failure {
+    use litchi::keynote::semantic::presentation::{Error as ReadError, IoKind};
+    failure!(error, IoKind::NotFound, ReadError::UnexpectedFormat { .. })
 }
 
 /// Open a Numbers document.

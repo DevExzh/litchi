@@ -1,12 +1,13 @@
 use std::io;
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::decode_varint_from_bytes;
 use litchi_iwa_core::{
     Archive, ArchiveInfo, ArchiveObject, FieldInfo, FieldPath, FieldType, RawMessage, SnappyStream,
 };
 use litchi_iwa_protos::{kn, tsa, tsk, tsp};
-use litchi_keynote::{Limits, Package, Position, SlideSelector, slide::delete};
+use litchi_keynote::{Package, Position, SlideSelector, slide::delete};
 use prost::Message as _;
 
 const DOCUMENT_MEMBER: &str = "Index/Document.iwa";

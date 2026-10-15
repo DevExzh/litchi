@@ -21,9 +21,10 @@ use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldPath, RawMessage, 
 use litchi_iwa_protos::{kn, tsa, tsd, tsk, tsp, tst, tswp};
 use litchi_keynote::slide::table::dimension::{Dimension, Points, Size};
 use litchi_keynote::{
-    Package, ReadOptions, SemanticLimits, SlideSelector, SlideTableDimensionCommit,
+    OpenOptions, Package, SemanticLimits, SlideSelector, SlideTableDimensionCommit,
     SlideTableDimensionDiagnostics, SlideTableDimensionEdit, SlideTableDimensionError,
-    SlideTableDimensionLimitKind, SlideTableDimensionPatch, SlideTableDimensionPath, TableSelector,
+    SlideTableDimensionLimitKind, SlideTableDimensionPatch, SlideTableDimensionPath, SourceLimits,
+    TableSelector,
 };
 use prost::Message as _;
 
@@ -1334,22 +1335,27 @@ fn two_table_z_order_selectors_are_isolated() -> TestResult {
 #[test]
 fn finite_physical_and_semantic_limits_refuse_before_publication() -> TestResult {
     let source = synthetic_package(false, false)?;
-    let input_limit = Limits::new(
-        u64::try_from(source.len().saturating_sub(1))?,
-        128,
-        4 * 1024 * 1024,
-        8 * 1024 * 1024,
-        8 * 1024 * 1024,
-    )?;
-    assert!(Package::from_bytes_with_limits(&source, input_limit).is_err());
+    let input_limit = SourceLimits::builder()
+        .max_input_bytes(u64::try_from(source.len().saturating_sub(1))?)?
+        .max_entries(128)?
+        .max_entry_bytes(4 * 1024 * 1024)?
+        .max_aggregate_bytes(8 * 1024 * 1024)?
+        .max_component_bytes(8 * 1024 * 1024)?
+        .build()?;
+    assert!(
+        Package::from_bytes_with_options(&source, OpenOptions::new().source_limits(input_limit))
+            .is_err()
+    );
 
     let exact_fields = (1..=4_096)
         .find_map(|fields| {
-            let archive = litchi_iwa_core::Limits::default()
-                .with_header_fields(fields)
+            let limits = SourceLimits::builder()
+                .max_header_fields(fields)
+                .and_then(|limits| limits.build())
                 .ok()?;
-            let limits = Limits::default().with_archive_limits(archive).ok()?;
-            let package = Package::from_bytes_with_limits(&source, limits).ok()?;
+            let package =
+                Package::from_bytes_with_options(&source, OpenOptions::new().source_limits(limits))
+                    .ok()?;
             package
                 .slide_table_dimension_size("Tables", 0usize, Dimension::Row(1))
                 .is_ok()
@@ -1357,9 +1363,12 @@ fn finite_physical_and_semantic_limits_refuse_before_publication() -> TestResult
         })
         .ok_or_else(|| io::Error::other("no finite header-field boundary found"))?;
     assert!(exact_fields > 1);
-    let archive = litchi_iwa_core::Limits::default().with_header_fields(exact_fields - 1)?;
-    let limits = Limits::default().with_archive_limits(archive)?;
-    if let Ok(package) = Package::from_bytes_with_limits(&source, limits) {
+    let limits = SourceLimits::builder()
+        .max_header_fields(exact_fields - 1)?
+        .build()?;
+    if let Ok(package) =
+        Package::from_bytes_with_options(&source, OpenOptions::new().source_limits(limits))
+    {
         let before = exact_bytes(&package)?;
         let result = package.slide_table_dimension_size("Tables", 0usize, Dimension::Row(1));
         assert!(matches!(
@@ -1369,10 +1378,9 @@ fn finite_physical_and_semantic_limits_refuse_before_publication() -> TestResult
         assert_eq!(exact_bytes(&package)?, before);
     }
 
-    let semantic =
-        SemanticLimits::new(1_000_000, 65_536, 1, 1_000_000, 1_000_000, 64 * 1024 * 1024)?;
+    let semantic = SemanticLimits::builder().max_references(1)?.build()?;
     let restricted =
-        Package::from_bytes_with_options(&source, ReadOptions::new(Limits::default(), semantic))?;
+        Package::from_bytes_with_options(&source, OpenOptions::new().semantic_limits(semantic))?;
     let before = exact_bytes(&restricted)?;
     assert!(
         restricted

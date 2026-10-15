@@ -22,7 +22,7 @@ use litchi_iwa_core::{
 use litchi_iwa_protos::{kn, tsa, tsch, tsd, tsk, tsp, tss};
 use litchi_keynote::{
     Axis, ChartAxisTitleError, ChartAxisTitleLimitKind, ChartSelector, Package, Position,
-    ReadOptions, SemanticLimits, SlideSelector,
+    SemanticLimits, SlideSelector,
 };
 use prost::Message as _;
 

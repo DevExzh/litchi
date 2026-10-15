@@ -13,13 +13,14 @@ def document(
     argument: str = "selector",
     semantic: bool = False,
 ) -> dict:
-    """Build a small rustdoc document with one public document reader."""
+    """Build a small rustdoc document with one public semantic reader."""
+    module = public_api.semantic_module(crate)
     paths: dict[str, dict[str, object]] = {
         "0": {"path": [crate], "kind": "module"},
-        "1": {"path": [crate, "document"], "kind": "module"},
-        "2": {"path": [crate, "document", "Document"], "kind": "struct"},
+        "1": {"path": [crate, module], "kind": "module"},
+        "2": {"path": [crate, module, "Document"], "kind": "struct"},
         "3": {
-            "path": [crate, "document", "Document", "open"],
+            "path": [crate, module, "Document", "open"],
             "kind": "function",
         },
         "4": {"path": [crate, "Document"], "kind": "struct"},
@@ -31,7 +32,7 @@ def document(
             "inner": {"module": {"items": ["1", "4"]}},
         },
         "1": {
-            "name": "document",
+            "name": module,
             "crate_id": 0,
             "inner": {"module": {"items": ["2", "3"]}},
         },
@@ -66,7 +67,7 @@ def document(
             "crate_id": 0,
             "inner": {
                 "use": {
-                    "source": "crate::document::Document",
+                    "source": f"crate::{module}::Document",
                     "name": "Document",
                     "id": "2",
                     "is_glob": False,
@@ -75,7 +76,7 @@ def document(
         },
     }
     if leak_name is not None:
-        paths["5"] = {"path": [crate, "document", leak_name], "kind": "struct"}
+        paths["5"] = {"path": [crate, module, leak_name], "kind": "struct"}
         index["5"] = {
             "name": leak_name,
             "crate_id": 0,
@@ -94,7 +95,7 @@ def document(
     if semantic:
         for item_id, name in (("5", "DocumentIdentifier"), ("6", "NodeId")):
             paths[item_id] = {
-                "path": [crate, "document", name],
+                "path": [crate, module, name],
                 "kind": "struct",
             }
             index[item_id] = {
@@ -319,10 +320,18 @@ class IworkLeafPublicApiGateTests(unittest.TestCase):
         self.assertEqual(len(failures), 1)
         self.assertIn("physical package type", failures[0])
 
-    def test_public_keynote_document_module_remains_supported(self) -> None:
+    def test_public_keynote_presentation_module_is_the_semantic_root(self) -> None:
         self.assertEqual(
             public_api.violations(document(crate="litchi_keynote"), "litchi_keynote"),
             [],
+        )
+        self.assertEqual(public_api.semantic_module("litchi_keynote"), "presentation")
+
+    def test_retired_keynote_document_module_is_not_the_semantic_root(self) -> None:
+        value = document(crate="litchi_numbers")
+        failures = public_api.violations(value, "litchi_keynote")
+        self.assertEqual(
+            failures, ["missing public module `litchi_keynote::presentation`"]
         )
 
     def test_blanket_dependency_impls_are_ignored(self) -> None:

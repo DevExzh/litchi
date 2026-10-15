@@ -12,7 +12,7 @@ use litchi_iwa_common::wire::{WireView, append_length_delimited_field};
 use litchi_iwa_core::{Archive, SnappyStream};
 use litchi_iwa_protos::{kn, tsd, tsp};
 use litchi_keynote::slide::media::{Point, Size};
-use litchi_keynote::{MovieSelector, Package, ReadOptions, SemanticLimits, SlideSelector};
+use litchi_keynote::{MovieSelector, OpenOptions, Package, SemanticLimits, SlideSelector};
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -1167,15 +1167,8 @@ fn native_audio_position_rejects_non_finite_values_and_wrong_kinds_atomically() 
 
 #[test]
 fn native_audio_position_limits_preempt_publication() -> TestResult {
-    let semantic = SemanticLimits::new(
-        SemanticLimits::MAX_OBJECTS,
-        SemanticLimits::MAX_SLIDES,
-        1,
-        SemanticLimits::MAX_TEXT_STORAGES,
-        SemanticLimits::MAX_TEXT_FRAGMENTS,
-        SemanticLimits::MAX_TEXT_BYTES,
-    )?;
-    let options = ReadOptions::new(Limits::default(), semantic);
+    let semantic = SemanticLimits::builder().max_references(1)?.build()?;
+    let options = OpenOptions::new().semantic_limits(semantic);
     match Package::from_bytes_with_options(NATIVE_BASELINE, options) {
         Err(_) => {},
         Ok(package) => {

@@ -12,7 +12,7 @@ use std::{collections::BTreeMap, env, fs, io, path::PathBuf, time::Duration};
 use litchi_iwa_archive::{Limits, package::Catalog};
 use litchi_iwa_common::shape::geometry::{Point, Size};
 use litchi_keynote::{
-    MediaPart, MovieKind, MovieSelector, Package, ReadOptions, SemanticLimits, SlideSelector,
+    MediaPart, MovieKind, MovieSelector, OpenOptions, Package, SlideSelector, SourceLimits,
     slide::movie::Options,
 };
 
@@ -625,17 +625,15 @@ fn entry_limit_refusal_does_not_mutate_the_source() -> TestResult {
         .max()
         .ok_or_else(|| io::Error::other("empty native fixture"))?;
     let defaults = Limits::default();
-    let limits = Limits::new(
-        defaults.max_input_bytes(),
-        defaults.max_entries(),
-        largest as u64,
-        defaults.max_total_bytes(),
-        defaults.max_iwa_stream_bytes(),
-    )?;
-    let limited = Package::from_bytes_with_options(
-        NATIVE_SOURCE,
-        ReadOptions::new(limits, SemanticLimits::default()),
-    )?;
+    let limits = SourceLimits::builder()
+        .max_input_bytes(defaults.max_input_bytes())?
+        .max_entries(defaults.max_entries())?
+        .max_entry_bytes(largest as u64)?
+        .max_aggregate_bytes(defaults.max_total_bytes())?
+        .max_component_bytes(defaults.max_iwa_stream_bytes())?
+        .build()?;
+    let limited =
+        Package::from_bytes_with_options(NATIVE_SOURCE, OpenOptions::new().source_limits(limits))?;
     let mut oversized_movie = movie;
     oversized_movie.resize(largest + 1, 0);
     let before = exact_bytes(&limited)?;

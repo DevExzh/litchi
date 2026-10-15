@@ -411,7 +411,8 @@ mod time;
 pub mod background;
 pub mod build;
 pub mod chart;
-pub mod document;
+pub mod limits;
+pub mod presentation;
 pub mod show;
 pub mod slide;
 pub mod soundtrack;
@@ -422,16 +423,15 @@ pub use build::{AnimationType, Build};
 pub use chart::{
     Axis, ChartArrangement, ChartCatalog, ChartDescriptor, ChartSelector, ChartSelectorError,
 };
-pub use document::{
-    Document, DocumentIoKind, DocumentReadError, DocumentReadLimitKind, DocumentReadOptions,
-    DocumentSemanticLimitKind, DocumentSemanticLimits, DocumentSemanticLimitsError,
-    DocumentSourceLimitKind, DocumentSourceLimits, DocumentSourceLimitsError, DocumentStats,
-};
 pub use error::{Error, Result};
+pub use limits::{
+    LimitKind, OpenOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsBuilder,
+    SourceLimitKind, SourceLimits, SourceLimitsBuilder,
+};
 pub use litchi_core::Position;
 pub use litchi_iwa_common::chart::data::ChartData;
 /// Maximum canonical `Metadata/Properties.plist` bytes retained by
-/// archive-free document ingress.
+/// archive-free [`Presentation`] ingress.
 pub use litchi_iwa_detect::MAX_PROPERTIES_BYTES as MAX_DOCUMENT_PROPERTIES_BYTES;
 pub use litchi_iwa_text::{TextPosition, TextSpan};
 #[cfg(feature = "internal-iwork-source")]
@@ -442,7 +442,7 @@ pub use package::__decode_slide_drawable_projection;
 pub use package::__decode_slide_node_projection;
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
-pub use package::__semantic_document_from_prepared_source;
+pub use package::__presentation_from_prepared_source;
 #[cfg(feature = "internal-iwork-source")]
 #[doc(hidden)]
 pub use package::{
@@ -463,12 +463,11 @@ pub use package::{
     ChartLegendVisibilityDiagnostics, ChartLegendVisibilityEdit, ChartLegendVisibilityError,
     ChartLegendVisibilityLimitKind, ChartLegendVisibilityPatch, ChartTitleCommit,
     ChartTitleDiagnostics, ChartTitleEdit, ChartTitleError, ChartTitleLimitKind, ChartTitlePatch,
-    Commit, Diagnostics, Edit, EditError, KEYNOTE_PHYSICAL_SORT_OWNER_ACTIVE, Limits, MAX_OBJECTS,
-    MAX_REFERENCES, MAX_SLIDES, MAX_TEXT_BYTES, MAX_TEXT_FRAGMENTS, MAX_TEXT_STORAGES, Package,
-    Patch, PayloadLimitKind, ReadError, ReadOptions, SaveError, SemanticLimitKind, SemanticLimits,
-    SemanticLimitsError, SemanticPath, SlideBackgroundCommit, SlideBackgroundDiagnostics,
-    SlideBackgroundEdit, SlideBackgroundError, SlideBackgroundLimitKind, SlideBackgroundPatch,
-    SlideBuildOrderCommit, SlideBuildOrderDiagnostics, SlideBuildOrderEdit, SlideBuildOrderError,
+    Commit, Diagnostics, Edit, EditError, KEYNOTE_PHYSICAL_SORT_OWNER_ACTIVE, Package, Patch,
+    PayloadLimitKind, ReadError, SaveError, SemanticPath, SlideBackgroundCommit,
+    SlideBackgroundDiagnostics, SlideBackgroundEdit, SlideBackgroundError,
+    SlideBackgroundLimitKind, SlideBackgroundPatch, SlideBuildOrderCommit,
+    SlideBuildOrderDiagnostics, SlideBuildOrderEdit, SlideBuildOrderError,
     SlideBuildOrderLimitKind, SlideBuildOrderPatch, SlideImageAdjustmentsCommit,
     SlideImageAdjustmentsDiagnostics, SlideImageAdjustmentsEdit, SlideImageAdjustmentsError,
     SlideImageAdjustmentsLimitKind, SlideImageAdjustmentsPatch, SlideMovieCaptionCommit,
@@ -542,6 +541,7 @@ pub use package::{
     SlideTableCellNumberFormatPath,
 };
 pub use package::{SlideTableCellsError, SlideTableCellsLimitKind, SlideTableCellsPath};
+pub use presentation::Presentation;
 pub use selector::{
     DrawableSelector, ReplySelector, SlideSelector, SlideSelectorError, SlideSelectorResult,
 };

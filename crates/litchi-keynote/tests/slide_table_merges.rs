@@ -3,7 +3,7 @@
 use std::error::Error as StdError;
 
 use litchi_keynote::{
-    Limits, Package, ReadOptions, SemanticLimits, SlideSelector, SlideTableMergesError,
+    OpenOptions, Package, SemanticLimits, SlideSelector, SlideTableMergesError,
     SlideTableMergesLimitKind, TableSelector, slide::table::merge::Region,
 };
 
@@ -47,17 +47,10 @@ fn merge_read_reports_invalid_table_selector_without_exposing_native_ids()
 #[test]
 fn selection_and_merge_decode_share_the_cumulative_reference_budget()
 -> Result<(), Box<dyn StdError>> {
-    let semantic = SemanticLimits::new(
-        SemanticLimits::MAX_OBJECTS,
-        SemanticLimits::MAX_SLIDES,
-        1,
-        SemanticLimits::MAX_TEXT_STORAGES,
-        SemanticLimits::MAX_TEXT_FRAGMENTS,
-        SemanticLimits::MAX_TEXT_BYTES,
-    )?;
+    let semantic = SemanticLimits::builder().max_references(1)?.build()?;
     let package = Package::from_bytes_with_options(
         NATIVE_SOURCE,
-        ReadOptions::new(Limits::default(), semantic),
+        OpenOptions::new().semantic_limits(semantic),
     )?;
 
     let error = package

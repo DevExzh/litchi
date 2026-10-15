@@ -2,6 +2,7 @@ use std::io;
 use std::sync::Arc;
 
 use litchi_core::Position;
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::{
     decode_varint_from_bytes, encode_varint_into,
@@ -9,7 +10,7 @@ use litchi_iwa_common::{
 };
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{kn, tsa, tsk, tsp};
-use litchi_keynote::{EditError, Limits, Package, ReadError, SlideSelector, SlideSelectorError};
+use litchi_keynote::{EditError, Package, ReadError, SlideSelector, SlideSelectorError};
 use prost::Message;
 
 const DOCUMENT_MEMBER: &str = "Index/Document.iwa";

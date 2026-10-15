@@ -22,7 +22,7 @@ use litchi_iwa_core::{
 use litchi_iwa_protos::{kn, tsa, tsd, tsk, tsp, tst, tswp};
 use litchi_keynote::slide::table::lock::State;
 use litchi_keynote::{
-    Package, ReadOptions, SemanticLimits, SlideSelector, SlideTableLockStateCommit,
+    OpenOptions, Package, SemanticLimits, SlideSelector, SlideTableLockStateCommit,
     SlideTableLockStateDiagnostics, SlideTableLockStateEdit, SlideTableLockStateError,
     SlideTableLockStateLimitKind, SlideTableLockStatePatch, SlideTableLockStatePath, TableSelector,
 };
@@ -931,10 +931,9 @@ fn opaque_metadata_and_data_or_missing_identifier_routes_fail_closed() -> TestRe
 #[test]
 fn lock_state_limits_fail_before_publication_and_keep_source_exact() -> TestResult {
     let source = synthetic_package([None, Some(false), Some(true)])?;
-    let semantic =
-        SemanticLimits::new(1_000_000, 65_536, 1, 1_000_000, 1_000_000, 64 * 1024 * 1024)?;
+    let semantic = SemanticLimits::builder().max_references(1)?.build()?;
     let package =
-        Package::from_bytes_with_options(&source, ReadOptions::new(Limits::default(), semantic))?;
+        Package::from_bytes_with_options(&source, OpenOptions::new().semantic_limits(semantic))?;
     let before = exact_bytes(&package)?;
     assert!(matches!(
         package.slide_table_lock_state(0usize, 0usize),

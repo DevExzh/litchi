@@ -81,8 +81,8 @@ pub(super) fn regions_in_editor(
             "Keynote table model {model_object_id} is not owned by slide {slide_index}"
         )));
     };
-    let options =
-        litchi_keynote::ReadOptions::new(limits, litchi_keynote::SemanticLimits::default());
+    let options = super::focused_keynote_options(limits)
+        .map_err(|_error| Error::KeynoteSlideTableMerges(SlideTableMergesError::InvalidSource))?;
     let reader = MergeReader::__from_shared_catalog(components, options)
         .map_err(map_focused_merges_error)?;
     match reader.slide_table_merges(
@@ -726,7 +726,9 @@ fn map_table_info_error(error: table_info_codec::DecodeError) -> Error {
 
 fn map_projection_error(error: litchi_keynote::ReadError) -> Error {
     Error::KeynoteSlideTableMerges(match error {
-        litchi_keynote::ReadError::NotKeynote => SlideTableMergesError::UnsupportedSource,
+        litchi_keynote::ReadError::UnexpectedFormat { .. } => {
+            SlideTableMergesError::UnsupportedSource
+        },
         litchi_keynote::ReadError::Archive(ArchiveError::Limit {
             kind,
             observed,

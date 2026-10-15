@@ -2257,7 +2257,7 @@ fn map_read_error(error: ReadError) -> ChartAxisTitleError {
         ReadError::Allocation { amount, .. } => ChartAxisTitleError::Allocation { amount },
         ReadError::Archive(_)
         | ReadError::Detection(_)
-        | ReadError::NotKeynote
+        | ReadError::UnexpectedFormat { .. }
         | ReadError::InvalidFormat(_)
         | ReadError::Decode(_)
         | ReadError::TextStorage { .. }

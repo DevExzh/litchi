@@ -24,8 +24,8 @@ use litchi_iwa_common::wire::{append_length_delimited_field, append_varint_field
 use litchi_iwa_core::{Archive, SnappyStream};
 use litchi_iwa_protos::{tsd, tsp};
 use litchi_keynote::{
-    DrawableSelector, DrawableSummary, Limits, Package, ReadOptions, ReplySelector, SemanticLimits,
-    SlideSelector,
+    DrawableSelector, DrawableSummary, OpenOptions, Package, ReplySelector, SemanticLimits,
+    SlideSelector, SourceLimits,
 };
 use prost::Message as _;
 
@@ -68,31 +68,33 @@ fn native_package() -> &'static Package {
     })
 }
 
-fn native_read_options() -> ReadOptions {
+fn native_read_options() -> OpenOptions {
     // The native comment routes perform a package-wide ownership census.  The
     // checked fixture contains 990 IWA objects, so the shared 256-entry fuzz
     // profile would reject this deterministic seed before semantic coverage.
     // Keep the widened profile local to native and hostile-native inputs.
-    static OPTIONS: OnceLock<ReadOptions> = OnceLock::new();
+    static OPTIONS: OnceLock<OpenOptions> = OnceLock::new();
     *OPTIONS.get_or_init(|| {
-        let archive = Limits::new(
-            MAX_PACKAGE_BYTES,
-            NATIVE_MAX_ENTRIES,
-            MAX_ENTRY_BYTES,
-            MAX_EXPANDED_BYTES,
-            MAX_IWA_STREAM_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid native archive limits: {error}"));
-        let semantic = SemanticLimits::new(
-            MAX_OBJECTS,
-            MAX_SLIDES,
-            NATIVE_MAX_REFERENCES,
-            MAX_TEXT_STORAGES,
-            MAX_TEXT_FRAGMENTS,
-            MAX_TEXT_BYTES,
-        )
-        .unwrap_or_else(|error| unreachable!("valid native semantic limits: {error}"));
-        ReadOptions::new(archive, semantic)
+        let archive = SourceLimits::builder()
+            .max_input_bytes(MAX_PACKAGE_BYTES)
+            .and_then(|limits| limits.max_entries(NATIVE_MAX_ENTRIES))
+            .and_then(|limits| limits.max_entry_bytes(MAX_ENTRY_BYTES))
+            .and_then(|limits| limits.max_aggregate_bytes(MAX_EXPANDED_BYTES))
+            .and_then(|limits| limits.max_component_bytes(MAX_IWA_STREAM_BYTES))
+            .and_then(|limits| limits.build())
+            .unwrap_or_else(|error| unreachable!("valid native archive limits: {error}"));
+        let semantic = SemanticLimits::builder()
+            .max_objects(MAX_OBJECTS)
+            .and_then(|limits| limits.max_slides(MAX_SLIDES))
+            .and_then(|limits| limits.max_references(NATIVE_MAX_REFERENCES))
+            .and_then(|limits| limits.max_text_storages(MAX_TEXT_STORAGES))
+            .and_then(|limits| limits.max_text_fragments(MAX_TEXT_FRAGMENTS))
+            .and_then(|limits| limits.max_text_bytes(MAX_TEXT_BYTES))
+            .and_then(|limits| limits.build())
+            .unwrap_or_else(|error| unreachable!("valid native semantic limits: {error}"));
+        OpenOptions::new()
+            .source_limits(archive)
+            .semantic_limits(semantic)
     })
 }
 
@@ -935,18 +937,18 @@ fn exercise_invalid_selectors(package: &Package, source_bytes: &[u8]) {
 fn exercise_limit_budget_once() {
     static RUN: OnceLock<()> = OnceLock::new();
     RUN.get_or_init(|| {
-        let semantic = SemanticLimits::new(
-            MAX_OBJECTS,
-            MAX_SLIDES,
-            1,
-            MAX_TEXT_STORAGES,
-            MAX_TEXT_FRAGMENTS,
-            MAX_TEXT_BYTES,
-        )
-        .unwrap_or_else(|error| panic!("finite comment semantic limit must build: {error}"));
+        let semantic = SemanticLimits::builder()
+            .max_objects(MAX_OBJECTS)
+            .and_then(|limits| limits.max_slides(MAX_SLIDES))
+            .and_then(|limits| limits.max_references(1))
+            .and_then(|limits| limits.max_text_storages(MAX_TEXT_STORAGES))
+            .and_then(|limits| limits.max_text_fragments(MAX_TEXT_FRAGMENTS))
+            .and_then(|limits| limits.max_text_bytes(MAX_TEXT_BYTES))
+            .and_then(|limits| limits.build())
+            .unwrap_or_else(|error| panic!("finite comment semantic limit must build: {error}"));
         match Package::from_bytes_with_options(
             NATIVE_KEYNOTE,
-            ReadOptions::new(Limits::default(), semantic),
+            OpenOptions::new().semantic_limits(semantic),
         ) {
             Err(error) => observe_error(error),
             Ok(package) => {

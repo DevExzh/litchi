@@ -190,6 +190,30 @@ fn focused_table_index(
     })
 }
 
+/// Describe a validated physical iWork archive profile as the focused Keynote
+/// ingress envelope.
+///
+/// The focused owner accepts the archive dimensions it names
+/// ([`litchi_keynote::SourceLimits`]); every other neutral IWA dimension keeps
+/// its default.
+pub(super) fn focused_keynote_options(
+    limits: litchi_iwa_archive::Limits,
+) -> std::result::Result<litchi_keynote::OpenOptions, litchi_keynote::Error> {
+    let archive = limits.archive_limits();
+    let source = litchi_keynote::SourceLimits::builder()
+        .max_input_bytes(limits.max_input_bytes())?
+        .max_entries(limits.max_entries())?
+        .max_entry_bytes(limits.max_entry_bytes())?
+        .max_aggregate_bytes(limits.max_total_bytes())?
+        .max_component_bytes(limits.max_iwa_stream_bytes())?
+        .max_component_objects(archive.max_objects())?
+        .max_component_messages(archive.max_messages())?
+        .max_message_bytes(archive.max_message_bytes())?
+        .max_header_fields(archive.max_header_fields())?
+        .build()?;
+    Ok(litchi_keynote::OpenOptions::new().source_limits(source))
+}
+
 fn focused_table_package(editor: &KeynoteEditor) -> Result<litchi_keynote::Package> {
     let package_limits = editor.package().limits();
     let archive_limits = litchi_iwa_archive::Limits::new(
@@ -202,8 +226,8 @@ fn focused_table_package(editor: &KeynoteEditor) -> Result<litchi_keynote::Packa
     .map_err(|error| Error::InvalidFormat(format!("focused Keynote limits: {error}")))?
     .with_archive_limits(package_limits.effective_archive_limits()?)
     .map_err(|error| Error::InvalidFormat(format!("focused Keynote archive limits: {error}")))?;
-    let options =
-        litchi_keynote::ReadOptions::new(archive_limits, litchi_keynote::SemanticLimits::default());
+    let options = focused_keynote_options(archive_limits)
+        .map_err(|error| Error::InvalidFormat(format!("focused Keynote limits: {error}")))?;
     if let Some(source) = editor.package().exact_source_owner() {
         return litchi_keynote::Package::__from_shared_source_with_options(source, options)
             .map_err(|error| {
@@ -212,7 +236,7 @@ fn focused_table_package(editor: &KeynoteEditor) -> Result<litchi_keynote::Packa
     }
 
     let bytes = editor.package().to_bytes()?;
-    litchi_keynote::Package::from_bytes_with_limits(&bytes, archive_limits).map_err(|error| {
+    litchi_keynote::Package::from_bytes_with_options(&bytes, options).map_err(|error| {
         Error::InvalidFormat(format!("focused Keynote table source failed: {error}"))
     })
 }
