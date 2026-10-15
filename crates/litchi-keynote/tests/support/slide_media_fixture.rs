@@ -99,7 +99,6 @@ fn movie_payload(movie: usize) -> TestResult<Vec<u8>> {
                 }),
                 flags: Some(0x20),
                 angle: Some(17.5),
-                ..Default::default()
             }),
             parent: Some(reference(SLIDE)),
             title: Some(reference(TITLES[movie])),

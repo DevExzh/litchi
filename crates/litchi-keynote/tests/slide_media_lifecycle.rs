@@ -129,7 +129,7 @@ fn with_repeated_content_owner(source: &[u8], repeats: usize) -> TestResult<Vec<
         .first_mut()
         .ok_or_else(|| io::Error::other("missing repeated-owner message metadata"))?;
     let mut data_references = Vec::with_capacity(repeats as usize + 1);
-    data_references.extend(std::iter::repeat(fixture::CONTENT_DATA).take(repeats as usize));
+    data_references.extend(std::iter::repeat_n(fixture::CONTENT_DATA, repeats as usize));
     data_references.push(fixture::POSTER_DATA);
     info.data_references = data_references;
     let source = fixture::replace_document_archive(source, archive)?;
@@ -373,11 +373,7 @@ fn native_component_containing_object(
         .map_err(Into::into)
 }
 
-fn native_object_message<'a>(
-    archive: &'a Archive,
-    identifier: u64,
-    type_: u32,
-) -> TestResult<&'a [u8]> {
+fn native_object_message(archive: &Archive, identifier: u64, type_: u32) -> TestResult<&[u8]> {
     archive
         .object(identifier)
         .and_then(|object| {
@@ -649,9 +645,7 @@ fn native_metadata(source: &[u8]) -> TestResult<tsp::PackageMetadata> {
     )?)
 }
 
-fn native_document_component<'a>(
-    metadata: &'a tsp::PackageMetadata,
-) -> TestResult<&'a tsp::ComponentInfo> {
+fn native_document_component(metadata: &tsp::PackageMetadata) -> TestResult<&tsp::ComponentInfo> {
     metadata
         .components
         .iter()

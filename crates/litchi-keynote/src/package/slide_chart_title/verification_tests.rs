@@ -205,11 +205,7 @@ fn stylesheet_registration(package: &Package, target_identifier: u64) -> (u64, u
                     .message_infos
                     .get(message_index)
                     .expect("stylesheet message metadata");
-                if info
-                    .object_references
-                    .iter()
-                    .any(|identifier| *identifier == target_identifier)
-                {
+                if info.object_references.contains(&target_identifier) {
                     assert!(
                         selected
                             .replace((object_identifier, message_index))

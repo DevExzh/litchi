@@ -111,7 +111,7 @@ fn component_containing_object(source: &[u8], identifier: u64) -> TestResult<(St
         .map_err(Into::into)
 }
 
-fn object_message<'a>(archive: &'a Archive, identifier: u64, type_: u32) -> TestResult<&'a [u8]> {
+fn object_message(archive: &Archive, identifier: u64, type_: u32) -> TestResult<&[u8]> {
     archive
         .object(identifier)
         .and_then(|object| {
@@ -269,9 +269,7 @@ fn metadata_from_payload(payload: &[u8]) -> TestResult<tsp::PackageMetadata> {
     Ok(metadata)
 }
 
-fn document_component<'a>(
-    metadata: &'a tsp::PackageMetadata,
-) -> TestResult<&'a tsp::ComponentInfo> {
+fn document_component(metadata: &tsp::PackageMetadata) -> TestResult<&tsp::ComponentInfo> {
     metadata
         .components
         .iter()

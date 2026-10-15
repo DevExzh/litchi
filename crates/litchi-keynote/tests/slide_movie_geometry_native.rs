@@ -112,7 +112,7 @@ fn native_arrange_oracle_retains_original_size_rotation_and_reflection() -> R {
             assert_ne!(geometry.flags.unwrap_or_default() & 4, 0);
             let size = geometry.size.expect("native displayed size");
             assert_eq!((size.width, size.height), (320.0, 180.0));
-            assert_eq!(movie.original_size, Some(size.clone()));
+            assert_eq!(movie.original_size, Some(size));
             assert_eq!(movie.natural_size, Some(size));
         }
     }

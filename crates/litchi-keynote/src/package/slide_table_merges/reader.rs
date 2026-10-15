@@ -516,6 +516,7 @@ mod tests {
                             .checked_add(1)
                             .ok_or("synthetic slide identifier overflow")?;
                         show.slide_tree.slides.push(reference(node_identifier));
+                        #[allow(deprecated, reason = "the required native field is deprecated")]
                         let node = kn::SlideNodeArchive {
                             slide: Some(reference(slide_identifier)),
                             is_skipped: false,

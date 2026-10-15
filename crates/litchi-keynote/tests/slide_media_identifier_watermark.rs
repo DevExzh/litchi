@@ -701,9 +701,9 @@ fn assert_native_saved_candidate(
 fn assert_native_saved_bytes(bytes: &[u8], expected_media_count: usize) -> TestResult {
     let package = Package::from_bytes(bytes)?;
     package.validate()?;
-    assert_eq!(native_media_ids(&bytes)?.len(), expected_media_count);
-    let saved_watermark = watermark(&bytes)?;
-    let saved_physical_maximum = physical_maximum(&bytes)?;
+    assert_eq!(native_media_ids(bytes)?.len(), expected_media_count);
+    let saved_watermark = watermark(bytes)?;
+    let saved_physical_maximum = physical_maximum(bytes)?;
     assert!(saved_watermark >= saved_physical_maximum);
     eprintln!(
         "native saved watermark receipt: watermark={saved_watermark}, physical_maximum={saved_physical_maximum}, media_count={expected_media_count}"

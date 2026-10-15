@@ -59,7 +59,7 @@ fn with_dangling_header_reference(source: &[u8]) -> TestResult<Vec<u8>> {
         let mut archive = Archive::parse(stream.as_bytes())?;
         let mut changed = false;
         for object in &mut archive.objects {
-            for message_info in &mut object.archive_info.message_infos {
+            if let Some(message_info) = object.archive_info.message_infos.first_mut() {
                 if message_info.field_infos.is_empty() {
                     message_info.field_infos.push(FieldInfo::new(vec![99_999]));
                 }
@@ -68,7 +68,6 @@ fn with_dangling_header_reference(source: &[u8]) -> TestResult<Vec<u8>> {
                     .object_references
                     .push(DANGLING_REFERENCE);
                 changed = true;
-                break;
             }
             if changed {
                 break;

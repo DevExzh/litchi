@@ -356,11 +356,7 @@ fn native_component_stream_containing_object(
     .into())
 }
 
-fn native_object_message<'a>(
-    archive: &'a Archive,
-    identifier: u64,
-    type_: u32,
-) -> TestResult<&'a [u8]> {
+fn native_object_message(archive: &Archive, identifier: u64, type_: u32) -> TestResult<&[u8]> {
     archive
         .object(identifier)
         .and_then(|object| {
@@ -670,7 +666,6 @@ fn with_native_unselected_comment_reply(
             ..Default::default()
         }],
         storage_uuid: Some(SYNTHETIC_SURVIVING_COMMENT_UUID),
-        ..Default::default()
     }
     .encode_to_vec();
     let mut object = ArchiveObject::new(

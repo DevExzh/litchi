@@ -1647,6 +1647,10 @@ mod tests {
 
     use super::*;
 
+    #[allow(
+        deprecated,
+        reason = "the fixture authors the deprecated integer loop field"
+    )]
     fn payload() -> Vec<u8> {
         tsd::MovieArchive {
             super_: tsd::DrawableArchive::default(),
@@ -1686,6 +1690,10 @@ mod tests {
     }
 
     #[test]
+    #[allow(
+        deprecated,
+        reason = "the fixture authors the deprecated integer loop field"
+    )]
     fn borrowed_payload_reader_rejects_conflicting_loop_fields() {
         let source = tsd::MovieArchive {
             super_: tsd::DrawableArchive::default(),

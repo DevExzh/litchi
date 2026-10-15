@@ -187,10 +187,10 @@ fn native_metadata(source: &[u8]) -> TestResult<tsp::PackageMetadata> {
     Ok(tsp::PackageMetadata::decode(payload.as_slice())?)
 }
 
-fn metadata_component<'a>(
-    metadata: &'a tsp::PackageMetadata,
+fn metadata_component(
+    metadata: &tsp::PackageMetadata,
     identifier: u64,
-) -> TestResult<&'a tsp::ComponentInfo> {
+) -> TestResult<&tsp::ComponentInfo> {
     metadata
         .components
         .iter()
@@ -199,10 +199,7 @@ fn metadata_component<'a>(
         .map_err(Into::into)
 }
 
-fn data_record<'a>(
-    metadata: &'a tsp::PackageMetadata,
-    identifier: u64,
-) -> TestResult<&'a tsp::DataInfo> {
+fn data_record(metadata: &tsp::PackageMetadata, identifier: u64) -> TestResult<&tsp::DataInfo> {
     metadata
         .datas
         .iter()

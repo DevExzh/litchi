@@ -381,7 +381,7 @@ fn strict_native_saved_readback(expected: Point) -> TestResult {
         "unselected Audio B position changed"
     );
 
-    for index in 0..baseline_media.len() {
+    for (index, _) in baseline_media.iter().enumerate() {
         assert_eq!(
             saved.slide_media_data(
                 SlideSelector::index(0),

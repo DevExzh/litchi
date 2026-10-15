@@ -89,12 +89,12 @@ fn assert_common_movie_state(before: &Package, after: &Package) -> TestResult {
     let before_slide = before
         .show()?
         .slides()
-        .get(0)
+        .first()
         .ok_or_else(|| io::Error::other("missing source slide"))?;
     let after_slide = after
         .show()?
         .slides()
-        .get(0)
+        .first()
         .ok_or_else(|| io::Error::other("missing candidate slide"))?;
     assert_eq!(before_slide.movies(), after_slide.movies());
     assert_eq!(
@@ -328,7 +328,7 @@ fn native_fixture_admits_shared_media_and_preserves_semantic_context() -> TestRe
     let show = package.show()?;
     let slide = show
         .slides()
-        .get(0)
+        .first()
         .ok_or_else(|| io::Error::other("missing native slide"))?;
     for (movie_position, x) in [(2, 200.0_f32), (3, 700.0_f32)] {
         let media = slide.movies()[movie_position];
