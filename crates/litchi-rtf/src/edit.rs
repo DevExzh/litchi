@@ -29,6 +29,7 @@ use std::ops::Range;
 mod composition;
 mod destination_splice;
 mod picture_payload;
+mod producer_paragraphs;
 mod transfer;
 pub use composition::{
     Composition, CompositionConflict, CompositionError, CompositionLimits, ConflictSet,
@@ -5038,6 +5039,53 @@ impl Edit {
     /// Returns an error when the changed source is outside the supported
     /// closure or candidate validation/readback fails.
     pub fn commit(self) -> Result<Commit, Error> {
+        // A paragraph removal, move or swap that the plain-body paths refuse
+        // falls back to exact source splicing of producer paragraphs
+        // (record 0293), whose typed refusal names the producer construct.
+        self.ensure_operation_room_for(0)?;
+        self.admit_replacement(0)?;
+        // Moves and swaps try the splice first: the lifecycle projection
+        // rewrites the body, while the splice keeps every source byte.
+        match self.operations.as_slice() {
+            [operation @ Operation::RemoveParagraph { .. }] => {
+                let operation = operation.clone();
+                let source = self.source.clone();
+                match self.commit_staged() {
+                    Err(Error::UnsupportedSource(_)) => {
+                        producer_paragraphs::commit(source, &operation)
+                    },
+                    result => result,
+                }
+            },
+            [
+                operation @ (Operation::MoveParagraph {
+                    position,
+                    final_position,
+                    ..
+                }
+                | Operation::SwapParagraph {
+                    first: position,
+                    second: final_position,
+                    ..
+                }),
+            ] if position != final_position => {
+                match producer_paragraphs::commit(self.source.clone(), &operation.clone()) {
+                    Err(Error::UnsupportedSource(reason)) => {
+                        self.commit_staged().map_err(|error| match error {
+                            // The splice's refusal names the producer
+                            // construct; prefer it to the projection's.
+                            Error::UnsupportedSource(_) => Error::UnsupportedSource(reason),
+                            other => other,
+                        })
+                    },
+                    result => result,
+                }
+            },
+            _ => self.commit_staged(),
+        }
+    }
+
+    fn commit_staged(self) -> Result<Commit, Error> {
         self.ensure_operation_room_for(0)?;
         self.admit_replacement(0)?;
         let operation_count = self.operations.len();
