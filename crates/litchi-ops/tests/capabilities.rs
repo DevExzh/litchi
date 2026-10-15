@@ -157,8 +157,8 @@ fn ordinary_reports_hide_native_selection_fields() {
             "cell" => (true, false, true),
             // Record 0251c: comments are added and removed.
             "table" | "row" | "comment" => (false, true, true),
-            // Record 0251d: pictures are added.
-            "picture" => (false, true, false),
+            // Record 0251d: pictures are added; record 0295: SmartArt too.
+            "picture" | "smartart" => (false, true, false),
             // Record 0283: charts are added, set and removed.
             "chart" => (true, true, true),
             "sdt" => (false, false, true),
@@ -272,6 +272,26 @@ fn ordinary_reports_hide_native_selection_fields() {
                 assert!(property.get(), "comment {}", property.name());
                 assert!(!property.set(), "comment {}", property.name());
                 assert!(property.add(), "comment {}", property.name());
+            } else if element.name() == "smartart" {
+                // Record 0295: layout, text, name, alternative text and
+                // extent seed a new graphic; the projection reads layout,
+                // its identifier, the node count and the outline.
+                assert!(!property.set(), "smartart {}", property.name());
+                assert_eq!(
+                    property.add(),
+                    !matches!(property.name(), "layoutId" | "nodeCount"),
+                    "smartart {}",
+                    property.name()
+                );
+                assert_eq!(
+                    property.get(),
+                    matches!(
+                        property.name(),
+                        "layout" | "layoutId" | "nodeCount" | "text"
+                    ),
+                    "smartart {}",
+                    property.name()
+                );
             } else if element.name() == "chart" {
                 // Record 0283: chart keys seed a new chart and most are
                 // also settable; the registry declares each.

@@ -597,6 +597,7 @@ pub(crate) static WORD: Vocabulary = Vocabulary {
         ("series", "series"),
         ("settings", "settings"),
         ("shape", "shape"),
+        ("smartart", "smartart"),
         ("style", "style"),
         ("styles", "styles"),
         ("tab", "tab"),
@@ -663,6 +664,7 @@ pub(crate) static WORD: Vocabulary = Vocabulary {
         ElementRule::new("series"),
         ElementRule::new("settings"),
         ElementRule::new("shape"),
+        ElementRule::new("smartart"),
         ElementRule::new("style"),
         ElementRule::new("styles").named(Named::Only {
             child: "style",

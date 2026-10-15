@@ -780,6 +780,7 @@ fn write_cell(output: &mut Vec<u8>, source: &[u8], cell: &CellSlot, action: &Act
             Payload::Set(_)
                 | Payload::SharedString { .. }
                 | Payload::SharedFormula { .. }
+                | Payload::Rich(_)
                 | Payload::Cache(_)
         )
     });
@@ -846,7 +847,10 @@ fn write_new_action(
     let content = payload.as_ref().filter(|payload| {
         matches!(
             payload,
-            Payload::Set(_) | Payload::SharedString { .. } | Payload::SharedFormula { .. }
+            Payload::Set(_)
+                | Payload::SharedString { .. }
+                | Payload::SharedFormula { .. }
+                | Payload::Rich(_)
         )
     });
     let name = sibling_name(row_name, "c");
@@ -884,6 +888,7 @@ fn payload_type(payload: &Payload) -> Option<&'static str> {
     match payload {
         Payload::Set(content) => content_type(content),
         Payload::SharedString { .. } => Some("s"),
+        Payload::Rich(_) => Some("inlineStr"),
         Payload::SharedFormula { .. } => None,
         Payload::Cache(value) => match value {
             Value::Bool(_) => Some("b"),
@@ -908,6 +913,7 @@ fn write_payload(output: &mut Vec<u8>, cell_name: &str, payload: &Payload) -> Re
             reference,
             formula,
         } => write_shared_formula(output, cell_name, *index, reference, formula.as_ref()),
+        Payload::Rich(rich) => write_rich(output, cell_name, rich),
         Payload::Clear | Payload::ClearIfPresent | Payload::Cache(_) => Ok(()),
     }
 }
@@ -1023,6 +1029,53 @@ fn write_content(output: &mut Vec<u8>, cell_name: &str, content: &Content) -> Re
             write_text_element(output, cell_name, "f", &escape_xml(formula.text()));
         },
     }
+    Ok(())
+}
+
+/// Write `rich` as an inline string: one `r` per run, its `rPr` children
+/// re-emitted with the cell's namespace prefix and their attributes as
+/// stored (record 0295).
+fn write_rich(output: &mut Vec<u8>, cell_name: &str, rich: &crate::cell::RichText) -> Result<()> {
+    let inline = sibling_name(cell_name, "is");
+    let run = sibling_name(cell_name, "r");
+    let properties = sibling_name(cell_name, "rPr");
+    let text = sibling_name(cell_name, "t");
+    let open = |output: &mut Vec<u8>, name: &str| {
+        output.push(b'<');
+        output.extend_from_slice(name.as_bytes());
+        output.push(b'>');
+    };
+    let close = |output: &mut Vec<u8>, name: &str| {
+        output.extend_from_slice(b"</");
+        output.extend_from_slice(name.as_bytes());
+        output.push(b'>');
+    };
+    open(output, &inline);
+    for item in rich.runs() {
+        require_xml_text(item.text())?;
+        open(output, &run);
+        if let Some(children) = item.properties.as_deref() {
+            open(output, &properties);
+            for (local, attributes) in children {
+                let name = sibling_name(cell_name, local);
+                output.push(b'<');
+                output.extend_from_slice(name.as_bytes());
+                if !attributes.is_empty() {
+                    output.push(b' ');
+                    output.extend_from_slice(attributes.as_bytes());
+                }
+                output.extend_from_slice(b"/>");
+            }
+            close(output, &properties);
+        }
+        output.push(b'<');
+        output.extend_from_slice(text.as_bytes());
+        output.extend_from_slice(b" xml:space=\"preserve\">");
+        output.extend_from_slice(escape_xml(&encode_spreadsheet_text(item.text())).as_bytes());
+        close(output, &text);
+        close(output, &run);
+    }
+    close(output, &inline);
     Ok(())
 }
 

@@ -1066,7 +1066,10 @@ fn invalid_query() -> Error {
 /// the preceding native edit has been published, which preserves insert,
 /// remove, and missing-cell semantics.
 /// CSV/TSV import through one native edit (record 0266).
+pub(crate) mod find;
 pub(crate) mod import;
+#[cfg(feature = "eval")]
+pub(crate) mod refresh;
 
 pub(crate) mod coalesce {
     use super::{

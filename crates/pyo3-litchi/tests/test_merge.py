@@ -51,10 +51,25 @@ class MergeTests(unittest.TestCase):
         with self.assertRaises(L.PropertyError):
             template().merge('[{"a": 1}, {"a": 2}]')
         with self.assertRaises(L.UnsupportedError):
-            L.create("xlsb").merge({})
+            L.create("odg").merge({})
         with self.assertRaises(L.LitchiError) as caught:
             template().merge({"name": "x", "order": {"total": 1}}, max_replacements=1)
         self.assertEqual(caught.exception.code, "limit_exceeded")
+
+
+    def test_more_formats_merge(self):
+        # Record 0295: binary, legacy, RTF and ODF templates merge too.
+        book = L.create("xlsb").set("/Sheet1/A1", {"value": "Hi {{who}}"})
+        self.assertEqual(book.merge({"who": "you"}).file.get("/Sheet1/A1", depth=0)["text"], "Hi you")
+        text, _ = L.create("odt").add("/body", "paragraph", {"text": "Dear {{who}}"})
+        self.assertEqual(text.merge({"who": "Ada"}).file.text(), "Dear Ada")
+        sheet = L.create("ods").set("/Sheet1/A1", {"value": "{{n}} items"})
+        self.assertEqual(sheet.merge({"n": 3}).file.get("/Sheet1/A1", depth=0)["text"], "3 items")
+
+    def test_find_replace_on_more_formats(self):
+        text, _ = L.create("odt").add("/body", "paragraph", {"text": "draft one, draft two"})
+        commit = text.apply({"command": "set", "path": "/", "props": {"find": "draft", "replace": "final"}})
+        self.assertEqual(commit.file.text(), "final one, final two")
 
 
 if __name__ == "__main__":

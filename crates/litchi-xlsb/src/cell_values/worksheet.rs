@@ -983,8 +983,10 @@ impl Edit {
     /// Replace a value while retaining its existing BIFF12 storage family.
     ///
     /// Strings may change UTF-16 length. RK replacements must be exactly
-    /// representable. Formula variants alter only cached results; use
-    /// [`Self::set_formula`] to replace the inert formula payload.
+    /// representable. Formula variants alter only cached results, and may
+    /// change the cached result's type (a number cache becoming a string
+    /// cache, record 0295); use [`Self::set_formula`] to replace the inert
+    /// formula payload.
     ///
     /// # Errors
     ///
@@ -2438,6 +2440,13 @@ fn validate_replacement(original: &Value, replacement: &Value) -> Result<()> {
 }
 
 fn same_storage_family(left: &Value, right: &Value) -> bool {
+    // A formula record keeps its formula whatever its cached result is: the
+    // record is re-encoded from the cache and the retained formula, so the
+    // four `BrtFmla*` families are one family for a cache write (record
+    // 0295).
+    if left.is_formula_cache() && right.is_formula_cache() {
+        return true;
+    }
     matches!(
         (left, right),
         (Value::Blank, Value::Blank)
@@ -3627,6 +3636,57 @@ mod tests {
             commit.patch().inverse().apply(&after).expect("revert"),
             before
         );
+    }
+
+    /// Record 0295: a formula record's cache may change type; the record is
+    /// re-encoded with its formula, and the patch inverts exactly.
+    #[test]
+    fn formula_caches_change_type_and_keep_their_formula() {
+        let before = stream();
+        let snapshot = read(&before).expect("snapshot");
+        let number = Reference::new(3, 6).expect("formula number");
+        let string = Reference::new(3, 11).expect("formula string");
+        let formula = snapshot
+            .cell(number)
+            .expect("lookup")
+            .expect("formula")
+            .formula
+            .clone();
+        let mut edit = snapshot.edit();
+        edit.set_formula_string_cache(number, "eleven".to_string())
+            .expect("number to string");
+        edit.set_formula_number_cache(string, 2.5)
+            .expect("string to number");
+        assert!(
+            edit.set_number(number, 1.0).is_err(),
+            "a plain value stays refused"
+        );
+        let commit = edit.commit().expect("commit");
+        let after = commit
+            .snapshot()
+            .cell(number)
+            .expect("lookup")
+            .expect("cell");
+        assert_eq!(
+            after.value(),
+            &Value::FormulaStringCache("eleven".to_string())
+        );
+        assert_eq!(after.formula, formula);
+        assert_eq!(
+            commit
+                .snapshot()
+                .cell(string)
+                .expect("lookup")
+                .expect("cell")
+                .value(),
+            &Value::FormulaNumberCache(2.5)
+        );
+        let restored = commit
+            .patch()
+            .inverse()
+            .apply(commit.snapshot().source_bytes())
+            .expect("inverse");
+        assert_eq!(restored, before);
     }
 
     #[test]

@@ -69,20 +69,17 @@ impl File {
             if !admitted {
                 super::admit(self)?;
             }
-            let (step, summary) = run(self, options, limits)?;
-            let mut steps = Vec::new();
-            let mut snapshot_bytes = 0;
-            if let Some(step) = step {
-                if step.snapshot_bytes > limits.max_snapshot_bytes() {
-                    return Err(Error::Limit {
-                        kind: LimitKind::SnapshotBytes,
-                        observed: step.snapshot_bytes,
-                        maximum: limits.max_snapshot_bytes(),
-                    }
-                    .into());
+            let (steps, summary) = run_steps(self, options, limits)?;
+            let snapshot_bytes = steps.iter().fold(0usize, |bytes, step| {
+                bytes.saturating_add(step.snapshot_bytes)
+            });
+            if snapshot_bytes > limits.max_snapshot_bytes() {
+                return Err(Error::Limit {
+                    kind: LimitKind::SnapshotBytes,
+                    observed: snapshot_bytes,
+                    maximum: limits.max_snapshot_bytes(),
                 }
-                snapshot_bytes = step.snapshot_bytes;
-                steps.push(step);
+                .into());
             }
             let changed = super::changed(&steps)?;
             let file = match steps.last() {
@@ -144,29 +141,48 @@ impl Edit {
                 }
                 .into());
             }
-            let (step, summary) = run(&self.current, options, &self.limits)?;
-            if let Some(step) = step {
-                let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
-                if bytes > self.limits.max_snapshot_bytes() {
-                    return Err(Error::Limit {
-                        kind: LimitKind::SnapshotBytes,
-                        observed: bytes,
-                        maximum: self.limits.max_snapshot_bytes(),
-                    }
-                    .into());
+            let (steps, summary) = run_steps(&self.current, options, &self.limits)?;
+            let bytes = steps.iter().fold(self.snapshot_bytes, |bytes, step| {
+                bytes.saturating_add(step.snapshot_bytes)
+            });
+            if bytes > self.limits.max_snapshot_bytes() {
+                return Err(Error::Limit {
+                    kind: LimitKind::SnapshotBytes,
+                    observed: bytes,
+                    maximum: self.limits.max_snapshot_bytes(),
                 }
-                self.steps
-                    .try_reserve(1)
-                    .map_err(|source| Error::Allocation { source })?;
+                .into());
+            }
+            self.steps
+                .try_reserve(steps.len())
+                .map_err(|source| Error::Allocation { source })?;
+            for step in steps {
                 self.current = step.after.clone();
                 self.steps.push(step);
-                self.snapshot_bytes = bytes;
             }
+            self.snapshot_bytes = bytes;
             self.operations += 1;
             Ok(summary)
         })();
         result.map_err(|error| self.poison(error, index))
     }
+}
+
+/// Refresh through the format's native editor: the native commits, each
+/// on the previous one's result (one, except for chunked XLS edits).
+fn run_steps(
+    file: &File,
+    options: &Options,
+    limits: &SemanticLimits,
+) -> Result<(Vec<super::Step>, Summary)> {
+    #[cfg(all(feature = "xls", feature = "eval"))]
+    if let File::Xls(handle) = file {
+        let (commits, summary) =
+            crate::format::xls::write::refresh::refresh(file, handle, options, limits)?;
+        return Ok((super::xls_steps(commits)?, summary));
+    }
+    let (step, summary) = run(file, options, limits)?;
+    Ok((step.into_iter().collect(), summary))
 }
 
 /// Refresh through the format's native editor: at most one native commit.
@@ -202,24 +218,40 @@ fn run(
                 None => Ok((None, summary)),
             }
         },
-        #[cfg(all(feature = "eval", any(feature = "xlsb", feature = "xls")))]
-        _ if matches!(
-            file.format(),
-            Some(litchi_core::FileFormat::Xlsb | litchi_core::FileFormat::Xls)
-        ) =>
-        {
-            if options.writes_cache() {
-                return Err(crate::Error::new(
-                    Code::UnsupportedCapability,
-                    "formula cache write-back is implemented for XLSX workbooks",
-                )
-                .with_suggestion("refresh without write_cache for a report, or convert to XLSX"));
+        #[cfg(feature = "doc")]
+        File::Doc(handle) => {
+            let (commit, summary) = crate::format::doc::refresh::refresh(handle, options, limits)?;
+            match commit {
+                Some(commit) => Ok((Some(super::wrap_doc(handle, commit, ())?.0), summary)),
+                None => Ok((None, summary)),
             }
-            let report = file.recalculate(options.calc_options())?;
-            Ok((
-                None,
-                crate::refresh::workbook_summary(file, &report, false)?,
-            ))
+        },
+        #[cfg(feature = "odt")]
+        File::Odt(handle) | File::Oth(handle) | File::Odm(handle) => {
+            let (commit, summary) =
+                crate::format::odt::write::refresh::refresh(handle, options, limits)?;
+            match commit {
+                Some(commit) => Ok((Some(super::wrap_odt(handle, commit, ())?.0), summary)),
+                None => Ok((None, summary)),
+            }
+        },
+        #[cfg(feature = "odp")]
+        File::Odp(handle) => {
+            let (commit, summary) =
+                crate::format::odp::write::refresh::refresh(handle, options, limits)?;
+            match commit {
+                Some(commit) => Ok((Some(super::wrap_odp(handle, commit, ())?.0), summary)),
+                None => Ok((None, summary)),
+            }
+        },
+        #[cfg(all(feature = "xlsb", feature = "eval"))]
+        File::Xlsb(handle) => {
+            let (commit, summary) =
+                crate::format::xlsb::write::refresh::refresh(file, handle, options, limits)?;
+            match commit {
+                Some(commit) => Ok((Some(super::wrap_xlsb(handle, commit, ())?.0), summary)),
+                None => Ok((None, summary)),
+            }
         },
         _ => {
             let _ = (options, limits);
@@ -231,9 +263,11 @@ fn run(
 fn unsupported(file: &File) -> crate::Error {
     let error = crate::Error::new(
         Code::UnsupportedCapability,
-        "field refresh recomputes DOCX fields, PPTX slide fields and workbook formulas",
+        "this format has no field refresh adapter",
     )
-    .with_suggestion("refresh a DOCX, PPTX or XLSX file");
+    .with_suggestion(
+        "refresh a DOCX, DOC, ODT, PPTX, ODP or workbook file (record 0295 follow-up)",
+    );
     match file.format() {
         Some(format) => error.with_format(format),
         None => error,

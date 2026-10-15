@@ -12,7 +12,7 @@ import unittest
 
 from _support import L, fixture, typed_dict_fields
 
-WORKBOOKS = ("xlsx", "xlsb", "xls")
+WORKBOOKS = ("xlsx", "xlsb", "xls", "ods")
 
 
 def cell_text(file, path):

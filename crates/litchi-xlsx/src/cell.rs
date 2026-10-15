@@ -486,6 +486,117 @@ impl fmt::Display for Number {
     }
 }
 
+/// The rich-text runs of one cell (record 0295): each run's text and its
+/// run properties (`rPr`) exactly as the source item spells them, so a run
+/// text can change while every run keeps its formatting.
+///
+/// Read with [`crate::Worksheet::rich_text`], changed with
+/// [`RichText::set_run_text`], written with
+/// [`crate::WorksheetEdit::set_rich_text`] as the cell's own inline rich
+/// string.
+///
+/// ```
+/// # fn main() -> litchi_xlsx::Result<()> {
+/// use litchi_xlsx::{Package, RichText};
+///
+/// let mut edit = Package::new()?.edit()?;
+/// let mut rich = RichText::plain("Hello");
+/// rich.set_run_text(0, "Bye")?;
+/// edit.sheet("Sheet1")?.expect("worksheet").set_rich_text("A1", rich)?;
+/// let workbook = edit.commit()?.into_package().workbook();
+/// let sheet = workbook.sheet("Sheet1")?.expect("worksheet");
+/// assert!(sheet.has_rich_text("A1")?);
+/// # Ok(())
+/// # }
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RichText {
+    runs: Vec<RichRun>,
+}
+
+/// One run of a [`RichText`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RichRun {
+    /// The `rPr` children as `(local name, raw attributes)`; `None` for a
+    /// run without `rPr`.
+    pub(crate) properties: Option<Box<[(Box<str>, Box<str>)]>>,
+    text: String,
+}
+
+impl RichText {
+    /// One unformatted run holding `text`.
+    #[must_use]
+    pub fn plain(text: impl Into<String>) -> Self {
+        Self {
+            runs: vec![RichRun {
+                properties: None,
+                text: text.into(),
+            }],
+        }
+    }
+
+    pub(crate) fn from_runs(runs: Vec<RichRun>) -> Self {
+        Self { runs }
+    }
+
+    /// The runs, in order.
+    #[must_use]
+    pub fn runs(&self) -> &[RichRun] {
+        &self.runs
+    }
+
+    /// The visible text: every run's text, joined.
+    #[must_use]
+    pub fn text(&self) -> String {
+        self.runs.iter().map(|run| run.text.as_str()).collect()
+    }
+
+    /// Replace the text of run `index`, keeping its properties.
+    ///
+    /// # Errors
+    ///
+    /// An invalid-input error for an index past the last run.
+    pub fn set_run_text(&mut self, index: usize, text: impl Into<String>) -> Result<()> {
+        let run = self
+            .runs
+            .get_mut(index)
+            .ok_or_else(|| invalid("rich-text run index is out of range"))?;
+        run.text = text.into();
+        Ok(())
+    }
+
+    pub(crate) fn validate_for_write(&self) -> Result<()> {
+        if self.runs.is_empty() {
+            return Err(invalid("rich text needs at least one run"));
+        }
+        let count: usize = self.runs.iter().map(|run| run.text.chars().count()).sum();
+        if count > MAX_CELL_CHARACTERS {
+            return Err(invalid(format!(
+                "cell text exceeds {MAX_CELL_CHARACTERS} characters"
+            )));
+        }
+        Ok(())
+    }
+}
+
+impl RichRun {
+    pub(crate) fn new(properties: Option<Box<[(Box<str>, Box<str>)]>>, text: String) -> Self {
+        Self { properties, text }
+    }
+
+    /// The run's text.
+    #[must_use]
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
+    /// Whether the run carries run properties (`rPr`).
+    #[must_use]
+    pub fn is_formatted(&self) -> bool {
+        self.properties.is_some()
+    }
+}
+
 /// Cheaply cloned immutable text, including resolved shared strings.
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Text(Arc<str>);

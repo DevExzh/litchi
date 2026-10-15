@@ -508,7 +508,11 @@ const CREATE_PENDING: Refusal = Refusal {
     feature = "xlsx",
     feature = "pptx",
     feature = "xlsb",
-    feature = "xls"
+    feature = "xls",
+    feature = "rtf",
+    feature = "odt",
+    feature = "ods",
+    feature = "odp"
 ))]
 const RETAINED_SOURCE: Refusal = Refusal {
     code: Code::UnsupportedCapability,
@@ -2920,7 +2924,7 @@ impl Element {
         let add = add
             || (self.adapter == Adapter::Docx
                 && self.retains_source != Some(false)
-                && matches!(self.data().canonical, "picture" | "chart")
+                && matches!(self.data().canonical, "picture" | "chart" | "smartart")
                 && readable);
         #[cfg(feature = "xlsb")]
         let add = add

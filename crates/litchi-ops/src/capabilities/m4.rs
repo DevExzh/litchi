@@ -1,7 +1,8 @@
 //! Capability support for the M4 verbs of record 0266: CSV/TSV import and
-//! formula evaluation, both worksheet operations of XLSX, XLSB and XLS.
+//! formula evaluation, both worksheet operations of XLSX, XLSB and XLS; ODS
+//! imports since record 0295.
 
-#[cfg(any(feature = "xlsx", feature = "xlsb", feature = "xls"))]
+#[cfg(any(feature = "xlsx", feature = "xlsb", feature = "xls", feature = "ods"))]
 use super::RETAINED_SOURCE;
 use super::{Capabilities, Refusal, Support, Verb};
 use crate::Code;
@@ -15,12 +16,12 @@ const NOT_A_WORKBOOK: Refusal = Refusal {
     reason: "this format has no worksheets",
 };
 
-/// Import or evaluation on an OpenDocument spreadsheet (record 0277).
+/// Evaluation of an OpenDocument spreadsheet (records 0277 and 0295).
 #[cfg(feature = "ods")]
 const ODS_PENDING: Refusal = Refusal {
     code: Code::UnsupportedCapability,
-    follow_up: "ODS adapter follow-up (record 0277): CSV import and OpenFormula evaluation",
-    reason: "ODS worksheets are written cell by cell; CSV import and OpenFormula evaluation are not integrated",
+    follow_up: "record 0295 follow-up: OpenFormula translation for the litchi-eval engine",
+    reason: "ODS formulas are OpenFormula; the evaluation engine reads Excel syntax",
 };
 
 /// Evaluation in a build without the formula engine.
@@ -39,7 +40,11 @@ impl Capabilities {
         }
         #[cfg(feature = "ods")]
         if self.adapter() == Some(Adapter::Ods) {
-            return ODS_PENDING.support();
+            return match verb {
+                Verb::Import if self.retains_source == Some(false) => RETAINED_SOURCE.support(),
+                Verb::Import => Support::Supported,
+                _ => ODS_PENDING.support(),
+            };
         }
         let workbook = match self.adapter() {
             #[cfg(feature = "xlsx")]

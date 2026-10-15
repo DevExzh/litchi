@@ -88,6 +88,8 @@ pub(super) enum Value {
     Comment(Arc<litchi_docx::comment::Comment>),
     /// A chart of a paragraph, with its paragraph.
     Chart(Arc<super::chart::ChartValue>),
+    /// A SmartArt graphic (record 0295).
+    SmartArt(Arc<super::smartart::SmartArtValue>),
 }
 
 /// One direct child of a block container: the container's index and the

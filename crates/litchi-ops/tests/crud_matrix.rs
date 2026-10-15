@@ -418,6 +418,15 @@ const RECIPES: &[Recipe] = &[
         props: &[("chartType", "column"), ("data", "A:1,2;B:3,4")],
         start: false,
     },
+    // Record 0295: DOCX SmartArt is added under a paragraph from an outline.
+    Recipe {
+        format: "docx",
+        element: "smartart",
+        fixture: "seed",
+        parent: "/body/p[1]",
+        props: &[("layout", "process"), ("text", "Plan\nBuild")],
+        start: false,
+    },
     Recipe {
         format: "xlsx",
         element: "chart",

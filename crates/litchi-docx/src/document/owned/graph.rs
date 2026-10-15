@@ -356,6 +356,13 @@ impl Edit<Package> {
 
     /// The first `rIdN` the main part and the staged changes do not use.
     pub(super) fn next_relationship_id(&self) -> Result<String> {
+        // One identifier was asked for, so one is returned.
+        Ok(self.next_relationship_ids(1)?.swap_remove(0))
+    }
+
+    /// The first `count` `rIdN`s the main part and the staged changes do
+    /// not use, ascending.
+    pub(super) fn next_relationship_ids(&self, count: usize) -> Result<Vec<String>> {
         let main = self
             .package
             .opc_package()
@@ -375,12 +382,14 @@ impl Edit<Package> {
             );
         }
         let mut index = used.len() + 1;
-        loop {
+        let mut ids = Vec::with_capacity(count);
+        while ids.len() < count {
             let candidate = format!("rId{index}");
             if !used.contains(&candidate) {
-                return Ok(candidate);
+                ids.push(candidate);
             }
             index += 1;
         }
+        Ok(ids)
     }
 }
