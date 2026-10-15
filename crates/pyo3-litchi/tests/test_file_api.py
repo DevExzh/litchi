@@ -31,6 +31,7 @@ from pathlib import Path
 
 from _support import (
     STUB_PATH,
+    TEST_DATA,
     L,
     copy_fixture,
     fixture,
@@ -173,16 +174,41 @@ class OpenTests(ErrorAssertions):
                 self.assertEqual(str(file.format), name)
                 self.assertEqual(file.get("/", 0)["path"], "/")
 
-    def test_iwork_refusal_names_the_family_opener(self):
-        # litchi::File holds Apple iWork from tier 3 (M6); the family classes
-        # read it today.
-        for relative, name, opener in (
-            ("iwork/pages/basic.pages", "Pages", "Document.open"),
-            ("iwork/keynote/basic.key", "Keynote", "Presentation.open"),
-            ("iwork/numbers/basic.numbers", "Numbers", "Workbook.open"),
+    def test_iwork_packages_open_as_files(self):
+        # litchi::File holds Apple iWork since record 0296 (owner decision D1).
+        for relative, name, path, text in (
+            ("iwork/pages/basic.pages", "Pages", "/body/p[1]", "Litchi native Pages fixture"),
+            (
+                "iwork/keynote/basic.key",
+                "Keynote",
+                "/slide[1]/placeholder[title]",
+                "Litchi native Keynote fixture",
+            ),
+            (
+                "iwork/numbers/basic.numbers",
+                "Numbers",
+                "/sheet[1]/table[1]/B2",
+                "Litchi native Numbers fixture",
+            ),
         ):
             with self.subTest(fixture=relative):
-                error = raised(lambda: open_fixture(relative))
+                file = open_fixture(relative)
+                self.assertEqual(str(file.format), name)
+                self.assertEqual(file.get(path, 0)["text"], text)
+                self.assertEqual(file.to_bytes(), read_fixture(relative))
+
+    def test_iwork_package_directory_refusal_names_the_family_opener(self):
+        # The leaves edit and save only single-file packages; the family
+        # classes read the app-authored directory form.
+        for relative, name, opener in (
+            ("iwork/directory/pages/basic.pages", "Pages", "Document.open"),
+            ("iwork/directory/keynote/basic.key", "Keynote", "Presentation.open"),
+            ("iwork/directory/numbers/basic.numbers", "Numbers", "Workbook.open"),
+        ):
+            with self.subTest(fixture=relative):
+                directory = TEST_DATA / relative
+                self.assertTrue(directory.is_dir(), directory)
+                error = raised(lambda: L.open(str(directory)))
                 self.assertError(
                     error, L.UnsupportedError, "unsupported_format", f"open it with {opener}"
                 )
@@ -634,8 +660,10 @@ class SchemaTests(unittest.TestCase):
     def test_stub_typed_dict_matches_the_export(self):
         fields = typed_dict_fields(STUB_PATH)["_Schema"]
         self.assertEqual(list(L.schema("xlsx")), [key for key in fields if key != "pending"])
-        self.assertEqual(list(L.schema("pages")), [key for key in fields if key != "setKeywords"])
-        self.assertEqual(L.schema("pages")["elements"], [])
+        # Every claimed format has a registry since record 0296, so no
+        # format exports the `pending` shape in this build.
+        self.assertEqual(L.schema("pages"), golden("registry/pages.json"))
+        self.assertTrue(L.schema("numbers")["elements"])
 
     def test_unknown_format_names_raise(self):
         with self.assertRaises(L.PropertyError):

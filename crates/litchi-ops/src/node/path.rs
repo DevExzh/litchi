@@ -284,7 +284,13 @@ impl<'a> PathStep<'a> {
     /// The worksheet cell step `B3`, written in A1 notation from its
     /// zero-based `column` and `row`.
     #[must_use]
-    #[cfg(any(feature = "xls", feature = "xlsx", feature = "xlsb", feature = "ods"))]
+    #[cfg(any(
+        feature = "xls",
+        feature = "xlsx",
+        feature = "xlsb",
+        feature = "ods",
+        feature = "numbers"
+    ))]
     pub(crate) const fn cell(column: u32, row: u32) -> Self {
         Self {
             name: "",

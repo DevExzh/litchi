@@ -1,6 +1,7 @@
 //! The CRUD checklist of record 0289 (plan step 25, design §14 layer 2).
 //!
-//! For every non-iWork format, every element kind its capability report
+//! For every claimed format (the iWork formats since record 0296), every
+//! element kind its capability report
 //! lists is crossed with the verbs `get`, `find`, `query`, `view`, `set`,
 //! `add`, `remove`, `move`, `swap`, `edit`, `batch`, `create` and `save`.
 //! Each cell is classified from [`Capabilities`] (supported, typed gap with
@@ -40,7 +41,10 @@
     feature = "odb",
     feature = "oth",
     feature = "odm",
-    feature = "odf-formula"
+    feature = "odf-formula",
+    feature = "pages",
+    feature = "keynote",
+    feature = "numbers"
 ))]
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -284,6 +288,33 @@ const SPECS: &[Spec] = &[
         fixtures: &[
             "odf/native-resave/source/font-styles.odf",
             "libreoffice-core/starmath/qa/extras/data/tdf151842.odf",
+        ],
+    },
+    // Record 0296: the iWork formats. The corpus holds only one-slide
+    // Keynote decks, so a slide's `remove` meets the leaf's last-slide
+    // refusal.
+    Spec {
+        format: FileFormat::Pages,
+        name: "pages",
+        extension: "pages",
+        fixtures: &[
+            "iwork/pages/body-sections-unicode.pages",
+            "iwork/pages/basic.pages",
+        ],
+    },
+    Spec {
+        format: FileFormat::Keynote,
+        name: "keynote",
+        extension: "key",
+        fixtures: &["iwork/keynote/basic.key"],
+    },
+    Spec {
+        format: FileFormat::Numbers,
+        name: "numbers",
+        extension: "numbers",
+        fixtures: &[
+            "iwork/numbers/basic.numbers",
+            "iwork/numbers/cell-value-native.numbers",
         ],
     },
 ];
@@ -567,6 +598,15 @@ const KNOWN_FAILURES: &[(&str, &str, &str, &str)] = &[
         "F6: `create()` packages from the OTH (and ODM) leaf builders have no \
          meta.xml, which the ODT metadata editor requires",
     ),
+    (
+        "keynote",
+        "slide",
+        "remove",
+        "F8 (record 0296): the corpus holds only one-slide Keynote decks, and the \
+         leaf refuses deleting the final slide (typed `invalid_argument`); \
+         `create` cannot make a second slide (IWORK_API_REQUESTS.md requests 1 \
+         and 8)",
+    ),
 ];
 
 fn test_data() -> PathBuf {
@@ -674,6 +714,14 @@ fn load_fixtures(spec: &Spec) -> Vec<Fixture> {
             label: "create()".to_owned(),
             file,
         }),
+        // The iWork leaves have no from-scratch builder yet (record 0296,
+        // `IWORK_API_REQUESTS.md` request 1): their checklist starts from
+        // the pinned fixtures only.
+        Err(error)
+            if matches!(
+                spec.format,
+                FileFormat::Pages | FileFormat::Keynote | FileFormat::Numbers
+            ) && code_of(&error) == Code::UnsupportedCapability.as_str() => {},
         Err(error) => panic!("{}: create failed: {error}", spec.name),
     }
     for (format, steps) in SEEDS {
@@ -1441,7 +1489,15 @@ fn run_format(spec: &Spec) -> Report {
             Err(format!("reopened as {:?}", reopened.format()))
         }
     });
-    let saved = match &created {
+    // A format without a creator (the iWork formats, record 0296) saves
+    // its first pinned fixture.
+    let base = created.clone().or_else(|error| {
+        fixtures
+            .first()
+            .map(|fixture| fixture.file.clone())
+            .ok_or(error)
+    });
+    let saved = match &base {
         Ok(file) => (|| {
             let dir = tempfile::tempdir().map_err(|error| error.to_string())?;
             let path = dir.path().join(format!("saved.{}", spec.extension));

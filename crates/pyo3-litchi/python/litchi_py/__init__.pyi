@@ -837,8 +837,8 @@ def open(path: Path | str) -> File:
     Raises:
         IoError: (an OSError) If the file cannot be read
         UnsupportedError: (a ValueError) If the file is not an Office file,
-            or is in a format File does not hold (Apple iWork: open it with
-            Document.open, Presentation.open or Workbook.open)
+            or is an Apple iWork package directory, which File does not hold
+            (open it with Document.open, Presentation.open or Workbook.open)
         CorruptFileError: (a ValueError) If the file is malformed
     """
     ...

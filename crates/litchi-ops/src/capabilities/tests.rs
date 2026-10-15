@@ -6,8 +6,8 @@
 use litchi_core::FileFormat;
 
 use super::{
-    CREATE_PENDING, Capabilities, EDITS, OBJECT_STRUCTURE, SAVE_PENDING, State, Support, Verb,
-    path_segment, positional, refused,
+    CREATE_PENDING, Capabilities, EDITS, IWORK_CREATE, IWORK_STRUCTURE, OBJECT_STRUCTURE,
+    SAVE_PENDING, State, Support, Verb, path_segment, positional, refused,
 };
 use crate::Code;
 use crate::view::Mode;
@@ -256,6 +256,25 @@ fn every_format_has_one_answer_for_its_reads() {
                 && !object_edit;
             #[cfg(not(feature = "odf-objects"))]
             let object_refusal = false;
+            #[cfg(feature = "iwork-adapter")]
+            let iwork_edit = crate::read::Adapter::of(format)
+                .and_then(crate::format::iwork::writes)
+                .is_some_and(|writes| match verb {
+                    Verb::Set | Verb::Edit | Verb::Batch => true,
+                    Verb::Add => !writes.addable.is_empty(),
+                    Verb::Remove => !writes.removable.is_empty(),
+                    Verb::Move => !writes.movable.is_empty(),
+                    _ => false,
+                });
+            #[cfg(not(feature = "iwork-adapter"))]
+            let iwork_edit = false;
+            #[cfg(feature = "iwork-adapter")]
+            let iwork_refusal = crate::read::Adapter::of(format)
+                .and_then(crate::format::iwork::writes)
+                .is_some()
+                && !iwork_edit;
+            #[cfg(not(feature = "iwork-adapter"))]
+            let iwork_refusal = false;
             let odp_edit = format == FileFormat::Odp
                 && cfg!(feature = "odp")
                 && matches!(
@@ -294,10 +313,13 @@ fn every_format_has_one_answer_for_its_reads() {
                         ))
                     || text_family_edit
                     || object_edit
+                    || iwork_edit
                 {
                     Support::Supported
                 } else if object_refusal {
                     OBJECT_STRUCTURE.support()
+                } else if iwork_refusal {
+                    IWORK_STRUCTURE.support()
                 } else if get.is_supported() {
                     EDITS.support()
                 } else {
@@ -332,8 +354,14 @@ fn every_format_has_one_answer_for_its_reads() {
                         | FileFormat::Odb
                         | FileFormat::Odf
                 ) && crate::read::Adapter::of(format).is_some());
-            let expected = if integrated {
+            let iwork = matches!(
+                format,
+                FileFormat::Pages | FileFormat::Keynote | FileFormat::Numbers
+            ) && crate::read::Adapter::of(format).is_some();
+            let expected = if integrated || (iwork && verb == Verb::Save) {
                 Support::Supported
+            } else if iwork {
+                IWORK_CREATE.support()
             } else if get.is_supported() {
                 match verb {
                     Verb::Save => SAVE_PENDING.support(),
@@ -468,12 +496,17 @@ fn xls_adapter_advertises_writes_and_keeps_granular_gaps() {
 }
 
 #[test]
-fn formats_without_a_variant_point_at_m6() {
-    // Every ODF format has a `File` variant since record 0282.
-    for format in [FileFormat::Pages, FileFormat::Keynote, FileFormat::Numbers] {
+fn iwork_formats_without_their_feature_name_it() {
+    // Every claimed format has a `File` variant since record 0296; a build
+    // without a format's feature names the feature.
+    for (format, feature) in [
+        (FileFormat::Pages, "enable the `pages` cargo feature"),
+        (FileFormat::Keynote, "enable the `keynote` cargo feature"),
+        (FileFormat::Numbers, "enable the `numbers` cargo feature"),
+    ] {
         let refusal = refused(format);
         assert_eq!(refusal.code, Code::UnsupportedFormat, "{format:?}");
-        assert_eq!(refusal.follow_up, "M6", "{format:?}");
+        assert_eq!(refusal.follow_up, feature, "{format:?}");
     }
 }
 

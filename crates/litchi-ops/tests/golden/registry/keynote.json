@@ -1,0 +1,290 @@
+{
+  "format": "keynote",
+  "elements": [
+    {
+      "format": "keynote",
+      "element": "presentation",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/"
+        ]
+      },
+      "children": [
+        {
+          "element": "slide",
+          "pathSegment": "slide"
+        }
+      ],
+      "properties": {
+        "slideCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      }
+    },
+    {
+      "format": "keynote",
+      "element": "slide",
+      "parent": "presentation",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "placeholder",
+          "pathSegment": "placeholder"
+        },
+        {
+          "element": "notes",
+          "pathSegment": "notes"
+        }
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "title": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "hidden": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "keynote",
+      "element": "placeholder",
+      "parent": "slide",
+      "elementAliases": [
+        "ph"
+      ],
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/placeholder[title]",
+          "/slide[N]/placeholder[body]"
+        ]
+      },
+      "properties": {
+        "type": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "keynote",
+      "element": "notes",
+      "parent": "slide",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/slide[N]/notes"
+        ]
+      },
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    }
+  ],
+  "gaps": [
+    {
+      "subject": "element",
+      "element": "shape",
+      "code": "unsupported_capability",
+      "followUp": "0298 Keynote shapes (IWORK_API_REQUESTS.md request 9)",
+      "reason": "the Keynote leaf has no public shape model beyond the title and body placeholders"
+    },
+    {
+      "subject": "element",
+      "element": "run",
+      "code": "unsupported_capability",
+      "followUp": "0298 Keynote text runs (IWORK_API_REQUESTS.md request 10)",
+      "reason": "the Keynote leaf exposes placeholder text as plain text; character runs and their formatting have no public model yet"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "notes",
+      "context": "speaker notes text",
+      "code": "unsupported_capability",
+      "followUp": "0298 Keynote notes writes",
+      "reason": "speaker notes are read-only here; the leaf's slide-notes transaction is not wired yet"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "slide",
+      "context": "a new slide",
+      "code": "unsupported_capability",
+      "followUp": "IWORK_API_REQUESTS.md request 8",
+      "reason": "the Keynote leaf has no slide creation transaction"
+    },
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "presentation",
+      "context": "a presentation from scratch",
+      "code": "unsupported_capability",
+      "followUp": "IWORK_API_REQUESTS.md request 1",
+      "reason": "the Keynote leaf has no from-scratch package builder"
+    },
+    {
+      "subject": "view",
+      "mode": "issues",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "forms",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "html",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "svg",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "screenshot",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "pdf",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    }
+  ],
+  "setKeywords": {
+    "verb": "replace",
+    "support": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0273 follow-up: a find adapter over the format's run-level text edits",
+      "reason": "find/replace is not integrated for this format"
+    },
+    "keywords": {
+      "find": {
+        "type": "string",
+        "constraint": {
+          "notEmpty": true
+        },
+        "set": true
+      },
+      "replace": {
+        "type": "string",
+        "set": true
+      },
+      "matchCase": {
+        "type": "bool",
+        "default": true,
+        "set": true
+      },
+      "wholeWord": {
+        "type": "bool",
+        "default": false,
+        "set": true
+      },
+      "regex": {
+        "type": "bool",
+        "default": false,
+        "set": true,
+        "writeGap": {
+          "code": "unsupported_capability",
+          "followUp": "record 0010 Q3: an owner-approved regular-expression dependency",
+          "reason": "Litchi has no approved regular-expression engine; `regex=true` and OfficeCLI's `r\"...\"` patterns are refused"
+        }
+      }
+    }
+  }
+}

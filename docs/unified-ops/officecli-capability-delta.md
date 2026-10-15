@@ -31,6 +31,8 @@ differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `299bb82c87cfef0c27ecfe8bd4fb7df4982635a954c5fa57ac58897900e0e2fa` |
 | golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `73fafb3ba518137725602d97210ce5837886dff848671f143278fd3cb55063e3` |
 | golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `2038cde02828395f020df3d9b9732cc9350ce839bba5bc5aee3089cdd0e81fab` |
+| golden | `crates/litchi-ops/tests/golden/registry/keynote.json` | `ee5b6b3e8334322bd4b01dd29ff414e2848a4089b71eabe9f85c92f10079c528` |
+| golden | `crates/litchi-ops/tests/golden/registry/numbers.json` | `d0dc9b4ced609425f80a61cd43c63a60419bce7511b357439744be30489cb671` |
 | golden | `crates/litchi-ops/tests/golden/registry/odb.json` | `0453235e155865a3fe31dc4514173f6efdd2fe8f96ffaf90f5a26b628b1e8d37` |
 | golden | `crates/litchi-ops/tests/golden/registry/odc.json` | `05e776b5e0c2e18ff9818b559fc374c50af6d1448a587e673ee37e2f0a8912e9` |
 | golden | `crates/litchi-ops/tests/golden/registry/odf.json` | `4dea6fd9a84402435381507f54fc3e7691aed039323e46431b65c5f029b5ecb7` |
@@ -41,6 +43,7 @@ differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/registry/ods.json` | `fb65bbebcd964b898a5fc2b4863dfa189ef8c53dfbab59e8552c929b190c72e0` |
 | golden | `crates/litchi-ops/tests/golden/registry/odt.json` | `530031295ae44a24667d22c7270cebc1afe59c456466d71014d85fe657180b3a` |
 | golden | `crates/litchi-ops/tests/golden/registry/oth.json` | `b24208bdbf248ce4fdc63b644b214beb2d6d5273921ce5aa5dce7a1ddfbe43ae` |
+| golden | `crates/litchi-ops/tests/golden/registry/pages.json` | `6f74d52d7f771828d66318aa7157c589ba3a057b96578d91c4a1b7180598d783` |
 | officecli | `schemas/help` (152 files, OfficeCLI commit `dced0d74`) | `0bcd8cae45fabc0c5e45ff99d1994465fb213ac1b8db3f7eadd87339fb40ced4` |
 
 ## Statuses
@@ -86,6 +89,8 @@ Elements:
 | xls | 7 | 31 | 0 | 0 | 1 | 2 | 1 |
 | pptx | 25 | 8 | 0 | 0 | 0 | 1 | 9 |
 | ppt | 15 | 18 | 0 | 0 | 0 | 1 | 8 |
+| keynote | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
+| numbers | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
 | odb | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
 | odc | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
 | odf | 0 | 0 | 0 | 0 | 0 | 0 | 2 |
@@ -96,6 +101,7 @@ Elements:
 | ods | 8 | 30 | 0 | 0 | 1 | 2 | 1 |
 | odt | 19 | 12 | 0 | 0 | 13 | 2 | 5 |
 | oth | 0 | 0 | 0 | 0 | 0 | 0 | 22 |
+| pages | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
 
 Property reads:
 
@@ -109,6 +115,8 @@ Property reads:
 | xls | 56 | 4 | 504 | 0 | 24 | 1 | 102 | 0 |
 | pptx | 197 | 22 | 70 | 0 | 117 | 0 | 281 | 256 |
 | ppt | 41 | 3 | 318 | 0 | 48 | 0 | 277 | 47 |
+| keynote | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| numbers | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | odb | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | odc | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | odf | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -119,6 +127,7 @@ Property reads:
 | ods | 25 | 11 | 501 | 0 | 26 | 1 | 127 | 6 |
 | odt | 63 | 0 | 199 | 0 | 168 | 1 | 530 | 45 |
 | oth | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| pages | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 
 Property writes:
 
@@ -132,6 +141,8 @@ Property writes:
 | xls | 1 | 19 | 524 | 0 | 0 | 147 |
 | pptx | 86 | 28 | 447 | 0 | 140 | 242 |
 | ppt | 0 | 14 | 547 | 0 | 16 | 157 |
+| keynote | 0 | 0 | 0 | 0 | 0 | 0 |
+| numbers | 0 | 0 | 0 | 0 | 0 | 0 |
 | odb | 0 | 0 | 0 | 0 | 0 | 0 |
 | odc | 0 | 0 | 0 | 0 | 0 | 0 |
 | odf | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -142,6 +153,7 @@ Property writes:
 | ods | 6 | 5 | 533 | 0 | 6 | 147 |
 | odt | 12 | 32 | 752 | 0 | 31 | 179 |
 | oth | 0 | 0 | 0 | 0 | 0 | 0 |
+| pages | 0 | 0 | 0 | 0 | 0 | 0 |
 
 ## docx
 
@@ -7829,6 +7841,59 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | `set` | `shape` | `native-shape-preservation` | top-level shape, outline placeholder, paragraph and notes text and shape anchors require native closure admission: a changed text length refuses where interactions, field metacharacters or several formatting or language runs hold character positions; nested groups, new text bodies and rich-text formatting remain unsupported | M2 PPT nested-shape and rich-text edits |
 | `batch` | `presentation` | `native-write-coalescing` | distinct direct shape text/geometry sets share native transactions; selectors, repeated shapes, reads and structural edits close the run; broader coalescing and frozen-harness qualification remain open | M2 PPT broader native edit runs and performance qualification |
 
+## keynote
+
+### Elements
+
+| OfficeCLI element | Litchi element | Status | Follow-up |
+|---|---|---|---|
+|  | presentation | litchi-only |  |
+|  | slide | litchi-only |  |
+|  | placeholder | litchi-only |  |
+|  | notes | litchi-only |  |
+
+### Properties
+
+| Element | Property | Type | OfficeCLI `asg` | Litchi `asg` | Read | Write | Follow-up |
+|---|---|---|---|---|---|---|---|
+
+### Contextual operation gaps
+
+These operation gaps apply only to the named selection or leaf context; ordinary element operation support remains in the capability report.
+
+| Verb | Element | Context | Reason | Follow-up |
+|---|---|---|---|---|
+| `set` | `notes` | `speaker notes text` | speaker notes are read-only here; the leaf's slide-notes transaction is not wired yet | 0298 Keynote notes writes |
+| `add` | `slide` | `a new slide` | the Keynote leaf has no slide creation transaction | IWORK_API_REQUESTS.md request 8 |
+| `create` | `presentation` | `a presentation from scratch` | the Keynote leaf has no from-scratch package builder | IWORK_API_REQUESTS.md request 1 |
+
+## numbers
+
+### Elements
+
+| OfficeCLI element | Litchi element | Status | Follow-up |
+|---|---|---|---|
+|  | workbook | litchi-only |  |
+|  | sheet | litchi-only |  |
+|  | table | litchi-only |  |
+|  | cell | litchi-only |  |
+
+### Properties
+
+| Element | Property | Type | OfficeCLI `asg` | Litchi `asg` | Read | Write | Follow-up |
+|---|---|---|---|---|---|---|---|
+
+### Contextual operation gaps
+
+These operation gaps apply only to the named selection or leaf context; ordinary element operation support remains in the capability report.
+
+| Verb | Element | Context | Reason | Follow-up |
+|---|---|---|---|---|
+| `set` | `cell` | `a formula` | the leaf's formula authoring is not wired; `value` writes text, numbers and booleans | 0299 Numbers formula writes |
+| `add` | `sheet` | `a new sheet` | the Numbers leaf has no sheet lifecycle transaction | IWORK_API_REQUESTS.md request 4 |
+| `add` | `table` | `a new table` | the Numbers leaf has no table lifecycle transaction | IWORK_API_REQUESTS.md request 5 |
+| `create` | `workbook` | `a workbook from scratch` | the Numbers leaf has no from-scratch package builder | IWORK_API_REQUESTS.md request 1 |
+
 ## odb
 
 ### Elements
@@ -10743,3 +10808,30 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | `set` | `document` | `signed-or-encrypted-package` | the leaf preserves signed and encrypted packages only as exact no-ops; changed writes are refused | ADR 0034 ODF security vocabulary (record 0268 G5) |
 | `get` | `document` | `flat-odf-input` | single-XML .fodt input is detected but refused; the leaf flat snapshot has no body index or package owner the adapter can publish through | M6 flat ODF owner |
 | `create` | `document` | `template` | ODT template creation (.ott) is not supported | use Flavor::Document |
+
+## pages
+
+### Elements
+
+| OfficeCLI element | Litchi element | Status | Follow-up |
+|---|---|---|---|
+|  | document | litchi-only |  |
+|  | body | litchi-only |  |
+|  | paragraph | litchi-only |  |
+|  | section | litchi-only |  |
+
+### Properties
+
+| Element | Property | Type | OfficeCLI `asg` | Litchi `asg` | Read | Write | Follow-up |
+|---|---|---|---|---|---|---|---|
+
+### Contextual operation gaps
+
+These operation gaps apply only to the named selection or leaf context; ordinary element operation support remains in the capability report.
+
+| Verb | Element | Context | Reason | Follow-up |
+|---|---|---|---|---|
+| `add` | `p` | `a new paragraph` | the Pages leaf has no paragraph insertion transaction | IWORK_API_REQUESTS.md request 12 |
+| `remove` | `p` | `a paragraph` | the Pages leaf has no paragraph removal transaction | IWORK_API_REQUESTS.md request 12 |
+| `add` | `section` | `a new section` | the Pages leaf has no section lifecycle transaction | IWORK_API_REQUESTS.md request 11 |
+| `create` | `document` | `a document from scratch` | the Pages leaf has no from-scratch package builder | IWORK_API_REQUESTS.md request 1 |

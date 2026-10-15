@@ -60,13 +60,14 @@ FIXTURE_EXCLUDED_PACKAGES = frozenset(
         "litchi-numbers-wire",
         "litchi-pages",
         "litchi-py",
+        "litchi-cli",
+        "litchi-ops",
     }
 )
 FIXTURE_BULK_PACKAGES = frozenset(
     {
         "litchi-biff",
         "litchi-cfb",
-        "litchi-cli",
         "litchi-codepage",
         "litchi-core",
         "litchi-crypto",
@@ -94,7 +95,6 @@ FIXTURE_BULK_PACKAGES = frozenset(
         "litchi-ole-common",
         "litchi-ooxml-common",
         "litchi-opc",
-        "litchi-ops",
         "litchi-oth",
         "litchi-ppt",
         "litchi-pptx",
@@ -320,6 +320,45 @@ def metadata_fixture() -> dict[str, object]:
                     ],
                 }
             ]
+        if name == "litchi-ops":
+            # The unified layer's optional iWork leaf edges (record 0296).
+            raw["dependencies"] = [
+                {
+                    "name": dependency_name,
+                    "source": None,
+                    "req": "^0.0.1",
+                    "kind": None,
+                    "rename": None,
+                    "optional": True,
+                    "uses_default_features": True,
+                    "target": None,
+                    "registry": None,
+                    "path": str(ROOT / "crates" / dependency_name),
+                    "features": [],
+                }
+                for dependency_name in (
+                    "litchi-iwa-detect",
+                    "litchi-keynote",
+                    "litchi-numbers",
+                    "litchi-pages",
+                )
+            ]
+        if name == "litchi-cli":
+            raw["dependencies"] = [
+                {
+                    "name": "litchi-ops",
+                    "source": None,
+                    "req": "^0.0.1",
+                    "kind": None,
+                    "rename": None,
+                    "optional": False,
+                    "uses_default_features": True,
+                    "target": None,
+                    "registry": None,
+                    "path": str(ROOT / "crates/litchi-ops"),
+                    "features": ["pages", "keynote", "numbers"],
+                }
+            ]
         if name == FIXTURE_FACADE_PACKAGE:
             raw["dependencies"] = [
                 {
@@ -388,9 +427,16 @@ class NonIworkGateTests(unittest.TestCase):
         self.assertEqual(self.plan.iwork_packages, FIXTURE_IWORK_PACKAGES)
         self.assertEqual(len(self.plan.unsafe_facade_dependents), 1)
         self.assertEqual(self.plan.unsafe_facade_dependents, {"litchi-py"})
-        self.assertEqual(len(self.plan.excluded_packages), 18)
+        # The unified layer is iWork-capable (record 0296): out of the bulk
+        # slice, yet allowed in the safe facade trees.
+        self.assertEqual(self.plan.unified_packages, {"litchi-cli", "litchi-ops"})
+        self.assertEqual(
+            self.plan.facade_forbidden_packages,
+            self.plan.excluded_packages - {"litchi-cli", "litchi-ops"},
+        )
+        self.assertEqual(len(self.plan.excluded_packages), 20)
         self.assertEqual(self.plan.excluded_packages, FIXTURE_EXCLUDED_PACKAGES)
-        self.assertEqual(len(self.plan.bulk_packages), 48)
+        self.assertEqual(len(self.plan.bulk_packages), 46)
         self.assertEqual(self.plan.bulk_packages, FIXTURE_BULK_PACKAGES)
         self.assertEqual(self.plan.unsafe_facade_features, FIXTURE_UNSAFE_FACADE_FEATURES)
         self.assertEqual(self.plan.safe_facade_features, FIXTURE_SAFE_FACADE_FEATURES)
@@ -617,7 +663,7 @@ class NonIworkGateTests(unittest.TestCase):
 
         with mock.patch.object(gate, "_run_capped_capture", side_effect=fake_capture):
             bulk_count, facade_count = gate.verify_dependency_trees("cargo", self.plan)
-        self.assertEqual(bulk_count, 48)
+        self.assertEqual(bulk_count, 46)
         self.assertEqual(facade_count, len(self.plan.safe_facade_features))
         self.assertEqual(len(calls), 2 + len(self.plan.safe_facade_features))
         self.assertTrue(all("--locked" not in argv for argv in calls))
@@ -713,8 +759,8 @@ class NonIworkGateTests(unittest.TestCase):
         specs = gate.command_specs("cargo", self.plan, "lib-tests")
         bulk_tests = [spec for spec in specs if spec.scope.startswith("bulk-test/")]
         bulk_cleans = [spec for spec in specs if spec.scope.startswith("bulk-clean/")]
-        self.assertEqual(len(bulk_tests), 48)
-        self.assertEqual(len(bulk_cleans), 48)
+        self.assertEqual(len(bulk_tests), 46)
+        self.assertEqual(len(bulk_cleans), 46)
         self.assertEqual(specs[-2].scope, "facade-safe-features")
         self.assertEqual(specs[-1].scope, "facade-clean")
         self.assertEqual(specs[-3].scope, "facade-default-feature")
@@ -2212,7 +2258,7 @@ class NonIworkGateTests(unittest.TestCase):
                 "--no-fail-fast",
             ),
         )
-        # One standalone project has none of the 48-root fan-out the bulk
+        # One standalone project has none of the 46-root fan-out the bulk
         # modes serialize against, so its test threads stay at Cargo's
         # default; serializing them measured 1,870 s of test execution
         # against 581 s for the same 531 passing tests.

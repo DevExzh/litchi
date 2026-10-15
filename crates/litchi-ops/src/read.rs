@@ -20,7 +20,8 @@ use litchi_core::FileFormat;
         feature = "ods",
         feature = "odt",
         feature = "odp",
-        feature = "odf-objects"
+        feature = "odf-objects",
+        feature = "iwork-adapter"
     )),
     allow(
         clippy::only_used_in_recursion,
@@ -147,6 +148,11 @@ impl File {
                 let path = path.into_path()?;
                 crate::format::odf_tree::get(handle, &path)
             },
+            #[cfg(feature = "iwork-adapter")]
+            Self::Pages(handle) | Self::Keynote(handle) | Self::Numbers(handle) => {
+                let path = path.into_path()?;
+                crate::format::iwork::get(handle, &path)
+            },
             Self::Signed(signed) => signed.file().get(path),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -236,6 +242,11 @@ impl File {
                 let path = path.into_path()?;
                 crate::format::odf_tree::find(handle, &path)
             },
+            #[cfg(feature = "iwork-adapter")]
+            Self::Pages(handle) | Self::Keynote(handle) | Self::Numbers(handle) => {
+                let path = path.into_path()?;
+                crate::format::iwork::find(handle, &path)
+            },
             Self::Signed(signed) => signed.file().find(path),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -318,6 +329,10 @@ impl File {
             | Self::Odb(handle)
             | Self::Odf(handle) => {
                 crate::format::odf_tree::query(handle, selector).map(Matches::object)
+            },
+            #[cfg(feature = "iwork-adapter")]
+            Self::Pages(handle) | Self::Keynote(handle) | Self::Numbers(handle) => {
+                crate::format::iwork::query(handle, selector).map(Matches::iwork)
             },
             Self::Signed(signed) => signed.file().query(selector),
             Self::Locked(locked) => Err(locked.read_error()),
@@ -406,6 +421,10 @@ impl File {
             | Self::Odb(handle)
             | Self::Odf(handle) => crate::format::odf_tree::views::view_json(handle, mode)
                 .map(crate::view::Json::object),
+            #[cfg(feature = "iwork-adapter")]
+            Self::Pages(handle) | Self::Keynote(handle) | Self::Numbers(handle) => {
+                crate::format::iwork::views::view_json(handle, mode).map(crate::view::Json::iwork)
+            },
             Self::Signed(signed) => signed.file().view_json(mode),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -489,6 +508,10 @@ impl File {
             | Self::Odi(handle)
             | Self::Odb(handle)
             | Self::Odf(handle) => crate::format::odf_tree::views::view_to(handle, mode, output),
+            #[cfg(feature = "iwork-adapter")]
+            Self::Pages(handle) | Self::Keynote(handle) | Self::Numbers(handle) => {
+                crate::format::iwork::views::view_to(handle, mode, output)
+            },
             Self::Signed(signed) => signed.file().view_to(mode, output),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -551,6 +574,15 @@ pub(crate) enum Adapter {
     /// OpenDocument formula (`.odf`, record 0282).
     #[cfg(feature = "odf-formula")]
     OdfFormula,
+    /// Apple Pages (`.pages`, iWork object-tree adapter, record 0296).
+    #[cfg(feature = "pages")]
+    Pages,
+    /// Apple Keynote (`.key`, record 0296).
+    #[cfg(feature = "keynote")]
+    Keynote,
+    /// Apple Numbers (`.numbers`, record 0296).
+    #[cfg(feature = "numbers")]
+    Numbers,
 }
 
 impl Adapter {
@@ -595,6 +627,12 @@ impl Adapter {
             FileFormat::Odb => Some(Self::Odb),
             #[cfg(feature = "odf-formula")]
             FileFormat::Odf => Some(Self::OdfFormula),
+            #[cfg(feature = "pages")]
+            FileFormat::Pages => Some(Self::Pages),
+            #[cfg(feature = "keynote")]
+            FileFormat::Keynote => Some(Self::Keynote),
+            #[cfg(feature = "numbers")]
+            FileFormat::Numbers => Some(Self::Numbers),
             _ => None,
         }
     }
@@ -634,6 +672,12 @@ impl Adapter {
             Self::Odb => FileFormat::Odb,
             #[cfg(feature = "odf-formula")]
             Self::OdfFormula => FileFormat::Odf,
+            #[cfg(feature = "pages")]
+            Self::Pages => FileFormat::Pages,
+            #[cfg(feature = "keynote")]
+            Self::Keynote => FileFormat::Keynote,
+            #[cfg(feature = "numbers")]
+            Self::Numbers => FileFormat::Numbers,
         }
     }
 
@@ -728,6 +772,21 @@ macro_rules! with_spec {
             #[cfg(feature = "odf-formula")]
             $crate::read::Adapter::OdfFormula => {
                 let $spec = &$crate::format::odf_tree::formula::SPEC;
+                $body
+            },
+            #[cfg(feature = "pages")]
+            $crate::read::Adapter::Pages => {
+                let $spec = &$crate::format::iwork::pages::SPEC;
+                $body
+            },
+            #[cfg(feature = "keynote")]
+            $crate::read::Adapter::Keynote => {
+                let $spec = &$crate::format::iwork::keynote::SPEC;
+                $body
+            },
+            #[cfg(feature = "numbers")]
+            $crate::read::Adapter::Numbers => {
+                let $spec = &$crate::format::iwork::numbers::SPEC;
                 $body
             },
         }

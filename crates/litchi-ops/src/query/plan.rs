@@ -35,10 +35,11 @@ use crate::value::compare::Compiled;
 /// use litchi_ops::query::{Plan, Query};
 ///
 /// let query = Query::parse("paragraph[style=Heading1]")?;
-/// // Format adapters register their query support in M1 step R4; until a
-/// // format has one, compiling for it is `unsupported_capability`.
-/// let error = Plan::compile(&query, FileFormat::Pages).unwrap_err();
-/// assert_eq!(error.code(), litchi_ops::Code::UnsupportedCapability);
+/// // A format whose adapter is not in this build cannot compile a plan.
+/// if cfg!(not(feature = "pages")) {
+///     let error = Plan::compile(&query, FileFormat::Pages).unwrap_err();
+///     assert_eq!(error.code(), litchi_ops::Code::UnsupportedCapability);
+/// }
 /// # Ok::<(), litchi_ops::Error>(())
 /// ```
 #[derive(Clone)]
@@ -146,6 +147,12 @@ impl<'q> Plan<'q> {
                 if crate::read::Adapter::of(format).is_some() =>
             {
                 crate::format::odf_tree::compile(query, format)
+            },
+            #[cfg(feature = "iwork-adapter")]
+            FileFormat::Pages | FileFormat::Keynote | FileFormat::Numbers
+                if crate::read::Adapter::of(format).is_some() =>
+            {
+                crate::format::iwork::compile(query, format)
             },
             _ => {
                 let _ = query;

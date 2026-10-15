@@ -17,6 +17,7 @@ use std::path::Path;
     feature = "odt",
     feature = "odp",
     feature = "odf-objects",
+    feature = "iwork-adapter",
     all(
         any(unix, windows),
         any(
@@ -48,6 +49,7 @@ use crate::{File, OpenOptions};
     feature = "odt",
     feature = "odp",
     feature = "odf-objects",
+    feature = "iwork-adapter",
     all(
         any(unix, windows),
         any(
@@ -132,7 +134,8 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
             feature = "ods",
             feature = "odp",
             feature = "odt",
-            feature = "odf-objects"
+            feature = "odf-objects",
+            feature = "iwork-adapter"
         ))]
         let file = if matches!(
             file.format(),
@@ -147,6 +150,9 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
                     | litchi_core::FileFormat::Xlsb
                     | litchi_core::FileFormat::Ods
                     | litchi_core::FileFormat::Odp
+                    | litchi_core::FileFormat::Pages
+                    | litchi_core::FileFormat::Keynote
+                    | litchi_core::FileFormat::Numbers
             )
         ) || matches!(&file, File::Locked(_))
         {
@@ -241,7 +247,8 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
         feature = "ods",
         feature = "odp",
         feature = "odt",
-        feature = "odf-objects"
+        feature = "odf-objects",
+        feature = "iwork-adapter"
     ))]
     let opened = if matches!(
         opened.format(),
@@ -263,6 +270,9 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
                 | litchi_core::FileFormat::Odi
                 | litchi_core::FileFormat::Odb
                 | litchi_core::FileFormat::Odf
+                | litchi_core::FileFormat::Pages
+                | litchi_core::FileFormat::Keynote
+                | litchi_core::FileFormat::Numbers
         )
     ) || matches!(&opened, File::Locked(_))
     {
@@ -456,7 +466,16 @@ mod zip {
             version,
             super::super::input_ceiling(options),
         )?;
-        super::super::bytes::zip_fallback(bytes, options, tail)
+        let file = super::super::bytes::zip_fallback(bytes, options, tail)?;
+        // An iWork package saves back to its path (record 0296).
+        #[cfg(feature = "iwork-adapter")]
+        if file.iwork().is_some() {
+            return Ok(super::super::attach_origin(
+                file,
+                super::stable_origin(path)?,
+            ));
+        }
+        Ok(file)
     }
 
     /// Adopt the positional owner of an ODF package of `format`.

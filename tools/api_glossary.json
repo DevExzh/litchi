@@ -8114,6 +8114,31 @@
         }
       ],
       "families": []
+    },
+    {
+      "id": "ops-iwork",
+      "package": "litchi-ops",
+      "default_features": true,
+      "features": [
+        "pages",
+        "keynote",
+        "numbers"
+      ],
+      "banned_names": [
+        {
+          "name": "snapshot",
+          "scope": "litchi_ops::format::iwork::Iwork",
+          "replacement": "handles are immutable snapshots; clone the `File` (ADR 0034 §3, record 0296)",
+          "recursive": false
+        },
+        {
+          "name": "changed",
+          "scope": "litchi_ops::format::iwork::Iwork",
+          "replacement": "compare with `File::same_content` or the commit's patch (ADR 0034, record 0296)",
+          "recursive": false
+        }
+      ],
+      "families": []
     }
   ]
 }

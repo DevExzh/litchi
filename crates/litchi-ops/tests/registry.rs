@@ -32,6 +32,9 @@ fn registry_goldens_follow_enabled_formats() {
         (FileFormat::Odi, "odi", cfg!(feature = "odi")),
         (FileFormat::Odb, "odb", cfg!(feature = "odb")),
         (FileFormat::Odf, "odf", cfg!(feature = "odf-formula")),
+        (FileFormat::Pages, "pages", cfg!(feature = "pages")),
+        (FileFormat::Keynote, "keynote", cfg!(feature = "keynote")),
+        (FileFormat::Numbers, "numbers", cfg!(feature = "numbers")),
     ] {
         let schema = litchi_ops::schema(format);
         assert_eq!(schema.registered(), enabled, "{name}");

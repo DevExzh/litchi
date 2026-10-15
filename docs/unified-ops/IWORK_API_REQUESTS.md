@@ -1,9 +1,11 @@
 # iWork public API requests from the unified operations API
 
-Status: initial stub (record 0002, 2026-10-04). The owner has delayed iWork to tier 3; these requests are
-recorded early so the iWork owners can plan. The unified-ops program **does not modify** `litchi-iwa*`,
-`litchi-numbers*`, `litchi-pages` or `litchi-keynote` (`docs/UNIFIED_OPS_GOAL.md`, constraint 7). Until a
-request lands, the gap stays visible in `capabilities()`.
+Status: initial stub (record 0002, 2026-10-04); superseded in part by owner
+decisions D1 and D2 (2026-10-15, record 0248): the unified-ops program may now
+edit `litchi-iwa*`, `litchi-numbers*`, `litchi-pages` and `litchi-keynote`, and
+`File` holds the iWork packages directly (record 0296, section below). The
+requests stay the iWork leaves' backlog; until a request lands, the gap stays
+visible in `capabilities()`.
 
 ## What already suffices (wiring only)
 
@@ -105,3 +107,51 @@ with `.map(Keywords::from)` (one line each) when the field flips:
 `Keywords` already exists in `litchi_core::metadata` with `From<String>` and
 `From<&str>`, so the change compiles against today's `litchi-core` once the
 field type flips. No other iWork code touches the fields record 0253 changed.
+
+## 2026-10-15 iWork joins `File` (record 0296)
+
+Owner decisions D1 and D2 (record 0248, 2026-10-15) let `litchi-ops` depend
+on the iWork crates and let the unified-ops program edit them. Record 0296
+makes `File::Pages`, `File::Keynote` and `File::Numbers` hold the leaf
+`Package` directly, through the object-tree adapter `litchi_ops::format::iwork`.
+
+**Consumed now.**
+
+- Open: `litchi_iwa_detect::PreparedSource::from_shared_bytes`, then each
+  leaf's hidden prepared-source ingress (`__from_prepared_source`; the
+  `internal-iwork-source` feature). Record 0296 added the Numbers ingress
+  (`crates/litchi-numbers/src/package.rs`, `Package::__from_prepared_source`).
+- Reads: Pages `sections`/`section_text`/`metadata`; Keynote
+  `slides`/`slide_text`/`metadata`; Numbers `sheets`/tables/`iter_cells`.
+- Writes: Pages `edit_section_text` (paragraph text as a UTF-16 span of its
+  section, and whole-section text); Keynote `edit_slide_text` (title and
+  body), `edit` (slide skip), `edit_slide_order`, `edit_slide_deletion`;
+  Numbers `edit_table_cells` (text, number, boolean, clear).
+- Save: each leaf's `write_to`, staged by `litchi_core::atomic::save`.
+- The Keynote deletion result and error are named through the leaf's
+  canonical `litchi_keynote::slide::delete` module.
+
+**Still open, as `capabilities()` gaps** (requests above unless noted):
+
+- 1: `Package::new()` for all three formats; `create(Format::{Pages,
+  Keynote, Numbers})` returns `unsupported_capability`.
+- 3: typed encrypted state (no `Locked` for iWork yet).
+- 4–6: Numbers sheet, table, row and column lifecycle.
+- 7, 10, 13: text styling (Numbers cells, Keynote spans, Pages spans).
+- 8, 9: Keynote slide add/duplicate and shape CRUD.
+- 11, 12: Pages section add/remove and paragraph insert/remove/move.
+- 14: Pages metadata set.
+- **New 15 — public prepared-source ingress.** The unified layer uses the
+  hidden `__from_prepared_source` seams. A documented, non-hidden
+  `Package::from_prepared(PreparedSource, SemanticLimits)` per format (and a
+  public way to keep the `Arc<[u8]>` source without a copy) would let the
+  `internal-iwork-source` feature stay private to the facade.
+- **New 16 — package directories.** The leaves refuse directory-backed
+  sources ("support semantic projection only"), so `File` refuses an
+  app-authored package directory and the facade's read-only
+  `litchi::iwork::Document` stays its reader. Editing and saving a
+  directory (or converting it to a single-file package) would let the
+  facade reader go (plan step 28).
+- **New 17 — Numbers formula writes through the unified registry.** The
+  leaf authors formulas (`Edit::set_formula`); the unified `value` key does
+  not map onto it yet (follow-up record 0299).

@@ -254,6 +254,15 @@ pub fn create_with(format: FileFormat, options: &CreateOptions) -> Result<File> 
             .map(|file| file.into_file());
     }
 
+    #[cfg(feature = "iwork-adapter")]
+    if matches!(
+        format,
+        FileFormat::Pages | FileFormat::Keynote | FileFormat::Numbers
+    ) && crate::read::Adapter::of(format).is_some()
+    {
+        return crate::format::iwork::Iwork::create(format, options).map(|file| file.into_file());
+    }
+
     let _ = options;
     if format_feature_enabled(format) {
         Err(unsupported_capability(format))
@@ -267,6 +276,10 @@ pub fn create_with(format: FileFormat, options: &CreateOptions) -> Result<File> 
 /// This is deliberately kept beside creation's refusal mapping rather than
 /// inferred from `File`: a format can have its leaf enabled while its unified
 /// creator is still a pending capability.
+#[allow(
+    clippy::match_like_matches_macro,
+    reason = "one arm per format keeps each feature beside its format; with every feature on the arms are all `true`"
+)]
 fn format_feature_enabled(format: FileFormat) -> bool {
     match format {
         FileFormat::Doc => cfg!(feature = "doc"),
@@ -287,7 +300,10 @@ fn format_feature_enabled(format: FileFormat) -> bool {
         FileFormat::Odi => cfg!(feature = "odi"),
         FileFormat::Odb => cfg!(feature = "odb"),
         FileFormat::Odf => cfg!(feature = "odf-formula"),
-        FileFormat::Pages | FileFormat::Keynote | FileFormat::Numbers | _ => false,
+        FileFormat::Pages => cfg!(feature = "pages"),
+        FileFormat::Keynote => cfg!(feature = "keynote"),
+        FileFormat::Numbers => cfg!(feature = "numbers"),
+        _ => false,
     }
 }
 
@@ -311,6 +327,9 @@ fn feature_suggestion(format: FileFormat) -> &'static str {
         FileFormat::Odi => "enable the `odi` cargo feature",
         FileFormat::Odb => "enable the `odb` cargo feature",
         FileFormat::Odf => "enable the `odf-formula` cargo feature",
+        FileFormat::Pages => "enable the `pages` cargo feature",
+        FileFormat::Keynote => "enable the `keynote` cargo feature",
+        FileFormat::Numbers => "enable the `numbers` cargo feature",
         _ => "the format has no unified creator in this build",
     }
 }

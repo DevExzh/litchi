@@ -75,7 +75,9 @@
 //! assert_eq!(json["format"], "docx");
 //! # }
 //! // A format whose adapter is not in this build has no elements.
-//! assert_eq!(litchi_ops::schema(FileFormat::Pages).elements().count(), 0);
+//! if cfg!(not(feature = "pages")) {
+//!     assert_eq!(litchi_ops::schema(FileFormat::Pages).elements().count(), 0);
+//! }
 //! ```
 
 #![cfg_attr(

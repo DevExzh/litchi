@@ -4926,3 +4926,38 @@ development-only edges and 11 ordered migration debts with IDs
 `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]` (270 policy edges including the
 migration edges), with one migration host. Cargo metadata lists 271 internal
 dependency declarations.
+
+## 2026-10-15 amendment: `litchi-ops` iWork leaf edges (owner decision D1)
+
+Unified-ops record [0296](../unified-ops/0296-iwork-joins-file.md) applies
+owner decision D1 (record 0248): the iWork-free constraint on `litchi-ops`
+is removed, and the single `File` enum holds Pages, Keynote and Numbers
+packages directly. That adds four optional normal edges, each registered
+with the reason "owner decision D1, record 0296":
+
+- `litchi-ops -> litchi-pages` (`pages` feature);
+- `litchi-ops -> litchi-keynote` (`keynote` feature);
+- `litchi-ops -> litchi-numbers` (`numbers` feature);
+- `litchi-ops -> litchi-iwa-detect` (the internal `iwork-adapter` umbrella
+  each of the three turns on): detection classifies an iWork package itself,
+  as the last ZIP candidate, and prepares its container once for the leaf.
+
+The three format features also turn on their leaf's `internal-iwork-source`
+feature, the prepared-source ingress the facade already used. The edges point
+downward (facade tier to leaf), and `litchi-ops` stays runtime-neutral: the
+iWork leaves take no runtime package.
+
+The non-iWork release gate (`tools/non_iwork_gate.py`) no longer treats
+`litchi-ops` as iWork-free, as ADR 0033 §7 planned for the first iWork edge.
+`litchi-ops` and `litchi-cli` (which depends on it) are classified as the
+iWork-capable unified layer: they leave the bulk slice (48 to 46 bulk
+packages, 18 to 20 excluded), and the facade's safe feature closures may
+still contain them, because those closures turn on none of their iWork
+features; the gate's tree checks keep proving that the safe closures reach
+no iWork package. The gate stays the fast non-iWork lane for the leaf and
+common crates.
+
+The policy gains four canonical edges and keeps 12 development-only edges
+and 11 ordered migration debts with IDs `[1, 2, 4, 8, 10, 12, 13, 14, 15,
+16, 17]`, with one migration host; `tools/check_crate_boundaries.py`
+reports 67 workspace packages and 282 internal dependency declarations.

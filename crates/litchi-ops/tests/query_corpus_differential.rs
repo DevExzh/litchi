@@ -16,7 +16,9 @@
 //! landed. The ODM digests were added by record 0282, printed by the build
 //! that first opened ODM through the shared ODT adapter, and the ODG, ODC,
 //! ODB and ODF formula digests by the same record from the object-tree
-//! adapter's reads. Each digest covers, file by file, every match's kind,
+//! adapter's reads. The Pages, Keynote and Numbers digests were added by
+//! record 0296, printed by the iWork object-tree adapter's reads. Each
+//! digest covers, file by file, every match's kind,
 //! path, positional path and text, and every error, so a changed result set
 //! on any file changes it. Set `LITCHI_BLESS_GOLDEN=1` to write the current
 //! build's digests instead, after showing that a change of results is
@@ -85,6 +87,12 @@ fn corpus_queries_return_what_they_returned_before() {
         ("odt", query_corpus::ODT),
         #[cfg(feature = "odp")]
         ("odp", query_corpus::ODP),
+        #[cfg(feature = "pages")]
+        ("pages", query_corpus::PAGES),
+        #[cfg(feature = "keynote")]
+        ("key", query_corpus::KEYNOTE),
+        #[cfg(feature = "numbers")]
+        ("numbers", query_corpus::NUMBERS),
     ] {
         let matched = selectors
             .iter()

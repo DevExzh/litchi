@@ -1,0 +1,406 @@
+{
+  "format": "pages",
+  "state": "open",
+  "verbs": {
+    "get": {
+      "supported": true
+    },
+    "find": {
+      "supported": true
+    },
+    "query": {
+      "supported": true
+    },
+    "view": {
+      "supported": true
+    },
+    "evaluate": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "none: import and evaluation are worksheet operations",
+      "reason": "this format has no worksheets"
+    },
+    "set": {
+      "supported": true
+    },
+    "add": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "IWORK_API_REQUESTS.md",
+      "reason": "the iWork leaf has no such structural transaction yet"
+    },
+    "remove": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "IWORK_API_REQUESTS.md",
+      "reason": "the iWork leaf has no such structural transaction yet"
+    },
+    "move": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "IWORK_API_REQUESTS.md",
+      "reason": "the iWork leaf has no such structural transaction yet"
+    },
+    "swap": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "IWORK_API_REQUESTS.md",
+      "reason": "the iWork leaf has no such structural transaction yet"
+    },
+    "edit": {
+      "supported": true
+    },
+    "batch": {
+      "supported": true
+    },
+    "import": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "none: import and evaluation are worksheet operations",
+      "reason": "this format has no worksheets"
+    },
+    "merge": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "template merge for XLSB and the legacy, RTF and ODF formats (record 0274 F1)",
+      "reason": "template merge fills DOCX, PPTX and XLSX templates"
+    },
+    "replace": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0273 follow-up: a find adapter over the format's run-level text edits",
+      "reason": "find/replace is not integrated for this format"
+    },
+    "refresh": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "field refresh for the legacy, RTF and ODF formats (record 0279 follow-up)",
+      "reason": "field refresh recomputes DOCX fields, PPTX slide fields and workbook formulas"
+    },
+    "save": {
+      "supported": true
+    },
+    "create": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "IWORK_API_REQUESTS.md request 1",
+      "reason": "the iWork leaves have no from-scratch package builder"
+    }
+  },
+  "views": {
+    "text": {
+      "supported": true
+    },
+    "annotated": {
+      "supported": true
+    },
+    "outline": {
+      "supported": true
+    },
+    "stats": {
+      "supported": true
+    },
+    "issues": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    "forms": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    "html": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "svg": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "screenshot": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "pdf": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    }
+  },
+  "elements": [
+    {
+      "format": "pages",
+      "element": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/"
+        ]
+      },
+      "children": [
+        {
+          "element": "body",
+          "pathSegment": "body"
+        },
+        {
+          "element": "section",
+          "pathSegment": "section"
+        }
+      ],
+      "properties": {
+        "sectionCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "paragraphCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      }
+    },
+    {
+      "format": "pages",
+      "element": "body",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/body"
+        ]
+      },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "p"
+        }
+      ],
+      "properties": {
+        "paragraphCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "pages",
+      "element": "paragraph",
+      "parent": "body",
+      "elementAliases": [
+        "p"
+      ],
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]"
+        ]
+      },
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "section": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "pages",
+      "element": "section",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/section[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "paragraphCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    }
+  ],
+  "gaps": [
+    {
+      "subject": "element",
+      "element": "r",
+      "code": "unsupported_capability",
+      "followUp": "0297 Pages text runs (IWORK_API_REQUESTS.md request 13)",
+      "reason": "the Pages leaf exposes body text as plain section text; character runs and their formatting have no public model yet"
+    },
+    {
+      "subject": "element",
+      "element": "tbl",
+      "code": "unsupported_capability",
+      "followUp": "0297 Pages body tables",
+      "reason": "the Pages leaf's body-table catalog and cell APIs are not wired into the unified tree yet"
+    },
+    {
+      "subject": "element",
+      "element": "metadata",
+      "code": "unsupported_capability",
+      "followUp": "IWORK_API_REQUESTS.md request 14",
+      "reason": "Pages document properties are read through File::metadata(); the leaf has no metadata write transaction"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "p",
+      "context": "a new paragraph",
+      "code": "unsupported_capability",
+      "followUp": "IWORK_API_REQUESTS.md request 12",
+      "reason": "the Pages leaf has no paragraph insertion transaction"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "p",
+      "context": "a paragraph",
+      "code": "unsupported_capability",
+      "followUp": "IWORK_API_REQUESTS.md request 12",
+      "reason": "the Pages leaf has no paragraph removal transaction"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "section",
+      "context": "a new section",
+      "code": "unsupported_capability",
+      "followUp": "IWORK_API_REQUESTS.md request 11",
+      "reason": "the Pages leaf has no section lifecycle transaction"
+    },
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "document",
+      "context": "a document from scratch",
+      "code": "unsupported_capability",
+      "followUp": "IWORK_API_REQUESTS.md request 1",
+      "reason": "the Pages leaf has no from-scratch package builder"
+    },
+    {
+      "subject": "view",
+      "mode": "issues",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "forms",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "html",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "svg",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "screenshot",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "pdf",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    }
+  ]
+}

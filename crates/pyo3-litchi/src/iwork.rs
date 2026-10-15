@@ -1,18 +1,19 @@
-//! Apple iWork inputs (Pages, Keynote, Numbers).
+//! Apple iWork inputs (Pages, Keynote, Numbers) for the read classes.
 //!
-//! The unified `litchi::File` does not hold iWork formats until tier 3
-//! (record 0003 §16.4): `litchi::open` refuses them with
-//! `unsupported_format` and the detected format. The Python openers then read
-//! the input through the format's archive-free semantic document, which the
-//! facade re-exports as `litchi::{pages, keynote, numbers}::semantic`.
+//! `litchi::open` opens iWork packages as `File::Pages`, `File::Keynote` and
+//! `File::Numbers` since record 0296, and `litchi_py.open` returns them as
+//! unified files. The family views (`File::document`, `presentation`,
+//! `workbook`) do not cover iWork, so the `Document`, `Presentation` and
+//! `Workbook` read classes read an iWork input through the format's
+//! archive-free semantic document, which the facade re-exports as
+//! `litchi::{pages, keynote, numbers}::semantic`. An iWork package
+//! directory, which `litchi::open` still refuses, takes the same route.
 //!
 //! These are the documents the facade's `Document`, `Presentation` and
 //! `sheet::Workbook` used to project, so the Python reads keep their output
 //! (risk R6 in record 0003): Pages text and one paragraph per text block,
 //! Keynote text with the show title and each slide's text, Numbers sheet
-//! names and the sheet/table/cell text layout. The format-neutral
-//! `litchi::iwork::Document` cannot carry these: its snapshot has no Numbers
-//! sheets, keeps only textual Numbers cells, and has no Keynote show title.
+//! names and the sheet/table/cell text layout.
 
 use std::path::Path;
 
@@ -21,7 +22,7 @@ use litchi::{Code, FileFormat};
 use crate::errors::Failure;
 
 /// Whether `error` is `litchi::open`'s refusal of an iWork input of
-/// `format`.
+/// `format` (a package directory).
 pub(crate) fn is_refused(error: &litchi::Error, format: FileFormat) -> bool {
     error.code() == Code::UnsupportedFormat && error.detected() == Some(format)
 }

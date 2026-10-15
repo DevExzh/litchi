@@ -19,9 +19,14 @@ default = []
 # types; detection (step S4) needs the OLE, OPC, ODF and RTF probes and owners;
 # the legacy handles (step S5d) read OLE property sets through
 # `litchi-ole-common`.
-# The iWork features carry no dependency: `litchi-ops` must stay iWork-free
-# (`tools/non_iwork_gate.py`), so they only shape `detect::DetectedFormat` and
-# the facade-supplied lowest-precedence ZIP tail.
+# The iWork features (owner decision D1, record 0296) read and write Pages,
+# Keynote and Numbers packages through their leaf owners: `File::Pages`,
+# `File::Keynote` and `File::Numbers` hold the leaf `Package` behind one
+# object-tree adapter (`format::iwork`), whose internal umbrella is
+# `iwork-adapter`. Detection classifies iWork packages itself, as the last
+# ZIP candidate, through `litchi-iwa-detect`; the leaves' prepared-source
+# ingress (`internal-iwork-source`) adopts the detection's parsed container
+# without a second ZIP pass.
 # `encryption` (step S6) adds `Locked::unlock`: OOXML package decryption
 # through `litchi-crypto`, the OOXML leaves' decrypted-package constructors,
 # and legacy PowerPoint decryption. It also lets an OOXML-only build parse the
@@ -53,9 +58,10 @@ odi         = ["odf-objects", "dep:litchi-odi"]
 odb         = ["odf-objects", "dep:litchi-odb"]
 odf-formula = ["odf-objects", "dep:litchi-odf-formula"]
 odf-objects = ["dep:litchi-odf-common"]
-pages   = []
-keynote = []
-numbers = []
+pages   = ["iwork-adapter", "dep:litchi-pages", "litchi-pages/internal-iwork-source"]
+keynote = ["iwork-adapter", "dep:litchi-keynote", "litchi-keynote/internal-iwork-source"]
+numbers = ["iwork-adapter", "dep:litchi-numbers", "litchi-numbers/internal-iwork-source"]
+iwork-adapter = ["dep:litchi-iwa-detect"]
 
 encryption = [
     "dep:litchi-cfb",
@@ -106,7 +112,10 @@ litchi-docx         = { workspace = true, optional = true }
 litchi-drawingml    = { workspace = true, optional = true }
 litchi-eval         = { workspace = true, optional = true } # Formula evaluation (record 0266)
 litchi-formula      = { workspace = true, optional = true }
+litchi-iwa-detect   = { workspace = true, optional = true } # iWork detection (record 0296)
+litchi-keynote      = { workspace = true, optional = true } # Keynote owner (record 0296)
 litchi-markdown     = { workspace = true, optional = true }
+litchi-numbers      = { workspace = true, optional = true } # Numbers owner (record 0296)
 litchi-odb          = { workspace = true, optional = true }
 litchi-odc          = { workspace = true, optional = true }
 litchi-odf-common   = { workspace = true, optional = true }
@@ -119,6 +128,7 @@ litchi-odt          = { workspace = true, optional = true }
 litchi-odm          = { workspace = true, optional = true }
 litchi-ole-common   = { workspace = true, optional = true }
 litchi-oth          = { workspace = true, optional = true }
+litchi-pages        = { workspace = true, optional = true } # Pages owner (record 0296)
 litchi-ooxml-common = { workspace = true, optional = true }
 litchi-opc          = { workspace = true, optional = true }
 litchi-ppt          = { workspace = true, optional = true }
@@ -186,3 +196,8 @@ required-features = ["oth", "odm", "odg", "odc", "odi", "odb", "odf-formula"]
 [[example]]
 name              = "refresh_bench"
 required-features = ["docx", "xlsx", "eval"]
+
+# Paired leaf-vs-unified iWork measurements (record 0296).
+[[example]]
+name              = "iwork_bench"
+required-features = ["pages", "keynote", "numbers"]

@@ -945,6 +945,73 @@ fn odt_writes_save_in_place() {
     assert!(reopened.text().expect("text").contains("Added"));
 }
 
+/// The iWork formats (record 0296): reads and the leaves' focused writes,
+/// saved in place, from the command line.
+#[test]
+fn iwork_writes_save_in_place() {
+    let dir = tempfile::tempdir().expect("tempdir");
+
+    let pages = scratch(
+        dir.path(),
+        "d.pages",
+        Some("iwork/pages/body-sections-unicode.pages"),
+    );
+    expect(
+        0,
+        [
+            "set",
+            arg(&pages),
+            "/body/p[2]",
+            "--prop",
+            "text=From the CLI",
+        ],
+    );
+    assert_eq!(text_of(&pages, "/body/p[2]"), "From the CLI");
+    assert_eq!(
+        text_of(&pages, "/body/p[3]"),
+        "Second section marker — end."
+    );
+
+    let keynote = scratch(dir.path(), "k.key", Some("iwork/keynote/basic.key"));
+    expect(
+        0,
+        [
+            "set",
+            arg(&keynote),
+            "/slide[1]/placeholder[title]",
+            "--prop",
+            "text=CLI title",
+        ],
+    );
+    assert_eq!(
+        text_of(&keynote, "/slide[1]/placeholder[title]"),
+        "CLI title"
+    );
+
+    let numbers = scratch(dir.path(), "n.numbers", Some("iwork/numbers/basic.numbers"));
+    expect(
+        0,
+        [
+            "set",
+            arg(&numbers),
+            "/sheet[1]/table[1]/B2",
+            "--prop",
+            "value=CLI cell",
+        ],
+    );
+    assert_eq!(text_of(&numbers, "/sheet[1]/table[1]/B2"), "CLI cell");
+    let query = expect(0, ["query", arg(&numbers), "cell", "--json"]).json();
+    assert!(query.to_string().contains("CLI cell"), "{query}");
+
+    // Creation is a typed gap until the leaves can build a package.
+    let run = expect(5, ["create", arg(&dir.path().join("blank.pages"))]);
+    assert!(
+        run.stderr.contains("unsupported_capability"),
+        "{}",
+        run.stderr
+    );
+}
+
 const ITEMS: &str = r#"[
   {"command":"add","parent":"/body","type":"paragraph","props":{"text":"B1"}},
   {"command":"set","path":"/body/p[1]/r[1]","props":{"bold":true}},

@@ -136,16 +136,18 @@ use crate::{Family, File};
 /// use litchi_ops::Code;
 /// use litchi_ops::capabilities::{Capabilities, Support, Verb};
 ///
-/// // Apple Pages has no unified `File` variant before milestone M6.
+/// // A build without the `pages` feature refuses Apple Pages as a whole.
 /// let pages = Capabilities::of(FileFormat::Pages);
-/// match pages.verb(Verb::Get) {
-///     Support::Unsupported { code, follow_up, .. } => {
-///         assert_eq!(code, Code::UnsupportedFormat);
-///         assert_eq!(follow_up, "M6");
-///     },
-///     other => panic!("{other:?}"),
+/// if cfg!(not(feature = "pages")) {
+///     match pages.verb(Verb::Get) {
+///         Support::Unsupported { code, follow_up, .. } => {
+///             assert_eq!(code, Code::UnsupportedFormat);
+///             assert_eq!(follow_up, "enable the `pages` cargo feature");
+///         },
+///         other => panic!("{other:?}"),
+///     }
+///     assert_eq!(pages.elements().count(), 0);
 /// }
-/// assert_eq!(pages.elements().count(), 0);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Capabilities {
@@ -461,6 +463,31 @@ const OBJECT_STRUCTURE: Refusal = Refusal {
     code: Code::UnsupportedCapability,
     follow_up: "0282 ODF object-format structure",
     reason: "the format's leaf has no such structural operation",
+};
+
+/// The structural verbs the iWork leaves do not offer yet (record 0296):
+/// element creation, and removal, moving and swapping where the leaf has
+/// no such transaction (`IWORK_API_REQUESTS.md`).
+#[cfg_attr(
+    not(feature = "iwork-adapter"),
+    allow(dead_code, reason = "read only when an iWork format is compiled in")
+)]
+const IWORK_STRUCTURE: Refusal = Refusal {
+    code: Code::UnsupportedCapability,
+    follow_up: "IWORK_API_REQUESTS.md",
+    reason: "the iWork leaf has no such structural transaction yet",
+};
+
+/// iWork documents cannot be created from scratch yet: the leaves have no
+/// package builder (`IWORK_API_REQUESTS.md` request 1).
+#[cfg_attr(
+    not(feature = "iwork-adapter"),
+    allow(dead_code, reason = "read only when an iWork format is compiled in")
+)]
+const IWORK_CREATE: Refusal = Refusal {
+    code: Code::UnsupportedCapability,
+    follow_up: "IWORK_API_REQUESTS.md request 1",
+    reason: "the iWork leaves have no from-scratch package builder",
 };
 
 const EDITS: Refusal = Refusal {
@@ -958,6 +985,16 @@ impl Capabilities {
                     _ => OBJECT_STRUCTURE.support(),
                 };
             }
+            #[cfg(feature = "iwork-adapter")]
+            if let Some(writes) = self.adapter().and_then(crate::format::iwork::writes) {
+                return match verb {
+                    Verb::Set | Verb::Edit | Verb::Batch => Support::Supported,
+                    Verb::Add if !writes.addable.is_empty() => Support::Supported,
+                    Verb::Remove if !writes.removable.is_empty() => Support::Supported,
+                    Verb::Move if !writes.movable.is_empty() => Support::Supported,
+                    _ => IWORK_STRUCTURE.support(),
+                };
+            }
             return EDITS.support();
         }
         match verb {
@@ -1015,6 +1052,13 @@ impl Capabilities {
             return Support::Supported;
         }
         if self.format == Some(FileFormat::Odp) && cfg!(feature = "odp") {
+            return Support::Supported;
+        }
+        if matches!(
+            self.format,
+            Some(FileFormat::Pages | FileFormat::Keynote | FileFormat::Numbers)
+        ) && self.adapter().is_some()
+        {
             return Support::Supported;
         }
         #[cfg(feature = "ppt")]
@@ -1075,6 +1119,13 @@ impl Capabilities {
         }
         if self.format == Some(FileFormat::Odp) && cfg!(feature = "odp") {
             return Support::Supported;
+        }
+        if matches!(
+            self.format,
+            Some(FileFormat::Pages | FileFormat::Keynote | FileFormat::Numbers)
+        ) && self.adapter().is_some()
+        {
+            return IWORK_CREATE.support();
         }
 
         #[cfg(feature = "ppt")]
@@ -1237,10 +1288,9 @@ fn refused(format: FileFormat) -> Refusal {
         FileFormat::Odi => feature("enable the `odi` cargo feature"),
         FileFormat::Odb => feature("enable the `odb` cargo feature"),
         FileFormat::Odf => feature("enable the `odf-formula` cargo feature"),
-        FileFormat::Pages | FileFormat::Keynote | FileFormat::Numbers => closed(
-            "M6",
-            "iWork documents join `File` in milestone M6; read them through `litchi::iwork::Document`",
-        ),
+        FileFormat::Pages => feature("enable the `pages` cargo feature"),
+        FileFormat::Keynote => feature("enable the `keynote` cargo feature"),
+        FileFormat::Numbers => feature("enable the `numbers` cargo feature"),
         _ => closed(
             "M6",
             "the format has no unified `File` variant before milestone M6",
@@ -2368,6 +2418,12 @@ const fn view_gap(adapter: Adapter, mode: Mode) -> Option<&'static GapSpec> {
         Adapter::Odb => m1_view_gap(mode),
         #[cfg(feature = "odf-formula")]
         Adapter::OdfFormula => m1_view_gap(mode),
+        #[cfg(feature = "pages")]
+        Adapter::Pages => m1_view_gap(mode),
+        #[cfg(feature = "keynote")]
+        Adapter::Keynote => m1_view_gap(mode),
+        #[cfg(feature = "numbers")]
+        Adapter::Numbers => m1_view_gap(mode),
     }
 }
 
@@ -2520,6 +2576,15 @@ check_capabilities!(crate::format::odf_tree::odi::SPEC);
 check_capabilities!(crate::format::odf_tree::odb::SPEC);
 #[cfg(feature = "odf-formula")]
 check_capabilities!(crate::format::odf_tree::formula::SPEC);
+
+#[cfg(feature = "pages")]
+check_capabilities!(crate::format::iwork::pages::SPEC);
+
+#[cfg(feature = "keynote")]
+check_capabilities!(crate::format::iwork::keynote::SPEC);
+
+#[cfg(feature = "numbers")]
+check_capabilities!(crate::format::iwork::numbers::SPEC);
 
 /// Byte equality usable in constant evaluation.
 const fn same(a: &str, b: &str) -> bool {
@@ -2830,6 +2895,11 @@ impl Element {
             || (crate::format::odf_tree::writes(self.adapter)
                 .is_some_and(|writes| writes.settable.contains(&self.data().canonical))
                 && readable);
+        #[cfg(feature = "iwork-adapter")]
+        let settable = settable
+            || (crate::format::iwork::writes(self.adapter)
+                .is_some_and(|writes| writes.settable.contains(&self.data().canonical))
+                && readable);
         let structural = {
             #[cfg(feature = "docx")]
             {
@@ -2922,6 +2992,11 @@ impl Element {
             || (crate::format::odf_tree::writes(self.adapter)
                 .is_some_and(|writes| writes.addable.contains(&self.data().canonical))
                 && readable);
+        #[cfg(feature = "iwork-adapter")]
+        let add = add
+            || (crate::format::iwork::writes(self.adapter)
+                .is_some_and(|writes| writes.addable.contains(&self.data().canonical))
+                && readable);
         #[cfg(feature = "pptx")]
         let remove = structural
             || (self.adapter == Adapter::Pptx
@@ -2999,6 +3074,11 @@ impl Element {
         #[cfg(feature = "odf-objects")]
         let remove = remove
             || (crate::format::odf_tree::writes(self.adapter)
+                .is_some_and(|writes| writes.removable.contains(&self.data().canonical))
+                && readable);
+        #[cfg(feature = "iwork-adapter")]
+        let remove = remove
+            || (crate::format::iwork::writes(self.adapter)
                 .is_some_and(|writes| writes.removable.contains(&self.data().canonical))
                 && readable);
         Operations {
@@ -3494,6 +3574,10 @@ fn option_gap(adapter: Adapter, index: usize) -> Option<Option<&'static GapSpec>
     }
     #[cfg(feature = "odf-objects")]
     if let Some(writes) = crate::format::odf_tree::writes(adapter) {
+        return writes.gaps.get(index).map(Some);
+    }
+    #[cfg(feature = "iwork-adapter")]
+    if let Some(writes) = crate::format::iwork::writes(adapter) {
         return writes.gaps.get(index).map(Some);
     }
     let _ = (adapter, index);
