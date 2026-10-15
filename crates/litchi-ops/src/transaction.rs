@@ -2708,6 +2708,12 @@ impl Edit {
                 let (commit, matched) = handle.find_replace(target, &spec, &limits)?;
                 wrap_doc(handle, commit, matched)
             },
+            #[cfg(feature = "xlsb")]
+            File::Xlsb(handle) => {
+                let (commit, matched) =
+                    crate::format::xlsb::write::find::find_replace(handle, target, &spec, &limits)?;
+                wrap_xlsb(handle, commit, matched)
+            },
             #[cfg(feature = "ppt")]
             File::Ppt(handle) => {
                 let (commit, matched) =

@@ -2563,6 +2563,7 @@ pub(crate) mod sheet_coalesce {
 /// sequence of ordinary scalar writes or removals share one package-owned
 /// edit.
 /// CSV/TSV import through one native edit (record 0266).
+pub(crate) mod find;
 pub(crate) mod import;
 
 pub(crate) mod coalesce {

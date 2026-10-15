@@ -221,6 +221,15 @@ fn run(
                 None => Ok((None, summary)),
             }
         },
+        #[cfg(feature = "xlsb")]
+        File::Xlsb(handle) => {
+            let (commit, summary) =
+                crate::format::xlsb::write::find::merge(handle, record, options, limits)?;
+            match commit {
+                Some(commit) => Ok((Some(super::wrap_xlsb(handle, commit, ())?.0), summary)),
+                None => Ok((None, summary)),
+            }
+        },
         #[cfg(feature = "ppt")]
         File::Ppt(handle) => {
             let (commit, summary) =

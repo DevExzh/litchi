@@ -53,6 +53,16 @@ impl<'t> Run<'t> {
 
     /// The same run with its scope flag set.
     #[must_use]
+    #[cfg_attr(
+        not(any(
+            feature = "doc",
+            feature = "ppt",
+            feature = "rtf",
+            feature = "odt",
+            feature = "odp"
+        )),
+        allow(dead_code, reason = "spreadsheet scopes select whole cells")
+    )]
     pub(crate) const fn scoped(mut self, scoped: bool) -> Self {
         self.scoped = scoped;
         self

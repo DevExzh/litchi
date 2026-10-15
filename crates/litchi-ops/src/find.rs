@@ -368,6 +368,11 @@ pub(crate) fn set(
         crate::File::Doc(handle) => handle
             .find_replace(&target, &spec, &limits)
             .map(|(commit, _)| crate::File::Doc(commit.after)),
+        #[cfg(feature = "xlsb")]
+        crate::File::Xlsb(handle) => {
+            crate::format::xlsb::write::find::find_replace(handle, &target, &spec, &limits)
+                .map(|(commit, _)| crate::File::Xlsb(commit.into_file()))
+        },
         #[cfg(feature = "ppt")]
         crate::File::Ppt(handle) => {
             crate::format::ppt::write::find::find_replace(handle, &target, &spec, &limits)

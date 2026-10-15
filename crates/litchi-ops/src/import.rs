@@ -87,6 +87,20 @@ mod tests;
 /// Excel's maximum number of characters in one cell.
 pub(crate) const MAX_CELL_CHARS: usize = 32_767;
 
+/// Refuse a rewritten cell text longer than [`MAX_CELL_CHARS`] (find and
+/// merge, record 0295).
+#[cfg(any(feature = "xlsb", feature = "xls", feature = "ods"))]
+pub(crate) fn check_cell_length(text: &str, format: litchi_core::FileFormat) -> Result<()> {
+    if text.len() > MAX_CELL_CHARS && text.chars().count() > MAX_CELL_CHARS {
+        return Err(crate::Error::new(
+            crate::Code::InvalidValue,
+            "a rewritten cell would be longer than 32,767 characters",
+        )
+        .with_format(format));
+    }
+    Ok(())
+}
+
 /// The fixed staging charge of one imported field, beside its text.
 const FIELD_CHARGE: usize = 64;
 

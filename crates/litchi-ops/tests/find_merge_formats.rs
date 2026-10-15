@@ -241,6 +241,74 @@ mod ppt {
     }
 }
 
+/// A workbook of `format` with text, number and formula cells on two sheets.
+#[cfg(any(feature = "xlsb", feature = "xls", feature = "ods"))]
+fn workbook(format: FileFormat) -> File {
+    let file = create(format).unwrap();
+    let file = file
+        .add("/", NewNode::new("sheet").prop("name", "Second"))
+        .unwrap()
+        .file;
+    file.edit(|edit| {
+        edit.set("/Sheet1/A1", props! { "value" => "Dear {{name}}, hello" })?;
+        edit.set("/Sheet1/B2", props! { "value" => "hello hello" })?;
+        edit.set("/Sheet1/C3", props! { "value" => 42 })?;
+        edit.set("/Second/A1", props! { "value" => "hello from {{ city }}" })?;
+        Ok(())
+    })
+    .unwrap()
+    .file
+}
+
+#[cfg(any(feature = "xlsb", feature = "xls", feature = "ods"))]
+fn spreadsheet_find_and_merge(format: FileFormat) {
+    let file = workbook(format);
+    let (after, matched) = find(&file, "/", "hello", "bye");
+    assert_eq!(matched, 4);
+    let after = reopen(&after);
+    assert_eq!(text(&after, "/Sheet1/A1"), "Dear {{name}}, bye");
+    assert_eq!(text(&after, "/Sheet1/B2"), "bye bye");
+    assert_eq!(text(&after, "/Second/A1"), "bye from {{ city }}");
+    assert_eq!(text(&after, "/Sheet1/C3"), "42");
+    // A sheet, a cell and a row scope.
+    let (sheet, matched) = find(&file, "/Second", "hello", "x");
+    assert_eq!(matched, 1);
+    assert_eq!(text(&sheet, "/Sheet1/B2"), "hello hello");
+    let (cell, matched) = find(&file, "/Sheet1/B2", "hello", "x");
+    assert_eq!(matched, 2);
+    assert_eq!(text(&cell, "/Sheet1/A1"), "Dear {{name}}, hello");
+    // Numbers are not text.
+    let (_, matched) = find(&file, "/", "42", "x");
+    assert_eq!(matched, 0);
+    let (same, matched) = find(&file, "/", "absent", "x");
+    assert_eq!(matched, 0);
+    assert_eq!(same.to_bytes().unwrap(), file.to_bytes().unwrap());
+    let error = file
+        .set("/", props! { "find" => "hello", "bold" => true })
+        .unwrap_err();
+    assert_eq!(error.code(), Code::UnsupportedProperty);
+
+    let commit = file
+        .merge(
+            &record(&[("name", "Ada"), ("city", "Paris")]),
+            &Options::new(),
+        )
+        .unwrap();
+    assert_eq!(commit.value.replacements(), 2);
+    let merged = reopen(&commit.file);
+    assert_eq!(text(&merged, "/Sheet1/A1"), "Dear Ada, hello");
+    assert_eq!(text(&merged, "/Second/A1"), "hello from Paris");
+    let none = file.merge(&Record::new(), &Options::new()).unwrap();
+    assert!(none.patch.is_noop());
+    assert_eq!(none.value.unresolved(), ["city", "name"]);
+}
+
+#[cfg(feature = "xlsb")]
+#[test]
+fn xlsb_find_and_merge() {
+    spreadsheet_find_and_merge(FileFormat::Xlsb);
+}
+
 #[test]
 fn formats_are_reported() {
     let _ = FileFormat::Doc;
