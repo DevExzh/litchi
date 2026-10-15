@@ -30,6 +30,7 @@ use std::borrow::Cow;
 use std::fmt::{self, Write as _};
 use std::iter::FusedIterator;
 use std::ops::Deref;
+use std::sync::Arc;
 
 use litchi_core::selector::{Combinator, Path, Position, Step};
 
@@ -52,6 +53,17 @@ pub(crate) enum PlanRef<'q> {
     Owned(Box<Plan<'q>>),
     /// Prepared once by the caller and reused.
     Borrowed(&'q Plan<'q>),
+    /// Shared with this thread's plan cache (record 0291).
+    Shared(Arc<Plan<'static>>),
+}
+
+impl<'q> From<super::cache::Compiled<'q>> for PlanRef<'q> {
+    fn from(plan: super::cache::Compiled<'q>) -> Self {
+        match plan {
+            super::cache::Compiled::Shared(plan) => Self::Shared(plan),
+            super::cache::Compiled::Fresh(plan) => Self::Owned(plan),
+        }
+    }
 }
 
 impl<'q> Deref for PlanRef<'q> {
@@ -61,6 +73,7 @@ impl<'q> Deref for PlanRef<'q> {
         match self {
             Self::Owned(plan) => plan,
             Self::Borrowed(plan) => plan,
+            Self::Shared(plan) => plan,
         }
     }
 }
@@ -131,6 +144,11 @@ where
     /// alternative selects its `[N]`th match. Its containers are then read
     /// through [`Inspect::early_children`] (record 0267).
     early: bool,
+    /// The kinds of the query's one alternative when it tests the kind
+    /// only and selects no position (`cell`, `p`, `shape`): a visited node
+    /// then matches exactly when it is of one of them, and the visit skips
+    /// the per-alternative bookkeeping (record 0291).
+    kind_only: Option<u128>,
 }
 
 struct Frame<'f, N>
@@ -298,6 +316,14 @@ where
                     Some(Positional::Nth(_))
                 )
             });
+        let kind_only = match plan.top.as_slice() {
+            [chain] => {
+                let chain = plan.chains[*chain as usize];
+                (chain.shortcut == Shortcut::KindOnly && chain.position.is_none())
+                    .then_some(chain.kinds)
+            },
+            _ => None,
+        };
         Ok(Self {
             nav,
             plan,
@@ -321,6 +347,7 @@ where
                 yielded: 0,
                 visited: 0,
                 early,
+                kind_only,
             },
         })
     }
@@ -827,6 +854,15 @@ where
         let kind_bit = bit(kind);
         if self.state.interest & kind_bit == 0 {
             return Ok(Verdict::No);
+        }
+        // The loop below, for one kind-only alternative without a position:
+        // its shortcut matches every node of its kinds, which yields.
+        if let Some(kinds) = self.state.kind_only {
+            return Ok(if kinds & kind_bit == 0 {
+                Verdict::No
+            } else {
+                Verdict::Yield
+            });
         }
         let candidate = Candidate {
             node,

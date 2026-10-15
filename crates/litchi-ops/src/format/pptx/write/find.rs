@@ -254,7 +254,7 @@ impl Pptx {
                 &mut scopes,
             )?;
         } else if let Some(query) = target.query() {
-            let walk = crate::query::run(&nav, query.clone())?;
+            let walk = crate::query::run(&nav, query)?;
             if !walk.plan().diagnostics().is_empty() {
                 return Err(error(
                     Code::InvalidSelector,

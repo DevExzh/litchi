@@ -187,7 +187,7 @@ pub(crate) fn resolve<'f, F: Flavor>(
     if let Some(path) = target.path() {
         nodes.push(crate::path::resolve::get(&Nav::<F>::new(file), path)?);
     } else if let Some(query) = target.query() {
-        let walk = crate::query::run(Nav::<F>::new(file), query.clone())?;
+        let walk = crate::query::run(Nav::<F>::new(file), query)?;
         if !walk.plan().diagnostics().is_empty() {
             return Err(refusal(
                 Code::InvalidSelector,
