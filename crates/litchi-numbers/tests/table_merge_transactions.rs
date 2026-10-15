@@ -1,10 +1,8 @@
 //! Exact-source selector-first Numbers merge transactions.
 
 use litchi_numbers::table::merge::Region;
-use litchi_numbers::{
-    Package, PackageLimits, PackageReadOptions, PackageSemanticLimits, SheetSelector,
-    TableMergesError, TableSelector,
-};
+use litchi_numbers::table::merge::transaction::Error as TableMergesError;
+use litchi_numbers::{Package, SheetSelector, TableSelector};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -162,16 +160,22 @@ fn removing_and_readding_an_existing_region_is_an_exact_noop() -> TestResult {
 #[test]
 fn changed_publication_honors_the_package_output_ceiling() -> TestResult {
     let source = Package::from_bytes(NATIVE_SOURCE)?;
-    let limits = PackageLimits::new(
-        NATIVE_SOURCE.len() as u64,
-        PackageLimits::MAX_ENTRIES,
-        PackageLimits::MAX_ENTRY_BYTES,
-        PackageLimits::MAX_TOTAL_BYTES,
-        PackageLimits::MAX_IWA_STREAM_BYTES,
-    )?;
+    let limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(NATIVE_SOURCE.len() as u64)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
     let bounded = Package::from_bytes_with_options(
         NATIVE_SOURCE,
-        PackageReadOptions::new(limits, PackageSemanticLimits::default()),
+        litchi_numbers::OpenOptions::new()
+            .source_limits(limits)
+            .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
     )?;
     let region = Region::new(1, 1, 1, 2)?;
     let mut edit = bounded.edit_table_merges(SheetSelector::index(0), TableSelector::index(0))?;

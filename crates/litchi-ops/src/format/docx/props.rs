@@ -52,6 +52,7 @@ pub(super) fn text<'n>(node: &'n Node<'_>) -> Result<Option<Cow<'n, str>>> {
         },
         Value::Equation(block) => equation_latex(block)?.map(Cow::Owned),
         Value::Comment(comment) => Some(Cow::Owned(comment_text(comment)?)),
+        Value::SmartArt(smartart) => Some(Cow::Owned(super::smartart::smartart_text(smartart))),
         Value::Picture(_) | Value::Chart(_) => None,
         Value::Document
         | Value::Body(_)
@@ -154,7 +155,8 @@ pub(super) fn child_count(node: &Node<'_>) -> Result<Option<u32>> {
         | Value::Section(_)
         | Value::Comment(_)
         | Value::Picture(_)
-        | Value::Chart(_) => 0,
+        | Value::Chart(_)
+        | Value::SmartArt(_) => 0,
     };
     Ok(Some(u32::try_from(count).unwrap_or(u32::MAX)))
 }
@@ -234,6 +236,7 @@ pub(super) fn format<'n>(node: &'n Node<'_>) -> Result<Format<'n>> {
         })),
         Value::Picture(picture) => Props::Picture(Arc::clone(picture)),
         Value::Chart(chart) => Props::Chart(node.docx, Arc::clone(chart)),
+        Value::SmartArt(smartart) => Props::SmartArt(Arc::clone(smartart)),
         Value::Body(_) | Value::Section(_) | Value::Comments => Props::None,
     };
     let invalid = match &props {
@@ -320,6 +323,8 @@ pub(crate) enum Props<'a> {
     Picture(Arc<litchi_docx::image::InlineImage>),
     /// A chart: its frame, and its chart part read through the handle.
     Chart(&'a super::Docx, Arc<super::chart::ChartValue>),
+    /// A SmartArt graphic (record 0295).
+    SmartArt(Arc<super::smartart::SmartArtValue>),
 }
 
 impl<'a> Props<'a> {
@@ -339,6 +344,7 @@ impl<'a> Props<'a> {
             Self::Comment(comment) => comment_value(comment, index),
             Self::Picture(picture) => picture_value(picture, index),
             Self::Chart(docx, chart) => super::chart::chart_value(docx, chart, index),
+            Self::SmartArt(smartart) => super::smartart::smartart_value(smartart, index),
         }
     }
 }
@@ -359,6 +365,7 @@ impl std::fmt::Debug for Props<'_> {
             Self::Comment(_) => "Props::Comment",
             Self::Picture(_) => "Props::Picture",
             Self::Chart(..) => "Props::Chart",
+            Self::SmartArt(_) => "Props::SmartArt",
         })
     }
 }

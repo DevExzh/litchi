@@ -513,8 +513,8 @@ impl Package {
         let target_package = patch
             .target_package()
             .ok_or(Error::Verification { path: patch.path() })?;
-        if source_package.read_options() != self.read_options()
-            || target_package.read_options() != self.read_options()
+        if source_package.state.options != self.state.options
+            || target_package.state.options != self.state.options
         {
             return Err(Error::PatchConflict);
         }
@@ -647,8 +647,8 @@ fn commit_plan(plan: Plan<'_>) -> Result<Commit, Error> {
     };
     let selected = resolve_table(
         source,
-        SheetSelector::Index(sheet_position),
-        TableSelector::Index(table_position),
+        SheetSelector::index(sheet_position),
+        TableSelector::index(table_position),
     )?;
     let requested = changes.len();
     let mut changed_count = 0usize;
@@ -6428,8 +6428,8 @@ fn verify_semantic_changes(
 ) -> Result<(), Error> {
     let selected = resolve_table(
         candidate,
-        SheetSelector::Index(sheet_position),
-        TableSelector::Index(table_position),
+        SheetSelector::index(sheet_position),
+        TableSelector::index(table_position),
     )?;
     for change in changes {
         let valid = match change.input_ref() {

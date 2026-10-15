@@ -13,7 +13,7 @@ use std::{fmt::Debug, fmt::Display, hint::black_box, sync::OnceLock};
 
 use libfuzzer_sys::fuzz_target;
 use litchi::numbers::{
-    Package, PackageLimits, PackageReadOptions, PackageSemanticLimits, SheetSelector,
+    Package, SheetSelector,
     TableSelector,
     table::title::{Error as TitleError, Path as TitlePath, Settings},
 };
@@ -96,27 +96,21 @@ fn hex_nibble(byte: u8) -> Option<u8> {
     }
 }
 
-fn options() -> PackageReadOptions {
-    static OPTIONS: OnceLock<PackageReadOptions> = OnceLock::new();
+fn options() -> litchi::numbers::OpenOptions {
+    static OPTIONS: OnceLock<litchi::numbers::OpenOptions> = OnceLock::new();
     *OPTIONS.get_or_init(|| {
-        let archive = PackageLimits::new(
-            MAX_INPUT_BYTES,
-            MAX_ENTRIES,
-            MAX_ENTRY_BYTES,
-            MAX_EXPANDED_BYTES,
-            MAX_IWA_STREAM_BYTES,
-        )
+        let archive = litchi::numbers::SourceLimits::builder().max_input_bytes(MAX_INPUT_BYTES).and_then(|b| b.max_members(MAX_ENTRIES)).and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES)).and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES)).and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES)).and_then(|b| b.build())
         .unwrap_or_else(|error| unreachable!("valid Numbers title archive limits: {error}"));
         let semantic =
-            PackageSemanticLimits::new(MAX_OBJECTS, MAX_SHEETS, MAX_TABLES, MAX_REFERENCES)
+            litchi::numbers::SemanticLimits::builder().max_objects(MAX_OBJECTS).and_then(|b| b.max_sheets(MAX_SHEETS)).and_then(|b| b.max_tables(MAX_TABLES)).and_then(|b| b.max_references(MAX_REFERENCES)).and_then(|b| b.build())
                 .unwrap_or_else(|error| {
                     unreachable!("valid Numbers title semantic limits: {error}")
                 })
-                .with_projection_limits(MAX_MATERIALIZED_CELLS, MAX_TEXT_BYTES)
+                .to_builder().max_materialized_cells(MAX_MATERIALIZED_CELLS).and_then(|b| b.max_output_text_bytes(MAX_TEXT_BYTES)).and_then(|b| b.build())
                 .unwrap_or_else(|error| {
                     unreachable!("valid Numbers title projection limits: {error}")
                 });
-        PackageReadOptions::new(archive, semantic)
+        litchi::numbers::OpenOptions::new().source_limits(archive).semantic_limits(semantic)
     })
 }
 
@@ -195,7 +189,7 @@ fn exercise_selector_reads(package: &Package, data: &[u8]) {
         SheetSelector::index(usize::from(read_u16(data, 0))),
         TableSelector::index(usize::from(read_u16(data, 2))),
     ));
-    if let Some(sheet) = package.document().sheets().first()
+    if let Some(sheet) = package.workbook_ref().sheets().first()
         && let Some(table) = sheet.tables().next()
     {
         observe_result(package.table_title_settings(
@@ -206,7 +200,7 @@ fn exercise_selector_reads(package: &Package, data: &[u8]) {
 }
 
 fn exercise_selector_errors(package: &Package, source_bytes: &[u8]) {
-    let sheet_count = package.document().sheets().len();
+    let sheet_count = package.workbook_ref().sheets().len();
     if let Err(error) =
         package.table_title_settings(SheetSelector::index(sheet_count), TableSelector::index(0))
     {

@@ -135,6 +135,7 @@ fn clone_payload(payload: &Payload) -> Payload {
             formula: formula.clone(),
         },
         Payload::Cache(value) => Payload::Cache(value.clone()),
+        Payload::Rich(rich) => Payload::Rich(rich.clone()),
         Payload::Clear => Payload::Clear,
         Payload::ClearIfPresent => Payload::ClearIfPresent,
     }

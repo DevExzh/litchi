@@ -254,6 +254,11 @@ pub(crate) struct BodyEdits {
     metadata: litchi_odf_common::metadata::Assignments,
     styles: StyleAllocator,
     generated: Generated,
+    /// Text field replacements (record 0295): each field's bytes and its
+    /// new markup.
+    fields: Vec<(Range<usize>, String)>,
+    /// The body's text field ranges, scanned on the first field edit.
+    field_ranges: Option<Vec<Range<usize>>>,
 }
 
 /// Names and counters for generated tables, sections and notes.
@@ -429,6 +434,43 @@ impl BodyEdits {
         }
         self.claim(body, id, target.range(), Claim::Whole)?;
         self.edit_mut(id).text = Some(text);
+        Ok(())
+    }
+
+    /// Replace the displayed text of the text field at `range` (record
+    /// 0295), keeping its element and attributes.
+    pub(crate) fn set_field_text(
+        &mut self,
+        body: Body<'_>,
+        range: Range<usize>,
+        text: &str,
+    ) -> Result<()> {
+        xml::check_text(text, "text")?;
+        if self.field_ranges.is_none() {
+            self.field_ranges = Some(
+                super::fields::text_fields(body)?
+                    .iter()
+                    .map(super::fields::TextField::range)
+                    .collect(),
+            );
+        }
+        let known = self.field_ranges.as_ref().is_some_and(|ranges| {
+            ranges
+                .binary_search_by_key(&range.start, |known| known.start)
+                .is_ok_and(|index| ranges[index] == range)
+        });
+        if !known {
+            return Err(invalid("the ODT text field does not exist in this body"));
+        }
+        if self.fields.iter().any(|(held, _)| overlaps(held, &range)) {
+            return Err(invalid(
+                "an ODT text field is edited twice in one transaction",
+            ));
+        }
+        let pseudo = NodeId(u32::MAX - u32::try_from(self.fields.len()).unwrap_or(0));
+        self.claim(body, pseudo, range.clone(), Claim::Whole)?;
+        let markup = super::fields::render(body, range.clone(), text);
+        self.fields.push((range, markup));
         Ok(())
     }
 
@@ -1667,6 +1709,13 @@ pub(crate) fn apply(document: &Document, edits: BodyEdits) -> Result<Option<Vec<
         splices.push(Splice {
             range: marker.clone(),
             bytes: String::new(),
+            start_tag: false,
+        });
+    }
+    for (range, bytes) in std::mem::take(&mut edits.fields) {
+        splices.push(Splice {
+            range,
+            bytes,
             start_tag: false,
         });
     }

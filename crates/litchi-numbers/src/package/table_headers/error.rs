@@ -110,7 +110,7 @@ pub(super) fn map_read_error(error: ReadError) -> Error {
                     LimitKind::WireWork
                 },
                 SemanticLimitKind::OutputTextBytes
-                | SemanticLimitKind::FormulaWireBytes
+                | SemanticLimitKind::FormulaCategoryBytes
                 | SemanticLimitKind::TextBytes => LimitKind::PayloadBytes,
                 _ => LimitKind::PayloadItems,
             },

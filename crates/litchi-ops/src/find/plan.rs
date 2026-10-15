@@ -4,7 +4,19 @@ use std::borrow::Cow;
 use std::ops::Range;
 
 use super::Matcher;
-#[cfg(any(feature = "pptx", feature = "xlsx", feature = "rtf", test))]
+#[cfg(any(
+    feature = "pptx",
+    feature = "xlsx",
+    feature = "rtf",
+    feature = "doc",
+    feature = "ppt",
+    feature = "xls",
+    feature = "xlsb",
+    feature = "odt",
+    feature = "ods",
+    feature = "odp",
+    test
+))]
 use crate::error::Code;
 use crate::error::{Error, Result};
 
@@ -38,12 +50,24 @@ impl<'t> Piece<'t> {
 }
 
 /// The change to one piece.
-#[cfg(any(feature = "pptx", feature = "xlsx", feature = "rtf", test))]
+#[cfg(any(
+    feature = "pptx",
+    feature = "xlsx",
+    feature = "rtf",
+    feature = "doc",
+    feature = "ppt",
+    feature = "xls",
+    feature = "xlsb",
+    feature = "odt",
+    feature = "ods",
+    feature = "odp",
+    test
+))]
 #[cfg_attr(
-    not(any(feature = "docx", feature = "pptx")),
+    not(any(feature = "pptx", test)),
     allow(
         dead_code,
-        reason = "the XLSX adapter plans one piece per cell and reads only its text"
+        reason = "only PPTX formats matched ranges; the other adapters read the text"
     )
 )]
 pub(crate) struct Rewrite {
@@ -57,7 +81,19 @@ pub(crate) struct Rewrite {
 }
 
 /// The result of [`plan`].
-#[cfg(any(feature = "pptx", feature = "xlsx", feature = "rtf", test))]
+#[cfg(any(
+    feature = "pptx",
+    feature = "xlsx",
+    feature = "rtf",
+    feature = "doc",
+    feature = "ppt",
+    feature = "xls",
+    feature = "xlsb",
+    feature = "odt",
+    feature = "ods",
+    feature = "odp",
+    test
+))]
 #[derive(Default)]
 pub(crate) struct Plan {
     /// Number of matches kept.
@@ -108,7 +144,19 @@ pub(crate) struct Scratch {
 /// # Errors
 ///
 /// As [`plan`].
-#[cfg(any(feature = "pptx", feature = "xlsx", feature = "rtf", test))]
+#[cfg(any(
+    feature = "pptx",
+    feature = "xlsx",
+    feature = "rtf",
+    feature = "doc",
+    feature = "ppt",
+    feature = "xls",
+    feature = "xlsb",
+    feature = "odt",
+    feature = "ods",
+    feature = "odp",
+    test
+))]
 pub(crate) fn plan_with(
     scratch: &mut Scratch,
     pieces: &[Piece<'_>],
@@ -206,7 +254,19 @@ pub(crate) fn matches_with(
 }
 
 /// The new text of the ranges a rewrite changes.
-#[cfg(any(feature = "pptx", feature = "xlsx", feature = "rtf", test))]
+#[cfg(any(
+    feature = "pptx",
+    feature = "xlsx",
+    feature = "rtf",
+    feature = "doc",
+    feature = "ppt",
+    feature = "xls",
+    feature = "xlsb",
+    feature = "odt",
+    feature = "ods",
+    feature = "odp",
+    test
+))]
 #[derive(Clone, Copy)]
 pub(crate) enum Values<'v> {
     /// Keep the matched text: only formatting changes.
@@ -215,13 +275,36 @@ pub(crate) enum Values<'v> {
     Same(&'v str),
     /// One replacement per range, in order.
     #[cfg_attr(
-        not(feature = "pptx"),
-        allow(dead_code, reason = "template merge plans PPTX runs through it")
+        not(any(
+            feature = "pptx",
+            feature = "xlsx",
+            feature = "rtf",
+            feature = "doc",
+            feature = "ppt",
+            feature = "xls",
+            feature = "xlsb",
+            feature = "odt",
+            feature = "ods",
+            feature = "odp"
+        )),
+        allow(dead_code, reason = "template merge plans runs through it")
     )]
     Each(&'v [&'v str]),
 }
 
-#[cfg(any(feature = "pptx", feature = "xlsx", feature = "rtf", test))]
+#[cfg(any(
+    feature = "pptx",
+    feature = "xlsx",
+    feature = "rtf",
+    feature = "doc",
+    feature = "ppt",
+    feature = "xls",
+    feature = "xlsb",
+    feature = "odt",
+    feature = "ods",
+    feature = "odp",
+    test
+))]
 impl<'v> Values<'v> {
     fn at(self, index: usize) -> Option<&'v str> {
         match self {
@@ -240,7 +323,18 @@ impl<'v> Values<'v> {
 /// # Errors
 ///
 /// `limit_exceeded` beyond `max_bytes` of rewritten text.
-#[cfg(feature = "pptx")]
+#[cfg(any(
+    feature = "pptx",
+    feature = "xlsx",
+    feature = "rtf",
+    feature = "doc",
+    feature = "ppt",
+    feature = "xls",
+    feature = "xlsb",
+    feature = "odt",
+    feature = "ods",
+    feature = "odp"
+))]
 pub(crate) fn rewrite_ranges(
     pieces: &[Piece<'_>],
     ranges: &[Range<usize>],
@@ -270,7 +364,19 @@ pub(crate) fn rewrite_ranges(
     Ok(rewrites)
 }
 
-#[cfg(any(feature = "pptx", feature = "xlsx", feature = "rtf", test))]
+#[cfg(any(
+    feature = "pptx",
+    feature = "xlsx",
+    feature = "rtf",
+    feature = "doc",
+    feature = "ppt",
+    feature = "xls",
+    feature = "xlsb",
+    feature = "odt",
+    feature = "ods",
+    feature = "odp",
+    test
+))]
 #[allow(
     clippy::too_many_arguments,
     reason = "one group's inputs and the shared accumulators"

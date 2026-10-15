@@ -24,7 +24,7 @@ fn assert_names(
     table_name: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let sheet = package
-        .document()
+        .workbook_ref()
         .sheet(SheetSelector::name(sheet_name))?
         .ok_or_else(|| io::Error::other("Numbers facade has no expected sheet"))?;
     let table = sheet

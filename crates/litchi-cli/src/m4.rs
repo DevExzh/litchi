@@ -18,7 +18,7 @@ use crate::{exit, render};
 /// `litchi import FILE PATH [SOURCE]`, OfficeCLI's import shape.
 #[derive(Debug, Args)]
 pub(crate) struct Import {
-    /// The workbook (XLSX, XLSB or XLS).
+    /// The workbook (XLSX, XLSB, XLS or ODS).
     pub(crate) file: PathBuf,
     /// The worksheet (`/Sheet1`) or origin cell (`/Sheet1/B2`).
     pub(crate) path: String,

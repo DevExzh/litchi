@@ -292,7 +292,7 @@ class IworkLeafPublicApiGateTests(unittest.TestCase):
         value["index"]["0"]["inner"]["module"]["items"].remove("4")
         self.assertEqual(
             public_api.violations(value, "litchi_numbers"),
-            ["missing public module `litchi_numbers::document`"],
+            ["missing public module `litchi_numbers::document`, `::workbook` or `::presentation`"],
         )
 
     def test_private_pages_document_module_is_reached_through_root_reexport(

@@ -6,7 +6,7 @@
 use litchi_core::FileFormat;
 
 use super::{
-    CREATE_PENDING, Capabilities, EDITS, IWORK_CREATE, IWORK_STRUCTURE, SAVE_PENDING, State,
+    CREATE_PENDING, Capabilities, EDITS, IWORK_STRUCTURE, SAVE_PENDING, State,
     Support, Verb, path_segment, positional, refused,
 };
 use crate::Code;
@@ -346,6 +346,8 @@ fn every_format_has_one_answer_for_its_reads() {
                 || (format == FileFormat::Ods && cfg!(feature = "ods"))
                 || (format == FileFormat::Odt && cfg!(feature = "odt"))
                 || (format == FileFormat::Odp && cfg!(feature = "odp"))
+                // Record 0297: Numbers builds a blank workbook.
+                || (format == FileFormat::Numbers && cfg!(feature = "numbers"))
                 || (matches!(
                     format,
                     FileFormat::Oth
@@ -360,13 +362,10 @@ fn every_format_has_one_answer_for_its_reads() {
                 format,
                 FileFormat::Pages | FileFormat::Keynote | FileFormat::Numbers
             ) && crate::read::Adapter::of(format).is_some();
-            // Pages (record 0299) and Keynote (record 0298) create their
-            // minimal documents.
-            let pages_create = matches!(format, FileFormat::Pages | FileFormat::Keynote) && iwork;
-            let expected = if integrated || (iwork && verb == Verb::Save) || pages_create {
+            // Pages (record 0299), Numbers (record 0297) and Keynote (record
+            // 0298) create their minimal documents.
+            let expected = if integrated || iwork {
                 Support::Supported
-            } else if iwork {
-                IWORK_CREATE.support()
             } else if get.is_supported() {
                 match verb {
                     Verb::Save => SAVE_PENDING.support(),
@@ -743,7 +742,8 @@ fn doc_enumerates_its_unprojected_element_gaps() {
     }
 }
 
-/// Record 0273: find/replace answers for the formats with a find adapter.
+/// Records 0273 and 0295: find/replace answers for the formats with a find
+/// adapter.
 #[test]
 fn replace_is_supported_where_a_find_adapter_exists() {
     for format in [
@@ -756,14 +756,13 @@ fn replace_is_supported_where_a_find_adapter_exists() {
         FileFormat::Xlsb,
         FileFormat::Rtf,
         FileFormat::Odt,
+        FileFormat::Ods,
+        FileFormat::Odp,
+        FileFormat::Odg,
     ] {
         let support = Capabilities::of(format).verb(Verb::Replace);
         let adapter = crate::read::Adapter::of(format).is_some();
-        let integrated = adapter
-            && matches!(
-                format,
-                FileFormat::Docx | FileFormat::Xlsx | FileFormat::Pptx
-            );
+        let integrated = adapter && format != FileFormat::Odg;
         assert_eq!(support.is_supported(), integrated, "{format:?}");
         if adapter && !integrated {
             assert_eq!(
@@ -805,7 +804,8 @@ fn m4_verbs_are_worksheet_verbs() {
     }
 }
 
-/// Record 0274: merge answers for DOCX, PPTX and XLSX templates only.
+/// Records 0274 and 0295: merge answers for the text, presentation and
+/// workbook templates, not for the ODF object formats.
 #[test]
 fn merge_is_a_template_verb() {
     for format in [
@@ -814,13 +814,16 @@ fn merge_is_a_template_verb() {
         FileFormat::Xlsx,
         FileFormat::Xlsb,
         FileFormat::Doc,
+        FileFormat::Ppt,
+        FileFormat::Xls,
         FileFormat::Rtf,
+        FileFormat::Odt,
+        FileFormat::Ods,
+        FileFormat::Odp,
+        FileFormat::Odg,
     ] {
         let capabilities = Capabilities::of(format);
-        let template = matches!(
-            format,
-            FileFormat::Docx | FileFormat::Pptx | FileFormat::Xlsx
-        ) && crate::read::Adapter::of(format).is_some();
+        let template = format != FileFormat::Odg && crate::read::Adapter::of(format).is_some();
         assert_eq!(
             capabilities.verb(Verb::Merge).is_supported(),
             template,
@@ -845,6 +848,8 @@ fn refresh_is_supported_where_fields_are_computed() {
         let support = Capabilities::of(format).verb(Verb::Refresh);
         let adapter = (format == FileFormat::Docx && cfg!(feature = "docx"))
             || (format == FileFormat::Pptx && cfg!(feature = "pptx"))
+            || (format == FileFormat::Doc && cfg!(feature = "doc"))
+            || (format == FileFormat::Odt && cfg!(feature = "odt"))
             || (format == FileFormat::Xlsx && cfg!(all(feature = "xlsx", feature = "eval")))
             || (format == FileFormat::Xlsb && cfg!(all(feature = "xlsb", feature = "eval")))
             || (format == FileFormat::Xls && cfg!(all(feature = "xls", feature = "eval")));

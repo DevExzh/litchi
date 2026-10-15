@@ -323,9 +323,13 @@ const SPECS: &[Spec] = &[
         format: FileFormat::Numbers,
         name: "numbers",
         extension: "numbers",
+        // Record 0297: a merged range and a two-sheet workbook join the
+        // checklist, so `mergeCell` reads and sheet/table moves are pinned.
         fixtures: &[
             "iwork/numbers/basic.numbers",
             "iwork/numbers/cell-value-native.numbers",
+            "iwork/numbers/table-merges-native.numbers",
+            "iwork/numbers/table-relocation-native.numbers",
         ],
     },
 ];
@@ -351,6 +355,16 @@ struct Recipe {
 const PNG: &str = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAYAAAB/qH1jAAAAEklEQVR4nGP4z8DwHxkzoAsAAA8hD/EEN8afAAAAAElFTkSuQmCC";
 
 const RECIPES: &[Recipe] = &[
+    // Record 0297: a Numbers merged range needs an A1 `ref` of two cells or
+    // more inside the table's grid.
+    Recipe {
+        format: "numbers",
+        element: "mergeCell",
+        fixture: "create()",
+        parent: "/sheet[1]/table[1]",
+        props: &[("ref", "B2:C3")],
+        start: false,
+    },
     // Record 0288: ODC axis/series add work on a chart Litchi made; the
     // odfdom fixtures hold content outside the leaf's lossless surface.
     Recipe {
@@ -425,6 +439,15 @@ const RECIPES: &[Recipe] = &[
         fixture: "seed",
         parent: "/body/p[1]",
         props: &[("chartType", "column"), ("data", "A:1,2;B:3,4")],
+        start: false,
+    },
+    // Record 0295: DOCX SmartArt is added under a paragraph from an outline.
+    Recipe {
+        format: "docx",
+        element: "smartart",
+        fixture: "seed",
+        parent: "/body/p[1]",
+        props: &[("layout", "process"), ("text", "Plan\nBuild")],
         start: false,
     },
     Recipe {

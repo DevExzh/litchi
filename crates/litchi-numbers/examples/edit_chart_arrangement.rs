@@ -13,9 +13,8 @@ use std::ffi::OsString;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use litchi_numbers::{
-    ChartArrangement, ChartSelector, Package, SheetChartArrangementError, SheetSelector,
-};
+use litchi_numbers::sheet::chart::arrangement::Error as SheetChartArrangementError;
+use litchi_numbers::{ChartArrangement, ChartSelector, Package, SheetSelector};
 use tempfile::NamedTempFile;
 
 const USAGE: &str = "usage: edit_chart_arrangement <input.numbers> <output.numbers> \

@@ -8,7 +8,7 @@
 use std::{collections::HashSet, io};
 
 use litchi_iwa::numbers::{FormulaExpression, NumbersDocumentBuilder, NumbersEditor};
-use litchi_numbers::{Document, SheetSelector, TableSelector, cell::Value};
+use litchi_numbers::{SheetSelector, TableSelector, Workbook, cell::Value};
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
@@ -18,7 +18,7 @@ fn stored_value(
     table_name: &str,
     address: &str,
 ) -> TestResult<Value> {
-    let document = Document::from_bytes(bytes)?;
+    let document = Workbook::from_bytes(bytes)?;
     let table = document.table(sheet_index, table_name)?.ok_or_else(|| {
         io::Error::other(format!("missing {table_name:?} on sheet {sheet_index}"))
     })?;

@@ -464,19 +464,6 @@ const IWORK_STRUCTURE: Refusal = Refusal {
     reason: "the iWork leaf has no such structural transaction yet",
 };
 
-/// Numbers documents cannot be created from scratch yet: that leaf has no
-/// package builder (`IWORK_API_REQUESTS.md` request 1; Pages and Keynote
-/// create their minimal documents since records 0299 and 0298).
-#[cfg_attr(
-    not(feature = "iwork-adapter"),
-    allow(dead_code, reason = "read only when an iWork format is compiled in")
-)]
-const IWORK_CREATE: Refusal = Refusal {
-    code: Code::UnsupportedCapability,
-    follow_up: "IWORK_API_REQUESTS.md request 1",
-    reason: "the iWork leaves have no from-scratch package builder",
-};
-
 /// The refusal of every edit verb in M1.
 const EDITS: Refusal = Refusal {
     code: Code::UnsupportedCapability,
@@ -508,7 +495,11 @@ const CREATE_PENDING: Refusal = Refusal {
     feature = "xlsx",
     feature = "pptx",
     feature = "xlsb",
-    feature = "xls"
+    feature = "xls",
+    feature = "rtf",
+    feature = "odt",
+    feature = "ods",
+    feature = "odp"
 ))]
 const RETAINED_SOURCE: Refusal = Refusal {
     code: Code::UnsupportedCapability,
@@ -1102,15 +1093,15 @@ impl Capabilities {
         if self.format == Some(FileFormat::Odp) && cfg!(feature = "odp") {
             return Support::Supported;
         }
-        // Pages (record 0299) and Keynote (record 0298) create their
-        // minimal documents.
-        if matches!(self.format, Some(FileFormat::Pages | FileFormat::Keynote))
+        // Pages (record 0299), Numbers (record 0297) and Keynote (record
+        // 0298) create their minimal documents.
+        if matches!(
+            self.format,
+            Some(FileFormat::Pages | FileFormat::Keynote | FileFormat::Numbers)
+        )
             && self.adapter().is_some()
         {
             return Support::Supported;
-        }
-        if self.format == Some(FileFormat::Numbers) && self.adapter().is_some() {
-            return IWORK_CREATE.support();
         }
 
         #[cfg(feature = "ppt")]
@@ -2923,7 +2914,7 @@ impl Element {
         let add = add
             || (self.adapter == Adapter::Docx
                 && self.retains_source != Some(false)
-                && matches!(self.data().canonical, "picture" | "chart")
+                && matches!(self.data().canonical, "picture" | "chart" | "smartart")
                 && readable);
         #[cfg(feature = "xlsb")]
         let add = add

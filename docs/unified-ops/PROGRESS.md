@@ -653,7 +653,21 @@ The coordinator's Claude process stalled and exited while seven agents (wave R7 
   - 85/85 checklist cells, 32/32 files byte-identical; single ops within 1–2%.
   - Miss: 10k batch 2.64× (the fixed tree build).
   - Open: section add/remove, text runs, table-cell writes.
-- `iwork-numbers` (0297) was sent back to its agent to merge trunk: 14 shared-adapter conflicts with 0299.
+- Merged `m4-ext` (0295):
+  - find/replace and template merge on XLSB, DOC, XLS, PPT, RTF, ODT/OTH/ODM, ODS and ODP through one shared engine;
+  - XLSX rich-text cells rewritten run by run;
+  - field refresh for DOC, ODT-family and ODP; XLSB/XLS formula cache write-back;
+  - CSV import into ODS; DOCX SmartArt insertion;
+  - ODF splice writes no longer quadratic.
+  - Miss: ODT find with 1 match in 10k paragraphs is 1.12× (F7).
+  - The branch's committed corpus-deltas table was stale and was regenerated.
+- Merged `iwork-numbers` (0297), after its agent merged trunk:
+  - Numbers ADR 0034 W1 (`Package` owner, `Workbook` projection, limits, `Package::new()`);
+  - formula text parser;
+  - unified create, renames, cell value/formula/number format, merges, clear, sheet/table moves;
+  - cell sets coalesce per table.
+  - Typed gaps: sheet/table/row/column add/remove (requests 4–6), formulas on created workbooks (18), comments (19), text styles.
+  - Single ops 1.00–1.04×, open+get 1.17×, 1k batch 1.44–1.48×.
 
 Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-pptx-w4` 9474e2b6ce, `uo/m2-l-xlsb-w1` 876588a23c, `uo/m1-r4-perf` 012fd509ff.
 

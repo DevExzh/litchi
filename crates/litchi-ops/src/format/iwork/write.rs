@@ -7,7 +7,7 @@
 //! package becomes a new handle whose tree is built on its first read; an
 //! exact no-op returns the source handle.
 
-#[cfg(any(feature = "keynote", feature = "pages"))]
+#[cfg(any(feature = "keynote", feature = "pages", feature = "numbers"))]
 use litchi_core::Position;
 use litchi_core::selector::Path;
 
@@ -15,12 +15,12 @@ use super::{Flavor, Iwork, Nav, Node, Owner};
 use crate::error::{Code, Error, Result};
 use crate::new_node::NewNode;
 use crate::path::PathArg;
-#[cfg(any(feature = "pages", feature = "keynote"))]
+#[cfg(any(feature = "pages", feature = "keynote", feature = "numbers"))]
 use crate::props::PropValue;
 use crate::props::{IntoProps, Props};
 use crate::target::TargetArg;
 use crate::transaction::{Error as TransactionError, LimitKind, SemanticLimits};
-#[cfg(any(feature = "pages", feature = "keynote"))]
+#[cfg(any(feature = "pages", feature = "keynote", feature = "numbers"))]
 use crate::value::{Scalar, ValueType};
 
 /// One leaf transaction's reversible proof.
@@ -39,6 +39,9 @@ pub(crate) enum LeafPatch {
     Keynote(super::keynote::Patch),
     #[cfg(feature = "numbers")]
     NumbersCells(litchi_numbers::table::cells::Patch),
+    /// One of the other Numbers transactions (record 0297).
+    #[cfg(feature = "numbers")]
+    Numbers(super::numbers::Patch),
 }
 
 impl LeafPatch {
@@ -50,6 +53,8 @@ impl LeafPatch {
             Self::Keynote(patch) => patch.is_noop(),
             #[cfg(feature = "numbers")]
             Self::NumbersCells(patch) => patch.is_noop(),
+            #[cfg(feature = "numbers")]
+            Self::Numbers(patch) => patch.is_noop(),
         }
     }
 }
@@ -224,7 +229,7 @@ pub(crate) fn node_at<'f, F: Flavor>(file: &'f Iwork, path: &PathArg<'_>) -> Res
 }
 
 /// The value of `key` coerced to text; `null` is `None`.
-#[cfg(any(feature = "pages", feature = "keynote"))]
+#[cfg(any(feature = "pages", feature = "keynote", feature = "numbers"))]
 pub(crate) fn text(value: &PropValue<'_>, key: &'static str) -> Result<Option<String>> {
     value
         .with_coerced(ValueType::Text, |scalar| {
@@ -295,7 +300,7 @@ pub(crate) fn element_refusal(verb: &'static str, node: &Node<'_>) -> Error {
 /// The zero-based destination of a move among `count` siblings, for an
 /// element now at `from`; `anchor` resolves a `before`/`after` path to its
 /// sibling position.
-#[cfg(any(feature = "keynote", feature = "pages"))]
+#[cfg(any(feature = "keynote", feature = "pages", feature = "numbers"))]
 pub(crate) fn destination(
     from: usize,
     count: usize,
@@ -351,7 +356,7 @@ pub(crate) fn set<'p, 'v>(
     }
 }
 
-/// Add one element (Pages paragraphs).
+/// Add one element (Pages paragraphs; Numbers merged ranges, record 0297).
 pub(crate) fn add<'p, 'n>(
     file: &Iwork,
     parent: PathArg<'p>,
@@ -363,15 +368,17 @@ pub(crate) fn add<'p, 'n>(
         Owner::Pages(package) => super::pages::add(file, package, &parent, &node, limits),
         #[cfg(feature = "keynote")]
         Owner::Keynote(package) => super::keynote::add(file, package, &parent, &node, limits),
+        #[cfg(feature = "numbers")]
+        Owner::Numbers(package) => super::numbers::add(file, package, &parent, &node, limits),
         #[allow(
             unreachable_patterns,
-            reason = "the Pages and Keynote leaves add elements; Numbers does not yet"
+            reason = "every iWork leaf adds elements; the arm covers a build without them"
         )]
         _ => {
             let _ = (parent, node, limits);
             Err(refusal(
                 Code::UnsupportedCapability,
-                "adding Numbers sheets, tables, rows or columns needs leaf lifecycle APIs (IWORK_API_REQUESTS.md requests 4 to 6)",
+                "this build cannot add elements to the format",
             ))
         },
     }
@@ -388,16 +395,15 @@ pub(crate) fn remove<'p>(
         Owner::Pages(package) => super::pages::remove(file, package, &target, limits),
         #[cfg(feature = "keynote")]
         Owner::Keynote(package) => super::keynote::remove(file, package, &target, limits),
-        #[allow(
-            unreachable_patterns,
-            reason = "the Pages and Keynote leaves remove elements; Numbers does not yet"
-        )]
+        #[cfg(feature = "numbers")]
+        Owner::Numbers(package) => super::numbers::remove(file, package, &target, limits),
+        #[allow(unreachable_patterns, reason = "every iWork leaf removes elements")]
         _ => {
             let _ = (target, limits);
             let _ = file;
             Err(refusal(
                 Code::UnsupportedCapability,
-                "removing Numbers sheets, tables, rows or columns needs leaf lifecycle APIs (IWORK_API_REQUESTS.md requests 4 to 6); clear a cell with `set` and a null value",
+                "this iWork element cannot be removed",
             ))
         },
     }
@@ -417,15 +423,16 @@ pub(crate) fn move_to<'p, 'q>(
         Owner::Keynote(package) => {
             super::keynote::move_to(file, package, &path, &placement, limits)
         },
-        #[allow(
-            unreachable_patterns,
-            reason = "the Pages and Keynote leaves order elements; Numbers does not yet"
-        )]
+        #[cfg(feature = "numbers")]
+        Owner::Numbers(package) => {
+            super::numbers::move_to(file, package, &path, &placement, limits)
+        },
+        #[allow(unreachable_patterns, reason = "every iWork leaf orders elements")]
         _ => {
             let _ = (path, placement, limits);
             Err(refusal(
                 Code::UnsupportedCapability,
-                "moving Numbers elements is not wired yet (follow-up: record 0297)",
+                "this iWork element cannot be moved",
             ))
         },
     }

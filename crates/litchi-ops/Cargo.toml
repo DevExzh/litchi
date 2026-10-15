@@ -202,6 +202,11 @@ required-features = ["docx", "xlsx", "eval"]
 name              = "iwork_bench"
 required-features = ["pages", "keynote", "numbers"]
 
+# Paired leaf-vs-unified Numbers measurements (record 0297).
+[[example]]
+name              = "numbers_unified_bench"
+required-features = ["numbers"]
+
 # Paired leaf-vs-unified Pages write measurements (record 0299).
 [[example]]
 name              = "pages_bench"
@@ -211,3 +216,8 @@ required-features = ["pages"]
 [[example]]
 name              = "keynote_bench"
 required-features = ["keynote"]
+
+# Paired leaf-vs-unified find, merge and import on more formats (record 0295).
+[[example]]
+name              = "m4_formats_bench"
+required-features = ["odt", "doc", "ods"]

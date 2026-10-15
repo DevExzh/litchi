@@ -14,11 +14,10 @@ use litchi_iwa_common::WireLimits;
 use litchi_iwa_core::{Archive, Limits, RawMessage, SnappyStream};
 use litchi_numbers_wire::table_merges as merge_wire;
 
-use super::{
-    Budget, Package, TableMergesError, TableMergesLimitKind, decode_model_merges,
-    select_semantic_positions,
-};
+use super::{Budget, Package, decode_model_merges, select_semantic_positions};
 use crate::table::merge::Region;
+use crate::table::merge::transaction::Error as TableMergesError;
+use crate::table::merge::transaction::LimitKind as TableMergesLimitKind;
 use crate::{SheetSelector, TableSelector};
 
 /// A mutable, selector-first merge state staged against one immutable package.
@@ -26,7 +25,7 @@ use crate::{SheetSelector, TableSelector};
 /// The state starts with the source order.  Removing an existing region and
 /// adding it again keeps the final source order; newly added regions retain
 /// their staging order after all surviving source regions.
-pub struct TableMergesEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
     sheet_position: usize,
     table_position: usize,
@@ -38,10 +37,10 @@ pub struct TableMergesEdit<'a> {
     columns: u32,
 }
 
-impl fmt::Debug for TableMergesEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("TableMergesEdit")
+            .debug_struct("Edit")
             .field("sheet_position", &self.sheet_position)
             .field("table_position", &self.table_position)
             .field("regions", &self.regions)
@@ -49,7 +48,7 @@ impl fmt::Debug for TableMergesEdit<'_> {
     }
 }
 
-impl TableMergesEdit<'_> {
+impl Edit<'_> {
     /// Return the currently staged merged regions.
     #[must_use]
     pub fn regions(&self) -> &[Region] {
@@ -115,7 +114,7 @@ impl TableMergesEdit<'_> {
     }
 
     /// Commit the staged state as a fully reopened exact-source package.
-    pub fn commit(self) -> Result<TableMergesCommit, TableMergesError> {
+    pub fn commit(self) -> Result<Commit, TableMergesError> {
         let source_catalog = physical_source(self.source)?;
         let source_bytes = source_catalog.__source_owner();
         let source_fingerprint = fingerprint(&source_bytes);
@@ -123,9 +122,9 @@ impl TableMergesEdit<'_> {
         let after = normalize_regions(&edit.before, &edit.regions, &mut edit.budget)?;
 
         if after == edit.before {
-            return Ok(TableMergesCommit {
+            return Ok(Commit {
                 package: edit.source.snapshot(),
-                patch: TableMergesPatch {
+                patch: Patch {
                     source: source_bytes.clone(),
                     target: source_bytes,
                     source_fingerprint,
@@ -135,7 +134,7 @@ impl TableMergesEdit<'_> {
                     before: edit.before,
                     after,
                 },
-                diagnostics: TableMergesDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
 
@@ -153,7 +152,7 @@ impl TableMergesEdit<'_> {
         )?;
         let target = physical_source(&package)?.__source_owner();
         let target_fingerprint = fingerprint(&target);
-        let patch = TableMergesPatch {
+        let patch = Patch {
             source: source_bytes,
             target,
             source_fingerprint,
@@ -163,8 +162,8 @@ impl TableMergesEdit<'_> {
             before: edit.before,
             after,
         };
-        let diagnostics = TableMergesDiagnostics::published(&patch.before, &patch.after);
-        Ok(TableMergesCommit {
+        let diagnostics = Diagnostics::published(&patch.before, &patch.after);
+        Ok(Commit {
             package,
             patch,
             diagnostics,
@@ -174,7 +173,7 @@ impl TableMergesEdit<'_> {
 
 /// An exact-source reversible table-merges patch.
 #[derive(Clone, PartialEq, Eq)]
-pub struct TableMergesPatch {
+pub struct Patch {
     source: SharedBytes,
     target: SharedBytes,
     source_fingerprint: u64,
@@ -185,10 +184,10 @@ pub struct TableMergesPatch {
     after: Vec<Region>,
 }
 
-impl fmt::Debug for TableMergesPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("TableMergesPatch")
+            .debug_struct("Patch")
             .field("sheet_position", &self.sheet_position)
             .field("table_position", &self.table_position)
             .field("before", &self.before)
@@ -197,7 +196,7 @@ impl fmt::Debug for TableMergesPatch {
     }
 }
 
-impl TableMergesPatch {
+impl Patch {
     /// Return the source merge state required before applying this patch.
     #[must_use]
     pub fn before(&self) -> &[Region] {
@@ -236,7 +235,7 @@ impl TableMergesPatch {
 
 /// Compact evidence describing one committed merge transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct TableMergesDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     full_reparse_performed: bool,
@@ -244,7 +243,7 @@ pub struct TableMergesDiagnostics {
     regions_removed: usize,
 }
 
-impl TableMergesDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -307,13 +306,13 @@ impl TableMergesDiagnostics {
 /// The fully reopened immutable result of one merge transaction.
 #[must_use = "a Numbers table-merges commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct TableMergesCommit {
+pub struct Commit {
     package: Package,
-    patch: TableMergesPatch,
-    diagnostics: TableMergesDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl TableMergesCommit {
+impl Commit {
     /// Borrow the fully reopened package snapshot.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -328,13 +327,13 @@ impl TableMergesCommit {
 
     /// Borrow the reversible exact-source patch.
     #[must_use]
-    pub const fn patch(&self) -> &TableMergesPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Borrow compact publication diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> &TableMergesDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -345,7 +344,7 @@ impl Package {
         &self,
         sheet: impl Into<SheetSelector<'sheet>>,
         table: impl Into<TableSelector<'table>>,
-    ) -> Result<TableMergesEdit<'_>, TableMergesError> {
+    ) -> Result<Edit<'_>, TableMergesError> {
         let mut budget = Budget::new(self)?;
         let (sheet_position, table_position) =
             select_semantic_positions(self, sheet.into(), table.into(), &mut budget)?;
@@ -359,7 +358,7 @@ impl Package {
             .map_err(map_header_error)?;
         let before = decode_model_merges(model, &mut budget)?;
         let regions = clone_regions(&before)?;
-        Ok(TableMergesEdit {
+        Ok(Edit {
             source: self,
             sheet_position,
             table_position,
@@ -373,10 +372,7 @@ impl Package {
     }
 
     /// Apply an exact-source-checked reversible merge patch.
-    pub fn apply_table_merges(
-        &self,
-        patch: &TableMergesPatch,
-    ) -> Result<TableMergesCommit, TableMergesError> {
+    pub fn apply_table_merges(&self, patch: &Patch) -> Result<Commit, TableMergesError> {
         let source_catalog = physical_source(self)?;
         if fingerprint(source_catalog.source_bytes()) != patch.source_fingerprint
             || source_catalog.source_bytes() != patch.source.as_ref()
@@ -399,10 +395,10 @@ impl Package {
             {
                 return Err(TableMergesError::PatchConflict);
             }
-            return Ok(TableMergesCommit {
+            return Ok(Commit {
                 package: self.snapshot(),
                 patch: patch.clone(),
-                diagnostics: TableMergesDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         if !source_catalog.source_is_exact()
@@ -423,10 +419,10 @@ impl Package {
         if actual != patch.after {
             return Err(TableMergesError::Verification);
         }
-        Ok(TableMergesCommit {
+        Ok(Commit {
             package: candidate,
             patch: patch.clone(),
-            diagnostics: TableMergesDiagnostics::published(&patch.before, &patch.after),
+            diagnostics: Diagnostics::published(&patch.before, &patch.after),
         })
     }
 }

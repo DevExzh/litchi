@@ -30,6 +30,9 @@ pub(crate) enum Payload {
     /// Replace the cached result of an existing formula cell, keeping its
     /// `f` element byte for byte (record 0279).
     Cache(crate::cell::Value),
+    /// Write rich text as the cell's own inline string, each run keeping
+    /// its run properties (record 0295).
+    Rich(Box<crate::cell::RichText>),
     /// Ensure an explicit empty cell record exists.
     Clear,
     /// Clear only when another effect or the base snapshot retains the cell.
@@ -85,6 +88,13 @@ impl Action {
         }
     }
 
+    pub(crate) fn rich(text: crate::cell::RichText) -> Self {
+        Self::Update {
+            payload: Some(Payload::Rich(Box::new(text))),
+            style: None,
+        }
+    }
+
     pub(crate) const fn clear(create: bool) -> Self {
         Self::Update {
             payload: Some(if create {
@@ -122,7 +132,12 @@ impl Action {
             Self::Update { payload, style } => {
                 matches!(
                     payload,
-                    Some(Payload::Set(_) | Payload::SharedString { .. } | Payload::Clear)
+                    Some(
+                        Payload::Set(_)
+                            | Payload::SharedString { .. }
+                            | Payload::Rich(_)
+                            | Payload::Clear
+                    )
                 ) || matches!(style, Some(StyleEffect::Set(_)))
             },
             Self::Remove => false,

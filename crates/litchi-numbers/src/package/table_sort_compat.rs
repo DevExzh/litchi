@@ -15,10 +15,7 @@ use litchi_iwa_protos::{
     table_model_discovery_codec as model_codec, table_sort_order_codec as codec,
 };
 
-use super::{
-    Components, Document, DocumentLimits, Index, Package, ReadOptions, SemanticLimits, State,
-    table_headers,
-};
+use super::{Components, Index, Package, Profile, SemanticLimits, State, table_headers};
 use crate::selector::{SheetSelector, TableSelector};
 use crate::table::lock::State as LockState;
 use crate::table::sort::{ColumnIndex, Direction, Order, Rule, Scope};
@@ -111,7 +108,7 @@ impl Package {
 }
 
 fn physical_package(bytes: &[u8]) -> Result<Package> {
-    let options = ReadOptions::default();
+    let options = Profile::default();
     let components = Components::from_bytes(bytes, options.archive()).map_err(map_package_error)?;
     super::validate_numbers_application(&components, options.archive())
         .map_err(map_package_error)?;
@@ -121,7 +118,7 @@ fn physical_package(bytes: &[u8]) -> Result<Package> {
         .physical()
         .ok_or(Error::UnsupportedSource)?
         .__source_owner();
-    let document = Document::from_sheets_with_limits(Vec::new(), DocumentLimits::default())
+    let document = crate::Workbook::from_sheets_with_limits(Vec::new(), SemanticLimits::DEFAULT)
         .map_err(|_| invalid_source())?;
     Ok(Package {
         state: Arc::new(State {
@@ -170,11 +167,13 @@ fn resolve_sheet_position(source: &Package, selector: SheetSelector<'_>) -> Resu
     let root = Package::root_sheet_order(&source.state.components, SemanticLimits::default())
         .map_err(|_| invalid_source())?;
     match selector {
-        SheetSelector::Index(index) => root
-            .sheet_references()
-            .get(index)
-            .map(|_| index)
-            .ok_or(Error::SheetNotFound),
+        SheetSelector::Position(index) => {
+            let index = index.get();
+            root.sheet_references()
+                .get(index)
+                .map(|_| index)
+                .ok_or(Error::SheetNotFound)
+        },
         SheetSelector::Name(name) => {
             let mut found = None;
             for index in 0..root.sheet_references().len() {
@@ -194,7 +193,8 @@ fn resolve_table_position(
     selector: TableSelector<'_>,
 ) -> Result<usize> {
     match selector {
-        TableSelector::Index(index) => {
+        TableSelector::Position(index) => {
+            let index = index.get();
             table_headers::resolve::resolve_target_physical(source, sheet_position, index)
                 .map_err(map_header_error)?;
             Ok(index)
@@ -478,8 +478,8 @@ fn verify_candidate(
     let candidate = physical_package(output)?;
     let selected = resolve_target(
         &candidate,
-        SheetSelector::Index(target.native.sheet_position),
-        TableSelector::Index(target.native.table_position),
+        SheetSelector::index(target.native.sheet_position),
+        TableSelector::index(target.native.table_position),
     )?;
     if selected.before.as_ref() != expected
         || selected.native.model_identifier != target.native.model_identifier

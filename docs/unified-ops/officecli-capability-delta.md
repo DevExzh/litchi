@@ -21,29 +21,29 @@ differs from the hash recorded below.
 
 | Input | File | SHA-256 |
 |---|---|---|
-| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `86e968845c303bf78b2f2f7ad0cecf24a277cb1ab77f87721fb2b86958bd89bd` |
-| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `8b7d0fb6364c01a35f8e4ca4aa2b4d59214bb3be1144ae3c32804ff8211f1028` |
-| golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `85c16b486c3dadd7565c8855656c93f20bba6a09d62bf7dbee7e67603a0f6a54` |
-| golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `c48a379cc794c4ef21c52b5194f6a5c48cebb0f00f9e101e260415adfdbd8461` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `6e78cda6a9782ff91cbd9e647c43478016f0b0b69ab91435c80c612daa2a5e72` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `55f0808295e05bf834eabb36af5711d1811c453bcd90cd2c4620bc029777abf9` |
+| golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `50f8da9165f985c1e7c72a12aeb12e57c77ea6c93b68da89b56d2f85986d4e08` |
+| golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `7f0bb0d83ab8d8ab1f6951aebfb8d1b26516d7c5a1bb201e346bac315faa7d69` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `728daa474cf4f13235a7d82ad19802d4a051195be4bdc6b73dc462cabea8b957` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `d261a29c010985932815530391ff3b57dff5ebb7c490acc95fa955b1ccf57f7e` |
-| golden | `crates/litchi-ops/tests/golden/registry/xlsb.json` | `ed42211205eb0476cc90d02802f88c447b9bcf6ae4a28c54816704539152e06f` |
-| golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `299bb82c87cfef0c27ecfe8bd4fb7df4982635a954c5fa57ac58897900e0e2fa` |
+| golden | `crates/litchi-ops/tests/golden/registry/xlsb.json` | `17866e45cf525f14b60e55cfb5590014a980b5493350319f324adce9d5fabcf6` |
+| golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `1797c362ea6d2c866d70d7801e1bc625acfb1758440bbfcb0fcd19884ac4d07d` |
 | golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `73fafb3ba518137725602d97210ce5837886dff848671f143278fd3cb55063e3` |
-| golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `2038cde02828395f020df3d9b9732cc9350ce839bba5bc5aee3089cdd0e81fab` |
-| golden | `crates/litchi-ops/tests/golden/registry/keynote.json` | `5bc19d57d8e7686cf6681f46772df3c30a693e5fb2565d24dce5043ea038308b` |
-| golden | `crates/litchi-ops/tests/golden/registry/numbers.json` | `d0dc9b4ced609425f80a61cd43c63a60419bce7511b357439744be30489cb671` |
-| golden | `crates/litchi-ops/tests/golden/registry/odb.json` | `4f342b6f2149dc3284dd48cc71f4a7badb5a1632dc4183a7e9598cc12d5dca6a` |
-| golden | `crates/litchi-ops/tests/golden/registry/odc.json` | `c9004bc22d2c3964ef98a14a4feca6253166bf33f81b8211058cc88a1c8dd930` |
-| golden | `crates/litchi-ops/tests/golden/registry/odf.json` | `cabb51b0613549d02fc2406fa65ad81effaa77ab6d6a9efb35aec3f543672fa7` |
-| golden | `crates/litchi-ops/tests/golden/registry/odg.json` | `a6d4a2ac265c877e800a7be446d609d1b861f68984287766f89da53a207770cb` |
-| golden | `crates/litchi-ops/tests/golden/registry/odi.json` | `e0811c798a96bf746d25dd019c455d03b0567d87403e4e86b0651eea1f6258b6` |
-| golden | `crates/litchi-ops/tests/golden/registry/odm.json` | `050fbc8caa9b47b9386f15121f679db258d333143fa02d03fbd239d1471ed85b` |
-| golden | `crates/litchi-ops/tests/golden/registry/odp.json` | `ebd7d17a818097117b0343558b54d6d853ccc2850415499d3e76204c337a6124` |
-| golden | `crates/litchi-ops/tests/golden/registry/ods.json` | `11c617b55cbd890049be50ab3c408c731b68aae700a62f62e161b1f1a0d02a17` |
-| golden | `crates/litchi-ops/tests/golden/registry/odt.json` | `786e46c288409010e4a4d53512ae56dae60423eec63c4c404a2ee3551473cf73` |
-| golden | `crates/litchi-ops/tests/golden/registry/oth.json` | `d2bf72f03e8ac9b8dbce6db3625e34e6ebe2be45ad62798154d39f869f2fc737` |
-| golden | `crates/litchi-ops/tests/golden/registry/pages.json` | `add1c4298a7e4dfc5afde7516418c0f754d1b4e747b0840f89f0883a2d63d722` |
+| golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `232e6d10bfb92c6f50d0b80e9206938030ffc468f48ef078c2e4d8a091b8c89a` |
+| golden | `crates/litchi-ops/tests/golden/registry/keynote.json` | `ef314e1e8b8607d17dc63ddee4e32ed7eb67e056f4d34f6d52ebe5f3750a4a7b` |
+| golden | `crates/litchi-ops/tests/golden/registry/numbers.json` | `1096eea95f8aaf22bbd6e1a512f3beb39a19b62efc3cf3d1eb53d319a57d3712` |
+| golden | `crates/litchi-ops/tests/golden/registry/odb.json` | `6db2565f0802f112be6d3db035e0444e2e132d7c24546c7ff18ec004de4fada7` |
+| golden | `crates/litchi-ops/tests/golden/registry/odc.json` | `b3d7d096e06b8dd2300d8d27d56449e1cbba6976e302308f6cc47db1090bd8ee` |
+| golden | `crates/litchi-ops/tests/golden/registry/odf.json` | `7f3d45bc3a6a7be93cb0cf50617df4c59fe2c13236ce331e3142f38229005a41` |
+| golden | `crates/litchi-ops/tests/golden/registry/odg.json` | `a6a2731d888a494e6e9b2cdcb95c7dc3e2d6434b0872a612b4acc8d8a14f93cf` |
+| golden | `crates/litchi-ops/tests/golden/registry/odi.json` | `ae58459a816d8f5e9589778be23054de447115fe445e805eda0bb7ac6fee9445` |
+| golden | `crates/litchi-ops/tests/golden/registry/odm.json` | `ff30dfda02183baa2952667b60f97fc880ae89102392884fb022c2e1bb416eae` |
+| golden | `crates/litchi-ops/tests/golden/registry/odp.json` | `6a14cabd33f6f0f65d9397307fddea6917e0b5380d4921266cf0000ca3648929` |
+| golden | `crates/litchi-ops/tests/golden/registry/ods.json` | `3a7d89d93de8cdb1b8e225b37b78f6cc2adae9cf187b384071cdafd1c846d69c` |
+| golden | `crates/litchi-ops/tests/golden/registry/odt.json` | `adbc9fc35ffae00c3089b29ffbe50bf327f8a0f7ec11080651ed8ddda00f87ba` |
+| golden | `crates/litchi-ops/tests/golden/registry/oth.json` | `d7ed0734b44bf5cec561cea44b5e7629e2c19e96ce1834aecacf776daf95b990` |
+| golden | `crates/litchi-ops/tests/golden/registry/pages.json` | `0198494f9b01534e0e0c947ca0f100cc9bd63ab8e52b4f37c28ada745b8b8734` |
 | officecli | `schemas/help` (152 files, OfficeCLI commit `dced0d74`) | `0bcd8cae45fabc0c5e45ff99d1994465fb213ac1b8db3f7eadd87339fb40ced4` |
 
 ## Statuses
@@ -81,7 +81,7 @@ Elements:
 
 | Format | supported | gap | folded | pending | missing | out of scope | litchi-only |
 |---|---|---|---|---|---|---|---|
-| docx | 14 | 21 | 0 | 0 | 9 | 2 | 5 |
+| docx | 14 | 21 | 0 | 0 | 9 | 2 | 6 |
 | doc | 15 | 11 | 0 | 0 | 18 | 2 | 1 |
 | rtf | 22 | 8 | 0 | 0 | 14 | 2 | 1 |
 | xlsx | 11 | 27 | 0 | 0 | 1 | 2 | 1 |
@@ -90,7 +90,7 @@ Elements:
 | pptx | 25 | 8 | 0 | 0 | 0 | 1 | 9 |
 | ppt | 15 | 18 | 0 | 0 | 0 | 1 | 8 |
 | keynote | 0 | 0 | 0 | 0 | 0 | 0 | 16 |
-| numbers | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
+| numbers | 0 | 0 | 0 | 0 | 0 | 0 | 5 |
 | odb | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
 | odc | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
 | odf | 0 | 0 | 0 | 0 | 0 | 0 | 2 |
@@ -212,6 +212,7 @@ Property writes:
 |  | comments | litchi-only |  |
 |  | settings | litchi-only | L-DOCX-R6 (R4x) |
 |  | theme | litchi-only | L-DOCX-R6 (R4x) |
+|  | smartart | litchi-only |  |
 
 ### Properties
 
@@ -7896,6 +7897,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 |  | sheet | litchi-only |  |
 |  | table | litchi-only |  |
 |  | cell | litchi-only |  |
+|  | mergeCell | litchi-only |  |
 
 ### Properties
 
@@ -7908,10 +7910,12 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 
 | Verb | Element | Context | Reason | Follow-up |
 |---|---|---|---|---|
-| `set` | `cell` | `a formula` | the leaf's formula authoring is not wired; `value` writes text, numbers and booleans | 0299 Numbers formula writes |
-| `add` | `sheet` | `a new sheet` | the Numbers leaf has no sheet lifecycle transaction | IWORK_API_REQUESTS.md request 4 |
-| `add` | `table` | `a new table` | the Numbers leaf has no table lifecycle transaction | IWORK_API_REQUESTS.md request 5 |
-| `create` | `workbook` | `a workbook from scratch` | the Numbers leaf has no from-scratch package builder | IWORK_API_REQUESTS.md request 1 |
+| `set` | `cell` | `cross-table formula references` | formula text is parsed with local A1 references and the authorable function subset; references to other tables need source-bound table handles | record 0297 follow-ups (IWORK_API_REQUESTS.md) |
+| `add` | `sheet` | `a new sheet` | the Numbers leaf has no sheet creation transaction | IWORK_API_REQUESTS.md request 4 |
+| `remove` | `sheet` | `a sheet and its graph` | the Numbers leaf has no sheet deletion transaction | IWORK_API_REQUESTS.md request 4 |
+| `add` | `table` | `a new table` | the Numbers leaf has no table creation transaction | IWORK_API_REQUESTS.md request 5 |
+| `remove` | `table` | `a table and its storage` | the Numbers leaf has no table deletion transaction | IWORK_API_REQUESTS.md request 5 |
+| `move` | `table` | `a position within its sheet` | the leaf relocates a table into another sheet (appended there); it has no transaction that reorders tables within one sheet | record 0297 follow-ups (IWORK_API_REQUESTS.md) |
 
 ## odb
 

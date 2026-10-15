@@ -1311,6 +1311,28 @@ impl Edit {
             .ok_or_else(|| invalid("the inserted chart did not read back"))
     }
 
+    /// Insert a run holding an inline SmartArt graphic into the paragraph at
+    /// `paragraph`, before its direct run `at` (after its last child for
+    /// `None`) (record 0295). `relationships` are the data, layout, quick
+    /// style and colors relationships the caller stages.
+    pub(crate) fn insert_smartart_markup_at(
+        &mut self,
+        paragraph: &ElementPath,
+        at: Option<Position>,
+        relationships: [&str; 4],
+        smartart: &SmartArtMarkup<'_>,
+    ) -> Result<()> {
+        self.ensure_unmanaged("insert_smartart_at")?;
+        if paragraph.steps().last().map(|step| step.local()) != Some(b"p".as_slice()) {
+            return Err(not_found());
+        }
+        let conformance = self.projected.conformance;
+        self.insert_inline_counted(paragraph, at, b"r", false, |prefix| {
+            smartart_markup(prefix, conformance, relationships, smartart)
+        })?;
+        Ok(())
+    }
+
     /// Resize (`Some((width, height))`, in EMUs) or remove (`None`) the
     /// chart at `ordinal` among the paragraph's charts. A removed chart
     /// takes its run with it when the run holds nothing else.
@@ -2361,6 +2383,77 @@ fn chart_markup(
     let (width, height, id) = (chart.width, chart.height, chart.id);
     let drawing = format!(
         r#"<wp:inline xmlns:wp="{wordprocessing}" distT="0" distB="0" distL="0" distR="0"><wp:extent cx="{width}" cy="{height}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="{id}" name="{name}" descr="{description}"/><wp:cNvGraphicFramePr/><a:graphic xmlns:a="{main}"><a:graphicData uri="{uri}"><{element}:chart xmlns:{element}="{uri}" xmlns:r="{relationships}" r:id="{relationship_id}"/></a:graphicData></a:graphic></wp:inline>"#
+    );
+    let mut xml = buffer(staging_add(drawing.len(), 128)?)?;
+    open(&mut xml, prefix, "r");
+    if declare {
+        xml.extend_from_slice(b" xmlns:");
+        xml.extend_from_slice(prefix);
+        xml.extend_from_slice(b"=\"");
+        xml.extend_from_slice(conformance.namespace().as_bytes());
+        xml.push(b'"');
+    }
+    xml.push(b'>');
+    open(&mut xml, prefix, "drawing");
+    xml.push(b'>');
+    xml.extend_from_slice(drawing.as_bytes());
+    close(&mut xml, prefix, "drawing");
+    close(&mut xml, prefix, "r");
+    Ok(xml)
+}
+
+/// The drawing of a new inline SmartArt graphic (record 0295): its extent
+/// in EMUs, its drawing object identifier, name and description.
+pub(crate) struct SmartArtMarkup<'a> {
+    pub(crate) width: i64,
+    pub(crate) height: i64,
+    pub(crate) id: u32,
+    pub(crate) name: &'a str,
+    pub(crate) description: &'a str,
+}
+
+/// The markup of a run holding an inline SmartArt graphic: a `dgm:relIds`
+/// reference to its data, layout, quick-style and colors parts.
+fn smartart_markup(
+    prefix: &[u8],
+    conformance: Conformance,
+    [data, layout, style, colors]: [&str; 4],
+    smartart: &SmartArtMarkup<'_>,
+) -> Result<Vec<u8>> {
+    let (prefix, declare) = if prefix.is_empty() {
+        (b"w".as_slice(), true)
+    } else {
+        (prefix, false)
+    };
+    let (wordprocessing, main, diagram) = match conformance {
+        Conformance::Strict => (
+            "http://purl.oclc.org/ooxml/drawingml/wordprocessingDrawing",
+            "http://purl.oclc.org/ooxml/drawingml/main",
+            litchi_drawingml::diagram::DGM_NAMESPACE_STRICT,
+        ),
+        Conformance::Transitional => (
+            "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing",
+            "http://schemas.openxmlformats.org/drawingml/2006/main",
+            litchi_drawingml::diagram::DGM_NAMESPACE,
+        ),
+    };
+    let escaped = |text: &str| -> Result<String> {
+        let mut out = Vec::new();
+        super::super::append_literal_escaped_xml(&mut out, text);
+        String::from_utf8(out).map_err(|_| refusal(Refusal::InvalidPropertyValue))
+    };
+    let name = escaped(smartart.name)?;
+    let description = escaped(smartart.description)?;
+    let (data, layout, style, colors) = (
+        escaped(data)?,
+        escaped(layout)?,
+        escaped(style)?,
+        escaped(colors)?,
+    );
+    let relationships = relationships_namespace(conformance);
+    let (width, height, id) = (smartart.width, smartart.height, smartart.id);
+    let drawing = format!(
+        r#"<wp:inline xmlns:wp="{wordprocessing}" distT="0" distB="0" distL="0" distR="0"><wp:extent cx="{width}" cy="{height}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="{id}" name="{name}" descr="{description}"/><wp:cNvGraphicFramePr/><a:graphic xmlns:a="{main}"><a:graphicData uri="{diagram}"><dgm:relIds xmlns:dgm="{diagram}" xmlns:r="{relationships}" r:dm="{data}" r:lo="{layout}" r:qs="{style}" r:cs="{colors}"/></a:graphicData></a:graphic></wp:inline>"#
     );
     let mut xml = buffer(staging_add(drawing.len(), 128)?)?;
     open(&mut xml, prefix, "r");

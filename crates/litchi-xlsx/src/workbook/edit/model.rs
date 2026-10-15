@@ -73,6 +73,9 @@ impl State {
             Some(Payload::SharedString { text, .. }) => {
                 Cell::Value(crate::Value::Text(text.clone()))
             },
+            Some(Payload::Rich(rich)) => {
+                Cell::Value(crate::Value::Text(crate::cell::Text::from(rich.text())))
+            },
             Some(Payload::SharedFormula {
                 formula: Some(formula),
                 ..
@@ -110,6 +113,7 @@ impl State {
             Some(
                 Payload::Set(_)
                 | Payload::SharedFormula { .. }
+                | Payload::Rich(_)
                 | Payload::Cache(_)
                 | Payload::Clear
                 | Payload::ClearIfPresent,
@@ -437,6 +441,7 @@ fn has_content_after(before: Option<&Cell>, action: Option<&Action>) -> bool {
                     Payload::Set(_)
                     | Payload::SharedString { .. }
                     | Payload::SharedFormula { .. }
+                    | Payload::Rich(_)
                     | Payload::Cache(_),
                 ),
             ..

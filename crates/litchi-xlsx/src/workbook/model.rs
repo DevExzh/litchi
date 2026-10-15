@@ -1484,6 +1484,42 @@ impl Worksheet {
             .is_ok())
     }
 
+    /// The rich-text runs of the shared string at `at`, each with its run
+    /// properties as stored (record 0295). `None` for a cell that is not a
+    /// shared string with runs, or whose item a run rewrite cannot keep
+    /// (phonetic runs, nested run-property markup). An inline rich string
+    /// is read from the worksheet part (one scan of it).
+    ///
+    /// # Errors
+    ///
+    /// The errors of reading the worksheet's cell store or the
+    /// shared-string part.
+    pub fn rich_text<'a>(&self, at: impl Into<At<'a>>) -> Result<Option<crate::RichText>> {
+        let address = at.into().resolve()?;
+        let Some(entry) = self.store()?.entry(address) else {
+            return Ok(None);
+        };
+        if entry.inline_rich {
+            let part = self.owner.package.get_part(&self.data.part_uri)?;
+            return inline_rich(part.blob(), &address.a1());
+        }
+        let Some(index) = entry.shared_string else {
+            return Ok(None);
+        };
+        if self
+            .owner
+            .rich_shared_strings()?
+            .binary_search(&index)
+            .is_err()
+        {
+            return Ok(None);
+        }
+        let Some(uri) = self.owner.shared_strings_uri.as_ref() else {
+            return Ok(None);
+        };
+        rich_item(self.owner.package.get_part(uri)?.blob(), index)
+    }
+
     /// Lazily traverse stored cells selected by A1 range, raw zero-based
     /// half-open bounds, or a reusable checked rectangle.
     pub fn cells<'a>(&self, area: impl Into<Area<'a>>) -> Result<Cells<'_>> {
@@ -1855,6 +1891,176 @@ fn rich_items(xml: &[u8]) -> Result<Box<[usize]>> {
     Ok(rich.into_boxed_slice())
 }
 
+/// The runs of shared-string item `wanted`, each with its `rPr` children
+/// as `(local name, raw attributes)`; `None` when the item has no runs or
+/// holds what a run rewrite would drop (phonetic data, nested `rPr`
+/// markup, text outside the runs).
+fn rich_item(xml: &[u8], wanted: usize) -> Result<Option<crate::RichText>> {
+    use quick_xml::events::Event;
+    let mut reader = quick_xml::Reader::from_reader(xml);
+    let mut depth = 0usize;
+    let mut count = 0usize;
+    loop {
+        match reader
+            .read_event()
+            .map_err(|error| invalid(format!("malformed shared-string part: {error}")))?
+        {
+            Event::Start(element) => {
+                depth += 1;
+                if depth == 2 && element.local_name().as_ref() == b"si" {
+                    if count == wanted {
+                        return read_runs(&mut reader);
+                    }
+                    count += 1;
+                }
+            },
+            Event::Empty(element) => {
+                if depth == 1 && element.local_name().as_ref() == b"si" {
+                    if count == wanted {
+                        return Ok(None);
+                    }
+                    count += 1;
+                }
+            },
+            Event::End(_) => depth = depth.saturating_sub(1),
+            Event::Eof => return Ok(None),
+            _ => {},
+        }
+    }
+}
+
+/// The runs of the inline string of cell `a1` in worksheet `xml` (record
+/// 0295), as [`rich_item`] reads an item. One scan of the worksheet part.
+fn inline_rich(xml: &[u8], a1: &str) -> Result<Option<crate::RichText>> {
+    use quick_xml::events::Event;
+    let mut reader = quick_xml::Reader::from_reader(xml);
+    let mut in_cell = false;
+    let mut depth = 0usize;
+    let mut cell_depth = 0usize;
+    loop {
+        match reader
+            .read_event()
+            .map_err(|error| invalid(format!("malformed worksheet part: {error}")))?
+        {
+            Event::Start(element) => {
+                depth += 1;
+                let local = element.local_name();
+                if local.as_ref() == b"c" {
+                    in_cell = element
+                        .try_get_attribute("r")
+                        .ok()
+                        .flatten()
+                        .is_some_and(|attribute| attribute.value.as_ref() == a1.as_bytes());
+                    cell_depth = depth;
+                } else if in_cell && depth == cell_depth + 1 && local.as_ref() == b"is" {
+                    return read_runs(&mut reader);
+                }
+            },
+            Event::End(_) => {
+                if in_cell && depth == cell_depth {
+                    return Ok(None);
+                }
+                depth = depth.saturating_sub(1);
+            },
+            Event::Eof => return Ok(None),
+            _ => {},
+        }
+    }
+}
+
+/// Read the runs of the string item whose start tag `reader` just read, up
+/// to its end tag.
+fn read_runs(reader: &mut quick_xml::Reader<&[u8]>) -> Result<Option<crate::RichText>> {
+    use quick_xml::events::Event;
+    let attributes = |element: &quick_xml::events::BytesStart<'_>| -> Result<Box<str>> {
+        let raw = std::str::from_utf8(element.attributes_raw())
+            .map_err(|error| invalid(format!("string attributes are not UTF-8: {error}")))?;
+        Ok(raw.trim().into())
+    };
+    let local = |element: &quick_xml::events::BytesStart<'_>| -> Result<Box<str>> {
+        std::str::from_utf8(element.local_name().as_ref())
+            .map(Into::into)
+            .map_err(|error| invalid(format!("string element name is not UTF-8: {error}")))
+    };
+    let mut runs: Vec<crate::RichRun> = Vec::new();
+    let mut properties: Option<Vec<(Box<str>, Box<str>)>> = None;
+    let mut text = String::new();
+    // Depth below the item and where the reader is: 0 the item, 1 a run,
+    // 2 its `rPr`, 3 its `t`.
+    let mut depth = 0usize;
+    let mut place = 0u8;
+    loop {
+        match reader
+            .read_event()
+            .map_err(|error| invalid(format!("malformed string item: {error}")))?
+        {
+            Event::Start(element) => {
+                depth += 1;
+                match (depth, element.local_name().as_ref(), place) {
+                    (1, b"r", 0) => {
+                        place = 1;
+                        properties = None;
+                        text.clear();
+                    },
+                    (2, b"rPr", 1) => {
+                        place = 2;
+                        properties = Some(Vec::new());
+                    },
+                    (2, b"t", 1) => place = 3,
+                    // A plain `t` beside runs, `rPh`, `phoneticPr` or
+                    // children with content are not kept by a run rewrite.
+                    _ => return Ok(None),
+                }
+            },
+            Event::Empty(element) => match (depth, place) {
+                (2, 2) => {
+                    if let Some(properties) = properties.as_mut() {
+                        properties.push((local(&element)?, attributes(&element)?));
+                    }
+                },
+                (1, 1) if element.local_name().as_ref() == b"rPr" => {
+                    properties = Some(Vec::new());
+                },
+                (1, 1) if element.local_name().as_ref() == b"t" => {},
+                _ => return Ok(None),
+            },
+            Event::Text(value) if place == 3 => text.push_str(
+                &value
+                    .decode()
+                    .map_err(|error| invalid(format!("string text: {error}")))?,
+            ),
+            Event::CData(value) if place == 3 => text.push_str(
+                &value
+                    .decode()
+                    .map_err(|error| invalid(format!("string text: {error}")))?,
+            ),
+            Event::GeneralRef(reference) if place == 3 => {
+                text.push_str(&litchi_ooxml_common::xml::decode_xml_reference(&reference)?);
+            },
+            Event::End(_) => {
+                match (depth, place) {
+                    (0, _) => {
+                        return Ok((!runs.is_empty()).then(|| crate::RichText::from_runs(runs)));
+                    },
+                    (2, 2 | 3) => place = 1,
+                    (1, 1) => {
+                        let decoded = raw::strings::decode_spreadsheet_text(&text)?;
+                        runs.push(crate::RichRun::new(
+                            properties.take().map(Vec::into_boxed_slice),
+                            decoded,
+                        ));
+                        place = 0;
+                    },
+                    _ => {},
+                }
+                depth = depth.saturating_sub(1);
+            },
+            Event::Eof => return Ok(None),
+            _ => {},
+        }
+    }
+}
+
 #[cfg(test)]
 mod rich_item_tests {
     #[test]
@@ -1862,5 +2068,68 @@ mod rich_item_tests {
         let xml = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="4" uniqueCount="4"><si><t>plain</t></si><si><r><rPr><b/></rPr><t>rich</t></r><r><t> text</t></r></si><si/><si><t>x</t><rPh sb="0" eb="1"><t>y</t></rPh></si><si><r><t>z</t></r></si></sst>"#;
         assert_eq!(&*super::rich_items(xml).unwrap(), &[1, 4]);
         assert!(super::rich_items(b"<sst").is_err());
+    }
+
+    #[test]
+    fn rich_item_keeps_each_runs_properties() {
+        let xml = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><t>plain</t></si><si><r><rPr><b/><sz val="11"/><color rgb="FFFF0000"/></rPr><t>rich &amp; </t></r><r><t xml:space="preserve">text_x0009_</t></r></si><si><t>x</t><rPh sb="0" eb="1"><t>y</t></rPh></si><si><r><t>a</t></r><rPh sb="0" eb="1"><t>y</t></rPh></si></sst>"#;
+        assert_eq!(super::rich_item(xml, 0).unwrap(), None);
+        let rich = super::rich_item(xml, 1).unwrap().unwrap();
+        assert_eq!(rich.text(), "rich & text\t");
+        assert_eq!(rich.runs().len(), 2);
+        assert!(rich.runs()[0].is_formatted());
+        assert!(!rich.runs()[1].is_formatted());
+        let properties = rich.runs()[0].properties.as_deref().unwrap();
+        assert_eq!(&*properties[1].0, "sz");
+        assert_eq!(&*properties[1].1, r#"val="11""#);
+        assert_eq!(super::rich_item(xml, 2).unwrap(), None);
+        assert_eq!(super::rich_item(xml, 3).unwrap(), None);
+        assert_eq!(super::rich_item(xml, 9).unwrap(), None);
+    }
+}
+
+#[cfg(test)]
+mod rich_text_write_tests {
+    use crate::{Package, RichText};
+
+    /// A workbook whose `A1` shows a formatted shared string.
+    fn rich_workbook() -> crate::Result<Package> {
+        let mut edit = Package::new()?.edit()?;
+        edit.sheet("Sheet1")?
+            .expect("worksheet")
+            .set_rich_text("A1", RichText::plain("x"))?;
+        edit.commit()
+            .map(crate::workbook::edit::Commit::into_package)
+    }
+
+    #[test]
+    fn a_rewritten_rich_string_keeps_each_runs_properties() -> crate::Result<()> {
+        // A shared-string item with two runs, through the reader.
+        let item = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><si><r><rPr><b/><sz val="11"/></rPr><t>Hello </t></r><r><rPr><i/></rPr><t>world</t></r></si></sst>"#;
+        let mut rich = super::rich_item(item, 0)?.expect("rich item");
+        rich.set_run_text(0, "Bye ")?;
+        let mut edit = rich_workbook()?.edit()?;
+        edit.sheet("Sheet1")?
+            .expect("worksheet")
+            .set_rich_text("B2", rich)?;
+        let package = edit.commit()?.into_package();
+        let workbook = package.workbook();
+        let sheet = workbook.sheet("Sheet1")?.expect("worksheet");
+        assert!(sheet.has_rich_text("B2")?);
+        let read = sheet.rich_text("B2")?.expect("inline runs");
+        assert_eq!(read.runs().len(), 2);
+        assert_eq!(read.text(), "Bye world");
+        assert!(read.runs()[1].is_formatted());
+        let mut edit = package.edit()?;
+        let sheet = edit.sheet("Sheet1")?.expect("worksheet");
+        let crate::State::Cell {
+            content: crate::Cell::Value(crate::Value::Text(text)),
+            ..
+        } = sheet.state("B2")?
+        else {
+            panic!("a text cell");
+        };
+        assert_eq!(text.as_str(), "Bye world");
+        Ok(())
     }
 }

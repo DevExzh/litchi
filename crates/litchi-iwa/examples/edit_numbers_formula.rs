@@ -4,7 +4,7 @@ use litchi_iwa::numbers::{
     FormulaAxisReference, FormulaBinaryOperator, FormulaCellReference, FormulaExpression,
     FormulaPivotCategoryReference, FormulaUuid, NumbersEditor,
 };
-use litchi_numbers::{Document, Position, cell::FiniteF64};
+use litchi_numbers::{Position, Workbook, cell::FiniteF64};
 
 fn parse_address(address: &str) -> Result<FormulaCellReference, String> {
     let mut input = address;
@@ -254,7 +254,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     editor.set_formula(table_id, row, column, expression)?;
     editor.save(output)?;
 
-    let document = Document::open(output)?;
+    let document = Workbook::open(output)?;
     let sheets = document.sheets();
     let cell = sheets
         .iter()

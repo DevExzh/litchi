@@ -168,6 +168,13 @@ fn run(
             }
             Ok((steps, summary))
         },
+        #[cfg(feature = "ods")]
+        File::Ods(handle) => {
+            let (commit, summary) =
+                crate::format::ods::write::import::import(handle, path, table, limits)?;
+            let (step, summary) = super::wrap_ods(handle, commit, summary)?;
+            Ok((vec![step], summary))
+        },
         _ => {
             let _ = (path, table, limits);
             Err(unsupported(file))
@@ -184,6 +191,8 @@ fn origin(file: &File, path: &crate::path::PathArg<'_>) -> Result<import::Origin
         File::Xlsb(handle) => crate::format::xlsb::write::import::origin(handle, path),
         #[cfg(feature = "xls")]
         File::Xls(handle) => crate::format::xls::write::import::origin(handle, path),
+        #[cfg(feature = "ods")]
+        File::Ods(handle) => crate::format::ods::write::import::origin(handle, path),
         _ => {
             let _ = path;
             Err(unsupported(file))

@@ -8116,6 +8116,1162 @@
       "families": []
     },
     {
+      "id": "numbers-minimal",
+      "features": [],
+      "package": "litchi-numbers",
+      "default_features": true,
+      "banned_names": [
+        {
+          "name": "Document",
+          "scope": "litchi_numbers",
+          "replacement": "use litchi_numbers::Workbook (ADR 0034 §2, record 0297)",
+          "recursive": false
+        },
+        {
+          "name": "document",
+          "scope": "litchi_numbers",
+          "replacement": "use litchi_numbers::Workbook (ADR 0034 §2, record 0297); the module is `workbook`",
+          "recursive": false
+        },
+        {
+          "name": "document",
+          "scope": "litchi_numbers::Package",
+          "replacement": "use Package::workbook() / workbook_ref() (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "document_snapshot",
+          "scope": "litchi_numbers::Package",
+          "replacement": "use Package::workbook() (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "read_options",
+          "scope": "litchi_numbers::Package",
+          "replacement": "use Package::open_options() (ADR 0034 §5)",
+          "recursive": false
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_numbers::Package",
+          "replacement": "use open_with_options(path, OpenOptions) (ADR 0034 §4)",
+          "recursive": false
+        },
+        {
+          "name": "from_bytes_with_limits",
+          "scope": "litchi_numbers::Package",
+          "replacement": "use from_bytes_with_options(bytes, OpenOptions) (ADR 0034 §4)",
+          "recursive": false
+        },
+        {
+          "name": "apply_table_move",
+          "scope": "litchi_numbers::Package",
+          "replacement": "use apply_table_relocation (one name per concept, ADR 0034 §1)",
+          "recursive": false
+        },
+        {
+          "name": "NotNumbers",
+          "scope": "litchi_numbers",
+          "replacement": "use UnexpectedFormat { detected } (ADR 0034 §6)"
+        },
+        {
+          "name": "Index",
+          "scope": "litchi_numbers::selector::SheetSelector",
+          "replacement": "use Position(Position) (ADR 0034 §8)",
+          "recursive": false
+        },
+        {
+          "name": "Index",
+          "scope": "litchi_numbers::selector::TableSelector",
+          "replacement": "use Position(Position) (ADR 0034 §8)",
+          "recursive": false
+        },
+        {
+          "name": "Index",
+          "scope": "litchi_numbers::selector::ChartSelector",
+          "replacement": "use Position(Position) (ADR 0034 §8)",
+          "recursive": false
+        },
+        {
+          "name": "as_index",
+          "scope": "litchi_numbers::selector::SheetSelector",
+          "replacement": "use as_position (ADR 0034 §8)",
+          "recursive": false
+        },
+        {
+          "name": "as_index",
+          "scope": "litchi_numbers::selector::TableSelector",
+          "replacement": "use as_position (ADR 0034 §8)",
+          "recursive": false
+        },
+        {
+          "name": "as_index",
+          "scope": "litchi_numbers::selector::ChartSelector",
+          "replacement": "use as_position (ADR 0034 §8)",
+          "recursive": false
+        },
+        {
+          "name": "DocumentLimits",
+          "scope": "litchi_numbers",
+          "replacement": "use SourceLimits / SemanticLimits / OpenOptions (ADR 0034 §5, record 0297)"
+        },
+        {
+          "name": "DocumentSourceLimits",
+          "scope": "litchi_numbers",
+          "replacement": "use SourceLimits / SemanticLimits / OpenOptions (ADR 0034 §5, record 0297)"
+        },
+        {
+          "name": "DocumentSourceLimitKind",
+          "scope": "litchi_numbers",
+          "replacement": "use SourceLimits / SemanticLimits / OpenOptions (ADR 0034 §5, record 0297)"
+        },
+        {
+          "name": "DocumentSourceLimitsError",
+          "scope": "litchi_numbers",
+          "replacement": "use SourceLimits / SemanticLimits / OpenOptions (ADR 0034 §5, record 0297)"
+        },
+        {
+          "name": "DocumentReadOptions",
+          "scope": "litchi_numbers",
+          "replacement": "use SourceLimits / SemanticLimits / OpenOptions (ADR 0034 §5, record 0297)"
+        },
+        {
+          "name": "DocumentLimitsError",
+          "scope": "litchi_numbers",
+          "replacement": "use SourceLimits / SemanticLimits / OpenOptions (ADR 0034 §5, record 0297)"
+        },
+        {
+          "name": "DocumentLimitKind",
+          "scope": "litchi_numbers",
+          "replacement": "use SourceLimits / SemanticLimits / OpenOptions (ADR 0034 §5, record 0297)"
+        },
+        {
+          "name": "ReadOptions",
+          "scope": "litchi_numbers",
+          "replacement": "use SourceLimits / SemanticLimits / OpenOptions (ADR 0034 §5, record 0297)"
+        },
+        {
+          "name": "PackageReadOptions",
+          "scope": "litchi_numbers",
+          "replacement": "use SourceLimits / SemanticLimits / OpenOptions (ADR 0034 §5, record 0297)"
+        },
+        {
+          "name": "PackageLimits",
+          "scope": "litchi_numbers",
+          "replacement": "use SourceLimits / SemanticLimits / OpenOptions (ADR 0034 §5, record 0297)"
+        },
+        {
+          "name": "PackageSemanticLimits",
+          "scope": "litchi_numbers",
+          "replacement": "use SourceLimits / SemanticLimits / OpenOptions (ADR 0034 §5, record 0297)"
+        },
+        {
+          "name": "PackageSemanticLimitsError",
+          "scope": "litchi_numbers",
+          "replacement": "use SourceLimits / SemanticLimits / OpenOptions (ADR 0034 §5, record 0297)"
+        },
+        {
+          "name": "SemanticLimitsError",
+          "scope": "litchi_numbers",
+          "replacement": "use SourceLimits / SemanticLimits / OpenOptions (ADR 0034 §5, record 0297)"
+        },
+        {
+          "name": "LimitsError",
+          "scope": "litchi_numbers",
+          "replacement": "use SourceLimits / SemanticLimits / OpenOptions (ADR 0034 §5, record 0297)"
+        },
+        {
+          "name": "DEFAULT_MAX_TEXT_BYTES",
+          "scope": "litchi_numbers",
+          "replacement": "use SourceLimits / SemanticLimits / OpenOptions (ADR 0034 §5, record 0297)"
+        },
+        {
+          "name": "PackageError",
+          "scope": "litchi_numbers",
+          "replacement": "prefixed root aliases are removed: use the crate-root ingress Error/Result or litchi_numbers::workbook::{Error, ReadError, ReadLimitKind, Result, Stats} (ADR 0034 §6)",
+          "recursive": false
+        },
+        {
+          "name": "PackageResult",
+          "scope": "litchi_numbers",
+          "replacement": "prefixed root aliases are removed: use the crate-root ingress Error/Result or litchi_numbers::workbook::{Error, ReadError, ReadLimitKind, Result, Stats} (ADR 0034 §6)",
+          "recursive": false
+        },
+        {
+          "name": "PackageResourceError",
+          "scope": "litchi_numbers",
+          "replacement": "prefixed root aliases are removed: use the crate-root ingress Error/Result or litchi_numbers::workbook::{Error, ReadError, ReadLimitKind, Result, Stats} (ADR 0034 §6)",
+          "recursive": false
+        },
+        {
+          "name": "PackagePayloadLimitKind",
+          "scope": "litchi_numbers",
+          "replacement": "prefixed root aliases are removed: use the crate-root ingress Error/Result or litchi_numbers::workbook::{Error, ReadError, ReadLimitKind, Result, Stats} (ADR 0034 §6)",
+          "recursive": false
+        },
+        {
+          "name": "PackageSemanticPath",
+          "scope": "litchi_numbers",
+          "replacement": "prefixed root aliases are removed: use the crate-root ingress Error/Result or litchi_numbers::workbook::{Error, ReadError, ReadLimitKind, Result, Stats} (ADR 0034 §6)",
+          "recursive": false
+        },
+        {
+          "name": "DocumentError",
+          "scope": "litchi_numbers",
+          "replacement": "prefixed root aliases are removed: use the crate-root ingress Error/Result or litchi_numbers::workbook::{Error, ReadError, ReadLimitKind, Result, Stats} (ADR 0034 §6)",
+          "recursive": false
+        },
+        {
+          "name": "DocumentReadError",
+          "scope": "litchi_numbers",
+          "replacement": "prefixed root aliases are removed: use the crate-root ingress Error/Result or litchi_numbers::workbook::{Error, ReadError, ReadLimitKind, Result, Stats} (ADR 0034 §6)",
+          "recursive": false
+        },
+        {
+          "name": "DocumentReadLimitKind",
+          "scope": "litchi_numbers",
+          "replacement": "prefixed root aliases are removed: use the crate-root ingress Error/Result or litchi_numbers::workbook::{Error, ReadError, ReadLimitKind, Result, Stats} (ADR 0034 §6)",
+          "recursive": false
+        },
+        {
+          "name": "DocumentResult",
+          "scope": "litchi_numbers",
+          "replacement": "prefixed root aliases are removed: use the crate-root ingress Error/Result or litchi_numbers::workbook::{Error, ReadError, ReadLimitKind, Result, Stats} (ADR 0034 §6)",
+          "recursive": false
+        },
+        {
+          "name": "DocumentStats",
+          "scope": "litchi_numbers",
+          "replacement": "prefixed root aliases are removed: use the crate-root ingress Error/Result or litchi_numbers::workbook::{Error, ReadError, ReadLimitKind, Result, Stats} (ADR 0034 §6)",
+          "recursive": false
+        },
+        {
+          "name": "TableLockEdit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::table::lock::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableLockPatch",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::table::lock::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableLockCommit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::table::lock::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableLockDiagnostics",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::table::lock::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableLockError",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::table::lock::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableLockLimitKind",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::table::lock::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableMergesEdit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::table::merge::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableMergesPatch",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::table::merge::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableMergesCommit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::table::merge::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableMergesDiagnostics",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::table::merge::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableMergesError",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::table::merge::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableMergesLimitKind",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::table::merge::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetChartArrangementEdit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::arrangement::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetChartArrangementPatch",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::arrangement::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetChartArrangementCommit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::arrangement::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetChartArrangementDiagnostics",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::arrangement::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetChartArrangementError",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::arrangement::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetChartArrangementLimitKind",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::arrangement::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "ChartArrangementEdit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::arrangement::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "ChartArrangementPatch",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::arrangement::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "ChartArrangementCommit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::arrangement::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "ChartArrangementDiagnostics",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::arrangement::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "ChartArrangementError",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::arrangement::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "ChartArrangementLimitKind",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::arrangement::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetChartDataEdit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::data::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetChartDataPatch",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::data::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetChartDataCommit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::data::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetChartDataDiagnostics",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::data::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetChartDataError",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::data::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetChartDataLimitKind",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::data::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "ChartDataEdit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::data::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "ChartDataPatch",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::data::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "ChartDataCommit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::data::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "ChartDataDiagnostics",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::data::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "ChartDataError",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::data::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "ChartDataLimitKind",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::data::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetImageAdjustmentsEdit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::shape::image::adjustments::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetImageAdjustmentsPatch",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::shape::image::adjustments::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetImageAdjustmentsCommit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::shape::image::adjustments::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetImageAdjustmentsDiagnostics",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::shape::image::adjustments::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetImageAdjustmentsError",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::shape::image::adjustments::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetImageAdjustmentsLimitKind",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::shape::image::adjustments::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableCellCommentEdit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableCellCommentPatch",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableCellCommentCommit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableCellCommentDiagnostics",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableCellCommentError",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableCellCommentLimitKind",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableCellCommentReplyEdit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableCellCommentReplyPatch",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableCellCommentReplyCommit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableCellCommentReplyDiagnostics",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableCellCommentReplyError",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableCellCommentReplyLimitKind",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "CommentReplyEdit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "CommentReplyPatch",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "CommentReplyCommit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "CommentReplyDiagnostics",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "CommentReplyError",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "CommentReplyLimitKind",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "ChartMetadataError",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::metadata::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "ChartMetadataLimitKind",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::metadata::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TransactionError",
+          "scope": "litchi_numbers::table::dimension::transaction",
+          "replacement": "use table::dimension::transaction::Error (ADR 0034 §3)",
+          "recursive": false
+        }
+      ],
+      "families": [
+        "litchi_numbers::cell::comment",
+        "litchi_numbers::cell::comment::transaction",
+        "litchi_numbers::cell::data_format::control::transaction",
+        "litchi_numbers::cell::data_format::currency::transaction",
+        "litchi_numbers::cell::data_format::custom::transaction",
+        "litchi_numbers::cell::data_format::date_time::transaction",
+        "litchi_numbers::cell::data_format::duration::transaction",
+        "litchi_numbers::cell::data_format::fraction::transaction",
+        "litchi_numbers::cell::data_format::number::transaction",
+        "litchi_numbers::cell::data_format::percentage::transaction",
+        "litchi_numbers::cell::data_format::pop_up_menu::transaction",
+        "litchi_numbers::cell::data_format::scientific::transaction",
+        "litchi_numbers::cell::data_format::text::transaction",
+        "litchi_numbers::names",
+        "litchi_numbers::sheet::order",
+        "litchi_numbers::sheet::chart::arrangement",
+        "litchi_numbers::sheet::chart::data",
+        "litchi_numbers::shape::image::adjustments",
+        "litchi_numbers::table::appearance::transaction",
+        "litchi_numbers::table::cells",
+        "litchi_numbers::table::dimension::transaction",
+        "litchi_numbers::table::headers::transaction",
+        "litchi_numbers::table::lock",
+        "litchi_numbers::table::merge::transaction",
+        "litchi_numbers::table::relocation",
+        "litchi_numbers::table::sort::transaction",
+        "litchi_numbers::table::title"
+      ]
+    },
+    {
+      "id": "numbers-full",
+      "features": [
+        "internal-iwork-source"
+      ],
+      "package": "litchi-numbers",
+      "default_features": true,
+      "banned_names": [
+        {
+          "name": "Document",
+          "scope": "litchi_numbers",
+          "replacement": "use litchi_numbers::Workbook (ADR 0034 §2, record 0297)",
+          "recursive": false
+        },
+        {
+          "name": "document",
+          "scope": "litchi_numbers",
+          "replacement": "use litchi_numbers::Workbook (ADR 0034 §2, record 0297); the module is `workbook`",
+          "recursive": false
+        },
+        {
+          "name": "document",
+          "scope": "litchi_numbers::Package",
+          "replacement": "use Package::workbook() / workbook_ref() (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "document_snapshot",
+          "scope": "litchi_numbers::Package",
+          "replacement": "use Package::workbook() (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "read_options",
+          "scope": "litchi_numbers::Package",
+          "replacement": "use Package::open_options() (ADR 0034 §5)",
+          "recursive": false
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_numbers::Package",
+          "replacement": "use open_with_options(path, OpenOptions) (ADR 0034 §4)",
+          "recursive": false
+        },
+        {
+          "name": "from_bytes_with_limits",
+          "scope": "litchi_numbers::Package",
+          "replacement": "use from_bytes_with_options(bytes, OpenOptions) (ADR 0034 §4)",
+          "recursive": false
+        },
+        {
+          "name": "apply_table_move",
+          "scope": "litchi_numbers::Package",
+          "replacement": "use apply_table_relocation (one name per concept, ADR 0034 §1)",
+          "recursive": false
+        },
+        {
+          "name": "NotNumbers",
+          "scope": "litchi_numbers",
+          "replacement": "use UnexpectedFormat { detected } (ADR 0034 §6)"
+        },
+        {
+          "name": "Index",
+          "scope": "litchi_numbers::selector::SheetSelector",
+          "replacement": "use Position(Position) (ADR 0034 §8)",
+          "recursive": false
+        },
+        {
+          "name": "Index",
+          "scope": "litchi_numbers::selector::TableSelector",
+          "replacement": "use Position(Position) (ADR 0034 §8)",
+          "recursive": false
+        },
+        {
+          "name": "Index",
+          "scope": "litchi_numbers::selector::ChartSelector",
+          "replacement": "use Position(Position) (ADR 0034 §8)",
+          "recursive": false
+        },
+        {
+          "name": "as_index",
+          "scope": "litchi_numbers::selector::SheetSelector",
+          "replacement": "use as_position (ADR 0034 §8)",
+          "recursive": false
+        },
+        {
+          "name": "as_index",
+          "scope": "litchi_numbers::selector::TableSelector",
+          "replacement": "use as_position (ADR 0034 §8)",
+          "recursive": false
+        },
+        {
+          "name": "as_index",
+          "scope": "litchi_numbers::selector::ChartSelector",
+          "replacement": "use as_position (ADR 0034 §8)",
+          "recursive": false
+        },
+        {
+          "name": "DocumentLimits",
+          "scope": "litchi_numbers",
+          "replacement": "use SourceLimits / SemanticLimits / OpenOptions (ADR 0034 §5, record 0297)"
+        },
+        {
+          "name": "DocumentSourceLimits",
+          "scope": "litchi_numbers",
+          "replacement": "use SourceLimits / SemanticLimits / OpenOptions (ADR 0034 §5, record 0297)"
+        },
+        {
+          "name": "DocumentSourceLimitKind",
+          "scope": "litchi_numbers",
+          "replacement": "use SourceLimits / SemanticLimits / OpenOptions (ADR 0034 §5, record 0297)"
+        },
+        {
+          "name": "DocumentSourceLimitsError",
+          "scope": "litchi_numbers",
+          "replacement": "use SourceLimits / SemanticLimits / OpenOptions (ADR 0034 §5, record 0297)"
+        },
+        {
+          "name": "DocumentReadOptions",
+          "scope": "litchi_numbers",
+          "replacement": "use SourceLimits / SemanticLimits / OpenOptions (ADR 0034 §5, record 0297)"
+        },
+        {
+          "name": "DocumentLimitsError",
+          "scope": "litchi_numbers",
+          "replacement": "use SourceLimits / SemanticLimits / OpenOptions (ADR 0034 §5, record 0297)"
+        },
+        {
+          "name": "DocumentLimitKind",
+          "scope": "litchi_numbers",
+          "replacement": "use SourceLimits / SemanticLimits / OpenOptions (ADR 0034 §5, record 0297)"
+        },
+        {
+          "name": "ReadOptions",
+          "scope": "litchi_numbers",
+          "replacement": "use SourceLimits / SemanticLimits / OpenOptions (ADR 0034 §5, record 0297)"
+        },
+        {
+          "name": "PackageReadOptions",
+          "scope": "litchi_numbers",
+          "replacement": "use SourceLimits / SemanticLimits / OpenOptions (ADR 0034 §5, record 0297)"
+        },
+        {
+          "name": "PackageLimits",
+          "scope": "litchi_numbers",
+          "replacement": "use SourceLimits / SemanticLimits / OpenOptions (ADR 0034 §5, record 0297)"
+        },
+        {
+          "name": "PackageSemanticLimits",
+          "scope": "litchi_numbers",
+          "replacement": "use SourceLimits / SemanticLimits / OpenOptions (ADR 0034 §5, record 0297)"
+        },
+        {
+          "name": "PackageSemanticLimitsError",
+          "scope": "litchi_numbers",
+          "replacement": "use SourceLimits / SemanticLimits / OpenOptions (ADR 0034 §5, record 0297)"
+        },
+        {
+          "name": "SemanticLimitsError",
+          "scope": "litchi_numbers",
+          "replacement": "use SourceLimits / SemanticLimits / OpenOptions (ADR 0034 §5, record 0297)"
+        },
+        {
+          "name": "LimitsError",
+          "scope": "litchi_numbers",
+          "replacement": "use SourceLimits / SemanticLimits / OpenOptions (ADR 0034 §5, record 0297)"
+        },
+        {
+          "name": "DEFAULT_MAX_TEXT_BYTES",
+          "scope": "litchi_numbers",
+          "replacement": "use SourceLimits / SemanticLimits / OpenOptions (ADR 0034 §5, record 0297)"
+        },
+        {
+          "name": "PackageError",
+          "scope": "litchi_numbers",
+          "replacement": "prefixed root aliases are removed: use the crate-root ingress Error/Result or litchi_numbers::workbook::{Error, ReadError, ReadLimitKind, Result, Stats} (ADR 0034 §6)",
+          "recursive": false
+        },
+        {
+          "name": "PackageResult",
+          "scope": "litchi_numbers",
+          "replacement": "prefixed root aliases are removed: use the crate-root ingress Error/Result or litchi_numbers::workbook::{Error, ReadError, ReadLimitKind, Result, Stats} (ADR 0034 §6)",
+          "recursive": false
+        },
+        {
+          "name": "PackageResourceError",
+          "scope": "litchi_numbers",
+          "replacement": "prefixed root aliases are removed: use the crate-root ingress Error/Result or litchi_numbers::workbook::{Error, ReadError, ReadLimitKind, Result, Stats} (ADR 0034 §6)",
+          "recursive": false
+        },
+        {
+          "name": "PackagePayloadLimitKind",
+          "scope": "litchi_numbers",
+          "replacement": "prefixed root aliases are removed: use the crate-root ingress Error/Result or litchi_numbers::workbook::{Error, ReadError, ReadLimitKind, Result, Stats} (ADR 0034 §6)",
+          "recursive": false
+        },
+        {
+          "name": "PackageSemanticPath",
+          "scope": "litchi_numbers",
+          "replacement": "prefixed root aliases are removed: use the crate-root ingress Error/Result or litchi_numbers::workbook::{Error, ReadError, ReadLimitKind, Result, Stats} (ADR 0034 §6)",
+          "recursive": false
+        },
+        {
+          "name": "DocumentError",
+          "scope": "litchi_numbers",
+          "replacement": "prefixed root aliases are removed: use the crate-root ingress Error/Result or litchi_numbers::workbook::{Error, ReadError, ReadLimitKind, Result, Stats} (ADR 0034 §6)",
+          "recursive": false
+        },
+        {
+          "name": "DocumentReadError",
+          "scope": "litchi_numbers",
+          "replacement": "prefixed root aliases are removed: use the crate-root ingress Error/Result or litchi_numbers::workbook::{Error, ReadError, ReadLimitKind, Result, Stats} (ADR 0034 §6)",
+          "recursive": false
+        },
+        {
+          "name": "DocumentReadLimitKind",
+          "scope": "litchi_numbers",
+          "replacement": "prefixed root aliases are removed: use the crate-root ingress Error/Result or litchi_numbers::workbook::{Error, ReadError, ReadLimitKind, Result, Stats} (ADR 0034 §6)",
+          "recursive": false
+        },
+        {
+          "name": "DocumentResult",
+          "scope": "litchi_numbers",
+          "replacement": "prefixed root aliases are removed: use the crate-root ingress Error/Result or litchi_numbers::workbook::{Error, ReadError, ReadLimitKind, Result, Stats} (ADR 0034 §6)",
+          "recursive": false
+        },
+        {
+          "name": "DocumentStats",
+          "scope": "litchi_numbers",
+          "replacement": "prefixed root aliases are removed: use the crate-root ingress Error/Result or litchi_numbers::workbook::{Error, ReadError, ReadLimitKind, Result, Stats} (ADR 0034 §6)",
+          "recursive": false
+        },
+        {
+          "name": "TableLockEdit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::table::lock::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableLockPatch",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::table::lock::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableLockCommit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::table::lock::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableLockDiagnostics",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::table::lock::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableLockError",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::table::lock::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableLockLimitKind",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::table::lock::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableMergesEdit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::table::merge::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableMergesPatch",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::table::merge::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableMergesCommit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::table::merge::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableMergesDiagnostics",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::table::merge::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableMergesError",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::table::merge::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableMergesLimitKind",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::table::merge::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetChartArrangementEdit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::arrangement::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetChartArrangementPatch",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::arrangement::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetChartArrangementCommit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::arrangement::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetChartArrangementDiagnostics",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::arrangement::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetChartArrangementError",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::arrangement::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetChartArrangementLimitKind",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::arrangement::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "ChartArrangementEdit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::arrangement::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "ChartArrangementPatch",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::arrangement::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "ChartArrangementCommit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::arrangement::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "ChartArrangementDiagnostics",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::arrangement::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "ChartArrangementError",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::arrangement::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "ChartArrangementLimitKind",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::arrangement::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetChartDataEdit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::data::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetChartDataPatch",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::data::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetChartDataCommit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::data::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetChartDataDiagnostics",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::data::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetChartDataError",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::data::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetChartDataLimitKind",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::data::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "ChartDataEdit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::data::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "ChartDataPatch",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::data::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "ChartDataCommit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::data::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "ChartDataDiagnostics",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::data::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "ChartDataError",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::data::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "ChartDataLimitKind",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::data::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetImageAdjustmentsEdit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::shape::image::adjustments::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetImageAdjustmentsPatch",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::shape::image::adjustments::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetImageAdjustmentsCommit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::shape::image::adjustments::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetImageAdjustmentsDiagnostics",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::shape::image::adjustments::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetImageAdjustmentsError",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::shape::image::adjustments::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "SheetImageAdjustmentsLimitKind",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::shape::image::adjustments::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableCellCommentEdit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableCellCommentPatch",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableCellCommentCommit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableCellCommentDiagnostics",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableCellCommentError",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableCellCommentLimitKind",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableCellCommentReplyEdit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableCellCommentReplyPatch",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableCellCommentReplyCommit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableCellCommentReplyDiagnostics",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableCellCommentReplyError",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TableCellCommentReplyLimitKind",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "CommentReplyEdit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "CommentReplyPatch",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "CommentReplyCommit",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "CommentReplyDiagnostics",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "CommentReplyError",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "CommentReplyLimitKind",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::cell::comment::transaction::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "ChartMetadataError",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::metadata::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "ChartMetadataLimitKind",
+          "scope": "litchi_numbers",
+          "replacement": "use the focused module family `litchi_numbers::sheet::chart::metadata::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 §3, record 0297)"
+        },
+        {
+          "name": "TransactionError",
+          "scope": "litchi_numbers::table::dimension::transaction",
+          "replacement": "use table::dimension::transaction::Error (ADR 0034 §3)",
+          "recursive": false
+        }
+      ],
+      "families": [
+        "litchi_numbers::cell::comment",
+        "litchi_numbers::cell::comment::transaction",
+        "litchi_numbers::cell::data_format::control::transaction",
+        "litchi_numbers::cell::data_format::currency::transaction",
+        "litchi_numbers::cell::data_format::custom::transaction",
+        "litchi_numbers::cell::data_format::date_time::transaction",
+        "litchi_numbers::cell::data_format::duration::transaction",
+        "litchi_numbers::cell::data_format::fraction::transaction",
+        "litchi_numbers::cell::data_format::number::transaction",
+        "litchi_numbers::cell::data_format::percentage::transaction",
+        "litchi_numbers::cell::data_format::pop_up_menu::transaction",
+        "litchi_numbers::cell::data_format::scientific::transaction",
+        "litchi_numbers::cell::data_format::text::transaction",
+        "litchi_numbers::names",
+        "litchi_numbers::sheet::order",
+        "litchi_numbers::sheet::chart::arrangement",
+        "litchi_numbers::sheet::chart::data",
+        "litchi_numbers::shape::image::adjustments",
+        "litchi_numbers::table::appearance::transaction",
+        "litchi_numbers::table::cells",
+        "litchi_numbers::table::dimension::transaction",
+        "litchi_numbers::table::headers::transaction",
+        "litchi_numbers::table::lock",
+        "litchi_numbers::table::merge::transaction",
+        "litchi_numbers::table::relocation",
+        "litchi_numbers::table::sort::transaction",
+        "litchi_numbers::table::title"
+      ]
+    },
+    {
       "id": "ops-iwork",
       "package": "litchi-ops",
       "default_features": true,

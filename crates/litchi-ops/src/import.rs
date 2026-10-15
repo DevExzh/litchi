@@ -1,8 +1,9 @@
 //! CSV and TSV import into a worksheet (design §13 P0, record 0266).
 //!
 //! [`File::import`](crate::File::import) decodes delimited text, infers each
-//! field's type, and writes the fields into a worksheet of an XLSX, XLSB or
-//! XLS workbook in **one** atomic native commit, starting at the target cell
+//! field's type, and writes the fields into a worksheet of an XLSX, XLSB,
+//! XLS or ODS workbook in **one** atomic native commit (XLS: chained chunks
+//! of one mutation), starting at the target cell
 //! (`/Sheet1/B2`) or at `A1` of the target sheet (`/Sheet1`). The original
 //! handle is never changed; empty input is an exact no-op.
 //!
@@ -47,7 +48,8 @@
 //!    serial number in the workbook's date system with a `yyyy-mm-dd` or
 //!    `yyyy-mm-dd hh:mm:ss` number format. Dates before the date system's
 //!    epoch stay text. XLS has no unified number-format write yet, so XLS
-//!    keeps dates as text ([`Summary::dates_as_text`]);
+//!    keeps dates as text ([`Summary::dates_as_text`]); ODS stores them as
+//!    native `date` cells (record 0295);
 //! 3. `TRUE` or `FALSE`, in any case;
 //! 4. text.
 //!
@@ -68,7 +70,7 @@
 //! grid from the origin cell ([`Code::OutOfRange`](crate::Code::OutOfRange)).
 
 #![cfg_attr(
-    not(any(feature = "xlsx", feature = "xlsb", feature = "xls")),
+    not(any(feature = "xlsx", feature = "xlsb", feature = "xls", feature = "ods")),
     allow(
         dead_code,
         reason = "only the workbook import adapters consume the parsed table"
@@ -86,6 +88,20 @@ mod tests;
 
 /// Excel's maximum number of characters in one cell.
 pub(crate) const MAX_CELL_CHARS: usize = 32_767;
+
+/// Refuse a rewritten cell text longer than [`MAX_CELL_CHARS`] (find and
+/// merge, record 0295).
+#[cfg(any(feature = "xlsb", feature = "xls", feature = "ods"))]
+pub(crate) fn check_cell_length(text: &str, format: litchi_core::FileFormat) -> Result<()> {
+    if text.len() > MAX_CELL_CHARS && text.chars().count() > MAX_CELL_CHARS {
+        return Err(crate::Error::new(
+            crate::Code::InvalidValue,
+            "a rewritten cell would be longer than 32,767 characters",
+        )
+        .with_format(format));
+    }
+    Ok(())
+}
 
 /// The fixed staging charge of one imported field, beside its text.
 const FIELD_CHARGE: usize = 64;
@@ -489,11 +505,19 @@ pub(crate) enum Written {
     Number,
     Boolean,
     #[cfg_attr(
-        not(any(feature = "xlsx", feature = "xlsb")),
+        not(any(feature = "xlsx", feature = "xlsb", feature = "ods")),
         allow(dead_code, reason = "XLS keeps imported dates as text")
     )]
     Date,
+    #[cfg_attr(
+        not(any(feature = "xlsx", feature = "xlsb", feature = "xls")),
+        allow(dead_code, reason = "ODS imports dates natively")
+    )]
     DateAsText,
+    #[cfg_attr(
+        not(any(feature = "xlsx", feature = "xlsb", feature = "xls")),
+        allow(dead_code, reason = "ODS import refuses formulas")
+    )]
     Formula,
     Empty,
 }

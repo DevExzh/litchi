@@ -142,7 +142,7 @@ fn merge_write_limits(
         })?;
     Ok(ReadLimits {
         wire,
-        max_regions: litchi_numbers::PackageSemanticLimits::MAX_MATERIALIZED_CELLS
+        max_regions: litchi_numbers::MAX_MATERIALIZED_CELLS
             .min(litchi_iwa_common::WireLimits::MAX_FIELDS),
         max_overlap_checks: overlap_checks,
     })
@@ -413,8 +413,8 @@ pub(crate) fn merge_in_package(
             "Table-cell region {region:?} overlaps existing merge {overlap:?}"
         )));
     }
-    let maximum = litchi_numbers::PackageSemanticLimits::MAX_MATERIALIZED_CELLS
-        .min(litchi_iwa_common::WireLimits::MAX_FIELDS);
+    let maximum =
+        litchi_numbers::MAX_MATERIALIZED_CELLS.min(litchi_iwa_common::WireLimits::MAX_FIELDS);
     let observed = existing.len().checked_add(1).ok_or({
         Error::IwaCommon(litchi_iwa_common::Error::LimitExceeded {
             kind: litchi_iwa_common::LimitKind::TableCells,

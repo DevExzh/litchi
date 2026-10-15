@@ -47,7 +47,7 @@ fn header_storage_decode_options(max_bytes: usize) -> dimension_codec::DecodeOpt
         work,
         HEADER_CODEC_RECURSION_LIMIT,
         bounded_source_len.clamp(1, litchi_numbers::MAX_REFERENCES),
-        bounded_source_len.clamp(1, litchi_numbers::DEFAULT_MAX_TEXT_BYTES),
+        bounded_source_len.clamp(1, litchi_numbers::MAX_TEXT_BYTES),
     )
 }
 
@@ -404,11 +404,11 @@ pub(super) fn write_dimension_size(
                 litchi_numbers::MAX_REFERENCES
             )));
         }
-        if result_upper_bound.text_bytes() > litchi_numbers::DEFAULT_MAX_TEXT_BYTES {
+        if result_upper_bound.text_bytes() > litchi_numbers::MAX_TEXT_BYTES {
             return Err(Error::InvalidFormat(format!(
                 "Numbers header bucket rewrite exceeded its text limit: observed {}, limit {}",
                 result_upper_bound.text_bytes(),
-                litchi_numbers::DEFAULT_MAX_TEXT_BYTES
+                litchi_numbers::MAX_TEXT_BYTES
             )));
         }
         let execute_options = header_storage_decode_options(requirements.output_bytes());

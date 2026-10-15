@@ -96,15 +96,15 @@ pub(crate) fn keynote_failure(error: litchi::keynote::semantic::presentation::Er
 }
 
 /// Open a Numbers document.
-pub(crate) fn open_numbers(path: &Path) -> Result<litchi::numbers::semantic::Document, Failure> {
-    litchi::numbers::semantic::Document::open(path).map_err(numbers_failure)
+pub(crate) fn open_numbers(path: &Path) -> Result<litchi::numbers::semantic::Workbook, Failure> {
+    litchi::numbers::semantic::Workbook::open(path).map_err(numbers_failure)
 }
 
 /// Classify a Numbers read error.
-pub(crate) fn numbers_failure(error: litchi::numbers::semantic::DocumentReadError) -> Failure {
-    use litchi::numbers::IoKind;
-    use litchi::numbers::semantic::DocumentReadError as ReadError;
-    failure!(error, IoKind::NotFound, ReadError::NotNumbers)
+pub(crate) fn numbers_failure(error: litchi::numbers::semantic::ReadError) -> Failure {
+    use litchi::numbers::semantic::ReadError;
+    use litchi::numbers::workbook::IoKind;
+    failure!(error, IoKind::NotFound, ReadError::UnexpectedFormat { .. })
 }
 
 /// The paragraph-like text values of a Pages document, in section order:

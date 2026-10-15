@@ -15,6 +15,9 @@ use crate::{
     table::{Dimensions, cells::Error as TableCellError},
 };
 
+#[path = "formula_parse.rs"]
+mod parse;
+
 /// Maximum UTF-8 bytes retained by one expression, including function names.
 pub const MAX_OWNED_BYTES: usize = 1024 * 1024;
 /// Maximum semantic nodes retained by one expression.
@@ -70,6 +73,12 @@ pub enum Error {
     InvalidArity,
     /// A range has reversed endpoints.
     ReversedRange,
+    /// Formula text could not be parsed; `offset` is the UTF-8 byte offset
+    /// of the first unexpected input (the text itself is never retained).
+    Syntax {
+        /// Byte offset of the first unexpected input.
+        offset: usize,
+    },
 }
 
 impl fmt::Display for Error {
@@ -93,6 +102,12 @@ impl fmt::Display for Error {
             },
             Self::InvalidArity => formatter.write_str("invalid Numbers formula function arity"),
             Self::ReversedRange => formatter.write_str("Numbers formula range is reversed"),
+            Self::Syntax { offset } => {
+                write!(
+                    formatter,
+                    "Numbers formula text is malformed at byte {offset}"
+                )
+            },
         }
     }
 }
@@ -612,15 +627,18 @@ pub(crate) fn resolve_table_handle<'sheet, 'table>(
     let sheet_selector = sheet_selector.into();
     let table_selector = table_selector.into();
     let (sheet_position, sheet) = match sheet_selector {
-        SheetSelector::Index(position) => source
-            .document()
-            .sheets()
-            .get(position)
-            .map(|sheet| (position, sheet))
-            .ok_or(TableCellError::SheetNotFound)?,
+        SheetSelector::Position(position) => {
+            let position = position.get();
+            source
+                .workbook_ref()
+                .sheets()
+                .get(position)
+                .map(|sheet| (position, sheet))
+                .ok_or(TableCellError::SheetNotFound)?
+        },
         SheetSelector::Name(name) => {
             let mut matches = source
-                .document()
+                .workbook_ref()
                 .sheets()
                 .iter()
                 .enumerate()
@@ -639,11 +657,14 @@ pub(crate) fn resolve_table_handle<'sheet, 'table>(
             path: Path::Package,
         })?;
     let (table_position, table) = match table_selector {
-        TableSelector::Index(position) => sheet
-            .tables()
-            .nth(position)
-            .map(|table| (position, table))
-            .ok_or(TableCellError::TableNotFound)?,
+        TableSelector::Position(position) => {
+            let position = position.get();
+            sheet
+                .tables()
+                .nth(position)
+                .map(|table| (position, table))
+                .ok_or(TableCellError::TableNotFound)?
+        },
         TableSelector::Name(name) => {
             let mut matches = sheet
                 .tables()

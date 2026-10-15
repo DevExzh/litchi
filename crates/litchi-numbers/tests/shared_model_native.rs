@@ -101,7 +101,7 @@ fn assert_boolean(package: &Package, address: &str, expected: bool) -> Result<()
 fn native_numbers_fixture_reads_all_shared_model_values() -> Result<(), Box<dyn Error>> {
     let package = Package::open(repository_path(NATIVE_FIXTURE))?;
     let table = package
-        .document()
+        .workbook_ref()
         .sheet(0)?
         .ok_or_else(|| std::io::Error::other("native Numbers fixture has no first sheet"))?
         .at(0)?

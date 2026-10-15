@@ -1196,7 +1196,7 @@ impl PackagePair {
         target_artifact: &SharedBytes,
         path: Path,
     ) -> Result<Self, Error> {
-        if source.read_options() != target.read_options()
+        if source.profile() != target.profile()
             || !std::ptr::eq(source.source_bytes(), source_artifact.as_ref())
             || !std::ptr::eq(target.source_bytes(), target_artifact.as_ref())
         {
@@ -1234,8 +1234,7 @@ impl fmt::Debug for PackagePair {
 }
 
 fn package_snapshot_eq(left: &Package, right: &Package) -> bool {
-    left.read_options() == right.read_options()
-        && std::ptr::eq(left.source_bytes(), right.source_bytes())
+    left.profile() == right.profile() && std::ptr::eq(left.source_bytes(), right.source_bytes())
 }
 
 /// One process-local exact-source capability for a cell batch.

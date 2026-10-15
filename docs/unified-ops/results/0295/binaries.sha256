@@ -1,0 +1,1 @@
+m4_formats_bench  30aaf8d5718648754e63af7e0b68cce19fb47316b82890cd1e046c56761de0cc  (release; built from the tree of the perf commit above; cargo build --release -p litchi-ops --example m4_formats_bench --features odt,doc,ods; not committed)

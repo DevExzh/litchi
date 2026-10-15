@@ -258,6 +258,9 @@ pub struct Edit {
     /// Coalesced object-format sets (record 0288).
     #[cfg(feature = "odf-objects")]
     odf_tree: Option<crate::format::odf_tree::coalesce::Run>,
+    /// Coalesced Numbers cell values and formulas (record 0297).
+    #[cfg(feature = "numbers")]
+    numbers_cells: Option<crate::format::iwork::numbers::coalesce::Run>,
     /// Coalesced Pages paragraph text sets (record 0299).
     #[cfg(feature = "pages")]
     pages: Option<crate::format::iwork::pages::Run>,
@@ -359,6 +362,8 @@ impl File {
                 ods_cells: None,
                 #[cfg(feature = "odf-objects")]
                 odf_tree: None,
+                #[cfg(feature = "numbers")]
+                numbers_cells: None,
                 #[cfg(feature = "pages")]
                 pages: None,
                 #[cfg(feature = "keynote")]
@@ -1990,6 +1995,59 @@ impl Edit {
             self.operations += 1;
             return Ok(Some(changed));
         }
+        #[cfg(feature = "numbers")]
+        if let File::Numbers(handle) = &self.current {
+            let planned = match &mut self.numbers_cells {
+                Some(run) => run.cell_plan(_target, _props),
+                None => handle.numbers_cell_plan(_target, _props, None),
+            };
+            if planned.is_err() {
+                self.flush_pending()?;
+            }
+            let Some(mut plan) = planned? else {
+                if self.numbers_cells.is_some() {
+                    self.flush_pending()?;
+                }
+                return Ok(None);
+            };
+            if self.operations >= self.limits.max_operations() {
+                return Err(Error::Limit {
+                    kind: LimitKind::Operations,
+                    observed: self.operations.saturating_add(1),
+                    maximum: self.limits.max_operations(),
+                }
+                .into());
+            }
+            if self
+                .numbers_cells
+                .as_ref()
+                .is_some_and(|run| run.requires_barrier(&plan))
+            {
+                self.flush_pending()?;
+                let File::Numbers(handle) = &self.current else {
+                    return Err(pending());
+                };
+                let Some(replanned) = handle.numbers_cell_plan(_target, _props, None)? else {
+                    return Ok(None);
+                };
+                plan = replanned;
+            }
+            if self.numbers_cells.is_none() {
+                let File::Numbers(handle) = &self.current else {
+                    return Err(pending());
+                };
+                self.numbers_cells = Some(crate::format::iwork::numbers::coalesce::Run::new(
+                    handle,
+                    &self.limits,
+                )?);
+            }
+            let run = self.numbers_cells.as_mut().ok_or_else(|| {
+                crate::Error::new(Code::InternalError, "Numbers cell run missing")
+            })?;
+            let changed = run.stage(plan, _index)?;
+            self.operations += 1;
+            return Ok(Some(changed));
+        }
         #[cfg(feature = "ods")]
         if let File::Ods(_) = &self.current {
             let planned = match &self.ods_cells {
@@ -2664,6 +2722,31 @@ impl Edit {
             })();
             result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
         }
+        #[cfg(feature = "numbers")]
+        if let Some(run) = self.numbers_cells.take() {
+            let index = run.first_index();
+            let result = (|| -> Result<()> {
+                let (base, commit) = run.commit()?;
+                let (step, ()) = wrap_iwork(&base, commit, ())?;
+                let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
+                if bytes > self.limits.max_snapshot_bytes() {
+                    return Err(Error::Limit {
+                        kind: LimitKind::SnapshotBytes,
+                        observed: bytes,
+                        maximum: self.limits.max_snapshot_bytes(),
+                    }
+                    .into());
+                }
+                self.steps
+                    .try_reserve(1)
+                    .map_err(|source| Error::Allocation { source })?;
+                self.current = step.after.clone();
+                self.steps.push(step);
+                self.snapshot_bytes = bytes;
+                Ok(())
+            })();
+            result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
+        }
         #[cfg(feature = "odf-objects")]
         if let Some(run) = self.odf_tree.take() {
             let index = run.first_index();
@@ -2792,6 +2875,10 @@ impl Edit {
                 {
                     self.ods_cells = None;
                 }
+                #[cfg(feature = "numbers")]
+                {
+                    self.numbers_cells = None;
+                }
                 #[cfg(feature = "odp")]
                 {
                     self.odp = None;
@@ -2824,10 +2911,20 @@ impl Edit {
                 return Err(error);
             },
         };
-        #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "rtf"))]
         let limits = self.limits;
-        #[cfg(not(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "rtf")))]
-        let _ = (target, &spec);
+        let _ = (target, &spec, &limits);
+        #[cfg(feature = "xls")]
+        if matches!(self.current, File::Xls(_)) {
+            return self.execute_steps(|file| match file {
+                File::Xls(handle) => {
+                    let (commits, matched) = crate::format::xls::write::find::find_replace(
+                        handle, target, &spec, &limits,
+                    )?;
+                    Ok((xls_steps(commits)?, matched))
+                },
+                _ => Err(crate::find::unsupported(file)),
+            });
+        }
         self.execute(|file| match file {
             #[cfg(feature = "docx")]
             File::Docx(handle) => {
@@ -2848,6 +2945,41 @@ impl Edit {
             File::Rtf(handle) => {
                 let (commit, matched) = handle.find_replace(target, &spec, &limits)?;
                 wrap_rtf(handle, commit, matched)
+            },
+            #[cfg(feature = "doc")]
+            File::Doc(handle) => {
+                let (commit, matched) = handle.find_replace(target, &spec, &limits)?;
+                wrap_doc(handle, commit, matched)
+            },
+            #[cfg(feature = "xlsb")]
+            File::Xlsb(handle) => {
+                let (commit, matched) =
+                    crate::format::xlsb::write::find::find_replace(handle, target, &spec, &limits)?;
+                wrap_xlsb(handle, commit, matched)
+            },
+            #[cfg(feature = "ods")]
+            File::Ods(handle) => {
+                let (commit, matched) =
+                    crate::format::ods::write::find::find_replace(handle, target, &spec, &limits)?;
+                wrap_ods(handle, commit, matched)
+            },
+            #[cfg(feature = "odt")]
+            File::Odt(handle) | File::Oth(handle) | File::Odm(handle) => {
+                let (commit, matched) =
+                    crate::format::odt::write::find::find_replace(handle, target, &spec, &limits)?;
+                wrap_odt(handle, commit, matched)
+            },
+            #[cfg(feature = "odp")]
+            File::Odp(handle) => {
+                let (commit, matched) =
+                    crate::format::odp::write::find::find_replace(handle, target, &spec, &limits)?;
+                wrap_odp(handle, commit, matched)
+            },
+            #[cfg(feature = "ppt")]
+            File::Ppt(handle) => {
+                let (commit, matched) =
+                    crate::format::ppt::write::find::find_replace(handle, target, &spec, &limits)?;
+                wrap_ppt(handle, commit, matched)
             },
             _ => Err(crate::find::unsupported(file)),
         })
@@ -2938,6 +3070,18 @@ impl Edit {
         self.failure.clone().map_or(Ok(()), Err)
     }
     fn execute<T>(&mut self, operation: impl FnOnce(&File) -> Result<(Step, T)>) -> Result<T> {
+        self.execute_steps(|file| {
+            let (step, value) = operation(file)?;
+            Ok((vec![step], value))
+        })
+    }
+
+    /// [`Self::execute`] for one mutation that commits several native steps,
+    /// each on the previous one's result (XLS chunks, record 0295).
+    fn execute_steps<T>(
+        &mut self,
+        operation: impl FnOnce(&File) -> Result<(Vec<Step>, T)>,
+    ) -> Result<T> {
         self.check()?;
         self.flush_pending()?;
         let index = self.operations;
@@ -2950,8 +3094,10 @@ impl Edit {
                 }
                 .into());
             }
-            let (step, value) = operation(&self.current)?;
-            let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
+            let (steps, value) = operation(&self.current)?;
+            let bytes = steps.iter().fold(self.snapshot_bytes, |bytes, step| {
+                bytes.saturating_add(step.snapshot_bytes)
+            });
             if bytes > self.limits.max_snapshot_bytes() {
                 return Err(Error::Limit {
                     kind: LimitKind::SnapshotBytes,
@@ -2961,16 +3107,30 @@ impl Edit {
                 .into());
             }
             self.steps
-                .try_reserve(1)
+                .try_reserve(steps.len())
                 .map_err(|source| Error::Allocation { source })?;
-            self.current = step.after.clone();
-            self.steps.push(step);
+            for step in steps {
+                self.current = step.after.clone();
+                self.steps.push(step);
+            }
             self.snapshot_bytes = bytes;
             self.operations += 1;
             Ok(value)
         })();
         result.map_err(|error| self.poison(error, index))
     }
+}
+
+/// The steps of chained XLS commits, each on the previous one's result.
+#[cfg(feature = "xls")]
+fn xls_steps(commits: Vec<crate::format::xls::WriteCommit>) -> Result<Vec<Step>> {
+    commits
+        .into_iter()
+        .map(|commit| {
+            let before = commit.before.clone();
+            Ok(wrap_xls(&before, commit, ())?.0)
+        })
+        .collect()
 }
 
 #[cfg(feature = "docx")]

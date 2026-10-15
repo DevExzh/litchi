@@ -48,6 +48,8 @@ CREATABLE = (
     "docx", "xlsx", "pptx", "xlsb", "doc", "xls", "ppt", "rtf", "ods", "odt", "odp",
     # The remaining ODF formats (record 0282).
     "oth", "odm", "odg", "odc", "odi", "odb", "odf",
+    # Numbers builds a blank workbook (record 0297).
+    "numbers",
     # Pages builds its minimal document (record 0299), Keynote its minimal
     # presentation (record 0298).
     "pages", "keynote",
@@ -147,12 +149,6 @@ class CreateTests(WriteAssertions):
         self.assertError(error, L.PropertyError, "invalid_argument")
         self.assertIn("docx", error.suggestion)
         self.assertError(raised(lambda: L.create(5)), L.PropertyError, "invalid_argument")
-
-    def test_formats_without_a_builder_are_unsupported(self):
-        for name in ("numbers",):
-            with self.subTest(format=name):
-                error = raised(lambda: L.create(name))
-                self.assertIsInstance(error, L.UnsupportedError)
 
     def test_iwork_writes_round_trip(self):
         # Record 0296: the iWork leaves' focused writes through litchi_py.

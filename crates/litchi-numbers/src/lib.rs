@@ -1,7 +1,7 @@
 //! Numbers semantic value models.
 //!
 //! This crate owns archive-free Numbers semantics, bounded native package
-//! reading, and focused exact package transactions. [`Package::document`]
+//! reading, and focused exact package transactions. [`Package::workbook`]
 //! exposes the strict rooted workbook, while
 //! [`compatibility_tables_from_bytes`] is an explicitly allocating global
 //! projection for historical structured-data migration, including detached
@@ -308,10 +308,13 @@
 
 /// Cell-level Numbers vocabulary.
 pub mod cell;
-/// Immutable, archive-free Numbers document snapshots.
-pub mod document;
+/// Fresh workbooks: `Package::new`, the option-bearing `Builder` and the
+/// explicit document `Identity`.
+pub mod create;
 /// Dependency-free formula vocabulary shared by Numbers, Pages, and Keynote.
 pub mod formula;
+/// Checked source and semantic ingress profiles and the open envelope.
+pub mod limits;
 /// Atomic, preservation-safe Numbers sheet and table name transactions.
 pub mod names;
 /// Native Numbers package parsing and semantic projection.
@@ -324,15 +327,16 @@ pub mod shape;
 pub mod sheet;
 /// Sparse semantic table vocabulary.
 pub mod table;
+/// The read-only semantic workbook projection.
+pub mod workbook;
 
 pub use cell::CellControl;
 pub use cell::data_format::{Checkbox, PopUpMenu, Slider, StarRating, Stepper};
-pub use document::{
-    DEFAULT_MAX_TEXT_BYTES, Document, DocumentReadOptions, DocumentSourceLimitKind,
-    DocumentSourceLimits, DocumentSourceLimitsError, Error as DocumentError, IoKind,
-    LimitKind as DocumentLimitKind, Limits as DocumentLimits, LimitsError as DocumentLimitsError,
-    MAX_MATERIALIZED_CELLS, MAX_SHEETS, MAX_TABLES, ReadError as DocumentReadError,
-    ReadLimitKind as DocumentReadLimitKind, Result as DocumentResult, Stats as DocumentStats,
+pub use create::{Builder, Identity};
+pub use limits::{
+    LimitKind, MAX_MATERIALIZED_CELLS, MAX_OBJECTS, MAX_REFERENCES, MAX_SHEETS, MAX_TABLES,
+    MAX_TEXT_BYTES, OpenOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsBuilder,
+    SourceLimitKind, SourceLimits, SourceLimitsBuilder,
 };
 pub use litchi_iwa_common::chart::arrangement::ChartArrangement;
 pub use litchi_iwa_common::chart::data::ChartData;
@@ -353,47 +357,10 @@ pub use package::{__decode_image_adjustments_payload, ImageAdjustmentsError};
 pub use package::{
     __movie_playback_settings, __rewrite_movie_playback_settings, MoviePlaybackError,
 };
+
 pub use package::{
-    ChartArrangementCommit as SheetChartArrangementCommit,
-    ChartArrangementDiagnostics as SheetChartArrangementDiagnostics,
-    ChartArrangementEdit as SheetChartArrangementEdit,
-    ChartArrangementError as SheetChartArrangementError,
-    ChartArrangementLimitKind as SheetChartArrangementLimitKind,
-    ChartArrangementPatch as SheetChartArrangementPatch,
-};
-pub use package::{
-    ChartDataCommit, ChartDataDiagnostics, ChartDataEdit, ChartDataPatch, SheetChartDataCommit,
-    SheetChartDataDiagnostics, SheetChartDataEdit, SheetChartDataPatch,
-};
-pub use package::{ChartDataError, ChartDataLimitKind};
-pub use package::{ChartMetadataError, ChartMetadataLimitKind};
-pub use package::{
-    Error as PackageError, Limits as PackageLimits, MAX_OBJECTS, MAX_REFERENCES, MergeReader,
-    Package, PayloadLimitKind as PackagePayloadLimitKind, ReadOptions as PackageReadOptions,
-    ResourceError as PackageResourceError, Result as PackageResult, SaveError, SemanticLimitKind,
-    SemanticLimits as PackageSemanticLimits, SemanticLimitsError as PackageSemanticLimitsError,
-    SemanticPath as PackageSemanticPath, SheetImageAdjustmentsCommit,
-    SheetImageAdjustmentsDiagnostics, SheetImageAdjustmentsEdit, SheetImageAdjustmentsError,
-    SheetImageAdjustmentsLimitKind, SheetImageAdjustmentsPatch, TableLockCommit,
-    TableLockDiagnostics, TableLockEdit, TableLockError, TableLockLimitKind, TableLockPatch,
-    TableMergesCommit, TableMergesDiagnostics, TableMergesEdit, TableMergesError,
-    TableMergesLimitKind, TableMergesPatch, WriteError,
-    comments::{
-        Comment as TableCellComment, CommentAuthor as TableCellCommentAuthor,
-        CommentReply as TableCellCommentReply, CommentReplyCommit as TableCellCommentReplyCommit,
-        CommentReplyDiagnostics as TableCellCommentReplyDiagnostics,
-        CommentReplyEdit as TableCellCommentReplyEdit,
-        CommentReplyError as TableCellCommentReplyError,
-        CommentReplyIndex as TableCellCommentReplyIndex,
-        CommentReplyLimitKind as TableCellCommentReplyLimitKind,
-        CommentReplyPatch as TableCellCommentReplyPatch,
-        CommentReplyPath as TableCellCommentReplyPath,
-        CommentTimestamp as TableCellCommentTimestamp, Commit as TableCellCommentCommit,
-        Diagnostics as TableCellCommentDiagnostics, Edit as TableCellCommentEdit,
-        Error as TableCellCommentError, LimitKind as TableCellCommentLimitKind,
-        Patch as TableCellCommentPatch, Path as TableCellCommentPath,
-    },
-    compatibility_tables_from_bytes, compatibility_tables_from_bytes_with_options,
+    Error, MergeReader, Package, PayloadLimitKind, ResourceError, Result, SaveError, SemanticPath,
+    WriteError, compatibility_tables_from_bytes, compatibility_tables_from_bytes_with_options,
 };
 pub use selector::{ChartSelector, SheetSelector, TableSelector};
 pub use shape::image::{ImageAdjustment, ImageAdjustments, ImageEnhancement, ImageSelector};
@@ -406,3 +373,4 @@ pub use table::{
     Dimensions, Error as TableError, Grid, GridBudget, InsertError, InsertResult, Position, Range,
     Table, View,
 };
+pub use workbook::Workbook;

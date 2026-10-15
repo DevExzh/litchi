@@ -135,7 +135,10 @@ impl Package {
             .map_err(|error| map_read_error(ReadError::Semantic(error)))?
             .ok_or(Error::SheetNotFound)?;
         let table_position = match table.into() {
-            TableSelector::Index(index) => selected_sheet.tables().nth(index).map(|_| index),
+            TableSelector::Position(index) => {
+                let index = index.get();
+                selected_sheet.tables().nth(index).map(|_| index)
+            },
             TableSelector::Name(name) => selected_sheet
                 .tables()
                 .position(|candidate_table| candidate_table.name() == name),

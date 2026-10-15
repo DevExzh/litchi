@@ -17,9 +17,9 @@ use litchi_iwa_common::{WireLimits, wire::WireView};
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::{image_adjustments_codec as codec, tsd};
 use litchi_numbers::cell::Value;
+use litchi_numbers::shape::image::adjustments::Error as SheetImageAdjustmentsError;
 use litchi_numbers::{
-    __decode_image_adjustments_payload, ImageAdjustmentsError, Package, SheetImageAdjustmentsError,
-    SheetSelector,
+    __decode_image_adjustments_payload, ImageAdjustmentsError, Package, SheetSelector,
     shape::image::{ImageAdjustment, ImageAdjustments, ImageEnhancement, ImageSelector},
 };
 use prost::Message as _;

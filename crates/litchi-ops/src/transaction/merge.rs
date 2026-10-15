@@ -14,7 +14,8 @@ impl File {
     /// rules. The template is unchanged, so one handle fills any number of
     /// records.
     ///
-    /// Supported for DOCX, PPTX and XLSX. A template without a matching
+    /// Supported for DOCX, PPTX, XLSX, XLSB, DOC, PPT, XLS, RTF, ODT, OTH,
+    /// ODM, ODS and ODP (records 0274 and 0295). A template without a matching
     /// placeholder or field is an exact no-op: the returned file is the
     /// template and its patch is a no-op.
     ///
@@ -70,20 +71,17 @@ impl File {
             if !admitted {
                 super::admit(self)?;
             }
-            let (step, summary) = run(self, record, options, limits)?;
-            let mut steps = Vec::new();
-            let mut snapshot_bytes = 0;
-            if let Some(step) = step {
-                if step.snapshot_bytes > limits.max_snapshot_bytes() {
-                    return Err(Error::Limit {
-                        kind: LimitKind::SnapshotBytes,
-                        observed: step.snapshot_bytes,
-                        maximum: limits.max_snapshot_bytes(),
-                    }
-                    .into());
+            let (steps, summary) = run_steps(self, record, options, limits)?;
+            let snapshot_bytes = steps.iter().fold(0usize, |bytes, step| {
+                bytes.saturating_add(step.snapshot_bytes)
+            });
+            if snapshot_bytes > limits.max_snapshot_bytes() {
+                return Err(Error::Limit {
+                    kind: LimitKind::SnapshotBytes,
+                    observed: snapshot_bytes,
+                    maximum: limits.max_snapshot_bytes(),
                 }
-                snapshot_bytes = step.snapshot_bytes;
-                steps.push(step);
+                .into());
             }
             let changed = super::changed(&steps)?;
             let file = match steps.last() {
@@ -145,29 +143,49 @@ impl Edit {
                 }
                 .into());
             }
-            let (step, summary) = run(&self.current, record, options, &self.limits)?;
-            if let Some(step) = step {
-                let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
-                if bytes > self.limits.max_snapshot_bytes() {
-                    return Err(Error::Limit {
-                        kind: LimitKind::SnapshotBytes,
-                        observed: bytes,
-                        maximum: self.limits.max_snapshot_bytes(),
-                    }
-                    .into());
+            let (steps, summary) = run_steps(&self.current, record, options, &self.limits)?;
+            let bytes = steps.iter().fold(self.snapshot_bytes, |bytes, step| {
+                bytes.saturating_add(step.snapshot_bytes)
+            });
+            if bytes > self.limits.max_snapshot_bytes() {
+                return Err(Error::Limit {
+                    kind: LimitKind::SnapshotBytes,
+                    observed: bytes,
+                    maximum: self.limits.max_snapshot_bytes(),
                 }
-                self.steps
-                    .try_reserve(1)
-                    .map_err(|source| Error::Allocation { source })?;
+                .into());
+            }
+            self.steps
+                .try_reserve(steps.len())
+                .map_err(|source| Error::Allocation { source })?;
+            for step in steps {
                 self.current = step.after.clone();
                 self.steps.push(step);
-                self.snapshot_bytes = bytes;
             }
+            self.snapshot_bytes = bytes;
             self.operations += 1;
             Ok(summary)
         })();
         result.map_err(|error| self.poison(error, index))
     }
+}
+
+/// Merge through the format's native editor: the native commits, each on
+/// the previous one's result (one, except for chunked XLS edits).
+fn run_steps(
+    file: &File,
+    record: &Record,
+    options: &Options,
+    limits: &SemanticLimits,
+) -> Result<(Vec<super::Step>, Summary)> {
+    #[cfg(feature = "xls")]
+    if let File::Xls(handle) = file {
+        let (commits, summary) =
+            crate::format::xls::write::find::merge(handle, record, options, limits)?;
+        return Ok((super::xls_steps(commits)?, summary));
+    }
+    let (step, summary) = run(file, record, options, limits)?;
+    Ok((step.into_iter().collect(), summary))
 }
 
 /// Merge through the format's native editor: at most one native commit.
@@ -205,6 +223,67 @@ fn run(
                 None => Ok((None, summary)),
             }
         },
+        #[cfg(feature = "rtf")]
+        File::Rtf(handle) => {
+            let (commit, summary) = handle.merge(record, options, limits)?;
+            match commit {
+                Some(commit) => Ok((Some(super::wrap_rtf(handle, commit, ())?.0), summary)),
+                None => Ok((None, summary)),
+            }
+        },
+        #[cfg(feature = "doc")]
+        File::Doc(handle) => {
+            let (commit, summary) = handle.merge(record, options, limits)?;
+            match commit {
+                Some(commit) => Ok((Some(super::wrap_doc(handle, commit, ())?.0), summary)),
+                None => Ok((None, summary)),
+            }
+        },
+        #[cfg(feature = "xlsb")]
+        File::Xlsb(handle) => {
+            let (commit, summary) =
+                crate::format::xlsb::write::find::merge(handle, record, options, limits)?;
+            match commit {
+                Some(commit) => Ok((Some(super::wrap_xlsb(handle, commit, ())?.0), summary)),
+                None => Ok((None, summary)),
+            }
+        },
+        #[cfg(feature = "ods")]
+        File::Ods(handle) => {
+            let (commit, summary) =
+                crate::format::ods::write::find::merge(handle, record, options, limits)?;
+            match commit {
+                Some(commit) => Ok((Some(super::wrap_ods(handle, commit, ())?.0), summary)),
+                None => Ok((None, summary)),
+            }
+        },
+        #[cfg(feature = "odt")]
+        File::Odt(handle) | File::Oth(handle) | File::Odm(handle) => {
+            let (commit, summary) =
+                crate::format::odt::write::find::merge(handle, record, options, limits)?;
+            match commit {
+                Some(commit) => Ok((Some(super::wrap_odt(handle, commit, ())?.0), summary)),
+                None => Ok((None, summary)),
+            }
+        },
+        #[cfg(feature = "odp")]
+        File::Odp(handle) => {
+            let (commit, summary) =
+                crate::format::odp::write::find::merge(handle, record, options, limits)?;
+            match commit {
+                Some(commit) => Ok((Some(super::wrap_odp(handle, commit, ())?.0), summary)),
+                None => Ok((None, summary)),
+            }
+        },
+        #[cfg(feature = "ppt")]
+        File::Ppt(handle) => {
+            let (commit, summary) =
+                crate::format::ppt::write::find::merge(handle, record, options, limits)?;
+            match commit {
+                Some(commit) => Ok((Some(super::wrap_ppt(handle, commit, ())?.0), summary)),
+                None => Ok((None, summary)),
+            }
+        },
         _ => {
             let _ = (record, options, limits);
             Err(unsupported(file))
@@ -215,9 +294,11 @@ fn run(
 fn unsupported(file: &File) -> crate::Error {
     let error = crate::Error::new(
         Code::UnsupportedCapability,
-        "template merge fills DOCX, PPTX and XLSX templates",
+        "template merge fills word-processing, presentation and spreadsheet templates",
     )
-    .with_suggestion("convert the template to DOCX, PPTX or XLSX");
+    .with_suggestion(
+        "convert the template to a word-processing, presentation or spreadsheet format",
+    );
     match file.format() {
         Some(format) => error.with_format(format),
         None => error,

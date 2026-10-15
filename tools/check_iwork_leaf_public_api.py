@@ -42,14 +42,8 @@ LEAF_PACKAGES = (
 LEAF_CRATE_NAMES = {package: package.replace("-", "_") for package in LEAF_PACKAGES}
 
 
-# The read-only semantic projection module of each leaf crate (ADR 0034 §1:
-# `Document` for word processing, `Presentation` for decks).
-SEMANTIC_MODULES = {"litchi_keynote": "presentation"}
-
-
-def semantic_module(crate_name: str) -> str:
-    """Return the public semantic projection module name of one leaf crate."""
-    return SEMANTIC_MODULES.get(crate_name, "document")
+# The family-named semantic projection modules (ADR 0034 §2).
+SEMANTIC_MODULES = ("document", "workbook", "presentation")
 
 
 DEFAULT_JSON = {
@@ -398,12 +392,20 @@ def _semantic_path_violation(
 def _document_ids(
     index: Mapping[str, Any], paths: Mapping[str, Any], crate_name: str
 ) -> tuple[set[str], str | None]:
-    """Return the public semantic module and its root re-export targets."""
-    module_path = (crate_name, semantic_module(crate_name))
+    """Return the public semantic-projection module and its root re-export
+    targets.
+
+    The projection module is named for its family (ADR 0034 §2): `document`
+    for word processing, `workbook` for spreadsheets (record 0297) and
+    `presentation` for decks; any of them that exists is checked.
+    """
+    module_paths = tuple(
+        (crate_name, name) for name in SEMANTIC_MODULES
+    )
     roots = {
         item_id
         for item_id, entry in paths.items()
-        if _path_entry_path(entry) == module_path
+        if _path_entry_path(entry) in module_paths
     }
 
     # A root `pub use document::{...}` has a root path but points at the
@@ -440,11 +442,11 @@ def _document_ids(
         is_root_alias = item_id in crate_root_items or (
             crate_root_id is None and item_path[:1] == (crate_name,)
         )
-        if target_path[:2] == module_path and is_root_alias:
+        if target_path[:2] in module_paths and is_root_alias:
             roots.add(item_id)
 
     if not roots:
-        return set(), f"missing public module `{crate_name}::{semantic_module(crate_name)}`"
+        return set(), f"missing public module `{crate_name}::document`, `::workbook` or `::presentation`"
     return roots, None
 
 

@@ -1,7 +1,7 @@
 //! Numbers Spreadsheet Support
 //!
 //! This module provides Numbers creation and editing support. Use
-//! [`litchi_numbers::Document`] for archive-free spreadsheet reading.
+//! [`litchi_numbers::Workbook`] for archive-free spreadsheet reading.
 //!
 //! ## Features
 //!
@@ -14,9 +14,9 @@
 //! ## Example
 //!
 //! ```rust,no_run
-//! use litchi_numbers::Document;
+//! use litchi_numbers::Workbook;
 //!
-//! let doc = Document::open("spreadsheet.numbers")?;
+//! let doc = Workbook::open("spreadsheet.numbers")?;
 //! let sheets = doc.sheets();
 //!
 //! for sheet in sheets.iter() {

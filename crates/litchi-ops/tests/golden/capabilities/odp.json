@@ -48,22 +48,13 @@
       "reason": "this format has no worksheets"
     },
     "merge": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "template merge for XLSB and the legacy, RTF and ODF formats (record 0274 F1)",
-      "reason": "template merge fills DOCX, PPTX and XLSX templates"
+      "supported": true
     },
     "replace": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "record 0273 follow-up: a find adapter over the format's run-level text edits",
-      "reason": "ODP find/replace is not integrated; the leaf's scene run text changes can carry it"
+      "supported": true
     },
     "refresh": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "field refresh for the legacy, RTF and ODF formats (record 0279 follow-up)",
-      "reason": "field refresh recomputes DOCX fields, PPTX slide fields and workbook formulas"
+      "supported": true
     },
     "save": {
       "supported": true

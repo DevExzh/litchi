@@ -25,7 +25,7 @@ pub const MAX_SLIDES: usize = 65_536;
 /// Maximum number of sections retained by one structured snapshot.
 pub const MAX_SECTIONS: usize = litchi_pages::MAX_SECTIONS;
 /// Maximum UTF-8 bytes retained by one structured snapshot.
-pub const DEFAULT_MAX_TEXT_BYTES: usize = litchi_numbers::DEFAULT_MAX_TEXT_BYTES;
+pub const DEFAULT_MAX_TEXT_BYTES: usize = litchi_numbers::MAX_TEXT_BYTES;
 
 /// Finite construction limits for an immutable structured snapshot.
 #[allow(

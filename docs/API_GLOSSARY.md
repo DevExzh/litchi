@@ -27,11 +27,11 @@ Rules of reading:
 |---|---|---|---|
 | Immutable owner snapshot (physical + semantic, all state verbs) | `Package` | — | ✅ numbers/pages/keynote/doc/ods · ✅ XLSX primary owner (0250; scoped `&mut` families pending) · ✅ RTF owner split (0223; atomic publication 0226) · ✅ XLS (0197–0198) · ✅ PPT immutable owner/publication and primary edit (0211–0212) · 🔴 pptx remaining direct mutators (0127 removes the package writer) · 🔴 docx immutable public owner (0019 shares the physical graph; `document_mut`/`props*` removed 0251, package-level legacy mutators remain) · ✅ odt/odp/ods immutable `Package` owners split from the read-only `Document`/`Presentation`/`Workbook` projections (0268) · ✅ oth/odm (`Document`), odg (`Drawing`), odc (`Chart`), odi (`Image`), odb (`Database`) and odf-formula (`Formula`) `Package` owners with read-only projections (0282) · 🔴 xlsb (W2) |
 | Read-only semantic projection, word processing | `Document` | — | ✅ pages · ✅ RTF shared owned projection (0223) · ✅ docx owned `Package::document()` projection (0019) |
-| Read-only semantic projection, spreadsheets | `Workbook` | `Spreadsheet` | 🔴 numbers `Document`→`Workbook` (W1) · ✅ xlsx `Workbook` owned projection via `Package::workbook()` (0250) · ✅ ods `Spreadsheet`→`Workbook` owned projection via `Package::workbook()` (0268) · ✅ XLS (0197) |
+| Read-only semantic projection, spreadsheets | `Workbook` | `Spreadsheet` | ✅ numbers `Document`→`Workbook`, owned `Package::workbook()` / borrowed `workbook_ref()`, module `litchi_numbers::workbook` (0297) · ✅ xlsx `Workbook` owned projection via `Package::workbook()` (0250) · ✅ ods `Spreadsheet`→`Workbook` owned projection via `Package::workbook()` (0268) · ✅ XLS (0197) |
 | Read-only semantic projection, decks | `Presentation` | — | ✅ keynote (0298): `Document`→`presentation::Presentation`, `Package::semantic_snapshot()`→`Package::presentation()` · ✅ pptx view / odp `Presentation` owned projection via `Package::presentation()` (0268) · ✅ PPT shared owned projection (0211) |
 | Projection accessor | `Package::{document, workbook, presentation}()` | — | owned projections primary; borrowed `*_ref()` views secondary |
-| Option-bearing fresh authoring | per-format `Builder` in a focused module | `WorkbookWriter` (xlsb), `Writer` (doc), `*DocumentBuilder` prefixes (litchi-iwa) | ✅ XLSB (0175), XLS (0200), PPT (0213) and RTF (0225) `Builder::build()` return `Package`; ✅ ODT/ODS/ODP `Builder::build()` return `Package` (0268); ✅ OTH/ODM/ODG/ODC/ODI/ODB/ODF-formula `Builder::build()` return `Package` (0282); ✅ pages `builder::Builder::build() -> Package` (0299); ✅ Keynote `litchi_keynote::builder::Builder::build()` returns `Package`, identity required (0298); 🔴 remaining W2–W4 builders (Numbers) |
-| iWork document identity (explicit, required) | `Identity` with `Identity::generate()` / fixed bytes | implicit random identity inside builders | ✅ pages `builder::Identity::{generate, from_bytes}`; `Builder::build()` without one is `PackageError::MissingIdentity`; fixed identities give byte-identical builds (0299) · ✅ Keynote `litchi_keynote::Identity` (`generate()`, `from_bytes`, fixed `Identity::BLANK`, `Package::identity()`); `Builder::build()` without identity is `builder::Error::MissingIdentity` (0298) · 🔴 numbers (W1) |
+| Option-bearing fresh authoring | per-format `Builder` in a focused module | `WorkbookWriter` (xlsb), `Writer` (doc), `*DocumentBuilder` prefixes (litchi-iwa) | ✅ XLSB (0175), XLS (0200), PPT (0213) and RTF (0225) `Builder::build()` return `Package`; ✅ ODT/ODS/ODP `Builder::build()` return `Package` (0268); ✅ OTH/ODM/ODG/ODC/ODI/ODB/ODF-formula `Builder::build()` return `Package` (0282); ✅ pages `builder::Builder::build() -> Package` (0299); ✅ Numbers `litchi_numbers::create::Builder::build() -> Package` (0297); ✅ Keynote `litchi_keynote::builder::Builder::build()` returns `Package`, identity required (0298); 🔴 remaining W2–W4 builders |
+| iWork document identity (explicit, required) | `Identity` with `Identity::generate()` / fixed bytes | implicit random identity inside builders | ✅ pages `builder::Identity::{generate, from_bytes}`; `Builder::build()` without one is `PackageError::MissingIdentity`; fixed identities give byte-identical builds (0299) · ✅ Numbers `create::Identity` (`generate`, `from_bytes`, fixed `BLANK`); `Builder::build()` without identity is `create::Error::MissingIdentity` (0297) · ✅ Keynote `litchi_keynote::Identity` (`generate()`, `from_bytes`, fixed `Identity::BLANK`, `Package::identity()`); `Builder::build()` without identity is `builder::Error::MissingIdentity` (0298) |
 
 ## 2. Transaction vocabulary (iWork canonical form)
 
@@ -119,8 +119,8 @@ and redaction vocabulary remain pending.
 | Open from bytes (copy allowed) | `from_bytes(&[u8])` | `from_bytes(Vec<u8>)` signatures (xlsx/odt/odp), `from_slice` (xlsx), `from_vec` (pptx, removed 0252) | ✅ DOCX owning/lazy Package (0038/0040); ✅ XLSX `Package` (0250; copies into the owned source archive); ✅ PPTX (0252); ✅ XLSB `Package` (0261; copies into the owned source archive; `from_slice*` deleted) · ✅ ODT/ODS/ODP `Package::from_bytes(&[u8])` (0268) · ✅ OTH/ODM/ODG/ODC/ODI/ODB/ODF-formula `Package::from_bytes(&[u8])` (0282); 🔴 flat `Flat*` owners |
 | Open from shared bytes (zero-copy) | `from_shared_bytes(Arc<[u8]>)` | — | ✅ numbers; ✅ pages `Package::from_shared_bytes{,_with_options}` (0299); offered only where zero-copy is real |
 | Open from reader | `from_reader(R)` | — | ✅ docx/xlsx; ✅ XLSB `Package`/`SourceBackedWorkbook` (0261); extended per wave |
-| Configured open | `open_with_options(path, OpenOptions)`, `from_bytes_with_options(bytes, OpenOptions)` | `open_with_limits`, `open_with` (doc), `open_with_options` under other type names | envelope decided in §5 · ✅ DOCX (0038) · ✅ XLSX `OpenOptions` (source limits, leniency, encryption limits; 0250) · ✅ PPTX owning `Package` and positional-source presentation owners (0252) · ✅ XLSB `OpenOptions` (source, external-link and cache limits, leniency, drawing decoding, execution context) on `Package`, the `Workbook` projection constructors and `SourceBackedWorkbook` (0261) · ✅ DOC raw owner and part editors, `open_with_limits*` banned crate-wide (0258) · ✅ PPT `text_edit::SourceSnapshot::open_with_options` and `slide_order::Snapshot::from_bytes_with_options` only (0260) · ✅ keynote `Package`, `Presentation` and `MergeReader` `open_with_options`/`from_bytes_with_options` (`open_with_limits`/`from_bytes_with_limits` deleted, 0298) · ✅ ODT/ODS/ODP `open_with_options`/`from_bytes_with_options`/`from_reader_with_options` with the `litchi_odf_common::OpenOptions` envelope (source + semantic limits, 0268) · ✅ the other seven ODF `Package` owners `open_with_options`/`from_bytes_with_options`/`from_reader_with_options` (0282) · ✅ pages `Package::{open_with_options, from_bytes_with_options, from_shared_bytes_with_options}`; `open_with_limits`/`from_bytes_with_limits` banned (0299); 🔴 PPT `raw::Reader` limits-only ingress and scoped-family `*_with_limits` (W4 residue) |
-| Minimal fresh artifact | `Package::new()` | `Workbook::create()` duplicate (xlsx) | ✅ docx; ✅ canonical PPTX constructor (0127); ✅ XLSB (0175); ✅ XLS (0199); ✅ RTF (0225); ✅ XLSX (0250); ✅ pages (deterministic built-in template, 0299); ✅ Keynote, deterministic with the fixed `Identity::BLANK` (0298) · all formats gain it |
+| Configured open | `open_with_options(path, OpenOptions)`, `from_bytes_with_options(bytes, OpenOptions)` | `open_with_limits`, `open_with` (doc), `open_with_options` under other type names | envelope decided in §5 · ✅ DOCX (0038) · ✅ XLSX `OpenOptions` (source limits, leniency, encryption limits; 0250) · ✅ PPTX owning `Package` and positional-source presentation owners (0252) · ✅ XLSB `OpenOptions` (source, external-link and cache limits, leniency, drawing decoding, execution context) on `Package`, the `Workbook` projection constructors and `SourceBackedWorkbook` (0261) · ✅ DOC raw owner and part editors, `open_with_limits*` banned crate-wide (0258) · ✅ PPT `text_edit::SourceSnapshot::open_with_options` and `slide_order::Snapshot::from_bytes_with_options` only (0260) · ✅ keynote `Package`, `Presentation` and `MergeReader` `open_with_options`/`from_bytes_with_options` (`open_with_limits`/`from_bytes_with_limits` deleted, 0298) · ✅ ODT/ODS/ODP `open_with_options`/`from_bytes_with_options`/`from_reader_with_options` with the `litchi_odf_common::OpenOptions` envelope (source + semantic limits, 0268) · ✅ the other seven ODF `Package` owners `open_with_options`/`from_bytes_with_options`/`from_reader_with_options` (0282) · ✅ pages `Package::{open_with_options, from_bytes_with_options, from_shared_bytes_with_options}`; `open_with_limits`/`from_bytes_with_limits` banned (0299) · ✅ Numbers `Package::{open_with_options, from_bytes_with_options, from_shared_bytes_with_options}` and the `Workbook` projection (0297); 🔴 PPT `raw::Reader` limits-only ingress and scoped-family `*_with_limits` (W4 residue) |
+| Minimal fresh artifact | `Package::new()` | `Workbook::create()` duplicate (xlsx) | ✅ docx; ✅ canonical PPTX constructor (0127); ✅ XLSB (0175); ✅ XLS (0199); ✅ RTF (0225); ✅ XLSX (0250); ✅ pages (deterministic built-in template, 0299); ✅ Numbers (0297; byte-identical, fixed `Identity::BLANK`); ✅ Keynote, deterministic with the fixed `Identity::BLANK` (0298) · all formats gain it |
 | Save to path | `save(path)` — **always atomic** (sibling temp + rename) | non-atomic `Builder::save` (odt/odp) | ✅ OOXML, including lazy DOCX (0041), and RTF (0226) · ✅ ODF: every ODT/ODS/ODP/ODC/formula/generic whole-package save publishes through `litchi_core::atomic` with failed-save CRUD evidence (0268); `Package::{save, save_with_durability}` on all seven remaining ODF owners (0282) |
 | Save with explicit durability | `save_with_durability(path, Durability)` | — | ✅ OOXML and RTF (0226); extended everywhere |
 | Bytes output | `to_bytes()` | `Builder::build() -> Vec<u8>` as output (ODF) | ✅ owning DOCX (0044); lazy managed DOCX bytes pending. `build()` returns `Package`; output lives on `Package` |
@@ -134,11 +134,11 @@ and redaction vocabulary remain pending.
 
 | Concept | Canonical | Banned | Notes / status |
 |---|---|---|---|
-| Physical ingress limits | `SourceLimits` | `ReadLimits` (OPC re-exports in docx/pptx/xlsx/xlsb), `SourcePackageLimits` (odt), `package::Limits` (doc), `RecordLimits` (ppt), `DocumentSourceLimits` (iWork) | ✅ keynote (0298) `SourceLimits` (input, entries, entry/aggregate/component bytes, archive objects/messages/message bytes/header fields) · ✅ OPC `SourceLimits`/`SourceLimitsBuilder` and OOXML `SourceLimits` re-exports, record 0035 · ✅ DOC (0192); ✅ XLS eager/retained policies (0196–0198); ✅ PPT (0210); ✅ ODF `litchi_odf_common::SourceLimits` (`SourcePackageLimits` deleted, 0268); ✅ pages `SourceLimits` (input bytes, members, entry/aggregate/component bytes; `DocumentSourceLimits` and the `Limits` re-export deleted, 0299); 🔴 numbers |
-| Semantic limits | `SemanticLimits` | `DocumentLimits` (numbers), `DocumentSemanticLimits` (keynote) | ✅ keynote (0298), `DocumentSemanticLimits` merged into `SemanticLimits`; ✅ pages; ✅ RTF primary operation count and replacement bytes (0227–0228); ✅ XLSB nested `data_model`, `calculation_chain`, `volatile_dependencies` and `xml_maps` `ReadLimits` and their `Limits` aliases renamed `SemanticLimits` (0261) · ✅ ODT/ODS/ODP `SemanticLimits` (content/styles bytes, units; 0268) · ✅ pages builder form, `SemanticLimitsError` deleted (0299) · 🔴 remaining dimensions and W1 |
-| Open configuration envelope | `OpenOptions` (per format, extensible fields) | `PackageOpenOptions` (doc — merges), `ReadOptions` (numbers), `iwork::Options` (facade) | ✅ keynote (0298) `OpenOptions { source_limits, semantic_limits }` on `Package`, `Presentation` and `MergeReader`; ✅ DOCX ingress envelope (0038–0040); ✅ XLSB (0261, `OpenPolicy` refusals for owner-specific policies); ✅ pages `OpenOptions` (`DocumentReadOptions` deleted, 0299); owning lazy-policy support and W1–W4 pending |
-| Construction idiom | consuming builder, fallible `max_<dimension>` setters, fallible `build()` | positional `new(...)` constructors (iWork) | ✅ keynote (0298) `SourceLimits::builder()`/`SemanticLimits::builder()`; ✅ OPC, DOC (0192), XLS (0196) and PPT (0210) · ✅ pages `SourceLimits::builder()`/`SemanticLimits::builder()` (0299) · 🔴 numbers W1 |
-| Build-time invalid limit | `Error::InvalidLimit { kind, value, maximum }` | standalone `*LimitsError` types (doc, iWork) | ✅ keynote (0298) `Error::InvalidLimit { kind: LimitKind, value, maximum }`; ✅ OPC `InvalidLimit` with contextual maximum (0036); DOC (0192), XLS (0196), PPT (0210); pages `PackageError::InvalidLimit` (0299); other owners pending |
+| Physical ingress limits | `SourceLimits` | `ReadLimits` (OPC re-exports in docx/pptx/xlsx/xlsb), `SourcePackageLimits` (odt), `package::Limits` (doc), `RecordLimits` (ppt), `DocumentSourceLimits` (iWork) | ✅ keynote (0298) `SourceLimits` (input, entries, entry/aggregate/component bytes, archive objects/messages/message bytes/header fields) · ✅ OPC `SourceLimits`/`SourceLimitsBuilder` and OOXML `SourceLimits` re-exports, record 0035 · ✅ DOC (0192); ✅ XLS eager/retained policies (0196–0198); ✅ PPT (0210); ✅ ODF `litchi_odf_common::SourceLimits` (`SourcePackageLimits` deleted, 0268); ✅ pages `SourceLimits` (input bytes, members, entry/aggregate/component bytes; `DocumentSourceLimits` and the `Limits` re-export deleted, 0299); ✅ Numbers `litchi_numbers::SourceLimits` (`DocumentSourceLimits`, `PackageLimits` deleted; adds the format-specific `header_fields` dimension; default = hard ceilings, 0297) |
+| Semantic limits | `SemanticLimits` | `DocumentLimits` (numbers), `DocumentSemanticLimits` (keynote) | ✅ keynote (0298), `DocumentSemanticLimits` merged into `SemanticLimits`; ✅ pages; ✅ RTF primary operation count and replacement bytes (0227–0228); ✅ XLSB nested `data_model`, `calculation_chain`, `volatile_dependencies` and `xml_maps` `ReadLimits` and their `Limits` aliases renamed `SemanticLimits` (0261) · ✅ ODT/ODS/ODP `SemanticLimits` (content/styles bytes, units; 0268) · ✅ pages builder form, `SemanticLimitsError` deleted (0299) · ✅ Numbers one `SemanticLimits` for the package and the `Workbook` projection (`DocumentLimits`, `PackageSemanticLimits` deleted, 0297) · 🔴 remaining dimensions and W1 |
+| Open configuration envelope | `OpenOptions` (per format, extensible fields) | `PackageOpenOptions` (doc — merges), `ReadOptions` (numbers), `iwork::Options` (facade) | ✅ keynote (0298) `OpenOptions { source_limits, semantic_limits }` on `Package`, `Presentation` and `MergeReader`; ✅ DOCX ingress envelope (0038–0040); ✅ XLSB (0261, `OpenPolicy` refusals for owner-specific policies); ✅ pages `OpenOptions` (`DocumentReadOptions` deleted, 0299); ✅ Numbers `litchi_numbers::OpenOptions` on `Package`, `Workbook` and `MergeReader` ingress (`ReadOptions`, `DocumentReadOptions` deleted, 0297); owning lazy-policy support and W1–W4 pending |
+| Construction idiom | consuming builder, fallible `max_<dimension>` setters, fallible `build()` | positional `new(...)` constructors (iWork) | ✅ keynote (0298) `SourceLimits::builder()`/`SemanticLimits::builder()`; ✅ OPC, DOC (0192), XLS (0196) and PPT (0210) · ✅ pages `SourceLimits::builder()`/`SemanticLimits::builder()` (0299) · ✅ Numbers `SourceLimits::builder()`, `SemanticLimits::builder()` (0297) |
+| Build-time invalid limit | `Error::InvalidLimit { kind, value, maximum }` | standalone `*LimitsError` types (doc, iWork) | ✅ keynote (0298) `Error::InvalidLimit { kind: LimitKind, value, maximum }`; ✅ OPC `InvalidLimit` with contextual maximum (0036); DOC (0192), XLS (0196), PPT (0210); pages `PackageError::InvalidLimit` (0299); ✅ Numbers `limits::Error::InvalidLimit { kind: LimitKind, .. }` (`SemanticLimitsError`, `DocumentSourceLimitsError`, `DocumentLimitsError` deleted, 0297); other owners pending |
 | Ingress limit exceeded | `Error::Limit { kind, observed, maximum }` | `OpcError::ReadLimit`, facade `ResourceLimit` mapping drift | ✅ OPC (0036), DOC (0192), XLS (0196), PPT (0210) kind/observed/maximum; ✅ XLSB cell-values transaction bounds (`PackageError::Limit`, 0261); broader taxonomy pending |
 | Limit kind enums | `SourceLimitKind` / `SemanticLimitKind` | `ReadResource`, per-crate one-off kinds | ✅ keynote (0298) `SourceLimitKind`/`SemanticLimitKind` with `as_str()` nouns and `LimitKind::{Source, Semantic}`; ✅ OPC/OOXML (0036), DOC (0192), XLS (0196), PPT (0210) `SourceLimitKind`; ✅ XLSB `cell_values::LimitKind` (0261); other semantic kinds pending |
 | Dimension naming | nouns (`input_bytes`, `members`, `entry_bytes`, `aggregate_bytes`, `depth`, `events`, …); setters `max_<noun>` | a second name for an existing dimension | ✅ OPC common nouns (0037); shared defaults remain 512 MiB input and XML depth 256; other families pending |
@@ -252,7 +252,7 @@ semantic-limit migrations.
 
 | Concept | Canonical variant | Banned |
 |---|---|---|
-| Recognized but wrong family | `UnexpectedFormat { detected: FileFormat }` | `NotPages` / `NotKeynote` / `NotNumbers`, string messages (`"Not an ODT file: …"`) (✅ keynote (0298): `ReadError` and `presentation::Error`; ✅ pages `PackageError::UnexpectedFormat`, unrecognized input `PackageError::NotOfficeFile`; `NotPages` banned, 0299) |
+| Recognized but wrong family | `UnexpectedFormat { detected: FileFormat }` | `NotPages` / `NotKeynote` / `NotNumbers`, string messages (`"Not an ODT file: …"`) (✅ keynote (0298): `ReadError` and `presentation::Error`; ✅ pages `PackageError::UnexpectedFormat`, unrecognized input `PackageError::NotOfficeFile`; `NotPages` banned, 0299; ✅ Numbers package and workbook `UnexpectedFormat`, 0297) |
 | Unrecognized input | `NotOfficeFile` | — |
 | Source file changed after open | `SourceChanged { expected, observed }` | — |
 | Patch base mismatch | `PatchConflict { .. }` | `StaleSource` (merges; the two concepts stay distinct; ✅ PPTX 0252, 🔴 docx) |
@@ -290,7 +290,7 @@ semantic-limit migrations.
 
 | Concept | Canonical | Banned | Notes / status |
 |---|---|---|---|
-| Catalog selector | `Selector<'a> = Name(Cow<'a, str>) \| Position(Position)` | the `Id` variant (raw IDs live in raw modules); `Index(usize)` (numbers); `At`/`Index` selector forms (pages footnotes) | ✅ core/pages/keynote shape · ✅ XLS `cell_values`/`sheet_visibility` `Position(Position)` (0259) · ✅ pages `ImageSelector`/`BodyChartSelector` `Position(Position)`, footnote `Selector::{Anchor, Position}` (0299) · 🔴 numbers (W1) |
+| Catalog selector | `Selector<'a> = Name(Cow<'a, str>) \| Position(Position)` | the `Id` variant (raw IDs live in raw modules); `Index(usize)` (numbers); `At`/`Index` selector forms (pages footnotes) | ✅ core/pages/keynote shape · ✅ XLS `cell_values`/`sheet_visibility` `Position(Position)` (0259) · ✅ pages `ImageSelector`/`BodyChartSelector` `Position(Position)`, footnote `Selector::{Anchor, Position}` (0299) · ✅ numbers `SheetSelector`/`TableSelector`/`ChartSelector::Position(Position)`, `#[non_exhaustive]` (0297) |
 | Positional selection word | `Position` — checked, zero-based value type | `Index` as a selector variant; raw `usize` in public signatures (facade `slide(usize)`, `paragraph(usize)`) | 🔴 facade fold into M0a |
 | Selector-taking methods | `impl Into<Selector>` parameter, `Result<Option<_>>` return; missing → `Ok(None)`, ambiguous/invalid → typed error, never panics, no `Index` trait | method-level splits that bypass the selector channel | pptx `scene::get/at` converge (W2) |
 | Grid coordinates (not selectors) | `At` / `Area` with A1 parsing at the edge | treating coordinates as catalog selectors | ✅ xlsx; rule recorded |
@@ -2262,6 +2262,69 @@ generator so DOCX shares it.
 | `litchi_docx::document::{NewChart, chart_workbook}`, `Edit::{insert_chart_at, chart_parts, set_chart, set_chart_extent_at, remove_chart_at}` | adopted (0283) |
 
 See [0283](unified-ops/0283-docx-charts-and-chartex.md).
+
+## Find/replace and merge on every text format (record 0295)
+
+Find/replace (`set` with `find=`) and template merge (`File::merge`) cover
+XLSB, DOC, PPT, XLS, RTF, ODT, OTH, ODM, ODS and ODP through one
+crate-private text-surface engine (`find::surface`) and per-format adapters
+over their existing native text and cell edits; no new unified verb or
+option. XLSX rich-text cells are rewritten run by run through a new leaf
+read and write pair: `Worksheet::rich_text` reads a cell's runs (a formatted
+shared-string item or an inline rich string) with each run's properties as
+stored, `RichText::set_run_text` changes one run's text, and
+`WorksheetEdit::set_rich_text` writes the runs as the cell's own inline rich
+string.
+
+| Name | Status |
+|---|---|
+| `litchi_xlsx::{RichText, RichRun}` (`RichText::{plain, runs, text, set_run_text}`, `RichRun::{text, is_formatted}`) | adopted (0295) |
+| `litchi_xlsx::Worksheet::rich_text` | adopted (0295) |
+| `litchi_xlsx::WorksheetEdit::set_rich_text` | adopted (0295) |
+| `litchi_odt::body::{TextField, text_fields}` (`TextField::{name, range, attribute, text}`), `litchi_odt::transaction::Edit::set_field_text` | adopted (0295): ODT field refresh |
+| `litchi_odp::scene::Change::SetFieldText` | adopted (0295): ODP field refresh |
+| `litchi_docx::document::NewSmartArt` (`new`, `with_size`, `with_name`, `with_description`, `size`), `Edit::insert_smartart_at` | adopted (0295): DOCX SmartArt insertion |
+| DOCX `smartart` element (`/smartart[N]`, `/body/smartart[N]`; `layout`, `layoutId`, `nodeCount`, `text`; add-only `name`, `alt`, `width`, `height`) | adopted (0295) |
+| `litchi_xlsb` cell-value formula caches changing type (`set_formula_*_cache` across the four `BrtFmla*` families) | behaviour (0295): XLSB cache write-back |
+
+See [0295](unified-ops/0295-m4-engines-on-more-formats.md).
+
+## W1 Numbers (record 0297)
+
+`litchi-numbers` completes its ADR 0034 W1 slice. The immutable `Package`
+owns every state verb (`open`, `from_bytes`, `from_shared_bytes`, their
+`*_with_options` forms over one `OpenOptions`, `new`, `edit_*`, `apply_*`,
+`save`, `write_to`); `Workbook` (formerly `Document`, module
+`litchi_numbers::workbook`) is the read-only projection, owned through
+`Package::workbook()` and borrowed through `workbook_ref()`. Like the Pages
+`Document`, the projection keeps read-only `open`/`from_bytes` ingress for
+app-authored package directories, which the package owner refuses.
+
+- Limits: `litchi_numbers::limits::{SourceLimits, SourceLimitsBuilder,
+  SemanticLimits, SemanticLimitsBuilder, SourceLimitKind, SemanticLimitKind,
+  LimitKind, OpenOptions, Error}`; invalid values are the module's
+  `limits::Error::InvalidLimit` (kept off the package error so the
+  read-only projection's API does not reach the physical `package` module;
+  `tools/check_iwork_leaf_public_api.py`). The
+  source default stays at the hard ceilings (2 GiB input): the focused
+  transactions derive their work budgets from the physical profile.
+- Creation: `Package::new()` (one sheet, one 10 × 5 table, fixed
+  `Identity::BLANK`, byte-identical) and `create::Builder` with a required
+  `create::Identity`.
+- Transaction families moved into focused modules with short names:
+  `table::lock`, `table::merge::transaction`, `sheet::chart::{arrangement,
+  data, metadata}`, `shape::image::adjustments`, `cell::comment`,
+  `cell::comment::transaction`; `table::dimension::transaction::Error` replaces
+  `TransactionError`. The prefixed root aliases are deleted.
+- Selectors: `Position(Position)`; `index(usize)` and `From<usize>` stay as
+  constructors (the Pages precedent); `as_index` is deleted.
+- Errors: `Error::UnexpectedFormat { detected }` and
+  `workbook::ReadError::UnexpectedFormat { detected }` replace `NotNumbers`;
+  the root keeps the ingress `Error`/`Result` only.
+
+Profiles `numbers-minimal` and `numbers-full` (`internal-iwork-source`) in
+`tools/api_glossary.json` ban 103 retired names and register 27 complete
+transaction families.
 
 ## W1 Keynote (record 0298)
 

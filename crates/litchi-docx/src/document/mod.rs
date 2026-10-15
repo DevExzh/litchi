@@ -74,7 +74,9 @@ pub mod fields {
 }
 
 pub use limit::LimitKind;
-pub use owned::{Commit, Edit, HyperlinkTarget, NewChart, NewComment, NewPicture, chart_workbook};
+pub use owned::{
+    Commit, Edit, HyperlinkTarget, NewChart, NewComment, NewPicture, NewSmartArt, chart_workbook,
+};
 
 pub(crate) use owned::story_parts_of;
 pub(crate) use transaction::MAX_DOCUMENT_XML_BYTES;

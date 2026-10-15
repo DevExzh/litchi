@@ -3,7 +3,8 @@
 #[cfg(feature = "numbers")]
 #[test]
 fn numbers_merge_reader_is_available_without_the_migration_host() {
-    use litchi::numbers::{MergeReader, SheetSelector, TableMergesError, TableSelector};
+    use litchi::numbers::table::merge::transaction::Error as TableMergesError;
+    use litchi::numbers::{MergeReader, SheetSelector, TableSelector};
     let source = include_bytes!("../../../test-data/iwork/numbers/table-merges-native.numbers");
     let reader = MergeReader::from_bytes(source).unwrap();
     let regions = reader

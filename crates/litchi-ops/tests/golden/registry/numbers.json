@@ -37,7 +37,7 @@
       "parent": "workbook",
       "operations": {
         "add": false,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
         "remove": false
@@ -60,7 +60,7 @@
         "name": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "tableCount": {
@@ -84,7 +84,7 @@
       "parent": "sheet",
       "operations": {
         "add": false,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
         "remove": false
@@ -101,13 +101,17 @@
         {
           "element": "cell",
           "pathSegment": "A1"
+        },
+        {
+          "element": "mergeCell",
+          "pathSegment": "mergeCell"
         }
       ],
       "properties": {
         "name": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "rowCount": {
@@ -117,6 +121,12 @@
           "get": true
         },
         "columnCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "mergeCount": {
           "type": "int",
           "add": false,
           "set": false,
@@ -140,7 +150,7 @@
         "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -163,15 +173,38 @@
         "formula": {
           "type": "string",
           "add": false,
+          "set": true,
+          "get": true
+        },
+        "merge": {
+          "type": "string",
+          "add": false,
           "set": false,
           "get": true
+        },
+        "mergeAnchor": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "numberFormat": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
         }
       },
       "propertyGaps": {
         "font.bold": {
           "code": "unsupported_capability",
           "followUp": "IWORK_API_REQUESTS.md request 7",
-          "reason": "the Numbers leaf has no cell text-style transaction"
+          "reason": "the Numbers leaf has no cell text-style transaction; `numberFormat` covers decimal and percentage display formats only"
+        },
+        "comment": {
+          "code": "unsupported_capability",
+          "followUp": "record 0297 follow-ups (IWORK_API_REQUESTS.md)",
+          "reason": "the leaf's cell-comment transaction refuses every natively authored corpus package (`InvalidSource`/`UnsupportedDependency`: author storage and comment-list ownership outside its admitted scope), and comments are resolved per cell, so neither reads nor writes are claimed"
         }
       },
       "predicates": {
@@ -182,6 +215,38 @@
           "value"
         ]
       }
+    },
+    {
+      "format": "numbers",
+      "element": "mergeCell",
+      "parent": "table",
+      "operations": {
+        "add": true,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": true
+      },
+      "paths": {
+        "positional": [
+          "/sheet[N]/table[N]/mergeCell[N]"
+        ]
+      },
+      "properties": {
+        "ref": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
     }
   ],
   "gaps": [
@@ -189,17 +254,17 @@
       "subject": "element",
       "element": "row",
       "code": "unsupported_capability",
-      "followUp": "0299 Numbers rows and columns (IWORK_API_REQUESTS.md request 6)",
-      "reason": "rows and columns are table coordinates here; the leaf's row and column insertion and deletion are not package transactions yet"
+      "followUp": "IWORK_API_REQUESTS.md request 6",
+      "reason": "rows and columns are table coordinates here; the leaf has no package transaction that inserts or deletes them (the migration host's editor does, outside the supported crates)"
     },
     {
       "subject": "operation",
       "verb": "set",
       "element": "cell",
-      "context": "a formula",
+      "context": "cross-table formula references",
       "code": "unsupported_capability",
-      "followUp": "0299 Numbers formula writes",
-      "reason": "the leaf's formula authoring is not wired; `value` writes text, numbers and booleans"
+      "followUp": "record 0297 follow-ups (IWORK_API_REQUESTS.md)",
+      "reason": "formula text is parsed with local A1 references and the authorable function subset; references to other tables need source-bound table handles"
     },
     {
       "subject": "operation",
@@ -208,7 +273,16 @@
       "context": "a new sheet",
       "code": "unsupported_capability",
       "followUp": "IWORK_API_REQUESTS.md request 4",
-      "reason": "the Numbers leaf has no sheet lifecycle transaction"
+      "reason": "the Numbers leaf has no sheet creation transaction"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "sheet",
+      "context": "a sheet and its graph",
+      "code": "unsupported_capability",
+      "followUp": "IWORK_API_REQUESTS.md request 4",
+      "reason": "the Numbers leaf has no sheet deletion transaction"
     },
     {
       "subject": "operation",
@@ -217,16 +291,25 @@
       "context": "a new table",
       "code": "unsupported_capability",
       "followUp": "IWORK_API_REQUESTS.md request 5",
-      "reason": "the Numbers leaf has no table lifecycle transaction"
+      "reason": "the Numbers leaf has no table creation transaction"
     },
     {
       "subject": "operation",
-      "verb": "create",
-      "element": "workbook",
-      "context": "a workbook from scratch",
+      "verb": "remove",
+      "element": "table",
+      "context": "a table and its storage",
       "code": "unsupported_capability",
-      "followUp": "IWORK_API_REQUESTS.md request 1",
-      "reason": "the Numbers leaf has no from-scratch package builder"
+      "followUp": "IWORK_API_REQUESTS.md request 5",
+      "reason": "the Numbers leaf has no table deletion transaction"
+    },
+    {
+      "subject": "operation",
+      "verb": "move",
+      "element": "table",
+      "context": "a position within its sheet",
+      "code": "unsupported_capability",
+      "followUp": "record 0297 follow-ups (IWORK_API_REQUESTS.md)",
+      "reason": "the leaf relocates a table into another sheet (appended there); it has no transaction that reorders tables within one sheet"
     },
     {
       "subject": "view",
@@ -276,7 +359,7 @@
     "support": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "record 0273 follow-up: a find adapter over the format's run-level text edits",
+      "followUp": "record 0295 follow-up: a find adapter over the format's text edits",
       "reason": "find/replace is not integrated for this format"
     },
     "keywords": {

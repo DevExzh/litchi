@@ -271,7 +271,7 @@ fn host_merge_read_does_not_mask_a_focused_root_edge_error() -> TestResult {
     let focused = MergeReader::from_bytes(&malformed)?;
     assert!(matches!(
         focused.table_merges(0usize, 0usize),
-        Err(litchi_numbers::TableMergesError::InvalidSource)
+        Err(litchi_numbers::table::merge::transaction::Error::InvalidSource)
     ));
 
     let host = NumbersEditor::from_bytes(&malformed)?;
@@ -280,7 +280,9 @@ fn host_merge_read_does_not_mask_a_focused_root_edge_error() -> TestResult {
         .expect_err("the focused handoff must reject an undeclared model edge");
     assert!(matches!(
         error,
-        IwaError::NumbersTableMerges(litchi_numbers::TableMergesError::InvalidSource)
+        IwaError::NumbersTableMerges(
+            litchi_numbers::table::merge::transaction::Error::InvalidSource
+        )
     ));
     assert_eq!(host.to_bytes()?, malformed);
     Ok(())
