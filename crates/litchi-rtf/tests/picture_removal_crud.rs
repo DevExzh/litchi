@@ -257,3 +257,36 @@ fn durable_inverse_refuses_a_foreign_artifact_even_with_the_same_visible_text() 
         Err(Error::PatchConflict)
     ));
 }
+
+/// Record 0290 F7: removal moves the whole group's bytes, so a payload that
+/// does not match its declared format (LibreOffice `n192129.rtf` stores GIF
+/// data under `\pngblip`) or a format payload edits do not support (EMF) is
+/// removed exactly, and the durable inverse restores it; payload replacement
+/// still refuses such a picture.
+#[test]
+fn removes_groups_whose_payload_format_payload_edits_refuse() {
+    const MISMATCHED: &str =
+        r"{\pict \pngblip \picw-64 \pich-1061137057 \picwgoal0 \pichgoal0 474946383961100010003b}";
+    const EMF: &str = r"{\pict\emfblip\picw4\pich4 0100000058000000}";
+    let input = format!(r"{{\rtf1 Before{MISMATCHED}Middle{EMF}After\par }}");
+    let document = Package::parse(&input).unwrap();
+    assert_eq!(document.pictures().len(), 2);
+
+    let mut edit = document.edit();
+    edit.remove_pictures(&[0, 1]).unwrap();
+    let commit = edit.commit().unwrap();
+    let expected = input.replace(MISMATCHED, "").replace(EMF, "");
+    assert_eq!(commit.package().to_bytes().unwrap(), expected.as_bytes());
+    assert!(commit.package().pictures().is_empty());
+    assert_eq!(commit.package().text(), document.text());
+
+    let durable = commit.patch().to_durable(durable_limits(2)).unwrap();
+    let restored = commit.package().apply_durable(&durable.inverse()).unwrap();
+    assert_eq!(restored.to_bytes().unwrap(), input.as_bytes());
+
+    let mut payload = document.edit();
+    assert!(matches!(
+        payload.replace_picture_payload(0, [0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a]),
+        Err(Error::UnsupportedSource(_))
+    ));
+}

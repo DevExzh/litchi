@@ -106,6 +106,8 @@ impl Edit {
     ///
     /// The selector resolves against the immutable source. The complete group
     /// is removed byte-for-byte; surrounding source is never reserialized.
+    /// The payload's format is not inspected, so a group whose data does not
+    /// match its declared blip type is removed as written.
     /// Binary pictures, nested pictures, compatibility wrappers, fields,
     /// shapes, objects, protected documents, and unknown syntax are refused.
     ///
@@ -153,7 +155,7 @@ impl Edit {
         }
         self.ensure_operation_room_for(positions.len())?;
 
-        let located = locate_standalone_pictures(&self.source)?;
+        let located = locate_standalone_pictures(&self.source, Locate::Group)?;
         let mut staged = Vec::new();
         staged
             .try_reserve(positions.len())
@@ -257,7 +259,7 @@ impl Edit {
             });
         }
 
-        let located = locate_standalone_pictures(&self.source)?;
+        let located = locate_standalone_pictures(&self.source, Locate::Payload)?;
         // Rendering preserves each source transport's exact length. Admit the
         // aggregate before cloning payloads or allocating encoded transports.
         let replacement_bytes = replacements.iter().try_fold(0usize, |total, replacement| {
@@ -345,7 +347,7 @@ pub(super) fn commit(edit: Edit, operation_count: usize) -> Result<Commit, Error
         ));
     }
     super::ensure_changed_publication_allowed(&edit.source)?;
-    let located = locate_standalone_pictures(&edit.source)?;
+    let located = locate_standalone_pictures(&edit.source, Locate::Payload)?;
     let source_bytes = edit
         .source
         .source_bytes()
@@ -399,7 +401,7 @@ pub(super) fn commit_removals(edit: Edit, operation_count: usize) -> Result<Comm
         });
     }
     super::ensure_changed_publication_allowed(&edit.source)?;
-    let located = locate_standalone_pictures(&edit.source)?;
+    let located = locate_standalone_pictures(&edit.source, Locate::Group)?;
     let source_bytes = edit
         .source
         .source_bytes()
@@ -536,7 +538,7 @@ pub(super) fn apply_durable_removal_patch(
             maximum: MAX_PICTURE_REMOVAL_OPERATIONS,
         });
     }
-    let located = locate_standalone_pictures(source)?;
+    let located = locate_standalone_pictures(source, Locate::Group)?;
     let mut positions = Vec::new();
     positions
         .try_reserve(operations.len())
@@ -590,7 +592,7 @@ pub(super) fn apply_durable_insertion_patch(
         });
     }
     // Reuse the same closure proof for every picture already in the artifact.
-    let _ = locate_standalone_pictures(source)?;
+    let _ = locate_standalone_pictures(source, Locate::Group)?;
     let source_bytes = source
         .source_bytes()
         .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
@@ -714,7 +716,7 @@ fn verify_insertion_candidate(
             "exact picture restoration changed visible document text",
         ));
     }
-    let located = locate_standalone_pictures(candidate)?;
+    let located = locate_standalone_pictures(candidate, Locate::Group)?;
     let mut source_position = 0usize;
     for position in 0..candidate.pictures().len() {
         if let Some((_, _, group)) = insertions
@@ -763,7 +765,7 @@ pub(super) fn apply_durable_operation(
     edit: &mut Edit,
     operation: &litchi_core::patch::PatchOperation,
 ) -> Result<(), Error> {
-    let located = locate_standalone_pictures(source)?;
+    let located = locate_standalone_pictures(source, Locate::Payload)?;
     let (replacement, transport) = decode_durable_operation(&located, operation)?;
     let replacements = [replacement];
     let transports = [transport];
@@ -783,7 +785,7 @@ pub(super) fn apply_durable_patch(
             maximum: MAX_PICTURE_PAYLOAD_OPERATIONS,
         });
     }
-    let located = locate_standalone_pictures(source)?;
+    let located = locate_standalone_pictures(source, Locate::Payload)?;
     let mut decoded = Vec::new();
     decoded
         .try_reserve(operations.len())
@@ -873,7 +875,23 @@ fn decode_durable_operation(
     Ok((PicturePayloadReplacement::new(position, payload), transport))
 }
 
-fn locate_standalone_pictures(source: &Package) -> Result<Vec<LocatedPicture>, Error> {
+/// What a located picture is for.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Locate {
+    /// Payload replacement: the declared format must be PNG or JPEG and the
+    /// source payload must carry its signature.
+    Payload,
+    /// Whole-group removal or its inverse insertion: the group's bytes move
+    /// unchanged, so the payload's format is not inspected. A producer that
+    /// declares one format and stores another (LibreOffice `n192129.rtf`:
+    /// GIF data under `\pngblip`) keeps exactly what it wrote.
+    Group,
+}
+
+fn locate_standalone_pictures(
+    source: &Package,
+    purpose: Locate,
+) -> Result<Vec<LocatedPicture>, Error> {
     let source_bytes = source
         .source_bytes()
         .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
@@ -933,6 +951,7 @@ fn locate_standalone_pictures(source: &Package) -> Result<Vec<LocatedPicture>, E
                         &spans,
                         cursor,
                         source.pictures().get(located.len()),
+                        purpose,
                     )?;
                     located.push(picture);
                     cursor = close_index;
@@ -967,11 +986,14 @@ fn locate_picture_group(
     spans: &[Range<usize>],
     open_index: usize,
     semantic: Option<&crate::picture::Picture<'_>>,
+    purpose: Locate,
 ) -> Result<(LocatedPicture, usize), Error> {
     let semantic = semantic.ok_or(Error::UnsupportedSource(
         "standalone picture has no matching semantic record",
     ))?;
-    validate_supported_image(semantic.image_type, semantic.data())?;
+    if purpose == Locate::Payload {
+        validate_supported_image(semantic.image_type, semantic.data())?;
+    }
     if semantic.data().len() > MAX_EDITABLE_PICTURE_BYTES {
         return Err(Error::InputTooLarge {
             observed: semantic.data().len(),
