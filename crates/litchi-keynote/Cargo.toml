@@ -18,6 +18,10 @@ name = "keynote_duplicate_slide"
 path = "examples/duplicate_slide.rs"
 
 [[example]]
+name = "keynote_edit_slide_drawables"
+path = "examples/edit_slide_drawables.rs"
+
+[[example]]
 name = "edit_chart_caption"
 path = "examples/edit_chart_caption.rs"
 

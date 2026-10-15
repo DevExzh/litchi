@@ -26,6 +26,7 @@ pub(crate) mod slide_chart_title;
 pub(crate) mod slide_chart_value_axis;
 pub(crate) mod slide_creation;
 pub(crate) mod slide_delete;
+pub(crate) mod slide_drawable;
 pub(crate) mod slide_drawable_comments;
 pub(crate) mod slide_media_lifecycle;
 pub(crate) mod slide_media_properties;

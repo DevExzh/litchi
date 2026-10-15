@@ -73,8 +73,26 @@ Each request is described by intent. The signatures are suggestions; the owners 
    `Error::UnsupportedContent` for slides whose content lives in other
    components (tables, charts, comments). The unified adapter is the
    coordinator's follow-up.
-9. **Shape and text-box CRUD:** add, remove, and change geometry.
-10. **Text formatting** on slide text spans.
+9. **Shape and text-box CRUD:** add, remove, and change geometry. *Landed in 0298:*
+   `litchi_keynote::slide::drawable` — `Package::slide_drawable_list(slide)`
+   (kind, `Geometry`, text, name, lock, z-order position, in
+   `DrawableSelector` order) and `Package::edit_slide_drawables()` with
+   `Edit::{set_geometry, remove, move_to, add_text_box, add_shape, add_image}`
+   (several operations per edit, one commit; `Preset::{Rectangle,
+   RoundedRectangle, Ellipse}`; PNG/JPEG/GIF images),
+   `Package::apply_slide_drawables`, exact-source `Patch::{is_noop, inverse}`.
+   Typed refusals: removing tables, charts, groups, movies/audio (see
+   `slide::media::lifecycle`) and placeholders; removing a drawable referenced
+   by builds or other objects; geometry of tables, charts, groups, lines and
+   movies. Removed images keep their data items in the package.
+10. **Text formatting** on slide text spans. *Partially landed in 0298:*
+   read-only `Package::slide_drawable_text_runs(slide, drawable)` (character
+   runs with bold, italic, underline, size, font and RGB colour where the
+   character-style table names a decodable style); the write
+   `drawable::Edit::set_text_style(slide, drawable, TextSpan, Style)` is a
+   typed `Error::Unsupported { reason: Unsupported::TextStyling }` until a
+   native character-style override fixture exists to port the host's layout
+   from.
 
 **Pages**
 

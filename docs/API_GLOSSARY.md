@@ -2316,3 +2316,16 @@ ADR 0034 W1 for `litchi-keynote`, part 3 (slide creation):
 | `Package::apply_slide_creation(&Patch)` | Exact source check, reopen; `Patch::{is_noop, inverse, source_slide_count, target_slide_count, created_slides}` | ✅ 0298 |
 | `Commit::{package, into_package, patch, diagnostics, into_parts}` | `Diagnostics::{changed, created_slides, touched_components, full_reparse_performed}` | ✅ 0298 |
 | `creation::Error::UnsupportedContent { reason: Unsupported }` | Typed refusals: `ExternalContent`, `UnmodelledContent`, `RegistryShape`, `LayoutState`, `LayoutMedia`, `NotesTemplate`, `SharedComponent` | ✅ 0298 |
+
+ADR 0034 W1 for `litchi-keynote`, part 4 (slide drawables):
+
+| Canonical name | Notes | Status |
+| --- | --- | --- |
+| `litchi_keynote::slide::drawable::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` | Registered family (41st) in `keynote-minimal` / `keynote-full` | ✅ 0298 |
+| `Package::slide_drawable_list(impl Into<SlideSelector>) -> Box<[drawable::Drawable]>` | Source order of the slide's owned drawables (the `DrawableSelector` order); `Drawable::{selector, kind, geometry, text, name, is_locked, z_position}`; `drawable::Kind` (text box, shape, line, image, movie, audio, title/body/slide-number/object/other placeholder, table, chart, group, other); no native identifiers. `slide_drawables` stays the comment family's summary list | ✅ 0298 |
+| `drawable::Geometry { x, y, width, height, rotation: Option<f32> }` | Points and degrees from `TSD.GeometryArchive`; `Geometry::{new, with_rotation}` | ✅ 0298 |
+| `Package::edit_slide_drawables() -> drawable::Edit<'_>` | Several operations per edit, one workspace, one commit; selectors resolve against the base snapshot | ✅ 0298 |
+| `Edit::{set_geometry, remove, move_to}(slide, drawable, …)` | `move_to` takes the back-to-front z-order `Position`; owned order (and so selectors) unchanged | ✅ 0298 |
+| `Edit::{add_text_box(slide, Geometry, &str), add_shape(slide, Preset, Geometry, &str), add_image(slide, &[u8], &str, Geometry)}` | `drawable::Preset::{Rectangle, RoundedRectangle { radius }, Ellipse}`; `ImageFormat::{Png, Jpeg, Gif}` sniffed; `Commit::created() -> &[Created { slide(), drawable() }]` | ✅ 0298 |
+| `Edit::set_text_style(slide, drawable, TextSpan, Style)` | Validates, then typed `Error::Unsupported { reason: Unsupported::TextStyling }`; `Package::slide_drawable_text_runs` reads `TextRun { span, text, style }` | 🔴 write refused (0298) |
+| `Package::apply_slide_drawables(&Patch)` | Exact source check, reopen; `Patch::{is_noop, inverse, operations}` | ✅ 0298 |

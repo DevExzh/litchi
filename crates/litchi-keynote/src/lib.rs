@@ -158,6 +158,42 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
+//! # Slide drawables: inventory, geometry, removal, z-order and creation
+//!
+//! [`Package::slide_drawable_list`] reads the drawables a slide owns in
+//! source order (kind, frame, text, shape name, lock state and z-order
+//! position); [`DrawableSelector`] addresses that order. The
+//! [`slide::drawable`] family stages any number of
+//! [`slide::drawable::Edit::set_geometry`], [`slide::drawable::Edit::remove`],
+//! [`slide::drawable::Edit::move_to`], [`slide::drawable::Edit::add_text_box`],
+//! [`slide::drawable::Edit::add_shape`] and
+//! [`slide::drawable::Edit::add_image`] operations and commits them as one
+//! verified package; selectors resolve against the base snapshot. Removing
+//! tables, charts, groups, movies and placeholders, and character-style
+//! writes, are typed [`slide::drawable::Error::Unsupported`] refusals;
+//! [`Package::slide_drawable_text_runs`] reads character runs.
+//!
+//! ```no_run
+//! use litchi_keynote::slide::drawable::{Geometry, Preset};
+//! use litchi_keynote::{DrawableSelector, Package, SlideSelector};
+//!
+//! let package = Package::open("input.key")?;
+//! let slide = SlideSelector::index(0);
+//! let mut edit = package.edit_slide_drawables();
+//! edit.remove(slide, DrawableSelector::index(0))?
+//!     .add_shape(slide, Preset::Ellipse, Geometry::new(100.0, 100.0, 200.0, 200.0), "Hi")?;
+//! let commit = edit.commit()?;
+//! let created = commit.created()[0].drawable();
+//! let drawables = commit.package().slide_drawable_list(slide)?;
+//! assert_eq!(drawables[created.as_index()].text(), Some("Hi"));
+//!
+//! let restored = commit
+//!     .package()
+//!     .apply_slide_drawables(&commit.patch().inverse())?;
+//! assert_eq!(restored.package().slide_drawable_list(slide)?, package.slide_drawable_list(slide)?);
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
 //! # Edit presentation settings
 //!
 //! Read or stage dimensions and playback behavior without native identifiers
