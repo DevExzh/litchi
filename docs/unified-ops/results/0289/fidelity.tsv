@@ -244,7 +244,7 @@ libreoffice-core/sw/qa/writerfilter/rtftok/data/floating-table.rtf	rtf	exact		by
 libreoffice-core/sw/qa/writerfilter/rtftok/data/floattable-tbl-overlap.rtf	rtf	exact		byte-exact	/body/tbl[1]/tr[1]/tc[1] text
 libreoffice-core/vcl/qa/cppunit/pdfexport/data/master.odm	odm	exact		value-exact	/metadata author: 22304 -> 20649 bytes, first difference at 7
 libreoffice-core/writerperfect/qa/unit/data/writer/epubexport/simple-ruby.odt	odt	exact		value-exact	/body/p[1] text: 8307 -> 6834 bytes, first difference at 7
-libreoffice-core/xmloff/qa/unit/data/tdf156707_text_form_control_borders.odt	odt	exact		value-exact	/body/p[1] text: 14711 -> 12866 bytes, first difference at 7
+libreoffice-core/xmloff/qa/unit/data/tdf156707_text_form_control_borders.odt	odt	exact		value-exact	/metadata language: 14711 -> 12890 bytes, first difference at 7
 libreoffice-core/xmloff/qa/unit/data/tdf162686_3D_metal_type_ODF.fods	ods	refused	edit: unsupported_capability: flat ODS (.fods) opens read-only through the unified layer; save-only exact	-	
 libreoffice-core/xmloff/qa/unit/data/tdf167358_label_form_control_borders.odt	odt	exact		value-exact	/body/p[1] text: 14503 -> 13639 bytes, first difference at 7
 libreoffice-core/xmlsecurity/doc/OpenDocumentSignatures-Workflow.odg	odg	exact		value-exact	/page[1] name: 32729 -> 31132 bytes, first difference at 7
@@ -432,9 +432,9 @@ ooxml/pptx/backgrounds.pptx	pptx	exact		none
 ooxml/pptx/connectorConnection.pptx	pptx	exact		none	
 ooxml/pptx/curvedConnectors.pptx	pptx	exact		none	
 ooxml/pptx/elbowConnectors.pptx	pptx	exact		none	
-ooxml/pptx/line-chart.pptx	pptx	exact		none	
+ooxml/pptx/line-chart.pptx	pptx	exact		refused	/slide[1]/chart[1] chartType: invalid_value: unknown chart type
 ooxml/pptx/pie-chart.pptx	pptx	exact		refused	/slide[1]/chart[1] chartType: invalid_value: unknown chart type
-ooxml/pptx/radar-chart.pptx	pptx	exact		none	
+ooxml/pptx/radar-chart.pptx	pptx	exact		refused	/slide[1]/chart[1] chartType: invalid_value: unknown chart type
 ooxml/pptx/sample.pptx	pptx	exact		none	
 ooxml/pptx/scatter-chart.pptx	pptx	exact		none	
 ooxml/pptx/shape-blur-effect.pptx	pptx	exact		none	

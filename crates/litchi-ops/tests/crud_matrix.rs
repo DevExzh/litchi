@@ -19,8 +19,8 @@
 //! `docs/unified-ops/results/0289/crud-checklist.{md,tsv}`. Rewrite it with
 //! `LITCHI_BLESS=1` after showing that a change is intended. A
 //! claimed-supported cell that fails is a bug: [`KNOWN_FAILURES`] lists the
-//! ones record 0289 left open, each with its cause, and the test fails on
-//! any other.
+//! ones records 0289 and 0290 left open, each with its cause, and the test
+//! fails on any other.
 
 #![cfg(all(
     feature = "doc",
@@ -515,59 +515,17 @@ const SEEDS: &[(&str, &[Step])] = &[
 ];
 
 /// Claimed-supported cells that fail, with the cause record 0289 found:
-/// `(format, element, verb, cause)`. Each entry is a recorded bug.
-const KNOWN_FAILURES: &[(&str, &str, &str, &str)] = &[
-    (
-        "pptx",
-        "placeholder",
-        "query",
-        "F1: the query compiles `placeholder` to its own element kind, but \
-         placeholder nodes are shapes with a placeholder binding, so the type \
-         selector matches nothing; `shape[type=placeholder]` works",
-    ),
-    (
-        "odp",
-        "placeholder",
-        "query",
-        "F1: as PPTX, placeholder nodes are ODP shapes with a presentation class",
-    ),
-    (
-        "pptx",
-        "chart",
-        "view",
-        "F2: litchi-drawingml rejects the negative `c:axId` values some producers \
-         write (ST_UnsignedInt); `get` succeeds, the node view's chart decode fails",
-    ),
-    (
-        "pptx",
-        "ole",
-        "remove",
-        "F3: every corpus OLE object sits in markup compatibility the source-backed \
-         removal refuses, and `add` cannot make one",
-    ),
-    (
-        "ppt",
-        "slide",
-        "set",
-        "F4: `hidden` rewrites an existing SSSlideInfoAtom; producer slides and \
-         `create()` slides have none, and the leaf does not insert one",
-    ),
-    (
-        "rtf",
-        "picture",
-        "remove",
-        "F7: the only producer pictures (LibreOffice `n192129.rtf`) are refused by \
-         the exact source editor (the replacement does not retain the declared \
-         picture format); RTF has no picture `add` to make one",
-    ),
-    (
-        "oth",
-        "metadata",
-        "set",
-        "F6: `create()` packages from the OTH (and ODM) leaf builders have no \
-         meta.xml, which the ODT metadata editor requires",
-    ),
-];
+/// `(format, element, verb, cause)`. Each entry is a recorded bug. Record
+/// 0290 fixed F1, F2, F4, F6 and F7.
+const KNOWN_FAILURES: &[(&str, &str, &str, &str)] = &[(
+    "pptx",
+    "ole",
+    "remove",
+    "F3: every corpus OLE object sits in markup compatibility (the `mc:AlternateContent` \
+     inside the `p:graphicFrame`); the source-backed slide guard refuses any markup \
+     compatibility outside a direct transition at snapshot, apply and publication \
+     (record 0290 §3), and `add` cannot make one",
+)];
 
 fn test_data() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data")

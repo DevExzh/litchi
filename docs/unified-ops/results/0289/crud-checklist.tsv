@@ -898,7 +898,7 @@ pptx	shape	create	supported		ok format
 pptx	shape	save	supported		ok format
 pptx	placeholder	get	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slidemaster[1]/shape[2]
 pptx	placeholder	find	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slidemaster[1]/shape[2]
-pptx	placeholder	query	supported		FAILED no match in any fixture although /slidemaster[1]/shape[2] exists
+pptx	placeholder	query	supported		ok matches in create()
 pptx	placeholder	view	supported		ok 8 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf163852.pptx` /slidemaster[1]/shape[2]
 pptx	placeholder	set	supported		ok `ooxml/pptx/shapes.pptx` /slide[2]/shape[2] font=Litchi
 pptx	placeholder	add	n/a	add not offered for this element	-
@@ -964,7 +964,7 @@ pptx	tc	save	supported		ok format
 pptx	chart	get	supported		ok 4 instances, first `ooxml/pptx/radar-chart.pptx` /slide[1]/chart[1]
 pptx	chart	find	supported		ok 4 instances, first `ooxml/pptx/radar-chart.pptx` /slide[1]/chart[1]
 pptx	chart	query	supported		ok matches in ooxml/pptx/radar-chart.pptx
-pptx	chart	view	supported		FAILED corrupt_file: chart part: invalid DrawingML: invalid chart type-group axis ID '-1884094432' (`ooxml/pptx/radar-chart.pptx` /slide[1]/chart[1])
+pptx	chart	view	supported		ok 4 instances, first `ooxml/pptx/radar-chart.pptx` /slide[1]/chart[1]
 pptx	chart	set	supported		ok `create() + add slide + add chart` /slide[1]/chart[1] x=12pt
 pptx	chart	add	supported		ok /slide[1]/chart[1] on `create() + add slide` under /slide[1] [chartType,data]
 pptx	chart	remove	supported		ok `create() + add slide + add chart` /slide[1]/chart[1]
@@ -1260,10 +1260,10 @@ pptx	animation	edit	gap	M1-extended	-
 pptx	animation	batch	gap	M1-extended	-
 pptx	animation	create	gap	M1-extended	ok format
 pptx	animation	save	gap	M1-extended	ok format
-pptx	series	get	supported		ok 5 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf114821.pptx` /slide[1]/chart[1]/series[1]
-pptx	series	find	supported		ok 5 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf114821.pptx` /slide[1]/chart[1]/series[1]
-pptx	series	query	supported		ok matches in libreoffice-core/sd/qa/unit/data/pptx/tdf114821.pptx
-pptx	series	view	supported		ok 5 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf114821.pptx` /slide[1]/chart[1]/series[1]
+pptx	series	get	supported		ok 6 instances, first `ooxml/pptx/radar-chart.pptx` /slide[1]/chart[1]/series[1]
+pptx	series	find	supported		ok 6 instances, first `ooxml/pptx/radar-chart.pptx` /slide[1]/chart[1]/series[1]
+pptx	series	query	supported		ok matches in ooxml/pptx/radar-chart.pptx
+pptx	series	view	supported		ok 6 instances, first `ooxml/pptx/radar-chart.pptx` /slide[1]/chart[1]/series[1]
 pptx	series	set	supported		ok `create() + add slide + add chart` /slide[1]/chart[1]/series[1] name=Litchi
 pptx	series	add	n/a	add not offered for this element	-
 pptx	series	remove	n/a	remove not offered for this element	-
@@ -1273,10 +1273,10 @@ pptx	series	edit	supported		ok tx.set
 pptx	series	batch	supported		ok set item
 pptx	series	create	supported		ok format
 pptx	series	save	supported		ok format
-pptx	axis	get	supported		ok 6 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf114821.pptx` /slide[1]/chart[1]/axis[1]
-pptx	axis	find	supported		ok 6 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf114821.pptx` /slide[1]/chart[1]/axis[1]
-pptx	axis	query	supported		ok matches in libreoffice-core/sd/qa/unit/data/pptx/tdf114821.pptx
-pptx	axis	view	supported		ok 6 instances, first `libreoffice-core/sd/qa/unit/data/pptx/tdf114821.pptx` /slide[1]/chart[1]/axis[1]
+pptx	axis	get	supported		ok 8 instances, first `ooxml/pptx/radar-chart.pptx` /slide[1]/chart[1]/axis[1]
+pptx	axis	find	supported		ok 8 instances, first `ooxml/pptx/radar-chart.pptx` /slide[1]/chart[1]/axis[1]
+pptx	axis	query	supported		ok matches in ooxml/pptx/radar-chart.pptx
+pptx	axis	view	supported		ok 8 instances, first `ooxml/pptx/radar-chart.pptx` /slide[1]/chart[1]/axis[1]
 pptx	axis	set	supported		ok `create() + add slide + add chart` /slide[1]/chart[1]/axis[1] title=Litchi
 pptx	axis	add	n/a	add not offered for this element	-
 pptx	axis	remove	n/a	remove not offered for this element	-
@@ -2200,13 +2200,13 @@ ppt	slide	get	supported		ok 8 instances, first `poi/test-data/slideshow/incorrec
 ppt	slide	find	supported		ok 8 instances, first `poi/test-data/slideshow/incorrect_slide_order.ppt` /slide[1]
 ppt	slide	query	supported		ok matches in poi/test-data/slideshow/incorrect_slide_order.ppt
 ppt	slide	view	supported		ok 8 instances, first `poi/test-data/slideshow/incorrect_slide_order.ppt` /slide[1]
-ppt	slide	set	supported		FAILED hidden=true: unsupported_capability: the format cannot perform the requested operation   hidden=false: unsupported_capability: the format cannot perfo...
+ppt	slide	set	supported		ok `create() + add slide` /slide[1] hidden=true
 ppt	slide	add	supported		ok /slide[1] on `create()` under / []
 ppt	slide	remove	supported		ok `create() + add slide` /slide[1]
 ppt	slide	move	format-verb		ok `create() + add slide` /slide[1] /slide[2]
 ppt	slide	swap	format-verb		ok `create() + add slide` /slide[1] /slide[2]
-ppt	slide	edit	supported		-
-ppt	slide	batch	supported		-
+ppt	slide	edit	supported		ok tx.set
+ppt	slide	batch	supported		ok set item
 ppt	slide	create	supported		ok format
 ppt	slide	save	supported		ok format
 ppt	shape	get	supported		ok 8 instances, first `poi/test-data/slideshow/incorrect_slide_order.ppt` /slide[1]/shape[1]
@@ -2839,7 +2839,7 @@ rtf	picture	query	supported		ok matches in libreoffice-core/sw/qa/extras/rtfexpo
 rtf	picture	view	supported		ok 1 instances, first `libreoffice-core/sw/qa/extras/rtfexport/data/n192129.rtf` /body/p[1]/picture[1]
 rtf	picture	set	n/a	set not offered for this element	-
 rtf	picture	add	n/a	add not offered for this element	-
-rtf	picture	remove	supported		FAILED unsupported_capability: unsupported RTF edit source: replacement bytes do not retain the declared picture format
+rtf	picture	remove	supported		ok `libreoffice-core/sw/qa/extras/rtfexport/data/n192129.rtf` /body/p[1]/picture[1]
 rtf	picture	move	format-verb		unreached
 rtf	picture	swap	format-verb		unreached
 rtf	picture	edit	n/a	edit not offered for this element	-
@@ -3587,15 +3587,15 @@ odp	shape	edit	supported		ok tx.set
 odp	shape	batch	supported		ok set item
 odp	shape	create	supported		ok format
 odp	shape	save	supported		ok format
-odp	placeholder	get	supported		ok 1 instances, first `odf/corpus/impress-basic.odp` /slide[1]/shape[2]
-odp	placeholder	find	supported		ok 1 instances, first `odf/corpus/impress-basic.odp` /slide[1]/shape[2]
-odp	placeholder	query	supported		FAILED no match in any fixture although /slide[1]/shape[2] exists
-odp	placeholder	view	supported		ok 1 instances, first `odf/corpus/impress-basic.odp` /slide[1]/shape[2]
-odp	placeholder	set	supported		ok `odf/corpus/impress-basic.odp` /slide[1]/shape[2] name=Litchi
+odp	placeholder	get	supported		ok 5 instances, first `odf/odp/tdf169979.odp` /slide[1]/shape[1]
+odp	placeholder	find	supported		ok 5 instances, first `odf/odp/tdf169979.odp` /slide[1]/shape[1]
+odp	placeholder	query	supported		ok matches in odf/odp/tdf169979.odp
+odp	placeholder	view	supported		ok 5 instances, first `odf/odp/tdf169979.odp` /slide[1]/shape[1]
+odp	placeholder	set	supported		ok `odf/odp/tdf169979.odp` /slide[1]/shape[1] name=Litchi
 odp	placeholder	add	n/a	add not offered for this element	-
-odp	placeholder	remove	supported		ok `odf/corpus/impress-basic.odp` /slide[1]/shape[2]
-odp	placeholder	move	format-verb		unreached
-odp	placeholder	swap	format-verb		unreached
+odp	placeholder	remove	supported		ok `odf/odp/tdf169979.odp` /slide[1]/shape[1]
+odp	placeholder	move	format-verb		ok `odf/corpus/impress-basic.odp` /slide[1]/shape[2] /slide[1]/shape[1]
+odp	placeholder	swap	format-verb		ok `odf/corpus/impress-basic.odp` /slide[1]/shape[2] /slide[1]/shape[1]
 odp	placeholder	edit	supported		ok tx.set
 odp	placeholder	batch	supported		ok set item
 odp	placeholder	create	supported		ok format
@@ -4410,13 +4410,13 @@ oth	metadata	get	supported		ok 8 instances, first `create()` /metadata
 oth	metadata	find	supported		ok 8 instances, first `create()` /metadata
 oth	metadata	query	supported		ok matches in create()
 oth	metadata	view	supported		ok 8 instances, first `create()` /metadata
-oth	metadata	set	supported		FAILED title=Litchi: corrupt_file: Invalid format: the ODF package has no meta.xml for metadata edits   title=7: corrupt_file: Invalid format: the ODF packag...
+oth	metadata	set	supported		ok `create() + add paragraph` /metadata title=Litchi
 oth	metadata	add	n/a	add not offered for this element	-
 oth	metadata	remove	n/a	remove not offered for this element	-
 oth	metadata	move	format-verb		unreached
 oth	metadata	swap	format-verb		unreached
-oth	metadata	edit	supported		-
-oth	metadata	batch	supported		-
+oth	metadata	edit	supported		ok tx.set
+oth	metadata	batch	supported		ok set item
 oth	metadata	create	supported		ok format
 oth	metadata	save	supported		ok format
 odm	document	get	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm` /
@@ -4696,7 +4696,7 @@ odm	metadata	get	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras
 odm	metadata	find	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm` /metadata
 odm	metadata	query	supported		ok matches in create()
 odm	metadata	view	supported		ok 8 instances, first `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm` /metadata
-odm	metadata	set	supported		ok `libreoffice-core/sw/qa/extras/uiwriter/data/DUMMY.odm + add hyperlink` /metadata title=Litchi
+odm	metadata	set	supported		ok `create() + add paragraph` /metadata title=Litchi
 odm	metadata	add	n/a	add not offered for this element	-
 odm	metadata	remove	n/a	remove not offered for this element	-
 odm	metadata	move	format-verb		unreached
