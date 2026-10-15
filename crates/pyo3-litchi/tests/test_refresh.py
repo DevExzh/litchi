@@ -53,7 +53,7 @@ class RefreshTests(unittest.TestCase):
         with self.assertRaises(L.PropertyError):
             doc.refresh(clock=3)
         with self.assertRaises(L.UnsupportedError):
-            L.create("xlsb").refresh(write_cache=True)
+            L.create("rtf").refresh()
 
 
 if __name__ == "__main__":

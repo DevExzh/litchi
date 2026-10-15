@@ -1,5 +1,6 @@
-//! `merge` (record 0274): fill a DOCX, PPTX or XLSX template from JSON or
-//! CSV data through `File::merge`, one output per record.
+//! `merge` (records 0274 and 0295): fill a template (DOCX, PPTX, XLSX,
+//! XLSB, DOC, PPT, XLS, RTF, ODT, OTH, ODM, ODS or ODP) from JSON or CSV
+//! data through `File::merge`, one output per record.
 
 use std::io::{Read as _, Write};
 use std::path::{Path, PathBuf};
@@ -16,7 +17,8 @@ use crate::{exit, render};
 /// `litchi merge TEMPLATE OUTPUT --data JSON`.
 #[derive(Debug, Args)]
 pub(crate) struct Merge {
-    /// The template (DOCX, PPTX or XLSX) with `{{key}}` placeholders.
+    /// The template (a word-processing, presentation or spreadsheet file)
+    /// with `{{key}}` placeholders.
     pub(crate) template: PathBuf,
     /// The data file (`.json` or `.csv`; `-` reads stdin), or, with
     /// `--data`, the output file (OfficeCLI's form).

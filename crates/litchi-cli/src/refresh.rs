@@ -17,7 +17,7 @@ use crate::{exit, render};
 /// `litchi refresh FILE`.
 #[derive(Debug, Args)]
 pub(crate) struct Refresh {
-    /// The document (DOCX, PPTX, or a workbook).
+    /// The document (DOCX, DOC, ODT, OTH, ODM, PPTX, ODP, or a workbook).
     pub(crate) file: PathBuf,
     /// The date and time DATE, TIME and slide date fields show
     /// (`YYYY-MM-DD` or `YYYY-MM-DDTHH:MM[:SS]`); without it they keep

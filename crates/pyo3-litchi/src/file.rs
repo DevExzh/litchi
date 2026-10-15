@@ -723,7 +723,7 @@ impl File {
     /// Import CSV or TSV text into a worksheet; return the Commit.
     ///
     /// ``target`` is a sheet ("/Sheet1", origin A1) or an origin cell
-    /// ("/Sheet1/B2") of an XLSX, XLSB or XLS workbook. Every field is
+    /// ("/Sheet1/B2") of an XLSX, XLSB, XLS or ODS workbook. Every field is
     /// written in one atomic commit; empty input changes nothing. Numbers,
     /// ISO dates and TRUE/FALSE are inferred unless ``infer`` is False;
     /// fields starting with "=" become formulas only with ``formulas``. The
@@ -799,7 +799,8 @@ impl File {
     /// Word ``MERGEFIELD`` fields) from one data record; return the Commit.
     ///
     /// The template is unchanged, so one opened template fills any number
-    /// of records. DOCX, PPTX and XLSX only. Placeholders split across runs
+    /// of records. DOCX, PPTX, XLSX, XLSB, DOC, PPT, XLS, RTF, ODT, OTH,
+    /// ODM, ODS and ODP templates. Placeholders split across runs
     /// keep each run's formatting. The GIL is released while merging.
     ///
     /// Args:
@@ -823,8 +824,8 @@ impl File {
     ///     PropertyError: (a ValueError) If the data is not one JSON
     ///         object, an option is invalid, or a value holds a character
     ///         the document cannot store
-    ///     UnsupportedError: (a ValueError) If the format is not DOCX, PPTX
-    ///         or XLSX
+    ///     UnsupportedError: (a ValueError) If the format has no merge
+    ///         adapter (the ODF object formats)
     ///     LitchiError: If a limit is exceeded ("limit_exceeded")
     #[pyo3(signature = (
         data,
@@ -857,9 +858,11 @@ impl File {
     /// Recompute the document's derived field results; return the Commit.
     ///
     /// DOCX: tables of contents (from the headings), SEQ, REF, DATE/TIME,
-    /// document-property and count fields; PPTX: slide-number and date
-    /// fields; workbooks: formula results (written back as cached values
-    /// only with ``write_cache``, XLSX only). Page numbers need a layout
+    /// document-property and count fields; DOC: the same fields but REF;
+    /// ODT, OTH, ODM: date, time and document-property fields; PPTX and
+    /// ODP: slide-number and date fields; workbooks (XLSX, XLSB, XLS):
+    /// formula results (written back as cached values only with
+    /// ``write_cache``). Page numbers need a layout
     /// engine Litchi does not have: PAGE-like fields keep their cached
     /// result, and a table of contents keeps each entry's cached page
     /// number. The file is unchanged; a document whose results are current

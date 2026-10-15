@@ -1299,7 +1299,7 @@ class File:
         """Import CSV or TSV text into a worksheet; return the Commit.
 
         ``target`` is a sheet ("/Sheet1", origin A1) or an origin cell
-        ("/Sheet1/B2") of an XLSX, XLSB or XLS workbook. Every field is
+        ("/Sheet1/B2") of an XLSX, XLSB, XLS or ODS workbook. Every field is
         written in one atomic commit; empty input changes nothing. Numbers,
         ISO dates and TRUE/FALSE are inferred unless ``infer`` is False;
         fields starting with "=" become formulas only with ``formulas``.
@@ -1329,7 +1329,8 @@ class File:
 
         ``data`` is a mapping (values rendered as JSON renders them; nested
         members are also reachable as "a.b" and "a[0]" keys) or a JSON
-        object as str or bytes. DOCX, PPTX and XLSX only. The template is
+        object as str or bytes. DOCX, PPTX, XLSX, XLSB, DOC, PPT, XLS, RTF,
+        ODT, OTH, ODM, ODS and ODP templates. The template is
         unchanged, so one opened template fills any number of records.
         Placeholders split across runs keep each run's formatting.
         ``missing`` is "keep" (leave a placeholder whose key the record
@@ -1340,8 +1341,8 @@ class File:
             PropertyError: (a ValueError) If the data is not one JSON
                 object, an option is invalid, or a value holds a character
                 the document cannot store
-            UnsupportedError: (a ValueError) If the format is not DOCX, PPTX
-                or XLSX
+            UnsupportedError: (a ValueError) If the format has no merge
+                adapter (the ODF object formats)
             LitchiError: If a limit is exceeded ("limit_exceeded")
         """
         ...
@@ -1360,9 +1361,11 @@ class File:
         Commit.
 
         DOCX: tables of contents (from the headings), SEQ, REF, DATE/TIME,
-        document-property and count fields; PPTX: slide-number and date
-        fields; workbooks: formula results (written back as cached values
-        only with ``write_cache``, XLSX only). Page-number fields keep their
+        document-property and count fields; DOC: the same fields but REF;
+        ODT, OTH, ODM: date, time and document-property fields; PPTX and
+        ODP: slide-number and date fields; workbooks (XLSX, XLSB, XLS):
+        formula results (written back as cached values only with
+        ``write_cache``). Page-number fields keep their
         cached result and a table of contents keeps each entry's cached page
         number (``page_numbers="require"`` refuses unknown ones). ``clock``
         is "YYYY-MM-DD[THH:MM[:SS]]", a datetime.datetime or a
