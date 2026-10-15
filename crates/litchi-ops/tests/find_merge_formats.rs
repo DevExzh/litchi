@@ -15,6 +15,7 @@
 ))]
 #![allow(clippy::unwrap_used, reason = "test assertions")]
 
+#[allow(unused_imports, reason = "used by a subset of the format features")]
 use litchi_core::FileFormat;
 #[allow(unused_imports, reason = "used by a subset of the format features")]
 use litchi_ops::merge::{Missing, Options, Record};
@@ -536,9 +537,4 @@ fn odp_find_and_merge() {
             .patch
             .is_noop()
     );
-}
-
-#[test]
-fn formats_are_reported() {
-    let _ = FileFormat::Doc;
 }
