@@ -10,6 +10,7 @@ use super::StructureError;
 
 pub(in crate::package) const VARINT: u8 = 0;
 pub(in crate::package) const LENGTH_DELIMITED: u8 = 2;
+pub(in crate::package) const FIXED32: u8 = 5;
 
 /// One parsed field: number, wire type, raw encoding and payload span.
 #[derive(Debug, Clone)]
@@ -37,6 +38,18 @@ impl Field {
             return Err(StructureError::Malformed);
         }
         Ok(value)
+    }
+
+    /// The value of a `float` (fixed32) field.
+    pub(in crate::package) fn float(&self) -> Result<f32, StructureError> {
+        let bytes: [u8; 4] = self
+            .payload()
+            .try_into()
+            .map_err(|_| StructureError::Unexpected("float field"))?;
+        if self.wire_type != FIXED32 {
+            return Err(StructureError::Unexpected("float field"));
+        }
+        Ok(f32::from_le_bytes(bytes))
     }
 
     /// The payload of a length-delimited field.
@@ -125,6 +138,11 @@ impl Fields {
         self.set_single(number, VARINT, &payload);
     }
 
+    /// Set a singular `float` field, in place when present.
+    pub(in crate::package) fn set_float(&mut self, number: u32, value: f32) {
+        self.set_single(number, FIXED32, &value.to_le_bytes());
+    }
+
     /// Set a singular message field, in place when present.
     pub(in crate::package) fn set_message(&mut self, number: u32, payload: &[u8]) {
         self.set_single(number, LENGTH_DELIMITED, payload);
@@ -182,6 +200,16 @@ impl Writer {
         self.key(number, VARINT);
         encode_varint_into(&mut self.bytes, value);
         self
+    }
+
+    pub(in crate::package) fn float(mut self, number: u32, value: f32) -> Self {
+        self.key(number, FIXED32);
+        self.bytes.extend_from_slice(&value.to_le_bytes());
+        self
+    }
+
+    pub(in crate::package) fn boolean(self, number: u32, value: bool) -> Self {
+        self.varint(number, u64::from(value))
     }
 
     pub(in crate::package) fn bytes(mut self, number: u32, value: &[u8]) -> Self {

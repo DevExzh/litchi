@@ -15,6 +15,7 @@ use super::StructureError;
 
 const LAST_OBJECT_IDENTIFIER: u32 = 1;
 const COMPONENTS: u32 = 3;
+const DATAS: u32 = 4;
 const ROOT_SAVE_TOKEN: u32 = 8;
 
 const COMPONENT_IDENTIFIER: u32 = 1;
@@ -115,6 +116,25 @@ impl Component {
                 owners: vec![(object, 1)],
             });
         }
+    }
+
+    /// Remove the UUID records of `objects`; returns how many were removed.
+    pub(in crate::package) fn remove_object_uuids(&mut self, objects: &[u64]) -> usize {
+        let before = self.object_uuids.len();
+        self.object_uuids
+            .retain(|(identifier, _)| !objects.contains(identifier));
+        before - self.object_uuids.len()
+    }
+
+    /// Drop `object` as an owner of every data item; a data record left
+    /// without owners is removed from this component (the data item itself
+    /// stays in the package).
+    pub(in crate::package) fn remove_data_owner(&mut self, object: u64) {
+        for entry in &mut self.data_references {
+            entry.owners.retain(|(owner, _)| *owner != object);
+        }
+        self.data_references
+            .retain(|entry| !entry.owners.is_empty());
     }
 
     /// A copy registered as a new component `identifier` stored at
@@ -547,6 +567,65 @@ impl Registry {
         Ok(())
     }
 
+    /// Every registered data identifier (`DataInfo.identifier`).
+    pub(in crate::package) fn data_identifiers(
+        &self,
+        limits: WireLimits,
+    ) -> Result<Vec<u64>, StructureError> {
+        let mut identifiers = Vec::new();
+        for entry in &self.entries {
+            let Entry::Raw(raw) = entry else { continue };
+            if field_number(raw) != Some(DATAS) {
+                continue;
+            }
+            let outer = parse_wire_fields_with_limits(raw, limits)?;
+            let [field] = outer.as_slice() else {
+                return Err(StructureError::Registry("data info"));
+            };
+            let inner = field.payload(raw)?;
+            let mut identifier = None;
+            for part in parse_wire_fields_with_limits(inner, limits)? {
+                if part.number() == 1 && part.wire_type() == VARINT {
+                    identifier = Some(varint(part, inner)?);
+                }
+            }
+            identifiers.push(identifier.ok_or(StructureError::Registry("data identifier"))?);
+        }
+        Ok(identifiers)
+    }
+
+    /// Append one `DataInfo` record (identifier, SHA-1 digest, preferred and
+    /// stored file names and materialized length) after the existing ones.
+    pub(in crate::package) fn add_data_info(
+        &mut self,
+        identifier: u64,
+        digest: &[u8],
+        preferred_file_name: &str,
+        file_name: &str,
+        length: u64,
+    ) {
+        let mut inner = Vec::new();
+        inner.push(0x08);
+        encode_varint_into(&mut inner, identifier);
+        message_field(&mut inner, 2, digest);
+        message_field(&mut inner, 3, preferred_file_name.as_bytes());
+        message_field(&mut inner, 4, file_name.as_bytes());
+        encode_varint_into(&mut inner, u64::from(18_u32 << 3));
+        encode_varint_into(&mut inner, length);
+        let mut raw = Vec::new();
+        message_field(&mut raw, DATAS, &inner);
+        let position = self
+            .entries
+            .iter()
+            .rposition(|entry| match entry {
+                Entry::Raw(raw) => field_number(raw) == Some(DATAS),
+                Entry::Component(..) => true,
+                _ => false,
+            })
+            .map_or(self.entries.len(), |index| index + 1);
+        self.entries.insert(position, Entry::Raw(raw));
+    }
+
     /// Encode the registry. Unchanged fields keep their exact bytes and
     /// order; when any component was touched the root save token advances
     /// once and is stamped on every touched component.
@@ -824,5 +903,50 @@ mod tests {
             }]
         );
         assert_eq!(decoded.external_references().len(), 1);
+    }
+
+    #[test]
+    fn data_owners_and_uuids_are_removed() {
+        let mut component = Component::decode(
+            &{
+                let mut output = vec![0x08, 0x05];
+                message_field(&mut output, COMPONENT_PREFERRED_LOCATOR, b"Slide");
+                output
+            },
+            limits(),
+        )
+        .expect("decodes");
+        component.add_data_owner(9, 100);
+        component.add_data_owner(9, 101);
+        component.add_data_owner(10, 100);
+        component.add_object_uuid(100, Uuid { lower: 1, upper: 2 });
+        component.add_object_uuid(101, Uuid { lower: 3, upper: 4 });
+        component.remove_data_owner(100);
+        assert_eq!(
+            component.data_references,
+            vec![DataReference {
+                data: 9,
+                owners: vec![(101, 1)],
+            }]
+        );
+        assert_eq!(component.remove_object_uuids(&[100, 7]), 1);
+        assert_eq!(component.uuid_of(100), None);
+        assert_eq!(component.uuid_of(101), Some(Uuid { lower: 3, upper: 4 }));
+    }
+
+    #[test]
+    fn data_infos_are_listed_and_appended() {
+        let package = fixture("basic.key");
+        let mut registry =
+            Registry::decode(&registry_payload(&package), limits()).expect("decodes");
+        let before = registry.data_identifiers(limits()).expect("lists");
+        assert!(!before.is_empty());
+        let next = before.iter().max().copied().unwrap_or(0) + 1;
+        registry.add_data_info(next, &[7; 20], "pixel.png", "pixel-1.png", 74);
+        let encoded = registry.encode().expect("encodes");
+        let decoded = Registry::decode(&encoded, limits()).expect("decodes");
+        let after = decoded.data_identifiers(limits()).expect("lists");
+        assert_eq!(after.len(), before.len() + 1);
+        assert_eq!(after.last(), Some(&next));
     }
 }

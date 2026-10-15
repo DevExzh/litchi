@@ -39,6 +39,8 @@ pub(in crate::package) struct Workspace<'p> {
     next_identifier: u64,
     /// Objects inserted by this transaction.
     inserted: usize,
+    /// Non-archive package members created by this transaction (data).
+    members: BTreeMap<String, Vec<u8>>,
 }
 
 impl<'p> Workspace<'p> {
@@ -94,6 +96,7 @@ impl<'p> Workspace<'p> {
             uuids,
             next_identifier,
             inserted: 0,
+            members: BTreeMap::new(),
         })
     }
 
@@ -209,7 +212,7 @@ impl<'p> Workspace<'p> {
     /// (the registry member included).
     pub(in crate::package) fn touched_members(&self) -> usize {
         let registry = usize::from(!self.changed.contains_key(METADATA_MEMBER));
-        self.changed.len() + self.created.len() + registry
+        self.changed.len() + self.created.len() + self.members.len() + registry
     }
 
     /// Insert a new object into an existing or created component.
@@ -230,6 +233,42 @@ impl<'p> Workspace<'p> {
             .insert_object_with_limits(object, limits)?;
         self.located.insert(identifier, member.to_owned());
         self.inserted += 1;
+        Ok(())
+    }
+
+    /// Remove one staged object from its component.
+    pub(in crate::package) fn remove_object(
+        &mut self,
+        identifier: u64,
+    ) -> Result<ArchiveObject, StructureError> {
+        let member = self
+            .component_of(identifier)
+            .ok_or(StructureError::MissingObject)?;
+        let removed = self
+            .archive_mut(&member)?
+            .remove_object(identifier)
+            .ok_or(StructureError::MissingObject)?;
+        self.located.remove(&identifier);
+        Ok(removed)
+    }
+
+    /// Whether a package member of this exact name exists or is staged.
+    pub(in crate::package) fn has_member(&self, member: &str) -> bool {
+        self.members.contains_key(member)
+            || self.created.contains_key(member)
+            || self.package.structure_has_member(member)
+    }
+
+    /// Stage a new raw package member (for example a `Data/` file).
+    pub(in crate::package) fn insert_member(
+        &mut self,
+        member: &str,
+        bytes: Vec<u8>,
+    ) -> Result<(), StructureError> {
+        if member.is_empty() || self.has_member(member) {
+            return Err(StructureError::Registry("package member exists"));
+        }
+        self.members.insert(member.to_owned(), bytes);
         Ok(())
     }
 
@@ -385,6 +424,11 @@ impl<'p> Workspace<'p> {
             .iter()
             .filter(|(member, _)| self.created.contains_key(member))
             .map(|(member, bytes)| EntryInsertion::new(member, bytes))
+            .chain(
+                self.members
+                    .iter()
+                    .map(|(member, bytes)| EntryInsertion::new(member, bytes)),
+            )
             .collect::<Vec<_>>();
         self.package.structure_reassemble(&insertions, &edits, &[])
     }
@@ -467,5 +511,36 @@ mod tests {
             .archive_info
             .should_merge = None;
         assert_eq!(workspace.touched_members(), 3);
+    }
+
+    #[test]
+    fn removed_objects_and_new_members_are_published() {
+        let package = fixture("basic.key");
+        let mut workspace = Workspace::new(&package).expect("workspace");
+        let caption = 2_652_157;
+        assert!(workspace.remove_object(caption).is_ok());
+        assert!(workspace.object(caption).is_none());
+        assert_eq!(
+            workspace.remove_object(caption).err(),
+            Some(StructureError::MissingObject)
+        );
+        assert!(workspace.has_member("Index/Document.iwa"));
+        workspace
+            .insert_member("Data/litchi-test.bin", b"bytes".to_vec())
+            .expect("inserts");
+        assert!(
+            workspace
+                .insert_member("Data/litchi-test.bin", Vec::new())
+                .is_err()
+        );
+        assert_eq!(workspace.touched_members(), 3);
+        // The publish carries the new member (the slide-drawable family
+        // reopens and validates complete candidates).
+        let bytes = workspace.publish().expect("publishes");
+        assert!(
+            bytes
+                .windows(20)
+                .any(|window| window == b"Data/litchi-test.bin")
+        );
     }
 }
