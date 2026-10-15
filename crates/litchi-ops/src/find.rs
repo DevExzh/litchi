@@ -368,6 +368,11 @@ pub(crate) fn set(
         crate::File::Doc(handle) => handle
             .find_replace(&target, &spec, &limits)
             .map(|(commit, _)| crate::File::Doc(commit.after)),
+        #[cfg(feature = "ppt")]
+        crate::File::Ppt(handle) => {
+            crate::format::ppt::write::find::find_replace(handle, &target, &spec, &limits)
+                .map(|(commit, _)| crate::File::Ppt(commit.after))
+        },
         _ => Err(unsupported(file)),
     }
 }

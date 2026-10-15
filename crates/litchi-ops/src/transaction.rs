@@ -2708,6 +2708,12 @@ impl Edit {
                 let (commit, matched) = handle.find_replace(target, &spec, &limits)?;
                 wrap_doc(handle, commit, matched)
             },
+            #[cfg(feature = "ppt")]
+            File::Ppt(handle) => {
+                let (commit, matched) =
+                    crate::format::ppt::write::find::find_replace(handle, target, &spec, &limits)?;
+                wrap_ppt(handle, commit, matched)
+            },
             _ => Err(crate::find::unsupported(file)),
         })
     }

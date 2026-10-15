@@ -8,6 +8,7 @@
 //! streams itself.
 
 pub(crate) mod coalesce;
+pub(crate) mod find;
 
 use std::collections::HashSet;
 

@@ -167,6 +167,80 @@ mod rtf {
     }
 }
 
+/// A tracked fixture under `test-data/`.
+#[allow(dead_code, reason = "used by a subset of the format features")]
+fn fixture(path: &str) -> File {
+    let bytes = std::fs::read(
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data")
+            .join(path),
+    )
+    .unwrap();
+    open_bytes(bytes).unwrap()
+}
+
+#[cfg(feature = "ppt")]
+mod ppt {
+    use super::*;
+
+    const NOTES: &str = "poi/test-data/slideshow/basic_test_ppt_file.ppt";
+
+    #[test]
+    fn find_rewrites_shapes_and_notes() {
+        let deck = fixture(NOTES);
+        let (after, matched) = find(&deck, "/", "page", "slide");
+        assert!(matched >= 3, "{matched}");
+        let after = reopen(&after);
+        assert_eq!(
+            text(&after, "/slide[1]/shape[2]"),
+            "This is a test subtitle\rThis is on slide 1"
+        );
+        assert_eq!(
+            text(&after, "/slide[1]/notes"),
+            "These are the notes for slide 1"
+        );
+        // A paragraph scope and a notes scope.
+        let (scoped, matched) = find(&deck, "/slide[1]/shape[2]/paragraph[2]", "page", "x");
+        assert_eq!(matched, 1);
+        assert_eq!(
+            text(&scoped, "/slide[1]/notes"),
+            "These are the notes for page 1"
+        );
+        let (notes, matched) = find(&deck, "/slide[2]/notes", "page", "leaf");
+        assert_eq!(matched, 1);
+        assert_eq!(
+            text(&notes, "/slide[1]/notes"),
+            "These are the notes for page 1"
+        );
+        let (same, matched) = find(&deck, "/", "absent", "x");
+        assert_eq!(matched, 0);
+        assert_eq!(same.to_bytes().unwrap(), deck.to_bytes().unwrap());
+        let error = deck
+            .set("/", props! { "find" => "page", "bold" => true })
+            .unwrap_err();
+        assert_eq!(error.code(), Code::UnsupportedProperty);
+    }
+
+    #[test]
+    fn merge_fills_paragraphs() {
+        let deck = fixture(NOTES)
+            .set("/slide[1]/notes", props! { "text" => "Notes for {{who}}" })
+            .unwrap();
+        let commit = deck
+            .merge(&record(&[("who", "Ada")]), &Options::new())
+            .unwrap();
+        assert_eq!(commit.value.replacements(), 1);
+        assert_eq!(
+            text(&reopen(&commit.file), "/slide[1]/notes"),
+            "Notes for Ada"
+        );
+        let error = deck
+            .merge(&record(&[("who", "a\nb")]), &Options::new())
+            .unwrap_err();
+        assert_eq!(error.code(), Code::InvalidValue);
+    }
+}
+
 #[test]
 fn formats_are_reported() {
     let _ = FileFormat::Doc;
