@@ -88,6 +88,10 @@ fn scratch_pages_supports_multi_paragraph_drop_cap_crud() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn scratch_numbers_and_keynote_support_drop_cap_crud() {
     let (position, size) = text_box_geometry();
     let expected = model(6, 2)

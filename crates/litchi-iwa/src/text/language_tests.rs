@@ -20,6 +20,10 @@ fn explicit(tag: &str) -> TextLanguage {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn scratch_text_language_runs_round_trip_in_every_suite() {
     let english = explicit("en");
     let french = explicit("fr-CA");

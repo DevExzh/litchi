@@ -24,9 +24,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let layout_name = layout.name.clone();
     let slide = editor.add_slide(layout.id)?;
     editor.save(output)?;
-    println!(
-        "created slide {} (node {}, object {}) from layout {layout_name:?}",
-        slide.index, slide.node_id, slide.slide_id
-    );
+    println!("created slide {} from layout {layout_name:?}", slide.index);
     Ok(())
 }

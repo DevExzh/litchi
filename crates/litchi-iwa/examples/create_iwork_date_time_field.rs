@@ -18,6 +18,10 @@ const SIZE: DrawableSize = DrawableSize {
     height: 120.0,
 };
 
+#[expect(
+    deprecated,
+    reason = "demonstrates the legacy raw-ID Keynote editor API, which takes native object IDs; litchi_keynote::Package has no equivalent text-box route yet"
+)]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let output = std::env::args()
         .nth(1)

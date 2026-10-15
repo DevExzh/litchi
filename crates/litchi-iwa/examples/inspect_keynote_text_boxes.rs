@@ -4,16 +4,17 @@ use std::env;
 
 use litchi_iwa::keynote::{KeynoteEditor, KeynoteSlideTextRole};
 
+#[expect(
+    deprecated,
+    reason = "demonstrates the legacy raw-ID Keynote editor API, which takes native object IDs; litchi_keynote::Package has no equivalent text-box route yet"
+)]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let input = env::args()
         .nth(1)
         .ok_or("usage: inspect_keynote_text_boxes <input.key>")?;
     let editor = KeynoteEditor::open(input)?;
     for slide in editor.slides()? {
-        println!(
-            "slide={} node={} object={} name={:?}",
-            slide.index, slide.node_id, slide.slide_id, slide.name
-        );
+        println!("slide={} name={:?}", slide.index, slide.name);
         let mut text_box_index = 0usize;
         for (text_index, text) in editor
             .slide_text_storages(slide.index)?

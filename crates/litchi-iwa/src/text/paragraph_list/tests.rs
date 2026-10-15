@@ -17,6 +17,10 @@ const SIZE: DrawableSize = DrawableSize {
 };
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn canonical_lists_round_trip_update_and_reset_in_every_suite() {
     let mut pages = PagesEditor::create_with_text("Lists").unwrap();
     let pages_box = pages
@@ -110,6 +114,10 @@ fn canonical_lists_round_trip_update_and_reset_in_every_suite() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn text_boxes_round_trip_custom_bullets_in_every_suite() {
     let paragraph = TextPosition::from_utf16_index(6).unwrap();
     let arrow = ParagraphListBullet::new("➡").unwrap();
@@ -196,6 +204,10 @@ fn text_boxes_round_trip_custom_bullets_in_every_suite() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn text_boxes_round_trip_bullet_geometry_in_every_suite() {
     let paragraph = TextPosition::from_utf16_index(6).unwrap();
     let geometry = ParagraphListBulletGeometry::new(
@@ -293,6 +305,10 @@ fn text_boxes_round_trip_bullet_geometry_in_every_suite() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn text_boxes_round_trip_list_indentation_in_every_suite() {
     let paragraph = TextPosition::from_utf16_index(6).unwrap();
     let indentation = ParagraphListIndentation::new(
@@ -390,6 +406,10 @@ fn text_boxes_round_trip_list_indentation_in_every_suite() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn text_boxes_round_trip_list_label_colors_in_every_suite() {
     let paragraph = TextPosition::from_utf16_index(6).unwrap();
     let color = ParagraphListLabelColor::Explicit(
@@ -482,6 +502,10 @@ fn text_boxes_round_trip_list_label_colors_in_every_suite() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn text_boxes_round_trip_number_formats_in_every_suite() {
     let paragraph = TextPosition::from_utf16_index(6).unwrap();
     let format = ParagraphListNumberFormat::affixed(
@@ -579,6 +603,10 @@ fn text_boxes_round_trip_number_formats_in_every_suite() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn text_boxes_round_trip_number_tiering_in_every_suite() {
     let paragraph = TextPosition::from_utf16_index(6).unwrap();
     let tiered = ParagraphListNumberTiering::Tiered;
@@ -673,6 +701,10 @@ fn text_boxes_round_trip_number_tiering_in_every_suite() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn text_boxes_round_trip_number_scale_in_every_suite() {
     let paragraph = TextPosition::from_utf16_index(6).unwrap();
     let scale = ParagraphListNumberScale::from_percent(135.0).unwrap();

@@ -19,7 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             print_assets("presentation", &editor.media_assets()?);
             for slide in editor.slides()? {
                 print_assets(
-                    &format!("slide[{}] id={}", slide.index, slide.slide_id),
+                    &format!("slide[{}]", slide.index),
                     &editor.slide_media_assets(slide.index)?,
                 );
             }

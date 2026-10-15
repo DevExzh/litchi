@@ -353,6 +353,10 @@ mod tests {
     }
 
     #[test]
+    #[expect(
+        deprecated,
+        reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+    )]
     fn scratch_suite_text_boxes_support_column_crud() {
         let two = Columns::equal(
             Count::new(2).unwrap(),

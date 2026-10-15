@@ -67,6 +67,10 @@ fn highlight_crud_round_trips_and_restores_pages_exactly() {
 }
 
 #[test]
+#[expect(
+    deprecated,
+    reason = "exercises the legacy raw-ID Keynote editor API, which takes native object IDs; retained for migration-host compatibility"
+)]
 fn scratch_highlights_work_in_numbers_and_keynote() {
     let mut numbers = NumbersDocumentBuilder::new().build().unwrap();
     let sheet_id = numbers.sheets().unwrap()[0].object_id;
