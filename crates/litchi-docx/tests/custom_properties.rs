@@ -21,10 +21,14 @@ fn custom_properties_xml(bytes: &[u8]) -> Vec<u8> {
         .to_vec()
 }
 
-fn refused_document_edit(package: &mut Package) {
+/// Opens and drops a document edit. The alt-chunk-header fixture (an
+/// `w:altChunk` after the body-final section properties) was refused until
+/// record 0293 admitted that tail; either way the package keeps its custom
+/// properties.
+fn abandoned_document_edit(package: &mut Package) {
     assert!(
-        package.edit().is_err(),
-        "the alt-chunk-header fixture must refuse document editing"
+        package.edit().is_ok(),
+        "the alt-chunk-header fixture admits document editing"
     );
 }
 
@@ -178,12 +182,12 @@ fn clean_real_fixture_preserves_custom_properties_for_stream_and_path_save() {
 }
 
 #[test]
-fn refused_document_edit_preserves_custom_properties_for_stream_and_path_save() {
+fn abandoned_document_edit_preserves_custom_properties_for_stream_and_path_save() {
     let expected = custom_properties_xml(HEADER_FIXTURE);
 
     let mut streamed = Package::from_reader(Cursor::new(HEADER_FIXTURE))
         .expect("open alt-chunk-header fixture for refused stream save");
-    refused_document_edit(&mut streamed);
+    abandoned_document_edit(&mut streamed);
     let mut stream_output = Vec::new();
     streamed
         .write_to(&mut stream_output)
@@ -194,7 +198,7 @@ fn refused_document_edit_preserves_custom_properties_for_stream_and_path_save() 
     let path = directory.path().join("refused-alt-chunk-header.docx");
     let mut saved = Package::from_reader(Cursor::new(HEADER_FIXTURE))
         .expect("open alt-chunk-header fixture for refused path save");
-    refused_document_edit(&mut saved);
+    abandoned_document_edit(&mut saved);
     saved
         .save(&path)
         .expect("path save after refused document edit");

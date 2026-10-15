@@ -490,10 +490,25 @@ fn lifecycle_selectors_limits_and_structural_composition_fail_before_publication
 
 #[test]
 fn changed_lifecycle_refuses_opaque_formatted_ambiguous_and_nonplain_transports() {
+    // Formatted paragraphs and line breaks are removed by the producer
+    // splice (record 0293): the survivors read back unchanged.
+    for (input, expected) in [
+        (r"{\rtf1\ansi \b One\par Two}", r"{\rtf1\ansi \b Two}"),
+        (
+            r"{\rtf1\ansi One\line wrapped\par Two}",
+            r"{\rtf1\ansi Two}",
+        ),
+    ] {
+        let source = Package::parse(input).unwrap();
+        let mut edit = source.edit();
+        edit.remove_paragraph(Position::new(0)).unwrap();
+        let commit = edit.commit().unwrap();
+        assert_eq!(commit.package().to_bytes().unwrap(), expected.as_bytes());
+        assert_eq!(source.to_bytes().unwrap(), input.as_bytes());
+    }
+    // Unknown syntax and tables stay refused.
     let cases = [
         Package::parse(r"{\rtf1\ansi One\future42 Two\par Three}").unwrap(),
-        Package::parse(r"{\rtf1\ansi \b One\par Two}").unwrap(),
-        Package::parse(r"{\rtf1\ansi One\line wrapped\par Two}").unwrap(),
         Package::parse(r"{\rtf1\ansi One\par\trowd\cellx1000\intbl Cell\cell\row}").unwrap(),
     ];
     for source in cases {

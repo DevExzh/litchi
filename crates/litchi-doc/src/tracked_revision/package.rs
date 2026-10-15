@@ -6,11 +6,11 @@ use super::codec::{
     PLCFATNBKF, PLCFATNBKL, PLCFBKF, PLCFBKL, PLCFBTE_CHPX, PLCFBTE_PAPX, PLCFFLD_MOM,
     ParsedMetadata, STTBFRMARK, align2, align512, append_table_block, build_papx_pages, corrupted,
     delete_piece_range, encode_revision, fib_pair, infer_moves, insert_piece, kind_order,
-    merge_adjacent, metadata_from_sprms, parse_authors, parse_chpx, parse_clx, parse_cp_table,
-    parse_papx, property_metadata, put_fib_pair, put_u32, read_units, replace_papx_revision_sprms,
-    replace_revision_sprms, restore_before_wall, retain_sprms, revision_opcodes, serialize_authors,
-    serialize_clx, slice, split_transform_chpx, split_transform_papx, strict_sprms, u16_at, u32_at,
-    validate_metadata, validate_range,
+    merge_adjacent, metadata_from_sprms, papx_sprms, parse_authors, parse_chpx, parse_clx,
+    parse_cp_table, parse_papx, property_metadata, put_fib_pair, put_u32, read_units,
+    replace_papx_revision_sprms, replace_revision_sprms, restore_before_wall, retain_sprms,
+    revision_opcodes, serialize_authors, serialize_clx, slice, split_transform_chpx,
+    split_transform_papx, strict_sprms, u16_at, u32_at, validate_metadata, validate_range,
 };
 use super::model::{CpTable, FcRun, PapxRun, RawPiece, Revision, RevisionKind, RevisionMetadata};
 use crate::package::{Error as PackageError, Result};
@@ -2811,7 +2811,7 @@ impl RevisionEditor {
                 .grpprl
                 .get(2..)
                 .ok_or_else(|| corrupted("PAPX has no style index"))?;
-            let sprms = strict_sprms(body)?;
+            let sprms = papx_sprms(body)?;
             for (kind, op, rsid) in [
                 (
                     RevisionKind::ParagraphFormatting,

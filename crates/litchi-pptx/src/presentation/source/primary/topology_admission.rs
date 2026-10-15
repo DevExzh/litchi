@@ -68,25 +68,21 @@ fn validate_inner(
         );
     }
     let slide = prepared.part(&key.part_uri)?;
-    if slide.content_type() != ct::PML_SLIDE || slide.rels().len() != 1 {
+    if slide.content_type() != ct::PML_SLIDE {
         return refuse(
             SlideRemovalRefusal::UnsupportedRelationship,
-            "selected slide must have one layout relationship",
+            "selected slide has an unexpected content type",
         );
     }
-    let layout = slide.rels().iter().next().ok_or(Error::PatchConflict)?;
-    if layout.is_external()
-        || !crate::parts::is_relationship_type(layout.reltype(), rt::SLIDE_LAYOUT, "slideLayout")
-        || layout.target_query().is_some()
-        || layout.target_fragment().is_some()
-    {
+    let layout = crate::opened::removal_layout_edge(slide.rels())?;
+    if layout.target_query().is_some() || layout.target_fragment().is_some() {
         return refuse(
             SlideRemovalRefusal::UnsupportedRelationship,
             "selected slide has a non-layout relationship",
         );
     }
     canonical_edge(presentation_uri, selected)?;
-    canonical_edge(&key.part_uri, layout)?;
+    canonical_internal_edges(&key.part_uri, slide.rels())?;
     let layout_uri = layout.target_partname()?;
     if !layout_uri.as_str().starts_with("/ppt/slideLayouts/")
         || prepared.part(&layout_uri)?.content_type() != ct::PML_SLIDE_LAYOUT
@@ -188,9 +184,11 @@ fn refuse<T>(kind: SlideRemovalRefusal, detail: &str) -> Result<T> {
     })
 }
 
-/// Add the single typed layout edge before installing its exact XML image.
-/// OPC's raw-image guard subsequently validates the complete manifest grammar
-/// and proves that the image describes this typed edge and no others.
+/// Add the typed edges of a restored slide before installing its exact XML
+/// image: its one layout edge, its slide jumps and its external edges (the
+/// edges [`crate::opened::removal_layout_edge`] admits for removal). OPC's
+/// raw-image guard subsequently validates the complete manifest grammar and
+/// proves that the image describes these typed edges and no others.
 pub(super) fn stage_layout(
     package: &Package,
     plan: &mut litchi_opc::SourceTopologyPlan,
@@ -222,7 +220,8 @@ pub(super) fn stage_layout(
         })
         .transpose()?;
     let mut reader = NsReader::from_reader(xml);
-    let mut edge = None;
+    let mut layout = false;
+    let mut edges = Vec::new();
     loop {
         package.owner.package.check_execution()?;
         let (namespace, event) = reader
@@ -238,15 +237,10 @@ pub(super) fn stage_layout(
                         ))
                     ) =>
             {
-                if edge.is_some() {
-                    return refuse(
-                        SlideRemovalRefusal::UnsupportedRelationship,
-                        "restored slide must have one layout edge",
-                    );
-                }
                 let mut id = None;
                 let mut kind = None;
                 let mut target = None;
+                let mut external = false;
                 for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(|e| Error::Xml(e.to_string()))?;
                     let value = attribute
@@ -256,11 +250,15 @@ pub(super) fn stage_layout(
                         b"Id" => id = Some(value.into_owned()),
                         b"Type" => kind = Some(value.into_owned()),
                         b"Target" => target = Some(value.into_owned()),
-                        b"TargetMode" if value.as_ref() != "Internal" => {
-                            return refuse(
-                                SlideRemovalRefusal::UnsupportedRelationship,
-                                "restored layout edge must be internal",
-                            );
+                        b"TargetMode" => match value.as_ref() {
+                            "Internal" => {},
+                            "External" => external = true,
+                            _ => {
+                                return refuse(
+                                    SlideRemovalRefusal::UnsupportedRelationship,
+                                    "restored slide edge has an unknown target mode",
+                                );
+                            },
                         },
                         _ => {},
                     }
@@ -268,24 +266,38 @@ pub(super) fn stage_layout(
                 let id = id.ok_or(Error::PatchConflict)?;
                 let kind = kind.ok_or(Error::PatchConflict)?;
                 let target = target.ok_or(Error::PatchConflict)?;
-                if !crate::parts::is_relationship_type(&kind, rt::SLIDE_LAYOUT, "slideLayout")
+                if external {
+                    edges.push((id, kind, None, target));
+                    continue;
+                }
+                let is_layout =
+                    crate::parts::is_relationship_type(&kind, rt::SLIDE_LAYOUT, "slideLayout");
+                if (!is_layout && !crate::parts::is_relationship_type(&kind, rt::SLIDE, "slide"))
                     || target.contains(['?', '#'])
+                    || (is_layout && std::mem::replace(&mut layout, true))
                 {
                     return refuse(
                         SlideRemovalRefusal::UnsupportedRelationship,
                         "restored slide has unsupported edge",
                     );
                 }
-                let target =
+                let part =
                     PackURI::from_rel_ref(owner.base_uri(), &target).map_err(Error::Invalid)?;
-                edge = Some((id, kind, target));
+                edges.push((id, kind, Some(part), target));
             },
             Event::Eof => break,
             _ => {},
         }
     }
-    let (id, kind, target) = edge.ok_or(Error::PatchConflict)?;
-    plan.try_add_internal_relationship(owner.clone(), id, kind, target)?;
+    if !layout {
+        return Err(Error::PatchConflict);
+    }
+    for (id, kind, part, target) in edges {
+        match part {
+            Some(part) => plan.try_add_internal_relationship(owner.clone(), id, kind, part)?,
+            None => plan.try_add_external_relationship(owner.clone(), id, kind, target)?,
+        }
+    }
     Ok(())
 }
 
@@ -304,8 +316,19 @@ pub(super) fn validate_physical_roundtrip(package: &Package, key: &StableSlideKe
             .ok_or(Error::PatchConflict)?,
     )?;
     let slide = source.part(&key.part_uri)?;
-    let layout = slide.rels().iter().next().ok_or(Error::PatchConflict)?;
-    canonical_edge(&key.part_uri, layout)
+    crate::opened::removal_layout_edge(slide.rels())?;
+    canonical_internal_edges(&key.part_uri, slide.rels())
+}
+
+/// Every internal edge of a removed slide is restored as a typed
+/// owner-relative edge, so each must already be spelled that way.
+fn canonical_internal_edges(owner: &PackURI, relationships: &Relationships) -> Result<()> {
+    for relationship in relationships.iter() {
+        if !relationship.is_external() {
+            canonical_edge(owner, relationship)?;
+        }
+    }
+    Ok(())
 }
 
 fn canonical_edge(owner: &PackURI, relationship: &litchi_opc::Relationship) -> Result<()> {

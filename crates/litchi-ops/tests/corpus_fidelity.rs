@@ -12,7 +12,9 @@
 //! new value and back, and the reopened value must equal the original.
 //! Whether the reverted bytes also equal the input is reported, not
 //! required: a revert is a second edit, and the leaves may normalize what
-//! they rewrite.
+//! they rewrite. A structural round trip follows on XLS, PPTX and RTF
+//! (record 0293): a row inserted and removed, or a slide or paragraph moved
+//! and moved back, must read back with the same node texts.
 //!
 //! An empty edit the leaf editor refuses (typed) is reported with its
 //! cause, and the file then goes through `open` → `save_as`, which must be
@@ -57,7 +59,7 @@ use std::path::{Path, PathBuf};
 
 use litchi_core::FileFormat;
 use litchi_ops::value::ValueType;
-use litchi_ops::{File, Props, open};
+use litchi_ops::{File, NewNode, Placement, Props, open};
 
 /// Formats whose no-op save is allowed to differ from the input, with the
 /// documented normalization. Empty: every format must be exact.
@@ -161,6 +163,11 @@ struct Outcome {
     /// walk) or `-` (not attempted).
     revert: &'static str,
     revert_detail: String,
+    /// Structural round trip (record 0293): `byte-exact`, `value-exact`,
+    /// `mismatch`, `one-way` (the inverse is refused, typed), `refused`,
+    /// `none` (nothing to move) or `-` (not attempted for the format).
+    structure: &'static str,
+    structure_detail: String,
 }
 
 fn first_difference(a: &[u8], b: &[u8]) -> String {
@@ -299,6 +306,107 @@ fn revert(file: &File, input: &[u8]) -> (&'static str, String) {
     ("refused", refusals.first().cloned().unwrap_or_default())
 }
 
+/// Texts of the nodes at `paths`, for the value check of a structural round
+/// trip.
+fn texts(file: &File, paths: &[&str]) -> Vec<Option<String>> {
+    paths
+        .iter()
+        .map(|path| current(file, path, "text"))
+        .collect()
+}
+
+/// A structural edit and its inverse on the formats whose structure record
+/// 0293 extended to producer files: XLS inserts a row at the top of the
+/// first sheet and removes it again; PPTX moves the first slide after the
+/// second and back; RTF moves the first body paragraph after the second and
+/// back. The reverted file must read back with the same node texts; whether
+/// its bytes equal the input is reported.
+fn structure(file: &File, input: &[u8]) -> (&'static str, String) {
+    type Forward = fn(&File) -> litchi_ops::Result<File>;
+    type Inverse = fn(&File) -> litchi_ops::Result<File>;
+    let count = |parent: &str, kind: &str| {
+        file.get(parent).map_or(0, |node| {
+            node.children()
+                .filter_map(Result::ok)
+                .filter(|child| child.kind() == kind)
+                .count()
+        })
+    };
+    let (label, checked, forward, inverse): (&str, &[&str], Forward, Inverse) = match file.format()
+    {
+        Some(FileFormat::Xls) => {
+            if count("/", "sheet") == 0 {
+                return ("none", String::new());
+            }
+            (
+                "row add+remove",
+                &["/sheet[1]/row[1]"],
+                |file| {
+                    file.add("/sheet[1]", NewNode::new("row").at(Placement::Start))
+                        .map(|added| added.file)
+                },
+                |file| file.remove("/sheet[1]/row[1]"),
+            )
+        },
+        Some(FileFormat::Pptx) => {
+            if count("/", "slide") < 2 {
+                return ("none", String::new());
+            }
+            (
+                "slide move+back",
+                &["/slide[1]", "/slide[2]"],
+                |file| file.move_to("/slide[1]", Placement::after("/slide[2]")?),
+                |file| file.move_to("/slide[2]", Placement::Start),
+            )
+        },
+        Some(FileFormat::Rtf) => {
+            if count("/body", "paragraph") < 2 {
+                return ("none", String::new());
+            }
+            (
+                "paragraph move+back",
+                &["/body/p[1]", "/body/p[2]"],
+                |file| file.move_to("/body/p[1]", Placement::after("/body/p[2]")?),
+                |file| file.move_to("/body/p[2]", Placement::before("/body/p[1]")?),
+            )
+        },
+        _ => return ("-", String::new()),
+    };
+    let original = catch_unwind(AssertUnwindSafe(|| texts(file, checked))).unwrap_or_default();
+    let changed = match guarded(|| forward(file)) {
+        Ok(changed) => changed,
+        Err(error) if untyped(&error) => return ("mismatch", format!("{label}: {error}")),
+        Err(error) => return ("refused", format!("{label}: {error}")),
+    };
+    let result = guarded(|| {
+        let reverted = inverse(&changed)?;
+        let bytes = reverted.to_bytes()?;
+        let reopened = litchi_ops::open_bytes(bytes.clone())?;
+        Ok((bytes, texts(&reopened, checked)))
+    });
+    match result {
+        Ok((bytes, values)) if values == original => {
+            if bytes == input {
+                ("byte-exact", label.to_owned())
+            } else {
+                (
+                    "value-exact",
+                    format!("{label}: {}", first_difference(input, &bytes)),
+                )
+            }
+        },
+        Ok((_, values)) => (
+            "mismatch",
+            format!("{label}: reopened {values:?}, expected {original:?}"),
+        ),
+        Err(error) if untyped(&error) => ("mismatch", format!("{label}: inverse {error}")),
+        Err(error) => (
+            "one-way",
+            format!("{label}: the inverse is refused: {error}"),
+        ),
+    }
+}
+
 /// The result of one file, or the open error for a file the unified layer
 /// does not open as a claimed format.
 fn run(relative: &str, dir: &Path) -> Result<Outcome, String> {
@@ -320,6 +428,8 @@ fn run(relative: &str, dir: &Path) -> Result<Outcome, String> {
         detail,
         revert,
         revert_detail,
+        structure: "-",
+        structure_detail: String::new(),
     };
     if let File::Locked(_) = file {
         return Ok(outcome("locked", String::new(), "-", String::new()));
@@ -354,7 +464,16 @@ fn run(relative: &str, dir: &Path) -> Result<Outcome, String> {
     } else {
         ("-", String::new())
     };
-    Ok(outcome(noop, detail, revert, revert_detail))
+    let (structure, structure_detail) = if noop == "exact" {
+        structure(&file, &input)
+    } else {
+        ("-", String::new())
+    };
+    Ok(Outcome {
+        structure,
+        structure_detail,
+        ..outcome(noop, detail, revert, revert_detail)
+    })
 }
 
 /// Extensions of the claimed formats and their flat and template variants,
@@ -413,6 +532,18 @@ fn open_empty_edit_save_is_byte_identical() {
                 _ => "revert -",
             })
             .or_default() += 1;
+        if outcome.structure != "-" {
+            *entry
+                .entry(match outcome.structure {
+                    "byte-exact" => "structure byte-exact",
+                    "value-exact" => "structure value-exact",
+                    "mismatch" => "structure mismatch",
+                    "one-way" => "structure one-way",
+                    "refused" => "structure refused",
+                    _ => "structure none",
+                })
+                .or_default() += 1;
+        }
     }
     let columns = [
         "exact",
@@ -429,9 +560,15 @@ fn open_empty_edit_save_is_byte_identical() {
         "revert one-way",
         "revert refused",
         "revert none",
+        "structure byte-exact",
+        "structure value-exact",
+        "structure mismatch",
+        "structure one-way",
+        "structure refused",
+        "structure none",
     ];
     let mut markdown = format!(
-        "# Corpus fidelity (record 0289, generated)\n\n\
+        "# Corpus fidelity (records 0289 and 0293, generated)\n\n\
          Generated by `crates/litchi-ops/tests/corpus_fidelity.rs` over every file\n\
          under `test-data/` that opens as a claimed format; rewrite with\n\
          `LITCHI_BLESS=1`. `exact`: open → empty edit → save is byte-identical;\n\
@@ -441,7 +578,12 @@ fn open_empty_edit_save_is_byte_identical() {
          set one text property and set it back; `byte-exact` also matches the\n\
          input bytes, `value-exact` only the value, `one-way` the set back was\n\
          refused (typed), `refused` every candidate set was refused (typed),\n\
-         `none` no settable text within 400 nodes.\n\n\
+         `none` no settable text within 400 nodes. Structure (record 0293,\n\
+         XLS, PPTX and RTF only): insert a row at the top of the first sheet\n\
+         and remove it, or move the first slide or body paragraph after the\n\
+         second and back; `byte-exact` also matches the input bytes,\n\
+         `value-exact` only the moved nodes' text, `refused` the forward edit\n\
+         was refused (typed), `none` nothing to move.\n\n\
          | format | {} |\n|---|{}\n",
         columns.join(" | "),
         "---|".repeat(columns.len())
@@ -480,27 +622,33 @@ fn open_empty_edit_save_is_byte_identical() {
         let _ = writeln!(markdown, "| {extension} | {} |", codes.join(", "));
     }
     markdown.push_str("\n## Every no-op that is not exact, and every revert that is not exact\n\n");
-    let mut tsv = String::from("file\tformat\tnoop\tdetail\trevert\trevert_detail\n");
+    let mut tsv = String::from(
+        "file\tformat\tnoop\tdetail\trevert\trevert_detail\tstructure\tstructure_detail\n",
+    );
     let mut unexpected = Vec::new();
     for (relative, outcome) in &outcomes {
         let _ = writeln!(
             tsv,
-            "{relative}\t{}\t{}\t{}\t{}\t{}",
+            "{relative}\t{}\t{}\t{}\t{}\t{}\t{}\t{}",
             outcome.format,
             outcome.noop,
             clean(&outcome.detail),
             outcome.revert,
-            clean(&outcome.revert_detail)
+            clean(&outcome.revert_detail),
+            outcome.structure,
+            clean(&outcome.structure_detail)
         );
         let save_only_differs = outcome.detail.contains("save-only DIFFERS");
         let bad = matches!(
             outcome.noop,
             "differs" | "error" | "signed-differs" | "signed-error"
         ) || save_only_differs
-            || outcome.revert == "mismatch";
+            || outcome.revert == "mismatch"
+            || outcome.structure == "mismatch";
         if bad
             || !matches!(outcome.noop, "exact" | "signed-exact" | "locked")
             || outcome.revert == "one-way"
+            || outcome.structure == "one-way"
         {
             let _ = writeln!(
                 markdown,
@@ -514,6 +662,12 @@ fn open_empty_edit_save_is_byte_identical() {
                         outcome.revert,
                         clean(&outcome.revert_detail)
                     )
+                } else if matches!(outcome.structure, "mismatch" | "one-way") {
+                    format!(
+                        "; structure {}: {}",
+                        outcome.structure,
+                        clean(&outcome.structure_detail)
+                    )
                 } else {
                     String::new()
                 }
@@ -525,8 +679,12 @@ fn open_empty_edit_save_is_byte_identical() {
                 .any(|(format, _)| *format == outcome.format)
         {
             unexpected.push(format!(
-                "{relative} ({}): {} {} {}",
-                outcome.format, outcome.noop, outcome.detail, outcome.revert_detail
+                "{relative} ({}): {} {} {} {}",
+                outcome.format,
+                outcome.noop,
+                outcome.detail,
+                outcome.revert_detail,
+                outcome.structure_detail
             ));
         }
     }

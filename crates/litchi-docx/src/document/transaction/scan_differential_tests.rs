@@ -417,3 +417,28 @@ fn an_exact_no_op_commit_still_shares_its_source_allocation() {
         base.xml_bytes()
     ));
 }
+
+/// Record 0293: producers import `w:altChunk` content after the body-final
+/// section properties. That tail is admitted as untouched bytes outside the
+/// content region; body content after the section properties stays refused.
+#[test]
+fn an_alt_chunk_after_the_final_section_properties_is_an_untouched_tail() {
+    let admitted = document(r#"<w:p/><w:sectPr/><w:altChunk r:id="rId9" xmlns:r="urn:r"/>"#);
+    let verdict = assert_scan_parity(&admitted);
+    assert!(verdict.starts_with("ok "), "{verdict}");
+    let layout = scan_document(&admitted).unwrap();
+    let section = admitted
+        .windows(b"<w:sectPr/>".len())
+        .position(|window| window == b"<w:sectPr/>")
+        .unwrap();
+    assert_eq!(layout.content_end as usize, section);
+
+    for refused in [
+        document("<w:p/><w:sectPr/><w:p/>"),
+        document("<w:sectPr/><w:tbl/>"),
+        document("<w:sectPr></w:sectPr><w:sdt></w:sdt>"),
+    ] {
+        let verdict = assert_scan_parity(&refused);
+        assert!(verdict.contains("not the final body child"), "{verdict}");
+    }
+}
