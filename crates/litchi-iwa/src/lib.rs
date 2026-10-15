@@ -99,7 +99,7 @@
 //! ```rust,no_run
 //! use litchi_numbers::Workbook;
 //!
-//! let doc = Document::open("spreadsheet.numbers")?;
+//! let doc = Workbook::open("spreadsheet.numbers")?;
 //!
 //! for sheet in doc.sheets() {
 //!     for table in sheet.tables() {
