@@ -643,12 +643,6 @@ pub(super) fn insertion(
     Ok(position)
 }
 
-/// The rendered path of item `index` in `file`'s tree.
-fn path_of(file: &Iwork, index: u32) -> Result<Path<'static>> {
-    let rendered = crate::node::NodePath::new(file.tree().item(index).path()).to_string();
-    Ok(Path::parse(&rendered)?.into_owned())
-}
-
 /// The slide a drawable add targets and its new-drawable request.
 pub(super) struct DrawableRequest {
     pub(super) add: Add,
@@ -901,14 +895,24 @@ pub(crate) fn add(
             }
             let slide = parent_node.item().leaf()[0] as usize;
             let request = drawable_request(slide, node, limits)?;
+            let element = request.element;
+            // A new drawable joins the end of its slide's drawables: its
+            // ordinal among the slide's elements of its kind is their count.
+            let tree = file.tree();
+            let ordinal = tree
+                .item(parent_node.index())
+                .children()
+                .iter()
+                .filter(|child| tree.item(**child).type_name() == element)
+                .count();
             let mut pending = Pending::default();
             pending.stage_add(request.add, 0);
             let (commit, published) = publish(file, package, pending, 1, limits)?;
-            let created = published
-                .created
-                .first()
-                .ok_or_else(|| refusal(Code::InternalError, "the new drawable is missing"))?;
-            let path = drawable_path(&commit.after, slide, created.drawable().as_index())?;
+            if published.created.is_empty() {
+                return Err(refusal(Code::InternalError, "the new drawable is missing"));
+            }
+            let path = Path::parse(&format!("/slide[{}]/{element}[{}]", slide + 1, ordinal + 1))?
+                .into_owned();
             Ok((commit, path))
         },
         ("placeholder" | "notes" | "shape", "p" | "paragraph") => {
@@ -949,28 +953,6 @@ pub(crate) fn add(
         ("slide", other) => Err(add_gap(other)),
         _ => Err(element_refusal("add", &parent_node)),
     }
-}
-
-/// The path of the drawable at `drawable` of `slide` in `file`'s tree.
-pub(super) fn drawable_path(file: &Iwork, slide: usize, drawable: usize) -> Result<Path<'static>> {
-    let tree = file.tree();
-    let slide_item = *tree
-        .item(super::ROOT)
-        .children()
-        .get(slide)
-        .ok_or_else(|| refusal(Code::InternalError, "the slide is missing"))?;
-    let index = tree
-        .item(slide_item)
-        .children()
-        .iter()
-        .copied()
-        .find(|child| {
-            let item = tree.item(*child);
-            let leaf = item.leaf().map(|value| value as usize);
-            leaf[1] == DRAWABLE && leaf[3] == drawable && item.type_name() != "paragraph"
-        })
-        .ok_or_else(|| refusal(Code::InternalError, "the new drawable is missing"))?;
-    path_of(file, index)
 }
 
 /// The line of the paragraph at `anchor`, which must belong to `text`.
