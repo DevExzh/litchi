@@ -621,6 +621,19 @@ The coordinator's Claude process stalled and exited while seven agents (wave R7 
   - empty-edit refusals 21 → 19; no regressions.
 - Disk incidents (free disk at 22 GB and then 13 GB): agent and gate build directories are pruned aggressively. Most of the disk is held by the performance program's build directory in the main checkout, outside this program.
 
+- Merged `perf-path` (0291):
+  - ODB single set 1.35× → 1.00×;
+  - compile-time path-lookup index;
+  - per-thread RTF plan cache (fan-out 1.13–1.28×);
+  - walker fast path and borrowed selectors: ODS warm cell −20%, ODT −15%, XLS get −23% instructions.
+  - Miss: DOCX single set 1.11–1.12×. The remaining 7.7 K instructions are in `litchi-core` `Path::parse`, DOCX handle allocation and admission.
+  - Fix at merge: the 0296 NUMBERS vocabulary gains the alias index.
+- Merged `odf-verbs` (0292):
+  - ODG/ODC/ODI/ODB/formula move/swap/add/remove are element-level (new leaf `move_shape_to_page`, `move_{table,column,query}`);
+  - `.fodt`/`.fodg` open (46/46 and 3/5);
+  - flat ODT/ODS/ODP/ODG edits write back only the changed elements; flat fidelity refusals 71 → 0.
+  - Open: G-ODP-1, flat member-adding edits, flat ODC/ODI/ODB/formula.
+
 ## M6 — iWork (2026-10-15)
 - Merged `iwork-found` (0296, owner decisions D1/D2):
   - the iWork-free gate is removed; the `pages`, `keynote` and `numbers` features carry their leaf edges (ADR 0024 amendment), and `litchi-ops`/`litchi-cli` leave the non-iWork bulk lane (48 → 46);
