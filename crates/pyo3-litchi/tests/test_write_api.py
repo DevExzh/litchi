@@ -151,6 +151,19 @@ class CreateTests(WriteAssertions):
                 error = raised(lambda: L.create(name))
                 self.assertIsInstance(error, L.UnsupportedError)
 
+    def test_iwork_writes_round_trip(self):
+        # Record 0296: the iWork leaves' focused writes through litchi_py.
+        pages = L.open(fixture("iwork/pages/body-sections-unicode.pages"))
+        edited = pages.set("/body/p[2]", {"text": "From Python"})
+        self.assertEqual(L.open_bytes(edited.to_bytes()).get("/body/p[2]", 0)["text"], "From Python")
+        numbers = L.open(fixture("iwork/numbers/basic.numbers"))
+        edited = numbers.set("/sheet[1]/table[1]/B3", {"value": 12})
+        cell = L.open_bytes(edited.to_bytes()).get("/sheet[1]/table[1]/B3", 0)
+        self.assertEqual(cell["format"]["value"], 12)
+        keynote = L.open(fixture("iwork/keynote/basic.key"))
+        edited = keynote.set("/slide[1]", {"hidden": True})
+        self.assertTrue(L.open_bytes(edited.to_bytes()).get("/slide[1]", 0)["format"]["hidden"])
+
     def test_a_created_file_has_no_path(self):
         error = raised(lambda: L.create("docx").save())
         self.assertError(error, L.IoError, "file_required")

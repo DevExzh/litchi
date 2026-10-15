@@ -141,6 +141,9 @@ Topology (ADR 0002, ADR 0024):
   `litchi-ops` like the facade (safe and unsafe feature closures) instead of
   as a bulk root. That reclassification is part of the change that adds the
   first iWork edge.
+  *Done in record 0296 (owner decision D1, 2026-10-15): `litchi-ops` and
+  `litchi-cli` left the bulk slice as the iWork-capable unified layer; see
+  the ADR 0024 amendment of that date.*
 
 Format features of `litchi-ops` mirror the facade's per-format features; they
 are inert until the corresponding leaf edge exists.

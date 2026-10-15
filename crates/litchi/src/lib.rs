@@ -170,10 +170,12 @@
 //!
 //! # Apple iWork
 //!
-//! Pages, Keynote and Numbers documents are read through the `iwork` module
-//! (the `iwork` feature). [`open`] recognizes them and refuses them with
-//! [`Code::UnsupportedFormat`] and a suggestion to use
-//! `litchi::iwork::Document::open`.
+//! Pages, Keynote and Numbers packages open through [`open`] as
+//! `File::Pages`, `File::Keynote` and `File::Numbers` (the `pages`, `keynote`
+//! and `numbers` features): paths, queries, views, the leaves' focused writes
+//! and atomic saves, like every other format (record 0296). An app-authored
+//! package *directory* is refused with [`Code::UnsupportedFormat`]; the
+//! read-only `litchi::iwork::Document` (the `iwork` feature) reads it.
 //!
 //! # Unified operations
 //!

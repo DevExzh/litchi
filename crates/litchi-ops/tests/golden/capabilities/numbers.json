@@ -1,0 +1,412 @@
+{
+  "format": "numbers",
+  "state": "open",
+  "verbs": {
+    "get": {
+      "supported": true
+    },
+    "find": {
+      "supported": true
+    },
+    "query": {
+      "supported": true
+    },
+    "view": {
+      "supported": true
+    },
+    "evaluate": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "none: import and evaluation are worksheet operations",
+      "reason": "this format has no worksheets"
+    },
+    "set": {
+      "supported": true
+    },
+    "add": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "IWORK_API_REQUESTS.md",
+      "reason": "the iWork leaf has no such structural transaction yet"
+    },
+    "remove": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "IWORK_API_REQUESTS.md",
+      "reason": "the iWork leaf has no such structural transaction yet"
+    },
+    "move": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "IWORK_API_REQUESTS.md",
+      "reason": "the iWork leaf has no such structural transaction yet"
+    },
+    "swap": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "IWORK_API_REQUESTS.md",
+      "reason": "the iWork leaf has no such structural transaction yet"
+    },
+    "edit": {
+      "supported": true
+    },
+    "batch": {
+      "supported": true
+    },
+    "import": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "none: import and evaluation are worksheet operations",
+      "reason": "this format has no worksheets"
+    },
+    "merge": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "template merge for XLSB and the legacy, RTF and ODF formats (record 0274 F1)",
+      "reason": "template merge fills DOCX, PPTX and XLSX templates"
+    },
+    "replace": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "record 0273 follow-up: a find adapter over the format's run-level text edits",
+      "reason": "find/replace is not integrated for this format"
+    },
+    "refresh": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "field refresh for the legacy, RTF and ODF formats (record 0279 follow-up)",
+      "reason": "field refresh recomputes DOCX fields, PPTX slide fields and workbook formulas"
+    },
+    "save": {
+      "supported": true
+    },
+    "create": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "IWORK_API_REQUESTS.md request 1",
+      "reason": "the iWork leaves have no from-scratch package builder"
+    }
+  },
+  "views": {
+    "text": {
+      "supported": true
+    },
+    "annotated": {
+      "supported": true
+    },
+    "outline": {
+      "supported": true
+    },
+    "stats": {
+      "supported": true
+    },
+    "issues": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    "forms": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    "html": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "svg": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "screenshot": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "pdf": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    }
+  },
+  "elements": [
+    {
+      "format": "numbers",
+      "element": "workbook",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/"
+        ]
+      },
+      "children": [
+        {
+          "element": "sheet",
+          "pathSegment": "sheet"
+        }
+      ],
+      "properties": {
+        "sheetCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      }
+    },
+    {
+      "format": "numbers",
+      "element": "sheet",
+      "parent": "workbook",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/<sheet name>"
+        ],
+        "positional": [
+          "/sheet[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "table",
+          "pathSegment": "table"
+        }
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "tableCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "numbers",
+      "element": "table",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/<sheet name>/<table name>"
+        ],
+        "positional": [
+          "/sheet[N]/table[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "cell",
+          "pathSegment": "A1"
+        }
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "rowCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "columnCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "numbers",
+      "element": "cell",
+      "parent": "table",
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/sheet[N]/table[N]/A1"
+        ]
+      },
+      "properties": {
+        "type": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "value": {
+          "type": "scalar",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "formula": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type",
+          "value"
+        ]
+      }
+    }
+  ],
+  "gaps": [
+    {
+      "subject": "element",
+      "element": "row",
+      "code": "unsupported_capability",
+      "followUp": "0299 Numbers rows and columns (IWORK_API_REQUESTS.md request 6)",
+      "reason": "rows and columns are table coordinates here; the leaf's row and column insertion and deletion are not package transactions yet"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "font.bold",
+      "code": "unsupported_capability",
+      "followUp": "IWORK_API_REQUESTS.md request 7",
+      "reason": "the Numbers leaf has no cell text-style transaction"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "cell",
+      "context": "a formula",
+      "code": "unsupported_capability",
+      "followUp": "0299 Numbers formula writes",
+      "reason": "the leaf's formula authoring is not wired; `value` writes text, numbers and booleans"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "sheet",
+      "context": "a new sheet",
+      "code": "unsupported_capability",
+      "followUp": "IWORK_API_REQUESTS.md request 4",
+      "reason": "the Numbers leaf has no sheet lifecycle transaction"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "table",
+      "context": "a new table",
+      "code": "unsupported_capability",
+      "followUp": "IWORK_API_REQUESTS.md request 5",
+      "reason": "the Numbers leaf has no table lifecycle transaction"
+    },
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "workbook",
+      "context": "a workbook from scratch",
+      "code": "unsupported_capability",
+      "followUp": "IWORK_API_REQUESTS.md request 1",
+      "reason": "the Numbers leaf has no from-scratch package builder"
+    },
+    {
+      "subject": "view",
+      "mode": "issues",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "forms",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "html",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "svg",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "screenshot",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "pdf",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    }
+  ]
+}

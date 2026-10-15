@@ -77,8 +77,9 @@ The unified reader covers .docx, .xlsx, .pptx, .xlsb, .doc, .xls, .ppt and
 .rtf; .odt, .ods and .odp open and answer `text()`, `metadata()` and
 `capabilities()`, while their `get`, `find`, `query` and `view` raise
 `UnsupportedError` (`unsupported_capability`) until their readers land, as
-`capabilities()` reports. Apple iWork files are read by the family classes
-below.
+`capabilities()` reports. Apple Pages, Keynote and Numbers packages open as
+`File` too (record 0296); an app-authored iWork package directory is read by
+the family classes below.
 
 ### Editing
 

@@ -56,16 +56,6 @@ impl ZipTail for IworkTail {
     }
 }
 
-/// Classify an iWork package directory, which the unified openers' file
-/// route cannot read as a single positional source. Only the iWork formats
-/// this build enables are named.
-pub(crate) fn classify_directory(path: &std::path::Path) -> Option<FileFormat> {
-    match litchi_iwa_detect::path(path) {
-        Ok(Some(format)) => iwork_format(format),
-        _ => None,
-    }
-}
-
 #[allow(
     unreachable_patterns,
     reason = "match arms are feature-gated; some are unreachable depending on the enabled features"

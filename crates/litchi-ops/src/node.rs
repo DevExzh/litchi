@@ -68,6 +68,8 @@ macro_rules! dispatch {
             Node::Odp($inner) => $body,
             #[cfg(feature = "odf-objects")]
             Node::Object($inner) => $body,
+            #[cfg(feature = "iwork-adapter")]
+            Node::Iwork($inner) => $body,
             #[cfg(any(test, feature = "test-support"))]
             Node::Fake($inner) => $body,
             #[cfg(not(any(
@@ -83,6 +85,7 @@ macro_rules! dispatch {
                 feature = "ods",
                 feature = "odp",
                 feature = "odf-objects",
+                feature = "iwork-adapter",
                 test,
                 feature = "test-support"
             )))]
@@ -149,7 +152,8 @@ pub(crate) use view::Project;
     feature = "ods",
     feature = "odt",
     feature = "odp",
-    feature = "odf-objects"
+    feature = "odf-objects",
+    feature = "iwork-adapter"
 ))]
 pub(crate) use view::Source;
 pub use view::{
@@ -217,6 +221,10 @@ pub enum Node<'f> {
     /// (object-tree adapter, record 0282).
     #[cfg(feature = "odf-objects")]
     Object(crate::format::odf_tree::Node<'f>),
+    /// An Apple Pages, Keynote or Numbers node (iWork object-tree adapter,
+    /// record 0296).
+    #[cfg(feature = "iwork-adapter")]
+    Iwork(crate::format::iwork::Node<'f>),
     /// A node of the test-only fake format.
     #[cfg(any(test, feature = "test-support"))]
     #[doc(hidden)]
@@ -235,6 +243,7 @@ pub enum Node<'f> {
         feature = "ods",
         feature = "odp",
         feature = "odf-objects",
+        feature = "iwork-adapter",
         test,
         feature = "test-support"
     )))]
@@ -424,6 +433,17 @@ impl<'f> Node<'f> {
     pub fn as_rtf(&self) -> Option<&crate::format::rtf::Node<'f>> {
         match self {
             Self::Rtf(node) => Some(node),
+            #[allow(unreachable_patterns, reason = "format variants depend on features")]
+            _ => None,
+        }
+    }
+
+    /// Borrow the typed iWork node (Pages, Keynote, Numbers; record 0296).
+    #[cfg(feature = "iwork-adapter")]
+    #[must_use]
+    pub fn as_iwork(&self) -> Option<&crate::format::iwork::Node<'f>> {
+        match self {
+            Self::Iwork(node) => Some(node),
             #[allow(unreachable_patterns, reason = "format variants depend on features")]
             _ => None,
         }

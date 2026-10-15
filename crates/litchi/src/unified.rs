@@ -1,15 +1,13 @@
 //! The facade's entry points into the unified operations API (ADR 0033).
 //!
-//! `litchi-ops` owns [`File`](crate::File) and its single-pass openers, but it must stay
-//! free of iWork crates (`tools/non_iwork_gate.py`), so on its own it cannot
-//! name a Pages, Keynote or Numbers package. These openers hand it the
-//! facade's iWork ZIP classifier, the lowest-precedence candidate the
-//! facade's detection functions also use. An iWork input is then refused
-//! with [`Code::UnsupportedFormat`](crate::Code::UnsupportedFormat), its
-//! detected format and a suggestion to open it with
-//! `litchi::iwork::Document::open`, instead of being reported as
-//! unrecognized. Every other input opens exactly as `litchi_ops::open` opens
-//! it.
+//! `litchi-ops` owns [`File`](crate::File) and its single-pass openers, and
+//! since record 0296 (owner decision D1) it opens Apple Pages, Keynote and
+//! Numbers packages itself, as `File::Pages`, `File::Keynote` and
+//! `File::Numbers`. These openers are `litchi_ops::open` with one facade
+//! refinement: an iWork input the unified `File` cannot hold (an
+//! app-authored package directory) is refused with a suggestion that names
+//! the facade's read-only `litchi::iwork::Document`, or the `iwork` cargo
+//! feature that builds it.
 
 use std::path::Path;
 
@@ -25,8 +23,6 @@ use litchi_core::FileFormat;
 use litchi_ops::Code;
 use litchi_ops::{Error, File, OpenOptions, Result};
 
-use crate::detection_smart::FacadeTail;
-
 /// Open the file at `path`, detecting its format from the content.
 ///
 /// One detection pass classifies the file and builds the owner its format
@@ -39,9 +35,9 @@ use crate::detection_smart::FacadeTail;
 /// Returns [`Code::FileNotFound`](crate::Code::FileNotFound) when the path
 /// does not exist, [`Code::UnsupportedFormat`](crate::Code::UnsupportedFormat)
 /// for an input that is not an Office file (with no
-/// [`detected`](Error::detected) format), for an Apple iWork package or
-/// package directory (with the iWork format and a suggestion), and for a
-/// format whose cargo feature is off (with the format and a suggestion),
+/// [`detected`](Error::detected) format), for an Apple iWork package
+/// directory (with the iWork format and a suggestion), and for a format
+/// whose cargo feature is off (with the format and a suggestion),
 /// [`Code::LimitExceeded`](crate::Code::LimitExceeded) when the input
 /// exceeds a read limit, and the format's typed error when its container
 /// cannot be read.
@@ -82,8 +78,7 @@ pub fn open(path: impl AsRef<Path>) -> Result<File> {
 /// # Ok::<(), litchi::Error>(())
 /// ```
 pub fn open_with(path: impl AsRef<Path>, options: &OpenOptions) -> Result<File> {
-    let path = path.as_ref();
-    litchi_ops::open_with_tail(path, options, &FacadeTail).map_err(|error| refuse_path(path, error))
+    litchi_ops::open_with(path, options).map_err(refuse)
 }
 
 /// Open an in-memory input, detecting its format from the content.
@@ -119,26 +114,12 @@ pub fn open_bytes(bytes: impl Into<Vec<u8>>) -> Result<File> {
 /// assert_eq!(error.code(), Code::LimitExceeded);
 /// ```
 pub fn open_bytes_with(bytes: impl Into<Vec<u8>>, options: &OpenOptions) -> Result<File> {
-    litchi_ops::open_bytes_with_tail(bytes, options, &FacadeTail).map_err(refuse)
+    litchi_ops::open_bytes_with(bytes, options).map_err(refuse)
 }
 
-/// Finish a refusal of the input at `path`. The file route reads one
-/// positional source, so it refuses an iWork package directory as an I/O
-/// error; that directory is named here, on the error path only.
-fn refuse_path(path: &Path, error: Error) -> Error {
-    #[cfg(any(feature = "pages", feature = "keynote", feature = "numbers"))]
-    if path.is_dir()
-        && let Some(format) = crate::detection_smart::iwork_tail::classify_directory(path)
-    {
-        return refuse(Error::iwork_unsupported(format));
-    }
-    #[cfg(not(any(feature = "pages", feature = "keynote", feature = "numbers")))]
-    let _ = path;
-    refuse(error)
-}
-
-/// Finish a refusal: the iWork suggestion names `litchi::iwork`, which only
-/// the aggregate `iwork` feature builds, so a build without it says so.
+/// Finish a refusal: the suggestion for an iWork package directory names
+/// `litchi::iwork`, which only the aggregate `iwork` feature builds, so a
+/// build without it says so.
 fn refuse(error: Error) -> Error {
     #[cfg(all(
         any(feature = "pages", feature = "keynote", feature = "numbers"),
@@ -149,6 +130,9 @@ fn refuse(error: Error) -> Error {
             error.detected(),
             Some(FileFormat::Pages | FileFormat::Keynote | FileFormat::Numbers)
         )
+        && error
+            .suggestion()
+            .is_some_and(|suggestion| suggestion.contains("litchi::iwork"))
     {
         return error.with_suggestion(
             "enable the `iwork` cargo feature and open the file with `litchi::iwork::Document::open`",

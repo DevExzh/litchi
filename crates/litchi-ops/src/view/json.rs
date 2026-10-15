@@ -16,7 +16,8 @@
         feature = "ods",
         feature = "odt",
         feature = "odp",
-        feature = "odf-objects"
+        feature = "odf-objects",
+        feature = "iwork-adapter"
     )),
     allow(
         dead_code,
@@ -79,6 +80,8 @@ enum Inner<'f> {
     Odp(crate::format::odp::views::Json),
     #[cfg(feature = "odf-objects")]
     Object(crate::format::odf_tree::views::Json),
+    #[cfg(feature = "iwork-adapter")]
+    Iwork(crate::format::iwork::views::Json),
     /// Keeps `'f` in use; uninhabited.
     #[allow(dead_code, reason = "uninhabited: only keeps the lifetime in use")]
     Never(Infallible, PhantomData<&'f ()>),
@@ -172,6 +175,14 @@ impl Json<'_> {
             inner: Inner::Object(json),
         }
     }
+
+    /// An iWork object-tree view (Pages, Keynote, Numbers).
+    #[cfg(feature = "iwork-adapter")]
+    pub(crate) fn iwork(json: crate::format::iwork::views::Json) -> Self {
+        Self {
+            inner: Inner::Iwork(json),
+        }
+    }
 }
 
 impl Serialize for Json<'_> {
@@ -201,6 +212,8 @@ impl Serialize for Json<'_> {
             Inner::Odp(json) => json.serialize(serializer),
             #[cfg(feature = "odf-objects")]
             Inner::Object(json) => json.serialize(serializer),
+            #[cfg(feature = "iwork-adapter")]
+            Inner::Iwork(json) => json.serialize(serializer),
             Inner::Never(never, _) => match *never {},
         }
     }

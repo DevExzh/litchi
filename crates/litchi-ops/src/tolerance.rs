@@ -78,8 +78,8 @@ pub enum ToleranceReport {
     /// 0282), with the format it was read as.
     #[cfg(feature = "odf-objects")]
     Object(FileFormat, litchi_odf_common::ToleranceReport),
-    /// A format whose reader keeps no repair report (the Apple iWork
-    /// formats, which the `litchi` facade opens outside the unified `File`).
+    /// A format whose reader keeps no repair report: the Apple iWork
+    /// formats (`File::Pages`, `File::Keynote`, `File::Numbers`).
     ///
     /// Conformance is unknown, so such a report is never
     /// [`clean`](ToleranceReport::is_clean); its counts are zero.

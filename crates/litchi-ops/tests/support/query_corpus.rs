@@ -277,6 +277,47 @@ pub(crate) const ODP: &[&str] = &[
     "slideLayout",
 ];
 
+/// Apple Pages selectors (record 0296), recorded from the iWork read
+/// adapter.
+#[cfg(feature = "pages")]
+pub(crate) const PAGES: &[&str] = &[
+    "p",
+    "section",
+    "body > p",
+    "p:contains(e)",
+    "p[section>=2]",
+    "section[paragraphCount>1]",
+    "p[last()]",
+    "p:not(:empty)",
+];
+
+/// Apple Keynote selectors (record 0296).
+#[cfg(feature = "keynote")]
+pub(crate) const KEYNOTE: &[&str] = &[
+    "slide",
+    "placeholder",
+    "notes",
+    "placeholder[type=title]",
+    "slide[hidden=true]",
+    "slide > placeholder",
+    "placeholder:contains(a)",
+    "slide[last()]",
+];
+
+/// Apple Numbers selectors (record 0296).
+#[cfg(feature = "numbers")]
+pub(crate) const NUMBERS: &[&str] = &[
+    "sheet",
+    "table",
+    "cell",
+    "cell[type=number]",
+    "cell[type=text]",
+    "table[rowCount>10]",
+    "cell:contains(a)",
+    "table > cell",
+    "sheet[name~=Sheet]",
+];
+
 /// FNV-1a over two 64-bit lanes with different offsets.
 struct Fnv([u64; 2]);
 
@@ -467,6 +508,12 @@ pub(crate) fn digests(root: &Path) -> BTreeMap<String, String> {
         ("odp", FileFormat::Odp, ODP),
         #[cfg(feature = "odp")]
         ("fodp", FileFormat::Odp, ODP),
+        #[cfg(feature = "pages")]
+        ("pages", FileFormat::Pages, PAGES),
+        #[cfg(feature = "keynote")]
+        ("key", FileFormat::Keynote, KEYNOTE),
+        #[cfg(feature = "numbers")]
+        ("numbers", FileFormat::Numbers, NUMBERS),
     ] {
         let mut hashers: Vec<Fnv> = selectors.iter().map(|_| Fnv::new()).collect();
         let mut counts = vec![0_usize; selectors.len()];

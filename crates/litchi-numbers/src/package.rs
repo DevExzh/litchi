@@ -665,6 +665,39 @@ impl Package {
         Self::from_shared_bytes_with_options(source, options)
     }
 
+    /// Consume a package source prepared by a format coordinator.
+    ///
+    /// This unstable handoff adopts the coordinator's parsed container
+    /// without a second ZIP traversal or IWA component decode, exactly as the
+    /// Pages and Keynote owners' prepared-source ingress does. The source's
+    /// physical profile remains authoritative; `semantic` selects the
+    /// semantic admission limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::NotNumbers`] when the source belongs to another
+    /// application, an [`Error::InvalidFormat`] for a directory-backed or
+    /// semantic-only source, and the errors of [`Self::from_bytes_with_options`]
+    /// when the package cannot become a semantic document.
+    #[cfg(feature = "internal-iwork-source")]
+    #[doc(hidden)]
+    pub fn __from_prepared_source(
+        source: PreparedSource,
+        semantic: SemanticLimits,
+    ) -> Result<Self> {
+        if source.format() != Format::Numbers {
+            return Err(Error::NotNumbers);
+        }
+        let catalog = source.__into_source_catalog().ok_or_else(|| {
+            Error::InvalidFormat(
+                "directory-backed Numbers sources support semantic projection only".to_owned(),
+            )
+        })?;
+        let limits = catalog.limits();
+        let components = Components::PhysicalShared(Box::new(catalog));
+        Self::from_components_with_options(components, ReadOptions::new(limits, semantic))
+    }
+
     fn from_shared_bytes_with_options(source: Arc<[u8]>, options: ReadOptions) -> Result<Self> {
         let components = Components::from_shared_bytes(source, options.archive())?;
         Self::from_components_with_options(components, options)

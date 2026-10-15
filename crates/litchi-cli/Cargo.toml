@@ -27,7 +27,7 @@ doc  = false
 # derive macros, help, usage and error context are all the CLI needs.
 clap        = { version = "4", default-features = false, features = ["derive", "error-context", "help", "std", "usage"] }
 litchi-core = { workspace = true }
-litchi-ops  = { workspace = true, features = ["doc", "docx", "ppt", "pptx", "rtf", "xls", "xlsb", "xlsx", "odt", "ods", "odp", "oth", "odm", "odg", "odc", "odi", "odb", "odf-formula", "eval"] }
+litchi-ops  = { workspace = true, features = ["doc", "docx", "ppt", "pptx", "rtf", "xls", "xlsb", "xlsx", "odt", "ods", "odp", "oth", "odm", "odg", "odc", "odi", "odb", "odf-formula", "pages", "keynote", "numbers", "eval"] }
 serde       = { workspace = true }
 serde_json  = { workspace = true }
 

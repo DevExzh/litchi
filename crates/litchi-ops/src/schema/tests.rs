@@ -1,5 +1,6 @@
 use super::*;
 
+#[cfg(not(feature = "pages"))]
 #[test]
 fn unregistered_formats_export_an_empty_pending_schema() {
     let pages = schema(FileFormat::Pages);

@@ -33,6 +33,9 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | oth | 22 | 205 | 177 | 1 | 21 | 0 | 37 | 26 | 0 |
 | odm | 22 | 205 | 184 | 0 | 17 | 0 | 37 | 26 | 2 |
 | odf | 2 | 18 | 18 | 0 | 0 | 6 | 2 | 0 | 0 |
+| pages | 4 | 25 | 25 | 0 | 0 | 20 | 7 | 0 | 0 |
+| keynote | 4 | 26 | 21 | 1 | 4 | 12 | 10 | 0 | 1 |
+| numbers | 4 | 22 | 22 | 0 | 0 | 20 | 10 | 0 | 0 |
 
 ## docx
 
@@ -541,4 +544,40 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | math | ok | ok | n/a | ok | ok | gap | n/a | gap | gap | ok | ok | ok | ok |
 | element | ok | ok | ok | ok | ok | gap | ok | gap | gap | ok | ok | ok | ok |
+
+## pages
+
+- fixtures: `iwork/pages/body-sections-unicode.pages`, `iwork/pages/basic.pages`
+- document views on `iwork/pages/basic.pages`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
+
+| element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| document | ok | ok | n/a | ok | n/a | gap | gap | gap | gap | n/a | n/a | gap | ok |
+| body | ok | ok | ok | ok | n/a | gap | gap | gap | gap | n/a | n/a | gap | ok |
+| paragraph | ok | ok | ok | ok | ok | gap | gap | gap | gap | ok | ok | gap | ok |
+| section | ok | ok | ok | ok | ok | gap | gap | gap | gap | ok | ok | gap | ok |
+
+## keynote
+
+- fixtures: `iwork/keynote/basic.key`
+- document views on `iwork/keynote/basic.key`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
+
+| element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| presentation | ok | ok | n/a | ok | n/a | gap | n/a | no pair | gap | n/a | n/a | gap | ok |
+| slide | ok | ok | ok | ok | ok | gap | FAIL | no pair | gap | ok | ok | gap | ok |
+| placeholder | ok | ok | ok | ok | ok | gap | n/a | refused | gap | ok | ok | gap | ok |
+| notes | unreached | unreached | unreached | unreached | n/a | gap | n/a | no pair | gap | n/a | n/a | gap | ok |
+
+## numbers
+
+- fixtures: `iwork/numbers/basic.numbers`, `iwork/numbers/cell-value-native.numbers`
+- document views on `iwork/numbers/cell-value-native.numbers`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
+
+| element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| workbook | ok | ok | n/a | ok | n/a | gap | gap | gap | gap | n/a | n/a | gap | ok |
+| sheet | ok | ok | ok | ok | n/a | gap | gap | gap | gap | n/a | n/a | gap | ok |
+| table | ok | ok | ok | ok | n/a | gap | gap | gap | gap | n/a | n/a | gap | ok |
+| cell | ok | ok | ok | ok | ok | gap | gap | gap | gap | ok | ok | gap | ok |
 

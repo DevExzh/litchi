@@ -812,6 +812,35 @@ pub(crate) static MATH: Vocabulary = Vocabulary {
 #[cfg(feature = "odf-formula")]
 const _: () = assert!(well_formed(&MATH) && names_are_aliases(&MATH));
 
+/// Apple Numbers workbooks (record 0296): sheets hold tables, and cells
+/// belong to a table. A sheet or a table is named by the step itself
+/// (`/Sheet 1/Table 1/A1`), and a table's cells are its A1 steps.
+#[cfg(feature = "numbers")]
+pub(crate) static NUMBERS: Vocabulary = Vocabulary {
+    family: Family::Workbook,
+    root: "workbook",
+    aliases: &[("cell", "cell"), ("sheet", "sheet"), ("table", "table")],
+    elements: &[
+        ElementRule::new("cell"),
+        ElementRule::new("sheet").named(Named::First {
+            child: "table",
+            case: Caseless,
+        }),
+        ElementRule::new("table")
+            .ids(&[Identity::new("name", Caseless)])
+            .bare(Bare::Name(Caseless))
+            .cells(),
+        ElementRule::new("workbook").named(Named::First {
+            child: "sheet",
+            case: Caseless,
+        }),
+    ],
+    roots: "/<sheet name>, /sheet[N], /sheet[N]/table[N] (cells as /Sheet 1/Table 1/A1)",
+};
+
+#[cfg(feature = "numbers")]
+const _: () = assert!(well_formed(&NUMBERS) && names_are_aliases(&NUMBERS));
+
 /// Legacy Word and RTF share the semantic path spelling but have no OOXML
 /// paragraph wire identities. Keep the known unsupported concepts for typed
 /// refusals.

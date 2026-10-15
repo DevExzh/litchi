@@ -9,9 +9,9 @@ crate-type = ["cdylib"]
 
 [dependencies]
 
-# The main litchi library. `legacy` is doc, ppt and xls; `iwork` keeps the
-# facade's Pages, Keynote and Numbers readers, which `litchi::File` does not
-# hold until tier 3.
+# The main litchi library. `legacy` is doc, ppt and xls; `iwork` turns on the
+# unified Pages, Keynote and Numbers handles (record 0296) and the facade's
+# semantic readers the family classes use for iWork.
 litchi = { path = "../litchi", default-features = false, features = [
     "legacy",
     "ooxml",

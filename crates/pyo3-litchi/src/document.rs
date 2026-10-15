@@ -23,7 +23,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
 }
 
 /// What a `Document` reads: a unified file of the word-processing family,
-/// or a Pages document, which `litchi::File` does not hold yet.
+/// or a Pages document, which `litchi::File` opens without a family view.
 enum Source {
     File(litchi::File),
     Pages(litchi::pages::semantic::Document),
@@ -62,6 +62,12 @@ pub struct Document {
 impl Document {
     fn read(path: &std::path::Path) -> Result<Source, Failure> {
         match litchi::open(path) {
+            // `litchi::File` opens iWork packages (record 0296), but its
+            // family views do not cover them; this reader keeps the
+            // semantic document's projection.
+            Ok(file) if file.format() == Some(CoreFormat::Pages) => {
+                iwork::open_pages(path).map(Source::Pages)
+            },
             Ok(file) => match file.document() {
                 Ok(_) => Ok(Source::File(file)),
                 Err(error) => Err(Failure::open(&error, Opener::Document)),

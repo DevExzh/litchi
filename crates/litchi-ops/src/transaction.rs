@@ -134,6 +134,8 @@ enum Leaf {
     Odp(Box<crate::format::odp::write::Patch>),
     #[cfg(feature = "odf-objects")]
     Object(Box<crate::format::odf_tree::write::Patch>),
+    #[cfg(feature = "iwork-adapter")]
+    Iwork(Box<crate::format::iwork::write::Patch>),
     #[cfg(feature = "xlsx")]
     Xlsx {
         source: litchi_xlsx::Package,
@@ -515,7 +517,8 @@ impl Edit {
                 feature = "ods",
                 feature = "odt",
                 feature = "odp",
-                feature = "odf-objects"
+                feature = "odf-objects",
+                feature = "iwork-adapter"
             ))]
             let limits = self.limits;
             self.execute(|file| match file {
@@ -577,6 +580,10 @@ impl Edit {
                 | File::Odf(handle) => {
                     wrap_object(handle, handle.set_with_limits(target, props, &limits)?, ())
                 },
+                #[cfg(feature = "iwork-adapter")]
+                File::Pages(handle) | File::Keynote(handle) | File::Numbers(handle) => {
+                    wrap_iwork(handle, handle.set_with_limits(target, props, &limits)?, ())
+                },
                 #[allow(unreachable_patterns)]
                 _ => Err(pending()),
             })
@@ -604,7 +611,8 @@ impl Edit {
             feature = "ods",
             feature = "odt",
             feature = "odp",
-            feature = "odf-objects"
+            feature = "odf-objects",
+            feature = "iwork-adapter"
         ))]
         let limits = self.limits;
         self.execute(|file| match file {
@@ -665,6 +673,12 @@ impl Edit {
                     handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
                 wrap_object(handle, commit, path)
             },
+            #[cfg(feature = "iwork-adapter")]
+            File::Pages(handle) | File::Keynote(handle) | File::Numbers(handle) => {
+                let (commit, path) =
+                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                wrap_iwork(handle, commit, path)
+            },
             #[cfg(feature = "doc")]
             File::Doc(handle) => {
                 let (commit, path) =
@@ -702,7 +716,8 @@ impl Edit {
             feature = "ods",
             feature = "odt",
             feature = "odp",
-            feature = "odf-objects"
+            feature = "odf-objects",
+            feature = "iwork-adapter"
         ))]
         let limits = self.limits;
         self.execute(|file| match file {
@@ -763,6 +778,12 @@ impl Edit {
                 let (commit, path) =
                     handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
                 wrap_object(handle, commit, path)
+            },
+            #[cfg(feature = "iwork-adapter")]
+            File::Pages(handle) | File::Keynote(handle) | File::Numbers(handle) => {
+                let (commit, path) =
+                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                wrap_iwork(handle, commit, path)
             },
             #[cfg(feature = "doc")]
             File::Doc(handle) => {
@@ -833,7 +854,8 @@ impl Edit {
                 feature = "ods",
                 feature = "odt",
                 feature = "odp",
-                feature = "odf-objects"
+                feature = "odf-objects",
+                feature = "iwork-adapter"
             ))]
             let limits = self.limits;
             self.execute(|file| match file {
@@ -894,6 +916,12 @@ impl Edit {
                 | File::Odi(handle)
                 | File::Odb(handle)
                 | File::Odf(handle) => wrap_object(
+                    handle,
+                    handle.remove_with_limits(target.clone(), &limits)?,
+                    (),
+                ),
+                #[cfg(feature = "iwork-adapter")]
+                File::Pages(handle) | File::Keynote(handle) | File::Numbers(handle) => wrap_iwork(
                     handle,
                     handle.remove_with_limits(target.clone(), &limits)?,
                     (),
@@ -1114,7 +1142,8 @@ impl Edit {
             feature = "ods",
             feature = "odt",
             feature = "odp",
-            feature = "odf-objects"
+            feature = "odf-objects",
+            feature = "iwork-adapter"
         ))]
         let limits = self.limits;
         self.execute(|file| match file {
@@ -1183,6 +1212,12 @@ impl Edit {
                 handle.move_to_with_limits(_path.into_path()?, _to.into_placement()?, &limits)?,
                 (),
             ),
+            #[cfg(feature = "iwork-adapter")]
+            File::Pages(handle) | File::Keynote(handle) | File::Numbers(handle) => wrap_iwork(
+                handle,
+                handle.move_to_with_limits(_path.into_path()?, _to.into_placement()?, &limits)?,
+                (),
+            ),
             #[cfg(feature = "doc")]
             File::Doc(handle) => wrap_doc(
                 handle,
@@ -1214,7 +1249,8 @@ impl Edit {
             feature = "ods",
             feature = "odt",
             feature = "odp",
-            feature = "odf-objects"
+            feature = "odf-objects",
+            feature = "iwork-adapter"
         ))]
         let limits = self.limits;
         self.execute(|file| match file {
@@ -1273,6 +1309,12 @@ impl Edit {
             | File::Odi(handle)
             | File::Odb(handle)
             | File::Odf(handle) => wrap_object(
+                handle,
+                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &limits)?,
+                (),
+            ),
+            #[cfg(feature = "iwork-adapter")]
+            File::Pages(handle) | File::Keynote(handle) | File::Numbers(handle) => wrap_iwork(
                 handle,
                 handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &limits)?,
                 (),
@@ -2964,6 +3006,31 @@ fn wrap_object<T>(
     ))
 }
 
+#[cfg(feature = "iwork-adapter")]
+fn wrap_iwork<T>(
+    _before: &crate::format::iwork::Iwork,
+    commit: crate::format::iwork::write::Commit,
+    value: T,
+) -> Result<(Step, T)> {
+    let crate::format::iwork::write::Commit {
+        before,
+        after,
+        patch,
+        operations,
+        snapshot_bytes,
+    } = commit;
+    Ok((
+        Step {
+            before: before.into_file(),
+            after: after.into_file(),
+            leaf: Leaf::Iwork(Box::new(patch)),
+            leaf_operations: operations,
+            snapshot_bytes,
+        },
+        value,
+    ))
+}
+
 #[cfg(feature = "odt")]
 fn wrap_odt<T>(
     _before: &crate::format::odt::Odt,
@@ -3070,6 +3137,19 @@ fn changed(steps: &[Step]) -> Result<bool> {
         }
         return Ok(!before.same_content(after));
     }
+    #[cfg(feature = "iwork-adapter")]
+    if let (Some(before), Some(after)) = (first.before.iwork(), last.after.iwork()) {
+        if let [
+            Step {
+                leaf: Leaf::Iwork(patch),
+                ..
+            },
+        ] = steps
+        {
+            return Ok(!patch.is_noop());
+        }
+        return before.same_content(after).map(|same| !same);
+    }
     #[cfg(feature = "odt")]
     if let (Some(before), Some(after)) = (first.before.odt_family(), last.after.odt_family()) {
         if let [
@@ -3133,6 +3213,10 @@ fn same_snapshot(left: &File, right: &File) -> bool {
         | (File::Odi(left), File::Odi(right))
         | (File::Odb(left), File::Odb(right))
         | (File::Odf(left), File::Odf(right)) => left.same_snapshot(right),
+        #[cfg(feature = "iwork-adapter")]
+        (File::Pages(left), File::Pages(right))
+        | (File::Keynote(left), File::Keynote(right))
+        | (File::Numbers(left), File::Numbers(right)) => left.same_snapshot(right),
         #[cfg(feature = "xls")]
         (File::Xls(left), File::Xls(right)) => left.same_snapshot(right),
         #[cfg(feature = "ppt")]
@@ -3201,6 +3285,8 @@ fn admit(file: &File) -> Result<()> {
         | File::Odi(handle)
         | File::Odb(handle)
         | File::Odf(handle) => handle.admit_edit(),
+        #[cfg(feature = "iwork-adapter")]
+        File::Pages(handle) | File::Keynote(handle) | File::Numbers(handle) => handle.admit_edit(),
         #[cfg(feature = "odp")]
         File::Odp(handle) => handle.admit_edit(),
         _ => check_source(file),
@@ -3246,6 +3332,10 @@ fn check_source(file: &File) -> Result<()> {
         | File::Odi(handle)
         | File::Odb(handle)
         | File::Odf(handle) => handle.check_source(),
+        #[cfg(feature = "iwork-adapter")]
+        File::Pages(handle) | File::Keynote(handle) | File::Numbers(handle) => {
+            handle.check_source()
+        },
         #[cfg(feature = "odp")]
         File::Odp(handle) => handle.check_source(),
         File::Signed(signed) => Err(crate::Error::signed(signed.format())),

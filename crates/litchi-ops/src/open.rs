@@ -139,9 +139,10 @@ pub fn open_bytes_with(bytes: impl Into<Vec<u8>>, options: &OpenOptions) -> Resu
 /// A ZIP input that no other candidate claims (neither an OOXML nor an
 /// OpenDocument package) is handed to `tail`; see
 /// [`detect::tail`](crate::detect::tail). An input the tail names is refused
-/// with [`Error::iwork_unsupported`], with the format the tail reported. The
-/// `litchi` facade passes its iWork classifier here, so that a Pages, Keynote
-/// or Numbers package is reported as such instead of as unrecognized.
+/// with [`Error::iwork_unsupported`], with the format the tail reported.
+/// Apple iWork packages no longer need a tail: in a build with the `pages`,
+/// `keynote` or `numbers` feature, detection classifies them itself, as the
+/// last built-in ZIP candidate before the tail (record 0296).
 ///
 /// # Errors
 ///
@@ -165,9 +166,27 @@ pub fn open_with_tail<T: ZipTail>(
     tail: &T,
 ) -> Result<File> {
     check_cancelled(options)?;
-    let file = path::open(path.as_ref(), options, tail)?;
+    let file = path::open(path.as_ref(), options, tail)
+        .map_err(|error| refuse_directory(path.as_ref(), error))?;
     check_cancelled(options)?;
     Ok(file)
+}
+
+/// Finish a refusal of the input at `path`. The file route reads one
+/// positional source, so an iWork package directory (the app-authored
+/// bundle form) fails there; it is named here, on the error path only. The
+/// iWork leaves edit and save only single-file packages, so the directory
+/// is refused with [`Error::iwork_unsupported`].
+fn refuse_directory(path: &Path, error: Error) -> Error {
+    #[cfg(feature = "iwork-adapter")]
+    if path.is_dir()
+        && let Some(format) = crate::format::iwork::classify_directory(path)
+    {
+        return Error::iwork_unsupported(format);
+    }
+    #[cfg(not(feature = "iwork-adapter"))]
+    let _ = path;
+    error
 }
 
 /// [`open_bytes_with`] with a lowest-precedence ZIP classifier; see
@@ -387,7 +406,8 @@ fn signed_if(file: File, format: FileFormat, signed: bool, origin: crate::Signat
     feature = "ods",
     feature = "odp",
     feature = "odt",
-    feature = "odf-objects"
+    feature = "odf-objects",
+    feature = "iwork-adapter"
 ))]
 pub(crate) fn attach_origin(file: File, origin: Arc<Path>) -> File {
     match file {
@@ -400,6 +420,10 @@ pub(crate) fn attach_origin(file: File, origin: Arc<Path>) -> File {
         #[cfg(feature = "odf-objects")]
         File::Odg(tree) | File::Odc(tree) | File::Odi(tree) | File::Odb(tree) | File::Odf(tree) => {
             tree.with_origin(Some(origin)).into_file()
+        },
+        #[cfg(feature = "iwork-adapter")]
+        File::Pages(iwork) | File::Keynote(iwork) | File::Numbers(iwork) => {
+            iwork.with_origin(Some(origin)).into_file()
         },
         #[cfg(feature = "odp")]
         File::Odp(odp) => File::Odp(odp.with_origin(Some(origin))),

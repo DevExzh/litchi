@@ -437,6 +437,9 @@ pub enum Source {
     /// LaTeX.
     #[cfg(feature = "formula")]
     Formula(litchi_formula::FormulaError),
+    /// A Pages, Keynote or Numbers leaf error (record 0296).
+    #[cfg(feature = "iwork-adapter")]
+    Iwork(crate::format::iwork::LeafError),
 }
 
 // Leaf diagnostic payloads can contain authored document text. Typed access
@@ -538,6 +541,8 @@ impl Source {
             Self::Odf(error) => Some(error),
             #[cfg(feature = "formula")]
             Self::Formula(error) => Some(error),
+            #[cfg(feature = "iwork-adapter")]
+            Self::Iwork(error) => Some(error),
         }
     }
 }
@@ -612,8 +617,11 @@ impl Error {
         error
     }
 
-    /// Reports an iWork input (Pages, Keynote or Numbers) given to the unified
-    /// opener, which does not handle iWork in this release.
+    /// Reports an iWork input (Pages, Keynote or Numbers) the unified `File`
+    /// cannot hold: an app-authored package directory, which the leaves
+    /// neither edit nor save, or a package a caller's ZIP tail named. The
+    /// suggestion names the read-only `litchi::iwork::Document`, which reads
+    /// both.
     #[must_use]
     pub fn iwork_unsupported(detected: FileFormat) -> Self {
         Self::unsupported_format(Some(detected)).with_suggestion(IWORK_SUGGESTION)
@@ -2221,6 +2229,14 @@ from_leaf!(
     litchi_crypto::ooxml::Error => Crypto, None
 );
 from_leaf!(#[cfg(feature = "formula")] litchi_formula::FormulaError => Formula, None);
+from_leaf!(#[cfg(feature = "iwork-adapter")] crate::format::iwork::LeafError => Iwork, None);
+
+#[cfg(feature = "iwork-adapter")]
+impl Classify for crate::format::iwork::LeafError {
+    fn classify(&self) -> Class {
+        Class::of(self.code())
+    }
+}
 
 #[cfg(test)]
 mod tests;

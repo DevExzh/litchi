@@ -1,9 +1,10 @@
 //! The facade's unified entry point: `litchi::open` and `litchi::File`
 //! (ADR 0033, M0a step S7).
 //!
-//! The root names the `litchi-ops` API; `open` and `open_bytes` refuse Apple
-//! iWork inputs with their detected format and a suggestion instead of
-//! reporting them as unrecognized; and the reads the facade's format-family
+//! The root names the `litchi-ops` API; `open` and `open_bytes` open Apple
+//! iWork packages as `File` variants (record 0296) and refuse an iWork
+//! package directory with its detected format and a suggestion; and the
+//! reads the facade's format-family
 //! types offered (tolerance reports, PPTX slide catalogs and sizes) come
 //! from the format handles with the same values.
 //!
@@ -187,30 +188,28 @@ fn assert_iwork_refused(error: &litchi::Error, format: FileFormat) {
 
 #[cfg(any(feature = "pages", feature = "keynote", feature = "numbers"))]
 #[test]
-fn iwork_packages_are_refused_with_their_format_on_every_route() {
+fn iwork_packages_open_as_file_variants_on_every_route() {
     let eager = litchi::OpenOptions::new().source_mode(litchi::SourceMode::Eager);
     let fixtures = iwork_fixtures();
     assert!(!fixtures.is_empty());
     for (format, package, _) in fixtures {
         assert!(package.is_file(), "{}", package.display());
         let bytes = std::fs::read(&package).unwrap();
-        for error in [
-            litchi::open(&package).unwrap_err(),
-            litchi::open_with(&package, &eager).unwrap_err(),
-            litchi::open_bytes(bytes.clone()).unwrap_err(),
-            litchi::open_bytes_with(bytes, &eager).unwrap_err(),
+        for file in [
+            litchi::open(&package).unwrap(),
+            litchi::open_with(&package, &eager).unwrap(),
+            litchi::open_bytes(bytes.clone()).unwrap(),
+            litchi::open_bytes_with(bytes.clone(), &eager).unwrap(),
         ] {
-            assert_iwork_refused(&error, format);
+            assert_eq!(file.format(), Some(format));
+            assert!(
+                file.capabilities()
+                    .verb(litchi::capabilities::Verb::Get)
+                    .is_supported()
+            );
+            // An exact no-op publication is the package itself.
+            assert_eq!(file.to_bytes().unwrap(), bytes);
         }
-        // The refused input is what the iWork reader opens.
-        #[cfg(feature = "iwork")]
-        assert_eq!(
-            litchi::iwork::Document::open(&package)
-                .unwrap()
-                .format()
-                .name(),
-            format!("{format:?}")
-        );
     }
 }
 
@@ -257,14 +256,14 @@ fn a_disabled_format_is_reported_with_its_feature() {
 }
 
 /// The facade's detection functions and `open` agree on iWork: detection
-/// names the format, and `open` refuses it with that format.
+/// names the format `open` opens.
 #[cfg(feature = "pages")]
 #[test]
 fn detection_and_open_agree_on_iwork() {
     let path = fixture("iwork/pages/basic.pages");
     assert_eq!(litchi::detect_file_format(&path), Some(FileFormat::Pages));
-    let error = litchi::open(&path).unwrap_err();
-    assert_eq!(error.detected(), litchi::detect_file_format(&path));
+    let file = litchi::open(&path).unwrap();
+    assert_eq!(file.format(), litchi::detect_file_format(&path));
 }
 
 // ----------------------------------------------------- family view refusals --
@@ -410,12 +409,19 @@ fn workbook_tolerance_reports_come_from_the_handles() {
     assert_eq!(compared, 7);
 }
 
-/// Pages, which `open` refuses, keeps no repair report: the untracked report
-/// names it.
+/// Pages keeps no repair report: the opened file's report is untracked
+/// and names it.
 #[cfg(feature = "pages")]
 #[test]
 fn pages_reports_stay_untracked() {
-    let report = litchi::ToleranceReport::Untracked(FileFormat::Pages);
+    let report = litchi::open(fixture("iwork/pages/basic.pages"))
+        .unwrap()
+        .tolerance_report()
+        .unwrap();
+    assert_eq!(
+        report,
+        litchi::ToleranceReport::Untracked(FileFormat::Pages)
+    );
     assert!(!report.is_tracked());
     assert!(!report.is_clean());
     assert_eq!(report.total(), 0);

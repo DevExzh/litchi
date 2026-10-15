@@ -212,7 +212,8 @@ fn reclaim(shared: std::sync::Arc<Vec<u8>>) -> Vec<u8> {
 }
 
 /// The lowest-precedence ZIP candidates: an ODF package (with or without a
-/// `mimetype` member), then the caller's tail, which names iWork packages.
+/// `mimetype` member), then an Apple iWork package (in a build with an iWork
+/// feature), then the caller's tail.
 pub(super) fn zip_fallback<T: ZipTail>(
     bytes: Vec<u8>,
     options: &OpenOptions,
@@ -235,6 +236,20 @@ pub(super) fn zip_fallback<T: ZipTail>(
         feature = "odf-objects"
     )))]
     let _ = options;
+    #[cfg(feature = "iwork-adapter")]
+    let bytes = match crate::format::iwork::Iwork::detect_bytes(bytes, options)? {
+        crate::format::iwork::Detected::Opened(file) => return Ok(file.into_file()),
+        crate::format::iwork::Detected::Disabled(format) => {
+            return Err(
+                Error::unsupported_format(Some(format)).with_suggestion(match format {
+                    FileFormat::Pages => "enable the `pages` cargo feature",
+                    FileFormat::Keynote => "enable the `keynote` cargo feature",
+                    _ => "enable the `numbers` cargo feature",
+                }),
+            );
+        },
+        crate::format::iwork::Detected::Declined(bytes) => bytes,
+    };
     match tail.classify_bytes(&bytes) {
         Some(format) => Err(Error::iwork_unsupported(format)),
         None => Err(Error::unsupported_format(None)),

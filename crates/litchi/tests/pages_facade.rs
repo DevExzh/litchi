@@ -81,20 +81,13 @@ fn body_storage_reaches_facade_paragraphs() -> Result<(), Box<dyn std::error::Er
         assert_eq!(body.additional_text().collect::<Vec<_>>(), [expected]);
     }
 
-    let error = litchi::open(&path).expect_err("litchi::open refuses Pages");
-    assert_eq!(error.code(), litchi::Code::UnsupportedFormat, "{error:?}");
-    assert_eq!(
-        error.detected(),
-        Some(litchi::FileFormat::Pages),
-        "{error:?}"
-    );
-    let suggestion = error
-        .suggestion()
-        .ok_or_else(|| io::Error::other("the Pages refusal carries no suggestion"))?;
-    assert!(
-        suggestion.contains("litchi::iwork::Document::open"),
-        "{suggestion}"
-    );
+    // `litchi::open` reads the same body through the unified `File`
+    // (record 0296): one paragraph per line of the section's text.
+    let file = litchi::open(&path)?;
+    assert_eq!(file.format(), Some(litchi::FileFormat::Pages));
+    let first_line = expected.split('\n').next().unwrap_or_default();
+    let paragraph = file.get("/body/p[1]")?;
+    assert_eq!(paragraph.view().text()?.as_deref(), Some(first_line));
 
     Ok(())
 }

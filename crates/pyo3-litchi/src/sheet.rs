@@ -17,7 +17,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
 }
 
 /// What a `Workbook` reads: a unified file of the workbook family, or a
-/// Numbers document, which `litchi::File` does not hold yet.
+/// Numbers document, which `litchi::File` opens without a family view.
 enum Source {
     File(litchi::File),
     Numbers(litchi::numbers::semantic::Document),
@@ -55,6 +55,12 @@ pub struct Workbook {
 impl Workbook {
     fn read(path: &std::path::Path) -> Result<Source, Failure> {
         match litchi::open(path) {
+            // `litchi::File` opens iWork packages (record 0296), but its
+            // family views do not cover them; this reader keeps the
+            // semantic document's projection.
+            Ok(file) if file.format() == Some(CoreFormat::Numbers) => {
+                iwork::open_numbers(path).map(Source::Numbers)
+            },
             Ok(file) => match file.workbook() {
                 Ok(_) => Ok(Source::File(file)),
                 Err(error) => Err(Failure::open(&error, Opener::Workbook)),
