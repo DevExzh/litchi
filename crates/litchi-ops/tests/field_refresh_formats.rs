@@ -2,6 +2,7 @@
 //! follow-up F1): computable fields rewritten in one native commit,
 //! page-number fields kept (`needs_layout`), exact no-ops when current.
 
+#![cfg(any(feature = "doc", feature = "odt", feature = "odp"))]
 #![allow(clippy::unwrap_used, reason = "test assertions")]
 
 #[allow(unused_imports, reason = "used by a subset of the format features")]

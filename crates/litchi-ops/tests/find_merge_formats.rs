@@ -3,6 +3,16 @@
 //! run, paragraph or cell edits; one atomic commit, exact no-ops, round
 //! trips and typed refusals.
 
+#![cfg(any(
+    feature = "doc",
+    feature = "rtf",
+    feature = "ppt",
+    feature = "xlsb",
+    feature = "xls",
+    feature = "ods",
+    feature = "odt",
+    feature = "odp"
+))]
 #![allow(clippy::unwrap_used, reason = "test assertions")]
 
 use litchi_core::FileFormat;

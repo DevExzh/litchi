@@ -149,7 +149,7 @@ fn fresh(existing: Option<&Cell>) -> Cell {
     let mut cell = Cell::new(CellValue::Empty, String::new());
     if let Some(existing) = existing {
         cell.style_name.clone_from(&existing.style_name);
-        cell.merge = existing.merge.clone();
+        cell.merge = existing.merge;
     }
     cell
 }
