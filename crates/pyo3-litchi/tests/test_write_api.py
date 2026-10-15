@@ -48,6 +48,8 @@ CREATABLE = (
     "docx", "xlsx", "pptx", "xlsb", "doc", "xls", "ppt", "rtf", "ods", "odt", "odp",
     # The remaining ODF formats (record 0282).
     "oth", "odm", "odg", "odc", "odi", "odb", "odf",
+    # Pages builds its minimal document (record 0299).
+    "pages",
 )
 #: The formats File holds read-only, and a fixture of each: none since ODT
 #: (0276), ODS (0277) and ODP (0278) gained writers.
@@ -146,7 +148,7 @@ class CreateTests(WriteAssertions):
         self.assertError(raised(lambda: L.create(5)), L.PropertyError, "invalid_argument")
 
     def test_formats_without_a_builder_are_unsupported(self):
-        for name in ("pages",):
+        for name in ("numbers",):
             with self.subTest(format=name):
                 error = raised(lambda: L.create(name))
                 self.assertIsInstance(error, L.UnsupportedError)

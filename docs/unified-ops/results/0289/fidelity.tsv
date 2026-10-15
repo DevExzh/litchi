@@ -3,7 +3,7 @@ Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestDataStorage/O14
 Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/svg.docx	docx	exact		none		-	
 iwork/directory/keynote/basic.key/Index.zip	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 123322 -> 123308 bytes, first difference at 14	-	
 iwork/directory/numbers/basic.numbers/Index.zip	numbers	exact		none		-	
-iwork/directory/pages/basic.pages/Index.zip	pages	exact		byte-exact	/body/p[1] text	-	
+iwork/directory/pages/basic.pages/Index.zip	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
 iwork/keynote/basic.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 500058 -> 455848 bytes, first difference at 328815	-	
 iwork/keynote/chart-arrangement-retirement-resaved.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 510176 -> 459802 bytes, first difference at 331046	-	
 iwork/keynote/chart-caption-native-resaved.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 495846 -> 457000 bytes, first difference at 328385	-	
@@ -95,37 +95,37 @@ iwork/numbers/table-data-list-native.numbers	numbers	exact		none		-
 iwork/numbers/table-merges-native.numbers	numbers	exact		none		-	
 iwork/numbers/table-relocation-native-resaved.numbers	numbers	exact		none		-	
 iwork/numbers/table-relocation-native.numbers	numbers	exact		none		-	
-iwork/pages/audio-playback-native-resaved.pages	pages	exact		refused	/section[1] text: unsupported_capability: the Pages text edit intersects dependent content	-	
-iwork/pages/audio-playback-native.pages	pages	exact		refused	/section[1] text: unsupported_capability: the Pages text edit intersects dependent content	-	
-iwork/pages/basic.pages	pages	exact		byte-exact	/body/p[1] text	-	
-iwork/pages/body-sections-unicode.pages	pages	exact		byte-exact	/section[2] text	-	
-iwork/pages/body-table-catalog-native.pages	pages	exact		byte-exact	/body/p[1] text	-	
-iwork/pages/body-table-cells-native.pages	pages	exact		byte-exact	/body/p[1] text	-	
-iwork/pages/body-table-comment-hidden-native-saved.pages	pages	exact		byte-exact	/body/p[1] text	-	
-iwork/pages/body-table-cross-reference-native.pages	pages	exact		byte-exact	/body/p[1] text	-	
-iwork/pages/body-table-hidden-axes-cleared-native.pages	pages	exact		byte-exact	/body/p[1] text	-	
-iwork/pages/body-table-hidden-axes-focused-native.pages	pages	exact		byte-exact	/body/p[1] text	-	
-iwork/pages/body-table-hidden-axes-native.pages	pages	exact		byte-exact	/body/p[1] text	-	
-iwork/pages/body-table-merges-native.pages	pages	exact		byte-exact	/body/p[1] text	-	
-iwork/pages/body-table-name-focused-native-saved.pages	pages	exact		byte-exact	/body/p[1] text	-	
-iwork/pages/body-table-name-focused.pages	pages	exact		byte-exact	/body/p[1] text	-	
-iwork/pages/body-table-name-visible-native.pages	pages	exact		byte-exact	/body/p[1] text	-	
-iwork/pages/body-table-read-native.pages	pages	exact		byte-exact	/body/p[1] text	-	
-iwork/pages/body-table-visible.pages	pages	exact		byte-exact	/body/p[1] text	-	
-iwork/pages/chart-arrangement-native.pages	pages	exact		refused	/body/p[1] text: unsupported_capability: the Pages text edit intersects dependent content	-	
-iwork/pages/chart-arrangement-retirement-resaved.pages	pages	exact		refused	/body/p[1] text: unsupported_capability: the Pages text edit intersects dependent content	-	
-iwork/pages/chart-data-edited-native.pages	pages	exact		refused	/body/p[1] text: unsupported_capability: the Pages text edit intersects dependent content	-	
-iwork/pages/chart-data-native.pages	pages	exact		refused	/body/p[1] text: unsupported_capability: the Pages text edit intersects dependent content	-	
-iwork/pages/chart-grid-authored-native.pages	pages	exact		refused	/section[1] text: unsupported_capability: the Pages text edit intersects dependent content	-	
-iwork/pages/chart-grid-replaced-native.pages	pages	exact		refused	/section[1] text: unsupported_capability: the Pages text edit intersects dependent content	-	
-iwork/pages/image-adjustments-direct-resaved.pages	pages	exact		refused	/section[1] text: unsupported_capability: the Pages text edit intersects dependent content	-	
-iwork/pages/image-adjustments-native-resaved.pages	pages	exact		refused	/section[1] text: unsupported_capability: the Pages text edit intersects dependent content	-	
-iwork/pages/image-adjustments-native.pages	pages	exact		refused	/section[1] text: unsupported_capability: the Pages text edit intersects dependent content	-	
-iwork/pages/image-adjustments-retirement-resaved.pages	pages	exact		refused	/section[1] text: unsupported_capability: the Pages text edit intersects dependent content	-	
-iwork/pages/source-built-hidden-axes-before.pages	pages	exact		refused	/body/p[1] text: unsupported_capability: the Pages text edit intersects dependent content	-	
-iwork/pages/source-built-hidden-axes-legacy.pages	pages	exact		refused	/body/p[1] text: unsupported_capability: the Pages text edit intersects dependent content	-	
-iwork/pages/source-built-table-stylesheet-before.pages	pages	exact		refused	/section[1] text: unsupported_capability: the Pages text edit intersects dependent content	-	
-iwork/pages/source-built-table-stylesheet-native-saved.pages	pages	exact		refused	/section[1] text: unsupported_capability: the Pages text edit intersects dependent content	-	
+iwork/pages/audio-playback-native-resaved.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/audio-playback-native.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/basic.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/body-sections-unicode.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/body-table-catalog-native.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/body-table-cells-native.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/body-table-comment-hidden-native-saved.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/body-table-cross-reference-native.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/body-table-hidden-axes-cleared-native.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/body-table-hidden-axes-focused-native.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/body-table-hidden-axes-native.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/body-table-merges-native.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/body-table-name-focused-native-saved.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/body-table-name-focused.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/body-table-name-visible-native.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/body-table-read-native.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/body-table-visible.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/chart-arrangement-native.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/chart-arrangement-retirement-resaved.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/chart-data-edited-native.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/chart-data-native.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/chart-grid-authored-native.pages	pages	exact		value-exact	/section[1] name: 66763 -> 66768 bytes, first difference at 14	value-exact	paragraph add+remove: 66763 -> 66768 bytes, first difference at 14
+iwork/pages/chart-grid-replaced-native.pages	pages	exact		value-exact	/section[1] name: 67748 -> 67753 bytes, first difference at 14	value-exact	paragraph add+remove: 67748 -> 67753 bytes, first difference at 14
+iwork/pages/image-adjustments-direct-resaved.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/image-adjustments-native-resaved.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/image-adjustments-native.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/image-adjustments-retirement-resaved.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/source-built-hidden-axes-before.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/source-built-hidden-axes-legacy.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/source-built-table-stylesheet-before.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
+iwork/pages/source-built-table-stylesheet-native-saved.pages	pages	exact		value-exact	/section[1] name: 37712 -> 37713 bytes, first difference at 14	value-exact	paragraph add+remove: 37712 -> 37713 bytes, first difference at 14
 iwork/synthetic/numbers/custom-focused.numbers	numbers	exact		none		-	
 libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp	odp	exact		value-exact	/slide[1] name: 16945 -> 16948 bytes, first difference at 9192	-	
 libreoffice-core/chart2/qa/extras/data/xls/chart.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: Unsafe edit refused: worksheet has no INDEX record

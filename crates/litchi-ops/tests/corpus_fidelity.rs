@@ -13,8 +13,9 @@
 //! Whether the reverted bytes also equal the input is reported, not
 //! required: a revert is a second edit, and the leaves may normalize what
 //! they rewrite. A structural round trip follows on XLS, PPTX and RTF
-//! (record 0293): a row inserted and removed, or a slide or paragraph moved
-//! and moved back, must read back with the same node texts.
+//! (record 0293) and Pages (record 0299): a row inserted and removed, a
+//! slide or paragraph moved and moved back, or a Pages paragraph added and
+//! removed, must read back with the same node texts.
 //!
 //! An empty edit the leaf editor refuses (typed) is reported with its
 //! cause, and the file then goes through `open` → `save_as`, which must be
@@ -370,6 +371,22 @@ fn structure(file: &File, input: &[u8]) -> (&'static str, String) {
                 |file| file.move_to("/body/p[2]", Placement::before("/body/p[1]")?),
             )
         },
+        // Record 0299: a Pages paragraph added at the start of the body and
+        // removed again, through the leaf paragraph transaction.
+        Some(FileFormat::Pages) => (
+            "paragraph add+remove",
+            &["/body/p[1]"],
+            |file| {
+                file.add(
+                    "/body",
+                    NewNode::new("p")
+                        .prop("text", "Structural probe")
+                        .at(Placement::Start),
+                )
+                .map(|added| added.file)
+            },
+            |file| file.remove("/body/p[1]"),
+        ),
         _ => return ("-", String::new()),
     };
     let original = catch_unwind(AssertUnwindSafe(|| texts(file, checked))).unwrap_or_default();

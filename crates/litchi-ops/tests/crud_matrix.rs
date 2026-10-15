@@ -300,6 +300,8 @@ const SPECS: &[Spec] = &[
         fixtures: &[
             "iwork/pages/body-sections-unicode.pages",
             "iwork/pages/basic.pages",
+            // Record 0299: body tables, cells and anchored paragraphs.
+            "iwork/pages/body-table-read-native.pages",
         ],
     },
     Spec {

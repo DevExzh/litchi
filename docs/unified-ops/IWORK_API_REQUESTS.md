@@ -155,3 +155,41 @@ makes `File::Pages`, `File::Keynote` and `File::Numbers` hold the leaf
 - **New 17 — Numbers formula writes through the unified registry.** The
   leaf authors formulas (`Edit::set_formula`); the unified `value` key does
   not map onto it yet (follow-up record 0299).
+
+## 2026-10-15 Pages to parity (record 0299)
+
+Record 0299 closes the Pages requests in the leaf (`litchi-pages`, owner
+decision D2) and wires them into `File::Pages`:
+
+- **1 (Pages)** — `Package::new()` returns the deterministic minimal document
+  (a 5 KiB built-in template); `builder::Builder` with a required
+  `builder::Identity` (`Identity::generate()` or fixed bytes) authors one
+  with fresh identity sidecars and initial body text. Unified
+  `create(Pages)` uses `Package::new()`.
+- **2 (Pages)** — every Pages family is a focused module with the canonical
+  `{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` (ADR 0034 W1); the
+  unified write chain keeps each leaf patch.
+- **12** — `section::paragraphs` (`Package::{section_paragraphs,
+  edit_section_paragraphs, apply_section_paragraphs}`): set, insert, remove,
+  relocate and swap by `Position`, published as one section-text splice
+  when the change consumes no object anchor. Setting an anchored
+  paragraph's text keeps its objects; removing or moving one is refused
+  (`AnchoredParagraph`). The section-text transaction now also accepts the
+  parent back-edges of objects anchored in the body (the source-built
+  table files 0296 found refused).
+- **14** — `metadata::{Edit, …}` (`Package::{edit_metadata,
+  apply_metadata}`) writes title, author, keywords and description into
+  `Metadata/Properties.plist`; the Pages app does not show these keys.
+- **16 (Pages)** — `Package::open` reads an app-authored package directory
+  by converting it to its single-file form; `File` opens it (no origin:
+  `save_as` writes the single-file package).
+- Also wired: body tables (read, cell text read, remove), headers and
+  footers (read, text set), body footnotes (read, add at a paragraph end,
+  text set, remove), section names.
+
+**Still open for Pages:** 11 (section add/remove), 13 (text runs and
+formatting), body-table cell writes and table creation (no Pages
+cell-write transaction; the Numbers writer is not shared), directory
+save-back to the bundle form, and `litchi::iwork::Document` removal
+(blocked on the Keynote and Numbers directory and table gaps, records
+0297–0298).

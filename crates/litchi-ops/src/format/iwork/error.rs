@@ -24,6 +24,27 @@ pub enum LeafError {
     /// Writing the Pages package to a sink failed.
     #[cfg(feature = "pages")]
     PagesWrite(litchi_pages::WriteError),
+    /// A Pages paragraph transaction failed.
+    #[cfg(feature = "pages")]
+    PagesParagraphs(litchi_pages::section::paragraphs::Error),
+    /// A Pages section-name transaction failed.
+    #[cfg(feature = "pages")]
+    PagesName(litchi_pages::section::name::Error),
+    /// A Pages header or footer text transaction failed.
+    #[cfg(feature = "pages")]
+    PagesHeaderFooter(litchi_pages::header_footer::text::Error),
+    /// A Pages footnote text transaction failed.
+    #[cfg(feature = "pages")]
+    PagesFootnote(litchi_pages::footnote::text::Error),
+    /// A Pages body-footnote lifecycle transaction failed.
+    #[cfg(feature = "pages")]
+    PagesFootnotes(litchi_pages::footnote::body::transaction::Error),
+    /// A Pages document-properties transaction failed.
+    #[cfg(feature = "pages")]
+    PagesMetadata(litchi_pages::metadata::Error),
+    /// A Pages body-table deletion failed.
+    #[cfg(feature = "pages")]
+    PagesTableDeletion(litchi_pages::table::deletion::Error),
     /// The Keynote package could not be read.
     #[cfg(feature = "keynote")]
     Keynote(litchi_keynote::ReadError),
@@ -66,6 +87,20 @@ impl fmt::Display for LeafError {
             Self::PagesText(error) => error.fmt(formatter),
             #[cfg(feature = "pages")]
             Self::PagesWrite(error) => error.fmt(formatter),
+            #[cfg(feature = "pages")]
+            Self::PagesParagraphs(error) => error.fmt(formatter),
+            #[cfg(feature = "pages")]
+            Self::PagesName(error) => error.fmt(formatter),
+            #[cfg(feature = "pages")]
+            Self::PagesHeaderFooter(error) => error.fmt(formatter),
+            #[cfg(feature = "pages")]
+            Self::PagesFootnote(error) => error.fmt(formatter),
+            #[cfg(feature = "pages")]
+            Self::PagesFootnotes(error) => error.fmt(formatter),
+            #[cfg(feature = "pages")]
+            Self::PagesMetadata(error) => error.fmt(formatter),
+            #[cfg(feature = "pages")]
+            Self::PagesTableDeletion(error) => error.fmt(formatter),
             #[cfg(feature = "keynote")]
             Self::Keynote(error) => error.fmt(formatter),
             #[cfg(feature = "keynote")]
@@ -100,6 +135,20 @@ impl std::error::Error for LeafError {
             Self::PagesText(error) => Some(error),
             #[cfg(feature = "pages")]
             Self::PagesWrite(error) => Some(error),
+            #[cfg(feature = "pages")]
+            Self::PagesParagraphs(error) => Some(error),
+            #[cfg(feature = "pages")]
+            Self::PagesName(error) => Some(error),
+            #[cfg(feature = "pages")]
+            Self::PagesHeaderFooter(error) => Some(error),
+            #[cfg(feature = "pages")]
+            Self::PagesFootnote(error) => Some(error),
+            #[cfg(feature = "pages")]
+            Self::PagesFootnotes(error) => Some(error),
+            #[cfg(feature = "pages")]
+            Self::PagesMetadata(error) => Some(error),
+            #[cfg(feature = "pages")]
+            Self::PagesTableDeletion(error) => Some(error),
             #[cfg(feature = "keynote")]
             Self::Keynote(error) => Some(error),
             #[cfg(feature = "keynote")]
@@ -141,6 +190,20 @@ impl LeafError {
             Self::Pages(error) => pages_code(error),
             #[cfg(feature = "pages")]
             Self::PagesText(error) => pages_text_code(error),
+            #[cfg(feature = "pages")]
+            Self::PagesParagraphs(error) => pages_paragraphs_code(error),
+            #[cfg(feature = "pages")]
+            Self::PagesName(error) => pages_name_code(error),
+            #[cfg(feature = "pages")]
+            Self::PagesHeaderFooter(error) => pages_region_code(error),
+            #[cfg(feature = "pages")]
+            Self::PagesFootnote(error) => pages_footnote_code(error),
+            #[cfg(feature = "pages")]
+            Self::PagesFootnotes(error) => pages_footnotes_code(error),
+            #[cfg(feature = "pages")]
+            Self::PagesMetadata(error) => pages_metadata_code(error),
+            #[cfg(feature = "pages")]
+            Self::PagesTableDeletion(error) => pages_deletion_code(error),
             #[cfg(feature = "keynote")]
             Self::Keynote(error) => keynote_code(error),
             #[cfg(feature = "keynote")]
@@ -208,6 +271,100 @@ fn pages_text_code(error: &litchi_pages::section::text::Error) -> Code {
         E::Allocation { .. } | E::OperationAlreadyStaged | E::Verification => Code::InternalError,
         E::InvalidSource | E::PatchConflict => Code::InvalidInput,
         _ => Code::InvalidValue,
+    }
+}
+
+#[cfg(feature = "pages")]
+fn pages_paragraphs_code(error: &litchi_pages::section::paragraphs::Error) -> Code {
+    use litchi_pages::section::paragraphs::Error as E;
+    match error {
+        E::Text(error) => pages_text_code(error),
+        E::PositionNotFound { .. } => Code::PathNotFound,
+        E::ParagraphBreak => Code::InvalidValue,
+        E::InterleavedAnchors | E::AnchoredParagraph => Code::UnsupportedCapability,
+        E::LastParagraph => Code::InvalidArgument,
+        E::LimitExceeded { .. } => Code::LimitExceeded,
+        E::PatchConflict => Code::InvalidInput,
+        _ => Code::InternalError,
+    }
+}
+
+#[cfg(feature = "pages")]
+fn pages_name_code(error: &litchi_pages::section::name::Error) -> Code {
+    use litchi_pages::section::name::Error as E;
+    match error {
+        E::NameNotFound | E::PositionNotFound { .. } => Code::PathNotFound,
+        E::LimitExceeded { .. } => Code::LimitExceeded,
+        E::UnsupportedSource => Code::UnsupportedCapability,
+        E::PatchConflict | E::InvalidSource => Code::InvalidInput,
+        E::Allocation { .. } | E::Verification => Code::InternalError,
+        _ => Code::InvalidValue,
+    }
+}
+
+#[cfg(feature = "pages")]
+fn pages_region_code(error: &litchi_pages::header_footer::text::Error) -> Code {
+    use litchi_pages::header_footer::text::Error as E;
+    match error {
+        E::NotFound | E::PositionOutOfBounds => Code::PathNotFound,
+        E::TextTooLarge | E::StructuralMarker => Code::InvalidValue,
+        E::LimitExceeded { .. } => Code::LimitExceeded,
+        E::PatchConflict | E::InvalidSource => Code::InvalidInput,
+        E::Allocation { .. } | E::Verification => Code::InternalError,
+        _ => Code::UnsupportedCapability,
+    }
+}
+
+#[cfg(feature = "pages")]
+fn pages_footnote_code(error: &litchi_pages::footnote::text::Error) -> Code {
+    use litchi_pages::footnote::text::Error as E;
+    match error {
+        E::NotFound => Code::PathNotFound,
+        E::TextTooLarge | E::CustomMarkTooLarge | E::StructuralMarker => Code::InvalidValue,
+        E::LimitExceeded { .. } => Code::LimitExceeded,
+        E::PatchConflict | E::InvalidSource => Code::InvalidInput,
+        E::Allocation { .. } | E::Verification => Code::InternalError,
+        _ => Code::UnsupportedCapability,
+    }
+}
+
+#[cfg(feature = "pages")]
+fn pages_footnotes_code(error: &litchi_pages::footnote::body::transaction::Error) -> Code {
+    use litchi_pages::footnote::body::transaction::Error as E;
+    match error {
+        E::NotFound => Code::PathNotFound,
+        E::PositionOutOfBounds => Code::OutOfRange,
+        E::PositionOccupied | E::StructuralMarker | E::TextTooLarge | E::CustomMarkTooLarge => {
+            Code::InvalidValue
+        },
+        E::LimitExceeded { .. } => Code::LimitExceeded,
+        E::PatchConflict | E::InvalidSource => Code::InvalidInput,
+        E::Allocation { .. } | E::Verification => Code::InternalError,
+        _ => Code::UnsupportedCapability,
+    }
+}
+
+#[cfg(feature = "pages")]
+fn pages_metadata_code(error: &litchi_pages::metadata::Error) -> Code {
+    use litchi_pages::metadata::Error as E;
+    match error {
+        E::InvalidValue => Code::InvalidValue,
+        E::LimitExceeded { .. } => Code::LimitExceeded,
+        E::PatchConflict | E::InvalidSource => Code::InvalidInput,
+        _ => Code::InternalError,
+    }
+}
+
+#[cfg(feature = "pages")]
+fn pages_deletion_code(error: &litchi_pages::table::deletion::Error) -> Code {
+    use litchi_pages::table::deletion::Error as E;
+    match error {
+        E::TableNotFound => Code::PathNotFound,
+        E::AmbiguousTableName | E::AmbiguousSelector => Code::InvalidPath,
+        E::LimitExceeded { .. } => Code::LimitExceeded,
+        E::PatchConflict => Code::InvalidInput,
+        E::Verification => Code::InternalError,
+        _ => Code::UnsupportedCapability,
     }
 }
 

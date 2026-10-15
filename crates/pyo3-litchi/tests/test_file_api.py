@@ -197,11 +197,21 @@ class OpenTests(ErrorAssertions):
                 self.assertEqual(file.get(path, 0)["text"], text)
                 self.assertEqual(file.to_bytes(), read_fixture(relative))
 
+    def test_pages_package_directory_opens_as_a_single_file_package(self):
+        # Record 0299: the Pages leaf converts the app-authored directory to
+        # its single-file form; the handle has no origin, so it saves with
+        # save_as.
+        directory = TEST_DATA / "iwork/directory/pages/basic.pages"
+        self.assertTrue(directory.is_dir(), directory)
+        file = L.open(str(directory))
+        self.assertEqual(str(file.format), "Pages")
+        single = open_fixture("iwork/pages/basic.pages")
+        self.assertEqual(file.get("/body/p[1]", 0)["text"], single.get("/body/p[1]", 0)["text"])
+
     def test_iwork_package_directory_refusal_names_the_family_opener(self):
-        # The leaves edit and save only single-file packages; the family
-        # classes read the app-authored directory form.
+        # The Keynote and Numbers leaves edit and save only single-file
+        # packages; the family classes read the app-authored directory form.
         for relative, name, opener in (
-            ("iwork/directory/pages/basic.pages", "Pages", "Document.open"),
             ("iwork/directory/keynote/basic.key", "Keynote", "Presentation.open"),
             ("iwork/directory/numbers/basic.numbers", "Numbers", "Workbook.open"),
         ):

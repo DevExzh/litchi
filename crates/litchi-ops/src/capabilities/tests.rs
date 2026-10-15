@@ -264,6 +264,8 @@ fn every_format_has_one_answer_for_its_reads() {
                     Verb::Add => !writes.addable.is_empty(),
                     Verb::Remove => !writes.removable.is_empty(),
                     Verb::Move => !writes.movable.is_empty(),
+                    // Pages exchanges paragraphs (record 0299).
+                    Verb::Swap => format == FileFormat::Pages && !writes.movable.is_empty(),
                     _ => false,
                 });
             #[cfg(not(feature = "iwork-adapter"))]
@@ -358,7 +360,9 @@ fn every_format_has_one_answer_for_its_reads() {
                 format,
                 FileFormat::Pages | FileFormat::Keynote | FileFormat::Numbers
             ) && crate::read::Adapter::of(format).is_some();
-            let expected = if integrated || (iwork && verb == Verb::Save) {
+            // Pages creates its minimal document (record 0299).
+            let pages_create = format == FileFormat::Pages && iwork;
+            let expected = if integrated || (iwork && verb == Verb::Save) || pages_create {
                 Support::Supported
             } else if iwork {
                 IWORK_CREATE.support()

@@ -14,9 +14,10 @@
 //! recorded, and adopt the committed package as a new handle whose tree is
 //! built on its first read.
 //!
-//! Package directories (the app-authored bundle form) are refused: the
-//! leaves edit and save only single-file packages, and the facade's
-//! read-only `litchi::iwork::Document` reads directories.
+//! Package directories (the app-authored bundle form) open for Pages: the
+//! leaf converts the bundle to its single-file form (record 0299). Keynote
+//! and Numbers directories are still refused; the facade's read-only
+//! `litchi::iwork::Document` reads them.
 
 /// Declares a field-less kind enum with its vocabulary mapping.
 macro_rules! kinds {
@@ -98,6 +99,11 @@ struct State {
     /// Built on the first read: the open route decodes only what the leaf
     /// open decodes.
     tree: OnceLock<Built>,
+    /// The complete tree, for a format whose tree builds some children on
+    /// demand (Pages section headers and footers, record 0299): built the
+    /// first time a read reaches them. Every item of `tree` keeps its index
+    /// here, so nodes taken from either tree stay valid.
+    full: OnceLock<Built>,
     origin: Option<Arc<Path>>,
 }
 
@@ -239,6 +245,7 @@ impl Iwork {
         Self(Arc::new(State {
             owner,
             tree: OnceLock::new(),
+            full: OnceLock::new(),
             origin,
         }))
     }
@@ -305,6 +312,9 @@ impl Iwork {
     }
 
     fn built(&self) -> &Built {
+        if let Some(full) = self.0.full.get() {
+            return full;
+        }
         self.0.tree.get_or_init(|| match self.0.owner.tree() {
             Ok(tree) => Built { tree, error: None },
             Err(error) => Built {
@@ -312,6 +322,38 @@ impl Iwork {
                 error: Some(error),
             },
         })
+    }
+
+    /// Complete the tree before the children of `parent` are read, when the
+    /// format builds them on demand (Pages section headers and footers).
+    pub(crate) fn expand(&self, parent: u32) {
+        #[cfg(feature = "pages")]
+        if self.0.full.get().is_none()
+            && matches!(self.0.owner, Owner::Pages(_))
+            && self.tree().item(parent).type_name() == "section"
+        {
+            self.expand_all();
+        }
+        #[cfg(not(feature = "pages"))]
+        let _ = parent;
+    }
+
+    /// Complete the tree (views and whole-tree reads).
+    pub(crate) fn expand_all(&self) {
+        match &self.0.owner {
+            #[cfg(feature = "pages")]
+            Owner::Pages(package) => {
+                self.0.full.get_or_init(|| Built {
+                    tree: pages::build_full(package),
+                    error: None,
+                });
+            },
+            #[allow(
+                unreachable_patterns,
+                reason = "only the Pages tree builds children on demand"
+            )]
+            _ => {},
+        }
     }
 
     /// The object tree, built on the first call.
@@ -444,16 +486,34 @@ impl Iwork {
         Ok(written)
     }
 
-    /// A fresh package of `format`: refused, the iWork leaves have no
-    /// from-scratch builder yet (`IWORK_API_REQUESTS.md` request 1).
+    /// A fresh package of `format`. Pages documents come from the leaf's
+    /// deterministic `Package::new()` (record 0299); Keynote and Numbers
+    /// have no from-scratch builder yet (`IWORK_API_REQUESTS.md` request 1).
     pub(crate) fn create(format: FileFormat, options: &crate::CreateOptions) -> Result<Self> {
         let _ = options;
+        #[cfg(feature = "pages")]
+        if format == FileFormat::Pages {
+            let package = litchi_pages::Package::new()
+                .map_err(|error| leaf_error(LeafError::Pages(error), FileFormat::Pages))?;
+            return Ok(Self::from_owner(Owner::Pages(package), None));
+        }
         Err(Error::new(
             crate::Code::UnsupportedCapability,
-            "creating an iWork document from scratch needs a leaf `Package::new()`, which the Pages, Keynote and Numbers owners do not have yet",
+            "creating a Keynote or Numbers document from scratch needs a leaf `Package::new()`, which those owners do not have yet",
         )
         .with_format(format)
         .with_suggestion("open an existing package and edit it"))
+    }
+
+    /// Open an app-authored Pages package directory: the leaf captures the
+    /// bundle once and converts it to its single-file form (record 0299).
+    /// The handle has no origin, so `save()` needs a path (`save_as`), and
+    /// the saved file is the single-file package.
+    #[cfg(feature = "pages")]
+    pub(crate) fn open_pages_directory(path: &Path) -> Result<Self> {
+        let package = litchi_pages::Package::open(path)
+            .map_err(|error| leaf_error(LeafError::Pages(error), FileFormat::Pages))?;
+        Ok(Self::from_owner(Owner::Pages(package), None))
     }
 
     /// Tag an error with this handle's format.
