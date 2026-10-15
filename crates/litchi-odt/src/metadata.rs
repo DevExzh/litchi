@@ -62,11 +62,14 @@ impl Edit {
 
     /// Publish the staged properties as one new package.
     ///
+    /// A package without `meta.xml` gains one declaring the content's
+    /// `office:version`.
+    ///
     /// # Errors
     ///
-    /// Returns [`Error::Core`] when the package has no `meta.xml`, a
-    /// namespace the edit writes is undeclared, or the package is signed or
-    /// encrypted (changed writes there are refused).
+    /// Returns [`Error::Core`] when a namespace the edit writes is
+    /// undeclared, or the package is signed or encrypted (changed writes
+    /// there are refused).
     pub fn commit(self) -> Result<Commit, Error> {
         let fields = self.fields;
         let (package, patch) = self.inner.commit()?.into_parts();

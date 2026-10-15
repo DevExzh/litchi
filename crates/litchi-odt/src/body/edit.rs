@@ -24,6 +24,7 @@ use super::{Attribute, AutomaticInsert, Body, Kind, Node, NodeId, Style};
 use crate::Document;
 use crate::core::{AuthoredXmlFragment, XmlSourcePart, XmlSplicePublication};
 use crate::metadata::Field as Metadata;
+use litchi_odf_common::metadata::Publication;
 
 /// The largest number of cells one inserted table may create.
 const MAX_GENERATED_CELLS: usize = 16_384;
@@ -1728,16 +1729,41 @@ pub(crate) fn apply(document: &Document, edits: BodyEdits) -> Result<Option<Vec<
         }
         publications.push(publication);
     }
+    // A package without meta.xml (OTH and ODM builders write none) gains
+    // one after the content splices (record 0290 F6).
+    let mut create_meta = false;
     if !edits.metadata.is_empty() {
-        if let Some(publication) = metadata_publication(document, &edits.metadata)? {
-            publications.push(publication);
+        match metadata_publication(document, &edits.metadata)? {
+            Publication::Splices(publication) => publications.push(publication),
+            Publication::MissingPart => create_meta = true,
+            _ => {},
         }
     }
-    if publications.is_empty() {
-        return Ok(None);
+    let rebuilt = if publications.is_empty() {
+        None
+    } else {
+        Some(crate::core::rebuild_package_with_xml_splices(
+            package,
+            publications,
+            MAX_PACKAGE_BYTES,
+        )?)
+    };
+    if !create_meta {
+        return Ok(rebuilt);
     }
-    crate::core::rebuild_package_with_xml_splices(package, publications, MAX_PACKAGE_BYTES)
-        .map(Some)
+    let reopened;
+    let base = match rebuilt {
+        Some(ref bytes) => {
+            reopened = crate::core::OwnedPackage::from_bytes(bytes.clone())?;
+            &reopened
+        },
+        None => package,
+    };
+    let created = edits
+        .metadata
+        .created_package(base)
+        .map_err(metadata_error)?;
+    Ok(created.or(rebuilt))
 }
 
 fn classify(bytes: String, start_tag: bool) -> Result<AuthoredXmlFragment> {
@@ -1979,11 +2005,15 @@ fn whole_content(target: Node<'_>, text: &str, out: &mut String) -> Result<()> {
 fn metadata_publication(
     document: &Document,
     fields: &litchi_odf_common::metadata::Assignments,
-) -> Result<Option<XmlSplicePublication>> {
+) -> Result<Publication> {
     fields
-        .publication(document.transaction_package())
-        .map_err(|error| match error {
-            litchi_odf_common::Error::Core(error) => error,
-            other => invalid(other.to_string()),
-        })
+        .plan_publication(document.transaction_package())
+        .map_err(metadata_error)
+}
+
+fn metadata_error(error: litchi_odf_common::Error) -> Error {
+    match error {
+        litchi_odf_common::Error::Core(error) => error,
+        other => invalid(other.to_string()),
+    }
 }
