@@ -5039,44 +5039,21 @@ impl Edit {
     /// Returns an error when the changed source is outside the supported
     /// closure or candidate validation/readback fails.
     pub fn commit(self) -> Result<Commit, Error> {
-        // A paragraph removal, move or swap that the plain-body paths refuse
-        // falls back to exact source splicing of producer paragraphs
-        // (record 0293), whose typed refusal names the producer construct.
-        self.ensure_operation_room_for(0)?;
-        self.admit_replacement(0)?;
-        // Moves and swaps try the splice first: the lifecycle projection
-        // rewrites the body, while the splice keeps every source byte.
+        // The plain-body paths keep their behaviour and cost; a paragraph
+        // removal, move or swap they refuse falls back to exact source
+        // splicing of producer paragraphs (record 0293), whose typed refusal
+        // names the producer construct.
         match self.operations.as_slice() {
-            [operation @ Operation::RemoveParagraph { .. }] => {
+            [
+                operation @ (Operation::RemoveParagraph { .. }
+                | Operation::MoveParagraph { .. }
+                | Operation::SwapParagraph { .. }),
+            ] => {
                 let operation = operation.clone();
                 let source = self.source.clone();
                 match self.commit_staged() {
                     Err(Error::UnsupportedSource(_)) => {
                         producer_paragraphs::commit(source, &operation)
-                    },
-                    result => result,
-                }
-            },
-            [
-                operation @ (Operation::MoveParagraph {
-                    position,
-                    final_position,
-                    ..
-                }
-                | Operation::SwapParagraph {
-                    first: position,
-                    second: final_position,
-                    ..
-                }),
-            ] if position != final_position => {
-                match producer_paragraphs::commit(self.source.clone(), &operation.clone()) {
-                    Err(Error::UnsupportedSource(reason)) => {
-                        self.commit_staged().map_err(|error| match error {
-                            // The splice's refusal names the producer
-                            // construct; prefer it to the projection's.
-                            Error::UnsupportedSource(_) => Error::UnsupportedSource(reason),
-                            other => other,
-                        })
                     },
                     result => result,
                 }
