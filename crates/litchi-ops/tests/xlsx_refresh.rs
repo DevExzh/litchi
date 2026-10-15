@@ -78,3 +78,50 @@ fn write_back_is_xlsx_only() {
     assert_eq!(error.unwrap(), 0);
     let _ = Code::UnsupportedCapability;
 }
+
+/// Record 0295: XLSB and XLS write stale results back as the formula
+/// records' cached values, once.
+#[cfg(all(feature = "xlsb", feature = "xls"))]
+#[test]
+fn legacy_and_binary_workbooks_write_caches_back() {
+    for format in [FileFormat::Xlsb, FileFormat::Xls] {
+        let file = litchi_ops::create(format)
+            .unwrap()
+            .set("/Sheet1/A1", props! { "value" => 20 })
+            .unwrap()
+            .set("/Sheet1/A2", props! { "formula" => "A1*2" })
+            .unwrap()
+            .set("/Sheet1/A3", props! { "formula" => "A1+1" })
+            .unwrap();
+        let report = file.refresh(&Options::new()).unwrap();
+        assert!(report.patch.is_noop(), "{format:?}");
+        let stale = report.value.count(Status::Stale);
+        let written = file
+            .refresh(&Options::new().write_cache(true))
+            .unwrap_or_else(|error| panic!("{format:?}: {error}"));
+        assert_eq!(
+            written.value.refreshed(),
+            stale,
+            "{format:?}: {:?}",
+            written
+                .value
+                .fields()
+                .iter()
+                .map(|field| (field.status(), field.reason()))
+                .collect::<Vec<_>>()
+        );
+        if stale > 0 {
+            assert!(written.diagnostics.changed(), "{format:?}");
+        }
+        let reopened = litchi_ops::open_bytes(written.file.to_bytes().unwrap()).unwrap();
+        let again = reopened.refresh(&Options::new().write_cache(true)).unwrap();
+        assert!(again.patch.is_noop(), "{format:?}");
+        assert_eq!(again.value.count(Status::Unchanged), 2, "{format:?}");
+        let restored = written.patch.inverse().apply(&written.file).unwrap();
+        assert_eq!(
+            restored.to_bytes().unwrap(),
+            file.to_bytes().unwrap(),
+            "{format:?}"
+        );
+    }
+}

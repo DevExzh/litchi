@@ -1760,10 +1760,15 @@ fn merge_fills_templates_per_record() {
         ],
     );
     assert!(run.stderr.contains("invalid_json"), "{}", run.stderr);
+    // Record 0295: an XLSB template merges; an ODF drawing has no merge.
     let workbook = dir.path().join("book.xlsb");
     expect(0, ["create", arg(&workbook)]);
     let other = dir.path().join("other.xlsb");
-    expect(5, ["merge", arg(&workbook), arg(&other), "--data", "{}"]);
+    expect(0, ["merge", arg(&workbook), arg(&other), "--data", "{}"]);
+    let drawing = dir.path().join("drawing.odg");
+    expect(0, ["create", arg(&drawing)]);
+    let copy = dir.path().join("copy.odg");
+    expect(5, ["merge", arg(&drawing), arg(&copy), "--data", "{}"]);
 }
 
 #[test]

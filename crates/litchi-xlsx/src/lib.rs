@@ -184,8 +184,8 @@ pub use auto_filter::{
 };
 pub use calculation_properties::{Mode, ReferenceMode};
 pub use cell::{
-    Cell, Cells, Content, Date, ErrorValue, Extents, IndexedCells, Number, RecordIndex,
-    SharedStringKey, Text, Value,
+    Cell, Cells, Content, Date, ErrorValue, Extents, IndexedCells, Number, RecordIndex, RichRun,
+    RichText, SharedStringKey, Text, Value,
 };
 pub use cell_watches::{
     CellWatchConformance, CellWatchReference, CellWatches, parse_cell_watches, write_cell_watches,

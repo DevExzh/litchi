@@ -53,6 +53,10 @@ pub struct AuthoredXmlFragment {
 )]
 pub struct XmlSplicePublication {
     edits: Vec<Edit>,
+    /// The largest end of the edits' ranges: an edit starting after it
+    /// overlaps none of them, so ascending edits are checked in O(1)
+    /// (record 0295).
+    max_end: usize,
     source: XmlSourcePart,
     source_candidate: Option<Vec<u8>>,
 }
@@ -316,6 +320,7 @@ impl XmlSplicePublication {
     pub const fn new(source: XmlSourcePart) -> Self {
         Self {
             edits: Vec::new(),
+            max_end: 0,
             source,
             source_candidate: None,
         }
@@ -359,6 +364,7 @@ impl XmlSplicePublication {
         verify_source_document(&candidate, source.path())?;
         Ok(Self {
             edits: Vec::new(),
+            max_end: 0,
             source,
             source_candidate: Some(candidate),
         })
@@ -409,6 +415,7 @@ impl XmlSplicePublication {
         verify_source_document(&candidate, source.path())?;
         Ok(Self {
             edits: Vec::new(),
+            max_end: 0,
             source,
             source_candidate: Some(candidate),
         })
@@ -434,13 +441,17 @@ impl XmlSplicePublication {
         if actual != proof.expected {
             return invalid("stale XML splice source range");
         }
-        if self
-            .edits
-            .iter()
-            .any(|edit| ranges_overlap_or_conflict(&edit.range, &proof.range))
+        let after_every_edit = proof.range.start > self.max_end
+            || (proof.range.start == self.max_end && !proof.range.is_empty());
+        if !(self.edits.is_empty() || after_every_edit)
+            && self
+                .edits
+                .iter()
+                .any(|edit| ranges_overlap_or_conflict(&edit.range, &proof.range))
         {
             return invalid("overlapping XML splice ranges");
         }
+        self.max_end = self.max_end.max(proof.range.end);
         self.edits.push(Edit {
             fragment,
             range: proof.range,

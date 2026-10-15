@@ -2026,10 +2026,7 @@
   "setKeywords": {
     "verb": "replace",
     "support": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "record 0273 follow-up: a find adapter over the format's run-level text edits",
-      "reason": "find/replace is not integrated for this format"
+      "supported": true
     },
     "keywords": {
       "find": {

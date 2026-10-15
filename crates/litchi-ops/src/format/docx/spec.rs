@@ -120,6 +120,8 @@ pub enum Kind {
     Break,
     /// A tab character (gap).
     Tab,
+    /// A SmartArt graphic, addressed document-wide (record 0295).
+    SmartArt,
 }
 
 impl Kind {
@@ -251,6 +253,7 @@ names! {
     Shape => "shape",
     Break => "break",
     Tab => "tab",
+    SmartArt => "smartart",
 }
 
 // ---------------------------------------------------------------------------
@@ -944,7 +947,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 "document",
                 &["document"],
                 &[],
-                &[K::Body, K::Comments],
+                &[K::Body, K::Comments, K::SmartArt],
                 &["/"],
                 DOCUMENT_PROPS,
             ),
@@ -1287,6 +1290,15 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 &[K::Paragraph],
                 &["/body/p[N]/tab[M]"],
                 &TAB_GAP,
+            ),
+            element(
+                K::SmartArt,
+                "smartart",
+                &["smartart"],
+                &[K::Document],
+                &[],
+                &["/smartart[N]", "/body/smartart[N]"],
+                super::smartart::SMARTART_PROPS,
             ),
         ],
         gaps: &[

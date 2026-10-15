@@ -1,9 +1,9 @@
 //! Template merge (design §13 P0, record 0274): fill `{{key}}` placeholders
 //! and Word `MERGEFIELD` fields from a data [`Record`].
 //!
-//! [`File::merge`](crate::File::merge) replaces every placeholder of a DOCX,
-//! PPTX or XLSX template with its record value in **one** atomic native
-//! commit and returns the filled copy; the template handle is never
+//! [`File::merge`](crate::File::merge) replaces every placeholder of a
+//! template (DOCX, PPTX, XLSX, XLSB, DOC, PPT, XLS, RTF, ODT, OTH, ODM, ODS
+//! or ODP) with its record value in **one** atomic native commit and returns the filled copy; the template handle is never
 //! changed, so one opened template fills any number of records. `merge`
 //! always means template (mail) merge here, as in OfficeCLI; document
 //! merging is a separate concern.
@@ -41,7 +41,11 @@
 //! |---|---|---|
 //! | DOCX | every paragraph of the body (tables, content controls and text boxes included), headers, footers, footnotes, endnotes and comments | A placeholder may span runs. Its value takes the formatting of the placeholder's first character; the rest of the placeholder is removed from the runs it spans, which keep their own formatting. Tabs and line feeds in values become `w:tab` and `w:br`. |
 //! | PPTX | every paragraph of every slide's shapes (group members included) | As DOCX, run by run; a value may not hold a line break. |
-//! | XLSX | every text cell of every worksheet; formulas are never touched | The cell keeps its style; a rich-text cell becomes plain text. |
+//! | XLSX | every text cell of every worksheet; formulas are never touched | The cell keeps its style; a rich-text cell is filled run by run and keeps each run's formatting (record 0295). |
+//! | XLSB, XLS, ODS | as XLSX (record 0295) | The cell keeps its style. An XLSB rich-text cell (inline or a formatted shared string) and an ODS cell holding hyperlinks are fixed content; an XLS cell showing a formatted shared string becomes plain text. |
+//! | DOC, RTF | every main-story paragraph, run by run (record 0295) | As DOCX; runs holding fields or drawings are fixed content, DOC tables are not merged; a value may not hold a line break. |
+//! | PPT | every text shape and notes page, paragraph by paragraph (record 0295) | The native editor replaces a shape's text whole, keeping a single-run body's formatting; a value may not hold a line break. |
+//! | ODT, OTH, ODM, ODP | every paragraph of the body (comments excluded) or of every slide's objects, table cells and notes, run by run (record 0295) | Each run keeps its style; runs holding fields or nested markup are fixed content; line feeds and tabs become `text:line-break` and `text:tab`. |
 //!
 //! A placeholder broken by other content (a tab, a drawing, a field) is not
 //! a placeholder.
@@ -86,11 +90,20 @@
 //! the returned file is the template and its patch is a no-op.
 
 #![cfg_attr(
-    not(any(feature = "docx", feature = "pptx", feature = "xlsx")),
-    allow(
-        dead_code,
-        reason = "only the DOCX, PPTX and XLSX adapters plan merges"
-    )
+    not(any(
+        feature = "docx",
+        feature = "pptx",
+        feature = "xlsx",
+        feature = "doc",
+        feature = "ppt",
+        feature = "xls",
+        feature = "xlsb",
+        feature = "rtf",
+        feature = "odt",
+        feature = "ods",
+        feature = "odp"
+    )),
+    allow(dead_code, reason = "only the format adapters plan merges")
 )]
 
 use std::collections::BTreeSet;
@@ -906,7 +919,19 @@ fn apply_case(value: &str, switches: &[litchi_docx::field::Switch]) -> String {
 
 /// Text values keep tabs and line feeds; a carriage return (alone or before
 /// a line feed) becomes a line feed.
-#[cfg(any(feature = "docx", feature = "xlsx", test))]
+#[cfg(any(
+    feature = "docx",
+    feature = "xlsx",
+    feature = "rtf",
+    feature = "doc",
+    feature = "ppt",
+    feature = "xls",
+    feature = "xlsb",
+    feature = "odt",
+    feature = "ods",
+    feature = "odp",
+    test
+))]
 pub(crate) fn normalize_breaks(value: &str) -> std::borrow::Cow<'_, str> {
     if value.contains('\r') {
         std::borrow::Cow::Owned(value.replace("\r\n", "\n").replace('\r', "\n"))

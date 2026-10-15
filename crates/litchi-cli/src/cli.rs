@@ -72,9 +72,10 @@ pub(crate) enum Command {
     /// Recalculate every formula and compare it with its cached value
     /// (record 0266).
     Recalculate(crate::m4::Recalculate),
-    /// Fill a DOCX, PPTX or XLSX template's `{{key}}` placeholders and Word
-    /// merge fields from JSON or CSV data, one output per record
-    /// (record 0274).
+    /// Fill a template's `{{key}}` placeholders (DOCX, PPTX, XLSX, XLSB,
+    /// DOC, PPT, XLS, RTF and the ODF text, presentation and spreadsheet
+    /// formats) and Word merge fields from JSON or CSV data, one output per
+    /// record (records 0274 and 0295).
     Merge(crate::merge::Merge),
     /// Recompute derived field results: DOCX tables of contents and
     /// fields, PPTX slide numbers and dates, workbook formula caches

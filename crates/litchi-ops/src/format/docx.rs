@@ -90,6 +90,7 @@ mod props;
 mod publish;
 pub(crate) mod refresh;
 pub(crate) mod setters;
+mod smartart;
 mod spec;
 mod structure;
 pub(crate) mod views;

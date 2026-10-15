@@ -62,20 +62,20 @@
     "merge": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "template merge for XLSB and the legacy, RTF and ODF formats (record 0274 F1)",
-      "reason": "template merge fills DOCX, PPTX and XLSX templates"
+      "followUp": "template merge for the ODF object formats and iWork (record 0295)",
+      "reason": "template merge fills word-processing, presentation and spreadsheet templates"
     },
     "replace": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "record 0273 follow-up: a find adapter over the format's run-level text edits",
+      "followUp": "record 0295 follow-up: a find adapter over the format's text edits",
       "reason": "find/replace is not integrated for this format"
     },
     "refresh": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "field refresh for the legacy, RTF and ODF formats (record 0279 follow-up)",
-      "reason": "field refresh recomputes DOCX fields, PPTX slide fields and workbook formulas"
+      "followUp": "record 0295 follow-up: field refresh for PPT, RTF and the ODF object formats",
+      "reason": "this format has no field refresh adapter"
     },
     "save": {
       "supported": true

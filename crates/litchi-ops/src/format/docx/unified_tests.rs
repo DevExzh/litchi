@@ -1060,6 +1060,14 @@ fn capabilities_match_live_paths_queries_and_views() {
         )
         .expect("add a chart")
         .into_file();
+    // And SmartArt (record 0295).
+    let smartart = file
+        .add(
+            "/body/p[1]",
+            crate::NewNode::new("smartart").prop("text", "A\nB"),
+        )
+        .expect("add a SmartArt graphic")
+        .into_file();
     let file_for = |name: &str| {
         if matches!(name, "comments" | "comment") {
             &commented
@@ -1067,6 +1075,8 @@ fn capabilities_match_live_paths_queries_and_views() {
             &pictured
         } else if name == "chart" {
             &charted
+        } else if name == "smartart" {
+            &smartart
         } else {
             &file
         }

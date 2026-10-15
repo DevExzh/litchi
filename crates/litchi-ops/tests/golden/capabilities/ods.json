@@ -17,8 +17,8 @@
     "evaluate": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "ODS adapter follow-up (record 0277): CSV import and OpenFormula evaluation",
-      "reason": "ODS worksheets are written cell by cell; CSV import and OpenFormula evaluation are not integrated"
+      "followUp": "record 0295 follow-up: OpenFormula translation for the litchi-eval engine",
+      "reason": "ODS formulas are OpenFormula; the evaluation engine reads Excel syntax"
     },
     "set": {
       "supported": true
@@ -42,28 +42,19 @@
       "supported": true
     },
     "import": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "ODS adapter follow-up (record 0277): CSV import and OpenFormula evaluation",
-      "reason": "ODS worksheets are written cell by cell; CSV import and OpenFormula evaluation are not integrated"
+      "supported": true
     },
     "merge": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "template merge for XLSB and the legacy, RTF and ODF formats (record 0274 F1)",
-      "reason": "template merge fills DOCX, PPTX and XLSX templates"
+      "supported": true
     },
     "replace": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "record 0273 follow-up: a find adapter over the format's run-level text edits",
-      "reason": "find/replace is not integrated for this format"
+      "supported": true
     },
     "refresh": {
       "supported": false,
       "code": "unsupported_capability",
-      "followUp": "field refresh for the legacy, RTF and ODF formats (record 0279 follow-up)",
-      "reason": "field refresh recomputes DOCX fields, PPTX slide fields and workbook formulas"
+      "followUp": "record 0295 follow-up: field refresh for PPT, RTF and the ODF object formats",
+      "reason": "this format has no field refresh adapter"
     },
     "save": {
       "supported": true

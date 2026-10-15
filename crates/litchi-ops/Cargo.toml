@@ -206,3 +206,8 @@ required-features = ["pages", "keynote", "numbers"]
 [[example]]
 name              = "pages_bench"
 required-features = ["pages"]
+
+# Paired leaf-vs-unified find, merge and import on more formats (record 0295).
+[[example]]
+name              = "m4_formats_bench"
+required-features = ["odt", "doc", "ods"]

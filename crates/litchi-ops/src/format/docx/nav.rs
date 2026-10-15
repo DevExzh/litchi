@@ -532,6 +532,10 @@ impl<'f> Navigate<'f> for Nav<'f> {
             (Value::Document | Value::Body(_), Kind::Chart) => {
                 super::chart::pick_document_chart(self.docx, &step.select)
             },
+            // SmartArt is addressed document-wide too (record 0295).
+            (Value::Document | Value::Body(_), Kind::SmartArt) => {
+                super::smartart::pick_document_smartart(self.docx, &step.select)
+            },
             (Value::Paragraph { paragraph, .. }, Kind::Hyperlink) => {
                 let links = hyperlinks(self.docx, paragraph)?;
                 Ok(match pick_index(links.len(), &step.select) {

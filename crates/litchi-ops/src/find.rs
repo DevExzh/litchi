@@ -40,12 +40,37 @@
 //! [`crate::Applied::matched`].
 
 #![cfg_attr(
-    not(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "rtf")),
+    not(any(
+        feature = "docx",
+        feature = "xlsx",
+        feature = "pptx",
+        feature = "xlsx",
+        feature = "rtf",
+        feature = "doc",
+        feature = "ppt",
+        feature = "xls",
+        feature = "xlsb",
+        feature = "odt",
+        feature = "ods",
+        feature = "odp"
+    )),
     allow(dead_code, unused_imports, unused_variables)
 )]
 
 mod matcher;
 mod plan;
+#[cfg(any(
+    feature = "xlsx",
+    feature = "rtf",
+    feature = "doc",
+    feature = "ppt",
+    feature = "xls",
+    feature = "xlsb",
+    feature = "odt",
+    feature = "ods",
+    feature = "odp"
+))]
+pub(crate) mod surface;
 #[cfg(test)]
 mod tests;
 
@@ -56,10 +81,32 @@ pub(crate) use matcher::Matcher;
 pub(crate) use plan::matches_with;
 #[cfg(test)]
 pub(crate) use plan::plan;
-#[cfg(any(feature = "pptx", feature = "xlsx", feature = "rtf"))]
+#[cfg(any(
+    feature = "pptx",
+    feature = "xlsx",
+    feature = "rtf",
+    feature = "doc",
+    feature = "ppt",
+    feature = "xls",
+    feature = "xlsb",
+    feature = "odt",
+    feature = "ods",
+    feature = "odp"
+))]
 pub(crate) use plan::plan_with;
 pub(crate) use plan::{Piece, Scratch};
-#[cfg(feature = "pptx")]
+#[cfg(any(
+    feature = "pptx",
+    feature = "xlsx",
+    feature = "rtf",
+    feature = "doc",
+    feature = "ppt",
+    feature = "xls",
+    feature = "xlsb",
+    feature = "odt",
+    feature = "ods",
+    feature = "odp"
+))]
 pub(crate) use plan::{Values, rewrite_ranges};
 
 use crate::error::{Code, Error, Result};
@@ -301,9 +348,8 @@ pub(crate) fn set(
     props: &Props<'_>,
 ) -> Result<crate::File> {
     let spec = Spec::admit(props)?;
-    #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "rtf"))]
     let limits = crate::transaction::SemanticLimits::default();
-    let _ = &target;
+    let _ = (&target, &limits);
     match file {
         #[cfg(feature = "docx")]
         crate::File::Docx(handle) => handle
@@ -321,6 +367,46 @@ pub(crate) fn set(
         crate::File::Rtf(handle) => handle
             .find_replace(&target, &spec, &limits)
             .map(|(commit, _)| crate::File::Rtf(commit.after)),
+        #[cfg(feature = "doc")]
+        crate::File::Doc(handle) => handle
+            .find_replace(&target, &spec, &limits)
+            .map(|(commit, _)| crate::File::Doc(commit.after)),
+        #[cfg(feature = "xlsb")]
+        crate::File::Xlsb(handle) => {
+            crate::format::xlsb::write::find::find_replace(handle, &target, &spec, &limits)
+                .map(|(commit, _)| crate::File::Xlsb(commit.into_file()))
+        },
+        #[cfg(feature = "xls")]
+        crate::File::Xls(handle) => crate::format::xls::write::find::find_replace(
+            handle, &target, &spec, &limits,
+        )
+        .map(|(commits, _)| {
+            crate::File::Xls(
+                commits
+                    .last()
+                    .map_or_else(|| handle.clone(), |commit| commit.after.clone()),
+            )
+        }),
+        #[cfg(feature = "ods")]
+        crate::File::Ods(handle) => {
+            crate::format::ods::write::find::find_replace(handle, &target, &spec, &limits)
+                .map(|(commit, _)| crate::File::Ods(commit.after))
+        },
+        #[cfg(feature = "odt")]
+        crate::File::Odt(handle) | crate::File::Oth(handle) | crate::File::Odm(handle) => {
+            crate::format::odt::write::find::find_replace(handle, &target, &spec, &limits)
+                .map(|(commit, _)| commit.after.into_file())
+        },
+        #[cfg(feature = "odp")]
+        crate::File::Odp(handle) => {
+            crate::format::odp::write::find::find_replace(handle, &target, &spec, &limits)
+                .map(|(commit, _)| crate::File::Odp(commit.after))
+        },
+        #[cfg(feature = "ppt")]
+        crate::File::Ppt(handle) => {
+            crate::format::ppt::write::find::find_replace(handle, &target, &spec, &limits)
+                .map(|(commit, _)| crate::File::Ppt(commit.after))
+        },
         _ => Err(unsupported(file)),
     }
 }

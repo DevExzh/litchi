@@ -41,6 +41,26 @@ impl ObjectRef {
     }
 }
 
+/// The field elements [`Change::SetFieldText`] rewrites.
+const TEXT_FIELDS: [&str; 16] = [
+    "page-number",
+    "page-count",
+    "date",
+    "time",
+    "title",
+    "subject",
+    "description",
+    "keywords",
+    "initial-creator",
+    "creator",
+    "author-name",
+    "creation-date",
+    "creation-time",
+    "modification-date",
+    "modification-time",
+    "file-name",
+];
+
 /// A story: an object's text, or one table cell's text.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct StoryRef {
@@ -124,6 +144,20 @@ pub enum Change {
     },
     /// Replace one run's content with plain text.
     SetRunText {
+        /// The story.
+        story: StoryRef,
+        /// Zero-based paragraph position.
+        paragraph: usize,
+        /// Zero-based run position.
+        run: usize,
+        /// The new text.
+        text: String,
+    },
+    /// Replace the displayed text of one field run (`text:page-number`,
+    /// `text:date`, `text:title`, ...), keeping its element and attributes:
+    /// a field refresh (record 0295). Bookmarks and other markers are
+    /// refused.
+    SetFieldText {
         /// The story.
         story: StoryRef,
         /// Zero-based paragraph position.
@@ -407,6 +441,12 @@ impl<'a> Planner<'a> {
                 run,
                 text,
             } => self.set_run_text(story, *paragraph, *run, text),
+            Change::SetFieldText {
+                story,
+                paragraph,
+                run,
+                text,
+            } => self.set_field_text(story, *paragraph, *run, text),
             Change::InsertParagraph { story, index, text } => {
                 self.insert_paragraph(story, *index, text)
             },
@@ -618,6 +658,47 @@ impl<'a> Planner<'a> {
             },
             RunKind::Field => Err(unsupported("ODP field runs are computed and cannot be set")),
         }
+    }
+
+    fn set_field_text(
+        &mut self,
+        story: &StoryRef,
+        index: usize,
+        run: usize,
+        text: &str,
+    ) -> Result<()> {
+        let paragraph = self.paragraph(story, index)?;
+        let selected = paragraph.runs.get(run).ok_or_else(|| missing("run"))?;
+        if selected.kind != RunKind::Field {
+            return Err(invalid("the ODP run is not a field"));
+        }
+        let tag_end = if selected.content.start > selected.range.start {
+            selected.content.start
+        } else {
+            selected.range.end
+        };
+        let name = StartTag::parse(&self.xml[selected.range.start..tag_end])?.name;
+        let local = name.rsplit(':').next().unwrap_or(name);
+        if !TEXT_FIELDS.contains(&local) {
+            return Err(unsupported(
+                "this ODP field run holds no displayed text to refresh",
+            ));
+        }
+        if selected.text == text {
+            return Ok(());
+        }
+        let range = selected.range.clone();
+        let content = selected.content.clone();
+        let empty = content.start == range.end;
+        let prefix = self.text_prefix()?;
+        let encoded = encode(prefix, text)?;
+        self.replace_content(
+            range.clone(),
+            range.start..tag_end,
+            content,
+            empty,
+            &encoded,
+        )
     }
 
     fn insert_paragraph(&mut self, reference: &StoryRef, index: usize, text: &str) -> Result<()> {

@@ -1,8 +1,10 @@
 //! Field and table-of-contents refresh (design §13 P0, record 0279).
 //!
 //! [`File::refresh`](crate::File::refresh) recomputes the derived results a
-//! document caches: tables of contents and computable fields in DOCX, slide
-//! numbers and dates in PPTX, and formula results in XLSX. Every field the
+//! document caches: tables of contents and computable fields in DOCX,
+//! computable fields in DOC, ODT, OTH and ODM, slide numbers and dates in
+//! PPTX and ODP, and formula results in XLSX, XLSB and XLS (records 0279
+//! and 0295). Every field the
 //! refresh meets is reported in the [`Summary`] with a [`Status`]; the
 //! changed results are written in **one** atomic native commit, and a
 //! document whose results are all current is an exact no-op.
@@ -61,6 +63,17 @@
 //! fields (except the `PAGEREF`s a rebuilt table of contents replaces), in
 //! text boxes, with numeric pictures (`\#`) or other switches are
 //! [`Status::Unsupported`]. Only the main story is refreshed.
+//!
+//! # Other formats (record 0295)
+//!
+//! | Format | Fields |
+//! |---|---|
+//! | DOC | the main story's top-level fields with a result, computed as DOCX computes them (`REF` is `unsupported`), rewritten through the native field-result edit; a story with a nested field or a field without a result reports every computable field `unsupported` |
+//! | ODT, OTH, ODM | the body's `text:date`/`text:time` (clock), stored-time and document-property fields; page fields are [`Status::NeedsLayout`], fixed fields [`Status::Locked`], fields with an ODF data style `unsupported` |
+//! | ODP | as ODT, and `text:page-number` (the slide position) and `text:page-count` (the number of slides) on every slide and notes page |
+//! | XLSB, XLS | formula results as XLSX, written back with [`Options::write_cache`] as the formula records' cached results |
+//!
+//! PPT and RTF have no refresh adapter yet.
 //!
 //! # Limits
 //!
@@ -560,7 +573,10 @@ impl Field {
         self
     }
 
-    #[cfg(all(feature = "eval", feature = "xlsx"))]
+    #[cfg(all(
+        feature = "eval",
+        any(feature = "xlsx", feature = "xlsb", feature = "xls")
+    ))]
     pub(crate) const fn with_status(mut self, status: Status, reason: &'static str) -> Self {
         self.status = status;
         self.reason = Some(reason);
@@ -615,6 +631,27 @@ pub struct Summary {
 }
 
 impl Summary {
+    /// A summary of `fields` without bookmarks or missing page numbers.
+    #[cfg_attr(
+        not(any(
+            all(feature = "eval", any(feature = "xlsb", feature = "xls")),
+            feature = "doc",
+            feature = "odt",
+            feature = "odp"
+        )),
+        allow(
+            dead_code,
+            reason = "used by the adapters that build their report as a list"
+        )
+    )]
+    pub(crate) const fn from_fields(fields: Vec<Field>) -> Self {
+        Self {
+            fields,
+            bookmarks: 0,
+            missing_page_numbers: 0,
+        }
+    }
+
     /// Every field met, in document order.
     #[must_use]
     pub fn fields(&self) -> &[Field] {
@@ -924,6 +961,267 @@ pub(crate) fn workbook_summary(
         missing_page_numbers: 0,
     })
 }
+
+/// Why a field was not computed.
+#[cfg(any(feature = "docx", feature = "doc", feature = "odt", feature = "odp"))]
+pub(crate) type Skip = (Status, Option<&'static str>);
+
+/// The new displayed text of an ODF text field (record 0295): `name` is the
+/// element's local name (`date`, `title`, ...), `fixed` its `text:fixed`,
+/// `styled` whether it names a data style. Page fields are the caller's
+/// (they need layout in a text document, the slide position in a
+/// presentation).
+#[cfg(any(feature = "odt", feature = "odp"))]
+pub(crate) fn odf_field(
+    name: &str,
+    fixed: bool,
+    styled: bool,
+    metadata: &litchi_core::Metadata,
+    clock: Option<Clock>,
+) -> std::result::Result<String, Skip> {
+    if fixed {
+        return Err((Status::Locked, Some("the field is fixed (text:fixed)")));
+    }
+    let dated = |stamp: Option<litchi_core::metadata::Timestamp>, time: bool| {
+        if styled {
+            return Err((
+                Status::Unsupported,
+                Some("ODF data styles are not applied to field values"),
+            ));
+        }
+        let clock = stamp.and_then(Clock::from_timestamp).ok_or((
+            Status::Unresolved,
+            Some("the document does not store this time"),
+        ))?;
+        Ok(clock.format(if time { "HH:mm:ss" } else { "yyyy-MM-dd" }))
+    };
+    let property = |value: &Option<String>| Ok(value.clone().unwrap_or_default());
+    match name {
+        "date" | "time" => {
+            if styled {
+                return Err((
+                    Status::Unsupported,
+                    Some("ODF data styles are not applied to field values"),
+                ));
+            }
+            let clock = clock.ok_or((Status::NeedsClock, None))?;
+            Ok(clock.format(if name == "date" {
+                "yyyy-MM-dd"
+            } else {
+                "HH:mm:ss"
+            }))
+        },
+        "creation-date" => dated(metadata.created, false),
+        "creation-time" => dated(metadata.created, true),
+        "modification-date" => dated(metadata.modified, false),
+        "modification-time" => dated(metadata.modified, true),
+        "print-date" => dated(metadata.last_printed, false),
+        "print-time" => dated(metadata.last_printed, true),
+        "title" => property(&metadata.title),
+        "subject" => property(&metadata.subject),
+        "description" => property(&metadata.description),
+        "keywords" => property(&metadata.keywords),
+        "initial-creator" => property(&metadata.author),
+        "creator" => property(&metadata.last_modified_by),
+        _ => Err((Status::Unsupported, None)),
+    }
+}
+
+#[cfg(any(feature = "docx", feature = "doc"))]
+mod word {
+    use std::collections::HashMap;
+
+    use litchi_core::Metadata;
+
+    use super::{Clock, Instruction, Status, apply_case, format_number};
+
+    use super::Skip;
+
+    /// The new result of a Word field that is not a table of contents (DOCX,
+    /// and DOC since record 0295): `bookmark` reads a bookmark's text for
+    /// `REF`, `counts` the main story's words and non-space characters.
+    pub(crate) fn word_field(
+        kind: &str,
+        instruction: &Instruction,
+        metadata: &Metadata,
+        clock: Option<Clock>,
+        seq: &mut HashMap<String, (u64, bool)>,
+        bookmark: impl FnOnce(&str) -> Option<String>,
+        counts: impl FnOnce() -> (usize, usize),
+    ) -> Result<String, Skip> {
+        if instruction.has('#') {
+            return Err((
+                Status::Unsupported,
+                Some("numeric pictures (\\#) are not applied"),
+            ));
+        }
+        let text = match kind {
+            "SEQ" => return sequence(instruction, seq),
+            "DATE" | "TIME" => {
+                let clock = clock.ok_or((Status::NeedsClock, None))?;
+                let default = if kind == "DATE" {
+                    "M/d/yyyy"
+                } else {
+                    "h:mm am/pm"
+                };
+                clock.format(instruction.switch('@').unwrap_or(default))
+            },
+            "CREATEDATE" | "SAVEDATE" | "PRINTDATE" => {
+                let stamp = match kind {
+                    "CREATEDATE" => metadata.created,
+                    "SAVEDATE" => metadata.modified,
+                    _ => metadata.last_printed,
+                };
+                let clock = stamp.and_then(Clock::from_timestamp).ok_or((
+                    Status::Unresolved,
+                    Some("the document does not store this time"),
+                ))?;
+                clock.format(instruction.switch('@').unwrap_or("M/d/yyyy h:mm:ss am/pm"))
+            },
+            "REF" => {
+                let name = instruction
+                    .arguments
+                    .first()
+                    .ok_or((Status::Unsupported, Some("REF names no bookmark")))?;
+                if instruction
+                    .switches
+                    .iter()
+                    .any(|(switch, _)| !matches!(switch, 'h' | '*'))
+                {
+                    return Err((
+                        Status::Unsupported,
+                        Some("REF paragraph-number and position switches are not computed"),
+                    ));
+                }
+                bookmark(name).ok_or((Status::Unresolved, Some("the bookmark does not exist")))?
+            },
+            "TITLE" | "SUBJECT" | "AUTHOR" | "KEYWORDS" | "COMMENTS" | "LASTSAVEDBY" => {
+                if !instruction.arguments.is_empty() {
+                    return Err((
+                        Status::Unsupported,
+                        Some("setting a property from a field is not done"),
+                    ));
+                }
+                property(metadata, kind).unwrap_or_default()
+            },
+            "DOCPROPERTY" => {
+                let name = instruction
+                    .arguments
+                    .first()
+                    .ok_or((Status::Unsupported, Some("DOCPROPERTY names no property")))?;
+                let key = name.replace(' ', "").to_ascii_uppercase();
+                property(metadata, &key).ok_or((
+                    Status::Unresolved,
+                    Some("the property is not a known document property"),
+                ))?
+            },
+            "NUMWORDS" | "NUMCHARS" => {
+                let (words, characters) = counts();
+                if kind == "NUMWORDS" {
+                    words
+                } else {
+                    characters
+                }
+                .to_string()
+            },
+            _ => return Err((Status::Unsupported, None)),
+        };
+        let mut text = text;
+        for format in instruction.formats() {
+            text = apply_case(&text, format).ok_or((
+                Status::Unsupported,
+                Some("the \\* format is not applied to this field"),
+            ))?;
+        }
+        Ok(text)
+    }
+
+    fn property(metadata: &Metadata, key: &str) -> Option<String> {
+        let value = match key {
+            "TITLE" => &metadata.title,
+            "SUBJECT" => &metadata.subject,
+            "AUTHOR" => &metadata.author,
+            "KEYWORDS" => &metadata.keywords,
+            "COMMENTS" => &metadata.description,
+            "LASTSAVEDBY" => &metadata.last_modified_by,
+            "CATEGORY" => &metadata.category,
+            "COMPANY" => &metadata.company,
+            "MANAGER" => &metadata.manager,
+            "TEMPLATE" => &metadata.template,
+            _ => return None,
+        };
+        Some(value.clone().unwrap_or_default())
+    }
+
+    /// `SEQ` numbering in document order, after OfficeCLI's evaluator.
+    pub(crate) fn sequence(
+        instruction: &Instruction,
+        counters: &mut HashMap<String, (u64, bool)>,
+    ) -> Result<String, Skip> {
+        let identifier = instruction
+            .arguments
+            .first()
+            .ok_or((Status::Unsupported, Some("SEQ names no sequence")))?
+            .clone();
+        let counter = counters.entry(identifier).or_insert((0, false));
+        if counter.1 {
+            return Err((
+                Status::Unsupported,
+                Some("an earlier field of this sequence was not computed"),
+            ));
+        }
+        if instruction.has('s') {
+            counter.1 = true;
+            return Err((
+                Status::Unsupported,
+                Some("heading-relative SEQ resets (\\s) need heading numbering"),
+            ));
+        }
+        let value = if let Some(reset) = instruction.switch('r') {
+            let Ok(reset) = reset.trim().parse::<u64>() else {
+                counter.1 = true;
+                return Err((
+                    Status::Unsupported,
+                    Some("the SEQ \\r reset is not a number"),
+                ));
+            };
+            reset
+        } else if instruction.has('c') {
+            counter.0
+        } else {
+            counter.0 + 1
+        };
+        counter.0 = value;
+        if instruction.has('h') {
+            return Ok(String::new());
+        }
+        let mut formats = instruction.formats();
+        let text = match formats.next() {
+            None => value.to_string(),
+            Some(format) => {
+                if formats.next().is_some() {
+                    counter.1 = true;
+                    return Err((Status::Unsupported, Some("several SEQ formats")));
+                }
+                if let Some(text) = format_number(value, format) {
+                    text
+                } else {
+                    counter.1 = true;
+                    return Err((
+                        Status::Unsupported,
+                        Some("the SEQ number format is not applied"),
+                    ));
+                }
+            },
+        };
+        Ok(text)
+    }
+}
+#[cfg(any(feature = "docx", feature = "doc"))]
+#[cfg(all(test, feature = "docx"))]
+pub(crate) use word::sequence;
+#[cfg(any(feature = "docx", feature = "doc"))]
+pub(crate) use word::word_field;
 
 #[cfg(test)]
 mod tests;

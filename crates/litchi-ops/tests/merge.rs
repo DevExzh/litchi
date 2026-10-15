@@ -498,14 +498,29 @@ fn xlsx_text_cells_are_filled_and_formulas_kept() {
 
 #[test]
 fn other_formats_report_the_gap() {
-    for format in [FileFormat::Xlsb, FileFormat::Xls] {
+    #[cfg(feature = "odg")]
+    {
+        let format = FileFormat::Odg;
         let file = litchi_ops::create(format).unwrap();
         let error = file.merge(&Record::new(), &Options::new()).unwrap_err();
         assert_eq!(error.code(), Code::UnsupportedCapability);
         assert_eq!(error.format(), Some(format));
         assert!(!Capabilities::of(format).verb(Verb::Merge).is_supported());
     }
-    for format in [FileFormat::Docx, FileFormat::Pptx, FileFormat::Xlsx] {
+    // Record 0295: the workbook formats merge too; an empty template is an
+    // exact no-op.
+    for format in [FileFormat::Xlsb, FileFormat::Xls] {
+        let file = litchi_ops::create(format).unwrap();
+        let commit = file.merge(&Record::new(), &Options::new()).unwrap();
+        assert!(commit.patch.is_noop());
+    }
+    for format in [
+        FileFormat::Docx,
+        FileFormat::Pptx,
+        FileFormat::Xlsx,
+        FileFormat::Xlsb,
+        FileFormat::Xls,
+    ] {
         assert!(
             Capabilities::of(format).verb(Verb::Merge).is_supported(),
             "{format:?}"
