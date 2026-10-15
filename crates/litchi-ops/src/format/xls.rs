@@ -272,12 +272,32 @@ impl Xls {
     /// once, after the operation.  Source versions only advance, so one
     /// probe after the read detects a change made before or during it, and a
     /// freshness failure takes precedence over the operation's own result.
+    ///
+    /// The operation runs in a fence scope for this handle, so the reads it
+    /// nests (a `View::text` that formats through further fenced reads)
+    /// share this one check instead of each adding their own; inside an
+    /// enclosing scope (a resolver or query step, or an outer `finish`),
+    /// whose check runs after the whole step, the operation runs alone
+    /// (record 0291). Every public read still ends in at least one check.
     pub(crate) fn finish<T>(&self, operation: impl FnOnce() -> Result<T>) -> Result<T> {
-        let value = operation();
+        let key = self.fence_key();
+        if crate::path::fence::is_active(key) {
+            return operation();
+        }
+        let value = {
+            let _scope = crate::path::fence::Scope::enter(key);
+            operation()
+        };
         match self.check_source() {
             Err(error) => Err(error),
             Ok(()) => value,
         }
+    }
+
+    /// This handle's key for [`crate::path::fence::Scope`]: its shared
+    /// owner, which every clone of the handle reads.
+    pub(crate) fn fence_key(&self) -> usize {
+        Arc::as_ptr(&self.0).addr()
     }
 
     #[cfg(test)]
@@ -739,6 +759,99 @@ mod tests {
                 crate::error::Source::XlsSource(SourceBackedError::SourceChanged { .. })
             ));
         }
+    }
+
+    /// An in-memory source that counts its version observations.
+    struct Counting {
+        inner: litchi_core::OwnedSource,
+        versions: std::sync::atomic::AtomicUsize,
+    }
+
+    impl litchi_core::ReadAt for Counting {
+        fn len(&self) -> std::io::Result<u64> {
+            self.inner.len()
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> std::io::Result<usize> {
+            self.inner.read_at(offset, output)
+        }
+
+        fn version(&self) -> std::io::Result<litchi_core::SourceVersion> {
+            self.versions
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            self.inner.version()
+        }
+    }
+
+    /// Record 0291: a read nested in another fenced read of the same handle
+    /// (a sheet's `View::text`, which reads the sheet name through a
+    /// fenced reader) shares the outer read's one check; every public read
+    /// still checks once, and every query match once.
+    #[test]
+    fn nested_fenced_reads_share_the_outer_check() {
+        let counting = Arc::new(Counting {
+            inner: litchi_core::OwnedSource::new(fixture("Simple.xls")),
+            versions: std::sync::atomic::AtomicUsize::new(0),
+        });
+        let workbook = SourceBackedWorkbook::from_read_at(counting.clone()).unwrap();
+        let unified = crate::File::Xls(Xls::from_source(workbook).unwrap());
+        let observe = |read: &dyn Fn()| {
+            let before = counting.versions.load(std::sync::atomic::Ordering::Relaxed);
+            read();
+            counting.versions.load(std::sync::atomic::Ordering::Relaxed) - before
+        };
+        let sheet = unified.get("/sheet[1]").unwrap();
+        // `View::text` of a sheet reads its name through `sheet_name`, itself
+        // a fenced read: one check for both.
+        assert_eq!(observe(&|| drop(sheet.view().text().unwrap())), 1);
+        assert_eq!(observe(&|| drop(sheet.view().text().unwrap())), 1);
+        // A `get` checks once after resolving.
+        assert_eq!(observe(&|| drop(unified.get("/sheet[1]").unwrap())), 1);
+        // Each match of a query, and its end, is checked.
+        // Each match of a query, and its end, is still checked (owner
+        // decision 2026-10-14), besides what the leaf observes.
+        let sheets = unified.query("sheet").unwrap().count();
+        assert!(sheets >= 1);
+        assert!(observe(&|| assert_eq!(unified.query("sheet").unwrap().count(), sheets)) > sheets);
+    }
+
+    /// Record 0291: nested reads under `View::text` share one check, and
+    /// a node read before a change still refuses the changed source.
+    #[cfg(any(unix, windows))]
+    #[test]
+    fn shared_nested_checks_still_refuse_a_changed_source() {
+        let file = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(file.path(), fixture("Simple.xls")).unwrap();
+        let unified = crate::open(file.path()).unwrap();
+        let node = unified.get("/sheet[1]/A1").unwrap();
+        let before = node.view().text().unwrap();
+        assert!(before.is_some());
+        assert_eq!(
+            unified.get("/sheet[1]/A1").unwrap().view().text().unwrap(),
+            before
+        );
+        let mut appended = std::fs::OpenOptions::new()
+            .append(true)
+            .open(file.path())
+            .unwrap();
+        appended.write_all(&[0]).unwrap();
+        appended.flush().unwrap();
+        for error in [
+            node.view().text().unwrap_err(),
+            unified.get("/sheet[1]/A1").unwrap_err(),
+        ] {
+            assert!(
+                matches!(
+                    error.leaf(),
+                    crate::error::Source::XlsSource(SourceBackedError::SourceChanged { .. })
+                ),
+                "{error:?}"
+            );
+        }
+        assert!(!crate::path::fence::is_active(match &unified {
+            crate::File::Xls(xls) => xls.fence_key(),
+            _ => unreachable!(),
+        }));
     }
 
     #[test]
