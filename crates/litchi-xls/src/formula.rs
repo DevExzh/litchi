@@ -380,6 +380,7 @@ pub(crate) enum FormulaReferenceSpan {
 /// Returns the exact byte fields for every ordinary same-sheet `PtgRef` and
 /// `PtgArea` after fully validating the bounded token expression. Names,
 /// shared-relative references, 3-D references, and unknown tokens fail closed.
+#[cfg(test)]
 pub(crate) fn formula_2d_reference_spans(tokens: &[u8]) -> Option<Vec<FormulaReferenceSpan>> {
     if tokens.len() > MAX_FORMULA_TOKEN_BYTES {
         return None;
@@ -387,6 +388,43 @@ pub(crate) fn formula_2d_reference_spans(tokens: &[u8]) -> Option<Vec<FormulaRef
     let mut decoder = FormulaDecoder::new(tokens, None, None);
     decoder.decode().ok()?;
     Some(decoder.references)
+}
+
+/// One 3-D reference of a formula: its `ixti` (the EXTERNSHEET entry that
+/// names its sheet span) and the token offsets of its coordinate fields.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct Formula3dSpan {
+    /// The XTI index the reference names.
+    pub(crate) extern_sheet: u16,
+    /// The coordinate fields; `None` for `PtgRefErr3d`/`PtgAreaErr3d`, which
+    /// keep no coordinate.
+    pub(crate) reference: Option<FormulaReferenceSpan>,
+}
+
+/// Every reference of a fully validated token expression: the same-sheet
+/// `PtgRef`/`PtgArea` fields and the 3-D references with their XTI index.
+/// Defined-name operands (`PtgName`, `PtgNameX`) carry no coordinate and are
+/// accepted; shared-relative references and unknown tokens fail closed.
+pub(crate) struct FormulaReferences {
+    /// Same-sheet references.
+    pub(crate) same_sheet: Vec<FormulaReferenceSpan>,
+    /// 3-D references.
+    pub(crate) three_d: Vec<Formula3dSpan>,
+}
+
+/// Returns [`FormulaReferences`] for a token expression, without a workbook
+/// context: names and sheet prefixes are not resolved, only located.
+pub(crate) fn formula_reference_spans(tokens: &[u8]) -> Option<FormulaReferences> {
+    if tokens.len() > MAX_FORMULA_TOKEN_BYTES {
+        return None;
+    }
+    let mut decoder = FormulaDecoder::new(tokens, None, None);
+    decoder.locate_only = true;
+    decoder.decode().ok()?;
+    Some(FormulaReferences {
+        same_sheet: decoder.references,
+        three_d: decoder.references_3d,
+    })
 }
 
 /// Render a shared formula template at a particular formula-cell origin.
@@ -426,6 +464,10 @@ struct FormulaDecoder<'a> {
     context: Option<&'a FormulaContext>,
     shared_origin: Option<(u16, u16)>,
     references: Vec<FormulaReferenceSpan>,
+    /// Locate references without a workbook context: names and 3-D sheet
+    /// prefixes render as placeholders and 3-D references are recorded.
+    locate_only: bool,
+    references_3d: Vec<Formula3dSpan>,
 }
 
 impl<'a> FormulaDecoder<'a> {
@@ -443,6 +485,8 @@ impl<'a> FormulaDecoder<'a> {
             context,
             shared_origin,
             references: Vec::new(),
+            locate_only: false,
+            references_3d: Vec::new(),
         }
     }
 
@@ -604,6 +648,10 @@ impl<'a> FormulaDecoder<'a> {
                 }
                 self.function(metadata.name, args)
             },
+            0x23 if self.locate_only => {
+                self.u32()?;
+                self.push_text(String::from("_"))
+            },
             0x23 => {
                 let index = self.u32()?;
                 let name = self
@@ -674,6 +722,17 @@ impl<'a> FormulaDecoder<'a> {
                 let last = cell_reference(last_row, last_col)?;
                 self.push_rendered(format_args!("{first}:{last}"))
             },
+            0x39 if self.locate_only => {
+                self.u16()?;
+                self.u16()?;
+                if self.u16()? != 0 {
+                    return Err(());
+                }
+                self.name_x_operands.try_reserve(1).map_err(|_error| ())?;
+                self.name_x_operands.push(self.stack.len());
+                self.push_text(String::from("_"))
+            },
+            0x3a..=0x3d if self.locate_only => self.locate_3d(base),
             0x39 => {
                 let extern_sheet = self.u16()?;
                 let name_index = self.u16()?;
@@ -738,6 +797,47 @@ impl<'a> FormulaDecoder<'a> {
             },
             _ => Err(()),
         }
+    }
+
+    /// Records one 3-D reference token (`base` 0x3A–0x3D) without a context.
+    fn locate_3d(&mut self, base: u8) -> Result<(), ()> {
+        let extern_sheet = self.u16()?;
+        let reference = match base {
+            0x3a => {
+                let row = self.pos;
+                self.skip(2)?;
+                let column = self.pos;
+                self.skip(2)?;
+                Some(FormulaReferenceSpan::Cell { row, column })
+            },
+            0x3b => {
+                let first_row = self.pos;
+                let last_row = first_row + 2;
+                let first_column = first_row + 4;
+                let last_column = first_row + 6;
+                self.skip(8)?;
+                Some(FormulaReferenceSpan::Area {
+                    first_row,
+                    last_row,
+                    first_column,
+                    last_column,
+                })
+            },
+            0x3c => {
+                self.skip(4)?;
+                None
+            },
+            _ => {
+                self.skip(8)?;
+                None
+            },
+        };
+        self.references_3d.try_reserve(1).map_err(|_error| ())?;
+        self.references_3d.push(Formula3dSpan {
+            extern_sheet,
+            reference,
+        });
+        self.push_text(String::from("_"))
     }
 
     fn attribute(&mut self) -> Result<(), ()> {

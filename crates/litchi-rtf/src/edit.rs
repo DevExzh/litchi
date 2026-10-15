@@ -29,6 +29,7 @@ use std::ops::Range;
 mod composition;
 mod destination_splice;
 mod picture_payload;
+mod producer_paragraphs;
 mod transfer;
 pub use composition::{
     Composition, CompositionConflict, CompositionError, CompositionLimits, ConflictSet,
@@ -5038,6 +5039,30 @@ impl Edit {
     /// Returns an error when the changed source is outside the supported
     /// closure or candidate validation/readback fails.
     pub fn commit(self) -> Result<Commit, Error> {
+        // The plain-body paths keep their behaviour and cost; a paragraph
+        // removal, move or swap they refuse falls back to exact source
+        // splicing of producer paragraphs (record 0293), whose typed refusal
+        // names the producer construct.
+        match self.operations.as_slice() {
+            [
+                operation @ (Operation::RemoveParagraph { .. }
+                | Operation::MoveParagraph { .. }
+                | Operation::SwapParagraph { .. }),
+            ] => {
+                let operation = operation.clone();
+                let source = self.source.clone();
+                match self.commit_staged() {
+                    Err(Error::UnsupportedSource(_)) => {
+                        producer_paragraphs::commit(source, &operation)
+                    },
+                    result => result,
+                }
+            },
+            _ => self.commit_staged(),
+        }
+    }
+
+    fn commit_staged(self) -> Result<Commit, Error> {
         self.ensure_operation_room_for(0)?;
         self.admit_replacement(0)?;
         let operation_count = self.operations.len();

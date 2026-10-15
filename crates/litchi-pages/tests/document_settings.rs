@@ -1,6 +1,7 @@
 use std::io;
 use std::sync::Arc;
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
 use litchi_iwa_common::{decode_varint_from_bytes, encode_varint_into, wire::WireView};
 use litchi_iwa_core::{
@@ -8,7 +9,7 @@ use litchi_iwa_core::{
 };
 use litchi_iwa_protos::{tp, tsa, tsk, tsp, tswp};
 use litchi_pages::{
-    Limits, Package,
+    Package,
     document_options::Options,
     document_settings::{
         Commit, Diagnostics, Edit, Error as SettingsError, LimitKind, Patch, Settings,
@@ -1457,7 +1458,10 @@ fn output_limit_is_typed_and_failure_is_atomic() -> TestResult {
         1024 * 1024,
         1024 * 1024,
     )?;
-    let package = Package::from_bytes_with_limits(&bytes, limits)?;
+    let package = Package::from_bytes_with_options(
+        &bytes,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    )?;
     assert!(matches!(
         package.edit_document_settings()?.set(after).commit(),
         Err(SettingsError::LimitExceeded {

@@ -9295,6 +9295,873 @@
         }
       ],
       "families": []
+    },
+    {
+      "id": "pages",
+      "package": "litchi-pages",
+      "default_features": true,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "BodyChartArrangementCommit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::chart::arrangement::Commit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyChartArrangementDiagnostics",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::chart::arrangement::Diagnostics (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyChartArrangementEdit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::chart::arrangement::Edit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyChartArrangementError",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::chart::arrangement::Error (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyChartArrangementLimitKind",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::chart::arrangement::LimitKind (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyChartArrangementPatch",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::chart::arrangement::Patch (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyChartDataCommit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::chart::data::Commit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyChartDataDiagnostics",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::chart::data::Diagnostics (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyChartDataEdit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::chart::data::Edit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyChartDataError",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::chart::data::Error (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyChartDataLimitKind",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::chart::data::LimitKind (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyChartDataPatch",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::chart::data::Patch (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyChartMetadataError",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::chart::metadata::Error (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyChartMetadataLimitKind",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::chart::metadata::LimitKind (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyDrawableOrderCommit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::drawable::order::Commit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyDrawableOrderDiagnostics",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::drawable::order::Diagnostics (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyDrawableOrderEdit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::drawable::order::Edit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyDrawableOrderError",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::drawable::order::Error (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyDrawableOrderLimitKind",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::drawable::order::LimitKind (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyDrawableOrderPatch",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::drawable::order::Patch (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyFootnoteCommit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::footnote::body::transaction::Commit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyFootnoteDiagnostics",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::footnote::body::transaction::Diagnostics (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyFootnoteEdit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::footnote::body::transaction::Edit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyFootnoteError",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::footnote::body::transaction::Error (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyFootnoteLimitKind",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::footnote::body::transaction::LimitKind (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyFootnotePatch",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::footnote::body::transaction::Patch (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyFootnoteSnapshot",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::footnote::body::transaction::Snapshot (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyImageAdjustmentsCommit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::image::adjustments::Commit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyImageAdjustmentsDiagnostics",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::image::adjustments::Diagnostics (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyImageAdjustmentsEdit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::image::adjustments::Edit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyImageAdjustmentsError",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::image::adjustments::Error (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyImageAdjustmentsLimitKind",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::image::adjustments::LimitKind (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyImageAdjustmentsPatch",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::image::adjustments::Patch (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableAppearanceCommit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::appearance::transaction::Commit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableAppearanceDiagnostics",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::appearance::transaction::Diagnostics (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableAppearanceEdit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::appearance::transaction::Edit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableAppearanceError",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::appearance::transaction::Error (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableAppearanceLimitKind",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::appearance::transaction::LimitKind (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableAppearancePatch",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::appearance::transaction::Patch (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableAppearancePath",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::appearance::transaction::Path (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableCatalog",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::catalog::Catalog (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableCatalogError",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::catalog::Error (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableCatalogLimitKind",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::catalog::LimitKind (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableCellsError",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::cells::Error (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableCellsLimitKind",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::cells::LimitKind (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableDeletionCommit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::deletion::Commit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableDeletionDiagnostics",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::deletion::Diagnostics (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableDeletionError",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::deletion::Error (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableDeletionLimitKind",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::deletion::LimitKind (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableDeletionPatch",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::deletion::Patch (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableDimensionCommit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::dimension::transaction::Commit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableDimensionDiagnostics",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::dimension::transaction::Diagnostics (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableDimensionEdit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::dimension::transaction::Edit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableDimensionError",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::dimension::transaction::Error (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableDimensionLimitKind",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::dimension::transaction::LimitKind (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableDimensionPatch",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::dimension::transaction::Patch (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableHeaderSettingsCommit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::headers::transaction::Commit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableHeaderSettingsDiagnostics",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::headers::transaction::Diagnostics (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableHeaderSettingsEdit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::headers::transaction::Edit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableHeaderSettingsError",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::headers::transaction::Error (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableHeaderSettingsInvalidReason",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::headers::transaction::InvalidReason (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableHeaderSettingsLimitKind",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::headers::transaction::LimitKind (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableHeaderSettingsPatch",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::headers::transaction::Patch (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableHiddenAxesCommit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::hidden_axes::transaction::Commit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableHiddenAxesDiagnostics",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::hidden_axes::transaction::Diagnostics (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableHiddenAxesEdit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::hidden_axes::transaction::Edit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableHiddenAxesError",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::hidden_axes::transaction::Error (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableHiddenAxesLimitKind",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::hidden_axes::transaction::LimitKind (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableHiddenAxesPatch",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::hidden_axes::transaction::Patch (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableHiddenAxesPath",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::hidden_axes::transaction::Path (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableLockCommit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::lock::Commit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableLockDiagnostics",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::lock::Diagnostics (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableLockEdit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::lock::Edit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableLockError",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::lock::Error (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableLockLimitKind",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::lock::LimitKind (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableLockPatch",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::lock::Patch (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableMergesCommit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::merge::transaction::Commit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableMergesDiagnostics",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::merge::transaction::Diagnostics (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableMergesEdit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::merge::transaction::Edit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableMergesError",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::merge::transaction::Error (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableMergesLimitKind",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::merge::transaction::LimitKind (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableMergesPatch",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::merge::transaction::Patch (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableNameCommit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::name::transaction::Commit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableNameDiagnostics",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::name::transaction::Diagnostics (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableNameEdit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::name::transaction::Edit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableNameError",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::name::transaction::Error (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableNameLimitKind",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::name::transaction::LimitKind (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableNamePatch",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::name::transaction::Patch (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableNamePath",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::name::transaction::Path (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableSnapshot",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::catalog::Snapshot (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableSortCommit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::sort::transaction::Commit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableSortDiagnostics",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::sort::transaction::Diagnostics (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableSortEdit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::sort::transaction::Edit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableSortError",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::sort::transaction::Error (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableSortLimitKind",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::sort::transaction::LimitKind (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableSortPatch",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::sort::transaction::Patch (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableSortPath",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::sort::transaction::Path (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableTitleCommit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::title::Commit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableTitleDiagnostics",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::title::Diagnostics (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableTitleEdit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::title::Edit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableTitleError",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::title::Error (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableTitleLimitKind",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::title::LimitKind (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableTitlePatch",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::title::Patch (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "FootnoteTextCommit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::footnote::text::Commit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "FootnoteTextDiagnostics",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::footnote::text::Diagnostics (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "FootnoteTextEdit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::footnote::text::Edit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "FootnoteTextError",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::footnote::text::Error (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "FootnoteTextLimitKind",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::footnote::text::LimitKind (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "FootnoteTextPatch",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::footnote::text::Patch (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "HeaderFooterTextCommit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::header_footer::text::Commit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "HeaderFooterTextDiagnostics",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::header_footer::text::Diagnostics (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "HeaderFooterTextEdit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::header_footer::text::Edit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "HeaderFooterTextError",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::header_footer::text::Error (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "HeaderFooterTextLimitKind",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::header_footer::text::LimitKind (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "HeaderFooterTextPatch",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::header_footer::text::Patch (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "PageLayoutCommit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::page_layout::transaction::Commit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "PageLayoutDiagnostics",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::page_layout::transaction::Diagnostics (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "PageLayoutEdit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::page_layout::transaction::Edit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "PageLayoutError",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::page_layout::transaction::Error (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "PageLayoutLimitKind",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::page_layout::transaction::LimitKind (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "PageLayoutPatch",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::page_layout::transaction::Patch (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "SectionNameCommit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::section::name::Commit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "SectionNameDiagnostics",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::section::name::Diagnostics (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "SectionNameEdit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::section::name::Edit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "SectionNameError",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::section::name::Error (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "SectionNameLimitKind",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::section::name::LimitKind (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "SectionNamePatch",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::section::name::Patch (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "SectionPaginationCommit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::section::pagination::transaction::Commit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "SectionPaginationDiagnostics",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::section::pagination::transaction::Diagnostics (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "SectionPaginationEdit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::section::pagination::transaction::Edit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "SectionPaginationError",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::section::pagination::transaction::Error (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "SectionPaginationLimitKind",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::section::pagination::transaction::LimitKind (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "SectionPaginationPatch",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::section::pagination::transaction::Patch (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "SectionTextCommit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::section::text::Commit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "SectionTextDiagnostics",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::section::text::Diagnostics (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "SectionTextEdit",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::section::text::Edit (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "SectionTextError",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::section::text::Error (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "SectionTextLimitKind",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::section::text::LimitKind (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "SectionTextPatch",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::section::text::Patch (ADR 0034 §3, record 0299)"
+        },
+        {
+          "name": "BodyTableHeaderSettings",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::headers::Settings; aliases are deleted (ADR 0034 §1, record 0299)"
+        },
+        {
+          "name": "BodyTableLockState",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::lock::State; aliases are deleted (ADR 0034 §1, record 0299)"
+        },
+        {
+          "name": "BodyTableNameValueError",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::name::Error; aliases are deleted (ADR 0034 §1, record 0299)"
+        },
+        {
+          "name": "BodyTableName",
+          "scope": "litchi_pages",
+          "replacement": "use litchi_pages::table::name::Name; aliases are deleted (ADR 0034 §1, record 0299)"
+        },
+        {
+          "name": "NotPages",
+          "scope": "litchi_pages",
+          "replacement": "use PackageError::UnexpectedFormat { detected } (ADR 0034 §6), record 0299"
+        },
+        {
+          "name": "DocumentSourceLimits",
+          "scope": "litchi_pages",
+          "replacement": "use SourceLimits (ADR 0034 §5), record 0299"
+        },
+        {
+          "name": "DocumentSourceLimitKind",
+          "scope": "litchi_pages",
+          "replacement": "use SourceLimitKind (ADR 0034 §5), record 0299"
+        },
+        {
+          "name": "DocumentSourceLimitsError",
+          "scope": "litchi_pages",
+          "replacement": "use PackageError::InvalidLimit (ADR 0034 §5), record 0299"
+        },
+        {
+          "name": "SemanticLimitsError",
+          "scope": "litchi_pages",
+          "replacement": "use PackageError::InvalidLimit (ADR 0034 §5), record 0299"
+        },
+        {
+          "name": "DocumentReadOptions",
+          "scope": "litchi_pages",
+          "replacement": "use OpenOptions (ADR 0034 §5), record 0299"
+        },
+        {
+          "name": "ReadError",
+          "scope": "litchi_pages",
+          "replacement": "open through Package; its PackageError is the ingress error (ADR 0034 §2), record 0299"
+        },
+        {
+          "name": "ReadLimitKind",
+          "scope": "litchi_pages",
+          "replacement": "use LimitKind (ADR 0034 §5), record 0299"
+        },
+        {
+          "name": "Limits",
+          "scope": "litchi_pages",
+          "replacement": "use SourceLimits and OpenOptions (ADR 0034 §5, record 0299)",
+          "recursive": false
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_pages::Package",
+          "replacement": "use open_with_options/from_bytes_with_options, Clone, and document()/document_ref() (ADR 0034 §3-§5, record 0299)",
+          "recursive": false
+        },
+        {
+          "name": "from_bytes_with_limits",
+          "scope": "litchi_pages::Package",
+          "replacement": "use open_with_options/from_bytes_with_options, Clone, and document()/document_ref() (ADR 0034 §3-§5, record 0299)",
+          "recursive": false
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_pages::Package",
+          "replacement": "use open_with_options/from_bytes_with_options, Clone, and document()/document_ref() (ADR 0034 §3-§5, record 0299)",
+          "recursive": false
+        },
+        {
+          "name": "semantic_document",
+          "scope": "litchi_pages::Package",
+          "replacement": "use open_with_options/from_bytes_with_options, Clone, and document()/document_ref() (ADR 0034 §3-§5, record 0299)",
+          "recursive": false
+        },
+        {
+          "name": "open",
+          "scope": "litchi_pages::Document",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2, record 0299)",
+          "recursive": false
+        },
+        {
+          "name": "open_with_options",
+          "scope": "litchi_pages::Document",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2, record 0299)",
+          "recursive": false
+        },
+        {
+          "name": "from_bytes",
+          "scope": "litchi_pages::Document",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2, record 0299)",
+          "recursive": false
+        },
+        {
+          "name": "from_bytes_with_options",
+          "scope": "litchi_pages::Document",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2, record 0299)",
+          "recursive": false
+        },
+        {
+          "name": "from_shared_bytes",
+          "scope": "litchi_pages::Document",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2, record 0299)",
+          "recursive": false
+        },
+        {
+          "name": "from_shared_bytes_with_options",
+          "scope": "litchi_pages::Document",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2, record 0299)",
+          "recursive": false
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_pages::Document",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2, record 0299)",
+          "recursive": false
+        },
+        {
+          "name": "section",
+          "scope": "litchi_pages::Document",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2, record 0299)",
+          "recursive": false
+        }
+      ],
+      "families": [
+        "litchi_pages::metadata",
+        "litchi_pages::document_settings",
+        "litchi_pages::section::text",
+        "litchi_pages::section::name",
+        "litchi_pages::section::settings",
+        "litchi_pages::section::background",
+        "litchi_pages::section::pagination::transaction",
+        "litchi_pages::page_layout::transaction",
+        "litchi_pages::header_footer::text",
+        "litchi_pages::footnote::text",
+        "litchi_pages::footnote::body::transaction",
+        "litchi_pages::chart::arrangement",
+        "litchi_pages::chart::data",
+        "litchi_pages::drawable::order",
+        "litchi_pages::image::adjustments",
+        "litchi_pages::table::appearance::transaction",
+        "litchi_pages::table::dimension::transaction",
+        "litchi_pages::table::headers::transaction",
+        "litchi_pages::table::hidden_axes::transaction",
+        "litchi_pages::table::merge::transaction",
+        "litchi_pages::table::name::transaction",
+        "litchi_pages::table::sort::transaction",
+        "litchi_pages::table::title",
+        "litchi_pages::table::lock"
+      ]
     }
   ]
 }

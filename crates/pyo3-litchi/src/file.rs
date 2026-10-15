@@ -64,8 +64,9 @@ const _: () = assert!(DEFAULT_MAX_NODES == 100_000);
 /// Raises:
 ///     IoError: (an OSError) If the file cannot be read
 ///     UnsupportedError: (a ValueError) If the file is not an Office file,
-///         or is an Apple iWork package directory, which File does not hold
-///         (open it with Document.open, Presentation.open or Workbook.open)
+///         or is a Keynote or Numbers package directory, which File does not
+///         hold (open it with Presentation.open or Workbook.open); a Pages
+///         package directory opens as its single-file form
 ///     CorruptFileError: (a ValueError) If the file is malformed
 #[pyfunction]
 fn open(py: Python<'_>, path: PathBuf) -> PyResult<File> {

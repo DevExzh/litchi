@@ -163,7 +163,7 @@ fn resolve_targets(
     let Some(query) = target.query() else {
         return Err(error(Code::InvalidArgument, "mutation target is empty"));
     };
-    let walk = crate::query::run(nav, query.clone())?;
+    let walk = crate::query::run(nav, query)?;
     if !walk.plan().diagnostics().is_empty() {
         return Err(error(
             Code::InvalidSelector,

@@ -273,10 +273,19 @@
       "subject": "operation",
       "verb": "move",
       "element": "shape",
-      "context": "a shape into another page",
+      "context": "a group member, or a shape whose identity a connector or link on its page names, into another page",
       "code": "unsupported_capability",
-      "followUp": "0288 ODG cross-page shape transfer",
-      "reason": "shapes move within their page; a move to another page needs the leaf's dependency-checked shape transfer"
+      "followUp": "0292 ODG cross-page reference rewriting",
+      "reason": "a shape moves to another page with its bytes unchanged; group members move with their group, and an identity dependency that would cross pages is refused rather than left dangling"
+    },
+    {
+      "subject": "operation",
+      "verb": "swap",
+      "element": "shape",
+      "context": "two groups on different pages",
+      "code": "unsupported_capability",
+      "followUp": "0292 ODG cross-page group swap",
+      "reason": "a cross-page swap is two transfers addressed by position; two group subtrees shift each other's positions, so move them one at a time"
     },
     {
       "subject": "operation",

@@ -18,7 +18,9 @@ use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::tsp;
 use litchi_pages::table::dimension::Dimension;
 use litchi_pages::{
-    BodyTableDimensionError, BodyTableNameError, BodyTableNameLimitKind, BodyTableSelector, Package,
+    BodyTableSelector, Package, table::dimension::transaction::Error as BodyTableDimensionError,
+    table::name::transaction::Error as BodyTableNameError,
+    table::name::transaction::LimitKind as BodyTableNameLimitKind,
 };
 use prost::Message as _;
 
@@ -551,7 +553,10 @@ fn source_name_rename_budget_failure_is_typed_and_atomic() -> TestResult {
         1024 * 1024,
         1024 * 1024,
     )?;
-    let package = Package::from_bytes_with_limits(fixture.source, limits)?;
+    let package = Package::from_bytes_with_options(
+        fixture.source,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    )?;
     let before = exact_bytes(&package)?;
     let replacement = "x".repeat(4_096);
     let error = package

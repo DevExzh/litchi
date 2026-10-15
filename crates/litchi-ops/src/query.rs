@@ -76,6 +76,7 @@
 
 mod arg;
 mod bounds;
+mod cache;
 pub(crate) mod compile;
 #[cfg(any(test, feature = "test-support"))]
 mod fake;

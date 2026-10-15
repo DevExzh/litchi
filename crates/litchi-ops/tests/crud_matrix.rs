@@ -300,6 +300,8 @@ const SPECS: &[Spec] = &[
         fixtures: &[
             "iwork/pages/body-sections-unicode.pages",
             "iwork/pages/basic.pages",
+            // Record 0299: body tables, cells and anchored paragraphs.
+            "iwork/pages/body-table-read-native.pages",
         ],
     },
     Spec {
@@ -370,6 +372,24 @@ const RECIPES: &[Recipe] = &[
         fixture: "create()",
         parent: "/",
         props: &[("values", "Sheet1.B1:B3")],
+        start: false,
+    },
+    // Record 0292: the legend is added through the typed definition of a
+    // chart Litchi made; a MathML token needs its tag and text together.
+    Recipe {
+        format: "odc",
+        element: "legend",
+        fixture: "create()",
+        parent: "/",
+        props: &[("position", "bottom")],
+        start: false,
+    },
+    Recipe {
+        format: "odf",
+        element: "element",
+        fixture: "create()",
+        parent: "/",
+        props: &[("tag", "mi"), ("text", "x")],
         start: false,
     },
     Recipe {
@@ -1127,7 +1147,27 @@ fn element_claim(caps: &Capabilities, element: &Element, verb: &str) -> Claim {
         .properties()
         .find_map(|property| property.write_gap())
         .filter(|_| matches!(verb, "set" | "edit" | "batch"));
-    match write_gap {
+    // An operation gap the report lists for this verb and element (record
+    // 0292: the object formats refuse at element level, not verb level).
+    let object_format = matches!(
+        caps.format(),
+        Some(
+            FileFormat::Odg | FileFormat::Odc | FileFormat::Odi | FileFormat::Odb | FileFormat::Odf
+        )
+    );
+    let operation_gap = || {
+        caps.gaps().filter(|_| object_format).find(|gap| {
+            matches!(
+                gap.subject(),
+                litchi_ops::capabilities::Subject::Operation { verb: gap_verb, element: gap_element, .. }
+                    if gap_verb == verb && element.name().eq_ignore_ascii_case(gap_element)
+            )
+        })
+    };
+    match write_gap.or_else(operation_gap) {
+        Some(gap) if gap.follow_up().starts_with("none") => {
+            Claim::OutOfScope(gap.follow_up().to_owned())
+        },
         Some(gap) => Claim::Gap(gap.follow_up().to_owned()),
         None => Claim::OutOfScope(format!("{verb} not offered for this element")),
     }

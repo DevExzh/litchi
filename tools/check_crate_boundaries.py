@@ -2226,12 +2226,22 @@ IWA_IMAGE_ADJUSTMENTS_OWNER_MODULES = {
     # itself behind that feature would make the supported API disappear from
     # a normal format-crate build.
     ecosystem: re.compile(r"(?m)^\s*mod\s+(?:r#)?image_adjustments\s*;")
-    for ecosystem in ("Keynote", "Pages", "Numbers")
+    for ecosystem in ("Keynote", "Numbers")
+} | {
+    # ADR 0034 W1: the Pages owner is crate-visible so ``image::adjustments``
+    # can re-export its short names; ``pub mod`` remains rejected.
+    "Pages": re.compile(
+        r"(?m)^\s*pub\s*\(\s*crate\s*\)\s*mod\s+(?:r#)?image_adjustments\s*;"
+    ),
 }
+# Ecosystems whose semantic image-adjustment types are published through an
+# ADR 0034 W1 transaction module (checked by the shared Pages family helper)
+# rather than through the crate root.
+IWA_IMAGE_ADJUSTMENTS_TRANSACTION_FAMILY_OWNERS = {"Pages": "image_adjustments"}
 IWA_IMAGE_ADJUSTMENTS_FEATURE_GATED_MODULE = re.compile(
     r"(?ms)^\s*#\s*\[\s*cfg\s*\(\s*feature\s*=\s*"
     r'"internal-iwork-source"\s*\)\s*\]\s*\n'
-    r"\s*mod\s+(?:r#)?image_adjustments\s*;"
+    r"\s*(?:pub\s*\([^()]*\)\s*)?mod\s+(?:r#)?image_adjustments\s*;"
 )
 IWA_IMAGE_ADJUSTMENTS_OWNER_SEAMS = (
     "__decode_image_adjustments_payload",
@@ -2281,12 +2291,13 @@ IWA_IMAGE_ADJUSTMENTS_SEMANTIC_TYPES = {
         "SlideImageAdjustmentsPatch",
         "SlideImageAdjustmentsDiagnostics",
     ),
+    # ADR 0034 W1 short names, published as ``litchi_pages::image::adjustments``.
     "Pages": (
-        "BodyImageAdjustmentsError",
-        "BodyImageAdjustmentsEdit",
-        "BodyImageAdjustmentsCommit",
-        "BodyImageAdjustmentsPatch",
-        "BodyImageAdjustmentsDiagnostics",
+        "Error",
+        "Edit",
+        "Commit",
+        "Patch",
+        "Diagnostics",
     ),
     # ADR 0034 W1 (record 0297): short names in `shape::image::adjustments`.
     "Numbers": (
@@ -15346,7 +15357,21 @@ PAGES_FOOTNOTE_LIFECYCLE_SEMANTIC_TYPES = (
     "Position",
     "Selector",
 )
+# ADR 0034 W1: canonical short names defined by the owner and re-exported
+# only by ``litchi_pages::footnote::body::transaction``.  The deleted prefixed
+# spellings stay focused markers and alias targets; the ``body_footnote`` owner
+# path marks
+# the canonical re-export.
 PAGES_FOOTNOTE_LIFECYCLE_CANONICAL_TYPES = (
+    "Edit",
+    "Patch",
+    "Commit",
+    "Diagnostics",
+    "Error",
+    "LimitKind",
+    "Snapshot",
+)
+PAGES_FOOTNOTE_LIFECYCLE_LEGACY_CANONICAL_TYPES = (
     "BodyFootnoteEdit",
     "BodyFootnotePatch",
     "BodyFootnoteCommit",
@@ -15355,7 +15380,7 @@ PAGES_FOOTNOTE_LIFECYCLE_CANONICAL_TYPES = (
     "BodyFootnoteLimitKind",
 )
 PAGES_FOOTNOTE_LIFECYCLE_SHORT_NAMES = frozenset(
-    PAGES_FOOTNOTE_LIFECYCLE_CANONICAL_TYPES
+    PAGES_FOOTNOTE_LIFECYCLE_LEGACY_CANONICAL_TYPES
     + PAGES_FOOTNOTE_LIFECYCLE_SEMANTIC_TYPES
 )
 PAGES_FOOTNOTE_LIFECYCLE_PACKAGE_METHODS = (
@@ -15388,7 +15413,7 @@ PAGES_FOOTNOTE_LIFECYCLE_FLAT_ALIASES = frozenset(
     }
 )
 PAGES_FOOTNOTE_LIFECYCLE_ALIAS_TARGETS = frozenset(
-    PAGES_FOOTNOTE_LIFECYCLE_CANONICAL_TYPES
+    PAGES_FOOTNOTE_LIFECYCLE_LEGACY_CANONICAL_TYPES
     + PAGES_FOOTNOTE_LIFECYCLE_SEMANTIC_TYPES
 )
 PAGES_FOOTNOTE_LIFECYCLE_OWNER_PATH = re.compile(
@@ -15471,29 +15496,131 @@ PAGES_DOCUMENT_PUBLIC_API_SOURCES = (
     PAGES_SOURCE_ROOT / "document.rs",
     PAGES_SOURCE_ROOT / "lib.rs",
 )
+PAGES_DOCUMENT_DEDICATED_PUBLIC_API_SOURCES = frozenset(
+    {PAGES_SOURCE_ROOT / "document.rs"}
+)
+# ADR 0034 wave W1 (record 0299) replaced the ``DocumentSourceLimits`` /
+# ``ReadError`` ingress family with the root ``OpenOptions``, ``SourceLimits``
+# and ``SemanticLimits`` profiles (defined in the private ``limits`` module and
+# re-exported from ``lib.rs``).
 PAGES_DOCUMENT_PUBLIC_MARKERS = frozenset(
     {
         "Body",
         "DEFAULT_MAX_TEXT_BYTES",
         "Document",
-        "DocumentReadOptions",
-        "DocumentSourceLimitKind",
-        "DocumentSourceLimits",
-        "DocumentSourceLimitsError",
+        "DocumentStats",
         "Error",
-        "IoKind",
+        "LimitKind",
         "MAX_BODY_STORAGES",
         "MAX_SECTIONS",
-        "ReadError",
-        "ReadLimitKind",
+        "OpenOptions",
         "Result",
         "Root",
         "SemanticLimitKind",
         "SemanticLimits",
-        "SemanticLimitsError",
+        "SemanticLimitsBuilder",
+        "SourceLimitKind",
+        "SourceLimits",
+        "SourceLimitsBuilder",
     }
 )
 PAGES_PACKAGE_SOURCE = PAGES_SOURCE_ROOT / "package.rs"
+
+# ADR 0034 wave W1 (record 0299): every Pages transaction family lives in a
+# ``pub(crate) mod <owner>;`` under ``package/`` that defines the canonical
+# short names (``Edit``, ``Patch``, ``Commit``, ``Diagnostics``, ``Error``,
+# ``LimitKind`` plus a few family extras), and exactly one public module
+# re-exports them with ``pub use crate::package::<owner>::{...};``.  The crate
+# root re-exports none of them, and the former prefixed spellings are deleted
+# rather than aliased.
+#
+# Each row is ``(owner module, legacy prefix, public module path, short names,
+# legacy-name overrides)``.  The legacy name of a short name is
+# ``prefix + short`` unless the override map names it.
+PAGES_TRANSACTION_SIX = ("Commit", "Diagnostics", "Edit", "Error", "LimitKind", "Patch")
+PAGES_TRANSACTION_FAMILIES: tuple[
+    tuple[str, str, tuple[str, ...], tuple[str, ...], dict[str, str]], ...
+] = (
+    ("body_chart_arrangement", "BodyChartArrangement", ("chart", "arrangement"), PAGES_TRANSACTION_SIX, {}),
+    ("body_chart_data", "BodyChartData", ("chart", "data"), PAGES_TRANSACTION_SIX, {}),
+    ("body_chart_metadata", "BodyChartMetadata", ("chart", "metadata"), ("Error", "LimitKind"), {}),
+    ("body_footnote", "BodyFootnote", ("footnote", "body", "transaction"), PAGES_TRANSACTION_SIX + ("Snapshot",), {}),
+    ("body_table_appearance", "BodyTableAppearance", ("table", "appearance", "transaction"), PAGES_TRANSACTION_SIX + ("Path",), {}),
+    (
+        "body_table_catalog",
+        "BodyTableCatalog",
+        ("table", "catalog"),
+        ("Catalog", "Error", "LimitKind", "Snapshot"),
+        {"Catalog": "BodyTableCatalog", "Snapshot": "BodyTableSnapshot"},
+    ),
+    ("body_table_deletion", "BodyTableDeletion", ("table", "deletion"), ("Commit", "Diagnostics", "Error", "LimitKind", "Patch"), {}),
+    ("body_table_dimension", "BodyTableDimension", ("table", "dimension", "transaction"), PAGES_TRANSACTION_SIX, {}),
+    ("body_table_headers", "BodyTableHeaderSettings", ("table", "headers", "transaction"), PAGES_TRANSACTION_SIX + ("InvalidReason",), {}),
+    ("body_table_hidden_axes", "BodyTableHiddenAxes", ("table", "hidden_axes", "transaction"), PAGES_TRANSACTION_SIX + ("Path",), {}),
+    ("body_table_merges", "BodyTableMerges", ("table", "merge", "transaction"), PAGES_TRANSACTION_SIX, {}),
+    ("body_table_name", "BodyTableName", ("table", "name", "transaction"), PAGES_TRANSACTION_SIX + ("Path",), {}),
+    ("body_table_sort", "BodyTableSort", ("table", "sort", "transaction"), PAGES_TRANSACTION_SIX + ("Path",), {}),
+    ("body_table_title", "BodyTableTitle", ("table", "title"), PAGES_TRANSACTION_SIX, {}),
+    ("drawable_order", "BodyDrawableOrder", ("drawable", "order"), PAGES_TRANSACTION_SIX, {}),
+    ("footnote_text", "FootnoteText", ("footnote", "text"), PAGES_TRANSACTION_SIX, {}),
+    ("header_footer_text", "HeaderFooterText", ("header_footer", "text"), PAGES_TRANSACTION_SIX, {}),
+    ("image_adjustments", "BodyImageAdjustments", ("image", "adjustments"), PAGES_TRANSACTION_SIX, {}),
+    ("metadata_edit", "MetadataEdit", ("metadata",), PAGES_TRANSACTION_SIX, {}),
+    ("page_layout", "PageLayout", ("page_layout", "transaction"), PAGES_TRANSACTION_SIX, {}),
+    ("section_name", "SectionName", ("section", "name"), PAGES_TRANSACTION_SIX, {}),
+    ("section_pagination", "SectionPagination", ("section", "pagination", "transaction"), PAGES_TRANSACTION_SIX, {}),
+    ("section_paragraphs", "SectionParagraphs", ("section", "paragraphs"), PAGES_TRANSACTION_SIX, {}),
+    ("section_text", "SectionText", ("section", "text"), PAGES_TRANSACTION_SIX, {}),
+    ("table_cells", "BodyTableCells", ("table", "cells"), ("Error", "LimitKind"), {}),
+    ("table_lock", "BodyTableLock", ("table", "lock"), PAGES_TRANSACTION_SIX, {}),
+)
+PAGES_TRANSACTION_FAMILY_BY_OWNER = {
+    family[0]: family for family in PAGES_TRANSACTION_FAMILIES
+}
+# Root aliases and ingress types deleted by W1 that have no prefix+short
+# spelling.  ``MetadataEdit*`` and ``SectionParagraphs*`` were never published
+# but are banned with the other prefixed spellings so the families stay
+# uniform.
+PAGES_TRANSACTION_RETIRED_EXTRA_NAMES = frozenset(
+    {
+        "BodyTableHeaderSettings",
+        "BodyTableLockState",
+        "BodyTableName",
+        "BodyTableNameValueError",
+        "DocumentReadOptions",
+        "DocumentSourceLimitKind",
+        "DocumentSourceLimits",
+        "DocumentSourceLimitsError",
+        "IoKind",
+        "ReadError",
+        "ReadLimitKind",
+        "SemanticLimitsError",
+    }
+)
+
+
+# Deleted root aliases that belonged to one family.
+PAGES_TRANSACTION_FAMILY_RETIRED_ALIASES = {
+    "body_table_headers": frozenset({"BodyTableHeaderSettings"}),
+    "body_table_name": frozenset({"BodyTableName", "BodyTableNameValueError"}),
+    "table_lock": frozenset({"BodyTableLockState"}),
+}
+
+
+def _pages_transaction_legacy_names(owner: str) -> frozenset[str]:
+    """Return the deleted prefixed spellings and aliases of one W1 family."""
+
+    _, prefix, _, shorts, overrides = PAGES_TRANSACTION_FAMILY_BY_OWNER[owner]
+    return frozenset(
+        overrides.get(short, prefix + short) for short in shorts
+    ) | PAGES_TRANSACTION_FAMILY_RETIRED_ALIASES.get(owner, frozenset())
+
+
+PAGES_TRANSACTION_RETIRED_NAMES = frozenset(
+    name
+    for family in PAGES_TRANSACTION_FAMILIES
+    for name in _pages_transaction_legacy_names(family[0])
+) | PAGES_TRANSACTION_RETIRED_EXTRA_NAMES
 PAGES_BODY_CHART_ARRANGEMENT_OWNER_SOURCE = (
     PAGES_SOURCE_ROOT / "package" / "body_chart_arrangement.rs"
 )
@@ -16251,6 +16378,11 @@ PAGES_PAGE_LAYOUT_EXPORT_SOURCES = (
     PAGES_SOURCE_ROOT / "lib.rs",
     PAGES_SOURCE_ROOT / "package.rs",
 )
+# ADR 0034 W1 deleted these prefixed spellings (the owner now defines the
+# short names, published by ``page_layout::transaction``).  They stay markers
+# so a reintroduced root export is still inspected; the ``page_layout`` path
+# test in ``_is_pages_page_layout_public_declaration`` marks the canonical
+# re-export, and ``audit_pages_transaction_family_source_topology`` bans them.
 PAGES_PAGE_LAYOUT_PUBLIC_MARKERS = frozenset(
     {
         "PageLayoutCommit",
@@ -16274,8 +16406,23 @@ PAGES_TABLE_LOCK_EXPORT_SOURCES = (
     PAGES_TABLE_LOCK_PACKAGE_EXPORT_SOURCE,
     PAGES_SOURCE_ROOT / "table" / "mod.rs",
 )
-PAGES_TABLE_LOCK_SEMANTIC_TYPES = ("State", "BodyTableLockState")
+# ADR 0034 W1: ``table::lock`` publishes ``State`` plus the owner's canonical
+# short transaction names; the ``BodyTableLockState`` root alias and the
+# prefixed ``BodyTableLock*`` spellings are deleted (rejected by the shared
+# family helper).  The legacy spellings remain focused markers and alias
+# targets because the short names are too common to locate a table-lock
+# declaration outside the owner; the ``table_lock``/``table::lock`` owner path
+# marks the canonical re-export.
+PAGES_TABLE_LOCK_SEMANTIC_TYPES = ("State",)
 PAGES_TABLE_LOCK_CANONICAL_TYPES = (
+    "Edit",
+    "Patch",
+    "Commit",
+    "Diagnostics",
+    "Error",
+    "LimitKind",
+)
+PAGES_TABLE_LOCK_LEGACY_CANONICAL_TYPES = (
     "BodyTableLockEdit",
     "BodyTableLockPatch",
     "BodyTableLockCommit",
@@ -16284,7 +16431,7 @@ PAGES_TABLE_LOCK_CANONICAL_TYPES = (
     "BodyTableLockLimitKind",
 )
 PAGES_TABLE_LOCK_VALUE_TYPE = "State"
-PAGES_TABLE_LOCK_SHORT_NAMES = frozenset(PAGES_TABLE_LOCK_CANONICAL_TYPES)
+PAGES_TABLE_LOCK_SHORT_NAMES = frozenset(PAGES_TABLE_LOCK_LEGACY_CANONICAL_TYPES)
 PAGES_TABLE_LOCK_PUBLIC_NAMES = (
     PAGES_TABLE_LOCK_SHORT_NAMES | frozenset(PAGES_TABLE_LOCK_SEMANTIC_TYPES)
 )
@@ -16322,7 +16469,7 @@ PAGES_TABLE_LOCK_FOCUSED_MARKERS = frozenset(
     PAGES_TABLE_LOCK_SHORT_NAMES | {"BodyTableLockState"}
 )
 PAGES_TABLE_LOCK_ALIAS_TARGETS = frozenset(
-    PAGES_TABLE_LOCK_CANONICAL_TYPES + ("BodyTableLockState",)
+    PAGES_TABLE_LOCK_LEGACY_CANONICAL_TYPES + ("BodyTableLockState",)
 )
 PAGES_TABLE_LOCK_OWNER_PATH = re.compile(
     r"(?<![A-Za-z0-9_#])(?:r#)?(?:table_lock|table[ \t\r\n]*::"
@@ -16399,7 +16546,21 @@ PAGES_TABLE_TITLE_EXPORT_SOURCES = (
 )
 PAGES_TABLE_TITLE_SELECTOR_SOURCE = PAGES_SOURCE_ROOT / "selector.rs"
 PAGES_TABLE_TITLE_SEMANTIC_TYPES = ("Settings",)
+# ADR 0034 W1: the owner defines these canonical short names and only
+# ``litchi_pages::table::title`` re-exports them (checked by the shared
+# family helper).  The deleted prefixed spellings stay focused markers
+# and alias targets: the short names are too common in ``lib.rs`` and
+# ``package.rs`` to locate a declaration of this family, while the owner
+# path marks the canonical re-export.
 PAGES_TABLE_TITLE_CANONICAL_TYPES = (
+    "Edit",
+    "Patch",
+    "Commit",
+    "Diagnostics",
+    "Error",
+    "LimitKind",
+)
+PAGES_TABLE_TITLE_LEGACY_CANONICAL_TYPES = (
     "BodyTableTitleEdit",
     "BodyTableTitlePatch",
     "BodyTableTitleCommit",
@@ -16408,7 +16569,7 @@ PAGES_TABLE_TITLE_CANONICAL_TYPES = (
     "BodyTableTitleLimitKind",
 )
 PAGES_TABLE_TITLE_SHORT_NAMES = frozenset(
-    PAGES_TABLE_TITLE_CANONICAL_TYPES + PAGES_TABLE_TITLE_SEMANTIC_TYPES
+    PAGES_TABLE_TITLE_LEGACY_CANONICAL_TYPES + PAGES_TABLE_TITLE_SEMANTIC_TYPES
 )
 PAGES_TABLE_TITLE_PUBLIC_NAMES = (
     PAGES_TABLE_TITLE_SHORT_NAMES | {"BodyTableTitleSettings"}
@@ -16440,7 +16601,7 @@ PAGES_TABLE_TITLE_FLAT_ALIASES = frozenset(
     }
 )
 PAGES_TABLE_TITLE_ALIAS_TARGETS = frozenset(
-    PAGES_TABLE_TITLE_CANONICAL_TYPES + ("Settings",)
+    PAGES_TABLE_TITLE_LEGACY_CANONICAL_TYPES + ("Settings",)
 )
 PAGES_TABLE_TITLE_OWNER_PATH = re.compile(
     r"(?<![A-Za-z0-9_#])(?:r#)?(?:body_table_title|table[ \t\r\n]*::"
@@ -16564,7 +16725,22 @@ PAGES_TABLE_HEADERS_EXPORT_SOURCES = (
 )
 PAGES_TABLE_HEADERS_SELECTOR_SOURCE = PAGES_SOURCE_ROOT / "selector.rs"
 PAGES_TABLE_HEADERS_SEMANTIC_TYPES = ("Count", "Error", "Settings")
+# ADR 0034 W1: the owner defines these canonical short names and only
+# ``litchi_pages::table::headers::transaction`` re-exports them (checked by the shared
+# family helper).  The deleted prefixed spellings stay focused markers
+# and alias targets: the short names are too common in ``lib.rs`` and
+# ``package.rs`` to locate a declaration of this family, while the owner
+# path marks the canonical re-export.
 PAGES_TABLE_HEADERS_CANONICAL_TYPES = (
+    "Edit",
+    "Patch",
+    "Commit",
+    "Diagnostics",
+    "Error",
+    "InvalidReason",
+    "LimitKind",
+)
+PAGES_TABLE_HEADERS_LEGACY_CANONICAL_TYPES = (
     "BodyTableHeaderSettingsEdit",
     "BodyTableHeaderSettingsPatch",
     "BodyTableHeaderSettingsCommit",
@@ -16574,10 +16750,10 @@ PAGES_TABLE_HEADERS_CANONICAL_TYPES = (
     "BodyTableHeaderSettingsLimitKind",
 )
 PAGES_TABLE_HEADERS_SHORT_NAMES = frozenset(
-    PAGES_TABLE_HEADERS_CANONICAL_TYPES + PAGES_TABLE_HEADERS_SEMANTIC_TYPES
+    PAGES_TABLE_HEADERS_LEGACY_CANONICAL_TYPES + PAGES_TABLE_HEADERS_SEMANTIC_TYPES
 )
 PAGES_TABLE_HEADERS_FOCUSED_MARKERS = frozenset(
-    PAGES_TABLE_HEADERS_CANONICAL_TYPES + ("Count", "Settings", "BodyTableHeaderSettings")
+    PAGES_TABLE_HEADERS_LEGACY_CANONICAL_TYPES + ("Count", "Settings", "BodyTableHeaderSettings")
 )
 PAGES_TABLE_HEADERS_PUBLIC_NAMES = (
     PAGES_TABLE_HEADERS_SHORT_NAMES | {"BodyTableHeaderSettings"}
@@ -16610,7 +16786,7 @@ PAGES_TABLE_HEADERS_FLAT_ALIASES = frozenset(
     }
 )
 PAGES_TABLE_HEADERS_ALIAS_TARGETS = frozenset(
-    PAGES_TABLE_HEADERS_CANONICAL_TYPES + ("Count", "Settings")
+    PAGES_TABLE_HEADERS_LEGACY_CANONICAL_TYPES + ("Count", "Settings")
 )
 PAGES_TABLE_HEADERS_OWNER_PATH = re.compile(
     r"(?<![A-Za-z0-9_#])(?:r#)?(?:body_table_headers|table[ \t\r\n]*::"
@@ -16688,7 +16864,21 @@ PAGES_TABLE_DIMENSION_EXPORT_SOURCES = (
 )
 PAGES_TABLE_DIMENSION_SELECTOR_SOURCE = PAGES_SOURCE_ROOT / "selector.rs"
 PAGES_TABLE_DIMENSION_SEMANTIC_TYPES = ("Dimension", "Points", "Size")
+# ADR 0034 W1: the owner defines these canonical short names and only
+# ``litchi_pages::table::dimension::transaction`` re-exports them (checked by the shared
+# family helper).  The deleted prefixed spellings stay focused markers
+# and alias targets: the short names are too common in ``lib.rs`` and
+# ``package.rs`` to locate a declaration of this family, while the owner
+# path marks the canonical re-export.
 PAGES_TABLE_DIMENSION_CANONICAL_TYPES = (
+    "Edit",
+    "Patch",
+    "Commit",
+    "Diagnostics",
+    "Error",
+    "LimitKind",
+)
+PAGES_TABLE_DIMENSION_LEGACY_CANONICAL_TYPES = (
     "BodyTableDimensionEdit",
     "BodyTableDimensionPatch",
     "BodyTableDimensionCommit",
@@ -16697,7 +16887,7 @@ PAGES_TABLE_DIMENSION_CANONICAL_TYPES = (
     "BodyTableDimensionLimitKind",
 )
 PAGES_TABLE_DIMENSION_SHORT_NAMES = frozenset(
-    PAGES_TABLE_DIMENSION_CANONICAL_TYPES + PAGES_TABLE_DIMENSION_SEMANTIC_TYPES
+    PAGES_TABLE_DIMENSION_LEGACY_CANONICAL_TYPES + PAGES_TABLE_DIMENSION_SEMANTIC_TYPES
 )
 PAGES_TABLE_DIMENSION_PUBLIC_NAMES = PAGES_TABLE_DIMENSION_SHORT_NAMES
 PAGES_TABLE_DIMENSION_PACKAGE_METHODS = (
@@ -16732,7 +16922,7 @@ PAGES_TABLE_DIMENSION_FLAT_ALIASES = frozenset(
     }
 )
 PAGES_TABLE_DIMENSION_ALIAS_TARGETS = frozenset(
-    PAGES_TABLE_DIMENSION_CANONICAL_TYPES + PAGES_TABLE_DIMENSION_SEMANTIC_TYPES
+    PAGES_TABLE_DIMENSION_LEGACY_CANONICAL_TYPES + PAGES_TABLE_DIMENSION_SEMANTIC_TYPES
 )
 PAGES_TABLE_DIMENSION_OWNER_PATH = re.compile(
     r"(?<![A-Za-z0-9_#])(?:r#)?(?:body_table_dimension|table[ \t\r\n]*::"
@@ -16857,7 +17047,22 @@ PAGES_TABLE_SORT_TRANSACTION_TYPES = (
     "Error",
     "LimitKind",
 )
+# ADR 0034 W1: the owner defines these canonical short names and only
+# ``litchi_pages::table::sort::transaction`` re-exports them (checked by the shared
+# family helper).  The deleted prefixed spellings stay focused markers
+# and alias targets: the short names are too common in ``lib.rs`` and
+# ``package.rs`` to locate a declaration of this family, while the owner
+# path marks the canonical re-export.
 PAGES_TABLE_SORT_CANONICAL_TYPES = (
+    "Edit",
+    "Patch",
+    "Commit",
+    "Diagnostics",
+    "Error",
+    "LimitKind",
+    "Path",
+)
+PAGES_TABLE_SORT_LEGACY_CANONICAL_TYPES = (
     "BodyTableSortEdit",
     "BodyTableSortPatch",
     "BodyTableSortCommit",
@@ -16869,7 +17074,7 @@ PAGES_TABLE_SORT_SHORT_NAMES = frozenset(
     PAGES_TABLE_SORT_SEMANTIC_TYPES + PAGES_TABLE_SORT_TRANSACTION_TYPES
 )
 PAGES_TABLE_SORT_PUBLIC_NAMES = frozenset(
-    PAGES_TABLE_SORT_SEMANTIC_TYPES + PAGES_TABLE_SORT_CANONICAL_TYPES
+    PAGES_TABLE_SORT_SEMANTIC_TYPES + PAGES_TABLE_SORT_LEGACY_CANONICAL_TYPES
 )
 PAGES_TABLE_SORT_PACKAGE_METHODS = (
     "body_table_sort_order",
@@ -16906,7 +17111,7 @@ PAGES_TABLE_SORT_FLAT_ALIASES = frozenset(
     }
 )
 PAGES_TABLE_SORT_ALIAS_TARGETS = frozenset(
-    PAGES_TABLE_SORT_CANONICAL_TYPES + PAGES_TABLE_SORT_SEMANTIC_TYPES
+    PAGES_TABLE_SORT_LEGACY_CANONICAL_TYPES + PAGES_TABLE_SORT_SEMANTIC_TYPES
 )
 PAGES_TABLE_SORT_OWNER_PATH = re.compile(
     r"(?<![A-Za-z0-9_#])(?:r#)?(?:body_table_sort|table[ \t\r\n]*::"
@@ -17090,7 +17295,21 @@ PAGES_HEADER_FOOTER_EXPORT_SOURCES = (
 PAGES_HEADER_FOOTER_SELECTOR_SOURCE = PAGES_HEADER_FOOTER_SEMANTIC_SOURCE
 PAGES_HEADER_FOOTER_SEMANTIC_TYPES = ("HeaderFooter", "Template", "Kind")
 PAGES_HEADER_FOOTER_SELECTOR_TYPES = ("HeaderFooterSelector",)
+# ADR 0034 W1: the owner defines the canonical short names and only
+# ``litchi_pages::header_footer::text`` re-exports them.  The deleted prefixed
+# spellings stay in the focused-marker and alias-target sets below, so a
+# declaration that reintroduces one outside the owner is still inspected; the
+# short names are too common in ``lib.rs``/``package.rs`` to serve as markers
+# (the ``header_footer_text`` owner path marks the canonical re-export).
 PAGES_HEADER_FOOTER_CANONICAL_TYPES = (
+    "Edit",
+    "Patch",
+    "Commit",
+    "Diagnostics",
+    "Error",
+    "LimitKind",
+)
+PAGES_HEADER_FOOTER_LEGACY_CANONICAL_TYPES = (
     "HeaderFooterTextEdit",
     "HeaderFooterTextPatch",
     "HeaderFooterTextCommit",
@@ -17099,7 +17318,7 @@ PAGES_HEADER_FOOTER_CANONICAL_TYPES = (
     "HeaderFooterTextLimitKind",
 )
 PAGES_HEADER_FOOTER_SHORT_NAMES = frozenset(
-    PAGES_HEADER_FOOTER_CANONICAL_TYPES
+    PAGES_HEADER_FOOTER_LEGACY_CANONICAL_TYPES
     + PAGES_HEADER_FOOTER_SEMANTIC_TYPES
     + PAGES_HEADER_FOOTER_SELECTOR_TYPES
 )
@@ -17136,7 +17355,7 @@ PAGES_HEADER_FOOTER_FLAT_ALIASES = frozenset(
     }
 )
 PAGES_HEADER_FOOTER_ALIAS_TARGETS = frozenset(
-    PAGES_HEADER_FOOTER_CANONICAL_TYPES
+    PAGES_HEADER_FOOTER_LEGACY_CANONICAL_TYPES
     + PAGES_HEADER_FOOTER_SEMANTIC_TYPES
     + PAGES_HEADER_FOOTER_SELECTOR_TYPES
 )
@@ -17301,7 +17520,19 @@ PAGES_SECTION_TEXT_EXPORT_SOURCES = (
 )
 PAGES_SECTION_TEXT_SELECTOR_SOURCE = PAGES_SECTION_TEXT_SEMANTIC_SOURCE
 PAGES_SECTION_TEXT_SEMANTIC_TYPES = ("SectionSelector",)
+# ADR 0034 W1: canonical short names defined by the owner and re-exported
+# only by ``litchi_pages::section::text``.  The deleted prefixed spellings
+# remain focused markers/alias targets (they are also flat aliases below); the
+# ``section_text`` owner path marks the canonical re-export.
 PAGES_SECTION_TEXT_CANONICAL_TYPES = (
+    "Commit",
+    "Diagnostics",
+    "Edit",
+    "Error",
+    "LimitKind",
+    "Patch",
+)
+PAGES_SECTION_TEXT_LEGACY_CANONICAL_TYPES = (
     "SectionTextCommit",
     "SectionTextDiagnostics",
     "SectionTextEdit",
@@ -17310,7 +17541,7 @@ PAGES_SECTION_TEXT_CANONICAL_TYPES = (
     "SectionTextPatch",
 )
 PAGES_SECTION_TEXT_SHORT_NAMES = frozenset(
-    PAGES_SECTION_TEXT_CANONICAL_TYPES + PAGES_SECTION_TEXT_SEMANTIC_TYPES
+    PAGES_SECTION_TEXT_LEGACY_CANONICAL_TYPES + PAGES_SECTION_TEXT_SEMANTIC_TYPES
 )
 PAGES_SECTION_TEXT_PUBLIC_NAMES = PAGES_SECTION_TEXT_SHORT_NAMES
 PAGES_SECTION_TEXT_ALLOWED_PUBLIC_IDENTIFIERS = frozenset(
@@ -17380,7 +17611,7 @@ PAGES_SECTION_TEXT_FLAT_ALIASES = frozenset(
     }
 )
 PAGES_SECTION_TEXT_ALIAS_TARGETS = frozenset(
-    PAGES_SECTION_TEXT_CANONICAL_TYPES + PAGES_SECTION_TEXT_SEMANTIC_TYPES
+    PAGES_SECTION_TEXT_LEGACY_CANONICAL_TYPES + PAGES_SECTION_TEXT_SEMANTIC_TYPES
 )
 PAGES_SECTION_TEXT_OWNER_PATH = re.compile(
     r"(?<![A-Za-z0-9_#])(?:r#)?(?:section_text|section[ \t\r\n]*::"
@@ -17603,7 +17834,12 @@ PAGES_TABLE_APPEARANCE_TRANSACTION_TYPES = (
     "LimitKind",
     "Path",
 )
-PAGES_TABLE_APPEARANCE_CANONICAL_TYPES = (
+# ADR 0034 W1: the owner defines the canonical short names (identical to the
+# ``transaction`` re-export set) and only
+# ``litchi_pages::table::appearance::transaction`` publishes them.  The
+# deleted prefixed spellings stay focused markers and alias targets.
+PAGES_TABLE_APPEARANCE_CANONICAL_TYPES = PAGES_TABLE_APPEARANCE_TRANSACTION_TYPES
+PAGES_TABLE_APPEARANCE_LEGACY_CANONICAL_TYPES = (
     "BodyTableAppearanceEdit",
     "BodyTableAppearancePatch",
     "BodyTableAppearanceCommit",
@@ -17618,8 +17854,13 @@ PAGES_TABLE_APPEARANCE_SHORT_NAMES = frozenset(
 )
 PAGES_TABLE_APPEARANCE_PUBLIC_NAMES = frozenset(
     PAGES_TABLE_APPEARANCE_SEMANTIC_TYPES
-    + PAGES_TABLE_APPEARANCE_CANONICAL_TYPES
+    + PAGES_TABLE_APPEARANCE_LEGACY_CANONICAL_TYPES
     + ("BodyTableSelector",)
+)
+# Public names that may legitimately be the target spelling of a ``pub use``
+# rename (none of the W1 transaction names may be renamed).
+PAGES_TABLE_APPEARANCE_ALIAS_EXEMPT_NAMES = frozenset(
+    PAGES_TABLE_APPEARANCE_SEMANTIC_TYPES + ("BodyTableSelector",)
 )
 PAGES_TABLE_APPEARANCE_PACKAGE_METHODS = (
     "body_table_appearance",
@@ -17647,7 +17888,7 @@ PAGES_TABLE_APPEARANCE_FLAT_ALIASES = frozenset(
     }
 )
 PAGES_TABLE_APPEARANCE_ALIAS_TARGETS = frozenset(
-    PAGES_TABLE_APPEARANCE_CANONICAL_TYPES + PAGES_TABLE_APPEARANCE_SEMANTIC_TYPES
+    PAGES_TABLE_APPEARANCE_LEGACY_CANONICAL_TYPES + PAGES_TABLE_APPEARANCE_SEMANTIC_TYPES
 )
 PAGES_TABLE_APPEARANCE_OWNER_PATH = re.compile(
     r"(?<![A-Za-z0-9_#])(?:r#)?(?:body_table_appearance|table[ \t\r\n]*::"
@@ -17766,7 +18007,8 @@ PAGES_TABLE_APPEARANCE_OWNER_MARKER_GROUPS = {
     "metadata ownership": ("MetadataFacts", "inspect_package_metadata_with_visitor", "uuid_additions", "SaveTokenBatch", "external_additions"),
     "prepared execution accounting": ("model_requirements", "stylesheet_requirements", "execution_requirements", "execute"),
     "package reassembly": ("prepare_reassembly_with_deletions", "EntryEdit", "execute"),
-    "exact artifacts and inverse": ("BodyTableAppearancePatch", "source_fingerprint", "inverse", "is_noop", "PatchConflict"),
+    # ADR 0034 W1: the owner's patch is the canonical short ``Patch``.
+    "exact artifacts and inverse": ("impl Patch", "source_fingerprint", "inverse", "is_noop", "PatchConflict"),
     "candidate reopen and locality": ("candidate", "Package::from_source_with_options", "verify_candidate_locality", "full_reparse_performed"),
     "preview preservation": ("deleted_previews", "root_preview_deletions"),
 }
@@ -17953,7 +18195,12 @@ PAGES_TABLE_HIDDEN_AXES_TRANSACTION_TYPES = (
     "LimitKind",
     "Path",
 )
-PAGES_TABLE_HIDDEN_AXES_CANONICAL_TYPES = (
+# ADR 0034 W1: the owner defines the canonical short names (identical to the
+# ``transaction`` re-export set) and only
+# ``litchi_pages::table::hidden_axes::transaction`` publishes them.  The
+# deleted prefixed spellings stay focused markers and alias targets.
+PAGES_TABLE_HIDDEN_AXES_CANONICAL_TYPES = PAGES_TABLE_HIDDEN_AXES_TRANSACTION_TYPES
+PAGES_TABLE_HIDDEN_AXES_LEGACY_CANONICAL_TYPES = (
     "BodyTableHiddenAxesEdit",
     "BodyTableHiddenAxesPatch",
     "BodyTableHiddenAxesCommit",
@@ -17968,8 +18215,13 @@ PAGES_TABLE_HIDDEN_AXES_SHORT_NAMES = frozenset(
 )
 PAGES_TABLE_HIDDEN_AXES_PUBLIC_NAMES = frozenset(
     PAGES_TABLE_HIDDEN_AXES_SEMANTIC_TYPES
-    + PAGES_TABLE_HIDDEN_AXES_CANONICAL_TYPES
+    + PAGES_TABLE_HIDDEN_AXES_LEGACY_CANONICAL_TYPES
     + ("BodyTableSelector",)
+)
+# Public names that may legitimately be the target spelling of a rename
+# (none of the W1 transaction names may be renamed).
+PAGES_TABLE_HIDDEN_AXES_ALIAS_EXEMPT_NAMES = frozenset(
+    PAGES_TABLE_HIDDEN_AXES_SEMANTIC_TYPES + ("BodyTableSelector",)
 )
 PAGES_TABLE_HIDDEN_AXES_PACKAGE_METHODS = (
     "body_table_hidden_axes",
@@ -18017,7 +18269,7 @@ PAGES_TABLE_HIDDEN_AXES_FLAT_ALIASES = frozenset(
     }
 )
 PAGES_TABLE_HIDDEN_AXES_ALIAS_TARGETS = frozenset(
-    PAGES_TABLE_HIDDEN_AXES_CANONICAL_TYPES
+    PAGES_TABLE_HIDDEN_AXES_LEGACY_CANONICAL_TYPES
     + PAGES_TABLE_HIDDEN_AXES_SEMANTIC_TYPES
 )
 PAGES_TABLE_HIDDEN_AXES_OWNER_PATH = re.compile(
@@ -18784,30 +19036,32 @@ FACADE_SOURCE_ROOT = Path("crates/litchi/src")
 # re-export shape and prevents a package alias from being hidden behind a
 # semantic namespace.
 SEMANTIC_FACADE_REQUIRED_EXPORTS = {
+    # ADR 0034 wave W1 (record 0299): the Pages reader returns the leaf's
+    # ``PackageError`` and is configured by ``OpenOptions`` with the
+    # ``SourceLimits``/``SemanticLimits`` profiles.  The retired
+    # ``DocumentSourceLimits``/``ReadError`` family is listed in
+    # ``SEMANTIC_FACADE_OWNER_FORBIDDEN_NAMES`` below.
     "pages": frozenset(
         {
             "Body",
             "Document",
-            "DocumentReadOptions",
-            "DocumentSourceLimitKind",
-            "DocumentSourceLimits",
-            "DocumentSourceLimitsError",
             "DocumentStats",
             "Error",
-            "IoKind",
+            "LimitKind",
+            "OpenOptions",
+            "PackageError",
             "Position",
-            "ReadError",
-            "ReadLimitKind",
             "Result",
             "Root",
             "Section",
             "SectionSelector",
             "SectionType",
-            "SemanticLimitKind",
-            "SemanticLimits",
-            "SemanticLimitsError",
             "SelectorError",
             "SelectorResult",
+            "SemanticLimitKind",
+            "SemanticLimits",
+            "SourceLimitKind",
+            "SourceLimits",
             "TextPosition",
             "TextSpan",
         }
@@ -18889,6 +19143,39 @@ SEMANTIC_FACADE_FORBIDDEN_NAMES = frozenset(
         "WireView",
     }
 )
+# Per-owner exceptions to ``SEMANTIC_FACADE_FORBIDDEN_NAMES``.  The Pages
+# readers report typed wrong-format, limit and malformed-input failures through
+# the leaf ``PackageError``; ``Package`` itself and ``PackageResult`` remain
+# forbidden.
+SEMANTIC_FACADE_OWNER_ALLOWED_NAMES = {
+    "pages": frozenset({"PackageError"}),
+}
+# Per-owner names that must not reappear in a semantic facade.  For Pages these
+# are the ingress types deleted by ADR 0034 wave W1 (record 0299).
+SEMANTIC_FACADE_OWNER_FORBIDDEN_NAMES = {
+    "pages": frozenset(
+        {
+            "DocumentReadOptions",
+            "DocumentSourceLimitKind",
+            "DocumentSourceLimits",
+            "DocumentSourceLimitsError",
+            "IoKind",
+            "ReadError",
+            "ReadLimitKind",
+            "SemanticLimitsError",
+        }
+    ),
+}
+# Reader helpers in a semantic facade may delegate to the leaf package ingress
+# inside a function body (``litchi_pages::Package::open(path).map(...)``).
+# Only that exact call shape is removed before the forbidden-name scan, so a
+# ``Package`` export, alias or signature is still reported.
+SEMANTIC_FACADE_OWNER_PACKAGE_INGRESS_CALL = {
+    "pages": re.compile(
+        r"\blitchi_pages[ \t\r\n]*::[ \t\r\n]*Package[ \t\r\n]*::"
+        r"[ \t\r\n]*(?:open|from_bytes)[ \t\r\n]*\("
+    ),
+}
 SEMANTIC_FACADE_FORBIDDEN_PATH = re.compile(
     r"(?<![A-Za-z0-9_])(?:"
     r"(?:litchi_iwa(?:_(?:archive|common|core|detect|index|package|protos|"
@@ -20013,8 +20300,14 @@ def audit_litchi_semantic_facade_source_topology(root: Path = ROOT) -> list[str]
             )
             continue
         semantic_body, semantic_body_offset = semantic_result
+        ingress_call = SEMANTIC_FACADE_OWNER_PACKAGE_INGRESS_CALL.get(owner)
+        scanned_body = (
+            semantic_body
+            if ingress_call is None
+            else ingress_call.sub(lambda match: " " * len(match.group(0)), semantic_body)
+        )
         identifiers = {
-            match.group(1) for match in RUST_IDENTIFIER.finditer(semantic_body)
+            match.group(1) for match in RUST_IDENTIFIER.finditer(scanned_body)
         }
         missing = required - identifiers
         if missing:
@@ -20024,7 +20317,11 @@ def audit_litchi_semantic_facade_source_topology(root: Path = ROOT) -> list[str]
                 + f": {path.relative_to(root)}:{semantic_line}"
             )
 
-        for identifier in sorted(identifiers & SEMANTIC_FACADE_FORBIDDEN_NAMES):
+        forbidden = (
+            SEMANTIC_FACADE_FORBIDDEN_NAMES
+            - SEMANTIC_FACADE_OWNER_ALLOWED_NAMES.get(owner, frozenset())
+        ) | SEMANTIC_FACADE_OWNER_FORBIDDEN_NAMES.get(owner, frozenset())
+        for identifier in sorted(identifiers & forbidden):
             violations.append(
                 f"litchi {owner} semantic facade exposes forbidden `{identifier}`: "
                 f"{path.relative_to(root)}:{semantic_line}"
@@ -41353,6 +41650,11 @@ def audit_pages_table_sort_facade_source_topology(root: Path = ROOT) -> list[str
                 "focused litchi-pages table-sort public API is missing "
                 f"canonical package type {name}: {PAGES_TABLE_SORT_OWNER_SOURCE}"
             )
+    violations.extend(
+        _pages_transaction_family_violations(
+            root, "body_table_sort", "focused litchi-pages table-sort public API"
+        )
+    )
     owner_methods = {
         name: declaration
         for name, declaration, _line_number in _rust_public_methods_in_impl(
@@ -41543,10 +41845,8 @@ def audit_pages_table_sort_facade_source_topology(root: Path = ROOT) -> list[str
                     or "body_table_sort" in target_identifiers
                     or "sort" in target_identifiers
                 ) and alias and alias != target:
-                    if path == semantic_path and alias in PAGES_TABLE_SORT_TRANSACTION_TYPES:
-                        continue
-                    if alias in PAGES_TABLE_SORT_PUBLIC_NAMES:
-                        continue
+                    # ADR 0034 W1: no rename of the owner's short names and no
+                    # prefixed root alias.
                     violations.append(
                         "focused litchi-pages table-sort public API retains "
                         f"alternate alias {alias} for {target}: {path.relative_to(root)}:{line_number}"
@@ -41559,7 +41859,7 @@ def audit_pages_table_sort_facade_source_topology(root: Path = ROOT) -> list[str
                     target in PAGES_TABLE_SORT_ALIAS_TARGETS
                     or "body_table_sort" in target_identifiers
                     or "sort" in target_identifiers
-                ) and alias != target and alias not in PAGES_TABLE_SORT_PUBLIC_NAMES:
+                ) and alias != target:
                     violations.append(
                         "focused litchi-pages table-sort public API retains "
                         f"alternate alias {alias} for {target}: {path.relative_to(root)}:{line_number}"
@@ -41990,15 +42290,13 @@ def audit_pages_table_appearance_facade_source_topology(
                 "focused litchi-pages body-table appearance public API is missing canonical "
                 f"type {name}: {PAGES_TABLE_APPEARANCE_OWNER_SOURCE}"
             )
-    for name in PAGES_TABLE_APPEARANCE_CANONICAL_TYPES:
-        for path in (package_path, lib_path):
-            if name not in _rust_canonical_exports(
-                sources[path], frozenset({name})
-            ):
-                violations.append(
-                    "focused litchi-pages body-table appearance public API is missing root "
-                    f"re-export {name}: {path.relative_to(root)}"
-                )
+    violations.extend(
+        _pages_transaction_family_violations(
+            root,
+            "body_table_appearance",
+            "focused litchi-pages body-table appearance public API",
+        )
+    )
 
     owner_methods = {
         name: declaration
@@ -42021,10 +42319,10 @@ def audit_pages_table_appearance_facade_source_topology(
                 f"{PAGES_TABLE_APPEARANCE_OWNER_SOURCE}"
             )
     apply_declaration = owner_methods.get("apply_body_table_appearance")
-    if apply_declaration is not None and "BodyTableAppearancePatch" not in apply_declaration:
+    if apply_declaration is not None and re.search(r"\bPatch\b", apply_declaration) is None:
         violations.append(
             "focused litchi-pages body-table appearance apply method must accept "
-            f"BodyTableAppearancePatch: {PAGES_TABLE_APPEARANCE_OWNER_SOURCE}"
+            f"Patch: {PAGES_TABLE_APPEARANCE_OWNER_SOURCE}"
         )
     edit_methods = {
         name
@@ -42165,7 +42463,7 @@ def audit_pages_table_appearance_facade_source_topology(
         if (root / path).is_file()
     }
     facade_names = (
-        set(PAGES_TABLE_APPEARANCE_CANONICAL_TYPES)
+        set(PAGES_TABLE_APPEARANCE_LEGACY_CANONICAL_TYPES)
         | set(PAGES_TABLE_APPEARANCE_SEMANTIC_TYPES)
         | {"BodyTableSelector"}
         | set(PAGES_TABLE_APPEARANCE_PACKAGE_METHODS)
@@ -42243,9 +42541,7 @@ def audit_pages_table_appearance_facade_source_topology(
                 target = identifiers[alias_index - 1] if alias_index > 2 else ""
                 alias = identifiers[alias_index + 1] if alias_index + 1 < len(identifiers) else ""
                 if target in PAGES_TABLE_APPEARANCE_ALIAS_TARGETS and alias and alias != target:
-                    if path == semantic_path and alias in PAGES_TABLE_APPEARANCE_TRANSACTION_TYPES:
-                        continue
-                    if alias in PAGES_TABLE_APPEARANCE_PUBLIC_NAMES:
+                    if alias in PAGES_TABLE_APPEARANCE_ALIAS_EXEMPT_NAMES:
                         continue
                     violations.append(
                         "focused litchi-pages body-table appearance public API retains alternate alias "
@@ -42254,7 +42550,7 @@ def audit_pages_table_appearance_facade_source_topology(
             if identifiers[:2] == ["pub", "type"] and len(identifiers) >= 4:
                 alias = identifiers[2]
                 target = identifiers[-1]
-                if target in PAGES_TABLE_APPEARANCE_ALIAS_TARGETS and alias != target and alias not in PAGES_TABLE_APPEARANCE_PUBLIC_NAMES:
+                if target in PAGES_TABLE_APPEARANCE_ALIAS_TARGETS and alias != target and alias not in PAGES_TABLE_APPEARANCE_ALIAS_EXEMPT_NAMES:
                     violations.append(
                         "focused litchi-pages body-table appearance public API retains alternate alias "
                         f"{alias} for {target}: {path.relative_to(root)}:{line_number}"
@@ -42400,14 +42696,13 @@ def audit_pages_table_hidden_axes_facade_source_topology(
                 "focused litchi-pages body-table hidden-axes public API is missing canonical "
                 f"type {name}: {PAGES_TABLE_HIDDEN_AXES_OWNER_SOURCE}"
             )
-        for export_path in (package_path, lib_path):
-            if name not in _rust_canonical_exports(
-                sources[export_path], frozenset({name})
-            ):
-                violations.append(
-                    "focused litchi-pages body-table hidden-axes public API is missing root "
-                    f"re-export {name}: {export_path.relative_to(root)}"
-                )
+    violations.extend(
+        _pages_transaction_family_violations(
+            root,
+            "body_table_hidden_axes",
+            "focused litchi-pages body-table hidden-axes public API",
+        )
+    )
 
     owner_methods = {
         name: declaration
@@ -42430,10 +42725,10 @@ def audit_pages_table_hidden_axes_facade_source_topology(
                 f"{PAGES_TABLE_HIDDEN_AXES_OWNER_SOURCE}"
             )
     apply_declaration = owner_methods.get("apply_body_table_hidden_axes")
-    if apply_declaration is not None and "BodyTableHiddenAxesPatch" not in apply_declaration:
+    if apply_declaration is not None and re.search(r"\bPatch\b", apply_declaration) is None:
         violations.append(
             "focused litchi-pages body-table hidden-axes apply method must accept "
-            f"BodyTableHiddenAxesPatch: {PAGES_TABLE_HIDDEN_AXES_OWNER_SOURCE}"
+            f"Patch: {PAGES_TABLE_HIDDEN_AXES_OWNER_SOURCE}"
         )
 
     edit_methods = {
@@ -42839,9 +43134,7 @@ def audit_pages_table_hidden_axes_facade_source_topology(
                     or "body_table_hidden_axes" in target_identifiers
                     or "hidden_axes" in target_identifiers
                 ) and alias and alias != target:
-                    if path == semantic_path and alias in PAGES_TABLE_HIDDEN_AXES_TRANSACTION_TYPES:
-                        continue
-                    if alias in PAGES_TABLE_HIDDEN_AXES_PUBLIC_NAMES:
+                    if alias in PAGES_TABLE_HIDDEN_AXES_ALIAS_EXEMPT_NAMES:
                         continue
                     violations.append(
                         "focused litchi-pages body-table hidden-axes public API retains alternate alias "
@@ -42855,7 +43148,7 @@ def audit_pages_table_hidden_axes_facade_source_topology(
                     target in PAGES_TABLE_HIDDEN_AXES_ALIAS_TARGETS
                     or "body_table_hidden_axes" in target_identifiers
                     or "hidden_axes" in target_identifiers
-                ) and alias != target and alias not in PAGES_TABLE_HIDDEN_AXES_PUBLIC_NAMES:
+                ) and alias != target and alias not in PAGES_TABLE_HIDDEN_AXES_ALIAS_EXEMPT_NAMES:
                     violations.append(
                         "focused litchi-pages body-table hidden-axes public API retains alternate alias "
                         f"{alias} for {target}: {path.relative_to(root)}:{line_number}"
@@ -43589,16 +43882,13 @@ def audit_pages_footnote_lifecycle_facade_source_topology(
             "focused litchi-pages body-footnote public API is missing canonical "
             f"root footnote module: {PAGES_FOOTNOTE_LIFECYCLE_EXPORT_SOURCES[0]}"
         )
-    root_exports = _rust_canonical_exports(
-        lib_source, frozenset(PAGES_FOOTNOTE_LIFECYCLE_CANONICAL_TYPES)
-    )
-    for name in PAGES_FOOTNOTE_LIFECYCLE_CANONICAL_TYPES:
-        if name in root_exports:
-            continue
-        violations.append(
-            "focused litchi-pages body-footnote public API is missing root "
-            f"re-export {name}: {PAGES_FOOTNOTE_LIFECYCLE_EXPORT_SOURCES[0]}"
+    violations.extend(
+        _pages_transaction_family_violations(
+            root,
+            "body_footnote",
+            "focused litchi-pages body-footnote public API",
         )
+    )
 
     footnote_path = root / PAGES_FOOTNOTE_LIFECYCLE_EXPORT_SOURCES[2]
     footnote_source = (
@@ -44701,7 +44991,7 @@ def audit_pages_document_public_api(root: Path = ROOT) -> list[str]:
         if not path.is_file():
             continue
         source = path.read_text(encoding="utf-8")
-        dedicated_source = relative == PAGES_SOURCE_ROOT / "document.rs"
+        dedicated_source = relative in PAGES_DOCUMENT_DEDICATED_PUBLIC_API_SOURCES
         for declaration, line_number in _rust_public_declarations(source):
             identifiers = {
                 match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
@@ -47026,7 +47316,16 @@ def audit_iwa_shared_image_adjustments_source_topology(
             export_sources.append(_mask_rust_comments(source_for(export_path)))
         export_sources[0] = _mask_rust_comments(export_sources[0])
         semantic_types = frozenset(IWA_IMAGE_ADJUSTMENTS_SEMANTIC_TYPES[ecosystem])
-        if not any(
+        family_owner = IWA_IMAGE_ADJUSTMENTS_TRANSACTION_FAMILY_OWNERS.get(ecosystem)
+        if family_owner is not None:
+            violations.extend(
+                _pages_transaction_family_violations(
+                    root,
+                    family_owner,
+                    f"focused litchi-{ecosystem.lower()} image-adjustments",
+                )
+            )
+        elif not any(
             IWA_IMAGE_ADJUSTMENTS_SEMANTIC_TYPES[ecosystem][0]
             in _rust_canonical_exports(source, semantic_types)
             for source in export_sources
@@ -53143,8 +53442,13 @@ def _audit_focused_chart_arrangement_owner_source_topology(
     owner_markers: tuple[str, ...],
     lazy_codec_markers: tuple[str, ...],
     canonical_types: tuple[str, ...],
+    owner_module_visibility: str | None = None,
 ) -> list[str]:
     """Audit one focused chart-arrangement package owner.
+
+    ``owner_module_visibility`` is the exact visibility the package owner
+    module must carry: ``None`` for a private ``mod``, ``"pub(crate)"`` for
+    the ADR 0034 W1 Pages owners.  A ``pub mod`` owner is always rejected.
 
     The ratchet is deliberately limited to the public package seam and a few
     stable ownership markers.  Native graph identifiers and wire helpers may
@@ -53196,7 +53500,8 @@ def _audit_focused_chart_arrangement_owner_source_topology(
             f"focused {label} package owner module is missing: {package_source}"
         )
     for _, visibility, _, _, line_number in module_declarations:
-        if visibility is not None:
+        normalized = None if visibility is None else re.sub(r"\s+", "", visibility)
+        if normalized != owner_module_visibility:
             violations.append(
                 f"focused {label} package owner module must remain private: "
                 f"{package_source}:{line_number}"
@@ -53357,14 +53662,15 @@ def audit_pages_body_chart_arrangement_owner_source_topology(
         },
         owner_markers=PAGES_BODY_CHART_ARRANGEMENT_OWNER_MARKERS,
         lazy_codec_markers=PAGES_BODY_CHART_ARRANGEMENT_LAZY_CODEC_MARKERS,
-        canonical_types=(
-            "BodyChartArrangementCommit",
-            "BodyChartArrangementDiagnostics",
-            "BodyChartArrangementEdit",
-            "BodyChartArrangementError",
-            "BodyChartArrangementLimitKind",
-            "BodyChartArrangementPatch",
-        ),
+        # ADR 0034 W1: the canonical short names are published only by
+        # ``litchi_pages::chart::arrangement``; the shared family check below
+        # verifies the owner definitions and that exact re-export.
+        canonical_types=(),
+        owner_module_visibility="pub(crate)",
+    ) + _pages_transaction_family_violations(
+        root,
+        "body_chart_arrangement",
+        "focused litchi-pages body-chart arrangement",
     )
 
 
@@ -66981,6 +67287,12 @@ def audit_pages_table_lock_facade_source_topology(root: Path = ROOT) -> list[str
             "focused litchi-pages table-lock public API is missing "
             f"canonical package table-lock type {name}: {PAGES_TABLE_LOCK_OWNER_SOURCE}"
         )
+    if owner_present:
+        violations.extend(
+            _pages_transaction_family_violations(
+                root, "table_lock", "focused litchi-pages table-lock public API"
+            )
+        )
 
     lib_path = root / PAGES_TABLE_LOCK_EXPORT_SOURCES[0]
     lib_source = (
@@ -67113,10 +67425,11 @@ def audit_pages_table_lock_facade_source_topology(root: Path = ROOT) -> list[str
                 table_lock_target = bool(
                     set(target_identifiers) & PAGES_TABLE_LOCK_ALIAS_TARGETS
                 ) or ("lock" in target_identifiers and "State" in target_identifiers)
-                canonical_state_alias = (
-                    alias == "BodyTableLockState" and "State" in target_identifiers
-                )
-                if table_lock_target and not canonical_state_alias:
+                # W1 deleted the ``BodyTableLockState`` alias: any type alias
+                # of ``State`` in ``table::lock`` is now an alternate route.
+                if path == semantic_path and "State" in target_identifiers:
+                    table_lock_target = True
+                if table_lock_target:
                     target = target_identifiers[-1]
                     if alias != target:
                         violations.append(
@@ -67279,6 +67592,11 @@ def audit_pages_table_title_facade_source_topology(root: Path = ROOT) -> list[st
             "focused litchi-pages table-title public API is missing "
             f"canonical package type {name}: {PAGES_TABLE_TITLE_OWNER_SOURCE}"
         )
+    violations.extend(
+        _pages_transaction_family_violations(
+            root, "body_table_title", "focused litchi-pages table-title public API"
+        )
+    )
     if owner_present:
         owner_source = (
             owner_path.read_text(encoding="utf-8") if owner_path.is_file() else ""
@@ -67397,19 +67715,8 @@ def audit_pages_table_title_facade_source_topology(root: Path = ROOT) -> list[st
                     target in PAGES_TABLE_TITLE_ALIAS_TARGETS
                     or "body_table_title" in target_identifiers
                 ) and alias and alias != target:
-                    # A sibling table-settings semantic alias is not a title
-                    # route; keep the title ratchet scoped to its own facade.
-                    if alias == "BodyTableHeaderSettings":
-                        continue
-                    if path == semantic_path and alias in {
-                        "Commit",
-                        "Diagnostics",
-                        "Edit",
-                        "Error",
-                        "LimitKind",
-                        "Patch",
-                    }:
-                        continue
+                    # ADR 0034 W1: ``table::title`` re-exports the owner's
+                    # short names directly, so no rename is permitted here.
                     violations.append(
                         "focused litchi-pages table-title public API retains "
                         f"alternate alias {alias} for {target}: "
@@ -67423,8 +67730,6 @@ def audit_pages_table_title_facade_source_topology(root: Path = ROOT) -> list[st
                     target in PAGES_TABLE_TITLE_ALIAS_TARGETS
                     or "body_table_title" in target_identifiers
                 ) and alias != target:
-                    if alias == "BodyTableHeaderSettings":
-                        continue
                     violations.append(
                         "focused litchi-pages table-title public API retains "
                         f"alternate alias {alias} for {target}: "
@@ -67579,6 +67884,11 @@ def audit_pages_table_headers_facade_source_topology(root: Path = ROOT) -> list[
             "focused litchi-pages table-headers public API is missing "
             f"canonical package type {name}: {PAGES_TABLE_HEADERS_OWNER_SOURCE}"
         )
+    violations.extend(
+        _pages_transaction_family_violations(
+            root, "body_table_headers", "focused litchi-pages table-headers public API"
+        )
+    )
 
     lib_path = root / PAGES_TABLE_HEADERS_EXPORT_SOURCES[0]
     lib_source = (
@@ -67689,19 +67999,8 @@ def audit_pages_table_headers_facade_source_topology(root: Path = ROOT) -> list[
                     or "body_table_headers" in target_identifiers
                     or "headers" in target_identifiers
                 ) and alias and alias != target:
-                    if alias in PAGES_TABLE_HEADERS_PUBLIC_NAMES:
-                        continue
-                    if path == semantic_path and alias in {
-                        "Commit",
-                        "Diagnostics",
-                        "Edit",
-                        "Error",
-                        "LimitKind",
-                        "Patch",
-                        "Count",
-                        "Settings",
-                    }:
-                        continue
+                    # ADR 0034 W1 deleted the ``BodyTableHeaderSettings`` and
+                    # prefixed aliases; the short names are re-exported as-is.
                     violations.append(
                         "focused litchi-pages table-headers public API retains "
                         f"alternate alias {alias} for {target}: "
@@ -67716,8 +68015,6 @@ def audit_pages_table_headers_facade_source_topology(root: Path = ROOT) -> list[
                     or "body_table_headers" in target_identifiers
                     or "headers" in target_identifiers
                 ) and alias != target:
-                    if alias in PAGES_TABLE_HEADERS_PUBLIC_NAMES:
-                        continue
                     violations.append(
                         "focused litchi-pages table-headers public API retains "
                         f"alternate alias {alias} for {target}: "
@@ -67870,6 +68167,11 @@ def audit_pages_table_dimension_facade_source_topology(
             "focused litchi-pages table-dimension public API is missing "
             f"canonical package type {name}: {PAGES_TABLE_DIMENSION_OWNER_SOURCE}"
         )
+    violations.extend(
+        _pages_transaction_family_violations(
+            root, "body_table_dimension", "focused litchi-pages table-dimension public API"
+        )
+    )
 
     owner_methods = {
         name
@@ -67971,15 +68273,7 @@ def audit_pages_table_dimension_facade_source_topology(
                     or "body_table_dimension" in target_identifiers
                     or "dimension" in target_identifiers
                 ) and alias and alias != target:
-                    if path == semantic_path and alias in {
-                        "Commit",
-                        "Diagnostics",
-                        "Edit",
-                        "Error",
-                        "LimitKind",
-                        "Patch",
-                    }:
-                        continue
+                    # ADR 0034 W1: no rename of the owner's short names.
                     violations.append(
                         "focused litchi-pages table-dimension public API retains "
                         f"alternate alias {alias} for {target}: {path.relative_to(root)}:{line_number}"
@@ -68181,13 +68475,13 @@ def audit_pages_header_footer_facade_source_topology(
             "focused litchi-pages header/footer public API is missing canonical "
             f"root header_footer module: {PAGES_HEADER_FOOTER_EXPORT_SOURCES[0]}"
         )
-    for name in PAGES_HEADER_FOOTER_CANONICAL_TYPES:
-        if name in _rust_canonical_exports(lib_source, frozenset({name})):
-            continue
-        violations.append(
-            "focused litchi-pages header/footer public API is missing root "
-            f"re-export {name}: {PAGES_HEADER_FOOTER_EXPORT_SOURCES[0]}"
+    violations.extend(
+        _pages_transaction_family_violations(
+            root,
+            "header_footer_text",
+            "focused litchi-pages header/footer public API",
         )
+    )
     if "HeaderFooterSelector" not in _rust_canonical_exports(
         lib_source, frozenset({"HeaderFooterSelector"})
     ):
@@ -68433,13 +68727,13 @@ def audit_pages_section_text_facade_source_topology(
             "focused litchi-pages section-text public API is missing root "
             f"SectionSelector re-export: {PAGES_SECTION_TEXT_EXPORT_SOURCES[0]}"
         )
-    for name in PAGES_SECTION_TEXT_CANONICAL_TYPES:
-        if name in _rust_canonical_exports(lib_source, frozenset({name})):
-            continue
-        violations.append(
-            "focused litchi-pages section-text public API is missing root "
-            f"re-export {name}: {PAGES_SECTION_TEXT_EXPORT_SOURCES[0]}"
+    violations.extend(
+        _pages_transaction_family_violations(
+            root,
+            "section_text",
+            "focused litchi-pages section-text public API",
         )
+    )
 
     package_path = root / PAGES_SECTION_TEXT_EXPORT_SOURCES[1]
     package_source = (
@@ -69989,6 +70283,13 @@ IWA_TABLE_MERGE_TRANSACTION_SPECS = (
         "module_name": "body_table_merges",
         "transaction_module": "transaction",
         "prefix": "BodyTableMerges",
+        # ADR 0034 W1: canonical short names published only by
+        # ``litchi_pages::table::merge::transaction``.
+        "type_names": {
+            suffix: suffix for suffix in ("Edit", "Patch", "Commit", "Diagnostics")
+        },
+        "type_display_prefix": "table::merge::transaction::",
+        "transaction_family_owner": "body_table_merges",
         "edit_method": "edit_body_table_merges",
         "apply_method": "apply_body_table_merges",
         "selector_types": frozenset({"BodyTableSelector"}),
@@ -70152,13 +70453,16 @@ IWA_PAGES_BODY_TABLE_DELETION_PACKAGE_SOURCE = Path(
 IWA_PAGES_BODY_TABLE_DELETION_LIBRARY_SOURCE = Path(
     "crates/litchi-pages/src/lib.rs"
 )
+# ADR 0034 W1: the owner defines these canonical short names and only
+# ``litchi_pages::table::deletion`` re-exports them; the removed table is the
+# ``table::catalog::Snapshot`` value.
 IWA_PAGES_BODY_TABLE_DELETION_CANONICAL_TYPES = frozenset(
     {
-        "BodyTableDeletionCommit",
-        "BodyTableDeletionDiagnostics",
-        "BodyTableDeletionError",
-        "BodyTableDeletionLimitKind",
-        "BodyTableDeletionPatch",
+        "Commit",
+        "Diagnostics",
+        "Error",
+        "LimitKind",
+        "Patch",
     }
 )
 IWA_PAGES_BODY_TABLE_DELETION_PACKAGE_METHODS = (
@@ -70275,8 +70579,8 @@ IWA_PAGES_BODY_TABLE_DELETION_OWNER_MARKER_GROUPS = {
         "body_table_catalog",
     ),
     "semantic deletion patch": (
-        "BodyTableDeletionPatch",
-        "BodyTableSnapshot",
+        "Patch",
+        "Snapshot",
         "removed_table",
         "staged",
         "deletion",
@@ -72934,10 +73238,18 @@ def _audit_table_merge_transaction_source_topology(
 
     format_name = spec["format_name"]
     prefix = spec["prefix"]
-    canonical_names = frozenset(
-        f"{prefix}{suffix}"
+    # ADR 0034 W1 Pages owners define the canonical short names (``Edit``,
+    # ``Patch``, ...); other formats still use ``<prefix><suffix>``.
+    type_names = {
+        suffix: spec.get("type_names", {}).get(suffix, f"{prefix}{suffix}")
         for suffix in IWA_TABLE_MERGE_TRANSACTION_CANONICAL_SUFFIXES
-    )
+    }
+    display_prefix = spec.get("type_display_prefix", "")
+    type_labels = {
+        suffix: f"{display_prefix}{name}" for suffix, name in type_names.items()
+    }
+    canonical_names = frozenset(type_names.values())
+    family_owner = spec.get("transaction_family_owner")
     owner_path = spec["owner_path"]
     owner_source = sources[0][1]
     owner_code = _mask_rust_non_code(owner_source)
@@ -73028,14 +73340,33 @@ def _audit_table_merge_transaction_source_topology(
                 f"focused {format_name} table-merge transaction child is missing "
                 f"canonical type {name}: {child_path}"
             )
-    if package_source:
+    facade_sources = [(package_path, package_source), (library_path, library_source)]
+    if family_owner is not None:
+        # W1: only the family's public module re-exports the short names;
+        # the package and crate-root facades must not.  The shared helper
+        # checks the owner visibility, the exact re-export and the deleted
+        # prefixed spellings.
+        violations.extend(
+            _pages_transaction_family_violations(
+                root, family_owner, f"focused {format_name} table-merge"
+            )
+        )
+        public_file, public_scope, _ = _pages_public_module_scope(
+            root, PAGES_TRANSACTION_FAMILY_BY_OWNER[family_owner][2]
+        )
+        facade_sources = (
+            []
+            if public_file is None or public_scope is None
+            else [(public_file.relative_to(root), public_scope)]
+        )
+    elif package_source:
         package_exports = _rust_canonical_exports(package_source, canonical_names)
         for name in sorted(canonical_names - package_exports):
             violations.append(
                 f"focused {format_name} table-merge package facade is missing "
                 f"canonical export {name}: {package_path}"
             )
-    if library_source:
+    if library_source and family_owner is None:
         library_exports = _rust_canonical_exports(library_source, canonical_names)
         for name in sorted(canonical_names - library_exports):
             violations.append(
@@ -73105,10 +73436,7 @@ def _audit_table_merge_transaction_source_topology(
     # Facade re-exports are public declarations too. Restrict this scan to
     # declarations carrying one of the canonical names so unrelated package
     # APIs remain outside the merge ratchet.
-    for path, source in (
-        (package_path, package_source),
-        (library_path, library_source),
-    ):
+    for path, source in facade_sources:
         if not source:
             continue
         for declaration, line_number in _rust_public_declarations(source):
@@ -73164,10 +73492,10 @@ def _audit_table_merge_transaction_source_topology(
         )
     else:
         declaration, _line_number, path = package_methods[spec["edit_method"]]
-        if re.search(rf"\b{re.escape(prefix + 'Edit')}\b", declaration) is None:
+        if re.search(rf"\b{re.escape(type_names['Edit'])}\b", declaration) is None:
             violations.append(
                 f"focused {format_name} {spec['edit_method']} must return the "
-                f"typed {prefix}Edit: {path}"
+                f"typed {type_labels['Edit']}: {path}"
             )
         for selector in sorted(spec["selector_types"]):
             if re.search(rf"\b{re.escape(selector)}\b", declaration) is None:
@@ -73208,15 +73536,15 @@ def _audit_table_merge_transaction_source_topology(
         )
     else:
         declaration, _line_number, path = package_methods[spec["apply_method"]]
-        if re.search(rf"\b{re.escape(prefix + 'Patch')}\b", declaration) is None:
+        if re.search(rf"\b{re.escape(type_names['Patch'])}\b", declaration) is None:
             violations.append(
                 f"focused {format_name} {spec['apply_method']} must accept the "
-                f"typed {prefix}Patch: {path}"
+                f"typed {type_labels['Patch']}: {path}"
             )
-        if re.search(rf"\b{re.escape(prefix + 'Commit')}\b", declaration) is None:
+        if re.search(rf"\b{re.escape(type_names['Commit'])}\b", declaration) is None:
             violations.append(
                 f"focused {format_name} {spec['apply_method']} must return the "
-                f"typed {prefix}Commit: {path}"
+                f"typed {type_labels['Commit']}: {path}"
             )
         if not apply_evidence:
             violations.append(
@@ -73241,7 +73569,7 @@ def _audit_table_merge_transaction_source_topology(
         method_name for method_name, _declaration, _line in sum(
             [
                 _rust_public_methods_in_impl(
-                    _mask_rust_cfg_test_items(source), f"{prefix}Edit"
+                    _mask_rust_cfg_test_items(source), type_names["Edit"]
                 )
                 for _path, source in sources
             ],
@@ -73252,27 +73580,27 @@ def _audit_table_merge_transaction_source_topology(
         method_name: declaration
         for _path, source in sources
         for method_name, declaration, _line in _rust_public_methods_in_impl(
-            _mask_rust_cfg_test_items(source), f"{prefix}Edit"
+            _mask_rust_cfg_test_items(source), type_names["Edit"]
         )
     }
     for required in ("merge", "unmerge", "commit"):
         if required not in edit_methods:
             violations.append(
-                f"focused {format_name} {prefix}Edit is missing public {required}: "
+                f"focused {format_name} {type_labels['Edit']} is missing public {required}: "
                 f"{spec['transaction_path']}"
             )
         elif required in {"merge", "unmerge"} and re.search(
             r"\bRegion\b", edit_signatures[required]
         ) is None:
             violations.append(
-                f"focused {format_name} {prefix}Edit::{required} must use common "
+                f"focused {format_name} {type_labels['Edit']}::{required} must use common "
                 f"Region values: {spec['transaction_path']}"
             )
     patch_methods = {
         method_name for method_name, _declaration, _line in sum(
             [
                 _rust_public_methods_in_impl(
-                    _mask_rust_cfg_test_items(source), f"{prefix}Patch"
+                    _mask_rust_cfg_test_items(source), type_names["Patch"]
                 )
                 for _path, source in sources
             ],
@@ -73282,14 +73610,14 @@ def _audit_table_merge_transaction_source_topology(
     for required in ("before", "after", "is_noop", "inverse"):
         if required not in patch_methods:
             violations.append(
-                f"focused {format_name} {prefix}Patch is missing public {required}: "
+                f"focused {format_name} {type_labels['Patch']} is missing public {required}: "
                 f"{spec['transaction_path']}"
             )
     commit_methods = {
         method_name for method_name, _declaration, _line in sum(
             [
                 _rust_public_methods_in_impl(
-                    _mask_rust_cfg_test_items(source), f"{prefix}Commit"
+                    _mask_rust_cfg_test_items(source), type_names["Commit"]
                 )
                 for _path, source in sources
             ],
@@ -73299,14 +73627,14 @@ def _audit_table_merge_transaction_source_topology(
     for required in ("package", "into_package", "patch", "diagnostics"):
         if required not in commit_methods:
             violations.append(
-                f"focused {format_name} {prefix}Commit is missing public {required}: "
+                f"focused {format_name} {type_labels['Commit']} is missing public {required}: "
                 f"{spec['transaction_path']}"
             )
     diagnostics_methods = {
         method_name for method_name, _declaration, _line in sum(
             [
                 _rust_public_methods_in_impl(
-                    _mask_rust_cfg_test_items(source), f"{prefix}Diagnostics"
+                    _mask_rust_cfg_test_items(source), type_names["Diagnostics"]
                 )
                 for _path, source in sources
             ],
@@ -73315,7 +73643,7 @@ def _audit_table_merge_transaction_source_topology(
     }
     if "changed" not in diagnostics_methods:
         violations.append(
-            f"focused {format_name} {prefix}Diagnostics is missing public changed: "
+            f"focused {format_name} {type_labels['Diagnostics']} is missing public changed: "
             f"{spec['transaction_path']}"
         )
 
@@ -73725,11 +74053,19 @@ def _audit_pages_body_table_deletion_public_surface(
 
     # Public re-exports are checked independently from the owner methods: a
     # future facade alias must not reintroduce a physical type through a
-    # declaration that never appears in the transaction child itself.
-    for path, source in (
-        (IWA_PAGES_BODY_TABLE_DELETION_PACKAGE_SOURCE, package_source),
-        (IWA_PAGES_BODY_TABLE_DELETION_LIBRARY_SOURCE, library_source),
-    ):
+    # declaration that never appears in the transaction child itself.  After
+    # ADR 0034 W1 the family is published only by ``table::deletion``; the
+    # short names are too common to filter ``package.rs``/``lib.rs``
+    # declarations, so the scan covers that public module's scope.
+    public_file, public_scope, _ = _pages_public_module_scope(
+        root, PAGES_TRANSACTION_FAMILY_BY_OWNER["body_table_deletion"][2]
+    )
+    facade_sources = (
+        []
+        if public_file is None or public_scope is None
+        else [(public_file.relative_to(root), public_scope)]
+    )
+    for path, source in facade_sources:
         for declaration, line in _rust_public_declarations(source):
             identifiers = {
                 match.group(1) for match in RUST_IDENTIFIER.finditer(declaration)
@@ -73859,16 +74195,13 @@ def audit_pages_body_table_deletion_source_topology(
                 "Pages body-table deletion owner is missing canonical type "
                 f"{name}: {owner_path}"
             )
-        if package_source and name not in _rust_canonical_exports(package_source, canonical):
-            violations.append(
-                "Pages body-table deletion package facade is missing canonical export "
-                f"{name}: {IWA_PAGES_BODY_TABLE_DELETION_PACKAGE_SOURCE}"
-            )
-        if library_source and name not in _rust_canonical_exports(library_source, canonical):
-            violations.append(
-                "Pages body-table deletion crate facade is missing canonical export "
-                f"{name}: {IWA_PAGES_BODY_TABLE_DELETION_LIBRARY_SOURCE}"
-            )
+    # The package and crate-root facades no longer re-export the family; the
+    # shared helper checks ``table::deletion`` and the deleted spellings.
+    violations.extend(
+        _pages_transaction_family_violations(
+            root, "body_table_deletion", "Pages body-table deletion"
+        )
+    )
 
     all_source = "\n".join(source for _path, source in sources)
     all_code = _mask_rust_non_code(all_source)
@@ -73955,7 +74288,7 @@ def audit_pages_body_table_deletion_source_topology(
                 "Pages remove_body_table must accept BodyTableSelector: "
                 f"{path}:{line}"
             )
-        if re.search(r"\bBodyTableDeletion(?:Error|LimitKind)?\b", declaration) is None:
+        if re.search(r"\bResult\s*<\s*Commit\s*,\s*Error\s*>", declaration) is None:
             violations.append(
                 "Pages remove_body_table must return the typed deletion result: "
                 f"{path}:{line}"
@@ -73970,7 +74303,7 @@ def audit_pages_body_table_deletion_source_topology(
             body_code,
         )
         staging = re.search(
-            r"\b(?:BodyTableDeletionPatch|stage|staged|reassemble|rewrite|"
+            r"\b(?:Patch|stage|staged|reassemble|rewrite|"
             r"candidate)\b",
             body_code,
         )
@@ -74003,14 +74336,14 @@ def audit_pages_body_table_deletion_source_topology(
             f"{owner_path}"
         )
     for declaration, body, line, path in apply_records:
-        if re.search(r"\bBodyTableDeletionPatch\b", declaration) is None:
+        if re.search(r"\bPatch\b", declaration) is None:
             violations.append(
-                "Pages apply_body_table_deletion must accept BodyTableDeletionPatch: "
+                "Pages apply_body_table_deletion must accept table::deletion::Patch: "
                 f"{path}:{line}"
             )
-        if re.search(r"\bBodyTableDeletionCommit\b", declaration) is None:
+        if re.search(r"\bCommit\b", declaration) is None:
             violations.append(
-                "Pages apply_body_table_deletion must return BodyTableDeletionCommit: "
+                "Pages apply_body_table_deletion must return table::deletion::Commit: "
                 f"{path}:{line}"
             )
         body_code = _mask_rust_non_code(body)
@@ -74019,7 +74352,7 @@ def audit_pages_body_table_deletion_source_topology(
             body_code = body_code[body_opening + 1 :]
         admission = re.search(
             r"\b(?:PatchConflict|source_fingerprint|target_fingerprint|"
-            r"exact_source|authoriz|validate_patch|BodyTableDeletionPatch)\b",
+            r"exact_source|authoriz|validate_patch|Patch)\b",
             body_code,
         )
         staging = re.search(
@@ -74051,13 +74384,13 @@ def audit_pages_body_table_deletion_source_topology(
         method_name
         for path, source in sources
         for method_name, _declaration, _line in _rust_public_methods_in_impl(
-            _mask_rust_cfg_test_items(source), "BodyTableDeletionCommit"
+            _mask_rust_cfg_test_items(source), "Commit"
         )
     }
     for required in ("package", "into_package", "patch", "diagnostics", "removed_table"):
         if required not in commit_methods:
             violations.append(
-                "Pages BodyTableDeletionCommit is missing public "
+                "Pages table::deletion::Commit is missing public "
                 f"{required}: {owner_path}"
             )
 
@@ -74065,18 +74398,18 @@ def audit_pages_body_table_deletion_source_topology(
         (path, declaration, line)
         for path, source in sources
         for method_name, declaration, line in _rust_public_methods_in_impl(
-            _mask_rust_cfg_test_items(source), "BodyTableDeletionCommit"
+            _mask_rust_cfg_test_items(source), "Commit"
         )
         if method_name == "removed_table"
     ]
     if removed_table_records and not any(
-        re.search(r"\bBodyTableSnapshot\b", declaration)
+        re.search(r"\bSnapshot\b", declaration)
         for _path, declaration, _line in removed_table_records
     ):
         path, _declaration, line = removed_table_records[0]
         violations.append(
-            "Pages BodyTableDeletionCommit::removed_table must return semantic "
-            f"BodyTableSnapshot: {path}:{line}"
+            "Pages table::deletion::Commit::removed_table must return semantic "
+            f"table::catalog::Snapshot: {path}:{line}"
         )
 
     violations.extend(
@@ -76596,6 +76929,401 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+PAGES_TRANSACTION_REEXPORT = re.compile(
+    r"(?<![A-Za-z0-9_])pub[ \t\r\n]+use[ \t\r\n]+(?:crate[ \t\r\n]*::[ \t\r\n]*)?"
+    r"package[ \t\r\n]*::[ \t\r\n]*(?:r#)?(?P<owner>[A-Za-z_][A-Za-z0-9_]*)"
+    r"[ \t\r\n]*::[ \t\r\n]*(?P<items>\{[^{}]*\}|\*|(?:r#)?[A-Za-z_][A-Za-z0-9_]*"
+    r"(?:[ \t\r\n]+as[ \t\r\n]+(?:r#)?[A-Za-z_][A-Za-z0-9_]*)?)[ \t\r\n]*;"
+)
+PAGES_PUBLIC_USE_STATEMENT = re.compile(
+    r"(?<![A-Za-z0-9_])pub[ \t\r\n]+use\b[^;]*;"
+)
+PAGES_NOMINAL_DEFINITION = re.compile(
+    r"(?<![A-Za-z0-9_#])(?:struct|enum|union|trait|type)[ \t\r\n]+"
+    r"(?:r#)?(?P<name>[A-Za-z_][A-Za-z0-9_]*)\b"
+)
+
+
+_PAGES_MASKED_SOURCE_CACHE: dict[tuple[str, int, int], str] = {}
+
+
+def _pages_masked_production_code(path: Path) -> str:
+    """Return cfg(test)- and comment-masked code, cached by file identity."""
+
+    stat = path.stat()
+    key = (str(path), stat.st_mtime_ns, stat.st_size)
+    cached = _PAGES_MASKED_SOURCE_CACHE.get(key)
+    if cached is None:
+        cached = _mask_rust_non_code(
+            _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        )
+        _PAGES_MASKED_SOURCE_CACHE[key] = cached
+    return cached
+
+
+def _pages_retired_name_violations(
+    root: Path, names: frozenset[str], title: str
+) -> list[str]:
+    """Reject a definition or ``pub use`` of a retired Pages spelling.
+
+    Any nominal definition (``struct``/``enum``/``union``/``trait``/``type``
+    at any visibility) is reported, as is any exactly-``pub`` ``use`` that
+    names the spelling.  Private and ``pub(crate)`` imports such as
+    ``use super::body_chart_arrangement::Error as BodyChartArrangementError``
+    are implementation detail and remain allowed.
+    """
+
+    source_root = root / PAGES_SOURCE_ROOT
+    if not names or not source_root.is_dir():
+        return []
+    violations: list[str] = []
+    for path in sorted(source_root.rglob("*.rs")):
+        code = _pages_masked_production_code(path)
+        if not any(name in code for name in names):
+            continue
+        relative = path.relative_to(root)
+        for match in PAGES_NOMINAL_DEFINITION.finditer(code):
+            if match.group("name") in names:
+                line_number = code.count("\n", 0, match.start()) + 1
+                violations.append(
+                    f"{title} defines retired name {match.group('name')}: "
+                    f"{relative}:{line_number}"
+                )
+        for statement in PAGES_PUBLIC_USE_STATEMENT.finditer(code):
+            identifiers = {
+                match.group(1) for match in RUST_IDENTIFIER.finditer(statement.group(0))
+            }
+            for name in sorted(identifiers & names):
+                line_number = code.count("\n", 0, statement.start()) + 1
+                violations.append(
+                    f"{title} publicly re-exports retired name {name}: "
+                    f"{relative}:{line_number}"
+                )
+    return violations
+
+
+def _pages_reexport_items(items: str) -> tuple[frozenset[str], tuple[str, ...], bool]:
+    """Split one ``use`` item list into public names, aliases and a glob flag."""
+
+    names: set[str] = set()
+    aliases: list[str] = []
+    glob = False
+    for item in items.strip().strip("{}").split(","):
+        tokens = item.replace("r#", "").split()
+        if not tokens:
+            continue
+        if tokens == ["*"]:
+            glob = True
+            continue
+        if len(tokens) == 3 and tokens[1] == "as":
+            if tokens[0] != tokens[2]:
+                aliases.append(f"{tokens[0]} as {tokens[2]}")
+            names.add(tokens[2])
+            continue
+        names.add(tokens[0])
+    return frozenset(names), tuple(aliases), glob
+
+
+def _pages_public_module_scope(
+    root: Path, segments: tuple[str, ...]
+) -> tuple[Path | None, str | None, list[str]]:
+    """Resolve one ``litchi_pages::a::b`` public module to its source scope.
+
+    Returns the file holding the innermost module, that module's source text
+    (an inline body or a whole file) and any visibility violations on the
+    way.  Every segment must be declared exactly ``pub mod``.
+    """
+
+    source_root = root / PAGES_SOURCE_ROOT
+    path = source_root / "lib.rs"
+    public_path = "::".join(segments)
+    if not path.is_file():
+        return None, None, [f"Pages crate root is missing: {PAGES_SOURCE_ROOT / 'lib.rs'}"]
+    scope = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+    directory = source_root
+    violations: list[str] = []
+    for index, segment in enumerate(segments):
+        prefix = "::".join(segments[: index + 1])
+        declarations = _rust_root_level_module_declarations(scope, frozenset({segment}))
+        if not declarations:
+            return path, None, violations + [
+                f"Pages transaction module {public_path} is missing public module "
+                f"{prefix}: {path.relative_to(root)}"
+            ]
+        _, visibility, shape, body, line_number = declarations[0]
+        if visibility is None or re.sub(r"\s+", "", visibility) != "pub":
+            violations.append(
+                f"Pages transaction module {prefix} must be declared `pub mod`: "
+                f"{path.relative_to(root)}:{line_number}"
+            )
+        if shape == "inline":
+            scope = body
+        elif shape == "external":
+            candidates = (directory / f"{segment}.rs", directory / segment / "mod.rs")
+            found = next((candidate for candidate in candidates if candidate.is_file()), None)
+            if found is None:
+                return path, None, violations + [
+                    f"Pages transaction module {prefix} has no source file: "
+                    f"{path.relative_to(root)}:{line_number}"
+                ]
+            path = found
+            scope = _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+        else:
+            return path, None, violations + [
+                f"Pages transaction module {prefix} has an invalid declaration: "
+                f"{path.relative_to(root)}:{line_number}"
+            ]
+        directory = directory / segment
+    return path, scope, violations
+
+
+def _pages_transaction_family_violations(
+    root: Path, owner: str, label: str | None = None
+) -> list[str]:
+    """Check one W1 transaction family's owner, definitions and public module.
+
+    * ``package.rs`` declares the owner exactly ``pub(crate) mod <owner>;``
+      (a ``pub mod`` owner or a private one is reported);
+    * the owner (or a child source under ``package/<owner>/``) defines every
+      canonical short name and the owner makes it reachable;
+    * the family's public module re-exports exactly the canonical short
+      names with one ``pub use crate::package::<owner>::{...};`` and no
+      alias or glob.
+
+    Alternate paths, legacy spellings and globs elsewhere in the crate are
+    checked once by ``audit_pages_transaction_family_source_topology``.
+    """
+
+    _, _, segments, shorts, _ = PAGES_TRANSACTION_FAMILY_BY_OWNER[owner]
+    title = label or f"Pages {owner} transaction family"
+    public_path = "::".join(segments)
+    expected = frozenset(shorts)
+    violations: list[str] = []
+
+    package_path = root / PAGES_PACKAGE_SOURCE
+    if not package_path.is_file():
+        return [f"{title} package source is missing: {PAGES_PACKAGE_SOURCE}"]
+    package_source = _mask_rust_cfg_test_items(package_path.read_text(encoding="utf-8"))
+    declarations = _rust_root_level_module_declarations(package_source, frozenset({owner}))
+    if not declarations:
+        violations.append(
+            f"{title} owner module is missing `pub(crate) mod {owner};`: "
+            f"{PAGES_PACKAGE_SOURCE}"
+        )
+    for _, visibility, shape, _, line_number in declarations:
+        normalized = re.sub(r"\s+", "", visibility or "")
+        if normalized != "pub(crate)":
+            violations.append(
+                f"{title} owner module must be declared `pub(crate) mod {owner};` "
+                f"(found `{normalized or 'private'} mod`): "
+                f"{PAGES_PACKAGE_SOURCE}:{line_number}"
+            )
+        if shape != "external":
+            violations.append(
+                f"{title} owner module must live in its own source file: "
+                f"{PAGES_PACKAGE_SOURCE}:{line_number}"
+            )
+
+    owner_relative = PAGES_SOURCE_ROOT / "package" / f"{owner}.rs"
+    owner_path = root / owner_relative
+    if not owner_path.is_file():
+        violations.append(f"{title} owner source is missing: {owner_relative}")
+    else:
+        owner_source = _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+        reachable = _rust_canonical_exports(owner_source, expected)
+        defined: set[str] = set()
+        family_sources = [owner_source]
+        helper_root = root / PAGES_SOURCE_ROOT / "package" / owner
+        if helper_root.is_dir():
+            family_sources.extend(
+                _mask_rust_cfg_test_items(path.read_text(encoding="utf-8"))
+                for path in sorted(helper_root.rglob("*.rs"))
+            )
+        for family_source in family_sources:
+            code = _mask_rust_non_code(family_source)
+            for match in PAGES_NOMINAL_DEFINITION.finditer(code):
+                if match.group("name") in expected:
+                    defined.add(match.group("name"))
+        for name in shorts:
+            if name not in defined:
+                violations.append(
+                    f"{title} owner is missing canonical type {name}: {owner_relative}"
+                )
+            elif name not in reachable:
+                violations.append(
+                    f"{title} owner does not publish canonical type {name}: "
+                    f"{owner_relative}"
+                )
+
+    violations.extend(
+        _pages_retired_name_violations(root, _pages_transaction_legacy_names(owner), title)
+    )
+
+    public_file, scope, module_violations = _pages_public_module_scope(root, segments)
+    violations.extend(f"{title}: {item}" for item in module_violations)
+    if public_file is None or scope is None:
+        return violations
+    public_relative = public_file.relative_to(root)
+    code = _mask_rust_non_code(scope)
+    exported: set[str] = set()
+    statements = 0
+    for match in PAGES_TRANSACTION_REEXPORT.finditer(code):
+        if match.group("owner") != owner or _rust_brace_depth_at(code, match.start()):
+            continue
+        statements += 1
+        names, aliases, glob = _pages_reexport_items(match.group("items"))
+        exported.update(names)
+        for alias in aliases:
+            violations.append(
+                f"{title} public module {public_path} re-exports alias {alias}: "
+                f"{public_relative}"
+            )
+        if glob:
+            violations.append(
+                f"{title} public module {public_path} glob re-exports its owner: "
+                f"{public_relative}"
+            )
+    if not statements:
+        violations.append(
+            f"{title} public module {public_path} is missing "
+            f"`pub use crate::package::{owner}::{{...}};`: {public_relative}"
+        )
+    elif statements > 1:
+        violations.append(
+            f"{title} public module {public_path} re-exports its owner more than once: "
+            f"{public_relative}"
+        )
+    for name in sorted(expected - exported):
+        if statements:
+            violations.append(
+                f"{title} public module {public_path} is missing canonical export "
+                f"{name}: {public_relative}"
+            )
+    for name in sorted(exported - expected):
+        violations.append(
+            f"{title} public module {public_path} exports non-canonical {name}: "
+            f"{public_relative}"
+        )
+    return violations
+
+
+def audit_pages_transaction_family_source_topology(root: Path = ROOT) -> list[str]:
+    """Keep the ADR 0034 W1 Pages transaction modules canonical.
+
+    Every family in ``PAGES_TRANSACTION_FAMILIES`` is checked by
+    ``_pages_transaction_family_violations``.  Crate-wide, this audit also
+    rejects:
+
+    * a nominal definition (any visibility) or a ``pub use`` of a deleted
+      prefixed spelling or retired root alias (``BodyTableLockState``,
+      ``BodyTableHeaderSettings``, ``BodyTableName``, the
+      ``DocumentSourceLimits``/``ReadError`` family, ...);
+    * a second public path to a family's canonical names: any other
+      ``pub use`` that names the owner module and imports a canonical short
+      name, an alias or a glob.  Private and ``pub(crate)`` imports (for
+      example ``use ...::{Error as BodyChartArrangementError}`` inside another
+      owner) are not public surface and are allowed;
+    * raw byte-slice or archive/wire/protobuf identifiers in public
+      declarations of the owner sources.
+    """
+
+    source_root = root / PAGES_SOURCE_ROOT
+    if not source_root.is_dir():
+        return []
+    violations: list[str] = []
+    for owner, *_ in PAGES_TRANSACTION_FAMILIES:
+        violations.extend(_pages_transaction_family_violations(root, owner))
+
+    violations.extend(
+        _pages_retired_name_violations(
+            root,
+            PAGES_TRANSACTION_RETIRED_EXTRA_NAMES,
+            "Pages W1 retired alias/ingress family",
+        )
+    )
+
+    owners = {family[0]: frozenset(family[3]) for family in PAGES_TRANSACTION_FAMILIES}
+    reexports: dict[str, int] = {owner: 0 for owner in owners}
+    for path in sorted(source_root.rglob("*.rs")):
+        relative = path.relative_to(root)
+        code = _pages_masked_production_code(path)
+        for statement in PAGES_PUBLIC_USE_STATEMENT.finditer(code):
+            text = statement.group(0)
+            line_number = code.count("\n", 0, statement.start()) + 1
+            identifiers = [match.group(1) for match in RUST_IDENTIFIER.finditer(text)]
+            for owner, shorts in owners.items():
+                if owner not in identifiers:
+                    continue
+                tail = text[text.find(owner) + len(owner):]
+                tail_identifiers = set(
+                    match.group(1) for match in RUST_IDENTIFIER.finditer(tail)
+                )
+                if "*" in tail:
+                    violations.append(
+                        f"Pages transaction owner {owner} is glob re-exported: "
+                        f"{relative}:{line_number}"
+                    )
+                if tail_identifiers & shorts:
+                    reexports[owner] += 1
+                for alias in re.finditer(
+                    r"(?:r#)?([A-Za-z_][A-Za-z0-9_]*)[ \t\r\n]+as[ \t\r\n]+"
+                    r"(?:r#)?([A-Za-z_][A-Za-z0-9_]*)",
+                    tail,
+                ):
+                    if alias.group(1) != alias.group(2):
+                        violations.append(
+                            f"Pages transaction owner {owner} has alternate public alias "
+                            f"{alias.group(2)} for {alias.group(1)}: {relative}:{line_number}"
+                        )
+    for owner, count in sorted(reexports.items()):
+        if count > 1:
+            violations.append(
+                f"Pages transaction owner {owner} has {count} public re-export paths; "
+                f"only litchi_pages::{'::'.join(PAGES_TRANSACTION_FAMILY_BY_OWNER[owner][2])} "
+                f"may publish it: {PAGES_SOURCE_ROOT}"
+            )
+
+    for owner in owners:
+        owner_relative = PAGES_SOURCE_ROOT / "package" / f"{owner}.rs"
+        owner_path = root / owner_relative
+        if not owner_path.is_file():
+            continue
+        source = _mask_rust_cfg_test_items(owner_path.read_text(encoding="utf-8"))
+        lines = _mask_rust_non_code(source).split("\n")
+        for declaration, line_number in _rust_public_declarations(source):
+            if re.search(r"(?<![A-Za-z0-9_])pub[ \t\r\n]*\(", declaration[:16]):
+                continue
+            # ``#[doc(hidden)]`` items are the unstable internal-source seams
+            # (``__decode_*``); they are audited by their own focused gates.
+            attribute_index = line_number - 2
+            hidden = False
+            while attribute_index >= 0 and lines[attribute_index].strip().startswith("#"):
+                if re.search(r"\bdoc\s*\(\s*hidden\s*\)", lines[attribute_index]):
+                    hidden = True
+                attribute_index -= 1
+            if hidden:
+                continue
+            for match in RUST_IDENTIFIER.finditer(declaration):
+                reason = _iwork_public_leak(match.group(1))
+                # Counts such as ``removed_objects`` and error variants such
+                # as ``ObjectMarkerReplacement`` are semantic vocabulary, not
+                # native handles; the focused per-family gates classify them.
+                if reason is None or reason == "native object":
+                    continue
+                identifier_line = line_number + declaration.count("\n", 0, match.start(1))
+                violations.append(
+                    f"Pages {owner} transaction public API exposes {reason} "
+                    f"{match.group(1)}: {owner_relative}:{identifier_line}"
+                )
+            for match in RUST_BYTE_SLICE.finditer(declaration):
+                identifier_line = line_number + declaration.count("\n", 0, match.start())
+                violations.append(
+                    f"Pages {owner} transaction public API exposes raw byte slice: "
+                    f"{owner_relative}:{identifier_line}"
+                )
+    return sorted(set(violations))
+
+
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
     try:
@@ -76616,6 +77344,7 @@ def main(argv: list[str] | None = None) -> int:
         + audit_iwa_protos_root_alias_source_topology()
         + audit_iwa_charts_compatibility_source_topology()
         + audit_litchi_semantic_facade_source_topology()
+        + audit_pages_transaction_family_source_topology()
         + audit_iwork_example_source_topology()
         + audit_retired_iwa_obsolete_examples_source_topology()
         + audit_iwa_keynote_source_topology()

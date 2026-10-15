@@ -1,0 +1,259 @@
+//! Fresh Pages documents: [`Package::new`] and the option-bearing
+//! [`Builder`] (ADR 0034 §4 and §9).
+//!
+//! [`Package::new`] returns the minimal valid Pages document: one empty body
+//! section in US Letter geometry. It is deterministic: every call publishes
+//! the same bytes, carrying the fixed identity of the built-in template.
+//!
+//! [`Builder`] authors a document with a caller-chosen [`Identity`] and
+//! optional initial body text. The identity is a required, explicit input:
+//! [`Identity::generate`] gives a native-like fresh identity (the only place
+//! this crate consults randomness, and only when called), and
+//! [`Identity::from_bytes`] a fixed one for deterministic pipelines and
+//! goldens. [`Builder::build`] without an identity is
+//! [`PackageError::MissingIdentity`].
+//!
+//! ```
+//! use litchi_pages::builder::{Builder, Identity};
+//! use litchi_pages::Package;
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let blank = Package::new()?;
+//! assert_eq!(blank.sections().len(), 1);
+//!
+//! let identity = Identity::from_bytes([7; 16]);
+//! let first = Builder::new().identity(identity).body_text("Hello").build()?;
+//! let second = Builder::new().identity(identity).body_text("Hello").build()?;
+//! assert_eq!(first.to_bytes()?, second.to_bytes()?);
+//! assert_eq!(first.text()?, "Hello");
+//! assert!(matches!(
+//!     Builder::new().build(),
+//!     Err(litchi_pages::PackageError::MissingIdentity)
+//! ));
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! The built-in template was authored once by the legacy `litchi-iwa`
+//! `PagesDocumentBuilder` (record 0299 lists its provenance and digest); the
+//! crate embeds the bytes, so building performs no protobuf authoring.
+
+use std::fmt;
+
+use crate::{Package, PackageError, PackageResult};
+
+/// The built-in minimal Pages document.
+pub(crate) const TEMPLATE: &[u8] = include_bytes!("../assets/blank.pages");
+
+/// The identity of a fresh Pages document: its document UUID (also the
+/// `DocumentIdentifier`, `stableDocumentUUID` and `shareUUID`) and its
+/// private UUID.
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Identity {
+    document: [u8; 16],
+    private: [u8; 16],
+}
+
+impl fmt::Debug for Identity {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Identity")
+            .field("document", &uuid(self.document))
+            .finish_non_exhaustive()
+    }
+}
+
+/// Force the RFC 4122 version-4 and variant bits.
+const fn version_four(mut bytes: [u8; 16]) -> [u8; 16] {
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    bytes
+}
+
+impl Identity {
+    /// A fresh identity from the operating system's randomness, as Pages
+    /// creates for a new document.
+    #[must_use]
+    pub fn generate() -> Self {
+        Self {
+            document: litchi_core::id::generate_guid_bytes(),
+            private: litchi_core::id::generate_guid_bytes(),
+        }
+    }
+
+    /// A fixed identity: the document UUID is `bytes` (with the version-4
+    /// bits forced) and the private UUID is derived from it, so equal inputs
+    /// give byte-identical documents.
+    #[must_use]
+    pub const fn from_bytes(bytes: [u8; 16]) -> Self {
+        let mut private = bytes;
+        let mut index = 0;
+        while index < 16 {
+            private[index] = bytes[15 - index] ^ 0x5a;
+            index += 1;
+        }
+        Self {
+            document: version_four(bytes),
+            private: version_four(private),
+        }
+    }
+
+    /// The document UUID in Pages' uppercase hyphenated form.
+    #[must_use]
+    pub fn document_uuid(&self) -> String {
+        uuid(self.document)
+    }
+
+    /// The private UUID in Pages' uppercase hyphenated form.
+    #[must_use]
+    pub fn private_uuid(&self) -> String {
+        uuid(self.private)
+    }
+}
+
+fn uuid(bytes: [u8; 16]) -> String {
+    let mut out = String::with_capacity(36);
+    for (index, byte) in bytes.iter().enumerate() {
+        if matches!(index, 4 | 6 | 8 | 10) {
+            out.push('-');
+        }
+        out.push_str(&format!("{byte:02X}"));
+    }
+    out
+}
+
+/// Option-bearing authoring of a fresh Pages document.
+#[derive(Debug, Clone, Default)]
+#[must_use]
+pub struct Builder {
+    identity: Option<Identity>,
+    body_text: String,
+}
+
+impl Builder {
+    /// Start a builder with no identity and an empty body.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Select the document identity (required).
+    pub const fn identity(mut self, identity: Identity) -> Self {
+        self.identity = Some(identity);
+        self
+    }
+
+    /// Set the initial body text; `\n` separates paragraphs.
+    pub fn body_text(mut self, text: impl Into<String>) -> Self {
+        self.body_text = text.into();
+        self
+    }
+
+    /// Build the document.
+    ///
+    /// # Errors
+    ///
+    /// [`PackageError::MissingIdentity`] without an identity; a typed text
+    /// error ([`PackageError::InvalidFormat`]) when the body text holds a
+    /// reserved Pages marker character.
+    pub fn build(self) -> PackageResult<Package> {
+        let identity = self.identity.ok_or(PackageError::MissingIdentity)?;
+        let package = Package::new()?.with_identity(&identity)?;
+        if self.body_text.is_empty() {
+            return Ok(package);
+        }
+        let mut edit = package
+            .edit_body_text()
+            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
+        edit.set(&self.body_text)
+            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
+        let commit = edit
+            .commit()
+            .map_err(|error| PackageError::InvalidFormat(error.to_string()))?;
+        Ok(commit.into_package())
+    }
+}
+
+impl Package {
+    /// The minimal valid Pages document: one empty body section.
+    ///
+    /// Deterministic: every call gives the same bytes and the built-in
+    /// template's fixed identity. Use [`Builder`] with
+    /// [`Identity::generate`] for a fresh identity.
+    ///
+    /// # Errors
+    ///
+    /// Only when the built-in template fails to open, which its tests rule
+    /// out.
+    pub fn new() -> PackageResult<Self> {
+        Self::from_bytes(TEMPLATE)
+    }
+
+    /// The same document with `identity` written into its identity
+    /// sidecars (`Metadata/DocumentIdentifier` and the UUID keys of
+    /// `Metadata/Properties.plist`).
+    fn with_identity(&self, identity: &Identity) -> PackageResult<Self> {
+        let document = identity.document_uuid();
+        let private = identity.private_uuid();
+        let properties = super::package::sidecars::properties(self)?;
+        let mut dictionary = properties.unwrap_or_default();
+        for key in ["documentUUID", "stableDocumentUUID", "shareUUID"] {
+            dictionary.insert(key.to_owned(), plist::Value::String(document.clone()));
+        }
+        dictionary.insert("privateUUID".to_owned(), plist::Value::String(private));
+        super::package::sidecars::rewrite(self, Some(&dictionary), Some(document.as_bytes()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Builder, Identity, TEMPLATE};
+    use crate::{Package, PackageError};
+
+    #[test]
+    fn the_template_opens_and_is_deterministic() {
+        let first = Package::new().unwrap_or_else(|error| panic!("template: {error}"));
+        let second = Package::new().unwrap_or_else(|error| panic!("template: {error}"));
+        assert_eq!(first.sections().len(), 1);
+        assert_eq!(first.text().ok().as_deref(), Some(""));
+        assert_eq!(first.to_bytes().ok().as_deref(), Some(TEMPLATE));
+        assert_eq!(first.to_bytes().ok(), second.to_bytes().ok());
+    }
+
+    #[test]
+    fn fixed_identities_are_byte_identical_and_distinct_from_each_other() {
+        let build = |seed: u8| {
+            Builder::new()
+                .identity(Identity::from_bytes([seed; 16]))
+                .body_text("One\nTwo")
+                .build()
+                .unwrap_or_else(|error| panic!("build: {error}"))
+        };
+        let (first, again, other) = (build(1), build(1), build(2));
+        assert_eq!(first.to_bytes().ok(), again.to_bytes().ok());
+        assert_ne!(first.to_bytes().ok(), other.to_bytes().ok());
+        assert_eq!(first.text().ok().as_deref(), Some("One\nTwo"));
+        let identifier = first.metadata().identifier;
+        assert_eq!(
+            identifier.as_deref(),
+            Some(Identity::from_bytes([1; 16]).document_uuid().as_str())
+        );
+    }
+
+    #[test]
+    fn a_build_without_identity_is_refused() {
+        assert!(matches!(
+            Builder::new().body_text("x").build(),
+            Err(PackageError::MissingIdentity)
+        ));
+    }
+
+    #[test]
+    fn uuids_use_the_pages_spelling() {
+        let identity = Identity::from_bytes([0xab; 16]);
+        let text = identity.document_uuid();
+        assert_eq!(text.len(), 36);
+        assert_eq!(&text[14..15], "4");
+        assert!(text.chars().all(|c| c == '-' || c.is_ascii_hexdigit()));
+        assert_ne!(identity.document_uuid(), identity.private_uuid());
+    }
+}

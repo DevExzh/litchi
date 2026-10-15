@@ -1538,7 +1538,7 @@ fn resolve_cell_targets(
         matched = true;
         append_cell_node(&mut targets, &mut seen, &mut non_cell, node, limits)?;
     } else if let Some(query) = target.query() {
-        let walk = crate::query::run(Nav::new(file), query.clone())?;
+        let walk = crate::query::run(Nav::new(file), query)?;
         if !walk.plan().diagnostics().is_empty() {
             return Err(Error::new(
                 Code::InvalidSelector,
@@ -1762,7 +1762,7 @@ fn resolve_sheet_removal_targets(
     let Some(query) = target.query() else {
         return Ok(None);
     };
-    let walk = crate::query::run(Nav::new(file), query.clone())?;
+    let walk = crate::query::run(Nav::new(file), query)?;
     if !walk.plan().diagnostics().is_empty() {
         return Err(Error::new(
             Code::InvalidSelector,
@@ -1819,7 +1819,7 @@ fn resolve_sheet_targets(
         let node = crate::path::resolve::get(&Nav::new(file), path)?;
         append_sheet(&mut positions, &mut seen, node, limits)?;
     } else if let Some(query) = target.query() {
-        let walk = crate::query::run(Nav::new(file), query.clone())?;
+        let walk = crate::query::run(Nav::new(file), query)?;
         if !walk.plan().diagnostics().is_empty() {
             return Err(Error::new(
                 Code::InvalidSelector,

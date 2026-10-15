@@ -15,7 +15,7 @@ use litchi_iwa_protos::{tsp, tst};
 use litchi_pages::table::appearance::{
     Appearance, Banding, GridlineVisibility, Gridlines, RowSizing,
 };
-use litchi_pages::{BodyTableAppearanceError as Error, BodyTableSelector, Package};
+use litchi_pages::{BodyTableSelector, Package, table::appearance::transaction::Error};
 use prost::Message as _;
 
 #[path = "body_table_header_settings.rs"]
@@ -903,7 +903,10 @@ fn exact_no_op_skips_changed_target_resolution_but_changes_fail_closed() -> Test
     // changed-path resolution, providing a deterministic no-op ordering gate.
     let archive_limits = litchi_iwa_core::Limits::default().with_header_fields(75)?;
     let limits = Limits::default().with_archive_limits(archive_limits)?;
-    let package = Package::from_bytes_with_limits(&source, limits)?;
+    let package = Package::from_bytes_with_options(
+        &source,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    )?;
     let edit = package.edit_body_table_appearance(0usize)?;
     let before = package.exact_bytes();
     let appearance = edit.appearance();
@@ -1187,7 +1190,10 @@ fn finite_ingress_and_semantic_limits_refuse_before_publication() -> TestResult 
     for fields in 1..=4_096 {
         let archive_limits = litchi_iwa_core::Limits::default().with_header_fields(fields)?;
         let limits = Limits::default().with_archive_limits(archive_limits)?;
-        let Ok(package) = Package::from_bytes_with_limits(&source, limits) else {
+        let Ok(package) = Package::from_bytes_with_options(
+            &source,
+            litchi_pages::OpenOptions::new().__archive_limits(limits),
+        ) else {
             continue;
         };
         let before = package.exact_bytes();
@@ -1216,13 +1222,13 @@ fn public_transaction_values_are_archive_free_send_sync_and_redacted() -> TestRe
     assert_traits::<GridlineVisibility>();
     assert_traits::<Gridlines>();
     assert_traits::<RowSizing>();
-    assert_traits::<litchi_pages::BodyTableAppearanceEdit<'static>>();
-    assert_traits::<litchi_pages::BodyTableAppearancePatch>();
-    assert_traits::<litchi_pages::BodyTableAppearanceCommit>();
-    assert_traits::<litchi_pages::BodyTableAppearanceDiagnostics>();
-    assert_traits::<litchi_pages::BodyTableAppearanceError>();
-    assert_traits::<litchi_pages::BodyTableAppearanceLimitKind>();
-    assert_traits::<litchi_pages::BodyTableAppearancePath>();
+    assert_traits::<litchi_pages::table::appearance::transaction::Edit<'static>>();
+    assert_traits::<litchi_pages::table::appearance::transaction::Patch>();
+    assert_traits::<litchi_pages::table::appearance::transaction::Commit>();
+    assert_traits::<litchi_pages::table::appearance::transaction::Diagnostics>();
+    assert_traits::<Error>();
+    assert_traits::<litchi_pages::table::appearance::transaction::LimitKind>();
+    assert_traits::<litchi_pages::table::appearance::transaction::Path>();
 
     let package = Package::from_bytes(&body_fixture::direct_package()?)?;
     let edit = package.edit_body_table_appearance(0usize)?;

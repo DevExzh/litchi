@@ -726,15 +726,18 @@ mod ods {
             crate::detect::detect_file_format_from_bytes(FLAT_ODS),
             Some(litchi_core::FileFormat::Ods)
         );
-        // Flat ODS opens read-only through the leaf's flat owner (record
-        // 0277); both routes agree with detection.
+        // Flat ODS opens through the leaf's flat owner (record 0277); both
+        // routes agree with detection, and an edit republishes into the
+        // flat bytes (record 0292).
         let opened = crate::open_bytes(FLAT_ODS.to_vec()).unwrap();
         assert_eq!(opened.format(), Some(litchi_core::FileFormat::Ods));
         assert_eq!(opened.text().unwrap(), "value");
-        let error = opened
+        let edited = opened
             .set("/Sheet1/A1", crate::props! { "value" => 1 })
-            .unwrap_err();
-        assert_eq!(error.code(), Code::UnsupportedCapability);
+            .unwrap();
+        let published = edited.to_bytes().unwrap();
+        assert!(published.starts_with(b"<?xml"));
+        assert_eq!(crate::open_bytes(published).unwrap().text().unwrap(), "1");
         #[cfg(any(unix, windows))]
         {
             let temporary = super::super::temporary_with(FLAT_ODS, "");

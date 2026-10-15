@@ -15,7 +15,6 @@ use litchi_opc::{
     AuthoredXmlFragment, PackURI, PreparedTopology, Relationship, SourceBackedPackage,
     SourceLimits, SourceTopologyPlan,
 };
-use quick_xml::XmlVersion;
 use quick_xml::events::Event;
 use quick_xml::name::{Namespace, ResolveResult};
 use quick_xml::reader::NsReader;
@@ -484,29 +483,7 @@ fn dependency_free_layout(
     package: &SourceBackedPackage,
     slide: &litchi_opc::PartView<'_>,
 ) -> Result<PackURI> {
-    if slide.rels().len() != 1 {
-        return refusal(
-            SlideRemovalRefusal::UnsupportedRelationship,
-            "the selected slide must have only one layout relationship",
-        );
-    }
-    let relationship = slide
-        .rels()
-        .iter()
-        .next()
-        .ok_or_else(|| Error::Invalid("slide-removal relationship count changed".into()))?;
-    if relationship.is_external()
-        || !crate::parts::is_relationship_type(
-            relationship.reltype(),
-            rt::SLIDE_LAYOUT,
-            "slideLayout",
-        )
-    {
-        return refusal(
-            SlideRemovalRefusal::UnsupportedRelationship,
-            "the selected slide has a non-layout or external relationship",
-        );
-    }
+    let relationship = crate::opened::removal_layout_edge(slide.rels())?;
     if relationship.target_query().is_some() || relationship.target_fragment().is_some() {
         return refusal(
             SlideRemovalRefusal::AmbiguousTopology,
@@ -731,28 +708,21 @@ fn reject_mce(xml: &[u8], package: &SourceBackedPackage) -> Result<()> {
                 for attribute in element.checked_attributes() {
                     let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
                     let key = attribute.key.as_ref();
+                    // A declaration alone (LibreOffice declares the
+                    // namespace on every root) carries no alternate content;
+                    // MCE elements and attributes are refused where used.
                     if key == b"xmlns" || key.starts_with(b"xmlns:") {
-                        let value = attribute
-                            .normalized_value(XmlVersion::Implicit1_0)
-                            .map_err(|error| Error::Xml(error.to_string()))?;
-                        if value.as_bytes() == MCE_NAMESPACE {
-                            return refusal(
-                                SlideRemovalRefusal::MarkupCompatibility,
-                                "the presentation declares a markup-compatibility namespace",
-                            );
-                        }
-                    } else {
-                        let attribute_namespace =
-                            reader.resolver().resolve_attribute(attribute.key).0;
-                        if matches!(
-                            attribute_namespace,
-                            ResolveResult::Bound(Namespace(value)) if value == MCE_NAMESPACE
-                        ) {
-                            return refusal(
-                                SlideRemovalRefusal::MarkupCompatibility,
-                                "the presentation contains a markup-compatibility attribute",
-                            );
-                        }
+                        continue;
+                    }
+                    let attribute_namespace = reader.resolver().resolve_attribute(attribute.key).0;
+                    if matches!(
+                        attribute_namespace,
+                        ResolveResult::Bound(Namespace(value)) if value == MCE_NAMESPACE
+                    ) {
+                        return refusal(
+                            SlideRemovalRefusal::MarkupCompatibility,
+                            "the presentation contains a markup-compatibility attribute",
+                        );
                     }
                 }
             },

@@ -86,6 +86,7 @@ fn depth(item: &Item) -> usize {
 /// The `mode` view as JSON.
 pub(crate) fn view_json(file: &Iwork, mode: Mode) -> Result<Json> {
     file.checked_tree()?;
+    file.expand_all();
     let items = file.tree().items();
     match mode {
         Mode::Text => {
@@ -150,6 +151,7 @@ fn stats(file: &Iwork) -> StatsJson {
 /// Stream the `mode` view as text.
 pub(crate) fn view_to<W: fmt::Write>(file: &Iwork, mode: Mode, out: &mut W) -> Result<()> {
     file.checked_tree()?;
+    file.expand_all();
     let items = file.tree().items();
     let sink = |_: fmt::Error| {
         Error::new(Code::IoError, "the view output sink refused to write")

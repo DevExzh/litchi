@@ -5,10 +5,10 @@ use std::hint::black_box;
 use std::sync::OnceLock;
 
 use libfuzzer_sys::fuzz_target;
-use litchi::pages::{
-    Limits, Package, SectionPaginationError, SectionPaginationLimitKind, SectionSelector,
+use litchi::pages::{ Package, section::pagination::transaction::Error as SectionPaginationError, section::pagination::transaction::LimitKind as SectionPaginationLimitKind, SectionSelector,
     section::{PageNumber, PageNumbering, Pagination, Start},
 };
+use litchi_iwa_archive::Limits;
 
 const MAX_INPUT_BYTES: u64 = 256 * 1024;
 const OVERSIZED_INPUT_BYTES: usize = 256 * 1024 + 1;
@@ -21,7 +21,7 @@ const PRIVATE_SECTION_NAME: &str = "__litchi_private_pages_section_pagination_na
 const NATIVE_PAGES: &[u8] = include_bytes!("../../../../test-data/iwork/pages/basic.pages");
 
 fuzz_target!(|data: &[u8]| {
-    match Package::from_bytes_with_limits(data, fuzz_limits()) {
+    match Package::from_bytes_with_options(data, litchi_pages::OpenOptions::new().__archive_limits(fuzz_limits())) {
         Ok(package) => exercise_package(&package, data),
         Err(error) => observe_error(error),
     }
@@ -53,7 +53,7 @@ fn fuzz_limits() -> Limits {
 fn native_package() -> &'static Package {
     static PACKAGE: OnceLock<Package> = OnceLock::new();
     PACKAGE.get_or_init(|| {
-        let package = Package::from_bytes_with_limits(NATIVE_PAGES, fuzz_limits())
+        let package = Package::from_bytes_with_options(NATIVE_PAGES, litchi_pages::OpenOptions::new().__archive_limits(fuzz_limits()))
             .unwrap_or_else(|error| panic!("native Pages pagination seed must open: {error}"));
         let expected = pagination(
             Some(Start::NextPage),
@@ -295,7 +295,7 @@ fn exercise_resource_mutation(data: &[u8]) {
             return;
         },
     };
-    let package = match Package::from_bytes_with_limits(NATIVE_PAGES, limits) {
+    let package = match Package::from_bytes_with_options(NATIVE_PAGES, litchi_pages::OpenOptions::new().__archive_limits(limits)) {
         Ok(package) => package,
         Err(error) => {
             observe_error(error);
@@ -366,7 +366,7 @@ fn exercise_semantic_values(data: &[u8]) {
 }
 
 fn exercise_redacted_malformed_ingress() {
-    match Package::from_bytes_with_limits(PRIVATE_MALFORMED_INPUT, fuzz_limits()) {
+    match Package::from_bytes_with_options(PRIVATE_MALFORMED_INPUT, litchi_pages::OpenOptions::new().__archive_limits(fuzz_limits())) {
         Err(error) => observe_redacted(
             error,
             std::str::from_utf8(PRIVATE_MALFORMED_INPUT)
@@ -379,7 +379,7 @@ fn exercise_redacted_malformed_ingress() {
 fn exercise_input_limit() {
     static OVERSIZED: OnceLock<Box<[u8]>> = OnceLock::new();
     let bytes = OVERSIZED.get_or_init(|| vec![0; OVERSIZED_INPUT_BYTES].into_boxed_slice());
-    match Package::from_bytes_with_limits(bytes, fuzz_limits()) {
+    match Package::from_bytes_with_options(bytes, litchi_pages::OpenOptions::new().__archive_limits(fuzz_limits())) {
         Err(error) => observe_error(error),
         Ok(_) => panic!("an oversized Pages input must be rejected"),
     }

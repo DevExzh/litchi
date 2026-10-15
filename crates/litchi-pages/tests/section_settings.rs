@@ -361,7 +361,7 @@ fn synthetic_package_with_first_message(
             (PREVIEWS[1], b"micro preview".as_slice()),
             (PREVIEWS[2], b"web preview".as_slice()),
         ],
-        litchi_pages::Limits::default(),
+        litchi_iwa_archive::Limits::default(),
     )?)
 }
 
@@ -376,8 +376,10 @@ fn legacy_package_bytes(flat: &[u8]) -> TestResult<Vec<u8>> {
         })
         .map(|entry| (entry.name(), entry.data()))
         .collect::<Vec<_>>();
-    let inner =
-        litchi_iwa_archive::package::to_bytes(inner_entries, litchi_pages::Limits::default())?;
+    let inner = litchi_iwa_archive::package::to_bytes(
+        inner_entries,
+        litchi_iwa_archive::Limits::default(),
+    )?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [
             ("legacy.pages/Index.zip", inner.as_slice()),
@@ -386,7 +388,7 @@ fn legacy_package_bytes(flat: &[u8]) -> TestResult<Vec<u8>> {
                 b"legacy outer sentinel".as_slice(),
             ),
         ],
-        litchi_pages::Limits::default(),
+        litchi_iwa_archive::Limits::default(),
     )?)
 }
 

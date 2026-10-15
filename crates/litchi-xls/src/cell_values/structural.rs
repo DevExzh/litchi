@@ -31,6 +31,10 @@ const HLINK_TOOLTIP: u16 = 0x0800;
 const MSO_DRAWING: u16 = 0x00ec;
 const OBJ: u16 = 0x005d;
 const SELECTION: u16 = 0x001d;
+const VERTICAL_PAGE_BREAKS: u16 = 0x001a;
+const HORIZONTAL_PAGE_BREAKS: u16 = 0x001b;
+const NOTE: u16 = 0x001c;
+const COL_INFO: u16 = 0x007d;
 
 #[derive(Clone, Copy)]
 pub(super) enum AxisShift {
@@ -62,6 +66,12 @@ struct BoundSheet {
 struct RowData {
     row_record: Vec<u8>,
     cell_records: Vec<Vec<u8>>,
+    /// The source `Row` extents `(colMic, colMac)` when the producer wrote
+    /// wider extents than the row's cells span (Excel and LibreOffice often
+    /// write the sheet-wide extents). Column shifts move them like the cells;
+    /// [`patch_row_extents`] keeps them while they still cover the cells, so
+    /// a structural edit and its inverse leave such rows byte-identical.
+    stored_extents: Option<(u16, u16)>,
 }
 
 pub(super) fn apply(
@@ -1002,13 +1012,18 @@ pub(super) fn certify_shift(
     shift: AxisShift,
 ) -> Result<()> {
     let workbook = &source.inner.workbook_stream;
-    certify_workbook_shift(workbook)?;
     let workbook_index = source
         .inner
         .sheets
         .get(sheet)
         .ok_or_else(|| Error::UnsafeEdit("worksheet dependency index is stale".into()))?
         .workbook_index;
+    let mut candidate = Vec::new();
+    candidate
+        .try_reserve_exact(workbook.len())
+        .map_err(|_error| Error::Allocation("certifying workbook dependencies"))?;
+    candidate.extend_from_slice(workbook);
+    patch_workbook_dependencies(&mut candidate, workbook_index, shift)?;
     let bounds = bound_sheets(workbook)?;
     let bound = bounds
         .get(workbook_index)
@@ -1957,20 +1972,17 @@ fn rewrite_worksheet(
     layout: &[&super::layout::LayoutChange],
     shared_strings: &[String],
 ) -> Result<()> {
-    if operations.iter().any(|operation| {
-        matches!(
-            operation,
-            StructuralChange::Rows { .. } | StructuralChange::Columns { .. }
-        )
-    }) {
-        certify_workbook_shift(workbook)?;
-    }
     let workbook_index = source
         .inner
         .sheets
         .get(sheet)
         .ok_or_else(|| Error::UnsafeEdit("worksheet operation index is stale".into()))?
         .workbook_index;
+    for operation in operations {
+        if let Some(shift) = axis_shift(operation) {
+            patch_workbook_dependencies(workbook, workbook_index, shift)?;
+        }
+    }
     let bounds = bound_sheets(workbook)?;
     let bound = bounds
         .get(workbook_index)
@@ -2001,7 +2013,160 @@ fn rewrite_worksheet(
     replace_range_and_adjust_bounds(workbook, start, end, &replacement)
 }
 
-fn certify_workbook_shift(workbook: &[u8]) -> Result<()> {
+/// The workbook's sheet-reference table: the self-referencing `SupBook`
+/// (MS-XLS 2.4.271) and every `XTI` of `ExternSheet` (2.4.105) as
+/// `(SupBook index, first tab, last tab)`.
+struct ExternSheets {
+    self_book: Option<u16>,
+    entries: Vec<(u16, i16, i16)>,
+}
+
+const SUP_BOOK: u16 = 0x01ae;
+const EXTERN_SHEET: u16 = 0x0017;
+const EXTERN_NAME: u16 = 0x0023;
+const LBL: u16 = 0x0018;
+const BRAI: u16 = 0x1051;
+const EOF: u16 = 0x000a;
+
+fn extern_sheets(workbook: &[u8], records: &[RawRecord]) -> Result<ExternSheets> {
+    let mut sheets = ExternSheets {
+        self_book: None,
+        entries: Vec::new(),
+    };
+    let mut books = 0_u16;
+    for (position, record) in records.iter().enumerate() {
+        match record.kind {
+            EOF => break,
+            SUP_BOOK => {
+                let payload = record_payload(workbook, record, "SupBook")?;
+                if payload.len() == 4 && payload[2..4] == [0x01, 0x04] {
+                    sheets.self_book.get_or_insert(books);
+                }
+                books = books
+                    .checked_add(1)
+                    .ok_or_else(|| Error::InvalidData("SupBook count overflows".into()))?;
+            },
+            EXTERN_SHEET => {
+                if records
+                    .get(position + 1)
+                    .is_some_and(|next| next.kind == CONTINUE)
+                {
+                    return Err(Error::UnsafeEdit(
+                        "row/column movement cannot close a continued ExternSheet record".into(),
+                    ));
+                }
+                let payload = record_payload(workbook, record, "ExternSheet")?;
+                let count = usize::from(binary::read_u16_le_at(payload, 0)?);
+                if payload.len() != 2 + count * 6 {
+                    return Err(Error::InvalidData(
+                        "ExternSheet count does not match its payload".into(),
+                    ));
+                }
+                for entry in payload[2..].as_chunks::<6>().0 {
+                    sheets.entries.push((
+                        u16::from_le_bytes([entry[0], entry[1]]),
+                        i16::from_le_bytes([entry[2], entry[3]]),
+                        i16::from_le_bytes([entry[4], entry[5]]),
+                    ));
+                }
+            },
+            _ => {},
+        }
+    }
+    Ok(sheets)
+}
+
+/// Where a 3-D reference points relative to the shifted worksheet.
+enum Target3d {
+    /// Another sheet or another workbook: the shift does not touch it.
+    Elsewhere,
+    /// Exactly the shifted worksheet.
+    Shifted,
+}
+
+fn target_3d(sheets: &ExternSheets, extern_sheet: u16, tab: usize) -> Result<Target3d> {
+    let &(book, first, last) = sheets
+        .entries
+        .get(usize::from(extern_sheet))
+        .ok_or_else(|| Error::InvalidData("3-D reference names a missing XTI".into()))?;
+    if Some(book) != sheets.self_book || first < 0 || last < 0 {
+        return Ok(Target3d::Elsewhere);
+    }
+    let (first, last) = (first as usize, last as usize);
+    if tab < first.min(last) || tab > first.max(last) {
+        return Ok(Target3d::Elsewhere);
+    }
+    if first != last {
+        return Err(Error::UnsafeEdit(
+            "row/column movement cannot close a 3-D reference spanning several sheets".into(),
+        ));
+    }
+    Ok(Target3d::Shifted)
+}
+
+/// Shifts the 3-D references of `tokens` that name the shifted worksheet.
+/// `name_formula` marks a `NameParsedFormula`, whose relative references are
+/// offsets (`RgceLocRel`), which a shift cannot move: they are refused.
+fn patch_3d_references(
+    tokens: &mut [u8],
+    sheets: &ExternSheets,
+    tab: usize,
+    shift: AxisShift,
+    name_formula: bool,
+) -> Result<()> {
+    let references = crate::formula::formula_reference_spans(tokens).ok_or_else(|| {
+        Error::UnsafeEdit("row/column movement cannot read a workbook formula's references".into())
+    })?;
+    if name_formula && !references.same_sheet.is_empty() {
+        return Err(Error::UnsafeEdit(
+            "row/column movement cannot close a defined name with a sheet-less reference".into(),
+        ));
+    }
+    for reference in references.three_d {
+        if matches!(
+            target_3d(sheets, reference.extern_sheet, tab)?,
+            Target3d::Elsewhere
+        ) {
+            continue;
+        }
+        let Some(span) = reference.reference else {
+            continue;
+        };
+        if name_formula {
+            let flags = match span {
+                crate::formula::FormulaReferenceSpan::Cell { column, .. } => {
+                    binary::read_u16_le_at(tokens, column)?
+                },
+                crate::formula::FormulaReferenceSpan::Area {
+                    first_column,
+                    last_column,
+                    ..
+                } => {
+                    binary::read_u16_le_at(tokens, first_column)?
+                        | binary::read_u16_le_at(tokens, last_column)?
+                },
+            };
+            if flags & 0xc000 != 0 {
+                return Err(Error::UnsafeEdit(
+                    "row/column movement cannot close a relative reference in a defined name"
+                        .into(),
+                ));
+            }
+        }
+        patch_reference_span(tokens, span, shift)?;
+    }
+    Ok(())
+}
+
+/// Shifts the workbook-wide dependencies of one worksheet's row or column
+/// shift in place, and refuses those it cannot close.
+///
+/// Defined names (`Lbl`), chart series links (`BRAI`) and cell formulas
+/// anywhere in the stream keep 3-D references into the shifted worksheet;
+/// their coordinate fields are rewritten at fixed width, so no record moves.
+/// External names belong to another workbook's `SupBook` and are untouched.
+/// Records whose coordinates this owner does not model stay refusals.
+fn patch_workbook_dependencies(workbook: &mut [u8], tab: usize, shift: AxisShift) -> Result<()> {
     // These records can retain formulas or coordinates into any worksheet.
     // Without a complete token/range rewriter, moving coordinates would make
     // them stale even when the selected worksheet itself has no Formula cell.
@@ -2009,9 +2174,6 @@ fn certify_workbook_shift(workbook: &[u8]) -> Result<()> {
         TABLE,
         SHARED_FORMULA,
         ARRAY,
-        0x0018,
-        0x0023,
-        0x1051,
         0x01b0,
         0x0879,
         0x087a,
@@ -2028,19 +2190,92 @@ fn certify_workbook_shift(workbook: &[u8]) -> Result<()> {
             record.kind
         )));
     }
-    for record in records.iter().filter(|record| record.kind == FORMULA) {
-        let payload = record_payload(workbook, record, "Formula")?;
-        certify_formula_owner(payload)?;
-    }
-    for record in records.iter().filter(|record| record.kind == HLINK) {
+    let sheets = extern_sheets(workbook, &records)?;
+    let mut current_book_is_self = false;
+    for (position, record) in records.iter().enumerate() {
+        let continued = records
+            .get(position + 1)
+            .is_some_and(|next| next.kind == CONTINUE);
         let payload_start = record
             .start
             .checked_add(4)
-            .ok_or_else(|| Error::InvalidData("HLINK payload offset overflow".into()))?;
-        let payload = workbook
-            .get(payload_start..record.end)
-            .ok_or_else(|| Error::InvalidData("HLINK payload is truncated".into()))?;
-        certify_hyperlink_target(payload)?;
+            .ok_or_else(|| Error::InvalidData("dependency payload offset overflow".into()))?;
+        match record.kind {
+            SUP_BOOK => {
+                let payload = record_payload(workbook, record, "SupBook")?;
+                current_book_is_self = payload.len() == 4 && payload[2..4] == [0x01, 0x04];
+            },
+            EXTERN_NAME if current_book_is_self => {
+                return Err(Error::UnsafeEdit(
+                    "row/column movement cannot close an ExternName of this workbook".into(),
+                ));
+            },
+            LBL | BRAI if continued => {
+                return Err(Error::UnsafeEdit(format!(
+                    "row/column movement cannot close a continued record 0x{:04X}",
+                    record.kind
+                )));
+            },
+            LBL => {
+                let payload = workbook
+                    .get_mut(payload_start..record.end)
+                    .ok_or_else(|| Error::InvalidData("Lbl payload is truncated".into()))?;
+                if payload.len() < 14 {
+                    return Err(Error::InvalidData("Lbl payload is truncated".into()));
+                }
+                let name_length = usize::from(payload[3]);
+                let formula_length = usize::from(binary::read_u16_le_at(payload, 4)?);
+                let wide = payload[14..].first().is_some_and(|flags| flags & 1 != 0);
+                let start = 15 + name_length * if wide { 2 } else { 1 };
+                if name_length == 0 || formula_length == 0 {
+                    continue;
+                }
+                let tokens = payload
+                    .get_mut(start..start + formula_length)
+                    .ok_or_else(|| Error::InvalidData("Lbl formula is truncated".into()))?;
+                patch_3d_references(tokens, &sheets, tab, shift, true)?;
+            },
+            BRAI => {
+                let payload = workbook
+                    .get_mut(payload_start..record.end)
+                    .ok_or_else(|| Error::InvalidData("BRAI payload is truncated".into()))?;
+                let formula_length = usize::from(binary::read_u16_le_at(payload, 6)?);
+                if formula_length == 0 {
+                    continue;
+                }
+                if payload.len() != 8 + formula_length {
+                    return Err(Error::InvalidData(
+                        "BRAI formula length does not match its payload".into(),
+                    ));
+                }
+                let tokens = &mut payload[8..];
+                let references =
+                    crate::formula::formula_reference_spans(tokens).ok_or_else(|| {
+                        Error::UnsafeEdit(
+                            "row/column movement cannot read a chart series formula".into(),
+                        )
+                    })?;
+                if !references.same_sheet.is_empty() {
+                    return Err(Error::UnsafeEdit(
+                        "row/column movement cannot close a sheet-less chart reference".into(),
+                    ));
+                }
+                patch_3d_references(tokens, &sheets, tab, shift, false)?;
+            },
+            FORMULA => {
+                let payload = workbook
+                    .get_mut(payload_start..record.end)
+                    .ok_or_else(|| Error::InvalidData("Formula payload is truncated".into()))?;
+                let length = formula_tokens(payload)?.len();
+                let tokens = &mut payload[22..22 + length];
+                patch_3d_references(tokens, &sheets, tab, shift, false)?;
+            },
+            HLINK => {
+                let payload = record_payload(workbook, record, "HLINK")?;
+                certify_hyperlink_target(payload)?;
+            },
+            _ => {},
+        }
     }
     Ok(())
 }
@@ -2273,6 +2508,7 @@ fn apply_row_layout(
                     RowData {
                         row_record: super::layout::new_row_record(*row, *after)?,
                         cell_records: Vec::new(),
+                        stored_extents: None,
                     },
                 );
             },
@@ -2379,6 +2615,10 @@ fn patch_coordinate_dependencies(
                 HLINK => patch_hyperlink(payload, shift)?,
                 HLINK_TOOLTIP => patch_hyperlink_tooltip(payload, shift)?,
                 MSO_DRAWING => patch_officeart(payload, shift)?,
+                COL_INFO => patch_col_info(payload, shift)?,
+                NOTE => patch_note(payload, shift)?,
+                VERTICAL_PAGE_BREAKS => patch_vertical_breaks(payload, shift)?,
+                HORIZONTAL_PAGE_BREAKS => patch_horizontal_breaks(payload, shift)?,
                 _ => {},
             }
         }
@@ -2512,6 +2752,18 @@ fn shift_axis_range(
     if first > last {
         return Err(Error::InvalidData("dependency range is inverted".into()));
     }
+    if first < last && u32::from(last) + 1 == limit {
+        // A range through the last row or column of the grid (a whole column
+        // `A:A`, a format to the sheet edge) keeps that end: an insertion
+        // cannot push it outside the grid and a deletion does not pull it
+        // in, so insert followed by delete stays an exact inverse.
+        let first = if insert && first < start {
+            first
+        } else {
+            shift_axis_point(first, start, count, insert, limit)?
+        };
+        return Ok((first, last));
+    }
     if insert && first < start && last >= start {
         let shifted_last = shift_axis_point(last, start, count, true, limit)?;
         return Ok((first, shifted_last));
@@ -2555,6 +2807,146 @@ fn patch_hyperlink_tooltip(payload: &mut [u8], shift: AxisShift) -> Result<()> {
         .get_mut(2..10)
         .ok_or_else(|| Error::InvalidData("HLinkTooltip range is truncated".into()))?;
     patch_ref8(range, shift)
+}
+
+/// `ColInfo` (MS-XLS 2.4.53): a column span's width and format. Rows do not
+/// touch it. A column shift moves the span like a range, except that a span
+/// ending at the last BIFF8 column (`colLast` 255, or 256 as some producers
+/// write it) keeps that end: it means "through the end of the grid", which an
+/// insertion cannot push outside the grid and a deletion cannot pull in. That
+/// keeps insert followed by delete of the same columns an exact inverse.
+fn patch_col_info(payload: &mut [u8], shift: AxisShift) -> Result<()> {
+    let AxisShift::Columns {
+        start,
+        count,
+        insert,
+    } = shift
+    else {
+        return Ok(());
+    };
+    if payload.len() < 4 {
+        return Err(Error::InvalidData("ColInfo payload is truncated".into()));
+    }
+    let first = binary::read_u16_le_at(payload, 0)?;
+    let last = binary::read_u16_le_at(payload, 2)?;
+    if first > last || first > 255 || last > 256 {
+        return Err(Error::InvalidData("ColInfo column span is invalid".into()));
+    }
+    let (start, count) = (u16::from(start), u16::from(count));
+    let (first, last) = if last >= 255 {
+        let first = if insert && first >= start {
+            first.checked_add(count).filter(|first| *first <= 255)
+        } else if !insert && first >= start {
+            if first < start + count {
+                // The deleted span holds the open-ended span's first column:
+                // its new start would be ambiguous.
+                return Err(Error::UnsafeEdit(
+                    "row/column deletion would erase a dependency coordinate".into(),
+                ));
+            }
+            Some(first - count)
+        } else {
+            Some(first)
+        }
+        .ok_or_else(|| {
+            Error::UnsafeEdit(
+                "row/column insertion moves a dependency coordinate outside BIFF8".into(),
+            )
+        })?;
+        (first, last)
+    } else {
+        shift_axis_range(first, last, start, count, insert, 256)?
+    };
+    payload[0..2].copy_from_slice(&first.to_le_bytes());
+    payload[2..4].copy_from_slice(&last.to_le_bytes());
+    Ok(())
+}
+
+/// `Note` (MS-XLS 2.4.179): the commented cell.
+fn patch_note(payload: &mut [u8], shift: AxisShift) -> Result<()> {
+    if payload.len() < 4 {
+        return Err(Error::InvalidData("Note payload is truncated".into()));
+    }
+    match shift {
+        AxisShift::Rows {
+            start,
+            count,
+            insert,
+        } => {
+            let row = binary::read_u16_le_at(payload, 0)?;
+            let row = shift_axis_point(row, start, count, insert, 65_536)?;
+            payload[0..2].copy_from_slice(&row.to_le_bytes());
+        },
+        AxisShift::Columns {
+            start,
+            count,
+            insert,
+        } => {
+            let column = binary::read_u16_le_at(payload, 2)?;
+            let column = shift_axis_point(column, u16::from(start), u16::from(count), insert, 256)?;
+            payload[2..4].copy_from_slice(&column.to_le_bytes());
+        },
+    }
+    Ok(())
+}
+
+/// The breaks of a `VerticalPageBreaks` or `HorizontalPageBreaks` record
+/// (MS-XLS 2.4.350, 2.4.122): a count, then six-byte `(position, span
+/// first, span last)` entries.
+fn page_breaks(payload: &mut [u8]) -> Result<&mut [[u8; 6]]> {
+    let count = usize::from(binary::read_u16_le_at(payload, 0)?);
+    if payload.len() != 2 + count * 6 {
+        return Err(Error::InvalidData(
+            "page-break count does not match its payload".into(),
+        ));
+    }
+    Ok(payload[2..].as_chunks_mut::<6>().0)
+}
+
+/// Shifts the breaks of one record. `position_axis_rows` names the axis of
+/// the break position (rows for horizontal breaks); the span runs along the
+/// other axis, and a span covering that whole axis is left as it is.
+fn patch_page_breaks(payload: &mut [u8], shift: AxisShift, position_axis_rows: bool) -> Result<()> {
+    let (start, count, insert, rows) = match shift {
+        AxisShift::Rows {
+            start,
+            count,
+            insert,
+        } => (start, count, insert, true),
+        AxisShift::Columns {
+            start,
+            count,
+            insert,
+        } => (u16::from(start), u16::from(count), insert, false),
+    };
+    let limit = if rows { 65_536 } else { 256 };
+    for entry in page_breaks(payload)? {
+        if rows == position_axis_rows {
+            // A break sits before its position; it moves with the row or
+            // column it precedes, and deleting that row or column erases it.
+            let position = u16::from_le_bytes([entry[0], entry[1]]);
+            let position = shift_axis_point(position, start, count, insert, limit)?;
+            entry[0..2].copy_from_slice(&position.to_le_bytes());
+        } else {
+            let first = u16::from_le_bytes([entry[2], entry[3]]);
+            let last = u16::from_le_bytes([entry[4], entry[5]]);
+            let whole = u32::from(last) + 1 >= limit && first == 0;
+            if !whole {
+                let (first, last) = shift_axis_range(first, last, start, count, insert, limit)?;
+                entry[2..4].copy_from_slice(&first.to_le_bytes());
+                entry[4..6].copy_from_slice(&last.to_le_bytes());
+            }
+        }
+    }
+    Ok(())
+}
+
+fn patch_vertical_breaks(payload: &mut [u8], shift: AxisShift) -> Result<()> {
+    patch_page_breaks(payload, shift, false)
+}
+
+fn patch_horizontal_breaks(payload: &mut [u8], shift: AxisShift) -> Result<()> {
+    patch_page_breaks(payload, shift, true)
 }
 
 fn patch_ref8(range: &mut [u8], shift: AxisShift) -> Result<()> {
@@ -2689,6 +3081,7 @@ fn collect_rows(worksheet: &[u8], records: &[RawRecord]) -> Result<BTreeMap<u16,
                         RowData {
                             row_record: bytes,
                             cell_records: Vec::new(),
+                            stored_extents: None,
                         },
                     )
                     .is_some()
@@ -2733,7 +3126,75 @@ fn collect_rows(worksheet: &[u8], records: &[RawRecord]) -> Result<BTreeMap<u16,
             },
         }
     }
+    for data in rows.values_mut() {
+        let stored = row_extents_field(&data.row_record)?;
+        if stored != cell_extents(&data.cell_records)? {
+            data.stored_extents = Some(stored);
+        }
+    }
     Ok(rows)
+}
+
+/// The `(colMic, colMac)` fields of a `Row` record.
+fn row_extents_field(row_record: &[u8]) -> Result<(u16, u16)> {
+    Ok((
+        binary::read_u16_le_at(row_record, 6)?,
+        binary::read_u16_le_at(row_record, 8)?,
+    ))
+}
+
+/// The `(first, last + 1)` column extents of a row's cell records, `(0, 0)`
+/// for a row without cells.
+fn cell_extents(cell_records: &[Vec<u8>]) -> Result<(u16, u16)> {
+    let mut first = u16::MAX;
+    let mut last = 0_u16;
+    for record in cell_records {
+        let kind = record_kind(record)?;
+        if matches!(kind, TABLE | SHARED_FORMULA | ARRAY | STRING | CONTINUE) {
+            continue;
+        }
+        let start = u16::from(cell_column(record)?);
+        let end = if matches!(kind, MUL_RK | MUL_BLANK) {
+            let payload_len = usize::from(u16::from_le_bytes([record[2], record[3]]));
+            binary::read_u16_le_at(record, 4 + payload_len - 2)?
+        } else {
+            start
+        };
+        first = first.min(start);
+        last = last.max(end);
+    }
+    Ok(if first == u16::MAX {
+        (0, 0)
+    } else {
+        (first, last + 1)
+    })
+}
+
+/// Moves stored `(colMic, colMac)` extents with a column shift; `None` when
+/// they no longer describe a span.
+fn shift_stored_extents(
+    (first, end): (u16, u16),
+    start: u16,
+    count: u16,
+    insert: bool,
+) -> Option<(u16, u16)> {
+    let (first, end) = if insert {
+        (
+            if first >= start { first + count } else { first },
+            if end > start { end + count } else { end },
+        )
+    } else {
+        let deleted_end = start + count;
+        let shift = |value: u16| {
+            if value >= deleted_end {
+                value - count
+            } else {
+                value.min(start)
+            }
+        };
+        (shift(first), shift(end))
+    };
+    (first < end && end <= 256).then_some((first, end))
 }
 
 fn apply_cell_change(
@@ -2773,6 +3234,7 @@ fn apply_cell_change(
                 row.insert(RowData {
                     row_record,
                     cell_records: Vec::new(),
+                    stored_extents: None,
                 });
             }
             let record = encode_cell(reference, after, source, resources, shared_strings)?;
@@ -2892,6 +3354,7 @@ fn apply_formula_cell_resource(
             row.insert(RowData {
                 row_record,
                 cell_records: Vec::new(),
+                stored_extents: None,
             });
         }
         let mut record = Vec::new();
@@ -3198,6 +3661,7 @@ fn insert_packed_rk(
         row.insert(RowData {
             row_record,
             cell_records: Vec::new(),
+            stored_extents: None,
         });
     }
     let row = rows
@@ -3550,6 +4014,9 @@ fn shift_columns(
 ) -> Result<()> {
     let delete_end = start.saturating_add(count);
     for data in rows.values_mut() {
+        data.stored_extents = data.stored_extents.and_then(|extents| {
+            shift_stored_extents(extents, u16::from(start), u16::from(count), insert)
+        });
         let mut retained = Vec::new();
         for mut record in std::mem::take(&mut data.cell_records) {
             let kind = record_kind(&record)?;
@@ -3616,27 +4083,14 @@ fn patch_row_number(data: &mut RowData, row: u16) -> Result<()> {
 
 fn patch_row_extents(rows: &mut BTreeMap<u16, RowData>) -> Result<()> {
     for data in rows.values_mut() {
-        let mut first = u16::MAX;
-        let mut last = 0_u16;
-        for record in &data.cell_records {
-            let kind = record_kind(record)?;
-            if matches!(kind, TABLE | SHARED_FORMULA | ARRAY | STRING | CONTINUE) {
-                continue;
-            }
-            let start = u16::from(cell_column(record)?);
-            let end = if matches!(kind, MUL_RK | MUL_BLANK) {
-                let payload_len = usize::from(u16::from_le_bytes([record[2], record[3]]));
-                binary::read_u16_le_at(record, 4 + payload_len - 2)?
-            } else {
-                start
-            };
-            first = first.min(start);
-            last = last.max(end);
-        }
-        let (first, last_plus_one) = if first == u16::MAX {
-            (0, 0)
-        } else {
-            (first, last + 1)
+        let (first, last_plus_one) = cell_extents(&data.cell_records)?;
+        let (first, last_plus_one) = match data.stored_extents {
+            Some((stored_first, stored_end))
+                if last_plus_one == 0 || (stored_first <= first && last_plus_one <= stored_end) =>
+            {
+                (stored_first, stored_end)
+            },
+            _ => (first, last_plus_one),
         };
         data.row_record
             .get_mut(6..8)
@@ -3886,12 +4340,8 @@ fn certify_coordinate_shift(
         0x01b0,
         0x0879,
         0x087a,
-        0x001c,
-        0x007d,
         0x009e,
         0x0041,
-        0x001a,
-        0x001b,
         0x0090,
     ];
     if let Some(record) = records
@@ -3919,6 +4369,12 @@ fn certify_coordinate_shift(
             HLINK_TOOLTIP => certify_mutation(payload, shift, patch_hyperlink_tooltip)?,
             MSO_DRAWING => certify_mutation(payload, shift, patch_officeart)?,
             OBJ => certify_simple_drawing_obj(payload)?,
+            COL_INFO => certify_mutation(payload, shift, patch_col_info)?,
+            NOTE => certify_mutation(payload, shift, patch_note)?,
+            VERTICAL_PAGE_BREAKS => certify_mutation(payload, shift, patch_vertical_breaks)?,
+            HORIZONTAL_PAGE_BREAKS => {
+                certify_mutation(payload, shift, patch_horizontal_breaks)?;
+            },
             _ => {},
         }
     }
@@ -3975,15 +4431,6 @@ fn formula_tokens(payload: &[u8]) -> Result<&[u8]> {
     Ok(tokens)
 }
 
-fn certify_formula_owner(payload: &[u8]) -> Result<()> {
-    if crate::formula::formula_2d_reference_spans(formula_tokens(payload)?).is_none() {
-        return Err(Error::UnsafeEdit(
-            "row/column movement supports only ordinary same-sheet Ref/Area Formula tokens".into(),
-        ));
-    }
-    Ok(())
-}
-
 fn patch_formula_record(payload: &mut [u8], shift: AxisShift) -> Result<()> {
     let token_length = formula_tokens(payload)?.len();
     let tokens = payload
@@ -3993,65 +4440,66 @@ fn patch_formula_record(payload: &mut [u8], shift: AxisShift) -> Result<()> {
 }
 
 fn patch_formula_tokens(tokens: &mut [u8], shift: AxisShift) -> Result<()> {
-    let references = crate::formula::formula_2d_reference_spans(tokens).ok_or_else(|| {
+    // 3-D references, including those naming this worksheet, are closed by
+    // `patch_workbook_dependencies` over the whole stream.
+    let references = crate::formula::formula_reference_spans(tokens).ok_or_else(|| {
         Error::UnsafeEdit(
-            "row/column movement supports only ordinary same-sheet Ref/Area Formula tokens".into(),
+            "row/column movement supports only ordinary Ref/Area and 3-D Formula tokens".into(),
         )
     })?;
-    for reference in references {
-        match (reference, shift) {
-            (
-                crate::formula::FormulaReferenceSpan::Cell { row, .. },
-                AxisShift::Rows {
-                    start,
-                    count,
-                    insert,
-                },
-            ) => patch_formula_row(tokens, row, start, count, insert)?,
-            (
-                crate::formula::FormulaReferenceSpan::Cell { column, .. },
-                AxisShift::Columns {
-                    start,
-                    count,
-                    insert,
-                },
-            ) => patch_formula_column(tokens, column, start, count, insert)?,
-            (
-                crate::formula::FormulaReferenceSpan::Area {
-                    first_row,
-                    last_row,
-                    ..
-                },
-                AxisShift::Rows {
-                    start,
-                    count,
-                    insert,
-                },
-            ) => patch_formula_row_range(tokens, first_row, last_row, start, count, insert)?,
-            (
-                crate::formula::FormulaReferenceSpan::Area {
-                    first_column,
-                    last_column,
-                    ..
-                },
-                AxisShift::Columns {
-                    start,
-                    count,
-                    insert,
-                },
-            ) => {
-                patch_formula_column_range(
-                    tokens,
-                    first_column,
-                    last_column,
-                    start,
-                    count,
-                    insert,
-                )?;
-            },
-        }
+    for reference in references.same_sheet {
+        patch_reference_span(tokens, reference, shift)?;
     }
     Ok(())
+}
+
+fn patch_reference_span(
+    tokens: &mut [u8],
+    reference: crate::formula::FormulaReferenceSpan,
+    shift: AxisShift,
+) -> Result<()> {
+    match (reference, shift) {
+        (
+            crate::formula::FormulaReferenceSpan::Cell { row, .. },
+            AxisShift::Rows {
+                start,
+                count,
+                insert,
+            },
+        ) => patch_formula_row(tokens, row, start, count, insert),
+        (
+            crate::formula::FormulaReferenceSpan::Cell { column, .. },
+            AxisShift::Columns {
+                start,
+                count,
+                insert,
+            },
+        ) => patch_formula_column(tokens, column, start, count, insert),
+        (
+            crate::formula::FormulaReferenceSpan::Area {
+                first_row,
+                last_row,
+                ..
+            },
+            AxisShift::Rows {
+                start,
+                count,
+                insert,
+            },
+        ) => patch_formula_row_range(tokens, first_row, last_row, start, count, insert),
+        (
+            crate::formula::FormulaReferenceSpan::Area {
+                first_column,
+                last_column,
+                ..
+            },
+            AxisShift::Columns {
+                start,
+                count,
+                insert,
+            },
+        ) => patch_formula_column_range(tokens, first_column, last_column, start, count, insert),
+    }
 }
 
 fn patch_formula_row(
@@ -4461,11 +4909,31 @@ fn encode_bound_name(name: &str) -> Result<Vec<u8>> {
     Ok(encoded)
 }
 
+/// Every BIFF record frame of `bytes`, stopping at stream padding.
+///
+/// Producers pad the Workbook stream after its final EOF with zero bytes
+/// (Excel and LibreOffice round small streams up to the 4,096-byte
+/// mini-stream cutoff). That tail is no record: a zero run reads as empty
+/// records of type 0 and then a truncated header. The scan stops where only
+/// zero bytes remain, and the callers keep that tail as untouched bytes.
 fn raw_records(bytes: &[u8]) -> Result<Vec<RawRecord>> {
     let mut records = Vec::new();
+    let mut end_of_last = 0_usize;
+    let padding_from = |offset: usize| {
+        bytes
+            .get(offset..)
+            .is_some_and(|tail| tail.iter().all(|byte| *byte == 0))
+    };
     for item in Records::new(bytes) {
-        let record = item?;
+        let record = match item {
+            Ok(record) => record,
+            Err(_) if end_of_last > 0 && padding_from(end_of_last) => break,
+            Err(error) => return Err(error.into()),
+        };
         let start = record.offset();
+        if record.kind().get() == 0 && start > 0 && padding_from(start) {
+            break;
+        }
         let end = start
             .checked_add(4)
             .and_then(|value| value.checked_add(record.payload().len()))
@@ -4475,6 +4943,7 @@ fn raw_records(bytes: &[u8]) -> Result<Vec<RawRecord>> {
             start,
             end,
         });
+        end_of_last = end;
     }
     Ok(records)
 }
@@ -4571,6 +5040,217 @@ mod tests {
         assert!(patch_ref8(&mut destructive_range, destructive).is_err());
     }
 
+    const INSERT_ROWS: AxisShift = AxisShift::Rows {
+        start: 3,
+        count: 2,
+        insert: true,
+    };
+    const DELETE_ROWS: AxisShift = AxisShift::Rows {
+        start: 3,
+        count: 2,
+        insert: false,
+    };
+    const INSERT_COLUMNS: AxisShift = AxisShift::Columns {
+        start: 3,
+        count: 2,
+        insert: true,
+    };
+    const DELETE_COLUMNS: AxisShift = AxisShift::Columns {
+        start: 3,
+        count: 2,
+        insert: false,
+    };
+
+    fn round_trip(
+        original: &[u8],
+        patch: fn(&mut [u8], AxisShift) -> Result<()>,
+        forward: AxisShift,
+        back: AxisShift,
+    ) -> Vec<u8> {
+        let mut bytes = original.to_vec();
+        patch(&mut bytes, forward).unwrap();
+        let shifted = bytes.clone();
+        patch(&mut bytes, back).unwrap();
+        assert_eq!(bytes, original);
+        shifted
+    }
+
+    #[test]
+    fn zero_padding_after_the_final_eof_is_not_a_record() {
+        for padding in [1, 3, 4, 9] {
+            let mut stream = raw_record(0x0809, &[0; 16]);
+            stream.extend(raw_record(EOF, &[]));
+            stream.extend(std::iter::repeat_n(0, padding));
+            let records = raw_records(&stream).unwrap();
+            assert_eq!(records.len(), 2, "padding {padding}");
+            assert_eq!(records[1].kind, EOF);
+        }
+        let mut garbage = raw_record(0x0809, &[0; 16]);
+        garbage.extend([0, 0, 7]);
+        assert!(raw_records(&garbage).is_err());
+    }
+
+    #[test]
+    fn col_info_shifts_with_columns_and_keeps_the_grid_end() {
+        // Columns D:F (3..=5): an insertion at D moves the span.
+        let span = [3, 0, 5, 0, 0x6d, 0x08, 0x0f, 0, 0, 0, 0, 0];
+        let shifted = round_trip(&span, patch_col_info, INSERT_COLUMNS, DELETE_COLUMNS);
+        assert_eq!(&shifted[..4], &[5, 0, 7, 0]);
+        // Rows never touch a ColInfo.
+        round_trip(&span, patch_col_info, INSERT_ROWS, DELETE_ROWS);
+        // A span through the grid end (B:IV) keeps its end.
+        let open = [1, 0, 0xff, 0, 0x6d, 0x08, 0x0f, 0, 0, 0, 0, 0];
+        let shifted = round_trip(&open, patch_col_info, INSERT_COLUMNS, DELETE_COLUMNS);
+        assert_eq!(&shifted[..4], &[1, 0, 0xff, 0]);
+        // Deleting the open span's first column is refused.
+        let mut first = [3, 0, 0, 1, 0x6d, 0x08, 0x0f, 0, 0, 0, 0, 0];
+        assert!(patch_col_info(&mut first, DELETE_COLUMNS).is_err());
+    }
+
+    #[test]
+    fn notes_and_page_breaks_shift_and_inverse_exactly() {
+        let note = [7, 0, 4, 0, 0, 0, 1, 0];
+        let shifted = round_trip(&note, patch_note, INSERT_ROWS, DELETE_ROWS);
+        assert_eq!(&shifted[..4], &[9, 0, 4, 0]);
+        round_trip(&note, patch_note, INSERT_COLUMNS, DELETE_COLUMNS);
+        let mut erased = note;
+        assert!(
+            patch_note(
+                &mut erased,
+                AxisShift::Rows {
+                    start: 7,
+                    count: 1,
+                    insert: false,
+                }
+            )
+            .is_err()
+        );
+
+        // A horizontal break before row 10 spanning every column.
+        let horizontal = [1, 0, 10, 0, 0, 0, 0xff, 0];
+        let shifted = round_trip(
+            &horizontal,
+            patch_horizontal_breaks,
+            INSERT_ROWS,
+            DELETE_ROWS,
+        );
+        assert_eq!(&shifted[2..4], &[12, 0]);
+        let shifted = round_trip(
+            &horizontal,
+            patch_horizontal_breaks,
+            INSERT_COLUMNS,
+            DELETE_COLUMNS,
+        );
+        assert_eq!(shifted, horizontal);
+        // A vertical break before column E spanning every row.
+        let vertical = [1, 0, 4, 0, 0, 0, 0xff, 0xff];
+        let shifted = round_trip(
+            &vertical,
+            patch_vertical_breaks,
+            INSERT_COLUMNS,
+            DELETE_COLUMNS,
+        );
+        assert_eq!(&shifted[2..4], &[6, 0]);
+        round_trip(&vertical, patch_vertical_breaks, INSERT_ROWS, DELETE_ROWS);
+    }
+
+    #[test]
+    fn whole_axis_formula_ranges_keep_the_grid_end() {
+        // PtgArea A:A ($A$1:$A$65536), a PtgRef to row 6, and PtgAdd.
+        let original = [
+            0x25, 0, 0, 0xff, 0xff, 0, 0xc0, 0, 0xc0, 0x24, 5, 0, 1, 0xc0, 0x03,
+        ];
+        let mut tokens = original;
+        patch_formula_tokens(&mut tokens, INSERT_ROWS).unwrap();
+        assert_eq!(&tokens[1..5], &[0, 0, 0xff, 0xff]);
+        assert_eq!(&tokens[10..12], &[7, 0]);
+        patch_formula_tokens(&mut tokens, DELETE_ROWS).unwrap();
+        assert_eq!(tokens, original);
+    }
+
+    /// A Workbook stream with a self `SupBook`, two XTIs (sheet 0 and sheet
+    /// 1), a print-area `Lbl` on sheet 0 and a formula pointing at sheet 1.
+    fn three_d_workbook() -> Vec<u8> {
+        let mut stream = raw_record(
+            0x0809,
+            &[0x00, 0x06, 0x05, 0x00, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        );
+        stream.extend(raw_record(SUP_BOOK, &[2, 0, 0x01, 0x04]));
+        stream.extend(raw_record(
+            EXTERN_SHEET,
+            &[2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0],
+        ));
+        // Lbl: builtin Print_Area (0x06), sheet-scoped (itab 1), formula
+        // PtgArea3d ixti 0 $A$4:$C$9.
+        let mut name = vec![0x20, 0, 0, 1, 11, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0x06];
+        name.extend([0x3b, 0, 0, 3, 0, 8, 0, 0, 0, 2, 0]);
+        stream.extend(raw_record(LBL, &name));
+        stream.extend(raw_record(EOF, &[]));
+        // A sheet formula =Sheet2!$B$7 (PtgRef3d ixti 1).
+        let mut formula = vec![0; 20];
+        formula.extend([7, 0, 0x3a, 1, 0, 6, 0, 1, 0]);
+        stream.extend(raw_record(FORMULA, &formula));
+        stream
+    }
+
+    #[test]
+    fn defined_names_and_3d_formulas_follow_their_sheet_and_inverse_exactly() {
+        let original = three_d_workbook();
+        let mut workbook = original.clone();
+        patch_workbook_dependencies(&mut workbook, 0, INSERT_ROWS).unwrap();
+        let name_start = original.len() - 4 - 29 - 4 - 4 - 27;
+        // $A$4:$C$9 on sheet 0 became $A$6:$C$11; the formula on sheet 1 kept $B$7.
+        assert_eq!(
+            &workbook[name_start + 4 + 16..name_start + 4 + 27],
+            &[0x3b, 0, 0, 5, 0, 10, 0, 0, 0, 2, 0]
+        );
+        assert_eq!(
+            workbook[workbook.len() - 6..],
+            original[original.len() - 6..]
+        );
+        patch_workbook_dependencies(&mut workbook, 0, DELETE_ROWS).unwrap();
+        assert_eq!(workbook, original);
+
+        // The same shift on sheet 1 moves only the formula's reference.
+        patch_workbook_dependencies(&mut workbook, 1, INSERT_ROWS).unwrap();
+        assert_eq!(&workbook[workbook.len() - 4..workbook.len() - 2], &[8, 0]);
+        patch_workbook_dependencies(&mut workbook, 1, DELETE_ROWS).unwrap();
+        assert_eq!(workbook, original);
+
+        // Deleting a row the name names is refused.
+        let mut erasing = original.clone();
+        assert!(
+            patch_workbook_dependencies(
+                &mut erasing,
+                0,
+                AxisShift::Rows {
+                    start: 8,
+                    count: 1,
+                    insert: false,
+                }
+            )
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn producer_row_extents_survive_a_shift_and_its_inverse() {
+        // A Row record for row 0 declaring columns 0..5 with one cell in
+        // column 1: a producer's sheet-wide extents.
+        let row = raw_record(ROW, &[0, 0, 0, 0, 5, 0, 0xff, 0, 0, 0, 0, 0, 0, 1, 0x0f, 0]);
+        let cell = raw_record(0x0201, &[0, 0, 1, 0, 0x0f, 0]);
+        let mut worksheet = row.clone();
+        worksheet.extend(&cell);
+        let mut rows = collect_rows(&worksheet, &raw_records(&worksheet).unwrap()).unwrap();
+        assert_eq!(rows[&0].stored_extents, Some((0, 5)));
+        shift_columns(&mut rows, 0, 1, true).unwrap();
+        patch_row_extents(&mut rows).unwrap();
+        assert_eq!(row_extents_field(&rows[&0].row_record).unwrap(), (1, 6));
+        shift_columns(&mut rows, 0, 1, false).unwrap();
+        patch_row_extents(&mut rows).unwrap();
+        assert_eq!(rows[&0].row_record, row);
+    }
+
     #[test]
     fn ext_sst_tail_resource_updates_bucket_and_inverts_exactly() {
         let mut workbook = raw_record(0x0809, &[0; 12]);
@@ -4645,6 +5325,7 @@ mod tests {
             RowData {
                 row_record: Vec::new(),
                 cell_records: records,
+                stored_extents: None,
             },
         )]);
         insert_packed_rk(
@@ -4728,6 +5409,7 @@ mod tests {
             RowData {
                 row_record: Vec::new(),
                 cell_records: Vec::new(),
+                stored_extents: None,
             },
         )]);
         for (column, value, style) in [(2, 1.0, 0), (3, 2.0, 1), (4, 3.0, 2)] {

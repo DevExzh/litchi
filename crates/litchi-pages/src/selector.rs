@@ -230,7 +230,7 @@ impl From<Position> for BodyTableSelector<'_> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ImageSelector {
     /// Select the image at this zero-based body source position.
-    Index(Position),
+    Position(Position),
 }
 
 /// Selects one chart anchored in the rooted Pages body by its zero-based
@@ -247,27 +247,27 @@ pub enum ImageSelector {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BodyChartSelector {
     /// Select the chart at this zero-based body source position.
-    Index(Position),
+    Position(Position),
 }
 
 impl BodyChartSelector {
     /// Create a selector from a zero-based body-chart index.
     #[must_use]
     pub const fn index(index: usize) -> Self {
-        Self::Index(Position::new(index))
+        Self::Position(Position::new(index))
     }
 
     /// Create a selector from a typed zero-based body-chart position.
     #[must_use]
     pub const fn position(position: Position) -> Self {
-        Self::Index(position)
+        Self::Position(position)
     }
 
     /// Return the selected typed body-chart position.
     #[must_use]
     pub const fn as_position(self) -> Position {
         match self {
-            Self::Index(position) => position,
+            Self::Position(position) => position,
         }
     }
 
@@ -294,20 +294,20 @@ impl ImageSelector {
     /// Create a selector from a zero-based body-image index.
     #[must_use]
     pub const fn index(index: usize) -> Self {
-        Self::Index(Position::new(index))
+        Self::Position(Position::new(index))
     }
 
     /// Create a selector from a typed zero-based body-image position.
     #[must_use]
     pub const fn position(position: Position) -> Self {
-        Self::Index(position)
+        Self::Position(position)
     }
 
     /// Return the selected typed body-image position.
     #[must_use]
     pub const fn as_position(self) -> Position {
         match self {
-            Self::Index(position) => position,
+            Self::Position(position) => position,
         }
     }
 

@@ -2880,13 +2880,11 @@ fn slide_removal_plan_refuses_dependencies_shared_owners_and_hostile_layouts() -
             "rIdExternalRemoval".into(),
             TargetMode::External,
         )?;
-    assert!(matches!(
-        external.opened_presentation()?.plan_slide_removal(0_usize),
-        Err(Error::SlideRemovalPlan {
-            kind: SlideRemovalRefusal::UnsupportedRelationship,
-            ..
-        })
-    ));
+    // An external edge leaves with the removed slide (record 0293).
+    let plan = external
+        .opened_presentation()?
+        .plan_slide_removal(0_usize)?;
+    assert_eq!(plan.patch().resource_count(), 2);
 
     let mut shared = opened_plain_slides_package(2)?;
     let slides = shared.opened_presentation()?.slides().to_vec();
@@ -3107,6 +3105,8 @@ fn slide_removal_plan_refuses_policy_surfaces_bounds_and_stale_graphs() -> Resul
         }
     }
 
+    // The default text style holds paragraph formatting only, so producer
+    // vocabulary inside it is admitted (record 0293).
     for default_text_style in [
         r#"<p:defaultTextStyle><a:defPPr futureOwner="opaque"/></p:defaultTextStyle>"#,
         r#"<p:defaultTextStyle><a:futureOwner/></p:defaultTextStyle>"#,
@@ -3123,15 +3123,9 @@ fn slide_removal_plan_refuses_policy_surfaces_bounds_and_stale_graphs() -> Resul
             .opc
             .get_part_mut(&presentation)?
             .set_blob(xml.into_bytes());
-        assert!(matches!(
-            unknown_drawingml
-                .opened_presentation()?
-                .plan_slide_removal(0_usize),
-            Err(Error::SlideRemovalPlan {
-                kind: SlideRemovalRefusal::UnknownSemanticSurface,
-                ..
-            })
-        ));
+        unknown_drawingml
+            .opened_presentation()?
+            .plan_slide_removal(0_usize)?;
     }
 
     let mut signed = opened_plain_slides_package(2)?;
@@ -3183,14 +3177,28 @@ fn slide_removal_plan_refuses_policy_surfaces_bounds_and_stale_graphs() -> Resul
                 1,
             );
         mce.opc.get_part_mut(&target)?.set_blob(xml.into_bytes());
-        assert!(matches!(
-            mce.opened_presentation()?.plan_slide_removal(0_usize),
-            Err(Error::SlideRemovalPlan {
-                kind: SlideRemovalRefusal::MarkupCompatibility,
-                ..
-            })
-        ));
+        // A bare declaration carries no alternate content (record 0293).
+        mce.opened_presentation()?.plan_slide_removal(0_usize)?;
     }
+    let mut mce = opened_plain_slides_package(2)?;
+    let presentation = mce.opened_presentation()?.presentation_name.clone();
+    let xml = std::str::from_utf8(mce.opc.get_part(&presentation)?.blob())
+        .map_err(|error| Error::Xml(error.to_string()))?
+        .replacen(
+            "<p:presentation ",
+            "<p:presentation xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" mc:Ignorable=\"p14\" xmlns:p14=\"http://schemas.microsoft.com/office/powerpoint/2010/main\" ",
+            1,
+        );
+    mce.opc
+        .get_part_mut(&presentation)?
+        .set_blob(xml.into_bytes());
+    assert!(matches!(
+        mce.opened_presentation()?.plan_slide_removal(0_usize),
+        Err(Error::SlideRemovalPlan {
+            kind: SlideRemovalRefusal::MarkupCompatibility,
+            ..
+        })
+    ));
 
     let mut protected = opened_plain_slides_package(2)?;
     let presentation = protected.opened_presentation()?.presentation_name.clone();

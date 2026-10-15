@@ -206,3 +206,8 @@ required-features = ["pages", "keynote", "numbers"]
 [[example]]
 name              = "numbers_unified_bench"
 required-features = ["numbers"]
+
+# Paired leaf-vs-unified Pages write measurements (record 0299).
+[[example]]
+name              = "pages_bench"
+required-features = ["pages"]

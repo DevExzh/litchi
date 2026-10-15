@@ -985,3 +985,49 @@ fn worksheet_indexes_many_array_ranges_and_rejects_indexed_overlap() {
         .is_err()
     );
 }
+
+/// An embedded chart substream (BOF ... EOF after its drawing object) holds
+/// chart-sheet records such as HEADER and its own EOF. The worksheet parser
+/// must skip it: before record 0293 it stopped at the chart's EOF, and the
+/// chart's HEADER collided with the worksheet's, so the complete reader
+/// dropped the worksheet.
+#[test]
+fn worksheet_skips_embedded_chart_substreams() {
+    let mut number = Vec::new();
+    number.extend_from_slice(&1u16.to_le_bytes());
+    number.extend_from_slice(&0u16.to_le_bytes());
+    number.extend_from_slice(&15u16.to_le_bytes());
+    number.extend_from_slice(&4.5f64.to_le_bytes());
+    let mut chart_bof = Vec::new();
+    chart_bof.extend_from_slice(&0x0600u16.to_le_bytes());
+    chart_bof.extend_from_slice(&0x0020u16.to_le_bytes());
+    chart_bof.extend_from_slice(&[0; 12]);
+
+    let mut stream = Vec::new();
+    push_record(&mut stream, 0x0014, &[0, 0, 0]);
+    push_record(&mut stream, 0x0809, &chart_bof);
+    push_record(&mut stream, 0x0014, &[0, 0, 0]);
+    push_record(&mut stream, 0x000A, &[]);
+    push_record(&mut stream, 0x0203, &number);
+    push_record(&mut stream, 0x000A, &[]);
+    let mut records = Records::new(&stream);
+
+    let worksheet = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
+        &mut records,
+        stream.len() as u64,
+        0,
+        0,
+        &Encoding::Utf16Le,
+        "Sheet1",
+        Arc::new(Vec::new()),
+        Arc::new(Vec::new()),
+        None,
+        Arc::new(Formatting::default()),
+    )
+    .unwrap();
+    assert!(matches!(
+        worksheet.get_cell(1, 0).unwrap().value(),
+        litchi_core::sheet::CellValue::Float(value) if *value == 4.5
+    ));
+    assert!(records.next().is_none());
+}

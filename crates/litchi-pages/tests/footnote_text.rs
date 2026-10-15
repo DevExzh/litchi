@@ -2,7 +2,7 @@ use litchi_iwa_archive::{Limits as ArchiveLimits, package::to_bytes};
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tp, tsp, tswp};
 use litchi_pages::footnote::body::{Position, Selector};
-use litchi_pages::{FootnoteTextError, Package};
+use litchi_pages::{Package, footnote::text::Error as FootnoteTextError};
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -262,7 +262,10 @@ fn low_iwa_limit_rejects_commit_atomically() -> TestResult {
         defaults.max_total_bytes(),
         fixture.decompressed_iwa_bytes,
     )?;
-    let package = Package::from_bytes_with_limits(&fixture.bytes, limits)?;
+    let package = Package::from_bytes_with_options(
+        &fixture.bytes,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    )?;
     let before = exact_bytes(&package)?;
 
     let mut edit = package.edit_body_footnote_text(Selector::index(1))?;

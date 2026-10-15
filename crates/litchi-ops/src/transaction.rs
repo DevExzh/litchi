@@ -261,6 +261,9 @@ pub struct Edit {
     /// Coalesced Numbers cell values and formulas (record 0297).
     #[cfg(feature = "numbers")]
     numbers_cells: Option<crate::format::iwork::numbers::coalesce::Run>,
+    /// Coalesced Pages paragraph text sets (record 0299).
+    #[cfg(feature = "pages")]
+    pages: Option<crate::format::iwork::pages::Run>,
     /// The match count of the last `find=` set (record 0273).
     matched: Option<usize>,
 }
@@ -358,6 +361,8 @@ impl File {
                 odf_tree: None,
                 #[cfg(feature = "numbers")]
                 numbers_cells: None,
+                #[cfg(feature = "pages")]
+                pages: None,
                 matched: None,
             };
             let value = f(&mut edit);
@@ -1610,6 +1615,38 @@ impl Edit {
             self.operations += 1;
             return Ok(Some(changed));
         }
+        #[cfg(feature = "pages")]
+        if let File::Pages(handle) = self.current.clone() {
+            // Paragraph `text` sets keep every paragraph's position, so a
+            // run of them shares one leaf paragraph transaction per section.
+            let plan = match crate::format::iwork::pages::plan(&handle, _target, _props) {
+                Ok(Some(plan)) => plan,
+                Ok(None) => {
+                    if self.pages.is_some() {
+                        self.flush_pending()?;
+                    }
+                    return Ok(None);
+                },
+                Err(error) => {
+                    self.flush_pending()?;
+                    return Err(error);
+                },
+            };
+            if self.operations >= self.limits.max_operations() {
+                return Err(Error::Limit {
+                    kind: LimitKind::Operations,
+                    observed: self.operations.saturating_add(1),
+                    maximum: self.limits.max_operations(),
+                }
+                .into());
+            }
+            let run = self.pages.get_or_insert_with(|| {
+                crate::format::iwork::pages::Run::new(&handle, &self.limits)
+            });
+            let changed = run.stage(plan, _index)?;
+            self.operations += 1;
+            return Ok(Some(changed));
+        }
         #[cfg(feature = "odt")]
         if let Some(handle) = self.current.odt_family().cloned() {
             // A run plans every set against its base handle (the current
@@ -2386,6 +2423,31 @@ impl Edit {
             })();
             result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
         }
+        #[cfg(feature = "pages")]
+        if let Some(run) = self.pages.take() {
+            let index = run.first_index();
+            let result = (|| -> Result<()> {
+                let (base, commit) = run.commit()?;
+                let (step, ()) = wrap_iwork(&base, commit, ())?;
+                let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
+                if bytes > self.limits.max_snapshot_bytes() {
+                    return Err(Error::Limit {
+                        kind: LimitKind::SnapshotBytes,
+                        observed: bytes,
+                        maximum: self.limits.max_snapshot_bytes(),
+                    }
+                    .into());
+                }
+                self.steps
+                    .try_reserve(1)
+                    .map_err(|source| Error::Allocation { source })?;
+                self.current = step.after.clone();
+                self.steps.push(step);
+                self.snapshot_bytes = bytes;
+                Ok(())
+            })();
+            result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
+        }
         #[cfg(feature = "odt")]
         if let Some(run) = self.odt.take() {
             let index = run.first_index();
@@ -2705,6 +2767,10 @@ impl Edit {
                 #[cfg(feature = "odt")]
                 {
                     self.odt = None;
+                }
+                #[cfg(feature = "pages")]
+                {
+                    self.pages = None;
                 }
                 #[cfg(feature = "xlsx")]
                 {

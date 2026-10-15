@@ -166,17 +166,31 @@ pub fn open_with_tail<T: ZipTail>(
     tail: &T,
 ) -> Result<File> {
     check_cancelled(options)?;
-    let file = path::open(path.as_ref(), options, tail)
-        .map_err(|error| refuse_directory(path.as_ref(), error))?;
+    let file = match path::open(path.as_ref(), options, tail) {
+        Ok(file) => file,
+        Err(error) => open_directory(path.as_ref(), error)?,
+    };
     check_cancelled(options)?;
     Ok(file)
 }
 
+/// Open the iWork package directory at `path` the file route refused: a
+/// Pages directory opens through its leaf (record 0299); the others are
+/// refused as before.
+fn open_directory(path: &Path, error: Error) -> Result<File> {
+    #[cfg(feature = "pages")]
+    if path.is_dir() && crate::format::iwork::classify_directory(path) == Some(FileFormat::Pages) {
+        return crate::format::iwork::Iwork::open_pages_directory(path)
+            .map(crate::format::iwork::Iwork::into_file);
+    }
+    Err(refuse_directory(path, error))
+}
+
 /// Finish a refusal of the input at `path`. The file route reads one
 /// positional source, so an iWork package directory (the app-authored
-/// bundle form) fails there; it is named here, on the error path only. The
-/// iWork leaves edit and save only single-file packages, so the directory
-/// is refused with [`Error::iwork_unsupported`].
+/// bundle form) fails there; it is named here, on the error path only. A
+/// Keynote or Numbers directory is refused with
+/// [`Error::iwork_unsupported`] (Pages directories open, record 0299).
 fn refuse_directory(path: &Path, error: Error) -> Error {
     #[cfg(feature = "iwork-adapter")]
     if path.is_dir()

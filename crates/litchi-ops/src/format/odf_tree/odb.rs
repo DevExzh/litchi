@@ -53,7 +53,7 @@ const QUERY_PROPS: &[PropSpec] = &[
     PropSpec::new("columnCount", ValueType::Int),
 ];
 
-static OPERATION_GAPS: [GapSpec; 4] = [
+static OPERATION_GAPS: [GapSpec; 6] = [
     GapSpec {
         subject: Subject::Operation {
             verb: "add",
@@ -83,6 +83,26 @@ static OPERATION_GAPS: [GapSpec; 4] = [
         code: Code::UnsupportedCapability,
         follow_up: "0282 ODB query rename",
         reason: "the leaf has no query rename; remove and add the query instead",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "move",
+            element: "column",
+            context: "a column into another table",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "0292 ODB cross-table column transfer",
+        reason: "a column belongs to its table's schema; columns move and swap within their table",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "move",
+            element: "table",
+            context: "a database that mixes table representations and definitions",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "0292 ODB mixed table collections",
+        reason: "representations and definitions order in separate collections, so one unified table order cannot be published",
     },
     super::METADATA_PATH_GAP,
 ];
@@ -148,7 +168,6 @@ pub(crate) static WRITES: super::Writes = super::Writes {
     settable: &["table", "column", "query"],
     addable: &["query"],
     removable: &["table", "column", "query"],
-    movable: &[],
     gaps: &OPERATION_GAPS,
 };
 
@@ -382,4 +401,107 @@ pub(crate) fn remove(
     }
     bound(LimitKind::Operations, nodes.len(), limits.max_operations())?;
     commit(file, edit, nodes.len(), limits)
+}
+
+/// The leaf position space of a table move: refused when the catalog mixes
+/// table representations and definitions, whose collections order apart.
+fn single_table_kind(package: &litchi_odb::Package) -> Result<()> {
+    let catalog = package.database().catalog().map_err(core)?;
+    let mut kinds = catalog.tables().iter().map(litchi_odb::Table::kind);
+    let first = kinds.next();
+    if kinds.any(|kind| Some(kind) != first) {
+        return Err(refusal(
+            Code::UnsupportedCapability,
+            "the database mixes table representations and definitions, which order in separate collections",
+        )
+        .with_suggestion("follow-up: 0292 ODB mixed table collections"));
+    }
+    Ok(())
+}
+
+/// Stage moving `node` (a table, column or query) to final position `to`
+/// among its siblings.
+fn stage_move(
+    file: &OdfTree,
+    edit: &mut litchi_odb::Edit<'_>,
+    node: &super::Node<'_>,
+    to: usize,
+) -> Result<()> {
+    let own = own_name(node);
+    let staging = |error| staging_error(error, FileFormat::Odb);
+    match node.item().type_name() {
+        "table" => edit.move_table(&own, to).map_err(staging),
+        "column" => edit
+            .move_column(&table_of(file, node), &own, to)
+            .map_err(staging),
+        "query" => edit.move_query(&own, to).map_err(staging),
+        _ => Err(element_refusal("move", node)),
+    }
+}
+
+/// Move a table, a column within its table, or a query (record 0292).
+pub(crate) fn move_to(
+    file: &OdfTree,
+    package: &litchi_odb::Package,
+    path: &PathArg<'_>,
+    placement: &crate::Placement<'_>,
+    limits: &SemanticLimits,
+) -> Result<Commit> {
+    let node = super::write::parent::<Odb>(file, path)?;
+    if node.item().type_name() == "database" {
+        return Err(element_refusal("move", &node));
+    }
+    let siblings = super::write::siblings(file, &node)?;
+    let super::write::Destination::Within(to) =
+        super::write::destination::<Odb>(file, &node, &siblings, placement)?
+    else {
+        return Err(refusal(
+            Code::UnsupportedCapability,
+            "an ODB column moves within its own table",
+        )
+        .with_suggestion("follow-up: 0292 ODB cross-table column transfer"));
+    };
+    if node.item().type_name() == "table" {
+        single_table_kind(package)?;
+    }
+    let mut edit = package.edit();
+    stage_move(file, &mut edit, &node, to)?;
+    commit(file, edit, 1, limits)
+}
+
+/// Exchange two tables, two columns of one table, or two queries.
+pub(crate) fn swap(
+    file: &OdfTree,
+    package: &litchi_odb::Package,
+    left: &PathArg<'_>,
+    right: &PathArg<'_>,
+    limits: &SemanticLimits,
+) -> Result<Commit> {
+    let (left, right) = super::write::swap_pair::<Odb>(file, left, right)?;
+    if left.item().type_name() == "database" {
+        return Err(element_refusal("swap", &left));
+    }
+    let left_siblings = super::write::siblings(file, &left)?;
+    let right_siblings = super::write::siblings(file, &right)?;
+    if left_siblings.parent != right_siblings.parent {
+        return Err(refusal(
+            Code::UnsupportedCapability,
+            "ODB columns swap within one table",
+        )
+        .with_suggestion("follow-up: 0292 ODB cross-table column transfer"));
+    }
+    if left.item().type_name() == "table" {
+        single_table_kind(package)?;
+    }
+    let (first, second, i, j) = if left_siblings.from <= right_siblings.from {
+        (left, right, left_siblings.from, right_siblings.from)
+    } else {
+        (right, left, right_siblings.from, left_siblings.from)
+    };
+    let mut edit = package.edit();
+    if i != j {
+        stage_move(file, &mut edit, &first, j)?;
+        stage_move(file, &mut edit, &second, i)?;
+    }
+    commit(file, edit, 2, limits)
 }

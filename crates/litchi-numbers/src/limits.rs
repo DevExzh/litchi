@@ -49,7 +49,6 @@ pub enum Error {
     },
 }
 
-
 /// Hard ceiling for native IWA objects indexed by one Numbers package.
 pub const MAX_OBJECTS: usize = 1_000_000;
 /// Hard ceiling for the caller-selected reference setting.

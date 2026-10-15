@@ -180,7 +180,7 @@ class RaisedErrorTests(unittest.TestCase):
         for opener in (L.Document, L.Presentation, L.Workbook):
             with self.subTest(opener=opener.__name__):
                 self.assertError(
-                    raised(opener, fixture("odf/odt/form-controls.fodt")),
+                    raised(opener, fixture("odf/flat/minimal-formula.fodf")),
                     L.UnsupportedError,
                     "unsupported_capability",
                 )

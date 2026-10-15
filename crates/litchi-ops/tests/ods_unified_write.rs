@@ -480,13 +480,25 @@ fn atomic_batches_leave_the_input_untouched_on_failure() {
 }
 
 #[test]
-fn flat_spreadsheets_refuse_writes_with_a_typed_gap() {
+fn flat_spreadsheets_write_through_their_projection() {
+    // Record 0292: a flat spreadsheet edits its packaged projection and
+    // republishes the edit into its flat bytes. A rich-text cell the leaf
+    // would flatten is refused, as in a packaged spreadsheet.
+    let source = std::fs::read(fixture("odf/ods/rich-text-hyperlinks.fods")).unwrap();
     let file = litchi_ops::open(fixture("odf/ods/rich-text-hyperlinks.fods")).must();
     let error = file
         .set("/sheet[1]/A1", props! { "value" => 1 })
         .unwrap_err();
-    assert_eq!(error.code(), Code::UnsupportedCapability);
-    assert!(file.capabilities().gaps().count() > 0);
+    assert_ne!(error.code(), Code::InternalError);
+    assert_eq!(file.to_bytes().must(), source);
+    assert!(
+        file.capabilities()
+            .verb(litchi_ops::capabilities::Verb::Set)
+            .is_supported()
+    );
+    let edited = file.set("/sheet[1]/D9", props! { "value" => 7 }).must();
+    let reopened = litchi_ops::open_bytes(edited.to_bytes().must()).must();
+    assert_eq!(text(&reopened, "/sheet[1]/D9"), "7");
 }
 
 #[test]

@@ -29,6 +29,13 @@ kinds! {
     }
 }
 
+/// A readable property `add` accepts but `set` does not write.
+const fn add_only(name: &'static str, ty: ValueType) -> PropSpec {
+    let mut spec = PropSpec::new(name, ty);
+    spec.access.add = true;
+    spec
+}
+
 const MATH_PROPS: &[PropSpec] = &[
     writable("starmath", ValueType::Text),
     PropSpec::new("starmathVersion", ValueType::Text),
@@ -37,9 +44,9 @@ const MATH_PROPS: &[PropSpec] = &[
 ];
 
 const ELEMENT_PROPS: &[PropSpec] = &[
-    PropSpec::new("tag", ValueType::Text),
-    writable("text", ValueType::Text),
-    PropSpec::new("mathvariant", ValueType::Text),
+    add_only("tag", ValueType::Text),
+    super::addable("text", ValueType::Text),
+    add_only("mathvariant", ValueType::Text),
     PropSpec::new("childCount", ValueType::Int),
 ];
 
@@ -48,11 +55,11 @@ static OPERATION_GAPS: [GapSpec; 3] = [
         subject: Subject::Operation {
             verb: "add",
             element: "element",
-            context: "a new MathML element",
+            context: "a MathML element with attributes other than `mathvariant`, or a subtree",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "0282 formula element authoring",
-        reason: "inserting MathML needs a typed element value the unified registry does not have yet",
+        follow_up: "0292 formula subtree authoring",
+        reason: "`add` creates one element from `tag`, `text` and `mathvariant`; nested subtrees are built by further adds, and other attributes need typed values",
     },
     GapSpec {
         subject: Subject::Operation {
@@ -108,9 +115,8 @@ impl Flavor for Formula {
 /// The elements `set` writes, `add` creates and `remove` deletes.
 pub(crate) static WRITES: super::Writes = super::Writes {
     settable: &["math", "element"],
-    addable: &[],
+    addable: &["element"],
     removable: &["element"],
-    movable: &[],
     gaps: &OPERATION_GAPS,
 };
 
@@ -254,7 +260,56 @@ fn commit(
     )
 }
 
-/// Adding MathML needs typed element values.
+/// The element at `route` under `root`.
+fn element_at<'e>(root: &'e Element, route: &[usize]) -> Result<&'e Element> {
+    let mut element = root;
+    for index in route {
+        element = element
+            .children()
+            .nth(*index)
+            .ok_or_else(|| refusal(Code::InternalError, "the MathML element disappeared"))?;
+    }
+    Ok(element)
+}
+
+/// The insertion index an `add` placement names among `count` children of
+/// `parent` (whose route is `parent_route`).
+fn insertion(
+    file: &OdfTree,
+    parent_route: &[usize],
+    placement: Option<&crate::Placement<'_>>,
+    count: usize,
+) -> Result<usize> {
+    use crate::Placement;
+    let anchor = |path: &PathArg<'_>| -> Result<usize> {
+        let anchor = super::write::parent::<Formula>(file, path)?;
+        match anchor.item().route().split_last() {
+            Some((index, route)) if route == parent_route => Ok(*index),
+            _ => Err(refusal(
+                Code::UnsupportedType,
+                "the placement anchor is not a child of the parent element",
+            )),
+        }
+    };
+    let index = match placement {
+        None | Some(Placement::End) => count,
+        Some(Placement::Start) => 0,
+        Some(Placement::Position(position)) => position.get(),
+        Some(Placement::Before(path)) => anchor(path)?,
+        Some(Placement::After(path)) => anchor(path)? + 1,
+        Some(Placement::Into(_, position)) => position.map_or(count, litchi_core::Position::get),
+    };
+    if index > count {
+        return Err(refusal(
+            Code::OutOfRange,
+            "the MathML insertion position is outside its parent",
+        ));
+    }
+    Ok(index)
+}
+
+/// Add one MathML element (`tag` required; `text` for token elements;
+/// `mathvariant`) under `/` or another element (record 0292).
 pub(crate) fn add(
     file: &OdfTree,
     package: &litchi_odf_formula::Package,
@@ -262,14 +317,165 @@ pub(crate) fn add(
     node: &NewNode<'_>,
     limits: &SemanticLimits,
 ) -> Result<(Commit, Path<'static>)> {
-    let _ = (file, package, parent, limits);
-    Err(refusal(
-        Code::UnsupportedCapability,
-        format!(
-            "adding `{}` elements to an ODF formula is not supported",
-            node.kind()
-        ),
-    ))
+    if !matches!(
+        node.kind().to_ascii_lowercase().as_str(),
+        "element" | "node"
+    ) {
+        return Err(refusal(
+            Code::UnsupportedCapability,
+            format!(
+                "adding `{}` elements to an ODF formula is not supported",
+                node.kind()
+            ),
+        )
+        .with_suggestion("add a MathML element: NewNode::new(\"element\").prop(\"tag\", \"mi\")"));
+    }
+    let parent_node = super::write::parent::<Formula>(file, parent)?;
+    let parent_route = parent_node.item().route().to_vec();
+    let mut tag = None;
+    let mut content = None;
+    let mut variant = None;
+    for (key, value) in node.props().iter() {
+        match key.as_str() {
+            "tag" => tag = super::write::text(value, "tag")?,
+            "text" => content = super::write::text(value, "text")?,
+            "mathvariant" => variant = super::write::text(value, "mathvariant")?,
+            other => {
+                return Err(refusal(
+                    Code::UnsupportedProperty,
+                    format!("`{other}` is not a property `add` accepts for a MathML element"),
+                )
+                .with_property(other.to_owned()));
+            },
+        }
+    }
+    let tag = required(tag, "tag")?;
+    let staging = |error| staging_error(error, FileFormat::Odf);
+    let mut element =
+        Element::new(&tag).map_err(|error| staging(error).with_property("tag".to_owned()))?;
+    if let Some(content) = content.filter(|content| !content.is_empty()) {
+        if !is_token(&element) {
+            return Err(refusal(
+                Code::UnsupportedCapability,
+                "only MathML token elements hold text",
+            )
+            .with_property("text".to_owned()));
+        }
+        element.push_text(&content);
+    }
+    if let Some(variant) = variant {
+        element
+            .set_attribute(None, "mathvariant", &variant)
+            .map_err(staging)?;
+    }
+    let count = element_at(package.formula().root(), &parent_route)?
+        .children()
+        .count();
+    let index = insertion(file, &parent_route, node.placement(), count)?;
+    let mut edit = package.edit();
+    edit.insert_child(&NodePath::new(parent_route.clone()), index, element)
+        .map_err(staging)?;
+    let commit = commit(file, edit, 1, limits)?;
+    let parent_path = parent_node.item().path().to_vec();
+    let path = super::write::added_path(&commit.after, &parent_path, "element", Some(index))?;
+    Ok((commit, path))
+}
+
+/// Move one MathML element among its siblings or under another element
+/// (record 0292). The leaf validates the content model of the result.
+pub(crate) fn move_to(
+    file: &OdfTree,
+    package: &litchi_odf_formula::Package,
+    path: &PathArg<'_>,
+    placement: &crate::Placement<'_>,
+    limits: &SemanticLimits,
+) -> Result<Commit> {
+    use super::write::Destination;
+    let node = super::write::parent::<Formula>(file, path)?;
+    if node.item().type_name() != "element" {
+        return Err(element_refusal("move", &node));
+    }
+    let route = node.item().route().to_vec();
+    let Some((&from, parent_route)) = route.split_last() else {
+        return Err(element_refusal("move", &node));
+    };
+    let siblings = super::write::siblings(file, &node)?;
+    let (target, index) =
+        match super::write::destination::<Formula>(file, &node, &siblings, placement)? {
+            Destination::Within(to) => {
+                if to == from {
+                    return commit(file, package.edit(), 1, limits);
+                }
+                (parent_route.to_vec(), Some(to))
+            },
+            Destination::Across { parent, position } => {
+                let mut target = parent.item().route().to_vec();
+                if parent.item().type_name() == "element" && target.starts_with(&route) {
+                    return Err(refusal(
+                        Code::InvalidArgument,
+                        "a MathML element cannot move into its own subtree",
+                    ));
+                }
+                // Removing the element shifts a later sibling subtree's route.
+                let depth = parent_route.len();
+                if target.len() > depth && target.starts_with(parent_route) && target[depth] > from
+                {
+                    target[depth] -= 1;
+                }
+                (target, position)
+            },
+        };
+    let staging = |error| staging_error(error, FileFormat::Odf);
+    let mut edit = package.edit();
+    let element = edit
+        .remove(&NodePath::new(route.clone()))
+        .map_err(staging)?;
+    let count = element_at(edit.root(), &target)?.children().count();
+    let index = index.unwrap_or(count);
+    if index > count {
+        return Err(refusal(
+            Code::OutOfRange,
+            "the MathML move position is outside its parent",
+        ));
+    }
+    edit.insert_child(&NodePath::new(target), index, element)
+        .map_err(staging)?;
+    commit(file, edit, 1, limits)
+}
+
+/// Exchange two MathML elements, neither inside the other.
+pub(crate) fn swap(
+    file: &OdfTree,
+    package: &litchi_odf_formula::Package,
+    left: &PathArg<'_>,
+    right: &PathArg<'_>,
+    limits: &SemanticLimits,
+) -> Result<Commit> {
+    let (left, right) = super::write::swap_pair::<Formula>(file, left, right)?;
+    if left.item().type_name() != "element" {
+        return Err(element_refusal("swap", &left));
+    }
+    let (left, right) = (left.item().route().to_vec(), right.item().route().to_vec());
+    let mut edit = package.edit();
+    if left != right {
+        if left.starts_with(&right) || right.starts_with(&left) {
+            return Err(refusal(
+                Code::InvalidArgument,
+                "a MathML element cannot swap with its own ancestor",
+            ));
+        }
+        let root = package.formula().root();
+        let (first, second) = (
+            element_at(root, &left)?.clone(),
+            element_at(root, &right)?.clone(),
+        );
+        let staging = |error| staging_error(error, FileFormat::Odf);
+        edit.replace(&NodePath::new(left), second)
+            .map_err(staging)?;
+        edit.replace(&NodePath::new(right), first)
+            .map_err(staging)?;
+    }
+    commit(file, edit, 2, limits)
 }
 
 /// Remove MathML elements.

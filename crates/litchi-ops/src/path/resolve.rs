@@ -280,7 +280,7 @@ fn classify<'s, 'f, N: Navigate<'f>>(
             return Ok(Some((Resolved { kind, select }, rule(spot, kind)?)));
         }
     }
-    let Some(canonical) = vocabulary.canonical(name) else {
+    let Some((canonical, rule)) = vocabulary.canonical_rule(name) else {
         if let Some(other) = vocabulary::elsewhere(vocabulary, name) {
             return Err(report::foreign(spot, name, vocabulary, other));
         }
@@ -292,7 +292,13 @@ fn classify<'s, 'f, N: Navigate<'f>>(
         return Ok(None);
     };
     let kind = model::<N>(spot, canonical)?;
-    let rule = rule(spot, kind)?;
+    // The alias table's rule is the kind's own when the adapter names its
+    // kind canonically, as every adapter does; otherwise look it up.
+    let rule = if kind.name() == canonical {
+        rule
+    } else {
+        self::rule(spot, kind)?
+    };
     let select = select(spot, step, rule, parent_is_root, path.raw)?;
     Ok(Some((Resolved { kind, select }, rule)))
 }
