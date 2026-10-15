@@ -8591,9 +8591,26 @@ class BoundaryPolicyTests(unittest.TestCase):
         host_edge = boundaries.Edge("litchi-iwa", "litchi-iwa-package")
         archive_edge = boundaries.Edge("litchi-iwa-archive", "litchi-iwa-package")
         all_policy_edges = self.policy.canonical_edges | self.policy.migration_edges
+        # Derive the expected inventory from the reviewed JSON rather than a
+        # hard-coded count, so a registered edge (each one carries its ADR
+        # 0024 amendment) does not break this test while a parser that drops,
+        # invents or merges an edge still does.
+        registered_edges = {
+            boundaries.Edge(dependent, dependency)
+            for dependent, dependencies in self.raw_policy["packages"].items()
+            for dependency in dependencies
+        }
+        registered_debt = {
+            boundaries.Edge(item["dependent"], item["dependency"])
+            for item in self.raw_policy["migration_debt"]
+        }
 
-        self.assertEqual(len(self.policy.packages), 67)
-        self.assertEqual(len(all_policy_edges), 270)
+        self.assertEqual(len(self.policy.packages), len(self.raw_policy["packages"]))
+        self.assertEqual(self.policy.canonical_edges, registered_edges)
+        self.assertEqual(self.policy.migration_edges, registered_debt)
+        self.assertEqual(
+            len(all_policy_edges), len(registered_edges) + len(registered_debt)
+        )
         self.assertEqual(len(self.policy.migration_debt), 11)
         self.assertEqual(
             [item.order for item in self.policy.migration_debt],
