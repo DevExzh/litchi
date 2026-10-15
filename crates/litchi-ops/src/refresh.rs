@@ -560,7 +560,10 @@ impl Field {
         self
     }
 
-    #[cfg(all(feature = "eval", feature = "xlsx"))]
+    #[cfg(all(
+        feature = "eval",
+        any(feature = "xlsx", feature = "xlsb", feature = "xls")
+    ))]
     pub(crate) const fn with_status(mut self, status: Status, reason: &'static str) -> Self {
         self.status = status;
         self.reason = Some(reason);
@@ -615,6 +618,15 @@ pub struct Summary {
 }
 
 impl Summary {
+    /// A summary of `fields` without bookmarks or missing page numbers.
+    pub(crate) const fn from_fields(fields: Vec<Field>) -> Self {
+        Self {
+            fields,
+            bookmarks: 0,
+            missing_page_numbers: 0,
+        }
+    }
+
     /// Every field met, in document order.
     #[must_use]
     pub fn fields(&self) -> &[Field] {

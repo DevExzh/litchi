@@ -4,7 +4,10 @@
 #[cfg(any(
     feature = "docx",
     feature = "pptx",
-    all(feature = "eval", feature = "xlsx")
+    all(
+        feature = "eval",
+        any(feature = "xlsx", feature = "xlsb", feature = "xls")
+    )
 ))]
 use super::RETAINED_SOURCE;
 use super::{Capabilities, Refusal, Support};
@@ -40,9 +43,9 @@ impl Capabilities {
             #[cfg(all(feature = "eval", feature = "xlsx"))]
             Some(Adapter::Xlsx) => (true, true),
             #[cfg(all(feature = "eval", feature = "xlsb"))]
-            Some(Adapter::Xlsb) => (true, false),
+            Some(Adapter::Xlsb) => (true, true),
             #[cfg(all(feature = "eval", feature = "xls"))]
-            Some(Adapter::Xls) => (true, false),
+            Some(Adapter::Xls) => (true, true),
             _ => (false, false),
         };
         if !adapter {
@@ -51,7 +54,10 @@ impl Capabilities {
         #[cfg(any(
             feature = "docx",
             feature = "pptx",
-            all(feature = "eval", feature = "xlsx")
+            all(
+                feature = "eval",
+                any(feature = "xlsx", feature = "xlsb", feature = "xls")
+            )
         ))]
         if edits && self.retains_source == Some(false) {
             return RETAINED_SOURCE.support();

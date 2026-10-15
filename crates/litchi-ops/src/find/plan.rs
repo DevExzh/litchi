@@ -64,10 +64,10 @@ impl<'t> Piece<'t> {
     test
 ))]
 #[cfg_attr(
-    not(any(feature = "docx", feature = "pptx")),
+    not(any(feature = "pptx", test)),
     allow(
         dead_code,
-        reason = "the XLSX adapter plans one piece per cell and reads only its text"
+        reason = "only PPTX formats matched ranges; the other adapters read the text"
     )
 )]
 pub(crate) struct Rewrite {
