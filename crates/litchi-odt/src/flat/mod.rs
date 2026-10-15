@@ -233,6 +233,26 @@ impl Document {
         crate::Package::from_bytes(&parts.to_bytes()?)
     }
 
+    /// This document with an edit of its packaged projection
+    /// ([`Self::to_package`]) applied: every top-level part element the
+    /// edit changed replaces its bytes here, and every other byte is kept
+    /// ([`litchi_odf_common::flat::Parts::merge_package`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`litchi_core::Error::Unsupported`] for an edit a flat
+    /// document cannot hold (a changed part root, added or removed
+    /// top-level elements, an added package member), and the flat reader's
+    /// error when the result does not reopen under this document's limits.
+    pub fn republish(
+        &self,
+        edited: &crate::Package,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        let parts = litchi_odf_common::flat::Parts::split(self.as_bytes())?;
+        let bytes = parts.merge_package(self.as_bytes(), edited.as_bytes())?;
+        Ok(Self::from_bytes_with_limits(bytes, self.limits)?)
+    }
+
     /// Returns the validated flat XML without reconstructing it.
     #[must_use]
     pub fn xml(&self) -> &str {

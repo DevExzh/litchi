@@ -445,6 +445,33 @@ class OdpVerbTests(WriteAssertions):
             self.assertEqual(L.open(target).get(path, 0)["text"], "Box")
 
 
+class FlatOdfTests(WriteAssertions):
+    """Flat ODF (record 0292): .fodt opens, and every flat family edits its
+    packaged projection and republishes into the flat bytes."""
+
+    def test_flat_text_paragraph_round_trip(self):
+        source = L.open(fixture("odf/odt/title-field-invalidate.fodt"))
+        before = source.to_bytes()
+        paths = [node["path"] for node in source.query("p")]
+        target = next(p for p in paths if source.get(p, 0)["text"] == "body text")
+        edited = source.set(target, {"text": "new body"})
+        published = edited.to_bytes()
+        self.assertEqual(published, before.replace(b">body text<", b">new body<"))
+        self.assertEqual(L.open_bytes(published).get(target, 0)["text"], "new body")
+        self.assertUnchanged(source, before)
+
+    def test_flat_drawing_and_moves_across_object_formats(self):
+        drawing = L.open(fixture("libreoffice-core/xmloff/qa/unit/data/tdf161327_LatheEndAngle.fodg"))
+        renamed = drawing.set("/page[1]", {"name": "Flat"})
+        self.assertEqual(L.open_bytes(renamed.to_bytes()).get("/page[1]", 0)["format"]["name"], "Flat")
+        # Record 0292: object-format verbs are element-level.
+        chart = L.create("odc")
+        for values in ("t.B2:B5", "t.C2:C5"):
+            chart, _ = chart.add("/", "series", {"values": values})
+        swapped = chart.swap("/series[1]", "/series[2]")
+        self.assertEqual(swapped.get("/series[1]", 0)["format"]["values"], "t.C2:C5")
+
+
 class OdfObjectTests(WriteAssertions):
     """ODF object formats (record 0288): producer drawing structure, the
     metadata family and typed chart writes."""

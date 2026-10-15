@@ -274,22 +274,26 @@ impl OdfTree {
         })))
     }
 
-    /// Whether the handle reads a flat single-XML document.
-    pub(crate) fn is_flat(&self) -> bool {
-        self.0.flat.is_some()
-    }
-
-    /// The refusal of a write to a flat single-XML document.
-    fn refuse_flat(&self) -> Result<()> {
-        if self.is_flat() {
-            return Err(Error::new(
-                crate::Code::UnsupportedCapability,
-                "flat OpenDocument drawings (.fodg) open read-only through the unified layer",
-            )
-            .with_format(self.format())
-            .with_suggestion("follow-up: 0292 flat ODG writes; save a packaged .odg to edit"));
+    /// The handle over a committed leaf owner: a packaged file adopts it;
+    /// a flat drawing republishes the edit of its packaged projection into
+    /// its flat bytes, element by element (record 0292).
+    pub(crate) fn republish(&self, owner: Owner) -> Result<Self> {
+        let Some(flat) = self.0.flat.as_deref() else {
+            return Self::from_commit(owner, self.origin().cloned());
+        };
+        let format = self.format();
+        let parts = litchi_odf_common::flat::Parts::split(flat)
+            .map_err(|error| core_error(error, format))?;
+        let bytes = parts
+            .merge_package(flat, owner.as_bytes())
+            .map_err(|error| core_error(error, format))?;
+        #[cfg(feature = "odg")]
+        if format == FileFormat::Odg {
+            let next = Self::from_flat(bytes, &OpenOptions::default())?;
+            return Ok(next.with_origin(self.origin().cloned()));
         }
-        Ok(())
+        let _ = bytes;
+        Err(Error::unsupported_format(Some(format)))
     }
 
     /// The bytes this handle publishes: the flat document, or the package.
@@ -453,7 +457,6 @@ impl OdfTree {
 
     /// Admit a leaf edit before a unified transaction starts.
     pub(crate) fn admit_edit(&self) -> Result<()> {
-        self.refuse_flat()?;
         self.check_source()
     }
 
@@ -512,7 +515,6 @@ impl OdfTree {
         props: impl crate::IntoProps<'v>,
         limits: &crate::transaction::SemanticLimits,
     ) -> Result<write::Commit> {
-        self.refuse_flat()?;
         write::set(self, target, props, limits).map_err(|error| self.tag(error))
     }
 
@@ -532,7 +534,6 @@ impl OdfTree {
         node: crate::NewNode<'n>,
         limits: &crate::transaction::SemanticLimits,
     ) -> Result<(write::Commit, crate::path::Path<'static>)> {
-        self.refuse_flat()?;
         write::add(self, parent, node, limits).map_err(|error| self.tag(error))
     }
 
@@ -547,7 +548,6 @@ impl OdfTree {
         target: crate::TargetArg<'p>,
         limits: &crate::transaction::SemanticLimits,
     ) -> Result<write::Commit> {
-        self.refuse_flat()?;
         write::remove(self, target, limits).map_err(|error| self.tag(error))
     }
 
@@ -571,7 +571,6 @@ impl OdfTree {
         placement: crate::Placement<'q>,
         limits: &crate::transaction::SemanticLimits,
     ) -> Result<write::Commit> {
-        self.refuse_flat()?;
         write::move_to(self, path, placement, limits).map_err(|error| self.tag(error))
     }
 
@@ -591,7 +590,6 @@ impl OdfTree {
         right: crate::path::PathArg<'q>,
         limits: &crate::transaction::SemanticLimits,
     ) -> Result<write::Commit> {
-        self.refuse_flat()?;
         write::swap(self, left, right, limits).map_err(|error| self.tag(error))
     }
 

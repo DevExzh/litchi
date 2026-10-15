@@ -1,11 +1,12 @@
 //! Flat (single-XML) OpenDocument through the unified layer (record 0292):
 //! `.fodt` and `.fodg` open and read through their families' adapters over
-//! the leaves' packaged read projections, and publish their flat bytes
-//! unchanged.
+//! the leaves' packaged projections; every flat family publishes its flat
+//! bytes unchanged, and an edit of the projection republishes into the flat
+//! document element by element, keeping every other byte.
 
-#![cfg(any(feature = "odt", feature = "odg"))]
+#![cfg(any(feature = "odt", feature = "odg", feature = "ods", feature = "odp"))]
 #![cfg_attr(
-    not(all(feature = "odt", feature = "odg")),
+    not(all(feature = "odt", feature = "odg", feature = "ods", feature = "odp")),
     allow(dead_code, unused_imports)
 )]
 
@@ -21,6 +22,27 @@ fn fixture(path: &str) -> std::path::PathBuf {
 
 fn bytes(path: &str) -> Vec<u8> {
     std::fs::read(fixture(path)).expect("read fixture")
+}
+
+/// The bytes outside one changed window are unchanged: the common prefix
+/// and suffix of `before` and `after` cover all but `changed` source bytes.
+fn assert_local(before: &[u8], after: &[u8], changed: usize) {
+    let prefix = before
+        .iter()
+        .zip(after)
+        .take_while(|(left, right)| left == right)
+        .count();
+    let suffix = before
+        .iter()
+        .rev()
+        .zip(after.iter().rev())
+        .take_while(|(left, right)| left == right)
+        .count();
+    assert!(
+        prefix + suffix + changed >= before.len(),
+        "the edit rewrote more than {changed} bytes (prefix {prefix}, suffix {suffix}, length {})",
+        before.len()
+    );
 }
 
 fn text(file: &File, path: &str) -> Option<String> {
@@ -52,6 +74,56 @@ mod odt {
         assert_eq!(file.to_bytes().unwrap(), source);
         let reopened = open(fixture(NESTED)).expect("open path");
         assert_eq!(reopened.to_bytes().unwrap(), source);
+    }
+
+    #[test]
+    fn writes_paragraph_text_into_the_flat_bytes() {
+        const TITLED: &str = "odf/odt/title-field-invalidate.fodt";
+        let source = bytes(TITLED);
+        let file = open_bytes(source.clone()).expect("open");
+        let path = file
+            .query("p")
+            .unwrap()
+            .map(Result::unwrap)
+            .find(|node| node.view().text().unwrap().as_deref() == Some("body text"))
+            .expect("the body paragraph")
+            .path()
+            .to_string();
+        let edited = file
+            .set(path.as_str(), props! { "text" => "new body" })
+            .expect("flat paragraph text");
+        let published = edited.to_bytes().unwrap();
+        assert_local(&source, &published, "body text".len());
+        let reopened = open_bytes(published.clone()).expect("reopen");
+        assert_eq!(text(&reopened, &path).as_deref(), Some("new body"));
+        assert_eq!(
+            String::from_utf8(published).unwrap(),
+            String::from_utf8(source)
+                .unwrap()
+                .replace(">body text<", ">new body<")
+        );
+        // A transaction of two sets, and metadata, publish flat too.
+        let committed = reopened
+            .edit(|tx| {
+                tx.set(path.as_str(), props! { "text" => "one" })?;
+                tx.set("/metadata", props! { "title" => "Flat" })?;
+                Ok(())
+            })
+            .expect("flat transaction");
+        let reopened = open_bytes(committed.file.to_bytes().unwrap()).expect("reopen");
+        assert_eq!(text(&reopened, &path).as_deref(), Some("one"));
+        assert_eq!(
+            reopened
+                .metadata()
+                .unwrap()
+                .and_then(|metadata| metadata.title),
+            Some("Flat".to_owned())
+        );
+        assert!(
+            String::from_utf8(committed.file.to_bytes().unwrap())
+                .unwrap()
+                .starts_with("<?xml")
+        );
     }
 
     #[test]
@@ -95,18 +167,86 @@ mod odg {
         assert!(file.query("page").unwrap().count() >= 1);
         assert!(file.query("shape").unwrap().count() >= 1);
         assert_eq!(file.to_bytes().unwrap(), source);
-        let error = file
+        let edited = file
             .set("/page[1]", props! { "name" => "Renamed" })
-            .expect_err("flat drawings are read-only");
-        assert_eq!(error.code(), Code::UnsupportedCapability);
+            .expect("flat page rename");
+        let published = edited.to_bytes().unwrap();
+        assert_local(&source, &published, 64);
+        let reopened = open_bytes(published).expect("reopen");
+        assert_eq!(
+            reopened
+                .get("/page[1]")
+                .unwrap()
+                .view()
+                .format()
+                .unwrap()
+                .into_iter()
+                .find(|prop| prop.key() == "name")
+                .map(|prop| prop.to_string())
+                .as_deref(),
+            Some("Renamed")
+        );
         let report = file.capabilities();
-        assert!(report.verb(Verb::Get).is_supported());
-        assert!(!report.verb(Verb::Set).is_supported());
+        assert!(report.verb(Verb::Set).is_supported());
     }
 
     #[test]
     fn a_drawing_without_a_body_is_a_typed_refusal() {
         let error = open_bytes(bytes("odf/drawing/hatch-angles.fodg")).expect_err("no body");
         assert_ne!(error.code(), Code::InternalError);
+    }
+}
+
+#[cfg(feature = "ods")]
+mod ods {
+    use super::*;
+
+    const GRID: &str = "odf/ods/grid-padding.fods";
+
+    #[test]
+    fn writes_cell_values_into_the_flat_bytes() {
+        let source = bytes(GRID);
+        let file = open_bytes(source.clone()).expect("open .fods");
+        let edited = file
+            .set("/Padded/A1", props! { "value" => "changed" })
+            .expect("flat cell value");
+        let published = edited.to_bytes().unwrap();
+        let reopened = open_bytes(published.clone()).expect("reopen");
+        assert_eq!(text(&reopened, "/Padded/A1").as_deref(), Some("changed"));
+        // Only the edited row changed.
+        assert_local(&source, &published, 2_048);
+        assert!(published.len() < source.len() + 2_048);
+    }
+}
+
+#[cfg(feature = "odp")]
+mod odp {
+    use super::*;
+
+    const MATH: &str = "libreoffice-core/sd/qa/unit/data/odp/Math.fodp";
+
+    #[test]
+    fn writes_slide_names_into_the_flat_bytes() {
+        let source = bytes(MATH);
+        let file = open_bytes(source.clone()).expect("open .fodp");
+        let edited = file
+            .set("/slide[1]", props! { "name" => "Renamed" })
+            .expect("flat slide name");
+        let published = edited.to_bytes().unwrap();
+        assert_local(&source, &published, 16);
+        let reopened = open_bytes(published).expect("reopen");
+        assert_eq!(
+            reopened
+                .get("/slide[1]")
+                .unwrap()
+                .view()
+                .format()
+                .unwrap()
+                .into_iter()
+                .find(|prop| prop.key() == "name")
+                .map(|prop| prop.to_string())
+                .as_deref(),
+            Some("Renamed")
+        );
     }
 }

@@ -178,6 +178,15 @@ impl Odt {
         }
         let flat = litchi_odt::flat::Document::from_bytes_with_limits(bytes, limits)
             .map_err(core_error)?;
+        Self::from_flat_document(flat, None)
+    }
+
+    /// Adopts a flat document (an open or a committed flat edit): its
+    /// packaged projection serves reads, its bytes publication.
+    pub(crate) fn from_flat_document(
+        flat: litchi_odt::flat::Document,
+        origin: Option<Arc<Path>>,
+    ) -> Result<Self> {
         let package = flat.to_package().map_err(odf_error)?;
         let document = package.document().map_err(core_error)?;
         Ok(Self(Arc::new(OdtState {
@@ -186,9 +195,22 @@ impl Odt {
             package: OnceLock::from(package),
             tree: OnceLock::new(),
             kinds: OnceLock::new(),
-            origin: None,
+            origin,
             flat: Some(flat),
         })))
+    }
+
+    /// The handle over a committed package: a packaged document adopts it;
+    /// a flat document republishes the edit into its flat bytes (record
+    /// 0292).
+    pub(crate) fn adopt(&self, package: litchi_odt::Package) -> Result<Self> {
+        match self.flat() {
+            Some(flat) => {
+                let republished = flat.republish(&package).map_err(odf_error)?;
+                Self::from_flat_document(republished, self.origin().cloned())
+            },
+            None => Self::from_package(package, self.origin().cloned(), self.format()),
+        }
     }
 
     /// The flat document this handle reads, when it reads one.
@@ -406,11 +428,6 @@ impl Odt {
 
     /// The immutable leaf package edits start from.
     pub(crate) fn package(&self) -> Result<&litchi_odt::Package> {
-        // A flat document's package is a read projection: package edits
-        // and publication never start from it.
-        if self.is_flat() {
-            return Err(write::flat_refusal());
-        }
         if let Some(package) = self.0.package.get() {
             return Ok(package);
         }
@@ -492,9 +509,6 @@ impl Odt {
     /// Admit a leaf edit before a unified transaction starts: the source is
     /// current and the package is available.
     pub(crate) fn admit_edit(&self) -> Result<()> {
-        if self.is_flat() {
-            return Err(write::flat_refusal());
-        }
         self.check_source()?;
         self.package().map(drop)
     }

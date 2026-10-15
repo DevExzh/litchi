@@ -2058,12 +2058,12 @@
     },
     {
       "subject": "operation",
-      "verb": "set",
+      "verb": "add",
       "element": "document",
       "context": "flat-odf-input",
       "code": "unsupported_capability",
-      "followUp": "0292 flat ODT writes",
-      "reason": "single-XML .fodt input reads through the leaf's packaged projection of its parts and republishes its flat bytes; writes are refused"
+      "followUp": "0292 flat ODF package members",
+      "reason": "a single-XML .fodt is edited through the leaf's packaged projection and republished element by element; an edit that adds a package member (a picture, an embedded object) or changes a part's root has no flat form and is refused"
     },
     {
       "subject": "operation",

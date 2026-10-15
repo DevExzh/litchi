@@ -93,7 +93,7 @@ pub(crate) fn finish(
         limits.max_snapshot_bytes(),
     )?;
     let after = if changed {
-        Odt::from_package(package, file.origin().cloned(), file.format())?
+        file.adopt(package)?
     } else {
         file.clone()
     };
@@ -454,16 +454,6 @@ fn resolve_targets<'f>(
     Ok(nodes)
 }
 
-/// The refusal of a package edit on a flat single-XML text document.
-pub(crate) fn flat_refusal() -> Error {
-    refusal(
-        Code::UnsupportedCapability,
-        "flat ODT (.fodt) opens read-only through the unified layer",
-    )
-    .with_format(FileFormat::Odt)
-    .with_suggestion("follow-up: 0292 flat ODT writes; save a packaged .odt to edit")
-}
-
 /// Set properties on every target through one leaf edit.
 pub(crate) fn set_with_limits<'p, 'v>(
     file: &Odt,
@@ -570,7 +560,7 @@ fn set_metadata(file: &Odt, props: &Props<'_>, limits: &SemanticLimits) -> Resul
         limits.max_snapshot_bytes(),
     )?;
     let after = if changed {
-        Odt::from_package(package, file.origin().cloned(), file.format())?
+        file.adopt(package)?
     } else {
         file.clone()
     };

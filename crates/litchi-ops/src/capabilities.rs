@@ -505,33 +505,6 @@ const PPTX_SHAPE_ADD: Refusal = Refusal {
     reason: "this PPTX owner cannot add a slide or top-level text-box shape",
 };
 
-/// The refusal of edits on a flat (single-XML) OpenDocument text document
-/// (record 0292).
-#[cfg(feature = "odt")]
-const ODT_FLAT: Refusal = Refusal {
-    code: Code::UnsupportedCapability,
-    follow_up: "0292 flat ODT writes; save a packaged .odt to edit",
-    reason: "flat OpenDocument text documents (.fodt) are read-only in the unified API",
-};
-
-/// The refusal of edits on a flat (single-XML) OpenDocument drawing
-/// (record 0292).
-#[cfg(feature = "odg")]
-const ODG_FLAT: Refusal = Refusal {
-    code: Code::UnsupportedCapability,
-    follow_up: "0292 flat ODG writes; save a packaged .odg to edit",
-    reason: "flat OpenDocument drawings (.fodg) are read-only in the unified API",
-};
-
-/// The refusal of edits on a flat (single-XML) OpenDocument presentation,
-/// which the unified API reads but does not edit.
-#[cfg(feature = "odp")]
-const ODP_FLAT: Refusal = Refusal {
-    code: Code::UnsupportedCapability,
-    follow_up: "M6 flat ODF writes; convert to a packaged .odp to edit",
-    reason: "flat OpenDocument presentations (.fodp) are read-only in the unified API",
-};
-
 /// The refusal of a locked OOXML package whose format its name does not
 /// tell.
 const UNKNOWN: Refusal = Refusal {
@@ -939,9 +912,6 @@ impl Capabilities {
                     | Verb::Batch
             ) && self.adapter() == Some(Adapter::Odt)
             {
-                if self.retains_source == Some(false) {
-                    return ODT_FLAT.support();
-                }
                 return Support::Supported;
             }
             #[cfg(feature = "odp")]
@@ -956,11 +926,6 @@ impl Capabilities {
                     | Verb::Batch
             ) && self.adapter() == Some(Adapter::Odp)
             {
-                // A flat (single-XML) document reports that it retained no
-                // editable package.
-                if self.retains_source == Some(false) {
-                    return ODP_FLAT.support();
-                }
                 return Support::Supported;
             }
             #[cfg(feature = "odf-objects")]
@@ -971,10 +936,6 @@ impl Capabilities {
                 .and_then(crate::format::odf_tree::writes)
                 .is_some()
             {
-                #[cfg(feature = "odg")]
-                if self.retains_source == Some(false) {
-                    return ODG_FLAT.support();
-                }
                 return Support::Supported;
             }
             return EDITS.support();
@@ -1285,12 +1246,6 @@ fn retains_source(file: &File) -> Option<bool> {
         File::Xls(handle) => Some(handle.retains_source()),
         #[cfg(feature = "ppt")]
         File::Ppt(handle) => Some(handle.retains_source()),
-        #[cfg(feature = "odp")]
-        File::Odp(handle) if handle.is_flat() => Some(false),
-        #[cfg(feature = "odt")]
-        File::Odt(handle) if handle.is_flat() => Some(false),
-        #[cfg(feature = "odg")]
-        File::Odg(handle) if handle.is_flat() => Some(false),
         File::Signed(signed) => retains_source(signed.file()),
         _ => None,
     }
@@ -2852,7 +2807,6 @@ impl Element {
         let settable = settable
             || (crate::format::odf_tree::writes(self.adapter)
                 .is_some_and(|writes| writes.settable.contains(&self.data().canonical))
-                && self.retains_source != Some(false)
                 && readable);
         let structural = {
             #[cfg(feature = "docx")]
@@ -2945,7 +2899,6 @@ impl Element {
         let add = add
             || (crate::format::odf_tree::writes(self.adapter)
                 .is_some_and(|writes| writes.addable.contains(&self.data().canonical))
-                && self.retains_source != Some(false)
                 && readable);
         #[cfg(feature = "pptx")]
         let remove = structural
@@ -3025,7 +2978,6 @@ impl Element {
         let remove = remove
             || (crate::format::odf_tree::writes(self.adapter)
                 .is_some_and(|writes| writes.removable.contains(&self.data().canonical))
-                && self.retains_source != Some(false)
                 && readable);
         Operations {
             add,

@@ -36,11 +36,11 @@ differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/registry/odf.json` | `cabb51b0613549d02fc2406fa65ad81effaa77ab6d6a9efb35aec3f543672fa7` |
 | golden | `crates/litchi-ops/tests/golden/registry/odg.json` | `a6d4a2ac265c877e800a7be446d609d1b861f68984287766f89da53a207770cb` |
 | golden | `crates/litchi-ops/tests/golden/registry/odi.json` | `e0811c798a96bf746d25dd019c455d03b0567d87403e4e86b0651eea1f6258b6` |
-| golden | `crates/litchi-ops/tests/golden/registry/odm.json` | `1997446931560ab63a100d9c909ff61fef33cf0e20ac064a7ee09fa53ad808be` |
+| golden | `crates/litchi-ops/tests/golden/registry/odm.json` | `050fbc8caa9b47b9386f15121f679db258d333143fa02d03fbd239d1471ed85b` |
 | golden | `crates/litchi-ops/tests/golden/registry/odp.json` | `ebd7d17a818097117b0343558b54d6d853ccc2850415499d3e76204c337a6124` |
-| golden | `crates/litchi-ops/tests/golden/registry/ods.json` | `fb65bbebcd964b898a5fc2b4863dfa189ef8c53dfbab59e8552c929b190c72e0` |
-| golden | `crates/litchi-ops/tests/golden/registry/odt.json` | `39a3d16e84fcff07cf459fb232e37657c3da40d68b47574f2d8311c7ed059a5d` |
-| golden | `crates/litchi-ops/tests/golden/registry/oth.json` | `bcd40d755d06ab03c9beb5cc7de870d70bc14202a990080b5c381a23a73d3cd2` |
+| golden | `crates/litchi-ops/tests/golden/registry/ods.json` | `11c617b55cbd890049be50ab3c408c731b68aae700a62f62e161b1f1a0d02a17` |
+| golden | `crates/litchi-ops/tests/golden/registry/odt.json` | `786e46c288409010e4a4d53512ae56dae60423eec63c4c404a2ee3551473cf73` |
+| golden | `crates/litchi-ops/tests/golden/registry/oth.json` | `d2bf72f03e8ac9b8dbce6db3625e34e6ebe2be45ad62798154d39f869f2fc737` |
 | officecli | `schemas/help` (152 files, OfficeCLI commit `dced0d74`) | `0bcd8cae45fabc0c5e45ff99d1994465fb213ac1b8db3f7eadd87339fb40ced4` |
 
 ## Statuses
@@ -8014,7 +8014,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | `set` | `run` | `clear-formatting` | a null value cannot remove a character or paragraph property; set the property's off value instead | M6 ODT formatting removal |
 | `set` | `cell` | `typed-values` | cell text writes a string cell; numeric, date and formula cell values are not authored | M6 ODT typed cell values |
 | `set` | `document` | `signed-or-encrypted-package` | the leaf preserves signed and encrypted packages only as exact no-ops; changed writes are refused | ADR 0034 ODF security vocabulary (record 0268 G5) |
-| `set` | `document` | `flat-odf-input` | single-XML .fodt input reads through the leaf's packaged projection of its parts and republishes its flat bytes; writes are refused | 0292 flat ODT writes |
+| `add` | `document` | `flat-odf-input` | a single-XML .fodt is edited through the leaf's packaged projection and republished element by element; an edit that adds a package member (a picture, an embedded object) or changes a part's root has no flat form and is refused | 0292 flat ODF package members |
 | `create` | `document` | `template` | ODT template creation (.ott) is not supported | use Flavor::Document |
 
 ## odp
@@ -9607,7 +9607,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | `add` | `col` | `native-editor` | inserting or removing a column that shifts cells needs a logical column editor the leaf does not have | ODS adapter follow-up (record 0277) |
 | `set` | `row` | `layout` | row height and visibility, and column width and visibility, live in automatic styles the unified writer does not author yet | ODS adapter follow-up (record 0277) |
 | `set` | `namedrange` | `scope` | a named range's scope is fixed once added; named expressions are retargeted through `ref` and are not added | ODS adapter follow-up (record 0277) |
-| `set` | `workbook` | `flat-odf` | flat single-XML spreadsheets (.fods) open read-only; their leaf transaction admits scalar cell writes only and is not integrated | ODS adapter follow-up (record 0277) |
+| `set` | `workbook` | `flat-odf` | flat single-XML spreadsheets (.fods) are edited through the leaf's packaged projection and republished element by element (record 0292); an edit that adds a package member or changes a part's root has no flat form and is refused, as is a projection the packaged reader refuses | ODS adapter follow-up (record 0277) |
 | `batch` | `cell` | `coalescing` | consecutive direct cell value, text, clear and formula sets share one leaf edit; style, merge, range and query sets and every other verb close the run | ODS adapter follow-up (record 0277) |
 
 ## odt
@@ -10695,7 +10695,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | `set` | `run` | `clear-formatting` | a null value cannot remove a character or paragraph property; set the property's off value instead | M6 ODT formatting removal |
 | `set` | `cell` | `typed-values` | cell text writes a string cell; numeric, date and formula cell values are not authored | M6 ODT typed cell values |
 | `set` | `document` | `signed-or-encrypted-package` | the leaf preserves signed and encrypted packages only as exact no-ops; changed writes are refused | ADR 0034 ODF security vocabulary (record 0268 G5) |
-| `set` | `document` | `flat-odf-input` | single-XML .fodt input reads through the leaf's packaged projection of its parts and republishes its flat bytes; writes are refused | 0292 flat ODT writes |
+| `add` | `document` | `flat-odf-input` | a single-XML .fodt is edited through the leaf's packaged projection and republished element by element; an edit that adds a package member (a picture, an embedded object) or changes a part's root has no flat form and is refused | 0292 flat ODF package members |
 | `create` | `document` | `template` | ODT template creation (.ott) is not supported | use Flavor::Document |
 
 ## oth
@@ -10748,5 +10748,5 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | `set` | `run` | `clear-formatting` | a null value cannot remove a character or paragraph property; set the property's off value instead | M6 ODT formatting removal |
 | `set` | `cell` | `typed-values` | cell text writes a string cell; numeric, date and formula cell values are not authored | M6 ODT typed cell values |
 | `set` | `document` | `signed-or-encrypted-package` | the leaf preserves signed and encrypted packages only as exact no-ops; changed writes are refused | ADR 0034 ODF security vocabulary (record 0268 G5) |
-| `set` | `document` | `flat-odf-input` | single-XML .fodt input reads through the leaf's packaged projection of its parts and republishes its flat bytes; writes are refused | 0292 flat ODT writes |
+| `add` | `document` | `flat-odf-input` | a single-XML .fodt is edited through the leaf's packaged projection and republished element by element; an edit that adds a package member (a picture, an embedded object) or changes a part's root has no flat form and is refused | 0292 flat ODF package members |
 | `create` | `document` | `template` | ODT template creation (.ott) is not supported | use Flavor::Document |

@@ -208,9 +208,12 @@ impl Ods {
         Arc::ptr_eq(&self.0.inner, &other.0.inner)
     }
 
-    /// Whether the handle reads a flat single-XML spreadsheet.
-    pub(crate) fn is_flat(&self) -> bool {
-        matches!(self.owner(), OdsOwner::Flat(_))
+    /// The exact bytes of a flat single-XML spreadsheet.
+    pub(crate) fn flat_bytes(&self) -> Option<&[u8]> {
+        match self.owner() {
+            OdsOwner::Flat(flat) => Some(flat.as_bytes()),
+            _ => None,
+        }
     }
 
     /// Whether the owner defers package-member reads to the file, for the
@@ -403,11 +406,22 @@ impl Ods {
                 let materialized = spreadsheet.materialize().map_err(core_error)?;
                 Ok(package.get_or_init(|| materialized).clone())
             },
-            OdsOwner::Flat(_) => Err(Error::new(
-                Code::UnsupportedCapability,
-                "a flat ODS spreadsheet has no package owner",
-            )
-            .with_format(FileFormat::Ods)),
+            // A flat spreadsheet's edits start from its packaged projection
+            // and republish into the flat bytes (record 0292).
+            OdsOwner::Flat(flat) => {
+                let parts =
+                    litchi_odf_common::flat::Parts::split(flat.as_bytes()).map_err(core_error)?;
+                let bytes = parts.to_bytes().map_err(core_error)?;
+                // The flat reader admitted the document; a projection the
+                // packaged reader refuses is a gap of the edit.
+                Package::from_bytes(&bytes).map_err(|error| {
+                    odf_error(error)
+                        .caused_by_argument(Code::UnsupportedCapability)
+                        .with_suggestion(
+                            "follow-up: 0292 flat ODF projection admission; the packaged reader refuses this flat document's parts",
+                        )
+                })
+            },
         }
     }
 

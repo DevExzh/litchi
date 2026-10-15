@@ -167,7 +167,7 @@ pub(crate) fn finish(
         snapshot_bytes,
         limits.max_snapshot_bytes(),
     )?;
-    let after = OdfTree::from_commit(owner, file.origin().cloned())?;
+    let after = file.republish(owner)?;
     Ok(Commit {
         before: file.clone(),
         after,
@@ -418,7 +418,6 @@ pub(crate) fn set_groups(
     groups: &[Group<'_, '_, '_>],
     limits: &SemanticLimits,
 ) -> Result<Commit> {
-    file.admit_edit()?;
     match file.owner() {
         #[cfg(feature = "odg")]
         Owner::Odg(package) => super::odg::set(file, package, groups, limits),
