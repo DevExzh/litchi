@@ -290,3 +290,34 @@ fn edits_on_a_real_document() {
     assert_eq!(paragraphs[0].text_properties().italic(), Some(true));
     assert_eq!(paragraphs[1].text().unwrap(), "changed");
 }
+
+/// Record 0295: text fields are listed with their text and attributes, and
+/// one field's text is replaced in place, keeping its element.
+#[test]
+fn text_fields_are_listed_and_rewritten() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/odfdo/tests/samples/variable.odt");
+    let package = Package::from_bytes(&std::fs::read(path).unwrap()).unwrap();
+    let document = package.document().unwrap();
+    let body = document.body().unwrap();
+    let fields = text_fields(body).unwrap();
+    let names: Vec<&str> = fields.iter().map(TextField::name).collect();
+    assert!(names.starts_with(&["date", "time", "title"]), "{names:?}");
+    assert_eq!(fields[0].attribute("fixed").as_deref(), Some("true"));
+    assert!(fields[0].attribute("data-style-name").is_some());
+    let title = fields.iter().find(|field| field.name() == "title").unwrap();
+    assert_eq!(title.text(), "Intitulé");
+    let mut edit = package.edit();
+    edit.set_field_text(title, "A & B").unwrap();
+    assert!(
+        edit.set_field_text(title, "again").is_err(),
+        "one edit per field"
+    );
+    let next = edit.commit().unwrap().into_package();
+    let document = next.document().unwrap();
+    let body = document.body().unwrap();
+    let fields = text_fields(body).unwrap();
+    let title = fields.iter().find(|field| field.name() == "title").unwrap();
+    assert_eq!(title.text(), "A & B");
+    assert_eq!(fields.len(), names.len());
+}

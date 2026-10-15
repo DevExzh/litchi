@@ -950,6 +950,71 @@ pub(crate) fn workbook_summary(
     })
 }
 
+/// Why a field was not computed.
+#[cfg(any(feature = "docx", feature = "doc", feature = "odt", feature = "odp"))]
+pub(crate) type Skip = (Status, Option<&'static str>);
+
+/// The new displayed text of an ODF text field (record 0295): `name` is the
+/// element's local name (`date`, `title`, ...), `fixed` its `text:fixed`,
+/// `styled` whether it names a data style. Page fields are the caller's
+/// (they need layout in a text document, the slide position in a
+/// presentation).
+#[cfg(any(feature = "odt", feature = "odp"))]
+pub(crate) fn odf_field(
+    name: &str,
+    fixed: bool,
+    styled: bool,
+    metadata: &litchi_core::Metadata,
+    clock: Option<Clock>,
+) -> std::result::Result<String, Skip> {
+    if fixed {
+        return Err((Status::Locked, Some("the field is fixed (text:fixed)")));
+    }
+    let dated = |stamp: Option<litchi_core::metadata::Timestamp>, time: bool| {
+        if styled {
+            return Err((
+                Status::Unsupported,
+                Some("ODF data styles are not applied to field values"),
+            ));
+        }
+        let clock = stamp.and_then(Clock::from_timestamp).ok_or((
+            Status::Unresolved,
+            Some("the document does not store this time"),
+        ))?;
+        Ok(clock.format(if time { "HH:mm:ss" } else { "yyyy-MM-dd" }))
+    };
+    let property = |value: &Option<String>| Ok(value.clone().unwrap_or_default());
+    match name {
+        "date" | "time" => {
+            if styled {
+                return Err((
+                    Status::Unsupported,
+                    Some("ODF data styles are not applied to field values"),
+                ));
+            }
+            let clock = clock.ok_or((Status::NeedsClock, None))?;
+            Ok(clock.format(if name == "date" {
+                "yyyy-MM-dd"
+            } else {
+                "HH:mm:ss"
+            }))
+        },
+        "creation-date" => dated(metadata.created, false),
+        "creation-time" => dated(metadata.created, true),
+        "modification-date" => dated(metadata.modified, false),
+        "modification-time" => dated(metadata.modified, true),
+        "print-date" => dated(metadata.last_printed, false),
+        "print-time" => dated(metadata.last_printed, true),
+        "title" => property(&metadata.title),
+        "subject" => property(&metadata.subject),
+        "description" => property(&metadata.description),
+        "keywords" => property(&metadata.keywords),
+        "initial-creator" => property(&metadata.author),
+        "creator" => property(&metadata.last_modified_by),
+        _ => Err((Status::Unsupported, None)),
+    }
+}
+
 #[cfg(any(feature = "docx", feature = "doc"))]
 mod word {
     use std::collections::HashMap;
@@ -958,8 +1023,7 @@ mod word {
 
     use super::{Clock, Instruction, Status, apply_case, format_number};
 
-    /// Why a field was not computed.
-    pub(crate) type Skip = (Status, Option<&'static str>);
+    use super::Skip;
 
     /// The new result of a Word field that is not a table of contents (DOCX,
     /// and DOC since record 0295): `bookmark` reads a bookmark's text for
@@ -1144,6 +1208,7 @@ mod word {
 #[cfg(any(feature = "docx", feature = "doc"))]
 #[cfg(all(test, feature = "docx"))]
 pub(crate) use word::sequence;
+#[cfg(any(feature = "docx", feature = "doc"))]
 pub(crate) use word::word_field;
 
 #[cfg(test)]

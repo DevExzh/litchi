@@ -2264,5 +2264,6 @@ string.
 | `litchi_xlsx::{RichText, RichRun}` (`RichText::{plain, runs, text, set_run_text}`, `RichRun::{text, is_formatted}`) | adopted (0295) |
 | `litchi_xlsx::Worksheet::rich_text` | adopted (0295) |
 | `litchi_xlsx::WorksheetEdit::set_rich_text` | adopted (0295) |
+| `litchi_odt::body::{TextField, text_fields}` (`TextField::{name, range, attribute, text}`), `litchi_odt::transaction::Edit::set_field_text` | adopted (0295): ODT field refresh |
 
 See [0295](unified-ops/0295-m4-engines-on-more-formats.md).

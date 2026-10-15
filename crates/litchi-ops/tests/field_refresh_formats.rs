@@ -113,3 +113,63 @@ mod doc {
         assert_eq!(restored.to_bytes().unwrap(), file.to_bytes().unwrap());
     }
 }
+
+#[cfg(feature = "odt")]
+mod odt {
+    use litchi_ops::props;
+
+    use super::*;
+
+    /// odfdo's `variable.odt`: fixed date and time fields, a title field,
+    /// and page fields.
+    fn fixture() -> File {
+        open_bytes(
+            std::fs::read(
+                std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                    .join("../../test-data/odfdo/tests/samples/variable.odt"),
+            )
+            .unwrap(),
+        )
+        .unwrap()
+    }
+
+    fn statuses(summary: &litchi_ops::refresh::Summary) -> Vec<(String, Status)> {
+        summary
+            .fields()
+            .iter()
+            .map(|field| (field.kind().to_owned(), field.status()))
+            .collect()
+    }
+
+    #[test]
+    fn metadata_fields_follow_the_document_and_page_fields_need_layout() {
+        let file = fixture();
+        // The stored title is current: nothing to write.
+        let report = file.refresh(&clock()).unwrap();
+        assert!(report.patch.is_noop());
+        let expected = [
+            ("DATE".to_owned(), Status::Locked),
+            ("TIME".to_owned(), Status::Locked),
+            ("TITLE".to_owned(), Status::Unchanged),
+            ("PAGE-NUMBER".to_owned(), Status::NeedsLayout),
+            ("PAGE-COUNT".to_owned(), Status::NeedsLayout),
+        ];
+        let found = statuses(&report.value);
+        for entry in &expected {
+            assert!(found.contains(entry), "{entry:?} in {found:?}");
+        }
+        // A new title is written into the title field, once.
+        let retitled = file
+            .set("/metadata", props! { "title" => "Rapport" })
+            .unwrap();
+        let commit = retitled.refresh(&clock()).unwrap();
+        assert_eq!(commit.value.refreshed(), 1);
+        let after = open_bytes(commit.file.to_bytes().unwrap()).unwrap();
+        let text = after.view(litchi_ops::view::Mode::Text).unwrap();
+        assert!(text.contains("Rapport"), "{text}");
+        assert!(!text.contains("Intitulé"), "{text}");
+        assert!(after.refresh(&clock()).unwrap().patch.is_noop());
+        let restored = commit.patch.inverse().apply(&commit.file).unwrap();
+        assert_eq!(restored.to_bytes().unwrap(), retitled.to_bytes().unwrap());
+    }
+}

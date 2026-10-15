@@ -33,6 +33,7 @@
 //! ```
 
 mod edit;
+mod fields;
 mod index;
 mod properties;
 mod text;
@@ -45,6 +46,7 @@ use litchi_core::Result;
 
 pub(crate) use edit::{BodyEdits, apply as apply_body_edits};
 pub use edit::{Location, NewNode, Placement, admits};
+pub use fields::{TextField, text_fields};
 pub use properties::{
     CellProperties, ParagraphProperties, ParagraphPropertyEdit, TextProperties, TextPropertyEdit,
 };

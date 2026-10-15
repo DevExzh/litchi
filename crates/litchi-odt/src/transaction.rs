@@ -1554,6 +1554,23 @@ impl Edit {
         self.stage_body(|edits, body| edits.set_text(body, node, text))
     }
 
+    /// Stages replacing the displayed text of one body text field
+    /// ([`crate::body::text_fields`]), keeping its element and attributes:
+    /// a field refresh (record 0295).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a field of another body, text XML cannot carry,
+    /// or an edit overlapping another staged body edit.
+    pub fn set_field_text(
+        &mut self,
+        field: &crate::body::TextField<'_>,
+        text: &str,
+    ) -> Result<&mut Self> {
+        let range = field.range();
+        self.stage_body(|edits, body| edits.set_field_text(body, range, text))
+    }
+
     /// Stages setting (`Some`) or removing (`None`) one typed attribute of
     /// a body node.
     ///

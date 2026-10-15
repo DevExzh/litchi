@@ -46,6 +46,7 @@ use crate::value::{Base, Color, Length, Scalar, ValueType};
 
 pub(crate) mod coalesce;
 pub(crate) mod find;
+pub(crate) mod refresh;
 
 /// The leaf proof and immutable endpoints of one ODT write.
 pub(crate) struct Commit {
