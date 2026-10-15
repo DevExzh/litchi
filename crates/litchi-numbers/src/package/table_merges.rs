@@ -1325,7 +1325,7 @@ fn map_package_error(error: PackageError) -> Error {
                 SemanticLimitKind::Objects => LimitKind::PayloadObjects,
                 SemanticLimitKind::References => LimitKind::PayloadReferences,
                 SemanticLimitKind::OutputTextBytes
-                | SemanticLimitKind::FormulaWireBytes
+                | SemanticLimitKind::FormulaCategoryBytes
                 | SemanticLimitKind::TextBytes => LimitKind::PayloadBytes,
                 SemanticLimitKind::FormulaRenderDepth | SemanticLimitKind::FormulaDepth => {
                     LimitKind::WireNesting

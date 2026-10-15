@@ -169,7 +169,7 @@ fn map_formula_envelope_wire_error(error: litchi_iwa_common::Error) -> Error {
             observed,
             limit,
         } => Error::SemanticLimit {
-            kind: SemanticLimitKind::FormulaWireBytes,
+            kind: SemanticLimitKind::FormulaCategoryBytes,
             observed,
             maximum: limit,
             path: SemanticPath::StructuredTables,
@@ -322,7 +322,7 @@ fn map_table_cell_decode_limit_with_offsets(
     use numbers_table_cell_storage_codec::DecodeLimit;
     let (kind, observed, maximum) = match limit {
         DecodeLimit::Bytes { observed, maximum } => {
-            (SemanticLimitKind::FormulaWireBytes, observed, maximum)
+            (SemanticLimitKind::FormulaCategoryBytes, observed, maximum)
         },
         DecodeLimit::References { observed, maximum } => (
             SemanticLimitKind::References,
@@ -382,7 +382,7 @@ fn map_comment_storage_codec_error(
     use comment_storage_codec::DecodeLimit;
     let (kind, observed, maximum) = match limit {
         DecodeLimit::Bytes { observed, maximum } => {
-            (SemanticLimitKind::FormulaWireBytes, observed, maximum)
+            (SemanticLimitKind::FormulaCategoryBytes, observed, maximum)
         },
         DecodeLimit::References { observed, maximum } => (
             SemanticLimitKind::References,
@@ -580,7 +580,7 @@ impl ProjectionBudget {
             self.formula_wire_bytes,
             amount,
             MAX_FORMULA_WIRE_BYTES,
-            SemanticLimitKind::FormulaWireBytes,
+            SemanticLimitKind::FormulaCategoryBytes,
         )?;
         Ok(())
     }
@@ -4008,7 +4008,7 @@ fn map_rich_text_rewrite_error(error: litchi_iwa_text_wire::RewriteError) -> Err
             } else if resource.contains("work") {
                 SemanticLimitKind::FormulaWork
             } else {
-                SemanticLimitKind::FormulaWireBytes
+                SemanticLimitKind::FormulaCategoryBytes
             },
             observed,
             maximum: limit,
@@ -4122,14 +4122,14 @@ impl FormulaReferenceBudget {
         self.charge_work(bytes)?;
         self.wire_bytes = self.wire_bytes.checked_add(bytes).ok_or_else(|| {
             formula_semantic_limit(
-                SemanticLimitKind::FormulaWireBytes,
+                SemanticLimitKind::FormulaCategoryBytes,
                 usize::MAX,
                 self.maximum_wire_bytes,
             )
         })?;
         if self.wire_bytes > self.maximum_wire_bytes {
             return Err(formula_semantic_limit(
-                SemanticLimitKind::FormulaWireBytes,
+                SemanticLimitKind::FormulaCategoryBytes,
                 self.wire_bytes,
                 self.maximum_wire_bytes,
             ));
@@ -5348,7 +5348,7 @@ fn map_formula_render_decode_error(error: numbers_formula_codec::DecodeError) ->
     use numbers_formula_codec::DecodeLimit;
     match error.resource_limit() {
         Some(DecodeLimit::Bytes { observed, maximum }) => Error::SemanticLimit {
-            kind: SemanticLimitKind::FormulaWireBytes,
+            kind: SemanticLimitKind::FormulaCategoryBytes,
             observed,
             maximum,
             path: SemanticPath::StructuredTables,
@@ -10270,7 +10270,7 @@ mod tests {
         assert!(matches!(
             error,
             Error::SemanticLimit {
-                kind: SemanticLimitKind::FormulaWireBytes,
+                kind: SemanticLimitKind::FormulaCategoryBytes,
                 observed,
                 maximum,
                 ..
@@ -10371,7 +10371,7 @@ mod tests {
         assert!(matches!(
             error,
             Error::SemanticLimit {
-                kind: SemanticLimitKind::FormulaWireBytes,
+                kind: SemanticLimitKind::FormulaCategoryBytes,
                 observed: 2,
                 maximum: 0,
                 path: SemanticPath::StructuredTables,
@@ -10972,7 +10972,7 @@ mod tests {
         assert!(matches!(
             collect_formula_category_payload(&[0x08], &mut names, &mut budget),
             Err(Error::SemanticLimit {
-                kind: SemanticLimitKind::FormulaWireBytes,
+                kind: SemanticLimitKind::FormulaCategoryBytes,
                 observed,
                 maximum: MAX_FORMULA_WIRE_BYTES,
                 path: SemanticPath::StructuredTables,

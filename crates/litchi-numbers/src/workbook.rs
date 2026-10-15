@@ -1025,7 +1025,7 @@ fn semantic_limit_kind(kind: crate::limits::SemanticLimitKind) -> ReadLimitKind 
         | crate::limits::SemanticLimitKind::FormulaDepth => ReadLimitKind::PayloadNesting,
         crate::limits::SemanticLimitKind::Objects
         | crate::limits::SemanticLimitKind::References => ReadLimitKind::PayloadFields,
-        crate::limits::SemanticLimitKind::FormulaWireBytes => ReadLimitKind::PayloadBytes,
+        crate::limits::SemanticLimitKind::FormulaCategoryBytes => ReadLimitKind::PayloadBytes,
         crate::limits::SemanticLimitKind::FormulaRenderWork
         | crate::limits::SemanticLimitKind::FormulaWork => ReadLimitKind::PayloadWork,
     }

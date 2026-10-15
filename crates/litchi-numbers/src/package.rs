@@ -1350,7 +1350,7 @@ fn preflight_root_sheet_references_with_max(
         if let Some(limit) = error.resource_limit() {
             let (kind, observed, maximum) = match limit {
                 numbers_sheet_order_codec::DecodeLimit::Bytes { observed, maximum } => {
-                    (SemanticLimitKind::FormulaWireBytes, observed, maximum)
+                    (SemanticLimitKind::FormulaCategoryBytes, observed, maximum)
                 },
                 numbers_sheet_order_codec::DecodeLimit::References { observed, maximum } => (
                     SemanticLimitKind::Sheets,
@@ -2109,7 +2109,7 @@ fn map_sheet_preflight_error(
         } => Error::SemanticLimit {
             kind: match kind {
                 names::LimitKind::PayloadReferences => SemanticLimitKind::References,
-                names::LimitKind::WireBytes => SemanticLimitKind::FormulaWireBytes,
+                names::LimitKind::WireBytes => SemanticLimitKind::FormulaCategoryBytes,
                 names::LimitKind::WireFields => SemanticLimitKind::Objects,
                 names::LimitKind::WireNesting => SemanticLimitKind::FormulaDepth,
                 names::LimitKind::WireWork => SemanticLimitKind::FormulaWork,

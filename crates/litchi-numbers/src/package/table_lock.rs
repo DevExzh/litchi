@@ -945,7 +945,7 @@ fn map_read_error(error: ReadError) -> Error {
                 super::SemanticLimitKind::Objects => LimitKind::PayloadObjects,
                 super::SemanticLimitKind::References => LimitKind::PayloadReferences,
                 super::SemanticLimitKind::OutputTextBytes
-                | super::SemanticLimitKind::FormulaWireBytes
+                | super::SemanticLimitKind::FormulaCategoryBytes
                 | super::SemanticLimitKind::TextBytes => LimitKind::PayloadBytes,
                 super::SemanticLimitKind::FormulaRenderDepth
                 | super::SemanticLimitKind::FormulaDepth => LimitKind::WireNesting,

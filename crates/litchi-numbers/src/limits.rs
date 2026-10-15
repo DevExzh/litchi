@@ -8,14 +8,15 @@
 //! read-only [`Workbook`](crate::Workbook) ingress.
 //!
 //! Both profiles are built with consuming builders whose `max_<dimension>`
-//! setters accept `1..=MAXIMUM`; a value outside that range is
-//! [`Error::InvalidLimit`](crate::Error::InvalidLimit). An exceeded ceiling
-//! at ingress is a typed limit error naming the dimension.
+//! setters accept `1..=MAXIMUM`; a value outside that range is this
+//! module's [`Error::InvalidLimit`] (ADR 0034 folds it into the owning
+//! module's error type). An exceeded ceiling at ingress is a typed limit
+//! error naming the dimension.
 //!
 //! ```
 //! use litchi_numbers::{OpenOptions, SemanticLimits, SourceLimits};
 //!
-//! # fn main() -> Result<(), litchi_numbers::Error> {
+//! # fn main() -> Result<(), litchi_numbers::limits::Error> {
 //! let source = SourceLimits::builder().max_input_bytes(64 * 1024 * 1024)?.build()?;
 //! let semantic = SemanticLimits::builder().max_sheets(16)?.build()?;
 //! let options = OpenOptions::new()
@@ -29,7 +30,25 @@
 
 use std::fmt;
 
-use crate::package::Error;
+use crate::package::Error as PackageError;
+
+/// A limit outside its valid range, from a [`SourceLimitsBuilder`] or
+/// [`SemanticLimitsBuilder`] setter or `build()`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
+#[non_exhaustive]
+pub enum Error {
+    /// A caller-selected limit is outside `1..=maximum`.
+    #[error("Numbers {kind} limit must be between 1 and {maximum}, got {value}")]
+    InvalidLimit {
+        /// The dimension being configured.
+        kind: LimitKind,
+        /// The rejected value.
+        value: u64,
+        /// The hard ceiling for this dimension.
+        maximum: u64,
+    },
+}
+
 
 /// Hard ceiling for native IWA objects indexed by one Numbers package.
 pub const MAX_OBJECTS: usize = 1_000_000;
@@ -180,7 +199,7 @@ impl SourceLimits {
     }
 
     /// The physical archive profile handed to the package catalog.
-    pub(crate) fn archive(self) -> Result<litchi_iwa_archive::Limits, Error> {
+    pub(crate) fn archive(self) -> Result<litchi_iwa_archive::Limits, PackageError> {
         let limits = litchi_iwa_archive::Limits::new(
             self.input_bytes,
             self.members,
@@ -188,15 +207,17 @@ impl SourceLimits {
             self.aggregate_bytes,
             self.component_bytes,
         )
-        .map_err(Error::Archive)?;
+        .map_err(PackageError::Archive)?;
         if self.header_fields == Self::MAXIMUM.header_fields {
             return Ok(limits);
         }
         let profile = limits
             .archive_limits()
             .with_header_fields(self.header_fields)
-            .map_err(|error| Error::Archive(litchi_iwa_archive::Error::Iwa(error)))?;
-        limits.with_archive_limits(profile).map_err(Error::Archive)
+            .map_err(|error| PackageError::Archive(litchi_iwa_archive::Error::Iwa(error)))?;
+        limits
+            .with_archive_limits(profile)
+            .map_err(PackageError::Archive)
     }
 
     /// The detector profile handed to semantic-only ingress.
@@ -378,7 +399,7 @@ pub enum SemanticLimitKind {
     FormulaRenderDepth,
     /// Fixed aggregate bytes of type-6383 category metadata scanned by formula
     /// enrichment.
-    FormulaWireBytes,
+    FormulaCategoryBytes,
     /// Fixed aggregate formula-discovery and category-preflight work.
     FormulaWork,
     /// Fixed aggregate source text admitted to formula enrichment.
@@ -398,7 +419,7 @@ impl fmt::Display for SemanticLimitKind {
             Self::OutputTextBytes => "output text bytes",
             Self::FormulaRenderWork => "formula render work",
             Self::FormulaRenderDepth => "formula render depth",
-            Self::FormulaWireBytes => "formula wire bytes",
+            Self::FormulaCategoryBytes => "formula category bytes",
             Self::FormulaWork => "formula work",
             Self::TextBytes => "text bytes",
             Self::FormulaDepth => "formula depth",
@@ -511,7 +532,7 @@ impl SemanticLimits {
             SemanticLimitKind::OutputTextBytes => self.output_text_bytes,
             SemanticLimitKind::FormulaRenderWork => self.formula_render_work,
             SemanticLimitKind::FormulaRenderDepth => self.formula_render_depth,
-            SemanticLimitKind::FormulaWireBytes
+            SemanticLimitKind::FormulaCategoryBytes
             | SemanticLimitKind::FormulaWork
             | SemanticLimitKind::TextBytes
             | SemanticLimitKind::FormulaDepth => return None,
@@ -719,9 +740,9 @@ impl OpenOptions {
 #[cfg(test)]
 mod tests {
     use super::{
-        LimitKind, OpenOptions, SemanticLimitKind, SemanticLimits, SourceLimitKind, SourceLimits,
+        Error, LimitKind, OpenOptions, SemanticLimitKind, SemanticLimits, SourceLimitKind,
+        SourceLimits,
     };
-    use crate::Error;
 
     #[test]
     fn builders_reject_zero_and_values_above_the_hard_ceiling() {

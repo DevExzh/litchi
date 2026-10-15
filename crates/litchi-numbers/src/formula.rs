@@ -15,6 +15,9 @@ use crate::{
     table::{Dimensions, cells::Error as TableCellError},
 };
 
+#[path = "formula_parse.rs"]
+mod parse;
+
 /// Maximum UTF-8 bytes retained by one expression, including function names.
 pub const MAX_OWNED_BYTES: usize = 1024 * 1024;
 /// Maximum semantic nodes retained by one expression.
@@ -70,6 +73,12 @@ pub enum Error {
     InvalidArity,
     /// A range has reversed endpoints.
     ReversedRange,
+    /// Formula text could not be parsed; `offset` is the UTF-8 byte offset
+    /// of the first unexpected input (the text itself is never retained).
+    Syntax {
+        /// Byte offset of the first unexpected input.
+        offset: usize,
+    },
 }
 
 impl fmt::Display for Error {
@@ -93,6 +102,12 @@ impl fmt::Display for Error {
             },
             Self::InvalidArity => formatter.write_str("invalid Numbers formula function arity"),
             Self::ReversedRange => formatter.write_str("Numbers formula range is reversed"),
+            Self::Syntax { offset } => {
+                write!(
+                    formatter,
+                    "Numbers formula text is malformed at byte {offset}"
+                )
+            },
         }
     }
 }

@@ -663,7 +663,7 @@ const fn map_semantic_limit_kind(kind: SemanticLimitKind) -> super::LimitKind {
     match kind {
         SemanticLimitKind::OutputTextBytes
         | SemanticLimitKind::TextBytes
-        | SemanticLimitKind::FormulaWireBytes => super::LimitKind::TextBytes,
+        | SemanticLimitKind::FormulaCategoryBytes => super::LimitKind::TextBytes,
         SemanticLimitKind::References
         | SemanticLimitKind::Objects
         | SemanticLimitKind::Sheets

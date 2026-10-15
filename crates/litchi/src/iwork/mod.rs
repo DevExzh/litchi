@@ -492,7 +492,7 @@ fn numbers_resource(kind: litchi_numbers::SemanticLimitKind) -> Resource {
         | litchi_numbers::SemanticLimitKind::TextBytes => Resource::TextBytes,
         litchi_numbers::SemanticLimitKind::FormulaRenderDepth
         | litchi_numbers::SemanticLimitKind::FormulaDepth => Resource::NestingDepth,
-        litchi_numbers::SemanticLimitKind::FormulaWireBytes => Resource::PayloadBytes,
+        litchi_numbers::SemanticLimitKind::FormulaCategoryBytes => Resource::PayloadBytes,
         litchi_numbers::SemanticLimitKind::FormulaRenderWork
         | litchi_numbers::SemanticLimitKind::FormulaWork => Resource::SemanticWork,
         _ => Resource::SemanticWork,
@@ -803,7 +803,7 @@ mod tests {
                 Resource::NestingDepth,
             ),
             (
-                litchi_numbers::SemanticLimitKind::FormulaWireBytes,
+                litchi_numbers::SemanticLimitKind::FormulaCategoryBytes,
                 Resource::PayloadBytes,
             ),
             (

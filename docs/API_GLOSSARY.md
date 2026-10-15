@@ -2259,7 +2259,10 @@ app-authored package directories, which the package owner refuses.
 
 - Limits: `litchi_numbers::limits::{SourceLimits, SourceLimitsBuilder,
   SemanticLimits, SemanticLimitsBuilder, SourceLimitKind, SemanticLimitKind,
-  LimitKind, OpenOptions}`; invalid values are `Error::InvalidLimit`. The
+  LimitKind, OpenOptions, Error}`; invalid values are the module's
+  `limits::Error::InvalidLimit` (kept off the package error so the
+  read-only projection's API does not reach the physical `package` module;
+  `tools/check_iwork_leaf_public_api.py`). The
   source default stays at the hard ceilings (2 GiB input): the focused
   transactions derive their work budgets from the physical profile.
 - Creation: `Package::new()` (one sheet, one 10 × 5 table, fixed

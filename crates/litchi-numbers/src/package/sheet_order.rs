@@ -240,9 +240,9 @@ impl Edit<'_> {
 
     /// Validate and atomically publish the staged immutable candidate.
     ///
-    /// A changed move requires exactly the three canonical root preview assets,
-    /// updates both order owners together, removes those assets (three to
-    /// zero), and preserves all unrelated retained data. An equal-position
+    /// A changed move requires the three canonical root preview assets or
+    /// none of them, updates both order owners together, removes present
+    /// assets (three to zero), and preserves all unrelated retained data. An equal-position
     /// move shares the source artifact unchanged.
     ///
     /// # Errors
@@ -287,7 +287,10 @@ impl Edit<'_> {
         preflight_transaction_work(self.source, None, &mut budget)?;
         let target = self.target.ok_or(Error::InvalidSource)?;
         let previews = root_preview_deletions(source_catalog)?;
-        if previews.len() != ROOT_PREVIEWS.len() {
+        // A package carries either the complete canonical preview set (which
+        // a changed move removes as stale) or none at all (a fresh workbook,
+        // or one an earlier transaction already stripped): record 0297.
+        if !previews.is_empty() && previews.len() != ROOT_PREVIEWS.len() {
             return Err(Error::UnsupportedSource);
         }
         let rewritten = rewrite::rewrite(
@@ -604,7 +607,7 @@ impl Package {
         let expected_target = patch.target_target.as_deref().ok_or(Error::PatchConflict)?;
         if !matches!(
             (patch.source_previews, patch.target_previews),
-            (3, 0) | (0, 3)
+            (3, 0) | (0, 3) | (0, 0)
         ) {
             return Err(Error::PatchConflict);
         }
