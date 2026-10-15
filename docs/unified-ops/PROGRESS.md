@@ -245,8 +245,6 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 ## Awaiting owner confirmation
 
 - Record 0248 decisions (provisional coordinator defaults, 2026-10-13):
-  - D1, iWork placement: (a), a facade-level `File` wraps `litchi_ops::File` plus the iWork variants, so `litchi-ops` stays iWork-free.
-  - D2: the W1 iWork renames and the leaf API requests stay with the iWork owners (`IWORK_API_REQUESTS.md`).
   - D3: tiers stay strict. Phase F (RTF/ODF/iWork) waits until tiers 1–2 reach P0 CRUD; the RTF work already landed is kept.
   - D4: earlier provisional decisions remain provisional.
   - D5: budget misses get engineering first. Explanations come only after a fix attempt.
@@ -597,6 +595,10 @@ Cut from `99cc3138eb`. It targets what Phase G (0289) found still open for the D
 - `producer-structure` (0293): structural edits on producer files — XLS rows/columns, PPTX slide remove, RTF paragraph lifecycle — and the three editor-vs-reader admission gaps.
 - `acceptance2` (0294): Python mirror of the Phase G scenarios, fixtures for the 70 unreached cells, bench matrix extended to 0285+.
 - `m4-ext` (0295): find/merge/refresh on more formats, CSV import into ODS, DOCX SmartArt (0284a), XLSX rich-text find.
+
+## Owner decisions (2026-10-15)
+- **D1 (record 0248), iWork placement: remove the iWork-free gate.** `litchi-ops` may depend on the iWork crates, so the single `File` enum gets `Pages`, `Keynote` and `Numbers` variants directly. There is no facade-level wrapper and no separate adapter crate. The provisional option (a) is withdrawn.
+- **D2 (record 0248), iWork ownership: the iWork owner agent is paused.** The coordinator's agents may now modify the iWork crates, including the ADR 0034 W1 iWork renames and the `IWORK_API_REQUESTS.md` leaf APIs.
 
 Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-pptx-w4` 9474e2b6ce, `uo/m2-l-xlsb-w1` 876588a23c, `uo/m1-r4-perf` 012fd509ff.
 

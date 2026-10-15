@@ -429,13 +429,13 @@ Phase F starts only once the tier 1 and tier 2 loops are signed off (see D3).
 
 ### Decisions that need the owner
 
-- **D1 — iWork placement.** `litchi-ops` must stay iWork-free (`non_iwork_gate`, constraint 7). The "single `File` enum for all 21 formats" therefore needs one of:
+- **D1 — iWork placement.** *Owner decision 2026-10-15: remove the iWork-free gate; `File` gains the iWork variants directly (no facade wrapper, no adapter crate).* `litchi-ops` must stay iWork-free (`non_iwork_gate`, constraint 7). The "single `File` enum for all 21 formats" therefore needs one of:
   - (a) a facade-level `File` that wraps `litchi_ops::File` plus iWork variants;
   - (b) relaxing the gate for a dedicated `litchi-ops-iwork` crate;
   - (c) a trait-free adapter in the facade.
 
   Recommended: (a).
-- **D2 — W1 iWork renames and the API requests.** These need scheduling with the iWork owners. Without leaf `Package::new` and lifecycle APIs, iWork can meet "write" only at element granularity.
+- **D2 — W1 iWork renames and the API requests.** *Owner decision 2026-10-15: the iWork owner agent is paused; coordinator agents may modify the iWork crates.* These need scheduling with the iWork owners. Without leaf `Package::new` and lifecycle APIs, iWork can meet "write" only at element granularity.
 - **D3 — Tier gating.** RTF tier 3 work (0222–0247) ran while DOC still had paragraph-text writes only. Confirm whether the tier 1/2 "working read+write loop" is met now (all 7 have set/save/create), so that Phase F may proceed in parallel, or whether it should wait for P0.
 - **D4 — Outstanding provisional decisions** (PROGRESS.md:244-268):
   - M0a S10 F1/F2;
