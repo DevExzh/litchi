@@ -1,0 +1,1159 @@
+{
+  "schema_version": 1,
+  "fixture_id": "excel-connections-010",
+  "generated_on": "2026-10-15",
+  "purpose": "Read-only evidence for a native Microsoft Excel workbook with one Power Query Text/CSV load and one legacy Text import, saved natively as XLSX, XLSB, and legacy XLS.",
+  "provenance": {
+    "producer_app": "Microsoft Office Excel",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "package_application": "Microsoft Macintosh Excel",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft Excel UI",
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "native_save_chain": [
+      "xlsx",
+      "xlsb",
+      "xls"
+    ],
+    "native_reopen": {
+      "all_variants_directly_reopened": true,
+      "link_or_refresh_prompt": "No explicit refresh was performed after the initial loads; all variants were reopened without repair and closed without refreshing.",
+      "xlsx": "The native XLSX was reopened before conversion and its query results remained present.",
+      "xlsb": "The XLSB was reopened from disk after recovery; the two connection entries and three loaded rows remained present.",
+      "xls": "The XLSX was saved as legacy XLS after accepting the generic compatibility warning; the XLS was reopened and its two connection entries and three imported rows remained present."
+    },
+    "all_documents_closed_before_hashing": true,
+    "lock_files_present_at_inspection": false
+  },
+  "corpus_locks": {
+    "source_csv": {
+      "path": "test-data/microsoft-office/assets/native-query-010.csv",
+      "bytes": 66,
+      "sha256": "fa8a8effa0eb4a04dd5fb4e2f88ac45f15f942fe0f24850862e0b192296c8ecb",
+      "encoding": "UTF-8",
+      "line_endings": "LF",
+      "role": "Source for both the Power Query Text/CSV load and the legacy Text import"
+    },
+    "fixture_files": {
+      "xlsx": {
+        "path": "test-data/microsoft-office/excel/excel-connections.xlsx",
+        "format": "xlsx",
+        "bytes": 18558,
+        "sha256": "c956cdc60d4149327d7d3f0c5c1952fcbeec3ae978c668c9d1bc5a6a19e258b8",
+        "container": "OPC ZIP",
+        "zip_entries": 21,
+        "zip_testzip": null
+      },
+      "xlsb": {
+        "path": "test-data/microsoft-office/excel/excel-connections.xlsb",
+        "format": "xlsb",
+        "bytes": 16589,
+        "sha256": "f24be09b3f7c7e0091a28c5b4b2f5457658cc3aba2ea67a4ec41b10c6d929e2d",
+        "container": "OPC ZIP",
+        "zip_entries": 23,
+        "zip_testzip": null
+      },
+      "xls": {
+        "path": "test-data/microsoft-office/excel/excel-connections.xls",
+        "format": "xls",
+        "bytes": 34304,
+        "sha256": "5b273db0f35f6ba4f3de8bc63c40535bd14ac14ceb0677dc3ea0a6df3958cbb4",
+        "container": "OLE2 CFB",
+        "cfb_signature": "D0 CF 11 E0 A1 B1 1A E1"
+      }
+    },
+    "audit_scope": {
+      "fixture_bytes_modified_by_audit": false,
+      "metadata_only_change": true,
+      "temporary_probe_harnesses": [
+        "/tmp/litchi_conn_probe",
+        "/tmp/litchi_xls_probe",
+        "/tmp/litchi_xls_raw_probe"
+      ],
+      "temporary_harnesses_outside_checkout": true,
+      "ui_probe_limit": "Developer and Tools menus were inspected only for this fixture; those narrow probes do not establish a global absence of VBA, form controls, XML Maps, Power Pivot, or other Excel features."
+    }
+  },
+  "expected_native_content": {
+    "source_csv_rows": [
+      [
+        "ID",
+        "Category",
+        "Amount"
+      ],
+      [
+        "1",
+        "ALPHA_010",
+        "12.5"
+      ],
+      [
+        "2",
+        "BETA_010",
+        "20"
+      ],
+      [
+        "3",
+        "ALPHA_010",
+        "7.5"
+      ]
+    ],
+    "power_query_sheet": {
+      "name": "native-query-010",
+      "dimension": "A1:C4",
+      "load_method": "Get Data > Power Query > Text/CSV; UTF-8, comma delimiter, automatic type detection, Load",
+      "table": {
+        "name": "native_query_010",
+        "display_name": "native_query_010",
+        "ref": "A1:C4",
+        "table_type": "queryTable",
+        "style": "TableStyleMedium7",
+        "show_row_stripes": true,
+        "columns": [
+          "ID",
+          "Category",
+          "Amount"
+        ]
+      },
+      "rows": [
+        [
+          1,
+          "ALPHA_010",
+          12.5
+        ],
+        [
+          2,
+          "BETA_010",
+          20
+        ],
+        [
+          3,
+          "ALPHA_010",
+          7.5
+        ]
+      ],
+      "query_list_entry": {
+        "name": "Query - native-query-010",
+        "description": "Connection to the native-query-010 query in the workbook."
+      }
+    },
+    "worksheet": {
+      "name": "Sheet1",
+      "dimension": "A1:C11",
+      "markers": {
+        "A1": "EXCEL_CONNECTIONS_010",
+        "B1": "Fixture ID: excel-connections-010",
+        "A2": "SOURCE_CSV_010",
+        "B2": "native-query-010.csv",
+        "A3": "SOURCE_TOTAL_010",
+        "B3": 40,
+        "A4": "QUERY_ROWS_010",
+        "B4": 3
+      },
+      "legacy_import": {
+        "range": "A8:C11",
+        "rows": [
+          [
+            "ID",
+            "Category",
+            "Amount"
+          ],
+          [
+            1,
+            "ALPHA_010",
+            12.5
+          ],
+          [
+            2,
+            "BETA_010",
+            20
+          ],
+          [
+            3,
+            "ALPHA_010",
+            7.5
+          ]
+        ],
+        "method": "Get Data > From Text (legacy import), existing worksheet destination $A$8",
+        "text_import_properties": {
+          "connection_name": "LEGACY_CSV_010",
+          "encoding_as_shown_in_ui": "Macintosh",
+          "delimiter_mode": "Delimited",
+          "tab": false,
+          "comma": true,
+          "column_type": "General",
+          "save_query_definition": true,
+          "refresh_data_when_opening": false,
+          "prompt_for_file_name_on_refresh": true,
+          "adjust_column_width": true,
+          "insert_cells_new": true,
+          "delete_unused": true,
+          "other_properties": "left at native defaults"
+        }
+      }
+    },
+    "connections_and_query_tables": {
+      "connection_names_in_native_query_manager": [
+        "Query - native-query-010",
+        "native-query-010"
+      ],
+      "power_query_connection": {
+        "name": "Query - native-query-010",
+        "type": 5,
+        "keep_alive": true,
+        "description": "Connection to the 'native-query-010' query in the workbook.",
+        "provider": "Microsoft.Mashup.OleDb.1",
+        "location": "native-query-010",
+        "command": "SELECT * FROM [native-query-010]"
+      },
+      "legacy_connection": {
+        "name": "native-query-010",
+        "type": 6,
+        "source_file": "test-data/microsoft-office/assets/native-query-010.csv",
+        "source_file_stored_in_package_as": "/Users/ryker/CodeProjects/litchi/test-data/microsoft-office/assets/native-query-010.csv",
+        "code_page_in_xlsx": 10000,
+        "tab": false,
+        "comma": true,
+        "field_count": 3
+      },
+      "query_tables": [
+        {
+          "part": "xl/queryTables/queryTable1.xml",
+          "name": "ExternalData_1",
+          "connection_id": 2,
+          "sheet_or_table_owner": "native-query-010 table relationship"
+        },
+        {
+          "part": "xl/queryTables/queryTable2.xml",
+          "name": "LEGACY_CSV_010",
+          "connection_id": 1,
+          "sheet_or_table_owner": "Sheet1 worksheet relationship"
+        }
+      ]
+    }
+  },
+  "package_evidence": {
+    "xlsx": {
+      "relevant_parts": {
+        "xl/workbook.xml": {
+          "bytes": 2564,
+          "sha256": "8fc2624181a0b9806774316642152f52ea0d9ebb1d06bd23608892d5bd7d92a9"
+        },
+        "xl/_rels/workbook.xml.rels": {
+          "bytes": 1118,
+          "sha256": "6174e193c86b4472f701a9996aa4f2ded51647441d41f1269d1b8e68e71a329b"
+        },
+        "xl/worksheets/sheet1.xml": {
+          "bytes": 1747,
+          "sha256": "bf7998e2c4458b57487545add75cb302095dc0e53ba4d2df4722a848320015b6"
+        },
+        "xl/worksheets/sheet2.xml": {
+          "bytes": 2148,
+          "sha256": "00d5abbf3712c9d66e3afd45eda2131319cd6583b83bcbff0fccdf7ea822ca1a"
+        },
+        "xl/worksheets/_rels/sheet1.xml.rels": {
+          "bytes": 293,
+          "sha256": "ac2075ad5ad18eaee04da95ec4b12db9c771cc7cef61bcf1376be2026715d327"
+        },
+        "xl/worksheets/_rels/sheet2.xml.rels": {
+          "bytes": 308,
+          "sha256": "6ab94e90383770ffcf059143b87a2e861f68774e348539971d08abccfb0b896c"
+        },
+        "xl/connections.xml": {
+          "bytes": 1147,
+          "sha256": "5d026224b0b0ced706c7be30f424db80925a88bca80d62d42cd26b2f99c8a846"
+        },
+        "xl/tables/table1.xml": {
+          "bytes": 1156,
+          "sha256": "81f50ba6e6e50ff179c0a5c87b86b3c680bbcedf6a0057ac31c02e9995368835"
+        },
+        "xl/tables/_rels/table1.xml.rels": {
+          "bytes": 308,
+          "sha256": "765d562639d7f0520e3d17229f067ed341e02e72dba03ded4642da66ce789f83"
+        },
+        "xl/queryTables/queryTable1.xml": {
+          "bytes": 836,
+          "sha256": "b365eb816f763da6b5c99ebfd5c6c7e7cdb55ec98afdc875c71a4263274476ac"
+        },
+        "xl/queryTables/queryTable2.xml": {
+          "bytes": 558,
+          "sha256": "0b65193bcf79915e91d9b6ab8c215a966d5636506eec01ccfb28e19ba0fded5a"
+        },
+        "customXml/item1.xml": {
+          "bytes": 11106,
+          "sha256": "b91251f434c5780de555d11f51616af3f8c0a608af258dc5d18b3360f9c14bb9"
+        },
+        "customXml/itemProps1.xml": {
+          "bytes": 314,
+          "sha256": "50c4ca15c3b62e6ba4b0f7941d852eaeebb7228ea98090f240d0984137d132a3"
+        }
+      },
+      "sheet_order": [
+        {
+          "name": "native-query-010",
+          "sheet_id": 2,
+          "relationship_id": "rId1",
+          "part": "/xl/worksheets/sheet1.xml"
+        },
+        {
+          "name": "Sheet1",
+          "sheet_id": 1,
+          "relationship_id": "rId2",
+          "part": "/xl/worksheets/sheet2.xml"
+        }
+      ],
+      "relationships": {
+        "workbook": [
+          {
+            "id": "rId1",
+            "type": "worksheet",
+            "target": "worksheets/sheet1.xml"
+          },
+          {
+            "id": "rId2",
+            "type": "worksheet",
+            "target": "worksheets/sheet2.xml"
+          },
+          {
+            "id": "rId4",
+            "type": "connections",
+            "target": "connections.xml"
+          },
+          {
+            "id": "rId7",
+            "type": "customXml",
+            "target": "../customXml/item1.xml"
+          }
+        ],
+        "native_query_sheet": [
+          {
+            "id": "rId1",
+            "type": "table",
+            "target": "../tables/table1.xml"
+          }
+        ],
+        "legacy_sheet": [
+          {
+            "id": "rId1",
+            "type": "queryTable",
+            "target": "../queryTables/queryTable2.xml"
+          }
+        ],
+        "native_query_table": [
+          {
+            "id": "rId1",
+            "type": "queryTable",
+            "target": "../queryTables/queryTable1.xml"
+          }
+        ]
+      },
+      "connections_xml": {
+        "connection_count": 2,
+        "legacy_text_connection": {
+          "id": 1,
+          "name": "native-query-010",
+          "type": 6,
+          "refreshed_version": 8,
+          "background": true,
+          "save_data": true,
+          "text_pr": {
+            "code_page": 10000,
+            "source_file": "/Users/ryker/CodeProjects/litchi/test-data/microsoft-office/assets/native-query-010.csv",
+            "tab": false,
+            "comma": true,
+            "field_count": 3
+          }
+        },
+        "power_query_connection": {
+          "id": 2,
+          "name": "Query - native-query-010",
+          "description": "Connection to the 'native-query-010' query in the workbook.",
+          "type": 5,
+          "keep_alive": true,
+          "refreshed_version": 8,
+          "background": true,
+          "save_data": true,
+          "db_pr": {
+            "connection": "Provider=Microsoft.Mashup.OleDb.1;Data Source=$Workbook$;Location=native-query-010;Extended Properties=\"\"",
+            "command": "SELECT * FROM [native-query-010]"
+          }
+        }
+      },
+      "query_table_xml": {
+        "ExternalData_1": {
+          "part": "xl/queryTables/queryTable1.xml",
+          "connection_id": 2,
+          "uid": "{B6504114-49D9-6043-8DFE-562F32F9EFEC}",
+          "auto_format_id": 16,
+          "apply_number_formats": false,
+          "apply_border_formats": false,
+          "apply_font_formats": false,
+          "apply_pattern_formats": false,
+          "fields": [
+            "ID",
+            "Category",
+            "Amount"
+          ]
+        },
+        "LEGACY_CSV_010": {
+          "part": "xl/queryTables/queryTable2.xml",
+          "connection_id": 1,
+          "uid": "{6B305A1D-3903-6740-8C9F-E26ADDBDD686}",
+          "auto_format_id": 16,
+          "apply_font_formats": true,
+          "apply_pattern_formats": true
+        }
+      },
+      "table_xml": {
+        "id": 1,
+        "name": "native_query_010",
+        "display_name": "native_query_010",
+        "ref": "A1:C4",
+        "table_type": "queryTable",
+        "style": "TableStyleMedium7",
+        "show_row_stripes": true,
+        "query_table_field_ids": [
+          1,
+          2,
+          3
+        ]
+      },
+      "defined_names": {
+        "ExternalData_1": "'native-query-010'!$A$1:$C$4",
+        "LEGACY_CSV_010": "Sheet1!$A$8:$C$11"
+      },
+      "custom_xml_data_mashup": {
+        "part": "customXml/item1.xml",
+        "bytes": 11106,
+        "sha256": "b91251f434c5780de555d11f51616af3f8c0a608af258dc5d18b3360f9c14bb9",
+        "encoding": "UTF-16 LE with BOM",
+        "root": "DataMashup",
+        "namespace": "http://schemas.microsoft.com/DataMashup",
+        "typed_power_query_model": "not projected by the direct package probe; preserve the opaque part bytes"
+      },
+      "absent_feature_parts": [
+        "externalLinks",
+        "embeddings",
+        "richData",
+        "comments",
+        "drawings",
+        "pivot",
+        "custom XML other than DataMashup"
+      ]
+    },
+    "xlsb": {
+      "relevant_parts": {
+        "xl/workbook.bin": {
+          "bytes": 1120,
+          "sha256": "05decc3f22096c76346dc62032ab380ecd2ea988fdd503a87ae927a89374cadd"
+        },
+        "xl/_rels/workbook.bin.rels": {
+          "bytes": 1118,
+          "sha256": "82bff66643764f4a9065e0486bfc6034f128576df3fe156789e7eca8ef384ac3"
+        },
+        "xl/worksheets/sheet1.bin": {
+          "bytes": 749,
+          "sha256": "c3d642dd094d55495c00ce8bf128791e655f4a6e2a15b17a888646e3f104feeb"
+        },
+        "xl/worksheets/sheet2.bin": {
+          "bytes": 1004,
+          "sha256": "1159724e101957b8cc8d61b0ba7d237dbda2f0221e217c4bec9119f2472be502"
+        },
+        "xl/worksheets/_rels/sheet1.bin.rels": {
+          "bytes": 420,
+          "sha256": "ed7b6b41128466bc0568566d61aa234ee2d1363e1b3dca0130c1e36e3c19441a"
+        },
+        "xl/worksheets/_rels/sheet2.bin.rels": {
+          "bytes": 435,
+          "sha256": "5aae3ecc1429cf95dde5e4a7c8d9711fb3f5fba37ec0d892367e67e61a47e46e"
+        },
+        "xl/connections.bin": {
+          "bytes": 867,
+          "sha256": "717f4d78702e5c1e1c55f6b12b871739b614fd716c5fc8e6d2eb220f6f2b7ef6"
+        },
+        "xl/tables/table1.bin": {
+          "bytes": 579,
+          "sha256": "25211a3c276ede0c2b3a154d8ab05c781188b249b73d83dcfb2cec2642394e71"
+        },
+        "xl/queryTables/queryTable1.bin": {
+          "bytes": 201,
+          "sha256": "4b4c7075bdc13467abde3fe7f4d067593051027ebc0615d7e76e35daa5c65ce6"
+        },
+        "xl/queryTables/queryTable2.bin": {
+          "bytes": 77,
+          "sha256": "f0eb8bc05607e979f4b3cbe3ed09cbe587ad205cd0d5ff6edad3aa0578c81ea5"
+        },
+        "customXml/item1.xml": {
+          "bytes": 11106,
+          "sha256": "b91251f434c5780de555d11f51616af3f8c0a608af258dc5d18b3360f9c14bb9"
+        },
+        "customXml/itemProps1.xml": {
+          "bytes": 314,
+          "sha256": "50c4ca15c3b62e6ba4b0f7941d852eaeebb7228ea98090f240d0984137d132a3"
+        }
+      },
+      "relationships": {
+        "native_query_sheet": [
+          {
+            "id": "rId1",
+            "type": "xlBinaryIndex",
+            "target": "binaryIndex1.bin"
+          },
+          {
+            "id": "rId2",
+            "type": "table",
+            "target": "../tables/table1.bin"
+          }
+        ],
+        "legacy_sheet": [
+          {
+            "id": "rId1",
+            "type": "xlBinaryIndex",
+            "target": "binaryIndex2.bin"
+          },
+          {
+            "id": "rId2",
+            "type": "queryTable",
+            "target": "../queryTables/queryTable2.bin"
+          }
+        ],
+        "native_query_table": [
+          {
+            "id": "rId1",
+            "type": "queryTable",
+            "target": "../queryTables/queryTable1.bin"
+          }
+        ]
+      },
+      "connections_bin_records": [
+        {
+          "offset_hex": "0x0000",
+          "record": "BrtBeginExtConnections",
+          "kind_hex": "0x01AD",
+          "payload_bytes": 0
+        },
+        {
+          "offset_hex": "0x0020",
+          "record": "BrtBeginExtConnection",
+          "kind_hex": "0x00C9",
+          "payload_bytes": 59,
+          "connection": 1,
+          "name": "native-query-010"
+        },
+        {
+          "offset_hex": "0x005E",
+          "record": "BrtBeginTextPr",
+          "kind_hex": "0x021A",
+          "payload_bytes": 190,
+          "connection": 1,
+          "contains": "absolute CSV source path and text import flags"
+        },
+        {
+          "offset_hex": "0x0120",
+          "record": "text wizard family",
+          "kind_hex": "0x021C",
+          "payload_bytes": 4
+        },
+        {
+          "offset_hex": "0x0127",
+          "record": "text wizard field",
+          "kind_hex": "0x021E",
+          "payload_bytes": 8
+        },
+        {
+          "offset_hex": "0x0132",
+          "record": "text wizard field",
+          "kind_hex": "0x021E",
+          "payload_bytes": 8
+        },
+        {
+          "offset_hex": "0x013D",
+          "record": "text wizard field",
+          "kind_hex": "0x021E",
+          "payload_bytes": 8
+        },
+        {
+          "offset_hex": "0x014E",
+          "record": "BrtEndExtConnection",
+          "kind_hex": "0x00CA",
+          "payload_bytes": 0,
+          "connection": 1
+        },
+        {
+          "offset_hex": "0x016E",
+          "record": "BrtBeginExtConnection",
+          "kind_hex": "0x00C9",
+          "payload_bytes": 197,
+          "connection": 2,
+          "name": "Query - native-query-010"
+        },
+        {
+          "offset_hex": "0x0237",
+          "record": "BrtDbPr",
+          "kind_hex": "0x00CB",
+          "payload_bytes": 287,
+          "connection": 2,
+          "contains": "Microsoft.Mashup.OleDb.1 connection string and SELECT command"
+        },
+        {
+          "offset_hex": "0x035D",
+          "record": "BrtEndExtConnection",
+          "kind_hex": "0x00CA",
+          "payload_bytes": 0,
+          "connection": 2
+        },
+        {
+          "offset_hex": "0x0360",
+          "record": "BrtEndExtConnections",
+          "kind_hex": "0x01AE",
+          "payload_bytes": 0
+        }
+      ],
+      "query_table_records": {
+        "queryTable1.bin": "BrtBeginQueryTable wrapper; name ExternalData_1; connection id 2; three fields ID, Category, Amount",
+        "queryTable2.bin": "BrtBeginQueryTable wrapper; name LEGACY_CSV_010; connection id 1"
+      },
+      "custom_xml_data_mashup": {
+        "part": "customXml/item1.xml",
+        "bytes": 11106,
+        "sha256": "b91251f434c5780de555d11f51616af3f8c0a608af258dc5d18b3360f9c14bb9",
+        "root": "DataMashup",
+        "namespace": "http://schemas.microsoft.com/DataMashup"
+      }
+    },
+    "xls": {
+      "ole_container": {
+        "cfb_signature": "D0 CF 11 E0 A1 B1 1A E1",
+        "directory": [
+          {
+            "path": "/\u0001CompObj",
+            "kind": "stream",
+            "bytes": 102,
+            "sha256": "968cfb3a2b01c16ebec3dfba19cfbdda382a782b648731c414527fb3d591f1ba"
+          },
+          {
+            "path": "/Workbook",
+            "kind": "stream",
+            "bytes": 18817,
+            "sha256": "3bb7e43d8393fea4579e1a2d176254cb31f863541074946fcc2088bef1c8a284"
+          },
+          {
+            "path": "/MsoDataStore/WËÔSÌO4ÜTÒCÚDÀFAÀNÖ1FÀ==/Item",
+            "kind": "stream",
+            "bytes": 11106,
+            "sha256": "b91251f434c5780de555d11f51616af3f8c0a608af258dc5d18b3360f9c14bb9"
+          },
+          {
+            "path": "/MsoDataStore/WËÔSÌO4ÜTÒCÚDÀFAÀNÖ1FÀ==/Properties",
+            "kind": "stream",
+            "bytes": 314,
+            "sha256": "50c4ca15c3b62e6ba4b0f7941d852eaeebb7228ea98090f240d0984137d132a3"
+          },
+          {
+            "path": "/\\x05SummaryInformation",
+            "kind": "stream",
+            "bytes": 228,
+            "sha256": "41299df024d46decf356ecd2bbf9dbc052ffcedc265545aa24c147ef37d3dbb6"
+          },
+          {
+            "path": "/\\x05DocumentSummaryInformation",
+            "kind": "stream",
+            "bytes": 320,
+            "sha256": "f4d7f1d748ee733538c5a145afb7b9b545b24a8170451824f987e3b729fb4165"
+          }
+        ],
+        "application": "Microsoft Macintosh Excel",
+        "author": "Ryker Zhu"
+      },
+      "bound_sheet_records": [
+        {
+          "offset_hex": "0x2E17",
+          "record": "BOUNDSHEET8",
+          "payload_bytes": 24,
+          "name": "native-query-010"
+        },
+        {
+          "offset_hex": "0x2E33",
+          "record": "BOUNDSHEET8",
+          "payload_bytes": 14,
+          "name": "Sheet1"
+        }
+      ],
+      "native_query_sheet_records": [
+        {
+          "offset_hex": "0x4142",
+          "record": "Qsi",
+          "kind_hex": "0x01AD",
+          "payload_bytes": 29,
+          "name": "ExternalData_1"
+        },
+        {
+          "offset_hex": "0x4163",
+          "record": "DbQuery",
+          "kind_hex": "0x00DC",
+          "payload_bytes": 12
+        },
+        {
+          "offset_hex": "0x419A",
+          "record": "QsiSXTag",
+          "kind_hex": "0x0802",
+          "payload_bytes": 35
+        },
+        {
+          "offset_hex": "0x41C1",
+          "record": "DBQueryExt",
+          "kind_hex": "0x0803",
+          "payload_bytes": 28
+        },
+        {
+          "offset_hex": "0x41E1",
+          "record": "OleDbConn",
+          "kind_hex": "0x080A",
+          "payload_bytes": 12
+        },
+        {
+          "offset_hex": "0x41F1",
+          "record": "ExtString",
+          "kind_hex": "0x0804",
+          "payload_bytes": 112,
+          "contains": "Mashup OLE DB provider and connection"
+        },
+        {
+          "offset_hex": "0x4265",
+          "record": "Qsir",
+          "kind_hex": "0x0806",
+          "payload_bytes": 44
+        },
+        {
+          "offset_hex": "0x4295",
+          "record": "Qsif",
+          "kind_hex": "0x0807",
+          "payload_bytes": 21,
+          "field": "ID"
+        },
+        {
+          "offset_hex": "0x42AE",
+          "record": "Qsif",
+          "kind_hex": "0x0807",
+          "payload_bytes": 27,
+          "field": "Category"
+        },
+        {
+          "offset_hex": "0x42CD",
+          "record": "Qsif",
+          "kind_hex": "0x0807",
+          "payload_bytes": 25,
+          "field": "Amount"
+        }
+      ],
+      "legacy_sheet_records": [
+        {
+          "offset_hex": "0x485E",
+          "record": "Qsi",
+          "kind_hex": "0x01AD",
+          "payload_bytes": 29,
+          "name": "LEGACY_CSV_010"
+        },
+        {
+          "offset_hex": "0x487F",
+          "record": "DbQuery",
+          "kind_hex": "0x00DC",
+          "payload_bytes": 12
+        },
+        {
+          "offset_hex": "0x488F",
+          "record": "QsiSXTag",
+          "kind_hex": "0x0802",
+          "payload_bytes": 35
+        },
+        {
+          "offset_hex": "0x48B6",
+          "record": "DBQueryExt",
+          "kind_hex": "0x0803",
+          "payload_bytes": 28
+        },
+        {
+          "offset_hex": "0x48D6",
+          "record": "TxtQry",
+          "kind_hex": "0x0805",
+          "payload_bytes": 136,
+          "contains": "absolute CSV source path, comma delimiter, three fields, raw flags 0x8037"
+        }
+      ],
+      "custom_xml_data_mashup": {
+        "storage": "MsoDataStore/WËÔSÌO4ÜTÒCÚDÀFAÀNÖ1FÀ==",
+        "item_stream_bytes": 11106,
+        "item_stream_sha256": "b91251f434c5780de555d11f51616af3f8c0a608af258dc5d18b3360f9c14bb9",
+        "properties_stream_bytes": 314,
+        "properties_stream_sha256": "50c4ca15c3b62e6ba4b0f7941d852eaeebb7228ea98090f240d0984137d132a3",
+        "root": "DataMashup",
+        "namespace": "http://schemas.microsoft.com/DataMashup"
+      },
+      "absent_feature_parts": [
+        "OOXML externalLinks",
+        "OOXML embeddings",
+        "OOXML richData",
+        "OOXML comments"
+      ]
+    }
+  },
+  "library_validation": {
+    "xlsx": {
+      "package_open": "pass",
+      "sheet_names": [
+        "native-query-010",
+        "Sheet1"
+      ],
+      "tables_api": {
+        "api": "litchi_xlsx::workbook::Worksheet::tables",
+        "native_query_sheet_result": "pass",
+        "table_count": 1,
+        "table": {
+          "name": "native_query_010",
+          "ref": "A1:C4",
+          "table_type": "QueryTable",
+          "columns": [
+            "ID",
+            "Category",
+            "Amount"
+          ]
+        }
+      },
+      "query_tables_api": {
+        "api": "litchi_xlsx::workbook::Worksheet::query_tables",
+        "native_query_sheet_result": "pass",
+        "native_query_sheet_entries": 0,
+        "native_query_sheet_successful_empty_result": true,
+        "native_query_sheet_interpretation": "The worksheet has only a table relationship. queryTable1.xml is reached through xl/tables/_rels/table1.xml.rels, so this direct worksheet queryTable API returns an empty vector.",
+        "legacy_sheet_result": "pass",
+        "legacy_sheet_entries": 1,
+        "legacy_query_table": {
+          "name": "LEGACY_CSV_010",
+          "connection_id": 1,
+          "part": "/xl/queryTables/queryTable2.xml"
+        }
+      },
+      "connections_parser": {
+        "api": "litchi_xlsx::connections::Connections::parse",
+        "input": "/xl/connections.xml",
+        "result": "pass",
+        "connection_count": 2,
+        "typed_projection": "Both textPr and dbPr connections are projected; the absolute sourceFile is retained in the text connection."
+      },
+      "workbook_connections_catalog": "No public Workbook-level connections catalog was used; the connections part was parsed directly."
+    },
+    "xlsb": {
+      "api": "litchi_xlsb::Workbook::new",
+      "result": "pass",
+      "worksheet_count": 2,
+      "worksheet_names": [
+        "native-query-010",
+        "Sheet1"
+      ],
+      "tolerance_report": {
+        "defects": [],
+        "unrecorded": 0
+      },
+      "worksheet_values": {
+        "native-query-010": [
+          [
+            "ID",
+            "Category",
+            "Amount"
+          ],
+          [
+            1,
+            "ALPHA_010",
+            12.5
+          ],
+          [
+            2,
+            "BETA_010",
+            20
+          ],
+          [
+            3,
+            "ALPHA_010",
+            7.5
+          ]
+        ],
+        "Sheet1_markers_and_import": [
+          [
+            "EXCEL_CONNECTIONS_010",
+            "Fixture ID: excel-connections-010"
+          ],
+          [
+            "SOURCE_CSV_010",
+            "native-query-010.csv"
+          ],
+          [
+            "SOURCE_TOTAL_010",
+            40
+          ],
+          [
+            "QUERY_ROWS_010",
+            3
+          ],
+          [
+            "ID",
+            "Category",
+            "Amount"
+          ],
+          [
+            1,
+            "ALPHA_010",
+            12.5
+          ],
+          [
+            2,
+            "BETA_010",
+            20
+          ],
+          [
+            3,
+            "ALPHA_010",
+            7.5
+          ]
+        ]
+      },
+      "connections_api": {
+        "api": "Workbook::connections",
+        "result": "pass",
+        "connections": [
+          {
+            "id": 1,
+            "source_type": "Text",
+            "name": "native-query-010",
+            "background_query": true,
+            "refresh_on_load": false,
+            "save_data": true,
+            "files": null,
+            "properties": null,
+            "parameters": [],
+            "web_tables": []
+          },
+          {
+            "id": 2,
+            "source_type": "OleDb",
+            "name": "Query - native-query-010",
+            "description": "Connection to the 'native-query-010' query in the workbook.",
+            "credential": "Integrated",
+            "password": "NotSaved",
+            "maintain_connection": true,
+            "background_query": true,
+            "refresh_on_load": false,
+            "save_data": true,
+            "connection_string": "Provider=Microsoft.Mashup.OleDb.1;Data Source=$Workbook$;Location=native-query-010;Extended Properties=\"\"",
+            "command_type": "Sql",
+            "command": "SELECT * FROM [native-query-010]"
+          }
+        ],
+        "text_wizard_projection": "The typed Text connection has no files or properties fields; the raw BrtBeginTextPr and field records retain the source path and delimiter details."
+      },
+      "table_api": {
+        "tables_result": "pass",
+        "structured_tables_result": "pass",
+        "table": {
+          "id": 1,
+          "name": "native_query_010",
+          "range_zero_based": {
+            "first_row": 0,
+            "last_row": 3,
+            "first_col": 0,
+            "last_col": 2
+          },
+          "table_type": "QueryTable",
+          "header_row_count": 1,
+          "columns": [
+            "ID",
+            "Category",
+            "Amount"
+          ],
+          "query_table_field_ids": [
+            1,
+            2,
+            3
+          ]
+        }
+      },
+      "query_tables_api": {
+        "public_api": "not exposed by the current XLSB reader; queryTable1.bin/queryTable2.bin were audited as raw package records",
+        "successful_empty_result": false
+      }
+    },
+    "xls": {
+      "api": "litchi_xls::workbook::Workbook::new",
+      "package_open": "pass",
+      "bound_sheet_metadata_count": 2,
+      "bound_sheet_metadata_names": [
+        "native-query-010",
+        "Sheet1"
+      ],
+      "public_worksheet_count": 1,
+      "public_worksheet_names": [
+        "Sheet1"
+      ],
+      "native_sheet_by_name": {
+        "direct_result": "error",
+        "error": "WorksheetNotFound(\"native-query-010\")",
+        "successful_empty_result": false
+      },
+      "worksheet_index_1": {
+        "direct_result": "error",
+        "error": "WorksheetNotFound(\"Sheet index 1\")",
+        "successful_empty_result": false
+      },
+      "worksheet_error_suppression": {
+        "present": true,
+        "source": "crates/litchi-xls/src/workbook/package.rs:201-227",
+        "behavior": "parse_workbook drops every non-pivot worksheet parse Err(_) and continues without publishing a Worksheet value",
+        "original_native_sheet_parse_error": "unknown from the current public probe because the Err(_) arm discards the original error",
+        "interpretation": "The missing native-query-010 facade is an error-suppression boundary, not a successful empty worksheet result."
+      },
+      "legacy_query_tables": {
+        "api": "litchi_xls::worksheet::Worksheet::query_tables",
+        "result": "pass",
+        "entries": 1,
+        "name": "LEGACY_CSV_010",
+        "source": "Text",
+        "text_query": {
+          "delimited": true,
+          "codepage": "WindowsAnsi",
+          "new_codepage": 1,
+          "use_new_codepage": true,
+          "prompt_for_file": true,
+          "row_start_at": 1,
+          "tab": false,
+          "comma": true,
+          "fields": 3,
+          "file": "/Users/ryker/CodeProjects/litchi/test-data/microsoft-office/assets/native-query-010.csv"
+        }
+      },
+      "worksheet_values": {
+        "Sheet1": [
+          [
+            "EXCEL_CONNECTIONS_010",
+            "Fixture ID: excel-connections-010"
+          ],
+          [
+            "SOURCE_CSV_010",
+            "native-query-010.csv"
+          ],
+          [
+            "SOURCE_TOTAL_010",
+            40
+          ],
+          [
+            "QUERY_ROWS_010",
+            3
+          ],
+          [
+            "ID",
+            "Category",
+            "Amount"
+          ],
+          [
+            1,
+            "ALPHA_010",
+            12.5
+          ],
+          [
+            2,
+            "BETA_010",
+            20
+          ],
+          [
+            3,
+            "ALPHA_010",
+            7.5
+          ]
+        ]
+      },
+      "custom_xml_data_store": {
+        "api": "Workbook::custom_xml_data_store",
+        "result": "pass",
+        "item_count": 1,
+        "root": "DataMashup",
+        "namespace": "http://schemas.microsoft.com/DataMashup",
+        "item_bytes": 11106,
+        "item_sha256": "b91251f434c5780de555d11f51616af3f8c0a608af258dc5d18b3360f9c14bb9"
+      }
+    }
+  },
+  "mismatches_and_boundaries": [
+    {
+      "scope": "XLSX Power Query queryTable ownership",
+      "formats": [
+        "xlsx",
+        "xlsb"
+      ],
+      "raw_observation": "The native query sheet owns a table relationship; the table owns queryTable1 through xl/tables/_rels/table1.xml.rels. Sheet1 owns queryTable2 directly.",
+      "reader_observation": "litchi-xlsx Worksheet::query_tables returns a successful empty vector for native-query-010 while Worksheet::tables returns the QueryTable table. The XLSB reader exposes the structured table but no public query_tables API.",
+      "classification": "successful empty result caused by relationship traversal scope; preserve the indirect table-to-queryTable edge and do not treat it as absent source data"
+    },
+    {
+      "scope": "XLSB text connection projection",
+      "formats": [
+        "xlsb"
+      ],
+      "raw_observation": "connections.bin contains BrtBeginTextPr and text-wizard field records with the absolute CSV path and import flags.",
+      "reader_observation": "litchi_xlsb::host::connections::parse skips unhandled child record kinds; the typed Text connection reports files=None and properties=None, while the OleDb Power Query connection is fully projected.",
+      "classification": "typed reader boundary; raw records are the evidence for the legacy source path and delimiter fields"
+    },
+    {
+      "scope": "legacy XLS native query worksheet",
+      "formats": [
+        "xls"
+      ],
+      "raw_observation": "BIFF8 contains two BOUNDSHEET records and a native-query-010 worksheet substream with Qsi/DbQuery/OleDbConn/ExtString records.",
+      "reader_observation": "Workbook metadata sees both sheets, but parse_workbook suppresses the native worksheet parse error; the public workbook publishes only Sheet1 and the direct APIs return WorksheetNotFound for the native sheet.",
+      "classification": "errorsuppression; the original parse trigger is unknown, so the missing worksheet must not be recorded as a successful empty result"
+    },
+    {
+      "scope": "legacy text encoding representation",
+      "formats": [
+        "xls",
+        "xlsx"
+      ],
+      "raw_observation": "The native Text import dialog showed Macintosh encoding. XLSX stores codePage=10000, while the BIFF8 TxtQry flags are decoded by the current typed reader as WindowsAnsi/new_codepage=1.",
+      "reader_observation": "The source is ASCII and all values match, so this representation mismatch does not alter the fixture values.",
+      "classification": "UI-vs-wire/typed projection discrepancy; retain both observations and do not infer a data corruption issue"
+    },
+    {
+      "scope": "Power Query DataMashup payload",
+      "formats": [
+        "xlsx",
+        "xlsb",
+        "xls"
+      ],
+      "raw_observation": "The same 11,106-byte DataMashup payload is retained in customXml/item1.xml for XLSX/XLSB and the MsoDataStore Item stream for XLS.",
+      "reader_observation": "The XLS custom XML store is typed enough to report one DataMashup item; the query definition itself remains opaque to these direct probes.",
+      "classification": "raw payload preservation; do not call an opaque DataMashup a successful empty query definition"
+    },
+    {
+      "scope": "absolute source paths and UI feature scope",
+      "formats": [
+        "xlsx",
+        "xlsb",
+        "xls"
+      ],
+      "raw_observation": "The package and BIFF records contain the machine-specific absolute CSV source path; Developer and Tools menu checks were narrow UI probes.",
+      "reader_observation": "Path portability and feature absence outside those menus were not established by this audit.",
+      "classification": "corpus metadata lock and probe-scope limit; preserve the exact path/hash while avoiding global feature claims"
+    }
+  ],
+  "source_references": {
+    "xlsx_connections_parser": "crates/litchi-xlsx/src/connections/codec.rs:71-87",
+    "xlsx_worksheet_tables_and_query_tables": "crates/litchi-xlsx/src/workbook/model.rs:1586-1593; crates/litchi-xlsx/src/workbook/worksheet.rs:258-260; crates/litchi-xlsx/src/query_table/mod.rs:11-20",
+    "xlsb_connections_api_and_loading": "crates/litchi-xlsb/src/workbook/package.rs:853-861,1295-1299",
+    "xlsb_connection_record_parser": "crates/litchi-xlsb/src/host/connections/parse.rs:84-125",
+    "xlsb_table_models": "crates/litchi-xlsb/src/workbook/model.rs:171-174,201-221; crates/litchi-xlsb/src/host/table/model.rs:12-78,94-105",
+    "xls_worksheet_error_suppression": "crates/litchi-xls/src/workbook/package.rs:201-227",
+    "xls_query_table_api_and_model": "crates/litchi-xls/src/worksheet/mod.rs:474-485; crates/litchi-xls/src/query_table/mod.rs:1-24; crates/litchi-xls/src/query_table/model.rs:129-185,200-260",
+    "xls_text_query_parser": "crates/litchi-xls/src/query_table/codec.rs:289-322",
+    "xls_worksheet_record_collection": "crates/litchi-xls/src/workbook/codec/semantic/worksheet.rs:367-370,417-422,1095",
+    "xls_custom_xml_store": "crates/litchi-xls/src/workbook/package.rs:289-297"
+  }
+}

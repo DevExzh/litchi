@@ -1,0 +1,591 @@
+{
+  "schema_version": 1,
+  "fixture_id": "powerpoint-media-objects-004",
+  "generated_on": "2026-10-15",
+  "purpose": "Read-only inspection of native Microsoft PowerPoint media and embedded-object fixtures covering a trimmed video with a custom poster, a background audio clip, and a displayed Excel workbook OLE object in both PPTX and legacy PPT containers.",
+  "native_ui_observation_source": "Root agent Computer Use session; this inspection process did not operate Office UI.",
+  "provenance": {
+    "producer_app": "Microsoft Office PowerPoint",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "package_application": "Microsoft Macintosh PowerPoint",
+    "package_app_version": "16.0000",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft PowerPoint UI",
+    "source": "Synthetic slide markers were entered in native PowerPoint. The video, audio and poster used the existing test-data/iwork/keynote/media-replacement-assets files; the workbook was inserted from the existing native Excel fixture.",
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "all_documents_closed_before_hashing": true,
+    "lock_files_present_at_inspection": false
+  },
+  "scope_and_limits": {
+    "variants": [
+      "pptx",
+      "ppt"
+    ],
+    "native_reopen_verified": true,
+    "native_reopen_repair_prompt": false,
+    "external_links_followed": false,
+    "macros_or_external_code_executed": false,
+    "legacy_media_semantic_parity_claimed": false,
+    "audio_trim_claimed": false,
+    "audio_trim_limit": "The audio Trim UI was opened and canceled. No audio trim was saved; the persisted audio fade values are 0.0 seconds.",
+    "legacy_save_warning": "PowerPoint warned that the media on slide 2 would be saved as pictures when creating the legacy derivative; the warning was accepted.",
+    "source_workbook_unchanged_at_inspection": true,
+    "known_reader_boundaries": [
+      "litchi-pptx::media_parts::load_slide_media rejects slide 2 because video relationship rId1 has external Target=NULL, even though p14:media embeds media1.mov through rId2.",
+      "litchi-pptx::presentation::SourceBackedPresentation opens and reads all four slides, but SourceSlide::images refuses slide 4 because the OLE preview is inside an MCE AlternateContent branch whose picture ownership is ambiguous.",
+      "litchi-ppt::Presentation::images fails with OfficeArt(MalformedImage { reason: resolved BLIP UID does not match the FBSE UID }) for the legacy derivative; the typed external_media and ole_objects collections still recover the audio and Excel records."
+    ]
+  },
+  "expected_native_content": {
+    "slide_count": 4,
+    "slide_titles_or_markers": [
+      "PPT_MEDIA_004",
+      "VIDEO_EMBED_004",
+      "AUDIO_EMBED_004",
+      "OLE_WORKBOOK_004"
+    ],
+    "slide_1_text": [
+      "PPT_MEDIA_004",
+      "Fixture ID: powerpoint-media-objects-004",
+      "Native video, audio and embedded workbook"
+    ],
+    "video": {
+      "slide": 2,
+      "marker": "VIDEO_EMBED_004",
+      "source": "test-data/iwork/keynote/media-replacement-assets/striped.mov",
+      "duration_seconds": 2.0,
+      "alt_text": "VIDEO_ALT_004: synthetic colored stripes movie with a custom PNG poster.",
+      "alt_text_persisted": true,
+      "poster": {
+        "selection": "Image from File",
+        "source": "test-data/iwork/keynote/media-replacement-assets/poster.png",
+        "package_part": "/ppt/media/image1.png",
+        "package_relationship_id": "rId4",
+        "package_bytes": 1698,
+        "package_sha256": "d594d8f832d3ab38d03e0d06316d2fa5e401217e50e21e01814e593d752da3e8",
+        "matches_source_bytes": true,
+        "thumbnail_still_showed_stripes": true
+      },
+      "trim_seconds": {
+        "native_start_offset": 0.05,
+        "native_displayed_end": 1.95,
+        "native_end_offset_from_tail": 0.05,
+        "package_start_hundredths": 50,
+        "package_end_hundredths_from_tail": 50
+      },
+      "fade_seconds": {
+        "fade_in": 0.25,
+        "fade_out": 0.5,
+        "package_in_hundredths": 250,
+        "package_out_hundredths": 500
+      },
+      "playback": {
+        "start": "when clicked",
+        "loop": true,
+        "rewind_after_playing": true,
+        "reopened_playback_controls_confirmed": true
+      }
+    },
+    "audio": {
+      "slide": 3,
+      "marker": "AUDIO_EMBED_004",
+      "source": "test-data/iwork/keynote/media-replacement-assets/tone.wav",
+      "duration_seconds": 2.0,
+      "play_in_background": true,
+      "start": "automatically",
+      "play_across_slides": true,
+      "loop": true,
+      "hide_during_show": true,
+      "rewind_after_playing": true,
+      "fade_in_seconds": 0.0,
+      "fade_out_seconds": 0.0,
+      "reopened_playback_controls_confirmed": true
+    },
+    "ole_workbook": {
+      "slide": 4,
+      "marker": "OLE_WORKBOOK_004",
+      "source": "test-data/microsoft-office/excel/excel-values-formulas-chart.xlsx",
+      "display_as_icon": false,
+      "prog_id": "Excel.Sheet.12",
+      "object_name": "Worksheet",
+      "preview": {
+        "package_part": "/ppt/media/image3.emf",
+        "content_type": "image/x-emf",
+        "native_values_observed": [
+          49.75,
+          14
+        ]
+      },
+      "embedded_workbook": {
+        "package_part": "/ppt/embeddings/Microsoft_Excel_Worksheet.xlsx",
+        "sheet_names": [
+          "Sales chart",
+          "Sheet1",
+          "Sheet2"
+        ],
+        "formula_cells": {
+          "Sheet1!B6": {
+            "formula": "SUM(B2:B5)",
+            "cached_value": 14
+          },
+          "Sheet1!D6": {
+            "formula": "SUM(D2:D5)",
+            "cached_value": 49.75
+          },
+          "Sheet2!B3": {
+            "formula": "Sheet1!D6",
+            "cached_value": 49.75
+          },
+          "Sheet2!B4": {
+            "formula": "SUM(Table1[Quantity])",
+            "cached_value": 14
+          }
+        }
+      }
+    }
+  },
+  "files": [
+    {
+      "path": "test-data/microsoft-office/powerpoint/powerpoint-media-objects.pptx",
+      "format": "pptx",
+      "bytes": 183544,
+      "sha256": "35bf326a3d9374faee9f6a8837a3a5f9c3235de1b38013be0e9dc4cb76e4262f",
+      "file_description": "Microsoft PowerPoint 2007+",
+      "container": {
+        "kind": "OPC ZIP",
+        "zip_test": "pass",
+        "member_count": 49,
+        "relationship_part_count": 18,
+        "relationship_count": 48,
+        "internal_relationship_target_misses": 0,
+        "external_relationships": [
+          {
+            "part": "ppt/slides/_rels/slide2.xml.rels",
+            "id": "rId1",
+            "type": "video",
+            "target": "NULL",
+            "target_mode": "External"
+          }
+        ],
+        "members": [
+          "[Content_Types].xml",
+          "_rels/.rels",
+          "docProps/app.xml",
+          "docProps/core.xml",
+          "docProps/thumbnail.jpeg",
+          "ppt/_rels/presentation.xml.rels",
+          "ppt/embeddings/Microsoft_Excel_Worksheet.xlsx",
+          "ppt/media/image1.png",
+          "ppt/media/image2.png",
+          "ppt/media/image3.emf",
+          "ppt/media/media1.mov",
+          "ppt/media/media2.wav",
+          "ppt/presProps.xml",
+          "ppt/presentation.xml",
+          "ppt/slideLayouts/_rels/slideLayout1.xml.rels",
+          "ppt/slideLayouts/_rels/slideLayout10.xml.rels",
+          "ppt/slideLayouts/_rels/slideLayout11.xml.rels",
+          "ppt/slideLayouts/_rels/slideLayout2.xml.rels",
+          "ppt/slideLayouts/_rels/slideLayout3.xml.rels",
+          "ppt/slideLayouts/_rels/slideLayout4.xml.rels",
+          "ppt/slideLayouts/_rels/slideLayout5.xml.rels",
+          "ppt/slideLayouts/_rels/slideLayout6.xml.rels",
+          "ppt/slideLayouts/_rels/slideLayout7.xml.rels",
+          "ppt/slideLayouts/_rels/slideLayout8.xml.rels",
+          "ppt/slideLayouts/_rels/slideLayout9.xml.rels",
+          "ppt/slideLayouts/slideLayout1.xml",
+          "ppt/slideLayouts/slideLayout10.xml",
+          "ppt/slideLayouts/slideLayout11.xml",
+          "ppt/slideLayouts/slideLayout2.xml",
+          "ppt/slideLayouts/slideLayout3.xml",
+          "ppt/slideLayouts/slideLayout4.xml",
+          "ppt/slideLayouts/slideLayout5.xml",
+          "ppt/slideLayouts/slideLayout6.xml",
+          "ppt/slideLayouts/slideLayout7.xml",
+          "ppt/slideLayouts/slideLayout8.xml",
+          "ppt/slideLayouts/slideLayout9.xml",
+          "ppt/slideMasters/_rels/slideMaster1.xml.rels",
+          "ppt/slideMasters/slideMaster1.xml",
+          "ppt/slides/_rels/slide1.xml.rels",
+          "ppt/slides/_rels/slide2.xml.rels",
+          "ppt/slides/_rels/slide3.xml.rels",
+          "ppt/slides/_rels/slide4.xml.rels",
+          "ppt/slides/slide1.xml",
+          "ppt/slides/slide2.xml",
+          "ppt/slides/slide3.xml",
+          "ppt/slides/slide4.xml",
+          "ppt/tableStyles.xml",
+          "ppt/theme/theme1.xml",
+          "ppt/viewProps.xml"
+        ],
+        "content_type_defaults": {
+          "emf": "image/x-emf",
+          "jpeg": "image/jpeg",
+          "mov": "video/quicktime",
+          "png": "image/png",
+          "rels": "application/vnd.openxmlformats-package.relationships+xml",
+          "wav": "audio/x-wav",
+          "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+          "xml": "application/xml"
+        },
+        "key_relationships": {
+          "slide2": [
+            {
+              "id": "rId2",
+              "type": "media",
+              "target": "/ppt/media/media1.mov"
+            },
+            {
+              "id": "rId1",
+              "type": "video",
+              "target": "NULL",
+              "target_mode": "External"
+            },
+            {
+              "id": "rId4",
+              "type": "image",
+              "target": "/ppt/media/image1.png"
+            }
+          ],
+          "slide3": [
+            {
+              "id": "rId2",
+              "type": "audio",
+              "target": "/ppt/media/media2.wav"
+            },
+            {
+              "id": "rId1",
+              "type": "media",
+              "target": "/ppt/media/media2.wav"
+            },
+            {
+              "id": "rId4",
+              "type": "image",
+              "target": "/ppt/media/image2.png"
+            }
+          ],
+          "slide4": [
+            {
+              "id": "rId2",
+              "type": "package",
+              "target": "/ppt/embeddings/Microsoft_Excel_Worksheet.xlsx"
+            },
+            {
+              "id": "rId3",
+              "type": "image",
+              "target": "/ppt/media/image3.emf"
+            }
+          ]
+        },
+        "media_parts": [
+          {
+            "part": "ppt/media/media1.mov",
+            "content_type": "video/quicktime",
+            "bytes": 87997,
+            "sha256": "e4b92ec504d372e2330b37d4dcd0441d2990096f41f880343795c45508a0c997",
+            "source": "test-data/iwork/keynote/media-replacement-assets/striped.mov",
+            "matches_source_bytes": true
+          },
+          {
+            "part": "ppt/media/media2.wav",
+            "content_type": "audio/x-wav",
+            "bytes": 192044,
+            "sha256": "27f1b6add1bd884455da7a36244d92fc26b81b622ce1671d5cb77bebffeb135a",
+            "source": "test-data/iwork/keynote/media-replacement-assets/tone.wav",
+            "matches_source_bytes": true
+          },
+          {
+            "part": "ppt/media/image1.png",
+            "content_type": "image/png",
+            "bytes": 1698,
+            "sha256": "d594d8f832d3ab38d03e0d06316d2fa5e401217e50e21e01814e593d752da3e8",
+            "source": "test-data/iwork/keynote/media-replacement-assets/poster.png",
+            "matches_source_bytes": true
+          },
+          {
+            "part": "ppt/media/image2.png",
+            "content_type": "image/png",
+            "bytes": 4717,
+            "sha256": "b0151c2c2e3cf64bc37a7bb9d8b8b98d4c4fccf7b6af4c08c4f847a79f9db0da",
+            "role": "native audio icon/poster"
+          },
+          {
+            "part": "ppt/media/image3.emf",
+            "content_type": "image/x-emf",
+            "bytes": 81992,
+            "sha256": "d2a459ae9eec497ac562a4b96569b9dabe2e161f9d961c74192979ab95a7597b",
+            "role": "native OLE preview"
+          }
+        ],
+        "key_part_hashes": {
+          "ppt/presentation.xml": "a16637617c17045e80eb5939bf5aa7e72861d9bc7922f4278090acba6c31020f",
+          "ppt/presProps.xml": "cd12d22ac9a3825ff6772a707cd1e67f9ce26eb2aaf316023469a16b02852f85",
+          "ppt/slides/_rels/slide2.xml.rels": "04bddba50c4b8273f2214d98fe40eb4b76c3e3dd89b3a8563075929465ddf188",
+          "ppt/slides/_rels/slide3.xml.rels": "8f6b6d2062fad2b1fc4b7fc20d666970478e490cb783aa828c3c880f1b68a60c",
+          "ppt/slides/_rels/slide4.xml.rels": "a41b1c19b14c9df16c8dd335fa7efe861dae1da9b097eb0949394d5b7f2bbcf9",
+          "ppt/embeddings/Microsoft_Excel_Worksheet.xlsx": "07fbdf1bd05d9f080356bbc10bc9cc897ffd794a166b2c141f45bad707051bbc"
+        },
+        "ole_embedding": {
+          "part": "ppt/embeddings/Microsoft_Excel_Worksheet.xlsx",
+          "bytes": 18372,
+          "sha256": "07fbdf1bd05d9f080356bbc10bc9cc897ffd794a166b2c141f45bad707051bbc",
+          "zip_test": "pass",
+          "member_count": 21,
+          "source_path": "test-data/microsoft-office/excel/excel-values-formulas-chart.xlsx",
+          "source_bytes": 18686,
+          "source_sha256": "7b9b6602d687d3b0f65915611723c1cc60934e6ecca9c54bec44403904afbd57",
+          "byte_identical_to_source": false,
+          "unchanged_source_hash_rechecked": true,
+          "same_functional_sheet_and_formula_parts": true,
+          "known_native_rewrite": [
+            "PowerPoint removes xl/calcChain.xml from the embedded copy.",
+            "PowerPoint marks the embedded workbook view hidden and adds oleSize ref=A1:C5.",
+            "PowerPoint updates workbook calculation metadata and embedded core modified time."
+          ],
+          "member_only_in_source": [
+            "xl/calcChain.xml"
+          ],
+          "formula_value_checks": {
+            "Sheet1!B6": 14,
+            "Sheet1!D6": 49.75,
+            "Sheet2!B3": 49.75,
+            "Sheet2!B4": 14
+          }
+        }
+      },
+      "library_read": {
+        "reader": "litchi-pptx::Package::open -> presentation",
+        "package_open": "pass",
+        "tolerance_defects": 0,
+        "slide_count": 4,
+        "slide_size_emu": [
+          12192000,
+          6858000
+        ],
+        "slide_text": [
+          "PPT_MEDIA_004\nFixture ID: powerpoint-media-objects-004\nNative video, audio and embedded workbook",
+          "VIDEO_EMBED_004",
+          "AUDIO_EMBED_004",
+          "OLE_WORKBOOK_004"
+        ],
+        "semantic_shape_counts": [
+          2,
+          2,
+          2,
+          2
+        ],
+        "semantic_shape_kinds_and_names": [
+          [
+            "Auto:Title 1",
+            "Auto:Subtitle 2"
+          ],
+          [
+            "Auto:Title 1",
+            "Picture:striped.mov"
+          ],
+          [
+            "Auto:Title 1",
+            "Picture:tone.wav"
+          ],
+          [
+            "Auto:Title 1",
+            "Ole:Content Placeholder 3"
+          ]
+        ],
+        "media_parts_reader": {
+          "slide_2": {
+            "result": "error",
+            "error": "Invalid(\"external slide-media relationship 'rId1' is not fetched\")"
+          },
+          "slide_3": {
+            "result": "pass",
+            "picture_count": 1,
+            "kind": "Audio",
+            "name": "tone.wav",
+            "picture_relationship_id": "rId2",
+            "resource_part": "/ppt/media/media2.wav",
+            "resource_content_type": "audio/x-wav",
+            "office_extension_embed_relationship_id": "rId1",
+            "trim": null,
+            "fade": null
+          }
+        },
+        "source_backed_presentation": {
+          "open": "pass",
+          "tolerance_defects": 0,
+          "slide_count": 4,
+          "text_read": "pass for all four slides",
+          "images": {
+            "slide_1": {
+              "result": "pass",
+              "count": 0
+            },
+            "slide_2": {
+              "result": "pass",
+              "count": 1,
+              "name": "striped.mov",
+              "relationship_id": "rId4",
+              "target": "/ppt/media/image1.png",
+              "content_type": "image/png",
+              "read_bytes": 1698
+            },
+            "slide_3": {
+              "result": "pass",
+              "count": 1,
+              "name": "tone.wav",
+              "relationship_id": "rId4",
+              "target": "/ppt/media/image2.png",
+              "content_type": "image/png",
+              "read_bytes": 4717
+            },
+            "slide_4": {
+              "result": "error",
+              "error": "UnsafeEdit { operation: source-backed picture inventory, reason: picture ownership inside an MCE branch is ambiguous }"
+            }
+          }
+        },
+        "legacy_litchi_ppt_probe": "not_applicable; litchi-ppt expects CFB/OLE and returns Ole(NotOleFile) for this OPC ZIP."
+      },
+      "native_ui_validation": {
+        "reopen": "pass",
+        "repair_prompt": false,
+        "opened_exact_file_with_powerpoint_open": true,
+        "slide_count": 4,
+        "video_trim_and_fades_reopened": true,
+        "video_playback_controls_reopened": true,
+        "video_alt_text_persisted_in_slide_xml": true,
+        "audio_background_controls_reopened": true,
+        "audio_fades_reopened_as_zero": true,
+        "ole_preview_values_observed": [
+          49.75,
+          14
+        ]
+      }
+    },
+    {
+      "path": "test-data/microsoft-office/powerpoint/powerpoint-media-objects.ppt",
+      "format": "ppt",
+      "bytes": 282624,
+      "sha256": "4d65988f789ceaa3a393e00e2a36bc437e974250b6b12963449cded417e940fa",
+      "file_description": "Composite Document File V2 Document, Little Endian, Os: MacOS, Version 5.26, Code page: 10000, Author: Ryker Zhu, Last Saved By: Ryker Zhu, Revision Number: 1, Name of Creating Application: Microsoft Macintosh PowerPoint, Total Editing Time: 07:47, Create Time/Date: Thu Oct 15 07:27:33 2026, Last Saved Time/Date: Thu Oct 15 07:35:20 2026, Number of Words: 31",
+      "container": {
+        "kind": "Compound File Binary (CFB/OLE)",
+        "cfb_reader": "litchi-cfb::OleFile::open pass",
+        "stream_count": 5,
+        "streams": [
+          "Pictures",
+          "Current User",
+          "\\u0005SummaryInformation",
+          "PowerPoint Document",
+          "\\u0005DocumentSummaryInformation"
+        ],
+        "stream_lengths": {
+          "Pictures": 29930,
+          "Current User": 4096,
+          "\\u0005SummaryInformation": 5032,
+          "PowerPoint Document": 234725,
+          "\\u0005DocumentSummaryInformation": 4096
+        },
+        "powerpoint_document_record_evidence": [
+          "ExternalWavAudioEmbedded is present.",
+          "ExternalOleEmbed is present."
+        ]
+      },
+      "library_read": {
+        "reader": "litchi-ppt::Package::open -> presentation",
+        "package_open": "pass",
+        "slide_count": 4,
+        "has_pictures": true,
+        "slide_text": [
+          "PPT_MEDIA_004\nFixture ID: powerpoint-media-objects-004\rNative video, audio and embedded workbook",
+          "VIDEO_EMBED_004",
+          "AUDIO_EMBED_004",
+          "OLE_WORKBOOK_004"
+        ],
+        "fallback_shape_counts": [
+          2,
+          2,
+          2,
+          2
+        ],
+        "fallback_shape_kinds": "All returned legacy slide shapes were Placeholder values; media and OLE frames were not exposed in this shape inventory.",
+        "external_media": {
+          "result": "pass",
+          "object_count": 1,
+          "object": {
+            "kind": "EmbeddedWav",
+            "media_id": 4,
+            "sound_id": 1,
+            "duration_ms": 2000,
+            "loop_playback": true,
+            "rewind_after_playing": true,
+            "narration": false
+          },
+          "unknown_record": "ExternalOleEmbed at object_index 1"
+        },
+        "ole_objects": {
+          "result": "pass",
+          "object_count": 1,
+          "object": {
+            "object_id": 5,
+            "subtype": "Excel",
+            "persist_id": 2,
+            "menu_name": "Worksheet",
+            "program_id": "Excel.Sheet.12",
+            "clipboard_name": "Microsoft Excel Worksheet"
+          },
+          "unknown_record": "ExternalWavAudioEmbedded at object_index 0"
+        },
+        "images": {
+          "result": "error",
+          "error": "OfficeArt(MalformedImage { reason: resolved BLIP UID does not match the FBSE UID })"
+        },
+        "legacy_media_semantics": "The legacy typed records preserve the WAV and Excel metadata, but the video was downgraded to a picture by PowerPoint's legacy save path and no full media/picture semantic parity claim is made."
+      },
+      "native_ui_validation": {
+        "reopen": "pass",
+        "repair_prompt": false,
+        "opened_exact_file_with_powerpoint_open": true,
+        "slide_count": 4,
+        "legacy_save_warning_shown_and_accepted": true,
+        "warning_scope": "PowerPoint warned that media on slide 2 would be saved as pictures.",
+        "all_four_titles_matched": true
+      }
+    }
+  ],
+  "typed_reader_boundaries": {
+    "pptx_high_value_apis": [
+      "litchi_pptx::Package::open",
+      "Package::presentation().slide_count / slide_size / slides",
+      "Slide::text / shapes",
+      "litchi_pptx::media_parts::load_slide_media",
+      "litchi_pptx::presentation::SourceBackedPresentation::open",
+      "SourceSlide::images / read_image"
+    ],
+    "pptx_media_boundary": "The package-level PPTX reader sees media poster pictures as normal Picture shapes, while media_parts::load_slide_media requires the linked video relationship and therefore rejects the native slide-2 external NULL relationship.",
+    "pptx_ole_boundary": "The package-level PPTX reader returns an Ole shape for slide 4. SourceBackedPresentation::images refuses the same slide because the OLE preview appears in an MCE AlternateContent branch.",
+    "legacy_high_value_apis": [
+      "litchi_cfb::OleFile::open / list_streams / stream_len",
+      "litchi_ppt::Package::open -> presentation",
+      "Presentation::external_media",
+      "Presentation::ole_objects",
+      "Presentation::images",
+      "Slide::text / shape_count"
+    ],
+    "legacy_media_boundary": "The typed legacy ExternalWavAudioEmbedded and ExternalOleEmbed records are recoverable, but Presentation::images fails on the legacy Pictures stream before a complete picture inventory can be returned."
+  },
+  "validation_methods": [
+    "SHA-256 and byte size were computed from both closed final fixture byte streams.",
+    "file identified the OOXML fixture as Microsoft PowerPoint 2007+ and the legacy fixture as a MacOS CFB/OLE Microsoft PowerPoint document.",
+    "Python ZipFile.testzip passed for the PPTX; all 24 XML parts and 18 relationship parts parsed with ElementTree.",
+    "The PPTX relationship graph contained 48 relationships, zero missing internal targets, and one intentional external video target NULL.",
+    "PPTX media bytes were compared with striped.mov, tone.wav and poster.png; each source match was byte-identical and hashed.",
+    "The embedded workbook was extracted, tested as a ZIP, compared member by member with the source workbook, and checked for sheet names and cached formula values.",
+    "litchi-pptx package and source-backed readers were run against the PPTX; slide text, semantic shape counts, media loading outcomes and source-backed picture outcomes were recorded.",
+    "litchi-cfb and litchi-ppt readers were run against the legacy PPT; stream inventory, slide text, external audio, OLE metadata and the existing picture-reader error were recorded.",
+    "Root Computer Use observations record native PowerPoint reopen without repair for both formats, the legacy media warning, persisted video and audio playback settings, the custom poster selection, and the OLE preview values."
+  ]
+}

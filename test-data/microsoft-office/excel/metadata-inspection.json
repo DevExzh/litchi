@@ -1,0 +1,950 @@
+{
+  "schema_version": 1,
+  "fixture_id": "excel-metadata-015",
+  "generated_on": "2026-10-15",
+  "purpose": "Fixture-specific, read-only inspection of native Microsoft Excel metadata and worksheet features: rich text, literal apostrophe text, formula error caches, ignored errors, a cell watch, classic notes, a sheet background, data consolidation with linked results, and header/footer pictures across transitional OOXML, BIFF12, and BIFF8.",
+  "provenance": {
+    "producer_app": "Microsoft Office Excel",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "package_application": "Microsoft Macintosh Excel",
+    "package_app_version": "16.0300",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft Excel UI",
+    "authoring_scope": "A new native Excel workbook was authored through the UI. No LibreOffice or library writer generated any fixture bytes.",
+    "native_save_sequence": [
+      "Saved the native workbook as excel-metadata.xlsx.",
+      "Saved a BIFF12 binary derivative as excel-metadata.xlsb.",
+      "Reopened the original XLSX and saved the legacy BIFF8 derivative as excel-metadata.xls.",
+      "Closed all three files to the Excel Home screen, reopened each in native Excel without a repair prompt, and closed them before inspection."
+    ],
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "temporary_probe_harnesses_outside_checkout": true,
+    "all_documents_closed_before_hashing": true,
+    "lock_files_present_at_inspection": false
+  },
+  "scope_and_limits": {
+    "native_variants": [
+      "xlsx",
+      "xlsb",
+      "xls"
+    ],
+    "native_excel_reopen_verified": true,
+    "repair_or_conversion_prompt_observed": false,
+    "xls_save_warning": {
+      "generic_feature_loss_warning": "shown and accepted",
+      "older_formula_warning": "not reported for this save"
+    },
+    "semantic_parity_claimed": false,
+    "rendering_parity_claimed": false,
+    "calculation_limit": "This inspection records native UI state, stored formula tokens, cached values, and package/record payloads. It does not claim that the library recalculates formulas, renders images, evaluates watch windows, or reproduces Excel's UI behavior.",
+    "reader_boundary": "The typed-reader and raw-parser outcomes below are exact probes of these closed files. A typed-reader limitation is recorded as a library boundary; it is not evidence that native Excel failed to reopen a fixture."
+  },
+  "expected_native_content": {
+    "worksheet_order": [
+      "Sheet1",
+      "Source_A_015",
+      "Source_B_015",
+      "Consolidated_015",
+      "Print_015"
+    ],
+    "active_worksheet": "Print_015",
+    "sheet1": {
+      "dimension": "A1:B8",
+      "markers": {
+        "A1": "EXCEL_METADATA_015",
+        "B1": "Fixture ID: excel-metadata-015",
+        "A8": "END_METADATA_015"
+      },
+      "cells": {
+        "A2": {
+          "value": "RICH_TEXT_015 bold italic",
+          "native_formatting": [
+            {
+              "text": "RICH_TEXT_015 ",
+              "bold": false,
+              "italic": false
+            },
+            {
+              "text": "bold",
+              "bold": true,
+              "italic": false,
+              "font": "Aptos Narrow",
+              "font_size": 12
+            },
+            {
+              "text": " ",
+              "bold": false,
+              "italic": false,
+              "font": "Aptos Narrow",
+              "font_size": 12
+            },
+            {
+              "text": "italic",
+              "bold": false,
+              "italic": true,
+              "font": "Aptos Narrow",
+              "font_size": 12
+            }
+          ],
+          "native_partial_runs_verified": true
+        },
+        "A3": {
+          "value": "'00123",
+          "literal_leading_apostrophe_retained": true,
+          "native_entry": "pasted as literal text"
+        },
+        "A4": {
+          "formula": "A3+1",
+          "cached_value": "#VALUE!",
+          "error_type": "Value"
+        },
+        "A5": {
+          "formula": "1/0",
+          "cached_value": "#DIV/0!",
+          "error_type": "DivZero"
+        },
+        "A6": {
+          "value": "日本語_015 東京"
+        },
+        "A7": {
+          "formula": "SUM(10,20)",
+          "cached_value": 30
+        },
+        "A8": {
+          "value": "END_METADATA_015"
+        }
+      },
+      "ignored_errors": {
+        "native_ui_actions": [
+          "Tools > Error Checking > Ignore Error on A5",
+          "Tools > Error Checking > Ignore Error on A4",
+          "Error Checking reported complete"
+        ],
+        "range": "A4:A5",
+        "error_kind": "evalError"
+      },
+      "cell_watch": {
+        "native_ui": "Formulas > Watch Window > Add Watch",
+        "watched_cell": "Sheet1!A7",
+        "native_reopen_persisted": true,
+        "xls_reopen_value_and_formula": {
+          "value": 30,
+          "formula": "SUM(10,20)"
+        }
+      },
+      "classic_note": {
+        "cell": "A1",
+        "kind": "legacy classic note",
+        "author": "Ryker Zhu",
+        "body": "NOTE_FALLBACK_015: native New Comment produced a legacy note.",
+        "native_review_commands_observed": [
+          "Edit Comment",
+          "Delete",
+          "Show Hide",
+          "Show All"
+        ],
+        "threaded_reply_ui_observed": false
+      },
+      "sheet_background": {
+        "source": "test-data/iwork/keynote/media-replacement-assets/poster.png",
+        "source_size": 1698,
+        "source_sha256": "d594d8f832d3ab38d03e0d06316d2fa5e401217e50e21e01814e593d752da3e8",
+        "native_action": "Format > Sheet Background",
+        "embedded_image_hash_matches_source_in_xlsx_and_xlsb": true
+      },
+      "phonetic_search_observation": "Native search Phonetic exposed only Find/Replace; the Format menu did not expose Phonetic."
+    },
+    "source_sheets": {
+      "Source_A_015": {
+        "dimension": "A1:B3",
+        "cells": {
+          "A1": "Item_015",
+          "B1": "Amount_015",
+          "A2": "ALPHA_015",
+          "B2": 10,
+          "A3": "BETA_015",
+          "B3": 20
+        }
+      },
+      "Source_B_015": {
+        "dimension": "A1:B3",
+        "cells": {
+          "A1": "Item_015",
+          "B1": "Amount_015",
+          "A2": "ALPHA_015",
+          "B2": 5,
+          "A3": "BETA_015",
+          "B3": 7
+        }
+      }
+    },
+    "consolidated_sheet": {
+      "sheet": "Consolidated_015",
+      "dimension": "A1:C9",
+      "marker": "CONSOLIDATION_015",
+      "native_operation": {
+        "menu": "Data > Consolidate",
+        "function": "Sum",
+        "references": [
+          "Source_A_015!$A$1:$B$3",
+          "Source_B_015!$A$1:$B$3"
+        ],
+        "top_row": true,
+        "left_column": true,
+        "create_links": true,
+        "destination": "A3"
+      },
+      "linked_result_cells": {
+        "C4": {
+          "formula": "Source_A_015!$B$2",
+          "cached_value": 10
+        },
+        "C5": {
+          "formula": "Source_B_015!$B$2",
+          "cached_value": 5
+        },
+        "C6": {
+          "formula": "SUM(C4:C5)",
+          "cached_value": 15
+        },
+        "C7": {
+          "formula": "Source_A_015!$B$3",
+          "cached_value": 20
+        },
+        "C8": {
+          "formula": "Source_B_015!$B$3",
+          "cached_value": 7
+        },
+        "C9": {
+          "formula": "SUM(C7:C8)",
+          "cached_value": 27
+        }
+      },
+      "hidden_source_detail_rows": [
+        4,
+        5,
+        7,
+        8
+      ],
+      "outlined_rows": [
+        4,
+        5,
+        7,
+        8
+      ],
+      "collapsed_rows": [
+        5,
+        6,
+        8,
+        9
+      ],
+      "native_xls_reopen_verified": true
+    },
+    "print_sheet": {
+      "sheet": "Print_015",
+      "dimension": "A1:B4",
+      "cells": {
+        "A1": "HEADER_PICTURE_015",
+        "B1": "Native print metadata",
+        "A2": 1,
+        "B2": 42,
+        "A3": 2,
+        "B3": 84,
+        "A4": "END_PRINT_015"
+      },
+      "page_setup": {
+        "orientation": "portrait",
+        "horizontal_dpi": 0,
+        "vertical_dpi": 0
+      },
+      "odd_header": {
+        "left": "HEADER_IMAGE_015",
+        "center": "&[Picture]poster.png",
+        "right": "Page &P of &N"
+      },
+      "odd_footer": {
+        "left": "&[Picture]",
+        "right": "FOOTER_IMAGE_015"
+      },
+      "source_picture": "test-data/iwork/keynote/media-replacement-assets/poster.png",
+      "native_xls_reopen_verified": true
+    }
+  },
+  "format_observations": {
+    "xlsx": {
+      "container": "OPC ZIP",
+      "bytes": 17941,
+      "sha256": "dedee8a1ee2175267630a652d4a60f2e495abc5eac8086ee27b73d2d5ce29d78",
+      "zip_integrity": "pass",
+      "member_count": 22,
+      "main_workbook_content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml",
+      "spreadsheetml_namespace": "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+      "workbook_sheet_order": [
+        "Sheet1",
+        "Source_A_015",
+        "Source_B_015",
+        "Consolidated_015",
+        "Print_015"
+      ],
+      "active_tab": 4,
+      "selected_members": {
+        "xl/workbook.xml": {
+          "bytes": 2501,
+          "sha256": "f7638f72dfecd06f9ce7c0bb1e0a054960b511bd7a3831b3238d5916ff47d83"
+        },
+        "xl/worksheets/sheet1.xml": {
+          "bytes": 2026,
+          "sha256": "f4cff28ca1e3a66a17e19214c0a7b7c656f93f331cfd3b1c2d456775c7ddd547"
+        },
+        "xl/worksheets/sheet4.xml": {
+          "bytes": 2401,
+          "sha256": "45deb1a49fced46fbb0be63117f0b73bd2ac81129494dca510fd38034f78d523"
+        },
+        "xl/worksheets/sheet5.xml": {
+          "bytes": 1845,
+          "sha256": "f4e9db25e43d51f2f16e006c278aaf9cf82a42c4e6d1c791cb52512e3026f086"
+        },
+        "xl/sharedStrings.xml": {
+          "bytes": 1015,
+          "sha256": "65daa36b3a041c0265772119bdba596d6b1de80a184e6229d3a6600f0405a9f5"
+        },
+        "xl/comments1.xml": {
+          "bytes": 892,
+          "sha256": "cfe8a50f11d09bdad4269534045f051bcaf25c71aefed2238544989895a73ae6"
+        },
+        "xl/drawings/vmlDrawing1.vml": {
+          "bytes": 1150,
+          "sha256": "2c598738b4c1791e3caf96e0f5bd9856bab3b890ebdebafd9d0cbadd0829008e"
+        },
+        "xl/drawings/vmlDrawing2.vml": {
+          "bytes": 1507,
+          "sha256": "e3f137e8cde4570b0e76d9175f2e94bb514be87474f7156bf7bb612f6ce96acc"
+        },
+        "xl/media/image1.png": {
+          "bytes": 1698,
+          "sha256": "d594d8f832d3ab38d03e0d06316d2fa5e401217e50e21e01814e593d752da3e8"
+        },
+        "xl/calcChain.xml": {
+          "bytes": 305,
+          "sha256": "49eeb50937c04e65f824e579a9868273e2fa7112a6d5fcac4b355eed9bb93817"
+        }
+      }
+    },
+    "xlsb": {
+      "container": "OPC ZIP with BIFF12 binary parts",
+      "bytes": 17073,
+      "sha256": "953ae52533e2774aaa57c1336b858bbf2c4573993d48f71a9634593912c30fb9",
+      "zip_integrity": "pass",
+      "member_count": 30,
+      "main_workbook_content_type": "application/vnd.ms-excel.sheet.binary.macroEnabled.main",
+      "selected_members": {
+        "xl/workbook.bin": {
+          "bytes": 1127,
+          "sha256": "b743f26a4af212962d095652678652129026c3e6ade8fd632742896ffbdcfee6"
+        },
+        "xl/worksheets/sheet1.bin": {
+          "bytes": 920,
+          "sha256": "0fb18bf7e3d4b634f93cbb7ebd2bef8f715c60b2e52751f45ec618b1d47122ac"
+        },
+        "xl/worksheets/sheet4.bin": {
+          "bytes": 1186,
+          "sha256": "d4fe6c1a38901249f39d7fdcbaf970363d9d7fe8de68a45c33a85f119eaa36d3"
+        },
+        "xl/worksheets/sheet5.bin": {
+          "bytes": 1105,
+          "sha256": "6f7b9a98a3b0226eeea270557a6047440b47eb6fc3329f66e44d170ce00c0025"
+        },
+        "xl/sharedStrings.bin": {
+          "bytes": 563,
+          "sha256": "24199b4cb18e480efbd62f5df3618a3032cb44b44bca55f9178fb76ea2394540"
+        },
+        "xl/comments1.bin": {
+          "bytes": 283,
+          "sha256": "f8bd19438d4424e543a4a1ed9d119244cdd3191b1b0526c1ed00c4d508feebc6"
+        },
+        "xl/drawings/vmlDrawing1.vml": {
+          "bytes": 1150,
+          "sha256": "2c598738b4c1791e3caf96e0f5bd9856bab3b890ebdebafd9d0cbadd0829008e"
+        },
+        "xl/drawings/vmlDrawing2.vml": {
+          "bytes": 1507,
+          "sha256": "e3f137e8cde4570b0e76d9175f2e94bb514be87474f7156bf7bb612f6ce96acc"
+        },
+        "xl/media/image1.png": {
+          "bytes": 1698,
+          "sha256": "d594d8f832d3ab38d03e0d06316d2fa5e401217e50e21e01814e593d752da3e8"
+        },
+        "xl/calcChain.bin": {
+          "bytes": 141,
+          "sha256": "d49a3d26eb038702a7faf8699b675d0259cbfd7ad339a2ed0d3b7d5aa48c153f"
+        }
+      }
+    },
+    "xls": {
+      "container": "CFB/OLE2 BIFF8 workbook",
+      "bytes": 206848,
+      "sha256": "1b3b21d5bea5f8502bac2367cfdca2dc058f8e126b01631c61d19260d3ebc6b1",
+      "workbook_stream_bytes": 195402,
+      "native_reopen": "pass without repair",
+      "boundsheet8_count": 5,
+      "boundsheet8_records": [
+        {
+          "offset": "0x002EB5",
+          "record": "0x0085",
+          "payload_length": 14,
+          "sheet_stream_offset": "0x0045B6",
+          "sheet_name": "Sheet1"
+        },
+        {
+          "offset": "0x002EC7",
+          "record": "0x0085",
+          "payload_length": 20,
+          "sheet_stream_offset": "0x02EE4E",
+          "sheet_name": "Source_A_015"
+        },
+        {
+          "offset": "0x002EDF",
+          "record": "0x0085",
+          "payload_length": 20,
+          "sheet_stream_offset": "0x02F076",
+          "sheet_name": "Source_B_015"
+        },
+        {
+          "offset": "0x002EF7",
+          "record": "0x0085",
+          "payload_length": 24,
+          "sheet_stream_offset": "0x02F29E",
+          "sheet_name": "Consolidated_015"
+        },
+        {
+          "offset": "0x002F13",
+          "record": "0x0085",
+          "payload_length": 17,
+          "sheet_stream_offset": "0x02F692",
+          "sheet_name": "Print_015"
+        }
+      ],
+      "sheet_stream_end_offsets": [
+        "0x02EE4A",
+        "0x02F072",
+        "0x02F29A",
+        "0x02F68E",
+        "0x02FB46"
+      ]
+    }
+  },
+  "binary_record_invariants": {
+    "xlsx_xml": {
+      "sheet1": {
+        "dimension": "A1:B8",
+        "cellWatches": {
+          "cellWatch": "A7"
+        },
+        "ignoredErrors": {
+          "sqref": "A4:A5",
+          "evalError": "1"
+        },
+        "formula_cells": {
+          "A4": {
+            "formula": "A3+1",
+            "type": "e",
+            "cached": "#VALUE!"
+          },
+          "A5": {
+            "formula": "1/0",
+            "type": "e",
+            "cached": "#DIV/0!"
+          },
+          "A7": {
+            "formula": "SUM(10,20)",
+            "cached": 30
+          }
+        },
+        "relationships": {
+          "rId1": "../drawings/vmlDrawing1.vml",
+          "rId2": "../media/image1.png",
+          "rId3": "../comments1.xml"
+        }
+      },
+      "rich_shared_string": {
+        "part": "xl/sharedStrings.xml",
+        "count": 25,
+        "unique_count": 15,
+        "rich_item_index": 5,
+        "runs": [
+          {
+            "text": "RICH_TEXT_015 ",
+            "bold": false,
+            "italic": false
+          },
+          {
+            "text": "bold",
+            "bold": true,
+            "italic": false,
+            "font": "Aptos Narrow",
+            "font_size": 12
+          },
+          {
+            "text": " ",
+            "bold": false,
+            "italic": false,
+            "font": "Aptos Narrow",
+            "font_size": 12
+          },
+          {
+            "text": "italic",
+            "bold": false,
+            "italic": true,
+            "font": "Aptos Narrow",
+            "font_size": 12
+          }
+        ]
+      },
+      "comments": {
+        "part": "xl/comments1.xml",
+        "author": "Ryker Zhu",
+        "reference": "A1",
+        "body": "NOTE_FALLBACK_015: native New Comment produced a legacy note."
+      },
+      "sheet4_dataConsolidate": {
+        "element": "dataConsolidate",
+        "function": "Sum",
+        "leftLabels": "1",
+        "topLabels": "1",
+        "link": "1",
+        "dataRefs_count": 2,
+        "references": [
+          {
+            "sheet": "Source_A_015",
+            "ref": "A1:B3"
+          },
+          {
+            "sheet": "Source_B_015",
+            "ref": "A1:B3"
+          }
+        ],
+        "linked_formula_caches": {
+          "C4": 10,
+          "C5": 5,
+          "C6": 15,
+          "C7": 20,
+          "C8": 7,
+          "C9": 27
+        }
+      },
+      "sheet5_header_footer": {
+        "pageSetup": {
+          "orientation": "portrait",
+          "horizontalDpi": "0",
+          "verticalDpi": "0"
+        },
+        "oddHeader_raw": "&L&\"Aptos Narrow,Regular\"&K000000HEADER_IMAGE_015&C&\"Aptos Narrow,Regular\"&K000000&G&R&\"Aptos Narrow,Regular\"&K000000Page &P of &N",
+        "oddFooter_raw": "&L&\"Aptos Narrow,Regular\"&K000000&G&R&\"Aptos Narrow,Regular\"&K000000FOOTER_IMAGE_015",
+        "header_footer_picture_vml": "xl/drawings/vmlDrawing2.vml",
+        "header_footer_picture_relationship": "rId1 -> ../media/image1.png"
+      },
+      "calcChain": {
+        "part": "xl/calcChain.xml",
+        "entries": [
+          "Consolidated_015!C4",
+          "Consolidated_015!C5",
+          "Consolidated_015!C6",
+          "Consolidated_015!C7",
+          "Consolidated_015!C8",
+          "Consolidated_015!C9",
+          "Sheet1!A4",
+          "Sheet1!A5",
+          "Sheet1!A7"
+        ]
+      }
+    },
+    "xlsb_biff12": {
+      "shared_strings": {
+        "record_sequence": [
+          "0x009F BrtBeginSst",
+          "15 x 0x0013 BrtSstItem",
+          "0x00A0 BrtEndSst"
+        ],
+        "count": 25,
+        "unique_count": 15,
+        "rich_item_index": 5,
+        "rich_item_offset": "0x00CE",
+        "rich_item_payload_length": 71,
+        "rich_item_payload_prefix_hex": "01 19 00 00 00"
+      },
+      "sheet1_records": {
+        "cell_watch_collection": {
+          "begin_kind": "0x025D",
+          "cell_watch_kind": "0x025F",
+          "cell_watch_offset": "0x032B",
+          "payload_length": 8,
+          "payload_hex": "06 00 00 00 00 00 00 00",
+          "decoded_reference": "A7",
+          "end_kind": "0x025E"
+        },
+        "ignored_errors_collection": {
+          "begin_kind": "0x0288",
+          "cell_ignore_error_kind": "0x0289",
+          "cell_ignore_error_offset": "0x033C",
+          "payload_length": 24,
+          "payload_hex": "01 00 00 00 01 00 00 00 03 00 00 00 04 00 00 00 00 00 00 00 00 00 00 00",
+          "decoded_range": "A4:A5 / evalError",
+          "end_kind": "0x028A"
+        },
+        "legacy_drawing": [
+          {
+            "kind": "0x0227",
+            "offset": "0x035A",
+            "payload_length": 12,
+            "relationship": "rId2 -> comments VML"
+          },
+          {
+            "kind": "0x0232",
+            "offset": "0x0369",
+            "payload_length": 12,
+            "relationship": "rId3 -> sheet background image"
+          }
+        ]
+      },
+      "comments": {
+        "part": "xl/comments1.bin",
+        "author_record": "0x0278 COMMENT_AUTHOR: Ryker Zhu",
+        "comment_record": "0x027B COMMENT at A1",
+        "comment_text_record": "0x027D includes NOTE_FALLBACK_015 body"
+      },
+      "sheet4_consolidation_records": {
+        "begin_kind": "0x01EF BrtBeginDCon",
+        "begin_refs_kind": "0x01F1 BrtBeginDRefs",
+        "dref_kind": "0x01F3 BrtDRef",
+        "dref_count": 2,
+        "dref_payload_lengths": [
+          54,
+          54
+        ],
+        "source_names": [
+          "Source_A_015",
+          "Source_B_015"
+        ],
+        "source_range": "$A$1:$B$3",
+        "end_refs_kind": "0x01F2",
+        "end_kind": "0x01F0",
+        "linked_formula_caches": {
+          "C4": 10,
+          "C5": 5,
+          "C6": 15,
+          "C7": 20,
+          "C8": 7,
+          "C9": 27
+        }
+      },
+      "sheet5_print_records": {
+        "page_setup": {
+          "kind": "0x01DE",
+          "offset": "0x022C",
+          "payload_length": 38
+        },
+        "header_footer": {
+          "begin_kind": "0x01DF",
+          "offset": "0x0255",
+          "payload_length": 454,
+          "end_kind": "0x01E0",
+          "contains": [
+            "HEADER_IMAGE_015",
+            "&G",
+            "Page &P of &N",
+            "FOOTER_IMAGE_015"
+          ]
+        },
+        "header_footer_legacy_drawing": {
+          "kind": "0x0228",
+          "offset": "0x0422",
+          "payload_length": 12,
+          "relationship": "rId2 -> vmlDrawing2.vml"
+        }
+      },
+      "calc_chain": {
+        "part": "xl/calcChain.bin",
+        "begin_kind": "0x0210",
+        "formula_record_count": 9,
+        "formula_cells": [
+          "Consolidated_015!C4",
+          "Consolidated_015!C5",
+          "Consolidated_015!C6",
+          "Consolidated_015!C7",
+          "Consolidated_015!C8",
+          "Consolidated_015!C9",
+          "Sheet1!A4",
+          "Sheet1!A5",
+          "Sheet1!A7"
+        ],
+        "end_kind": "0x0211"
+      }
+    },
+    "xls_biff8": {
+      "rich_sst": {
+        "record": "0x00FC SST",
+        "rich_string_index": 5,
+        "typed_properties": {
+          "formatting_runs": [
+            {
+              "character_index": 14,
+              "font_index": 8,
+              "font": "Aptos Narrow bold"
+            },
+            {
+              "character_index": 18,
+              "font_index": 0,
+              "font": "plain"
+            },
+            {
+              "character_index": 19,
+              "font_index": 7,
+              "font": "Aptos Narrow italic"
+            }
+          ],
+          "phonetic": null
+        }
+      },
+      "cell_watch": {
+        "record": "0x086C CellWatch",
+        "offset": "0x02EDD9",
+        "payload_length": 16,
+        "payload_hex": "6C 08 01 00 06 00 06 00 00 00 00 00 00 00 00 00",
+        "decoded_reference": "A7"
+      },
+      "background_image": {
+        "record": "0x00E9 BkHim",
+        "first_offset": "0x0046CC",
+        "format": "Bitmap (0x0009)",
+        "reserved": "0x0001",
+        "declared_image_bytes": 172812,
+        "continue_record_count": 21,
+        "combined_payload_image_bytes": 172812,
+        "image_source": "native Excel BIFF8 embedding of poster.png; opaque payload retained by parser"
+      },
+      "consolidation": {
+        "dcon": {
+          "record": "0x0050 DCON",
+          "offset": "0x02F5F6",
+          "payload_length": 8,
+          "payload_hex": "08 00 00 00 01 00 01 00",
+          "function_code": 8,
+          "function": "Sum",
+          "left_labels": true,
+          "top_labels": true,
+          "create_links": true
+        },
+        "dconref": [
+          {
+            "record": "0x0051 DCONREF",
+            "offset": "0x02F602",
+            "payload_length": 22,
+            "source": "Source_A_015",
+            "range": "$A$1:$B$3"
+          },
+          {
+            "record": "0x0051 DCONREF",
+            "offset": "0x02F61C",
+            "payload_length": 22,
+            "source": "Source_B_015",
+            "range": "$A$1:$B$3"
+          }
+        ],
+        "linked_formula_caches": {
+          "C4": 10,
+          "C5": 5,
+          "C6": 15,
+          "C7": 20,
+          "C8": 7,
+          "C9": 27
+        }
+      },
+      "header_footer_text": {
+        "header_record": {
+          "record": "0x0014 HEADER",
+          "offset": "0x02F714",
+          "payload_length": 133,
+          "contains": [
+            "HEADER_IMAGE_015",
+            "&G",
+            "Page &P of &N"
+          ]
+        },
+        "footer_record": {
+          "record": "0x0015 FOOTER",
+          "offset": "0x02F79D",
+          "payload_length": 87,
+          "contains": [
+            "&G",
+            "FOOTER_IMAGE_015"
+          ]
+        }
+      },
+      "header_footer_pictures": [
+        {
+          "record": "0x0866 HFPicture",
+          "offset": "0x02F86",
+          "payload_length": 1905,
+          "flags": "fIsDrawingGroup=1",
+          "png_signature_relative_offset": 163
+        },
+        {
+          "record": "0x0866 HFPicture",
+          "offset": "0x02F9C8",
+          "payload_length": 290,
+          "flags": "fIsDrawing=1",
+          "png_signature_present": false
+        }
+      ],
+      "formula_errors": {
+        "formula_record": "0x0006",
+        "formula_count": 9,
+        "A4_error": "Error 15 (#VALUE!)",
+        "A5_error": "Error 7 (#DIV/0!)"
+      }
+    }
+  },
+  "reader_observations": {
+    "xlsx_typed_reader": {
+      "command": "cargo run -p litchi-xlsx --example read_xlsx -- test-data/microsoft-office/excel/excel-metadata.xlsx",
+      "exit_status": 0,
+      "worksheet_count": 5,
+      "worksheet_names": [
+        "Sheet1",
+        "Source_A_015",
+        "Source_B_015",
+        "Consolidated_015",
+        "Print_015"
+      ],
+      "active_sheet": "Print_015",
+      "formula_cache_observations": {
+        "Sheet1!A4": "Error(Value)",
+        "Sheet1!A5": "Error(DivZero)",
+        "Sheet1!A7": "Number(30)",
+        "Consolidated_015!C4:C9": [
+          10,
+          5,
+          15,
+          20,
+          7,
+          27
+        ]
+      },
+      "metadata_api_probe": {
+        "Sheet1.ignored_errors": "Some(IgnoredErrors { entries: [IgnoredError { ranges: [IgnoredErrorRangeReference(\"A4:A5\")], flags: [false, false, true, false, false, false, false, false, false] }], extensions: [] })",
+        "Consolidated_015.data_consolidation": "Some(DataConsolidation { function: Sum, left_labels: true, start_labels: false, top_labels: true, link: true, data_references: Some(References { references: [Source_A_015!A1:B3, Source_B_015!A1:B3], declared_count: Some(2) }) })",
+        "Print_015.header_footer": "Some(Settings) with odd header left HEADER_IMAGE_015, center &G, right Page &P of &N; odd footer left &G, right FOOTER_IMAGE_015"
+      },
+      "raw_shared_string_probe": {
+        "table_count": 15,
+        "rich_item_index": 5,
+        "runs": "four runs with bold Aptos Narrow 12 on bold and italic Aptos Narrow 12 on italic"
+      }
+    },
+    "xlsb_reader": {
+      "package_and_record_probe": {
+        "command": "cargo run -p litchi --example dump_xlsb_structure --features ooxml --no-default-features -- test-data/microsoft-office/excel/excel-metadata.xlsb",
+        "exit_status": 0,
+        "parts_reported": 21,
+        "record_families_reported": true
+      },
+      "high_level_reader_probe": {
+        "command": "cargo run -p litchi --example xlsb_reader --features ooxml --no-default-features -- test-data/microsoft-office/excel/excel-metadata.xlsb",
+        "outcome": "no output within 30 seconds; interrupted with exit 130",
+        "interpretation": "No typed high-level XLSB success is claimed. Raw BIFF12 package/record inspection is the bounded evidence for this fixture."
+      },
+      "raw_evidence": "Cell-watch, ignored-error, data-consolidation, comments, page-setup/header-footer, and calc-chain records were located and decoded at the offsets recorded in binary_record_invariants.xlsb_biff12."
+    },
+    "xls_typed_reader": {
+      "command": "cargo run -p litchi-xls --example read_xls -- test-data/microsoft-office/excel/excel-metadata.xls",
+      "exit_status": 0,
+      "worksheet_count_reported": 3,
+      "worksheet_names_reported": [
+        "Sheet1",
+        "Source_A_015",
+        "Source_B_015"
+      ],
+      "sheet1_cells_reported": {
+        "A1": "EXCEL_METADATA_015",
+        "B1": "Fixture ID: excel-metadata-015",
+        "A2": "RICH_TEXT_015 bold italic",
+        "A3": "'00123",
+        "A4": "#ERR(Error 15)",
+        "A5": "#ERR(Error 7)",
+        "A6": "Japanese",
+        "A7": 30,
+        "A8": "END_METADATA_015"
+      },
+      "comments_reported": 1,
+      "date_system_reported_1904": false,
+      "reader_boundary": "The raw BIFF8 workbook contains five BOUNDSHEET8 records and five worksheet substreams, but the typed read_xls example reports only the first three worksheets for this native file."
+    },
+    "xls_typed_metadata_probes": {
+      "shared_string_properties_index_5": "SharedStringProperties { formatting_runs: [{ character_index: 14, font_index: 8 }, { character_index: 18, font_index: 0 }, { character_index: 19, font_index: 7 }], phonetic: None }",
+      "public_api_surface": [
+        "Workbook::shared_string_properties",
+        "CellWatch::parse",
+        "BackgroundImage::parse",
+        "HeaderFooterPicture::parse",
+        "Consolidation"
+      ],
+      "opaque_picture_boundary": "BackgroundImage and HeaderFooterPicture preserve validated opaque BIFF8 image/OfficeArt payloads; they do not decode, render, or expose the native placement as a bitmap model."
+    }
+  },
+  "library_api_boundaries": {
+    "xlsx": {
+      "available": [
+        "Worksheet::ignored_errors",
+        "Worksheet::data_consolidation",
+        "Worksheet::header_footer",
+        "litchi_xlsx::parse_cell_watches",
+        "raw::shared_strings::Table::rich_text_runs",
+        "classic comments package parser"
+      ],
+      "boundary": "The simple Worksheet API does not expose the A1 classic note as a direct Worksheet::comments method; comments1.xml and its VML relationship are still present and the package comments model/parser exists. Sheet background and header/footer picture bytes are package relationships/VMl payloads rather than rendered image models."
+    },
+    "xlsb": {
+      "available": [
+        "raw BIFF12 record kinds for cell watches, ignored errors, data consolidation, comments, page setup, header/footer, and calc chain"
+      ],
+      "boundary": "The repository's high-level XLSB example did not complete within the probe window for this file; claims are limited to ZIP part and BIFF12 record inspection."
+    },
+    "xls": {
+      "available": [
+        "Workbook::shared_string_properties",
+        "CellWatch",
+        "BackgroundImage",
+        "HeaderFooterPicture",
+        "Consolidation"
+      ],
+      "boundary": "Typed BIFF8 worksheet enumeration reports three sheets even though raw BOUNDSHEET8 and substream inspection finds all five. Picture APIs preserve opaque payloads and do not render/anchor them."
+    }
+  },
+  "files": {
+    "test-data/microsoft-office/excel/excel-metadata.xlsx": {
+      "bytes": 17941,
+      "sha256": "dedee8a1ee2175267630a652d4a60f2e495abc5eac8086ee27b73d2d5ce29d78"
+    },
+    "test-data/microsoft-office/excel/excel-metadata.xlsb": {
+      "bytes": 17073,
+      "sha256": "953ae52533e2774aaa57c1336b858bbf2c4573993d48f71a9634593912c30fb9"
+    },
+    "test-data/microsoft-office/excel/excel-metadata.xls": {
+      "bytes": 206848,
+      "sha256": "1b3b21d5bea5f8502bac2367cfdca2dc058f8e126b01631c61d19260d3ebc6b1"
+    },
+    "test-data/iwork/keynote/media-replacement-assets/poster.png": {
+      "bytes": 1698,
+      "sha256": "d594d8f832d3ab38d03e0d06316d2fa5e401217e50e21e01814e593d752da3e8"
+    }
+  },
+  "validation_methods": [
+    "Native Excel reopened and closed all three final variants without a repair prompt.",
+    "ZIP member counts, selected part lengths, and SHA-256 values were recomputed from the closed XLSX/XLSB packages.",
+    "XLSX typed and raw metadata probes completed successfully; XLSB package/record probe completed; XLS BIFF8 typed and raw probes completed.",
+    "No source code, common metadata, or fixture bytes were edited during this inspection."
+  ]
+}

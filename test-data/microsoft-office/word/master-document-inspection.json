@@ -1,0 +1,127 @@
+{
+  "schema_version": 1,
+  "fixture_id": "word-master-document-017",
+  "generated_on": "2026-10-15",
+  "purpose": "Read-only inspection of native Microsoft Word master documents and their extensionless OOXML and CFB subdocument files.",
+  "provenance": {
+    "producer_app": "Microsoft Office Word",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft Word UI",
+    "source": "The modern parent was authored in fresh native Word and Outline > Show Document > Create generated CHILD after the child line was set to Heading 1. A modern Save As DOC attempt failed because Word encountered the generated child filename collision; failed outputs were moved outside the fixture set. A separate fresh native Word DOC was authored for the legacy pair and Outline > Create generated LEGACY. The modern and legacy pairs are independent native producer routes.",
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "shared_common_metadata_modified": false,
+    "office_files_modified_after_native_save": false,
+    "all_documents_closed_before_hashing": true,
+    "all_documents_reopened_without_repair": true,
+    "fixture_files_are_closed_after_reopen": true,
+    "failed_conversion_outputs_excluded_from_fixtures": "/tmp/litchi-office-failed-master-conversions-20261015",
+    "auditor": "/root/word_remaining_audit"
+  },
+  "files": [
+    {"path": "test-data/microsoft-office/word/word-master-document.docx", "format": "docx", "role": "native OOXML master parent", "bytes": 13425, "sha256": "c4b5d694a175ddc2d7f17dd6b5281c28f74acfe4f67ff3f9729c8ea841626f6a", "native_reopen": "pass"},
+    {"path": "test-data/microsoft-office/word/word-master-document/CHILD", "format": "docx (extensionless OOXML)", "role": "native OOXML subdocument", "bytes": 12461, "sha256": "4052af1a9227fca1a652f811f9d51c1d67ad290838cbcb6fa74fe64f5e5a9332", "native_reopen": "pass"},
+    {"path": "test-data/microsoft-office/word/word-master-native.doc", "format": "doc", "role": "independently authored native Word 97-2003 master parent", "bytes": 25088, "sha256": "0fa511c1c0e5e04f6c4d9071d4e27c301581c57980bcb01375c15f16c745ed7b", "native_reopen": "pass"},
+    {"path": "test-data/microsoft-office/word/word-master-native/LEGACY", "format": "doc (extensionless CFB)", "role": "native Word 97-2003 subdocument", "bytes": 22528, "sha256": "7c579350d652a6f0b261aeb762b2f071dfadcf5b54651c6b839ae32b3420b9bb", "native_reopen": "pass"}
+  ],
+  "content_markers": {
+    "modern_parent": ["WORD_MASTER_DOCUMENT_017", "Fixture ID: word-master-document-017", "END_MASTER_017"],
+    "modern_child": ["CHILD_SECTION_017", "Native master-document child content."],
+    "legacy_parent": ["WORD_MASTER_LEGACY_017", "Fixture ID: word-master-legacy-017", "END_LEGACY_MASTER_017"],
+    "legacy_child": ["LEGACY_CHILD_SECTION_017", "Native legacy subdocument content."]
+  },
+  "coverage": [
+    {"feature": "Native OOXML master document and extensionless child", "status": "evidenced_raw_package", "evidence": "The modern parent contains one w:subDoc in the END_MASTER_017 paragraph. rId4 is a standard subDocument relationship with Target=word-master-document/CHILD and TargetMode=External. The adjacent extensionless CHILD is a complete independently readable WordprocessingML package and is not a ZIP member of the parent."},
+    {"feature": "Native binary master document and extensionless child", "status": "evidenced_typed_and_raw", "evidence": "The legacy parent has nonzero FIB PlcfWKB index 54 and SttbFnm index 72 tables. litchi-doc reports one reference and resolves FNPI 0x0005 to the exact SttbFnm path for LEGACY. The child is a valid independent Word 97 CFB with empty master-document tables."},
+    {"feature": "Reference path closure", "status": "evidenced_with_portability_boundary", "evidence": "The OOXML external relationship stores word-master-document/CHILD and the adjacent fixture exists. The DOC SttbFnm stores an absolute macOS path, while FNIF ichRelative exposes the portable suffix word-master-native/LEGACY. The library exposes these paths verbatim and never opens or follows either child."},
+    {"feature": "Modern-to-legacy conversion", "status": "not_available_in_fixture_set", "evidence": "The modern Save As DOC attempt failed before producing a valid conversion because of Word's generated child filename collision. The legacy pair was authored independently; no OOXML-to-CFB parity claim is made."}
+  ],
+  "docx": {
+    "container": {
+      "kind": "OPC ZIP",
+      "zip_test": "pass",
+      "xml_validation": "pass",
+      "member_count": 11,
+      "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
+      "external_targets": [{"source_part": "/word/document.xml", "relationship_id": "rId4", "relationship_type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/subDocument", "target": "word-master-document/CHILD", "target_mode": "External", "adjacent_fixture_path": "test-data/microsoft-office/word/word-master-document/CHILD", "adjacent_fixture_exists": true, "target_is_not_a_parent_zip_member": true}]
+    },
+    "main_document": {
+      "source_member": "word/document.xml",
+      "xml_counts": {"w:p": 4, "w:r": 3, "w:t": 3, "w:subDoc": 1, "w:sectPr": 2, "w:pStyle": 0},
+      "paragraph_text": ["WORD_MASTER_DOCUMENT_017", "Fixture ID: word-master-document-017", "", "END_MASTER_017"],
+      "subdocument_anchor": {"paragraph_marker": "END_MASTER_017", "element": "w:subDoc", "relationship_id": "rId4", "same_paragraph_as_marker": true, "relative_order": "w:subDoc precedes the following w:r/w:t marker"},
+      "document_relationship_count": 6,
+      "subdocument_relationship": {"id": "rId4", "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/subDocument", "target": "word-master-document/CHILD", "target_mode": "External"}
+    },
+    "parent_members": [
+      {"path": "[Content_Types].xml", "bytes": 1312, "sha256": "dfa90f373b8fd8147ee3e4bfe1ee059e536cc1b068f7ec140c3fc0e6554f331a"},
+      {"path": "_rels/.rels", "bytes": 590, "sha256": "e19238d7a71fa7a2490776252686f70e2de6238c87cd509b5e3a3cc07c2ea4df"},
+      {"path": "word/document.xml", "bytes": 3808, "sha256": "7ff36dcaff1795fbf84d675f5c3dd71e348f534b20de3bcfa0d190307d3f9311"},
+      {"path": "word/_rels/document.xml.rels", "bytes": 987, "sha256": "17da297a9f518c06601289ab9adacacd325c31bba7d9ab4b3eb821791c5042a9"},
+      {"path": "word/theme/theme1.xml", "bytes": 8397, "sha256": "2760e6e84d4bf365af6570192dbe9cb57bb32653388d0ea041d116b25b1ca0a2"},
+      {"path": "word/settings.xml", "bytes": 3236, "sha256": "50fff75ff88fc310a2351ab1a9caaf7556dd9b45c2ebb47b77ca1082618343de"},
+      {"path": "word/styles.xml", "bytes": 42760, "sha256": "283c82b5f21d6bfaf590c36e4ee8bcf0ac03094fda9e0b98264ce109493bf824"},
+      {"path": "word/webSettings.xml", "bytes": 1069, "sha256": "9d21da07e99d87dfe36f6587ccc669539495e7130c513a0b63e3df49d2d71bd1"},
+      {"path": "word/fontTable.xml", "bytes": 1831, "sha256": "88dd0cd28c13a48d979681218c86597fe170a188fc9e3f73ad934b150c47b237"},
+      {"path": "docProps/core.xml", "bytes": 745, "sha256": "3ae08e9ff43d5e9ef3714e61b2d8a92c89f619e76c9cfdd69729961853339af0"},
+      {"path": "docProps/app.xml", "bytes": 711, "sha256": "72cf035069a81e3efea5ce9fc0be3387f1641bd7c6c139b70bb1ca2566d37049"}
+    ],
+    "child_package": {
+      "path": "test-data/microsoft-office/word/word-master-document/CHILD",
+      "extensionless": true,
+      "outbound_external_relationships": 0,
+      "xml_counts": {"w:p": 4, "w:r": 2, "w:t": 2, "w:subDoc": 0, "w:sectPr": 2, "w:pStyle": 1},
+      "paragraph_text": ["CHILD_SECTION_017", "Native master-document child content.", "", ""],
+      "first_paragraph_style": "Heading1",
+      "members": [
+        {"path": "[Content_Types].xml", "bytes": 1312, "sha256": "dfa90f373b8fd8147ee3e4bfe1ee059e536cc1b068f7ec140c3fc0e6554f331a"},
+        {"path": "_rels/.rels", "bytes": 590, "sha256": "e19238d7a71fa7a2490776252686f70e2de6238c87cd509b5e3a3cc07c2ea4df"},
+        {"path": "word/document.xml", "bytes": 3608, "sha256": "464b2a27099c234cfc791abf41a5e9f4d376436f3f3fa8b510de373d3807c71d"},
+        {"path": "word/_rels/document.xml.rels", "bytes": 817, "sha256": "b725d5476e76f555fc24ecb908474fd29b671687336e5e1177a5c4c35cb5939f"},
+        {"path": "word/theme/theme1.xml", "bytes": 8717, "sha256": "e7948e69d1ab51203d82e7e57d491987a16229547a1b6bfd124133a3a895c0ac"},
+        {"path": "word/settings.xml", "bytes": 3001, "sha256": "72cf540619da34355438ec81879a0e0f17e7af1a81409c83a43dcaf418849fbc"},
+        {"path": "word/styles.xml", "bytes": 30737, "sha256": "9692dc541e851c026e48c9a0e27584f4afc24b7b3d70db2d609351ca918e306d"},
+        {"path": "word/webSettings.xml", "bytes": 1069, "sha256": "9d21da07e99d87dfe36f6587ccc669539495e7130c513a0b63e3df49d2d71bd1"},
+        {"path": "word/fontTable.xml", "bytes": 1831, "sha256": "88dd0cd28c13a48d979681218c86597fe170a188fc9e3f73ad934b150c47b237"},
+        {"path": "docProps/core.xml", "bytes": 653, "sha256": "17449a40946d9ffeea652147e0f760d634974020382dd1d1758a0b094a14533e"},
+        {"path": "docProps/app.xml", "bytes": 711, "sha256": "55b30a072d191a8126214a1d91bb4da895b998f133fcd5d9b36a9b3c0f235685"}
+      ]
+    }
+  },
+  "doc": {
+    "container": {"kind": "OLE2 Compound File Binary", "file_utility_type": "Composite Document File V2, MacOS, code page 10000, Template Normal.dotm", "stream_count": 5},
+    "master": {
+      "path": "test-data/microsoft-office/word/word-master-native.doc",
+      "stream_inventory": [{"path": "/1Table", "bytes": 9311}, {"path": "/\u0001CompObj", "bytes": 114}, {"path": "/WordDocument", "bytes": 4096}, {"path": "/\u0005SummaryInformation", "bytes": 4096}, {"path": "/\u0005DocumentSummaryInformation", "bytes": 4096}],
+      "fib": {"nFib": "0x00C1", "version_name": "Word 97", "table_stream": "1Table", "main_document_char_count": 81, "pointers": {"PlcfWKB": {"index": 54, "offset": 7778, "length": 20}, "SttbFnm": {"index": 72, "offset": 7798, "length": 196}}},
+      "main_story": {"paragraph_count": 3, "table_count": 0, "typed_text_characters": 81, "paragraph_text": ["WORD_MASTER_LEGACY_017", "Fixture ID: word-master-legacy-017", "\fEND_LEGACY_MASTER_017"], "raw_typed_text": "WORD_MASTER_LEGACY_017\rFixture ID: word-master-legacy-017\r\u000cEND_LEGACY_MASTER_017\r"},
+      "plcf_wkb": {"fib_index": 54, "offset": 7778, "length": 20, "hex": "3B00000053000000000024000200050000000000", "count": 1, "positions": [59, 83], "wkb": {"raw_hex": "000024000200050000000000", "fn": 0, "flags": "0x0024", "outline_level": 2, "fnpi": "0x0005", "fnpi_type": 5, "fnpi_identifier": 0, "pdod": 0}},
+      "sttb_fnm": {"fib_index": 72, "offset": 7798, "length": 196, "hex": "FFFF010008005A002F00550073006500720073002F00720079006B00650072002F0043006F0064006500500072006F006A0065006300740073002F006C00690074006300680069002F0074006500730074002D0064006100740061002F006D006900630072006F0073006F00660074002D006F00660066006900630065002F0077006F00720064002F0077006F00720064002D006D00610073007400650072002D006E00610074006900760065002F004C00450047004100430059000500410B00000000", "header": {"fExtend": "0xFFFF", "cData": 1, "cbExtra": 8}, "entry": {"cchData": 90, "path": "/Users/ryker/CodeProjects/litchi/test-data/microsoft-office/word/word-master-native/LEGACY", "fnif_hex": "0500410B00000000", "fnpi": "0x0005", "fnpi_type": 5, "fnpi_identifier": 0, "ichRelative": 65, "fnfb": "0x0B", "valid_on_fat": true, "valid_on_ntfs": true, "non_file_system_path": false, "unused_hex": "00000000"}},
+      "typed_subdocuments": {"collection_present": true, "referenced_file_count": 1, "reference_count": 1, "referenced_file": {"kind": "Subdocument", "identifier": 0, "path": "/Users/ryker/CodeProjects/litchi/test-data/microsoft-office/word/word-master-native/LEGACY", "relative_path_offset": 65, "relative_path": "word-master-native/LEGACY", "file_system_flags": "0x0B", "fnif_unused": "00000000"}, "reference": {"start_cp": 59, "outline_level": 2, "file_name_key_kind": "Subdocument", "file_name_key_identifier": 0, "fnpi": "0x0005", "raw_flags": "0x0024", "pdod": 0, "resolved_name_index": 0}, "reader_behavior": "Inert metadata only; the library does not open, resolve, or follow LEGACY."}
+    },
+    "child": {
+      "path": "test-data/microsoft-office/word/word-master-native/LEGACY",
+      "extensionless": true,
+      "stream_inventory": [{"path": "/1Table", "bytes": 7012}, {"path": "/\u0001CompObj", "bytes": 114}, {"path": "/WordDocument", "bytes": 4096}, {"path": "/\u0005SummaryInformation", "bytes": 4096}, {"path": "/\u0005DocumentSummaryInformation", "bytes": 4096}],
+      "fib": {"nFib": "0x00C1", "version_name": "Word 97", "table_stream": "1Table", "pointers": {"PlcfWKB": {"index": 54, "offset": 5741, "length": 0}, "SttbFnm": {"index": 72, "offset": 5741, "length": 0}}},
+      "typed_subdocuments": {"collection_present": false},
+      "main_story": {"paragraph_count": 3, "table_count": 0, "typed_text_characters": 62, "paragraph_text": ["LEGACY_CHILD_SECTION_017", "Native legacy subdocument content.", "\f"], "raw_typed_text": "LEGACY_CHILD_SECTION_017\rNative legacy subdocument content.\r\u000c\r"}
+    }
+  },
+  "reader_validation": {
+    "docx_parent": {"command": "cargo run -q -p litchi-docx --example read_docx -- test-data/microsoft-office/word/word-master-document.docx", "exit_code": 0, "paragraph_count": 4, "table_count": 0, "text": "WORD_MASTER_DOCUMENT_017Fixture ID: word-master-document-017END_MASTER_017", "external_child_text_in_main_read": false},
+    "docx_child": {"command": "cargo run -q -p litchi-docx --example read_docx -- test-data/microsoft-office/word/word-master-document/CHILD", "exit_code": 0, "paragraph_count": 4, "table_count": 0, "text": "CHILD_SECTION_017Native master-document child content.", "extensionless_package_open": true},
+    "doc_parent": {"command": "cargo run -q -p litchi-doc --example read_doc -- test-data/microsoft-office/word/word-master-native.doc", "exit_code": 0, "paragraph_count": 3, "table_count": 0, "text_characters": 81, "word_version": "Word 97", "typed_subdocument_collection": "one reference; path exposed verbatim"},
+    "doc_child": {"command": "cargo run -q -p litchi-doc --example read_doc -- test-data/microsoft-office/word/word-master-native/LEGACY", "exit_code": 0, "paragraph_count": 3, "table_count": 0, "text_characters": 62, "word_version": "Word 97", "typed_subdocument_collection": "none because FIB 54/72 lengths are zero"},
+    "native_word_reopen": {"modern_parent": "pass; no repair dialog", "modern_child": "pass; no repair dialog", "legacy_parent": "pass; no repair dialog; Expand Subdocuments displayed the child body", "legacy_child": "pass; no repair dialog"}
+  },
+  "limitations": [
+    "The OOXML external target is recorded verbatim and its adjacent fixture is present, but this inspection does not claim that every OPC consumer resolves a relative external target against the same filesystem base.",
+    "The absolute SttbFnm path is native macOS producer evidence; relative_path is portable metadata, while the library deliberately does not resolve or open it.",
+    "The litchi-docx read example reads the parent main story and omits the external child story; this is an observed reader boundary, not a claim that all library layers reject or cannot model w:subDoc.",
+    "No valid modern-to-legacy conversion file exists in this fixture set because Word's native conversion attempt failed; the modern and legacy pairs must be qualified independently."
+  ]
+}

@@ -1,0 +1,981 @@
+{
+  "schema_version": 1,
+  "fixture_id": "excel-links-objects-006",
+  "generated_on": "2026-10-15",
+  "purpose": "Read-only evidence for a native Microsoft Excel workbook containing external workbook formulas with cached values, an in-cell picture, a classic cell note, and one embedded Word package, saved natively as XLSX, XLSB, and legacy XLS.",
+  "provenance": {
+    "producer_app": "Microsoft Office Excel",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "package_application": "Microsoft Macintosh Excel",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft Excel UI",
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "native_save_chain": [
+      "xlsx",
+      "xlsb",
+      "xls"
+    ],
+    "native_reopen": {
+      "all_variants_directly_reopened": true,
+      "external_link_prompt": "Don\u2019t Update selected on reopen; no link refresh or repair was performed",
+      "xlsx": "reopened in native Excel before binary conversion",
+      "xlsb": "recovery reopened the source and XLSB; the source closed unchanged and the recovered XLSB was closed with Don\u2019t Save; a direct disk reopen verified the image and cached values",
+      "xls": "Save As legacy XLS accepted the generic compatibility warning; direct reopen with Don\u2019t Update verified the cached values, Word preview, and the intentional picture conversion result",
+      "unexpected_quit": "The first XLSB close unexpectedly quit Excel; recovery was used and the recovered XLSB was closed without saving"
+    },
+    "all_documents_closed_before_hashing": true,
+    "lock_files_present_at_inspection": false
+  },
+  "corpus_locks": {
+    "source_workbook": {
+      "path": "test-data/microsoft-office/excel/excel-values-formulas-chart.xlsx",
+      "bytes": 18686,
+      "sha256": "7b9b6602d687d3b0f65915611723c1cc60934e6ecca9c54bec44403904afbd57",
+      "role": "External-link source workbook; this file was not modified"
+    },
+    "fixture_files": {
+      "xlsx": {
+        "path": "test-data/microsoft-office/excel/excel-links-objects.xlsx",
+        "format": "xlsx",
+        "bytes": 61817,
+        "sha256": "4bf5b315001334a876283187c6c7634373ab938f23c4e4b9a7788a12b88bcd42",
+        "container": "OPC ZIP",
+        "zip_entries": 27,
+        "zip_testzip": null
+      },
+      "xlsb": {
+        "path": "test-data/microsoft-office/excel/excel-links-objects.xlsb",
+        "format": "xlsb",
+        "bytes": 61091,
+        "sha256": "af752ae6b17f92d102d4d187fcad68753a389f5fec64f541442131c84048c311",
+        "container": "OPC ZIP",
+        "zip_entries": 28,
+        "zip_testzip": null
+      },
+      "xls": {
+        "path": "test-data/microsoft-office/excel/excel-links-objects.xls",
+        "format": "xls",
+        "bytes": 69120,
+        "sha256": "6745cb956264ad6ae906f84433e0dbcceb03a2bcf166fa36884cbcfd59e846b5",
+        "container": "OLE2 CFB",
+        "cfb_signature": "D0 CF 11 E0 A1 B1 1A E1"
+      }
+    },
+    "embedded_sources": {
+      "word_docx": {
+        "path": "test-data/microsoft-office/word/word-legacy-form-unprotected.docx",
+        "bytes": 13759,
+        "sha256": "a4b37e93f7cf0c93213e419cb42796e361785f4354d50a585dcd5b60ed910778",
+        "form_markers": [
+          "TEXT_FIELD_010",
+          "FORMTEXT",
+          "CHECKBOX_FIELD_010",
+          "FORMCHECKBOX",
+          "DROPDOWN_FIELD_010",
+          "FORMDROPDOWN",
+          "END_FORM_010"
+        ]
+      },
+      "poster_png": {
+        "path": "test-data/iwork/keynote/media-replacement-assets/poster.png",
+        "bytes": 1698,
+        "sha256": "d594d8f832d3ab38d03e0d06316d2fa5e401217e50e21e01814e593d752da3e8"
+      }
+    },
+    "audit_scope": {
+      "fixture_bytes_modified_by_audit": false,
+      "metadata_only_change": true,
+      "temporary_probe_harnesses": [
+        "/tmp/litchi-audit",
+        "/tmp/litchi-audit-xlsx",
+        "/tmp/litchi-audit-xlsb",
+        "/tmp/litchi-audit-xls"
+      ],
+      "temporary_harnesses_outside_checkout": true
+    }
+  },
+  "expected_native_content": {
+    "worksheet": {
+      "name": "Sheet1",
+      "dimension": "A1:B7",
+      "column_width": 34.83203125,
+      "row_5_height": 72,
+      "bold_range": "A1:B1",
+      "markers": {
+        "A1": "EXCEL_LINKS_OBJECTS_006",
+        "B1": "Fixture ID: excel-links-objects-006",
+        "A5": "IN_CELL_PICTURE_006",
+        "A6": "COMMENT_TARGET_006",
+        "B6": "Native cell annotation",
+        "A7": "END_LINKS_006"
+      }
+    },
+    "formulas_and_cached_values": {
+      "B2": {
+        "native_formula": "='[excel-values-formulas-chart.xlsx]Sheet1'!$D$6",
+        "stored_formula": "[1]Sheet1!$D$6",
+        "cached_value": 49.75
+      },
+      "B3": {
+        "native_formula": "='[excel-values-formulas-chart.xlsx]Sheet2'!$B$4",
+        "stored_formula": "[1]Sheet2!$B$4",
+        "cached_value": 14
+      },
+      "B4": {
+        "native_formula": "=B2+B3",
+        "stored_formula": "B2+B3",
+        "cached_value": 63.75
+      }
+    },
+    "in_cell_picture": {
+      "cell": "B5",
+      "authoring_command": "Insert Picture > Place in Cell",
+      "source_path": "test-data/iwork/keynote/media-replacement-assets/poster.png",
+      "source_sha256": "d594d8f832d3ab38d03e0d06316d2fa5e401217e50e21e01814e593d752da3e8",
+      "native_reopen": {
+        "xlsx": "picture visible in B5",
+        "xlsb": "picture visible in B5",
+        "xls": "B5 reopened as #VALUE! after native legacy conversion; this is the intentional conversion boundary"
+      },
+      "xlsx_cell_storage": {
+        "type": "e",
+        "value": "#VALUE!",
+        "rich_value_metadata_index": 1,
+        "rich_value_index": 0,
+        "rich_value_structure": "_localImage",
+        "rich_value_relationship_id": "rId1",
+        "rich_value_target": "../media/image1.png"
+      }
+    },
+    "classic_note": {
+      "cell": "B6",
+      "author": "Ryker Zhu",
+      "text": "COMMENT_ROOT_006: native Excel cell annotation.",
+      "native_object": "New Comment created a classic Excel note in this fixture",
+      "threaded_reply_ui": "not present",
+      "xlsx_part": "xl/comments1.xml",
+      "xlsb_part": "xl/comments1.bin",
+      "xls_representation": "legacy note records are retained in the BIFF8 worksheet substream"
+    },
+    "embedded_word": {
+      "cell_anchor": "A12",
+      "source": "test-data/microsoft-office/word/word-legacy-form-unprotected.docx",
+      "source_sha256": "a4b37e93f7cf0c93213e419cb42796e361785f4354d50a585dcd5b60ed910778",
+      "authoring_command": "Insert Object > From File",
+      "prog_id": "Document",
+      "shape_id": 1027,
+      "native_reopen": {
+        "xlsx": "Word preview visible; form markers retained in the preview",
+        "xlsb": "Word preview visible; form markers retained in the preview",
+        "xls": "Word preview visible after native legacy conversion"
+      },
+      "object_history": "An initially inserted wrong Excel object was undone before the final Word object was inserted; only the Word package is present in the saved fixtures.",
+      "activation": "No object activation was performed"
+    }
+  },
+  "package_evidence": {
+    "xlsx": {
+      "relevant_parts": {
+        "[Content_Types].xml": {
+          "bytes": 2589,
+          "sha256": "9ac8070fcf31e47a9574dfcc7cc7be5d57c60b10f380dca50ae44fcf425651aa"
+        },
+        "xl/workbook.xml": {
+          "bytes": 2351,
+          "sha256": "4e395964e13188c2b97fdb9aca4291cb69eeea3f9e4e9957d59dd54fef0532c6"
+        },
+        "xl/_rels/workbook.xml.rels": {
+          "bytes": 1697,
+          "sha256": "8b0eddfa477dbea63a89a25f9970319a7c6091e455ce2da829cd0e3b2001a720"
+        },
+        "xl/worksheets/sheet1.xml": {
+          "bytes": 2754,
+          "sha256": "b11f1e8f05fe1adba1ee24ad144f598f468806ae39844e91ae192d66f0fac8b3"
+        },
+        "xl/worksheets/_rels/sheet1.xml.rels": {
+          "bytes": 877,
+          "sha256": "6025bef8a370b9cfeb01198a125e07bfeb46504fd3bfc3cf8611e764383f7e46"
+        },
+        "xl/externalLinks/externalLink1.xml": {
+          "bytes": 897,
+          "sha256": "e3365c163dba9382fc274fc678cc48ec2f201d49200624a7ae5f0870e75713c6"
+        },
+        "xl/externalLinks/_rels/externalLink1.xml.rels": {
+          "bytes": 585,
+          "sha256": "38899b6a7eaff82597822d3fbd9664dfd7d1e9265bf3b1f2699003f91ef29463"
+        },
+        "xl/richData/richValueRel.xml": {
+          "bytes": 260,
+          "sha256": "3b91a9f9b34f844b7ce246b886e301013d92f8b4945e439fadb6c3054b977e99"
+        },
+        "xl/richData/rdrichvalue.xml": {
+          "bytes": 187,
+          "sha256": "3a8fd577fed4a7966c2c40f91e2bb391e1f93bc030ad315d7d815af619e0e735"
+        },
+        "xl/richData/rdrichvaluestructure.xml": {
+          "bytes": 258,
+          "sha256": "af56cc9f260a449a8166c0fdd124b31b0a256eed6a4cf2d1e20871195322db86"
+        },
+        "xl/richData/rdRichValueTypes.xml": {
+          "bytes": 1187,
+          "sha256": "40a21e275620c02216d56068a70f63abbd00b953267cc5f310674093d65e166d"
+        },
+        "xl/richData/_rels/richValueRel.xml.rels": {
+          "bytes": 292,
+          "sha256": "15a140b2ab9e3d49a7b49f824413744cc4959bc34c427cf50f7d6016697293c0"
+        },
+        "xl/comments1.xml": {
+          "bytes": 878,
+          "sha256": "c488c79818a89da1c79e5a2500a0744dd62e2b9faae609d9cddc44e927c74184"
+        },
+        "xl/drawings/drawing1.xml": {
+          "bytes": 1951,
+          "sha256": "59185fc79c234a3f9afd94cfe9f1b2f523050d92ffedbf02c97d350254b37a1b"
+        },
+        "xl/drawings/vmlDrawing1.vml": {
+          "bytes": 2429,
+          "sha256": "b847675dc9840ba2f2954ced47c2b5b4ac10553cb6bc42d14744376bee4e802d"
+        },
+        "xl/embeddings/Microsoft_Word_Document.docx": {
+          "bytes": 13759,
+          "sha256": "a4b37e93f7cf0c93213e419cb42796e361785f4354d50a585dcd5b60ed910778"
+        },
+        "xl/media/image1.png": {
+          "bytes": 1698,
+          "sha256": "d594d8f832d3ab38d03e0d06316d2fa5e401217e50e21e01814e593d752da3e8"
+        },
+        "xl/media/image2.emf": {
+          "bytes": 69384,
+          "sha256": "828d607c3857f92f8339115446c50beef2346cd3bdf796a22b941ca3c84aed37"
+        }
+      },
+      "worksheet_cells": {
+        "B2": "<f>[1]Sheet1!$D$6</f><v>49.75</v>",
+        "B3": "<f>[1]Sheet2!$B$4</f><v>14</v>",
+        "B4": "<f>B2+B3</f><v>63.75</v>",
+        "B5": "t=\"e\" vm=\"1\" <v>#VALUE!</v>",
+        "B6": "shared-string Native cell annotation"
+      },
+      "relationships": {
+        "workbook": [
+          {
+            "id": "rId2",
+            "type": "externalLink",
+            "target": "externalLinks/externalLink1.xml"
+          },
+          {
+            "id": "rId7",
+            "type": "richValueRel",
+            "target": "richData/richValueRel.xml"
+          },
+          {
+            "id": "rId8",
+            "type": "rdRichValue",
+            "target": "richData/rdrichvalue.xml"
+          },
+          {
+            "id": "rId9",
+            "type": "rdRichValueStructure",
+            "target": "richData/rdrichvaluestructure.xml"
+          },
+          {
+            "id": "rId10",
+            "type": "rdRichValueTypes",
+            "target": "richData/rdRichValueTypes.xml"
+          }
+        ],
+        "worksheet": [
+          {
+            "id": "rId1",
+            "type": "drawing",
+            "target": "../drawings/drawing1.xml"
+          },
+          {
+            "id": "rId2",
+            "type": "vmlDrawing",
+            "target": "../drawings/vmlDrawing1.vml"
+          },
+          {
+            "id": "rId3",
+            "type": "package",
+            "target": "../embeddings/Microsoft_Word_Document.docx"
+          },
+          {
+            "id": "rId4",
+            "type": "image",
+            "target": "../media/image2.emf"
+          },
+          {
+            "id": "rId5",
+            "type": "comments",
+            "target": "../comments1.xml"
+          }
+        ],
+        "external_link": [
+          {
+            "id": "rId1",
+            "type": "externalLinkPath",
+            "target": "excel-values-formulas-chart.xlsx",
+            "mode": "External"
+          },
+          {
+            "id": "rId2",
+            "type": "externalLinkPath",
+            "target": "/Users/ryker/CodeProjects/litchi/test-data/microsoft-office/excel/excel-values-formulas-chart.xlsx",
+            "mode": "External"
+          }
+        ],
+        "rich_value_rel": [
+          {
+            "id": "rId1",
+            "type": "image",
+            "target": "../media/image1.png"
+          }
+        ]
+      },
+      "external_link_xml": {
+        "sheet_names": [
+          "Sales chart",
+          "Sheet1",
+          "Sheet2"
+        ],
+        "cached_cells": [
+          {
+            "sheet_id": 1,
+            "reference": "D6",
+            "value": 49.75
+          },
+          {
+            "sheet_id": 2,
+            "reference": "B4",
+            "value": 14
+          }
+        ],
+        "raw_alternate_url": {
+          "element": "xxl21:absoluteUrl",
+          "relationship_id": "rId2"
+        }
+      },
+      "classic_note_xml": {
+        "author": "Ryker Zhu",
+        "cell": "B6",
+        "author_id": 0,
+        "shape_id": 0,
+        "raw_text": "Ryker Zhu:\r\nCOMMENT_ROOT_006: native Excel cell annotation."
+      },
+      "ole_xml": {
+        "program_id": "Document",
+        "shape_id": 1027,
+        "package_relationship_id": "rId3",
+        "preview_relationship_id": "rId4",
+        "object_anchor": {
+          "from": "col=0,row=11",
+          "to": "col=2,row=20",
+          "move_with_cells": true
+        },
+        "drawing_object": "Object 3"
+      },
+      "rich_data_xml": {
+        "value_count": 1,
+        "value": [
+          0,
+          5
+        ],
+        "structure_type": "_localImage",
+        "keys": [
+          "_rvRel:LocalImageIdentifier",
+          "CalcOrigin"
+        ],
+        "image_relation": "rId1 -> ../media/image1.png",
+        "feature_property_bag_part": false,
+        "checkbox_part": false
+      }
+    },
+    "xlsb": {
+      "relevant_parts": {
+        "[Content_Types].xml": {
+          "bytes": 2388,
+          "sha256": "7d2ba4b438e42f1f4a40133086ee51d96bfb153b6a9642cb37908a6580686be3"
+        },
+        "xl/workbook.bin": {
+          "bytes": 933,
+          "sha256": "642b8e771703702cb82035d3b76fdc16af7e90d34a4baa54becde75d11a7a574"
+        },
+        "xl/_rels/workbook.bin.rels": {
+          "bytes": 1697,
+          "sha256": "7a3b88093988a8994a345adc1c3fe398b6d5b48662cd67e299e09dd5e1313155"
+        },
+        "xl/worksheets/sheet1.bin": {
+          "bytes": 1028,
+          "sha256": "7316fd554fde9207b2479cc5c8e9636c8f50bf38c34f1c97346af86aea3c6506"
+        },
+        "xl/worksheets/_rels/sheet1.bin.rels": {
+          "bytes": 1004,
+          "sha256": "1e242a1de5103b8eb186e7ad05daecb0569bbf85ff8b11e9c4288d5c7a8aa784"
+        },
+        "xl/externalLinks/externalLink1.bin": {
+          "bytes": 192,
+          "sha256": "36d02ff00b57c94830793e8808b3720414a31427c930a7621465ead12b01aac4"
+        },
+        "xl/externalLinks/_rels/externalLink1.bin.rels": {
+          "bytes": 585,
+          "sha256": "38899b6a7eaff82597822d3fbd9664dfd7d1e9265bf3b1f2699003f91ef29463"
+        },
+        "xl/richData/richValueRel.xml": {
+          "bytes": 260,
+          "sha256": "3b91a9f9b34f844b7ce246b886e301013d92f8b4945e439fadb6c3054b977e99"
+        },
+        "xl/richData/rdrichvalue.xml": {
+          "bytes": 187,
+          "sha256": "3a8fd577fed4a7966c2c40f91e2bb391e1f93bc030ad315d7d815af619e0e735"
+        },
+        "xl/richData/rdrichvaluestructure.xml": {
+          "bytes": 258,
+          "sha256": "af56cc9f260a449a8166c0fdd124b31b0a256eed6a4cf2d1e20871195322db86"
+        },
+        "xl/richData/rdRichValueTypes.xml": {
+          "bytes": 1187,
+          "sha256": "40a21e275620c02216d56068a70f63abbd00b953267cc5f310674093d65e166d"
+        },
+        "xl/richData/_rels/richValueRel.xml.rels": {
+          "bytes": 292,
+          "sha256": "15a140b2ab9e3d49a7b49f824413744cc4959bc34c427cf50f7d6016697293c0"
+        },
+        "xl/comments1.bin": {
+          "bytes": 255,
+          "sha256": "443e3a9b1e2288a291aacfd07aaaa6c390509f0a78b1482747c913793a76599a"
+        },
+        "xl/drawings/drawing1.xml": {
+          "bytes": 1497,
+          "sha256": "2285ef47abd3a0e5bd9504e5d4507e4395610c3cd0e049e7071d1cd29143c19d"
+        },
+        "xl/drawings/vmlDrawing1.vml": {
+          "bytes": 2429,
+          "sha256": "b847675dc9840ba2f2954ced47c2b5b4ac10553cb6bc42d14744376bee4e802d"
+        },
+        "xl/embeddings/Microsoft_Word_Document.docx": {
+          "bytes": 13759,
+          "sha256": "a4b37e93f7cf0c93213e419cb42796e361785f4354d50a585dcd5b60ed910778"
+        },
+        "xl/media/image1.png": {
+          "bytes": 1698,
+          "sha256": "d594d8f832d3ab38d03e0d06316d2fa5e401217e50e21e01814e593d752da3e8"
+        },
+        "xl/media/image2.emf": {
+          "bytes": 69384,
+          "sha256": "828d607c3857f92f8339115446c50beef2346cd3bdf796a22b941ca3c84aed37"
+        }
+      },
+      "relationships": {
+        "workbook_external_link": {
+          "id": "rId2",
+          "target": "externalLinks/externalLink1.bin"
+        },
+        "worksheet": [
+          {
+            "id": "rId2",
+            "type": "drawing",
+            "target": "../drawings/drawing1.xml"
+          },
+          {
+            "id": "rId3",
+            "type": "vmlDrawing",
+            "target": "../drawings/vmlDrawing1.vml"
+          },
+          {
+            "id": "rId4",
+            "type": "package",
+            "target": "../embeddings/Microsoft_Word_Document.docx"
+          },
+          {
+            "id": "rId5",
+            "type": "image",
+            "target": "../media/image2.emf"
+          },
+          {
+            "id": "rId6",
+            "type": "comments",
+            "target": "../comments1.bin"
+          }
+        ],
+        "external_link": [
+          {
+            "id": "rId1",
+            "type": "externalLinkPath",
+            "target": "excel-values-formulas-chart.xlsx",
+            "mode": "External"
+          },
+          {
+            "id": "rId2",
+            "type": "externalLinkPath",
+            "target": "/Users/ryker/CodeProjects/litchi/test-data/microsoft-office/excel/excel-values-formulas-chart.xlsx",
+            "mode": "External"
+          }
+        ],
+        "rich_value_rel": [
+          {
+            "id": "rId1",
+            "type": "image",
+            "target": "../media/image1.png"
+          }
+        ]
+      },
+      "raw_binary_observations": {
+        "workbook_records": [
+          {
+            "offset_hex": "0x00000047",
+            "kind_hex": "0x0025",
+            "payload_bytes": 6
+          },
+          {
+            "offset_hex": "0x0000004F",
+            "kind_hex": "0x0817",
+            "payload_bytes": 136
+          },
+          {
+            "offset_hex": "0x00000161",
+            "kind_hex": "0x0025",
+            "payload_bytes": 6
+          },
+          {
+            "offset_hex": "0x00000169",
+            "kind_hex": "0x0C00",
+            "payload_bytes": 16
+          }
+        ],
+        "worksheet_records": "Native BIFF12 cell, formula, image, note, drawing, and package records are present in xl/worksheets/sheet1.bin; the existing structure dump completed without editing the stream."
+      },
+      "rich_data_xml": {
+        "parts_present": [
+          "xl/richData/richValueRel.xml",
+          "xl/richData/rdrichvalue.xml",
+          "xl/richData/rdrichvaluestructure.xml",
+          "xl/richData/rdRichValueTypes.xml"
+        ],
+        "structure_type": "_localImage",
+        "image_relation": "rId1 -> ../media/image1.png",
+        "feature_property_bag_part": false,
+        "checkbox_part": false,
+        "typed_xlsb_rich_value_api": "No XLSB rich-value package loader was found in the current public API; raw parts are retained as package evidence."
+      },
+      "legacy_comment_codec": {
+        "row_zero_based": 5,
+        "column_zero_based": 1,
+        "cell": "B6",
+        "author": "Ryker Zhu",
+        "text": "Ryker Zhu:\nCOMMENT_ROOT_006: native Excel cell annotation.",
+        "guid_zeroed": true,
+        "alternate_guid": null
+      }
+    },
+    "xls": {
+      "workbook_stream": {
+        "bytes": 50762,
+        "sha256": "d01d3f30c16006605f602ae74d2019925b4a74cd64a9a03c5d26092a8810d4f2"
+      },
+      "biff_records": {
+        "worksheet_directory": [
+          {
+            "offset_hex": "0x002ECA",
+            "record": "BOUNDSHEET8",
+            "record_code_hex": "0x0085",
+            "payload_bytes": 14,
+            "sheet_name": "Sheet1"
+          },
+          {
+            "offset_hex": "0x00C079",
+            "record": "BOF",
+            "substream": "Sheet#0",
+            "payload_bytes": 16
+          },
+          {
+            "offset_hex": "0x00C1C7",
+            "record": "DIMENSIONS",
+            "payload_bytes": 14
+          },
+          {
+            "offset_hex": "0x00C646",
+            "record": "EOF",
+            "substream": "Sheet#0",
+            "payload_bytes": 0
+          }
+        ],
+        "external_link_cache": [
+          {
+            "offset_hex": "0x002F14",
+            "record": "SUPBOOK",
+            "record_code_hex": "0x01AE",
+            "payload_bytes": 70
+          },
+          {
+            "offset_hex": "0x002F5E",
+            "record": "XCT",
+            "record_code_hex": "0x0059",
+            "payload_bytes": 4
+          },
+          {
+            "offset_hex": "0x002F66",
+            "record": "CRN",
+            "record_code_hex": "0x005A",
+            "payload_bytes": 13
+          },
+          {
+            "offset_hex": "0x002F77",
+            "record": "XCT",
+            "record_code_hex": "0x0059",
+            "payload_bytes": 4
+          },
+          {
+            "offset_hex": "0x002F7F",
+            "record": "CRN",
+            "record_code_hex": "0x005A",
+            "payload_bytes": 13
+          },
+          {
+            "offset_hex": "0x002F90",
+            "record": "SUPBOOK",
+            "record_code_hex": "0x01AE",
+            "payload_bytes": 4
+          },
+          {
+            "offset_hex": "0x002F98",
+            "record": "EXTERNSHEET",
+            "record_code_hex": "0x0017",
+            "payload_bytes": 20
+          }
+        ]
+      },
+      "ole_container": {
+        "directory": [
+          {
+            "path": "/\u0001CompObj",
+            "kind": "stream",
+            "bytes": 102
+          },
+          {
+            "path": "/Workbook",
+            "kind": "stream",
+            "bytes": 50762
+          },
+          {
+            "path": "/MBD00DD3649",
+            "kind": "storage"
+          },
+          {
+            "path": "/MBD00DD3649/Package",
+            "kind": "stream",
+            "bytes": 13759,
+            "sha256": "a4b37e93f7cf0c93213e419cb42796e361785f4354d50a585dcd5b60ed910778"
+          },
+          {
+            "path": "/MBD00DD3649/\u0001CompObj",
+            "kind": "stream",
+            "bytes": 80,
+            "sha256": "8b08d19ab12f4e584dd6b669d8115a7c9e06893ce439bc5347dadb9e0476cd79"
+          },
+          {
+            "path": "/\u0005SummaryInformation",
+            "kind": "stream",
+            "bytes": 228,
+            "sha256": "e497d17bd4a80dbf572175953b85cc6f618758e11cb0ad068da1b15b02e46c38"
+          },
+          {
+            "path": "/\u0005DocumentSummaryInformation",
+            "kind": "stream",
+            "bytes": 244,
+            "sha256": "d473b1f85f20c7f2341a8a3b3b3c2fd8337e57b5b0f31e6027aff0a28b1fda58"
+          }
+        ],
+        "embedded_word_payload": {
+          "storage": "MBD00DD3649",
+          "stream": "Package",
+          "bytes": 13759,
+          "sha256": "a4b37e93f7cf0c93213e419cb42796e361785f4354d50a585dcd5b60ed910778"
+        }
+      },
+      "typed_ole_object": {
+        "snapshot": "litchi_xls::ole_object::Snapshot::open",
+        "worksheet_count": 1,
+        "object_count": 1,
+        "form_control_count": 0,
+        "object_id": 3,
+        "object_type_code": 8,
+        "storage_name": "MBD00DD3649",
+        "storage_position": 14497353,
+        "subrecords": [
+          "FtCmo(object_type=8, object_id=3, flags=24593)",
+          "FtCf(format=65535)",
+          "FtPioGrbit(raw=1)",
+          "FtPictFmla(storage_position=14497353, formula_prefix=PtgTbl)"
+        ]
+      }
+    }
+  },
+  "library_validation": {
+    "xlsx": {
+      "package_open": "pass",
+      "external_link_snapshot": {
+        "api": "litchi_xlsx::external_links::Snapshot::load",
+        "entries": 1,
+        "workbook_part": "/xl/workbook.xml",
+        "entry_part": "/xl/externalLinks/externalLink1.xml",
+        "relationship_id": "rId2",
+        "target_relationship_id": "rId1",
+        "target": "excel-values-formulas-chart.xlsx",
+        "sheet_names": [
+          "Sales chart",
+          "Sheet1",
+          "Sheet2"
+        ],
+        "cached_values": {
+          "Sheet1!D6": 49.75,
+          "Sheet2!B4": 14
+        },
+        "alternate_urls": null,
+        "interpretation": "The typed snapshot succeeds and retains the workbook target and cached cells, but does not expose the raw xxl21:absoluteUrl/rId2 relationship as alternate_urls. The raw XML and both relationships remain recorded above."
+      },
+      "ole_object_snapshot": {
+        "api": "litchi_xlsx::ole_objects::Snapshot::load",
+        "worksheet": "/xl/worksheets/sheet1.xml",
+        "object_count": 1,
+        "program_id": "Document",
+        "shape_id": 1027,
+        "relationship_id": "rId3",
+        "relationship_kind": "Package",
+        "target_part": "/xl/embeddings/Microsoft_Word_Document.docx",
+        "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "payload_bytes": 13759,
+        "payload_sha256": "a4b37e93f7cf0c93213e419cb42796e361785f4354d50a585dcd5b60ed910778",
+        "default_size": false,
+        "anchor": {
+          "from": "col=0,row=11",
+          "to": "col=2,row=20",
+          "move_with_cells": true
+        }
+      },
+      "classic_comments": {
+        "api": "litchi_xlsx::workbook::comments::load_from_worksheet",
+        "part": "/xl/comments1.xml",
+        "relationship_id": "rId5",
+        "author": "Ryker Zhu",
+        "cell": "B6",
+        "text": "Ryker Zhu:\r\nCOMMENT_ROOT_006: native Excel cell annotation.",
+        "guid": null,
+        "shape_id": 0
+      },
+      "rich_values": {
+        "api": "litchi_xlsx::load_rich_values",
+        "direct_result": "error",
+        "error": "invalid XLSX structure: 'application/vnd.ms-excel.richvaluerel+xml' requires rich-value data and structures",
+        "cause_evidence": "Native [Content_Types].xml uses application/vnd.ms-excel.rdrichvalue+xml and application/vnd.ms-excel.rdrichvaluestructure+xml, while the current classifier constants use application/vnd.ms-excel.rdRichValue+xml and application/vnd.ms-excel.rdRichValueStructure+xml. The relationship part is recognized, but data and structure are not classified, so validation rejects the graph.",
+        "raw_rich_value_parts_present": true,
+        "raw_image_relationship_present": true,
+        "successful_empty_result": false
+      },
+      "threaded_comments": {
+        "package_parts_present": false,
+        "worksheet_relationship_present": false,
+        "native_reply_ui": false
+      }
+    },
+    "xlsb": {
+      "eager_workbook": {
+        "api": "litchi_xlsb::Workbook::new",
+        "direct_result": "error",
+        "error": "InvalidFormula(\"external workbook/OLE link must have exactly one data-source relationship\")",
+        "display_error": "Invalid formula: external workbook/OLE link must have exactly one data-source relationship",
+        "successful_empty_result": false,
+        "interpretation": "The two native externalLinkPath relationships are the direct boundary. This is an external-link relationship validation error, not a missing worksheet or a missing Word package."
+      },
+      "source_backed_workbook": {
+        "api": "litchi_xlsb::SourceBackedWorkbook::from_reader",
+        "open": "pass",
+        "worksheet_count": 1,
+        "worksheet_names": [
+          "Sheet1"
+        ],
+        "external_link_count": 1,
+        "external_links": "same InvalidFormula external workbook/OLE link must have exactly one data-source relationship",
+        "text": "same InvalidFormula external workbook/OLE link must have exactly one data-source relationship",
+        "embedded_packages": [
+          {
+            "source": "/xl/worksheets/sheet1.bin",
+            "relationship_id": "rId4",
+            "relationship_kind": "Package",
+            "target_part": "/xl/embeddings/Microsoft_Word_Document.docx",
+            "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          }
+        ],
+        "interpretation": "The deferred source-backed catalog can enumerate the worksheet and embedded package, but the external-link semantic read and text projection fail on the duplicate data-source relationships."
+      },
+      "legacy_comments_codec": {
+        "api": "litchi_xlsb::comments::read",
+        "direct_result": "pass",
+        "record_count": 1,
+        "cell": "B6",
+        "author": "Ryker Zhu",
+        "text": "Ryker Zhu:\nCOMMENT_ROOT_006: native Excel cell annotation.",
+        "row_zero_based": 5,
+        "column_zero_based": 1
+      },
+      "rich_values": {
+        "typed_package_loader": "not exposed by the current XLSB public API",
+        "raw_parts_present": true,
+        "successful_empty_result": false
+      },
+      "threaded_comments": {
+        "package_parts_present": false,
+        "worksheet_relationship_present": false,
+        "native_reply_ui": false
+      }
+    },
+    "xls": {
+      "workbook": {
+        "api": "litchi_xls::workbook::Workbook::new",
+        "open": "pass",
+        "sheet_metadata_count": 1,
+        "sheet_metadata_names": [
+          "Sheet1"
+        ],
+        "external_links": {
+          "supporting_books": 2,
+          "external_names": 0,
+          "sheet_references": 3,
+          "external_workbook": {
+            "encoded_virtual_path": "\u0001excel-values-formulas-chart.xlsx",
+            "sheets": [
+              {
+                "name": "Sales chart",
+                "cache_valid": true,
+                "cache_declared": false,
+                "cached_cells": []
+              },
+              {
+                "name": "Sheet1",
+                "cache_valid": true,
+                "cache_declared": true,
+                "cached_cells": {
+                  "D6": 49.75
+                }
+              },
+              {
+                "name": "Sheet2",
+                "cache_valid": true,
+                "cache_declared": true,
+                "cached_cells": {
+                  "B4": 14
+                }
+              }
+            ]
+          }
+        }
+      },
+      "worksheet_facade": {
+        "api": "target/debug/examples/read_xls",
+        "worksheet_count": 0,
+        "names": [],
+        "probe_output": "Worksheet count : 0",
+        "worksheet_index_0": "WorksheetNotFound(\"Sheet index 0\")",
+        "successful_empty_result": false,
+        "error_suppression": {
+          "present": true,
+          "source": "crates/litchi-xls/src/workbook/package.rs:201-227",
+          "behavior": "parse_workbook drops every non-pivot worksheet parse Err(_) and continues without publishing a Worksheet value",
+          "original_worksheet_parse_error": "unknown by the current public probe; the Err(_) arm discards it"
+        }
+      },
+      "ole_snapshot": {
+        "api": "litchi_xls::ole_object::Snapshot::open",
+        "direct_result": "pass",
+        "worksheet_count": 1,
+        "object_count": 1,
+        "form_control_count": 0,
+        "object_id": 3,
+        "embedded_package_sha256": "a4b37e93f7cf0c93213e419cb42796e361785f4354d50a585dcd5b60ed910778"
+      },
+      "threaded_comments": {
+        "package_parts_present": false,
+        "native_reply_ui": false
+      }
+    }
+  },
+  "mismatches_and_boundaries": [
+    {
+      "scope": "external-link relationships",
+      "formats": [
+        "xlsx",
+        "xlsb"
+      ],
+      "raw_observation": "Each native externalLink part contains both rId1 relative and rId2 absolute externalLinkPath relationships; the link XML selects rId1 for the target and uses rId2 in xxl21:absoluteUrl.",
+      "xlsx_reader_observation": "External-link snapshot succeeds, but alternate_urls is null despite the raw alternate URL relationship.",
+      "xlsb_reader_observation": "Eager and source-backed external-link reads fail with InvalidFormula because the external workbook/OLE link must have exactly one data-source relationship.",
+      "classification": "typed relationship-model boundary; preserve both raw relationships"
+    },
+    {
+      "scope": "rich-value local image",
+      "formats": [
+        "xlsx",
+        "xlsb"
+      ],
+      "raw_observation": "Native Excel writes rdrichvalue/rdrichvaluestructure lowercase content-type spellings, a _localImage structure, and a richValueRel image edge to image1.png.",
+      "reader_observation": "The XLSX rich-value loader rejects the relationship part because the current data/structure content-type constants use camel-case spellings; XLSB exposes no typed rich-value package loader.",
+      "classification": "raw feature present; typed reader boundary, not a successful empty rich-value result"
+    },
+    {
+      "scope": "legacy XLS worksheet",
+      "formats": [
+        "xls"
+      ],
+      "raw_observation": "BIFF8 contains BOUNDSHEET8 Sheet1 at 0x002ECA and a Sheet#0 BOF/DIMENSIONS/EOF substream.",
+      "reader_observation": "Workbook metadata exposes one sheet, but parse_workbook suppresses the worksheet parse error, publishes zero worksheets, and the index-0 API reports WorksheetNotFound.",
+      "classification": "errorsuppression; the precise original worksheet parse trigger is unknown, so the empty facade must not be treated as a successful empty workbook"
+    },
+    {
+      "scope": "in-cell picture through XLS conversion",
+      "formats": [
+        "xlsx",
+        "xlsb",
+        "xls"
+      ],
+      "raw_observation": "XLSX/XLSB retain the native local-image rich-value graph and image1.png; XLS is a native legacy conversion and has no equivalent OOXML richData package.",
+      "native_observation": "XLSX and XLSB reopen with the image visible in B5; XLS reopens with B5=#VALUE! while the rest of the workbook and Word preview remain usable.",
+      "classification": "intentional native conversion boundary; preserve #VALUE! as the expected XLS observation"
+    },
+    {
+      "scope": "comments",
+      "formats": [
+        "xlsx",
+        "xlsb",
+        "xls"
+      ],
+      "raw_observation": "The fixture contains one classic cell note at B6 authored by Ryker Zhu; no threaded-comment/persons parts or reply UI were created.",
+      "classification": "classic note coverage; threaded replies are absent by design"
+    },
+    {
+      "scope": "embedded object identity",
+      "formats": [
+        "xlsx",
+        "xlsb",
+        "xls"
+      ],
+      "raw_observation": "Only the Word DOCX package is present: OOXML relationship/package payloads and the legacy MBD00DD3649/Package stream all hash to a4b37e93f7cf0c93213e419cb42796e361785f4354d50a585dcd5b60ed910778.",
+      "classification": "corpus lock; the undone preliminary Excel object is not part of any saved fixture"
+    }
+  ],
+  "source_references": {
+    "xlsx_external_links": "crates/litchi-xlsx/src/external_links/package.rs:177-226,297-335; crates/litchi-xlsx/src/external_links/snapshot.rs:27-87",
+    "xlsx_ole_objects": "crates/litchi-xlsx/src/ole_objects/snapshot.rs:15-80; crates/litchi-xlsx/src/ole_objects/model.rs:160-225",
+    "xlsx_classic_comments": "crates/litchi-xlsx/src/workbook/comments/package.rs:20-42",
+    "xlsx_rich_value_classification": "crates/litchi-xlsx/src/rich_values/package/model.rs:9-32,82-96",
+    "xlsx_rich_value_validation": "crates/litchi-xlsx/src/rich_values/package/load.rs:96-115",
+    "xlsb_external_links": "crates/litchi-xlsb/src/workbook/package.rs:1038-1044; crates/litchi-xlsb/src/workbook/source.rs:738-775; crates/litchi-xlsb/src/workbook/model.rs:127-168",
+    "xlsb_embedded_packages": "crates/litchi-xlsb/src/workbook/package.rs:654-665; crates/litchi-ooxml-common/src/embedded/model.rs:248-342",
+    "xlsb_threaded_comments": "crates/litchi-xlsb/src/comments/threaded/package/mod.rs:35-58,158-179",
+    "xls_worksheet_error_suppression": "crates/litchi-xls/src/workbook/package.rs:201-227; crates/litchi-xls/src/workbook/model.rs:318-322",
+    "xls_external_links": "crates/litchi-xls/src/workbook/model.rs:254-257; crates/litchi-xls/src/external_link/model.rs:167-297",
+    "xls_ole_objects": "crates/litchi-xls/src/ole_object/edit/model.rs:18-59; crates/litchi-xls/src/ole_object/semantic/obj.rs:233-300"
+  }
+}

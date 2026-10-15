@@ -1,0 +1,201 @@
+{
+  "schema_version": 1,
+  "fixture_id": "powerpoint-encrypted-008",
+  "generated_on": "2026-10-15",
+  "purpose": "Read-only inspection of native Microsoft PowerPoint password-to-open fixtures in Agile-encrypted PPTX and CryptoAPI RC4-encrypted legacy PPT containers.",
+  "native_ui_observation_source": "Root agent Computer Use session; this inspection process did not operate Office UI.",
+  "provenance": {
+    "producer_app": "Microsoft Office PowerPoint",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "package_application": "Microsoft Macintosh PowerPoint",
+    "package_app_version": "16.0000",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft PowerPoint UI",
+    "source_fixture": "test-data/microsoft-office/powerpoint/powerpoint-encrypted.pptx",
+    "source_fixture_sha256": "1fe2172a04f6d8c0e49204d0ee9ebffe05174b1fd8614095d049f6489a9dacca",
+    "legacy_derivative": "test-data/microsoft-office/powerpoint/powerpoint-encrypted.ppt",
+    "legacy_derivative_sha256": "2b60c0b31601ce2fe52eba46f1dc768f5685ff57459290feee2ec09080174c59",
+    "native_test_password": "OfficeFixture42!",
+    "password_scope": "Disposable public fixture credential; it is intentionally recorded so readers can verify the fixture.",
+    "modify_password": "blank",
+    "source_fixture_unchanged_at_inspection": true,
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "decrypted_office_files_written": false,
+    "all_documents_closed_before_hashing": true,
+    "lock_files_present_at_inspection": false
+  },
+  "scope_and_limits": {
+    "variants": ["pptx", "ppt"],
+    "native_reopen_verified": true,
+    "native_reopen_repair_prompt": false,
+    "native_reopen": {
+      "pptx": "PowerPoint reopened the saved PPTX and accepted OfficeFixture42! at the password prompt; the single slide and marker text were intact.",
+      "ppt": "PowerPoint reopened the saved PPT derivative with the same full password; the single slide and marker text were intact.",
+      "save_as_legacy": "Native Save As to PPT retained password-to-open protection without a compatibility warning for this one-slide specimen."
+    },
+    "in_memory_decryption": {
+      "performed": true,
+      "purpose": "Verify the clear package/document stream and marker text without creating a decrypted Office file.",
+      "clear_outputs_written": false,
+      "clear_pptx_zip_sha256": "60bf8d8c18859148f2057c78881341b3deea5e905a848043301709c79fc1e07b",
+      "clear_legacy_document_stream_sha256": "2a724b5890108b4451faa7f6ec354f709cc9ce86c743505f645c31daf65672c1"
+    },
+    "known_reader_boundaries": [
+      "litchi-pptx::Package::open without a password treats the CFB encrypted wrapper as a ZIP and returns the expected missing-end-of-central-directory error; password-aware ingress is required.",
+      "litchi-pptx password-aware ingress reports litchi_crypto::ooxml::Error::Password for both the empty/missing credential path and a wrong password, and accepts the correct password with AgileAes256Sha512 plus authenticated integrity.",
+      "litchi-ppt legacy ingress reports PasswordRequired when no OpenOptions password is supplied and InvalidPassword for a wrong password; the encryption feature is required for CryptoAPI decryption.",
+      "The encrypted PPTX clear package was inspected only in memory through litchi_crypto::ooxml::open; no decrypted ZIP or extracted part was written to the repository or scratch files.",
+      "The encrypted legacy PPT clear PowerPoint Document stream was inspected only in memory after applying the validated RC4 record-block context; the original CFB streams remain encrypted on disk."
+    ],
+    "external_links_followed": false,
+    "macros_or_external_code_executed": false
+  },
+  "expected_native_content": {
+    "slide_count": 1,
+    "slide_marker": "PPT_ENCRYPTED_008",
+    "slide_text_markers": [
+      "PPT_ENCRYPTED_008",
+      "Fixture ID: powerpoint-encrypted-008",
+      "Native password-to-open specimen.",
+      "VALUE_008: 42"
+    ],
+    "pptx_slide_part": "/ppt/slides/slide1.xml",
+    "pptx_slide_part_bytes": 1947,
+    "pptx_slide_part_sha256_after_in_memory_decryption": "838cb5c95bf363d13d85abf11242337901f3f99c784dfbbb8ebb5ceb7e7e66a6",
+    "pptx_reader_text": "PPT_ENCRYPTED_008\nFixture ID: powerpoint-encrypted-008\nNative password-to-open specimen. \nVALUE_008: 42",
+    "ppt_reader_text": "PPT_ENCRYPTED_008\nFixture ID: powerpoint-encrypted-008\rNative password-to-open specimen. VALUE_008: 42"
+  },
+  "pptx_agile_encryption": {
+    "outer_container": "CFB / Composite Document File V2",
+    "outer_file_bytes": 43520,
+    "outer_file_sha256": "1fe2172a04f6d8c0e49204d0ee9ebffe05174b1fd8614095d049f6489a9dacca",
+    "encryption_info_stream": {
+      "path": "EncryptionInfo",
+      "bytes": 1289,
+      "sha256": "b0084e43334e2adee97b1b3a34adf093be3c054c066879cae89ebd213330b664",
+      "header": {"major": 4, "minor": 4, "flags_hex": "0x00000040", "descriptor": "Agile XML"},
+      "key_data": {
+        "salt_size": 16,
+        "block_size": 16,
+        "key_bits": 256,
+        "hash_size": 64,
+        "cipher_algorithm": "AES",
+        "cipher_chaining": "ChainingModeCBC",
+        "hash_algorithm": "SHA512",
+        "salt_value_base64": "MvAzAsZalo/jgDkuiP51UA=="
+      },
+      "data_integrity": {"present": true, "authenticated": true},
+      "password_key_encryptor": {
+        "uri": "http://schemas.microsoft.com/office/2006/keyEncryptor/password",
+        "spin_count": 100000,
+        "salt_size": 16,
+        "block_size": 16,
+        "key_bits": 256,
+        "hash_size": 64,
+        "cipher_algorithm": "AES",
+        "cipher_chaining": "ChainingModeCBC",
+        "hash_algorithm": "SHA512",
+        "salt_value_base64": "lttLFphncB571sS52beW5Q==",
+        "encrypted_verifier_hash_input_present": true,
+        "encrypted_verifier_hash_value_present": true,
+        "encrypted_key_value_present": true
+      }
+    },
+    "encrypted_package_stream": {
+      "path": "EncryptedPackage",
+      "bytes": 36504,
+      "sha256": "d2228ad067524eae14c341738814b6ba5d8839270d587ddf2804879bfa8e6865",
+      "declared_clear_package_bytes": 36495,
+      "encrypted_payload_bytes": 36496,
+      "clear_package_sha256_in_memory": "60bf8d8c18859148f2057c78881341b3deea5e905a848043301709c79fc1e07b",
+      "clear_package_zip_members": 37
+    },
+    "data_spaces": {
+      "storage": "\u0006DataSpaces",
+      "version": {"path": "\u0006DataSpaces/Version", "bytes": 76, "sha256": "e81d2d7f4d8b4aa96a9d1ac9aad489caa06f24c3de2b66471479daf34672ce3a"},
+      "map": {"path": "\u0006DataSpaces/DataSpaceMap", "bytes": 112, "sha256": "b520d7662070c97304b0bbff09af9f61baaa6872976663ed1a886abc7c29cb15", "mapping": "EncryptedPackage -> StrongEncryptionDataSpace"},
+      "definition": {"path": "\u0006DataSpaces/DataSpaceInfo/StrongEncryptionDataSpace", "bytes": 64, "sha256": "167181108f6fd083cd67d569e9906a592ca923bc2d4c571ed1242caf92ed48f8", "transform": "StrongEncryptionTransform"},
+      "transform": {"path": "\u0006DataSpaces/TransformInfo/StrongEncryptionTransform/\u0006Primary", "bytes": 200, "sha256": "990349482cd707ba3093d6fff5bb72167a38f0831e58789a92c25cdeb01f7f93", "transform_guid": "{FF9A3F03-56EF-4613-BDD5-5A41C1D07246}", "transform_name": "Microsoft.Container.EncryptionTransform"}
+    },
+    "in_memory_reader_result": {
+      "kind": "AgileAes256Sha512",
+      "integrity": "Authenticated",
+      "correct_password_accepted": true,
+      "wrong_password_rejected": true,
+      "missing_password_rejected": true,
+      "marker_found_in_slide1_xml": true,
+      "presentation_reader_slide_count": 1
+    }
+  },
+  "legacy_ppt_cryptoapi": {
+    "outer_container": "CFB / Composite Document File V2",
+    "outer_file_bytes": 40960,
+    "outer_file_sha256": "2b60c0b31601ce2fe52eba46f1dc768f5685ff57459290feee2ec09080174c59",
+    "streams": {
+      "count": 4,
+      "current_user": {"bytes": 32, "sha256": "47b60b00ad742db8fe96b7a0ef564fb2992ce5d882cc1d331fb645dbaee67875", "record_type_hex": "0x0ff6", "header_token_hex": "0xf3d1c4df", "encrypted": true, "current_edit_offset_hex": "0x9002", "document_version_hex": "0x03f4", "release_version": 8},
+      "powerpoint_document": {"bytes": 36906, "sha256": "3b82b8ab4c1adcb62fa6e9288dac671bf0481ac0eba3c38410890b5630af946c"},
+      "summary_information": {"bytes": 292, "sha256": "1b78b1bbf87d49d1c3532973d6344ce50b46189ee50f055c162bd8965ac1a71b"},
+      "document_summary_information": {"bytes": 484, "sha256": "fa4a0723e8751d7ca775966ba4bf3a09b34aa6a4c358de99f922792a45e65fba"}
+    },
+    "crypt_session": {
+      "record_type": "CryptSession10Container",
+      "record_type_hex": "0x2f14",
+      "persist_id": 4,
+      "stream_offset_hex": "0x8f18",
+      "record_payload_bytes": 198,
+      "payload_sha256": "c499cb3615915f0d1df2f46808b7224ca64d1dbd45e4a7b66ba1fcd829a72cfe",
+      "cryptoapi": {
+        "major": 4,
+        "minor": 2,
+        "outer_flags_hex": "0x0000000c",
+        "header_flags_hex": "0x0000000c",
+        "header_size": 126,
+        "cipher_algorithm_hex": "0x00006801",
+        "hash_algorithm_hex": "0x00008004",
+        "cipher": "RC4",
+        "hash": "SHA1",
+        "key_bits": 128,
+        "provider": "Microsoft Enhanced Cryptographic Provider v1.0",
+        "salt_hex": "6be06e0f5cdefcf591bc1c57b2ac0573",
+        "encrypted_verifier_hex": "152cb209ca7012707d3e0db62e3eeb50",
+        "encrypted_verifier_hash_hex": "e95ffd30e16c0a2c2bdd6d1e86115ee40e4606a7"
+      }
+    },
+    "persist_and_user_edit": {
+      "persist_directory": {"record_type": "PersistPtrHolder", "record_type_hex": "0x1772", "offset_hex": "0x8fe6", "payload_bytes": 20, "mapping": [{"persist_id": 1, "offset_hex": "0x00000000"}, {"persist_id": 2, "offset_hex": "0x00000bda"}, {"persist_id": 3, "offset_hex": "0x00008b6f"}, {"persist_id": 4, "offset_hex": "0x00008f18"}]},
+      "user_edit": {"record_type": "UserEditAtom", "record_type_hex": "0x0ff5", "offset_hex": "0x9002", "payload_bytes": 32, "offset_last_edit": 0, "offset_persist_directory_hex": "0x8fe6", "document_persist_id": 1, "session_persist_id": 4, "max_persist_written": 4},
+      "clear_record_ranges_after_in_memory_rc4": [{"persist_id": 1, "type": "Document", "type_hex": "0x03e8", "offset_hex": "0x00000000", "payload_bytes": 3026}, {"persist_id": 2, "type": "MainMaster", "type_hex": "0x03f8", "offset_hex": "0x00000bda", "payload_bytes": 32653}, {"persist_id": 3, "type": "Slide", "type_hex": "0x03ee", "offset_hex": "0x00008b6f", "payload_bytes": 929}],
+      "clear_document_stream_sha256_in_memory": "2a724b5890108b4451faa7f6ec354f709cc9ce86c743505f645c31daf65672c1"
+    },
+    "in_memory_reader_result": {
+      "correct_password_accepted": true,
+      "wrong_password_rejected": true,
+      "missing_password_rejected": true,
+      "slide_count": 1,
+      "marker_found": true,
+      "typed_text_length": 102,
+      "pictures_stream_present": false
+    }
+  },
+  "reader_checks": {
+    "pptx_without_password": "PPTX OPC error: ZIP error: Missing end of central directory",
+    "pptx_wrong_password": "litchi_crypto::ooxml::Error::Password",
+    "pptx_missing_password": "litchi_crypto::ooxml::Error::Password",
+    "pptx_correct_password": "AgileAes256Sha512 accepted; authenticated clear package opened; one slide returned.",
+    "ppt_missing_password": "litchi_ppt::Error::PasswordRequired",
+    "ppt_wrong_password": "litchi_ppt::Error::InvalidPassword",
+    "ppt_correct_password": "one slide returned with PPT_ENCRYPTED_008 and VALUE_008: 42",
+    "source_reader_paths": [
+      "crates/litchi-pptx/src/package/encryption.rs",
+      "crates/litchi-crypto/src/ooxml/container.rs",
+      "crates/litchi-crypto/src/ooxml/agile.rs",
+      "crates/litchi-ppt/src/encryption.rs",
+      "crates/litchi-ppt/src/current_user.rs",
+      "crates/litchi-ppt/src/presentation/package.rs"
+    ]
+  }
+}

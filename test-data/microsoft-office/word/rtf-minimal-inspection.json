@@ -1,0 +1,249 @@
+{
+  "schema_version": 1,
+  "generated_on": "2026-10-15",
+  "purpose": "Read-only inspection of two minimal native Microsoft Word RTF fixtures used to isolate the empty datastore boundary from rich table-style serialization.",
+  "provenance": {
+    "producer_app": "Microsoft Office Word",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft Word UI",
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "existing_rtf_modified": false,
+    "analysis_method": "Read-only hash, raw-control, litchi-rtf, and textutil inspection",
+    "native_reopen_observed": true,
+    "native_reopen_repair_prompt": false,
+    "all_documents_closed_before_hashing": true,
+    "auditor": "/root/rtf_boundary_audit"
+  },
+  "files": [
+    {
+      "fixture_id": "word-rtf-minimal-006",
+      "path": "test-data/microsoft-office/word/word-rtf-minimal.rtf",
+      "format": "rtf",
+      "bytes": 46744,
+      "sha256": "9d4d939a0228701679d49da35db613e3a6bc827b2b38509c0f332142d217f76c",
+      "native_reopen": "pass",
+      "content": "Exactly one Normal paragraph: RTF_MINIMAL_006: plain native Microsoft Word paragraph."
+    },
+    {
+      "fixture_id": "word-rtf-table-grid-006",
+      "path": "test-data/microsoft-office/word/word-rtf-table-grid.rtf",
+      "format": "rtf",
+      "bytes": 48528,
+      "sha256": "a51aa77ff69eb6102b16231cb732f5aa19bb3e2dc2f5598d964dfb44e8622a69",
+      "native_reopen": "pass",
+      "derivation": "Native Word alternative created from the minimal fixture by adding RTF_TABLE_GRID_006 and a 2x2 Table Grid table; the original minimal file was preserved.",
+      "content": {
+        "paragraph_markers": ["RTF_MINIMAL_006: plain native Microsoft Word paragraph.", "RTF_TABLE_GRID_006"],
+        "table_rows": 2,
+        "table_columns": 2,
+        "table_values": [["Key", "Value"], ["RTF_CELL_006", "42"]],
+        "native_ui_options_reported": {
+          "header_row": true,
+          "banded_rows": true,
+          "first_column": true
+        }
+      }
+    }
+  ],
+  "inspection_source_references": [
+    {
+      "path": "test-data/microsoft-office/word/word-rtf-minimal.rtf",
+      "lines": "54-85,230",
+      "facts": [
+        "One Normal Table style record is present as \\ts11.",
+        "The body contains the single RTF_MINIMAL_006 paragraph marker.",
+        "The root header ends with one empty {\\*\\datastore } group."
+      ]
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-rtf-table-grid.rtf",
+      "lines": "51-101,237",
+      "facts": [
+        "The stylesheet contains one Table Grid record as \\ts35 and no \\ts36 records.",
+        "The body contains RTF_TABLE_GRID_006 followed by a 2x2 table with Key, Value, RTF_CELL_006, and 42.",
+        "The body has three \\trowd records, four exact \\cell controls, two \\row controls, one \\lastrow, and two \\yts35 references.",
+        "The root header ends with one empty {\\*\\datastore } group.",
+        "Raw RTF has no \\trhdr, \\tscfirstrow, or \\tscfirstcol controls; the reported UI options are retained separately from raw control observations."
+      ]
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/document.rs",
+      "lines": "586-613",
+      "fact": "The parser rejects a starred datastore destination when its hexadecimal payload is empty."
+    },
+    {
+      "path": "crates/litchi-rtf/src/text/stylesheet.rs",
+      "lines": "312-323",
+      "fact": "Duplicate typed style validation would reject repeated (Table, style_id) pairs; these minimal fixtures do not repeat a typed table-style selector."
+    }
+  ],
+  "fixtures": [
+    {
+      "fixture_id": "word-rtf-minimal-006",
+      "path": "test-data/microsoft-office/word/word-rtf-minimal.rtf",
+      "raw_control_counts": {
+        "ts11": 1,
+        "ts35": 0,
+        "ts36": 0,
+        "datastore": 1,
+        "trowd": 0,
+        "cell": 0,
+        "row": 0,
+        "trhdr": 0,
+        "lastrow": 0,
+        "yts35": 0,
+        "yts36": 0,
+        "tsrowd": 1,
+        "tbllkhdrrows": 0,
+        "tbllkhdrcols": 0,
+        "tbllknocolband": 0
+      },
+      "raw_markers": {
+        "RTF_MINIMAL_006": true,
+        "RTF_TABLE_GRID_006": false,
+        "RTF_CELL_006": false,
+        "Key": false,
+        "Value": false
+      },
+      "machine_checkable_expectations": [
+        {
+          "check": "regex_count",
+          "regex": "\\{\\s*\\\\\\*\\s*\\\\datastore\\s*\\}",
+          "expected": 1,
+          "scope": "whole file"
+        },
+        {
+          "check": "regex_count",
+          "regex": "\\{\\s*\\\\\\*\\s*\\\\ts36",
+          "expected": 0,
+          "scope": "whole file"
+        },
+        {
+          "check": "textutil",
+          "command": "textutil -convert txt -stdout test-data/microsoft-office/word/word-rtf-minimal.rtf",
+          "exit_code": 0,
+          "text_contains": ["RTF_MINIMAL_006: plain native Microsoft Word paragraph."]
+        },
+        {
+          "check": "native_library_command",
+          "command": "cargo run -q -p litchi-rtf --example parse_rtf -- test-data/microsoft-office/word/word-rtf-minimal.rtf",
+          "exit_code": 1,
+          "error": "MalformedDocument(\"RTF data-store payload cannot be empty\")"
+        }
+      ],
+      "observed_library_boundary": {
+        "classification": "observed",
+        "error": "MalformedDocument(\"RTF data-store payload cannot be empty\")",
+        "semantic_counts_available": false,
+        "interpretation": "A plain native Word RTF with no table body still reaches the empty datastore error and has no duplicate typed table-style error."
+      }
+    },
+    {
+      "fixture_id": "word-rtf-table-grid-006",
+      "path": "test-data/microsoft-office/word/word-rtf-table-grid.rtf",
+      "raw_control_counts": {
+        "ts11": 1,
+        "ts35": 4,
+        "ts36": 0,
+        "datastore": 1,
+        "trowd": 3,
+        "cell": 4,
+        "row": 2,
+        "trhdr": 0,
+        "lastrow": 1,
+        "yts35": 2,
+        "yts36": 0,
+        "tsrowd": 2,
+        "tbllkhdrrows": 3,
+        "tbllkhdrcols": 3,
+        "tbllknocolband": 3,
+        "irowband": 3
+      },
+      "raw_markers": {
+        "RTF_MINIMAL_006": true,
+        "RTF_TABLE_GRID_006": true,
+        "RTF_CELL_006": true,
+        "Key": true,
+        "Value": true,
+        "42": true
+      },
+      "machine_checkable_expectations": [
+        {
+          "check": "regex_count",
+          "regex": "\\{\\s*\\\\\\*\\s*\\\\datastore\\s*\\}",
+          "expected": 1,
+          "scope": "whole file"
+        },
+        {
+          "check": "regex_count",
+          "regex": "\\{\\s*\\\\\\*\\s*\\\\ts36",
+          "expected": 0,
+          "scope": "whole file"
+        },
+        {
+          "check": "control_word_count",
+          "control_words": {
+            "trowd": 3,
+            "cell": 4,
+            "row": 2,
+            "lastrow": 1,
+            "yts35": 2,
+            "ts35": 4
+          }
+        },
+        {
+          "check": "textutil",
+          "command": "textutil -convert txt -stdout test-data/microsoft-office/word/word-rtf-table-grid.rtf",
+          "exit_code": 0,
+          "text_contains": ["RTF_MINIMAL_006", "RTF_TABLE_GRID_006", "Key", "Value", "RTF_CELL_006", "42"]
+        },
+        {
+          "check": "native_library_command",
+          "command": "cargo run -q -p litchi-rtf --example parse_rtf -- test-data/microsoft-office/word/word-rtf-table-grid.rtf",
+          "exit_code": 1,
+          "error": "MalformedDocument(\"RTF data-store payload cannot be empty\")"
+        }
+      ],
+      "observed_library_boundary": {
+        "classification": "observed",
+        "error": "MalformedDocument(\"RTF data-store payload cannot be empty\")",
+        "semantic_counts_available": false,
+        "interpretation": "The native Table Grid style and 2x2 table do not reproduce the duplicate typed style error; the same empty datastore boundary remains first."
+      }
+    }
+  ],
+  "comparison": {
+    "minimal_plain_rtf": {
+      "datastore_empty_group": 1,
+      "table_style_duplicate_groups": 0,
+      "litchi_rtf_error": "MalformedDocument(\"RTF data-store payload cannot be empty\")"
+    },
+    "minimal_table_grid_rtf": {
+      "datastore_empty_group": 1,
+      "table_style_ts35_groups": 1,
+      "table_style_ts36_groups": 0,
+      "litchi_rtf_error": "MalformedDocument(\"RTF data-store payload cannot be empty\")"
+    },
+    "rich_tables_layout_rtf": {
+      "datastore_empty_group": 1,
+      "table_style_ts36_groups": 7,
+      "litchi_rtf_error": "MalformedDocument(\"RTF stylesheet contains a duplicate typed style ID\")"
+    },
+    "review_controls_rtf": {
+      "datastore_empty_group": 1,
+      "table_style_duplicate_groups": 0,
+      "litchi_rtf_error": "MalformedDocument(\"RTF data-store payload cannot be empty\")"
+    },
+    "finding": "The two minimal native fixtures isolate the empty datastore error as independent of review controls, rich table styling, and table body content. The duplicate typed style error is specific to the repeated native Grid Table 2 Accent 1 \\ts36 conditional records in the rich tables/layout derivative."
+  },
+  "known_limits": [
+    "The litchi-rtf reader stops before semantic counts on all four native Word RTF derivatives because the empty datastore group is rejected, except that the rich tables/layout derivative stops earlier at duplicate typed table style validation.",
+    "Raw RTF does not contain \\trhdr, \\tscfirstrow, or \\tscfirstcol in the Table Grid body; native UI option state is recorded as reported separately from raw control syntax.",
+    "No rendering, pagination, repeated-header behavior, table-layout calculation, or field recalculation is claimed.",
+    "This inspection does not modify the fixtures, library source, common manifest, or common coverage metadata."
+  ]
+}

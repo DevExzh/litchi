@@ -1,0 +1,443 @@
+{
+  "schema_version": 1,
+  "generated_on": "2026-10-15",
+  "purpose": "Read-only audit of native Microsoft Word RTF derivatives whose litchi-rtf parses stop before semantic traversal.",
+  "provenance": {
+    "producer_app": "Microsoft Office Word",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft Word UI",
+    "analysis_method": "Read-only source and RTF inspection; no fixture transformation",
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "existing_rtf_modified": false,
+    "all_documents_closed_before_hashing": true,
+    "native_reopen_observed": true,
+    "native_reopen_repair_prompt": false,
+    "auditor": "/root/rtf_boundary_audit"
+  },
+  "files": [
+    {
+      "path": "test-data/microsoft-office/word/word-tables-layout.rtf",
+      "format": "rtf",
+      "bytes": 79211,
+      "sha256": "34999eb1d97167904017ea056a9be222940ceb7c8fd827363958e74f4091910c",
+      "native_reopen": "pass"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-review-controls.rtf",
+      "format": "rtf",
+      "bytes": 51895,
+      "sha256": "d8c0845af1d7aaa55607299477d27683573b3f87d486c0e35aabce1b04e389fd",
+      "native_reopen": "pass"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-rtf-minimal.rtf",
+      "format": "rtf",
+      "bytes": 46744,
+      "sha256": "9d4d939a0228701679d49da35db613e3a6bc827b2b38509c0f332142d217f76c",
+      "native_reopen": "pass"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-rtf-table-grid.rtf",
+      "format": "rtf",
+      "bytes": 48528,
+      "sha256": "a51aa77ff69eb6102b16231cb732f5aa19bb3e2dc2f5598d964dfb44e8622a69",
+      "native_reopen": "pass"
+    }
+  ],
+  "source_references": [
+    {
+      "path": "crates/litchi-rtf/src/text/stylesheet.rs",
+      "lines": "312-323",
+      "fact": "StyleSheet::validate inserts (style_type, id) into a set and returns the duplicate typed style ID error when the pair repeats."
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/styles.rs",
+      "lines": "2472-2497",
+      "fact": "The stylesheet destination is parsed and validated when its closing brace is reached, before later root-header destinations are dispatched."
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/document.rs",
+      "lines": "586-613",
+      "fact": "The datastore parser accepts only hexadecimal text and rejects an immediate closing brace with the empty-payload error."
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/dispatch.rs",
+      "lines": "908-917",
+      "fact": "A starred datastore destination is parsed once at root-header dispatch and its bytes are stored only after parse_data_store_destination succeeds."
+    },
+    {
+      "path": "crates/litchi-rtf/tests/data_store.rs",
+      "lines": "53-68",
+      "fact": "The parser test suite explicitly rejects an empty starred datastore group."
+    },
+    {
+      "path": "test-data/microsoft-office/word/tables-layout-inspection.json",
+      "lines": "255-333",
+      "fact": "The native tables/layout RTF result, control-word counts, native reopen record, and known parser boundary are recorded."
+    },
+    {
+      "path": "test-data/microsoft-office/word/review-controls-inspection.json",
+      "lines": "271-356",
+      "fact": "The native review/control RTF result, control-word counts, native reopen record, and known parser boundary are recorded."
+    }
+  ],
+  "audits": [
+    {
+      "fixture_id": "word-tables-layout-002",
+      "path": "test-data/microsoft-office/word/word-tables-layout.rtf",
+      "observed_native_constructs": [
+        {
+          "kind": "table_style_definition",
+          "selector": "\\ts36",
+          "style_name": "Grid Table 2 Accent 1",
+          "group_count": 7,
+          "source_lines": "85-91",
+          "records": [
+            "base style with \\tsrowd, \\tscbandsh1, and \\tscbandsv1",
+            "conditional first row with \\tscfirstrow",
+            "conditional last row with \\tsclastrow",
+            "conditional first column with \\tscfirstcol",
+            "conditional last column with \\tsclastcol",
+            "conditional odd vertical band with \\tscbandvertodd",
+            "conditional odd horizontal band with \\tscbandhorzodd"
+          ]
+        },
+        {
+          "kind": "table_style_definition",
+          "selector": "\\ts35",
+          "style_name": "Table Grid",
+          "group_count": 1,
+          "source_lines": "81-85"
+        },
+        {
+          "kind": "empty_datastore_destination",
+          "literal": "{\\*\\datastore }",
+          "group_count": 1,
+          "source_line": 392
+        },
+        {
+          "kind": "table_body_style_references",
+          "selectors": ["\\ts36", "\\yts36", "\\tscfirstrow", "\\tscfirstcol", "\\tscbandhorzodd"],
+          "source_lines": "135-234"
+        }
+      ],
+      "machine_checkable_expectations": [
+        {
+          "check": "regex_count",
+          "regex": "\\{\\s*\\\\\\*\\s*\\\\ts36",
+          "expected": 7,
+          "scope": "whole file"
+        },
+        {
+          "check": "regex_count",
+          "regex": "\\{\\s*\\\\\\*\\s*\\\\ts35",
+          "expected": 1,
+          "scope": "whole file"
+        },
+        {
+          "check": "regex_count",
+          "regex": "\\{\\s*\\\\\\*\\s*\\\\datastore\\s*\\}",
+          "expected": 1,
+          "scope": "whole file"
+        },
+        {
+          "check": "control_word_count",
+          "control_words": {
+            "trowd": 13,
+            "cell": 59,
+            "row": 5,
+            "clvmgf": 1,
+            "clvmrg": 1,
+            "sectd": 8,
+            "cols": 1,
+            "header": 1,
+            "footer": 2,
+            "field": 2,
+            "fldinst": 2,
+            "fldrslt": 2,
+            "chftn": 6,
+            "footnote": 1,
+            "revised": 0,
+            "deleted": 0,
+            "bkmkstart": 0,
+            "bkmkend": 0,
+            "annotation": 0
+          }
+        },
+        {
+          "check": "native_library_command",
+          "command": "cargo run -q -p litchi-rtf --example parse_rtf -- test-data/microsoft-office/word/word-tables-layout.rtf",
+          "exit_code": 1,
+          "error": "MalformedDocument(\"RTF stylesheet contains a duplicate typed style ID\")"
+        }
+      ],
+      "observed_library_boundary": {
+        "classification": "observed",
+        "stage": "stylesheet validation before semantic traversal",
+        "error": "MalformedDocument(\"RTF stylesheet contains a duplicate typed style ID\")",
+        "semantic_counts_available": false,
+        "reason": "Each native conditional-formatting record repeats the Table style selector \\ts36, while the current validation key is the typed style pair (Table, 36)."
+      },
+      "hypotheses": [
+        {
+          "label": "hypothesis",
+          "confidence": "high",
+          "statement": "The seven \\ts36 groups are one logical Word table style serialized as a base definition plus separate conditional-formatting records, rather than seven independent logical styles.",
+          "evidence": [
+            "All groups use the same style name Grid Table 2 Accent 1.",
+            "The records are distinguished by conditional region controls and cell-formatting controls.",
+            "The body references the same style through \\ts36 and \\yts36.",
+            "The litchi-rtf style model stores conditional metadata on one table Style record and its writer emits those controls from one record (crates/litchi-rtf/src/codec/writer/codec/output/resources.rs:1337-1510)."
+          ]
+        },
+        {
+          "label": "hypothesis",
+          "confidence": "medium",
+          "statement": "The empty datastore group is an exporter sentinel for a document with no populated Custom XML data-store payload.",
+          "evidence": [
+            "The RTF has exactly {\\*\\datastore } with no hexadecimal text.",
+            "The corresponding DOCX package inventory has no customXml parts.",
+            "Native Word reopens the RTF without a repair prompt."
+          ]
+        }
+      ],
+      "native_ui_follow_ups": [
+        {
+          "candidate_id": "native_rtf_plain_baseline",
+          "ui_authoring": "Create a new blank Word document with one plain paragraph, save as RTF, close, and reopen in Word.",
+          "expected_observations": [
+            "A native Word empty datastore group may recur.",
+            "If no table style is present, the first litchi-rtf error should be the empty datastore error."
+          ],
+          "purpose": "Isolate the datastore boundary from table styles and body features."
+        },
+        {
+          "candidate_id": "native_rtf_table_grid",
+          "ui_authoring": "Create one simple Word table using Table Grid, save as RTF, close, and reopen.",
+          "expected_observations": [
+            "One Table Grid style record, typically \\ts35.",
+            "No repeated \\ts36 conditional records.",
+            "The empty datastore result can be compared with the plain baseline."
+          ],
+          "purpose": "Separate ordinary table serialization from accent table-style conditional serialization."
+        },
+        {
+          "candidate_id": "native_rtf_table_accent",
+          "ui_authoring": "Create one simple Word table and apply Grid Table 2 Accent 1, save as RTF, close, and reopen.",
+          "expected_observations": [
+            "Repeated \\ts36 records for the base style and conditional regions.",
+            "The duplicate typed style ID error occurs before the empty datastore error."
+          ],
+          "purpose": "Reproduce the table-style boundary with the smallest native UI document."
+        },
+        {
+          "candidate_id": "native_rtf_populated_datastore",
+          "ui_authoring": "If the installed Word UI exposes Developer/XML Mapping/custom XML authoring, create a populated custom XML store, save as RTF, close, and reopen.",
+          "expected_observations": [
+            "A starred datastore group with nonempty hexadecimal text.",
+            "No claim should be made if the macOS Word UI does not expose this authoring path."
+          ],
+          "purpose": "Obtain a native nonempty datastore fixture without synthesizing RTF bytes."
+        }
+      ]
+    },
+    {
+      "fixture_id": "word-review-controls-003",
+      "path": "test-data/microsoft-office/word/word-review-controls.rtf",
+      "observed_native_constructs": [
+        {
+          "kind": "empty_datastore_destination",
+          "literal": "{\\*\\datastore }",
+          "group_count": 1,
+          "source_line": 255
+        },
+        {
+          "kind": "tracked_revision_controls",
+          "controls": ["\\revised", "\\deleted", "\\revauth", "\\revdttm", "\\revauthdel", "\\revdttmdel", "\\insrsid", "\\delrsid"],
+          "source_lines": "97-99"
+        },
+        {
+          "kind": "bookmark_controls",
+          "controls": ["\\bkmkstart", "\\bkmkend"],
+          "name": "LITCHI_BOOKMARK_003",
+          "source_line": 100
+        },
+        {
+          "kind": "annotation_controls",
+          "controls": ["\\atrfstart", "\\atrfend", "\\atnid", "\\atnauthor", "\\annotation", "\\atnref", "\\atndate", "\\atnparent"],
+          "source_lines": "101-106"
+        },
+        {
+          "kind": "field_controls",
+          "controls": ["\\field", "\\fldinst", "\\fldrslt"],
+          "instruction": "REF LITCHI_BOOKMARK_003",
+          "source_line": 108
+        }
+      ],
+      "machine_checkable_expectations": [
+        {
+          "check": "regex_count",
+          "regex": "\\{\\s*\\\\\\*\\s*\\\\datastore\\s*\\}",
+          "expected": 1,
+          "scope": "whole file"
+        },
+        {
+          "check": "control_word_count",
+          "control_words": {
+            "revised": 1,
+            "deleted": 1,
+            "bkmkstart": 1,
+            "bkmkend": 1,
+            "field": 1,
+            "fldinst": 1,
+            "fldrslt": 1,
+            "annotation": 2,
+            "atrfstart": 2,
+            "atrfend": 2,
+            "insrsid": 18,
+            "delrsid": 1,
+            "revauth": 1,
+            "revdttm": 1
+          }
+        },
+        {
+          "check": "marker_presence",
+          "markers": [
+            "REVIEW_INSERT_003",
+            "REVIEW_DELETE_003",
+            "LITCHI_BOOKMARK_003",
+            "BOOKMARK_VALUE_003",
+            "MODERN_COMMENT_003",
+            "MODERN_REPLY_003"
+          ],
+          "expected": true
+        },
+        {
+          "check": "native_library_command",
+          "command": "cargo run -q -p litchi-rtf --example parse_rtf -- test-data/microsoft-office/word/word-review-controls.rtf",
+          "exit_code": 1,
+          "error": "MalformedDocument(\"RTF data-store payload cannot be empty\")"
+        }
+      ],
+      "observed_library_boundary": {
+        "classification": "observed",
+        "stage": "root-header datastore parsing before semantic traversal",
+        "error": "MalformedDocument(\"RTF data-store payload cannot be empty\")",
+        "semantic_counts_available": false,
+        "reason": "The stylesheet contains one normal table style record and does not trigger the duplicate typed style error; the empty datastore group is then rejected at its closing brace."
+      },
+      "hypotheses": [
+        {
+          "label": "hypothesis",
+          "confidence": "medium",
+          "statement": "The empty datastore group is independent of the review controls and is likely emitted by Word for an absent Custom XML data-store payload.",
+          "evidence": [
+            "The file has the same empty group shape as the tables/layout RTF.",
+            "The corresponding DOCX package has no customXml parts.",
+            "Native Word reopens the file without repair."
+          ]
+        }
+      ],
+      "native_ui_follow_ups": [
+        {
+          "candidate_id": "native_rtf_review_minimal",
+          "ui_authoring": "Create a one-page Word document containing only one tracked insertion, one tracked deletion, one bookmark, and one REF field; save as RTF, close, and reopen.",
+          "expected_observations": [
+            "The empty datastore group may recur independently of review controls.",
+            "Tracked revision, bookmark, and field controls remain available as raw RTF evidence even if parsing stops at datastore."
+          ],
+          "purpose": "Confirm that the current review fixture's first parser error is not caused by comments or custom properties."
+        }
+      ]
+    }
+  ],
+  "minimal_fixture_comparison": {
+    "inspection_metadata": "test-data/microsoft-office/word/rtf-minimal-inspection.json",
+    "machine_checkable_facts": [
+      {
+        "fixture_id": "word-rtf-minimal-006",
+        "path": "test-data/microsoft-office/word/word-rtf-minimal.rtf",
+        "empty_datastore_group_count": 1,
+        "table_style_ts36_group_count": 0,
+        "table_body_trowd_count": 0,
+        "textutil_markers": ["RTF_MINIMAL_006: plain native Microsoft Word paragraph."],
+        "litchi_rtf_error": "MalformedDocument(\"RTF data-store payload cannot be empty\")"
+      },
+      {
+        "fixture_id": "word-rtf-table-grid-006",
+        "path": "test-data/microsoft-office/word/word-rtf-table-grid.rtf",
+        "empty_datastore_group_count": 1,
+        "table_style_ts35_group_count": 1,
+        "table_style_ts36_group_count": 0,
+        "table_body_trowd_count": 3,
+        "table_body_exact_cell_count": 4,
+        "table_body_row_count": 2,
+        "textutil_markers": ["RTF_MINIMAL_006", "RTF_TABLE_GRID_006", "Key", "Value", "RTF_CELL_006", "42"],
+        "litchi_rtf_error": "MalformedDocument(\"RTF data-store payload cannot be empty\")"
+      },
+      {
+        "fixture_id": "word-tables-layout-002",
+        "path": "test-data/microsoft-office/word/word-tables-layout.rtf",
+        "empty_datastore_group_count": 1,
+        "table_style_ts36_group_count": 7,
+        "litchi_rtf_error": "MalformedDocument(\"RTF stylesheet contains a duplicate typed style ID\")"
+      },
+      {
+        "fixture_id": "word-review-controls-003",
+        "path": "test-data/microsoft-office/word/word-review-controls.rtf",
+        "empty_datastore_group_count": 1,
+        "table_style_duplicate_group_count": 0,
+        "litchi_rtf_error": "MalformedDocument(\"RTF data-store payload cannot be empty\")"
+      }
+    ],
+    "finding": "The two minimal native Word RTF fixtures isolate the empty datastore failure from rich table styling, review controls, and table body content. The duplicate typed style failure is specific to the repeated native Grid Table 2 Accent 1 \\ts36 conditional records in word-tables-layout.rtf.",
+    "raw_control_note": "word-rtf-table-grid.rtf contains one \\ts35 Table Grid stylesheet record and no \\ts36 records. Its raw table body has no \\trhdr, \\tscfirstrow, or \\tscfirstcol controls; UI option state is recorded separately in rtf-minimal-inspection.json."
+  },
+  "high_value_native_rtf_candidates": [
+    {
+      "candidate_id": "native_rtf_text_structure",
+      "features": ["title/heading styles", "Unicode", "bold/italic/underline/strike", "bullets", "hyperlink", "comment", "footnote"],
+      "expected_controls": ["\\stylesheet", "\\u", "\\field", "\\fldinst", "\\fldrslt", "\\chftn", "\\footnote"]
+    },
+    {
+      "candidate_id": "native_rtf_picture",
+      "features": ["PNG or JPEG picture", "picture dimensions", "goal dimensions"],
+      "expected_controls": ["\\pict", "\\pngblip or \\jpegblip", "\\picw", "\\pich", "\\picwgoal", "\\pichgoal"]
+    },
+    {
+      "candidate_id": "native_rtf_shape_textbox",
+      "features": ["shape", "text box", "shape text"],
+      "expected_controls": ["\\shp", "\\sp", "\\shptxt or legacy drawing controls"]
+    },
+    {
+      "candidate_id": "native_rtf_embedded_object",
+      "features": ["embedded chart or OLE object", "inert object bytes"],
+      "expected_controls": ["\\object", "\\objdata", "\\objresult"]
+    },
+    {
+      "candidate_id": "native_rtf_equation",
+      "features": ["native Word equation"],
+      "expected_controls": ["\\mmath", "math property controls"]
+    },
+    {
+      "candidate_id": "native_rtf_form_protection",
+      "features": ["legacy form field", "protected document"],
+      "expected_controls": ["\\formfield", "\\fftype", "\\ffname", "\\formprot", "\\password or \\passwordhash"]
+    },
+    {
+      "candidate_id": "native_rtf_bidi_codepages",
+      "features": ["Arabic/Hebrew plus CJK mixed-font text", "Unicode fallback", "direction controls"],
+      "expected_controls": ["\\u", "\\uc", "\\rtlch", "\\ltrch", "\\fcharset", "\\lang"]
+    }
+  ],
+  "scope_limits": [
+    "This file records parser boundaries and native raw syntax; it does not repair RTF, modify library code, or claim semantic parse success.",
+    "Hypotheses about Word's exporter behavior are labeled and should not be promoted to normative specification claims without an independent native baseline.",
+    "The native reply is present in the DOCX comment package, but this RTF audit does not claim UI-visible reply state after reopen.",
+    "No rendering, pagination, field recalculation, revision accept/reject, comment collaboration, or custom XML execution behavior is claimed."
+  ]
+}

@@ -1,0 +1,762 @@
+{
+  "schema_version": 1,
+  "audit_id": "excel-final-gap-review-2026-10-15",
+  "generated_on": "2026-10-15",
+  "purpose": "Read-only reconciliation of all Excel feature-inventory rows against the finalized native Microsoft Excel corpus and the two pre-finalization residual audits. This record identifies true remaining native authoring gaps, bounded subscopes, UI limitations, package-only families, external handoffs, and library boundaries without changing source code or coverage metadata.",
+  "provenance": {
+    "producer": "Microsoft Office Excel fixtures authored and reopened by the root agent Computer Use session; this audit did not operate Office UI.",
+    "platform_assumption": "The native UI observations are session-scoped to the available macOS Excel build. Cross-platform commands are not inferred.",
+    "libreoffice_used_for_native_fixture_authoring": false,
+    "library_code_modified": false,
+    "coverage_metadata_modified": false,
+    "inspection_files_written_by_this_audit": [
+      "test-data/microsoft-office/excel/final-gap-review.json"
+    ]
+  },
+  "scope": {
+    "coverage_source": "test-data/microsoft-office/coverage.json#/feature_inventory",
+    "coverage_sha256_before_write": "8cb147c61fcdd84b22545b0cf36b08f8f3cb57ae18fdb51aeb3636fb0d909b74",
+    "coverage_inventory_rows": 494,
+    "excel_inventory_rows": 206,
+    "excel_rows_by_format": {
+      "xls": 63,
+      "xlsx": 77,
+      "xlsb": 66
+    },
+    "non_excel_inventory_rows": 288,
+    "current_status_counts_before_reconciliation": {
+      "verified_native_fixture": 89,
+      "pending": 94,
+      "library_boundary": 22,
+      "not_applicable": 1
+    },
+    "residual_audits": [
+      {
+        "path": "test-data/microsoft-office/excel/binary-residual-coverage-audit.json",
+        "sha256": "98c9f5162de2b7359ff16d5983c05587196788c0a58a48a5d9adc5e55e510ab8",
+        "audited_pending_rows": 65,
+        "source_counts_before_finalization": {
+          "operation_only": 41,
+          "genuinely_missing_authorable_family": 10,
+          "external_handoff": 10,
+          "observed_native_ui_limitation": 4
+        }
+      },
+      {
+        "path": "test-data/microsoft-office/excel/xlsx-residual-coverage-audit.json",
+        "sha256": "1e7ee500ac3f4e3c46fd65c481ce71ad92d2bea0ba15ff8b0042924ccf1ca37b",
+        "audited_pending_rows": 30,
+        "source_counts_before_finalization": {
+          "operation_only": 11,
+          "genuinely_missing_authorable_family": 6,
+          "external_handoff": 6,
+          "observed_native_ui_limitation": 7
+        }
+      }
+    ],
+    "stale_category_note": "The coverage residual categories and residual audit labels predate the final metadata, revisions, and legacy MacroSheet fixtures. They are retained as provenance only; the disjoint reconciled groups below supersede their old genuinely_missing/unknown labels."
+  },
+  "finalized_native_groups": [
+    {
+      "inspection": "test-data/microsoft-office/excel/chart-families-inspection.json",
+      "fixture_id": "excel-chart-families-013",
+      "rows": [
+        "xls-182",
+        "xlsx-236",
+        "xlsb-309",
+        "xlsb-310"
+      ],
+      "bounded_scope": "17 embedded chart families, chart sheets/resources, caches, source formulas, and native reopen; rendering and complete chart authoring remain library boundaries.",
+      "inspection_bytes": 69098,
+      "inspection_sha256": "84359d69afe9d39808803ab454a2c31b7d10e7a5897dcbcb46587074fcfac4fb"
+    },
+    {
+      "inspection": "test-data/microsoft-office/excel/connections-inspection.json",
+      "fixture_id": "excel-connections-010",
+      "rows": [
+        "xls-166",
+        "xlsx-227",
+        "xlsx-252",
+        "xlsb-322",
+        "xlsb-323"
+      ],
+      "bounded_scope": "Native connection/query metadata and saved package records; no refresh, network, credentials, or provider execution.",
+      "inspection_bytes": 38389,
+      "inspection_sha256": "f90bf24252b82048a3880604587da5876838d681a0c091d5afa89ab0152ea202"
+    },
+    {
+      "inspection": "test-data/microsoft-office/excel/formula-owners-inspection.json",
+      "fixture_id": "excel-formula-owners-009",
+      "rows": [
+        "xls-141",
+        "xls-142",
+        "xls-165",
+        "xlsx-204",
+        "xlsx-206",
+        "xlsx-214",
+        "xlsb-282",
+        "xlsb-283",
+        "xlsb-306"
+      ],
+      "bounded_scope": "Native ordinary, array/CSE, shared/dynamic, data-table, scenario and cached formula-owner records; no library recalculation or execution claim.",
+      "inspection_bytes": 23582,
+      "inspection_sha256": "a5b0968429b594097acb0eb21197885973746bd4d5cc53f4376906db3722ce1f"
+    },
+    {
+      "inspection": "test-data/microsoft-office/excel/date1904-breaks-inspection.json",
+      "fixture_id": "excel-date1904-breaks-012",
+      "rows": [
+        "xls-155",
+        "xls-167",
+        "xls-168",
+        "xls-177",
+        "xlsx-212",
+        "xlsx-231",
+        "xlsb-291",
+        "xlsb-293",
+        "xlsb-304"
+      ],
+      "bounded_scope": "Native 1904 date system, cached serial/date values, hidden rows/columns, custom views, print metadata and manual breaks; no print/rendering runtime claim.",
+      "inspection_bytes": 26311,
+      "inspection_sha256": "ec43f391a40f62d7264dbc86a65bba526e630d292495d6de54badab5283eb10b"
+    },
+    {
+      "inspection": "test-data/microsoft-office/excel/form-controls-inspection.json",
+      "fixture_id": "excel-form-controls-008",
+      "rows": [
+        "xls-184",
+        "xlsx-256",
+        "xlsx-258",
+        "xlsx-266"
+      ],
+      "bounded_scope": "Eleven native worksheet Form Controls, linked values and inert drawing/VML/control properties; no ActiveX/VBA/control execution.",
+      "inspection_bytes": 39397,
+      "inspection_sha256": "41b0b103e11482b3fe345a4796d316a68bd3fe2b1d88d0d77b8a3c11ba7ee932"
+    },
+    {
+      "inspection": "test-data/microsoft-office/excel/conditional-drawings-inspection.json",
+      "fixture_id": "excel-conditional-drawings-005",
+      "rows": [
+        "xls-162",
+        "xlsx-223",
+        "xlsb-300"
+      ],
+      "bounded_scope": "Native data bars, color scales, icon sets, formula rule, duplicate rule and picture/shape drawing anchors; no rendering parity claim.",
+      "inspection_bytes": 28878,
+      "inspection_sha256": "44ca73d0be2ee5e4e4478ef41d0bcaaa5657bd1ed97543464d41cf0b14ded3e1"
+    },
+    {
+      "inspection": "test-data/microsoft-office/excel/visual-analytics-inspection.json",
+      "fixture_id": "excel-visual-analytics-004",
+      "rows": [
+        "xls-179",
+        "xls-180",
+        "xls-181",
+        "xlsx-242",
+        "xlsx-243",
+        "xlsx-235",
+        "xlsx-247",
+        "xlsb-301",
+        "xlsb-314",
+        "xlsb-315",
+        "xlsb-316"
+      ],
+      "bounded_scope": "Native pivot caches/views/charts, sparklines, filters/sorts/outlines and chart relationships as recorded by the inspection.",
+      "inspection_bytes": 23199,
+      "inspection_sha256": "f94debdefa6b1bfc051eb40389d7e60384076b8333a7f491f2444e7be218d414"
+    },
+    {
+      "inspection": "test-data/microsoft-office/excel/pivot-controls-inspection.json",
+      "fixture_id": "excel-pivot-controls-007",
+      "rows": [
+        "xlsx-242",
+        "xlsx-243",
+        "xlsx-247",
+        "xlsb-314",
+        "xlsb-315",
+        "xlsb-316"
+      ],
+      "bounded_scope": "Native Region/Product slicers, Date timeline selection and PivotChart saved-state controls; XLS conversion loss is recorded in the inspection.",
+      "inspection_bytes": 31391,
+      "inspection_sha256": "5d8ca0ea3c093eac02cc3cf15707edaa7831c9f4cf3918ed2bd7fad6381dac9b"
+    },
+    {
+      "inspection": "test-data/microsoft-office/excel/links-objects-inspection.json",
+      "fixture_id": "excel-links-objects-006",
+      "rows": [
+        "xls-183",
+        "xlsx-237",
+        "xlsx-238",
+        "xlsx-239",
+        "xlsb-313"
+      ],
+      "bounded_scope": "Native links, OLE/embedded objects and picture/drawing relationships as explicitly bounded by the inspection.",
+      "inspection_bytes": 36934,
+      "inspection_sha256": "4ad4e47c624cf71e1331cc96baf291465318eb54523d88a6ce0cac1488c726b0"
+    },
+    {
+      "inspection": "test-data/microsoft-office/excel/metadata-inspection.json",
+      "fixture_id": "excel-metadata-015",
+      "rows": [
+        "xls-140",
+        "xls-169",
+        "xls-170",
+        "xls-172",
+        "xlsx-203",
+        "xlsx-215",
+        "xlsx-228",
+        "xlsb-281",
+        "xlsb-307"
+      ],
+      "bounded_scope": "Rich runs, ignored errors, cell watch, classic note, background/header-footer pictures, consolidation and exact raw BIFF12/BIFF8 metadata; XLSB high-level timeout and XLS sheet enumeration are reader boundaries.",
+      "inspection_bytes": 31413,
+      "inspection_sha256": "eb1e46429c306908e0ead01f33571fea089558c9b2aac0b5526822b4e92931e3"
+    },
+    {
+      "inspection": "test-data/microsoft-office/excel/revisions-inspection.json",
+      "fixture_id": "excel-revisions-014",
+      "rows": [
+        "xls-175",
+        "xls-176",
+        "xlsx-234",
+        "xlsb-308"
+      ],
+      "bounded_scope": "Native revision headers/logs/user records and six deterministic edits; typed readers expose final cells/caches, not revision semantics or coauthoring.",
+      "inspection_bytes": 55944,
+      "inspection_sha256": "fb991fe8cafb664629ba8a710e30f520f210d10b90ae3c64c0986326258bdda5"
+    },
+    {
+      "inspection": "test-data/microsoft-office/excel/legacy-sheets-inspection.json",
+      "fixture_id": "excel-legacy-sheets-016",
+      "rows": [
+        "xls-153"
+      ],
+      "bounded_scope": "Real inert MacroSheet authored by Ctrl+F11 in XLSM/XLSB/XLS; the dialog-sheet sub-scope remains intentionally unclaimed.",
+      "inspection_bytes": 26368,
+      "inspection_sha256": "9a44bc60cb3a4ebdaf51ba8fed2d5d05cac3f33962ea92d61def17d4d526ab6d"
+    }
+  ],
+  "reconciled_excel_rows": {
+    "verified_native_fixture_rows": [
+      "xls-141",
+      "xls-142",
+      "xls-151",
+      "xls-153",
+      "xls-155",
+      "xls-159",
+      "xls-162",
+      "xls-163",
+      "xls-164",
+      "xls-165",
+      "xls-166",
+      "xls-167",
+      "xls-168",
+      "xls-177",
+      "xls-179",
+      "xls-180",
+      "xls-181",
+      "xls-182",
+      "xls-183",
+      "xls-184",
+      "xls-185",
+      "xls-186",
+      "xlsb-280",
+      "xlsb-282",
+      "xlsb-283",
+      "xlsb-291",
+      "xlsb-293",
+      "xlsb-297",
+      "xlsb-300",
+      "xlsb-301",
+      "xlsb-302",
+      "xlsb-303",
+      "xlsb-304",
+      "xlsb-306",
+      "xlsb-309",
+      "xlsb-310",
+      "xlsb-311",
+      "xlsb-312",
+      "xlsb-313",
+      "xlsb-314",
+      "xlsb-315",
+      "xlsb-316",
+      "xlsb-317",
+      "xlsb-318",
+      "xlsb-319",
+      "xlsb-320",
+      "xlsb-322",
+      "xlsb-323",
+      "xlsb-327",
+      "xlsb-335",
+      "xlsx-202",
+      "xlsx-204",
+      "xlsx-206",
+      "xlsx-209",
+      "xlsx-211",
+      "xlsx-212",
+      "xlsx-214",
+      "xlsx-218",
+      "xlsx-219",
+      "xlsx-222",
+      "xlsx-223",
+      "xlsx-224",
+      "xlsx-225",
+      "xlsx-227",
+      "xlsx-229",
+      "xlsx-230",
+      "xlsx-231",
+      "xlsx-232",
+      "xlsx-233",
+      "xlsx-235",
+      "xlsx-236",
+      "xlsx-237",
+      "xlsx-238",
+      "xlsx-239",
+      "xlsx-240",
+      "xlsx-241",
+      "xlsx-242",
+      "xlsx-243",
+      "xlsx-245",
+      "xlsx-247",
+      "xlsx-248",
+      "xlsx-249",
+      "xlsx-250",
+      "xlsx-252",
+      "xlsx-256",
+      "xlsx-257",
+      "xlsx-258",
+      "xlsx-265",
+      "xlsx-266"
+    ],
+    "verified_native_fixture_count": 89,
+    "pending_bounded_native_evidence_operation_unverified_rows": [
+      "xls-140",
+      "xls-169",
+      "xls-170",
+      "xls-172",
+      "xls-175",
+      "xls-176",
+      "xlsb-281",
+      "xlsb-307",
+      "xlsb-308",
+      "xlsx-203",
+      "xlsx-215",
+      "xlsx-228",
+      "xlsx-234"
+    ],
+    "pending_bounded_native_evidence_count": 13,
+    "pending_operation_unverified_rows": [
+      "xls-134",
+      "xls-135",
+      "xls-136",
+      "xls-138",
+      "xls-139",
+      "xls-143",
+      "xls-144",
+      "xls-145",
+      "xls-146",
+      "xls-147",
+      "xls-148",
+      "xls-154",
+      "xls-156",
+      "xls-157",
+      "xls-158",
+      "xls-160",
+      "xls-161",
+      "xls-173",
+      "xlsb-274",
+      "xlsb-275",
+      "xlsb-276",
+      "xlsb-277",
+      "xlsb-278",
+      "xlsb-279",
+      "xlsb-284",
+      "xlsb-285",
+      "xlsb-288",
+      "xlsb-290",
+      "xlsb-292",
+      "xlsb-294",
+      "xlsb-295",
+      "xlsb-296",
+      "xlsb-299",
+      "xlsb-305",
+      "xlsb-330",
+      "xlsx-197",
+      "xlsx-198",
+      "xlsx-199",
+      "xlsx-205",
+      "xlsx-207",
+      "xlsx-208",
+      "xlsx-210",
+      "xlsx-213",
+      "xlsx-251",
+      "xlsx-263"
+    ],
+    "pending_operation_unverified_count": 45,
+    "package_or_spec_boundary_rows_without_a_direct_local_gui_target": [
+      "xls-137",
+      "xls-178",
+      "xlsb-289"
+    ],
+    "package_or_spec_boundary_count": 3,
+    "package_or_external_metadata_handoff_rows_without_a_direct_local_gui_target": [
+      "xls-152",
+      "xlsx-254"
+    ],
+    "package_or_external_metadata_handoff_count": 2,
+    "observed_native_ui_limitation_rows": [
+      "xls-171",
+      "xls-192",
+      "xlsb-286",
+      "xlsb-287",
+      "xlsb-298",
+      "xlsb-324",
+      "xlsx-200",
+      "xlsx-201",
+      "xlsx-216",
+      "xlsx-217",
+      "xlsx-220",
+      "xlsx-244",
+      "xlsx-246",
+      "xlsx-253",
+      "xlsx-264"
+    ],
+    "observed_native_ui_limitation_count": 15,
+    "external_handoff_rows": [
+      "xls-149",
+      "xls-150",
+      "xls-174",
+      "xls-187",
+      "xls-188",
+      "xlsb-321",
+      "xlsb-325",
+      "xlsb-326",
+      "xlsb-328",
+      "xlsb-333",
+      "xlsx-226",
+      "xlsx-255",
+      "xlsx-259",
+      "xlsx-260",
+      "xlsx-261",
+      "xlsx-262"
+    ],
+    "external_handoff_count": 16,
+    "library_boundary_rows": [
+      "xls-189",
+      "xls-190",
+      "xls-191",
+      "xls-193",
+      "xls-194",
+      "xls-195",
+      "xls-196",
+      "xlsb-329",
+      "xlsb-331",
+      "xlsb-332",
+      "xlsb-334",
+      "xlsb-336",
+      "xlsb-337",
+      "xlsb-338",
+      "xlsb-339",
+      "xlsx-267",
+      "xlsx-268",
+      "xlsx-269",
+      "xlsx-270",
+      "xlsx-271",
+      "xlsx-272",
+      "xlsx-273"
+    ],
+    "library_boundary_count": 22,
+    "not_applicable_rows": [
+      "xlsx-221"
+    ],
+    "not_applicable_count": 1
+  },
+  "remaining_native_open_subscopes": [
+    {
+      "row_ids": [
+        "xls-153"
+      ],
+      "subscope": "BIFF8/OOXML/XLSB dialog-sheet authoring",
+      "row_status": "verified_native_fixture_for_macro_sheet_subscope; dialog sub-scope remains open",
+      "classification": "observed_native_ui_limitation_with_unknown_authoring_route",
+      "closed_scope": "Ctrl+F11 created and saved a real inert MacroSheet as Macro_016 in XLSM, XLSB and XLS.",
+      "native_ui_evidence": [
+        "Ctrl+F11 Insert MacroSheet was observed to create the MacroSheet.",
+        "Insert Sheet context actions exposed ordinary worksheet insertion only.",
+        "Search for dialog sheet returned Protect Workbook, Financial Functions, Cell Styles, Calculate and Print results, with no dialog-sheet authoring command."
+      ],
+      "known_route": "Ctrl+F11 for MacroSheet only.",
+      "dialog_route": null,
+      "candidate_route": "Requires a separately observed legacy/Windows Excel dialog-sheet command or an externally supplied native dialog-sheet file; no concrete route is evidenced by the local help/search/source boundary.",
+      "do_not_synthesize": true,
+      "inspection_reference": "test-data/microsoft-office/excel/legacy-sheets-inspection.json#/scope_and_limits/dialog_sheet_scope"
+    },
+    {
+      "row_ids": [
+        "xls-171",
+        "xlsx-217",
+        "xlsb-307"
+      ],
+      "subscope": "Phonetic information/properties",
+      "row_status": "pending; xlsb-307 has native CellWatch evidence but no phonetic payload",
+      "classification": "observed_native_ui_limitation",
+      "native_ui_evidence": [
+        "Excel search exposed Find/Replace but no Format > Phonetic route.",
+        "The native metadata fixture intentionally claims no phoneticPr/BIFF phonetic payload."
+      ],
+      "source_boundary": "The readers and writers have bounded phonetic metadata APIs, but source support does not prove local native UI authorability or layout/language conversion.",
+      "candidate_route": "A different Office host/locale with an exposed East Asian Phonetic Guide route would need a fresh native probe; no local route is confirmed.",
+      "do_not_synthesize": true,
+      "inspection_reference": "test-data/microsoft-office/excel/metadata-inspection.json#/library_api_boundaries"
+    },
+    {
+      "row_ids": [
+        "xlsx-220",
+        "xlsb-298"
+      ],
+      "subscope": "Threaded comments, persons, mentions and replies",
+      "row_status": "pending",
+      "classification": "observed_native_ui_limitation",
+      "native_ui_evidence": [
+        "Native Review > New Comment produced a legacy classic note.",
+        "Review exposed Edit Comment/Delete/Show Hide/Show All, with no Reply or threaded-person route."
+      ],
+      "source_boundary": "The XLSX/XLSB libraries own typed threaded metadata, but no collaboration service is contacted and the local native session did not create modern threaded parts.",
+      "candidate_route": "A Microsoft 365/Windows or account-enabled threaded-comment UI would need an independently observed native probe; no local route is confirmed.",
+      "do_not_synthesize": true,
+      "inspection_reference": "test-data/microsoft-office/excel/metadata-inspection.json#/format_observations/xlsx"
+    },
+    {
+      "row_ids": [
+        "xls-153",
+        "xls-171",
+        "xlsx-217",
+        "xlsx-220",
+        "xlsb-298",
+        "xlsb-307"
+      ],
+      "subscope": "Potential cross-host native probes",
+      "classification": "candidate_only; no concrete local route",
+      "candidate_targets": [
+        "A legacy/Windows Excel host that visibly exposes a Dialog Sheet insertion command, after the local Ctrl+F11 MacroSheet route is distinguished.",
+        "An Office host/locale that visibly exposes an East Asian Phonetic Guide/phonetic formatting command.",
+        "A Microsoft 365/account-enabled host that visibly creates threaded comments with persons, mentions and replies."
+      ],
+      "evidence_required": "Fresh native save, native reopen without repair, exact package/BIFF payload inspection, and typed reader boundary probes for only the newly created sub-scope.",
+      "do_not_duplicate": "Do not create another operation-only fixture for formula, cache, metadata, or ordinary note behavior already covered by the finalized corpus."
+    }
+  ],
+  "non_gui_or_external_family_decisions": [
+    {
+      "row_ids": [
+        "xls-137"
+      ],
+      "family": "Unknown and future BIFF records",
+      "classification": "operation_or_spec_boundary",
+      "reason": "Future/unknown records require a producer/version or raw native source; they are not a user-authorable Excel UI family."
+    },
+    {
+      "row_ids": [
+        "xls-152",
+        "xlsx-254"
+      ],
+      "family": "Custom XML data store(s)",
+      "classification": "package_or_external_metadata_handoff",
+      "reason": "The source APIs expose bounded payload/package owners, but no direct local Excel authoring route was observed and arbitrary application semantics are not inferred."
+    },
+    {
+      "row_ids": [
+        "xls-178"
+      ],
+      "family": "Office Toolbars XCB stream",
+      "classification": "package_or_spec_boundary",
+      "reason": "XCB is an inert legacy toolbar metadata stream with reader/writer APIs; no current native workbook UI route was observed for creating a controlled XCB payload."
+    },
+    {
+      "row_ids": [
+        "xlsb-289",
+        "xlsx-208"
+      ],
+      "family": "Volatile dependencies (xlsx-208 is the compound calculation-chain/volatile row)",
+      "classification": "operation_or_spec_boundary",
+      "reason": "These are generated/inert dependency metadata with no UI authoring workflow, refresh, evaluator, network, RTD or cube semantics. The XLSB matrix explicitly says native coverage is synthetic."
+    }
+  ],
+  "external_handoff_decisions": [
+    {
+      "row_ids": [
+        "xls-149",
+        "xlsx-260"
+      ],
+      "family": "Password/package encryption",
+      "reason": "Requires a human-controlled password/encryption handoff; no password is recorded here."
+    },
+    {
+      "row_ids": [
+        "xls-150",
+        "xlsx-259",
+        "xlsb-328"
+      ],
+      "family": "Digital signatures",
+      "reason": "Requires a certificate/private-key identity and trust context; no deterministic local UI fixture is claimed."
+    },
+    {
+      "row_ids": [
+        "xls-174",
+        "xls-187",
+        "xls-188",
+        "xlsx-226",
+        "xlsx-255",
+        "xlsx-261",
+        "xlsx-262",
+        "xlsb-321",
+        "xlsb-325",
+        "xlsb-326",
+        "xlsb-333"
+      ],
+      "family": "RTD/DDE/OLE/MDX, survey, add-in, task-pane, web-extension and custom Ribbon/provider behavior",
+      "reason": "Depends on an external provider, service, identity, manifest or executable host behavior. Saved inert metadata is not equivalent to a native runtime fixture."
+    }
+  ],
+  "genuinely_missing_authorable_families": {
+    "count": 0,
+    "row_ids": [],
+    "basis": "After the finalized metadata, revisions and MacroSheet records, every remaining pending row either has operation-only semantics, a bounded native sub-scope, a directly observed session UI limitation, a package/spec boundary, an external handoff, or an explicit library boundary. No pending row currently has both a concrete local native UI route and no finalized fixture."
+  },
+  "unknown_rows_and_routes": {
+    "coverage_matrix_unknown_excel_row_ids": [],
+    "coverage_matrix_unknown_note": "The current coverage residual_matrix_pending_categories.unknown bucket contains no Excel row IDs; its generic “unknown” mapping in the older audits represented the old genuinely-missing labels.",
+    "stale_audit_candidate_unknown_rows": {
+      "binary_residual_audit_authorable_rows_left_unknown_before_finalization": [
+        "xls-137",
+        "xls-152",
+        "xls-153",
+        "xls-169",
+        "xls-170",
+        "xls-171",
+        "xls-178",
+        "xlsb-289",
+        "xlsb-298",
+        "xlsb-307"
+      ],
+      "xlsx_residual_audit_authorable_rows_left_unknown_before_finalization": [
+        "xlsx-203",
+        "xlsx-215",
+        "xlsx-217",
+        "xlsx-220",
+        "xlsx-228",
+        "xlsx-234"
+      ]
+    },
+    "remaining_unknown_native_authoring_subscopes": [
+      "xls-153: dialog-sheet portion",
+      "xls-171: phonetic information",
+      "xlsx-217: phonetic properties",
+      "xlsx-220: threaded comments/persons/mentions",
+      "xlsb-298: threaded comments/persons",
+      "xlsb-307: phonetic portion"
+    ],
+    "interpretation": "These are route-unknown or UI-limited subscopes, not evidence that a local Excel writer should synthesize package bytes."
+  },
+  "reader_and_source_boundaries": {
+    "dialog_sheet": [
+      {
+        "path": "crates/litchi-xlsx/src/workbook/source.rs",
+        "lines": "44-50,1579-1584",
+        "evidence": "Recognizes Transitional and Strict dialog-sheet relationship types and maps them to WorksheetKind::Dialog; this is reader classification only."
+      },
+      {
+        "path": "crates/litchi-xlsx/src/workbook/package.rs",
+        "lines": "21-24,64-69",
+        "evidence": "Recognizes dialog-sheet relationships while opening the package graph."
+      },
+      {
+        "path": "crates/litchi-xlsx/src/cell_values/snapshot.rs",
+        "lines": "25-31,1431-1436",
+        "evidence": "Excludes dialog sheets from ordinary cell-value materialization and classifies the relationship as WorksheetKind::Dialog."
+      },
+      {
+        "path": "crates/litchi-xlsx/src/tab_state/snapshot.rs",
+        "lines": "17-24,647-652",
+        "evidence": "Classifies the dialog relationship in tab-state snapshots."
+      },
+      {
+        "path": "crates/litchi-xlsb/src/workbook/source.rs",
+        "lines": "29-59,643-646",
+        "evidence": "Requires application/vnd.ms-excel.dialogsheet and Transitional/Strict dialog relationships, then maps SheetKind::Dialog."
+      },
+      {
+        "path": "crates/litchi-xlsb/src/workbook/package.rs",
+        "lines": "37-40,54-57",
+        "evidence": "Keeps dialog-sheet relationships in the known non-worksheet package graph."
+      },
+      {
+        "path": "crates/litchi-ooxml-common/src/embedded/codec.rs",
+        "lines": "9-13,327-331",
+        "evidence": "Recognizes the XLSB dialog-sheet content type in embedded-part inventory."
+      },
+      {
+        "path": "crates/litchi-xls/src/sheet_metadata.rs",
+        "lines": "13-20,64-70",
+        "evidence": "Maps BIFF8 WorkSheet/BoundSheet8 metadata to WorksheetOrDialog because the legacy directory entry does not distinguish those two kinds."
+      }
+    ],
+    "phonetic_and_threaded": [
+      {
+        "path": "crates/litchi-xlsx/src/phonetic_properties.rs",
+        "lines": "100-101,304-343",
+        "evidence": "Typed phoneticPr parser criteria exist, but parser support does not prove native Excel UI authorability."
+      },
+      {
+        "path": "crates/litchi-xls/docs/FEATURE_MATRIX.md",
+        "lines": "35,71,99",
+        "evidence": "BIFF8 phonetic synthesis is unsupported; classic notes exist while modern threaded comments are outside the XLS model."
+      },
+      {
+        "path": "crates/litchi-xlsx/docs/FEATURE_MATRIX.md",
+        "lines": "50,58",
+        "evidence": "Phonetic and threaded-comment metadata are typed, inert models; no rendering or collaboration service is implied."
+      },
+      {
+        "path": "crates/litchi-xlsb/docs/FEATURE_MATRIX.md",
+        "lines": "61,70",
+        "evidence": "Threaded and phonetic metadata owners are typed, while collaboration/rendering are deliberately inactive."
+      }
+    ],
+    "package_only_families": [
+      {
+        "path": "crates/litchi-xls/docs/FEATURE_MATRIX.md",
+        "lines": "32,47,78",
+        "evidence": "Unknown/future BIFF, Custom XML and XCB are bounded opaque/package metadata families; their writer/read APIs do not establish a native Excel UI route."
+      },
+      {
+        "path": "crates/litchi-xlsb/docs/FEATURE_MATRIX.md",
+        "lines": "47,97,114",
+        "evidence": "Volatile dependencies and XML maps are inert metadata; mapped XML import/export and Custom XML processing are explicitly outside the library/runtime."
+      },
+      {
+        "path": "crates/litchi-xlsx/docs/FEATURE_MATRIX.md",
+        "lines": "41,96-97",
+        "evidence": "Volatile dependencies, XML maps and Custom XML stores have bounded package models but no host service or native UI behavior claim."
+      }
+    ]
+  },
+  "validation": {
+    "json_scope": "This file only; no source, library, fixture or common coverage metadata was changed.",
+    "disjoint_reconciliation": {
+      "verified_native_fixture": 89,
+      "pending_bounded_native_evidence_operation_unverified": 13,
+      "pending_operation_unverified": 45,
+      "package_or_spec_boundary": 3,
+      "package_or_external_metadata_handoff": 2,
+      "observed_native_ui_limitation": 15,
+      "external_handoff": 16,
+      "library_boundary": 22,
+      "not_applicable": 1,
+      "total_excel_rows": 206
+    },
+    "all_excel_rows_accounted_for": true,
+    "source_matrix_edits": false,
+    "office_files_reopened_by_this_audit": false
+  }
+}

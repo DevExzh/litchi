@@ -1,0 +1,723 @@
+{
+  "schema_version": 1,
+  "fixture_id": "excel-interaction-print-002",
+  "generated_on": "2026-10-15",
+  "purpose": "Read-only inspection of three native Microsoft Excel derivatives exercising validation types, formulas/cached values, notes, hyperlink metadata, named ranges, print setup, and protection state.",
+  "provenance": {
+    "producer_app": "Microsoft Office Excel",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "package_application": "Microsoft Macintosh Excel",
+    "package_app_version": "16.0300",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft Excel UI",
+    "source": "Synthetic validation/print/protection content entered and saved through native Excel, with native Save As derivatives for XLSX, XLSB and legacy XLS.",
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "all_documents_closed_before_hashing": true,
+    "lock_files_present_at_inspection": false
+  },
+  "scope_and_limits": {
+    "native_variants": [
+      "xlsx",
+      "xlsb",
+      "xls"
+    ],
+    "native_excel_reopen_verified": true,
+    "external_links_followed": false,
+    "macros_or_external_code_executed": false,
+    "xlsb_biff12_binary_values_decoded": false,
+    "xls_biff8_binary_values_decoded": false,
+    "legacy_derivative_feature_parity_claimed": false,
+    "fit_default_interpretation": "Native Excel's Fit to Page UI left fitToWidth and fitToHeight omitted in SpreadsheetML; this records the raw omission plus Excel's default 1-wide by 1-tall display rather than treating omitted attributes as a failure.",
+    "prompt_body_interpretation": "The saved whole-number validation has promptTitle=Quantity input and no prompt body attribute; attempted UI text not persisted as a prompt body is not claimed."
+  },
+  "expected_native_content": {
+    "worksheet": "Sheet1",
+    "cells": {
+      "dimension": "A1:I10",
+      "values": {
+        "B2": 3,
+        "B3": 5,
+        "B4": 2,
+        "B5": 4,
+        "C2": "Open",
+        "C3": "Closed",
+        "C4": "Hold",
+        "C5": "Open",
+        "D2": "2026-01-15",
+        "D3": "2026-02-20",
+        "D4": "2026-03-25",
+        "D5": "2026-04-30",
+        "E2": 12.5,
+        "E3": 25,
+        "E4": 9.5,
+        "E5": 48,
+        "F2": "Whole: 1-10",
+        "F3": "List: Open/Closed/Hold",
+        "F4": "Date: 2026",
+        "F5": "Decimal: 0-100",
+        "G2": "09:30",
+        "G3": "12:45",
+        "G4": "17:00",
+        "H2": "ABC",
+        "H3": "ABCD",
+        "H4": "ABCDE",
+        "I2": 2,
+        "I3": 4,
+        "I4": 6,
+        "A10": "HYPERLINK_FIXTURE_002"
+      },
+      "formulas_and_cached_values": {
+        "B6": {
+          "formula": "SUM(B2:B5)",
+          "cached_value": 14
+        },
+        "E6": {
+          "formula": "SUM(E2:E5)",
+          "cached_value": 95
+        }
+      }
+    },
+    "data_validations": {
+      "native_authoring_count": 7,
+      "types": [
+        {
+          "type": "whole",
+          "range": "B2:B5",
+          "formula1": "1",
+          "formula2": "10"
+        },
+        {
+          "type": "list",
+          "range": "C2:C5",
+          "formula1": "\"Open,Closed,Hold\""
+        },
+        {
+          "type": "date",
+          "range": "D2:D5",
+          "formula1": "46023 (2026-01-01)",
+          "formula2": "46387 (2026-12-31)"
+        },
+        {
+          "type": "decimal",
+          "range": "E2:E5",
+          "formula1": "0",
+          "formula2": "100"
+        },
+        {
+          "type": "time",
+          "range": "G2:G4",
+          "formula1": "0.375 (09:00)",
+          "formula2": "0.75 (18:00)"
+        },
+        {
+          "type": "textLength",
+          "range": "H2:H4",
+          "formula1": "3",
+          "formula2": "5"
+        },
+        {
+          "type": "custom",
+          "range": "I2:I4",
+          "formula1": "MOD(I2,2)=0"
+        }
+      ],
+      "native_authoring_scope": "Seven validation rules were created with native Excel UI; exact XML attributes are recorded for XLSX. XLSB/XLS binary validation semantics are not decoded here."
+    },
+    "defined_names": {
+      "FixtureAmounts": "Sheet1!$E$2:$E$5",
+      "_xlnm.Print_Area": "Sheet1!$A$1:$I$10",
+      "_xlnm.Print_Titles": "Sheet1!$A:$A,Sheet1!$1:$1"
+    },
+    "notes": [
+      {
+        "cell": "A2",
+        "marker": "LEGACY_NOTE_002",
+        "text": "LEGACY_NOTE_002: native Excel cell note."
+      },
+      {
+        "cell": "A3",
+        "marker": "COMMENT_COMMAND_002",
+        "text": "COMMENT_COMMAND_002: comment inserted through Review ribbon."
+      }
+    ],
+    "hyperlink": {
+      "cell": "A10",
+      "target": "https://example.com/litchi-excel-fixture",
+      "tooltip": "Native hyperlink screen tip 002"
+    },
+    "protection": {
+      "sheet": "Sheet1",
+      "sheet_protection_present": true,
+      "workbook_lock_structure": true,
+      "passwords": false,
+      "unlocked_input_region": "B2:I5",
+      "sheet_flags_allow_sort": true,
+      "sheet_flags_allow_auto_filter": true
+    },
+    "print": {
+      "print_area": "A1:I10",
+      "repeat_columns": "A:A",
+      "repeat_rows": "1:1",
+      "orientation": "landscape",
+      "scale": 80,
+      "fit_to_page": true,
+      "fit_to_width_raw": null,
+      "fit_to_height_raw": null,
+      "native_excel_default_fit_to_width": 1,
+      "native_excel_default_fit_to_height": 1,
+      "first_page_number": 3,
+      "page_order": "overThenDown",
+      "comments": "atEnd",
+      "margins": {
+        "left": 0.7,
+        "right": 0.7,
+        "top": 0.5,
+        "bottom": 0.5,
+        "header": 0.3,
+        "footer": 0.3
+      },
+      "gridlines": true,
+      "headings": true,
+      "horizontal_centered": true,
+      "header_fields": {
+        "left": "HEADER_LEFT_002",
+        "center": "Native Excel print fixture",
+        "right": "&A"
+      },
+      "footer_fields": {
+        "left": "FOOTER_002",
+        "center": "Page &P of &N",
+        "right": "&F"
+      }
+    }
+  },
+  "library_validation": {
+    "readers": [
+      "litchi-xlsx::Workbook::open",
+      "litchi-xlsb::Workbook::new",
+      "litchi-xls::Workbook::new"
+    ],
+    "xlsx": {
+      "package_open": "pass",
+      "tolerance_report": {
+        "defects": [],
+        "unrecorded": 0
+      },
+      "sheet_probe": "pass",
+      "worksheet_name": "Sheet1",
+      "cell_E6": {
+        "formula": "SUM(E2:E5)",
+        "cached_value": 95,
+        "view": "Stored(Formula)"
+      },
+      "data_validation_collections": 1,
+      "data_validation_declared_count": 7,
+      "data_validation_rules_materialized": 7,
+      "whole_prompt_title": "Quantity input",
+      "whole_prompt_body": null
+    },
+    "xlsb": {
+      "workbook_open": "pass",
+      "tolerance_report": {
+        "defects": [],
+        "unrecorded": 0
+      },
+      "worksheet_catalog": {
+        "count": 1,
+        "names": [
+          "Sheet1"
+        ]
+      },
+      "worksheet_materialization": "error",
+      "worksheet_error": "Unrecognized { typ: \"BrtBeginDVals collection\", val: \"unexpected record 0x0025\" }",
+      "interpretation": "The XLSB workbook/package opens, but materializing Sheet1 fails at the library's BIFF12 data-validation collection reader; this is recorded as a library read boundary, not as native fixture corruption."
+    },
+    "xls": {
+      "workbook_open": "pass",
+      "worksheet_catalog": {
+        "count": 0,
+        "names": []
+      },
+      "worksheet_materialization": "error",
+      "worksheet_error": "WorksheetNotFound(\"Sheet index 0\")",
+      "interpretation": "The legacy BIFF8 package opens at the Workbook reader boundary, but this read-only probe exposed no worksheet catalog; BIFF8 cell/formula semantics are therefore unclaimed."
+    },
+    "execution_scope": "Readers were run read-only against closed fixture bytes; no save, edit, recalculation, external-link fetch, or Office UI operation was performed by this inspection."
+  },
+  "files": [
+    {
+      "path": "test-data/microsoft-office/excel/excel-interaction-print.xlsx",
+      "format": "xlsx",
+      "bytes": 13089,
+      "sha256": "85254132754529fb47ffd4cc047d64d519c86a1452917d56688e94de85c4e887",
+      "file_description": "Microsoft Excel 2007+",
+      "container": {
+        "kind": "OPC ZIP",
+        "zip_test": "pass",
+        "member_count": 14,
+        "members": [
+          "[Content_Types].xml",
+          "_rels/.rels",
+          "docProps/app.xml",
+          "docProps/core.xml",
+          "xl/_rels/workbook.xml.rels",
+          "xl/calcChain.xml",
+          "xl/comments1.xml",
+          "xl/drawings/vmlDrawing1.vml",
+          "xl/sharedStrings.xml",
+          "xl/styles.xml",
+          "xl/theme/theme1.xml",
+          "xl/workbook.xml",
+          "xl/worksheets/_rels/sheet1.xml.rels",
+          "xl/worksheets/sheet1.xml"
+        ],
+        "xml_or_rels_parse": "pass",
+        "xml_or_rels_part_count": 13,
+        "relationship_count": 11,
+        "relationship_target_check": "pass",
+        "external_targets_recorded_not_fetched": [
+          "https://example.com/litchi-excel-fixture"
+        ]
+      },
+      "application_properties": {
+        "Application": "Microsoft Macintosh Excel",
+        "AppVersion": "16.0300",
+        "DocSecurity": "0"
+      },
+      "native_parts": {
+        "workbook": {
+          "sheet_names": [
+            "Sheet1"
+          ],
+          "defined_names": {
+            "FixtureAmounts": "Sheet1!$E$2:$E$5",
+            "_xlnm.Print_Area": "Sheet1!$A$1:$I$10",
+            "_xlnm.Print_Titles": "Sheet1!$A:$A,Sheet1!$1:$1"
+          },
+          "workbook_protection": {
+            "lockStructure": "1",
+            "password_attribute_present": false
+          }
+        },
+        "worksheet": {
+          "part": "xl/worksheets/sheet1.xml",
+          "dimension": "A1:I10",
+          "data_validation_count": 7,
+          "data_validations": [
+            {
+              "type": "whole",
+              "sqref": "B2:B5",
+              "formula1": "1",
+              "formula2": "10",
+              "allowBlank": true,
+              "showInputMessage": true,
+              "showErrorMessage": true,
+              "errorTitle": "Invalid quantity",
+              "error": "Quantity must be an integer from 1 to 10.",
+              "promptTitle": "Quantity input",
+              "prompt": null
+            },
+            {
+              "type": "list",
+              "sqref": "C2:C5",
+              "formula1": "\"Open,Closed,Hold\""
+            },
+            {
+              "type": "date",
+              "sqref": "D2:D5",
+              "formula1": "46023",
+              "formula2": "46387"
+            },
+            {
+              "type": "decimal",
+              "sqref": "E2:E5",
+              "formula1": "0",
+              "formula2": "100"
+            },
+            {
+              "type": "time",
+              "sqref": "G2:G4",
+              "formula1": "0.375",
+              "formula2": "0.75"
+            },
+            {
+              "type": "textLength",
+              "sqref": "H2:H4",
+              "formula1": "3",
+              "formula2": "5"
+            },
+            {
+              "type": "custom",
+              "sqref": "I2:I4",
+              "formula1": "MOD(I2,2)=0"
+            }
+          ],
+          "sheet_protection": {
+            "sheet": "1",
+            "objects": "1",
+            "scenarios": "1",
+            "sort": "0",
+            "autoFilter": "0",
+            "password_attribute_present": false
+          },
+          "unlocked_styles": {
+            "region": "B2:I5",
+            "style_indexes": [
+              3,
+              4,
+              5
+            ]
+          },
+          "formula_cells": [
+            {
+              "cell": "B6",
+              "formula": "SUM(B2:B5)",
+              "cached_value": 14
+            },
+            {
+              "cell": "E6",
+              "formula": "SUM(E2:E5)",
+              "cached_value": 95
+            }
+          ],
+          "calc_chain": [
+            "B6",
+            "E6"
+          ],
+          "comments": {
+            "part": "xl/comments1.xml",
+            "cells": [
+              "A2",
+              "A3"
+            ],
+            "authors": [
+              "Ryker Zhu"
+            ]
+          },
+          "comment_shapes": {
+            "part": "xl/drawings/vmlDrawing1.vml",
+            "note_shape_count": 2,
+            "cells": [
+              "A2",
+              "A3"
+            ]
+          },
+          "hyperlinks": [
+            {
+              "cell": "A10",
+              "target": "https://example.com/litchi-excel-fixture",
+              "tooltip": "Native hyperlink screen tip 002"
+            }
+          ],
+          "print": {
+            "pageSetUpPr": {
+              "fitToPage": "1",
+              "fitToWidth": null,
+              "fitToHeight": null
+            },
+            "pageSetup": {
+              "scale": "80",
+              "firstPageNumber": "3",
+              "pageOrder": "overThenDown",
+              "orientation": "landscape",
+              "cellComments": "atEnd"
+            },
+            "pageMargins": {
+              "left": "0.7",
+              "right": "0.7",
+              "top": "0.5",
+              "bottom": "0.5",
+              "header": "0.3",
+              "footer": "0.3"
+            },
+            "printOptions": {
+              "horizontalCentered": "1",
+              "headings": "1",
+              "gridLines": "1"
+            }
+          }
+        }
+      },
+      "library_read": {
+        "reader": "litchi-xlsx::Workbook::open",
+        "status": "pass",
+        "sheet_and_formula_probe": "pass",
+        "data_validation_probe": "pass",
+        "tolerance_defects": 0
+      },
+      "native_ui_validation": {
+        "observed_by": "Root agent via Computer Use",
+        "application": "Microsoft Excel",
+        "reopen": "pass",
+        "repair_prompt": false,
+        "used_range": "A1:I10",
+        "observations": [
+          "Closed and reopened in native Excel without a repair prompt.",
+          "The used range was A1:I10.",
+          "E6 retained/displayed 95 for formula SUM(E2:E5).",
+          "Review showed Unprotect Sheet for the saved sheet-protection state.",
+          "Review showed Protect Workbook enabled for workbook-structure protection.",
+          "No protection passwords were used."
+        ],
+        "protection": {
+          "sheet_protection_present": true,
+          "workbook_structure_protected": true,
+          "passwords": false,
+          "review_commands_observed": [
+            "Unprotect Sheet",
+            "Protect Workbook"
+          ]
+        },
+        "semantic_scope": "Visible native Excel reopen and selected UI state only; it does not certify every binary derivative feature."
+      }
+    },
+    {
+      "path": "test-data/microsoft-office/excel/excel-interaction-print.xlsb",
+      "format": "xlsb",
+      "bytes": 11418,
+      "sha256": "11d9221b268f52749ad4a736937c55353080a183f7cd8345c64b02b797929fc8",
+      "file_description": "Microsoft Excel 2007+",
+      "container": {
+        "kind": "OPC ZIP",
+        "zip_test": "pass",
+        "member_count": 15,
+        "members": [
+          "[Content_Types].xml",
+          "_rels/.rels",
+          "docProps/app.xml",
+          "docProps/core.xml",
+          "xl/_rels/workbook.bin.rels",
+          "xl/calcChain.bin",
+          "xl/comments1.bin",
+          "xl/drawings/vmlDrawing1.vml",
+          "xl/sharedStrings.bin",
+          "xl/styles.bin",
+          "xl/theme/theme1.xml",
+          "xl/workbook.bin",
+          "xl/worksheets/_rels/sheet1.bin.rels",
+          "xl/worksheets/binaryIndex1.bin",
+          "xl/worksheets/sheet1.bin"
+        ],
+        "xml_or_rels_parse": "pass",
+        "xml_or_rels_part_count": 7,
+        "relationship_count": 12,
+        "relationship_target_check": "pass",
+        "external_targets_recorded_not_fetched": [
+          "https://example.com/litchi-excel-fixture"
+        ],
+        "binary_part_sizes": {
+          "xl/workbook.bin": 1135,
+          "xl/worksheets/sheet1.bin": 3283,
+          "xl/styles.bin": 991,
+          "xl/sharedStrings.bin": 739,
+          "xl/worksheets/binaryIndex1.bin": 97,
+          "xl/comments1.bin": 478,
+          "xl/calcChain.bin": 36
+        }
+      },
+      "application_properties": {
+        "Application": "Microsoft Macintosh Excel",
+        "AppVersion": "16.0300",
+        "DocSecurity": "0"
+      },
+      "native_parts": {
+        "binary_feature_presence": {
+          "workbook": true,
+          "worksheet": true,
+          "styles": true,
+          "shared_strings": true,
+          "binary_index": true,
+          "comments": true,
+          "calc_chain": true,
+          "vml_note_shapes": true,
+          "table": false,
+          "chartsheet": false,
+          "chart_cache_xml": false,
+          "vba_project": false
+        },
+        "semantic_decode": {
+          "extracted": false,
+          "reason": "BIFF12 worksheet/workbook/style/shared-string/comment/calc-chain streams are binary; package presence and relationships are recorded without claiming a complete BIFF12 decoder result."
+        }
+      },
+      "library_read": {
+        "reader": "litchi-xlsb::Workbook::new",
+        "workbook_open": "pass",
+        "worksheet_catalog": {
+          "count": 1,
+          "names": [
+            "Sheet1"
+          ]
+        },
+        "worksheet_materialization": "error",
+        "error": "Unrecognized { typ: \"BrtBeginDVals collection\", val: \"unexpected record 0x0025\" }",
+        "tolerance_defects": 0
+      },
+      "native_ui_validation": {
+        "observed_by": "Root agent via Computer Use",
+        "application": "Microsoft Excel",
+        "reopen": "pass",
+        "repair_prompt": false,
+        "used_range": "A1:I10",
+        "observations": [
+          "Closed and reopened in native Excel without a repair prompt.",
+          "The used range was A1:I10.",
+          "E6 retained/displayed 95 for formula SUM(E2:E5).",
+          "Review showed Unprotect Sheet for the saved sheet-protection state.",
+          "Review showed Protect Workbook enabled for workbook-structure protection.",
+          "No protection passwords were used."
+        ],
+        "protection": {
+          "sheet_protection_present": true,
+          "workbook_structure_protected": true,
+          "passwords": false,
+          "review_commands_observed": [
+            "Unprotect Sheet",
+            "Protect Workbook"
+          ]
+        },
+        "semantic_scope": "Visible native Excel reopen and selected UI state only; it does not certify every binary derivative feature."
+      }
+    },
+    {
+      "path": "test-data/microsoft-office/excel/excel-interaction-print.xls",
+      "format": "xls",
+      "bytes": 30208,
+      "sha256": "b9a980ff14f8ef73d54c80d3151671d27cb1603aa624c25d75530d315c5e65ec",
+      "file_description": "Composite Document File V2 Document, Little Endian, Os: MacOS, Version 5.26, Code page: 10000, Author: Ryker Zhu, Last Saved By: Ryker Zhu, Name of Creating Application: Microsoft Macintosh Excel, Security: 0",
+      "container": {
+        "kind": "Compound File Binary (CFB/OLE)",
+        "signature_hex": "d0cf11e0a1b11ae1",
+        "signature_valid": true,
+        "header": {
+          "major_version": 3,
+          "minor_version": 62,
+          "byte_order_hex": "feff",
+          "sector_size": 512,
+          "mini_sector_size": 64,
+          "num_fat_sectors": 1,
+          "first_directory_sector": 57,
+          "mini_stream_cutoff": 4096,
+          "first_mini_fat_sector": 4294967294,
+          "num_mini_fat_sectors": 0,
+          "num_difat_sectors": 0
+        },
+        "directory_streams": [
+          {
+            "directory_index": 0,
+            "name": "Root Entry",
+            "object_type": "root",
+            "start_sector": 4294967294,
+            "size_bytes": 0
+          },
+          {
+            "directory_index": 1,
+            "name": "Workbook",
+            "object_type": "stream",
+            "start_sector": 0,
+            "size_bytes": 19975
+          },
+          {
+            "directory_index": 2,
+            "name": "\\u0005SummaryInformation",
+            "object_type": "stream",
+            "start_sector": 40,
+            "size_bytes": 4096
+          },
+          {
+            "directory_index": 3,
+            "name": "\\u0005DocumentSummaryInformation",
+            "object_type": "stream",
+            "start_sector": 48,
+            "size_bytes": 4096
+          }
+        ],
+        "integrity": {
+          "sector_count": 58,
+          "fat_sector_chain": [
+            56
+          ],
+          "directory_chain": [
+            57
+          ],
+          "directory_entry_count": 4,
+          "check": "pass",
+          "errors": []
+        }
+      },
+      "application_properties": {
+        "Application": "Microsoft Macintosh Excel",
+        "DocSecurity": "0",
+        "code_page": 10000
+      },
+      "native_parts": {
+        "native_stream_presence": {
+          "Workbook": true,
+          "\\u0005SummaryInformation": true,
+          "\\u0005DocumentSummaryInformation": true
+        },
+        "workbook_stream_size_bytes": 19975,
+        "semantic_decode": {
+          "extracted": false,
+          "reason": "BIFF8 Workbook stream is binary; CFB integrity and stream inventory are recorded without claiming complete BIFF8 cell/formula/validation/print semantics."
+        }
+      },
+      "library_read": {
+        "reader": "litchi-xls::Workbook::new",
+        "workbook_open": "pass",
+        "worksheet_catalog": {
+          "count": 0,
+          "names": []
+        },
+        "worksheet_materialization": "error",
+        "error": "WorksheetNotFound(\"Sheet index 0\")",
+        "semantic_decode": "not_claimed"
+      },
+      "native_ui_validation": {
+        "observed_by": "Root agent via Computer Use",
+        "application": "Microsoft Excel",
+        "reopen": "pass",
+        "repair_prompt": false,
+        "used_range": "A1:I10",
+        "observations": [
+          "Closed and reopened in native Excel without a repair prompt.",
+          "The used range was A1:I10.",
+          "E6 retained/displayed 95 for formula SUM(E2:E5).",
+          "Review showed Unprotect Sheet for the saved sheet-protection state.",
+          "Review showed Protect Workbook enabled for workbook-structure protection.",
+          "No protection passwords were used.",
+          "Saving the legacy XLS derivative displayed Excel's potential-feature-loss warning; it was accepted for this native derivative."
+        ],
+        "protection": {
+          "sheet_protection_present": true,
+          "workbook_structure_protected": true,
+          "passwords": false,
+          "review_commands_observed": [
+            "Unprotect Sheet",
+            "Protect Workbook"
+          ]
+        },
+        "semantic_scope": "Visible native Excel reopen and selected UI state only; it does not certify every binary derivative feature.",
+        "legacy_save_warning": {
+          "shown": true,
+          "accepted": true,
+          "semantic_parity_claimed": false
+        }
+      }
+    }
+  ],
+  "validation_methods": [
+    "SHA-256 computed from the closed fixture byte streams.",
+    "file(1) magic/type identification for OPC and CFB files.",
+    "ZIP central-directory and CRC check via Python ZipFile.testzip for XLSX/XLSB.",
+    "XML well-formedness via Python ElementTree for every XML and .rels part; VML was retained as a native XML-like part inventory.",
+    "OPC relationship targets resolved against package members; the example.com hyperlink target was recorded and never fetched.",
+    "CFB/OLE signature, sector geometry, FAT/directory chains and stream inventory checked read-only for XLS.",
+    "Existing litchi-xlsx, litchi-xlsb and litchi-xls reader APIs invoked read-only; materialization errors and unsupported binary boundaries are recorded verbatim.",
+    "Root Computer Use observations record native Excel close/reopen without repair prompt, used range, formula result and protection UI state; visible observations remain scoped."
+  ],
+  "native_ui_observation_source": "Root agent Computer Use session; this read-only inspection process did not operate Office UI."
+}

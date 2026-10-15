@@ -1,0 +1,642 @@
+{
+  "schema_version": 1,
+  "generated_on": "2026-10-15",
+  "purpose": "Read-only audit of the finalized native Microsoft Word tracked-move fixtures and the format-specific revision representations exposed to the library readers.",
+  "provenance": {
+    "producer_app": "Microsoft Office Word",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft Word UI",
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "fixtures_modified": false,
+    "common_metadata_modified": false,
+    "analysis_method": "Read-only native reopen, hash, ZIP/XML, CFB stream, raw RTF, textutil, and existing reader inspection",
+    "native_reopen_without_repair": true,
+    "all_three_fixture_documents_closed_before_hashing": true,
+    "auditor": "/root/rtf_boundary_audit"
+  },
+  "fixture_identity": {
+    "fixture_id": "word-tracked-moves-018",
+    "paragraph_markers": [
+      "WORD_TRACKED_MOVES_018",
+      "Fixture ID: word-tracked-moves-018",
+      "SOURCE_018: Move this complete native paragraph to the destination below.",
+      "ANCHOR_018: This paragraph remains in place.",
+      "DESTINATION_018",
+      "SOURCE_018: Move this complete native paragraph to the destination below.",
+      "END_TRACKED_MOVES_018"
+    ],
+    "move_source_text": "SOURCE_018: Move this complete native paragraph to the destination below.",
+    "move_anchor_text": "ANCHOR_018: This paragraph remains in place.",
+    "move_destination_marker": "DESTINATION_018",
+    "move_end_marker": "END_TRACKED_MOVES_018",
+    "native_operation": "With Track Changes on, select the complete SOURCE_018 paragraph including its paragraph mark, cut with the native Word clipboard, place the cursor before END_TRACKED_MOVES_018, and paste.",
+    "native_tracking_ui": {
+      "track_changes": "on",
+      "markup_preferences": "Move display styles were exposed as Double strike/underline green.",
+      "track_moves_checkbox": "not exposed in the native Preferences UI",
+      "app_preferences_changed": false,
+      "native_labels_observed": [
+        "Moved down[1]",
+        "Moved(insertion)[1]"
+      ]
+    }
+  },
+  "files": [
+    {
+      "path": "test-data/microsoft-office/word/word-tracked-moves.docx",
+      "format": "docx",
+      "bytes": 14475,
+      "sha256": "93970c2a65973afa1d7a63d9a02b1cc770aaf5b16052023e8f4af6c975367a65",
+      "native_reopen": "pass_without_repair",
+      "textutil_projection": "WORD_TRACKED_MOVES_018\nFixture ID: word-tracked-moves-018\nSOURCE_018: Move this complete native paragraph to the destination below.\nANCHOR_018: This paragraph remains in place.\nDESTINATION_018\nSOURCE_018: Move this complete native paragraph to the destination below.\nEND_TRACKED_MOVES_018\n",
+      "package_member_sha256": {
+        "word/document.xml": "fb457890a66675a728a7c58d986623f3cc2d018035178b7f1b4cdf35983d17bf",
+        "word/settings.xml": "90f9bbf206c286cece9af09917a37684e108d9bf90e8a8d714bd953185029ab5",
+        "word/people.xml": "5d0c11ba6764cc28c5e0f9500d217cd0532486e8c886261be8b5dd662925f8ed",
+        "docProps/core.xml": "a4d8831c4673dc7dd488d11448d208a65695cce71a2d59f81b5ce24402e22f90"
+      }
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-tracked-moves.doc",
+      "format": "doc",
+      "bytes": 24576,
+      "sha256": "a48cad2000150d06906d60a51dcec035a790b94880b518992d2e73fcc275c1f5",
+      "native_reopen": "pass_without_repair",
+      "textutil_projection": "WORD_TRACKED_MOVES_018\nFixture ID: word-tracked-moves-018\nANCHOR_018: This paragraph remains in place.\nDESTINATION_018\nSOURCE_018: Move this complete native paragraph to the destination below.\nEND_TRACKED_MOVES_018\n",
+      "native_ui_projection": "The reopened DOC displayed only a Deleted label for the downgrade, although the raw binary CHPX ranges retain both move-like sides."
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-tracked-moves.rtf",
+      "format": "rtf",
+      "bytes": 48209,
+      "sha256": "da8546c48bce7aab640d77fad2499555944fc1736ff7228e46334db1261e3f31",
+      "native_reopen": "pass_without_repair",
+      "textutil_projection": "WORD_TRACKED_MOVES_018\nFixture ID: word-tracked-moves-018\nSOURCE_018: Move this complete native paragraph to the destination below.\nANCHOR_018: This paragraph remains in place.\nDESTINATION_018\nSOURCE_018: Move this complete native paragraph to the destination below.\nEND_TRACKED_MOVES_018\n"
+    }
+  ],
+  "docx": {
+    "package_members": {
+      "word/document.xml": {
+        "bytes": 4986,
+        "sha256": "fb457890a66675a728a7c58d986623f3cc2d018035178b7f1b4cdf35983d17bf"
+      },
+      "word/settings.xml": {
+        "bytes": 3218,
+        "sha256": "90f9bbf206c286cece9af09917a37684e108d9bf90e8a8d714bd953185029ab5"
+      },
+      "word/people.xml": {
+        "bytes": 2747,
+        "sha256": "5d0c11ba6764cc28c5e0f9500d217cd0532486e8c886261be8b5dd662925f8ed"
+      },
+      "docProps/core.xml": {
+        "bytes": 745,
+        "sha256": "a4d8831c4673dc7dd488d11448d208a65695cce71a2d59f81b5ce24402e22f90"
+      }
+    },
+    "document_xml": {
+      "paragraph_count": 7,
+      "move_from_property_mark_count": 1,
+      "move_from_text_element_count": 1,
+      "move_to_property_mark_count": 1,
+      "move_to_text_element_count": 1,
+      "move_from_range_start_count": 1,
+      "move_from_range_end_count": 1,
+      "move_to_range_start_count": 1,
+      "move_to_range_end_count": 1,
+      "source_paragraph": {
+        "w14_paraId": "37888ED8",
+        "w14_textId": "6ADC9F90",
+        "w_rsidR": "00B1245D",
+        "w_rsidDel": "00EC3828",
+        "w_rsidRDefault": "00B1245D",
+        "w_rsidP": "00B1245D"
+      },
+      "destination_paragraph": {
+        "w14_paraId": "1F831F7A",
+        "w14_textId": "77777777",
+        "w_rsidR": "00EC3828",
+        "w_rsidRDefault": "00EC3828",
+        "w_rsidP": "00EC3828"
+      },
+      "move_range_name": "move242987239",
+      "move_from_ids_in_document_order": ["0", "2"],
+      "move_to_ids_in_document_order": ["3", "5"],
+      "range_start_ids": {
+        "moveFromRangeStart": "1",
+        "moveToRangeStart": "4"
+      },
+      "range_end_ids": {
+        "moveFromRangeEnd": "1",
+        "moveToRangeEnd": "4"
+      },
+      "revision_author": "Ryker Zhu",
+      "revision_date": "2026-10-15T20:07:00Z",
+      "revision_date_utc": "2026-10-15T12:07:00Z",
+      "move_text_occurrences": 2,
+      "source_paragraph_move_text": "SOURCE_018: Move this complete native paragraph to the destination below.",
+      "destination_paragraph_move_text": "SOURCE_018: Move this complete native paragraph to the destination below."
+    },
+    "settings_xml": {
+      "trackRevisions_element_count": 1,
+      "trackMoves_element_count": 0,
+      "w16du_dateUtc_namespace_declared": true,
+      "w14_docId": "0519BC3B",
+      "w15_docId": "{B0A9A352-76C5-3F4C-8108-F67DF5119EAF}",
+      "rsidRoot": "00B1245D",
+      "rsids_include": ["00B1245D", "00EC3828", "00842CC0"],
+      "compatibility_mode": "15"
+    },
+    "people_xml": {
+      "person_count": 1,
+      "authors": ["Ryker Zhu"],
+      "provider_id": "None",
+      "user_id": "Ryker Zhu"
+    },
+    "reader_observation": {
+      "command": "cargo run -q --manifest-path /tmp/litchi-tracked-moves-audit/Cargo.toml --bin docx -- test-data/microsoft-office/word/word-tracked-moves.docx",
+      "package_open": "pass",
+      "paragraph_count": 7,
+      "settings_track_revisions": true,
+      "document_revision_count": 4,
+      "revisions": [
+        {"revision_type": "Paragraph Mark Move From", "id": "0", "author": "Ryker Zhu", "date": "2026-10-15T20:07:00Z", "date_utc": "2026-10-15T12:07:00Z", "text": ""},
+        {"revision_type": "Move From", "id": "2", "author": "Ryker Zhu", "date": "2026-10-15T20:07:00Z", "date_utc": "2026-10-15T12:07:00Z", "text": "SOURCE_018: Move this complete native paragraph to the destination below."},
+        {"revision_type": "Paragraph Mark Move To", "id": "3", "author": "Ryker Zhu", "date": "2026-10-15T20:07:00Z", "date_utc": "2026-10-15T12:07:00Z", "text": ""},
+        {"revision_type": "Move To", "id": "5", "author": "Ryker Zhu", "date": "2026-10-15T20:07:00Z", "date_utc": "2026-10-15T12:07:00Z", "text": "SOURCE_018: Move this complete native paragraph to the destination below."}
+      ],
+      "tolerance_repairs_observed": []
+    }
+  },
+  "doc": {
+    "cfb_streams": {
+      "WordDocument": {
+        "bytes": 4096,
+        "sha256": "f5998e2e6f0f231f678371091fc3378e903d144737787e523a0993f89a7bc699"
+      },
+      "1Table": {
+        "bytes": 9185,
+        "sha256": "6b9c27adfe40cc0911bc8374e6c4c7e698808e8078a93b229698f11e50112ce4"
+      }
+    },
+    "fib": {
+      "nFib": "0x00C1",
+      "word_version": "Word 97",
+      "main_story_ccp_text": 289,
+      "fcMin": "0x0800",
+      "fcMac": "0x0921",
+      "table_stream": "1Table",
+      "fcPlcfBteChpx": "0x1E6C",
+      "lcbPlcfBteChpx": 12,
+      "fcPlcfBtePapx": "0x1E78",
+      "lcbPlcfBtePapx": 12,
+      "fcSttbfRMark": "0x1F07",
+      "lcbSttbfRMark": 42,
+      "fcDop": "0x20DD",
+      "lcbDop": 694
+    },
+    "revision_author_table": {
+      "name": "SttbfRMark",
+      "stream": "1Table",
+      "offset": "0x1F07",
+      "bytes": 42,
+      "sha256": "7bc9418bfd7bf29a04b419a005dbe43b4126cef26e0fc65fe30cab8edfd78fb6",
+      "hex": "ffff02000000070055006e006b006e006f0077006e000900520079006b006500720020005a0068007500",
+      "authors_by_index": {"0": "Unknown", "1": "Ryker Zhu"}
+    },
+    "chpx_revision_records": {
+      "plcf_bte_chpx": {
+        "stream": "1Table",
+        "offset": "0x1E6C",
+        "bytes": 12,
+        "sha256": "b892a96e9fb48da882e945ba2a70fba13cf4633ae74e4ded28e8b533ceda31e3",
+        "hex": "000800002109000005000000",
+        "fc_boundaries": ["0x0800", "0x0921"],
+        "fkp_page_numbers": [5]
+      },
+      "fkp_page": {
+        "word_document_offset": "0x0A00",
+        "page_number": 5,
+        "sha256": "565edfaf97a36c65af7c18443be6aa330897c53174289e5d43c4edf91c9e894a",
+        "run_count": 14
+      },
+      "move_from_ranges": [
+        {
+          "range": "[58,132)",
+          "fc_range": "[0x083A,0x0884)",
+          "covers": "SOURCE_018 text plus its paragraph mark",
+          "fkp_descriptor": "0xEF",
+          "grpprl_word_document_offset": "0x0BDE",
+          "grpprl_length_prefix": 25,
+          "grpprl_payload_hex": "00088116685d24b10017682838ec00634801006468077dea87",
+          "sprms": [
+            {"opcode": "0x0800", "name": "sprmCFRMarkDel", "operand_hex": "81", "meaning_in_this_fixture": "move-from/deletion Boolean8 state"},
+            {"opcode": "0x6816", "name": "sprmCRsidText", "operand_hex": "5d24b100"},
+            {"opcode": "0x6817", "name": "sprmCRsidRMDel", "operand_hex": "2838ec00"},
+            {"opcode": "0x4863", "name": "sprmCIbstRMarkDel", "operand_hex": "0100", "author_index": 1},
+            {"opcode": "0x6864", "name": "sprmCDttmRMarkDel", "operand_hex": "077dea87", "decoded": "2026-10-15 20:07, weekday 4"}
+          ]
+        }
+      ],
+      "move_to_ranges": [
+        {
+          "range": "[193,267)",
+          "fc_range": "[0x08C1,0x090B)",
+          "covers": "destination SOURCE_018 text plus its paragraph mark",
+          "fkp_descriptor": "0xE5",
+          "grpprl_word_document_offset": "0x0BCA",
+          "grpprl_length_prefix": 19,
+          "grpprl_payload_hex": "010881044801000568077dea8716682838ec00",
+          "sprms": [
+            {"opcode": "0x0801", "name": "sprmCFRMark", "operand_hex": "81", "meaning_in_this_fixture": "move-to/insertion Boolean8 state"},
+            {"opcode": "0x4804", "name": "sprmCIbstRMark", "operand_hex": "0100", "author_index": 1},
+            {"opcode": "0x6805", "name": "sprmCDttmRMark", "operand_hex": "077dea87", "decoded": "2026-10-15 20:07, weekday 4"},
+            {"opcode": "0x6816", "name": "sprmCRsidText", "operand_hex": "2838ec00"}
+          ]
+        }
+      ],
+      "unmarked_final_paragraph_mark": {
+        "range": "[288,289)",
+        "fc_range": "[0x0920,0x0921)",
+        "fkp_descriptor": "0xE1",
+        "grpprl_word_document_offset": "0x0BC2",
+        "grpprl_payload_hex": "1668c02c8400",
+        "sprms": [{"opcode": "0x6816", "name": "sprmCRsidText", "operand_hex": "c02c8400"}]
+      },
+      "shared_move_identity": {
+        "source_deletion_rsid": "0x00EC3828",
+        "destination_insertion_rsid": "0x00EC3828",
+        "author_index": 1,
+        "author": "Ryker Zhu",
+        "dttm_raw": "0x87EA7D07",
+        "dttm_decimal": 2280291591,
+        "dttm_decoded": "2026-10-15 20:07, weekday 4"
+      }
+    },
+    "dop": {
+      "stream": "1Table",
+      "offset": "0x20DD",
+      "bytes": 694,
+      "sha256": "37af83086784d678671a8de18635a26f9717bd6779014f488eaae8fb3d2cf5ec",
+      "version": "Word2013",
+      "DopBase_fRevMarking_byte_offset": 5,
+      "DopBase_fRevMarking_byte_hex": "88",
+      "Dop2007_settings_flags_offset": 620,
+      "Dop2007_settings_flags_hex": "21040000",
+      "Dop2007_settings_flags_value": "0x00000421",
+      "Dop2007_track_formatting": true,
+      "Dop2007_track_moves": false,
+      "note": "The raw DOP track_moves field is false even though native Word emitted the move records; retain this as an observed producer state and do not use it as a negative assertion against the move ranges."
+    },
+    "reader_observation": {
+      "basic_command": "cargo run -q -p litchi-doc --example read_doc -- test-data/microsoft-office/word/word-tracked-moves.doc",
+      "package_open": "pass",
+      "paragraph_count": 7,
+      "table_count": 0,
+      "total_characters": 289,
+      "fib_report": "nFib=0x00C1, Word version Word 97",
+      "revision_editor_command": "cargo run -q --manifest-path /tmp/litchi-tracked-moves-audit/Cargo.toml --bin litchi-tracked-moves-audit -- test-data/microsoft-office/word/word-tracked-moves.doc",
+      "revision_editor_open": "pass",
+      "revision_editor_authors": ["Unknown", "Ryker Zhu"],
+      "revision_editor_revision_count": 0,
+      "revision_editor_tolerance_report": [
+        {"defect": "Chp(Boolean)", "context": 2048},
+        {"defect": "Chp(Boolean)", "context": 2048},
+        {"defect": "Chp(Boolean)", "context": 2049},
+        {"defect": "Chp(Boolean)", "context": 2049}
+      ],
+      "document_properties": {
+        "version": "Word2013",
+        "versioned_parse": "pass",
+        "track_moves_raw": false
+      }
+    }
+  },
+  "rtf": {
+    "header_and_metadata": {
+      "source_lines": "76-79",
+      "revision_table": ["Unknown", "Ryker Zhu"],
+      "track_revisions_control_count": 1,
+      "track_moves_control": "\\trackmoves0",
+      "track_formatting_control": "\\trackformatting1",
+      "datastore_group_count": 1,
+      "datastore_group_literal": "{\\*\\datastore }}",
+      "datastore_source_line": 241
+    },
+    "move_markers": [
+      {
+        "kind": "From",
+        "start_control": "\\mvfmf",
+        "end_control": "\\mvfml",
+        "start_literal": "{\\*\\mvfmf move242987239 0100077dea87}",
+        "end_literal": "{\\*\\mvfml move242987239}",
+        "tag": "move242987239",
+        "payload_hex": "0100077dea87",
+        "payload_author_index": 1,
+        "payload_dttm_raw": "0x87EA7D07",
+        "source_lines": [89, 91],
+        "source_text": "SOURCE_018: Move this complete native paragraph to the destination below."
+      },
+      {
+        "kind": "To",
+        "start_control": "\\mvtof",
+        "end_control": "\\mvtol",
+        "start_literal": "{\\*\\mvtof move242987239 0100077dea87}",
+        "end_literal": "{\\*\\mvtol move242987239}",
+        "tag": "move242987239",
+        "payload_hex": "0100077dea87",
+        "payload_author_index": 1,
+        "payload_dttm_raw": "0x87EA7D07",
+        "source_lines": [94, 95],
+        "source_text": "SOURCE_018: Move this complete native paragraph to the destination below."
+      }
+    ],
+    "review_controls": {
+      "deleted_count": 1,
+      "revised_count": 1,
+      "mvauth_count": 2,
+      "mvdate_count": 2,
+      "mvf_count": 1,
+      "mvt_count": 1,
+      "revauthdel_count": 1,
+      "revdttmdel_count": 1,
+      "revauth_count": 1,
+      "revdttm_count": 1,
+      "insrsid_count": 6,
+      "delrsid_count": 1,
+      "deleted_source_line": 89,
+      "revised_destination_line": 94
+    },
+    "reader_observation": {
+      "command": "cargo run -q -p litchi-rtf --example parse_rtf -- test-data/microsoft-office/word/word-tracked-moves.rtf",
+      "exit_code": 1,
+      "error": "MalformedDocument(\"RTF revision text cannot contain active or external destinations\")",
+      "semantic_counts_available": false,
+      "error_stage": "The parser sees the starred move destination group while a deleted/revised text scope is active, before it reaches the root datastore group.",
+      "move_bookmarks_available_on_original_parse": false
+    },
+    "diagnostic_isolation_without_fixture_changes": [
+      {
+        "operation": "Remove the four move-marker groups in a temporary in-memory copy while retaining the rest of the native RTF.",
+        "result": "MalformedDocument(\"RTF data-store payload cannot be empty\")",
+        "interpretation": "The empty datastore is an independent later parser boundary."
+      },
+      {
+        "operation": "Remove only the empty datastore group in a temporary copy while retaining the native move groups and revision scopes.",
+        "result": "MalformedDocument(\"RTF revision text cannot contain active or external destinations\")",
+        "interpretation": "The move-marker nesting boundary occurs before datastore parsing."
+      },
+      {
+        "operation": "Remove revision control scopes and the empty datastore in a temporary copy, retaining all four move-marker groups.",
+        "result": "Parse succeeds; move_bookmarks length is 2; revisions length is 0.",
+        "parsed_move_bookmarks": [
+          {"kind": "From", "tag": "move242987239", "author": 1, "date": 2280291591, "position": 60},
+          {"kind": "To", "tag": "move242987239", "author": 1, "date": 2280291591, "position": 196}
+        ],
+        "interpretation": "The litchi-rtf move-bookmark model can retain these marker groups when they are not nested in a revision scope; this is a diagnostic result, not a successful parse of the native fixture."
+      }
+    ]
+  },
+  "observed_format_boundaries": [
+    {
+      "format": "docx",
+      "classification": "observed_pass",
+      "statement": "The native DOCX stores one text Move From, one text Move To, one paragraph-mark Move From, and one paragraph-mark Move To, all authored by Ryker Zhu at the same local and UTC timestamps and paired by the shared range name move242987239.",
+      "reader_evidence": "litchi-docx Document::revisions() returned the four typed revisions with IDs 0, 2, 3, and 5."
+    },
+    {
+      "format": "doc",
+      "classification": "observed_native_binary_boundary",
+      "statement": "The DOC downgrade retains source and destination CHPX ranges with sprmCFRMarkDel/sprmCFRMark Boolean8 operand 0x81, author index 1, the same DTTM, and the shared RSID 0x00EC3828.",
+      "reader_evidence": "litchi-doc RevisionEditor::revisions() returned zero because its current predicate accepts only operand byte 0x01 for these two revision flags; the native DOC UI showed only Deleted."
+    },
+    {
+      "format": "rtf",
+      "classification": "observed_parse_failure",
+      "statement": "The native RTF carries complete mvfmf/mvfml and mvtof/mvtol pairs with one shared alphanumeric tag and matching six-byte author/DTTM payloads, but those starred groups are nested inside deleted/revised text scopes.",
+      "reader_evidence": "litchi-rtf fails before semantic counts with the active/external-destination error; after move groups are removed, the empty datastore group is the next error."
+    }
+  ],
+  "negative_downgrade_expectations": [
+    {
+      "expectation": "Do not require DOCX paragraph-mark move revisions to survive DOCX -> DOC -> RTF conversion.",
+      "evidence": "DOCX reader returned explicit Paragraph Mark Move From/To entries; native DOC review UI exposed only Deleted; native RTF has move markers but the reader does not reach them."
+    },
+    {
+      "expectation": "Do not infer that \\trackmoves0 or the DOC DOP track_moves=false field means that no move markers exist.",
+      "evidence": "Both controls are present in the native files while the raw DOCX, DOC, and RTF still contain the move pair."
+    },
+    {
+      "expectation": "Do not treat litchi-doc RevisionEditor::revisions() == 0 as proof that the DOC is untracked.",
+      "evidence": "The raw DOC CHPX records contain 0x81 move-like revision states and the revision author table contains Ryker Zhu; the current reader checks for exact 0x01."
+    },
+    {
+      "expectation": "Do not claim that the original native RTF reader successfully exposes move_bookmarks or revisions.",
+      "evidence": "Document::open returns the active/external-destination error before semantic counts are available."
+    }
+  ],
+  "hypotheses": [
+    {
+      "label": "hypothesis",
+      "confidence": "high",
+      "statement": "The DOC Boolean8 operand 0x81 is Word's toggle encoding for the move sides. The same raw value appears on both sprmCFRMarkDel and sprmCFRMark, while the library's strict revision listing checks only exact value 0x01.",
+      "evidence": [
+        "Source range uses sprmCFRMarkDel 0x0800 with operand 0x81.",
+        "Destination range uses sprmCFRMark 0x0801 with operand 0x81.",
+        "The source code at crates/litchi-doc/src/tracked_revision/package.rs:2347-2367 checks operand_byte() == Some(1).",
+        "The reader reports four Chp(Boolean) tolerance defects at the two marked FC contexts and no revisions."
+      ]
+    },
+    {
+      "label": "hypothesis",
+      "confidence": "medium",
+      "statement": "The native DOC UI's single Deleted label is a presentation/conversion boundary: the binary retains both move-like CHPX ranges, but the legacy UI or its DOP track_moves=false state does not present the pair as Moved.",
+      "evidence": [
+        "Native reopened DOC had no repair prompt but displayed only Deleted.",
+        "Raw DOC source and destination ranges have matching author/date and shared RSID 0x00EC3828.",
+        "Dop2007 settings flags decode to track_moves=false."
+      ]
+    },
+    {
+      "label": "hypothesis",
+      "confidence": "high",
+      "statement": "The direct RTF failure is caused by the native move bookmark groups being emitted as starred destinations inside deleted/revised review scopes; the parser deliberately rejects active or external destinations in a revision text scope before it dispatches the move groups.",
+      "evidence": [
+        "\\mvfmf is inside the deleted source group on RTF line 89 and \\mvtof is inside the revised destination group on line 94.",
+        "The parser guard at crates/litchi-rtf/src/codec/parser/codec/groups.rs:131-168 rejects an ignorable destination while revision_type is active.",
+        "Removing only the empty datastore still yields the same active/external-destination error."
+      ]
+    }
+  ],
+  "native_ui_follow_ups": [
+    {
+      "candidate_id": "tracked_move_without_paragraph_mark",
+      "ui_authoring": "Repeat the native Word cut/paste with only the SOURCE text selected, excluding its terminal paragraph mark.",
+      "expected_construct_difference": "DOCX should retain Move From/Move To text revisions without Paragraph Mark Move From/To; DOC CHPX move ranges should stop before the paragraph mark; RTF marker groups should cover text only.",
+      "purpose": "Separate paragraph-mark move records from ordinary text move records."
+    },
+    {
+      "candidate_id": "ordinary_delete_insert_control",
+      "ui_authoring": "In a fresh native Word copy, turn Track Changes on, delete the source paragraph, then type or paste the same text as a new paragraph instead of using cut/paste.",
+      "expected_construct_difference": "The DOC Boolean8 operands should be ordinary 0x01 deletion/insertion states rather than the 0x81 states in this move fixture; the litchi-doc revision reader should provide a control comparison.",
+      "purpose": "Isolate the DOC move Boolean8 encoding from ordinary tracked deletion/insertion."
+    },
+    {
+      "candidate_id": "accepted_move_before_rtf_save",
+      "ui_authoring": "Open a copy in native Word, accept the moved change, save as RTF, close, and reopen.",
+      "expected_construct_difference": "The four move marker groups and deleted/revised text controls should disappear; if the native empty datastore remains, the reader should then isolate the datastore boundary directly.",
+      "purpose": "Separate review-marker parsing from the unrelated native datastore sentinel."
+    }
+  ],
+  "machine_checkable_expectations": [
+    {
+      "check": "sha256",
+      "command": "sha256sum test-data/microsoft-office/word/word-tracked-moves.docx test-data/microsoft-office/word/word-tracked-moves.doc test-data/microsoft-office/word/word-tracked-moves.rtf",
+      "expected": {
+        "word-tracked-moves.docx": "93970c2a65973afa1d7a63d9a02b1cc770aaf5b16052023e8f4af6c975367a65",
+        "word-tracked-moves.doc": "a48cad2000150d06906d60a51dcec035a790b94880b518992d2e73fcc275c1f5",
+        "word-tracked-moves.rtf": "da8546c48bce7aab640d77fad2499555944fc1736ff7228e46334db1261e3f31"
+      }
+    },
+    {
+      "check": "docx_xml_regex_counts",
+      "scope": "word/document.xml",
+      "expected": {
+        "<w:moveFrom w:id=": 2,
+        "<w:moveTo w:id=": 2,
+        "<w:moveFromRangeStart": 1,
+        "<w:moveFromRangeEnd": 1,
+        "<w:moveToRangeStart": 1,
+        "<w:moveToRangeEnd": 1,
+        "w:name=move242987239": 2,
+        "SOURCE_018: Move this complete native paragraph to the destination below.": 2
+      }
+    },
+    {
+      "check": "docx_settings_regex_counts",
+      "scope": "word/settings.xml",
+      "expected": {
+        "<w:trackRevisions": 1,
+        "<w:trackMoves": 0,
+        "w16du:dateUtc": 0
+      },
+      "note": "The w16du namespace is declared in settings and dateUtc attributes are on move elements in document.xml."
+    },
+    {
+      "check": "docx_reader_revisions",
+      "command": "cargo run -q --manifest-path /tmp/litchi-tracked-moves-audit/Cargo.toml --bin docx -- test-data/microsoft-office/word/word-tracked-moves.docx",
+      "expected": {
+        "exit_code": 0,
+        "paragraph_count": 7,
+        "track_revisions": true,
+        "document_revision_count": 4,
+        "revision_ids_in_order": ["0", "2", "3", "5"],
+        "revision_types_in_order": ["Paragraph Mark Move From", "Move From", "Paragraph Mark Move To", "Move To"]
+      }
+    },
+    {
+      "check": "rtf_control_counts",
+      "scope": "word-tracked-moves.rtf",
+      "expected": {
+        "mvfmf": 1,
+        "mvfml": 1,
+        "mvtof": 1,
+        "mvtol": 1,
+        "trackmoves0": 1,
+        "deleted": 1,
+        "revised": 1,
+        "datastore": 1,
+        "empty_datastore_literal": 1
+      }
+    },
+    {
+      "check": "rtf_reader_failure",
+      "command": "cargo run -q -p litchi-rtf --example parse_rtf -- test-data/microsoft-office/word/word-tracked-moves.rtf",
+      "expected": {
+        "exit_code": 1,
+        "error": "MalformedDocument(\"RTF revision text cannot contain active or external destinations\")",
+        "semantic_counts_available": false
+      }
+    },
+    {
+      "check": "doc_reader_projection",
+      "command": "cargo run -q -p litchi-doc --example read_doc -- test-data/microsoft-office/word/word-tracked-moves.doc",
+      "expected": {
+        "exit_code": 0,
+        "paragraph_count": 7,
+        "table_count": 0,
+        "total_characters": 289,
+        "revision_author_count": 2
+      }
+    },
+    {
+      "check": "doc_revision_reader_boundary",
+      "expected": {
+        "RevisionEditor::open": "pass",
+        "RevisionEditor::authors": ["Unknown", "Ryker Zhu"],
+        "RevisionEditor::revisions().len": 0,
+        "reason": "native move Boolean8 operands are 0x81 while the current litchi-doc listing predicate requires 0x01"
+      }
+    }
+  ],
+  "source_references": [
+    {
+      "path": "test-data/microsoft-office/word/word-tracked-moves.docx",
+      "member": "word/document.xml",
+      "references": "moveFrom/moveTo elements, range IDs 0/1/2/3/4/5, shared w:name move242987239, and source/destination rsids"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-tracked-moves.docx",
+      "member": "word/settings.xml",
+      "references": "w:trackRevisions; absence of w:trackMoves; w16du namespace declaration"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-tracked-moves.rtf",
+      "lines": "76-79,89-95,241",
+      "references": "revision table, trackmoves0, deleted/revised scopes, all four move markers, and empty datastore"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-tracked-moves.doc",
+      "stream_offsets": "WordDocument 0x0BDE/0x0BCA/0x0BC2; 1Table 0x1E6C/0x1F07/0x20DD",
+      "references": "CHPX FKP move ranges, SttbfRMark author table, DOP revision and track-moves settings"
+    },
+    {
+      "path": "crates/litchi-docx/src/revision.rs",
+      "lines": "82-105",
+      "fact": "The DOCX revision model has explicit MoveFrom, MoveTo, ParagraphMarkMoveFrom, and ParagraphMarkMoveTo types."
+    },
+    {
+      "path": "crates/litchi-docx/src/document/package/model.rs",
+      "lines": "306-340",
+      "fact": "Document::revisions reads recognized tracked revisions in source order."
+    },
+    {
+      "path": "crates/litchi-doc/src/tracked_revision/package.rs",
+      "lines": "2341-2367",
+      "fact": "The DOC revision listing checks sprmCFRMark and sprmCFRMarkDel only when operand_byte() is exactly 1."
+    },
+    {
+      "path": "crates/litchi-doc/src/tracked_revision/codec.rs",
+      "lines": "966-984",
+      "fact": "DOC move inference runs only after ordinary insertion/deletion revisions have been listed and pairs them by shared revision_save_id."
+    },
+    {
+      "path": "crates/litchi-doc/src/parts/document_properties_2007.rs",
+      "lines": "258-302",
+      "fact": "Dop2007 decodes settings bit 0 as track_formatting and bit 1 as track_moves."
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/groups.rs",
+      "lines": "131-168",
+      "fact": "The RTF parser rejects an active or external destination while revision text is active."
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/document.rs",
+      "lines": "586-613",
+      "fact": "The RTF parser rejects a starred datastore group with an empty hexadecimal payload."
+    }
+  ]
+}

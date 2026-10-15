@@ -1,0 +1,492 @@
+{
+  "schema_version": 1,
+  "fixture_id": "word-vector-diagram-013",
+  "generated_on": "2026-10-15",
+  "purpose": "Fixture-specific, read-only inspection of native Microsoft Word SVG pictures, a converted DrawingML/VML vector group, and a Basic Process SmartArt diagram across DOCX, DOC, and RTF derivatives.",
+  "provenance": {
+    "producer_app": "Microsoft Office Word",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft Word UI",
+    "source": "Synthetic content was entered and formatted in a fresh native Word document. The DOC was produced by native Word Save As from the DOCX, then closed and reopened. The RTF was produced by native Word Save As from the reopened DOCX; it was not produced from the DOC chain.",
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "all_documents_closed_before_hashing": true,
+    "fixture_files_are_closed_after_reopen": true
+  },
+  "files": [
+    {
+      "path": "test-data/microsoft-office/word/word-vector-diagram.docx",
+      "format": "docx",
+      "bytes": 41325,
+      "sha256": "971ecf71478aa0c51bdf46e8a665a49a531defffd251f490123cf3a69df78e79"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-vector-diagram.doc",
+      "format": "doc",
+      "bytes": 84992,
+      "sha256": "f308869e4e010ec4548fa0b6ba6cfaf7fd7b8ea1f792e8fcbe728009eb14bb77"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-vector-diagram.rtf",
+      "format": "rtf",
+      "bytes": 225434,
+      "sha256": "c63056f55b095edd424a67aaf90625dbddb61995818d3af81f6eade884872a02"
+    }
+  ],
+  "content_markers": {
+    "main_story": [
+      "WORD_VECTOR_DIAGRAM_013",
+      "Fixture ID: word-vector-diagram-013",
+      "SVG_VECTOR_013",
+      "SMARTART_PROCESS_013",
+      "CONVERTED_VECTOR_GROUP_013"
+    ],
+    "svg_source": "SVG_MARKER_007",
+    "smartart_nodes": [
+      "ACQUIRE_013",
+      "TRANSFORM_013",
+      "VERIFY_013"
+    ],
+    "svg_alt_text": "WORD_SVG_ALT_013: blue and yellow vector blocks with the SVG_MARKER_007 label.",
+    "source_svg": {
+      "path": "test-data/microsoft-office/assets/svg-blue-yellow-007.svg",
+      "bytes": 634,
+      "sha256": "7a9ddf774233cf05324a5f032d54003274d998e7cddda2185c899847e0ffead0"
+    }
+  },
+  "docx": {
+    "container": {
+      "kind": "OPC ZIP",
+      "zip_test": "pass",
+      "xml_validation": "pass",
+      "member_count": 18,
+      "external_targets": [],
+      "content_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml",
+      "parts": [
+        {"path": "[Content_Types].xml", "bytes": 2082, "sha256": "f7537c80e9ac7f6b5219765c68dd1f510ca39c6613611226fa5ef6a2a1d619b6"},
+        {"path": "_rels/.rels", "bytes": 590, "sha256": "e19238d7a71fa7a2490776252686f70e2de6238c87cd509b5e3a3cc07c2ea4df"},
+        {"path": "word/document.xml", "bytes": 18345, "sha256": "99303ed7a5a0fd08eac623cc869013e3ba5c9b0f6f34e84f47968cc13eec2eac"},
+        {"path": "word/diagrams/data1.xml", "bytes": 9512, "sha256": "2f2e9e86c5f94f3a030ecfce793b65c5ca1d82ab20037bc816ddb14d97d47b3b"},
+        {"path": "word/_rels/document.xml.rels", "bytes": 1797, "sha256": "cc2582e28a46ce759587afad80d2cad0b950fd3c9dc8d94b70e0beb2058025c7"},
+        {"path": "word/media/image1.png", "bytes": 13933, "sha256": "97fefe9283fc468417bf2b339b48197711947bd05cc835e40a31088b4e1e7990"},
+        {"path": "word/media/image2.svg", "bytes": 418, "sha256": "91bdc6ffe9ddcd4ddda5c1e4872f0003b6b0864a0523c19945a4917da6858a95"},
+        {"path": "word/diagrams/layout1.xml", "bytes": 4598, "sha256": "6dff17e5156e28a544c07fa1fc1a81a889b4aa1667c7ebc39630e2b54bf6389e"},
+        {"path": "word/diagrams/quickStyle1.xml", "bytes": 20749, "sha256": "b1aa29dfd0c14ec21c67d467f1c485d358471aca663657b87cc81d7ee8116b6c"},
+        {"path": "word/diagrams/colors1.xml", "bytes": 16863, "sha256": "3133b8cde18a92dce566e096d63e6999273dc9c0be88ec3b620d8884518e8a6a"},
+        {"path": "word/diagrams/drawing1.xml", "bytes": 8057, "sha256": "79572ea8c1321c72d2a91b81537cd960b1f5f4583ed17b056f871bfce3348fc2"},
+        {"path": "word/theme/theme1.xml", "bytes": 8397, "sha256": "2760e6e84d4bf365af6570192dbe9cb57bb32653388d0ea041d116b25b1ca0a2"},
+        {"path": "word/settings.xml", "bytes": 3199, "sha256": "756463c84bd2cca15dbb67861aac6df5008bda5b2c16fd66ab31bcb196592f4d"},
+        {"path": "word/styles.xml", "bytes": 42760, "sha256": "d503a00c8303f02126401bd18a78669b78d1d2ff459d8de125c029d377e1011b"},
+        {"path": "word/webSettings.xml", "bytes": 1069, "sha256": "9d21da07e99d87dfe36f6587ccc669539495e7130c513a0b63e3df49d2d71bd1"},
+        {"path": "word/fontTable.xml", "bytes": 2095, "sha256": "ffdce15aa8d94c5bd52cb30aa458c62ebc578d914b3707bc60fbf1d7b5069334"},
+        {"path": "docProps/core.xml", "bytes": 745, "sha256": "630699d8db0e04f895dde1dfb09e7e94936a5192647d837317bb39507d56fec9"},
+        {"path": "docProps/app.xml", "bytes": 713, "sha256": "8b571e630602905443fab370c10132b2f8838c4e9b62f5b9bf8ba9f7ea17e4b6"}
+      ],
+      "document_relationships": {
+        "rId1": "styles.xml",
+        "rId2": "settings.xml",
+        "rId3": "webSettings.xml",
+        "rId4": "media/image1.png",
+        "rId5": "media/image2.svg",
+        "rId6": "diagrams/data1.xml",
+        "rId7": "diagrams/layout1.xml",
+        "rId8": "diagrams/quickStyle1.xml",
+        "rId9": "diagrams/colors1.xml",
+        "rId10": "diagrams/drawing1.xml",
+        "rId11": "fontTable.xml",
+        "rId12": "theme/theme1.xml",
+        "target_check": "pass"
+      }
+    },
+    "main_document": {
+      "body_paragraph_count": 7,
+      "total_w_p_count_including_textbox_stories": 9,
+      "page_count_from_app_properties": 3,
+      "page_break_elements": 2,
+      "last_rendered_page_breaks": 2,
+      "paragraph_text": [
+        "WORD_VECTOR_DIAGRAM_013",
+        "Fixture ID: word-vector-diagram-013",
+        "SVG_VECTOR_013",
+        "",
+        "SMARTART_PROCESS_013",
+        "",
+        "CONVERTED_VECTOR_GROUP_013SVG_MARKER_007SVG_MARKER_007"
+      ],
+      "page_layout": {
+        "page_1": ["WORD_VECTOR_DIAGRAM_013", "Fixture ID: word-vector-diagram-013", "SVG_VECTOR_013", "first SVG picture"],
+        "page_2": ["SMARTART_PROCESS_013"],
+        "page_3": ["CONVERTED_VECTOR_GROUP_013", "converted SVG vector group", "SmartArt Basic Process fallback/diagram anchor"]
+      },
+      "xml_counts": {
+        "w:p": 9,
+        "w:r": 12,
+        "w:t": 7,
+        "wp:inline": 3,
+        "wp:anchor": 0,
+        "pic:pic": 1,
+        "a:graphic": 3,
+        "a:graphicData": 3,
+        "a:blip": 1,
+        "a:prstGeom": 4,
+        "wpg:wgp": 1,
+        "wps:wsp": 3,
+        "wps:txbx": 1,
+        "w:txbxContent": 2,
+        "v:group": 1,
+        "v:rect": 1,
+        "v:roundrect": 1,
+        "v:shape": 1,
+        "wp:docPr": 3,
+        "wp:extent": 3,
+        "mc:AlternateContent": 1,
+        "mc:Choice": 1,
+        "mc:Fallback": 1,
+        "dgm:relIds": 1
+      },
+      "svg_picture": {
+        "marker": "SVG_VECTOR_013",
+        "drawing_kind": "wp:inline",
+        "docPr_id": "2018164801",
+        "docPr_name": "Graphic 1",
+        "alt_text": "WORD_SVG_ALT_013: blue and yellow vector blocks with the SVG_MARKER_007 label.",
+        "fallback_relationship": "rId4",
+        "svg_relationship": "rId5",
+        "fallback_part": "word/media/image1.png",
+        "fallback_bytes": 13933,
+        "fallback_sha256": "97fefe9283fc468417bf2b339b48197711947bd05cc835e40a31088b4e1e7990",
+        "fallback_dimensions_pixels": {"width": 640, "height": 360},
+        "svg_part": "word/media/image2.svg",
+        "svg_bytes": 418,
+        "svg_sha256": "91bdc6ffe9ddcd4ddda5c1e4872f0003b6b0864a0523c19945a4917da6858a95",
+        "extent_emu": {"cx": 3048000, "cy": 1714500},
+        "extent_inches": {"width": 4.5, "height": 2.53125},
+        "locked_aspect": true,
+        "source_part_byte_equal_to_source_svg": false,
+        "office_svg_normalization": [
+          "Word stripped the source title and desc elements.",
+          "Word normalized font-family from Arial, sans-serif to Arial,Arial.",
+          "The SVG text SVG_MARKER_007 and blue/yellow fills remain in the package part."
+        ]
+      },
+      "converted_vector_group": {
+        "marker": "CONVERTED_VECTOR_GROUP_013",
+        "graphic_data_uri": "http://schemas.microsoft.com/office/word/2010/wordprocessingGroup",
+        "docPr_id": "1",
+        "docPr_name": "Graphic 3",
+        "extent_emu": {"cx": 3048000, "cy": 1714500},
+        "group_transform": {"off": {"x": 0, "y": 0}, "ext": {"cx": 3048000, "cy": 1714500}, "chOff": {"x": 0, "y": 0}, "chExt": {"cx": 3048000, "cy": 1714500}},
+        "children": [
+          {"name": "Rectangle 1484209329", "shape_type": "rect", "id": "1484209329", "off": {"x": 0, "y": 0}, "ext": {"cx": 3048000, "cy": 1714500}, "fill_srgb": "2879D8", "line": "noFill", "line_width": 9525},
+          {"name": "Rounded Rectangle 2069590361", "shape_type": "roundRect", "id": "2069590361", "off": {"x": 609600, "y": 342900}, "ext": {"cx": 1828800, "cy": 1028700}, "adjustment": "3703", "fill_srgb": "FFC12A", "line": "noFill", "line_width": 9525},
+          {"name": "Text Box 4", "shape_type": "rect", "id": "1842475965", "off": {"x": 548520, "y": 696225}, "ext": {"cx": 1951355, "cy": 447040}, "text": "SVG_MARKER_007", "font": "Arial bold 15pt, color 123B70", "txBox": true, "body_wrap": "none"}
+        ],
+        "vml_fallback": {
+          "group_id": "Graphic 3",
+          "coordsize": "30480,17145",
+          "child_shapes": ["v:rect", "v:roundrect", "v:shape"],
+          "repeated_text": "SVG_MARKER_007",
+          "opaque_gfxdata": [
+            {"owner": "v:group", "decoded_bytes": 1982, "sha256": "d35420560a9a526434933c813eabcbc5d103c0bd49ffb8866c1b5d59d0c04216"},
+            {"owner": "v:rect", "decoded_bytes": 974, "sha256": "13321941ee470318fcdab0f3aa950efa2925c88f4ea03dd4f238acd01ceef06a"},
+            {"owner": "v:roundrect", "decoded_bytes": 975, "sha256": "85562c3893819b88e9a6f35543b88f608dec487147bd95c89eb78cbf78acbd77"},
+            {"owner": "v:shape", "decoded_bytes": 975, "sha256": "285a0a74c4cab88fd6cecbc552b89670aa619216333aba6b39dd754aa913d6a6"}
+          ]
+        }
+      },
+      "smartart": {
+        "marker": "SMARTART_PROCESS_013",
+        "graphic_data_uri": "http://schemas.openxmlformats.org/drawingml/2006/diagram",
+        "docPr_id": "1400764559",
+        "docPr_name": "Diagram 2",
+        "extent_emu": {"cx": 5486400, "cy": 3200400},
+        "relIds": {"r:dm": "rId6", "r:lo": "rId7", "r:qs": "rId8", "r:cs": "rId9"},
+        "diagram_type": "Process",
+        "layout_unique_id": "urn:microsoft.com/office/officeart/2005/8/layout/process1",
+        "quick_style_unique_id": "urn:microsoft.com/office/officeart/2005/8/quickstyle/simple1",
+        "colors_unique_id": "urn:microsoft.com/office/officeart/2005/8/colors/accent1_2",
+        "data_point_count": 18,
+        "connection_count": 18,
+        "content_nodes": ["ACQUIRE_013", "TRANSFORM_013", "VERIFY_013"],
+        "drawing_shape_count": 5,
+        "drawing_shapes": [
+          {"geometry": "roundRect", "off": {"x": 4822, "y": 1167824}, "ext": {"cx": 1441251, "cy": 864750}, "text": "ACQUIRE_013", "fill": "accent1", "line": "lt1 width 12700"},
+          {"geometry": "rightArrow", "off": {"x": 1590198, "y": 1421484}, "ext": {"cx": 305545, "cy": 357430}, "fill": "accent1 tint 60000", "line": "noFill"},
+          {"geometry": "roundRect", "off": {"x": 2022574, "y": 1167824}, "ext": {"cx": 1441251, "cy": 864750}, "text": "TRANSFORM_013", "fill": "accent1", "line": "lt1 width 12700"},
+          {"geometry": "rightArrow", "off": {"x": 3607950, "y": 1421484}, "ext": {"cx": 305545, "cy": 357430}, "fill": "accent1 tint 60000", "line": "noFill"},
+          {"geometry": "roundRect", "off": {"x": 4040326, "y": 1167824}, "ext": {"cx": 1441251, "cy": 864750}, "text": "VERIFY_013", "fill": "accent1", "line": "lt1 width 12700"}
+        ],
+        "parts": {
+          "data": {"path": "word/diagrams/data1.xml", "bytes": 9512, "sha256": "2f2e9e86c5f94f3a030ecfce793b65c5ca1d82ab20037bc816ddb14d97d47b3b"},
+          "layout": {"path": "word/diagrams/layout1.xml", "bytes": 4598, "sha256": "6dff17e5156e28a544c07fa1fc1a81a889b4aa1667c7ebc39630e2b54bf6389e"},
+          "quick_style": {"path": "word/diagrams/quickStyle1.xml", "bytes": 20749, "sha256": "b1aa29dfd0c14ec21c67d467f1c485d358471aca663657b87cc81d7ee8116b6c"},
+          "colors": {"path": "word/diagrams/colors1.xml", "bytes": 16863, "sha256": "3133b8cde18a92dce566e096d63e6999273dc9c0be88ec3b620d8884518e8a6a"},
+          "pre_rendered_drawing": {"path": "word/diagrams/drawing1.xml", "bytes": 8057, "sha256": "79572ea8c1321c72d2a91b81537cd960b1f5f4583ed17b056f871bfce3348fc2"}
+        }
+      }
+    },
+    "library_projection": {
+      "read_example": {
+        "command": "cargo run -q -p litchi-docx --example read_docx -- test-data/microsoft-office/word/word-vector-diagram.docx",
+        "exit_code": 0,
+        "paragraph_count": 7,
+        "table_count": 0,
+        "text_bytes": 134,
+        "text": "WORD_VECTOR_DIAGRAM_013Fixture ID: word-vector-diagram-013SVG_VECTOR_013\nSMARTART_PROCESS_013\nCONVERTED_VECTOR_GROUP_013SVG_MARKER_007"
+      },
+      "drawing_inventory": {
+        "document_drawing_objects_count": 2,
+        "objects": [
+          {"name": "Graphic 1", "description": "WORD_SVG_ALT_013: blue and yellow vector blocks with the SVG_MARKER_007 label.", "width_emu": 3048000, "height_emu": 1714500, "kind": "Other", "anchor": "Inline"},
+          {"name": "Diagram 2", "description": "", "width_emu": 5486400, "height_emu": 3200400, "kind": "Other", "anchor": "Inline"}
+        ],
+        "converted_wpg_group_in_document_drawing_inventory": false,
+        "tolerance_report": "empty"
+      },
+      "smartart_inventory": {
+        "count": 1,
+        "diagram_type": "Process",
+        "text": "ACQUIRE_013\nTRANSFORM_013\nVERIFY_013",
+        "node_tree_content_nodes": 3,
+        "data_points": 18,
+        "connections": 18,
+        "pre_rendered_drawing_part": "/word/diagrams/drawing1.xml"
+      }
+    }
+  },
+  "doc": {
+    "container": {
+      "kind": "Compound Document File Binary (CFB/OLE)",
+      "file_identification": "Composite Document File V2 Document, Little Endian, MacOS, code page 10000",
+      "bytes": 84992,
+      "template": "Normal.dotm",
+      "application": "Microsoft Office Word",
+      "pages": 3,
+      "words": 11,
+      "characters": 146,
+      "security": 0,
+      "reader_word_version": "Word 97",
+      "reader_fib_version_hex": "0x00C1",
+      "streams": [
+        {"path": "Data", "bytes": 53334, "sha256": "8a43b7f9392ef64513b4c880db1802f08d376de7f13afb3f7dbf6d3e82113fed"},
+        {"path": "1Table", "bytes": 15162, "sha256": "d16af4da504b3ab002784cda43414aff12c3d910449fb4f82234a20de5ffcbc6"},
+        {"path": "\\u0001CompObj", "bytes": 114, "sha256": "f70fe384c672865fff4bb8ab60d73098bc751e8f2aa915b8aff2e2085648b428"},
+        {"path": "WordDocument", "bytes": 4096, "sha256": "ea341b6582d96aa1f590c459059787bed1efe867b3b88fd7bddc002d1e95b076"},
+        {"path": "\\u0005SummaryInformation", "bytes": 4096, "sha256": "c6171c3c7ea98694cc04a454f3cc5562b54220cc5fa1a244887edf92684af1ff"},
+        {"path": "\\u0005DocumentSummaryInformation", "bytes": 4096, "sha256": "a499f94ff50383f5581b6ae8ecbc7bd5b118054a9b8f58fae450eb5575a2c72f"}
+      ],
+      "object_pool_storages": []
+    },
+    "raw_stream_marker_scan": {
+      "WordDocument_ascii": ["SVG_VECTOR_013", "SMARTART_PROCESS_013", "CONVERTED_VECTOR_GROUP_013", "SVG_MARKER_007"],
+      "Data_ascii": ["SVG_MARKER_007"],
+      "smartart_node_ascii_hits": [],
+      "note": "The native DOC was accepted by Word and reopened with the SmartArt visible, but the three SmartArt node labels are not present as direct ASCII or UTF-16LE marker hits in the CFB streams. The binary OfficeArt/SmartArt payload is therefore retained as measured opaque stream evidence rather than interpreted as absent."
+    },
+    "read_example": {
+      "command": "cargo run -q -p litchi-doc --example read_doc -- test-data/microsoft-office/word/word-vector-diagram.doc",
+      "exit_code": 0,
+      "paragraph_count": 10,
+      "table_count": 0,
+      "total_characters": 175,
+      "text_contains": [
+        "WORD_VECTOR_DIAGRAM_013",
+        "Fixture ID: word-vector-diagram-013",
+        "SVG_VECTOR_013",
+        "SMARTART_PROCESS_013",
+        "CONVERTED_VECTOR_GROUP_013",
+        "SHAPE",
+        "SVG_MARKER_007"
+      ],
+      "text_projection": "WORD_VECTOR_DIAGRAM_013\\rFixture ID: word-vector-diagram-013\\rSVG_VECTOR_013\\u0001\\r\\u000c\\rSMARTART_PROCESS_013\\r\\u000c\\rCONVERTED_VECTOR_GROUP_013\\u0013 SHAPE  \\* MERGEFORMAT \\u0014\\b\\u0001\\u0015\\u0001\\rSVG_MARKER_007\\r\\r\\r"
+    },
+    "officeart_shape_inventory": {
+      "extract_shapes_count": 1,
+      "extract_drawing_shapes_count": 1,
+      "root": {
+        "shape_id": 1026,
+        "kind": "Group",
+        "native_shape_type": 0,
+        "group_bounds": {"left": 0, "top": 0, "right": 3048000, "bottom": 1714500},
+        "child_count": 3,
+        "office_art_bytes": 5636,
+        "unknown_property_count": 12
+      },
+      "children": [
+        {"shape_id": 1027, "kind": "Rectangle", "native_shape_type": 1, "anchor": {"left": 0, "top": 0, "right": 3048000, "bottom": 1714500}, "fill_rgb": [40, 121, 216], "office_art_bytes": 1140},
+        {"shape_id": 1028, "kind": "AutoShape", "native_shape_type": 2, "anchor": {"left": 609600, "top": 342900, "right": 2438400, "bottom": 1371600}, "fill_rgb": [255, 193, 42], "office_art_bytes": 1169},
+        {"shape_id": 1029, "kind": "TextBox", "native_shape_type": 202, "anchor": {"left": 548520, "top": 696225, "right": 2499875, "bottom": 1143265}, "text": "SVG_MARKER_007\\r", "office_art_bytes": 1139}
+      ],
+      "scope": "The DOC shape API exposes the converted OfficeArt group and its three children. It does not establish typed SVG or SmartArt semantics."
+    },
+    "textutil_read_only": {
+      "command": "textutil -convert txt -stdout test-data/microsoft-office/word/word-vector-diagram.doc",
+      "exit_code": 0,
+      "output_bytes": 168,
+      "output_sha256": "dad5e98b250831fccc3c7a0cc1d22b116839a2ad39d16c83bd725991b04169b3",
+      "observed": "Extracted text retains the body markers and converted shape field/text projection, with form-feed page separators; SmartArt node labels are not emitted in this text projection."
+    }
+  },
+  "rtf": {
+    "container": {
+      "kind": "Rich Text Format data, version 1, ANSI, code page 1252",
+      "external_targets": [],
+      "datastore_control_count": 1
+    },
+    "markers": {
+      "WORD_VECTOR_DIAGRAM_013": 1,
+      "Fixture ID: word-vector-diagram-013": 1,
+      "SVG_VECTOR_013": 1,
+      "SMARTART_PROCESS_013": 1,
+      "CONVERTED_VECTOR_GROUP_013": 1,
+      "SVG_MARKER_007": 3,
+      "ACQUIRE_013": 0,
+      "TRANSFORM_013": 0,
+      "VERIFY_013": 0,
+      "WORD_SVG_ALT_013": 1
+    },
+    "raw_control_counts": {
+      "shp": 3,
+      "shpgrp": 1,
+      "shpinst": 4,
+      "shppict": 2,
+      "shprslt": 1,
+      "shptxt": 1,
+      "sp": 124,
+      "sv": 130,
+      "pict": 5,
+      "pngblip": 2,
+      "wmetafile8": 3,
+      "field": 1,
+      "fldinst": 1,
+      "fldrslt": 1,
+      "object": 0,
+      "objdata": 0,
+      "mmath": 0,
+      "bkmkstart": 0,
+      "bkmkend": 0,
+      "datastore": 1
+    },
+    "picture_payloads": [
+      {
+        "role": "first SVG fallback and nonshppict duplicate",
+        "controls": ["\\pngblip", "\\wmetafile8"],
+        "blipuid": "edd70d83815396a2411ce7c5a4117ae9",
+        "bytes": 10853,
+        "sha256": "544cbfb9063b539645ef785be27aaba8717299e6719c48272d858b00c5060da8",
+        "png_dimensions_pixels": {"width": 502, "height": 281},
+        "payload_equal_between_pngblip_and_wmetafile8": true
+      },
+      {
+        "role": "converted SmartArt/vector fallback and nonshppict duplicate",
+        "controls": ["\\pngblip", "\\wmetafile8"],
+        "blipuid": "c0da78a76b6b48b89141dc7d5f145a49",
+        "bytes": 15111,
+        "sha256": "106ccd6deda8b393dade58844244222279a8dbf3940e7667142fa58af596b987",
+        "png_dimensions_pixels": {"width": 902, "height": 147},
+        "payload_equal_between_pngblip_and_wmetafile8": true
+      },
+      {
+        "role": "empty default-shape fallback",
+        "controls": ["\\wmetafile8"],
+        "bytes": 0,
+        "payload_present": false
+      }
+    ],
+    "metro_blob_zips": [
+      {
+        "owner": "Graphic 1",
+        "bytes": 16572,
+        "sha256": "5ca4fe571a7af97df9c6d4e4e89ed33477b1f6052d98675b2fc3af47ba5ecd4a",
+        "members": ["[Content_Types].xml", "_rels/.rels", "drs/e2oDoc.xml", "drs/media/image1.png", "drs/media/image2.svg", "drs/downrev.xml", "drs/_rels/e2oDoc.xml.rels"],
+        "embedded_media": {"image1_png_bytes": 13933, "image1_png_sha256": "97fefe9283fc468417bf2b339b48197711947bd05cc835e40a31088b4e1e7990", "image2_svg_bytes": 418, "image2_svg_sha256": "91bdc6ffe9ddcd4ddda5c1e4872f0003b6b0864a0523c19945a4917da6858a95"}
+      },
+      {
+        "owner": "Graphic 3",
+        "bytes": 1982,
+        "sha256": "d35420560a9a526434933c813eabcbc5d103c0bd49ffb8866c1b5d59d0c04216",
+        "members": ["[Content_Types].xml", "_rels/.rels", "drs/e2oDoc.xml", "drs/downrev.xml"]
+      },
+      {"owner": "Rectangle 1484209329", "bytes": 974, "sha256": "13321941ee470318fcdab0f3aa950efa2925c88f4ea03dd4f238acd01ceef06a", "members": ["[Content_Types].xml", "_rels/.rels", "drs/downrev.xml"]},
+      {"owner": "Rounded Rectangle 2069590361", "bytes": 975, "sha256": "85562c3893819b88e9a6f35543b88f608dec487147bd95c89eb78cbf78acbd77", "members": ["[Content_Types].xml", "_rels/.rels", "drs/downrev.xml"]},
+      {"owner": "Text Box 4", "bytes": 975, "sha256": "285a0a74c4cab88fd6cecbc552b89670aa619216333aba6b39dd754aa913d6a6", "members": ["[Content_Types].xml", "_rels/.rels", "drs/downrev.xml"]},
+      {
+        "owner": "Diagram 2",
+        "bytes": 9965,
+        "sha256": "627b8787676156e0b2eff7b4f679bd3444847bcb3e3b021cad8d32b3ea41e2f4",
+        "members": ["[Content_Types].xml", "_rels/.rels", "drs/diagrams/data1.xml", "drs/e2oDoc.xml", "drs/diagrams/layout1.xml", "drs/diagrams/quickStyle1.xml", "drs/diagrams/colors1.xml", "drs/diagrams/drawing1.xml", "drs/downrev.xml", "drs/_rels/e2oDoc.xml.rels"],
+        "diagram_text": ["ACQUIRE_013", "TRANSFORM_013", "VERIFY_013"],
+        "diagram_parts": {
+          "data1.xml": {"bytes": 13221, "sha256": "277cdb664f8d17295d6330bdac2a847d9112acf971974987776b75d5043f8e8f"},
+          "layout1.xml": {"bytes": 4598, "sha256": "6dff17e5156e28a544c07fa1fc1a81a889b4aa1667c7ebc39630e2b54bf6389e"},
+          "quickStyle1.xml": {"bytes": 20749, "sha256": "b1aa29dfd0c14ec21c67d467f1c485d358471aca663657b87cc81d7ee8116b6c"},
+          "colors1.xml": {"bytes": 16863, "sha256": "3133b8cde18a92dce566e096d63e6999273dc9c0be88ec3b620d8884518e8a6a"},
+          "drawing1.xml": {"bytes": 8998, "sha256": "7b6b5c6df5d9448f47b5010acb240d86c6eff317afbe13a4d6f057b3ac092deb"}
+        }
+      }
+    ],
+    "read_example": {
+      "command": "cargo run -q -p litchi-rtf --example parse_rtf -- test-data/microsoft-office/word/word-vector-diagram.rtf",
+      "exit_code": 1,
+      "error": "MalformedDocument(\"RTF shape-group shprslt destination must be starred\")",
+      "scope": "No semantic litchi-rtf parse claim is made for this native RTF fixture. The raw controls, decoded metroBlob packages, decoded picture payloads, and native Word reopen are the recorded RTF evidence."
+    },
+    "textutil_read_only": {
+      "command": "textutil -convert txt -stdout test-data/microsoft-office/word/word-vector-diagram.rtf",
+      "exit_code": 0,
+      "output_bytes": 127,
+      "output_sha256": "b2a7a02223b11cdcf85cf622408b4f155ede4cc9c27a2ec174e792cc604a79e7",
+      "observed": "Extracted text retains the five main-story markers and page separators; the SmartArt node labels and converted vector-group textbox are carried by object/blob groups rather than this text projection."
+    }
+  },
+  "conversion_comparison": {
+    "docx_to_doc": {
+      "source_chain": "Native Word DOCX Save As DOC; DOC was closed and reopened in Word.",
+      "native_visual_result": "Word reopened the DOC without repair and displayed the imported SVG fallback, converted vector group, and Basic Process SmartArt.",
+      "representation_change": [
+        "The OPC SVG picture and DrawingML group become CFB WordDocument/Data/1Table content and OfficeArt records.",
+        "The converted group is exposed by the DOC OfficeArt reader as one group with a blue rectangle, yellow rounded rectangle, and textbox; the SmartArt node labels are retained in the native UI but are not direct CFB marker hits.",
+        "The DOC has no ObjectPool storage and no DOCX relationship graph; its binary shape and SmartArt payloads are not byte-equivalent to the OPC parts."
+      ],
+      "library_observation": "litchi-doc returns the body/control text and a typed OfficeArt group tree. It does not establish typed SVG or SmartArt semantic parity from the DOC binary."
+    },
+    "docx_to_rtf": {
+      "source_chain": "Native Word DOCX Save As RTF from the reopened DOCX; no DOC-to-RTF conversion was used.",
+      "native_visual_result": "Word reopened the RTF without repair and displayed the SVG fallback, converted vector group, and Basic Process SmartArt with the recorded labels visible in the native UI.",
+      "representation_change": [
+        "The SVG picture and SmartArt/vector fallbacks become RTF shppict/nonshppict picture controls plus native Word metroBlob ZIPs.",
+        "The RTF retains full embedded e2oDoc media/relationships for Graphic 1 and a full data/layout/style/colors/drawing graph for Diagram 2 inside opaque metroBlob payloads.",
+        "The RTF raw scan has no ACQUIRE_013/TRANSFORM_013/VERIFY_013 body-marker hits; those labels are present in the decoded Diagram 2 data1.xml and drawing1.xml payloads."
+      ],
+      "library_observation": "litchi-rtf rejects the file before semantic projection with MalformedDocument(\"RTF shape-group shprslt destination must be starred\")."
+    }
+  },
+  "native_ui_validation": {
+    "observed_by": "root agent via Computer Use",
+    "application": "Microsoft Word",
+    "version": "16.110.2",
+    "build": "16.110.26062818",
+    "platform": "macOS",
+    "reopen": "pass for DOCX, DOC, and RTF",
+    "repair_prompt": false,
+    "observations": [
+      "DOCX reopened with the first imported SVG, page-break layout, converted SVG group, and Basic Process SmartArt.",
+      "The page-2 paragraph contains SMARTART_PROCESS_013; after insertion/reflow the SmartArt anchor is represented on page 3 with the converted group in the final package layout.",
+      "DOC reopened without repair and displayed the SVG fallback image with its alt text, the three-part converted vector group including SVG_MARKER_007, and the Basic Process SmartArt with ACQUIRE_013, TRANSFORM_013, and VERIFY_013.",
+      "RTF reopened without repair and displayed the same SVG fallback, converted group, and SmartArt content; accessibility inspection exposed the SmartArt node labels and group textbox marker."
+    ],
+    "semantic_scope": "Native UI observations establish Word save/close/reopen acceptance and visible content for the listed objects. They do not establish render equivalence, cross-application editability, or field/layout recalculation semantics."
+  },
+  "known_limits": [
+    "Markers alone do not prove a vector object was rendered or retained; the OPC parts, CFB OfficeArt tree, decoded RTF payloads, and native reopen observations provide the evidence used here.",
+    "No render-parity claim is made between DOCX, DOC, and RTF. Word intentionally emits different SVG/PNG, WPG/VML, OfficeArt, picture, and metroBlob representations.",
+    "The first SVG package part is not byte-identical to the supplied source SVG because Word normalized it; the source hash and package hash are recorded separately.",
+    "The DOCX typed drawing inventory reports the SVG picture and SmartArt anchor as Other and does not report the WPG group through Document::drawing_objects; this is a reader boundary, while the separate SmartArt inventory and raw XML provide the measured package evidence.",
+    "The DOC OfficeArt reader exposes the converted group and its three children but does not prove typed SVG or SmartArt semantic parity. The direct CFB marker scan did not find the three SmartArt node labels, so their native retention is reported only from Word UI and decoded RTF/DOCX evidence.",
+    "The RTF reader currently rejects this native file with MalformedDocument(\"RTF shape-group shprslt destination must be starred\"); this is recorded as a reader boundary, not a corrupt-fixture diagnosis.",
+    "The RTF picture payloads are recorded as exact decoded bytes and hashes; their wmetafile8 controls are native Word's nonshppict representation and are not interpreted as a general EMF/WMF guarantee."
+  ]
+}

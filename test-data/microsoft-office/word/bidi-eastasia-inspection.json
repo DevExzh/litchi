@@ -1,0 +1,518 @@
+{
+  "schema_version": 1,
+  "fixture_id": "word-bidi-eastasia-015",
+  "generated_on": "2026-10-15",
+  "purpose": "Read-only inspection of three native Microsoft Word bidi and East Asian language fixtures, including OOXML language and font associations, legacy DOC character-format runs, and native RTF controls.",
+  "provenance": {
+    "producer_app": "Microsoft Office Word",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft Word UI",
+    "source": "Seven paragraphs were entered in native Word. The Arabic, Hebrew, Japanese, and Chinese paragraph language settings were selected through Tools > Language. The font dialog was used with Arial for Arabic and Hebrew, Hiragino Mincho ProN for Japanese, and Songti SC for Chinese. Native Word saved the DOCX, DOC, and RTF files; each file was closed and reopened without a repair prompt before final closure.",
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "office_files_modified_after_native_save": false,
+    "all_documents_closed_before_hashing": true,
+    "all_documents_reopened_without_repair": true,
+    "fixture_files_are_closed_after_reopen": true,
+    "auditor": "/root/rtf_boundary_audit"
+  },
+  "files": [
+    {
+      "path": "test-data/microsoft-office/word/word-bidi-eastasia.docx",
+      "format": "docx",
+      "role": "native OOXML source",
+      "bytes": 14353,
+      "sha256": "d35591780c9001c7229c275e25c9b4051cbd8763fc078664fb2ad35d02a08aa9",
+      "native_reopen": "pass"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-bidi-eastasia.doc",
+      "format": "doc",
+      "role": "native legacy Word derivative",
+      "bytes": 25600,
+      "sha256": "145fd239d3a555d33f81352b34ef390692a4426280c3e42925e1be20740eec19",
+      "native_reopen": "pass"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-bidi-eastasia.rtf",
+      "format": "rtf",
+      "role": "native Word RTF derivative",
+      "bytes": 55704,
+      "sha256": "4c1faec1d945a3bfca15b3513a18d32786846229751a29502ebebb2a88a0df4a",
+      "native_reopen": "pass"
+    }
+  ],
+  "content_markers": [
+    "WORD_BIDI_EASTASIA_015",
+    "Fixture ID: word-bidi-eastasia-015",
+    "ARABIC_015: مرحبا بالعالم — اختبار النص العربي ١٢٣٤٥",
+    "HEBREW_015: שלום עולם — בדיקת טקסט 12345",
+    "JAPANESE_015: 日本語の禁則処理、句読点。「試験」１２３４５",
+    "CHINESE_015: 中文排版测试，标点符号。《测试》一二三四五",
+    "END_BIDI_EASTASIA_015"
+  ],
+  "expected_content": {
+    "paragraph_count": 7,
+    "paragraphs": [
+      {"index": 0, "text": "WORD_BIDI_EASTASIA_015"},
+      {"index": 1, "text": "Fixture ID: word-bidi-eastasia-015"},
+      {"index": 2, "text": "ARABIC_015: مرحبا بالعالم — اختبار النص العربي ١٢٣٤٥"},
+      {"index": 3, "text": "HEBREW_015: שלום עולם — בדיקת טקסט 12345"},
+      {"index": 4, "text": "JAPANESE_015: 日本語の禁則処理、句読点。「試験」１２３４５"},
+      {"index": 5, "text": "CHINESE_015: 中文排版测试，标点符号。《测试》一二三四五"},
+      {"index": 6, "text": "END_BIDI_EASTASIA_015"}
+    ],
+    "textutil_exact_text": "WORD_BIDI_EASTASIA_015\nFixture ID: word-bidi-eastasia-015\nARABIC_015: مرحبا بالعالم — اختبار النص العربي ١٢٣٤٥\nHEBREW_015: שלום עולם — בדיקת טקסט 12345\nJAPANESE_015: 日本語の禁則処理、句読点。「試験」１２３４５\nCHINESE_015: 中文排版测试，标点符号。《测试》一二三四五\nEND_BIDI_EASTASIA_015\n",
+    "textutil_formats_verified": ["doc", "docx", "rtf"]
+  },
+  "coverage": [
+    {
+      "feature": "native language selection and script text",
+      "status": "evidenced",
+      "evidence": "All three files preserve the seven exact marker paragraphs. DOCX records direct he-IL, ja-JP, and zh-CN language properties and inherits Arabic bidi language ar-SA from docDefaults; DOC and RTF preserve corresponding language IDs and script-specific controls."
+    },
+    {
+      "feature": "Latin, complex-script, and East Asian font associations",
+      "status": "evidenced",
+      "evidence": "DOCX records Arial Black for Latin prefixes/spaces, Arial plus cs=Arial for Arabic/Hebrew words, Hiragino Mincho ProN W3 for Japanese, Songti SC Light for Chinese, and fallback cs fonts MS Gothic/Microsoft JhengHei. The DOC FFN table and CHP runs carry the same native font choices."
+    },
+    {
+      "feature": "typed DOCX reader boundary",
+      "status": "evidenced",
+      "evidence": "litchi-docx reads seven paragraphs and zero tables with exact Unicode text, but its document text projection concatenates paragraph text without paragraph separators and does not expose the language/font properties in this example."
+    },
+    {
+      "feature": "typed DOC reader boundary",
+      "status": "evidenced",
+      "evidence": "litchi-doc reads seven paragraphs and zero tables, preserves 246 characters including paragraph separators, and exposes native CHP font indexes, language IDs, and FarEast script hints through Run properties."
+    },
+    {
+      "feature": "typed RTF reader boundary",
+      "status": "known-failure",
+      "evidence": "litchi-rtf exits with MalformedDocument(\"RTF data-store payload cannot be empty\") at the native empty starred datastore group. textutil still extracts the exact seven-line text."
+    },
+    {
+      "feature": "explicit paragraph RTL direction",
+      "status": "not-evidenced",
+      "evidence": "DOCX has zero w:bidi and w:rtl elements, RTF has zero \\rtlpar controls and two \\ltrpar controls, and the tested Word UI did not expose a separate paragraph direction setting. Character-level complex-script controls must not be treated as paragraph direction."
+    },
+    {
+      "feature": "Asian Kinsoku setting",
+      "status": "not-evidenced",
+      "evidence": "The Japanese text intentionally contains punctuation and brackets, but DOCX has no w:kinsoku, settings.xml has no w:kinsoku, and the native UI path exposed no Asian Typography/Kinsoku control. RTF contains asianbrkrule but no kinsoku control; this is raw compatibility evidence only."
+    }
+  ],
+  "docx": {
+    "container": {
+      "kind": "OPC ZIP",
+      "zip_test": "pass",
+      "xml_validation": "pass",
+      "member_count": 11,
+      "members": [
+        "[Content_Types].xml",
+        "_rels/.rels",
+        "word/document.xml",
+        "word/_rels/document.xml.rels",
+        "word/theme/theme1.xml",
+        "word/settings.xml",
+        "word/styles.xml",
+        "word/webSettings.xml",
+        "word/fontTable.xml",
+        "docProps/core.xml",
+        "docProps/app.xml"
+      ],
+      "content_types_override_count": 8,
+      "document_relationships": {
+        "rId1": "styles.xml",
+        "rId2": "settings.xml",
+        "rId3": "webSettings.xml",
+        "rId4": "fontTable.xml",
+        "rId5": "theme/theme1.xml"
+      },
+      "external_targets": []
+    },
+    "main_document": {
+      "source_member": "word/document.xml",
+      "source_lines": "4-280",
+      "xml_counts": {
+        "w:p": 7,
+        "w:r": 34,
+        "w:t": 34,
+        "w:proofErr": 18,
+        "w:bidi": 0,
+        "w:rtl": 0,
+        "w:kinsoku": 0,
+        "w:tbl": 0,
+        "w:sectPr": 1
+      },
+      "paragraph_texts": [
+        "WORD_BIDI_EASTASIA_015",
+        "Fixture ID: word-bidi-eastasia-015",
+        "ARABIC_015: مرحبا بالعالم — اختبار النص العربي ١٢٣٤٥",
+        "HEBREW_015: שלום עולם — בדיקת טקסט 12345",
+        "JAPANESE_015: 日本語の禁則処理、句読点。「試験」１２３４５",
+        "CHINESE_015: 中文排版测试，标点符号。《测试》一二三四五",
+        "END_BIDI_EASTASIA_015"
+      ],
+      "language_properties": {
+        "arabic": {
+          "paragraph_index": 2,
+          "direct_w_lang_bidi": 0,
+          "inherited_docDefaults_w_lang_bidi": "ar-SA",
+          "source_lines": "14-102"
+        },
+        "hebrew": {
+          "paragraph_index": 3,
+          "paragraph_w_lang_bidi": "he-IL",
+          "run_w_lang_bidi_count": 9,
+          "source_lines": "103-181"
+        },
+        "japanese": {
+          "paragraph_index": 4,
+          "paragraph_w_lang_eastAsia": "ja-JP",
+          "run_w_lang_eastAsia_count": 2,
+          "source_lines": "182-203"
+        },
+        "chinese": {
+          "paragraph_index": 5,
+          "paragraph_w_lang_eastAsia": "zh-CN",
+          "run_w_lang_eastAsia_count": 8,
+          "source_lines": "204-267"
+        }
+      },
+      "font_properties": {
+        "arabic": {
+          "latin_prefix_and_space_fonts": ["Arial Black"],
+          "rtl_word_fonts": ["Arial"],
+          "rtl_word_cs_fonts": ["Arial"],
+          "source_lines": "15-101"
+        },
+        "hebrew": {
+          "latin_prefix_and_space_fonts": ["Arial Black"],
+          "rtl_word_fonts": ["Arial"],
+          "rtl_word_cs_fonts": ["Arial"],
+          "source_lines": "104-180"
+        },
+        "japanese": {
+          "paragraph_and_prefix_fonts": ["Hiragino Mincho ProN W3"],
+          "body_fonts": ["Hiragino Mincho ProN W3"],
+          "body_cs_font": "MS Gothic",
+          "font_hint": "eastAsia",
+          "source_lines": "183-202"
+        },
+        "chinese": {
+          "paragraph_and_prefix_fonts": ["Songti SC Light"],
+          "body_fonts": ["Songti SC Light"],
+          "body_cs_fonts": ["MS Gothic", "Microsoft JhengHei"],
+          "font_hint": "eastAsia",
+          "source_lines": "205-266"
+        }
+      },
+      "section_properties": {
+        "page_size_twips": {"width": 12240, "height": 15840},
+        "margins_twips": {"top": 1440, "right": 1440, "bottom": 1440, "left": 1440, "header": 720, "footer": 720, "gutter": 0},
+        "column_space_twips": 720,
+        "line_pitch_twips": 360,
+        "source_lines": "273-278"
+      }
+    },
+    "styles": {
+      "source_member": "word/styles.xml",
+      "source_lines": "3-19",
+      "doc_defaults_rFonts": {
+        "asciiTheme": "minorHAnsi",
+        "eastAsiaTheme": "minorHAnsi",
+        "hAnsiTheme": "minorHAnsi",
+        "csTheme": "minorBidi"
+      },
+      "doc_defaults_lang": {
+        "val": "en-US",
+        "eastAsia": "en-US",
+        "bidi": "ar-SA"
+      }
+    },
+    "settings": {
+      "source_member": "word/settings.xml",
+      "source_lines": "3-45",
+      "zoom_percent": 100,
+      "compatibility_mode": 15,
+      "theme_font_lang": "en-US",
+      "w_bidi_count": 0,
+      "w_rtl_count": 0,
+      "w_kinsoku_count": 0,
+      "other_relevant_settings": ["w:characterSpacingControl=doNotCompress", "w:compatSetting enableOpenTypeFeatures=1"]
+    },
+    "font_table": {
+      "source_member": "word/fontTable.xml",
+      "source_lines": "3-68",
+      "font_count": 9,
+      "fonts": [
+        {"name": "Aptos", "charset": "00", "family": "swiss"},
+        {"name": "Times New Roman", "charset": "00", "family": "roman"},
+        {"name": "Aptos Display", "charset": "00", "family": "swiss"},
+        {"name": "Arial Black", "charset": "00", "family": "swiss"},
+        {"name": "Arial", "charset": "00", "family": "swiss"},
+        {"name": "Hiragino Mincho ProN W3", "charset": "80", "family": "roman"},
+        {"name": "MS Gothic", "altName": "ＭＳ ゴシック", "charset": "80", "family": "modern"},
+        {"name": "Songti SC Light", "altName": "SONGTI SC LIGHT", "charset": "86", "family": "auto"},
+        {"name": "Microsoft JhengHei", "charset": "88", "family": "swiss"}
+      ]
+    },
+    "typed_reader": {
+      "command": "cargo run -q -p litchi-docx --example read_docx -- test-data/microsoft-office/word/word-bidi-eastasia.docx",
+      "exit_code": 0,
+      "paragraph_count": 7,
+      "table_count": 0,
+      "document_text_utf8_bytes": 379,
+      "document_text": "WORD_BIDI_EASTASIA_015Fixture ID: word-bidi-eastasia-015ARABIC_015: مرحبا بالعالم — اختبار النص العربي ١٢٣٤٥HEBREW_015: שלום עולם — בדיקת טקסט 12345JAPANESE_015: 日本語の禁則処理、句読点。「試験」１２３４５CHINESE_015: 中文排版测试，标点符号。《测试》一二三四五END_BIDI_EASTASIA_015",
+      "paragraph_separators_in_document_text": false,
+      "core_properties": {
+        "creator": "Ryker Zhu",
+        "last_modified_by": "Ryker Zhu",
+        "created": "2026-10-15T10:46:00Z",
+        "modified": "2026-10-15T10:49:00Z"
+      },
+      "core_properties_source": "docProps/core.xml lines 3-11"
+    }
+  },
+  "doc": {
+    "container": {
+      "kind": "OLE2 CFB",
+      "file_description": "Composite Document File V2 Document, Little Endian, Os: MacOS, Version 5.26, Code page: 10000",
+      "streams": ["1Table", "\u0001CompObj", "WordDocument", "\u0005SummaryInformation", "\u0005DocumentSummaryInformation"]
+    },
+    "fib": {
+      "magic": "0xA5EC",
+      "nFib": "0x00C1",
+      "version_name": "Word 97",
+      "table_stream": "1Table",
+      "language_id": 1033,
+      "word_document_fcMin": 2048,
+      "word_document_fcMac": 2540,
+      "word_document_cbMac": 3630,
+      "ccpText": 246,
+      "font_table_pointer_index": 15,
+      "font_table_offset": 8183,
+      "font_table_bytes": 778,
+      "clx_bytes": 21,
+      "chpx_bte_bytes": 12,
+      "papx_bte_bytes": 12
+    },
+    "font_table": {
+      "string_count": 11,
+      "extra_data_size": 0,
+      "index_to_name": {
+        "0": "Times New Roman",
+        "1": "Symbol",
+        "2": "Arial",
+        "3": "Arial Black",
+        "4": "Hiragino Mincho ProN W3",
+        "5": "MS Gothic",
+        "6": "Songti SC Light",
+        "7": "Microsoft JhengHei",
+        "8": "Aptos",
+        "9": "Aptos Display",
+        "10": "Cambria Math"
+      }
+    },
+    "format_runs": {
+      "all_runs_font_size_half_points": 24,
+      "all_runs_is_bidi": null,
+      "paragraphs": [
+        {"index": 0, "run_count": 1, "font_index": [null], "font_index_bidi": [null], "language_id": [1033], "language_id_fe": [1033], "language_id_bidi": [1025], "script_hint": [null]},
+        {"index": 1, "run_count": 1, "font_index": [null], "font_index_bidi": [null], "language_id": [1033], "language_id_fe": [1033], "language_id_bidi": [1025], "script_hint": [null]},
+        {"index": 2, "run_count": 12, "font_index": [3, 2, 3, 2, 3, 2, 3, 2, 3, 2, 3, 2], "font_index_bidi": [null, 2, null, 2, null, 2, null, 2, null, 2, null, 2], "language_id_bidi": [1025], "text_segments": ["ARABIC_015: ", "مرحبا", " ", "بالعالم", " — ", "اختبار", " ", "النص", " ", "العربي", " ", "١٢٣٤٥"]},
+        {"index": 3, "run_count": 9, "font_index": [3, 2, 3, 2, 3, 2, 3, 2, 3], "font_index_bidi": [null, 2, null, 2, null, 2, null, 2, null], "language_id_bidi": [1037], "text_segments": ["HEBREW_015: ", "שלום", " ", "עולם", " — ", "בדיקת", " ", "טקסט", " 12345"]},
+        {"index": 4, "run_count": 2, "font_index": [4, 4], "font_index_fe": [4, 4], "font_index_other": [4, 4], "font_index_bidi": [null, 5], "language_id_fe": [1041], "language_id_bidi": [1025], "script_hint": ["FarEast"], "text_segments": ["JAPANESE_015: ", "日本語の禁則処理、句読点。「試験」１２３４５"]},
+        {"index": 5, "run_count": 8, "font_index": [6, 6, 6, 6, 6, 6, 6, 6], "font_index_fe": [6, 6, 6, 6, 6, 6, 6, 6], "font_index_other": [6, 6, 6, 6, 6, 6, 6, 6], "font_index_bidi": [null, 5, 7, 5, 7, 5, 7, 5], "language_id_fe": [2052], "language_id_bidi": [1025], "script_hint": ["FarEast"], "text_segments": ["CHINESE_015: ", "中文排版", "测试", "，", "标", "点符号。《", "测试", "》一二三四五"]},
+        {"index": 6, "run_count": 1, "font_index": [null], "font_index_bidi": [null], "language_id": [1033], "language_id_fe": [1033], "language_id_bidi": [1025], "script_hint": [null]}
+      ]
+    },
+    "typed_reader": {
+      "command": "cargo run -q -p litchi-doc --example read_doc -- test-data/microsoft-office/word/word-bidi-eastasia.doc",
+      "exit_code": 0,
+      "paragraph_count": 7,
+      "table_count": 0,
+      "total_characters": 246,
+      "paragraph_separator_count_in_text": 7,
+      "fib_version": "0x00C1",
+      "fib_version_name": "Word 97"
+    },
+    "textutil": {
+      "command": "textutil -convert txt -stdout test-data/microsoft-office/word/word-bidi-eastasia.doc",
+      "exit_code": 0,
+      "exact_text_match": true
+    }
+  },
+  "rtf": {
+    "file_description": "Rich Text Format data, version 1, ANSI, code page 1252, default middle east language ID 1025",
+    "source_line_count": 273,
+    "source_lines": {
+      "header_and_font_table": "1-48",
+      "stylesheet_and_defaults": "53-92",
+      "document_defaults_and_compatibility": "94-100",
+      "body": "103-128",
+      "themedata": "129-272",
+      "empty_datastore": 273
+    },
+    "default_document_settings": {
+      "rtf": "\\rtf1",
+      "ansi": true,
+      "ansicpg": 1252,
+      "uc_default": 1,
+      "adeflang": 1025,
+      "adeff": 31507,
+      "deff": 0,
+      "stshfdbch": 31506,
+      "stshfloch": 31506,
+      "stshfhich": 31506,
+      "stshfbi": 31507,
+      "deflang": 1033,
+      "deflangfe": 1033,
+      "themelang": 1033,
+      "themelangfe": 0,
+      "themelangcs": 0,
+      "source_lines": "1, 53-54, 94-100"
+    },
+    "font_and_associated_controls": {
+      "font_definition_count": 146,
+      "fbidi_count": 146,
+      "fcharset_count": 146,
+      "associated_font_controls_af_count": 161,
+      "fcs0_count": 69,
+      "fcs1_count": 69,
+      "rtlch_count": 69,
+      "ltrch_count": 69,
+      "loch_count": 36,
+      "hich_count": 36,
+      "dbch_count": 44,
+      "relevant_font_ids": {
+        "1": {"name": "Arial", "charset": 0},
+        "15": {"name": "MS Gothic", "charset": 128},
+        "53": {"name": "Microsoft JhengHei", "charset": 136},
+        "180": {"name": "Hiragino Mincho ProN W3", "charset": 128},
+        "345": {"name": "Songti SC Light", "charset": 134},
+        "380": {"name": "Arial Black", "charset": 0},
+        "1554": {"name": "Arial (Hebrew)", "charset": 177},
+        "1555": {"name": "Arial (Arabic)", "charset": 178},
+        "31506": {"name": "Aptos", "role": "theme East Asian/Latin default"},
+        "31507": {"name": "Times New Roman", "role": "theme bidi default"}
+      }
+    },
+    "language_and_unicode_controls": {
+      "uc_values_seen": [1, 2],
+      "u_control_count": 48,
+      "hex_fallback_count": 220,
+      "body_language_groups": {
+        "arabic": {"lines": "103-110", "alang": 1025, "lang": 1033, "langfe": 1033, "font_controls": [380, 1555, 1]},
+        "hebrew": {"lines": "111-114", "alang": 1037, "lang": 1033, "langfe": 1033, "font_controls": [380, 1554]},
+        "japanese": {"lines": "115-118", "lang": 1033, "langfe": 1041, "langfenp": 1041, "uc": 2, "font_controls": [180, 15]},
+        "chinese": {"lines": "119-127", "lang": 1033, "langfe": 2052, "langfenp": 2052, "uc": 2, "font_controls": [345, 53, 15]}
+      },
+      "lang_control_counts": {"lang": 29, "langfe": 29, "langnp": 17, "langfenp": 29, "alang": 26}
+    },
+    "paragraph_and_asian_controls": {
+      "par_count": 7,
+      "ltrpar_count": 2,
+      "rtlpar_count": 0,
+      "ltrsect_count": 2,
+      "rtlsect_count": 0,
+      "asianbrkrule_count": 1,
+      "kinsoku_count": 0,
+      "table_style_group_count": 1,
+      "table_style_groups": ["\\ts11"],
+      "table_body_controls": {"trowd": 0, "cell": 0, "row": 0}
+    },
+    "known_error": {
+      "typed_reader_command": "cargo run -q -p litchi-rtf --example parse_rtf -- test-data/microsoft-office/word/word-bidi-eastasia.rtf",
+      "exit_code": 1,
+      "error": "MalformedDocument(\"RTF data-store payload cannot be empty\")",
+      "raw_trigger": "{\\*\\datastore }",
+      "raw_trigger_line": 273,
+      "empty_payload": true,
+      "duplicate_typed_style_id_observed": false
+    },
+    "textutil": {
+      "command": "textutil -convert txt -stdout test-data/microsoft-office/word/word-bidi-eastasia.rtf",
+      "exit_code": 0,
+      "exact_text_match": true
+    }
+  },
+  "source_references": [
+    {
+      "path": "test-data/microsoft-office/word/word-bidi-eastasia.docx",
+      "member": "word/document.xml",
+      "formatted_source_lines": "4-280",
+      "facts": [
+        "Arabic paragraph index 2 uses Arial Black for its Latin prefix and spaces and Arial/cs=Arial for Arabic runs.",
+        "Hebrew paragraph index 3 carries direct w:lang bidi=he-IL on its paragraph properties and nine runs.",
+        "Japanese paragraph index 4 carries eastAsia=ja-JP and Hiragino Mincho ProN W3 with cs=MS Gothic on the body run.",
+        "Chinese paragraph index 5 carries eastAsia=zh-CN and Songti SC Light with alternating cs=MS Gothic and Microsoft JhengHei.",
+        "There are no w:bidi, w:rtl, or w:kinsoku elements."
+      ]
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-bidi-eastasia.docx",
+      "member": "word/styles.xml",
+      "formatted_source_lines": "3-19",
+      "facts": ["docDefaults w:lang is en-US/eastAsia=en-US/bidi=ar-SA; the Arabic paragraph has no direct w:lang bidi attribute."]
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-bidi-eastasia.docx",
+      "member": "word/settings.xml",
+      "formatted_source_lines": "3-45",
+      "facts": ["No w:bidi, w:rtl, or w:kinsoku setting is present; only ordinary compatibility and theme language settings are present."]
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-bidi-eastasia.docx",
+      "member": "word/fontTable.xml",
+      "formatted_source_lines": "3-68",
+      "facts": ["The package font table contains nine native entries including Arial Black, Arial, Hiragino Mincho ProN W3, MS Gothic, Songti SC Light, and Microsoft JhengHei."]
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-bidi-eastasia.rtf",
+      "lines": "1-128, 273",
+      "facts": ["The raw RTF contains script-specific font IDs, associated-font controls, language controls, Unicode controls, and one empty starred datastore destination; it has no rtlpar or kinsoku control."]
+    },
+    {
+      "path": "crates/litchi-rtf/src/codec/parser/codec/document.rs",
+      "lines": "586-613",
+      "facts": ["The typed RTF parser rejects a starred datastore destination when its hexadecimal payload is empty."]
+    }
+  ],
+  "known_limits": [
+    "The Arabic OOXML language is inherited from styles.xml docDefaults bidi=ar-SA; this fixture does not evidence a direct Arabic w:lang bidi attribute.",
+    "The native Word UI path did not expose an explicit RTL paragraph direction or Asian Kinsoku control. Character-level rtlch/fcs/af controls in RTF and cs/font associations in OOXML must not be reported as paragraph direction or proof of Kinsoku processing.",
+    "The DOCX example reader exposes text and paragraph/table counts but not OOXML language or font properties; raw package inspection and the legacy DOC Run properties provide the format evidence.",
+    "The RTF typed reader stops at the empty datastore before it can provide parsed font or run objects; all RTF font, language, and compatibility facts above are raw-source observations."
+  ],
+  "native_ui_follow_up_candidates": [
+    {
+      "id": "isolate-arabic-direct-language",
+      "status": "hypothesis",
+      "minimal_action": "Duplicate the native fixture, select only the Arabic paragraph, choose Tools > Language > Arabic, save a fresh DOCX, and compare document.xml/styles.xml.",
+      "discriminator": "A direct w:lang bidi value on the Arabic paragraph would distinguish direct selection from the current docDefaults bidi=ar-SA inheritance."
+    },
+    {
+      "id": "isolate-paragraph-direction",
+      "status": "hypothesis",
+      "minimal_action": "In a duplicate native fixture, use any available Home/Paragraph right-to-left command on only the Hebrew paragraph, save DOCX and RTF, and inspect for w:bidi or rtlpar.",
+      "discriminator": "A newly emitted w:bidi or \\rtlpar would be direct paragraph-direction evidence; the current fixture has neither."
+    },
+    {
+      "id": "isolate-kinsoku",
+      "status": "hypothesis",
+      "minimal_action": "In a duplicate native fixture, expose Word's Asian Typography/line-break settings if available for the Japanese paragraph, toggle one setting, save DOCX and RTF, and compare package/settings controls.",
+      "discriminator": "A w:kinsoku or RTF kinsoku control would distinguish a real setting from punctuation text alone; no such control is present currently."
+    },
+    {
+      "id": "isolate-datastore",
+      "status": "hypothesis",
+      "minimal_action": "Save a fresh one-paragraph native Word RTF with no script formatting and compare its root starred destinations with this file, retaining the current empty-datastore group as the boundary candidate.",
+      "discriminator": "If the fresh native RTF also has {\\*\\datastore } and litchi-rtf returns the same error, the failure is producer-wide rather than bidi/East Asian-specific."
+    }
+  ]
+}

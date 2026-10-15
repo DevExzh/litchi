@@ -1,0 +1,923 @@
+{
+  "schema_version": 1,
+  "fixture_id": "excel-pivot-controls-007",
+  "generated_on": "2026-10-15",
+  "purpose": "Fixture-specific, read-only inspection of native Microsoft Excel PivotTable controls: Region and Product slicers, a Date timeline, and a PivotChart, with transitional OOXML, BIFF12, and legacy BIFF8 derivatives.",
+  "provenance": {
+    "producer_app": "Microsoft Office Excel",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "package_application": "Microsoft Macintosh Excel",
+    "package_app_version": "16.0300",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft Excel UI",
+    "source_fixture": {
+      "path": "test-data/microsoft-office/excel/excel-visual-analytics.xlsx",
+      "bytes": 16951,
+      "sha256": "6d4326832690c1c004e3881eae21e2e7614050b67f2824c191fc0d4b06b1875d",
+      "hash_unchanged_after_authoring": true
+    },
+    "native_authoring_sequence": [
+      "Opened the source workbook in native Excel and saved the controls workbook as excel-pivot-controls.xlsx.",
+      "Saved a BIFF12 binary derivative as excel-pivot-controls.xlsb.",
+      "Reopened the XLSX, verified the controls and filtered value, then saved the legacy BIFF8 derivative as excel-pivot-controls.xls.",
+      "Closed and reopened all three final files in native Excel; no repair prompt was shown."
+    ],
+    "native_save_chain_only": true,
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "all_documents_closed_before_hashing": true,
+    "lock_files_present_at_inspection": false
+  },
+  "scope_and_limits": {
+    "native_variants": [
+      "xlsx",
+      "xlsb",
+      "xls"
+    ],
+    "native_excel_reopen_verified": true,
+    "repair_or_conversion_prompt_observed": false,
+    "external_links_followed": false,
+    "external_data_refreshed": false,
+    "legacy_save_warning": {
+      "shown_for": "xls",
+      "accepted": true,
+      "feature_loss_warning_accepted": true,
+      "observed_loss": "The XLS reopen retained the PivotTable result and PivotChart but did not retain the slicer and timeline controls."
+    },
+    "semantic_parity_claimed": false,
+    "rendering_parity_claimed": false,
+    "reader_boundary": "The package and typed-reader observations below are exact probes of these files. A typed-reader error is recorded as a library boundary; it is not evidence that native Excel failed to reopen the fixture."
+  },
+  "expected_native_content": {
+    "worksheet_order": [
+      "PivotChart007",
+      "Sheet2",
+      "Sheet1",
+      "Sheet3"
+    ],
+    "active_worksheet": "Sheet2",
+    "source_table": {
+      "worksheet": "Sheet1",
+      "actual_table_name": "Table1",
+      "range": "A1:F9",
+      "columns": [
+        "Date",
+        "Region",
+        "Product",
+        "Revenue",
+        "Units",
+        "Status"
+      ],
+      "row_count": 8,
+      "rows": [
+        {
+          "row": 2,
+          "date": "2026-03-03",
+          "date_serial": 46084,
+          "region": "North",
+          "product": "Widget",
+          "revenue": 16.5,
+          "units": 3,
+          "status": "Open"
+        },
+        {
+          "row": 3,
+          "date": "2026-01-20",
+          "date_serial": 46042,
+          "region": "South",
+          "product": "Widget",
+          "revenue": 25,
+          "units": 5,
+          "status": "Closed"
+        },
+        {
+          "row": 4,
+          "date": "2026-04-02",
+          "date_serial": 46114,
+          "region": "North",
+          "product": "Gadget",
+          "revenue": 14,
+          "units": 2,
+          "status": "Hold"
+        },
+        {
+          "row": 5,
+          "date": "2026-02-18",
+          "date_serial": 46071,
+          "region": "South",
+          "product": "Gadget",
+          "revenue": 48,
+          "units": 4,
+          "status": "Hold"
+        },
+        {
+          "row": 6,
+          "date": "2026-01-15",
+          "date_serial": 46037,
+          "region": "North",
+          "product": "Widget",
+          "revenue": 12.5,
+          "units": 3,
+          "status": "Open"
+        },
+        {
+          "row": 7,
+          "date": "2026-03-21",
+          "date_serial": 46102,
+          "region": "South",
+          "product": "Gadget",
+          "revenue": 20,
+          "units": 4,
+          "status": "Closed"
+        },
+        {
+          "row": 8,
+          "date": "2026-02-10",
+          "date_serial": 46063,
+          "region": "North",
+          "product": "Gadget",
+          "revenue": 9.5,
+          "units": 2,
+          "status": "Open"
+        },
+        {
+          "row": 9,
+          "date": "2026-04-18",
+          "date_serial": 46130,
+          "region": "South",
+          "product": "Widget",
+          "revenue": 30,
+          "units": 6,
+          "status": "Open"
+        }
+      ],
+      "date_cells_are_native_dates": true,
+      "filter": {
+        "field": "Region",
+        "value": "North",
+        "table_filter_column_id": 1,
+        "visible_rows_confirmed_before_first_save": [
+          2,
+          4,
+          6,
+          8
+        ],
+        "visible_count_confirmed_before_first_save": 4,
+        "source_count": 8,
+        "filter_mode_retained_on_native_reopen": true
+      },
+      "sort": {
+        "field": "Revenue",
+        "direction": "descending",
+        "sort_state_ref": "A2:F8",
+        "sort_condition_ref": "D1:D9",
+        "sort_condition_descending": true
+      }
+    },
+    "pivot_table": {
+      "worksheet": "Sheet2",
+      "name": "PivotTable1",
+      "location_after_controls": "A3:C6",
+      "cache_id": 1,
+      "internal_pivot_cache_id": 2018148052,
+      "cache_source_table": "Table1",
+      "row_axis": "Region",
+      "column_axis": "Product",
+      "report_filter": {
+        "field": "Status",
+        "displayed_value": "(All)"
+      },
+      "data_field": {
+        "field": "Revenue",
+        "function": "Sum",
+        "caption": "Sum of Revenue"
+      },
+      "fields": [
+        "Date",
+        "Region",
+        "Product",
+        "Revenue",
+        "Units",
+        "Status"
+      ],
+      "date_filter": {
+        "field": "Date",
+        "type": "dateBetween",
+        "serial_min_inclusive": 46054,
+        "serial_max_inclusive": 46081,
+        "use_whole_day": true,
+        "native_window": [
+          "2026-02-01",
+          "2026-02-28"
+        ]
+      },
+      "unfiltered_total": 175.5,
+      "filtered_values": {
+        "A3": "Sum of Revenue",
+        "B3": "Column Labels",
+        "A4": "Row Labels",
+        "B4": "Gadget",
+        "C4": "Grand Total",
+        "A5": "North",
+        "B5": 9.5,
+        "C5": 9.5,
+        "A6": "Grand Total",
+        "B6": 9.5,
+        "C6": 9.5
+      },
+      "markers": {
+        "A11": "Fixture ID: excel-pivot-controls-007",
+        "A12": "PIVOT_UNFILTERED_TOTAL_007: 175.5",
+        "A13": "PIVOT_FILTERED_TOTAL_007: 9.5",
+        "A14": "REGION_NORTH_FEBRUARY_2026"
+      },
+      "pivot_cache_record_count": 8,
+      "pivot_cache_field_summary": {
+        "Date": {
+          "contains_date": true,
+          "min_date": "2026-01-15T00:00:00",
+          "max_date": "2026-04-19T00:00:00"
+        },
+        "Region": {
+          "shared_item_count": 2,
+          "items": [
+            "North",
+            "South"
+          ]
+        },
+        "Product": {
+          "shared_item_count": 2,
+          "items": [
+            "Gadget",
+            "Widget"
+          ]
+        },
+        "Revenue": {
+          "min": 9.5,
+          "max": 48
+        },
+        "Units": {
+          "min": 2,
+          "max": 6,
+          "integer": true
+        },
+        "Status": {
+          "shared_item_count": 3,
+          "items": [
+            "Open",
+            "Closed",
+            "Hold"
+          ]
+        }
+      }
+    },
+    "slicers": {
+      "native_reopen_state": "Region North selected and South off; Product Gadget and Widget both selected.",
+      "caches": [
+        {
+          "name": "Slicer_Region",
+          "source_name": "Region",
+          "uid": "{467C1D31-B55C-B845-9810-5E25C4EC5640}",
+          "pivot_table": "PivotTable1",
+          "pivot_table_tab_id": 2,
+          "internal_pivot_cache_id": 2018148052,
+          "items": [
+            {
+              "cache_index": 0,
+              "label": "North",
+              "selected": true,
+              "xml_selected_flag": 1
+            },
+            {
+              "cache_index": 1,
+              "label": "South",
+              "selected": false,
+              "xml_selected_flag": 0
+            }
+          ]
+        },
+        {
+          "name": "Slicer_Product",
+          "source_name": "Product",
+          "uid": "{3309B01A-9F8C-5D4C-BC2C-3005F0F3632A}",
+          "pivot_table": "PivotTable1",
+          "pivot_table_tab_id": 2,
+          "internal_pivot_cache_id": 2018148052,
+          "items": [
+            {
+              "cache_index": 1,
+              "label": "Widget",
+              "selected": true,
+              "xml_selected_flag": 1
+            },
+            {
+              "cache_index": 0,
+              "label": "Gadget",
+              "selected": true,
+              "xml_selected_flag": 1
+            }
+          ]
+        }
+      ],
+      "views": [
+        {
+          "cache_name": "Slicer_Region",
+          "caption": "Region",
+          "uid": "{B460ACB2-2A17-C641-8684-FBD369D3522C}",
+          "row_height": 251883
+        },
+        {
+          "cache_name": "Slicer_Product",
+          "caption": "Product",
+          "uid": "{D42C1ED1-D414-A340-A9AA-756F9A98CD95}",
+          "row_height": 251883
+        }
+      ],
+      "parts": [
+        "xl/slicerCaches/slicerCache1.xml",
+        "xl/slicerCaches/slicerCache2.xml",
+        "xl/slicers/slicer1.xml"
+      ]
+    },
+    "timeline": {
+      "cache_name": "NativeTimeline_Date",
+      "source_name": "Date",
+      "uid": "{AE7083C3-0CBF-954C-824C-1CBA773C7841}",
+      "pivot_table": "PivotTable1",
+      "pivot_table_tab_id": 2,
+      "internal_pivot_cache_id": 2018148052,
+      "filter_type": "dateBetween",
+      "level": 2,
+      "selection_level": 2,
+      "selected_window": [
+        "2026-02-01T00:00:00",
+        "2026-02-28T00:00:00"
+      ],
+      "bounds": [
+        "2026-01-01T00:00:00",
+        "2027-01-01T00:00:00"
+      ],
+      "scroll_position": "2026-01-01T00:00:00",
+      "native_ui_sequence": [
+        "Inserted with the default Months level.",
+        "Scrolled to January 2026.",
+        "Selected February 2026."
+      ],
+      "view": {
+        "caption": "Date",
+        "uid": "{A44D620F-849C-8B49-A9E0-1E454E8DE67D}",
+        "part": "xl/timelines/timeline1.xml"
+      },
+      "cache_part": "xl/timelineCaches/timelineCache1.xml"
+    },
+    "pivot_chart": {
+      "chartsheet": "PivotChart007",
+      "part": "xl/charts/chart1.xml",
+      "pivot_source": "[excel-pivot-controls.xlsx]Sheet2!PivotTable1",
+      "pivot_format_id": 1,
+      "chart_type": "barChart",
+      "bar_direction": "col",
+      "grouping": "clustered",
+      "series_count": 1,
+      "series_formula": "Sheet2!$B$3:$B$4",
+      "series_cache": [
+        "Gadget"
+      ],
+      "category_formula": "Sheet2!$A$5:$A$6",
+      "category_cache": [
+        "North"
+      ],
+      "value_formula": "Sheet2!$B$5:$B$6",
+      "value_cache": [
+        9.5
+      ],
+      "native_ui_observation": "PivotTable Analyze > PivotChart created a clustered column chart and moved it to the new chart sheet PivotChart007; the native inspection showed Gadget / North / 9.5.",
+      "package_title_text_present": false,
+      "package_title_note": "The chart XML has no c:title text element; Gadget, North, and 9.5 are the cached series, category, and value observations."
+    },
+    "inherited_baseline_content": {
+      "source_table_filter_and_sort": true,
+      "sheet3_sparklines": true,
+      "sheet3_hidden_rows_and_columns_outline": true
+    }
+  },
+  "format_observations": {
+    "xlsx": {
+      "container": "OPC ZIP",
+      "bytes": 28115,
+      "sha256": "24c9b605f4241d89913f8cdd1ae75047d550fd2a8ed9ad3c731a13cce6d3b2ef",
+      "zip_integrity": "pass",
+      "member_count": 35,
+      "main_workbook_content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml",
+      "spreadsheetml_namespace": "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+      "critical_parts": [
+        "xl/workbook.xml",
+        "xl/worksheets/sheet1.xml",
+        "xl/worksheets/sheet2.xml",
+        "xl/worksheets/sheet3.xml",
+        "xl/worksheets/_rels/sheet1.xml.rels",
+        "xl/pivotCache/pivotCacheDefinition1.xml",
+        "xl/pivotCache/pivotCacheRecords1.xml",
+        "xl/pivotTables/pivotTable1.xml",
+        "xl/tables/table1.xml",
+        "xl/slicerCaches/slicerCache1.xml",
+        "xl/slicerCaches/slicerCache2.xml",
+        "xl/slicers/slicer1.xml",
+        "xl/timelineCaches/timelineCache1.xml",
+        "xl/timelines/timeline1.xml",
+        "xl/charts/chart1.xml",
+        "xl/chartsheets/sheet1.xml",
+        "xl/drawings/drawing1.xml",
+        "xl/drawings/drawing2.xml"
+      ],
+      "native_reopen": "pass; controls, filtered 9.5 result, and PivotChart reopened without repair"
+    },
+    "xlsb": {
+      "container": "OPC ZIP with BIFF12 binary parts and native Office XML chart/timeline/drawing parts",
+      "bytes": 24260,
+      "sha256": "bba0bc362bc05aad7b14804eac851e0b8eafe59d90c619acd266cba725b2d4bd",
+      "zip_integrity": "pass",
+      "member_count": 39,
+      "main_workbook_content_type": "application/vnd.ms-excel.sheet.binary.main",
+      "critical_parts": [
+        "xl/workbook.bin",
+        "xl/worksheets/sheet1.bin",
+        "xl/worksheets/sheet2.bin",
+        "xl/worksheets/sheet3.bin",
+        "xl/worksheets/_rels/sheet1.bin.rels",
+        "xl/pivotCache/pivotCacheDefinition1.bin",
+        "xl/pivotCache/pivotCacheRecords1.bin",
+        "xl/pivotTables/pivotTable1.bin",
+        "xl/slicerCaches/slicerCache1.bin",
+        "xl/slicerCaches/slicerCache2.bin",
+        "xl/slicers/slicer1.bin",
+        "xl/timelineCaches/timelineCache1.xml",
+        "xl/timelines/timeline1.xml",
+        "xl/charts/chart1.xml",
+        "xl/chartsheets/sheet1.bin",
+        "xl/drawings/drawing1.xml",
+        "xl/drawings/drawing2.xml"
+      ],
+      "native_reopen": "pass; slicers, timeline, filtered 9.5 result, and PivotChart007 reopened without repair"
+    },
+    "xls": {
+      "container": "CFB/OLE2 BIFF8 workbook",
+      "bytes": 34304,
+      "sha256": "6664ad779de5e965d5a153bafd11ec4a0d1fc0200d5d80d65b13eb5ac2c8b94c",
+      "file_description": "Composite Document File V2 Document, Microsoft Macintosh Excel",
+      "workbook_stream_bytes": 30187,
+      "boundsheet8_count": 4,
+      "native_sheet_order": [
+        "PivotChart007",
+        "Sheet2",
+        "Sheet1",
+        "Sheet3"
+      ],
+      "native_reopen": "pass without repair",
+      "native_pivot_and_filtered_result_retained": true,
+      "native_pivot_chart_retained": "PivotChart007 retained clustered column chart with North / Gadget / 9.5 observation",
+      "native_slicer_retained": false,
+      "native_timeline_retained": false,
+      "feature_loss_warning_accepted": true
+    }
+  },
+  "binary_record_invariants": {
+    "xlsx_xml_relationships": {
+      "workbook_sheets": {
+        "rId1": "PivotChart007 chartsheet",
+        "rId2": "Sheet2 worksheet / xl/worksheets/sheet1.xml",
+        "rId3": "Sheet1 worksheet / xl/worksheets/sheet2.xml",
+        "rId4": "Sheet3 worksheet / xl/worksheets/sheet3.xml",
+        "rId5": "pivotCacheDefinition1.xml",
+        "rId6": "slicerCache1.xml",
+        "rId7": "slicerCache2.xml",
+        "rId8": "timelineCache1.xml"
+      },
+      "sheet2_relationships": {
+        "rId1": "pivotTable1.xml",
+        "rId2": "drawing2.xml",
+        "rId3": "slicer1.xml",
+        "rId4": "timeline1.xml"
+      },
+      "chartsheet_relationships": {
+        "rId1": "drawing1.xml"
+      },
+      "drawing1_relationships": {
+        "rId1": "chart1.xml"
+      }
+    },
+    "xlsx_slicer_cache_xml": {
+      "slicerCache1": {
+        "part": "xl/slicerCaches/slicerCache1.xml",
+        "source": "Region",
+        "pivot_cache_id": 2018148052,
+        "items": 2,
+        "selected_item": "North"
+      },
+      "slicerCache2": {
+        "part": "xl/slicerCaches/slicerCache2.xml",
+        "source": "Product",
+        "pivot_cache_id": 2018148052,
+        "items": 2,
+        "selected_items": [
+          "Gadget",
+          "Widget"
+        ]
+      }
+    },
+    "xlsx_timeline_xml": {
+      "part": "xl/timelineCaches/timelineCache1.xml",
+      "source": "Date",
+      "pivot_cache_id": 2018148052,
+      "selection": [
+        "2026-02-01T00:00:00",
+        "2026-02-28T00:00:00"
+      ],
+      "bounds": [
+        "2026-01-01T00:00:00",
+        "2027-01-01T00:00:00"
+      ],
+      "filter_type": "dateBetween",
+      "root_has_mc_ignorable": true
+    },
+    "xlsx_drawing_anchors": [
+      {
+        "name": "Region",
+        "uri": "http://schemas.microsoft.com/office/drawing/2010/slicer",
+        "from": {
+          "col": 4,
+          "row": 2,
+          "col_off": 622300,
+          "row_off": 12700
+        },
+        "to": {
+          "col": 6,
+          "row": 14,
+          "col_off": 800100,
+          "row_off": 193672
+        },
+        "edit_as": "oneCell"
+      },
+      {
+        "name": "Product",
+        "uri": "http://schemas.microsoft.com/office/drawing/2010/slicer",
+        "from": {
+          "col": 7,
+          "row": 2,
+          "col_off": 584200,
+          "row_off": 0
+        },
+        "to": {
+          "col": 9,
+          "row": 14,
+          "col_off": 762000,
+          "row_off": 180972
+        },
+        "edit_as": "oneCell"
+      },
+      {
+        "name": "Date",
+        "uri": "http://schemas.microsoft.com/office/drawing/2012/timeslicer",
+        "from": {
+          "col": 4,
+          "row": 16,
+          "col_off": 609600,
+          "row_off": 88900
+        },
+        "to": {
+          "col": 8,
+          "row": 22,
+          "col_off": 647700,
+          "row_off": 190500
+        },
+        "edit_as": "oneCell"
+      }
+    ],
+    "xlsb_raw_records": {
+      "package_member_sizes": {
+        "xl/slicerCaches/slicerCache1.bin": 156,
+        "xl/slicerCaches/slicerCache2.bin": 160,
+        "xl/slicers/slicer1.bin": 240,
+        "xl/worksheets/sheet1.bin": "contains slicer extension records",
+        "xl/workbook.bin": 1371
+      },
+      "slicer_cache_parts": {
+        "slicerCache1.bin": [
+          "0x0433 BEGIN_SLICER_CACHE",
+          "0x0025 AC_BEGIN",
+          "0x0C00 UID",
+          "0x0026 AC_END",
+          "0x0435 BEGIN_SLICER_CACHE_DEF",
+          "0x043D SLICER_CACHE_PIVOT_TABLES",
+          "0x044C BEGIN_SLICER_CACHE_NATIVE",
+          "0x044E SLICER_CACHE_NATIVE_ITEM x2",
+          "0x044D END_SLICER_CACHE_NATIVE",
+          "0x0436 END_SLICER_CACHE_DEF",
+          "0x0434 END_SLICER_CACHE"
+        ],
+        "slicerCache2.bin": [
+          "0x0433 BEGIN_SLICER_CACHE",
+          "0x0025 AC_BEGIN",
+          "0x0C00 UID",
+          "0x0026 AC_END",
+          "0x0435 BEGIN_SLICER_CACHE_DEF",
+          "0x043D SLICER_CACHE_PIVOT_TABLES",
+          "0x044C BEGIN_SLICER_CACHE_NATIVE",
+          "0x044E SLICER_CACHE_NATIVE_ITEM x2",
+          "0x044D END_SLICER_CACHE_NATIVE",
+          "0x0436 END_SLICER_CACHE_DEF",
+          "0x0434 END_SLICER_CACHE"
+        ]
+      },
+      "slicer_view_records": [
+        "0x045B BEGIN_SLICERS",
+        "0x0025 AC_BEGIN / 0x0026 AC_END x2",
+        "0x0C00 UID x2",
+        "0x043B BEGIN_SLICER x2",
+        "0x043C END_SLICER x2",
+        "0x045C END_SLICERS"
+      ],
+      "sheet2_slicer_extension_records": [
+        "0x0437 BEGIN_SLICERS_EX",
+        "0x0439 BEGIN_SLICER_EX",
+        "0x043A END_SLICER_EX",
+        "0x0438 END_SLICERS_EX",
+        "0x0025/0x0026 AC wrappers x11",
+        "0x0C00 UID"
+      ],
+      "workbook_control_relationship_records": [
+        "0x042E BEGIN_SLICER_CACHE_IDS / 0x042F END",
+        "0x0430 BEGIN_SLICER_CACHE_ID x2 / 0x0431 END x2",
+        "0x0823 BEGIN_TIMELINE_CACHE_IDS / 0x0824 END",
+        "0x0825 BEGIN_TIMELINE_CACHE_ID / 0x0826 END"
+      ],
+      "pivot_table_records": {
+        "part": "xl/pivotTables/pivotTable1.bin",
+        "record_count": 142,
+        "bytes": 1236,
+        "families": [
+          "0x1388 BEGIN_SXVIEW",
+          "0x1389 END_SXVIEW",
+          "row/column/page/data field records",
+          "3 FRT pairs",
+          "2 AC pairs",
+          "2 UID records"
+        ]
+      },
+      "pivot_cache_records": {
+        "definition_part": "xl/pivotCache/pivotCacheDefinition1.bin",
+        "definition_record_count": 48,
+        "records_part": "xl/pivotCache/pivotCacheRecords1.bin",
+        "records_record_count": 10,
+        "records": "8 PCR_RECORD records between begin/end"
+      },
+      "chartsheet_records": {
+        "part": "xl/chartsheets/sheet1.bin",
+        "record_count": 13,
+        "bytes": 153,
+        "contains_chart_drawing": true
+      }
+    },
+    "xls_biff8_records": {
+      "workbook_stream_bytes": 30187,
+      "boundsheet8_count": 4,
+      "chart_sheet": {
+        "sheet": "PivotChart007",
+        "0x00EC MSODRAWING": 1,
+        "representative_chart_record_counts": {
+          "0x1001": 1,
+          "0x1002": 1,
+          "0x1003": 1,
+          "0x1006": 1,
+          "0x1007": 7,
+          "0x1009": 1,
+          "0x100A": 4,
+          "0x100B": 1,
+          "0x100D": 1,
+          "0x1014": 1,
+          "0x1015": 1,
+          "0x1017": 1,
+          "0x101D": 2,
+          "0x101E": 2,
+          "0x101F": 1,
+          "0x1020": 1,
+          "0x1021": 3,
+          "0x1022": 1,
+          "0x1024": 2,
+          "0x1025": 4,
+          "0x1026": 6,
+          "0x1027": 1,
+          "0x1032": 3,
+          "0x1033": 15,
+          "0x1034": 15,
+          "0x1041": 1,
+          "0x1044": 1,
+          "0x1045": 1,
+          "0x1046": 1,
+          "0x104F": 6,
+          "0x1051": 8,
+          "0x105F": 1,
+          "0x1062": 1,
+          "0x1064": 1,
+          "0x1065": 3,
+          "0x1066": 1
+        }
+      },
+      "pivot_sheet": {
+        "sheet": "Sheet2",
+        "0x005D OBJ": 1,
+        "0x00EC MSODRAWING": 1,
+        "0x00B0": 1,
+        "0x00B1": 6,
+        "0x00B2": 19,
+        "0x00B4": 2,
+        "0x00B5": 2,
+        "0x00B6": 1,
+        "0x0100": 6
+      },
+      "source_sheet": {
+        "sheet": "Sheet1",
+        "0x00BD cell records": 8,
+        "outline_sparkline_family_ids": {
+          "0x0867": 1,
+          "0x0871": 1,
+          "0x0872": 1,
+          "0x0877": 3,
+          "0x087F": 1,
+          "0x0895": 1
+        }
+      }
+    }
+  },
+  "reader_observations": {
+    "xlsx_cell_reader": {
+      "command": "cargo run --quiet -p litchi-xlsx --example read_xlsx -- test-data/microsoft-office/excel/excel-pivot-controls.xlsx",
+      "result": "pass",
+      "worksheet_names": [
+        "PivotChart007",
+        "Sheet2",
+        "Sheet1",
+        "Sheet3"
+      ],
+      "active_sheet": "Sheet2",
+      "sheet2_filtered_values": {
+        "B5": 9.5,
+        "C5": 9.5,
+        "B6": 9.5,
+        "C6": 9.5
+      },
+      "marker_values": {
+        "A11": "Fixture ID: excel-pivot-controls-007",
+        "A12": "PIVOT_UNFILTERED_TOTAL_007: 175.5",
+        "A13": "PIVOT_FILTERED_TOTAL_007: 9.5",
+        "A14": "REGION_NORTH_FEBRUARY_2026"
+      },
+      "source_date_readback": "numeric serial values in the generic cell reader; native Excel cells are dates",
+      "boundary": "The generic reader exposed the chartsheet entry and all worksheet values. It does not by itself provide a complete slicer, timeline, or PivotChart semantic API."
+    },
+    "xlsx_typed_control_probes": {
+      "package_open": "pass",
+      "workbook_open": "pass; sheets [PivotChart007, Sheet2, Sheet1, Sheet3], active Sheet2",
+      "slicer_cache_direct_read": "pass for slicerCache1.xml and slicerCache2.xml; each validates with one PivotTable binding",
+      "slicer_views_direct_read": "pass; two views: Region and Product",
+      "sheet2_slicer_parts_direct_load": "pass; count 1",
+      "workbook_sheet2_timelines": "error: invalid XLSX structure: View Cache reference rId8 must target an internal View Cache relationship",
+      "slicer_cache_package_load": "error: invalid XLSX structure: unreferenced Slicer Cache relationship rId6",
+      "timeline_cache_package_load": "error: invalid XLSX structure: View Cache reference rId8 must target an internal View Cache relationship",
+      "timeline_parts_package_load": "error: invalid XLSX structure: View Cache reference rId8 must target an internal View Cache relationship",
+      "timeline_cache_direct_read": "error: invalid XLSX structure: unexpected attribute 'Ignorable' on timelineCacheDefinition",
+      "timeline_views_direct_read": "error: invalid XLSX structure: unexpected attribute 'Ignorable' on timelines",
+      "boundary_interpretation": "The direct slicer XML reader succeeds, while the package graph and timeline codecs reject native Office extension relationship/attribute forms. These are reader boundaries observed against the native package."
+    },
+    "xlsb_typed_reader": {
+      "package_open": "pass",
+      "tolerance_report": {
+        "defects": [],
+        "unrecorded": 0
+      },
+      "workbook_open": "pass; worksheets [Sheet2, Sheet1, Sheet3], active worksheet index 0",
+      "chart_sheets": [
+        {
+          "index": 0,
+          "name": "PivotChart007",
+          "drawing_rel_id": "rId1"
+        }
+      ],
+      "slicer_cache_package_load": "error: Unrecognized slicer cache: missing BrtBeginSlicerCacheDef",
+      "timeline_cache_package_load": "error: Unrecognized timeline cache relationship: wrong type or external target",
+      "sheet2_materialization": "error: Unrecognized slicer views: unexpected record in view collection",
+      "sheet1_materialization": "pass; slicers None and timelines None for the source worksheet",
+      "sheet3_materialization": "error: Invalid format: invalid sparkline record family: record occurs after the worksheet FRT tail boundary",
+      "drawings": "two drawing parts parsed; native chart and control drawing XML relationships retained",
+      "boundary_interpretation": "The BIFF12 package opens and the raw controls are present. The typed control/materialization errors are parser boundaries, including strict record-family expectations around native Excel AC/UID wrappers."
+    },
+    "xls_typed_reader": {
+      "workbook_open": "pass; litchi_xls::Workbook::new",
+      "native_sheet_catalog": [
+        "PivotChart007",
+        "Sheet2",
+        "Sheet1",
+        "Sheet3"
+      ],
+      "public_worksheet_names_exposed": [
+        "Sheet2",
+        "Sheet3"
+      ],
+      "pivot_cache_count": 1,
+      "sheet2_pivot_tables": {
+        "count": 1,
+        "name": "PivotTable1",
+        "range_zero_based": {
+          "first_row": 2,
+          "last_row": 5,
+          "first_col": 0,
+          "last_col": 2
+        },
+        "cache_index": 0,
+        "row_field_count": 1,
+        "column_field_count": 1,
+        "page_field_count": 1,
+        "data_field_count": 1,
+        "field_axes": [
+          "None",
+          "Row",
+          "Column",
+          "Data",
+          "None",
+          "Page"
+        ],
+        "data_item": "Sum of Revenue"
+      },
+      "boundary": "The public generic worksheet catalog omits the native source Sheet1 and chartsheet even though raw BOUNDSHEET8 contains all four and the native XLS reopen retained the source data and chart. BIFF8 has no surfaced slicer or timeline API in this probe."
+    },
+    "public_api_surface_audit": {
+      "xlsx": [
+        "crates/litchi-xlsx/src/slicer/mod.rs",
+        "crates/litchi-xlsx/src/timeline/mod.rs",
+        "crates/litchi-xlsx/src/workbook/model.rs:1602 Worksheet::timelines"
+      ],
+      "xlsb": [
+        "crates/litchi-xlsb/src/package/mod.rs:127 slicer caches",
+        "crates/litchi-xlsb/src/package/mod.rs:177 timeline caches",
+        "crates/litchi-xlsb/src/sheet.rs:372 slicers",
+        "crates/litchi-xlsb/src/sheet.rs:377 timelines",
+        "crates/litchi-xlsb/src/workbook/model.rs:231 chart sheets"
+      ],
+      "xls": [
+        "crates/litchi-xls/src/workbook/model.rs:260 pivot caches",
+        "crates/litchi-xls/src/workbook/model.rs:306 worksheet pivot tables",
+        "No litchi-xls slicer or timeline API was found in the audited source tree"
+      ]
+    }
+  },
+  "files": [
+    {
+      "path": "test-data/microsoft-office/excel/excel-visual-analytics.xlsx",
+      "format": "xlsx",
+      "bytes": 16951,
+      "sha256": "6d4326832690c1c004e3881eae21e2e7614050b67f2824c191fc0d4b06b1875d",
+      "role": "native source baseline; hash unchanged"
+    },
+    {
+      "path": "test-data/microsoft-office/excel/excel-pivot-controls.xlsx",
+      "format": "xlsx",
+      "bytes": 28115,
+      "sha256": "24c9b605f4241d89913f8cdd1ae75047d550fd2a8ed9ad3c731a13cce6d3b2ef",
+      "container_kind": "OPC ZIP",
+      "member_count": 35,
+      "native_reopen_validation": "pass without repair; slicers, timeline, filtered pivot, and chart retained"
+    },
+    {
+      "path": "test-data/microsoft-office/excel/excel-pivot-controls.xlsb",
+      "format": "xlsb",
+      "bytes": 24260,
+      "sha256": "bba0bc362bc05aad7b14804eac851e0b8eafe59d90c619acd266cba725b2d4bd",
+      "container_kind": "OPC ZIP with BIFF12 binary parts",
+      "member_count": 39,
+      "native_reopen_validation": "pass without repair; slicers, timeline, filtered pivot, and chart retained"
+    },
+    {
+      "path": "test-data/microsoft-office/excel/excel-pivot-controls.xls",
+      "format": "xls",
+      "bytes": 34304,
+      "sha256": "6664ad779de5e965d5a153bafd11ec4a0d1fc0200d5d80d65b13eb5ac2c8b94c",
+      "container_kind": "CFB/OLE2 BIFF8",
+      "workbook_stream_bytes": 30187,
+      "boundsheet8_count": 4,
+      "native_reopen_validation": "pass without repair; PivotTable and PivotChart retained, slicer/timeline controls absent after legacy save"
+    }
+  ],
+  "validation_methods": [
+    "Computed SHA-256 and byte sizes from the closed final streams; the source baseline hash was rechecked.",
+    "Checked ZIP central-directory member counts and integrity for XLSX and XLSB.",
+    "Inspected OOXML workbook, worksheet, relationship, slicer, timeline, pivot, chart, and drawing parts read-only.",
+    "Inspected BIFF12 binary record families with the repository dump tooling and recorded the native slicer, timeline-reference, pivot, chart, and inherited sparkline families.",
+    "Inspected the BIFF8 Workbook stream with the repository dump_xls_records example; no legacy bytes were regenerated.",
+    "Ran the existing litchi-xlsx read_xlsx example against excel-pivot-controls.xlsx and recorded direct typed-part and package-graph outcomes.",
+    "Ran read-only litchi-xlsb and litchi-xls typed probes; parser boundaries are preserved verbatim above.",
+    "Native Excel close, reopen, warning choices, control selections, filtered values, and chart observations came from the root Computer Use session; this inspection process did not operate the Office UI."
+  ],
+  "native_ui_observation_source": "Root agent Computer Use session; native Microsoft Excel authored the three final files, reopened each without a repair prompt, verified Region=North, Product=Gadget+Widget, Date=February 2026, PivotTable total 9.5, and PivotChart007, then closed all files before hashing."
+}

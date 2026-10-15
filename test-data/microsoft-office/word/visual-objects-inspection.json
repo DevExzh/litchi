@@ -1,0 +1,667 @@
+{
+  "schema_version": 1,
+  "fixture_id": "word-visual-objects-007",
+  "generated_on": "2026-10-15",
+  "purpose": "Fixture-specific, read-only inspection of native Microsoft Word inline and floating pictures, a DrawingML/VML rounded rectangle, an embedded Excel worksheet, and a native doughnut chart across DOCX, DOC, and RTF derivatives.",
+  "provenance": {
+    "producer_app": "Microsoft Office Word",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft Word UI",
+    "source": "Synthetic content was entered and formatted in a native Word document. The DOC was produced by native Word Save As from the DOCX, then closed and reopened. The RTF was produced by native Word Save As from the reopened DOCX; it was not produced from the DOC chain.",
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "all_documents_closed_before_hashing": true,
+    "fixture_files_are_closed_after_reopen": true
+  },
+  "files": [
+    {
+      "path": "test-data/microsoft-office/word/word-visual-objects.docx",
+      "format": "docx",
+      "bytes": 169925,
+      "sha256": "9a4ed67e560b1fac85ba3dec56e3d613862051a1a377cce9616db2795e5a74c4"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-visual-objects.doc",
+      "format": "doc",
+      "bytes": 229376,
+      "sha256": "97911f12253131e23b1dd69f92329a891476bdb09bc9b3fb18a6bace7c075bf4"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-visual-objects.rtf",
+      "format": "rtf",
+      "bytes": 1005978,
+      "sha256": "25a188525ac0c8c83b61ce1f38a4a894f356029f815406bd01e0db8e87daf909"
+    }
+  ],
+  "docx": {
+    "container": {
+      "kind": "OPC ZIP",
+      "zip_test": "pass",
+      "xml_validation": "pass",
+      "member_count": 20,
+      "xml_part_count": 15,
+      "external_targets": [],
+      "relationships": {
+        "document": {
+          "rId1": "word/styles.xml",
+          "rId2": "word/settings.xml",
+          "rId3": "word/webSettings.xml",
+          "rId4": "word/media/image1.jpg",
+          "rId5": "word/media/image2.png",
+          "rId6": "word/media/image3.emf",
+          "rId7": "word/embeddings/Microsoft_Excel_Worksheet.xlsx",
+          "rId8": "word/charts/chart1.xml",
+          "rId9": "word/fontTable.xml",
+          "rId10": "word/theme/theme1.xml"
+        },
+        "chart1": {
+          "rId1": "../charts/style1.xml",
+          "rId2": "../charts/colors1.xml",
+          "rId3": "../embeddings/Microsoft_Excel_Worksheet1.xlsx"
+        },
+        "target_check": "pass"
+      },
+      "parts": [
+        {
+          "path": "[Content_Types].xml",
+          "bytes": 1906,
+          "sha256": "4d220bbfae76fd5259ccf0b6d20517da89e981fac60848bdace0feb5449c8af6"
+        },
+        {
+          "path": "word/document.xml",
+          "bytes": 15415,
+          "sha256": "177d4d84efb0e1ea5ce99d0d5d3dbf4d729f53fb55ea11c3dd213484a5d96c02"
+        },
+        {
+          "path": "word/_rels/document.xml.rels",
+          "bytes": 1506,
+          "sha256": "3a224d642ff4d1bc5c2095d130ab791366228c6273576bb3e3ecbab687f232a9"
+        },
+        {
+          "path": "word/media/image1.jpg",
+          "bytes": 83204,
+          "sha256": "b6f8d168d41e0fc296eb1e0e3855d9669584b7528c2ef4966817443d9bc9b929"
+        },
+        {
+          "path": "word/media/image2.png",
+          "bytes": 1698,
+          "sha256": "d594d8f832d3ab38d03e0d06316d2fa5e401217e50e21e01814e593d752da3e8"
+        },
+        {
+          "path": "word/media/image3.emf",
+          "bytes": 74428,
+          "sha256": "2585e48c4e95e526a3ca2cf32e14354d2bbb43b0d98bff7d4906870071a2c4a3"
+        },
+        {
+          "path": "word/embeddings/Microsoft_Excel_Worksheet.xlsx",
+          "bytes": 18372,
+          "sha256": "c4937954a07d192200a9a4cb17d016c345be840dff727f25e39e2d1cf65e866"
+        },
+        {
+          "path": "word/charts/chart1.xml",
+          "bytes": 7107,
+          "sha256": "c5ac8222b1f65005f190d16e803c8bda60e02f466756fb23922d3f57f9b067a9"
+        },
+        {
+          "path": "word/charts/style1.xml",
+          "bytes": 9937,
+          "sha256": "c1f9ed46ee58a42fd84eb085275cae0e1393d54b72a5a5fe9ece81381636b69f"
+        },
+        {
+          "path": "word/charts/colors1.xml",
+          "bytes": 878,
+          "sha256": "04fefba7d31853fa0aa636e5c8b8e308fc3126a9b48a1f4490947fff91d5a92f"
+        },
+        {
+          "path": "word/embeddings/Microsoft_Excel_Worksheet1.xlsx",
+          "bytes": 9894,
+          "sha256": "4e988e3f496ad305c02e39b2e4dc7349867c2c79aa69e0809bc63e99829864a2"
+        },
+        {
+          "path": "word/charts/_rels/chart1.xml.rels",
+          "bytes": 562,
+          "sha256": "242cf6a127ab9f66ca1cfca8fc8648189d131018fdb857bbfef07e8e35035bfd"
+        }
+      ]
+    },
+    "main_document": {
+      "markers": [
+        "WORD_VISUAL_OBJECTS_007",
+        "Fixture ID: word-visual-objects-007",
+        "INLINE_IMAGE_007",
+        "FLOATING_IMAGE_007",
+        "OLE_WORKBOOK_007",
+        "CHART_007"
+      ],
+      "page_layout": {
+        "page_count_from_app_properties": 3,
+        "page_break_elements": 2,
+        "last_rendered_page_breaks": 2,
+        "page_1": [
+          "WORD_VISUAL_OBJECTS_007",
+          "Fixture ID: word-visual-objects-007",
+          "INLINE_IMAGE_007",
+          "FLOATING_IMAGE_007",
+          "SHAPE_TEXTBOX_007"
+        ],
+        "page_2": [
+          "OLE_WORKBOOK_007"
+        ],
+        "page_3": [
+          "CHART_007"
+        ]
+      },
+      "xml_counts": {
+        "p": 13,
+        "r": 17,
+        "t": 10,
+        "tbl": 0,
+        "sdt": 0,
+        "wp:inline": 2,
+        "wp:anchor": 2,
+        "pic:pic": 2,
+        "a:graphic": 4,
+        "a:blip": 2,
+        "a:prstGeom": 3,
+        "wps:wsp": 1,
+        "wpg:wgp": 0,
+        "wp:docPr": 4,
+        "wp:extent": 4,
+        "c:chart": 1,
+        "o:OLEObject": 1,
+        "v:shape": 1,
+        "v:imagedata": 1
+      },
+      "text_projection": [
+        "WORD_VISUAL_OBJECTS_007",
+        "Fixture ID: word-visual-objects-007",
+        "INLINE_IMAGE_007",
+        "SHAPE_TEXTBOX_007",
+        "Native rounded rectangle",
+        "FLOATING_IMAGE_007",
+        "OLE_WORKBOOK_007",
+        "CHART_007"
+      ],
+      "pictures": {
+        "inline_jpeg": {
+          "marker": "INLINE_IMAGE_007",
+          "relationship": "rId4",
+          "part": "word/media/image1.jpg",
+          "source": "test-data/images/jpg/abstract1.jpg",
+          "source_bytes": 83204,
+          "source_sha256": "b6f8d168d41e0fc296eb1e0e3855d9669584b7528c2ef4966817443d9bc9b929",
+          "package_part_byte_equal_to_source": true,
+          "docPr_id": "1586275191",
+          "docPr_name": "Picture 1",
+          "alt_text": "INLINE_ALT_007: abstract JPEG with overlapping colored curves.",
+          "extent_emu": {
+            "cx": 2743200,
+            "cy": 2057400
+          },
+          "extent_inches": {
+            "width": 3.0,
+            "height": 2.25
+          },
+          "drawing_kind": "wp:inline"
+        },
+        "floating_png": {
+          "marker": "FLOATING_IMAGE_007",
+          "relationship": "rId5",
+          "part": "word/media/image2.png",
+          "source": "test-data/iwork/keynote/media-replacement-assets/poster.png",
+          "source_dimensions_pixels": {
+            "width": 320,
+            "height": 180
+          },
+          "source_bytes": 1698,
+          "source_sha256": "d594d8f832d3ab38d03e0d06316d2fa5e401217e50e21e01814e593d752da3e8",
+          "package_part_byte_equal_to_source": true,
+          "docPr_id": "948982246",
+          "docPr_name": "Picture 2",
+          "alt_text": "FLOATING_ALT_007: synthetic PNG poster anchored at middle right with square wrapping.",
+          "extent_emu": {
+            "cx": 1828800,
+            "cy": 1028700
+          },
+          "extent_inches": {
+            "width": 2.0,
+            "height": 1.125
+          },
+          "anchor": {
+            "drawing_kind": "wp:anchor",
+            "horizontal_relative_to": "margin",
+            "horizontal_alignment": "right",
+            "vertical_relative_to": "margin",
+            "vertical_alignment": "center",
+            "wrap": "square",
+            "wrap_text": "bothSides"
+          }
+        }
+      },
+      "shape": {
+        "marker": "SHAPE_TEXTBOX_007",
+        "drawing_kind": "wps:wsp in wp:anchor",
+        "docPr_id": "1925752799",
+        "docPr_name": "Rounded Rectangle 3",
+        "preset_geometry": "roundRect",
+        "extent_emu": {
+          "cx": 2984500,
+          "cy": 939800
+        },
+        "extent_inches_approx": {
+          "width": 3.26,
+          "height": 1.03
+        },
+        "text": [
+          "SHAPE_TEXTBOX_007",
+          "Native rounded rectangle"
+        ],
+        "anchor": {
+          "horizontal_relative_to": "column",
+          "horizontal_offset_emu": 38100,
+          "vertical_relative_to": "paragraph",
+          "vertical_offset_emu": 741045,
+          "wrap": "none",
+          "behind_document": false
+        },
+        "native_style": "Default Word rounded rectangle with theme teal fill/stroke, in front of text.",
+        "legacy_fallback": {
+          "present": true,
+          "kind": "VML v:roundrect",
+          "wrap_style": "square",
+          "duplicate_text_markers": true
+        }
+      },
+      "embedded_excel_worksheet": {
+        "marker": "OLE_WORKBOOK_007",
+        "relationship": "rId7",
+        "part": "word/embeddings/Microsoft_Excel_Worksheet.xlsx",
+        "ole_attributes": {
+          "Type": "Embed",
+          "ProgID": "Excel.Sheet.12",
+          "ShapeID": "_x0000_i1025",
+          "DrawAspect": "Content",
+          "ObjectID": "_1853584133"
+        },
+        "vml_preview": {
+          "relationship": "rId6",
+          "kind": "v:imagedata",
+          "format": "EMF",
+          "part": "word/media/image3.emf",
+          "shape_style": "196pt x 81pt with square wrap"
+        },
+        "payload_markers": [
+          "EXCEL_NATIVE_END",
+          "SUMMARY_NATIVE_END"
+        ],
+        "payload_source": "test-data/microsoft-office/excel/excel-values-formulas-chart.xlsx",
+        "payload_source_bytes": 18686,
+        "payload_source_sha256": "7b9b6602d687d3b0f65915611723c1cc60934e6ecca9c54bec44403904afbd57",
+        "embedded_bytes": 18372,
+        "embedded_sha256": "c4937954a07d192200a9a4cb17d016c345be840dff727f25e39e2d1cf65e866",
+        "source_package_member_count": 22,
+        "embedded_package_member_count": 21,
+        "source_and_embedded_byte_equal": false,
+        "observed_difference": "Native Word rewrote the embedded workbook; the embedded package omits the source xl/calcChain.xml while retaining the worksheet values and synthetic semantic markers. No source workbook bytes were changed."
+      },
+      "chart": {
+        "marker": "CHART_007",
+        "relationship": "rId8",
+        "part": "word/charts/chart1.xml",
+        "drawing_kind": "wp:inline",
+        "extent_emu": {
+          "cx": 5486400,
+          "cy": 3200400
+        },
+        "extent_inches": {
+          "width": 6.0,
+          "height": 3.5
+        },
+        "chart_type": "doughnut",
+        "series_name": "Sales",
+        "categories": [
+          "1st Qtr",
+          "2nd Qtr",
+          "3rd Qtr",
+          "4th Qtr"
+        ],
+        "values_displayed_in_native_ui": [
+          8.2,
+          3.2,
+          1.4,
+          1.2
+        ],
+        "values_in_chart_cache": [
+          "8.1999999999999993",
+          "3.2",
+          "1.4",
+          "1.2"
+        ],
+        "formulas": {
+          "series_name": "Sheet1!$B$1",
+          "categories": "Sheet1!$A$2:$A$5",
+          "values": "Sheet1!$B$2:$B$5"
+        },
+        "xml_features": {
+          "doughnutChart": 1,
+          "series": 1,
+          "data_points": 4,
+          "data_label_groups": 2,
+          "category_string_references": 2,
+          "numeric_references": 1,
+          "external_data_relationship": "rId3",
+          "hole_size_percent": 75,
+          "data_callouts": {
+            "enabled_in_native_ui": true,
+            "show_category_name": true,
+            "show_percentage": true,
+            "visual_labels_percent": [
+              58,
+              23,
+              10,
+              9
+            ]
+          }
+        },
+        "chart_data_workbook": {
+          "part": "word/embeddings/Microsoft_Excel_Worksheet1.xlsx",
+          "bytes": 9894,
+          "sha256": "4e988e3f496ad305c02e39b2e4dc7349867c2c79aa69e0809bc63e99829864a2",
+          "source_relation": "Word-generated chart data package; it is separate from the worksheet OLE payload and is not claimed as byte-identical to the source Excel workbook."
+        }
+      }
+    },
+    "library_projection": {
+      "read_example": {
+        "command": "cargo run -q -p litchi-docx --example read_docx -- test-data/microsoft-office/word/word-visual-objects.docx",
+        "exit_code": 0,
+        "paragraph_count": 9,
+        "table_count": 0,
+        "text_bytes": 160,
+        "text_contains": [
+          "WORD_VISUAL_OBJECTS_007",
+          "Fixture ID: word-visual-objects-007",
+          "INLINE_IMAGE_007",
+          "SHAPE_TEXTBOX_007",
+          "FLOATING_IMAGE_007",
+          "OLE_WORKBOOK_007",
+          "CHART_007"
+        ],
+        "scope": "The DOCX reader exposes paragraph text and markers. This probe does not claim picture layout, DrawingML shape semantics, OLE extraction, or chart rendering support."
+      }
+    },
+    "part_presence": {
+      "drawings": true,
+      "pictures": true,
+      "charts": true,
+      "embedded_ole_workbook": true,
+      "vml_fallback": true,
+      "vba_project": false,
+      "notes": false,
+      "headers": false,
+      "footers": false
+    }
+  },
+  "doc": {
+    "container": {
+      "kind": "Compound Document File V2 / CFB-OLE",
+      "file_identification": "Composite Document File V2 Document, Little Endian, MacOS, code page 10000",
+      "template": "Normal.dotm",
+      "application": "Microsoft Office Word",
+      "revision": 2,
+      "pages": 3,
+      "words": 13,
+      "characters": 173,
+      "security": 0,
+      "reader_word_version": "Word 97",
+      "reader_fib_version_hex": "0x00C1"
+    },
+    "compound_file_streams": {
+      "stream_count": 16,
+      "streams": [
+        {
+          "path": "/Data",
+          "bytes": 153938
+        },
+        {
+          "path": "/1Table",
+          "bytes": 12124
+        },
+        {
+          "path": "/ObjectPool/_1853584064/Package",
+          "bytes": 18372,
+          "semantic_role": "embedded Excel worksheet payload"
+        },
+        {
+          "path": "/ObjectPool/_1853584157/Workbook",
+          "bytes": 30785,
+          "semantic_role": "embedded chart object workbook"
+        },
+        {
+          "path": "/WordDocument",
+          "bytes": 5353
+        },
+        {
+          "path": "/ObjectPool/_1853584064/\\u0001Ole",
+          "bytes": 20
+        },
+        {
+          "path": "/ObjectPool/_1853584064/\\u0001CompObj",
+          "bytes": 97
+        },
+        {
+          "path": "/ObjectPool/_1853584064/\\u0003ObjInfo",
+          "bytes": 6
+        },
+        {
+          "path": "/ObjectPool/_1853584157/\\u0001Ole",
+          "bytes": 20
+        },
+        {
+          "path": "/ObjectPool/_1853584157/\\u0001CompObj",
+          "bytes": 78
+        },
+        {
+          "path": "/ObjectPool/_1853584157/\\u0003ObjInfo",
+          "bytes": 6
+        },
+        {
+          "path": "/ObjectPool/_1853584157/\\u0005SummaryInformation",
+          "bytes": 228
+        },
+        {
+          "path": "/ObjectPool/_1853584157/\\u0005DocumentSummaryInformation",
+          "bytes": 276
+        },
+        {
+          "path": "/\\u0001CompObj",
+          "bytes": 114
+        },
+        {
+          "path": "/\\u0005SummaryInformation",
+          "bytes": 420
+        },
+        {
+          "path": "/\\u0005DocumentSummaryInformation",
+          "bytes": 280
+        }
+      ],
+      "object_pool_storages": [
+        {
+          "storage": "_1853584064",
+          "object_class": "Excel.Sheet.12",
+          "contains": [
+            "\\u0001Ole",
+            "Package",
+            "\\u0001CompObj",
+            "\\u0003ObjInfo"
+          ]
+        },
+        {
+          "storage": "_1853584157",
+          "object_class": "Excel.Chart.8",
+          "contains": [
+            "\\u0001Ole",
+            "\\u0001CompObj",
+            "\\u0003ObjInfo",
+            "Workbook",
+            "\\u0005SummaryInformation",
+            "\\u0005DocumentSummaryInformation"
+          ]
+        }
+      ]
+    },
+    "read_example": {
+      "command": "cargo run -q -p litchi-doc --example read_doc -- test-data/microsoft-office/word/word-visual-objects.doc",
+      "exit_code": 0,
+      "paragraph_count": 13,
+      "table_count": 0,
+      "total_characters": 232,
+      "text_contains": [
+        "WORD_VISUAL_OBJECTS_007",
+        "Fixture ID: word-visual-objects-007",
+        "INLINE_IMAGE_007",
+        "FLOATING_IMAGE_007",
+        "OLE_WORKBOOK_007",
+        "EMBED Excel.Sheet.12",
+        "CHART_007",
+        "EMBED Excel.Chart.8 \\s",
+        "SHAPE_TEXTBOX_007",
+        "Native rounded rectangle"
+      ],
+      "scope": "The DOC reader exposes legacy object/control and text projections. It does not establish semantic equivalence of the DrawingML picture, VML shape, OLE workbook, or chart rendering."
+    },
+    "textutil_read_only": {
+      "command": "textutil -convert txt -stdout test-data/microsoft-office/word/word-visual-objects.doc",
+      "exit_code": 0,
+      "observed": "Extracted text retains the page markers, EMBED Excel.Sheet.12, EMBED Excel.Chart.8 \\s, and rounded-rectangle text, with form-feed page separators."
+    },
+    "native_conversion_scope": "This is a native Word 97-2003 derivative of the DOCX. The CFB ObjectPool proves separate worksheet and chart objects, but the legacy binary format is not claimed to preserve the DOCX OPC relationship graph byte-for-byte."
+  },
+  "rtf": {
+    "container": {
+      "kind": "Rich Text Format data, version 1, ANSI, code page 1252",
+      "external_targets": []
+    },
+    "markers": {
+      "WORD_VISUAL_OBJECTS_007": 1,
+      "Fixture ID: word-visual-objects-007": 1,
+      "INLINE_IMAGE_007": 1,
+      "FLOATING_IMAGE_007": 1,
+      "SHAPE_TEXTBOX_007": 2,
+      "Native rounded rectangle": 2,
+      "OLE_WORKBOOK_007": 1,
+      "CHART_007": 1
+    },
+    "raw_control_counts": {
+      "shppict": 3,
+      "pict": 8,
+      "pngblip": 2,
+      "jpegblip": 1,
+      "object": 2,
+      "objemb": 2,
+      "objclass": 2,
+      "objdata": 2,
+      "result": 2,
+      "ilvl1": 1,
+      "mmathPr": 2,
+      "field": 0,
+      "fldinst": 0,
+      "fldrslt": 0,
+      "chart": 0
+    },
+    "binary_objects": [
+      {
+        "object_index": 1,
+        "class": "Excel.Sheet.12",
+        "controls": {
+          "objemb": true,
+          "objw": 3920,
+          "objh": 1620
+        },
+        "objdata_decoded_bytes": 39153,
+        "objdata_sha256": "368367529b1ebf212145b1f211bc7916e593f7f03f0a9e02c1ec06fb98a56151",
+        "ole_cfb_signature_offset": 39,
+        "objdata_is_hex_encoded_in_rtf": true
+      },
+      {
+        "object_index": 2,
+        "class": "Excel.Chart.8",
+        "controls": {
+          "objemb": true,
+          "objsetsize": true,
+          "objw": 9041,
+          "objh": 5291,
+          "objscalex": 96,
+          "objscaley": 96
+        },
+        "objdata_decoded_bytes": 42730,
+        "objdata_sha256": "104c33abd4f333e120bd55b551c3c97e8430c9c2a5e79f0db745648e9ffef9c8",
+        "ole_cfb_signature_offset": 38,
+        "objdata_is_hex_encoded_in_rtf": true
+      }
+    ],
+    "read_example": {
+      "command": "cargo run -q -p litchi-rtf --example parse_rtf -- test-data/microsoft-office/word/word-visual-objects.rtf",
+      "exit_code": 1,
+      "error": "MalformedDocument(\"RTF data-store payload cannot be empty\")",
+      "scope": "No semantic litchi-rtf parse claim is made for this native RTF fixture."
+    },
+    "textutil_read_only": {
+      "command": "textutil -convert txt -stdout test-data/microsoft-office/word/word-visual-objects.rtf",
+      "exit_code": 0,
+      "observed": "Extracted text retains the page markers and object boundaries but omits the rounded-rectangle text and visual object payloads."
+    },
+    "semantic_scope": "Native RTF binary object groups and picture fallbacks are recorded as raw controls and decoded objdata. The RTF reader rejection is a library boundary for this fixture, not evidence that Word produced a corrupt file."
+  },
+  "conversion_comparison": {
+    "docx_to_doc": {
+      "source_chain": "Native Word DOCX Save As DOC; DOC was then closed and reopened in Word.",
+      "native_visual_result": "Word reopened the legacy document without repair and displayed the two pictures, rounded rectangle, worksheet, and doughnut chart.",
+      "representation_change": [
+        "OPC relationships and DrawingML chart/picture parts become CFB WordDocument/Data streams and ObjectPool OLE/picture objects.",
+        "The worksheet and chart are separate legacy ObjectPool storages with Excel.Sheet.12 and Excel.Chart.8 classes.",
+        "The DOC binary does not contain the DOCX inline/floating alt-text strings as raw ASCII; this is a measured binary difference, but it is not by itself a proof that Word's legacy object metadata is semantically absent."
+      ],
+      "library_observation": "The DOC reader returns text/control projections and EMBED object classes; it does not expose the DOCX anchor, alt-text, chart-cache, or worksheet-package semantics."
+    },
+    "docx_to_rtf": {
+      "source_chain": "Native Word DOCX Save As RTF from the reopened DOCX; no DOC-to-RTF conversion was used.",
+      "native_visual_result": "Word reopened the RTF without repair and displayed the two pictures, rounded rectangle, worksheet, and doughnut chart with the same visible callouts.",
+      "representation_change": [
+        "Structured DrawingML/VML and OLE content becomes RTF picture controls plus two hex-encoded binary OLE objdata groups.",
+        "The RTF retains the two supplied picture alt-text strings as raw metadata text and repeats the shape text in its shape/fallback groups.",
+        "The RTF has no chart control or field control groups in the raw scan; chart and worksheet semantics are carried by the native OLE objects and picture fallbacks instead."
+      ],
+      "library_observation": "The RTF reader rejects the file before semantic projection with MalformedDocument(\"RTF data-store payload cannot be empty\"), while macOS textutil extracts only the page markers and object boundaries."
+    }
+  },
+  "native_ui_validation": {
+    "observed_by": "root agent via Computer Use",
+    "application": "Microsoft Word",
+    "version": "16.110.2",
+    "build": "16.110.26062818",
+    "platform": "macOS",
+    "reopen": "pass for DOCX, DOC, and RTF",
+    "repair_prompt": false,
+    "observations": [
+      "DOCX reopened with the inline JPEG, middle-right floating PNG with square wrapping, in-front rounded rectangle, embedded Excel worksheet, and doughnut chart.",
+      "DOC reopened without repair and displayed both pictures, the rounded rectangle, the embedded worksheet, and the chart as legacy embedding/picture objects with the same chart callouts.",
+      "RTF reopened without repair and displayed both pictures, the rounded rectangle, the embedded worksheet, and the chart as RTF embedding/picture objects with the same chart callouts.",
+      "The chart was a native doughnut chart with Sales values 8.2, 3.2, 1.4, and 1.2 for 1st Qtr through 4th Qtr; native data callouts showed 58%, 23%, 10%, and 9%."
+    ],
+    "semantic_scope": "Native UI observations establish Word save/close/reopen acceptance and visible content for the listed objects. They do not establish rendering equivalence, field refresh behavior, object editability in another application, or library support beyond the recorded package and reader probes."
+  },
+  "known_limits": [
+    "Markers alone do not prove a visual object was rendered or retained; the package relationships, object parts, and native reopen observations provide the evidence used here.",
+    "The DOCX rounded rectangle has both DrawingML and a VML fallback, and its fallback repeats the shape text. Duplicate marker occurrences in the XML and RTF are therefore expected.",
+    "The source JPEG and PNG are byte-identical to their DOCX media parts, but Word rewrote the embedded worksheet package: the source has 22 ZIP members and the embedded OLE package has 21, with xl/calcChain.xml omitted. No source workbook bytes were changed.",
+    "The chart's Sales label is the series name in the chart cache; this fixture does not claim a separate chart-title text element.",
+    "The DOC and RTF contain legacy OLE/picture representations. Their native visual acceptance does not establish semantic parity with the DOCX DrawingML, chart XML, or source Excel package.",
+    "The RTF reader currently rejects this native file with MalformedDocument(\"RTF data-store payload cannot be empty\"), so the raw RTF controls and native Word reopen are the only RTF evidence recorded here.",
+    "This fixture covers these concrete pictures, one rounded rectangle, one embedded worksheet, and one doughnut chart. It does not claim coverage of SmartArt, connectors, grouped drawings, text wrapping modes beyond the recorded anchors, chart types other than doughnut, or other OLE classes."
+  ]
+}

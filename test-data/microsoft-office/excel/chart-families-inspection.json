@@ -1,0 +1,2277 @@
+{
+  "schema_version": 1,
+  "fixture_id": "excel-chart-families-013",
+  "generated_on": "2026-10-15",
+  "purpose": "Fixture-specific, read-only inspection of three native Microsoft Excel derivatives covering seventeen embedded classic chart families, chart caches, error bars, trendlines, secondary axes, 3-D and stock views, native SVG plus raster fallback drawing storage, BIFF12 chart resources, and BIFF8 chart substreams.",
+  "provenance": {
+    "producer_app": "Microsoft Office Excel",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "package_application": "Microsoft Macintosh Excel",
+    "package_app_version": "16.0300",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft Excel UI",
+    "source": "NativeExcelBook7 was authored in Excel with deterministic chart source ranges and one native SVG picture. Seventeen embedded charts were created or changed through the native Insert/Chart UI; the source XLSX was saved as XLSB, closed, and the original XLSX was reopened and saved as legacy XLS.",
+    "native_save_chain": [
+      "xlsx",
+      "xlsb",
+      "xlsx reopen",
+      "xls"
+    ],
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "temporary_probe_harnesses_outside_checkout": true,
+    "all_documents_closed_before_hashing": true,
+    "lock_files_present_at_inspection": false
+  },
+  "scope_and_limits": {
+    "native_variants": [
+      "xlsx",
+      "xlsb",
+      "xls"
+    ],
+    "native_excel_reopen_verified": true,
+    "repair_or_conversion_prompt_observed": false,
+    "legacy_xls_warning": {
+      "shown": true,
+      "accepted": true,
+      "feature_loss_warning_accepted": true,
+      "observed": "Legacy XLS reopening retained the SVG picture as a native raster fallback with alt text; complete chart-family parity is not claimed."
+    },
+    "chart_title_policy": "Native chart titles remained at Excel defaults; worksheet names provide deterministic chart-family identifiers.",
+    "chart_semantic_parity_claimed": false,
+    "rendering_parity_claimed": false,
+    "vba_payload_present": false,
+    "macro_execution": false,
+    "external_links_followed": false,
+    "reader_boundary": "Raw package and BIFF inventories establish stored chart and drawing resources. The generic reader examples expose cells/text and bounded chart/drawing package parts; they do not provide an Excel renderer, complete chart-family semantic round-trip, or a native UI equivalence guarantee.",
+    "format_boundaries": {
+      "xlsx": "Transitional SpreadsheetML stores all 17 chart XML payloads, 18 drawing parts, explicit caches, and the SVG/raster drawing relationship.",
+      "xlsb": "BIFF12 worksheet/workbook/index streams coexist with the same 17 native XML chart payloads and 18 DrawingML parts; chart XML hashes match XLSX.",
+      "xls": "BIFF8 stores 18 worksheet BOUNDSHEET entries, 17 nested embedded-chart substreams, and one worksheet without a chart host for the SVG marker; generic litchi-xls reading exposes only the SVG worksheet in this probe."
+    },
+    "coverage_rows": {
+      "xlsx-236": "Direct native embedded classic chart-family package evidence across 17 chart parts; complete chart rendering or chart-sheet coverage beyond existing fixtures is not claimed.",
+      "xlsx-239": "Direct existing worksheet SVG picture with raster fallback, two-cell geometry, alt text, and native Excel reopen evidence.",
+      "xlsb-309": "Workbook contains 17 chart resources and 18 worksheet/drawing binary relationships; standalone chart-sheet semantics remain bounded.",
+      "xlsb-310": "Direct native embedded chart resources and DrawingML relationships across 17 chart parts.",
+      "xls-182": "Direct BIFF8 chart-substream evidence across 17 native embedded chart hosts and 18 BOUNDSHEET entries.",
+      "explicit_complete_chart_boundaries": [
+        "xlsx-269",
+        "xlsb-334",
+        "xls-194"
+      ]
+    }
+  },
+  "expected_native_content": {
+    "workbook_name": "NativeExcelBook7",
+    "worksheet_order": [
+      "Line_013",
+      "Area_013",
+      "Pie_013",
+      "Radar_013",
+      "Surface_013",
+      "Scatter_013",
+      "Bubble_013",
+      "DrawingSVG_013",
+      "Bar_013",
+      "Bar3D_013",
+      "Area3D_013",
+      "Line3D_013",
+      "Contour_013",
+      "Doughnut_013",
+      "OfPie_013",
+      "Pie3D_013",
+      "Stock_013",
+      "Combo_013"
+    ],
+    "common_categorical_source": {
+      "range": "A1:D6",
+      "headers": [
+        "Category",
+        "SERIES_A_013",
+        "SERIES_B_013",
+        "SERIES_C_013"
+      ],
+      "rows": [
+        [
+          "ALPHA_013",
+          10,
+          14,
+          8
+        ],
+        [
+          "BETA_013",
+          15,
+          11,
+          13
+        ],
+        [
+          "GAMMA_013",
+          12,
+          18,
+          16
+        ],
+        [
+          "DELTA_013",
+          20,
+          16,
+          22
+        ],
+        [
+          "EPSILON_013",
+          17,
+          21,
+          19
+        ]
+      ]
+    },
+    "scatter_bubble_source": {
+      "range": "A1:C6",
+      "headers": [
+        "X_013",
+        "Y_013",
+        "SIZE_013"
+      ],
+      "rows": [
+        [
+          1,
+          2,
+          5
+        ],
+        [
+          2,
+          4,
+          10
+        ],
+        [
+          3,
+          3,
+          7
+        ],
+        [
+          4,
+          8,
+          14
+        ],
+        [
+          5,
+          7,
+          11
+        ]
+      ]
+    },
+    "stock_source": {
+      "range": "A1:D6",
+      "headers": [
+        "Date_013",
+        "High_013",
+        "Low_013",
+        "Close_013"
+      ],
+      "rows": [
+        [
+          "2026-10-01",
+          15,
+          10,
+          12
+        ],
+        [
+          "2026-10-02",
+          16,
+          11,
+          14
+        ],
+        [
+          "2026-10-03",
+          18,
+          13,
+          15
+        ],
+        [
+          "2026-10-04",
+          17,
+          12,
+          16
+        ],
+        [
+          "2026-10-05",
+          20,
+          14,
+          18
+        ]
+      ],
+      "native_date_cells": true,
+      "serials": [
+        46296,
+        46297,
+        46298,
+        46299,
+        46300
+      ]
+    },
+    "markers": {
+      "Line_013!F1": "EXCEL_CHART_FAMILIES_013",
+      "Line_013!F2": "Fixture ID: excel-chart-families-013",
+      "DrawingSVG_013!A1": "EXCEL_SVG_013",
+      "DrawingSVG_013!A2": "END_CHART_DRAWING_013"
+    },
+    "embedded_chart_count": 17,
+    "embedded_charts": [
+      {
+        "chart_id": "CHART_LINE_013",
+        "worksheet": "Line_013",
+        "chart_part": "xl/charts/chart1.xml",
+        "native_type": "line",
+        "chart_elements_declared": "lineChart",
+        "source": {
+          "source_range": "A1:D6",
+          "source_formula_pattern": "Line_013!$A$2:$A$6 with value columns B:D",
+          "series": [
+            "SERIES_A_013",
+            "SERIES_B_013",
+            "SERIES_C_013"
+          ]
+        },
+        "features": {
+          "error_bars": {
+            "series": [
+              "SERIES_A_013",
+              "SERIES_B_013",
+              "SERIES_C_013"
+            ],
+            "direction": "y",
+            "bar_type": "both",
+            "value_type": "percentage",
+            "value": 5
+          },
+          "trendline": {
+            "series": "SERIES_A_013",
+            "type": "linear",
+            "display_equation": false,
+            "display_r_squared": false
+          }
+        },
+        "package_evidence": {
+          "xlsx": {
+            "bytes": 10478,
+            "sha256": "afaa6487d087c849b659d486a932102a5a408b27d327e146686ac6e491c8220d",
+            "chart_elements": [
+              "lineChart"
+            ],
+            "series_count": 3,
+            "cache_point_counts": [
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              }
+            ],
+            "axes": [
+              {
+                "type": "catAx",
+                "ax_id": "933912448",
+                "cross_ax": "933905280",
+                "position": "b"
+              },
+              {
+                "type": "valAx",
+                "ax_id": "933905280",
+                "cross_ax": "933912448",
+                "position": "l"
+              }
+            ],
+            "style_relationship_target": "style1.xml",
+            "color_relationship_target": "colors1.xml"
+          },
+          "xlsb": {
+            "bytes": 10478,
+            "sha256": "afaa6487d087c849b659d486a932102a5a408b27d327e146686ac6e491c8220d",
+            "chart_elements": [
+              "lineChart"
+            ],
+            "series_count": 3,
+            "cache_point_counts": [
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              }
+            ],
+            "axes": [
+              {
+                "type": "catAx",
+                "ax_id": "933912448",
+                "cross_ax": "933905280",
+                "position": "b"
+              },
+              {
+                "type": "valAx",
+                "ax_id": "933905280",
+                "cross_ax": "933912448",
+                "position": "l"
+              }
+            ],
+            "style_relationship_target": "style1.xml",
+            "color_relationship_target": "colors1.xml"
+          },
+          "xlsx_xlsb_chart_xml_identical": true
+        }
+      },
+      {
+        "chart_id": "CHART_AREA_013",
+        "worksheet": "Area_013",
+        "chart_part": "xl/charts/chart2.xml",
+        "native_type": "area",
+        "chart_elements_declared": "areaChart",
+        "source": {
+          "source_range": "A1:D6",
+          "source_formula_pattern": "Area_013!$A$2:$A$6 with value columns B:D",
+          "series": [
+            "SERIES_A_013",
+            "SERIES_B_013",
+            "SERIES_C_013"
+          ]
+        },
+        "features": {
+          "grouping": "standard"
+        },
+        "package_evidence": {
+          "xlsx": {
+            "bytes": 8910,
+            "sha256": "7bcc9b5ef2d6ed9614069185bc486d7850dae4374d9d64e4038ba8609c1245cb",
+            "chart_elements": [
+              "areaChart"
+            ],
+            "series_count": 3,
+            "cache_point_counts": [
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              }
+            ],
+            "axes": [
+              {
+                "type": "catAx",
+                "ax_id": "936047296",
+                "cross_ax": "936043712",
+                "position": "b"
+              },
+              {
+                "type": "valAx",
+                "ax_id": "936043712",
+                "cross_ax": "936047296",
+                "position": "l"
+              }
+            ],
+            "style_relationship_target": "style2.xml",
+            "color_relationship_target": "colors2.xml"
+          },
+          "xlsb": {
+            "bytes": 8910,
+            "sha256": "7bcc9b5ef2d6ed9614069185bc486d7850dae4374d9d64e4038ba8609c1245cb",
+            "chart_elements": [
+              "areaChart"
+            ],
+            "series_count": 3,
+            "cache_point_counts": [
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              }
+            ],
+            "axes": [
+              {
+                "type": "catAx",
+                "ax_id": "936047296",
+                "cross_ax": "936043712",
+                "position": "b"
+              },
+              {
+                "type": "valAx",
+                "ax_id": "936043712",
+                "cross_ax": "936047296",
+                "position": "l"
+              }
+            ],
+            "style_relationship_target": "style2.xml",
+            "color_relationship_target": "colors2.xml"
+          },
+          "xlsx_xlsb_chart_xml_identical": true
+        }
+      },
+      {
+        "chart_id": "CHART_PIE_013",
+        "worksheet": "Pie_013",
+        "chart_part": "xl/charts/chart3.xml",
+        "native_type": "pie",
+        "chart_elements_declared": "pieChart",
+        "source": {
+          "source_range": "A1:B6",
+          "source_formula": "Pie_013!$A$2:$A$6 / Pie_013!$B$2:$B$6",
+          "series": [
+            "SERIES_A_013"
+          ]
+        },
+        "features": {
+          "vary_colors": true
+        },
+        "package_evidence": {
+          "xlsx": {
+            "bytes": 5267,
+            "sha256": "484c43ef7264c2f8ea98f1a044bd8bb2df94945a3070352d8da5af56e39b8e15",
+            "chart_elements": [
+              "pieChart"
+            ],
+            "series_count": 1,
+            "cache_point_counts": [
+              {
+                "cat": 5,
+                "val": 5
+              }
+            ],
+            "axes": [],
+            "style_relationship_target": "style3.xml",
+            "color_relationship_target": "colors3.xml"
+          },
+          "xlsb": {
+            "bytes": 5267,
+            "sha256": "484c43ef7264c2f8ea98f1a044bd8bb2df94945a3070352d8da5af56e39b8e15",
+            "chart_elements": [
+              "pieChart"
+            ],
+            "series_count": 1,
+            "cache_point_counts": [
+              {
+                "cat": 5,
+                "val": 5
+              }
+            ],
+            "axes": [],
+            "style_relationship_target": "style3.xml",
+            "color_relationship_target": "colors3.xml"
+          },
+          "xlsx_xlsb_chart_xml_identical": true
+        }
+      },
+      {
+        "chart_id": "CHART_RADAR_013",
+        "worksheet": "Radar_013",
+        "chart_part": "xl/charts/chart4.xml",
+        "native_type": "radar",
+        "chart_elements_declared": "radarChart",
+        "source": {
+          "source_range": "A1:D6",
+          "source_formula_pattern": "Radar_013!$A$2:$A$6 with value columns B:D",
+          "series": [
+            "SERIES_A_013",
+            "SERIES_B_013",
+            "SERIES_C_013"
+          ]
+        },
+        "features": {
+          "series_count": 3
+        },
+        "package_evidence": {
+          "xlsx": {
+            "bytes": 9108,
+            "sha256": "96f747a1ed29e94576514630b8dda6562c460451d12b4b79b232fd6d267dec17",
+            "chart_elements": [
+              "radarChart"
+            ],
+            "series_count": 3,
+            "cache_point_counts": [
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              }
+            ],
+            "axes": [
+              {
+                "type": "catAx",
+                "ax_id": "937160064",
+                "cross_ax": "937232576",
+                "position": "b"
+              },
+              {
+                "type": "valAx",
+                "ax_id": "937232576",
+                "cross_ax": "937160064",
+                "position": "l"
+              }
+            ],
+            "style_relationship_target": "style4.xml",
+            "color_relationship_target": "colors4.xml"
+          },
+          "xlsb": {
+            "bytes": 9108,
+            "sha256": "96f747a1ed29e94576514630b8dda6562c460451d12b4b79b232fd6d267dec17",
+            "chart_elements": [
+              "radarChart"
+            ],
+            "series_count": 3,
+            "cache_point_counts": [
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              }
+            ],
+            "axes": [
+              {
+                "type": "catAx",
+                "ax_id": "937160064",
+                "cross_ax": "937232576",
+                "position": "b"
+              },
+              {
+                "type": "valAx",
+                "ax_id": "937232576",
+                "cross_ax": "937160064",
+                "position": "l"
+              }
+            ],
+            "style_relationship_target": "style4.xml",
+            "color_relationship_target": "colors4.xml"
+          },
+          "xlsx_xlsb_chart_xml_identical": true
+        }
+      },
+      {
+        "chart_id": "CHART_SURFACE_013",
+        "worksheet": "Surface_013",
+        "chart_part": "xl/charts/chart5.xml",
+        "native_type": "3d_surface",
+        "chart_elements_declared": "surface3DChart",
+        "source": {
+          "source_range": "A1:D6",
+          "source_formula_pattern": "Surface_013!$A$2:$A$6 with value columns B:D",
+          "series": [
+            "SERIES_A_013",
+            "SERIES_B_013",
+            "SERIES_C_013"
+          ]
+        },
+        "features": {
+          "view": {
+            "rot_x": 15,
+            "rot_y": 20,
+            "wireframe": false
+          },
+          "style_relationship": null,
+          "color_relationship": null
+        },
+        "package_evidence": {
+          "xlsx": {
+            "bytes": 12718,
+            "sha256": "3161e0d9114a539fb5d1984c3885642f446358af8f7812bff347b2ead43ad965",
+            "chart_elements": [
+              "surface3DChart"
+            ],
+            "series_count": 3,
+            "cache_point_counts": [
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              }
+            ],
+            "axes": [
+              {
+                "type": "catAx",
+                "ax_id": "937533312",
+                "cross_ax": "937786688",
+                "position": "b"
+              },
+              {
+                "type": "valAx",
+                "ax_id": "937786688",
+                "cross_ax": "937533312",
+                "position": "l"
+              },
+              {
+                "type": "serAx",
+                "ax_id": "562745856",
+                "cross_ax": "937786688",
+                "position": "b"
+              }
+            ],
+            "style_relationship_target": null,
+            "color_relationship_target": null
+          },
+          "xlsb": {
+            "bytes": 12718,
+            "sha256": "3161e0d9114a539fb5d1984c3885642f446358af8f7812bff347b2ead43ad965",
+            "chart_elements": [
+              "surface3DChart"
+            ],
+            "series_count": 3,
+            "cache_point_counts": [
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              }
+            ],
+            "axes": [
+              {
+                "type": "catAx",
+                "ax_id": "937533312",
+                "cross_ax": "937786688",
+                "position": "b"
+              },
+              {
+                "type": "valAx",
+                "ax_id": "937786688",
+                "cross_ax": "937533312",
+                "position": "l"
+              },
+              {
+                "type": "serAx",
+                "ax_id": "562745856",
+                "cross_ax": "937786688",
+                "position": "b"
+              }
+            ],
+            "style_relationship_target": null,
+            "color_relationship_target": null
+          },
+          "xlsx_xlsb_chart_xml_identical": true
+        }
+      },
+      {
+        "chart_id": "CHART_SCATTER_013",
+        "worksheet": "Scatter_013",
+        "chart_part": "xl/charts/chart6.xml",
+        "native_type": "scatter",
+        "chart_elements_declared": "scatterChart",
+        "source": {
+          "source_range": "A1:B6",
+          "source_formula": "Scatter_013!$A$2:$A$6 X / Scatter_013!$B$2:$B$6 Y",
+          "series": [
+            "Y_013"
+          ]
+        },
+        "features": {
+          "scatter_style": "lineMarker",
+          "error_bars": {
+            "y": {
+              "direction": "y",
+              "bar_type": "both",
+              "value_type": "custom",
+              "positive": [
+                0.5,
+                1,
+                1.5,
+                2,
+                2.5
+              ],
+              "negative": [
+                0.25,
+                0.5,
+                0.75,
+                1,
+                1.25
+              ]
+            },
+            "x": {
+              "direction": "x",
+              "bar_type": "both",
+              "value_type": "fixedVal",
+              "value": 1
+            }
+          },
+          "trendline": {
+            "type": "linear",
+            "display_equation": true,
+            "display_r_squared": true,
+            "native_equation": "y = 1.4x + 0.6",
+            "native_r_squared": 0.7313
+          }
+        },
+        "package_evidence": {
+          "xlsx": {
+            "bytes": 8664,
+            "sha256": "f12a299430a00aa6a7f1f74c6a256e64d758e5a45d7fc7d291ff0975d9e148f6",
+            "chart_elements": [
+              "scatterChart"
+            ],
+            "series_count": 1,
+            "cache_point_counts": [
+              {
+                "xVal": 5,
+                "yVal": 5
+              }
+            ],
+            "axes": [
+              {
+                "type": "valAx",
+                "ax_id": "938234240",
+                "cross_ax": "938231104",
+                "position": "b"
+              },
+              {
+                "type": "valAx",
+                "ax_id": "938231104",
+                "cross_ax": "938234240",
+                "position": "l"
+              }
+            ],
+            "style_relationship_target": "style5.xml",
+            "color_relationship_target": "colors5.xml"
+          },
+          "xlsb": {
+            "bytes": 8664,
+            "sha256": "f12a299430a00aa6a7f1f74c6a256e64d758e5a45d7fc7d291ff0975d9e148f6",
+            "chart_elements": [
+              "scatterChart"
+            ],
+            "series_count": 1,
+            "cache_point_counts": [
+              {
+                "xVal": 5,
+                "yVal": 5
+              }
+            ],
+            "axes": [
+              {
+                "type": "valAx",
+                "ax_id": "938234240",
+                "cross_ax": "938231104",
+                "position": "b"
+              },
+              {
+                "type": "valAx",
+                "ax_id": "938231104",
+                "cross_ax": "938234240",
+                "position": "l"
+              }
+            ],
+            "style_relationship_target": "style5.xml",
+            "color_relationship_target": "colors5.xml"
+          },
+          "xlsx_xlsb_chart_xml_identical": true
+        }
+      },
+      {
+        "chart_id": "CHART_BUBBLE_013",
+        "worksheet": "Bubble_013",
+        "chart_part": "xl/charts/chart7.xml",
+        "native_type": "bubble",
+        "chart_elements_declared": "bubbleChart",
+        "source": {
+          "source_range": "A1:C6",
+          "source_formula": "Bubble_013!$A$2:$A$6 X / $B$2:$B$6 Y / $C$2:$C$6 SIZE",
+          "series": [
+            "Y_013"
+          ]
+        },
+        "features": {
+          "bubble_scale": 100,
+          "bubble_3d": false,
+          "points": [
+            {
+              "x": 1,
+              "y": 2,
+              "size": 5
+            },
+            {
+              "x": 2,
+              "y": 4,
+              "size": 10
+            },
+            {
+              "x": 3,
+              "y": 3,
+              "size": 7
+            },
+            {
+              "x": 4,
+              "y": 8,
+              "size": 14
+            },
+            {
+              "x": 5,
+              "y": 7,
+              "size": 11
+            }
+          ]
+        },
+        "package_evidence": {
+          "xlsx": {
+            "bytes": 7366,
+            "sha256": "01f797da7092443e645636037a06c734b5f182a8d9f734b094ad1f82289c735e",
+            "chart_elements": [
+              "bubbleChart"
+            ],
+            "series_count": 1,
+            "cache_point_counts": [
+              {
+                "xVal": 5,
+                "yVal": 5,
+                "bubbleSize": 5
+              }
+            ],
+            "axes": [
+              {
+                "type": "valAx",
+                "ax_id": "938881280",
+                "cross_ax": "942686656",
+                "position": "b"
+              },
+              {
+                "type": "valAx",
+                "ax_id": "942686656",
+                "cross_ax": "938881280",
+                "position": "l"
+              }
+            ],
+            "style_relationship_target": "style6.xml",
+            "color_relationship_target": "colors6.xml"
+          },
+          "xlsb": {
+            "bytes": 7366,
+            "sha256": "01f797da7092443e645636037a06c734b5f182a8d9f734b094ad1f82289c735e",
+            "chart_elements": [
+              "bubbleChart"
+            ],
+            "series_count": 1,
+            "cache_point_counts": [
+              {
+                "xVal": 5,
+                "yVal": 5,
+                "bubbleSize": 5
+              }
+            ],
+            "axes": [
+              {
+                "type": "valAx",
+                "ax_id": "938881280",
+                "cross_ax": "942686656",
+                "position": "b"
+              },
+              {
+                "type": "valAx",
+                "ax_id": "942686656",
+                "cross_ax": "938881280",
+                "position": "l"
+              }
+            ],
+            "style_relationship_target": "style6.xml",
+            "color_relationship_target": "colors6.xml"
+          },
+          "xlsx_xlsb_chart_xml_identical": true
+        }
+      },
+      {
+        "chart_id": "CHART_BAR_013",
+        "worksheet": "Bar_013",
+        "chart_part": "xl/charts/chart8.xml",
+        "native_type": "bar",
+        "chart_elements_declared": "barChart",
+        "source": {
+          "source_range": "A1:D6",
+          "source_formula_pattern": "Bar_013!$A$2:$A$6 with value columns B:D",
+          "series": [
+            "SERIES_A_013",
+            "SERIES_B_013",
+            "SERIES_C_013"
+          ]
+        },
+        "features": {
+          "bar_direction": "bar",
+          "grouping": "clustered"
+        },
+        "package_evidence": {
+          "xlsx": {
+            "bytes": 9032,
+            "sha256": "6b4c8a85b39f4c8bd440869664b904fa630ec5657c5c6636688df1b95d52a330",
+            "chart_elements": [
+              "barChart"
+            ],
+            "series_count": 3,
+            "cache_point_counts": [
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              }
+            ],
+            "axes": [
+              {
+                "type": "catAx",
+                "ax_id": "947638656",
+                "cross_ax": "947640000",
+                "position": "l"
+              },
+              {
+                "type": "valAx",
+                "ax_id": "947640000",
+                "cross_ax": "947638656",
+                "position": "b"
+              }
+            ],
+            "style_relationship_target": "style7.xml",
+            "color_relationship_target": "colors7.xml"
+          },
+          "xlsb": {
+            "bytes": 9032,
+            "sha256": "6b4c8a85b39f4c8bd440869664b904fa630ec5657c5c6636688df1b95d52a330",
+            "chart_elements": [
+              "barChart"
+            ],
+            "series_count": 3,
+            "cache_point_counts": [
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              }
+            ],
+            "axes": [
+              {
+                "type": "catAx",
+                "ax_id": "947638656",
+                "cross_ax": "947640000",
+                "position": "l"
+              },
+              {
+                "type": "valAx",
+                "ax_id": "947640000",
+                "cross_ax": "947638656",
+                "position": "b"
+              }
+            ],
+            "style_relationship_target": "style7.xml",
+            "color_relationship_target": "colors7.xml"
+          },
+          "xlsx_xlsb_chart_xml_identical": true
+        }
+      },
+      {
+        "chart_id": "CHART_BAR3D_013",
+        "worksheet": "Bar3D_013",
+        "chart_part": "xl/charts/chart9.xml",
+        "native_type": "3d_bar",
+        "chart_elements_declared": "bar3DChart",
+        "source": {
+          "source_range": "A1:D6",
+          "source_formula_pattern": "Bar3D_013!$A$2:$A$6 with value columns B:D",
+          "series": [
+            "SERIES_A_013",
+            "SERIES_B_013",
+            "SERIES_C_013"
+          ]
+        },
+        "features": {
+          "bar_direction": "bar",
+          "grouping": "clustered",
+          "view": {
+            "rot_x": 15,
+            "rot_y": 20
+          }
+        },
+        "package_evidence": {
+          "xlsx": {
+            "bytes": 9554,
+            "sha256": "83798fdb9c1423a56905c9b47e9af40eec9471aa8adba94e4805209877a221fb",
+            "chart_elements": [
+              "bar3DChart"
+            ],
+            "series_count": 3,
+            "cache_point_counts": [
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              }
+            ],
+            "axes": [
+              {
+                "type": "catAx",
+                "ax_id": "937240640",
+                "cross_ax": "947398720",
+                "position": "l"
+              },
+              {
+                "type": "valAx",
+                "ax_id": "947398720",
+                "cross_ax": "937240640",
+                "position": "b"
+              }
+            ],
+            "style_relationship_target": "style8.xml",
+            "color_relationship_target": "colors8.xml"
+          },
+          "xlsb": {
+            "bytes": 9554,
+            "sha256": "83798fdb9c1423a56905c9b47e9af40eec9471aa8adba94e4805209877a221fb",
+            "chart_elements": [
+              "bar3DChart"
+            ],
+            "series_count": 3,
+            "cache_point_counts": [
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              }
+            ],
+            "axes": [
+              {
+                "type": "catAx",
+                "ax_id": "937240640",
+                "cross_ax": "947398720",
+                "position": "l"
+              },
+              {
+                "type": "valAx",
+                "ax_id": "947398720",
+                "cross_ax": "937240640",
+                "position": "b"
+              }
+            ],
+            "style_relationship_target": "style8.xml",
+            "color_relationship_target": "colors8.xml"
+          },
+          "xlsx_xlsb_chart_xml_identical": true
+        }
+      },
+      {
+        "chart_id": "CHART_AREA3D_013",
+        "worksheet": "Area3D_013",
+        "chart_part": "xl/charts/chart10.xml",
+        "native_type": "3d_area",
+        "chart_elements_declared": "area3DChart",
+        "source": {
+          "source_range": "A1:D6",
+          "source_formula_pattern": "Area3D_013!$A$2:$A$6 with value columns B:D",
+          "series": [
+            "SERIES_A_013",
+            "SERIES_B_013",
+            "SERIES_C_013"
+          ]
+        },
+        "features": {
+          "grouping": "standard",
+          "depth_percent": 100,
+          "view": {
+            "rot_x": 15,
+            "rot_y": 20
+          }
+        },
+        "package_evidence": {
+          "xlsx": {
+            "bytes": 10688,
+            "sha256": "23a80b566f3625e2e87f8bef16d8243da8bcf5c6f1fc864f4b3983e2e384a850",
+            "chart_elements": [
+              "area3DChart"
+            ],
+            "series_count": 3,
+            "cache_point_counts": [
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              }
+            ],
+            "axes": [
+              {
+                "type": "catAx",
+                "ax_id": "945651712",
+                "cross_ax": "945328512",
+                "position": "b"
+              },
+              {
+                "type": "valAx",
+                "ax_id": "945328512",
+                "cross_ax": "945651712",
+                "position": "l"
+              },
+              {
+                "type": "serAx",
+                "ax_id": "508958208",
+                "cross_ax": "945328512",
+                "position": "b"
+              }
+            ],
+            "style_relationship_target": "style9.xml",
+            "color_relationship_target": "colors9.xml"
+          },
+          "xlsb": {
+            "bytes": 10688,
+            "sha256": "23a80b566f3625e2e87f8bef16d8243da8bcf5c6f1fc864f4b3983e2e384a850",
+            "chart_elements": [
+              "area3DChart"
+            ],
+            "series_count": 3,
+            "cache_point_counts": [
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              }
+            ],
+            "axes": [
+              {
+                "type": "catAx",
+                "ax_id": "945651712",
+                "cross_ax": "945328512",
+                "position": "b"
+              },
+              {
+                "type": "valAx",
+                "ax_id": "945328512",
+                "cross_ax": "945651712",
+                "position": "l"
+              },
+              {
+                "type": "serAx",
+                "ax_id": "508958208",
+                "cross_ax": "945328512",
+                "position": "b"
+              }
+            ],
+            "style_relationship_target": "style9.xml",
+            "color_relationship_target": "colors9.xml"
+          },
+          "xlsx_xlsb_chart_xml_identical": true
+        }
+      },
+      {
+        "chart_id": "CHART_LINE3D_013",
+        "worksheet": "Line3D_013",
+        "chart_part": "xl/charts/chart11.xml",
+        "native_type": "3d_line",
+        "chart_elements_declared": "line3DChart",
+        "source": {
+          "source_range": "A1:D6",
+          "source_formula_pattern": "Line3D_013!$A$2:$A$6 with value columns B:D",
+          "series": [
+            "SERIES_A_013",
+            "SERIES_B_013",
+            "SERIES_C_013"
+          ]
+        },
+        "features": {
+          "grouping": "standard",
+          "view": {
+            "rot_x": 15,
+            "rot_y": 20
+          }
+        },
+        "package_evidence": {
+          "xlsx": {
+            "bytes": 10281,
+            "sha256": "78ccfa4d1b06921d37316107a6ad139599aeef9801c0081483a131a834f9a0eb",
+            "chart_elements": [
+              "line3DChart"
+            ],
+            "series_count": 3,
+            "cache_point_counts": [
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              }
+            ],
+            "axes": [
+              {
+                "type": "catAx",
+                "ax_id": "958838336",
+                "cross_ax": "960358464",
+                "position": "b"
+              },
+              {
+                "type": "valAx",
+                "ax_id": "960358464",
+                "cross_ax": "958838336",
+                "position": "l"
+              },
+              {
+                "type": "serAx",
+                "ax_id": "515033088",
+                "cross_ax": "960358464",
+                "position": "b"
+              }
+            ],
+            "style_relationship_target": "style10.xml",
+            "color_relationship_target": "colors10.xml"
+          },
+          "xlsb": {
+            "bytes": 10281,
+            "sha256": "78ccfa4d1b06921d37316107a6ad139599aeef9801c0081483a131a834f9a0eb",
+            "chart_elements": [
+              "line3DChart"
+            ],
+            "series_count": 3,
+            "cache_point_counts": [
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              }
+            ],
+            "axes": [
+              {
+                "type": "catAx",
+                "ax_id": "958838336",
+                "cross_ax": "960358464",
+                "position": "b"
+              },
+              {
+                "type": "valAx",
+                "ax_id": "960358464",
+                "cross_ax": "958838336",
+                "position": "l"
+              },
+              {
+                "type": "serAx",
+                "ax_id": "515033088",
+                "cross_ax": "960358464",
+                "position": "b"
+              }
+            ],
+            "style_relationship_target": "style10.xml",
+            "color_relationship_target": "colors10.xml"
+          },
+          "xlsx_xlsb_chart_xml_identical": true
+        }
+      },
+      {
+        "chart_id": "CHART_CONTOUR_013",
+        "worksheet": "Contour_013",
+        "chart_part": "xl/charts/chart12.xml",
+        "native_type": "contour",
+        "chart_elements_declared": "surfaceChart",
+        "source": {
+          "source_range": "A1:D6",
+          "source_formula_pattern": "Contour_013!$A$2:$A$6 with value columns B:D",
+          "series": [
+            "SERIES_A_013",
+            "SERIES_B_013",
+            "SERIES_C_013"
+          ]
+        },
+        "features": {
+          "view": {
+            "rot_x": 90,
+            "rot_y": 0,
+            "perspective": 0,
+            "wireframe": false
+          }
+        },
+        "package_evidence": {
+          "xlsx": {
+            "bytes": 12735,
+            "sha256": "3d1af67f76ec5930513a264bcd0b64fe1763b4a915518d60c55666a5d261c06d",
+            "chart_elements": [
+              "surfaceChart"
+            ],
+            "series_count": 3,
+            "cache_point_counts": [
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              }
+            ],
+            "axes": [
+              {
+                "type": "catAx",
+                "ax_id": "977667840",
+                "cross_ax": "958461504",
+                "position": "b"
+              },
+              {
+                "type": "valAx",
+                "ax_id": "958461504",
+                "cross_ax": "977667840",
+                "position": "l"
+              },
+              {
+                "type": "serAx",
+                "ax_id": "527906816",
+                "cross_ax": "958461504",
+                "position": "b"
+              }
+            ],
+            "style_relationship_target": null,
+            "color_relationship_target": null
+          },
+          "xlsb": {
+            "bytes": 12735,
+            "sha256": "3d1af67f76ec5930513a264bcd0b64fe1763b4a915518d60c55666a5d261c06d",
+            "chart_elements": [
+              "surfaceChart"
+            ],
+            "series_count": 3,
+            "cache_point_counts": [
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              }
+            ],
+            "axes": [
+              {
+                "type": "catAx",
+                "ax_id": "977667840",
+                "cross_ax": "958461504",
+                "position": "b"
+              },
+              {
+                "type": "valAx",
+                "ax_id": "958461504",
+                "cross_ax": "977667840",
+                "position": "l"
+              },
+              {
+                "type": "serAx",
+                "ax_id": "527906816",
+                "cross_ax": "958461504",
+                "position": "b"
+              }
+            ],
+            "style_relationship_target": null,
+            "color_relationship_target": null
+          },
+          "xlsx_xlsb_chart_xml_identical": true
+        }
+      },
+      {
+        "chart_id": "CHART_DOUGHNUT_013",
+        "worksheet": "Doughnut_013",
+        "chart_part": "xl/charts/chart13.xml",
+        "native_type": "doughnut",
+        "chart_elements_declared": "doughnutChart",
+        "source": {
+          "source_range": "A1:B6",
+          "source_formula": "Doughnut_013!$A$2:$A$6 / $B$2:$B$6",
+          "series": [
+            "SERIES_A_013"
+          ]
+        },
+        "features": {
+          "hole_size": 50,
+          "vary_colors": true
+        },
+        "package_evidence": {
+          "xlsx": {
+            "bytes": 5314,
+            "sha256": "9b46cbde02b6dd3b17bcf500f5e6fbc3ec1d4ded948009ff598252c18eae172f",
+            "chart_elements": [
+              "doughnutChart"
+            ],
+            "series_count": 1,
+            "cache_point_counts": [
+              {
+                "cat": 5,
+                "val": 5
+              }
+            ],
+            "axes": [],
+            "style_relationship_target": "style11.xml",
+            "color_relationship_target": "colors11.xml"
+          },
+          "xlsb": {
+            "bytes": 5314,
+            "sha256": "9b46cbde02b6dd3b17bcf500f5e6fbc3ec1d4ded948009ff598252c18eae172f",
+            "chart_elements": [
+              "doughnutChart"
+            ],
+            "series_count": 1,
+            "cache_point_counts": [
+              {
+                "cat": 5,
+                "val": 5
+              }
+            ],
+            "axes": [],
+            "style_relationship_target": "style11.xml",
+            "color_relationship_target": "colors11.xml"
+          },
+          "xlsx_xlsb_chart_xml_identical": true
+        }
+      },
+      {
+        "chart_id": "CHART_OFPIE_013",
+        "worksheet": "OfPie_013",
+        "chart_part": "xl/charts/chart14.xml",
+        "native_type": "pie_of_pie",
+        "chart_elements_declared": "ofPieChart",
+        "source": {
+          "source_range": "A1:B6",
+          "source_formula": "OfPie_013!$A$2:$A$6 / $B$2:$B$6",
+          "series": [
+            "SERIES_A_013"
+          ]
+        },
+        "features": {
+          "of_pie_type": "pie",
+          "second_pie_size": 75,
+          "vary_colors": true
+        },
+        "package_evidence": {
+          "xlsx": {
+            "bytes": 5768,
+            "sha256": "b71d86dfffe4915d019d85abeff62572e8b4e4e06b062d4b5ccffd02ad26daa4",
+            "chart_elements": [
+              "ofPieChart"
+            ],
+            "series_count": 1,
+            "cache_point_counts": [
+              {
+                "cat": 5,
+                "val": 5
+              }
+            ],
+            "axes": [],
+            "style_relationship_target": "style12.xml",
+            "color_relationship_target": "colors12.xml"
+          },
+          "xlsb": {
+            "bytes": 5768,
+            "sha256": "b71d86dfffe4915d019d85abeff62572e8b4e4e06b062d4b5ccffd02ad26daa4",
+            "chart_elements": [
+              "ofPieChart"
+            ],
+            "series_count": 1,
+            "cache_point_counts": [
+              {
+                "cat": 5,
+                "val": 5
+              }
+            ],
+            "axes": [],
+            "style_relationship_target": "style12.xml",
+            "color_relationship_target": "colors12.xml"
+          },
+          "xlsx_xlsb_chart_xml_identical": true
+        }
+      },
+      {
+        "chart_id": "CHART_PIE3D_013",
+        "worksheet": "Pie3D_013",
+        "chart_part": "xl/charts/chart15.xml",
+        "native_type": "3d_pie",
+        "chart_elements_declared": "pie3DChart",
+        "source": {
+          "source_range": "A1:B6",
+          "source_formula": "Pie3D_013!$A$2:$A$6 / $B$2:$B$6",
+          "series": [
+            "SERIES_A_013"
+          ]
+        },
+        "features": {
+          "view": {
+            "rot_x": 75,
+            "rot_y": 0
+          },
+          "vary_colors": true
+        },
+        "package_evidence": {
+          "xlsx": {
+            "bytes": 6121,
+            "sha256": "5256d77cb9328a5bdbe272705e595df13b4b81fb5ab73df2fb6a7a33b7778a99",
+            "chart_elements": [
+              "pie3DChart"
+            ],
+            "series_count": 1,
+            "cache_point_counts": [
+              {
+                "cat": 5,
+                "val": 5
+              }
+            ],
+            "axes": [],
+            "style_relationship_target": "style13.xml",
+            "color_relationship_target": "colors13.xml"
+          },
+          "xlsb": {
+            "bytes": 6121,
+            "sha256": "5256d77cb9328a5bdbe272705e595df13b4b81fb5ab73df2fb6a7a33b7778a99",
+            "chart_elements": [
+              "pie3DChart"
+            ],
+            "series_count": 1,
+            "cache_point_counts": [
+              {
+                "cat": 5,
+                "val": 5
+              }
+            ],
+            "axes": [],
+            "style_relationship_target": "style13.xml",
+            "color_relationship_target": "colors13.xml"
+          },
+          "xlsx_xlsb_chart_xml_identical": true
+        }
+      },
+      {
+        "chart_id": "CHART_STOCK_013",
+        "worksheet": "Stock_013",
+        "chart_part": "xl/charts/chart16.xml",
+        "native_type": "stock_high_low_close",
+        "chart_elements_declared": "stockChart",
+        "source": {
+          "source_range": "A1:D6",
+          "source_formula": "Stock_013!$A$2:$A$6 dates / $B$2:$B$6 high / $C$2:$C$6 low / $D$2:$D$6 close",
+          "series": [
+            "High_013",
+            "Low_013",
+            "Close_013"
+          ]
+        },
+        "features": {
+          "stock_order": [
+            "High_013",
+            "Low_013",
+            "Close_013"
+          ]
+        },
+        "package_evidence": {
+          "xlsx": {
+            "bytes": 9407,
+            "sha256": "9997c0be896aa37d5b7b827d1fa15cd2a5b0c42f3393f0d594bd6f8c563cfa3c",
+            "chart_elements": [
+              "stockChart"
+            ],
+            "series_count": 3,
+            "cache_point_counts": [
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              }
+            ],
+            "axes": [
+              {
+                "type": "dateAx",
+                "ax_id": "944086912",
+                "cross_ax": "945526016",
+                "position": "b"
+              },
+              {
+                "type": "valAx",
+                "ax_id": "945526016",
+                "cross_ax": "944086912",
+                "position": "l"
+              }
+            ],
+            "style_relationship_target": "style14.xml",
+            "color_relationship_target": "colors14.xml"
+          },
+          "xlsb": {
+            "bytes": 9407,
+            "sha256": "9997c0be896aa37d5b7b827d1fa15cd2a5b0c42f3393f0d594bd6f8c563cfa3c",
+            "chart_elements": [
+              "stockChart"
+            ],
+            "series_count": 3,
+            "cache_point_counts": [
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              }
+            ],
+            "axes": [
+              {
+                "type": "dateAx",
+                "ax_id": "944086912",
+                "cross_ax": "945526016",
+                "position": "b"
+              },
+              {
+                "type": "valAx",
+                "ax_id": "945526016",
+                "cross_ax": "944086912",
+                "position": "l"
+              }
+            ],
+            "style_relationship_target": "style14.xml",
+            "color_relationship_target": "colors14.xml"
+          },
+          "xlsx_xlsb_chart_xml_identical": true
+        }
+      },
+      {
+        "chart_id": "CHART_COMBO_013",
+        "worksheet": "Combo_013",
+        "chart_part": "xl/charts/chart17.xml",
+        "native_type": "combo_column_line_secondary_axis",
+        "chart_elements_declared": "barChart+lineChart",
+        "source": {
+          "source_range": "A1:D6",
+          "source_formula_pattern": "Combo_013!$A$2:$A$6 with value columns B:D",
+          "series": [
+            "SERIES_A_013",
+            "SERIES_B_013",
+            "SERIES_C_013"
+          ]
+        },
+        "features": {
+          "column_group": {
+            "series": [
+              "SERIES_A_013",
+              "SERIES_B_013"
+            ],
+            "axis_group": "primary"
+          },
+          "line_group": {
+            "series": [
+              "SERIES_C_013"
+            ],
+            "axis_group": "secondary"
+          },
+          "secondary_value_axis": true,
+          "axis_positions": [
+            "primary-left",
+            "secondary-right"
+          ]
+        },
+        "package_evidence": {
+          "xlsx": {
+            "bytes": 10721,
+            "sha256": "d05762b3f2a5071c788b7a00a5643e35bd60bc46b196cb183419faa64a44e4fb",
+            "chart_elements": [
+              "barChart",
+              "lineChart"
+            ],
+            "series_count": 3,
+            "cache_point_counts": [
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              }
+            ],
+            "axes": [
+              {
+                "type": "catAx",
+                "ax_id": "946134464",
+                "cross_ax": "945896768",
+                "position": "b"
+              },
+              {
+                "type": "valAx",
+                "ax_id": "945896768",
+                "cross_ax": "946134464",
+                "position": "l"
+              },
+              {
+                "type": "valAx",
+                "ax_id": "944976576",
+                "cross_ax": "900174656",
+                "position": "r"
+              },
+              {
+                "type": "catAx",
+                "ax_id": "900174656",
+                "cross_ax": "944976576",
+                "position": "b"
+              }
+            ],
+            "style_relationship_target": "style15.xml",
+            "color_relationship_target": "colors15.xml"
+          },
+          "xlsb": {
+            "bytes": 10721,
+            "sha256": "d05762b3f2a5071c788b7a00a5643e35bd60bc46b196cb183419faa64a44e4fb",
+            "chart_elements": [
+              "barChart",
+              "lineChart"
+            ],
+            "series_count": 3,
+            "cache_point_counts": [
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              },
+              {
+                "cat": 5,
+                "val": 5
+              }
+            ],
+            "axes": [
+              {
+                "type": "catAx",
+                "ax_id": "946134464",
+                "cross_ax": "945896768",
+                "position": "b"
+              },
+              {
+                "type": "valAx",
+                "ax_id": "945896768",
+                "cross_ax": "946134464",
+                "position": "l"
+              },
+              {
+                "type": "valAx",
+                "ax_id": "944976576",
+                "cross_ax": "900174656",
+                "position": "r"
+              },
+              {
+                "type": "catAx",
+                "ax_id": "900174656",
+                "cross_ax": "944976576",
+                "position": "b"
+              }
+            ],
+            "style_relationship_target": "style15.xml",
+            "color_relationship_target": "colors15.xml"
+          },
+          "xlsx_xlsb_chart_xml_identical": true
+        }
+      }
+    ],
+    "svg_drawing": {
+      "worksheet": "DrawingSVG_013",
+      "worksheet_marker_cells": {
+        "A1": "EXCEL_SVG_013",
+        "A2": "END_CHART_DRAWING_013"
+      },
+      "drawing_part": "xl/drawings/drawing8.xml",
+      "drawing_relationship_part": "xl/drawings/_rels/drawing8.xml.rels",
+      "anchor": {
+        "kind": "twoCellAnchor",
+        "edit_as": "oneCell",
+        "from": {
+          "column": 0,
+          "row": 0,
+          "column_offset_emu": 0,
+          "row_offset_emu": 0
+        },
+        "to": {
+          "column": 3,
+          "row": 8,
+          "column_offset_emu": 571500,
+          "row_offset_emu": 88900
+        },
+        "native_position_policy": "PlaceOverCells"
+      },
+      "svg_part": {
+        "path": "xl/media/image2.svg",
+        "bytes": 418,
+        "sha256": "91bdc6ffe9ddcd4ddda5c1e4872f0003b6b0864a0523c19945a4917da6858a95",
+        "marker": "SVG_MARKER_007"
+      },
+      "raster_fallback_part": {
+        "path": "xl/media/image1.png",
+        "bytes": 13933,
+        "sha256": "97fefe9283fc468417bf2b339b48197711947bd05cc835e40a31088b4e1e7990",
+        "role": "native raster fallback retained alongside SVG"
+      },
+      "alt_text": "EXCEL_SVG_ALT_013: blue and yellow vector blocks with the SVG_MARKER_007 label.",
+      "drawing_relationship_to_svg": {
+        "Id": "rId2",
+        "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+        "Target": "../media/image2.svg"
+      },
+      "drawing_xml_bytes": 1472,
+      "drawing_xml_sha256": "3771b796b1a84bfb4ea8a087b7cf97a5d1583569d981ef8e776d777428a6bab6"
+    }
+  },
+  "package_inspection": {
+    "xlsx": {
+      "container_kind": "OPC ZIP / transitional SpreadsheetML",
+      "zip_integrity": "pass",
+      "member_count": 145,
+      "worksheet_parts": 18,
+      "worksheet_relationship_parts": 18,
+      "drawing_parts": 18,
+      "chart_parts": 17,
+      "chart_style_parts": 15,
+      "chart_color_style_parts": 15,
+      "chart_relationship_parts": 15,
+      "svg_drawing": {
+        "worksheet": "DrawingSVG_013",
+        "worksheet_marker_cells": {
+          "A1": "EXCEL_SVG_013",
+          "A2": "END_CHART_DRAWING_013"
+        },
+        "drawing_part": "xl/drawings/drawing8.xml",
+        "drawing_relationship_part": "xl/drawings/_rels/drawing8.xml.rels",
+        "anchor": {
+          "kind": "twoCellAnchor",
+          "edit_as": "oneCell",
+          "from": {
+            "column": 0,
+            "row": 0,
+            "column_offset_emu": 0,
+            "row_offset_emu": 0
+          },
+          "to": {
+            "column": 3,
+            "row": 8,
+            "column_offset_emu": 571500,
+            "row_offset_emu": 88900
+          },
+          "native_position_policy": "PlaceOverCells"
+        },
+        "svg_part": {
+          "path": "xl/media/image2.svg",
+          "bytes": 418,
+          "sha256": "91bdc6ffe9ddcd4ddda5c1e4872f0003b6b0864a0523c19945a4917da6858a95",
+          "marker": "SVG_MARKER_007"
+        },
+        "raster_fallback_part": {
+          "path": "xl/media/image1.png",
+          "bytes": 13933,
+          "sha256": "97fefe9283fc468417bf2b339b48197711947bd05cc835e40a31088b4e1e7990",
+          "role": "native raster fallback retained alongside SVG"
+        },
+        "alt_text": "EXCEL_SVG_ALT_013: blue and yellow vector blocks with the SVG_MARKER_007 label.",
+        "drawing_relationship_to_svg": {
+          "Id": "rId2",
+          "Type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image",
+          "Target": "../media/image2.svg"
+        },
+        "drawing_xml_bytes": 1472,
+        "drawing_xml_sha256": "3771b796b1a84bfb4ea8a087b7cf97a5d1583569d981ef8e776d777428a6bab6"
+      },
+      "chart_xml_payloads": {
+        "all_17_present": true,
+        "all_cache_point_counts_are_five": true,
+        "all_source_formula_refs_are_fixture_sheets": true,
+        "chart_xml_hashes": {
+          "xl/charts/chart1.xml": "afaa6487d087c849b659d486a932102a5a408b27d327e146686ac6e491c8220d",
+          "xl/charts/chart2.xml": "7bcc9b5ef2d6ed9614069185bc486d7850dae4374d9d64e4038ba8609c1245cb",
+          "xl/charts/chart3.xml": "484c43ef7264c2f8ea98f1a044bd8bb2df94945a3070352d8da5af56e39b8e15",
+          "xl/charts/chart4.xml": "96f747a1ed29e94576514630b8dda6562c460451d12b4b79b232fd6d267dec17",
+          "xl/charts/chart5.xml": "3161e0d9114a539fb5d1984c3885642f446358af8f7812bff347b2ead43ad965",
+          "xl/charts/chart6.xml": "f12a299430a00aa6a7f1f74c6a256e64d758e5a45d7fc7d291ff0975d9e148f6",
+          "xl/charts/chart7.xml": "01f797da7092443e645636037a06c734b5f182a8d9f734b094ad1f82289c735e",
+          "xl/charts/chart8.xml": "6b4c8a85b39f4c8bd440869664b904fa630ec5657c5c6636688df1b95d52a330",
+          "xl/charts/chart9.xml": "83798fdb9c1423a56905c9b47e9af40eec9471aa8adba94e4805209877a221fb",
+          "xl/charts/chart10.xml": "23a80b566f3625e2e87f8bef16d8243da8bcf5c6f1fc864f4b3983e2e384a850",
+          "xl/charts/chart11.xml": "78ccfa4d1b06921d37316107a6ad139599aeef9801c0081483a131a834f9a0eb",
+          "xl/charts/chart12.xml": "3d1af67f76ec5930513a264bcd0b64fe1763b4a915518d60c55666a5d261c06d",
+          "xl/charts/chart13.xml": "9b46cbde02b6dd3b17bcf500f5e6fbc3ec1d4ded948009ff598252c18eae172f",
+          "xl/charts/chart14.xml": "b71d86dfffe4915d019d85abeff62572e8b4e4e06b062d4b5ccffd02ad26daa4",
+          "xl/charts/chart15.xml": "5256d77cb9328a5bdbe272705e595df13b4b81fb5ab73df2fb6a7a33b7778a99",
+          "xl/charts/chart16.xml": "9997c0be896aa37d5b7b827d1fa15cd2a5b0c42f3393f0d594bd6f8c563cfa3c",
+          "xl/charts/chart17.xml": "d05762b3f2a5071c788b7a00a5643e35bd60bc46b196cb183419faa64a44e4fb"
+        }
+      }
+    },
+    "xlsb": {
+      "container_kind": "OPC ZIP with BIFF12 binary workbook/worksheet/index streams plus native XML DrawingML chart resources",
+      "zip_integrity": "pass",
+      "member_count": 163,
+      "workbook_binary_part": "xl/workbook.bin",
+      "worksheet_binary_parts": 18,
+      "worksheet_binary_index_parts": 18,
+      "worksheet_relationship_parts": 18,
+      "drawing_parts": 18,
+      "chart_parts": 17,
+      "chart_style_parts": 15,
+      "chart_color_style_parts": 15,
+      "chart_relationship_parts": 15,
+      "media_parts": [
+        "xl/media/image1.png",
+        "xl/media/image2.svg"
+      ],
+      "chart_xml_payloads": {
+        "all_17_present": true,
+        "byte_identical_to_xlsx_chart_xml": true
+      },
+      "binary_record_validation": {
+        "command": "cargo run --quiet -p litchi --example dump_xlsb_structure --features ooxml --no-default-features -- test-data/microsoft-office/excel/excel-chart-families.xlsb",
+        "result": "pass",
+        "observed": "workbook.bin, 18 worksheet .bin streams, 18 binaryIndex .bin streams, 18 DrawingML drawing parts and all 17 chart XML resources listed; BIFF12 iteration completed without truncation."
+      }
+    },
+    "xls": {
+      "container_kind": "CFB/OLE2 BIFF8",
+      "file_size_bytes": 253952,
+      "workbook_stream_bytes": 242420,
+      "cfb_directory_streams": [
+        {
+          "path": "/Workbook",
+          "bytes": 242420
+        },
+        {
+          "path": "/\u0005SummaryInformation",
+          "bytes": 4096
+        },
+        {
+          "path": "/\u0005DocumentSummaryInformation",
+          "bytes": 4096
+        }
+      ],
+      "boundsheet8_count": 18,
+      "bof_eof_inventory": {
+        "workbook_bof_dt_0005": 1,
+        "worksheet_bof_dt_0010": 18,
+        "nested_embedded_chart_bof_dt_0020": 17,
+        "total_bof_records": 36,
+        "total_eof_records": 36
+      },
+      "chart_record_families_observed": [
+        "0x0850",
+        "0x0852",
+        "0x0853",
+        "0x08A4",
+        "0x089D",
+        "0x089E",
+        "0x08A7",
+        "0x1001",
+        "0x1002",
+        "0x1003",
+        "0x1006",
+        "0x1007",
+        "0x1009",
+        "0x100A",
+        "0x100B",
+        "0x100D",
+        "0x1014",
+        "0x1015",
+        "0x1016",
+        "0x1017",
+        "0x1018",
+        "0x1019",
+        "0x101A",
+        "0x101B",
+        "0x101C",
+        "0x101D",
+        "0x101E",
+        "0x101F",
+        "0x1020",
+        "0x1021",
+        "0x1022",
+        "0x1024",
+        "0x1025",
+        "0x1026",
+        "0x1027",
+        "0x1032",
+        "0x1033",
+        "0x1034",
+        "0x103A",
+        "0x103E",
+        "0x103F",
+        "0x1041",
+        "0x1044",
+        "0x1045",
+        "0x1046",
+        "0x104A",
+        "0x104B",
+        "0x104E",
+        "0x104F",
+        "0x1050",
+        "0x1051",
+        "0x105B",
+        "0x105F",
+        "0x1061",
+        "0x1062",
+        "0x1064",
+        "0x1065",
+        "0x1066"
+      ],
+      "workbook_stream_record_count": 5272
+    }
+  },
+  "library_validation": {
+    "scope": "Read-only inspection; no library-generated fixture or source edit was performed.",
+    "xlsx_reader": {
+      "command": "cargo run --quiet -p litchi-xlsx --example read_xlsx -- test-data/microsoft-office/excel/excel-chart-families.xlsx",
+      "result": "pass",
+      "worksheet_count": 18,
+      "worksheet_names": [
+        "Line_013",
+        "Area_013",
+        "Pie_013",
+        "Radar_013",
+        "Surface_013",
+        "Scatter_013",
+        "Bubble_013",
+        "DrawingSVG_013",
+        "Bar_013",
+        "Bar3D_013",
+        "Area3D_013",
+        "Line3D_013",
+        "Contour_013",
+        "Doughnut_013",
+        "OfPie_013",
+        "Pie3D_013",
+        "Stock_013",
+        "Combo_013"
+      ],
+      "active_sheet": "Contour_013",
+      "marker_values": {
+        "Line_013!F1": "EXCEL_CHART_FAMILIES_013",
+        "Line_013!F2": "Fixture ID: excel-chart-families-013",
+        "DrawingSVG_013!A1": "EXCEL_SVG_013",
+        "DrawingSVG_013!A2": "END_CHART_DRAWING_013"
+      },
+      "boundary": "Cell values and cached source numbers were read; chart XML, drawing relationships, and SVG payloads were verified by raw OPC inspection rather than this cell-only example."
+    },
+    "xlsb_reader": {
+      "command": "cargo run --quiet -p litchi --example xlsb_reader --features ooxml --no-default-features -- test-data/microsoft-office/excel/excel-chart-families.xlsb",
+      "result": "pass",
+      "worksheet_text_extraction": "All 18 worksheet source ranges and SVG markers emitted; no open or text-extraction error.",
+      "boundary": "Confirms BIFF12 worksheet access but does not claim typed chart rendering or complete chart semantic traversal."
+    },
+    "xlsb_indexed_reader": {
+      "command": "cargo run --quiet -p litchi-xlsb --example binary_index_profile -- --fixture test-data/microsoft-office/excel/excel-chart-families.xlsb --case indexed_cold --sheet 1 --warmup 1 --samples 1",
+      "result": "pass",
+      "semantic_ok": true,
+      "cell_count": 24,
+      "dimensions_zero_based": [
+        0,
+        0,
+        5,
+        3
+      ],
+      "digest_stable": true
+    },
+    "xlsb_binary_structure": {
+      "command": "cargo run --quiet -p litchi --example dump_xlsb_structure --features ooxml --no-default-features -- test-data/microsoft-office/excel/excel-chart-families.xlsb",
+      "result": "pass",
+      "observed": "BIFF12 iteration completed for workbook.bin, worksheet .bin streams, binary index streams, and styles.bin; chart XML and drawing parts were present."
+    },
+    "xls_reader": {
+      "command": "cargo run --quiet -p litchi-xls --example read_xls -- test-data/microsoft-office/excel/excel-chart-families.xls",
+      "result": "pass",
+      "worksheet_count_exposed": 1,
+      "worksheet_names_exposed": [
+        "DrawingSVG_013"
+      ],
+      "native_boundsheet_count": 18,
+      "boundary": "Generic facade exposed the SVG marker worksheet while raw BIFF8 retained 17 nested chart substreams. This is a reader projection boundary, not evidence of native Excel loss."
+    },
+    "xls_cfb_reader": {
+      "command": "cargo run --quiet -p litchi-ole-common --example inspect_ole -- test-data/microsoft-office/excel/excel-chart-families.xls",
+      "result": "pass",
+      "signature": "D0 CF 11 E0 A1 B1 1A E1",
+      "stream_count": 3,
+      "workbook_stream_bytes": 242420
+    },
+    "xls_record_reader": {
+      "command": "cargo run --quiet -p litchi-xls --example dump_xls_records -- test-data/microsoft-office/excel/excel-chart-families.xls",
+      "result": "pass",
+      "workbook_stream_bytes": 242420,
+      "record_count": 5272,
+      "boundsheet8_count": 18,
+      "nested_embedded_chart_substreams": 17,
+      "truncation_or_parse_error": false
+    }
+  },
+  "files": [
+    {
+      "path": "test-data/microsoft-office/excel/excel-chart-families.xlsx",
+      "format": "xlsx",
+      "bytes": 128168,
+      "sha256": "eae01ec29bec519fcdb2f474068eab3e2845ea63a14bdbad7ad662d209218fbd",
+      "file_description": "Microsoft Excel 2007+ transitional OOXML",
+      "container_kind": "OPC ZIP",
+      "native_reopen_validation": "pass",
+      "zip_member_count": 145,
+      "zip_integrity": "pass"
+    },
+    {
+      "path": "test-data/microsoft-office/excel/excel-chart-families.xlsb",
+      "format": "xlsb",
+      "bytes": 128103,
+      "sha256": "d2f7a10375577f7014443eaf49a4215ff33d6bb48f15dc8bce77ca25c88b4da7",
+      "file_description": "Microsoft Excel Binary Workbook",
+      "container_kind": "OPC ZIP with BIFF12 binary workbook/worksheet parts and XML chart resources",
+      "native_reopen_validation": "pass",
+      "zip_member_count": 163,
+      "zip_integrity": "pass"
+    },
+    {
+      "path": "test-data/microsoft-office/excel/excel-chart-families.xls",
+      "format": "xls",
+      "bytes": 253952,
+      "sha256": "94aed9811a45661ee033e79738b46f0b98d8c89a76b7f2f5913ea01cd6ff5097",
+      "file_description": "Composite Document File V2 Document, Microsoft Macintosh Excel",
+      "container_kind": "CFB/OLE2 BIFF8",
+      "native_reopen_validation": "pass",
+      "workbook_stream_bytes": 242420,
+      "cfb_directory_streams": [
+        {
+          "path": "/Workbook",
+          "bytes": 242420
+        },
+        {
+          "path": "/\u0005SummaryInformation",
+          "bytes": 4096
+        },
+        {
+          "path": "/\u0005DocumentSummaryInformation",
+          "bytes": 4096
+        }
+      ],
+      "cfb_directory_stream_count": 3
+    }
+  ],
+  "validation_methods": [
+    "SHA-256 and byte sizes were computed from closed final fixture streams.",
+    "ZIP central-directory and CRC checks passed for XLSX and XLSB.",
+    "All 17 chart XML parts were parsed read-only; each cache had five points and all XLSX/XLSB chart XML hashes matched.",
+    "Chart style/color relationships, chart-axis IDs, source formulas, error-bar payloads, trendline flags, bubble-size ranges, stock series, combo axis groups, and SVG/raster drawing relationships were inspected without rewriting bytes.",
+    "BIFF12 record inventory was inspected with dump_xlsb_structure and binary_index_profile; no chart part was treated as executable code.",
+    "The BIFF8 Workbook stream was inspected with dump_xls_records and inspect_ole; nested chart BOF/EOF framing and chart record families were retained as raw evidence.",
+    "Existing litchi-xlsx, litchi-xlsb, litchi-xls and litchi-cfb reader examples were invoked read-only; their projection boundaries are recorded above.",
+    "Native Excel close, reopen, warning choice, chart retention, SVG fallback behavior and marker observations are from the root Computer Use session; this inspection did not operate Office UI."
+  ],
+  "native_ui_observation_source": "Root agent Computer Use session; all three final fixtures were saved through native Microsoft Excel, closed, reopened, inspected and closed again without a repair prompt."
+}

@@ -1,0 +1,528 @@
+{
+  "schema_version": 1,
+  "fixture_id": "powerpoint-visual-objects-format-variants-003",
+  "generated_on": "2026-10-15",
+  "purpose": "Read-only inspection of four native Microsoft PowerPoint format variants derived from the visual-object source deck, with package and reader evidence for test-fixture use.",
+  "provenance": {
+    "producer_app": "Microsoft Office PowerPoint",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "package_application": "Microsoft Macintosh PowerPoint",
+    "package_app_version": "16.0000",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft PowerPoint UI",
+    "source_fixture": "test-data/microsoft-office/powerpoint/powerpoint-visual-objects.pptx",
+    "source_inspection": "test-data/microsoft-office/powerpoint/visual-objects-inspection.json",
+    "derivation_chain": [
+      "powerpoint-visual-objects.pptx",
+      "powerpoint-visual-objects.potx",
+      "powerpoint-visual-objects.ppsx",
+      "powerpoint-visual-objects.pot",
+      "powerpoint-visual-objects.pps"
+    ],
+    "derivation_method": "Microsoft PowerPoint Save As through the native UI; no LibreOffice or programmatic Office generation was used.",
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "all_documents_closed_before_hashing": true,
+    "lock_files_present_at_inspection": false
+  },
+  "source_expected_features": {
+    "reference": "visual-objects-inspection.json",
+    "slide_count": 5,
+    "slide_titles": [
+      "Native PowerPoint visual objects",
+      "EMBEDDED_PICTURE_002",
+      "SMARTART_PROCESS_002",
+      "EMBEDDED_CHART_002",
+      "DRAWINGS_CONNECTOR_002"
+    ],
+    "markers": [
+      "Fixture ID: powerpoint-visual-objects-002",
+      "PICTURE_ALT_002",
+      "Acquire",
+      "Transform",
+      "Verify",
+      "REGIONAL_TOTALS_002",
+      "SOURCE_002",
+      "TARGET_002"
+    ],
+    "features": [
+      "Slide 2 embeds test-data/images/jpg/abstract1.jpg with the PICTURE_ALT_002 alt-text marker.",
+      "Slide 3 contains BasicProcess SmartArt with Acquire, Transform and Verify nodes and two connectors.",
+      "Slide 4 contains the REGIONAL_TOTALS_002 clustered-column chart with North, South and West series over Q1-Q4 and an embedded Excel worksheet.",
+      "Slide 5 contains grouped SOURCE_002 and TARGET_002 drawings with an elbow connector."
+    ]
+  },
+  "scope_and_limits": {
+    "variants": [
+      "potx",
+      "ppsx",
+      "pot",
+      "pps"
+    ],
+    "native_reopen_verified": true,
+    "native_reopen_repair_prompt": false,
+    "template_instantiation_claimed": false,
+    "slideshow_run_verified": true,
+    "os_finder_auto_launch_claimed": false,
+    "external_links_followed": false,
+    "macros_or_external_code_executed": false,
+    "legacy_chart_semantics_fully_decoded": false,
+    "legacy_smartart_editability_claimed": false,
+    "legacy_warning_scope": "PowerPoint warned that chart data could exceed legacy XLS row/column limits and that SmartArt would not be editable in pre-2007 PowerPoint; both warnings were acknowledged before saving the POT and PPS derivatives.",
+    "legacy_reader_shape_limit": "The normal litchi-ppt text reader reports slide 5 as zero shapes through its unwrap_or(0) fallback. The strict existing probe reaches slide 5 and returns OfficeArt(MalformedShape { reason: \"OfficeArt container header is invalid\" }); no legacy shape-parity claim is made."
+  },
+  "native_ui_validation": {
+    "observed_by": "Root agent via Computer Use",
+    "application": "Microsoft PowerPoint",
+    "saved_and_closed": [
+      "test-data/microsoft-office/powerpoint/powerpoint-visual-objects.potx",
+      "test-data/microsoft-office/powerpoint/powerpoint-visual-objects.ppsx",
+      "test-data/microsoft-office/powerpoint/powerpoint-visual-objects.pot",
+      "test-data/microsoft-office/powerpoint/powerpoint-visual-objects.pps"
+    ],
+    "reopen_variants": {
+      "potx": {
+        "path": "test-data/microsoft-office/powerpoint/powerpoint-visual-objects.potx",
+        "opened_exact_file_with_powerpoint_open": true,
+        "repair_prompt": false,
+        "slide_titles_match_source": true,
+        "template_instantiation_claimed": false
+      },
+      "ppsx": {
+        "path": "test-data/microsoft-office/powerpoint/powerpoint-visual-objects.ppsx",
+        "opened_exact_file_with_powerpoint_open": true,
+        "repair_prompt": false,
+        "slide_titles_match_source": true
+      },
+      "pot": {
+        "path": "test-data/microsoft-office/powerpoint/powerpoint-visual-objects.pot",
+        "opened_exact_file_with_powerpoint_open": true,
+        "repair_prompt": false,
+        "slide_titles_match_source": true,
+        "template_instantiation_claimed": false
+      },
+      "pps": {
+        "path": "test-data/microsoft-office/powerpoint/powerpoint-visual-objects.pps",
+        "opened_exact_file_with_powerpoint_open": true,
+        "repair_prompt": false,
+        "slide_titles_match_source": true
+      }
+    },
+    "legacy_save_warnings": {
+      "shown": true,
+      "accepted": true,
+      "affected_formats": [
+        "pot",
+        "pps"
+      ],
+      "messages": [
+        "Chart data rows/columns may exceed legacy XLS limits (65536 rows/256 columns).",
+        "SmartArt will not be editable in pre-2007 PowerPoint."
+      ]
+    },
+    "slide_show": {
+      "paths": [
+        "test-data/microsoft-office/powerpoint/powerpoint-visual-objects.ppsx",
+        "test-data/microsoft-office/powerpoint/powerpoint-visual-objects.pps"
+      ],
+      "activated_control": "PowerPoint SlideShow radio",
+      "traversal": "Slides 1 through 5 traversed with Right.",
+      "accessibility_titles": [
+        "Native PowerPoint visual objects",
+        "EMBEDDED_PICTURE_002",
+        "SMARTART_PROCESS_002",
+        "EMBEDDED_CHART_002",
+        "DRAWINGS_CONNECTOR_002"
+      ],
+      "all_five_titles_matched": true,
+      "final_markers_observed": [
+        "SOURCE_002",
+        "TARGET_002"
+      ],
+      "escape_used": true,
+      "closed_afterward": true,
+      "os_finder_auto_launch_claimed": false
+    }
+  },
+  "variants": [
+    {
+      "path": "test-data/microsoft-office/powerpoint/powerpoint-visual-objects.potx",
+      "format": "potx",
+      "bytes": 146947,
+      "sha256": "32b984e41daad175f926de235f7b9332d1bfb1e31e4afa04dee418778e87c735",
+      "file_description": "Microsoft PowerPoint 2007+",
+      "container": {
+        "kind": "OPC ZIP",
+        "zip_test": "pass",
+        "member_count": 56,
+        "member_names_same_as_source_pptx": true,
+        "xml_or_rels_parse": "pass",
+        "relationship_target_check": "pass; package relationship parts are unchanged from source",
+        "presentation_content_type": "application/vnd.openxmlformats-officedocument.presentationml.template.main+xml",
+        "presentation_relationships_same_as_source": true,
+        "changed_from_source_pptx": {
+          "[Content_Types].xml": {
+            "source_bytes": 4812,
+            "source_sha256": "285a40e0e56016258ffa26f0e10e5b1b74f5b353a86db4f87ef4c68c4cee9e7d",
+            "variant_bytes": 4808,
+            "variant_sha256": "a6693a896715d1f30bfc9274a94a12b5e4d9650811e9d1cba31850fa754e0934",
+            "reason": "The /ppt/presentation.xml override changes to the template main content type."
+          },
+          "ppt/presentation.xml": {
+            "source_bytes": 3361,
+            "source_sha256": "d2116f3263400968ab9389203fb52f1eee6cbfbb6659c0dd568a6c7d1679826a",
+            "variant_bytes": 3529,
+            "variant_sha256": "557d68c0bdf6ffcab3f89efa44d3b8801ecde2cdc2522cc48b148a94c692dac9",
+            "reason": "PowerPoint adds an empty p15:sldGuideLst extension; slide IDs, order, size and default text style remain unchanged."
+          },
+          "ppt/theme/theme1.xml": {
+            "source_bytes": 8723,
+            "source_sha256": "b3d77e0bc8b68d1b8aa69c2f44fc1708555190efc68544ab94834647ab4ca584",
+            "variant_bytes": 8736,
+            "variant_sha256": "38af142d963c52516bca973f4fe5c277b7985bc81054e6a11e854a58b4fdf1b3",
+            "reason": "PowerPoint updates the themeFamily name and identifiers to the variant basename."
+          },
+          "ppt/viewProps.xml": {
+            "source_bytes": 774,
+            "source_sha256": "e49164f71e68313dce50e0f035494ceced2404bb9d4c1aa37ea4c793474fd7b4",
+            "variant_bytes": 774,
+            "variant_sha256": "b083e44642e4dd024dd635fc092ebd12a4df94759ccf808e714e4eb3d6d539f9",
+            "reason": "PowerPoint changes normalViewPr/restoredLeft from 15621 to 15611."
+          },
+          "docProps/app.xml": {
+            "source_bytes": 1475,
+            "source_sha256": "b97fd4ba6c367f4c0ee38eda51d0205488ae5452c6db332298ee5d7a96496a41",
+            "variant_bytes": 1496,
+            "variant_sha256": "089381e0f63e66209cdb066d9a6cec7a70dc987ba45a93cb0ad29039d00a5ae8",
+            "reason": "PowerPoint adds an empty Template property."
+          },
+          "docProps/core.xml": {
+            "source_bytes": 660,
+            "source_sha256": "f3be1edb904b1e9147c2f566a72f0d1dcbf539e275e2d962dccb3442f564e65c",
+            "variant_bytes": 660,
+            "variant_sha256": "5cb1d6effe63c78865625ec91ceedf9111b5c7ec32305bdc10c15eca288d24b3",
+            "reason": "PowerPoint updates dcterms:modified to 2026-10-15T06:58:47Z."
+          }
+        },
+        "feature_parts_same_as_source": [
+          "_rels/.rels",
+          "ppt/_rels/presentation.xml.rels",
+          "ppt/slides/slide1.xml",
+          "ppt/slides/slide2.xml",
+          "ppt/slides/slide3.xml",
+          "ppt/slides/slide4.xml",
+          "ppt/slides/slide5.xml",
+          "ppt/charts/chart1.xml",
+          "ppt/diagrams/data1.xml",
+          "ppt/embeddings/Microsoft_Excel_Worksheet.xlsx",
+          "ppt/media/image1.jpg"
+        ],
+        "key_part_hashes": {
+          "ppt/slides/slide1.xml": "188a5a60dee8847171314d346e1229dd1fef44f8d4f5973c60f581c5e566a429",
+          "ppt/slides/slide2.xml": "64ee9ee46c05c21ad47221d6383ba80659a12f6d95dd42dda4d1bf46d9c208f9",
+          "ppt/slides/slide3.xml": "04acd1f160d6e6d75645801351526c21f4fa859cd7d2905529a6cb71f11abfed",
+          "ppt/slides/slide4.xml": "07a8e5ac26d09c89edfa8a0b0186b7a920a2535f2af3b4bcef5a2b9dc999cce9",
+          "ppt/slides/slide5.xml": "17c397aff64b78b16f0ca6430bb0461d0c8a4c92e080c1feff50cd503c65cc68",
+          "ppt/charts/chart1.xml": "a83b56bb84fdcff902557dd1abaef388d4973a14c2b7de8b2f299bb5192470e4",
+          "ppt/diagrams/data1.xml": "90bb45eb7d2734c5de9ca4eea5ada20070192cecf69cbfa65ec7114e5f8ecda3",
+          "ppt/embeddings/Microsoft_Excel_Worksheet.xlsx": "af2f15cd6d57f6e182e9d245a70cdddc5402fc8f0494f29b1b0707772abd99ff",
+          "ppt/media/image1.jpg": "b6f8d168d41e0fc296eb1e0e3855d9669584b7528c2ef4966817443d9bc9b929"
+        }
+      },
+      "library_read": {
+        "reader": "litchi-pptx::Package::open -> presentation",
+        "package_open": "pass",
+        "slide_count": 5,
+        "slide_size_emu": [
+          12192000,
+          6858000
+        ],
+        "slide_text": [
+          "Native PowerPoint visual objects\nFixture ID: powerpoint-visual-objects-002\nPictures, drawings, charts and SmartArt",
+          "EMBEDDED_PICTURE_002",
+          "SMARTART_PROCESS_002",
+          "EMBEDDED_CHART_002",
+          "DRAWINGS_CONNECTOR_002\nSOURCE_002\nTARGET_002"
+        ],
+        "semantic_shape_counts": [
+          2,
+          2,
+          2,
+          2,
+          5
+        ],
+        "legacy_litchi_ppt_probe": "not_applicable; litchi-ppt expects CFB/OLE and returns Ole(NotOleFile) for this OPC ZIP."
+      },
+      "native_ui_validation": {
+        "reopen": "pass",
+        "repair_prompt": false,
+        "opened_exact_file_with_powerpoint_open": true,
+        "template_instantiation_claimed": false
+      }
+    },
+    {
+      "path": "test-data/microsoft-office/powerpoint/powerpoint-visual-objects.ppsx",
+      "format": "ppsx",
+      "bytes": 146946,
+      "sha256": "bcacaefa1b30c32db879f9fe1262ea8a1c1db342049ced31f2ece99b2b3ee1d4",
+      "file_description": "Microsoft PowerPoint 2007+",
+      "container": {
+        "kind": "OPC ZIP",
+        "zip_test": "pass",
+        "member_count": 56,
+        "member_names_same_as_source_pptx": true,
+        "xml_or_rels_parse": "pass",
+        "relationship_target_check": "pass; package relationship parts are unchanged from source",
+        "presentation_content_type": "application/vnd.openxmlformats-officedocument.presentationml.slideshow.main+xml",
+        "presentation_relationships_same_as_source": true,
+        "changed_from_source_pptx": {
+          "[Content_Types].xml": {
+            "source_bytes": 4812,
+            "source_sha256": "285a40e0e56016258ffa26f0e10e5b1b74f5b353a86db4f87ef4c68c4cee9e7d",
+            "variant_bytes": 4809,
+            "variant_sha256": "1e46ee603f198e6018871597fcb9e1e5dd6738623e4f685ec941e8cbc6c33edf",
+            "reason": "The /ppt/presentation.xml override changes to the slideshow main content type."
+          },
+          "ppt/presentation.xml": {
+            "source_bytes": 3361,
+            "source_sha256": "d2116f3263400968ab9389203fb52f1eee6cbfbb6659c0dd568a6c7d1679826a",
+            "variant_bytes": 3529,
+            "variant_sha256": "557d68c0bdf6ffcab3f89efa44d3b8801ecde2cdc2522cc48b148a94c692dac9",
+            "reason": "PowerPoint adds an empty p15:sldGuideLst extension; slide IDs, order, size and default text style remain unchanged."
+          },
+          "ppt/theme/theme1.xml": {
+            "source_bytes": 8723,
+            "source_sha256": "b3d77e0bc8b68d1b8aa69c2f44fc1708555190efc68544ab94834647ab4ca584",
+            "variant_bytes": 8736,
+            "variant_sha256": "38af142d963c52516bca973f4fe5c277b7985bc81054e6a11e854a58b4fdf1b3",
+            "reason": "PowerPoint updates the themeFamily name and identifiers to the variant basename."
+          },
+          "ppt/viewProps.xml": {
+            "source_bytes": 774,
+            "source_sha256": "e49164f71e68313dce50e0f035494ceced2404bb9d4c1aa37ea4c793474fd7b4",
+            "variant_bytes": 774,
+            "variant_sha256": "b083e44642e4dd024dd635fc092ebd12a4df94759ccf808e714e4eb3d6d539f9",
+            "reason": "PowerPoint changes normalViewPr/restoredLeft from 15621 to 15611."
+          },
+          "docProps/app.xml": {
+            "source_bytes": 1475,
+            "source_sha256": "b97fd4ba6c367f4c0ee38eda51d0205488ae5452c6db332298ee5d7a96496a41",
+            "variant_bytes": 1496,
+            "variant_sha256": "089381e0f63e66209cdb066d9a6cec7a70dc987ba45a93cb0ad29039d00a5ae8",
+            "reason": "PowerPoint adds an empty Template property."
+          },
+          "docProps/core.xml": {
+            "source_bytes": 660,
+            "source_sha256": "f3be1edb904b1e9147c2f566a72f0d1dcbf539e275e2d962dccb3442f564e65c",
+            "variant_bytes": 660,
+            "variant_sha256": "d166477b42eb80ec2863d8e2226f1b73a916e0611da9d1ef9bf094dca916ac69",
+            "reason": "PowerPoint updates dcterms:modified to 2026-10-15T06:58:56Z."
+          }
+        },
+        "feature_parts_same_as_source": [
+          "_rels/.rels",
+          "ppt/_rels/presentation.xml.rels",
+          "ppt/slides/slide1.xml",
+          "ppt/slides/slide2.xml",
+          "ppt/slides/slide3.xml",
+          "ppt/slides/slide4.xml",
+          "ppt/slides/slide5.xml",
+          "ppt/charts/chart1.xml",
+          "ppt/diagrams/data1.xml",
+          "ppt/embeddings/Microsoft_Excel_Worksheet.xlsx",
+          "ppt/media/image1.jpg"
+        ],
+        "key_part_hashes": {
+          "ppt/slides/slide1.xml": "188a5a60dee8847171314d346e1229dd1fef44f8d4f5973c60f581c5e566a429",
+          "ppt/slides/slide2.xml": "64ee9ee46c05c21ad47221d6383ba80659a12f6d95dd42dda4d1bf46d9c208f9",
+          "ppt/slides/slide3.xml": "04acd1f160d6e6d75645801351526c21f4fa859cd7d2905529a6cb71f11abfed",
+          "ppt/slides/slide4.xml": "07a8e5ac26d09c89edfa8a0b0186b7a920a2535f2af3b4bcef5a2b9dc999cce9",
+          "ppt/slides/slide5.xml": "17c397aff64b78b16f0ca6430bb0461d0c8a4c92e080c1feff50cd503c65cc68",
+          "ppt/charts/chart1.xml": "a83b56bb84fdcff902557dd1abaef388d4973a14c2b7de8b2f299bb5192470e4",
+          "ppt/diagrams/data1.xml": "90bb45eb7d2734c5de9ca4eea5ada20070192cecf69cbfa65ec7114e5f8ecda3",
+          "ppt/embeddings/Microsoft_Excel_Worksheet.xlsx": "af2f15cd6d57f6e182e9d245a70cdddc5402fc8f0494f29b1b0707772abd99ff",
+          "ppt/media/image1.jpg": "b6f8d168d41e0fc296eb1e0e3855d9669584b7528c2ef4966817443d9bc9b929"
+        }
+      },
+      "library_read": {
+        "reader": "litchi-pptx::Package::open -> presentation",
+        "package_open": "pass",
+        "slide_count": 5,
+        "slide_size_emu": [
+          12192000,
+          6858000
+        ],
+        "slide_text": [
+          "Native PowerPoint visual objects\nFixture ID: powerpoint-visual-objects-002\nPictures, drawings, charts and SmartArt",
+          "EMBEDDED_PICTURE_002",
+          "SMARTART_PROCESS_002",
+          "EMBEDDED_CHART_002",
+          "DRAWINGS_CONNECTOR_002\nSOURCE_002\nTARGET_002"
+        ],
+        "semantic_shape_counts": [
+          2,
+          2,
+          2,
+          2,
+          5
+        ],
+        "legacy_litchi_ppt_probe": "not_applicable; litchi-ppt expects CFB/OLE and returns Ole(NotOleFile) for this OPC ZIP."
+      },
+      "native_ui_validation": {
+        "reopen": "pass",
+        "repair_prompt": false,
+        "opened_exact_file_with_powerpoint_open": true,
+        "slide_show_run": true,
+        "all_five_titles_matched": true,
+        "final_markers_observed": [
+          "SOURCE_002",
+          "TARGET_002"
+        ]
+      }
+    },
+    {
+      "path": "test-data/microsoft-office/powerpoint/powerpoint-visual-objects.pot",
+      "format": "pot",
+      "bytes": 346112,
+      "sha256": "1542c25eb684e950c474d4e83d3c49956d9cf81b0f5ae854ac18bf1fdb7a6ee6",
+      "file_description": "Composite Document File V2 Document, Little Endian, Os: MacOS, Version 5.26, Code page: 10000, Author: Ryker Zhu, Last Saved By: Ryker Zhu, Revision Number: 1, Name of Creating Application: Microsoft Macintosh PowerPoint, Total Editing Time: 06:44, Create Time/Date: Thu Oct 15 06:15:44 2026, Last Saved Time/Date: Thu Oct 15 06:59:12 2026, Number of Words: 49",
+      "container": {
+        "kind": "Compound File Binary (CFB/OLE)",
+        "cfb_reader": "litchi-cfb::OleFile::open pass via dump_ppt_structure",
+        "stream_count": 5,
+        "streams": [
+          "Pictures",
+          "Current User",
+          "\\u0005SummaryInformation",
+          "PowerPoint Document",
+          "\\u0005DocumentSummaryInformation"
+        ],
+        "known_stream_lengths": {
+          "Current User": 32,
+          "PowerPoint Document": 150682
+        },
+        "powerpoint_document_record_evidence": {
+          "record": "ExternalOleEmbed is present in the PowerPoint Document stream",
+          "semantic_chart_or_smartart_decode": false
+        }
+      },
+      "library_read": {
+        "reader": "litchi-ppt::Package::open -> presentation",
+        "package_open": "pass",
+        "slide_count": 5,
+        "has_pictures": true,
+        "total_text_characters": 224,
+        "slide_text": [
+          "Native PowerPoint visual objects\nFixture ID: powerpoint-visual-objects-002\rPictures, drawings, charts and SmartArt",
+          "EMBEDDED_PICTURE_002",
+          "SMARTART_PROCESS_002",
+          "EMBEDDED_CHART_002",
+          "DRAWINGS_CONNECTOR_002\nSOURCE_002\nTARGET_002"
+        ],
+        "fallback_shape_counts": [
+          2,
+          2,
+          2,
+          2,
+          0
+        ],
+        "strict_shape_probe": {
+          "probe": "/private/tmp/ppt_native_inspect/target/debug/ppt_native_inspect",
+          "slides_1_to_4": "pass",
+          "error_at": "slide 5 shape_count",
+          "error": "OfficeArt(MalformedShape { reason: \"OfficeArt container header is invalid\" })"
+        }
+      },
+      "native_ui_validation": {
+        "reopen": "pass",
+        "repair_prompt": false,
+        "opened_exact_file_with_powerpoint_open": true,
+        "slide_titles_match_source": true,
+        "template_instantiation_claimed": false,
+        "legacy_save_warning_shown_and_accepted": true,
+        "chart_and_smartart_editability_claimed": false
+      }
+    },
+    {
+      "path": "test-data/microsoft-office/powerpoint/powerpoint-visual-objects.pps",
+      "format": "pps",
+      "bytes": 352768,
+      "sha256": "dab26b532f2308b728849b3f16d2306e539b9351e876c22756efae5ee33b886d",
+      "file_description": "Composite Document File V2 Document, Little Endian, Os: MacOS, Version 5.26, Code page: 10000, Author: Ryker Zhu, Last Saved By: Ryker Zhu, Revision Number: 1, Name of Creating Application: Microsoft Macintosh PowerPoint, Total Editing Time: 06:58, Create Time/Date: Thu Oct 15 06:15:44 2026, Last Saved Time/Date: Thu Oct 15 06:59:26 2026, Number of Words: 49",
+      "container": {
+        "kind": "Compound File Binary (CFB/OLE)",
+        "cfb_reader": "litchi-cfb::OleFile::open pass via dump_ppt_structure",
+        "stream_count": 5,
+        "streams": [
+          "Pictures",
+          "Current User",
+          "\\u0005SummaryInformation",
+          "PowerPoint Document",
+          "\\u0005DocumentSummaryInformation"
+        ],
+        "known_stream_lengths": {
+          "Current User": 4096,
+          "PowerPoint Document": 150843
+        },
+        "powerpoint_document_record_evidence": {
+          "record": "ExternalOleEmbed is present in the PowerPoint Document stream",
+          "semantic_chart_or_smartart_decode": false
+        }
+      },
+      "library_read": {
+        "reader": "litchi-ppt::Package::open -> presentation",
+        "package_open": "pass",
+        "slide_count": 5,
+        "has_pictures": true,
+        "total_text_characters": 224,
+        "slide_text": [
+          "Native PowerPoint visual objects\nFixture ID: powerpoint-visual-objects-002\rPictures, drawings, charts and SmartArt",
+          "EMBEDDED_PICTURE_002",
+          "SMARTART_PROCESS_002",
+          "EMBEDDED_CHART_002",
+          "DRAWINGS_CONNECTOR_002\nSOURCE_002\nTARGET_002"
+        ],
+        "fallback_shape_counts": [
+          2,
+          2,
+          2,
+          2,
+          0
+        ],
+        "strict_shape_probe": {
+          "probe": "/private/tmp/ppt_native_inspect/target/debug/ppt_native_inspect",
+          "slides_1_to_4": "pass",
+          "error_at": "slide 5 shape_count",
+          "error": "OfficeArt(MalformedShape { reason: \"OfficeArt container header is invalid\" })"
+        }
+      },
+      "native_ui_validation": {
+        "reopen": "pass",
+        "repair_prompt": false,
+        "opened_exact_file_with_powerpoint_open": true,
+        "slide_titles_match_source": true,
+        "legacy_save_warning_shown_and_accepted": true,
+        "slide_show_run": true,
+        "all_five_titles_matched": true,
+        "final_markers_observed": [
+          "SOURCE_002",
+          "TARGET_002"
+        ],
+        "chart_and_smartart_editability_claimed": false
+      }
+    }
+  ],
+  "validation_methods": [
+    "SHA-256 and byte size computed from all four closed final fixture byte streams.",
+    "file identified the two OOXML variants as Microsoft PowerPoint 2007+ and the two legacy variants as CFB/OLE Microsoft PowerPoint documents.",
+    "unzip -t and Python ZipFile.testzip passed for both OOXML variants; each contained 56 members.",
+    "Python ElementTree parsed every XML and .rels member in the source PPTX, POTX and PPSX packages.",
+    "OOXML member-name sets, package relationships, slide XML, SmartArt data, chart XML, embedded workbook bytes and embedded picture bytes were compared with the source PPTX.",
+    "Existing litchi-pptx read_pptx was run against the PPTX, POTX and PPSX files; each opened with five slides, the source slide size and five semantic shapes on slide 5.",
+    "Existing litchi-ppt read_ppt and dump_ppt_structure were run against the POT and PPS files; CFB streams opened, five slides and all source text were recovered, and the strict shape probe recorded the existing slide-5 OfficeArt boundary.",
+    "Root Computer Use observations record exact-file PowerPoint reopen without repair, legacy warning acknowledgement, and PPSX/PPS SlideShow traversal with all five accessibility titles and the final SOURCE_002/TARGET_002 markers."
+  ],
+  "native_ui_observation_source": "Root agent Computer Use session; this inspection process did not operate Office UI."
+}

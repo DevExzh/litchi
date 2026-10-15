@@ -1,0 +1,628 @@
+{
+  "schema_version": 1,
+  "fixture_id": "excel-visual-analytics-004",
+  "generated_on": "2026-10-15",
+  "purpose": "Fixture-specific, read-only inspection of five native Microsoft Excel derivatives exercising structured-table filtering and sorting, PivotTable and PivotCache storage, sparklines, hidden rows and columns, and outline grouping across OOXML, Strict OOXML, BIFF12, and BIFF8.",
+  "provenance": {
+    "producer_app": "Microsoft Office Excel",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "package_application": "Microsoft Macintosh Excel",
+    "package_app_version": "16.0300",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft Excel UI",
+    "source": "Eight deterministic source rows were entered in native Excel, made into the actual Table1 table, filtered to Region=North, sorted by Revenue descending, and used for a Region-by-Product Sum of Revenue PivotTable with Status as a report filter. A second sheet contains two sparkline groups and a small hidden-row/hidden-column outline with deterministic markers.",
+    "native_save_chain": [
+      "xlsx",
+      "xltx",
+      "xlsb",
+      "strict xlsx",
+      "xls"
+    ],
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "all_documents_closed_before_hashing": true,
+    "lock_files_present_at_inspection": false
+  },
+  "scope_and_limits": {
+    "native_variants": [
+      "xlsx",
+      "xltx",
+      "xlsb",
+      "strict_xlsx",
+      "xls"
+    ],
+    "native_excel_reopen_verified": true,
+    "repair_or_conversion_prompt_observed": false,
+    "external_links_followed": false,
+    "external_data_refreshed": false,
+    "template_warning": {
+      "shown_for": "xltx",
+      "prompt_text": "workbook contains external data: clear before template and refresh?",
+      "user_action": "No",
+      "cache_retained": true
+    },
+    "legacy_save_warning": {
+      "shown_for": "xls",
+      "accepted": true,
+      "feature_loss_warning_accepted": true,
+      "semantic_parity_claimed": false
+    },
+    "legacy_derivative_feature_parity_claimed": false,
+    "xlsb_biff12_record_inventory": true,
+    "xls_biff8_record_inventory": true,
+    "sparkline_limit": "Native Excel retained two sparkline groups in XLSX, XLTX, XLSB, and Strict XLSX. Native Excel's legacy XLS save retained the other workbook data but showed no sparklines after reopen; that format-specific loss is recorded rather than treated as parity.",
+    "semantic_limit": "This fixture records native Excel storage and reopen observations for the listed feature families. It does not certify every Excel feature, native rendering equivalence, arbitrary producer parity, or complete BIFF8/BIFF12 decoding by the library."
+  },
+  "expected_native_content": {
+    "worksheet_order": [
+      "Sheet2",
+      "Sheet1",
+      "Sheet3"
+    ],
+    "source_table": {
+      "worksheet": "Sheet1",
+      "actual_table_name": "Table1",
+      "display_name": "Table1",
+      "range": "A1:F9",
+      "columns": [
+        "Date",
+        "Region",
+        "Product",
+        "Revenue",
+        "Units",
+        "Status"
+      ],
+      "row_count": 8,
+      "rows_in_native_sorted_order": [
+        {
+          "row": 2,
+          "date": "2026-03-03",
+          "region": "North",
+          "product": "Widget",
+          "revenue": 16.5,
+          "units": 3,
+          "status": "Open"
+        },
+        {
+          "row": 3,
+          "date": "2026-01-20",
+          "region": "South",
+          "product": "Widget",
+          "revenue": 25,
+          "units": 5,
+          "status": "Closed"
+        },
+        {
+          "row": 4,
+          "date": "2026-04-02",
+          "region": "North",
+          "product": "Gadget",
+          "revenue": 14,
+          "units": 2,
+          "status": "Hold"
+        },
+        {
+          "row": 5,
+          "date": "2026-02-18",
+          "region": "South",
+          "product": "Gadget",
+          "revenue": 48,
+          "units": 4,
+          "status": "Hold"
+        },
+        {
+          "row": 6,
+          "date": "2026-01-15",
+          "region": "North",
+          "product": "Widget",
+          "revenue": 12.5,
+          "units": 3,
+          "status": "Open"
+        },
+        {
+          "row": 7,
+          "date": "2026-03-21",
+          "region": "South",
+          "product": "Gadget",
+          "revenue": 20,
+          "units": 4,
+          "status": "Closed"
+        },
+        {
+          "row": 8,
+          "date": "2026-02-10",
+          "region": "North",
+          "product": "Gadget",
+          "revenue": 9.5,
+          "units": 2,
+          "status": "Open"
+        },
+        {
+          "row": 9,
+          "date": "2026-04-18",
+          "region": "South",
+          "product": "Widget",
+          "revenue": 30,
+          "units": 6,
+          "status": "Open"
+        }
+      ],
+      "dates_are_native_date_cells": true,
+      "filter": {
+        "field": "Region",
+        "value": "North",
+        "table_filter_column_id": 1,
+        "visible_rows_confirmed_before_first_save": [
+          2,
+          4,
+          6,
+          8
+        ],
+        "visible_count_confirmed_before_first_save": 4,
+        "source_count": 8,
+        "filter_mode_retained_on_native_reopen": true
+      },
+      "sort": {
+        "field": "Revenue",
+        "direction": "descending",
+        "sort_state_ref": "A2:F8",
+        "sort_condition_ref": "D1:D9",
+        "sort_condition_descending": true
+      }
+    },
+    "pivot_table": {
+      "worksheet": "Sheet2",
+      "name": "PivotTable1",
+      "cache_id": 5,
+      "cache_source_table": "Table1",
+      "location": "A3:D7",
+      "row_axis": "Region",
+      "column_axis": "Product",
+      "column_items": [
+        "Gadget",
+        "Widget",
+        "Grand Total"
+      ],
+      "report_filter": {
+        "field": "Status",
+        "displayed_value": "(All)"
+      },
+      "data_field": {
+        "field": "Revenue",
+        "function": "Sum",
+        "caption": "Sum of Revenue"
+      },
+      "expected_values": {
+        "B5": 23.5,
+        "C5": 29,
+        "D5": 52.5,
+        "B6": 68,
+        "C6": 55,
+        "D6": 123,
+        "B7": 91.5,
+        "C7": 84,
+        "D7": 175.5
+      },
+      "native_reopen_values_confirmed": {
+        "D5_north_total": 52.5,
+        "D6_south_total": 123,
+        "B7_gadget_total": 91.5,
+        "C7_widget_total": 84,
+        "D7_grand_total": 175.5
+      },
+      "markers": {
+        "A11": "Fixture ID: excel-visual-analytics-004",
+        "A12": "PIVOT_GRAND_TOTAL_004: 175.5"
+      },
+      "pivot_cache_record_count": 8,
+      "cache_fields": [
+        "Date",
+        "Region",
+        "Product",
+        "Revenue",
+        "Units",
+        "Status"
+      ]
+    },
+    "sparkline_groups": {
+      "worksheet": "Sheet3",
+      "group_count": 2,
+      "sparkline_count": 4,
+      "line_group": {
+        "type": "line",
+        "destinations": [
+          "F2",
+          "F3"
+        ],
+        "source_formulas": [
+          "Sheet3!B2:E2",
+          "Sheet3!B3:E3"
+        ],
+        "high_points": true,
+        "low_points": true,
+        "display_hidden_rows_and_columns": true
+      },
+      "column_group": {
+        "type": "column",
+        "destinations": [
+          "G2",
+          "G3"
+        ],
+        "source_formulas": [
+          "Sheet3!B2:E2",
+          "Sheet3!B3:E3"
+        ],
+        "display_hidden_rows_and_columns": true
+      },
+      "source_values": {
+        "B2:E2": [
+          12.5,
+          9.5,
+          16.5,
+          14
+        ],
+        "B3:E3": [
+          25,
+          48,
+          20,
+          30
+        ]
+      }
+    },
+    "outline_and_visibility": {
+      "worksheet": "Sheet3",
+      "hidden_columns": "B:E",
+      "hidden_column_outline_level": 1,
+      "collapsed_column_boundary": "F",
+      "hidden_rows": [
+        6,
+        7
+      ],
+      "hidden_row_outline_level": 1,
+      "collapsed_row_boundary": 8,
+      "markers_and_formula": {
+        "A6": "OUTLINE_ROW_004",
+        "B6": 10,
+        "A7": "OUTLINE_ROW_004_B",
+        "B7": 20,
+        "A8": "OUTLINE_SUM_004",
+        "B8": {
+          "formula": "SUM(B6:B7)",
+          "cached_value": 30
+        }
+      }
+    }
+  },
+  "format_observations": {
+    "xlsx": {
+      "container": "OPC ZIP",
+      "zip_integrity": "pass",
+      "member_count": 21,
+      "main_workbook_content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml",
+      "spreadsheetml_namespace": "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+      "strict_conformance": false,
+      "critical_parts": [
+        "xl/workbook.xml",
+        "xl/worksheets/sheet1.xml",
+        "xl/worksheets/sheet2.xml",
+        "xl/worksheets/sheet3.xml",
+        "xl/pivotCache/pivotCacheDefinition1.xml",
+        "xl/pivotCache/pivotCacheRecords1.xml",
+        "xl/pivotTables/pivotTable1.xml",
+        "xl/tables/table1.xml"
+      ],
+      "native_reopen": "pass"
+    },
+    "xltx": {
+      "container": "OPC ZIP",
+      "zip_integrity": "pass",
+      "member_count": 21,
+      "main_workbook_content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.template.main+xml",
+      "spreadsheetml_namespace": "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+      "strict_conformance": false,
+      "critical_parts": [
+        "xl/workbook.xml",
+        "xl/worksheets/sheet1.xml",
+        "xl/worksheets/sheet2.xml",
+        "xl/worksheets/sheet3.xml",
+        "xl/pivotCache/pivotCacheDefinition1.xml",
+        "xl/pivotCache/pivotCacheRecords1.xml",
+        "xl/pivotTables/pivotTable1.xml",
+        "xl/tables/table1.xml"
+      ],
+      "native_reopen": "pass",
+      "external_data_warning_action": "No; retain cache"
+    },
+    "xlsb": {
+      "container": "OPC ZIP with BIFF12 binary parts",
+      "zip_integrity": "pass",
+      "member_count": 25,
+      "main_workbook_content_type": "application/vnd.ms-excel.sheet.binary.main",
+      "critical_parts": [
+        "xl/workbook.bin",
+        "xl/worksheets/sheet1.bin",
+        "xl/worksheets/sheet2.bin",
+        "xl/worksheets/sheet3.bin",
+        "xl/pivotCache/pivotCacheDefinition1.bin",
+        "xl/pivotCache/pivotCacheRecords1.bin",
+        "xl/pivotTables/pivotTable1.bin",
+        "xl/tables/table1.bin"
+      ],
+      "native_reopen": "pass",
+      "native_sparkline_storage": "two groups and four sparkline records retained"
+    },
+    "strict_xlsx": {
+      "container": "Strict OPC ZIP",
+      "zip_integrity": "pass",
+      "member_count": 21,
+      "main_workbook_content_type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml",
+      "spreadsheetml_namespace": "http://purl.oclc.org/ooxml/spreadsheetml/main",
+      "office_relationship_namespace": "http://purl.oclc.org/ooxml/officeDocument/relationships",
+      "strict_conformance": true,
+      "critical_parts": [
+        "xl/workbook.xml",
+        "xl/worksheets/sheet1.xml",
+        "xl/worksheets/sheet2.xml",
+        "xl/worksheets/sheet3.xml",
+        "xl/pivotCache/pivotCacheDefinition1.xml",
+        "xl/pivotCache/pivotCacheRecords1.xml",
+        "xl/pivotTables/pivotTable1.xml",
+        "xl/tables/table1.xml"
+      ],
+      "native_reopen": "pass"
+    },
+    "xls": {
+      "container": "CFB/OLE2 BIFF8 workbook",
+      "workbook_stream_bytes": 21991,
+      "boundsheet8_count": 3,
+      "native_sheet_order": [
+        "Sheet2",
+        "Sheet1",
+        "Sheet3"
+      ],
+      "native_reopen": "pass",
+      "native_pivot_retained": true,
+      "native_filter_and_sort_retained": true,
+      "native_sparklines_retained": false,
+      "feature_loss_warning_accepted": true
+    }
+  },
+  "binary_record_invariants": {
+    "xlsb": {
+      "sheet3_bin_sparkline_record_counts": {
+        "0x0422_BrtBeginSparklineGroups": 1,
+        "0x0411_BrtBeginSparklineGroup": 2,
+        "0x0420_BrtBeginSparklines": 2,
+        "0x0413_BrtSparkline": 4,
+        "0x0421_BrtEndSparklines": 2,
+        "0x0412_BrtEndSparklineGroup": 2,
+        "0x0423_BrtEndSparklineGroups": 1
+      },
+      "pivot_cache_records1_bin_sequence": [
+        "0x00C1_BrtBeginPivotCacheRecords",
+        "0x0021_BrtPCRRecord x8",
+        "0x00C2_BrtEndPivotCacheRecords"
+      ],
+      "pivot_table1_bin_required_families": [
+        "0x0118_BrtBeginSXView / 0x013B_BrtEndSXView",
+        "0x013A_BrtBeginSXLocation",
+        "row-field and row-item records",
+        "column-field and column-item records",
+        "page-field records",
+        "data-field records",
+        "0x0201_BrtBeginTableStyleClient",
+        "0x0426/0x0427 PivotTable extension records"
+      ],
+      "table1_bin_filter_and_table_families": [
+        "0x0157 table metadata",
+        "0x00A1/0x00A2 auto-filter envelope",
+        "0x00A3/0x00A4 filter-column envelope",
+        "0x00A5/0x00A6 filters envelope",
+        "0x00A7 filter value",
+        "six table-column declarations",
+        "0x0201 table-style client"
+      ]
+    },
+    "xls": {
+      "workbook_globals": {
+        "0x0085_BOUNDSHEET8": 3,
+        "0x00FC_SST_payload_bytes": 350,
+        "0x0896_payload_bytes": 3266,
+        "0x089B_payload_bytes": 16
+      },
+      "pivot_sheet_record_counts": {
+        "0x00B0": 1,
+        "0x00B1": 6,
+        "0x00B2": 10,
+        "0x00B4": 2,
+        "0x00B5": 2,
+        "0x00B6": 1
+      },
+      "source_sheet_filter_record_presence": {
+        "0x00A1": 1,
+        "0x089C": 1
+      },
+      "sparkline_record_presence": false
+    }
+  },
+  "library_validation": {
+    "scope": "Read-only inspection; no library-generated fixture or source edit was performed.",
+    "xlsx_reader": {
+      "command": "cargo run --quiet -p litchi-xlsx --example read_xlsx -- test-data/microsoft-office/excel/excel-visual-analytics.xlsx",
+      "result": "pass",
+      "worksheet_names": [
+        "Sheet2",
+        "Sheet1",
+        "Sheet3"
+      ],
+      "pivot_marker_values": {
+        "D5": 52.5,
+        "D6": 123,
+        "D7": 175.5
+      },
+      "source_formula_readback": {
+        "Sheet3!B8": "SUM(B6:B7)",
+        "cached_value": 30
+      },
+      "boundary": "The general XLSX cell reader exposes the values and cached formula. This inspection did not claim a general XLSX sparkline renderer or a native Excel UI equivalent."
+    },
+    "additional_xlsx_container_probes": {
+      "xltx": {
+        "command": "cargo run --quiet -p litchi-xlsx --example read_xlsx -- test-data/microsoft-office/excel/excel-visual-analytics.xltx",
+        "result": "pass",
+        "worksheet_names": [
+          "Sheet2",
+          "Sheet1",
+          "Sheet3"
+        ],
+        "pivot_marker_values": {
+          "D5": 52.5,
+          "D6": 123,
+          "D7": 175.5
+        },
+        "source_formula_readback": {
+          "Sheet3!B8": "SUM(B6:B7)",
+          "cached_value": 30
+        },
+        "date_readback": "numeric serial values, matching the transitional XLSX probe",
+        "probe_interpretation": "The existing XLSX reader opened the native template container and exposed the same three sheets, pivot values, and cached formula. This is an observed reader result, independent of the native Excel reopen result."
+      },
+      "strict_xlsx": {
+        "command": "cargo run --quiet -p litchi-xlsx --example read_xlsx -- test-data/microsoft-office/excel/excel-visual-analytics-strict.xlsx",
+        "result": "pass",
+        "worksheet_names": [
+          "Sheet2",
+          "Sheet1",
+          "Sheet3"
+        ],
+        "pivot_marker_values": {
+          "D5": 52.5,
+          "D6": 123,
+          "D7": 175.5
+        },
+        "source_formula_readback": {
+          "Sheet3!B8": "SUM(B6:B7)",
+          "cached_value": 30
+        },
+        "date_readback": "typed Date values for the source Date column",
+        "probe_interpretation": "The existing XLSX reader opened the Strict OOXML container and exposed the same three sheets, pivot values, cached formula, and typed source dates. This is an observed reader result, independent of namespace validation and native Excel reopen."
+      }
+    },
+    "xlsb_reader": {
+      "indexed_probe_command": "cargo run --quiet -p litchi-xlsb --example binary_index_profile -- --fixture test-data/microsoft-office/excel/excel-visual-analytics.xlsb --case indexed_cold --sheet 1 --warmup 1 --samples 1",
+      "indexed_probe_result": "pass; sheet 1 returned 54 indexed cells with dimensions [0,0,8,5] and semantic_ok=true",
+      "generic_materialization_command": "cargo run --quiet -p litchi --example xlsb_reader --features ooxml --no-default-features -- test-data/microsoft-office/excel/excel-visual-analytics.xlsb",
+      "generic_materialization_result": "opened the package but returned Unsupported feature: source-backed XLSB worksheet materialization requires deferred PivotTable formula owners",
+      "boundary": "The XLSB package APIs expose typed pivot caches, pivot views, structured tables, charts, and direct sparkline snapshots. Source-backed worksheet materialization currently refuses this PivotTable dependency graph, and its source path explicitly refuses sparkline groups during that materialization route."
+    },
+    "xls_reader": {
+      "command": "cargo run --quiet -p litchi-xls --example read_xls -- test-data/microsoft-office/excel/excel-visual-analytics.xls",
+      "result": "pass",
+      "worksheet_names_exposed": [
+        "Sheet2",
+        "Sheet3"
+      ],
+      "worksheet_count_exposed": 2,
+      "native_boundsheet_count": 3,
+      "boundary": "The BIFF8 reader exposed the pivot and sparkline destination sheets and their cell values but did not expose the native Sheet1 source worksheet in this generic read invocation. Raw BIFF8 inspection still found the third BOUNDSHEET8 entry and source-sheet auto-filter records. Native Excel retained the source table, filter, sort, and pivot when reopening the XLS; this reader result is a library boundary, not a claim that the XLS bytes lost Sheet1."
+    },
+    "public_api_surface_audit": {
+      "xlsx": [
+        "crates/litchi-xlsx/src/workbook/model.rs:929 pivot caches",
+        "crates/litchi-xlsx/src/workbook/model.rs:979 pivot tables",
+        "crates/litchi-xlsx/src/workbook/model.rs:1039 pivot table data",
+        "crates/litchi-xlsx/src/workbook/model.rs:1479 worksheet auto-filter",
+        "crates/litchi-xlsx/src/workbook/model.rs:1526 worksheet outline properties",
+        "crates/litchi-xlsx/src/workbook/model.rs:1587 structured tables"
+      ],
+      "xlsb": [
+        "crates/litchi-xlsb/src/workbook/model.rs:172 tables",
+        "crates/litchi-xlsb/src/workbook/model.rs:177 pivot views",
+        "crates/litchi-xlsb/src/workbook/model.rs:187 pivot cache definitions",
+        "crates/litchi-xlsb/src/workbook/package.rs:488 direct sparkline snapshots",
+        "crates/litchi-xlsb/src/workbook/package.rs:525 sparkline publication",
+        "crates/litchi-xlsb/src/writer/worksheet/model/semantic.rs:534 and :567 hidden columns and rows",
+        "crates/litchi-xlsb/src/writer/worksheet/model/semantic.rs:578 auto-filter",
+        "crates/litchi-xlsb/src/writer/worksheet/model/semantic.rs:916 pivot-table views",
+        "crates/litchi-xlsb/src/writer/worksheet/model/semantic.rs:963 charts"
+      ],
+      "xls": [
+        "crates/litchi-xls/src/workbook/model.rs:260 pivot caches",
+        "crates/litchi-xls/src/workbook/model.rs:306 worksheet pivot tables",
+        "crates/litchi-xls/src/custom_view.rs:337 filter, hidden-row, and hidden-column view state",
+        "crates/litchi-xls/src/layout/row.rs:46 and :56 outline level and hidden row",
+        "crates/litchi-xls/src/layout/column.rs:52 and :72 hidden column and outline level",
+        "No litchi-xls sparkline API was found in the audited source tree"
+      ]
+    }
+  },
+  "files": [
+    {
+      "path": "test-data/microsoft-office/excel/excel-visual-analytics.xlsx",
+      "format": "xlsx",
+      "bytes": 16951,
+      "sha256": "6d4326832690c1c004e3881eae21e2e7614050b67f2824c191fc0d4b06b1875d",
+      "file_description": "Microsoft Excel 2007+",
+      "container_kind": "OPC ZIP",
+      "zip_integrity": "pass",
+      "member_count": 21,
+      "native_reopen_validation": "pass"
+    },
+    {
+      "path": "test-data/microsoft-office/excel/excel-visual-analytics.xltx",
+      "format": "xltx",
+      "bytes": 16953,
+      "sha256": "ba1368a3bd02540fefc47ce3efcd526a3b766c1c4d62394f42253139af41eca2",
+      "file_description": "Microsoft Excel 2007+",
+      "container_kind": "OPC ZIP",
+      "zip_integrity": "pass",
+      "member_count": 21,
+      "native_reopen_validation": "pass"
+    },
+    {
+      "path": "test-data/microsoft-office/excel/excel-visual-analytics.xlsb",
+      "format": "xlsb",
+      "bytes": 14139,
+      "sha256": "c300d09300ab8f5acc59f979a75e97d1a1aea2a37f7aea6a30ac8b5ea6564170",
+      "file_description": "Microsoft Excel 2007+",
+      "container_kind": "OPC ZIP with BIFF12 binary parts",
+      "zip_integrity": "pass",
+      "member_count": 25,
+      "native_reopen_validation": "pass"
+    },
+    {
+      "path": "test-data/microsoft-office/excel/excel-visual-analytics-strict.xlsx",
+      "format": "strict_xlsx",
+      "bytes": 17243,
+      "sha256": "853aebfb724342846aab084fe8dfeeac0cc58a418f816417a640a26fae78c41d",
+      "file_description": "Microsoft Excel 2007+",
+      "container_kind": "Strict OPC ZIP",
+      "zip_integrity": "pass",
+      "member_count": 21,
+      "native_reopen_validation": "pass"
+    },
+    {
+      "path": "test-data/microsoft-office/excel/excel-visual-analytics.xls",
+      "format": "xls",
+      "bytes": 26112,
+      "sha256": "7a0bab34cecbdc3673931ae55d34a0aba6bfcd93deffb5cfa6e08f12aac08f70",
+      "file_description": "Composite Document File V2 Document, Microsoft Macintosh Excel",
+      "container_kind": "CFB/OLE2 BIFF8",
+      "workbook_stream_bytes": 21991,
+      "native_reopen_validation": "pass"
+    }
+  ],
+  "validation_methods": [
+    "SHA-256 and byte sizes were computed from the closed fixture streams.",
+    "ZIP central-directory and CRC checks passed for XLSX, XLTX, XLSB, and Strict XLSX.",
+    "XML and relationship parts were inspected read-only; strict SpreadsheetML and office relationship namespaces were recorded separately from transitional namespaces.",
+    "OPC relationship targets and critical package members were resolved without external-link fetches.",
+    "BIFF12 part record families were inspected with the repository dump_records example after extracting each part in memory.",
+    "The BIFF8 Workbook stream was inspected with the repository dump_xls_records example; no legacy bytes were regenerated.",
+    "Existing litchi-xlsx, litchi-xlsb, and litchi-xls reader examples were invoked read-only and their materialization boundaries are recorded above.",
+    "Native Excel close, reopen, warning choices, feature retention, and marker values are recorded from the root Computer Use session; this inspection process did not operate the Office UI."
+  ],
+  "native_ui_observation_source": "Root agent Computer Use session; all five final fixtures were saved through native Microsoft Excel, closed, reopened, inspected, and closed again without a repair prompt."
+}

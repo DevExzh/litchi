@@ -1,0 +1,520 @@
+{
+  "schema_version": 1,
+  "fixture_id": "word-mailmerge-fields-009",
+  "generated_on": "2026-10-15",
+  "purpose": "Fixture-specific, read-only inspection of native Microsoft Word mail-merge fields, conditional and record-counter fields, external data-source metadata, and DOC/DOCX/RTF source variants.",
+  "provenance": {
+    "producer_app": "Microsoft Office Word",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft Word UI",
+    "source": "Synthetic content was entered and formatted in native Word. A Word Create New List data source was authored as DOCX, then saved as a legacy DOC source variant. The main DOCX was saved as DOC and reopened, then the reopened DOCX was saved as RTF; the RTF was not produced from the DOC chain.",
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "all_documents_closed_before_hashing": true,
+    "fixture_files_are_closed_after_reopen": true
+  },
+  "files": [
+    {
+      "path": "test-data/microsoft-office/word/word-mailmerge-fields.docx",
+      "format": "docx",
+      "bytes": 14282,
+      "sha256": "e399b0a14088a534dd6564f92dd0cef891d94258ee6cd002cb19076e86c67d27"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-mailmerge-fields.doc",
+      "format": "doc",
+      "bytes": 25600,
+      "sha256": "ff827594dce31dfab50128bf0b03e4cd044c28b884de4b50d3fbb4ff9d5a2418"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-mailmerge-fields.rtf",
+      "format": "rtf",
+      "bytes": 49788,
+      "sha256": "3400508a4557ed2bf76fe2472d344c9a4992b7bad5a79e9b578d596ae153d083"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-mailmerge-source.docx",
+      "format": "docx",
+      "role": "native Word mail-merge source table",
+      "bytes": 13745,
+      "sha256": "a2a524e7bc796021563e781556712589d4920e6f949348b0c8c179a8465a3e43"
+    },
+    {
+      "path": "test-data/microsoft-office/word/word-mailmerge-source.doc",
+      "format": "doc",
+      "role": "native Word legacy source variant",
+      "bytes": 29184,
+      "sha256": "749ac1792eeacefb2f8bdeb7f78e179473eb1cd1a304f8dd708a0dfd1ac028bc"
+    }
+  ],
+  "coverage": {
+    "feature_groups": [
+      {
+        "feature": "external mail-merge source table",
+        "status": "evidenced",
+        "evidence": "The native source DOCX contains a 3-row by 14-column table; the DOC source variant contains the same table and a native OLE Data stream."
+      },
+      {
+        "feature": "MERGEFIELD",
+        "status": "evidenced",
+        "evidence": "FirstName, LastName, and Amount fields are stored with cached placeholder results; the conditional IF also contains a nested FirstName merge field."
+      },
+      {
+        "feature": "IF conditional merge field",
+        "status": "evidenced",
+        "evidence": "Native Word preview produced MATCH_009 for Alex and OTHER_009 for Blair. The package stores the IF instruction and MATCH_009 cached result."
+      },
+      {
+        "feature": "MERGEREC and MERGESEQ",
+        "status": "evidenced",
+        "evidence": "Both record-counter fields are present with cached Word placeholder results; Word preview showed record 1 and record 2, while the sequence preview was empty."
+      },
+      {
+        "feature": "NEXT field, merge execution, send, and print",
+        "status": "not-covered",
+        "evidence": "No NEXT field was inserted and no merge/send/print operation was performed."
+      }
+    ]
+  },
+  "docx": {
+    "container": {
+      "kind": "OPC ZIP",
+      "zip_test": "pass",
+      "xml_validation": "pass",
+      "main_document_member_count": 12,
+      "source_member_count": 11,
+      "main_external_targets": [
+        "file:////Users/ryker/CodeProjects/litchi/test-data/microsoft-office/word/word-mailmerge-source.docx"
+      ],
+      "source_external_targets": [],
+      "main_relationship": "word/_rels/settings.xml.rels rId1 -> external mailMergeSource target file:////Users/ryker/CodeProjects/litchi/test-data/microsoft-office/word/word-mailmerge-source.docx",
+      "recipient_data_part": false,
+      "odso_part": false
+    },
+    "main_document": {
+      "markers": [
+        "WORD_MAILMERGE_009",
+        "Fixture ID: word-mailmerge-fields-009",
+        "RECIPIENT_009:",
+        "AMOUNT_009:",
+        "MERGE_RULE_009:",
+        "RECORD_NUMBER_009:",
+        "SEQUENCE_NUMBER_009:",
+        "END_MAILMERGE_009"
+      ],
+      "xml_counts": {
+        "w:p": 9,
+        "w:r": 24,
+        "w:t": 14,
+        "w:tbl": 0,
+        "w:sdt": 0,
+        "w:fldSimple": 6,
+        "w:fldChar": 3,
+        "w:instrText": 7
+      },
+      "fields": {
+        "merge_fields": [
+          {
+            "field_name": "FirstName",
+            "instruction": "MERGEFIELD FirstName",
+            "cached_result": "«FirstName»",
+            "occurrences": 2,
+            "nested_occurrence_in_if": true
+          },
+          {
+            "field_name": "LastName",
+            "instruction": "MERGEFIELD LastName",
+            "cached_result": "«LastName»",
+            "occurrences": 1
+          },
+          {
+            "field_name": "Amount",
+            "instruction": "MERGEFIELD Amount",
+            "cached_result": "«Amount»",
+            "occurrences": 1
+          }
+        ],
+        "conditional": {
+          "instruction_projection": "IF [MERGEFIELD FirstName] = \"Alex\" \"MATCH_009\" \"OTHER_009\"",
+          "cached_result": "MATCH_009",
+          "nested_merge_field_cached_result": null
+        },
+        "counters": [
+          {
+            "instruction": "MERGEREC",
+            "cached_result": "«Merge Record #»"
+          },
+          {
+            "instruction": "MERGESEQ",
+            "cached_result": "«Merge Sequence #»"
+          }
+        ],
+        "dirty_or_locked": false
+      },
+      "mail_merge_settings": {
+        "main_document_type": "formLetters",
+        "link_to_query": true,
+        "data_type": "textFile",
+        "query": "SELECT * FROM /Users/ryker/CodeProjects/litchi/test-data/microsoft-office/word/word-mailmerge-source.docx",
+        "data_source_relationship_id": "rId1",
+        "destination": "newDocument",
+        "active_record": 1,
+        "check_errors": 2,
+        "odso": null
+      },
+      "core_properties": {
+        "creator": "Ryker Zhu",
+        "last_modified_by": "Ryker Zhu",
+        "revision": "1",
+        "created": "2026-10-15T08:09:00Z",
+        "modified": "2026-10-15T08:13:00Z"
+      },
+      "read_example": {
+        "command": "cargo run -q -p litchi-docx --example read_docx -- test-data/microsoft-office/word/word-mailmerge-fields.docx",
+        "exit_code": 0,
+        "paragraph_count": 9,
+        "table_count": 0,
+        "text_bytes": 237,
+        "text_contains": [
+          "WORD_MAILMERGE_009",
+          "Fixture ID: word-mailmerge-fields-009",
+          "RECIPIENT_009: «FirstName»",
+          "AMOUNT_009: «Amount»",
+          "MERGE_RULE_009: MATCH_009",
+          "RECORD_NUMBER_009: «Merge Record #»",
+          "SEQUENCE_NUMBER_009: «Merge Sequence #»",
+          "END_MAILMERGE_009"
+        ]
+      }
+    },
+    "source_table": {
+      "package": "word/document.xml",
+      "xml_counts": {
+        "w:p": 43,
+        "w:r": 22,
+        "w:t": 22,
+        "w:tbl": 1,
+        "w:tr": 3,
+        "w:tc": 42,
+        "w:fldSimple": 0,
+        "w:sdt": 0
+      },
+      "headers": [
+        "Title",
+        "FirstName",
+        "LastName",
+        "JobTitle",
+        "Company",
+        "Address1",
+        "Address2",
+        "City",
+        "State",
+        "PostalCode",
+        "Country",
+        "HomePhone",
+        "WorkPhone",
+        "Amount"
+      ],
+      "records": [
+        {
+          "record_number": 1,
+          "FirstName": "Alex",
+          "LastName": "Fixture",
+          "Company": "NATIVE_MERGE_009",
+          "Amount": "42.50",
+          "other_fields_blank": true
+        },
+        {
+          "record_number": 2,
+          "FirstName": "Blair",
+          "LastName": "Sample",
+          "Company": "NATIVE_MERGE_009",
+          "Amount": "84.00",
+          "other_fields_blank": true
+        }
+      ],
+      "source_has_mail_merge_settings": false,
+      "source_has_external_relationships": false,
+      "read_example": {
+        "command": "cargo run -q -p litchi-docx --example read_docx -- test-data/microsoft-office/word/word-mailmerge-source.docx",
+        "exit_code": 0,
+        "paragraph_count": 43,
+        "table_count": 1,
+        "text_bytes": 167,
+        "text_contains": [
+          "Title",
+          "FirstName",
+          "LastName",
+          "NATIVE_MERGE_009",
+          "42.50",
+          "Blair",
+          "84.00"
+        ]
+      }
+    }
+  },
+  "doc": {
+    "main_document": {
+      "container": {
+        "kind": "Compound File Binary (CFB/OLE)",
+        "file_identification": "Composite Document File V2 Document, Little Endian, MacOS, code page 10000",
+        "fib_version_hex": "0x00C1",
+        "word_version_observed_by_reader": "Word 97",
+        "streams": {
+          "1Table": 9611,
+          "WordDocument": 4142,
+          "\\u0001CompObj": 114,
+          "\\u0005SummaryInformation": 4096,
+          "\\u0005DocumentSummaryInformation": 4096
+        }
+      },
+      "file_metadata_observed": {
+        "author": "Ryker Zhu",
+        "template": "Normal.dotm",
+        "last_saved_by": "Ryker Zhu",
+        "revision": 2,
+        "application": "Microsoft Office Word",
+        "created": "2026-10-15 08:13:00 UTC",
+        "last_saved": "2026-10-15 08:13:00 UTC",
+        "pages": 1,
+        "words": 28,
+        "characters": 375,
+        "codepage": 10000
+      },
+      "fields": {
+        "merge_fields": [
+          "MERGEFIELD FirstName",
+          "MERGEFIELD LastName",
+          "MERGEFIELD Amount",
+          "MERGEFIELD FirstName (nested in IF)"
+        ],
+        "conditional": {
+          "instruction_projection": "IF [MERGEFIELD FirstName] = \"Alex\" \"MATCH_009\" \"OTHER_009\"",
+          "cached_result": "MATCH_009"
+        },
+        "counters": ["MERGEREC", "MERGESEQ"],
+        "cached_merge_results": [
+          "«FirstName»",
+          "«LastName»",
+          "«Amount»",
+          "Alex",
+          "MATCH_009",
+          "«Merge Record #»",
+          "«Merge Sequence #»"
+        ]
+      },
+      "stored_mail_merge_source": {
+        "storage": "SttbFnm referenced file name plus Pms",
+        "path": "/Users/ryker/CodeProjects/litchi/test-data/microsoft-office/word/word-mailmerge-source.docx",
+        "fnpi_raw": 3,
+        "file_kind": "MailMergeDataSource",
+        "valid_on_ntfs": true,
+        "relative_path": null,
+        "pms": {
+          "main_document": true,
+          "data_source": true,
+          "header_file": false,
+          "merge_type": "None",
+          "is_automatic": false,
+          "suppress_blank_lines": true,
+          "record_selection": false,
+          "destination": "None",
+          "source_kind": "DataFile",
+          "link_to_file": true,
+          "uses_query": false,
+          "current_record": 1
+        },
+        "associated_string_mail_merge_path": "empty"
+      },
+      "read_example": {
+        "command": "cargo run -q -p litchi-doc --example read_doc -- test-data/microsoft-office/word/word-mailmerge-fields.doc",
+        "exit_code": 0,
+        "paragraph_count": 9,
+        "table_count": 0,
+        "total_characters": 403,
+        "text_contains": [
+          "WORD_MAILMERGE_009",
+          "MERGEFIELD FirstName",
+          "MERGEFIELD LastName",
+          "MERGEFIELD Amount",
+          "MATCH_009",
+          "MERGEREC",
+          "MERGESEQ",
+          "END_MAILMERGE_009"
+        ]
+      },
+      "textutil_read_only": {
+        "command": "textutil -convert txt -stdout test-data/microsoft-office/word/word-mailmerge-fields.doc",
+        "exit_code": 0,
+        "text_contains": [
+          "WORD_MAILMERGE_009",
+          "MERGEFIELD FirstName",
+          "MERGEFIELD LastName",
+          "MERGEFIELD Amount",
+          "MATCH_009",
+          "MERGEREC",
+          "MERGESEQ"
+        ]
+      }
+    },
+    "source_document": {
+      "container": {
+        "kind": "Compound File Binary (CFB/OLE)",
+        "file_identification": "Composite Document File V2 Document, Little Endian, MacOS, code page 10000",
+        "fib_version_hex": "0x00C1",
+        "word_version_observed_by_reader": "Word 97",
+        "streams": {
+          "Data": 4096,
+          "1Table": 9127,
+          "WordDocument": 4147,
+          "\\u0001CompObj": 114,
+          "\\u0005SummaryInformation": 4096,
+          "\\u0005DocumentSummaryInformation": 4096
+        }
+      },
+      "file_metadata_observed": {
+        "author": "Ryker Zhu",
+        "template": "Normal.dotm",
+        "last_saved_by": "Ryker Zhu",
+        "revision": 2,
+        "application": "Microsoft Office Word",
+        "created": "2026-10-15 08:17:00 UTC",
+        "last_saved": "2026-10-15 08:17:00 UTC",
+        "pages": 1,
+        "words": 15,
+        "characters": 198,
+        "codepage": 10000
+      },
+      "read_example": {
+        "command": "cargo run -q -p litchi-doc --example read_doc -- test-data/microsoft-office/word/word-mailmerge-source.doc",
+        "exit_code": 0,
+        "paragraph_count": 46,
+        "table_count": 1,
+        "table_rows": 3,
+        "total_characters": 213,
+        "text_contains": [
+          "Title",
+          "FirstName",
+          "LastName",
+          "NATIVE_MERGE_009",
+          "42.50",
+          "Blair",
+          "84.00"
+        ]
+      },
+      "semantic_mail_merge_metadata": "none; this file is the source table, not a main mail-merge document"
+    }
+  },
+  "rtf": {
+    "file_type": "Rich Text Format data, version 1, ANSI, code page 1252, default middle east language ID 1025",
+    "control_word_counts": {
+      "mailmerge_group": 1,
+      "mmmaintypeletters": 1,
+      "mmlinktoquery": 1,
+      "mmdatatypefile": 1,
+      "mmquery": 1,
+      "mmdatasource": 1,
+      "mmdestnewdoc": 1,
+      "mmreccur1": 1,
+      "mmerrors2": 1,
+      "MERGEFIELD": 4,
+      "MERGEREC": 1,
+      "MERGESEQ": 1,
+      "field": 7,
+      "fldinst": 7,
+      "fldrslt": 7
+    },
+    "mail_merge_group": {
+      "main_type": "letters",
+      "link_to_query": true,
+      "data_type": "file",
+      "query": "SELECT * FROM /Users/ryker/CodeProjects/litchi/test-data/microsoft-office/word/word-mailmerge-source.docx",
+      "data_source": "/Users/ryker/CodeProjects/litchi/test-data/microsoft-office/word/word-mailmerge-source.docx",
+      "destination": "newDocument",
+      "current_record": 1,
+      "error_mode": 2
+    },
+    "fields": {
+      "merge_fields": ["MERGEFIELD FirstName", "MERGEFIELD LastName", "MERGEFIELD Amount", "nested MERGEFIELD FirstName"],
+      "conditional": {
+        "instruction_projection": "IF [MERGEFIELD FirstName] = \"Alex\" \"MATCH_009\" \"OTHER_009\"",
+        "cached_result": "MATCH_009"
+      },
+      "counters": ["MERGEREC", "MERGESEQ"],
+      "cached_results_are_placeholders": true
+    },
+    "raw_markers": {
+      "contains_source_records": false,
+      "contains_NATIVE_MERGE_009": false,
+      "contains_Alex_as_if_operand": true,
+      "contains_Blair": false,
+      "contains_amount_records": false
+    },
+    "read_example": {
+      "command": "cargo run -q -p litchi-rtf --example parse_rtf -- test-data/microsoft-office/word/word-mailmerge-fields.rtf",
+      "exit_code": 1,
+      "error": "MalformedDocument(\"RTF file table has an invalid entry count\")",
+      "semantic_counts_available": false
+    },
+    "textutil_read_only": {
+      "command": "textutil -convert txt -stdout test-data/microsoft-office/word/word-mailmerge-fields.rtf",
+      "exit_code": 0,
+      "text_contains": [
+        "WORD_MAILMERGE_009",
+        "RECIPIENT_009: «FirstName»",
+        "AMOUNT_009: «Amount»",
+        "MERGE_RULE_009: MATCH_009",
+        "RECORD_NUMBER_009: «Merge Record #»",
+        "SEQUENCE_NUMBER_009: «Merge Sequence #»",
+        "END_MAILMERGE_009"
+      ]
+    }
+  },
+  "native_ui_validation": {
+    "reopen_status": {
+      "docx": "reopened in native Word without a source prompt or repair dialog",
+      "rtf": "reopened in native Word without a source prompt or repair dialog",
+      "doc": "reopened in native Word with the missing-data-source prompt recurring"
+    },
+    "merge_preview": {
+      "first_record": {
+        "FirstName": "Alex",
+        "LastName": "Fixture",
+        "Amount": "42.50",
+        "conditional_result": "MATCH_009",
+        "record_counter": "1"
+      },
+      "second_record": {
+        "FirstName": "Blair",
+        "LastName": "Sample",
+        "Amount": "84.00",
+        "conditional_result": "OTHER_009",
+        "record_counter": "2"
+      },
+      "sequence_preview": "empty",
+      "preview_state_before_save": "returned to the first record and was turned off before saving"
+    },
+    "legacy_doc_source_probe": {
+      "find_data_source": "Selecting the native word-mailmerge-source.doc through Word Find Data Source opened the one-page source without a repair dialog.",
+      "after_save_close_reopen": "The missing-data-source prompt recurred after saving, closing, and reopening the main DOC.",
+      "source_variant": "word-mailmerge-source.doc",
+      "observed_native_boundary": "The session-level relink was accepted by Word, but the prompt still recurred on the next reopen.",
+      "cause": "not established"
+    },
+    "document_chain": "The DOC was produced by native Word Save As from the main DOCX. The RTF was produced by native Word Save As from the reopened DOCX, not from the DOC chain.",
+    "field_scope": {
+      "last_name_layout": "LastName is on its own unlabeled paragraph; the other markers are labeled as shown in the package text projections.",
+      "next_field": false,
+      "merge_send_print_performed": false
+    }
+  },
+  "known_limits": [
+    "The fixture records inert field instructions, cached results, source paths, and source-table bytes. It does not claim that litchi performs a merge or refreshes cached results.",
+    "The finalized main DOC package currently stores the DOCX source path in its SttbFnm/Pms metadata; the native Word UI probe separately observed Find Data Source resolving word-mailmerge-source.doc and the missing-source prompt recurring after reopen. The reason for this boundary is not inferred.",
+    "The RTF parser failure is recorded as a library-reader outcome for this native Word RTF; textutil and Word UI observations do not establish semantic RTF parser parity.",
+    "No NEXT field, merge-to-new-document output, email/send, print, or sequence-value refresh fixture is included."
+  ]
+}

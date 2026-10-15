@@ -1,0 +1,410 @@
+{
+  "schema_version": 1,
+  "fixture_id": "excel-encrypted-011",
+  "generated_on": "2026-10-15",
+  "purpose": "Fixture-specific, read-only inspection of three native Microsoft Excel password-to-open derivatives, including the Office Agile CFB envelope, the BIFF8 FILEPASS header, and typed password boundaries.",
+  "provenance": {
+    "producer_app": "Microsoft Office Excel",
+    "app_version": "16.110.2",
+    "app_build": "16.110.26062818",
+    "package_application": "Microsoft Macintosh Excel",
+    "platform": "macOS",
+    "authoring_method": "Computer Use / native Microsoft Excel UI with a human-entered password handoff",
+    "source": "A fresh native workbook was populated with the marker cells, protected with a disposable password-to-open password, saved as encrypted XLSX, then saved natively as XLSB and legacy XLS.",
+    "native_save_chain": [
+      "encrypted XLSX",
+      "native XLSB Save As",
+      "native XLS Save As"
+    ],
+    "fixture_password": {
+      "value": "OfficeFixture42!",
+      "length_characters": 16,
+      "scope": "password-to-open only",
+      "disposable": true,
+      "entered_by": "human in native Excel UI",
+      "reused_outside_fixture": false
+    },
+    "libreoffice_used": false,
+    "programmatic_office_generation_used": false,
+    "library_code_modified": false,
+    "temporary_probe_harnesses_outside_checkout": true,
+    "plaintext_materialized_to_disk": false,
+    "all_documents_closed_before_hashing": true,
+    "lock_files_present_at_inspection": false,
+    "final_close_state": "All Excel windows were closed to Home after the native reopen checks."
+  },
+  "scope_and_limits": {
+    "native_variants": [
+      "xlsx",
+      "xlsb",
+      "xls"
+    ],
+    "native_excel_reopen_verified": true,
+    "correct_password_prompt_on_direct_open": true,
+    "correct_password_accepted_for_all_variants": true,
+    "repair_or_conversion_prompt_observed": false,
+    "wrong_password_native_reopen_tested": false,
+    "decryption_scope": "Typed positive probes decrypted only in memory; no decrypted Office copy was written or resaved.",
+    "xlsx_encryption_family": "Office Agile package encryption in a CFB/OLE2 envelope; encrypted OPC payload is held in EncryptedPackage.",
+    "xlsb_encryption_family": "Same Office Agile CFB/OLE2 envelope as XLSX; the XLSB reader has no password-aware CFB envelope API.",
+    "xls_encryption_family": "BIFF8 FILEPASS CryptoAPI RC4 (128-bit) with DOC_PROPERTIES flag; CFB property streams remain structurally visible.",
+    "xlsb_reader_boundary": "The typed XLSB Package::open/from_bytes APIs expect an OPC ZIP and reject this password envelope with a bounded missing-end-of-central-directory error. No XLSB password decryption helper is claimed.",
+    "semantic_limit": "Native Excel establishes the formula and cached result. The typed XLSX reader exposes formula text and cache; the tested XLS reader exposes the decrypted numeric result, while the XLSB reader stops at the outer encrypted CFB envelope."
+  },
+  "expected_native_content": {
+    "worksheet_order": [
+      "Sheet1"
+    ],
+    "dimension": "A1:B4",
+    "cells": {
+      "A1": "EXCEL_ENCRYPTED_011",
+      "B1": "Fixture ID: excel-encrypted-011",
+      "A2": "VALUE_011",
+      "B2": 42,
+      "A3": "FORMULA_011",
+      "B3": {
+        "formula": "B2*2",
+        "cached_value": 84
+      },
+      "A4": "END_ENCRYPTED_011"
+    },
+    "markers": [
+      "EXCEL_ENCRYPTED_011",
+      "VALUE_011",
+      "FORMULA_011",
+      "END_ENCRYPTED_011"
+    ],
+    "native_observation": "Each final file reopened in native Excel after a password prompt with the supplied 16-character password; Sheet1 markers were visible and no repair prompt appeared."
+  },
+  "package_inspection": {
+    "xlsx": {
+      "kind": "CFB/OLE2 Office encryption envelope",
+      "signature": "D0 CF 11 E0 A1 B1 1A E1",
+      "cfb_file_bytes": 15360,
+      "directory_stream_count": 6,
+      "directory_entries": [
+        "\u0006DataSpaces",
+        "EncryptionInfo",
+        "EncryptedPackage"
+      ],
+      "streams": [
+        {
+          "path": "/\u0006DataSpaces/Version",
+          "bytes": 76,
+          "sha256": "e81d2d7f4d8b4aa96a9d1ac9aad489caa06f24c3de2b66471479daf34672ce3a"
+        },
+        {
+          "path": "/\u0006DataSpaces/DataSpaceMap",
+          "bytes": 112,
+          "sha256": "b520d7662070c97304b0bbff09af9f61baaa6872976663ed1a886abc7c29cb15"
+        },
+        {
+          "path": "/\u0006DataSpaces/DataSpaceInfo/StrongEncryptionDataSpace",
+          "bytes": 64,
+          "sha256": "167181108f6fd083cd67d569e9906a592ca923bc2d4c571ed1242caf92ed48f8"
+        },
+        {
+          "path": "/\u0006DataSpaces/TransformInfo/StrongEncryptionTransform/\u0006Primary",
+          "bytes": 200,
+          "sha256": "990349482cd707ba3093d6fff5bb72167a38f0831e58789a92c25cdeb01f7f93"
+        },
+        {
+          "path": "/EncryptionInfo",
+          "bytes": 1289,
+          "sha256": "abcfce0210741e42462bbcc4aed8b5d4a9342aaf7d9be9379aa6431c58b38c8f"
+        },
+        {
+          "path": "/EncryptedPackage",
+          "bytes": 9208,
+          "sha256": "3dbe3a5c0ec0372e5efba1c6b188a2e7a569f30d98d84020f1e3b00d101f1017"
+        }
+      ],
+      "data_spaces_mapping": "EncryptedPackage -> StrongEncryptionDataSpace -> StrongEncryptionTransform/\u0006Primary",
+      "encryption_info": {
+        "format_version": {
+          "major": 4,
+          "minor": 4,
+          "raw_u32": "0x00040004"
+        },
+        "flags": "0x00000040",
+        "xml_scheme": "Agile OOXML password encryption",
+        "encryption_xml_namespace": "http://schemas.microsoft.com/office/2006/encryption",
+        "encryption_info_payload_offset_bytes": 8,
+        "key_data": {
+          "salt_size_bytes": 16,
+          "block_size_bytes": 16,
+          "key_bits": 256,
+          "hash_size_bytes": 64,
+          "cipher_algorithm": "AES",
+          "cipher_chaining": "ChainingModeCBC",
+          "hash_algorithm": "SHA512",
+          "data_integrity_hmac_present": true,
+          "data_integrity_hmac_key_bytes": 64,
+          "data_integrity_hmac_value_bytes": 64
+        },
+        "password_key_encryptor": {
+          "uri": "http://schemas.microsoft.com/office/2006/keyEncryptor/password",
+          "spin_count": 100000,
+          "salt_size_bytes": 16,
+          "block_size_bytes": 16,
+          "key_bits": 256,
+          "hash_size_bytes": 64,
+          "cipher_algorithm": "AES",
+          "cipher_chaining": "ChainingModeCBC",
+          "hash_algorithm": "SHA512",
+          "encrypted_verifier_hash_and_key_present": true
+        },
+        "note": "Salt and encrypted verifier/key material are present in EncryptionInfo; only structural parameters and stream hashes are recorded here."
+      },
+      "encrypted_package": {
+        "declared_plain_package_bytes": 9199,
+        "stream_bytes": 9208,
+        "ciphertext_and_padding_bytes": 9200,
+        "plaintext_extracted_or_written": false
+      },
+      "summary_information_present": false
+    },
+    "xlsb": {
+      "kind": "CFB/OLE2 Office encryption envelope",
+      "signature": "D0 CF 11 E0 A1 B1 1A E1",
+      "cfb_file_bytes": 14848,
+      "directory_stream_count": 6,
+      "directory_entries": [
+        "\u0006DataSpaces",
+        "EncryptionInfo",
+        "EncryptedPackage"
+      ],
+      "streams": [
+        {
+          "path": "/\u0006DataSpaces/Version",
+          "bytes": 76,
+          "sha256": "e81d2d7f4d8b4aa96a9d1ac9aad489caa06f24c3de2b66471479daf34672ce3a"
+        },
+        {
+          "path": "/\u0006DataSpaces/DataSpaceMap",
+          "bytes": 112,
+          "sha256": "b520d7662070c97304b0bbff09af9f61baaa6872976663ed1a886abc7c29cb15"
+        },
+        {
+          "path": "/\u0006DataSpaces/DataSpaceInfo/StrongEncryptionDataSpace",
+          "bytes": 64,
+          "sha256": "167181108f6fd083cd67d569e9906a592ca923bc2d4c571ed1242caf92ed48f8"
+        },
+        {
+          "path": "/\u0006DataSpaces/TransformInfo/StrongEncryptionTransform/\u0006Primary",
+          "bytes": 200,
+          "sha256": "990349482cd707ba3093d6fff5bb72167a38f0831e58789a92c25cdeb01f7f93"
+        },
+        {
+          "path": "/EncryptionInfo",
+          "bytes": 1289,
+          "sha256": "9ea517a8ba1adf26695c13f824679549fbd412bbafbc881d5880fff50fd8e651"
+        },
+        {
+          "path": "/EncryptedPackage",
+          "bytes": 8520,
+          "sha256": "832ff1407bb6208c6325dd8c44cb79377308b27887e0d80286ab7a3ae4b545f0"
+        }
+      ],
+      "data_spaces_mapping": "EncryptedPackage -> StrongEncryptionDataSpace -> StrongEncryptionTransform/\u0006Primary",
+      "encryption_info": {
+        "format_version": {
+          "major": 4,
+          "minor": 4,
+          "raw_u32": "0x00040004"
+        },
+        "flags": "0x00000040",
+        "xml_scheme": "Agile OOXML password encryption",
+        "encryption_xml_namespace": "http://schemas.microsoft.com/office/2006/encryption",
+        "encryption_info_payload_offset_bytes": 8,
+        "key_data": {
+          "salt_size_bytes": 16,
+          "block_size_bytes": 16,
+          "key_bits": 256,
+          "hash_size_bytes": 64,
+          "cipher_algorithm": "AES",
+          "cipher_chaining": "ChainingModeCBC",
+          "hash_algorithm": "SHA512",
+          "data_integrity_hmac_present": true,
+          "data_integrity_hmac_key_bytes": 64,
+          "data_integrity_hmac_value_bytes": 64
+        },
+        "password_key_encryptor": {
+          "uri": "http://schemas.microsoft.com/office/2006/keyEncryptor/password",
+          "spin_count": 100000,
+          "salt_size_bytes": 16,
+          "block_size_bytes": 16,
+          "key_bits": 256,
+          "hash_size_bytes": 64,
+          "cipher_algorithm": "AES",
+          "cipher_chaining": "ChainingModeCBC",
+          "hash_algorithm": "SHA512",
+          "encrypted_verifier_hash_and_key_present": true
+        },
+        "note": "Salt and encrypted verifier/key material are present in EncryptionInfo; only structural parameters and stream hashes are recorded here."
+      },
+      "encrypted_package": {
+        "declared_plain_package_bytes": 8497,
+        "stream_bytes": 8520,
+        "ciphertext_and_padding_bytes": 8512,
+        "plaintext_extracted_or_written": false
+      },
+      "summary_information_present": false
+    },
+    "xls": {
+      "kind": "CFB/OLE2 BIFF8 workbook",
+      "signature": "D0 CF 11 E0 A1 B1 1A E1",
+      "cfb_file_bytes": 26112,
+      "directory_stream_count": 3,
+      "streams": [
+        {
+          "path": "/Workbook",
+          "bytes": 16164,
+          "sha256": "386eb2a5216bc7afe4f8e42ec5433de53142580292052ea27e8bc38a4d27f21f"
+        },
+        {
+          "path": "/\u0005SummaryInformation",
+          "bytes": 4096,
+          "sha256": "bf7c4c901a6eaaebe1593e17eba67b9cc07894fc72264c4dc3ce28006eac4a63"
+        },
+        {
+          "path": "/\u0005DocumentSummaryInformation",
+          "bytes": 4096,
+          "sha256": "825664378f29f9b94886c112a11e9cfa53231197dd09ac29181f164523b5f897"
+        }
+      ],
+      "filepass": {
+        "record_offset_bytes": 20,
+        "record_sid": "0x002F",
+        "payload_bytes": 200,
+        "payload_sha256": "ed98f9afb3540a2c886407c6dd97fde3f6b20eac4dde8c92eae2ea30c6918649",
+        "encryption_type": 1,
+        "version": {
+          "major": 4,
+          "minor": 2
+        },
+        "flags": "0x0000000C",
+        "flags_meaning": [
+          "CRYPTO_API",
+          "DOC_PROPERTIES"
+        ],
+        "header_size_bytes": 126,
+        "algorithm": "RC4 / CALG_RC4 0x00006801",
+        "hash_algorithm": "SHA-1 / CALG_SHA1 0x00008004",
+        "key_bits": 128,
+        "provider": "Microsoft Enhanced Cryptographic Provider v1.0",
+        "salt_bytes": 16,
+        "salt_sha256": "060d5f013dd620880bdee179ffc35698f400d6bf8f45891b591cdf81ac2223da",
+        "encrypted_verifier_bytes": 16,
+        "encrypted_verifier_sha256": "ca8b334efb7a45ad24d998bc991b346948b6c975d536421db333b28929f708e3",
+        "encrypted_verifier_hash_bytes": 20,
+        "encrypted_verifier_hash_sha256": "86b2ba684c3ff3c4bbd3de7de61cd1159e41293abdb23054dfdfea9076f67d94",
+        "plaintext_filepass_or_workbook_copy_written": false
+      },
+      "biff_record_observation": {
+        "first_record": "BOF(Workbook) at offset 0, Biff8, length 16",
+        "filepass": "0x002F at offset 20, length 200",
+        "post_filepass": "InterfaceHdr 0x00E1, 0x00C1, 0x00E2, 0x005C followed by CODEPAGE and encrypted workbook records",
+        "summary_information_cleartext": true
+      },
+      "summary_information": {
+        "author": "Ryker Zhu",
+        "last_saved_by": "Ryker Zhu",
+        "application": "Microsoft Macintosh Excel",
+        "codepage": 10000
+      }
+    }
+  },
+  "library_validation": {
+    "reader_scope": "All readers and probes were inert and read-only; password decryption, where supported, occurred only in memory.",
+    "readers": [
+      "litchi_xlsx::Workbook::from_bytes_with_password",
+      "litchi_xls::Workbook::new_with_options + OpenOptions::with_password",
+      "litchi_xlsb::Package::from_bytes / Package::open",
+      "litchi-cfb::inspect_ole",
+      "litchi-xls::dump_xls_records"
+    ],
+    "xlsx": {
+      "correct_password": "pass; one Sheet1; A1:B4; B2 Number(42); B3 formula B2*2 with cached Number(84)",
+      "wrong_password": "expected error: litchi_xlsx::Error::Encryption(CryptoError::Password), displayed as incorrect OOXML package password",
+      "missing_password": "ordinary non-password API cannot parse the CFB envelope: litchi_xlsx::Error::Package(ZipError(\"Missing end of central directory\")); passing an empty string is treated as a supplied wrong password and returns CryptoError::Password"
+    },
+    "xls": {
+      "correct_password": "pass; one Sheet1; A1:B4; B2 Float(42.0); B3 Float(84.0) after in-memory BIFF8 CryptoAPI RC4 decryption",
+      "wrong_password": "expected error: litchi_xls::Error::InvalidPassword",
+      "missing_password": "expected error: litchi_xls::Error::PasswordRequired"
+    },
+    "xlsb": {
+      "correct_password": "unsupported at the typed XLSB package boundary; no password-aware encrypted CFB API exists",
+      "wrong_password": "not applicable because the typed XLSB reader rejects the outer CFB before password handling",
+      "missing_password": "not applicable because the typed XLSB reader rejects the outer CFB before password handling",
+      "observed_error": "litchi_xlsb::PackageError::Opc(ZipError(\"Missing end of central directory\"))"
+    },
+    "commands": [
+      "cargo run --quiet -p litchi-ole-common --example inspect_ole -- test-data/microsoft-office/excel/excel-encrypted.xlsx",
+      "cargo run --quiet -p litchi-ole-common --example inspect_ole -- test-data/microsoft-office/excel/excel-encrypted.xlsb",
+      "cargo run --quiet -p litchi-ole-common --example inspect_ole -- test-data/microsoft-office/excel/excel-encrypted.xls",
+      "cargo run --quiet -p litchi-xls --example dump_xls_records -- test-data/microsoft-office/excel/excel-encrypted.xls",
+      "cargo run --quiet -p litchi-xlsb --example binary_index_profile -- --fixture test-data/microsoft-office/excel/excel-encrypted.xlsb --case indexed_cold --warmup 1 --samples 1",
+      "cargo run --quiet --manifest-path /tmp/litchi_encryption_probe/Cargo.toml"
+    ],
+    "temporary_probe": {
+      "path": "/tmp/litchi_encryption_probe",
+      "dependencies": [
+        "litchi-xlsx (encryption feature)",
+        "litchi-xls",
+        "litchi-xlsb",
+        "litchi-core"
+      ],
+      "password_material": "The user-supplied disposable fixture password was used only as an in-memory probe argument; no decrypted output was written."
+    },
+    "native_reopen_evidence": "Root agent via Computer Use: direct native Excel open prompted for the password for all three files, the supplied password was accepted, markers and values were visible, no repair prompt appeared, and all windows were closed to Home."
+  },
+  "files": [
+    {
+      "path": "test-data/microsoft-office/excel/excel-encrypted.xlsx",
+      "format": "xlsx",
+      "bytes": 15360,
+      "sha256": "fdff80100da7f67c8a980ba3ccd648d5316765b013c302bd5cd5f60b32350416",
+      "file_description": "Microsoft Excel 2007+ encrypted workbook",
+      "native_reopen": {
+        "correct_password_prompt": true,
+        "correct_password_accepted": true,
+        "repair_prompt": false,
+        "marker_values_visible": true,
+        "B2_value": 42,
+        "B3_cached_value": 84
+      }
+    },
+    {
+      "path": "test-data/microsoft-office/excel/excel-encrypted.xlsb",
+      "format": "xlsb",
+      "bytes": 14848,
+      "sha256": "53648d150a11b3b28c9f53bfe664e7c3e325b4fde2a3e2f19a8fa69b9698e14c",
+      "file_description": "Microsoft Excel binary encrypted workbook",
+      "native_reopen": {
+        "correct_password_prompt": true,
+        "correct_password_accepted": true,
+        "repair_prompt": false,
+        "marker_values_visible": true,
+        "B2_value": 42,
+        "B3_cached_value": 84
+      }
+    },
+    {
+      "path": "test-data/microsoft-office/excel/excel-encrypted.xls",
+      "format": "xls",
+      "bytes": 26112,
+      "sha256": "ef8dd4ead6cd9ad3a9b4887423c2955ab2109f1e6acaf422a18526612543148e",
+      "file_description": "Microsoft Excel 97-2003 encrypted BIFF8 workbook",
+      "native_reopen": {
+        "correct_password_prompt": true,
+        "correct_password_accepted": true,
+        "repair_prompt": false,
+        "marker_values_visible": true,
+        "B2_value": 42,
+        "B3_cached_value": 84
+      }
+    }
+  ]
+}
