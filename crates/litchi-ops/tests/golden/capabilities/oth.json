@@ -54,10 +54,7 @@
       "supported": true
     },
     "refresh": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "field refresh for the legacy, RTF and ODF formats (record 0279 follow-up)",
-      "reason": "field refresh recomputes DOCX fields, PPTX slide fields and workbook formulas"
+      "supported": true
     },
     "save": {
       "supported": true

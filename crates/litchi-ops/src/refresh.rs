@@ -1,8 +1,10 @@
 //! Field and table-of-contents refresh (design §13 P0, record 0279).
 //!
 //! [`File::refresh`](crate::File::refresh) recomputes the derived results a
-//! document caches: tables of contents and computable fields in DOCX, slide
-//! numbers and dates in PPTX, and formula results in XLSX. Every field the
+//! document caches: tables of contents and computable fields in DOCX,
+//! computable fields in DOC, ODT, OTH and ODM, slide numbers and dates in
+//! PPTX and ODP, and formula results in XLSX, XLSB and XLS (records 0279
+//! and 0295). Every field the
 //! refresh meets is reported in the [`Summary`] with a [`Status`]; the
 //! changed results are written in **one** atomic native commit, and a
 //! document whose results are all current is an exact no-op.
@@ -61,6 +63,17 @@
 //! fields (except the `PAGEREF`s a rebuilt table of contents replaces), in
 //! text boxes, with numeric pictures (`\#`) or other switches are
 //! [`Status::Unsupported`]. Only the main story is refreshed.
+//!
+//! # Other formats (record 0295)
+//!
+//! | Format | Fields |
+//! |---|---|
+//! | DOC | the main story's top-level fields with a result, computed as DOCX computes them (`REF` is `unsupported`), rewritten through the native field-result edit; a story with a nested field or a field without a result reports every computable field `unsupported` |
+//! | ODT, OTH, ODM | the body's `text:date`/`text:time` (clock), stored-time and document-property fields; page fields are [`Status::NeedsLayout`], fixed fields [`Status::Locked`], fields with an ODF data style `unsupported` |
+//! | ODP | as ODT, and `text:page-number` (the slide position) and `text:page-count` (the number of slides) on every slide and notes page |
+//! | XLSB, XLS | formula results as XLSX, written back with [`Options::write_cache`] as the formula records' cached results |
+//!
+//! PPT and RTF have no refresh adapter yet.
 //!
 //! # Limits
 //!

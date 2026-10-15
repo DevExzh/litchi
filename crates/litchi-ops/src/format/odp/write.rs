@@ -9,6 +9,7 @@
 
 pub(crate) mod coalesce;
 pub(crate) mod find;
+pub(crate) mod refresh;
 
 use std::collections::HashSet;
 

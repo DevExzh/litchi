@@ -1,5 +1,6 @@
-//! Capability support for field refresh (record 0279): DOCX fields and
-//! tables of contents, PPTX slide fields, and workbook formula results.
+//! Capability support for field refresh (records 0279 and 0295): DOCX and
+//! DOC fields, DOCX tables of contents, PPTX and ODP slide fields, ODT
+//! text fields, and workbook formula results.
 
 #[cfg(any(
     feature = "docx",
@@ -31,8 +32,8 @@ use crate::read::Adapter;
 /// Refresh on a format without a refresh adapter.
 const NOTHING_TO_REFRESH: Refusal = Refusal {
     code: Code::UnsupportedCapability,
-    follow_up: "field refresh for the legacy, RTF and ODF formats (record 0279 follow-up)",
-    reason: "field refresh recomputes DOCX fields, PPTX slide fields and workbook formulas",
+    follow_up: "record 0295 follow-up: field refresh for PPT, RTF and the ODF object formats",
+    reason: "this format has no field refresh adapter",
 };
 
 impl Capabilities {
@@ -50,6 +51,8 @@ impl Capabilities {
             Some(Adapter::Doc) => (true, true),
             #[cfg(feature = "odt")]
             Some(Adapter::Odt) => (true, true),
+            #[cfg(feature = "odp")]
+            Some(Adapter::Odp) => (true, true),
             #[cfg(all(feature = "eval", feature = "xlsx"))]
             Some(Adapter::Xlsx) => (true, true),
             #[cfg(all(feature = "eval", feature = "xlsb"))]

@@ -173,3 +173,83 @@ mod odt {
         assert_eq!(restored.to_bytes().unwrap(), retitled.to_bytes().unwrap());
     }
 }
+
+#[cfg(feature = "odp")]
+mod odp {
+    use std::io::{Cursor, Read as _, Write as _};
+
+    use litchi_core::FileFormat;
+    use litchi_ops::{NewNode, create, props};
+
+    use super::*;
+
+    /// Replace `from` with `to` in the `content.xml` of an ODF package.
+    fn patch_content(bytes: &[u8], from: &str, to: &str) -> Vec<u8> {
+        let mut archive = zip::ZipArchive::new(Cursor::new(bytes)).unwrap();
+        let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
+        for index in 0..archive.len() {
+            let mut member = archive.by_index(index).unwrap();
+            let name = member.name().to_owned();
+            let mut data = Vec::new();
+            member.read_to_end(&mut data).unwrap();
+            if name == "content.xml" {
+                data = String::from_utf8(data)
+                    .unwrap()
+                    .replace(from, to)
+                    .into_bytes();
+            }
+            let options = zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored);
+            writer.start_file(name, options).unwrap();
+            writer.write_all(&data).unwrap();
+        }
+        writer.finish().unwrap().into_inner()
+    }
+
+    /// Two slides, each with a box showing its page number, the page
+    /// count, and the title.
+    fn deck() -> File {
+        let mut file = create(FileFormat::Odp).unwrap();
+        file = file.add("/", NewNode::new("slide")).unwrap().file;
+        for slide in ["/slide[1]", "/slide[2]"] {
+            file = file
+                .add(
+                    slide,
+                    NewNode::new("shape")
+                        .prop("text", "FIELDS")
+                        .prop("width", "10cm")
+                        .prop("height", "2cm"),
+                )
+                .unwrap()
+                .file;
+        }
+        let file = file.set("/metadata", props! { "title" => "Deck" }).unwrap();
+        let bytes = patch_content(
+            &file.to_bytes().unwrap(),
+            "FIELDS",
+            "Slide <text:page-number text:select-page=\"current\">9</text:page-number> of <text:page-count>9</text:page-count>: <text:title>old</text:title>",
+        );
+        open_bytes(bytes).unwrap()
+    }
+
+    #[test]
+    fn page_fields_follow_the_slide_position() {
+        let file = deck();
+        assert_eq!(text(&file, "/slide[2]/shape[1]"), "Slide 9 of 9: old");
+        let commit = file.refresh(&clock()).unwrap();
+        assert_eq!(commit.value.refreshed(), 6, "{:?}", commit.value);
+        assert_eq!(commit.diagnostics.commits(), 1);
+        let after = open_bytes(commit.file.to_bytes().unwrap()).unwrap();
+        assert_eq!(text(&after, "/slide[1]/shape[1]"), "Slide 1 of 2: Deck");
+        assert_eq!(text(&after, "/slide[2]/shape[1]"), "Slide 2 of 2: Deck");
+        assert!(after.refresh(&clock()).unwrap().patch.is_noop());
+        // Moving a slide makes its page number stale again.
+        let moved = after.swap("/slide[1]", "/slide[2]").unwrap();
+        let again = moved.refresh(&Options::new()).unwrap();
+        assert_eq!(again.value.refreshed(), 2);
+        assert_eq!(
+            text(&again.file, "/slide[1]/shape[1]"),
+            "Slide 1 of 2: Deck"
+        );
+    }
+}

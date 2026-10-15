@@ -235,6 +235,15 @@ fn run(
                 None => Ok((None, summary)),
             }
         },
+        #[cfg(feature = "odp")]
+        File::Odp(handle) => {
+            let (commit, summary) =
+                crate::format::odp::write::refresh::refresh(handle, options, limits)?;
+            match commit {
+                Some(commit) => Ok((Some(super::wrap_odp(handle, commit, ())?.0), summary)),
+                None => Ok((None, summary)),
+            }
+        },
         #[cfg(all(feature = "xlsb", feature = "eval"))]
         File::Xlsb(handle) => {
             let (commit, summary) =
@@ -254,9 +263,11 @@ fn run(
 fn unsupported(file: &File) -> crate::Error {
     let error = crate::Error::new(
         Code::UnsupportedCapability,
-        "field refresh recomputes DOCX fields, PPTX slide fields and workbook formulas",
+        "this format has no field refresh adapter",
     )
-    .with_suggestion("refresh a DOCX, PPTX or XLSX file");
+    .with_suggestion(
+        "refresh a DOCX, DOC, ODT, PPTX, ODP or workbook file (record 0295 follow-up)",
+    );
     match file.format() {
         Some(format) => error.with_format(format),
         None => error,

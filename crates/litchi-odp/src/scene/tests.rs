@@ -375,3 +375,53 @@ fn byte_order_mark_offsets_ranges() {
     let paragraph = &scene.pages()[0].objects()[0].story().unwrap().paragraphs()[0];
     assert!(xml[paragraph.range()].starts_with("<text:p"));
 }
+
+/// Record 0295: a field run's displayed text is replaced in place, its
+/// element and attributes kept; a text run, and a run that does not exist
+/// (bookmarks are not runs), are refused.
+#[test]
+fn field_text_keeps_the_field_element() {
+    let xml = document(concat!(
+        r#"<draw:page draw:name="p">"#,
+        r#"<draw:frame draw:name="F"><draw:text-box><text:p>No. <text:page-number text:select-page="current">7</text:page-number><text:page-count>2</text:page-count><text:bookmark text:name="b"/></text:p></draw:text-box></draw:frame>"#,
+        r#"</draw:page>"#,
+    ));
+    let changed = apply(
+        &xml,
+        &[
+            Change::SetFieldText {
+                story: title(0),
+                paragraph: 0,
+                run: 1,
+                text: "1".into(),
+            },
+            Change::SetFieldText {
+                story: title(0),
+                paragraph: 0,
+                run: 2,
+                text: "3".into(),
+            },
+        ],
+    );
+    assert!(
+        changed.contains(r#"<text:page-number text:select-page="current">1</text:page-number><text:page-count>3</text:page-count>"#),
+        "{changed}"
+    );
+    let scene = Scene::parse(&xml).unwrap();
+    for run in [0, 3] {
+        assert!(
+            plan(
+                &xml,
+                &scene,
+                &[Change::SetFieldText {
+                    story: title(0),
+                    paragraph: 0,
+                    run,
+                    text: "x".into(),
+                }],
+            )
+            .is_err(),
+            "run {run}"
+        );
+    }
+}

@@ -844,6 +844,8 @@ fn refresh_is_supported_where_fields_are_computed() {
         let support = Capabilities::of(format).verb(Verb::Refresh);
         let adapter = (format == FileFormat::Docx && cfg!(feature = "docx"))
             || (format == FileFormat::Pptx && cfg!(feature = "pptx"))
+            || (format == FileFormat::Doc && cfg!(feature = "doc"))
+            || (format == FileFormat::Odt && cfg!(feature = "odt"))
             || (format == FileFormat::Xlsx && cfg!(all(feature = "xlsx", feature = "eval")))
             || (format == FileFormat::Xlsb && cfg!(all(feature = "xlsb", feature = "eval")))
             || (format == FileFormat::Xls && cfg!(all(feature = "xls", feature = "eval")));
