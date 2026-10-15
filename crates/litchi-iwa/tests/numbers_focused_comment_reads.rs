@@ -271,10 +271,10 @@ fn wire_root_identifier(source: &[u8], row: usize) -> TestResult<u64> {
                 if list.list_type != tst::table_data_list::ListType::CommentStorage as i32 {
                     continue;
                 }
-                if let Some(entry) = list.entries.iter().find(|entry| entry.key == key) {
-                    if let Some(reference) = entry.comment_storage.as_ref() {
-                        roots.push(reference.identifier);
-                    }
+                if let Some(entry) = list.entries.iter().find(|entry| entry.key == key)
+                    && let Some(reference) = entry.comment_storage.as_ref()
+                {
+                    roots.push(reference.identifier);
                 }
                 continue;
             }
@@ -287,10 +287,10 @@ fn wire_root_identifier(source: &[u8], row: usize) -> TestResult<u64> {
             if segment.list_type != tst::table_data_list::ListType::CommentStorage as i32 {
                 continue;
             }
-            if let Some(entry) = segment.entries.iter().find(|entry| entry.key == key) {
-                if let Some(reference) = entry.comment_storage.as_ref() {
-                    roots.push(reference.identifier);
-                }
+            if let Some(entry) = segment.entries.iter().find(|entry| entry.key == key)
+                && let Some(reference) = entry.comment_storage.as_ref()
+            {
+                roots.push(reference.identifier);
             }
         }
     }

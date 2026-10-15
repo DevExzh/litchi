@@ -702,13 +702,12 @@ pub(crate) fn reply_objects(
     if matches!(corruption, Some(Corruption::MissingReply)) {
         result.retain(|object| object.archive_info.identifier != Some(FIRST_REPLY_ID));
     }
-    if matches!(corruption, Some(Corruption::WrongReplyType)) {
-        if let Some(object) = result
+    if matches!(corruption, Some(Corruption::WrongReplyType))
+        && let Some(object) = result
             .iter_mut()
             .find(|object| object.archive_info.identifier == Some(FIRST_REPLY_ID))
-        {
-            object.messages[0].type_ = COMMENT_STORAGE_TYPE + 1;
-        }
+    {
+        object.messages[0].type_ = COMMENT_STORAGE_TYPE + 1;
     }
     if matches!(corruption, Some(Corruption::DuplicateRootPayload)) {
         let root = result
