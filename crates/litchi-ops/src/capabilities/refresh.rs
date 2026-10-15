@@ -4,6 +4,7 @@
 #[cfg(any(
     feature = "docx",
     feature = "pptx",
+    feature = "doc",
     all(
         feature = "eval",
         any(feature = "xlsx", feature = "xlsb", feature = "xls")
@@ -15,6 +16,7 @@ use crate::Code;
 #[cfg(any(
     feature = "docx",
     feature = "pptx",
+    feature = "doc",
     all(
         feature = "eval",
         any(feature = "xlsx", feature = "xlsb", feature = "xls")
@@ -40,6 +42,8 @@ impl Capabilities {
             Some(Adapter::Docx) => (true, true),
             #[cfg(feature = "pptx")]
             Some(Adapter::Pptx) => (true, true),
+            #[cfg(feature = "doc")]
+            Some(Adapter::Doc) => (true, true),
             #[cfg(all(feature = "eval", feature = "xlsx"))]
             Some(Adapter::Xlsx) => (true, true),
             #[cfg(all(feature = "eval", feature = "xlsb"))]
@@ -54,6 +58,7 @@ impl Capabilities {
         #[cfg(any(
             feature = "docx",
             feature = "pptx",
+            feature = "doc",
             all(
                 feature = "eval",
                 any(feature = "xlsx", feature = "xlsb", feature = "xls")

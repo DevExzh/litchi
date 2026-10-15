@@ -619,6 +619,19 @@ pub struct Summary {
 
 impl Summary {
     /// A summary of `fields` without bookmarks or missing page numbers.
+    #[cfg_attr(
+        not(any(
+            feature = "xlsb",
+            feature = "xls",
+            feature = "doc",
+            feature = "odt",
+            feature = "odp"
+        )),
+        allow(
+            dead_code,
+            reason = "used by the adapters that build their report as a list"
+        )
+    )]
     pub(crate) const fn from_fields(fields: Vec<Field>) -> Self {
         Self {
             fields,
@@ -936,6 +949,202 @@ pub(crate) fn workbook_summary(
         missing_page_numbers: 0,
     })
 }
+
+#[cfg(any(feature = "docx", feature = "doc"))]
+mod word {
+    use std::collections::HashMap;
+
+    use litchi_core::Metadata;
+
+    use super::{Clock, Instruction, Status, apply_case, format_number};
+
+    /// Why a field was not computed.
+    pub(crate) type Skip = (Status, Option<&'static str>);
+
+    /// The new result of a Word field that is not a table of contents (DOCX,
+    /// and DOC since record 0295): `bookmark` reads a bookmark's text for
+    /// `REF`, `counts` the main story's words and non-space characters.
+    pub(crate) fn word_field(
+        kind: &str,
+        instruction: &Instruction,
+        metadata: &Metadata,
+        clock: Option<Clock>,
+        seq: &mut HashMap<String, (u64, bool)>,
+        bookmark: impl FnOnce(&str) -> Option<String>,
+        counts: impl FnOnce() -> (usize, usize),
+    ) -> Result<String, Skip> {
+        if instruction.has('#') {
+            return Err((
+                Status::Unsupported,
+                Some("numeric pictures (\\#) are not applied"),
+            ));
+        }
+        let text = match kind {
+            "SEQ" => return sequence(instruction, seq),
+            "DATE" | "TIME" => {
+                let clock = clock.ok_or((Status::NeedsClock, None))?;
+                let default = if kind == "DATE" {
+                    "M/d/yyyy"
+                } else {
+                    "h:mm am/pm"
+                };
+                clock.format(instruction.switch('@').unwrap_or(default))
+            },
+            "CREATEDATE" | "SAVEDATE" | "PRINTDATE" => {
+                let stamp = match kind {
+                    "CREATEDATE" => metadata.created,
+                    "SAVEDATE" => metadata.modified,
+                    _ => metadata.last_printed,
+                };
+                let clock = stamp.and_then(Clock::from_timestamp).ok_or((
+                    Status::Unresolved,
+                    Some("the document does not store this time"),
+                ))?;
+                clock.format(instruction.switch('@').unwrap_or("M/d/yyyy h:mm:ss am/pm"))
+            },
+            "REF" => {
+                let name = instruction
+                    .arguments
+                    .first()
+                    .ok_or((Status::Unsupported, Some("REF names no bookmark")))?;
+                if instruction
+                    .switches
+                    .iter()
+                    .any(|(switch, _)| !matches!(switch, 'h' | '*'))
+                {
+                    return Err((
+                        Status::Unsupported,
+                        Some("REF paragraph-number and position switches are not computed"),
+                    ));
+                }
+                bookmark(name).ok_or((Status::Unresolved, Some("the bookmark does not exist")))?
+            },
+            "TITLE" | "SUBJECT" | "AUTHOR" | "KEYWORDS" | "COMMENTS" | "LASTSAVEDBY" => {
+                if !instruction.arguments.is_empty() {
+                    return Err((
+                        Status::Unsupported,
+                        Some("setting a property from a field is not done"),
+                    ));
+                }
+                property(metadata, kind).unwrap_or_default()
+            },
+            "DOCPROPERTY" => {
+                let name = instruction
+                    .arguments
+                    .first()
+                    .ok_or((Status::Unsupported, Some("DOCPROPERTY names no property")))?;
+                let key = name.replace(' ', "").to_ascii_uppercase();
+                property(metadata, &key).ok_or((
+                    Status::Unresolved,
+                    Some("the property is not a known document property"),
+                ))?
+            },
+            "NUMWORDS" | "NUMCHARS" => {
+                let (words, characters) = counts();
+                if kind == "NUMWORDS" {
+                    words
+                } else {
+                    characters
+                }
+                .to_string()
+            },
+            _ => return Err((Status::Unsupported, None)),
+        };
+        let mut text = text;
+        for format in instruction.formats() {
+            text = apply_case(&text, format).ok_or((
+                Status::Unsupported,
+                Some("the \\* format is not applied to this field"),
+            ))?;
+        }
+        Ok(text)
+    }
+
+    fn property(metadata: &Metadata, key: &str) -> Option<String> {
+        let value = match key {
+            "TITLE" => &metadata.title,
+            "SUBJECT" => &metadata.subject,
+            "AUTHOR" => &metadata.author,
+            "KEYWORDS" => &metadata.keywords,
+            "COMMENTS" => &metadata.description,
+            "LASTSAVEDBY" => &metadata.last_modified_by,
+            "CATEGORY" => &metadata.category,
+            "COMPANY" => &metadata.company,
+            "MANAGER" => &metadata.manager,
+            "TEMPLATE" => &metadata.template,
+            _ => return None,
+        };
+        Some(value.clone().unwrap_or_default())
+    }
+
+    /// `SEQ` numbering in document order, after OfficeCLI's evaluator.
+    pub(crate) fn sequence(
+        instruction: &Instruction,
+        counters: &mut HashMap<String, (u64, bool)>,
+    ) -> Result<String, Skip> {
+        let identifier = instruction
+            .arguments
+            .first()
+            .ok_or((Status::Unsupported, Some("SEQ names no sequence")))?
+            .clone();
+        let counter = counters.entry(identifier).or_insert((0, false));
+        if counter.1 {
+            return Err((
+                Status::Unsupported,
+                Some("an earlier field of this sequence was not computed"),
+            ));
+        }
+        if instruction.has('s') {
+            counter.1 = true;
+            return Err((
+                Status::Unsupported,
+                Some("heading-relative SEQ resets (\\s) need heading numbering"),
+            ));
+        }
+        let value = if let Some(reset) = instruction.switch('r') {
+            let Ok(reset) = reset.trim().parse::<u64>() else {
+                counter.1 = true;
+                return Err((
+                    Status::Unsupported,
+                    Some("the SEQ \\r reset is not a number"),
+                ));
+            };
+            reset
+        } else if instruction.has('c') {
+            counter.0
+        } else {
+            counter.0 + 1
+        };
+        counter.0 = value;
+        if instruction.has('h') {
+            return Ok(String::new());
+        }
+        let mut formats = instruction.formats();
+        let text = match formats.next() {
+            None => value.to_string(),
+            Some(format) => {
+                if formats.next().is_some() {
+                    counter.1 = true;
+                    return Err((Status::Unsupported, Some("several SEQ formats")));
+                }
+                if let Some(text) = format_number(value, format) {
+                    text
+                } else {
+                    counter.1 = true;
+                    return Err((
+                        Status::Unsupported,
+                        Some("the SEQ number format is not applied"),
+                    ));
+                }
+            },
+        };
+        Ok(text)
+    }
+}
+#[cfg(any(feature = "docx", feature = "doc"))]
+#[cfg(all(test, feature = "docx"))]
+pub(crate) use word::sequence;
+pub(crate) use word::word_field;
 
 #[cfg(test)]
 mod tests;

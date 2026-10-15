@@ -11,9 +11,7 @@ use litchi_docx::document::fields::{Fields, TocEntry, Update};
 use super::write::{Commit, WorkEdit};
 use super::{Docx, DocxEditor, DocxOwner};
 use crate::error::{Code, Error, Result};
-use crate::refresh::{
-    Clock, Field, Instruction, Options, PageNumbers, Status, Summary, apply_case, format_number,
-};
+use crate::refresh::{Field, Instruction, Options, PageNumbers, Status, Summary, word_field};
 use crate::transaction::{Error as TransactionError, LimitKind, SemanticLimits};
 
 /// The default text width (US Letter, one-inch margins) for the page
@@ -347,13 +345,35 @@ pub(crate) fn plan(
             summary.fields.push(report(Status::Refreshed));
             continue;
         }
-        let computed = compute(
-            index,
+        let computed = word_field(
             &kind,
             instruction,
             metadata,
             options.clock_value(),
             &mut seq,
+            |name| {
+                index
+                    .bookmarks()
+                    .iter()
+                    .find(|bookmark| bookmark.name().eq_ignore_ascii_case(name))
+                    .map(|bookmark| bookmark.text().trim_end_matches(['\n', '\r']).to_owned())
+            },
+            || {
+                index
+                    .paragraphs()
+                    .iter()
+                    .fold((0, 0), |(words, characters), paragraph| {
+                        (
+                            words + paragraph.text().split_whitespace().count(),
+                            characters
+                                + paragraph
+                                    .text()
+                                    .chars()
+                                    .filter(|character| !character.is_whitespace())
+                                    .count(),
+                        )
+                    })
+            },
         );
         let text = match computed {
             Ok(text) => text,
@@ -649,199 +669,6 @@ fn plan_toc(
         missing,
         unchanged,
     })
-}
-
-type Skip = (Status, Option<&'static str>);
-
-/// The new result of a non-TOC field.
-fn compute(
-    index: &Fields,
-    kind: &str,
-    instruction: &Instruction,
-    metadata: &Metadata,
-    clock: Option<Clock>,
-    seq: &mut HashMap<String, (u64, bool)>,
-) -> std::result::Result<String, Skip> {
-    if instruction.has('#') {
-        return Err((
-            Status::Unsupported,
-            Some("numeric pictures (\\#) are not applied"),
-        ));
-    }
-    let text = match kind {
-        "SEQ" => return sequence(instruction, seq),
-        "DATE" | "TIME" => {
-            let clock = clock.ok_or((Status::NeedsClock, None))?;
-            let default = if kind == "DATE" {
-                "M/d/yyyy"
-            } else {
-                "h:mm am/pm"
-            };
-            clock.format(instruction.switch('@').unwrap_or(default))
-        },
-        "CREATEDATE" | "SAVEDATE" | "PRINTDATE" => {
-            let stamp = match kind {
-                "CREATEDATE" => metadata.created,
-                "SAVEDATE" => metadata.modified,
-                _ => metadata.last_printed,
-            };
-            let clock = stamp.and_then(Clock::from_timestamp).ok_or((
-                Status::Unresolved,
-                Some("the document does not store this time"),
-            ))?;
-            clock.format(instruction.switch('@').unwrap_or("M/d/yyyy h:mm:ss am/pm"))
-        },
-        "REF" => {
-            let name = instruction
-                .arguments
-                .first()
-                .ok_or((Status::Unsupported, Some("REF names no bookmark")))?;
-            if instruction
-                .switches
-                .iter()
-                .any(|(switch, _)| !matches!(switch, 'h' | '*'))
-            {
-                return Err((
-                    Status::Unsupported,
-                    Some("REF paragraph-number and position switches are not computed"),
-                ));
-            }
-            index
-                .bookmarks()
-                .iter()
-                .find(|bookmark| bookmark.name().eq_ignore_ascii_case(name))
-                .map(|bookmark| bookmark.text().trim_end_matches(['\n', '\r']).to_owned())
-                .ok_or((Status::Unresolved, Some("the bookmark does not exist")))?
-        },
-        "TITLE" | "SUBJECT" | "AUTHOR" | "KEYWORDS" | "COMMENTS" | "LASTSAVEDBY" => {
-            if !instruction.arguments.is_empty() {
-                return Err((
-                    Status::Unsupported,
-                    Some("setting a property from a field is not done"),
-                ));
-            }
-            property(metadata, kind).unwrap_or_default()
-        },
-        "DOCPROPERTY" => {
-            let name = instruction
-                .arguments
-                .first()
-                .ok_or((Status::Unsupported, Some("DOCPROPERTY names no property")))?;
-            let key = name.replace(' ', "").to_ascii_uppercase();
-            property(metadata, &key).ok_or((
-                Status::Unresolved,
-                Some("the property is not a known document property"),
-            ))?
-        },
-        "NUMWORDS" | "NUMCHARS" => {
-            let mut words = 0usize;
-            let mut characters = 0usize;
-            for paragraph in index.paragraphs() {
-                words += paragraph.text().split_whitespace().count();
-                characters += paragraph
-                    .text()
-                    .chars()
-                    .filter(|character| !character.is_whitespace())
-                    .count();
-            }
-            if kind == "NUMWORDS" {
-                words
-            } else {
-                characters
-            }
-            .to_string()
-        },
-        _ => return Err((Status::Unsupported, None)),
-    };
-    let mut text = text;
-    for format in instruction.formats() {
-        text = apply_case(&text, format).ok_or((
-            Status::Unsupported,
-            Some("the \\* format is not applied to this field"),
-        ))?;
-    }
-    Ok(text)
-}
-
-fn property(metadata: &Metadata, key: &str) -> Option<String> {
-    let value = match key {
-        "TITLE" => &metadata.title,
-        "SUBJECT" => &metadata.subject,
-        "AUTHOR" => &metadata.author,
-        "KEYWORDS" => &metadata.keywords,
-        "COMMENTS" => &metadata.description,
-        "LASTSAVEDBY" => &metadata.last_modified_by,
-        "CATEGORY" => &metadata.category,
-        "COMPANY" => &metadata.company,
-        "MANAGER" => &metadata.manager,
-        "TEMPLATE" => &metadata.template,
-        _ => return None,
-    };
-    Some(value.clone().unwrap_or_default())
-}
-
-/// `SEQ` numbering in document order, after OfficeCLI's evaluator.
-fn sequence(
-    instruction: &Instruction,
-    counters: &mut HashMap<String, (u64, bool)>,
-) -> std::result::Result<String, Skip> {
-    let identifier = instruction
-        .arguments
-        .first()
-        .ok_or((Status::Unsupported, Some("SEQ names no sequence")))?
-        .clone();
-    let counter = counters.entry(identifier).or_insert((0, false));
-    if counter.1 {
-        return Err((
-            Status::Unsupported,
-            Some("an earlier field of this sequence was not computed"),
-        ));
-    }
-    if instruction.has('s') {
-        counter.1 = true;
-        return Err((
-            Status::Unsupported,
-            Some("heading-relative SEQ resets (\\s) need heading numbering"),
-        ));
-    }
-    let value = if let Some(reset) = instruction.switch('r') {
-        let Ok(reset) = reset.trim().parse::<u64>() else {
-            counter.1 = true;
-            return Err((
-                Status::Unsupported,
-                Some("the SEQ \\r reset is not a number"),
-            ));
-        };
-        reset
-    } else if instruction.has('c') {
-        counter.0
-    } else {
-        counter.0 + 1
-    };
-    counter.0 = value;
-    if instruction.has('h') {
-        return Ok(String::new());
-    }
-    let mut formats = instruction.formats();
-    let text = match formats.next() {
-        None => value.to_string(),
-        Some(format) => {
-            if formats.next().is_some() {
-                counter.1 = true;
-                return Err((Status::Unsupported, Some("several SEQ formats")));
-            }
-            if let Some(text) = format_number(value, format) {
-                text
-            } else {
-                counter.1 = true;
-                return Err((
-                    Status::Unsupported,
-                    Some("the SEQ number format is not applied"),
-                ));
-            }
-        },
-    };
-    Ok(text)
 }
 
 #[cfg(test)]

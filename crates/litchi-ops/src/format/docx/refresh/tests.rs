@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use super::{heading_number, numbered, parse_range, sequence};
-use crate::refresh::{Instruction, Status};
+use super::{heading_number, numbered, parse_range};
+use crate::refresh::{Instruction, Status, sequence};
 
 fn seq(instructions: &[&str]) -> Vec<Result<String, Status>> {
     let mut counters = HashMap::new();

@@ -28,6 +28,7 @@ mod find;
 mod metadata;
 mod nav;
 mod node;
+pub(crate) mod refresh;
 mod spec;
 pub(crate) mod views;
 pub(crate) mod write;

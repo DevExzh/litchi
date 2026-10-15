@@ -218,6 +218,14 @@ fn run(
                 None => Ok((None, summary)),
             }
         },
+        #[cfg(feature = "doc")]
+        File::Doc(handle) => {
+            let (commit, summary) = crate::format::doc::refresh::refresh(handle, options, limits)?;
+            match commit {
+                Some(commit) => Ok((Some(super::wrap_doc(handle, commit, ())?.0), summary)),
+                None => Ok((None, summary)),
+            }
+        },
         #[cfg(all(feature = "xlsb", feature = "eval"))]
         File::Xlsb(handle) => {
             let (commit, summary) =
