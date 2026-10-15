@@ -450,3 +450,14 @@ fn test_into_metadata_no_keywords() {
     let meta: CoreMetadata = odf.into();
     assert!(meta.keywords.is_none());
 }
+
+/// Record 0290: both conversions to the common model carry `dc:language`,
+/// so `File::metadata()` reports a written language for every ODF format.
+#[test]
+fn common_metadata_carries_the_language() {
+    let xml = r#"<office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:dc="http://purl.org/dc/elements/1.1/"><office:meta><dc:language>de-DE</dc:language></office:meta></office:document-meta>"#;
+    let converted: CoreMetadata = Metadata::from_xml(xml).unwrap().into();
+    assert_eq!(converted.language.as_deref(), Some("de-DE"));
+    let checked = Metadata::from_xml(xml).unwrap().try_into_core().unwrap();
+    assert_eq!(checked.language.as_deref(), Some("de-DE"));
+}

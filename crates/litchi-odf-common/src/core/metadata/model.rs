@@ -189,6 +189,7 @@ impl Metadata {
             template,
             statistics,
             generator,
+            language,
             ..
         } = self;
 
@@ -259,6 +260,7 @@ impl Metadata {
             character_count: parse_u32_count(statistics.character_count),
             application: generator,
             last_printed: Self::parse_date(print_date).map(litchi_core::metadata::Timestamp::Utc),
+            language,
             ..Default::default()
         })
     }
@@ -293,6 +295,7 @@ impl From<Metadata> for CoreMetadata {
             application: odf_meta.generator,
             last_printed: Metadata::parse_date(odf_meta.print_date)
                 .map(litchi_core::metadata::Timestamp::Utc),
+            language: odf_meta.language,
             ..Default::default()
         }
     }
