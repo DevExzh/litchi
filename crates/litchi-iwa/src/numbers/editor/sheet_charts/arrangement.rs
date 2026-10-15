@@ -94,7 +94,9 @@ fn focused_chart_arrangement_package(editor: &NumbersEditor) -> Result<FocusedNu
     })
 }
 
-fn map_focused_chart_arrangement_error(error: litchi_numbers::SheetChartArrangementError) -> Error {
+fn map_focused_chart_arrangement_error(
+    error: litchi_numbers::sheet::chart::arrangement::Error,
+) -> Error {
     Error::InvalidFormat(format!(
         "focused Numbers chart arrangement operation failed: {error}"
     ))

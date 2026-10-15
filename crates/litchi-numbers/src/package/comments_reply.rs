@@ -64,17 +64,17 @@ impl CommentReplyIndex {
     }
 
     /// Convert a platform-sized index without truncating it.
-    pub fn try_from_usize(index: usize) -> Result<Self, CommentReplyError> {
+    pub fn try_from_usize(index: usize) -> Result<Self, Error> {
         u32::try_from(index)
             .map(Self)
-            .map_err(|_| CommentReplyError::IndexOverflow { observed: index })
+            .map_err(|_| Error::IndexOverflow { observed: index })
     }
 }
 
 /// A content-free location associated with a direct-reply operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum CommentReplyPath {
+pub enum Path {
     /// The complete Numbers package.
     Package,
     /// A rooted table cell used by an append operation or collection edit.
@@ -103,7 +103,7 @@ pub enum CommentReplyPath {
     },
 }
 
-impl CommentReplyPath {
+impl Path {
     const fn cell_parts(self) -> (usize, usize, usize, usize) {
         match self {
             Self::Package => (0, 0, 0, 0),
@@ -161,7 +161,7 @@ impl CommentReplyPath {
 /// Resource axes exposed by the direct-reply transaction boundary.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum CommentReplyLimitKind {
+pub enum LimitKind {
     /// Encoded package input bytes inspected.
     InputBytes,
     /// Candidate package output bytes emitted.
@@ -209,7 +209,7 @@ pub enum CommentReplyLimitKind {
 /// Failure from a selector-first direct-reply operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum CommentReplyError {
+pub enum Error {
     /// An A1 address was malformed.
     #[error("invalid Numbers comment-reply cell address")]
     InvalidAddress,
@@ -221,38 +221,38 @@ pub enum CommentReplyError {
     TableNotFound,
     /// A selected cell was outside the table.
     #[error("the selected Numbers comment-reply cell is outside the table")]
-    OutOfBounds { path: CommentReplyPath },
+    OutOfBounds { path: Path },
     /// The source graph or its native framing was not authoritative.
     #[error("the Numbers comment-reply source is invalid at {path:?}")]
-    InvalidSource { path: CommentReplyPath },
+    InvalidSource { path: Path },
     /// The package does not retain exact physical provenance.
     #[error("this Numbers source does not support exact comment-reply editing")]
     UnsupportedSource,
     /// The selected cell has no rooted comment.
     #[error("the selected Numbers cell has no rooted comment")]
-    CommentNotFound { path: CommentReplyPath },
+    CommentNotFound { path: Path },
     /// The selected direct-reply ordinal does not exist.
     #[error("the selected Numbers direct-reply ordinal does not exist")]
-    ReplyNotFound { path: CommentReplyPath },
+    ReplyNotFound { path: Path },
     /// The source graph needs a broader owner than this bounded slice.
     #[error("the Numbers comment-reply source has an unsupported dependency at {path:?}")]
-    UnsupportedDependency { path: CommentReplyPath },
+    UnsupportedDependency { path: Path },
     /// The selected table is locked against comment-reply mutation.
     #[error("the selected Numbers table is locked at {path:?}")]
-    TableLocked { path: CommentReplyPath },
+    TableLocked { path: Path },
     /// An operation-local resource ceiling was exceeded.
     #[error(
         "Numbers comment-reply {kind:?} limit exceeded: observed {observed}, maximum {maximum} at {path:?}"
     )]
     LimitExceeded {
         /// Resource axis.
-        kind: CommentReplyLimitKind,
+        kind: LimitKind,
         /// Observed or requested quantity.
         observed: usize,
         /// Configured ceiling.
         maximum: usize,
         /// Semantic operation path.
-        path: CommentReplyPath,
+        path: Path,
     },
     /// A bounded plan allocation failed before publication.
     #[error("could not allocate {amount} units for the Numbers comment-reply operation")]
@@ -260,7 +260,7 @@ pub enum CommentReplyError {
         /// Requested allocation units.
         amount: usize,
         /// Semantic operation path.
-        path: CommentReplyPath,
+        path: Path,
     },
     /// Candidate reopen did not reproduce the requested state.
     #[error("the edited Numbers comment reply failed semantic verification")]
@@ -276,14 +276,14 @@ pub enum CommentReplyError {
 
 /// Content-free publication diagnostics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct CommentReplyDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     deleted_previews: usize,
     full_reparse_performed: bool,
 }
 
-impl CommentReplyDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -343,30 +343,30 @@ enum ReplyOperation {
 }
 
 /// A selector-first direct-reply edit staged against one immutable package.
-pub struct CommentReplyEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
     target: Located,
-    path: CommentReplyPath,
+    path: Path,
     before: Box<[CommentReply]>,
     after: Vec<CommentReply>,
     operation: Option<ReplyOperation>,
-    staging_error: Option<CommentReplyError>,
+    staging_error: Option<Error>,
 }
 
-impl fmt::Debug for CommentReplyEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("CommentReplyEdit")
+            .debug_struct("Edit")
             .field("path", &self.path)
             .field("reply_count", &self.after.len())
             .finish_non_exhaustive()
     }
 }
 
-impl CommentReplyEdit<'_> {
+impl Edit<'_> {
     /// Return the rooted cell path selected for this edit.
     #[must_use]
-    pub const fn path(&self) -> CommentReplyPath {
+    pub const fn path(&self) -> Path {
         self.path
     }
 
@@ -390,7 +390,7 @@ impl CommentReplyEdit<'_> {
         match reply_from_text(self.source, text.as_ref(), self.path, timestamp, author) {
             Ok(reply) => {
                 let Ok(after) = clone_replies(&self.before, self.path) else {
-                    self.staging_error = Some(CommentReplyError::Allocation {
+                    self.staging_error = Some(Error::Allocation {
                         amount: self.before.len(),
                         path: self.path,
                     });
@@ -413,7 +413,7 @@ impl CommentReplyEdit<'_> {
     pub fn set(mut self, index: CommentReplyIndex, text: impl AsRef<str>) -> Self {
         let ordinal = index.index() as usize;
         if ordinal >= self.before.len() {
-            self.staging_error = Some(CommentReplyError::ReplyNotFound {
+            self.staging_error = Some(Error::ReplyNotFound {
                 path: self.path.reply(index),
             });
             return self;
@@ -432,7 +432,7 @@ impl CommentReplyEdit<'_> {
         ) {
             Ok(reply) => {
                 let Ok(after) = clone_replies(&self.before, self.path) else {
-                    self.staging_error = Some(CommentReplyError::Allocation {
+                    self.staging_error = Some(Error::Allocation {
                         amount: self.before.len(),
                         path: self.path,
                     });
@@ -456,13 +456,13 @@ impl CommentReplyEdit<'_> {
     pub fn remove(mut self, index: CommentReplyIndex) -> Self {
         let ordinal = index.index() as usize;
         if ordinal >= self.before.len() {
-            self.staging_error = Some(CommentReplyError::ReplyNotFound {
+            self.staging_error = Some(Error::ReplyNotFound {
                 path: self.path.reply(index),
             });
             return self;
         }
         let Ok(after) = clone_replies(&self.before, self.path) else {
-            self.staging_error = Some(CommentReplyError::Allocation {
+            self.staging_error = Some(Error::Allocation {
                 amount: self.before.len(),
                 path: self.path,
             });
@@ -476,7 +476,7 @@ impl CommentReplyEdit<'_> {
     }
 
     /// Validate and atomically publish this edit.
-    pub fn commit(self) -> Result<CommentReplyCommit, CommentReplyError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         if let Some(error) = self.staging_error {
             return Err(error);
         }
@@ -486,9 +486,9 @@ impl CommentReplyEdit<'_> {
 
 /// A reversible exact-source direct-reply patch.
 #[derive(Clone, PartialEq, Eq)]
-pub struct CommentReplyPatch {
+pub struct Patch {
     artifacts: OwnedExactArtifacts,
-    path: CommentReplyPath,
+    path: Path,
     before: Box<[CommentReply]>,
     after: Box<[CommentReply]>,
     source_cell: Arc<[u8]>,
@@ -498,20 +498,20 @@ pub struct CommentReplyPatch {
     touched_components: usize,
 }
 
-impl fmt::Debug for CommentReplyPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("CommentReplyPatch")
+            .debug_struct("Patch")
             .field("path", &self.path)
             .field("reply_count", &self.after.len())
             .finish_non_exhaustive()
     }
 }
 
-impl CommentReplyPatch {
+impl Patch {
     /// Return the semantic path represented by this patch.
     #[must_use]
-    pub const fn path(&self) -> CommentReplyPath {
+    pub const fn path(&self) -> Path {
         self.path
     }
 
@@ -565,13 +565,13 @@ impl CommentReplyPatch {
 /// One fully validated immutable direct-reply publication.
 #[must_use = "a comment-reply commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct CommentReplyCommit {
+pub struct Commit {
     package: Package,
-    patch: CommentReplyPatch,
-    diagnostics: CommentReplyDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl CommentReplyCommit {
+impl Commit {
     /// Borrow the validated package snapshot.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -586,13 +586,13 @@ impl CommentReplyCommit {
 
     /// Borrow the reversible patch.
     #[must_use]
-    pub const fn patch(&self) -> &CommentReplyPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Borrow publication diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> &CommentReplyDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -602,95 +602,91 @@ struct ReplyState {
     replies: Box<[CommentReply]>,
 }
 
-fn map_root_error(error: RootError, path: CommentReplyPath) -> CommentReplyError {
+fn map_root_error(error: RootError, path: Path) -> Error {
     match error {
-        RootError::InvalidAddress => CommentReplyError::InvalidAddress,
-        RootError::SheetNotFound => CommentReplyError::SheetNotFound,
-        RootError::TableNotFound => CommentReplyError::TableNotFound,
-        RootError::OutOfBounds { .. } => CommentReplyError::OutOfBounds { path },
-        RootError::UnsupportedSource => CommentReplyError::UnsupportedSource,
-        RootError::CommentNotFound { .. } => CommentReplyError::CommentNotFound { path },
-        RootError::UnsupportedDependency { .. } => {
-            CommentReplyError::UnsupportedDependency { path }
-        },
+        RootError::InvalidAddress => Error::InvalidAddress,
+        RootError::SheetNotFound => Error::SheetNotFound,
+        RootError::TableNotFound => Error::TableNotFound,
+        RootError::OutOfBounds { .. } => Error::OutOfBounds { path },
+        RootError::UnsupportedSource => Error::UnsupportedSource,
+        RootError::CommentNotFound { .. } => Error::CommentNotFound { path },
+        RootError::UnsupportedDependency { .. } => Error::UnsupportedDependency { path },
         RootError::LimitExceeded {
             kind,
             observed,
             maximum,
             ..
-        } => CommentReplyError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: match kind {
-                RootLimitKind::InputBytes => CommentReplyLimitKind::InputBytes,
-                RootLimitKind::OutputBytes => CommentReplyLimitKind::OutputBytes,
-                RootLimitKind::WireFields => CommentReplyLimitKind::Fields,
-                RootLimitKind::WireBytes => CommentReplyLimitKind::EncodedBytes,
-                RootLimitKind::WireWork => CommentReplyLimitKind::Work,
-                RootLimitKind::TextBytes => CommentReplyLimitKind::TextBytes,
-                RootLimitKind::References => CommentReplyLimitKind::References,
+                RootLimitKind::InputBytes => LimitKind::InputBytes,
+                RootLimitKind::OutputBytes => LimitKind::OutputBytes,
+                RootLimitKind::WireFields => LimitKind::Fields,
+                RootLimitKind::WireBytes => LimitKind::EncodedBytes,
+                RootLimitKind::WireWork => LimitKind::Work,
+                RootLimitKind::TextBytes => LimitKind::TextBytes,
+                RootLimitKind::References => LimitKind::References,
             },
             observed,
             maximum,
             path,
         },
-        RootError::Allocation { amount, .. } => CommentReplyError::Allocation { amount, path },
-        RootError::Verification => CommentReplyError::Verification,
-        RootError::PatchConflict => CommentReplyError::PatchConflict,
-        RootError::InvalidSource { .. } => CommentReplyError::InvalidSource { path },
+        RootError::Allocation { amount, .. } => Error::Allocation { amount, path },
+        RootError::Verification => Error::Verification,
+        RootError::PatchConflict => Error::PatchConflict,
+        RootError::InvalidSource { .. } => Error::InvalidSource { path },
     }
 }
 
-fn map_budget_error(error: BudgetError, path: CommentReplyPath) -> CommentReplyError {
+fn map_budget_error(error: BudgetError, path: Path) -> Error {
     match error {
         BudgetError::LimitExceeded {
             kind,
             observed,
             maximum,
             ..
-        } => CommentReplyError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: match kind {
-                BudgetLimitKind::InputBytes => CommentReplyLimitKind::InputBytes,
+                BudgetLimitKind::InputBytes => LimitKind::InputBytes,
                 BudgetLimitKind::OutputBytes | BudgetLimitKind::PackageBytes => {
-                    CommentReplyLimitKind::OutputBytes
+                    LimitKind::OutputBytes
                 },
-                BudgetLimitKind::Entries => CommentReplyLimitKind::Entries,
-                BudgetLimitKind::EntryBytes => CommentReplyLimitKind::EntryBytes,
-                BudgetLimitKind::TotalEntryBytes => CommentReplyLimitKind::TotalEntryBytes,
+                BudgetLimitKind::Entries => LimitKind::Entries,
+                BudgetLimitKind::EntryBytes => LimitKind::EntryBytes,
+                BudgetLimitKind::TotalEntryBytes => LimitKind::TotalEntryBytes,
                 BudgetLimitKind::PayloadBytes | BudgetLimitKind::TotalPayloadBytes => {
-                    CommentReplyLimitKind::PayloadBytes
+                    LimitKind::PayloadBytes
                 },
-                BudgetLimitKind::PayloadObjects => CommentReplyLimitKind::PayloadObjects,
-                BudgetLimitKind::PayloadMessages => CommentReplyLimitKind::PayloadMessages,
-                BudgetLimitKind::PayloadItems => CommentReplyLimitKind::PayloadItems,
-                BudgetLimitKind::PayloadReferences => CommentReplyLimitKind::References,
-                BudgetLimitKind::WireBytes => CommentReplyLimitKind::EncodedBytes,
-                BudgetLimitKind::WireOutputBytes => CommentReplyLimitKind::OutputBytes,
-                BudgetLimitKind::WireReferenceBytes => CommentReplyLimitKind::ReferenceBytes,
-                BudgetLimitKind::WireTextBytes => CommentReplyLimitKind::TextBytes,
-                BudgetLimitKind::WireFields => CommentReplyLimitKind::Fields,
-                BudgetLimitKind::WireNesting => CommentReplyLimitKind::Nesting,
-                BudgetLimitKind::WireWork => CommentReplyLimitKind::Work,
-                BudgetLimitKind::ScratchBytes => CommentReplyLimitKind::ScratchBytes,
-                BudgetLimitKind::RetainedBytes => CommentReplyLimitKind::RetainedBytes,
-                BudgetLimitKind::Allocations => CommentReplyLimitKind::Allocations,
-                BudgetLimitKind::CompressedBytes => CommentReplyLimitKind::CompressedBytes,
-                BudgetLimitKind::TransactionWork => CommentReplyLimitKind::TransactionWork,
+                BudgetLimitKind::PayloadObjects => LimitKind::PayloadObjects,
+                BudgetLimitKind::PayloadMessages => LimitKind::PayloadMessages,
+                BudgetLimitKind::PayloadItems => LimitKind::PayloadItems,
+                BudgetLimitKind::PayloadReferences => LimitKind::References,
+                BudgetLimitKind::WireBytes => LimitKind::EncodedBytes,
+                BudgetLimitKind::WireOutputBytes => LimitKind::OutputBytes,
+                BudgetLimitKind::WireReferenceBytes => LimitKind::ReferenceBytes,
+                BudgetLimitKind::WireTextBytes => LimitKind::TextBytes,
+                BudgetLimitKind::WireFields => LimitKind::Fields,
+                BudgetLimitKind::WireNesting => LimitKind::Nesting,
+                BudgetLimitKind::WireWork => LimitKind::Work,
+                BudgetLimitKind::ScratchBytes => LimitKind::ScratchBytes,
+                BudgetLimitKind::RetainedBytes => LimitKind::RetainedBytes,
+                BudgetLimitKind::Allocations => LimitKind::Allocations,
+                BudgetLimitKind::CompressedBytes => LimitKind::CompressedBytes,
+                BudgetLimitKind::TransactionWork => LimitKind::TransactionWork,
             },
             observed: usize::try_from(observed).unwrap_or(usize::MAX),
             maximum: usize::try_from(maximum).unwrap_or(usize::MAX),
             path,
         },
-        BudgetError::Allocation { amount, .. } => CommentReplyError::Allocation { amount, path },
-        BudgetError::UnsupportedSource => CommentReplyError::UnsupportedSource,
-        BudgetError::UnsupportedDependency { .. } => {
-            CommentReplyError::UnsupportedDependency { path }
-        },
-        BudgetError::Verification => CommentReplyError::Verification,
-        BudgetError::PatchConflict => CommentReplyError::PatchConflict,
+        BudgetError::Allocation { amount, .. } => Error::Allocation { amount, path },
+        BudgetError::UnsupportedSource => Error::UnsupportedSource,
+        BudgetError::UnsupportedDependency { .. } => Error::UnsupportedDependency { path },
+        BudgetError::Verification => Error::Verification,
+        BudgetError::PatchConflict => Error::PatchConflict,
         BudgetError::SheetNotFound
         | BudgetError::TableNotFound
         | BudgetError::CellNotFound
         | BudgetError::TableLocked { .. }
-        | BudgetError::InvalidSource { .. } => CommentReplyError::InvalidSource { path },
+        | BudgetError::InvalidSource { .. } => Error::InvalidSource { path },
     }
 }
 
@@ -711,8 +707,8 @@ fn metadata_rewrite_options(payload_len: usize, operation_count: usize) -> Metad
 fn charge_metadata_report(
     budget: &mut TransactionBudget,
     report: litchi_iwa_protos::package_metadata_codec::RewriteReport,
-    path: CommentReplyPath,
-) -> Result<(), CommentReplyError> {
+    path: Path,
+) -> Result<(), Error> {
     budget
         .charge_wire_bytes(report.input_bytes(), BudgetPath::Package)
         .and_then(|_| budget.charge_wire_fields(report.fields(), BudgetPath::Package))
@@ -734,8 +730,8 @@ fn charge_metadata_report(
 fn charge_metadata_requirements(
     budget: &mut TransactionBudget,
     requirements: litchi_iwa_protos::package_metadata_codec::RewriteExecutionRequirements,
-    path: CommentReplyPath,
-) -> Result<(), CommentReplyError> {
+    path: Path,
+) -> Result<(), Error> {
     budget
         .charge_wire_fields(requirements.fields(), BudgetPath::Package)
         .and_then(|_| budget.charge_wire_work(requirements.work_bytes(), BudgetPath::Package))
@@ -757,21 +753,18 @@ fn charge_metadata_requirements(
         .map_err(|error| map_budget_error(error, path))
 }
 
-fn map_metadata_error(
-    error: super::super::comments_metadata::MetadataError,
-    path: CommentReplyPath,
-) -> CommentReplyError {
+fn map_metadata_error(error: super::super::comments_metadata::MetadataError, path: Path) -> Error {
     match error.kind {
         super::super::comments_metadata::FailureKind::Unsupported => {
-            CommentReplyError::UnsupportedDependency { path }
+            Error::UnsupportedDependency { path }
         },
-        super::super::comments_metadata::FailureKind::Limit => CommentReplyError::LimitExceeded {
-            kind: CommentReplyLimitKind::Work,
+        super::super::comments_metadata::FailureKind::Limit => Error::LimitExceeded {
+            kind: LimitKind::Work,
             observed: error.observed,
             maximum: error.maximum,
             path,
         },
-        super::super::comments_metadata::FailureKind::Allocation => CommentReplyError::Allocation {
+        super::super::comments_metadata::FailureKind::Allocation => Error::Allocation {
             amount: error.allocation,
             path,
         },
@@ -780,34 +773,32 @@ fn map_metadata_error(
         | super::super::comments_metadata::FailureKind::InvalidSource
         | super::super::comments_metadata::FailureKind::Conflict
         | super::super::comments_metadata::FailureKind::VersionedOwnership => {
-            CommentReplyError::InvalidSource { path }
+            Error::InvalidSource { path }
         },
     }
 }
 
 fn map_native_error(
     error: super::super::comments_reply_native::NativeReplyError,
-    path: CommentReplyPath,
-) -> CommentReplyError {
+    path: Path,
+) -> Error {
     match error {
         super::super::comments_reply_native::NativeReplyError::UnsupportedDependency => {
-            CommentReplyError::UnsupportedDependency { path }
+            Error::UnsupportedDependency { path }
         },
         super::super::comments_reply_native::NativeReplyError::Allocation => {
-            CommentReplyError::Allocation { amount: 1, path }
+            Error::Allocation { amount: 1, path }
         },
-        super::super::comments_reply_native::NativeReplyError::Limit => {
-            CommentReplyError::LimitExceeded {
-                kind: CommentReplyLimitKind::Work,
-                observed: 1,
-                maximum: 0,
-                path,
-            }
+        super::super::comments_reply_native::NativeReplyError::Limit => Error::LimitExceeded {
+            kind: LimitKind::Work,
+            observed: 1,
+            maximum: 0,
+            path,
         },
         super::super::comments_reply_native::NativeReplyError::InvalidSource
         | super::super::comments_reply_native::NativeReplyError::Codec
         | super::super::comments_reply_native::NativeReplyError::Archive => {
-            CommentReplyError::InvalidSource { path }
+            Error::InvalidSource { path }
         },
     }
 }
@@ -815,14 +806,14 @@ fn map_native_error(
 fn reply_from_text(
     source: &Package,
     text: &str,
-    path: CommentReplyPath,
+    path: Path,
     timestamp: Option<CommentTimestamp>,
     author: Option<CommentAuthor>,
-) -> Result<CommentReply, CommentReplyError> {
+) -> Result<CommentReply, Error> {
     let maximum = source.state.options.semantic().max_output_text_bytes();
     if text.len() > maximum {
-        return Err(CommentReplyError::LimitExceeded {
-            kind: CommentReplyLimitKind::TextBytes,
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::TextBytes,
             observed: text.len(),
             maximum,
             path,
@@ -831,7 +822,7 @@ fn reply_from_text(
     let mut retained = String::new();
     retained
         .try_reserve_exact(text.len())
-        .map_err(|_| CommentReplyError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: text.len(),
             path,
         })?;
@@ -853,14 +844,11 @@ fn reply_metadata_from_template(
         .unwrap_or((None, None))
 }
 
-fn clone_replies(
-    source: &[CommentReply],
-    path: CommentReplyPath,
-) -> Result<Vec<CommentReply>, CommentReplyError> {
+fn clone_replies(source: &[CommentReply], path: Path) -> Result<Vec<CommentReply>, Error> {
     let mut cloned = Vec::new();
     cloned
         .try_reserve_exact(source.len())
-        .map_err(|_| CommentReplyError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: source.len(),
             path,
         })?;
@@ -873,7 +861,7 @@ fn resolve_reply_state<'sheet, 'table>(
     sheet: impl Into<SheetSelector<'sheet>>,
     table: impl Into<TableSelector<'table>>,
     position: CellPosition,
-) -> Result<ReplyState, CommentReplyError> {
+) -> Result<ReplyState, Error> {
     let located = resolve_comment(source, sheet, table, position).map_err(|error| {
         let path = match error {
             RootError::OutOfBounds { path }
@@ -882,13 +870,13 @@ fn resolve_reply_state<'sheet, 'table>(
             | RootError::UnsupportedDependency { path }
             | RootError::LimitExceeded { path, .. }
             | RootError::Allocation { path, .. } => root_to_reply_path(path),
-            _ => CommentReplyPath::Package,
+            _ => Path::Package,
         };
         map_root_error(error, path)
     })?;
     let path = root_to_reply_path(located.target.path);
     if located.comment.is_none() {
-        return Err(CommentReplyError::CommentNotFound { path });
+        return Err(Error::CommentNotFound { path });
     }
     let replies = source
         .table_cell_comment_replies(
@@ -898,27 +886,27 @@ fn resolve_reply_state<'sheet, 'table>(
         )
         .map_err(|error| map_root_error(error, path))?;
     if replies.len() != located.reply_ids.len() {
-        return Err(CommentReplyError::InvalidSource { path });
+        return Err(Error::InvalidSource { path });
     }
     let entry = located
         .entry
         .as_ref()
-        .ok_or(CommentReplyError::InvalidSource { path })?;
+        .ok_or(Error::InvalidSource { path })?;
     if !entry.owner.supports_text_rewrite() {
-        return Err(CommentReplyError::UnsupportedDependency { path });
+        return Err(Error::UnsupportedDependency { path });
     }
     Ok(ReplyState { located, replies })
 }
 
-fn root_to_reply_path(path: RootPath) -> CommentReplyPath {
+fn root_to_reply_path(path: RootPath) -> Path {
     match path {
-        RootPath::Package => CommentReplyPath::Package,
+        RootPath::Package => Path::Package,
         RootPath::Cell {
             sheet,
             table,
             row,
             column,
-        } => CommentReplyPath::Cell {
+        } => Path::Cell {
             sheet,
             table,
             row,
@@ -929,17 +917,17 @@ fn root_to_reply_path(path: RootPath) -> CommentReplyPath {
 
 fn no_op_commit(
     source: &Package,
-    path: CommentReplyPath,
+    path: Path,
     before: &[CommentReply],
     after: &[CommentReply],
-) -> Result<CommentReplyCommit, CommentReplyError> {
+) -> Result<Commit, Error> {
     let catalog = physical_source(source).map_err(|error| map_root_error(error, path))?;
     let owner = catalog.__source_owner();
     let before = before.to_vec().into_boxed_slice();
     let after = after.to_vec().into_boxed_slice();
-    Ok(CommentReplyCommit {
+    Ok(Commit {
         package: source.snapshot(),
-        patch: CommentReplyPatch {
+        patch: Patch {
             artifacts: OwnedExactArtifacts::new(owner.clone(), owner),
             path,
             before,
@@ -950,7 +938,7 @@ fn no_op_commit(
             target_previews: 0,
             touched_components: 0,
         },
-        diagnostics: CommentReplyDiagnostics::unchanged(),
+        diagnostics: Diagnostics::unchanged(),
     })
 }
 
@@ -985,8 +973,8 @@ fn reject_cross_member_references(
     comment_key: u32,
     identifiers: &[u64],
     limits: litchi_iwa_core::Limits,
-    path: CommentReplyPath,
-) -> Result<(), CommentReplyError> {
+    path: Path,
+) -> Result<(), Error> {
     if census
         .cell_comment_owners
         .iter()
@@ -1000,7 +988,7 @@ fn reject_cross_member_references(
                         .is_some_and(|identifier| identifiers.contains(&identifier)))
         })
     {
-        return Err(CommentReplyError::UnsupportedDependency { path });
+        return Err(Error::UnsupportedDependency { path });
     }
 
     for (component_index, component) in source.state.components.catalog().iter().enumerate() {
@@ -1018,22 +1006,22 @@ fn reject_cross_member_references(
                     ArchiveReferencePolicy::RejectUnknownMetadata,
                     limits,
                 )
-                .map_err(|_| CommentReplyError::UnsupportedDependency { path })?;
+                .map_err(|_| Error::UnsupportedDependency { path })?;
             if probe.found {
-                return Err(CommentReplyError::UnsupportedDependency { path });
+                return Err(Error::UnsupportedDependency { path });
             }
         }
     }
     Ok(())
 }
 
-fn commit_edit(edit: CommentReplyEdit<'_>) -> Result<CommentReplyCommit, CommentReplyError> {
+fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     let path = edit.path;
     if edit.before.as_ref() == edit.after.as_slice() {
         return no_op_commit(edit.source, path, &edit.before, &edit.after);
     }
     if edit.target.target.native.locked == crate::table::lock::State::Locked {
-        return Err(CommentReplyError::TableLocked { path });
+        return Err(Error::TableLocked { path });
     }
     // The reply transaction owns one ledger from source ingress through the
     // private candidate reopen.  Start it before resolving the physical
@@ -1042,7 +1030,7 @@ fn commit_edit(edit: CommentReplyEdit<'_>) -> Result<CommentReplyCommit, Comment
     let mut budget = TransactionBudget::new(edit.source);
     let catalog = physical_source(edit.source).map_err(|error| map_root_error(error, path))?;
     if !catalog.source_is_exact() {
-        return Err(CommentReplyError::UnsupportedSource);
+        return Err(Error::UnsupportedSource);
     }
     budget
         .charge_package_source(catalog, BudgetPath::Package)
@@ -1075,7 +1063,7 @@ fn commit_edit(edit: CommentReplyEdit<'_>) -> Result<CommentReplyCommit, Comment
         .target
         .entry
         .as_ref()
-        .ok_or(CommentReplyError::InvalidSource { path })?;
+        .ok_or(Error::InvalidSource { path })?;
     if !matches!(entry.owner, super::EntryOwner::Root)
         || edit
             .target
@@ -1083,7 +1071,7 @@ fn commit_edit(edit: CommentReplyEdit<'_>) -> Result<CommentReplyCommit, Comment
             .as_ref()
             .is_some_and(|entry| entry.storage_occurrences != 1)
     {
-        return Err(CommentReplyError::UnsupportedDependency { path });
+        return Err(Error::UnsupportedDependency { path });
     }
     // The complete global graph census is deliberately performed before any
     // native candidate allocation. It validates direct leaves, duplicate IDs,
@@ -1121,38 +1109,32 @@ fn commit_edit(edit: CommentReplyEdit<'_>) -> Result<CommentReplyCommit, Comment
     // metadata candidate is allocated until the helper supplies a complete
     // COW/refcount/ownership transition.
     let entry = entry.route;
-    let storage = edit
-        .target
-        .storage
-        .ok_or(CommentReplyError::InvalidSource { path })?;
-    let tile = edit
-        .target
-        .tile
-        .ok_or(CommentReplyError::InvalidSource { path })?;
+    let storage = edit.target.storage.ok_or(Error::InvalidSource { path })?;
+    let tile = edit.target.tile.ok_or(Error::InvalidSource { path })?;
     let model = edit.target.target.native;
     let component_index = model.component_index;
     let component = catalog
         .components()
         .get_index(component_index)
-        .ok_or(CommentReplyError::InvalidSource { path })?;
+        .ok_or(Error::InvalidSource { path })?;
     let member = NativeReplyMember {
         archive: component.archive(),
         component_index,
         member_name: component.name(),
     };
-    let route = |route: super::MessageRoute| -> Result<NativeReplyObjectRoute, CommentReplyError> {
+    let route = |route: super::MessageRoute| -> Result<NativeReplyObjectRoute, Error> {
         if route.component_index != component_index {
-            return Err(CommentReplyError::UnsupportedDependency { path });
+            return Err(Error::UnsupportedDependency { path });
         }
         let object = component
             .archive()
             .objects
             .get(route.object_index)
-            .ok_or(CommentReplyError::InvalidSource { path })?;
+            .ok_or(Error::InvalidSource { path })?;
         let identifier = object
             .archive_info
             .identifier
-            .ok_or(CommentReplyError::InvalidSource { path })?;
+            .ok_or(Error::InvalidSource { path })?;
         Ok(NativeReplyObjectRoute {
             member_index: 0,
             identifier,
@@ -1182,7 +1164,7 @@ fn commit_edit(edit: CommentReplyEdit<'_>) -> Result<CommentReplyCommit, Comment
         .map_err(|error| map_budget_error(error, path))?;
     replies
         .try_reserve_exact(edit.target.reply_ids.len())
-        .map_err(|_| CommentReplyError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: edit.target.reply_ids.len(),
             path,
         })?;
@@ -1193,13 +1175,13 @@ fn commit_edit(edit: CommentReplyEdit<'_>) -> Result<CommentReplyCommit, Comment
             .iter()
             .enumerate()
             .find(|(_, object)| object.archive_info.identifier == Some(*identifier))
-            .ok_or(CommentReplyError::InvalidSource { path })?;
+            .ok_or(Error::InvalidSource { path })?;
         let message_index = object
             .1
             .messages
             .iter()
             .position(|message| message.type_ == 3_056)
-            .ok_or(CommentReplyError::InvalidSource { path })?;
+            .ok_or(Error::InvalidSource { path })?;
         replies.push(NativeReplyObjectRoute {
             member_index: 0,
             identifier: *identifier,
@@ -1209,7 +1191,7 @@ fn commit_edit(edit: CommentReplyEdit<'_>) -> Result<CommentReplyCommit, Comment
     let comment_key = edit
         .target
         .comment_key
-        .ok_or(CommentReplyError::InvalidSource { path })?;
+        .ok_or(Error::InvalidSource { path })?;
     let mut protected_identifiers = Vec::new();
     budget
         .charge_allocations(1, BudgetPath::Package)
@@ -1224,7 +1206,7 @@ fn commit_edit(edit: CommentReplyEdit<'_>) -> Result<CommentReplyCommit, Comment
         .map_err(|error| map_budget_error(error, path))?;
     protected_identifiers
         .try_reserve_exact(1usize.saturating_add(replies.len()))
-        .map_err(|_| CommentReplyError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: 1usize.saturating_add(replies.len()),
             path,
         })?;
@@ -1283,10 +1265,9 @@ fn commit_edit(edit: CommentReplyEdit<'_>) -> Result<CommentReplyCommit, Comment
         list,
         root,
         replies: &replies,
-        tile_row: u32::try_from(edit.target.target.row)
-            .map_err(|_| CommentReplyError::OutOfBounds { path })?,
+        tile_row: u32::try_from(edit.target.target.row).map_err(|_| Error::OutOfBounds { path })?,
         tile_column: u32::try_from(edit.target.target.column)
-            .map_err(|_| CommentReplyError::OutOfBounds { path })?,
+            .map_err(|_| Error::OutOfBounds { path })?,
         comment_key,
         operation,
         new_root: root_identity,
@@ -1304,14 +1285,14 @@ fn commit_edit(edit: CommentReplyEdit<'_>) -> Result<CommentReplyCommit, Comment
             .iter()
             .find(|item| item.identifier == *identifier)
             .copied()
-            .ok_or(CommentReplyError::InvalidSource { path })?;
+            .ok_or(Error::InvalidSource { path })?;
         let component = *component_indices
             .first()
-            .ok_or(CommentReplyError::InvalidSource { path })?;
+            .ok_or(Error::InvalidSource { path })?;
         additions.push(
             metadata_facts
                 .uuid_addition(component, identity)
-                .map_err(|_| CommentReplyError::UnsupportedDependency { path })?,
+                .map_err(|_| Error::UnsupportedDependency { path })?,
         );
         let _ = ordinal;
     }
@@ -1320,12 +1301,12 @@ fn commit_edit(edit: CommentReplyEdit<'_>) -> Result<CommentReplyCommit, Comment
         removals.push(
             metadata_facts
                 .uuid_removal(component_index, *identifier)
-                .map_err(|_| CommentReplyError::UnsupportedDependency { path })?,
+                .map_err(|_| Error::UnsupportedDependency { path })?,
         );
     }
     let selectors = metadata_facts
         .touched_selectors(&component_indices)
-        .map_err(|_| CommentReplyError::UnsupportedDependency { path })?;
+        .map_err(|_| Error::UnsupportedDependency { path })?;
     let transition = CombinedBatch::new(
         metadata_facts.last_object_identifier(),
         fresh
@@ -1358,7 +1339,7 @@ fn commit_edit(edit: CommentReplyEdit<'_>) -> Result<CommentReplyCommit, Comment
     let metadata_limits = requirements.exact_limits();
     let metadata_payload = prepared
         .execute(metadata_limits)
-        .map_err(|_| CommentReplyError::Verification)?
+        .map_err(|_| Error::Verification)?
         .into_bytes();
     let metadata_bytes = pack_reply_metadata(
         edit.source,
@@ -1372,7 +1353,7 @@ fn commit_edit(edit: CommentReplyEdit<'_>) -> Result<CommentReplyCommit, Comment
         .state
         .components
         .physical()
-        .ok_or(CommentReplyError::UnsupportedSource)?;
+        .ok_or(Error::UnsupportedSource)?;
     let edit_count = native.member_edits.len().saturating_add(1);
     budget
         .charge_allocations(edit_count.saturating_add(2), BudgetPath::Package)
@@ -1381,21 +1362,21 @@ fn commit_edit(edit: CommentReplyEdit<'_>) -> Result<CommentReplyCommit, Comment
     let mut compressed_members = Vec::new();
     compressed_members
         .try_reserve_exact(native.member_edits.len())
-        .map_err(|_| CommentReplyError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: native.member_edits.len(),
             path,
         })?;
     let mut edits = Vec::new();
     edits
         .try_reserve_exact(edit_count)
-        .map_err(|_| CommentReplyError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: edit_count,
             path,
         })?;
     for member_edit in &native.member_edits {
         let maximum_compressed =
             SnappyStream::maximum_compressed_len(member_edit.member_bytes.len())
-                .map_err(|_| CommentReplyError::InvalidSource { path })?;
+                .map_err(|_| Error::InvalidSource { path })?;
         budget
             .charge_compressed_bytes(maximum_compressed, BudgetPath::Package)
             .and_then(|_| budget.charge_retained_bytes(maximum_compressed, BudgetPath::Package))
@@ -1409,10 +1390,10 @@ fn commit_edit(edit: CommentReplyEdit<'_>) -> Result<CommentReplyCommit, Comment
                 )
             })
             .map_err(|error| map_budget_error(error, path))?;
-        let bytes = SnappyStream::compress(&member_edit.member_bytes)
-            .map_err(|_| CommentReplyError::Verification)?;
+        let bytes =
+            SnappyStream::compress(&member_edit.member_bytes).map_err(|_| Error::Verification)?;
         if bytes.len() > maximum_compressed {
-            return Err(CommentReplyError::Verification);
+            return Err(Error::Verification);
         }
         compressed_members.push((member_edit.member_name.clone(), bytes));
     }
@@ -1431,7 +1412,7 @@ fn commit_edit(edit: CommentReplyEdit<'_>) -> Result<CommentReplyCommit, Comment
                 .iter()
                 .try_fold(total, |total, (_, bytes)| total.checked_add(bytes.len()))
         })
-        .ok_or(CommentReplyError::InvalidSource { path })?;
+        .ok_or(Error::InvalidSource { path })?;
     budget
         .charge_allocations(2, BudgetPath::Package)
         .and_then(|_| budget.charge_scratch_bytes(reassembly_scratch, BudgetPath::Package))
@@ -1440,7 +1421,7 @@ fn commit_edit(edit: CommentReplyEdit<'_>) -> Result<CommentReplyCommit, Comment
     let prepared_zip = physical
         .package()
         .prepare_reassembly_with_deletions(&edits, &previews, physical.limits())
-        .map_err(|_| CommentReplyError::Verification)?;
+        .map_err(|_| Error::Verification)?;
     let zip_requirements = prepared_zip.execution_requirements();
     budget
         .preflight_reassembly(zip_requirements, BudgetPath::Package)
@@ -1458,36 +1439,34 @@ fn commit_edit(edit: CommentReplyEdit<'_>) -> Result<CommentReplyCommit, Comment
     let zip_limits = zip_requirements.exact_limits();
     let bytes = prepared_zip
         .execute(zip_limits)
-        .map_err(|_| CommentReplyError::Verification)?;
+        .map_err(|_| Error::Verification)?;
     budget
         .charge_allocations(1, BudgetPath::Package)
         .and_then(|_| budget.charge_scratch_bytes(bytes.len(), BudgetPath::Package))
         .map_err(|error| map_budget_error(error, path))?;
     let candidate = Package::from_owned_bytes_with_options(bytes, edit.source.state.options)
-        .map_err(|_| CommentReplyError::Verification)?;
-    let candidate_catalog =
-        physical_source(&candidate).map_err(|_| CommentReplyError::Verification)?;
+        .map_err(|_| Error::Verification)?;
+    let candidate_catalog = physical_source(&candidate).map_err(|_| Error::Verification)?;
     budget
         .charge_candidate_reopen(candidate_catalog, BudgetPath::Package)
         .map_err(|error| map_budget_error(error, path))?;
     let (sheet, table, row, column) = path.cell_parts();
-    let position =
-        CellPosition::try_from_usize(row, column).map_err(|_| CommentReplyError::Verification)?;
+    let position = CellPosition::try_from_usize(row, column).map_err(|_| Error::Verification)?;
     let actual = candidate
         .table_cell_comment_replies(
             SheetSelector::index(sheet),
             TableSelector::index(table),
             position,
         )
-        .map_err(|_| CommentReplyError::Verification)?;
+        .map_err(|_| Error::Verification)?;
     if actual.as_ref() != edit.after.as_slice() {
-        return Err(CommentReplyError::Verification);
+        return Err(Error::Verification);
     }
     let source_owner = physical.__source_owner();
     let artifacts = OwnedExactArtifacts::new(source_owner, candidate_catalog.__source_owner());
-    Ok(CommentReplyCommit {
+    Ok(Commit {
         package: candidate,
-        patch: CommentReplyPatch {
+        patch: Patch {
             artifacts,
             path,
             before: edit.before,
@@ -1498,7 +1477,7 @@ fn commit_edit(edit: CommentReplyEdit<'_>) -> Result<CommentReplyCommit, Comment
             target_previews: 0,
             touched_components: native.touched_components.len(),
         },
-        diagnostics: CommentReplyDiagnostics::published(native.touched_components.len(), 0),
+        diagnostics: Diagnostics::published(native.touched_components.len(), 0),
     })
 }
 
@@ -1506,27 +1485,27 @@ fn pack_reply_metadata(
     source: &Package,
     route: crate::package::metadata::MessageRoute,
     payload: Vec<u8>,
-    path: CommentReplyPath,
+    path: Path,
     budget: &mut TransactionBudget,
-) -> Result<Vec<u8>, CommentReplyError> {
+) -> Result<Vec<u8>, Error> {
     let physical = source
         .state
         .components
         .physical()
-        .ok_or(CommentReplyError::UnsupportedSource)?;
+        .ok_or(Error::UnsupportedSource)?;
     let entry = physical
         .package()
         .iter()
         .find(|entry| entry.name() == crate::package::metadata::ENTRY_NAME)
-        .ok_or(CommentReplyError::InvalidSource { path })?;
+        .ok_or(Error::InvalidSource { path })?;
     let archive_limits = physical
         .limits()
         .effective_archive_limits()
-        .map_err(|_| CommentReplyError::InvalidSource { path })?;
+        .map_err(|_| Error::InvalidSource { path })?;
     let snappy_limits = physical
         .limits()
         .snappy_limits()
-        .map_err(|_| CommentReplyError::InvalidSource { path })?;
+        .map_err(|_| Error::InvalidSource { path })?;
     // Decompression and archive parsing allocate private buffers before their
     // exact report is available. Reserve that scratch envelope first; the
     // decoded archive and rewritten output are charged below from measured
@@ -1537,9 +1516,9 @@ fn pack_reply_metadata(
         .and_then(|_| budget.charge_transaction_work(entry.data().len(), BudgetPath::Package))
         .map_err(|error| map_budget_error(error, path))?;
     let stream = SnappyStream::decompress_with_limits(entry.data(), snappy_limits)
-        .map_err(|_| CommentReplyError::InvalidSource { path })?;
+        .map_err(|_| Error::InvalidSource { path })?;
     let mut archive = Archive::parse_with_limits(stream.as_bytes(), archive_limits)
-        .map_err(|_| CommentReplyError::InvalidSource { path })?;
+        .map_err(|_| Error::InvalidSource { path })?;
     let message_count = archive
         .objects
         .iter()
@@ -1554,13 +1533,13 @@ fn pack_reply_metadata(
         .objects
         .get_mut(route.object_index)
         .and_then(|object| object.messages.get_mut(route.message_index))
-        .ok_or(CommentReplyError::InvalidSource { path })?;
+        .ok_or(Error::InvalidSource { path })?;
     message.data = payload;
     let estimated = archive
         .encoded_len_with_limits(archive_limits)
-        .map_err(|_| CommentReplyError::InvalidSource { path })?;
+        .map_err(|_| Error::InvalidSource { path })?;
     let maximum_compressed = SnappyStream::maximum_compressed_len(estimated)
-        .map_err(|_| CommentReplyError::InvalidSource { path })?;
+        .map_err(|_| Error::InvalidSource { path })?;
     budget
         .charge_output(estimated, BudgetPath::Package)
         .and_then(|_| budget.charge_retained_bytes(estimated, BudgetPath::Package))
@@ -1574,17 +1553,16 @@ fn pack_reply_metadata(
         .map_err(|error| map_budget_error(error, path))?;
     let bytes = archive
         .to_bytes_with_limits(archive_limits)
-        .map_err(|_| CommentReplyError::InvalidSource { path })?;
+        .map_err(|_| Error::InvalidSource { path })?;
     if bytes.len() > estimated {
-        return Err(CommentReplyError::Verification);
+        return Err(Error::Verification);
     }
-    let compressed =
-        SnappyStream::compress(&bytes).map_err(|_| CommentReplyError::InvalidSource { path })?;
+    let compressed = SnappyStream::compress(&bytes).map_err(|_| Error::InvalidSource { path })?;
     if compressed.len() > maximum_compressed
         || compressed.len() > snappy_limits.max_compressed_stream()
     {
-        return Err(CommentReplyError::LimitExceeded {
-            kind: CommentReplyLimitKind::CompressedBytes,
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::CompressedBytes,
             observed: compressed.len(),
             maximum: maximum_compressed.min(snappy_limits.max_compressed_stream()),
             path,
@@ -1601,14 +1579,14 @@ impl Package {
         table: impl Into<TableSelector<'table>>,
         position: CellPosition,
         index: CommentReplyIndex,
-    ) -> Result<CommentReply, CommentReplyError> {
+    ) -> Result<CommentReply, Error> {
         let state = resolve_reply_state(self, sheet, table, position)?;
         let path = root_to_reply_path(state.located.target.path);
         let replies = state.replies;
         replies
             .get(index.index() as usize)
             .cloned()
-            .ok_or(CommentReplyError::ReplyNotFound {
+            .ok_or(Error::ReplyNotFound {
                 path: path.reply(index),
             })
     }
@@ -1620,9 +1598,8 @@ impl Package {
         table: impl Into<TableSelector<'table>>,
         address: &str,
         index: CommentReplyIndex,
-    ) -> Result<CommentReply, CommentReplyError> {
-        let position =
-            CellPosition::from_a1(address).map_err(|_| CommentReplyError::InvalidAddress)?;
+    ) -> Result<CommentReply, Error> {
+        let position = CellPosition::from_a1(address).map_err(|_| Error::InvalidAddress)?;
         self.table_cell_comment_reply(sheet, table, position, index)
     }
 
@@ -1632,11 +1609,11 @@ impl Package {
         sheet: impl Into<SheetSelector<'sheet>>,
         table: impl Into<TableSelector<'table>>,
         position: CellPosition,
-    ) -> Result<CommentReplyEdit<'_>, CommentReplyError> {
+    ) -> Result<Edit<'_>, Error> {
         let state = resolve_reply_state(self, sheet, table, position)?;
         let path = root_to_reply_path(state.located.target.path).as_cell();
         let after = clone_replies(&state.replies, path)?;
-        Ok(CommentReplyEdit {
+        Ok(Edit {
             source: self,
             target: state.located,
             path,
@@ -1653,9 +1630,8 @@ impl Package {
         sheet: impl Into<SheetSelector<'sheet>>,
         table: impl Into<TableSelector<'table>>,
         address: &str,
-    ) -> Result<CommentReplyEdit<'_>, CommentReplyError> {
-        let position =
-            CellPosition::from_a1(address).map_err(|_| CommentReplyError::InvalidAddress)?;
+    ) -> Result<Edit<'_>, Error> {
+        let position = CellPosition::from_a1(address).map_err(|_| Error::InvalidAddress)?;
         self.edit_table_cell_comment_replies(sheet, table, position)
     }
 
@@ -1667,7 +1643,7 @@ impl Package {
         position: CellPosition,
         index: CommentReplyIndex,
         text: impl AsRef<str>,
-    ) -> Result<CommentReplyCommit, CommentReplyError> {
+    ) -> Result<Commit, Error> {
         self.edit_table_cell_comment_replies(sheet, table, position)?
             .set(index, text)
             .commit()
@@ -1681,9 +1657,8 @@ impl Package {
         address: &str,
         index: CommentReplyIndex,
         text: impl AsRef<str>,
-    ) -> Result<CommentReplyCommit, CommentReplyError> {
-        let position =
-            CellPosition::from_a1(address).map_err(|_| CommentReplyError::InvalidAddress)?;
+    ) -> Result<Commit, Error> {
+        let position = CellPosition::from_a1(address).map_err(|_| Error::InvalidAddress)?;
         self.set_table_cell_comment_reply(sheet, table, position, index, text)
     }
 
@@ -1694,7 +1669,7 @@ impl Package {
         table: impl Into<TableSelector<'table>>,
         position: CellPosition,
         index: CommentReplyIndex,
-    ) -> Result<CommentReplyCommit, CommentReplyError> {
+    ) -> Result<Commit, Error> {
         self.edit_table_cell_comment_replies(sheet, table, position)?
             .remove(index)
             .commit()
@@ -1707,9 +1682,8 @@ impl Package {
         table: impl Into<TableSelector<'table>>,
         address: &str,
         index: CommentReplyIndex,
-    ) -> Result<CommentReplyCommit, CommentReplyError> {
-        let position =
-            CellPosition::from_a1(address).map_err(|_| CommentReplyError::InvalidAddress)?;
+    ) -> Result<Commit, Error> {
+        let position = CellPosition::from_a1(address).map_err(|_| Error::InvalidAddress)?;
         self.remove_table_cell_comment_reply(sheet, table, position, index)
     }
 
@@ -1720,7 +1694,7 @@ impl Package {
         table: impl Into<TableSelector<'table>>,
         position: CellPosition,
         text: impl AsRef<str>,
-    ) -> Result<CommentReplyCommit, CommentReplyError> {
+    ) -> Result<Commit, Error> {
         self.edit_table_cell_comment_replies(sheet, table, position)?
             .append(text)
             .commit()
@@ -1733,25 +1707,21 @@ impl Package {
         table: impl Into<TableSelector<'table>>,
         address: &str,
         text: impl AsRef<str>,
-    ) -> Result<CommentReplyCommit, CommentReplyError> {
-        let position =
-            CellPosition::from_a1(address).map_err(|_| CommentReplyError::InvalidAddress)?;
+    ) -> Result<Commit, Error> {
+        let position = CellPosition::from_a1(address).map_err(|_| Error::InvalidAddress)?;
         self.add_table_cell_comment_reply(sheet, table, position, text)
     }
 
     /// Apply a reversible exact-source direct-reply patch.
-    pub fn apply_table_cell_comment_reply(
-        &self,
-        patch: &CommentReplyPatch,
-    ) -> Result<CommentReplyCommit, CommentReplyError> {
+    pub fn apply_table_cell_comment_reply(&self, patch: &Patch) -> Result<Commit, Error> {
         let catalog = physical_source(self).map_err(|error| map_root_error(error, patch.path))?;
         let owner = catalog.__source_owner();
         if !patch.artifacts.authorizes_owner(&owner) {
-            return Err(CommentReplyError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let (sheet, table, row, column) = patch.path.cell_parts();
-        let position = CellPosition::try_from_usize(row, column)
-            .map_err(|_| CommentReplyError::PatchConflict)?;
+        let position =
+            CellPosition::try_from_usize(row, column).map_err(|_| Error::PatchConflict)?;
         let current = self
             .table_cell_comment_replies(
                 SheetSelector::index(sheet),
@@ -1760,19 +1730,19 @@ impl Package {
             )
             .map_err(|error| map_root_error(error, patch.path))?;
         if current.as_ref() != patch.before.as_ref() {
-            return Err(CommentReplyError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if patch.is_noop() {
-            return Ok(CommentReplyCommit {
+            return Ok(Commit {
                 package: self.snapshot(),
                 patch: patch.clone(),
-                diagnostics: CommentReplyDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         require_exact_apply_source(catalog.source_is_exact())?;
         let target_owner = patch.artifacts.target_owner();
         let candidate = Package::from_source_owner_with_options(target_owner, self.state.options)
-            .map_err(|_| CommentReplyError::Verification)?;
+            .map_err(|_| Error::Verification)?;
         let after = candidate
             .table_cell_comment_replies(
                 SheetSelector::index(sheet),
@@ -1781,12 +1751,12 @@ impl Package {
             )
             .map_err(|error| map_root_error(error, patch.path))?;
         if after.as_ref() != patch.after.as_ref() {
-            return Err(CommentReplyError::Verification);
+            return Err(Error::Verification);
         }
-        Ok(CommentReplyCommit {
+        Ok(Commit {
             package: candidate,
             patch: patch.clone(),
-            diagnostics: CommentReplyDiagnostics::published(
+            diagnostics: Diagnostics::published(
                 patch.touched_components,
                 patch.source_previews.saturating_sub(patch.target_previews),
             ),
@@ -1794,23 +1764,23 @@ impl Package {
     }
 }
 
-fn require_exact_apply_source(source_is_exact: bool) -> Result<(), CommentReplyError> {
+fn require_exact_apply_source(source_is_exact: bool) -> Result<(), Error> {
     if source_is_exact {
         Ok(())
     } else {
-        Err(CommentReplyError::UnsupportedSource)
+        Err(Error::UnsupportedSource)
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{CommentReplyError, require_exact_apply_source};
+    use super::{Error, require_exact_apply_source};
 
     #[test]
     fn changed_direct_apply_requires_exact_physical_provenance() {
         assert_eq!(
             require_exact_apply_source(false),
-            Err(CommentReplyError::UnsupportedSource)
+            Err(Error::UnsupportedSource)
         );
         assert_eq!(require_exact_apply_source(true), Ok(()));
     }

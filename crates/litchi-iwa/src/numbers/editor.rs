@@ -133,7 +133,7 @@ struct NumbersTextBoxGraph {
 #[cfg(test)]
 pub(crate) fn compatibility_document_from_bytes(
     bytes: &[u8],
-) -> crate::Result<litchi_numbers::Document> {
+) -> crate::Result<litchi_numbers::Workbook> {
     let editor = NumbersEditor::from_bytes(bytes)?;
     let descriptors = table_models(editor.package())?;
     let tables = litchi_numbers::compatibility_tables_from_bytes(bytes)
@@ -167,7 +167,7 @@ pub(crate) fn compatibility_document_from_bytes(
             "Numbers compatibility table projection contains an unrooted table".to_owned(),
         ));
     }
-    litchi_numbers::Document::from_sheets(sheets)
+    litchi_numbers::Workbook::from_sheets(sheets)
         .map_err(|error| crate::Error::InvalidFormat(error.to_string()))
 }
 

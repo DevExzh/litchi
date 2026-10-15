@@ -220,7 +220,7 @@ impl Iwork {
             litchi_iwa_detect::Format::Numbers => Owner::Numbers(
                 litchi_numbers::Package::__from_prepared_source(
                     prepared,
-                    litchi_numbers::PackageSemanticLimits::default(),
+                    litchi_numbers::SemanticLimits::DEFAULT,
                 )
                 .map_err(|error| leaf_error(LeafError::Numbers(error), FileFormat::Numbers))?,
             ),
@@ -360,7 +360,7 @@ impl Iwork {
             Owner::Keynote(package) => package.text().map_err(LeafError::Keynote),
             #[cfg(feature = "numbers")]
             Owner::Numbers(package) => package
-                .document()
+                .workbook_ref()
                 .plain_text()
                 .map_err(LeafError::NumbersText),
         }
@@ -382,7 +382,11 @@ impl Iwork {
                 .map_err(|error| leaf_error(LeafError::Keynote(error), FileFormat::Keynote)),
             #[cfg(feature = "numbers")]
             Owner::Numbers(package) => Ok(Some(
-                package.document().metadata().cloned().unwrap_or_default(),
+                package
+                    .workbook_ref()
+                    .metadata()
+                    .cloned()
+                    .unwrap_or_default(),
             )),
         }
     }

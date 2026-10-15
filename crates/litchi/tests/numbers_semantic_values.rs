@@ -2,7 +2,7 @@
 
 use litchi::numbers::semantic::cell::{FiniteF64, Type, Value};
 use litchi::numbers::semantic::formula::{
-    AxisReference, BinaryOperator, CachedValue, CellReference, FormulaError,
+    AxisReference, BinaryOperator, CachedValue, CellReference, Error as FormulaError,
 };
 use litchi::numbers::semantic::table::cells::{State, Storage};
 use litchi::numbers::semantic::table::{CellPosition, CellRange, Dimensions};

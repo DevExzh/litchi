@@ -312,7 +312,7 @@ impl<'a> Edit<'a> {
         validate_requested_name(name)?;
         let sheet = self
             .source
-            .document()
+            .workbook_ref()
             .sheet(selector)
             .map_err(|_error| Error::InvalidSource)?
             .ok_or(Error::SheetNotFound)?;
@@ -345,15 +345,18 @@ impl<'a> Edit<'a> {
         validate_requested_name(name)?;
         let sheet = self
             .source
-            .document()
+            .workbook_ref()
             .sheet(sheet)
             .map_err(|_error| Error::InvalidSource)?
             .ok_or(Error::SheetNotFound)?;
         let (position, semantic_table) = match table.into() {
-            TableSelector::Index(position) => (
-                position,
-                sheet.tables().nth(position).ok_or(Error::TableNotFound)?,
-            ),
+            TableSelector::Position(position) => {
+                let position = position.get();
+                (
+                    position,
+                    sheet.tables().nth(position).ok_or(Error::TableNotFound)?,
+                )
+            },
             TableSelector::Name(requested_name) => sheet
                 .tables()
                 .enumerate()
@@ -824,12 +827,12 @@ fn validate_final_names(source: &Package, operations: &[Operation]) -> Result<()
     let limits = source.state.options.semantic();
     let mut names = HashSet::new();
     names
-        .try_reserve(source.document().sheet_count())
+        .try_reserve(source.workbook_ref().sheet_count())
         .map_err(|_allocation| Error::Allocation {
-            amount: source.document().sheet_count(),
+            amount: source.workbook_ref().sheet_count(),
         })?;
     let mut total_name_bytes = 0usize;
-    for sheet in source.document().sheets() {
+    for sheet in source.workbook_ref().sheets() {
         let sheet_name = final_name(operations, Location::Sheet(sheet.index()), sheet.name());
         if !names.insert(sheet_name) {
             return Err(Error::DuplicateName {
@@ -899,9 +902,9 @@ fn retained_name_bytes(before: &str, after: &str, maximum: usize) -> Result<usiz
 }
 
 fn validate_changed_work_budget(source: &Package, operations: &[Operation]) -> Result<(), Error> {
-    let sheets = source.document().sheet_count();
+    let sheets = source.workbook_ref().sheet_count();
     let tables = source
-        .document()
+        .workbook_ref()
         .sheets()
         .iter()
         .fold(0usize, |count, sheet| {
@@ -1002,12 +1005,12 @@ fn verify_operation_state(
         };
         match operation.location {
             Location::Sheet(position) => package
-                .document()
+                .workbook_ref()
                 .sheets()
                 .get(position)
                 .is_some_and(|sheet| sheet.name() == expected),
             Location::Table(sheet, table) => package
-                .document()
+                .workbook_ref()
                 .sheets()
                 .get(sheet)
                 .and_then(|sheet| sheet.tables().nth(table))
@@ -1220,7 +1223,7 @@ fn rooted_formula_dependency_identifiers(source: &Package) -> Result<HashSet<u64
 
 fn rooted_table_info_identifiers(source: &Package) -> Result<HashSet<u64>, Error> {
     let expected = source
-        .document()
+        .workbook_ref()
         .sheets()
         .iter()
         .fold(0usize, |count, sheet| {
@@ -1230,7 +1233,7 @@ fn rooted_table_info_identifiers(source: &Package) -> Result<HashSet<u64>, Error
     identifiers
         .try_reserve(expected)
         .map_err(|_allocation| Error::Allocation { amount: expected })?;
-    for (sheet_position, semantic_sheet) in source.document().sheets().iter().enumerate() {
+    for (sheet_position, semantic_sheet) in source.workbook_ref().sheets().iter().enumerate() {
         let target = resolve_native_sheet(source, sheet_position)?;
         let object = source
             .state
@@ -1285,7 +1288,7 @@ fn validate_rooted_pivot_dependencies(
     }) else {
         return Ok(());
     };
-    for (sheet_position, sheet) in source.document().sheets().iter().enumerate() {
+    for (sheet_position, sheet) in source.workbook_ref().sheets().iter().enumerate() {
         for table_position in 0..sheet.table_count() {
             let target = resolve_native_table(source, sheet_position, table_position)?;
             if pivot_owner_present(&target.model_message.data)? {
@@ -1452,7 +1455,7 @@ fn resolve_native_sheet(source: &Package, sheet_position: usize) -> Result<Sheet
     )
     .map_err(map_read_error)?;
     let semantic = source
-        .document()
+        .workbook_ref()
         .sheets()
         .get(sheet_position)
         .ok_or(Error::SheetNotFound)?;
@@ -1555,7 +1558,7 @@ fn resolve_native_table(
         let model_object = resolved_object(source, model)?;
         validate_message_metadata(model_object, model_message_index)?;
         let semantic = source
-            .document()
+            .workbook_ref()
             .sheets()
             .get(sheet_position)
             .and_then(|semantic_sheet| semantic_sheet.tables().nth(table_position))
@@ -2299,7 +2302,7 @@ fn rewrite_names(
         .map_err(map_archive_error)?;
     drop(edits);
     drop(rewritten_entries);
-    let candidate = Package::from_shared_bytes_with_options(output.into(), source.state.options)
+    let candidate = Package::from_shared_profile(output.into(), source.state.options)
         .map_err(map_candidate_read_error)?;
     Ok((candidate, component_group_count(operations)))
 }
@@ -3089,12 +3092,12 @@ fn map_table_info_error(error: table_info_codec::DecodeError) -> Error {
     }
 }
 
-fn map_lock_error(error: super::TableLockError) -> Error {
+fn map_lock_error(error: crate::table::lock::Error) -> Error {
     match error {
-        super::TableLockError::SheetNotFound => Error::SheetNotFound,
-        super::TableLockError::TableNotFound => Error::TableNotFound,
-        super::TableLockError::UnsupportedSource => Error::UnsupportedSource,
-        super::TableLockError::LimitExceeded {
+        crate::table::lock::Error::SheetNotFound => Error::SheetNotFound,
+        crate::table::lock::Error::TableNotFound => Error::TableNotFound,
+        crate::table::lock::Error::UnsupportedSource => Error::UnsupportedSource,
+        crate::table::lock::Error::LimitExceeded {
             kind: _,
             observed,
             maximum,
@@ -3103,10 +3106,10 @@ fn map_lock_error(error: super::TableLockError) -> Error {
             observed,
             maximum,
         },
-        super::TableLockError::Allocation { amount } => Error::Allocation { amount },
-        super::TableLockError::InvalidSource
-        | super::TableLockError::Verification
-        | super::TableLockError::PatchConflict => Error::InvalidSource,
+        crate::table::lock::Error::Allocation { amount } => Error::Allocation { amount },
+        crate::table::lock::Error::InvalidSource
+        | crate::table::lock::Error::Verification
+        | crate::table::lock::Error::PatchConflict => Error::InvalidSource,
     }
 }
 
@@ -3161,7 +3164,8 @@ fn map_read_error(error: ReadError) -> Error {
         ReadError::Io(_)
         | ReadError::Detection(_)
         | ReadError::MalformedPayload { .. }
-        | ReadError::NotNumbers
+        | ReadError::UnexpectedFormat { .. }
+        | ReadError::InvalidLimit { .. }
         | ReadError::InvalidFormat(_)
         | ReadError::ParseError(_)
         | ReadError::Semantic(_) => Error::InvalidSource,

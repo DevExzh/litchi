@@ -226,7 +226,7 @@ impl NumbersEditor {
             Some(
                 Package::__from_shared_source_with_options(
                     source,
-                    litchi_numbers::PackageReadOptions::default(),
+                    litchi_numbers::OpenOptions::new(),
                 )
                 .map_err(|error| {
                     Error::InvalidFormat(format!(

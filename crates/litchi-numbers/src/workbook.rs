@@ -1,4 +1,10 @@
-//! Archive-free Numbers document semantics.
+//! The read-only Numbers workbook projection (ADR 0034 §2).
+//!
+//! [`Workbook`] is the archive-free, owned semantic snapshot of a Numbers
+//! document: its sheets, their tables and the tables' cells. It is obtained
+//! from [`crate::Package::workbook`], or read directly from a package file
+//! or an app-authored package directory with [`Workbook::open`] when no
+//! exact package bytes are needed.
 
 use std::collections::HashSet;
 use std::fmt;
@@ -9,197 +15,8 @@ use std::sync::Arc;
 use thiserror::Error as ThisError;
 
 use crate::cell::Value;
+use crate::limits::{LimitKind, OpenOptions, SemanticLimits};
 use crate::{Sheet, SheetSelector, TableSelector};
-
-/// Maximum number of ordered sheets retained by one semantic document.
-pub const MAX_SHEETS: usize = 4096;
-/// Maximum number of tables retained by one semantic document.
-pub const MAX_TABLES: usize = 65_536;
-/// Maximum number of materialized cells retained by one semantic document.
-pub const MAX_MATERIALIZED_CELLS: usize = 16_000_000;
-/// Maximum UTF-8 bytes retained by semantic names, headers, and textual cells.
-pub const DEFAULT_MAX_TEXT_BYTES: usize = 64 * 1024 * 1024;
-
-/// Stable source-capture resource category for archive-free Numbers ingress.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum DocumentSourceLimitKind {
-    /// Encoded bytes supplied by the caller.
-    InputBytes,
-    /// Independently addressed items discovered in the source.
-    Entries,
-    /// Decoded bytes contributed by one source item.
-    EntryBytes,
-    /// Aggregate decoded bytes contributed by all source items.
-    AggregateBytes,
-    /// Bytes contributed by one document payload component.
-    ComponentBytes,
-}
-
-impl fmt::Display for DocumentSourceLimitKind {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(match self {
-            Self::InputBytes => "input bytes",
-            Self::Entries => "entries",
-            Self::EntryBytes => "entry bytes",
-            Self::AggregateBytes => "aggregate bytes",
-            Self::ComponentBytes => "component bytes",
-        })
-    }
-}
-
-/// Invalid caller-selected source-capture limits.
-#[derive(Debug, ThisError, Clone, Copy, PartialEq, Eq)]
-#[error(
-    "Numbers document source {kind} limit must be non-zero and no greater than {maximum}, got {value}"
-)]
-#[non_exhaustive]
-pub struct DocumentSourceLimitsError {
-    /// Resource category whose requested limit is invalid.
-    pub kind: DocumentSourceLimitKind,
-    /// Requested resource ceiling.
-    pub value: u64,
-    /// Format-wide hard ceiling for this resource.
-    pub maximum: u64,
-}
-
-/// Checked physical resource ceilings for archive-free Numbers source capture.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct DocumentSourceLimits {
-    input_bytes: u64,
-    entries: usize,
-    entry_bytes: u64,
-    aggregate_bytes: u64,
-    component_bytes: usize,
-}
-
-impl DocumentSourceLimits {
-    /// Build a checked source-capture resource profile.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if any ceiling is zero or exceeds its hard maximum.
-    pub fn new(
-        max_input_bytes: u64,
-        max_entries: usize,
-        max_entry_bytes: u64,
-        max_aggregate_bytes: u64,
-        max_component_bytes: usize,
-    ) -> std::result::Result<Self, DocumentSourceLimitsError> {
-        check_source_limit(
-            DocumentSourceLimitKind::InputBytes,
-            max_input_bytes,
-            litchi_iwa_detect::Limits::HARD_MAX_INPUT_BYTES,
-        )?;
-        check_source_limit(
-            DocumentSourceLimitKind::Entries,
-            usize_u64(max_entries),
-            usize_u64(litchi_iwa_detect::Limits::HARD_MAX_FILES),
-        )?;
-        check_source_limit(
-            DocumentSourceLimitKind::EntryBytes,
-            max_entry_bytes,
-            litchi_iwa_detect::Limits::HARD_MAX_ENTRY_SIZE,
-        )?;
-        check_source_limit(
-            DocumentSourceLimitKind::AggregateBytes,
-            max_aggregate_bytes,
-            litchi_iwa_detect::Limits::HARD_MAX_TOTAL_SIZE,
-        )?;
-        check_source_limit(
-            DocumentSourceLimitKind::ComponentBytes,
-            usize_u64(max_component_bytes),
-            usize_u64(litchi_iwa_detect::Limits::HARD_MAX_IWA_STREAM_SIZE),
-        )?;
-        Ok(Self {
-            input_bytes: max_input_bytes,
-            entries: max_entries,
-            entry_bytes: max_entry_bytes,
-            aggregate_bytes: max_aggregate_bytes,
-            component_bytes: max_component_bytes,
-        })
-    }
-
-    /// Maximum encoded bytes accepted from one source.
-    #[must_use]
-    pub const fn max_input_bytes(self) -> u64 {
-        self.input_bytes
-    }
-
-    /// Maximum independently addressed source items accepted.
-    #[must_use]
-    pub const fn max_entries(self) -> usize {
-        self.entries
-    }
-
-    /// Maximum decoded bytes accepted from one source item.
-    #[must_use]
-    pub const fn max_entry_bytes(self) -> u64 {
-        self.entry_bytes
-    }
-
-    /// Maximum aggregate decoded bytes accepted from all source items.
-    #[must_use]
-    pub const fn max_aggregate_bytes(self) -> u64 {
-        self.aggregate_bytes
-    }
-
-    /// Maximum bytes accepted from one document payload component.
-    #[must_use]
-    pub const fn max_component_bytes(self) -> usize {
-        self.component_bytes
-    }
-
-    fn detector_limits(self) -> litchi_iwa_detect::Result<litchi_iwa_detect::Limits> {
-        litchi_iwa_detect::Limits::new(
-            self.input_bytes,
-            self.entries,
-            self.entry_bytes,
-            self.aggregate_bytes,
-            self.component_bytes,
-        )
-    }
-}
-
-impl Default for DocumentSourceLimits {
-    fn default() -> Self {
-        let limits = litchi_iwa_detect::Limits::default();
-        Self {
-            input_bytes: limits.max_input_bytes(),
-            entries: limits.max_files(),
-            entry_bytes: limits.max_entry_size(),
-            aggregate_bytes: limits.max_total_size(),
-            component_bytes: limits.max_iwa_stream_size(),
-        }
-    }
-}
-
-/// Physical and semantic profiles for archive-free Numbers document ingress.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct DocumentReadOptions {
-    source: DocumentSourceLimits,
-    semantic: Limits,
-}
-
-impl DocumentReadOptions {
-    /// Combine checked source-capture and semantic resource profiles.
-    #[must_use]
-    pub const fn new(source: DocumentSourceLimits, semantic: Limits) -> Self {
-        Self { source, semantic }
-    }
-
-    /// Return the bounded source-capture profile.
-    #[must_use]
-    pub const fn source(self) -> DocumentSourceLimits {
-        self.source
-    }
-
-    /// Return the semantic projection profile.
-    #[must_use]
-    pub const fn semantic(self) -> Limits {
-        self.semantic
-    }
-}
 
 /// Content-free filesystem failure category for archive-free ingress.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -299,8 +116,21 @@ pub enum ReadError {
     #[error("Numbers document I/O failure: {kind}")]
     Io { kind: IoKind },
     /// The recognized source belongs to a different application.
-    #[error("iWork source is not a Numbers document")]
-    NotNumbers,
+    #[error("the iWork source is a {detected:?} document, not Numbers")]
+    UnexpectedFormat {
+        /// The format the source was recognized as.
+        detected: litchi_core::FileFormat,
+    },
+    /// A caller-selected limit is outside its valid range.
+    #[error("Numbers {kind} limit must be between 1 and {maximum}, got {value}")]
+    InvalidLimit {
+        /// The dimension being configured.
+        kind: LimitKind,
+        /// The rejected value.
+        value: u64,
+        /// The hard ceiling for this dimension.
+        maximum: u64,
+    },
     /// A checked resource ceiling was exceeded.
     #[error("Numbers document {kind} limit exceeded: observed {observed}, maximum {maximum}")]
     Limit {
@@ -342,150 +172,10 @@ struct SourceDiagnostics {
     stats: Stats,
 }
 
-/// Caller-selected semantic resource governed by [`Limits`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum LimitKind {
-    /// Rooted sheets.
-    Sheets,
-    /// Rooted tables.
-    Tables,
-    /// Materialized cells.
-    MaterializedCells,
-    /// Retained and rendered UTF-8 bytes.
-    TextBytes,
-}
-
-impl fmt::Display for LimitKind {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(match self {
-            Self::Sheets => "sheets",
-            Self::Tables => "tables",
-            Self::MaterializedCells => "materialized cells",
-            Self::TextBytes => "text bytes",
-        })
-    }
-}
-
-/// An invalid semantic document ceiling.
-#[derive(Debug, ThisError, Clone, Copy, PartialEq, Eq)]
-#[error("Numbers document {kind} limit must be no greater than {maximum}, got {value}")]
-#[non_exhaustive]
-pub struct LimitsError {
-    /// Resource category whose requested ceiling is invalid.
-    pub kind: LimitKind,
-    /// Requested ceiling.
-    pub value: usize,
-    /// Hard semantic ceiling.
-    pub maximum: usize,
-}
-
-/// Finite construction limits for an immutable Numbers document.
-#[allow(
-    clippy::struct_field_names,
-    reason = "The public budget accessors intentionally share one max_* vocabulary"
-)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Limits {
-    max_sheets: usize,
-    max_tables: usize,
-    max_materialized_cells: usize,
-    max_text_bytes: usize,
-}
-
-impl Limits {
-    /// Creates a checked profile. Zero is a valid exact tightening.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when a requested ceiling exceeds its hard maximum.
-    pub const fn new(
-        max_sheets: usize,
-        max_tables: usize,
-        max_materialized_cells: usize,
-        max_text_bytes: usize,
-    ) -> std::result::Result<Self, LimitsError> {
-        if max_sheets > MAX_SHEETS {
-            return Err(LimitsError {
-                kind: LimitKind::Sheets,
-                value: max_sheets,
-                maximum: MAX_SHEETS,
-            });
-        }
-        if max_tables > MAX_TABLES {
-            return Err(LimitsError {
-                kind: LimitKind::Tables,
-                value: max_tables,
-                maximum: MAX_TABLES,
-            });
-        }
-        if max_materialized_cells > MAX_MATERIALIZED_CELLS {
-            return Err(LimitsError {
-                kind: LimitKind::MaterializedCells,
-                value: max_materialized_cells,
-                maximum: MAX_MATERIALIZED_CELLS,
-            });
-        }
-        if max_text_bytes > DEFAULT_MAX_TEXT_BYTES {
-            return Err(LimitsError {
-                kind: LimitKind::TextBytes,
-                value: max_text_bytes,
-                maximum: DEFAULT_MAX_TEXT_BYTES,
-            });
-        }
-        Ok(Self {
-            max_sheets,
-            max_tables,
-            max_materialized_cells,
-            max_text_bytes,
-        })
-    }
-
-    /// Returns the configured sheet ceiling.
-    #[must_use]
-    pub const fn max_sheets(self) -> usize {
-        self.max_sheets
-    }
-
-    /// Returns the configured table ceiling.
-    #[must_use]
-    pub const fn max_tables(self) -> usize {
-        self.max_tables
-    }
-
-    /// Returns the configured materialized-cell ceiling.
-    #[must_use]
-    pub const fn max_materialized_cells(self) -> usize {
-        self.max_materialized_cells
-    }
-
-    /// Returns the configured text-byte ceiling.
-    #[must_use]
-    pub const fn max_text_bytes(self) -> usize {
-        self.max_text_bytes
-    }
-}
-
-impl Default for Limits {
-    fn default() -> Self {
-        Self {
-            max_sheets: MAX_SHEETS,
-            max_tables: MAX_TABLES,
-            max_materialized_cells: MAX_MATERIALIZED_CELLS,
-            max_text_bytes: DEFAULT_MAX_TEXT_BYTES,
-        }
-    }
-}
-
 /// Errors returned while constructing a bounded semantic document.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum Error {
-    /// A semantic profile exceeded a hard maximum.
-    InvalidLimits {
-        /// Rejected checked-limit request.
-        error: LimitsError,
-    },
     /// The supplied sheet sequence exceeds the selected bound.
     TooManySheets {
         /// Number of supplied sheets.
@@ -538,7 +228,6 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::InvalidLimits { error } => error.fmt(formatter),
             Self::TooManySheets { actual, limit } => write!(
                 formatter,
                 "Numbers document contains {actual} sheets; maximum is {limit}"
@@ -585,7 +274,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// or table storage. Native archives, protobuf values, package entries, and
 /// physical object identifiers are intentionally outside this API.
 #[derive(Debug, Clone)]
-pub struct Document {
+pub struct Workbook {
     state: Arc<State>,
 }
 
@@ -596,7 +285,7 @@ struct State {
     diagnostics: Option<SourceDiagnostics>,
 }
 
-impl Document {
+impl Workbook {
     /// Open a complete Numbers package or an app-authored package directory.
     ///
     /// The source is captured once and eagerly projected into this immutable,
@@ -610,7 +299,7 @@ impl Document {
     /// Returns a typed error if source capture, format classification, or
     /// semantic projection fails or exceeds a checked resource ceiling.
     pub fn open(path: impl AsRef<Path>) -> std::result::Result<Self, ReadError> {
-        Self::open_with_options(path, DocumentReadOptions::default())
+        Self::open_with_options(path, OpenOptions::new())
     }
 
     /// Open an archive-free Numbers snapshot under explicit resource profiles.
@@ -620,11 +309,11 @@ impl Document {
     /// Returns the same failures as [`Self::open`].
     pub fn open_with_options(
         path: impl AsRef<Path>,
-        options: DocumentReadOptions,
+        options: OpenOptions,
     ) -> std::result::Result<Self, ReadError> {
         let source_limits = options
-            .source()
-            .detector_limits()
+            .source_limits_value()
+            .detector()
             .map_err(map_detection_error)?;
         let source = litchi_iwa_detect::PreparedSource::__from_path_with_numbers_semantics(
             path,
@@ -632,7 +321,7 @@ impl Document {
         )
         .map_err(map_detection_error)?
         .ok_or(ReadError::InvalidSource)?;
-        Self::from_prepared_source(source, options.semantic())
+        Self::from_prepared_source(source, options.semantic_limits_value())
     }
 
     /// Decode borrowed packaged Numbers bytes into an archive-free snapshot.
@@ -641,7 +330,7 @@ impl Document {
     ///
     /// Returns a typed capture, format, or semantic projection failure.
     pub fn from_bytes(bytes: &[u8]) -> std::result::Result<Self, ReadError> {
-        Self::from_bytes_with_options(bytes, DocumentReadOptions::default())
+        Self::from_bytes_with_options(bytes, OpenOptions::new())
     }
 
     /// Decode borrowed package bytes under explicit resource profiles.
@@ -651,11 +340,11 @@ impl Document {
     /// Returns the same failures as [`Self::from_bytes`].
     pub fn from_bytes_with_options(
         bytes: &[u8],
-        options: DocumentReadOptions,
+        options: OpenOptions,
     ) -> std::result::Result<Self, ReadError> {
         let source_limits = options
-            .source()
-            .detector_limits()
+            .source_limits_value()
+            .detector()
             .map_err(map_detection_error)?;
         let source = litchi_iwa_detect::PreparedSource::__from_bytes_with_numbers_semantics(
             bytes,
@@ -663,7 +352,7 @@ impl Document {
         )
         .map_err(map_detection_error)?
         .ok_or(ReadError::InvalidSource)?;
-        Self::from_prepared_source(source, options.semantic())
+        Self::from_prepared_source(source, options.semantic_limits_value())
     }
 
     /// Decode already-shared immutable package bytes without copying them at
@@ -676,7 +365,7 @@ impl Document {
     ///
     /// Returns a typed capture, format, or semantic projection failure.
     pub fn from_shared_bytes(bytes: Arc<[u8]>) -> std::result::Result<Self, ReadError> {
-        Self::from_shared_bytes_with_options(bytes, DocumentReadOptions::default())
+        Self::from_shared_bytes_with_options(bytes, OpenOptions::new())
     }
 
     /// Decode shared immutable package bytes under explicit resource profiles.
@@ -686,11 +375,11 @@ impl Document {
     /// Returns the same failures as [`Self::from_shared_bytes`].
     pub fn from_shared_bytes_with_options(
         bytes: Arc<[u8]>,
-        options: DocumentReadOptions,
+        options: OpenOptions,
     ) -> std::result::Result<Self, ReadError> {
         let source_limits = options
-            .source()
-            .detector_limits()
+            .source_limits_value()
+            .detector()
             .map_err(map_detection_error)?;
         let source = litchi_iwa_detect::PreparedSource::__from_shared_bytes_with_numbers_semantics(
             bytes,
@@ -698,21 +387,24 @@ impl Document {
         )
         .map_err(map_detection_error)?
         .ok_or(ReadError::InvalidSource)?;
-        Self::from_prepared_source(source, options.semantic())
+        Self::from_prepared_source(source, options.semantic_limits_value())
     }
 
     fn from_prepared_source(
         source: litchi_iwa_detect::PreparedSource,
-        semantic: Limits,
+        semantic: SemanticLimits,
     ) -> std::result::Result<Self, ReadError> {
         if source.format() != litchi_iwa_detect::Format::Numbers {
-            return Err(ReadError::NotNumbers);
+            return Err(ReadError::UnexpectedFormat {
+                detected: detected_format(source.format()),
+            });
         }
         crate::package::semantic_document_from_prepared_source(source, semantic)
             .map_err(map_package_read_error)
     }
 
-    /// Build a document from sheets in source order.
+    /// Build a workbook from sheets in source order under the default
+    /// semantic profile.
     ///
     /// # Errors
     ///
@@ -720,33 +412,11 @@ impl Document {
     /// exceeded, or [`Error::InvalidSheetIndex`] when a sheet is not numbered
     /// by its zero-based position in the supplied sequence.
     pub fn from_sheets(sheets: Vec<Sheet>) -> Result<Self> {
-        Self::from_sheets_with_limits(sheets, Limits::default())
+        Self::from_sheets_with_limits(sheets, SemanticLimits::DEFAULT)
     }
 
-    /// Build a document under a caller-selected sheet-count budget.
-    ///
-    /// The package-independent hard cap [`MAX_SHEETS`] cannot be relaxed by a
-    /// caller. The input vector is consumed without rebuilding its sheet
-    /// values when construction succeeds.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Error::TooManySheets`] when the supplied count exceeds either
-    /// the caller budget or the hard semantic cap, or
-    /// [`Error::InvalidSheetIndex`] when a sheet is not numbered by its
-    /// zero-based position in the supplied sequence.
-    pub fn from_sheets_with_max_sheets(sheets: Vec<Sheet>, max_sheets: usize) -> Result<Self> {
-        let limits = Limits::new(
-            max_sheets,
-            MAX_TABLES,
-            MAX_MATERIALIZED_CELLS,
-            DEFAULT_MAX_TEXT_BYTES,
-        )
-        .map_err(|error| Error::InvalidLimits { error })?;
-        Self::from_sheets_with_limits(sheets, limits)
-    }
-
-    /// Build a document under explicit finite semantic budgets.
+    /// Build a workbook under explicit finite semantic budgets: its sheet,
+    /// table, materialized-cell and output-text dimensions apply.
     ///
     /// The source vector is consumed without cloning its sheet or table
     /// values. Validation runs before the vector is moved into one shared
@@ -757,11 +427,11 @@ impl Document {
     ///
     /// Returns a typed error when any count, index, name, or textual-data
     /// budget is exceeded.
-    pub fn from_sheets_with_limits(sheets: Vec<Sheet>, limits: Limits) -> Result<Self> {
-        let max_sheets = limits.max_sheets.min(MAX_SHEETS);
-        let max_tables = limits.max_tables.min(MAX_TABLES);
-        let max_materialized_cells = limits.max_materialized_cells.min(MAX_MATERIALIZED_CELLS);
-        let max_text_bytes = limits.max_text_bytes.min(DEFAULT_MAX_TEXT_BYTES);
+    pub fn from_sheets_with_limits(sheets: Vec<Sheet>, limits: SemanticLimits) -> Result<Self> {
+        let max_sheets = limits.max_sheets();
+        let max_tables = limits.max_tables();
+        let max_materialized_cells = limits.max_materialized_cells();
+        let max_text_bytes = limits.max_output_text_bytes();
 
         if sheets.len() > max_sheets {
             return Err(Error::TooManySheets {
@@ -893,7 +563,7 @@ impl Document {
             SheetSelector::Name(name) => {
                 Ok(self.state.sheets.iter().find(|sheet| sheet.name() == name))
             },
-            SheetSelector::Index(index) => Ok(self.state.sheets.get(index)),
+            SheetSelector::Position(position) => Ok(self.state.sheets.get(position.get())),
         }
     }
 
@@ -920,7 +590,7 @@ impl Document {
     {
         let sheet = match sheet.into() {
             SheetSelector::Name(name) => self.state.sheets.iter().find(|item| item.name() == name),
-            SheetSelector::Index(index) => self.state.sheets.get(index),
+            SheetSelector::Position(position) => self.state.sheets.get(position.get()),
         };
         sheet.map_or(Ok(None), |sheet| sheet.select(table.into()))
     }
@@ -979,7 +649,7 @@ impl Document {
     /// Borrow metadata captured from a validated Numbers source.
     ///
     /// Only the three canonical document authorities are interpreted. Values
-    /// built from semantic sheets, including [`crate::Package::document`],
+    /// built from semantic sheets, including [`crate::Package::workbook`],
     /// have no source diagnostics and return `None`.
     #[must_use]
     pub fn metadata(&self) -> Option<&litchi_core::Metadata> {
@@ -993,7 +663,7 @@ impl Document {
     /// Returns a typed semantic error if retained values violate document
     /// invariants.
     pub fn validate(&self) -> Result<()> {
-        validate_sheets(&self.state.sheets, Limits::default())
+        validate_sheets(&self.state.sheets, SemanticLimits::DEFAULT)
     }
 }
 
@@ -1124,11 +794,11 @@ fn append_plain_text_line(output: &mut String, has_line: &mut bool, value: &str)
     *has_line = true;
 }
 
-fn validate_sheets(sheets: &[Sheet], limits: Limits) -> Result<()> {
-    let max_sheets = limits.max_sheets.min(MAX_SHEETS);
-    let max_tables = limits.max_tables.min(MAX_TABLES);
-    let max_cells = limits.max_materialized_cells.min(MAX_MATERIALIZED_CELLS);
-    let max_text = limits.max_text_bytes.min(DEFAULT_MAX_TEXT_BYTES);
+fn validate_sheets(sheets: &[Sheet], limits: SemanticLimits) -> Result<()> {
+    let max_sheets = limits.max_sheets();
+    let max_tables = limits.max_tables();
+    let max_cells = limits.max_materialized_cells();
+    let max_text = limits.max_output_text_bytes();
     if sheets.len() > max_sheets {
         return Err(Error::TooManySheets {
             actual: sheets.len(),
@@ -1182,35 +852,29 @@ fn validate_sheets(sheets: &[Sheet], limits: Limits) -> Result<()> {
     Ok(())
 }
 
-fn check_source_limit(
-    kind: DocumentSourceLimitKind,
-    value: u64,
-    maximum: u64,
-) -> std::result::Result<(), DocumentSourceLimitsError> {
-    if value == 0 || value > maximum {
-        return Err(DocumentSourceLimitsError {
+fn map_package_read_error(error: crate::Error) -> ReadError {
+    match error {
+        crate::Error::Io(error) => ReadError::Io {
+            kind: io_kind(error.kind()),
+        },
+        crate::Error::Archive(error) => map_archive_error(error),
+        crate::Error::Detection(error) => map_detection_error(error),
+        crate::Error::UnexpectedFormat { detected } => ReadError::UnexpectedFormat { detected },
+        crate::Error::InvalidLimit {
             kind,
             value,
             maximum,
-        });
-    }
-    Ok(())
-}
-
-fn map_package_read_error(error: crate::PackageError) -> ReadError {
-    match error {
-        crate::PackageError::Io(error) => ReadError::Io {
-            kind: io_kind(error.kind()),
+        } => ReadError::InvalidLimit {
+            kind,
+            value,
+            maximum,
         },
-        crate::PackageError::Archive(error) => map_archive_error(error),
-        crate::PackageError::Detection(error) => map_detection_error(error),
-        crate::PackageError::NotNumbers => ReadError::NotNumbers,
-        crate::PackageError::MalformedPayload { .. }
-        | crate::PackageError::InvalidFormat(_)
-        | crate::PackageError::ParseError(_) => ReadError::InvalidFormat,
-        crate::PackageError::Common(error) => map_common_error(error),
-        crate::PackageError::Semantic(error) => map_semantic_error(error),
-        crate::PackageError::SemanticLimit {
+        crate::Error::MalformedPayload { .. }
+        | crate::Error::InvalidFormat(_)
+        | crate::Error::ParseError(_) => ReadError::InvalidFormat,
+        crate::Error::Common(error) => map_common_error(error),
+        crate::Error::Semantic(error) => map_semantic_error(error),
+        crate::Error::SemanticLimit {
             kind,
             observed,
             maximum,
@@ -1220,7 +884,7 @@ fn map_package_read_error(error: crate::PackageError) -> ReadError {
             observed: usize_u64(observed),
             maximum: usize_u64(maximum),
         },
-        crate::PackageError::InputTooLarge { observed, maximum } => ReadError::Limit {
+        crate::Error::InputTooLarge { observed, maximum } => ReadError::Limit {
             kind: ReadLimitKind::InputBytes,
             observed,
             maximum,
@@ -1230,7 +894,6 @@ fn map_package_read_error(error: crate::PackageError) -> ReadError {
 
 fn map_semantic_error(error: Error) -> ReadError {
     match error {
-        Error::InvalidLimits { .. } => ReadError::InvalidSource,
         Error::TooManySheets { actual, limit } => ReadError::Limit {
             kind: ReadLimitKind::Sheets,
             observed: usize_u64(actual),
@@ -1351,24 +1014,20 @@ fn map_common_error(error: litchi_iwa_common::Error) -> ReadError {
     }
 }
 
-fn semantic_limit_kind(kind: crate::SemanticLimitKind) -> ReadLimitKind {
+fn semantic_limit_kind(kind: crate::limits::SemanticLimitKind) -> ReadLimitKind {
     match kind {
-        crate::SemanticLimitKind::Sheets => ReadLimitKind::Sheets,
-        crate::SemanticLimitKind::Tables => ReadLimitKind::Tables,
-        crate::SemanticLimitKind::MaterializedCells => ReadLimitKind::Cells,
-        crate::SemanticLimitKind::OutputTextBytes | crate::SemanticLimitKind::TextBytes => {
-            ReadLimitKind::TextBytes
-        },
-        crate::SemanticLimitKind::FormulaRenderDepth | crate::SemanticLimitKind::FormulaDepth => {
-            ReadLimitKind::PayloadNesting
-        },
-        crate::SemanticLimitKind::Objects | crate::SemanticLimitKind::References => {
-            ReadLimitKind::PayloadFields
-        },
-        crate::SemanticLimitKind::FormulaWireBytes => ReadLimitKind::PayloadBytes,
-        crate::SemanticLimitKind::FormulaRenderWork | crate::SemanticLimitKind::FormulaWork => {
-            ReadLimitKind::PayloadWork
-        },
+        crate::limits::SemanticLimitKind::Sheets => ReadLimitKind::Sheets,
+        crate::limits::SemanticLimitKind::Tables => ReadLimitKind::Tables,
+        crate::limits::SemanticLimitKind::MaterializedCells => ReadLimitKind::Cells,
+        crate::limits::SemanticLimitKind::OutputTextBytes
+        | crate::limits::SemanticLimitKind::TextBytes => ReadLimitKind::TextBytes,
+        crate::limits::SemanticLimitKind::FormulaRenderDepth
+        | crate::limits::SemanticLimitKind::FormulaDepth => ReadLimitKind::PayloadNesting,
+        crate::limits::SemanticLimitKind::Objects
+        | crate::limits::SemanticLimitKind::References => ReadLimitKind::PayloadFields,
+        crate::limits::SemanticLimitKind::FormulaWireBytes => ReadLimitKind::PayloadBytes,
+        crate::limits::SemanticLimitKind::FormulaRenderWork
+        | crate::limits::SemanticLimitKind::FormulaWork => ReadLimitKind::PayloadWork,
     }
 }
 
@@ -1449,6 +1108,15 @@ fn io_kind(kind: std::io::ErrorKind) -> IoKind {
     }
 }
 
+/// The unified format of an iWork detection result.
+pub(crate) const fn detected_format(format: litchi_iwa_detect::Format) -> litchi_core::FileFormat {
+    match format {
+        litchi_iwa_detect::Format::Pages => litchi_core::FileFormat::Pages,
+        litchi_iwa_detect::Format::Keynote => litchi_core::FileFormat::Keynote,
+        litchi_iwa_detect::Format::Numbers => litchi_core::FileFormat::Numbers,
+    }
+}
+
 fn usize_u64(value: usize) -> u64 {
     u64::try_from(value).unwrap_or(u64::MAX)
 }
@@ -1460,11 +1128,11 @@ mod tests {
     fn assert_send_sync<T: Send + Sync>() {}
 
     #[test]
-    fn empty_document_is_a_valid_bounded_snapshot() {
-        let document = Document::from_sheets(Vec::new())
+    fn empty_workbook_is_a_valid_bounded_snapshot() {
+        let document = Workbook::from_sheets(Vec::new())
             .unwrap_or_else(|error| panic!("empty document should be valid: {error}"));
 
-        assert_send_sync::<Document>();
+        assert_send_sync::<Workbook>();
         assert!(document.is_empty());
         assert_eq!(document.sheet_count(), 0);
         assert!(document.sheets().is_empty());
@@ -1482,16 +1150,23 @@ mod tests {
 
     #[test]
     fn construction_checks_budget_and_canonical_order() {
-        let too_many = Document::from_sheets_with_max_sheets(vec![Sheet::new("Sheet 1", 0)], 0);
+        let one = SemanticLimits::builder()
+            .max_sheets(1)
+            .and_then(crate::limits::SemanticLimitsBuilder::build)
+            .unwrap_or_else(|error| panic!("valid sheet limit rejected: {error}"));
+        let too_many = Workbook::from_sheets_with_limits(
+            vec![Sheet::new("Sheet 1", 0), Sheet::new("Sheet 2", 1)],
+            one,
+        );
         assert!(matches!(
             too_many,
             Err(Error::TooManySheets {
-                actual: 1,
-                limit: 0,
+                actual: 2,
+                limit: 1,
             })
         ));
 
-        let invalid = Document::from_sheets(vec![Sheet::new("Sheet 2", 1)]);
+        let invalid = Workbook::from_sheets(vec![Sheet::new("Sheet 2", 1)]);
         assert!(matches!(
             invalid,
             Err(Error::InvalidSheetIndex {
@@ -1504,7 +1179,7 @@ mod tests {
     #[test]
     fn clones_share_ordered_semantic_storage() {
         let document =
-            Document::from_sheets(vec![Sheet::new("Sheet 1", 0), Sheet::new("Sheet 2", 1)])
+            Workbook::from_sheets(vec![Sheet::new("Sheet 1", 0), Sheet::new("Sheet 2", 1)])
                 .unwrap_or_else(|error| panic!("document should be valid: {error}"));
         let snapshot = document.snapshot();
 
@@ -1542,7 +1217,7 @@ mod tests {
     #[test]
     fn sheet_lookup_is_selector_first_and_returns_none_when_missing() {
         let document =
-            Document::from_sheets(vec![Sheet::new("Summary", 0), Sheet::new("Archive", 1)])
+            Workbook::from_sheets(vec![Sheet::new("Summary", 0), Sheet::new("Archive", 1)])
                 .unwrap_or_else(|error| panic!("document should be valid: {error}"));
 
         assert_eq!(
@@ -1576,7 +1251,7 @@ mod tests {
     #[test]
     fn construction_rejects_duplicate_names_and_aggregate_budgets() {
         let duplicate =
-            Document::from_sheets(vec![Sheet::new("Summary", 0), Sheet::new("Summary", 1)]);
+            Workbook::from_sheets(vec![Sheet::new("Summary", 0), Sheet::new("Summary", 1)]);
         assert!(matches!(
             duplicate,
             Err(Error::DuplicateSheetName {
@@ -1598,20 +1273,41 @@ mod tests {
         assert!(sheet.push_table(table).is_ok());
         let sheet = sheet.finish();
 
-        let table_limit = Limits::new(1, 0, MAX_MATERIALIZED_CELLS, DEFAULT_MAX_TEXT_BYTES)
-            .unwrap_or_else(|error| panic!("valid zero table limit rejected: {error}"));
+        let mut second = crate::table::Builder::new("More", crate::Dimensions::new(1, 1));
+        assert!(
+            second
+                .set(crate::Position::new(0, 0), Value::Text("v".to_owned()))
+                .is_ok()
+        );
+        let second = second
+            .finish()
+            .unwrap_or_else(|error| panic!("table should be valid: {error}"));
+        let mut two_tables = crate::sheet::Builder::new("Summary", 0);
+        assert!(
+            two_tables
+                .push_table(sheet.tables().next().cloned().unwrap())
+                .is_ok()
+        );
+        assert!(two_tables.push_table(second).is_ok());
+        let two_tables = two_tables.finish();
+        let table_limit = SemanticLimits::builder()
+            .max_tables(1)
+            .and_then(crate::limits::SemanticLimitsBuilder::build)
+            .unwrap_or_else(|error| panic!("valid table limit rejected: {error}"));
         assert!(matches!(
-            Document::from_sheets_with_limits(vec![sheet.clone()], table_limit),
+            Workbook::from_sheets_with_limits(vec![two_tables], table_limit),
             Err(Error::TooManyTables {
-                actual: 1,
-                limit: 0,
+                actual: 2,
+                limit: 1,
             })
         ));
 
-        let text_limit = Limits::new(1, MAX_TABLES, MAX_MATERIALIZED_CELLS, 4)
+        let text_limit = SemanticLimits::builder()
+            .max_output_text_bytes(4)
+            .and_then(crate::limits::SemanticLimitsBuilder::build)
             .unwrap_or_else(|error| panic!("valid text limit rejected: {error}"));
         assert!(matches!(
-            Document::from_sheets_with_limits(vec![sheet], text_limit),
+            Workbook::from_sheets_with_limits(vec![sheet], text_limit),
             Err(Error::TextTooLarge {
                 observed: _,
                 limit: 4,

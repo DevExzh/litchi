@@ -15,7 +15,7 @@ use litchi_iwa::keynote::{KeynoteDocumentBuilder, KeynoteEditor};
 use litchi_iwa::numbers::{NumbersDocumentBuilder, NumbersEditor};
 use litchi_iwa::pages::PagesEditor;
 use litchi_keynote::Package as KeynotePackage;
-use litchi_numbers::Document as NumbersSemanticDocument;
+use litchi_numbers::Workbook as NumbersSemanticDocument;
 use litchi_pages::Document as PagesSemanticDocument;
 use tempfile::tempdir;
 

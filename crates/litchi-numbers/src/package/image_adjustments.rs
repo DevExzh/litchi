@@ -23,7 +23,7 @@ use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::image_adjustments_codec::{
     self as codec, ImageAdjustmentsSnapshot, ImageAdjustmentsWrite,
 };
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::{Error as PackageError, Package, SemanticLimitKind};
 use crate::{SheetSelector, shape::image::ImageSelector};
@@ -31,7 +31,7 @@ use crate::{SheetSelector, shape::image::ImageSelector};
 /// Typed failures at the hidden Numbers image-adjustment seam.
 #[doc(hidden)]
 #[cfg(feature = "internal-iwork-source")]
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 pub enum ImageAdjustmentsError {
     /// The bounded Buffa/wire projection rejected the source or candidate.
     #[error("image-adjustments codec rejected the payload: {0}")]
@@ -62,7 +62,7 @@ enum ReferenceKind {
 /// operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum SheetImageAdjustmentsLimitKind {
+pub enum LimitKind {
     /// Source or candidate wire bytes.
     WireBytes,
     /// Parsed fields.
@@ -81,7 +81,7 @@ pub enum SheetImageAdjustmentsLimitKind {
     OutputBytes,
 }
 
-impl fmt::Display for SheetImageAdjustmentsLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::WireBytes => "wire bytes",
@@ -97,9 +97,9 @@ impl fmt::Display for SheetImageAdjustmentsLimitKind {
 }
 
 /// Failure raised by a selector-first Numbers image-adjustment read or edit.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum SheetImageAdjustmentsError {
+pub enum Error {
     /// The package does not retain an exact physical source suitable for edits.
     #[error("this Numbers source does not support physical image-adjustment edits")]
     UnsupportedSource,
@@ -129,7 +129,7 @@ pub enum SheetImageAdjustmentsError {
         "Numbers image-adjustment {kind} limit exceeded: observed {observed}, maximum {maximum}"
     )]
     LimitExceeded {
-        kind: SheetImageAdjustmentsLimitKind,
+        kind: LimitKind,
         observed: u64,
         maximum: u64,
     },
@@ -192,7 +192,7 @@ fn preflight_sheet_drawables(
     source: &[u8],
     maximum_drawables: usize,
     budget: &ImageBudget,
-) -> Result<SheetDrawablePreflight, SheetImageAdjustmentsError> {
+) -> Result<SheetDrawablePreflight, Error> {
     let mut drawable_count = 0usize;
     let report = preflight_wire_tree_with_limits(source, budget.residual_wire_limits()?, |visit| {
         let is_drawable = match message_type {
@@ -237,8 +237,8 @@ fn preflight_sheet_drawables(
             kind: litchi_iwa_common::LimitKind::MaterializedCells,
             observed,
             limit,
-        } => SheetImageAdjustmentsError::LimitExceeded {
-            kind: SheetImageAdjustmentsLimitKind::References,
+        } => Error::LimitExceeded {
+            kind: LimitKind::References,
             observed: observed as u64,
             maximum: limit as u64,
         },
@@ -254,13 +254,13 @@ fn sheet_drawable_identifiers(
     message_type: u32,
     source: &[u8],
     budget: &mut ImageBudget,
-) -> Result<Vec<u64>, SheetImageAdjustmentsError> {
+) -> Result<Vec<u64>, Error> {
     let maximum_drawables = budget.max_references.saturating_sub(budget.references);
     let preflight = preflight_sheet_drawables(message_type, source, maximum_drawables, budget)?;
     let identifier_bytes = preflight
         .drawable_count
         .checked_mul(size_of::<u64>())
-        .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.preflight_scan(preflight.report)?;
     // One path scratch allocation belongs to the bounded preflight, another
     // to the source-ordered projection, and one Vec backs the identifiers.
@@ -268,14 +268,14 @@ fn sheet_drawable_identifiers(
     let retained = source
         .len()
         .checked_add(identifier_bytes)
-        .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.preflight_retained(retained)?;
     budget.charge_preflight_scan(preflight.report)?;
     let (_name, identifiers) =
         super::names::preflight_sheet_payload(message_type, source, maximum_drawables)
             .map_err(map_names_error)?;
     if identifiers.len() != preflight.drawable_count {
-        return Err(SheetImageAdjustmentsError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     // `preflight_sheet_payload` performs its own bounded walk and validates
     // each local TSP.Reference before materializing the identifier Vec.
@@ -309,16 +309,16 @@ const fn image_enhancement_to_native(value: ImageEnhancement) -> bool {
 
 /// One mutable image-adjustment value staged against an immutable Numbers
 /// package.
-pub struct SheetImageAdjustmentsEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
     selection: ImageSelection,
     after: ImageAdjustments,
 }
 
-impl fmt::Debug for SheetImageAdjustmentsEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SheetImageAdjustmentsEdit")
+            .debug_struct("Edit")
             .field("sheet_position", &self.selection.sheet_position)
             .field("image_position", &self.selection.image_position)
             .field("before", &self.selection.before)
@@ -327,12 +327,12 @@ impl fmt::Debug for SheetImageAdjustmentsEdit<'_> {
     }
 }
 
-impl<'a> SheetImageAdjustmentsEdit<'a> {
+impl<'a> Edit<'a> {
     fn new<'sheet>(
         source: &'a Package,
         sheet_selector: impl Into<SheetSelector<'sheet>>,
         image_selector: impl Into<ImageSelector>,
-    ) -> Result<Self, SheetImageAdjustmentsError> {
+    ) -> Result<Self, Error> {
         let mut budget = ImageBudget::for_package(source)?;
         let selection = select_image_with_budget(
             source,
@@ -373,34 +373,31 @@ impl<'a> SheetImageAdjustmentsEdit<'a> {
     }
 
     /// Replace all three optional inspector controls.
-    pub fn set(
-        mut self,
-        adjustments: ImageAdjustments,
-    ) -> Result<Self, SheetImageAdjustmentsError> {
+    pub fn set(mut self, adjustments: ImageAdjustments) -> Result<Self, Error> {
         self.after = adjustments;
         Ok(self)
     }
 
     /// Commit this exact-source edit after reopening and verifying its
     /// candidate.
-    pub fn commit(self) -> Result<SheetImageAdjustmentsCommit, SheetImageAdjustmentsError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         commit_edit(self.source, &self.selection, self.after)
     }
 }
 
 /// Exact-source checked reversible image-adjustment patch.
 #[derive(Clone, PartialEq)]
-pub struct SheetImageAdjustmentsPatch {
+pub struct Patch {
     artifacts: OwnedExactArtifacts,
     selection: ImageSelection,
     before: ImageAdjustments,
     after: ImageAdjustments,
 }
 
-impl fmt::Debug for SheetImageAdjustmentsPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SheetImageAdjustmentsPatch")
+            .debug_struct("Patch")
             .field("sheet_position", &self.selection.sheet_position)
             .field("image_position", &self.selection.image_position)
             .field("before", &self.before)
@@ -409,7 +406,7 @@ impl fmt::Debug for SheetImageAdjustmentsPatch {
     }
 }
 
-impl SheetImageAdjustmentsPatch {
+impl Patch {
     /// Return the selected sheet source position.
     #[must_use]
     pub const fn sheet_position(&self) -> Position {
@@ -466,13 +463,13 @@ impl SheetImageAdjustmentsPatch {
 
 /// Compact evidence describing one image-adjustment publication.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct SheetImageAdjustmentsDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     full_reparse_performed: bool,
 }
 
-impl SheetImageAdjustmentsDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -511,13 +508,13 @@ impl SheetImageAdjustmentsDiagnostics {
 /// Fully verified result of one image-adjustment transaction.
 #[must_use = "a Numbers image-adjustment commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct SheetImageAdjustmentsCommit {
+pub struct Commit {
     package: Package,
-    patch: SheetImageAdjustmentsPatch,
-    diagnostics: SheetImageAdjustmentsDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl SheetImageAdjustmentsCommit {
+impl Commit {
     /// Borrow the fully reopened package snapshot.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -532,13 +529,13 @@ impl SheetImageAdjustmentsCommit {
 
     /// Borrow the reversible exact-source patch.
     #[must_use]
-    pub const fn patch(&self) -> &SheetImageAdjustmentsPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Borrow compact publication diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> &SheetImageAdjustmentsDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -602,11 +599,11 @@ struct ImageBudget {
 }
 
 impl ImageBudget {
-    fn for_package(package: &Package) -> Result<Self, SheetImageAdjustmentsError> {
+    fn for_package(package: &Package) -> Result<Self, Error> {
         let archive = package.state.options.archive();
         let core = archive
             .effective_archive_limits()
-            .map_err(|_| SheetImageAdjustmentsError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?;
         let source = core
             .max_message_bytes()
             .min(core.max_archive_bytes())
@@ -631,12 +628,12 @@ impl ImageBudget {
                         .clamp(1, WireLimits::MAX_REWRITE_WORK),
                 )
             })
-            .map_err(|_| SheetImageAdjustmentsError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?;
         let semantic = package.state.options.semantic();
         let max_allocations = semantic
             .max_objects()
             .checked_add(semantic.max_references())
-            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let aggregate = source.saturating_mul(8).max(source);
         Ok(Self {
             limits,
@@ -663,13 +660,11 @@ impl ImageBudget {
         current: &mut usize,
         amount: usize,
         maximum: usize,
-        kind: SheetImageAdjustmentsLimitKind,
-    ) -> Result<(), SheetImageAdjustmentsError> {
-        let observed = current
-            .checked_add(amount)
-            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        kind: LimitKind,
+    ) -> Result<(), Error> {
+        let observed = current.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > maximum {
-            return Err(SheetImageAdjustmentsError::LimitExceeded {
+            return Err(Error::LimitExceeded {
                 kind,
                 observed: observed as u64,
                 maximum: maximum as u64,
@@ -683,13 +678,11 @@ impl ImageBudget {
         current: usize,
         amount: usize,
         maximum: usize,
-        kind: SheetImageAdjustmentsLimitKind,
-    ) -> Result<(), SheetImageAdjustmentsError> {
-        let observed = current
-            .checked_add(amount)
-            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        kind: LimitKind,
+    ) -> Result<(), Error> {
+        let observed = current.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > maximum {
-            return Err(SheetImageAdjustmentsError::LimitExceeded {
+            return Err(Error::LimitExceeded {
                 kind,
                 observed: observed as u64,
                 maximum: maximum as u64,
@@ -698,37 +691,32 @@ impl ImageBudget {
         Ok(())
     }
 
-    fn source(&mut self, amount: usize) -> Result<(), SheetImageAdjustmentsError> {
+    fn source(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.input,
             amount,
             self.max_input,
-            SheetImageAdjustmentsLimitKind::WireBytes,
+            LimitKind::WireBytes,
         )
     }
 
-    fn scan(
-        &mut self,
-        payload: &[u8],
-        fields: usize,
-        depth: usize,
-    ) -> Result<(), SheetImageAdjustmentsError> {
+    fn scan(&mut self, payload: &[u8], fields: usize, depth: usize) -> Result<(), Error> {
         self.source(payload.len())?;
         Self::add(
             &mut self.fields,
             fields,
             self.max_fields,
-            SheetImageAdjustmentsLimitKind::WireFields,
+            LimitKind::WireFields,
         )?;
         Self::add(
             &mut self.work,
             payload.len(),
             self.max_work,
-            SheetImageAdjustmentsLimitKind::WireWork,
+            LimitKind::WireWork,
         )?;
         if depth > self.max_nesting {
-            return Err(SheetImageAdjustmentsError::LimitExceeded {
-                kind: SheetImageAdjustmentsLimitKind::WireNesting,
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::WireNesting,
                 observed: depth as u64,
                 maximum: self.max_nesting as u64,
             });
@@ -737,29 +725,29 @@ impl ImageBudget {
         Ok(())
     }
 
-    fn preflight_scan(&self, report: WirePreflight) -> Result<(), SheetImageAdjustmentsError> {
+    fn preflight_scan(&self, report: WirePreflight) -> Result<(), Error> {
         Self::preflight(
             self.input,
             report.scanned_bytes(),
             self.max_input,
-            SheetImageAdjustmentsLimitKind::WireBytes,
+            LimitKind::WireBytes,
         )?;
         Self::preflight(
             self.fields,
             report.fields(),
             self.max_fields,
-            SheetImageAdjustmentsLimitKind::WireFields,
+            LimitKind::WireFields,
         )?;
         Self::preflight(
             self.work,
             report.scanned_bytes(),
             self.max_work,
-            SheetImageAdjustmentsLimitKind::WireWork,
+            LimitKind::WireWork,
         )?;
         let depth = report.max_depth();
         if depth > self.max_nesting {
-            return Err(SheetImageAdjustmentsError::LimitExceeded {
-                kind: SheetImageAdjustmentsLimitKind::WireNesting,
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::WireNesting,
                 observed: depth as u64,
                 maximum: self.max_nesting as u64,
             });
@@ -767,32 +755,29 @@ impl ImageBudget {
         Ok(())
     }
 
-    fn charge_preflight_scan(
-        &mut self,
-        report: WirePreflight,
-    ) -> Result<(), SheetImageAdjustmentsError> {
+    fn charge_preflight_scan(&mut self, report: WirePreflight) -> Result<(), Error> {
         Self::add(
             &mut self.input,
             report.scanned_bytes(),
             self.max_input,
-            SheetImageAdjustmentsLimitKind::WireBytes,
+            LimitKind::WireBytes,
         )?;
         Self::add(
             &mut self.fields,
             report.fields(),
             self.max_fields,
-            SheetImageAdjustmentsLimitKind::WireFields,
+            LimitKind::WireFields,
         )?;
         Self::add(
             &mut self.work,
             report.scanned_bytes(),
             self.max_work,
-            SheetImageAdjustmentsLimitKind::WireWork,
+            LimitKind::WireWork,
         )?;
         let depth = report.max_depth();
         if depth > self.max_nesting {
-            return Err(SheetImageAdjustmentsError::LimitExceeded {
-                kind: SheetImageAdjustmentsLimitKind::WireNesting,
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::WireNesting,
                 observed: depth as u64,
                 maximum: self.max_nesting as u64,
             });
@@ -801,88 +786,73 @@ impl ImageBudget {
         Ok(())
     }
 
-    fn work(&mut self, amount: usize) -> Result<(), SheetImageAdjustmentsError> {
-        Self::add(
-            &mut self.work,
-            amount,
-            self.max_work,
-            SheetImageAdjustmentsLimitKind::WireWork,
-        )
+    fn work(&mut self, amount: usize) -> Result<(), Error> {
+        Self::add(&mut self.work, amount, self.max_work, LimitKind::WireWork)
     }
 
-    fn references(&mut self, amount: usize) -> Result<(), SheetImageAdjustmentsError> {
+    fn references(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.references,
             amount,
             self.max_references,
-            SheetImageAdjustmentsLimitKind::References,
+            LimitKind::References,
         )
     }
 
-    fn allocations(&mut self, amount: usize) -> Result<(), SheetImageAdjustmentsError> {
+    fn allocations(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.allocations,
             amount,
             self.max_allocations,
-            SheetImageAdjustmentsLimitKind::Allocations,
+            LimitKind::Allocations,
         )
     }
 
-    fn retained(&mut self, amount: usize) -> Result<(), SheetImageAdjustmentsError> {
+    fn retained(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.retained,
             amount,
             self.max_retained,
-            SheetImageAdjustmentsLimitKind::Retained,
+            LimitKind::Retained,
         )
     }
 
-    fn output(&mut self, amount: usize) -> Result<(), SheetImageAdjustmentsError> {
+    fn output(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.output,
             amount,
             self.max_output,
-            SheetImageAdjustmentsLimitKind::OutputBytes,
+            LimitKind::OutputBytes,
         )
     }
 
-    fn preflight_output(&self, amount: usize) -> Result<(), SheetImageAdjustmentsError> {
-        Self::preflight(
-            self.output,
-            amount,
-            self.max_output,
-            SheetImageAdjustmentsLimitKind::OutputBytes,
-        )
+    fn preflight_output(&self, amount: usize) -> Result<(), Error> {
+        Self::preflight(self.output, amount, self.max_output, LimitKind::OutputBytes)
     }
 
-    fn preflight_work(&self, amount: usize) -> Result<(), SheetImageAdjustmentsError> {
-        Self::preflight(
-            self.work,
-            amount,
-            self.max_work,
-            SheetImageAdjustmentsLimitKind::WireWork,
-        )
+    fn preflight_work(&self, amount: usize) -> Result<(), Error> {
+        Self::preflight(self.work, amount, self.max_work, LimitKind::WireWork)
     }
 
-    fn preflight_allocations(&self, amount: usize) -> Result<(), SheetImageAdjustmentsError> {
+    fn preflight_allocations(&self, amount: usize) -> Result<(), Error> {
         Self::preflight(
             self.allocations,
             amount,
             self.max_allocations,
-            SheetImageAdjustmentsLimitKind::Allocations,
+            LimitKind::Allocations,
         )
     }
 
-    fn preflight_retained(&self, amount: usize) -> Result<(), SheetImageAdjustmentsError> {
+    fn preflight_retained(&self, amount: usize) -> Result<(), Error> {
         Self::preflight(
             self.retained,
             amount,
             self.max_retained,
-            SheetImageAdjustmentsLimitKind::Retained,
+            LimitKind::Retained,
         )
     }
 
-    fn residual_wire_limits(&self) -> Result<WireLimits, SheetImageAdjustmentsError> {
+    fn residual_wire_limits(&self) -> Result<WireLimits, Error> {
         let input = self.max_input.saturating_sub(self.input).max(1);
         let fields = self.max_fields.saturating_sub(self.fields).max(1);
         let work = self.max_work.saturating_sub(self.work).max(1);
@@ -891,17 +861,13 @@ impl ImageBudget {
             .and_then(|limits| limits.with_fields(limits.max_fields().min(fields)))
             .and_then(|limits| limits.with_rewrite_work(limits.max_rewrite_work().min(work)))
             .and_then(|limits| limits.with_nesting(limits.max_nesting().min(self.max_nesting)))
-            .map_err(|_| SheetImageAdjustmentsError::InvalidSource)
+            .map_err(|_| Error::InvalidSource)
     }
 
-    fn codec_options(
-        &self,
-        source: &[u8],
-    ) -> Result<codec::DecodeOptions, SheetImageAdjustmentsError> {
+    fn codec_options(&self, source: &[u8]) -> Result<codec::DecodeOptions, Error> {
         let limits = self.residual_wire_limits()?;
         let output = self.max_output.saturating_sub(self.output).max(1);
-        let recursion = u32::try_from(limits.max_nesting())
-            .map_err(|_| SheetImageAdjustmentsError::InvalidSource)?;
+        let recursion = u32::try_from(limits.max_nesting()).map_err(|_| Error::InvalidSource)?;
         Ok(codec::DecodeOptions::new(
             limits.max_input_bytes().min(source.len().max(1)),
             limits.max_fields(),
@@ -911,33 +877,30 @@ impl ImageBudget {
         .with_max_output_bytes(output))
     }
 
-    fn codec_report(
-        &mut self,
-        report: codec::DecodeReport,
-    ) -> Result<(), SheetImageAdjustmentsError> {
+    fn codec_report(&mut self, report: codec::DecodeReport) -> Result<(), Error> {
         Self::add(
             &mut self.input,
             report.input_bytes(),
             self.max_input,
-            SheetImageAdjustmentsLimitKind::WireBytes,
+            LimitKind::WireBytes,
         )?;
         Self::add(
             &mut self.fields,
             report.fields(),
             self.max_fields,
-            SheetImageAdjustmentsLimitKind::WireFields,
+            LimitKind::WireFields,
         )?;
         Self::add(
             &mut self.work,
             report.work_bytes(),
             self.max_work,
-            SheetImageAdjustmentsLimitKind::WireWork,
+            LimitKind::WireWork,
         )?;
         Self::add(
             &mut self.allocations,
             report.allocations(),
             self.max_allocations,
-            SheetImageAdjustmentsLimitKind::Allocations,
+            LimitKind::Allocations,
         )?;
         Self::add(
             &mut self.retained,
@@ -945,12 +908,12 @@ impl ImageBudget {
                 .retained_bytes()
                 .saturating_add(report.scratch_bytes()),
             self.max_retained,
-            SheetImageAdjustmentsLimitKind::Retained,
+            LimitKind::Retained,
         )?;
         let depth = usize::try_from(report.max_depth()).unwrap_or(usize::MAX);
         if depth > self.max_nesting {
-            return Err(SheetImageAdjustmentsError::LimitExceeded {
-                kind: SheetImageAdjustmentsLimitKind::WireNesting,
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::WireNesting,
                 observed: depth as u64,
                 maximum: self.max_nesting as u64,
             });
@@ -962,24 +925,24 @@ impl ImageBudget {
     fn codec_requirements(
         &mut self,
         requirements: codec::RewriteExecutionRequirements,
-    ) -> Result<(), SheetImageAdjustmentsError> {
+    ) -> Result<(), Error> {
         self.output(requirements.output_bytes)?;
         Self::add(
             &mut self.fields,
             requirements.fields,
             self.max_fields,
-            SheetImageAdjustmentsLimitKind::WireFields,
+            LimitKind::WireFields,
         )?;
         Self::add(
             &mut self.work,
             requirements.work_bytes,
             self.max_work,
-            SheetImageAdjustmentsLimitKind::WireWork,
+            LimitKind::WireWork,
         )?;
         let depth = usize::try_from(requirements.max_depth).unwrap_or(usize::MAX);
         if depth > self.max_nesting {
-            return Err(SheetImageAdjustmentsError::LimitExceeded {
-                kind: SheetImageAdjustmentsLimitKind::WireNesting,
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::WireNesting,
                 observed: depth as u64,
                 maximum: self.max_nesting as u64,
             });
@@ -994,11 +957,7 @@ impl ImageBudget {
         Ok(())
     }
 
-    fn candidate_reopen(
-        &mut self,
-        package: &Package,
-        bytes: usize,
-    ) -> Result<(), SheetImageAdjustmentsError> {
+    fn candidate_reopen(&mut self, package: &Package, bytes: usize) -> Result<(), Error> {
         self.source(bytes)?;
         self.work(bytes)?;
         let (allocations, retained) = package_reopen_requirements(package, bytes)?;
@@ -1011,7 +970,7 @@ impl ImageBudget {
     fn reassembly(
         &mut self,
         requirements: litchi_iwa_archive::package::ReassemblyExecutionRequirements,
-    ) -> Result<(), SheetImageAdjustmentsError> {
+    ) -> Result<(), Error> {
         self.output(requirements.output_bytes())?;
         self.allocations(requirements.allocations())?;
         self.retained(
@@ -1028,7 +987,7 @@ impl Package {
         &self,
         sheet_selector: impl Into<SheetSelector<'sheet>>,
         image_selector: impl Into<ImageSelector>,
-    ) -> Result<ImageAdjustments, SheetImageAdjustmentsError> {
+    ) -> Result<ImageAdjustments, Error> {
         let mut budget = ImageBudget::for_package(self)?;
         Ok(select_image_with_budget(
             self,
@@ -1045,19 +1004,16 @@ impl Package {
         &self,
         sheet_selector: impl Into<SheetSelector<'sheet>>,
         image_selector: impl Into<ImageSelector>,
-    ) -> Result<SheetImageAdjustmentsEdit<'_>, SheetImageAdjustmentsError> {
-        SheetImageAdjustmentsEdit::new(self, sheet_selector, image_selector)
+    ) -> Result<Edit<'_>, Error> {
+        Edit::new(self, sheet_selector, image_selector)
     }
 
     /// Apply an exact-source checked image-adjustment patch.
-    pub fn apply_sheet_image_adjustments(
-        &self,
-        patch: &SheetImageAdjustmentsPatch,
-    ) -> Result<SheetImageAdjustmentsCommit, SheetImageAdjustmentsError> {
+    pub fn apply_sheet_image_adjustments(&self, patch: &Patch) -> Result<Commit, Error> {
         let catalog = physical_catalog(self)?;
         let owner = catalog.__source_owner();
         if !patch.artifacts.authorizes_owner(&owner) {
-            return Err(SheetImageAdjustmentsError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let mut budget = ImageBudget::for_package(self)?;
         budget.source(self.source_bytes().len())?;
@@ -1069,17 +1025,17 @@ impl Package {
             &mut budget,
         )?;
         if !same_selection(&current, &patch.selection) || current.before != patch.before {
-            return Err(SheetImageAdjustmentsError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if patch.is_noop() {
-            return Ok(SheetImageAdjustmentsCommit {
+            return Ok(Commit {
                 package: self.snapshot(),
                 patch: patch.clone(),
-                diagnostics: SheetImageAdjustmentsDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         if !catalog.source_is_exact() {
-            return Err(SheetImageAdjustmentsError::UnsupportedSource);
+            return Err(Error::UnsupportedSource);
         }
         reopen_target_patch(self, patch, &mut budget)
     }
@@ -1091,38 +1047,38 @@ fn select_image_with_budget(
     image_selector: ImageSelector,
     require_editable: bool,
     budget: &mut ImageBudget,
-) -> Result<ImageSelection, SheetImageAdjustmentsError> {
+) -> Result<ImageSelection, Error> {
     let sheet_position = resolve_sheet_position(package, sheet_selector)?;
     let document = Package::root_document(&package.state.components).map_err(map_package_error)?;
     let sheet_reference = document
         .sheet_references()
         .get(sheet_position.get())
-        .ok_or(SheetImageAdjustmentsError::SheetPositionNotFound {
+        .ok_or(Error::SheetPositionNotFound {
             position: sheet_position,
         })?;
     let sheet_identifier = sheet_reference.identifier();
     if sheet_identifier == 0 || sheet_reference.deprecated_is_external() == Some(true) {
-        return Err(SheetImageAdjustmentsError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let resolved_sheet = package
         .state
         .index
         .resolve_ref_id(&package.state.components, sheet_identifier)
         .map_err(map_package_error)?
-        .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let sheet_component = package
         .state
         .components
         .catalog()
         .get_index(resolved_sheet.component_index)
-        .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let sheet_object = sheet_component
         .archive()
         .objects
         .get(resolved_sheet.object_index)
-        .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if sheet_object.archive_info.identifier != Some(sheet_identifier) {
-        return Err(SheetImageAdjustmentsError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     validate_message_metadata(sheet_object, resolved_sheet.messages.len())?;
     let has_sheet = unique_typed_message(sheet_object, SHEET_MESSAGE_TYPE)?.is_some();
@@ -1130,7 +1086,7 @@ fn select_image_with_budget(
         unique_typed_message(sheet_object, FORM_BASED_SHEET_MESSAGE_TYPE)?.is_some();
     let sheet_message_type = sheet_message_type_for(has_sheet, has_form_sheet)?;
     let sheet_payload = unique_typed_message(sheet_object, sheet_message_type)?
-        .ok_or(SheetImageAdjustmentsError::InvalidSource)
+        .ok_or(Error::InvalidSource)
         .map(|(_, message)| message.data.as_slice())?;
     let drawable_identifiers =
         sheet_drawable_identifiers(sheet_message_type, sheet_payload, budget)?;
@@ -1144,27 +1100,27 @@ fn select_image_with_budget(
             .index
             .resolve_ref_id(&package.state.components, drawable_identifier)
             .map_err(map_package_error)?
-            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let component = package
             .state
             .components
             .catalog()
             .get_index(resolved.component_index)
-            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let object = component
             .archive()
             .objects
             .get(resolved.object_index)
-            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if object.archive_info.identifier != Some(drawable_identifier) {
-            return Err(SheetImageAdjustmentsError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let Some((message_index, message)) = unique_typed_message(object, IMAGE_MESSAGE_TYPE)?
         else {
             continue;
         };
         if require_editable && resolved.component_index != resolved_sheet.component_index {
-            return Err(SheetImageAdjustmentsError::UnsupportedDependency);
+            return Err(Error::UnsupportedDependency);
         }
         let info = validate_selected_image_metadata(object, message_index, budget)?;
         let metadata = image_metadata(message.data.as_slice(), budget)?;
@@ -1172,7 +1128,7 @@ fn select_image_with_budget(
             || !image_data_metadata_is_owned(info, metadata.data_identifier)
             || metadata.parent_identifier != sheet_identifier
         {
-            return Err(SheetImageAdjustmentsError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if image_count == requested.get() {
             selected = Some(ImageEntry {
@@ -1182,11 +1138,9 @@ fn select_image_with_budget(
                 message_index,
             });
         }
-        image_count = image_count
-            .checked_add(1)
-            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        image_count = image_count.checked_add(1).ok_or(Error::InvalidSource)?;
     }
-    let entry = selected.ok_or(SheetImageAdjustmentsError::ImagePositionNotFound {
+    let entry = selected.ok_or(Error::ImagePositionNotFound {
         position: requested,
     })?;
     let image_component = package
@@ -1194,16 +1148,16 @@ fn select_image_with_budget(
         .components
         .catalog()
         .get_index(entry.component_index)
-        .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let image_object = image_component
         .archive()
         .objects
         .get(entry.object_index)
-        .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let message = image_object
         .messages
         .get(entry.message_index)
-        .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let before = decode_with_budget(message.data.as_slice(), budget)?;
     ensure_unique_image_owner(package, sheet_identifier, entry.identifier, budget)?;
     Ok(ImageSelection {
@@ -1219,15 +1173,11 @@ fn select_image_with_budget(
     })
 }
 
-fn decode_with_budget(
-    payload: &[u8],
-    budget: &mut ImageBudget,
-) -> Result<ImageAdjustments, SheetImageAdjustmentsError> {
+fn decode_with_budget(payload: &[u8], budget: &mut ImageBudget) -> Result<ImageAdjustments, Error> {
     let options = budget.codec_options(payload)?;
     let (snapshot, report) =
         codec::decode_image_adjustments_with_report(payload, options).map_err(map_codec_error)?;
-    let adjustments = adjustments_from_snapshot(snapshot)
-        .map_err(|_| SheetImageAdjustmentsError::InvalidSource)?;
+    let adjustments = adjustments_from_snapshot(snapshot).map_err(|_| Error::InvalidSource)?;
     budget.codec_report(report)?;
     Ok(adjustments)
 }
@@ -1235,28 +1185,29 @@ fn decode_with_budget(
 fn resolve_sheet_position(
     package: &Package,
     selector: SheetSelector<'_>,
-) -> Result<Position, SheetImageAdjustmentsError> {
+) -> Result<Position, Error> {
     match selector {
         SheetSelector::Name(name) => {
             if name.is_empty() {
-                return Err(SheetImageAdjustmentsError::EmptySheetName);
+                return Err(Error::EmptySheetName);
             }
             let mut matches = package
-                .document()
+                .workbook_ref()
                 .sheets()
                 .iter()
                 .filter(|sheet| sheet.name() == name);
             let Some(sheet) = matches.next() else {
-                return Err(SheetImageAdjustmentsError::SheetNameNotFound);
+                return Err(Error::SheetNameNotFound);
             };
             if matches.next().is_some() {
-                return Err(SheetImageAdjustmentsError::AmbiguousSelector);
+                return Err(Error::AmbiguousSelector);
             }
             Ok(Position::new(sheet.index()))
         },
-        SheetSelector::Index(index) => {
-            if package.document().sheets().get(index).is_none() {
-                return Err(SheetImageAdjustmentsError::SheetPositionNotFound {
+        SheetSelector::Position(index) => {
+            let index = index.get();
+            if package.workbook_ref().sheets().get(index).is_none() {
+                return Err(Error::SheetPositionNotFound {
                     position: Position::new(index),
                 });
             }
@@ -1268,7 +1219,7 @@ fn resolve_sheet_position(
 fn unique_typed_message(
     object: &litchi_iwa_core::ArchiveObject,
     message_type: u32,
-) -> Result<Option<(usize, &RawMessage)>, SheetImageAdjustmentsError> {
+) -> Result<Option<(usize, &RawMessage)>, Error> {
     validate_message_metadata(object, object.messages.len())?;
     let mut selected = None;
     for (index, message) in object.messages.iter().enumerate() {
@@ -1276,18 +1227,15 @@ fn unique_typed_message(
             continue;
         }
         if selected.replace((index, message)).is_some() {
-            return Err(SheetImageAdjustmentsError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(selected)
 }
 
-fn sheet_message_type_for(
-    has_sheet: bool,
-    has_form_sheet: bool,
-) -> Result<u32, SheetImageAdjustmentsError> {
+fn sheet_message_type_for(has_sheet: bool, has_form_sheet: bool) -> Result<u32, Error> {
     if has_sheet == has_form_sheet {
-        return Err(SheetImageAdjustmentsError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(if has_sheet {
         SHEET_MESSAGE_TYPE
@@ -1299,11 +1247,11 @@ fn sheet_message_type_for(
 fn validate_message_metadata(
     object: &litchi_iwa_core::ArchiveObject,
     expected_messages: usize,
-) -> Result<(), SheetImageAdjustmentsError> {
+) -> Result<(), Error> {
     if object.messages.len() != object.archive_info.message_infos.len()
         || object.messages.len() != expected_messages
     {
-        return Err(SheetImageAdjustmentsError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     for (message, info) in object
         .messages
@@ -1313,7 +1261,7 @@ fn validate_message_metadata(
         if message.type_ != info.type_
             || usize::try_from(info.length).ok() != Some(message.data.len())
         {
-            return Err(SheetImageAdjustmentsError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(())
@@ -1323,16 +1271,16 @@ fn validate_selected_image_metadata<'a>(
     object: &'a litchi_iwa_core::ArchiveObject,
     message_index: usize,
     budget: &mut ImageBudget,
-) -> Result<&'a litchi_iwa_core::MessageInfo, SheetImageAdjustmentsError> {
+) -> Result<&'a litchi_iwa_core::MessageInfo, Error> {
     let info = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let message = object
         .messages
         .get(message_index)
-        .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.work(image_metadata_work(info)?)?;
     if info.type_ != message.type_
         || object.archive_info.should_merge == Some(true)
@@ -1342,29 +1290,27 @@ fn validate_selected_image_metadata<'a>(
         || !info.fields_to_remove.is_empty()
         || !info.diff_read_version.is_empty()
     {
-        return Err(SheetImageAdjustmentsError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(info)
 }
 
-fn image_metadata_work(
-    info: &litchi_iwa_core::MessageInfo,
-) -> Result<usize, SheetImageAdjustmentsError> {
+fn image_metadata_work(info: &litchi_iwa_core::MessageInfo) -> Result<usize, Error> {
     let aggregate_data_work = info
         .data_references
         .len()
         .checked_mul(3)
-        .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let field_list_work = info
         .field_infos
         .len()
         .checked_mul(4)
-        .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let aggregate_object_work = info
         .object_references
         .len()
         .checked_mul(2)
-        .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let mut work = 1usize
         // The selected image proof scans aggregate data references once for
         // data ownership and once for the parent/data cross-kind exclusion;
@@ -1378,16 +1324,16 @@ fn image_metadata_work(
         .and_then(|amount| amount.checked_add(aggregate_object_work))
         .and_then(|amount| amount.checked_add(info.diff_merge_version.len()))
         .and_then(|amount| amount.checked_add(info.diff_read_version.len()))
-        .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if let Some(path) = info.diff_field_path.as_ref() {
         work = work
             .checked_add(path.path.len())
-            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     for path in &info.fields_to_remove {
         work = work
             .checked_add(path.path.len())
-            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     for field_info in &info.field_infos {
         let path_work = field_info
@@ -1395,17 +1341,17 @@ fn image_metadata_work(
             .path
             .len()
             .checked_mul(3)
-            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let object_work = field_info
             .object_references
             .len()
             .checked_mul(2)
-            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let data_work = field_info
             .data_references
             .len()
             .checked_mul(3)
-            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         work = work
             // The path is compared by both ownership proofs in addition to
             // this sizing walk.
@@ -1413,11 +1359,11 @@ fn image_metadata_work(
             .and_then(|amount| amount.checked_add(object_work))
             .and_then(|amount| amount.checked_add(data_work))
             .and_then(|amount| amount.checked_add(field_info.known_field_version.len()))
-            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if let Some(identifier) = field_info.known_field_feature_identifier.as_ref() {
             work = work
                 .checked_add(identifier.len())
-                .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
         }
     }
     Ok(work)
@@ -1490,10 +1436,7 @@ fn image_parent_metadata_is_owned(info: &litchi_iwa_core::MessageInfo, identifie
     matches!((aggregate, field_occurrence), (0, 0) | (1, 0 | 1))
 }
 
-fn image_metadata(
-    payload: &[u8],
-    budget: &mut ImageBudget,
-) -> Result<ImageMetadata, SheetImageAdjustmentsError> {
+fn image_metadata(payload: &[u8], budget: &mut ImageBudget) -> Result<ImageMetadata, Error> {
     let fields = WireView::parse_with_limits(payload, budget.residual_wire_limits()?)
         .map_err(map_wire_error)?;
     budget.scan(payload, fields.len(), 1)?;
@@ -1505,7 +1448,7 @@ fn image_metadata(
         match field.number() {
             IMAGE_SUPER_FIELD => {
                 if seen_super || field.wire_type() != 2 {
-                    return Err(SheetImageAdjustmentsError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 field.validate_canonical_framing().map_err(map_wire_error)?;
                 seen_super = true;
@@ -1516,7 +1459,7 @@ fn image_metadata(
                 for inner in nested.fields() {
                     if inner.number() == DRAWABLE_PARENT_FIELD {
                         if parent.is_some() || inner.wire_type() != 2 {
-                            return Err(SheetImageAdjustmentsError::InvalidSource);
+                            return Err(Error::InvalidSource);
                         }
                         inner.validate_canonical_framing().map_err(map_wire_error)?;
                         parent = Some(strict_reference_payload(
@@ -1529,7 +1472,7 @@ fn image_metadata(
             },
             IMAGE_DATA_FIELD => {
                 if seen_data || field.wire_type() != 2 {
-                    return Err(SheetImageAdjustmentsError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 field.validate_canonical_framing().map_err(map_wire_error)?;
                 seen_data = true;
@@ -1544,11 +1487,11 @@ fn image_metadata(
     }
     budget.references(2)?;
     if !seen_super || !seen_data {
-        return Err(SheetImageAdjustmentsError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(ImageMetadata {
-        parent_identifier: parent.ok_or(SheetImageAdjustmentsError::InvalidSource)?,
-        data_identifier: data_identifier.ok_or(SheetImageAdjustmentsError::InvalidSource)?,
+        parent_identifier: parent.ok_or(Error::InvalidSource)?,
+        data_identifier: data_identifier.ok_or(Error::InvalidSource)?,
     })
 }
 
@@ -1556,7 +1499,7 @@ fn strict_reference_payload(
     payload: &[u8],
     budget: &mut ImageBudget,
     kind: ReferenceKind,
-) -> Result<u64, SheetImageAdjustmentsError> {
+) -> Result<u64, Error> {
     let fields = WireView::parse_with_limits(payload, budget.residual_wire_limits()?)
         .map_err(map_wire_error)?;
     budget.scan(payload, fields.len(), 3)?;
@@ -1575,11 +1518,11 @@ fn strict_reference_payload(
                 }
                 field.validate_canonical_key().map_err(map_wire_error)?;
                 if field.wire_type() != 0 || identifier.is_some() {
-                    return Err(SheetImageAdjustmentsError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 let value = canonical_reference_varint(field.payload())?;
                 if value == 0 {
-                    return Err(SheetImageAdjustmentsError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 identifier = Some(value);
             },
@@ -1587,33 +1530,33 @@ fn strict_reference_payload(
                 1 => {
                     field.validate_canonical_key().map_err(map_wire_error)?;
                     if field.wire_type() != 0 || identifier.is_some() {
-                        return Err(SheetImageAdjustmentsError::InvalidSource);
+                        return Err(Error::InvalidSource);
                     }
                     let value = canonical_reference_varint(field.payload())?;
                     if value == 0 {
-                        return Err(SheetImageAdjustmentsError::InvalidSource);
+                        return Err(Error::InvalidSource);
                     }
                     identifier = Some(value);
                 },
                 2 => {
                     field.validate_canonical_key().map_err(map_wire_error)?;
                     if field.wire_type() != 0 || deprecated_type.is_some() {
-                        return Err(SheetImageAdjustmentsError::InvalidSource);
+                        return Err(Error::InvalidSource);
                     }
                     let value = canonical_reference_varint(field.payload())?;
                     if value > u64::from(i32::MAX.unsigned_abs()) && value < MIN_SIGN_EXTENDED_I32 {
-                        return Err(SheetImageAdjustmentsError::InvalidSource);
+                        return Err(Error::InvalidSource);
                     }
                     deprecated_type = Some(value);
                 },
                 3 => {
                     field.validate_canonical_key().map_err(map_wire_error)?;
                     if field.wire_type() != 0 {
-                        return Err(SheetImageAdjustmentsError::InvalidSource);
+                        return Err(Error::InvalidSource);
                     }
                     let value = canonical_reference_varint(field.payload())?;
                     if value > 1 || external.is_some() {
-                        return Err(SheetImageAdjustmentsError::InvalidSource);
+                        return Err(Error::InvalidSource);
                     }
                     external = Some(value != 0);
                 },
@@ -1622,16 +1565,15 @@ fn strict_reference_payload(
         }
     }
     if kind == ReferenceKind::Parent && external == Some(true) {
-        return Err(SheetImageAdjustmentsError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
-    identifier.ok_or(SheetImageAdjustmentsError::InvalidSource)
+    identifier.ok_or(Error::InvalidSource)
 }
 
-fn canonical_reference_varint(payload: &[u8]) -> Result<u64, SheetImageAdjustmentsError> {
-    let (value, width) =
-        decode_varint_from_bytes(payload).map_err(|_| SheetImageAdjustmentsError::InvalidSource)?;
+fn canonical_reference_varint(payload: &[u8]) -> Result<u64, Error> {
+    let (value, width) = decode_varint_from_bytes(payload).map_err(|_| Error::InvalidSource)?;
     if width != payload.len() || width != encoded_len(value) {
-        return Err(SheetImageAdjustmentsError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(value)
 }
@@ -1641,40 +1583,40 @@ fn ensure_unique_image_owner(
     sheet_identifier: u64,
     image_identifier: u64,
     budget: &mut ImageBudget,
-) -> Result<(), SheetImageAdjustmentsError> {
+) -> Result<(), Error> {
     let document = Package::root_document(&package.state.components).map_err(map_package_error)?;
     let mut occurrences = 0usize;
     let mut selected_occurrences = 0usize;
     for reference in document.sheet_references() {
         let identifier = reference.identifier();
         if identifier == 0 || reference.deprecated_is_external() == Some(true) {
-            return Err(SheetImageAdjustmentsError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let resolved = package
             .state
             .index
             .resolve_ref_id(&package.state.components, identifier)
             .map_err(map_package_error)?
-            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let component = package
             .state
             .components
             .catalog()
             .get_index(resolved.component_index)
-            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let object = component
             .archive()
             .objects
             .get(resolved.object_index)
-            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if object.archive_info.identifier != Some(identifier) {
-            return Err(SheetImageAdjustmentsError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let has_sheet = unique_typed_message(object, SHEET_MESSAGE_TYPE)?.is_some();
         let has_form_sheet = unique_typed_message(object, FORM_BASED_SHEET_MESSAGE_TYPE)?.is_some();
         let message_type = sheet_message_type_for(has_sheet, has_form_sheet)?;
         let payload = unique_typed_message(object, message_type)?
-            .ok_or(SheetImageAdjustmentsError::InvalidSource)
+            .ok_or(Error::InvalidSource)
             .map(|(_, message)| message.data.as_slice())?;
         let identifiers = sheet_drawable_identifiers(message_type, payload, budget)?;
         for drawable_identifier in identifiers {
@@ -1686,18 +1628,18 @@ fn ensure_unique_image_owner(
                 .index
                 .resolve_ref_id(&package.state.components, drawable_identifier)
                 .map_err(map_package_error)?
-                .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             let image_component = package
                 .state
                 .components
                 .catalog()
                 .get_index(resolved_image.component_index)
-                .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             let image_object = image_component
                 .archive()
                 .objects
                 .get(resolved_image.object_index)
-                .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             let Some((message_index, image_message)) =
                 unique_typed_message(image_object, IMAGE_MESSAGE_TYPE)?
             else {
@@ -1709,20 +1651,18 @@ fn ensure_unique_image_owner(
                 || !image_data_metadata_is_owned(info, metadata.data_identifier)
                 || metadata.parent_identifier != identifier
             {
-                return Err(SheetImageAdjustmentsError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
-            occurrences = occurrences
-                .checked_add(1)
-                .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+            occurrences = occurrences.checked_add(1).ok_or(Error::InvalidSource)?;
             if identifier == sheet_identifier {
                 selected_occurrences = selected_occurrences
                     .checked_add(1)
-                    .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
             }
         }
     }
     if occurrences != 1 || selected_occurrences != 1 {
-        return Err(SheetImageAdjustmentsError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -1742,7 +1682,7 @@ fn commit_edit(
     source: &Package,
     selection: &ImageSelection,
     after: ImageAdjustments,
-) -> Result<SheetImageAdjustmentsCommit, SheetImageAdjustmentsError> {
+) -> Result<Commit, Error> {
     let catalog = physical_catalog(source)?;
     let source_owner = catalog.__source_owner();
     let mut budget = ImageBudget::for_package(source)?;
@@ -1755,22 +1695,22 @@ fn commit_edit(
         &mut budget,
     )?;
     if !same_selection(&current, selection) || current.before != selection.before {
-        return Err(SheetImageAdjustmentsError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if selection.before == after {
-        return Ok(SheetImageAdjustmentsCommit {
+        return Ok(Commit {
             package: source.snapshot(),
-            patch: SheetImageAdjustmentsPatch {
+            patch: Patch {
                 artifacts: OwnedExactArtifacts::new(source_owner.clone(), source_owner),
                 selection: selection.clone(),
                 before: selection.before,
                 after,
             },
-            diagnostics: SheetImageAdjustmentsDiagnostics::unchanged(),
+            diagnostics: Diagnostics::unchanged(),
         });
     }
     if !catalog.source_is_exact() {
-        return Err(SheetImageAdjustmentsError::UnsupportedSource);
+        return Err(Error::UnsupportedSource);
     }
     let candidate = rewrite_image(source, selection, after, &mut budget)?;
     let target_catalog = physical_catalog(&candidate)?;
@@ -1783,30 +1723,30 @@ fn commit_edit(
         &mut budget,
     )?;
     if !same_selection(&selected, selection) || selected.before != after {
-        return Err(SheetImageAdjustmentsError::Verification);
+        return Err(Error::Verification);
     }
     verify_locality(source, &candidate, selection, &mut budget)?;
-    Ok(SheetImageAdjustmentsCommit {
+    Ok(Commit {
         package: candidate,
-        patch: SheetImageAdjustmentsPatch {
+        patch: Patch {
             artifacts: OwnedExactArtifacts::new(source_owner, target_owner),
             selection: selection.clone(),
             before: selection.before,
             after,
         },
-        diagnostics: SheetImageAdjustmentsDiagnostics::published(),
+        diagnostics: Diagnostics::published(),
     })
 }
 
 fn reopen_target_patch(
     source: &Package,
-    patch: &SheetImageAdjustmentsPatch,
+    patch: &Patch,
     budget: &mut ImageBudget,
-) -> Result<SheetImageAdjustmentsCommit, SheetImageAdjustmentsError> {
+) -> Result<Commit, Error> {
     let target_owner = patch.artifacts.target_owner();
     budget.candidate_reopen(source, target_owner.as_ref().len())?;
     let candidate = Package::from_source_owner_with_options(target_owner, source.state.options)
-        .map_err(|_| SheetImageAdjustmentsError::Verification)?;
+        .map_err(|_| Error::Verification)?;
     let selected = select_image_with_budget(
         &candidate,
         SheetSelector::position(patch.selection.sheet_position),
@@ -1815,13 +1755,13 @@ fn reopen_target_patch(
         budget,
     )?;
     if !same_selection(&selected, &patch.selection) || selected.before != patch.after {
-        return Err(SheetImageAdjustmentsError::Verification);
+        return Err(Error::Verification);
     }
     verify_locality(source, &candidate, &patch.selection, budget)?;
-    Ok(SheetImageAdjustmentsCommit {
+    Ok(Commit {
         package: candidate,
         patch: patch.clone(),
-        diagnostics: SheetImageAdjustmentsDiagnostics::published(),
+        diagnostics: Diagnostics::published(),
     })
 }
 
@@ -1830,24 +1770,24 @@ fn rewrite_image(
     selection: &ImageSelection,
     after: ImageAdjustments,
     budget: &mut ImageBudget,
-) -> Result<Package, SheetImageAdjustmentsError> {
+) -> Result<Package, Error> {
     let catalog = physical_catalog(source)?;
     let entry = catalog
         .package()
         .iter()
         .find(|entry| entry.name() == selection.component_name.as_ref())
-        .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(SheetImageAdjustmentsError::UnsupportedSource);
+        return Err(Error::UnsupportedSource);
     }
     let component = source
         .state
         .components
         .catalog()
         .get_index(selection.component_index)
-        .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if component.name() != selection.component_name.as_ref() {
-        return Err(SheetImageAdjustmentsError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let source_archive = component.archive();
     let archive_limits = source
@@ -1855,30 +1795,30 @@ fn rewrite_image(
         .options
         .archive()
         .effective_archive_limits()
-        .map_err(|_| SheetImageAdjustmentsError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
     let snappy_limits = source
         .state
         .options
         .archive()
         .snappy_limits()
-        .map_err(|_| SheetImageAdjustmentsError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
     let object = source_archive
         .objects
         .get(selection.object_index)
-        .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if object.archive_info.identifier != Some(selection.image_identifier) {
-        return Err(SheetImageAdjustmentsError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
-    let (message_index, message) = unique_typed_message(object, IMAGE_MESSAGE_TYPE)?
-        .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+    let (message_index, message) =
+        unique_typed_message(object, IMAGE_MESSAGE_TYPE)?.ok_or(Error::InvalidSource)?;
     if message_index != selection.message_index {
-        return Err(SheetImageAdjustmentsError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let _ = validate_selected_image_metadata(object, message_index, budget)?;
     let original = message.data.as_slice();
     let before = decode_with_budget(original, budget)?;
     if before != selection.before {
-        return Err(SheetImageAdjustmentsError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let source_encoded_len = source_archive
         .encoded_len_with_limits(archive_limits)
@@ -1898,8 +1838,8 @@ fn rewrite_image(
     let compressed_bound =
         SnappyStream::maximum_compressed_len(encoded_bound).map_err(map_core_error)?;
     if compressed_bound > snappy_limits.max_compressed_stream() {
-        return Err(SheetImageAdjustmentsError::LimitExceeded {
-            kind: SheetImageAdjustmentsLimitKind::WireBytes,
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::WireBytes,
             observed: compressed_bound as u64,
             maximum: snappy_limits.max_compressed_stream() as u64,
         });
@@ -1915,14 +1855,14 @@ fn rewrite_image(
     let total_allocations = clone_allocations
         .checked_add(header_allocations)
         .and_then(|amount| amount.checked_add(serialization_allocations))
-        .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.preflight_allocations(total_allocations)?;
     let temporary_retained = clone_retained
         .checked_add(header_retained)
         .and_then(|amount| amount.checked_add(serialization_retained))
         .and_then(|amount| amount.checked_add(encoded_bound))
         .and_then(|amount| amount.checked_add(compressed_bound))
-        .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.preflight_retained(temporary_retained)?;
     budget.allocations(total_allocations)?;
     budget.retained(clone_retained)?;
@@ -1936,11 +1876,11 @@ fn rewrite_image(
         .into_output();
     let verified = decode_with_budget(&rewritten, budget)?;
     if verified != after {
-        return Err(SheetImageAdjustmentsError::Verification);
+        return Err(Error::Verification);
     }
     archive
         .object_mut(selection.image_identifier)
-        .ok_or(SheetImageAdjustmentsError::InvalidSource)?
+        .ok_or(Error::InvalidSource)?
         .replace_message_preserving_header_with_limits(
             selection.message_index,
             RawMessage {
@@ -1971,7 +1911,7 @@ fn rewrite_image(
         .execute(reassembly_requirements.exact_limits())
         .map_err(map_archive_error)?;
     Package::from_owned_bytes_with_options(output, source.state.options)
-        .map_err(|_| SheetImageAdjustmentsError::Verification)
+        .map_err(|_| Error::Verification)
 }
 
 fn verify_locality(
@@ -1979,11 +1919,11 @@ fn verify_locality(
     candidate: &Package,
     selection: &ImageSelection,
     budget: &mut ImageBudget,
-) -> Result<(), SheetImageAdjustmentsError> {
+) -> Result<(), Error> {
     let source_catalog = physical_catalog(source)?;
     let candidate_catalog = physical_catalog(candidate)?;
     if source_catalog.package().len() != candidate_catalog.package().len() {
-        return Err(SheetImageAdjustmentsError::Verification);
+        return Err(Error::Verification);
     }
     for (source_entry, candidate_entry) in source_catalog
         .package()
@@ -1992,43 +1932,43 @@ fn verify_locality(
     {
         budget.work(source_entry.name().len().saturating_add(1))?;
         if source_entry.name() != candidate_entry.name() {
-            return Err(SheetImageAdjustmentsError::Verification);
+            return Err(Error::Verification);
         }
         if source_entry.name() != selection.component_name.as_ref()
             && source_entry.data() != candidate_entry.data()
         {
-            return Err(SheetImageAdjustmentsError::Verification);
+            return Err(Error::Verification);
         }
     }
     let source_archive = component_archive(source, selection.component_index)?;
     let candidate_archive = component_archive(candidate, selection.component_index)?;
     if source_archive.objects.len() != candidate_archive.objects.len() {
-        return Err(SheetImageAdjustmentsError::Verification);
+        return Err(Error::Verification);
     }
     let archive_limits = source
         .state
         .options
         .archive()
         .effective_archive_limits()
-        .map_err(|_| SheetImageAdjustmentsError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
     for (object_index, source_object) in source_archive.objects.iter().enumerate() {
         budget.work(source_object.messages.len())?;
         let candidate_object = candidate_archive
             .objects
             .get(object_index)
-            .ok_or(SheetImageAdjustmentsError::Verification)?;
+            .ok_or(Error::Verification)?;
         if object_index != selection.object_index {
             if !source_object.same_content_ignoring_offsets(candidate_object) {
-                return Err(SheetImageAdjustmentsError::Verification);
+                return Err(Error::Verification);
             }
             continue;
         }
         let candidate_message = candidate_object
             .messages
             .get(selection.message_index)
-            .ok_or(SheetImageAdjustmentsError::Verification)?;
+            .ok_or(Error::Verification)?;
         if candidate_message.type_ != IMAGE_MESSAGE_TYPE {
-            return Err(SheetImageAdjustmentsError::Verification);
+            return Err(Error::Verification);
         }
         let (clone_allocations, clone_retained) = archive_object_clone_requirements(
             source_object,
@@ -2053,55 +1993,51 @@ fn verify_locality(
         expected.header_length = candidate_object.header_length;
         expected.data_length = candidate_object.data_length;
         if !expected.same_content_ignoring_offsets(candidate_object) {
-            return Err(SheetImageAdjustmentsError::Verification);
+            return Err(Error::Verification);
         }
     }
     Ok(())
 }
 
-fn component_archive(
-    package: &Package,
-    component_index: usize,
-) -> Result<&Archive, SheetImageAdjustmentsError> {
+fn component_archive(package: &Package, component_index: usize) -> Result<&Archive, Error> {
     package
         .state
         .components
         .catalog()
         .get_index(component_index)
         .map(|component| component.archive())
-        .ok_or(SheetImageAdjustmentsError::InvalidSource)
+        .ok_or(Error::InvalidSource)
 }
 
-fn physical_catalog(package: &Package) -> Result<&SourceCatalog, SheetImageAdjustmentsError> {
+fn physical_catalog(package: &Package) -> Result<&SourceCatalog, Error> {
     package
         .state
         .components
         .physical()
-        .ok_or(SheetImageAdjustmentsError::UnsupportedSource)
+        .ok_or(Error::UnsupportedSource)
 }
 
 fn rewritten_archive_bound(
     source_encoded_len: usize,
     original_len: usize,
     replacement_len: usize,
-) -> Result<usize, SheetImageAdjustmentsError> {
+) -> Result<usize, Error> {
     const MAX_REWRITE_FRAMING_GROWTH: usize = 64;
     source_encoded_len
         .checked_sub(original_len)
         .and_then(|value| value.checked_add(replacement_len))
         .and_then(|value| value.checked_add(MAX_REWRITE_FRAMING_GROWTH))
-        .ok_or(SheetImageAdjustmentsError::InvalidSource)
+        .ok_or(Error::InvalidSource)
 }
 
 fn archive_header_rewrite_requirements(
     object: &litchi_iwa_core::ArchiveObject,
-) -> Result<(usize, usize), SheetImageAdjustmentsError> {
-    let header = usize::try_from(object.header_length)
-        .map_err(|_| SheetImageAdjustmentsError::InvalidSource)?;
+) -> Result<(usize, usize), Error> {
+    let header = usize::try_from(object.header_length).map_err(|_| Error::InvalidSource)?;
     let retained = header
         .checked_add(64)
         .and_then(|header| header.checked_mul(3))
-        .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     // The core header-preserving replacement stages canonical, rewritten, and
     // post-mutation header buffers before publishing the object. Reserve that
     // bounded work before cloning the archive so a later allocation failure
@@ -2109,17 +2045,14 @@ fn archive_header_rewrite_requirements(
     Ok((3, retained))
 }
 
-fn archive_serialization_requirements(
-    archive: &Archive,
-) -> Result<(usize, usize), SheetImageAdjustmentsError> {
+fn archive_serialization_requirements(archive: &Archive) -> Result<(usize, usize), Error> {
     let mut retained = 0usize;
     for object in &archive.objects {
-        let header = usize::try_from(object.header_length)
-            .map_err(|_| SheetImageAdjustmentsError::InvalidSource)?;
+        let header = usize::try_from(object.header_length).map_err(|_| Error::InvalidSource)?;
         retained = retained
             .checked_add(header)
             .and_then(|amount| amount.checked_add(64))
-            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     // Archive serialization allocates output and Snappy staging vectors plus
     // one temporary encoded header per object. Snappy's own physical limits
@@ -2129,14 +2062,14 @@ fn archive_serialization_requirements(
         .objects
         .len()
         .checked_add(2)
-        .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     Ok((allocations, retained))
 }
 
 fn archive_clone_requirements(
     archive: &Archive,
     encoded_len: usize,
-) -> Result<(usize, usize), SheetImageAdjustmentsError> {
+) -> Result<(usize, usize), Error> {
     // `encoded_len` covers the source payload and its retained physical
     // framing. The remaining accounting covers every decoded container and
     // metadata vector cloned by the core archive materialization.
@@ -2155,17 +2088,15 @@ fn archive_clone_requirements(
             &mut retained,
         )?;
         if object.header_length != 0 {
-            allocations = allocations
-                .checked_add(2)
-                .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+            allocations = allocations.checked_add(2).ok_or(Error::InvalidSource)?;
             retained = retained
                 .checked_add(
                     usize::try_from(object.header_length)
-                        .map_err(|_| SheetImageAdjustmentsError::InvalidSource)?
+                        .map_err(|_| Error::InvalidSource)?
                         .checked_mul(2)
-                        .ok_or(SheetImageAdjustmentsError::InvalidSource)?,
+                        .ok_or(Error::InvalidSource)?,
                 )
-                .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
         }
         for message in &object.messages {
             add_clone_bytes(message.data.len(), &mut allocations, &mut retained)?;
@@ -2230,20 +2161,18 @@ fn add_clone_vec<T>(
     length: usize,
     allocations: &mut usize,
     retained: &mut usize,
-) -> Result<(), SheetImageAdjustmentsError> {
+) -> Result<(), Error> {
     if length == 0 {
         return Ok(());
     }
-    *allocations = allocations
-        .checked_add(1)
-        .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+    *allocations = allocations.checked_add(1).ok_or(Error::InvalidSource)?;
     *retained = retained
         .checked_add(
             length
                 .checked_mul(size_of::<T>())
-                .ok_or(SheetImageAdjustmentsError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )
-        .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     Ok(())
 }
 
@@ -2251,7 +2180,7 @@ fn add_clone_bytes(
     length: usize,
     allocations: &mut usize,
     retained: &mut usize,
-) -> Result<(), SheetImageAdjustmentsError> {
+) -> Result<(), Error> {
     add_clone_vec::<u8>(length, allocations, retained)
 }
 
@@ -2259,7 +2188,7 @@ fn archive_object_clone_requirements(
     source: &litchi_iwa_core::ArchiveObject,
     candidate: &litchi_iwa_core::ArchiveObject,
     replacement_len: usize,
-) -> Result<(usize, usize), SheetImageAdjustmentsError> {
+) -> Result<(usize, usize), Error> {
     let mut allocations = 0usize;
     let mut retained = size_of::<litchi_iwa_core::ArchiveObject>();
     add_clone_vec::<RawMessage>(source.messages.len(), &mut allocations, &mut retained)?;
@@ -2324,51 +2253,46 @@ fn archive_object_clone_requirements(
         }
     }
     if source.header_length != 0 {
-        allocations = allocations
-            .checked_add(2)
-            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        allocations = allocations.checked_add(2).ok_or(Error::InvalidSource)?;
         retained = retained
             .checked_add(
                 usize::try_from(source.header_length)
-                    .map_err(|_| SheetImageAdjustmentsError::InvalidSource)?
+                    .map_err(|_| Error::InvalidSource)?
                     .checked_mul(2)
-                    .ok_or(SheetImageAdjustmentsError::InvalidSource)?,
+                    .ok_or(Error::InvalidSource)?,
             )
-            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     add_clone_bytes(replacement_len, &mut allocations, &mut retained)?;
-    let source_header = usize::try_from(source.header_length)
-        .map_err(|_| SheetImageAdjustmentsError::InvalidSource)?;
-    let candidate_header = usize::try_from(candidate.header_length)
-        .map_err(|_| SheetImageAdjustmentsError::InvalidSource)?;
+    let source_header = usize::try_from(source.header_length).map_err(|_| Error::InvalidSource)?;
+    let candidate_header =
+        usize::try_from(candidate.header_length).map_err(|_| Error::InvalidSource)?;
     let header_scratch = source_header
         .checked_add(candidate_header)
         .and_then(|bytes| bytes.checked_mul(3))
-        .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
-    allocations = allocations
-        .checked_add(3)
-        .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
+    allocations = allocations.checked_add(3).ok_or(Error::InvalidSource)?;
     retained = retained
         .checked_add(header_scratch)
-        .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     Ok((allocations, retained))
 }
 
 fn package_reopen_requirements(
     package: &Package,
     source_bytes: usize,
-) -> Result<(usize, usize), SheetImageAdjustmentsError> {
+) -> Result<(usize, usize), Error> {
     let archive_limits = package
         .state
         .options
         .archive()
         .effective_archive_limits()
-        .map_err(|_| SheetImageAdjustmentsError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
     let physical = package
         .state
         .components
         .physical()
-        .ok_or(SheetImageAdjustmentsError::UnsupportedSource)?;
+        .ok_or(Error::UnsupportedSource)?;
     let components = package.state.components.catalog();
     let entries = physical.package().iter();
     let mut allocations = 3usize; // SourceCatalog, component storage, and Package state.
@@ -2379,40 +2303,34 @@ fn package_reopen_requirements(
     // component index, and semantic package state around that allocation.
     // Reserve the known entry/component/index storage before parsing it.
     for entry in entries {
-        allocations = allocations
-            .checked_add(1)
-            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        allocations = allocations.checked_add(1).ok_or(Error::InvalidSource)?;
         let entry_slots = 2usize
             .checked_mul(size_of::<usize>())
-            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         retained = retained
             .checked_add(entry.name().len())
             .and_then(|value| value.checked_add(entry_slots))
-            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     if !components.is_empty() {
-        allocations = allocations
-            .checked_add(1)
-            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        allocations = allocations.checked_add(1).ok_or(Error::InvalidSource)?;
         let component_slots = components
             .len()
             .checked_mul(2)
             .and_then(|count| count.checked_mul(size_of::<usize>()))
-            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         retained = retained
             .checked_add(component_slots)
-            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     for component in components.iter() {
-        allocations = allocations
-            .checked_add(1)
-            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        allocations = allocations.checked_add(1).ok_or(Error::InvalidSource)?;
         retained = retained
             .checked_add(component.name().len())
-            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         object_count = object_count
             .checked_add(component.archive().objects.len())
-            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let encoded_len = component
             .archive()
             .encoded_len_with_limits(archive_limits)
@@ -2421,197 +2339,167 @@ fn package_reopen_requirements(
             archive_clone_requirements(component.archive(), encoded_len)?;
         allocations = allocations
             .checked_add(archive_allocations)
-            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         retained = retained
             .checked_add(archive_retained)
-            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     if object_count != 0 {
-        allocations = allocations
-            .checked_add(1)
-            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        allocations = allocations.checked_add(1).ok_or(Error::InvalidSource)?;
         retained = retained
             .checked_add(
                 object_count
                     .checked_mul(size_of::<(u64, usize, usize)>())
-                    .ok_or(SheetImageAdjustmentsError::InvalidSource)?,
+                    .ok_or(Error::InvalidSource)?,
             )
-            .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     // Reassembly output is converted into the package's shared source owner;
     // keep a second immutable allocation covered until the temporary Vec is
     // released by the caller.
-    allocations = allocations
-        .checked_add(1)
-        .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+    allocations = allocations.checked_add(1).ok_or(Error::InvalidSource)?;
     retained = retained
         .checked_add(source_bytes)
-        .ok_or(SheetImageAdjustmentsError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     Ok((allocations, retained))
 }
 
-fn map_package_error(error: PackageError) -> SheetImageAdjustmentsError {
+fn map_package_error(error: PackageError) -> Error {
     match error {
         PackageError::SemanticLimit {
             kind,
             observed,
             maximum,
             ..
-        } => SheetImageAdjustmentsError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: match kind {
-                SemanticLimitKind::References => SheetImageAdjustmentsLimitKind::References,
-                _ => SheetImageAdjustmentsLimitKind::WireWork,
+                SemanticLimitKind::References => LimitKind::References,
+                _ => LimitKind::WireWork,
             },
             observed: observed as u64,
             maximum: maximum as u64,
         },
         PackageError::Common(error) => map_common_error(error),
-        _ => SheetImageAdjustmentsError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_names_error(error: super::names::Error) -> SheetImageAdjustmentsError {
+fn map_names_error(error: super::names::Error) -> Error {
     match error {
         super::names::Error::LimitExceeded {
             kind,
             observed,
             maximum,
-        } => SheetImageAdjustmentsError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: match kind {
-                super::names::LimitKind::PayloadReferences => {
-                    SheetImageAdjustmentsLimitKind::References
-                },
+                super::names::LimitKind::PayloadReferences => LimitKind::References,
                 super::names::LimitKind::WireBytes
                 | super::names::LimitKind::PayloadBytes
-                | super::names::LimitKind::TotalPayloadBytes => {
-                    SheetImageAdjustmentsLimitKind::WireBytes
-                },
+                | super::names::LimitKind::TotalPayloadBytes => LimitKind::WireBytes,
                 super::names::LimitKind::WireFields
                 | super::names::LimitKind::PayloadItems
                 | super::names::LimitKind::PayloadMessages
-                | super::names::LimitKind::PayloadObjects => {
-                    SheetImageAdjustmentsLimitKind::WireFields
-                },
-                super::names::LimitKind::WireNesting => SheetImageAdjustmentsLimitKind::WireNesting,
-                _ => SheetImageAdjustmentsLimitKind::WireWork,
+                | super::names::LimitKind::PayloadObjects => LimitKind::WireFields,
+                super::names::LimitKind::WireNesting => LimitKind::WireNesting,
+                _ => LimitKind::WireWork,
             },
             observed,
             maximum,
         },
-        super::names::Error::Allocation { amount } => {
-            SheetImageAdjustmentsError::Allocation { amount }
-        },
-        _ => SheetImageAdjustmentsError::InvalidSource,
+        super::names::Error::Allocation { amount } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_common_error(error: litchi_iwa_common::Error) -> SheetImageAdjustmentsError {
+fn map_common_error(error: litchi_iwa_common::Error) -> Error {
     match error {
         litchi_iwa_common::Error::LimitExceeded {
             kind,
             observed,
             limit,
-        } => SheetImageAdjustmentsError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: match kind {
-                litchi_iwa_common::LimitKind::InputBytes => {
-                    SheetImageAdjustmentsLimitKind::WireBytes
-                },
-                litchi_iwa_common::LimitKind::Fields => SheetImageAdjustmentsLimitKind::WireFields,
-                litchi_iwa_common::LimitKind::OutputBytes => {
-                    SheetImageAdjustmentsLimitKind::OutputBytes
-                },
-                litchi_iwa_common::LimitKind::Nesting => {
-                    SheetImageAdjustmentsLimitKind::WireNesting
-                },
+                litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
+                litchi_iwa_common::LimitKind::Fields => LimitKind::WireFields,
+                litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_common::LimitKind::Nesting => LimitKind::WireNesting,
                 litchi_iwa_common::LimitKind::RewriteWork
                 | litchi_iwa_common::LimitKind::TableRows
                 | litchi_iwa_common::LimitKind::TableColumns
                 | litchi_iwa_common::LimitKind::TableCells
-                | litchi_iwa_common::LimitKind::MaterializedCells => {
-                    SheetImageAdjustmentsLimitKind::WireWork
-                },
+                | litchi_iwa_common::LimitKind::MaterializedCells => LimitKind::WireWork,
             },
             observed: observed as u64,
             maximum: limit as u64,
         },
-        litchi_iwa_common::Error::Allocation { amount, .. } => {
-            SheetImageAdjustmentsError::Allocation { amount }
-        },
-        _ => SheetImageAdjustmentsError::InvalidSource,
+        litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_codec_error(error: codec::DecodeError) -> SheetImageAdjustmentsError {
+fn map_codec_error(error: codec::DecodeError) -> Error {
     if let Some(limit) = error.limit_kind() {
         let (observed, maximum) = error.limit_values().unwrap_or((0, 0));
         let kind = match limit {
-            codec::DecodeLimit::InputBytes => SheetImageAdjustmentsLimitKind::WireBytes,
+            codec::DecodeLimit::InputBytes => LimitKind::WireBytes,
             codec::DecodeLimit::OutputBytes | codec::DecodeLimit::Retained => {
-                SheetImageAdjustmentsLimitKind::OutputBytes
+                LimitKind::OutputBytes
             },
-            codec::DecodeLimit::Fields => SheetImageAdjustmentsLimitKind::WireFields,
-            codec::DecodeLimit::Nesting => SheetImageAdjustmentsLimitKind::WireNesting,
+            codec::DecodeLimit::Fields => LimitKind::WireFields,
+            codec::DecodeLimit::Nesting => LimitKind::WireNesting,
             codec::DecodeLimit::Work
             | codec::DecodeLimit::Allocations
-            | codec::DecodeLimit::Scratch => SheetImageAdjustmentsLimitKind::WireWork,
-            _ => SheetImageAdjustmentsLimitKind::WireWork,
+            | codec::DecodeLimit::Scratch => LimitKind::WireWork,
+            _ => LimitKind::WireWork,
         };
-        return SheetImageAdjustmentsError::LimitExceeded {
+        return Error::LimitExceeded {
             kind,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
-    SheetImageAdjustmentsError::InvalidSource
+    Error::InvalidSource
 }
 
-fn map_wire_error(error: litchi_iwa_common::Error) -> SheetImageAdjustmentsError {
+fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
     map_common_error(error)
 }
 
-fn map_archive_error(error: litchi_iwa_archive::Error) -> SheetImageAdjustmentsError {
+fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     match error {
         litchi_iwa_archive::Error::Limit {
             observed,
             maximum,
             kind,
-        } => SheetImageAdjustmentsError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: match kind {
                 litchi_iwa_archive::LimitKind::InputBytes
                 | litchi_iwa_archive::LimitKind::CompressedEntryBytes
                 | litchi_iwa_archive::LimitKind::EntryBytes
                 | litchi_iwa_archive::LimitKind::TotalBytes
                 | litchi_iwa_archive::LimitKind::IwaStreamBytes
-                | litchi_iwa_archive::LimitKind::IwaTotalBytes => {
-                    SheetImageAdjustmentsLimitKind::WireBytes
-                },
+                | litchi_iwa_archive::LimitKind::IwaTotalBytes => LimitKind::WireBytes,
                 litchi_iwa_archive::LimitKind::Entries
                 | litchi_iwa_archive::LimitKind::MemberNameBytes
-                | litchi_iwa_archive::LimitKind::MetadataBytes => {
-                    SheetImageAdjustmentsLimitKind::WireFields
-                },
-                litchi_iwa_archive::LimitKind::OutputBytes => {
-                    SheetImageAdjustmentsLimitKind::OutputBytes
-                },
+                | litchi_iwa_archive::LimitKind::MetadataBytes => LimitKind::WireFields,
+                litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
             },
             observed,
             maximum,
         },
         litchi_iwa_archive::Error::Iwa(error) => map_core_error(error),
-        litchi_iwa_archive::Error::Allocation { amount, .. } => {
-            SheetImageAdjustmentsError::Allocation { amount }
-        },
-        _ => SheetImageAdjustmentsError::InvalidSource,
+        litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_core_error(error: litchi_iwa_core::Error) -> SheetImageAdjustmentsError {
+fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => SheetImageAdjustmentsError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: match kind {
                 litchi_iwa_core::LimitKind::ArchiveBytes
                 | litchi_iwa_core::LimitKind::ObjectBytes
@@ -2622,27 +2510,21 @@ fn map_core_error(error: litchi_iwa_core::Error) -> SheetImageAdjustmentsError {
                 | litchi_iwa_core::LimitKind::SnappyStreamBytes
                 | litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
                 | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes
-                | litchi_iwa_core::LimitKind::SnappyFrames => {
-                    SheetImageAdjustmentsLimitKind::WireBytes
-                },
+                | litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::WireBytes,
                 litchi_iwa_core::LimitKind::Objects
                 | litchi_iwa_core::LimitKind::Messages
                 | litchi_iwa_core::LimitKind::MessagesPerObject
                 | litchi_iwa_core::LimitKind::HeaderFields
-                | litchi_iwa_core::LimitKind::MetadataItems => {
-                    SheetImageAdjustmentsLimitKind::WireFields
-                },
-                litchi_iwa_core::LimitKind::HeaderNesting => {
-                    SheetImageAdjustmentsLimitKind::WireNesting
-                },
+                | litchi_iwa_core::LimitKind::MetadataItems => LimitKind::WireFields,
+                litchi_iwa_core::LimitKind::HeaderNesting => LimitKind::WireNesting,
             },
             observed: observed as u64,
             maximum: maximum as u64,
         },
         litchi_iwa_core::Error::Allocation { requested, .. } => {
-            SheetImageAdjustmentsError::Allocation { amount: requested }
+            Error::Allocation { amount: requested }
         },
-        _ => SheetImageAdjustmentsError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -2737,10 +2619,9 @@ mod graph_tests {
     use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, MessageInfo, RawMessage};
 
     use super::{
-        ImageAdjustment, ImageAdjustments, ImageBudget, SheetImageAdjustmentsError, codec,
-        image_data_metadata_is_owned, image_metadata, image_parent_metadata_is_owned,
-        sheet_drawable_identifiers, sheet_message_type_for, validate_selected_image_metadata,
-        write_from_adjustments,
+        Error, ImageAdjustment, ImageAdjustments, ImageBudget, codec, image_data_metadata_is_owned,
+        image_metadata, image_parent_metadata_is_owned, sheet_drawable_identifiers,
+        sheet_message_type_for, validate_selected_image_metadata, write_from_adjustments,
     };
 
     fn test_budget() -> ImageBudget {
@@ -2986,7 +2867,7 @@ mod graph_tests {
             let mut budget = test_budget();
             assert!(matches!(
                 validate_selected_image_metadata(&object, 0, &mut budget),
-                Err(SheetImageAdjustmentsError::InvalidSource)
+                Err(Error::InvalidSource)
             ));
             assert_eq!(object, before);
         }
@@ -2998,11 +2879,11 @@ mod graph_tests {
         assert_eq!(sheet_message_type_for(false, true).unwrap(), 3);
         assert!(matches!(
             sheet_message_type_for(true, true),
-            Err(SheetImageAdjustmentsError::InvalidSource)
+            Err(Error::InvalidSource)
         ));
         assert!(matches!(
             sheet_message_type_for(false, false),
-            Err(SheetImageAdjustmentsError::InvalidSource)
+            Err(Error::InvalidSource)
         ));
     }
 
@@ -3025,8 +2906,8 @@ mod graph_tests {
         tight.max_input = source.len();
         assert!(matches!(
             sheet_drawable_identifiers(2, &source, &mut tight),
-            Err(SheetImageAdjustmentsError::LimitExceeded {
-                kind: super::SheetImageAdjustmentsLimitKind::WireBytes,
+            Err(Error::LimitExceeded {
+                kind: super::LimitKind::WireBytes,
                 ..
             })
         ));

@@ -557,28 +557,23 @@ pub mod keynote {
 pub mod numbers {
     // Keep the format facade explicit: a leaf-package glob would silently
     // publish any future package, generated, or physical helper module.
-    // Package operations remain available by their established names, while
-    // the archive-free reader surface below is deliberately allowlisted.
+    // The package owner, its read-only `Workbook` projection, the ingress
+    // profiles and the focused transaction modules keep their ADR 0034
+    // names (record 0297).
     pub use litchi_numbers::{
-        AddressError, Cell, CellPosition, CellRange, ColumnDeletion, CoordinateError,
-        DEFAULT_MAX_TEXT_BYTES, Dimension, Dimensions, Document, DocumentError, DocumentLimitKind,
-        DocumentLimits, DocumentLimitsError, DocumentReadError, DocumentReadLimitKind,
-        DocumentReadOptions, DocumentResult, DocumentSourceLimitKind, DocumentSourceLimits,
-        DocumentSourceLimitsError, DocumentStats, Grid, GridBudget, InsertError, InsertResult,
-        IoKind, MAX_MATERIALIZED_CELLS, MAX_OBJECTS, MAX_REFERENCES, MAX_SHEETS, MAX_TABLES,
-        MergeReader, Package, PackageError, PackageLimits, PackagePayloadLimitKind,
-        PackageReadOptions, PackageResourceError, PackageResult, PackageSemanticLimits,
-        PackageSemanticLimitsError, PackageSemanticPath, Points, Position, Range, RowDeletion,
-        SemanticLimitKind, Sheet, SheetBuilder, SheetSelector, Size, Table, TableBuilder,
-        TableCellComment, TableCellCommentCommit, TableCellCommentDiagnostics,
-        TableCellCommentEdit, TableCellCommentError, TableCellCommentLimitKind,
-        TableCellCommentPatch, TableCellCommentPath, TableError, TableLockCommit,
-        TableLockDiagnostics, TableLockEdit, TableLockError, TableLockLimitKind, TableLockPatch,
-        TableMergesCommit, TableMergesDiagnostics, TableMergesEdit, TableMergesError,
-        TableMergesLimitKind, TableMergesPatch, TableSelector, TableSelectorError, View,
-        WriteError, compatibility_tables_from_bytes, compatibility_tables_from_bytes_with_options,
+        AddressError, Builder, Cell, CellPosition, CellRange, ColumnDeletion, CoordinateError,
+        Dimension, Dimensions, Error, Grid, GridBudget, Identity, InsertError, InsertResult,
+        LimitKind, MAX_MATERIALIZED_CELLS, MAX_OBJECTS, MAX_REFERENCES, MAX_SHEETS, MAX_TABLES,
+        MAX_TEXT_BYTES, MergeReader, OpenOptions, Package, PayloadLimitKind, Points, Position,
+        Range, ResourceError, Result, RowDeletion, SemanticLimitKind, SemanticLimits,
+        SemanticLimitsBuilder, SemanticPath, Sheet, SheetBuilder, SheetSelector, Size,
+        SourceLimitKind, SourceLimits, SourceLimitsBuilder, Table, TableBuilder, TableError,
+        TableSelector, TableSelectorError, View, Workbook, WriteError,
+        compatibility_tables_from_bytes, compatibility_tables_from_bytes_with_options,
     };
-    pub use litchi_numbers::{cell, document, formula, names, package, selector, sheet, table};
+    pub use litchi_numbers::{
+        cell, create, formula, limits, names, package, selector, sheet, table, workbook,
+    };
 
     /// Archive-free, immutable Numbers values.
     ///
@@ -604,7 +599,7 @@ pub mod numbers {
         /// handles remain in the focused package API.
         pub mod formula {
             pub use litchi_numbers::formula::{
-                AxisReference, BinaryOperator, CachedValue, CellReference, Error as FormulaError,
+                AxisReference, BinaryOperator, CachedValue, CellReference, Error,
             };
         }
 
@@ -623,33 +618,31 @@ pub mod numbers {
             }
         }
 
+        pub use litchi_numbers::workbook::{Error, ReadError, ReadLimitKind, Result, Stats};
         pub use litchi_numbers::{
-            Document, DocumentError as Error, DocumentLimitKind as LimitKind,
-            DocumentLimits as Limits, DocumentLimitsError as LimitsError, DocumentReadError,
-            DocumentReadLimitKind as ReadLimitKind, DocumentReadOptions, DocumentResult as Result,
-            DocumentSourceLimitKind, DocumentSourceLimits, DocumentSourceLimitsError,
-            DocumentStats, Sheet, SheetSelector, Table, TableSelector, TableSelectorError,
+            OpenOptions, SemanticLimitKind, SemanticLimits, Sheet, SheetSelector, SourceLimitKind,
+            SourceLimits, Table, TableSelector, TableSelectorError, Workbook,
         };
 
         /// Result returned by the archive-free Numbers source readers.
         ///
-        /// This is separate from [`Result`], which is the semantic document
+        /// This is separate from [`Result`], which is the semantic workbook
         /// construction result. The source reader's typed error retains
         /// format routing and bounded-ingress diagnostics.
-        pub type ReadResult<T> = std::result::Result<T, DocumentReadError>;
+        pub type ReadResult<T> = std::result::Result<T, ReadError>;
 
         /// Read one immutable Numbers snapshot from a complete package or
         /// app-authored package directory.
-        pub fn open(path: impl AsRef<std::path::Path>) -> ReadResult<Document> {
-            Document::open(path)
+        pub fn open(path: impl AsRef<std::path::Path>) -> ReadResult<Workbook> {
+            Workbook::open(path)
         }
 
         /// Read one immutable Numbers snapshot from package bytes.
         ///
         /// The Numbers owner performs family detection and semantic
         /// projection, so callers never need native identifiers or wire data.
-        pub fn from_bytes(bytes: &[u8]) -> ReadResult<Document> {
-            Document::from_bytes(bytes)
+        pub fn from_bytes(bytes: &[u8]) -> ReadResult<Workbook> {
+            Workbook::from_bytes(bytes)
         }
     }
 }

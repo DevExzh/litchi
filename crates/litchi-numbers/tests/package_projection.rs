@@ -10,11 +10,8 @@ use std::error::Error as StdError;
 use litchi_iwa_archive::Limits as ArchiveLimits;
 use litchi_iwa_common::wire::{append_length_delimited_field, append_varint_field};
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
-use litchi_iwa_protos::{tn, tsa, tsk, tsp, tswp};
-use litchi_numbers::{
-    MAX_MATERIALIZED_CELLS, Package, PackageError, PackageLimits, PackageReadOptions,
-    PackageSemanticLimits, PackageSemanticPath, SemanticLimitKind,
-};
+use litchi_iwa_protos::{tn, tsa, tsk, tsp};
+use litchi_numbers::{Error as PackageError, Package, SemanticPath as PackageSemanticPath};
 use prost::Message as _;
 
 const DOCUMENT_MESSAGE_TYPE: u32 = 1;
@@ -103,67 +100,6 @@ fn form_sheet_projection_matches_standard_sheet_semantics_and_ignores_unknowns()
 }
 
 #[test]
-#[allow(deprecated)]
-fn package_text_preserves_storage_fragment_boundaries_and_skips_malformed_storage() -> TestResult {
-    let root = numbers_root([]).encode_to_vec();
-    let first = tswp::StorageArchive {
-        text: vec!["first fragment".to_owned(), "second fragment".to_owned()],
-        ..Default::default()
-    };
-    let empty = tswp::StorageArchive::default();
-    let second = tswp::StorageArchive {
-        text: vec!["last fragment".to_owned()],
-        ..Default::default()
-    };
-    let bytes = package_bytes(vec![
-        object(1, DOCUMENT_MESSAGE_TYPE, root)?,
-        object(2, 200, first.encode_to_vec())?,
-        // A malformed compatibility storage is intentionally ignorable.
-        object(3, 200, vec![0xff])?,
-        object(4, 200, empty.encode_to_vec())?,
-        object(5, 201, second.encode_to_vec())?,
-    ])?;
-
-    let package = Package::from_bytes(&bytes)?;
-    assert_eq!(
-        package.text()?,
-        "first fragment\nsecond fragment\nlast fragment"
-    );
-    Ok(())
-}
-
-#[test]
-#[allow(deprecated)]
-fn package_text_enforces_the_selected_aggregate_output_budget() -> TestResult {
-    let root = numbers_root([]).encode_to_vec();
-    let storage = tswp::StorageArchive {
-        text: vec!["12345".to_owned(), "67890".to_owned()],
-        ..Default::default()
-    };
-    let bytes = package_bytes(vec![
-        object(1, DOCUMENT_MESSAGE_TYPE, root)?,
-        object(2, 200, storage.encode_to_vec())?,
-    ])?;
-    let semantic = PackageSemanticLimits::default()
-        .with_projection_limits(MAX_MATERIALIZED_CELLS, "12345\n67890".len() - 1)?;
-    let package = Package::from_bytes_with_options(
-        &bytes,
-        PackageReadOptions::new(PackageLimits::default(), semantic),
-    )?;
-
-    assert!(matches!(
-        package.text(),
-        Err(PackageError::SemanticLimit {
-            kind: SemanticLimitKind::OutputTextBytes,
-            observed: 11,
-            maximum: 10,
-            path: PackageSemanticPath::Package,
-        })
-    ));
-    Ok(())
-}
-
-#[test]
 fn malformed_form_sheet_payload_does_not_publish_a_partial_document() -> TestResult {
     let bytes = package_bytes(vec![
         object(1, DOCUMENT_MESSAGE_TYPE, numbers_root([2]).encode_to_vec())?,
@@ -231,6 +167,5 @@ fn length_delimited_wire_fields_are_not_accidentally_treated_as_scalars() -> Tes
         root,
     )?])?)?;
     assert!(package.sheets().is_empty());
-    assert_eq!(package.text()?, "");
     Ok(())
 }

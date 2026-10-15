@@ -186,7 +186,7 @@ pub(super) fn rewrite(
     )?;
     budget.charge_transaction_work(target_reopen.work)?;
     budget.charge_references(target_reopen.references)?;
-    let candidate = Package::from_shared_bytes_with_options(output.into(), source.state.options)
+    let candidate = Package::from_shared_profile(output.into(), source.state.options)
         .map_err(map_candidate_read_error)?;
     let candidate_target = resolve_native_target(&candidate, budget)?;
     if candidate_target.prepared() != target.prepared()
@@ -1258,7 +1258,7 @@ mod tests {
         assert_eq!(
             commit
                 .package()
-                .document()
+                .workbook_ref()
                 .sheets()
                 .iter()
                 .map(crate::sheet::Sheet::name)
@@ -1288,7 +1288,7 @@ mod tests {
         assert_eq!(
             reverse
                 .package()
-                .document()
+                .workbook_ref()
                 .sheets()
                 .iter()
                 .map(crate::sheet::Sheet::name)

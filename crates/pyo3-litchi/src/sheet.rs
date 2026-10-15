@@ -20,7 +20,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
 /// Numbers document, which `litchi::File` opens without a family view.
 enum Source {
     File(litchi::File),
-    Numbers(litchi::numbers::semantic::Document),
+    Numbers(litchi::numbers::semantic::Workbook),
 }
 
 /// Excel workbook interface

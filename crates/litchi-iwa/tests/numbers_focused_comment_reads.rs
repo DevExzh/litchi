@@ -14,16 +14,15 @@ use litchi_iwa_archive::{
     package::{Catalog, EntryEdit},
 };
 use litchi_iwa_protos::{tsd, tsk, tsp, tst};
-use litchi_numbers::{
-    CellPosition, Package, PackageLimits, PackageReadOptions, PackageSemanticLimits, SheetSelector,
-    TableCellCommentError, TableCellCommentLimitKind, TableSelector,
-};
+use litchi_numbers::{CellPosition, Package, SheetSelector, TableSelector};
 use litchi_numbers_wire::BncCell;
 use prost::Message as _;
 
 #[path = "../../litchi-numbers/tests/support/numbers_comment_fixture.rs"]
 mod fixture;
 use fixture::{Corruption, FixtureMode};
+use litchi_numbers::cell::comment::Error as TableCellCommentError;
+use litchi_numbers::cell::comment::LimitKind as TableCellCommentLimitKind;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
@@ -374,34 +373,34 @@ fn assert_metadata(comment: &impl CommentMetadata, expected: &WireComment) {
 
 trait CommentMetadata {
     fn text(&self) -> &str;
-    fn timestamp(&self) -> Option<litchi_numbers::package::comments::CommentTimestamp>;
-    fn author(&self) -> Option<&litchi_numbers::package::comments::CommentAuthor>;
+    fn timestamp(&self) -> Option<litchi_numbers::cell::comment::CommentTimestamp>;
+    fn author(&self) -> Option<&litchi_numbers::cell::comment::CommentAuthor>;
 }
 
-impl CommentMetadata for litchi_numbers::TableCellComment {
+impl CommentMetadata for litchi_numbers::cell::comment::Comment {
     fn text(&self) -> &str {
         self.text()
     }
 
-    fn timestamp(&self) -> Option<litchi_numbers::package::comments::CommentTimestamp> {
+    fn timestamp(&self) -> Option<litchi_numbers::cell::comment::CommentTimestamp> {
         self.timestamp()
     }
 
-    fn author(&self) -> Option<&litchi_numbers::package::comments::CommentAuthor> {
+    fn author(&self) -> Option<&litchi_numbers::cell::comment::CommentAuthor> {
         self.author()
     }
 }
 
-impl CommentMetadata for litchi_numbers::TableCellCommentReply {
+impl CommentMetadata for litchi_numbers::cell::comment::CommentReply {
     fn text(&self) -> &str {
         self.text()
     }
 
-    fn timestamp(&self) -> Option<litchi_numbers::package::comments::CommentTimestamp> {
+    fn timestamp(&self) -> Option<litchi_numbers::cell::comment::CommentTimestamp> {
         self.timestamp()
     }
 
-    fn author(&self) -> Option<&litchi_numbers::package::comments::CommentAuthor> {
+    fn author(&self) -> Option<&litchi_numbers::cell::comment::CommentAuthor> {
         self.author()
     }
 }
@@ -881,11 +880,14 @@ fn focused_comment_metadata_budget_counts_author_and_text_together() -> TestResu
         "fixture no longer exercises aggregate output"
     );
 
-    let semantic = PackageSemanticLimits::default()
-        .with_projection_limits(PackageSemanticLimits::MAX_MATERIALIZED_CELLS, 64)?;
+    let semantic = litchi_numbers::SemanticLimits::DEFAULT
+        .to_builder()
+        .max_materialized_cells(litchi_numbers::SemanticLimits::MAXIMUM.max_materialized_cells())
+        .and_then(|b| b.max_output_text_bytes(64))
+        .and_then(|b| b.build())?;
     let package = Package::from_bytes_with_options(
         &source,
-        PackageReadOptions::new(PackageLimits::default(), semantic),
+        litchi_numbers::OpenOptions::new().semantic_limits(semantic),
     )?;
     assert!(matches!(
         package.table_cell_comment_replies_a1(fixture::SHEET_NAME, fixture::TABLE_NAME, "A1"),
@@ -906,11 +908,14 @@ fn focused_comment_metadata_ignores_repeated_public_ids_when_bounded() -> TestRe
             .map(|index| format!("ignored-public-id-{index}-{}", "x".repeat(128)))
             .collect();
     })?;
-    let semantic = PackageSemanticLimits::default()
-        .with_projection_limits(PackageSemanticLimits::MAX_MATERIALIZED_CELLS, 64)?;
+    let semantic = litchi_numbers::SemanticLimits::DEFAULT
+        .to_builder()
+        .max_materialized_cells(litchi_numbers::SemanticLimits::MAXIMUM.max_materialized_cells())
+        .and_then(|b| b.max_output_text_bytes(64))
+        .and_then(|b| b.build())?;
     let package = Package::from_bytes_with_options(
         &source,
-        PackageReadOptions::new(PackageLimits::default(), semantic),
+        litchi_numbers::OpenOptions::new().semantic_limits(semantic),
     )?;
     let comment = package
         .table_cell_comment_a1(fixture::SHEET_NAME, fixture::TABLE_NAME, "A1")?

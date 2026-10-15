@@ -2218,7 +2218,7 @@ IWA_IMAGE_ADJUSTMENTS_OWNER_PACKAGE_SOURCES = {
 IWA_IMAGE_ADJUSTMENTS_OWNER_EXPORT_SOURCES = {
     "Keynote": Path("crates/litchi-keynote/src/lib.rs"),
     "Pages": Path("crates/litchi-pages/src/lib.rs"),
-    "Numbers": Path("crates/litchi-numbers/src/lib.rs"),
+    "Numbers": Path("crates/litchi-numbers/src/shape/image.rs"),
 }
 IWA_IMAGE_ADJUSTMENTS_OWNER_MODULES = {
     # All three packages expose selector-first semantic image APIs by default.
@@ -2288,12 +2288,13 @@ IWA_IMAGE_ADJUSTMENTS_SEMANTIC_TYPES = {
         "BodyImageAdjustmentsPatch",
         "BodyImageAdjustmentsDiagnostics",
     ),
+    # ADR 0034 W1 (record 0297): short names in `shape::image::adjustments`.
     "Numbers": (
-        "SheetImageAdjustmentsError",
-        "SheetImageAdjustmentsEdit",
-        "SheetImageAdjustmentsCommit",
-        "SheetImageAdjustmentsPatch",
-        "SheetImageAdjustmentsDiagnostics",
+        "Error",
+        "Edit",
+        "Commit",
+        "Patch",
+        "Diagnostics",
     ),
 }
 IWA_IMAGE_ADJUSTMENTS_HIDDEN_ERROR = "ImageAdjustmentsError"
@@ -8403,7 +8404,7 @@ NUMBERS_TABLE_APPEARANCE_SHARED_SOURCE_SEAM_DECLARATION = re.compile(
 NUMBERS_TABLE_APPEARANCE_SHARED_SOURCE_SEAM_SIGNATURE = re.compile(
     rf"(?ms)\bpub\s+fn\s+{re.escape(NUMBERS_TABLE_APPEARANCE_SHARED_SOURCE_SEAM)}"
     r"\s*\([^{{}};]*\bArc\s*<\s*\[\s*u8\s*\]\s*>"
-    r"[^{{}};]*\bReadOptions\b"
+    r"[^{{}};]*\bOpenOptions\b"
 )
 NUMBERS_TABLE_APPEARANCE_SHARED_SOURCE_SEAM_CALL = re.compile(
     rf"\b(?:[A-Za-z_][A-Za-z0-9_]*\s*::\s*)*Package\s*::\s*"
@@ -12111,7 +12112,7 @@ NUMBERS_TABLE_DIMENSION_TRANSACTION_TYPES = (
     "Diagnostics",
     "Path",
     "LimitKind",
-    "TransactionError",
+    "Error",
 )
 NUMBERS_TABLE_DIMENSION_TRANSACTION_TYPE_SET = frozenset(
     NUMBERS_TABLE_DIMENSION_TRANSACTION_TYPES
@@ -12866,10 +12867,9 @@ NUMBERS_TABLE_CELL_COMMENT_REPLY_PUBLIC_LEAK_PREFIXES = (
 NUMBERS_TABLE_CELL_COMMENT_REPLY_METADATA_TYPES = frozenset(
     {"CommentAuthor", "CommentTimestamp"}
 )
-NUMBERS_TABLE_CELL_COMMENT_REPLY_METADATA_ROOT_ALIASES = {
-    "CommentAuthor": "TableCellCommentAuthor",
-    "CommentTimestamp": "TableCellCommentTimestamp",
-}
+# ADR 0034 W1 (record 0297): no prefixed root aliases; the values are
+# published by `litchi_numbers::cell::comment`.
+NUMBERS_TABLE_CELL_COMMENT_REPLY_METADATA_ROOT_ALIASES: dict[str, str] = {}
 NUMBERS_TABLE_CELL_COMMENT_REPLY_METADATA_ALLOWED_IDENTIFIERS = frozenset(
     {"public_id"}
 )
@@ -12954,15 +12954,18 @@ NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_FUZZ_SOURCE = Path(
 NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_FUZZ_CORPUS = Path(
     "crates/litchi/fuzz/corpus/numbers_table_cell_comment_reply"
 )
+# ADR 0034 W1 (record 0297): the reply family keeps its focused
+# `cell::comment::transaction` module and short canonical names; the
+# prefixed root aliases are deleted.
 NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_TYPES = (
     "CommentReplyIndex",
-    "CommentReplyEdit",
-    "CommentReplyPatch",
-    "CommentReplyCommit",
-    "CommentReplyDiagnostics",
-    "CommentReplyError",
-    "CommentReplyLimitKind",
-    "CommentReplyPath",
+    "Edit",
+    "Patch",
+    "Commit",
+    "Diagnostics",
+    "Error",
+    "LimitKind",
+    "Path",
 )
 NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_INDEX_METHODS = (
     "new",
@@ -12970,11 +12973,7 @@ NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_INDEX_METHODS = (
     "get",
     "try_from_usize",
 )
-NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_ROOT_ALIASES = (
-    "TableCellCommentReply",
-    *(f"TableCellCommentReply{name.removeprefix('CommentReply')}"
-      for name in NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_TYPES),
-)
+NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_ROOT_ALIASES: tuple[str, ...] = ()
 NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_PACKAGE_METHODS = (
     "table_cell_comment_reply",
     "table_cell_comment_reply_a1",
@@ -14945,7 +14944,7 @@ IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_PUBLIC_SIGNATURES = {
     ),
     "__table_cell_comment_from_bytes_for_compatibility_with_options": (
         "pub fn __table_cell_comment_from_bytes_for_compatibility_with_options<"
-        "'sheet, 'table>( bytes: &[u8], options: ReadOptions, "
+        "'sheet, 'table>( bytes: &[u8], options: OpenOptions, "
         "sheet: impl Into<SheetSelector<'sheet>>, "
         "table: impl Into<TableSelector<'table>>, position: CellPosition, ) "
         "-> Result<Option<Comment>>"
@@ -14958,7 +14957,7 @@ IWA_NUMBERS_CELL_COMMENT_READER_COMPAT_PUBLIC_SIGNATURES = {
     ),
     "__table_cell_comment_replies_from_bytes_for_compatibility_with_options": (
         "pub fn __table_cell_comment_replies_from_bytes_for_compatibility_with_options<"
-        " 'sheet, 'table, >( bytes: &[u8], options: ReadOptions, "
+        " 'sheet, 'table, >( bytes: &[u8], options: OpenOptions, "
         "sheet: impl Into<SheetSelector<'sheet>>, "
         "table: impl Into<TableSelector<'table>>, position: CellPosition, ) "
         "-> Result<Box<[CommentReply]>>"
@@ -18845,19 +18844,18 @@ SEMANTIC_FACADE_REQUIRED_EXPORTS = {
             "Transition",
         }
     ),
+    # ADR 0034 W1 (record 0297).
     "numbers": frozenset(
         {
-            "Document",
-            "DocumentReadError",
-            "DocumentReadOptions",
-            "DocumentSourceLimitKind",
-            "DocumentSourceLimits",
-            "DocumentSourceLimitsError",
-            "DocumentStats",
+            "Workbook",
+            "ReadError",
+            "OpenOptions",
+            "SourceLimitKind",
+            "SourceLimits",
+            "Stats",
             "Error",
-            "LimitKind",
-            "Limits",
-            "LimitsError",
+            "SemanticLimitKind",
+            "SemanticLimits",
             "ReadLimitKind",
             "Result",
             "Sheet",
@@ -28394,7 +28392,7 @@ def audit_iwa_numbers_table_appearance_source_topology(
             ):
                 violations.append(
                     "focused litchi-numbers exact-source handoff seam must accept "
-                    "Arc<[u8]> and ReadOptions: "
+                    "Arc<[u8]> and OpenOptions: "
                     f"{NUMBERS_TABLE_APPEARANCE_SHARED_SOURCE}"
                 )
 
@@ -38994,6 +38992,9 @@ def audit_numbers_table_dimension_facade_source_topology(
                     and path in export_sources
                     and public_use_or_type
                     and identifier in NUMBERS_TABLE_DIMENSION_TRANSACTION_TYPE_SET
+                    # The shared dimension value error keeps its name beside
+                    # the transaction family's own `Error` (record 0297).
+                    and not (canonical_common_reexport and identifier == "Error")
                 ):
                     violations.append(
                         "focused litchi-numbers table-dimension public API retains "
@@ -49272,12 +49273,22 @@ def audit_numbers_table_cell_comment_reply_facade_source_topology(
                     f"metadata: {NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE}"
                 )
 
-    lib_exports = _rust_canonical_exports(lib_source, frozenset({public_alias}))
-    if public_alias not in lib_exports:
+    # ADR 0034 W1 (record 0297): the value is published by its focused
+    # `cell::comment` module under its canonical name; the prefixed root
+    # alias is deleted.
+    comment_path = root / NUMBERS_SOURCE_ROOT / "cell" / "comment.rs"
+    comment_source = (
+        _mask_rust_cfg_test_items(comment_path.read_text(encoding="utf-8"))
+        if comment_path.is_file()
+        else ""
+    )
+    if canonical_type not in _rust_canonical_exports(
+        comment_source, frozenset({canonical_type})
+    ):
         violations.append(
             "focused litchi-numbers comment-reply public API is missing "
-            f"canonical root {public_alias}: "
-            f"{NUMBERS_TABLE_CELL_COMMENT_REPLY_EXPORT_SOURCES[0]}"
+            f"canonical {canonical_type} in cell::comment: "
+            f"{comment_path.relative_to(root)}"
         )
 
     canonical_alias_pattern = re.compile(
@@ -49989,6 +50000,13 @@ def audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
                         f"re-exports, not type aliases: {location(path, line_number)}"
                     )
         for name in canonical_public_names:
+            # The reply family's short names (record 0297) are defined by the
+            # reply owner; the sibling comment family reuses the same names.
+            if (
+                name in {"Edit", "Patch", "Commit", "Diagnostics", "Error", "LimitKind", "Path"}
+                and not path.name.startswith("comments_reply")
+            ):
+                continue
             surface = public_type_surface(source, name)
             if surface is None:
                 continue
@@ -53279,7 +53297,9 @@ def audit_numbers_chart_arrangement_owner_source_topology(
         label="litchi-numbers chart-arrangement",
         owner_source=NUMBERS_CHART_ARRANGEMENT_OWNER_SOURCE,
         package_source=NUMBERS_PACKAGE_SOURCE,
-        public_source=NUMBERS_SOURCE_ROOT / "lib.rs",
+        # ADR 0034 W1 (record 0297): the family is published through the
+        # focused `sheet::chart::arrangement` module with short names.
+        public_source=NUMBERS_SOURCE_ROOT / "sheet" / "chart.rs",
         module_name=NUMBERS_CHART_ARRANGEMENT_PACKAGE_MODULE,
         methods=NUMBERS_CHART_ARRANGEMENT_PACKAGE_METHODS,
         selector_types={
@@ -53291,7 +53311,7 @@ def audit_numbers_chart_arrangement_owner_source_topology(
         method_markers={
             "sheet_chart_arrangement": ("select_chart_with_budget",),
             "sheet_chart_arrangements": ("discover_sheet_charts",),
-            "edit_sheet_chart_arrangement": ("ChartArrangementEdit::new",),
+            "edit_sheet_chart_arrangement": ("Edit::new",),
             "apply_sheet_chart_arrangement": (
                 "select_chart_with_budget",
                 "verify_locality",
@@ -53300,12 +53320,12 @@ def audit_numbers_chart_arrangement_owner_source_topology(
         owner_markers=NUMBERS_CHART_ARRANGEMENT_OWNER_MARKERS,
         lazy_codec_markers=NUMBERS_CHART_ARRANGEMENT_LAZY_CODEC_MARKERS,
         canonical_types=(
-            "SheetChartArrangementCommit",
-            "SheetChartArrangementDiagnostics",
-            "SheetChartArrangementEdit",
-            "SheetChartArrangementError",
-            "SheetChartArrangementLimitKind",
-            "SheetChartArrangementPatch",
+            "Commit",
+            "Diagnostics",
+            "Edit",
+            "Error",
+            "LimitKind",
+            "Patch",
         ),
     )
 
@@ -69949,7 +69969,10 @@ IWA_TABLE_MERGE_TRANSACTION_SPECS = (
         "library_path": Path("crates/litchi-numbers/src/lib.rs"),
         "module_name": "table_merges",
         "transaction_module": "transaction",
-        "prefix": "TableMerges",
+        # ADR 0034 W1 (record 0297): the family carries short names and is
+        # published through one focused module instead of prefixed aliases.
+        "prefix": "",
+        "focused_module": Path("crates/litchi-numbers/src/table/merge.rs"),
         "edit_method": "edit_table_merges",
         "apply_method": "apply_table_merges",
         "selector_types": frozenset({"SheetSelector", "TableSelector"}),
@@ -72488,10 +72511,10 @@ def audit_numbers_table_merge_reader_source_topology(
                     "Numbers table-merge reader internal ingress must accept "
                     f"Arc<ComponentCatalog>: {relative_reader}:{line_number}"
                 )
-            if re.search(r"\bReadOptions\b", declaration) is None:
+            if re.search(r"\bOpenOptions\b", declaration) is None:
                 violations.append(
                     "Numbers table-merge reader internal ingress must retain "
-                    f"ReadOptions: {relative_reader}:{line_number}"
+                    f"OpenOptions: {relative_reader}:{line_number}"
                 )
             for method in re.finditer(r"\bpub\s+fn\s+__from_shared_catalog\b", code):
                 if code.count("\n", 0, method.start()) + 1 != line_number:
@@ -72969,8 +72992,29 @@ def _audit_table_merge_transaction_source_topology(
     transaction_code = _mask_rust_non_code(transaction_source)
 
     # The owner must publish the four semantic lifecycle types through its
-    # private child. Package and crate-root facades repeat that exact set.
-    owner_exports = _rust_canonical_exports(owner_source, canonical_names)
+    # private child. Package and crate-root facades repeat that exact set,
+    # unless the family is published through one focused public module.
+    focused_module = spec.get("focused_module")
+    if focused_module is not None:
+        focused_absolute = root / focused_module
+        focused_source = (
+            _mask_rust_cfg_test_items(focused_absolute.read_text(encoding="utf-8"))
+            if focused_absolute.is_file()
+            else ""
+        )
+        focused_exports = _rust_canonical_exports(focused_source, canonical_names)
+        for name in sorted(canonical_names - focused_exports):
+            violations.append(
+                f"focused {format_name} table-merge focused module is missing "
+                f"canonical export {name}: {focused_module}"
+            )
+        package_source = ""
+        library_source = ""
+    owner_exports = (
+        canonical_names
+        if focused_module is not None
+        else _rust_canonical_exports(owner_source, canonical_names)
+    )
     for name in sorted(canonical_names - owner_exports):
         violations.append(
             f"focused {format_name} table-merge owner is missing canonical "

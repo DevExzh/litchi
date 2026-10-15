@@ -1150,7 +1150,10 @@ fn resolve<'sheet, 'table>(
         .map_err(|_error| invalid_source())?
         .ok_or(Error::SheetNotFound)?;
     let table_position = match table.into() {
-        TableSelector::Index(index) => selected_sheet.tables().nth(index).map(|_| index),
+        TableSelector::Position(index) => {
+            let index = index.get();
+            selected_sheet.tables().nth(index).map(|_| index)
+        },
         TableSelector::Name(name) => {
             let mut matches = selected_sheet
                 .tables()

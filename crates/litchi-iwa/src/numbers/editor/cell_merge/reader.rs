@@ -3,13 +3,12 @@
 #[cfg(test)]
 use std::sync::Arc;
 
-use litchi_numbers::{
-    MergeReader, PackageReadOptions, PackageSemanticLimits, SheetSelector, TableMergesError,
-    TableMergesLimitKind, TableSelector, table::merge::Region,
-};
+use litchi_numbers::{MergeReader, SheetSelector, TableSelector, table::merge::Region};
 
 use super::super::{NumbersEditor, selectors};
 use crate::{Error, IWorkPackage, Result};
+use litchi_numbers::table::merge::transaction::Error as TableMergesError;
+use litchi_numbers::table::merge::transaction::LimitKind as TableMergesLimitKind;
 
 /// Source-built and explicitly unrooted/legacy tables retain the compatibility
 /// reader. Every failure after a rooted canonical selection remains terminal.
@@ -30,7 +29,8 @@ fn cached_reader(package: &IWorkPackage) -> Result<MergeReader> {
     let (components, limits) = package.shared_component_catalog(map_catalog_error)?;
     MergeReader::__from_shared_catalog(
         components,
-        PackageReadOptions::new(limits, PackageSemanticLimits::default()),
+        litchi_numbers::OpenOptions::new()
+            .source_limits(litchi_numbers::SourceLimits::__from_archive(limits)),
     )
     .map_err(Error::from)
 }

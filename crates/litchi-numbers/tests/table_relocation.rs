@@ -632,7 +632,7 @@ fn same_sheet_move_is_an_exact_noop_and_replays_without_writing() -> TestResult 
         table_names(commit.package(), 0),
         vec![ALPHA_TABLE_NAME.to_owned(), BETA_TABLE_NAME.to_owned()]
     );
-    let replay = package.apply_table_move(commit.patch())?;
+    let replay = package.apply_table_relocation(commit.patch())?;
     assert!(replay.patch().is_noop());
     assert_eq!(replay.package().exact_bytes(), before);
     let indexed = package.move_table(
@@ -907,7 +907,7 @@ fn changed_patch_is_exact_source_bound_and_inverse_restores_every_byte() -> Test
     let target = commit.package().exact_bytes();
     assert_eq!(
         package
-            .apply_table_move(commit.patch())?
+            .apply_table_relocation(commit.patch())?
             .package()
             .exact_bytes(),
         target
@@ -917,7 +917,7 @@ fn changed_patch_is_exact_source_bound_and_inverse_restores_every_byte() -> Test
     assert_eq!(inverse.inverse(), *commit.patch());
     assert_eq!(
         Package::from_bytes(&target)?
-            .apply_table_move(&inverse)?
+            .apply_table_relocation(&inverse)?
             .package()
             .exact_bytes(),
         bytes
@@ -932,8 +932,8 @@ fn changed_patch_is_exact_source_bound_and_inverse_restores_every_byte() -> Test
     )?;
     let tampered = Package::from_bytes(&tampered)?;
     let tampered_before = tampered.exact_bytes();
-    assert!(tampered.apply_table_move(commit.patch()).is_err());
+    assert!(tampered.apply_table_relocation(commit.patch()).is_err());
     assert_eq!(tampered.exact_bytes(), tampered_before);
-    assert!(package.apply_table_move(&inverse).is_err());
+    assert!(package.apply_table_relocation(&inverse).is_err());
     Ok(())
 }

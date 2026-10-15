@@ -97,7 +97,7 @@
 //! ### Extract tables
 //!
 //! ```rust,no_run
-//! use litchi_numbers::Document;
+//! use litchi_numbers::Workbook;
 //!
 //! let doc = Document::open("spreadsheet.numbers")?;
 //!
@@ -249,7 +249,7 @@ pub enum Error {
     PagesSemantic(#[from] litchi_pages::Error),
 
     #[error(transparent)]
-    NumbersTableMerges(#[from] litchi_numbers::TableMergesError),
+    NumbersTableMerges(#[from] litchi_numbers::table::merge::transaction::Error),
 
     #[error(transparent)]
     PagesTableMerges(#[from] litchi_pages::BodyTableMergesError),

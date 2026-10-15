@@ -411,13 +411,16 @@ pub(super) fn resolve_table<'package>(
     table_selector: TableSelector<'_>,
 ) -> Result<SelectedTable<'package>, Error> {
     let (sheet_position, sheet) = match sheet_selector {
-        SheetSelector::Index(position) => source
-            .state
-            .document
-            .sheets()
-            .get(position)
-            .map(|sheet| (position, sheet))
-            .ok_or(Error::SheetNotFound)?,
+        SheetSelector::Position(position) => {
+            let position = position.get();
+            source
+                .state
+                .document
+                .sheets()
+                .get(position)
+                .map(|sheet| (position, sheet))
+                .ok_or(Error::SheetNotFound)?
+        },
         SheetSelector::Name(name) => {
             let mut matches = source
                 .state
@@ -438,11 +441,14 @@ pub(super) fn resolve_table<'package>(
     let compact_sheet = compact_position(sheet_position, Path::Package)?;
 
     let (table_position, table) = match table_selector {
-        TableSelector::Index(position) => sheet
-            .tables()
-            .nth(position)
-            .map(|table| (position, table))
-            .ok_or(Error::TableNotFound)?,
+        TableSelector::Position(position) => {
+            let position = position.get();
+            sheet
+                .tables()
+                .nth(position)
+                .map(|table| (position, table))
+                .ok_or(Error::TableNotFound)?
+        },
         TableSelector::Name(name) => {
             let mut matches = sheet
                 .tables()

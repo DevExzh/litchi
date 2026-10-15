@@ -5,8 +5,7 @@ use std::sync::Arc;
 
 use litchi_iwa_detect::{Format, PreparedSource};
 use litchi_numbers::{
-    __compatibility_tables_from_prepared_source, PackageSemanticLimits,
-    compatibility_tables_from_bytes,
+    __compatibility_tables_from_prepared_source, compatibility_tables_from_bytes,
 };
 
 fn fixture_path() -> PathBuf {
@@ -25,8 +24,10 @@ fn prepared_source_handoff_matches_global_compatibility_projection()
     drop(source);
     assert!(source_lifetime.upgrade().is_some());
 
-    let actual =
-        __compatibility_tables_from_prepared_source(prepared, PackageSemanticLimits::default())?;
+    let actual = __compatibility_tables_from_prepared_source(
+        prepared,
+        litchi_numbers::SemanticLimits::DEFAULT,
+    )?;
 
     assert!(source_lifetime.upgrade().is_none());
     assert_eq!(actual, expected);

@@ -9,16 +9,16 @@ use std::collections::{HashMap, HashSet};
 use super::NumbersEditor;
 use crate::archive::ArchiveObject;
 use crate::{Error, IWorkPackage, Result};
-use litchi_numbers::{Dimensions, Document, Sheet, SheetSelector, Table, TableSelector};
+use litchi_numbers::{Dimensions, Sheet, SheetSelector, Table, TableSelector, Workbook};
 
 /// A private semantic sheet catalog used only at the legacy archive boundary.
 ///
 /// The focused Numbers selector is intentionally archive-free.  The host still
 /// has to hand a selected native object to its existing writer, so this adapter
 /// keeps the native IDs in a parallel private vector and delegates the actual
-/// name/index match to `litchi_numbers::Document::sheet`.
+/// name/index match to `litchi_numbers::Workbook::sheet`.
 struct SheetSelectorAdapter {
-    semantic: Document,
+    semantic: Workbook,
     source_names: Vec<String>,
     native_ids: Vec<u64>,
 }
@@ -35,7 +35,7 @@ impl SheetSelectorAdapter {
             .enumerate()
             .map(|(index, name)| Sheet::new(name, index))
             .collect::<Vec<_>>();
-        let semantic = Document::from_sheets(semantic_sheets).map_err(|error| {
+        let semantic = Workbook::from_sheets(semantic_sheets).map_err(|error| {
             Error::InvalidFormat(format!(
                 "Numbers sheet selector catalog is invalid: {error}"
             ))
@@ -480,9 +480,11 @@ fn sheet_selector_error(selector: SheetSelector<'_>) -> Error {
         SheetSelector::Name(name) => {
             Error::ParseError(format!("Numbers sheet named {name:?} not found"))
         },
-        SheetSelector::Index(index) => Error::ParseError(format!(
-            "Numbers sheet catalog index {index} is out of bounds"
+        SheetSelector::Position(position) => Error::ParseError(format!(
+            "Numbers sheet catalog index {} is out of bounds",
+            position.get()
         )),
+        _ => Error::ParseError("Numbers sheet selector is not supported".to_owned()),
     }
 }
 
@@ -491,9 +493,11 @@ fn table_selector_error(selector: TableSelector<'_>) -> Error {
         TableSelector::Name(name) => {
             Error::ParseError(format!("Numbers table named {name:?} not found"))
         },
-        TableSelector::Index(index) => Error::ParseError(format!(
-            "Numbers table catalog index {index} is out of bounds"
+        TableSelector::Position(position) => Error::ParseError(format!(
+            "Numbers table catalog index {} is out of bounds",
+            position.get()
         )),
+        _ => Error::ParseError("Numbers table selector is not supported".to_owned()),
     }
 }
 
@@ -597,20 +601,22 @@ pub(super) fn focused_merge_table_indices(
         return Ok(None);
     }
     let document = super::numbers_document(package)?;
-    let limits = litchi_numbers::PackageSemanticLimits::default();
+    let limits = litchi_numbers::SemanticLimits::DEFAULT;
     let check = |kind, observed: usize, maximum: usize| -> Result<()> {
         if observed > maximum {
-            return Err(litchi_numbers::TableMergesError::LimitExceeded {
-                kind,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
-            .into());
+            return Err(
+                litchi_numbers::table::merge::transaction::Error::LimitExceeded {
+                    kind,
+                    observed: observed as u64,
+                    maximum: maximum as u64,
+                }
+                .into(),
+            );
         }
         Ok(())
     };
     check(
-        litchi_numbers::TableMergesLimitKind::Sheets,
+        litchi_numbers::table::merge::transaction::LimitKind::Sheets,
         document.sheets.len(),
         limits.max_sheets(),
     )?;
@@ -641,7 +647,7 @@ pub(super) fn focused_merge_table_indices(
         })?;
         references = references.saturating_add(sheet.drawable_infos.len());
         check(
-            litchi_numbers::TableMergesLimitKind::PayloadReferences,
+            litchi_numbers::table::merge::transaction::LimitKind::PayloadReferences,
             references,
             limits.max_references(),
         )?;
@@ -670,7 +676,7 @@ pub(super) fn focused_merge_table_indices(
             if let Some(identifier) = model_id {
                 tables = tables.saturating_add(1);
                 check(
-                    litchi_numbers::TableMergesLimitKind::Tables,
+                    litchi_numbers::table::merge::transaction::LimitKind::Tables,
                     tables,
                     limits.max_tables(),
                 )?;

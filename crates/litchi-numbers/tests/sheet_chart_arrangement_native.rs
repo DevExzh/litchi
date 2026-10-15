@@ -12,10 +12,8 @@ use litchi_iwa_common::wire::WireView;
 use litchi_iwa_core::{Archive, SnappyStream};
 use litchi_iwa_protos::tsch;
 use litchi_numbers::cell::Value;
-use litchi_numbers::{
-    ChartArrangement, ChartSelector, Package, SheetChartArrangementError, SheetSelector,
-    TableSelector,
-};
+use litchi_numbers::sheet::chart::arrangement::Error as SheetChartArrangementError;
+use litchi_numbers::{ChartArrangement, ChartSelector, Package, SheetSelector, TableSelector};
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;

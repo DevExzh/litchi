@@ -103,23 +103,20 @@ fn keynote_semantic_namespace_is_concrete_and_archive_free() {
 #[test]
 fn numbers_semantic_namespace_is_concrete_and_archive_free() {
     use litchi::numbers::semantic::{
-        Document, DocumentReadError, DocumentReadOptions, DocumentSourceLimitKind,
-        DocumentSourceLimits, DocumentSourceLimitsError, DocumentStats, Error, LimitKind, Limits,
-        LimitsError, ReadLimitKind, Result, Sheet, SheetSelector, Table, TableSelector,
-        TableSelectorError,
+        Error, OpenOptions, ReadError, ReadLimitKind, Result, SemanticLimitKind, SemanticLimits,
+        Sheet, SheetSelector, SourceLimitKind, SourceLimits, Stats, Table, TableSelector,
+        TableSelectorError, Workbook,
     };
 
-    assert_send_sync_static::<Document>();
-    assert_send_sync_static::<DocumentReadOptions>();
-    assert_send_sync_static::<DocumentReadError>();
-    assert_send_sync_static::<DocumentSourceLimitKind>();
-    assert_send_sync_static::<DocumentSourceLimits>();
-    assert_send_sync_static::<DocumentSourceLimitsError>();
-    assert_send_sync_static::<DocumentStats>();
+    assert_send_sync_static::<Workbook>();
+    assert_send_sync_static::<OpenOptions>();
+    assert_send_sync_static::<ReadError>();
+    assert_send_sync_static::<SourceLimitKind>();
+    assert_send_sync_static::<SourceLimits>();
+    assert_send_sync_static::<Stats>();
     assert_send_sync_static::<Error>();
-    assert_send_sync_static::<LimitKind>();
-    assert_send_sync_static::<Limits>();
-    assert_send_sync_static::<LimitsError>();
+    assert_send_sync_static::<SemanticLimitKind>();
+    assert_send_sync_static::<SemanticLimits>();
     assert_send_sync_static::<ReadLimitKind>();
     assert_send_sync_static::<Result<()>>();
     assert_send_sync_static::<Sheet>();
@@ -128,12 +125,14 @@ fn numbers_semantic_namespace_is_concrete_and_archive_free() {
     assert_send_sync_static::<TableSelector<'static>>();
     assert_send_sync_static::<TableSelectorError>();
 
-    let options = DocumentReadOptions::new(DocumentSourceLimits::default(), Limits::default());
-    assert_eq!(options.source(), DocumentSourceLimits::default());
-    assert_eq!(options.semantic(), Limits::default());
+    let options = OpenOptions::new()
+        .source_limits(SourceLimits::default())
+        .semantic_limits(SemanticLimits::default());
+    assert_eq!(options.source_limits_value(), SourceLimits::default());
+    assert_eq!(options.semantic_limits_value(), SemanticLimits::default());
 
     let sheet = SheetSelector::name("Summary");
     let table = TableSelector::index(0);
     assert!(matches!(sheet, SheetSelector::Name("Summary")));
-    assert!(matches!(table, TableSelector::Index(0)));
+    assert_eq!(table.as_position().map(|position| position.get()), Some(0));
 }

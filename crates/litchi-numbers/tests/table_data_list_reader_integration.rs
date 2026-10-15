@@ -14,10 +14,9 @@ use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, 
 use litchi_iwa_protos::tsce::ast_node_array_archive::{AstNodeArchive, AstNodeType};
 use litchi_iwa_protos::{tn, tsce, tsd, tsk, tsp, tst, tswp};
 use litchi_numbers::cell::Value;
-use litchi_numbers::{
-    CellPosition, Document, Package, PackageLimits, PackageReadOptions, PackageSemanticLimits,
-    TableCellCommentError, TableCellCommentPath,
-};
+use litchi_numbers::cell::comment::Error as TableCellCommentError;
+use litchi_numbers::cell::comment::Path as TableCellCommentPath;
+use litchi_numbers::{CellPosition, Package, Workbook};
 use litchi_numbers_wire::BncCell;
 use prost::Message as _;
 
@@ -934,7 +933,7 @@ fn rewrite_iwa_member(
     )?)
 }
 
-fn assert_semantics(document: &Document) -> TestResult {
+fn assert_semantics(document: &Workbook) -> TestResult {
     document.validate()?;
     let sheet = document
         .sheet(0)?
@@ -982,7 +981,7 @@ fn assert_rejected_by_both_readers(corruption: Corruption) -> TestResult {
         bytes, original,
         "Package parsing mutated its borrowed source"
     );
-    assert!(Document::from_bytes(&bytes).is_err());
+    assert!(Workbook::from_bytes(&bytes).is_err());
     assert_eq!(
         bytes, original,
         "Document parsing mutated its borrowed source"
@@ -996,21 +995,21 @@ fn mixed_root_and_segments_project_all_selected_lists_through_package_and_reopen
     let original = bytes.clone();
 
     let package = Package::from_bytes(&bytes)?;
-    assert_semantics(package.document())?;
-    assert_eq!(package.sheets(), package.document().sheets());
+    assert_semantics(package.workbook_ref())?;
+    assert_eq!(package.sheets(), package.workbook_ref().sheets());
     assert_eq!(
         bytes, original,
         "Package parsing mutated its borrowed source"
     );
 
-    let borrowed = Document::from_bytes(&bytes)?;
+    let borrowed = Workbook::from_bytes(&bytes)?;
     assert_semantics(&borrowed)?;
     assert_eq!(
         bytes, original,
         "Document parsing mutated its borrowed source"
     );
 
-    let reopened = Document::from_shared_bytes(Arc::from(bytes.clone()))?;
+    let reopened = Workbook::from_shared_bytes(Arc::from(bytes.clone()))?;
     assert_semantics(&reopened)?;
     assert_eq!(bytes, original, "Document reopen mutated its source copy");
     Ok(())
@@ -1025,20 +1024,20 @@ fn type_6201_hosts_use_strict_lists_without_public_raw_ids() -> TestResult {
     )?;
     let original = bytes.clone();
     let package = Package::from_bytes(&bytes)?;
-    assert_semantics(package.document())?;
+    assert_semantics(package.workbook_ref())?;
     assert_eq!(bytes, original, "Package parsing mutated its source");
 
     // The public package/document boundary retains only semantic values. In
     // particular, the alternate host message type and physical archive IDs
     // from this fixture do not appear in either public debug representation.
     assert_eq!(format!("{package:?}"), "Package { .. }");
-    let document_debug = format!("{:?}", package.document());
+    let document_debug = format!("{:?}", package.workbook_ref());
     assert!(!document_debug.contains("6201"));
     assert!(!document_debug.contains("identifier"));
     assert!(!document_debug.contains("ArchiveObject"));
     assert!(!document_debug.contains("RawMessage"));
 
-    let document = Document::from_bytes(&bytes)?;
+    let document = Workbook::from_bytes(&bytes)?;
     assert_semantics(&document)?;
     assert_eq!(bytes, original, "Document parsing mutated its source");
 
@@ -1063,7 +1062,7 @@ fn type_6201_hosts_use_strict_lists_without_public_raw_ids() -> TestResult {
         .expect_err("6201 non-canonical list host must be rejected by strict ingress");
     assert!(!package_error.to_string().contains("6201"));
     assert_eq!(malformed, malformed_original);
-    let document_error = Document::from_bytes(&malformed)
+    let document_error = Workbook::from_bytes(&malformed)
         .expect_err("Document must reject the same strict 6201 list host");
     assert!(!document_error.to_string().contains("6201"));
     assert_eq!(malformed, malformed_original);
@@ -1116,8 +1115,8 @@ fn document_ignores_valid_and_dangling_comment_ids_while_package_stays_strict() 
     let valid = synthetic_table_data_list_package(Corruption::None, 12)?;
     let valid_original = valid.clone();
     let package = Package::from_bytes(&valid)?;
-    assert_semantics(package.document())?;
-    let document = Document::from_bytes(&valid)?;
+    assert_semantics(package.workbook_ref())?;
+    let document = Workbook::from_bytes(&valid)?;
     assert_semantics(&document)?;
     assert_eq!(valid, valid_original);
 
@@ -1125,7 +1124,7 @@ fn document_ignores_valid_and_dangling_comment_ids_while_package_stays_strict() 
     let dangling_original = dangling.clone();
     assert!(Package::from_bytes(&dangling).is_err());
     assert_eq!(dangling, dangling_original);
-    let document = Document::from_bytes(&dangling)?;
+    let document = Workbook::from_bytes(&dangling)?;
     assert_semantics(&document)?;
     assert_eq!(dangling, dangling_original);
     Ok(())
@@ -1141,11 +1140,11 @@ fn package_projects_full_comment_metadata_and_replies_without_mutating_source() 
     // payload (including date, author, UUID, and both replies); the structured
     // compatibility projection exercises that same strict path a second time.
     let package = Package::from_bytes(&bytes)?;
-    assert_semantics(package.document())?;
+    assert_semantics(package.workbook_ref())?;
     assert_eq!(package.extract_structured_tables()?.len(), 1);
     assert_eq!(bytes, original, "Package parsing mutated its source");
 
-    let document = Document::from_bytes(&bytes)?;
+    let document = Workbook::from_bytes(&bytes)?;
     assert_semantics(&document)?;
     assert_eq!(bytes, original, "Document parsing mutated its source");
     Ok(())
@@ -1157,11 +1156,11 @@ fn missing_comment_text_is_an_empty_strict_value_and_document_still_skips_commen
     let original = bytes.clone();
 
     let package = Package::from_bytes(&bytes)?;
-    assert_semantics(package.document())?;
+    assert_semantics(package.workbook_ref())?;
     assert_eq!(package.extract_structured_tables()?.len(), 1);
     assert_eq!(bytes, original, "Package parsing mutated its source");
 
-    let document = Document::from_bytes(&bytes)?;
+    let document = Workbook::from_bytes(&bytes)?;
     assert_semantics(&document)?;
     assert_eq!(bytes, original, "Document parsing mutated its source");
     Ok(())
@@ -1352,13 +1351,13 @@ fn external_and_nested_reply_references_fail_in_selector_projection_atomically()
 fn comment_reply_reference_limit_rejects_atomically() -> TestResult {
     let bytes = synthetic_table_data_list_package(Corruption::None, 2)?;
     let original = bytes.clone();
-    let semantic = PackageSemanticLimits::new(
-        PackageSemanticLimits::MAX_OBJECTS,
-        1,
-        PackageSemanticLimits::MAX_TABLES,
-        1,
-    )?;
-    let options = PackageReadOptions::new(PackageLimits::default(), semantic);
+    let semantic = litchi_numbers::SemanticLimits::builder()
+        .max_objects(litchi_numbers::SemanticLimits::MAXIMUM.max_objects())
+        .and_then(|b| b.max_sheets(1))
+        .and_then(|b| b.max_tables(litchi_numbers::SemanticLimits::MAXIMUM.max_tables()))
+        .and_then(|b| b.max_references(1))
+        .and_then(|b| b.build())?;
+    let options = litchi_numbers::OpenOptions::new().semantic_limits(semantic);
     assert!(Package::from_bytes_with_options(&bytes, options).is_err());
     assert_eq!(
         bytes, original,
@@ -1424,7 +1423,7 @@ fn assert_package_rejects_comment_but_document_skips_it(corruption: Corruption) 
     assert!(Package::from_bytes(&bytes).is_err());
     assert_eq!(bytes, original, "Package rejection mutated its source");
 
-    let document = Document::from_bytes(&bytes)?;
+    let document = Workbook::from_bytes(&bytes)?;
     assert_semantics(&document)?;
     assert_eq!(bytes, original, "Document parsing mutated its source");
     Ok(())
@@ -1450,7 +1449,7 @@ fn duplicate_comment_storage_payload_is_atomic_in_package_and_skipped_by_documen
     );
     assert_eq!(bytes, original, "Package rejection mutated its source");
 
-    let document = Document::from_bytes(&bytes)?;
+    let document = Workbook::from_bytes(&bytes)?;
     assert_semantics(&document)?;
     assert_eq!(bytes, original, "Document parsing mutated its source");
     Ok(())
@@ -1741,11 +1740,14 @@ fn root_comment_clear_rejects_lossy_metadata_and_storage_object_rewrites() -> Te
 #[test]
 fn root_comment_clear_supersedes_a_failed_staged_replacement() -> TestResult {
     let source = include_bytes!("fixtures/comment-edit-root.numbers").as_slice();
-    let semantic = PackageSemanticLimits::default()
-        .with_projection_limits(PackageSemanticLimits::MAX_MATERIALIZED_CELLS, 64)?;
+    let semantic = litchi_numbers::SemanticLimits::DEFAULT
+        .to_builder()
+        .max_materialized_cells(litchi_numbers::SemanticLimits::MAXIMUM.max_materialized_cells())
+        .and_then(|b| b.max_output_text_bytes(64))
+        .and_then(|b| b.build())?;
     let package = Package::from_bytes_with_options(
         source,
-        PackageReadOptions::new(PackageLimits::default(), semantic),
+        litchi_numbers::OpenOptions::new().semantic_limits(semantic),
     )?;
     let sheet = package
         .sheets()

@@ -30,13 +30,13 @@ use litchi_iwa_protos::chart_data_codec as codec;
 
 use super::Package;
 use super::chart_arrangement::{
-    self, ChartArrangementError, ChartBudget, ChartSelection, parse_wire_view_with_budget,
-    physical_catalog, retain_payload_pair, rewrite_selected_chart_payload_with_previews,
-    same_selection, select_chart_with_budget, selected_chart_payload, verify_locality,
+    self, ChartBudget, ChartSelection, parse_wire_view_with_budget, physical_catalog,
+    retain_payload_pair, rewrite_selected_chart_payload_with_previews, same_selection,
+    select_chart_with_budget, selected_chart_payload, verify_locality,
 };
-use super::chart_data::{
-    ChartDataError, map_arrangement_error, map_codec_limit, read_selected_chart_data,
-};
+use super::chart_data::{map_arrangement_error, map_codec_limit, read_selected_chart_data};
+use crate::sheet::chart::arrangement::Error as ChartArrangementError;
+use crate::sheet::chart::data::Error as ChartDataError;
 use crate::{ChartSelector, SheetSelector};
 
 const CHART_EXTENSION_FIELD: u32 = 10_000;
@@ -62,17 +62,17 @@ const FORMULA_SCATTER_NEG_FIELD: u32 = 9;
 const FORMULA_SCHEME_FIELD: u32 = 10;
 
 /// A staged standalone Numbers chart-data edit.
-pub struct SheetChartDataEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
     selection: ChartSelection,
     before: Arc<ChartData>,
     after: Option<ChartData>,
 }
 
-impl fmt::Debug for SheetChartDataEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SheetChartDataEdit")
+            .debug_struct("Edit")
             .field("sheet_position", &self.selection.sheet_position)
             .field("chart_position", &self.selection.chart_position)
             .field("before", &self.before)
@@ -81,7 +81,7 @@ impl fmt::Debug for SheetChartDataEdit<'_> {
     }
 }
 
-impl<'a> SheetChartDataEdit<'a> {
+impl<'a> Edit<'a> {
     fn new(
         source: &'a Package,
         selection: ChartSelection,
@@ -133,7 +133,7 @@ impl<'a> SheetChartDataEdit<'a> {
     }
 
     /// Validate and atomically publish the staged immutable candidate.
-    pub fn commit(self) -> Result<SheetChartDataCommit, ChartDataError> {
+    pub fn commit(self) -> Result<Commit, ChartDataError> {
         commit_edit(
             self.source,
             &self.selection,
@@ -145,7 +145,7 @@ impl<'a> SheetChartDataEdit<'a> {
 
 /// Exact-source checked reversible standalone chart-data patch.
 #[derive(Clone, PartialEq)]
-pub struct SheetChartDataPatch {
+pub struct Patch {
     artifacts: OwnedExactArtifacts,
     selection: ChartSelection,
     before: Arc<ChartData>,
@@ -154,10 +154,10 @@ pub struct SheetChartDataPatch {
     target_payload: Option<Arc<[u8]>>,
 }
 
-impl fmt::Debug for SheetChartDataPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("SheetChartDataPatch")
+            .debug_struct("Patch")
             .field("sheet_position", &self.selection.sheet_position)
             .field("chart_position", &self.selection.chart_position)
             .field("before", &self.before)
@@ -166,7 +166,7 @@ impl fmt::Debug for SheetChartDataPatch {
     }
 }
 
-impl SheetChartDataPatch {
+impl Patch {
     /// Return the selected sheet source position.
     #[must_use]
     pub const fn sheet_position(&self) -> Position {
@@ -225,14 +225,14 @@ impl SheetChartDataPatch {
 
 /// Compact evidence describing one chart-data publication.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct SheetChartDataDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     full_reparse_performed: bool,
     deleted_previews: usize,
 }
 
-impl SheetChartDataDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -280,13 +280,13 @@ impl SheetChartDataDiagnostics {
 /// Fully verified result of one immutable chart-data transaction.
 #[must_use = "a Numbers chart-data commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct SheetChartDataCommit {
+pub struct Commit {
     package: Package,
-    patch: SheetChartDataPatch,
-    diagnostics: SheetChartDataDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl SheetChartDataCommit {
+impl Commit {
     /// Borrow the fully reopened package snapshot.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -301,25 +301,16 @@ impl SheetChartDataCommit {
 
     /// Borrow the reversible exact-source patch.
     #[must_use]
-    pub const fn patch(&self) -> &SheetChartDataPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Borrow compact publication diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> &SheetChartDataDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
-
-/// Ergonomic aliases matching the other focused chart owners.
-pub type ChartDataEdit<'a> = SheetChartDataEdit<'a>;
-/// Ergonomic alias for [`SheetChartDataPatch`].
-pub type ChartDataPatch = SheetChartDataPatch;
-/// Ergonomic alias for [`SheetChartDataCommit`].
-pub type ChartDataCommit = SheetChartDataCommit;
-/// Ergonomic alias for [`SheetChartDataDiagnostics`].
-pub type ChartDataDiagnostics = SheetChartDataDiagnostics;
 
 impl Package {
     /// Begin an exact immutable edit of one standalone sheet chart's numeric
@@ -328,7 +319,7 @@ impl Package {
         &self,
         sheet_selector: impl Into<SheetSelector<'sheet>>,
         chart_selector: impl Into<ChartSelector>,
-    ) -> Result<SheetChartDataEdit<'_>, ChartDataError> {
+    ) -> Result<Edit<'_>, ChartDataError> {
         let mut budget = ChartBudget::for_package(self).map_err(map_arrangement_error)?;
         let selection = select_chart_with_budget(
             self,
@@ -340,14 +331,11 @@ impl Package {
         .map_err(map_arrangement_error)?;
         ensure_standalone_chart(self, &selection, &mut budget).map_err(map_arrangement_error)?;
         let before = read_selected_chart_data(self, &selection, &mut budget)?;
-        SheetChartDataEdit::new(self, selection, before, &mut budget)
+        Edit::new(self, selection, before, &mut budget)
     }
 
     /// Apply an exact-source checked standalone chart-data patch.
-    pub fn apply_sheet_chart_data(
-        &self,
-        patch: &SheetChartDataPatch,
-    ) -> Result<SheetChartDataCommit, ChartDataError> {
+    pub fn apply_sheet_chart_data(&self, patch: &Patch) -> Result<Commit, ChartDataError> {
         let catalog = physical_catalog(self).map_err(map_arrangement_error)?;
         let source_owner = catalog.__source_owner();
         if !patch.artifacts.authorizes_owner(&source_owner) {
@@ -362,7 +350,7 @@ fn commit_edit(
     selection: &ChartSelection,
     before: Arc<ChartData>,
     after: Option<ChartData>,
-) -> Result<SheetChartDataCommit, ChartDataError> {
+) -> Result<Commit, ChartDataError> {
     let catalog = physical_catalog(source).map_err(map_arrangement_error)?;
     let source_owner = catalog.__source_owner();
     commit_patch_parts(source, selection, before, None, after, source_owner)
@@ -370,9 +358,9 @@ fn commit_edit(
 
 fn apply_patch_exact(
     source: &Package,
-    patch: &SheetChartDataPatch,
+    patch: &Patch,
     catalog: &litchi_iwa_archive::SourceCatalog,
-) -> Result<SheetChartDataCommit, ChartDataError> {
+) -> Result<Commit, ChartDataError> {
     let mut budget = ChartBudget::for_package(source).map_err(map_arrangement_error)?;
     budget
         .source(source.source_bytes().len())
@@ -401,10 +389,10 @@ fn apply_patch_exact(
         return Err(ChartDataError::PatchConflict);
     }
     if patch.is_noop() {
-        return Ok(SheetChartDataCommit {
+        return Ok(Commit {
             package: source.snapshot(),
             patch: patch.clone(),
-            diagnostics: SheetChartDataDiagnostics::unchanged(),
+            diagnostics: Diagnostics::unchanged(),
         });
     }
     if !catalog.source_is_exact() {
@@ -458,10 +446,10 @@ fn apply_patch_exact(
         chart_arrangement::root_preview_count(candidate_catalog, &mut budget)
             .map_err(map_arrangement_error)?;
     let deleted_previews = source_preview_count.saturating_sub(target_preview_count);
-    Ok(SheetChartDataCommit {
+    Ok(Commit {
         package: candidate,
         patch: patch.clone(),
-        diagnostics: SheetChartDataDiagnostics::published(deleted_previews),
+        diagnostics: Diagnostics::published(deleted_previews),
     })
 }
 
@@ -472,7 +460,7 @@ fn commit_patch_parts(
     after: Option<Arc<ChartData>>,
     owned_after: Option<ChartData>,
     source_owner: SharedBytes,
-) -> Result<SheetChartDataCommit, ChartDataError> {
+) -> Result<Commit, ChartDataError> {
     let mut budget = ChartBudget::for_package(source).map_err(map_arrangement_error)?;
     let after = match (after, owned_after) {
         (Some(after), None) => after,
@@ -516,9 +504,9 @@ fn commit_patch_parts(
     let requested_equal = before.bitwise_eq(after.as_ref());
     if requested_equal {
         charge_artifact_fingerprints(&mut budget, &source_owner, &source_owner)?;
-        return Ok(SheetChartDataCommit {
+        return Ok(Commit {
             package: source.snapshot(),
-            patch: SheetChartDataPatch {
+            patch: Patch {
                 artifacts: OwnedExactArtifacts::new(source_owner.clone(), source_owner),
                 selection: selection.clone(),
                 before,
@@ -526,7 +514,7 @@ fn commit_patch_parts(
                 source_payload: None,
                 target_payload: None,
             },
-            diagnostics: SheetChartDataDiagnostics::unchanged(),
+            diagnostics: Diagnostics::unchanged(),
         });
     }
     let source_catalog = physical_catalog(source).map_err(map_arrangement_error)?;
@@ -581,9 +569,9 @@ fn commit_patch_parts(
         })
         .map_err(map_arrangement_error)?;
     charge_artifact_fingerprints(&mut budget, &source_owner, &target_owner)?;
-    Ok(SheetChartDataCommit {
+    Ok(Commit {
         package: candidate,
-        patch: SheetChartDataPatch {
+        patch: Patch {
             artifacts: OwnedExactArtifacts::new(source_owner, target_owner),
             selection: selection.clone(),
             before,
@@ -591,7 +579,7 @@ fn commit_patch_parts(
             source_payload: Some(source_payload),
             target_payload: Some(target_payload),
         },
-        diagnostics: SheetChartDataDiagnostics::published(deleted_previews),
+        diagnostics: Diagnostics::published(deleted_previews),
     })
 }
 
@@ -652,33 +640,33 @@ fn map_rewrite_error(error: codec::RewriteError) -> ChartDataError {
             let (kind, observed, maximum) = match limit {
                 codec::RewriteLimit::Bytes { observed, maximum }
                 | codec::RewriteLimit::Output { observed, maximum } => (
-                    super::chart_data::ChartDataLimitKind::WireBytes,
+                    crate::sheet::chart::data::LimitKind::WireBytes,
                     observed,
                     maximum,
                 ),
                 codec::RewriteLimit::Fields { observed, maximum } => (
-                    super::chart_data::ChartDataLimitKind::WireFields,
+                    crate::sheet::chart::data::LimitKind::WireFields,
                     observed,
                     maximum,
                 ),
                 codec::RewriteLimit::Work { observed, maximum }
                 | codec::RewriteLimit::Scratch { observed, maximum } => (
-                    super::chart_data::ChartDataLimitKind::WireWork,
+                    crate::sheet::chart::data::LimitKind::WireWork,
                     observed,
                     maximum,
                 ),
                 codec::RewriteLimit::Nesting { observed, maximum } => (
-                    super::chart_data::ChartDataLimitKind::WireNesting,
+                    crate::sheet::chart::data::LimitKind::WireNesting,
                     observed as usize,
                     maximum as usize,
                 ),
                 codec::RewriteLimit::Allocations { observed, maximum } => (
-                    super::chart_data::ChartDataLimitKind::Allocations,
+                    crate::sheet::chart::data::LimitKind::Allocations,
                     observed,
                     maximum,
                 ),
                 codec::RewriteLimit::Retained { observed, maximum } => (
-                    super::chart_data::ChartDataLimitKind::RetainedBytes,
+                    crate::sheet::chart::data::LimitKind::RetainedBytes,
                     observed,
                     maximum,
                 ),

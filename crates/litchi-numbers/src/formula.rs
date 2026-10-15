@@ -612,15 +612,18 @@ pub(crate) fn resolve_table_handle<'sheet, 'table>(
     let sheet_selector = sheet_selector.into();
     let table_selector = table_selector.into();
     let (sheet_position, sheet) = match sheet_selector {
-        SheetSelector::Index(position) => source
-            .document()
-            .sheets()
-            .get(position)
-            .map(|sheet| (position, sheet))
-            .ok_or(TableCellError::SheetNotFound)?,
+        SheetSelector::Position(position) => {
+            let position = position.get();
+            source
+                .workbook_ref()
+                .sheets()
+                .get(position)
+                .map(|sheet| (position, sheet))
+                .ok_or(TableCellError::SheetNotFound)?
+        },
         SheetSelector::Name(name) => {
             let mut matches = source
-                .document()
+                .workbook_ref()
                 .sheets()
                 .iter()
                 .enumerate()
@@ -639,11 +642,14 @@ pub(crate) fn resolve_table_handle<'sheet, 'table>(
             path: Path::Package,
         })?;
     let (table_position, table) = match table_selector {
-        TableSelector::Index(position) => sheet
-            .tables()
-            .nth(position)
-            .map(|table| (position, table))
-            .ok_or(TableCellError::TableNotFound)?,
+        TableSelector::Position(position) => {
+            let position = position.get();
+            sheet
+                .tables()
+                .nth(position)
+                .map(|table| (position, table))
+                .ok_or(TableCellError::TableNotFound)?
+        },
         TableSelector::Name(name) => {
             let mut matches = sheet
                 .tables()
