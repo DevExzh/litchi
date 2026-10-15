@@ -11,8 +11,8 @@ use super::super::validation::{
     parse_axis_cross_between, parse_axis_cross_mode, parse_axis_label_align,
     parse_axis_orientation, parse_axis_position, parse_bool_attr, parse_built_in_unit,
     parse_data_label_position, parse_grouping, parse_marker_style, parse_number_format,
-    parse_tick_label_position, parse_tick_mark, parse_time_unit, required_enum_attr,
-    required_f64_attr, required_named_f64_attr, required_nonnegative_f64_attr,
+    parse_tick_label_position, parse_tick_mark, parse_time_unit, required_axis_id_attr,
+    required_enum_attr, required_f64_attr, required_named_f64_attr, required_nonnegative_f64_attr,
     required_positive_f64_attr, required_positive_u32_attr, required_string_attr,
     required_u32_attr,
 };

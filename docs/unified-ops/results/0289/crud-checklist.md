@@ -17,20 +17,20 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 |---|---|---|---|---|---|---|---|---|---|
 | docx | 40 | 120 | 120 | 0 | 0 | 325 | 45 | 8 | 8 |
 | xlsx | 26 | 92 | 92 | 0 | 0 | 195 | 29 | 2 | 14 |
-| pptx | 37 | 189 | 178 | 3 | 8 | 156 | 86 | 2 | 28 |
+| pptx | 37 | 189 | 180 | 1 | 8 | 156 | 86 | 2 | 28 |
 | xlsb | 26 | 58 | 54 | 0 | 4 | 234 | 30 | 2 | 6 |
 | doc | 13 | 86 | 86 | 0 | 0 | 0 | 57 | 2 | 6 |
 | xls | 26 | 59 | 59 | 0 | 0 | 247 | 18 | 2 | 6 |
-| ppt | 36 | 76 | 65 | 1 | 8 | 338 | 34 | 2 | 8 |
-| rtf | 21 | 154 | 153 | 1 | 0 | 0 | 77 | 2 | 6 |
+| ppt | 36 | 76 | 68 | 0 | 8 | 338 | 34 | 2 | 8 |
+| rtf | 21 | 154 | 154 | 0 | 0 | 0 | 77 | 2 | 6 |
 | odt | 22 | 205 | 205 | 0 | 0 | 0 | 37 | 29 | 5 |
 | ods | 26 | 78 | 78 | 0 | 0 | 221 | 21 | 2 | 8 |
-| odp | 30 | 170 | 165 | 1 | 4 | 143 | 39 | 4 | 10 |
+| odp | 30 | 170 | 166 | 0 | 4 | 143 | 39 | 6 | 10 |
 | odg | 4 | 33 | 29 | 0 | 4 | 0 | 11 | 4 | 0 |
 | odc | 4 | 36 | 32 | 0 | 4 | 8 | 8 | 0 | 0 |
 | odi | 3 | 23 | 23 | 0 | 0 | 12 | 4 | 0 | 0 |
 | odb | 4 | 36 | 36 | 0 | 0 | 8 | 8 | 0 | 0 |
-| oth | 22 | 205 | 177 | 1 | 21 | 0 | 37 | 26 | 0 |
+| oth | 22 | 205 | 180 | 0 | 21 | 0 | 37 | 26 | 0 |
 | odm | 22 | 205 | 184 | 0 | 17 | 0 | 37 | 26 | 2 |
 | odf | 2 | 18 | 18 | 0 | 0 | 6 | 2 | 0 | 0 |
 | pages | 4 | 25 | 25 | 0 | 0 | 20 | 7 | 0 | 0 |
@@ -129,12 +129,12 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | presentation | ok | ok | n/a | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | slide | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | shape | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
-| placeholder | ok | ok | FAIL | ok | ok | n/a | ok | refused | refused | ok | ok | ok | ok |
+| placeholder | ok | ok | ok | ok | ok | n/a | ok | refused | refused | ok | ok | ok | ok |
 | picture | ok | ok | ok | ok | n/a | n/a | ok | refused | refused | n/a | n/a | ok | ok |
 | table | ok | ok | ok | ok | n/a | n/a | ok | no pair | no pair | n/a | n/a | ok | ok |
 | tr | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | tc | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
-| chart | ok | ok | ok | FAIL | ok | ok | ok | refused | refused | ok | ok | ok | ok |
+| chart | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
 | group | ok | ok | ok | ok | n/a | n/a | ok | no pair | no pair | n/a | n/a | ok | ok |
 | connector | ok | ok | ok | ok | n/a | n/a | ok | refused | refused | n/a | n/a | ok | ok |
 | smartart | ok | ok | ok | ok | ok | ok | ok | refused | refused | ok | ok | ok | ok |
@@ -261,7 +261,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | presentation | ok | ok | n/a | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
-| slide | ok | ok | ok | ok | FAIL | ok | ok | ok | ok | - | - | ok | ok |
+| slide | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | shape | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
 | placeholder | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
 | picture | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
@@ -318,7 +318,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | comments | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | comment | ok | ok | ok | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
 | hyperlink | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
-| picture | ok | ok | ok | ok | n/a | n/a | FAIL | no pair | no pair | n/a | n/a | ok | ok |
+| picture | ok | ok | ok | ok | n/a | n/a | ok | no pair | no pair | n/a | n/a | ok | ok |
 | styles | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | style | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
 | numbering | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
@@ -400,7 +400,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | presentation | ok | ok | n/a | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | slide | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | shape | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
-| placeholder | ok | ok | FAIL | ok | ok | n/a | ok | no pair | no pair | ok | ok | ok | ok |
+| placeholder | ok | ok | ok | ok | ok | n/a | ok | ok | ok | ok | ok | ok | ok |
 | picture | ok | ok | ok | ok | ok | n/a | ok | no pair | no pair | ok | ok | ok | ok |
 | table | ok | ok | ok | ok | ok | n/a | ok | no pair | no pair | ok | ok | ok | ok |
 | tr | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
@@ -503,7 +503,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | bookmark | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | styles | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | style | unreached | unreached | unreached | unreached | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
-| metadata | ok | ok | ok | ok | FAIL | n/a | n/a | no pair | no pair | - | - | ok | ok |
+| metadata | ok | ok | ok | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
 
 ## odm
 

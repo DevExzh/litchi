@@ -172,18 +172,35 @@ impl Assignments {
         &self,
         package: &OwnedPackage,
     ) -> Result<Option<XmlSplicePublication>, Error> {
+        match self.plan_publication(package)? {
+            Publication::Unchanged => Ok(None),
+            Publication::Splices(publication) => Ok(Some(publication)),
+            Publication::MissingPart => Err(invalid(
+                "the ODF package has no meta.xml for metadata edits",
+            )),
+        }
+    }
+
+    /// What the staged assignments publish over `package`, with one
+    /// `meta.xml` lookup: splices into the part, nothing, or
+    /// [`Publication::MissingPart`] when the package has none (then
+    /// [`Assignments::created_package`] adds it).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Core`] when `meta.xml` has no `office:meta` element
+    /// or is malformed.
+    pub fn plan_publication(&self, package: &OwnedPackage) -> Result<Publication, Error> {
         if self.fields.is_empty() {
-            return Ok(None);
+            return Ok(Publication::Unchanged);
         }
         if !package.has_file("meta.xml")? {
-            return Err(invalid(
-                "the ODF package has no meta.xml for metadata edits",
-            ));
+            return Ok(Publication::MissingPart);
         }
         let part = XmlSourcePart::load(package, "meta.xml")?;
         let splices = plan(part.bytes(), &self.fields)?;
         if splices.is_empty() {
-            return Ok(None);
+            return Ok(Publication::Unchanged);
         }
         let mut publication = XmlSplicePublication::new(part.clone());
         for (range, bytes) in splices {
@@ -195,12 +212,20 @@ impl Assignments {
             };
             publication.replace(proof, fragment)?;
         }
-        Ok(Some(publication))
+        Ok(Publication::Splices(publication))
     }
 
     /// The package with a new `meta.xml` holding the staged values, for a
-    /// package that has none; `None` when nothing would be written.
-    fn created_part(&self, package: &OwnedPackage) -> Result<Option<Vec<u8>>, Error> {
+    /// package that has none (OTH and ODM packages from the leaf builders);
+    /// `None` when nothing would be written (only removals were staged). The
+    /// part declares the `office:version` of `content.xml`; every other
+    /// member is copied.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Core`] for a signed or encrypted package, or when the
+    /// package cannot be read or rewritten.
+    pub fn created_package(&self, package: &OwnedPackage) -> Result<Option<Vec<u8>>, Error> {
         let mut children = String::new();
         for (field, value) in &self.fields {
             let Some(value) = value else { continue };
@@ -282,6 +307,17 @@ fn content_version(package: &OwnedPackage) -> Result<String, Error> {
     }
 }
 
+/// What [`Assignments::plan_publication`] publishes over one package.
+#[non_exhaustive]
+pub enum Publication {
+    /// Nothing is staged, or every assignment matches the source.
+    Unchanged,
+    /// Element splices into the package's `meta.xml`.
+    Splices(XmlSplicePublication),
+    /// The package has no `meta.xml`.
+    MissingPart,
+}
+
 /// A detached metadata edit of one source package. Dropping it discards
 /// the staged assignments.
 pub struct Edit<P> {
@@ -324,20 +360,17 @@ impl<P: Owner> Edit<P> {
     /// the leaf's ingress errors when it refuses the published candidate.
     pub fn commit(self) -> Result<Commit<P>, Error> {
         let package = self.source.metadata_source()?;
-        let bytes = if package.has_file("meta.xml")? {
-            match self.assignments.publication(&package)? {
-                Some(publication) => {
-                    refuse_envelope(&package)?;
-                    Some(rebuild_package_with_xml_splices(
-                        &package,
-                        vec![publication],
-                        MAX_PACKAGE_BYTES,
-                    )?)
-                },
-                None => None,
-            }
-        } else {
-            self.assignments.created_part(&package)?
+        let bytes = match self.assignments.plan_publication(&package)? {
+            Publication::Splices(publication) => {
+                refuse_envelope(&package)?;
+                Some(rebuild_package_with_xml_splices(
+                    &package,
+                    vec![publication],
+                    MAX_PACKAGE_BYTES,
+                )?)
+            },
+            Publication::Unchanged => None,
+            Publication::MissingPart => self.assignments.created_package(&package)?,
         };
         let Some(bytes) = bytes else {
             return Ok(Commit {

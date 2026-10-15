@@ -327,6 +327,9 @@ pub(crate) enum Structural {
     /// A column element filter (`Sheet1!B[...]`): the cell's zero-based
     /// column.
     Column(u32),
+    /// A bare `placeholder` element on a format that walks placeholders as
+    /// shapes: the shape carries a placeholder binding.
+    Placeholder,
     /// A cell or range element filter (`A1:C5`): the cell lies inside.
     Range {
         /// The top-left corner: zero-based column and row.

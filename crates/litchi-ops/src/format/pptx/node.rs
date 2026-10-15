@@ -720,6 +720,13 @@ impl<'f> Node<'f> {
         }
     }
 
+    /// Whether the node is a `p:sp` with a placeholder binding: what a bare
+    /// `placeholder` selector matches.
+    pub(super) fn is_placeholder(&self) -> bool {
+        matches!(&self.item, Item::Tree(tree)
+            if tree.kind == Kind::Shape && tree.handle.view().placeholder().is_some())
+    }
+
     /// The OfficeCLI `type` of the node.
     pub(super) fn type_name(&self) -> &'static str {
         match &self.item {

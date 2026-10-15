@@ -7,8 +7,8 @@ use super::{
     parse_axis_cross_mode, parse_axis_label_align, parse_axis_orientation, parse_axis_position,
     parse_bool_attr, parse_built_in_unit, parse_chart_lines, parse_layout, parse_number_format,
     parse_text_element, parse_tick_label_position, parse_tick_mark, parse_time_unit, parse_title,
-    required_f64_attr, required_positive_f64_attr, required_positive_u32_attr, required_u32_attr,
-    set_chart_lines,
+    required_axis_id_attr, required_f64_attr, required_positive_f64_attr,
+    required_positive_u32_attr, set_chart_lines,
 };
 
 #[derive(Default)]
@@ -170,7 +170,7 @@ pub(crate) fn parse_axis_common_element(
     decoder: Decoder,
 ) -> Result<bool> {
     match element.local_name().as_ref() {
-        b"axId" => common.axis_id = Some(required_u32_attr(element, "chart axis ID")?),
+        b"axId" => common.axis_id = Some(required_axis_id_attr(element, "chart axis ID")?),
         b"orientation" => common.orientation = parse_axis_orientation(element)?,
         b"delete" => common.deleted = parse_bool_attr(element)?,
         b"axPos" => common.position = Some(parse_axis_position(element)?),
@@ -181,7 +181,7 @@ pub(crate) fn parse_axis_common_element(
         b"minorTickMark" => common.minor_tick_mark = parse_tick_mark(element)?,
         b"tickLblPos" => common.tick_label_position = parse_tick_label_position(element)?,
         b"crossAx" => {
-            common.cross_axis_id = Some(required_u32_attr(element, "chart crossing-axis ID")?);
+            common.cross_axis_id = Some(required_axis_id_attr(element, "chart crossing-axis ID")?);
         },
         b"crosses" => common.cross_mode = parse_axis_cross_mode(element)?,
         b"crossesAt" => {

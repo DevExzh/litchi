@@ -143,3 +143,24 @@ fn series_colors_replace_insert_and_clear_fills() {
         assert!(parsed.is_authored(&xml), "{kind:?}");
     }
 }
+
+/// Record 0290 F2: a source-preserving edit finds an axis whose producer ID
+/// is spelled as a negative signed integer.
+#[test]
+fn edits_find_axes_with_negative_producer_ids() {
+    let source = std::str::from_utf8(CHART)
+        .unwrap()
+        .replace(r#"<c:axId val="1"/>"#, r#"<c:axId val="-1884094432"/>"#)
+        .replace(
+            r#"<c:crossAx val="1"/>"#,
+            r#"<c:crossAx val="-1884094432"/>"#,
+        );
+    let snapshot = Snapshot::from_xml(source.as_bytes()).expect("chart fixture must parse");
+    let axis = (-1_884_094_432_i32).cast_unsigned();
+    let mut edit = snapshot.edit();
+    edit.set_axis_position(axis, AxisPosition::Top)
+        .expect("the negative axis ID must resolve");
+    let commit = edit.commit().expect("edit must commit");
+    let after = std::str::from_utf8(commit.patch().after_xml()).unwrap();
+    assert!(after.contains(r#"<c:axId val="-1884094432"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="t"/>"#), "{after}");
+}
