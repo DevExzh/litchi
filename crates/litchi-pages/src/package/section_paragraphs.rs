@@ -231,6 +231,9 @@ pub struct Edit<'a> {
     position: Position,
     before: &'a str,
     operations: Vec<Operation>,
+    /// The paragraphs with every staged operation applied, kept current so
+    /// staging is linear in the operation count.
+    current: Vec<String>,
 }
 
 impl fmt::Debug for Edit<'_> {
@@ -252,10 +255,10 @@ impl<'a> Edit<'a> {
                 maximum: u64::try_from(MAX_OPERATIONS).unwrap_or(u64::MAX),
             });
         }
-        // Validate against the running paragraph list so a refusal names
-        // the operation that caused it.
-        let mut paragraphs = self.paragraphs()?;
-        operation.apply(&mut paragraphs)?;
+        // Apply to the running paragraphs first: a refusal names the
+        // operation that caused it, and `apply` validates before it mutates,
+        // so a refused operation leaves the edit as it was.
+        operation.apply(&mut self.current)?;
         self.operations.push(operation);
         Ok(self)
     }
@@ -276,11 +279,7 @@ impl<'a> Edit<'a> {
     ///
     /// Infallible for operations that staged successfully.
     pub fn paragraphs(&self) -> Result<Vec<String>, Error> {
-        let mut paragraphs = paragraphs(self.before);
-        for operation in &self.operations {
-            operation.apply(&mut paragraphs)?;
-        }
-        Ok(paragraphs)
+        Ok(self.current.clone())
     }
 
     /// The selected section's source position.
@@ -348,7 +347,7 @@ impl<'a> Edit<'a> {
     ///
     /// The first refusal, leaving the source package untouched.
     pub fn commit(self) -> Result<Commit, Error> {
-        let after = self.paragraphs()?.join("\n");
+        let after = self.current.join("\n");
         let Some((span, replacement)) = splice(self.before, &after) else {
             return Ok(Commit {
                 package: self.source.clone(),
@@ -527,11 +526,13 @@ impl Package {
         selector: impl Into<SectionSelector<'selector>>,
     ) -> Result<Edit<'_>, Error> {
         let edit = self.edit_section_text(selector)?;
+        let before = edit.text();
         Ok(Edit {
             source: self,
             position: edit.position(),
-            before: edit.text(),
+            before,
             operations: Vec::new(),
+            current: paragraphs(before),
         })
     }
 
