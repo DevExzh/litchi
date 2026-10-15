@@ -198,7 +198,7 @@ fn chart_arrangement_inverse_and_exact_apply_are_source_bound() -> TestResult {
         .apply_sheet_chart_arrangement(&commit.patch().inverse())?;
     assert_eq!(exact_bytes(restored.package())?, source);
     assert_eq!(
-        arrangement(&restored.package(), 0, 0)?,
+        arrangement(restored.package(), 0, 0)?,
         ChartArrangement::default()
     );
 
@@ -294,16 +294,14 @@ fn chart_arrangement_fixture_has_cross_component_profile_and_untouched_assets() 
     assert_eq!(package.sheets().len(), 2);
     assert_eq!(package.sheets()[0].name(), "Sheet 1");
     assert_eq!(package.sheets()[1].name(), "Sheet 2");
-    assert_eq!(
-        fixture::object_message(
+    assert!(
+        !fixture::object_message(
             &source,
             DOCUMENT_MEMBER,
             fixture::DOCUMENT_ID,
             fixture::DOCUMENT_MESSAGE_TYPE
         )?
-        .len()
-            > 0,
-        true
+        .is_empty()
     );
     let catalog = Catalog::from_bytes(&source)?;
     for member in [

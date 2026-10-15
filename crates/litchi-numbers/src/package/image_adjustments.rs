@@ -2657,11 +2657,11 @@ mod tests {
         source: &[u8],
         adjustments: ImageAdjustments,
     ) -> Result<Vec<u8>, codec::DecodeError> {
-        Ok(codec::rewrite_image_adjustments(
+        codec::rewrite_image_adjustments(
             source,
             write_from_adjustments(adjustments),
             codec_options(source, WireLimits::default()),
-        )?)
+        )
     }
 
     #[test]

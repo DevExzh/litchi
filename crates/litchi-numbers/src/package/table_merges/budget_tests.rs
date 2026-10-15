@@ -464,7 +464,7 @@ fn absent_drawable_lock_is_valid_during_table_ownership_preflight() {
         let mut budget = Budget::new(&package).expect("native fixture admits the default profile");
         if locked.is_none() {
             assert!(
-                !source.iter().any(|byte| *byte == 0x28),
+                !source.contains(&0x28),
                 "the absent-lock case must omit DrawableArchive.locked"
             );
         }

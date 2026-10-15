@@ -2384,33 +2384,6 @@ fn same_selected_central_record(left: &[u8], right: &[u8]) -> bool {
         && left[28..] == right[28..]
 }
 
-#[cfg(test)]
-mod tests {
-    use super::same_selected_central_record;
-
-    #[test]
-    fn selected_central_record_mask_preserves_timestamp_and_allows_sizes() {
-        let source: Vec<u8> = (0..46).map(|value| value as u8).collect();
-
-        let mut timestamp = source.clone();
-        timestamp[14] ^= 1;
-        assert!(!same_selected_central_record(&source, &timestamp));
-
-        let mut crc = source.clone();
-        crc[16] ^= 1;
-        assert!(same_selected_central_record(&source, &crc));
-
-        let mut high_size = source.clone();
-        high_size[26] ^= 1;
-        high_size[27] ^= 1;
-        assert!(same_selected_central_record(&source, &high_size));
-
-        let mut filename_length = source.clone();
-        filename_length[28] ^= 1;
-        assert!(!same_selected_central_record(&source, &filename_length));
-    }
-}
-
 fn same_unselected_entry_records(left: &Entry, right: &Entry) -> bool {
     if left.data() != right.data()
         || left.metadata() != right.metadata()
@@ -2949,4 +2922,31 @@ fn _component_archive(
     component_index: usize,
 ) -> Result<&Archive, ChartArrangementError> {
     physical_component_archive(package, component_index)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::same_selected_central_record;
+
+    #[test]
+    fn selected_central_record_mask_preserves_timestamp_and_allows_sizes() {
+        let source: Vec<u8> = (0..46).map(|value| value as u8).collect();
+
+        let mut timestamp = source.clone();
+        timestamp[14] ^= 1;
+        assert!(!same_selected_central_record(&source, &timestamp));
+
+        let mut crc = source.clone();
+        crc[16] ^= 1;
+        assert!(same_selected_central_record(&source, &crc));
+
+        let mut high_size = source.clone();
+        high_size[26] ^= 1;
+        high_size[27] ^= 1;
+        assert!(same_selected_central_record(&source, &high_size));
+
+        let mut filename_length = source.clone();
+        filename_length[28] ^= 1;
+        assert!(!same_selected_central_record(&source, &filename_length));
+    }
 }

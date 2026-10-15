@@ -313,7 +313,6 @@ pub(crate) fn comment_segment() -> TestResult<ArchiveObject> {
                 length: 1,
             },
             entries: vec![comment_entry(1, ROOT_COMMENT_ID, 1)],
-            ..Default::default()
         }
         .encode_to_vec(),
     )?;
@@ -337,7 +336,6 @@ fn unrelated_comment_segment() -> TestResult<ArchiveObject> {
                 length: 1,
             },
             entries: vec![comment_entry(1, ROOT_COMMENT_ID, 1)],
-            ..Default::default()
         }
         .encode_to_vec(),
     )?;
@@ -679,9 +677,11 @@ pub(crate) fn reply_objects(
     };
     if !matches!(mode, FixtureMode::SharedReply | FixtureMode::CrossComponent) {
         let nested = matches!(corruption, Some(Corruption::NestedReplyReference));
-        let nested_replies = nested
-            .then(|| vec![reference(SECOND_REPLY_ID)])
-            .unwrap_or_default();
+        let nested_replies = if nested {
+            vec![reference(SECOND_REPLY_ID)]
+        } else {
+            Vec::new()
+        };
         result.push(comment_archive(
             FIRST_REPLY_ID,
             first_text,
