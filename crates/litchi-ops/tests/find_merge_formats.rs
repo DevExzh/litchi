@@ -309,6 +309,38 @@ fn xlsb_find_and_merge() {
     spreadsheet_find_and_merge(FileFormat::Xlsb);
 }
 
+#[cfg(feature = "xls")]
+#[test]
+fn xls_find_and_merge() {
+    spreadsheet_find_and_merge(FileFormat::Xls);
+}
+
+/// More changes than one native BIFF8 edit admits: chained commits inside
+/// one unified mutation.
+#[cfg(feature = "xls")]
+#[test]
+fn xls_merge_chains_native_edits() {
+    let source = "{{k}}\n".repeat(1_500);
+    let file = create(FileFormat::Xls)
+        .unwrap()
+        .import(
+            "/Sheet1",
+            source.as_bytes(),
+            &litchi_ops::import::Options::csv(),
+        )
+        .unwrap()
+        .file;
+    let commit = file.merge(&record(&[("k", "v")]), &Options::new()).unwrap();
+    assert_eq!(commit.value.replacements(), 1_500);
+    assert!(commit.diagnostics.commits() >= 2);
+    let after = reopen(&commit.file);
+    assert_eq!(text(&after, "/Sheet1/A1"), "v");
+    assert_eq!(text(&after, "/Sheet1/A1500"), "v");
+    let (found, matched) = find(&after, "/", "v", "w");
+    assert_eq!(matched, 1_500);
+    assert_eq!(text(&found, "/Sheet1/A1499"), "w");
+}
+
 #[test]
 fn formats_are_reported() {
     let _ = FileFormat::Doc;

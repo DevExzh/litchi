@@ -70,20 +70,17 @@ impl File {
             if !admitted {
                 super::admit(self)?;
             }
-            let (step, summary) = run(self, record, options, limits)?;
-            let mut steps = Vec::new();
-            let mut snapshot_bytes = 0;
-            if let Some(step) = step {
-                if step.snapshot_bytes > limits.max_snapshot_bytes() {
-                    return Err(Error::Limit {
-                        kind: LimitKind::SnapshotBytes,
-                        observed: step.snapshot_bytes,
-                        maximum: limits.max_snapshot_bytes(),
-                    }
-                    .into());
+            let (steps, summary) = run_steps(self, record, options, limits)?;
+            let snapshot_bytes = steps.iter().fold(0usize, |bytes, step| {
+                bytes.saturating_add(step.snapshot_bytes)
+            });
+            if snapshot_bytes > limits.max_snapshot_bytes() {
+                return Err(Error::Limit {
+                    kind: LimitKind::SnapshotBytes,
+                    observed: snapshot_bytes,
+                    maximum: limits.max_snapshot_bytes(),
                 }
-                snapshot_bytes = step.snapshot_bytes;
-                steps.push(step);
+                .into());
             }
             let changed = super::changed(&steps)?;
             let file = match steps.last() {
@@ -145,29 +142,49 @@ impl Edit {
                 }
                 .into());
             }
-            let (step, summary) = run(&self.current, record, options, &self.limits)?;
-            if let Some(step) = step {
-                let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
-                if bytes > self.limits.max_snapshot_bytes() {
-                    return Err(Error::Limit {
-                        kind: LimitKind::SnapshotBytes,
-                        observed: bytes,
-                        maximum: self.limits.max_snapshot_bytes(),
-                    }
-                    .into());
+            let (steps, summary) = run_steps(&self.current, record, options, &self.limits)?;
+            let bytes = steps.iter().fold(self.snapshot_bytes, |bytes, step| {
+                bytes.saturating_add(step.snapshot_bytes)
+            });
+            if bytes > self.limits.max_snapshot_bytes() {
+                return Err(Error::Limit {
+                    kind: LimitKind::SnapshotBytes,
+                    observed: bytes,
+                    maximum: self.limits.max_snapshot_bytes(),
                 }
-                self.steps
-                    .try_reserve(1)
-                    .map_err(|source| Error::Allocation { source })?;
+                .into());
+            }
+            self.steps
+                .try_reserve(steps.len())
+                .map_err(|source| Error::Allocation { source })?;
+            for step in steps {
                 self.current = step.after.clone();
                 self.steps.push(step);
-                self.snapshot_bytes = bytes;
             }
+            self.snapshot_bytes = bytes;
             self.operations += 1;
             Ok(summary)
         })();
         result.map_err(|error| self.poison(error, index))
     }
+}
+
+/// Merge through the format's native editor: the native commits, each on
+/// the previous one's result (one, except for chunked XLS edits).
+fn run_steps(
+    file: &File,
+    record: &Record,
+    options: &Options,
+    limits: &SemanticLimits,
+) -> Result<(Vec<super::Step>, Summary)> {
+    #[cfg(feature = "xls")]
+    if let File::Xls(handle) = file {
+        let (commits, summary) =
+            crate::format::xls::write::find::merge(handle, record, options, limits)?;
+        return Ok((super::xls_steps(commits)?, summary));
+    }
+    let (step, summary) = run(file, record, options, limits)?;
+    Ok((step.into_iter().collect(), summary))
 }
 
 /// Merge through the format's native editor: at most one native commit.

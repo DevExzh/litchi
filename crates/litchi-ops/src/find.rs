@@ -373,6 +373,17 @@ pub(crate) fn set(
             crate::format::xlsb::write::find::find_replace(handle, &target, &spec, &limits)
                 .map(|(commit, _)| crate::File::Xlsb(commit.into_file()))
         },
+        #[cfg(feature = "xls")]
+        crate::File::Xls(handle) => crate::format::xls::write::find::find_replace(
+            handle, &target, &spec, &limits,
+        )
+        .map(|(commits, _)| {
+            crate::File::Xls(
+                commits
+                    .last()
+                    .map_or_else(|| handle.clone(), |commit| commit.after.clone()),
+            )
+        }),
         #[cfg(feature = "ppt")]
         crate::File::Ppt(handle) => {
             crate::format::ppt::write::find::find_replace(handle, &target, &spec, &limits)

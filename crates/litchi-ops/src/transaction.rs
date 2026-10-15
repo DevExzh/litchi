@@ -2682,6 +2682,18 @@ impl Edit {
         };
         let limits = self.limits;
         let _ = (target, &spec, &limits);
+        #[cfg(feature = "xls")]
+        if matches!(self.current, File::Xls(_)) {
+            return self.execute_steps(|file| match file {
+                File::Xls(handle) => {
+                    let (commits, matched) = crate::format::xls::write::find::find_replace(
+                        handle, target, &spec, &limits,
+                    )?;
+                    Ok((xls_steps(commits)?, matched))
+                },
+                _ => Err(crate::find::unsupported(file)),
+            });
+        }
         self.execute(|file| match file {
             #[cfg(feature = "docx")]
             File::Docx(handle) => {
@@ -2740,6 +2752,18 @@ impl Edit {
         self.failure.clone().map_or(Ok(()), Err)
     }
     fn execute<T>(&mut self, operation: impl FnOnce(&File) -> Result<(Step, T)>) -> Result<T> {
+        self.execute_steps(|file| {
+            let (step, value) = operation(file)?;
+            Ok((vec![step], value))
+        })
+    }
+
+    /// [`Self::execute`] for one mutation that commits several native steps,
+    /// each on the previous one's result (XLS chunks, record 0295).
+    fn execute_steps<T>(
+        &mut self,
+        operation: impl FnOnce(&File) -> Result<(Vec<Step>, T)>,
+    ) -> Result<T> {
         self.check()?;
         self.flush_pending()?;
         let index = self.operations;
@@ -2752,8 +2776,10 @@ impl Edit {
                 }
                 .into());
             }
-            let (step, value) = operation(&self.current)?;
-            let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
+            let (steps, value) = operation(&self.current)?;
+            let bytes = steps.iter().fold(self.snapshot_bytes, |bytes, step| {
+                bytes.saturating_add(step.snapshot_bytes)
+            });
             if bytes > self.limits.max_snapshot_bytes() {
                 return Err(Error::Limit {
                     kind: LimitKind::SnapshotBytes,
@@ -2763,16 +2789,30 @@ impl Edit {
                 .into());
             }
             self.steps
-                .try_reserve(1)
+                .try_reserve(steps.len())
                 .map_err(|source| Error::Allocation { source })?;
-            self.current = step.after.clone();
-            self.steps.push(step);
+            for step in steps {
+                self.current = step.after.clone();
+                self.steps.push(step);
+            }
             self.snapshot_bytes = bytes;
             self.operations += 1;
             Ok(value)
         })();
         result.map_err(|error| self.poison(error, index))
     }
+}
+
+/// The steps of chained XLS commits, each on the previous one's result.
+#[cfg(feature = "xls")]
+fn xls_steps(commits: Vec<crate::format::xls::WriteCommit>) -> Result<Vec<Step>> {
+    commits
+        .into_iter()
+        .map(|commit| {
+            let before = commit.before.clone();
+            Ok(wrap_xls(&before, commit, ())?.0)
+        })
+        .collect()
 }
 
 #[cfg(feature = "docx")]

@@ -76,9 +76,8 @@ impl<'t> Run<'t> {
             feature = "odp",
             feature = "ods",
             feature = "xlsb",
-            feature = "xls",
+            feature = "doc",
             feature = "ppt",
-            test
         )),
         allow(dead_code, reason = "only adapters with fixed runs mark them")
     )]
