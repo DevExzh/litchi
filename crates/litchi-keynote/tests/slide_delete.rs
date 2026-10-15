@@ -1289,3 +1289,28 @@ fn public_deletion_values_are_send_sync() {
     assert_send_sync::<delete::LimitKind>();
     assert_send_sync::<delete::Path>();
 }
+
+/// A slide whose preview an earlier text edit invalidated keeps the
+/// registry's data-owner record of its dropped thumbnail; deleting the
+/// slide removes that record with it (record 0298, Phase G F8).
+#[test]
+fn deleting_a_slide_with_a_stale_thumbnail_owner_record() -> TestResult<()> {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/iwork/keynote/multi-slide.key");
+    let package = Package::open(path)?;
+    let titles = |package: &Package| -> TestResult<Vec<Option<String>>> {
+        Ok(package
+            .slides()?
+            .iter()
+            .map(|slide| slide.title().map(str::to_owned))
+            .collect())
+    };
+    let before = titles(&package)?;
+    let mut edit = package.edit_slide_deletion();
+    edit.remove_slide(SlideSelector::index(0))?;
+    let commit = edit.commit()?;
+    let reopened = Package::from_bytes(&exact_bytes(commit.package())?)?;
+    reopened.validate()?;
+    assert_eq!(titles(&reopened)?, before[1..]);
+    Ok(())
+}

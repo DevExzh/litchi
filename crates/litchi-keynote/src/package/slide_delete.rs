@@ -11,10 +11,10 @@ use litchi_iwa_common::{
 };
 use litchi_iwa_core::{Archive, ArchiveObject, FieldType, RawMessage, SnappyStream};
 use litchi_iwa_protos::package_metadata_codec::{
-    ComponentDescriptor, ComponentSelector, DataReferenceOwnerRemoval, ExternalReferenceDescriptor,
-    ExternalReferenceRemoval, ObjectUuidDescriptor, ObjectUuidRemoval, PackageMetadataVisitor,
-    RemovalBatch, RewriteError, RewriteOptions, UuidBits, inspect_package_metadata_with_visitor,
-    remove_package_metadata,
+    ComponentDescriptor, ComponentSelector, DataReferenceOwnerDescriptor,
+    DataReferenceOwnerRemoval, ExternalReferenceDescriptor, ExternalReferenceRemoval,
+    ObjectUuidDescriptor, ObjectUuidRemoval, PackageMetadataVisitor, RemovalBatch, RewriteError,
+    RewriteOptions, UuidBits, inspect_package_metadata_with_visitor, remove_package_metadata,
 };
 use thiserror::Error as ThisError;
 
@@ -173,6 +173,11 @@ struct MetadataFacts<'a> {
     /// view state's slide selection): `(source component, source locator,
     /// target component)`. They do not own the node and are dropped with it.
     weak_node_references: Vec<(u64, String, u64)>,
+    /// The registry's data-reference owner records of the node and the
+    /// slide: `(owner, data identifier, count)`. They are removed with
+    /// their owners even when the owner's archive no longer lists the data
+    /// (a slide whose preview was invalidated keeps its registry record).
+    data_owner_records: Vec<(u64, u64, u32)>,
     node_identifier: u64,
     slide_identifier: u64,
     node_locator: &'a str,
@@ -220,6 +225,31 @@ impl PackageMetadataVisitor for MetadataFacts<'_> {
         }
         Ok(())
     }
+    fn visit_data_reference_owner(
+        &mut self,
+        owner: DataReferenceOwnerDescriptor<'_>,
+    ) -> Result<(), RewriteError> {
+        let object = owner.object_identifier();
+        if object != self.node_identifier && object != self.slide_identifier {
+            return Ok(());
+        }
+        let locator = if object == self.node_identifier {
+            self.node_locator
+        } else {
+            self.slide_locator
+        };
+        if !owner.component().is_current()
+            || owner.component().effective_locator() != locator
+            || owner.has_unknown_fields()
+        {
+            self.invalid = true;
+        } else {
+            self.data_owner_records
+                .push((object, owner.data_identifier(), owner.count()));
+        }
+        Ok(())
+    }
+
     fn visit_external_reference(
         &mut self,
         reference: ExternalReferenceDescriptor<'_>,
@@ -335,6 +365,7 @@ fn select_metadata<'a>(
         invalid: false,
         ambiguous: false,
         weak_node_references: Vec::new(),
+        data_owner_records: Vec::new(),
         node_identifier,
         slide_identifier,
         node_locator: normalized_locator(node_component),
@@ -383,27 +414,43 @@ fn select_metadata<'a>(
         .message_infos
         .first()
         .ok_or(Error::InvalidSource)?;
-    let data_count = node_info
-        .data_references
-        .len()
-        .checked_add(slide_info.data_references.len())
-        .ok_or(Error::InvalidSource)?;
+    // The data each object's archive lists must have a registry owner
+    // record; the registry may also hold records the archive no longer
+    // lists (an invalidated slide preview), which go with their owner.
+    // A record of data the archive lists counts exactly its listings.
+    for (identifier, info) in [(node_identifier, node_info), (slide_identifier, slide_info)] {
+        if info.data_references.iter().any(|data| {
+            !facts
+                .data_owner_records
+                .iter()
+                .any(|(owner, record, _)| *owner == identifier && record == data)
+        }) {
+            return Err(Error::InvalidSource);
+        }
+        for (owner, data, count) in &facts.data_owner_records {
+            let listed = info
+                .data_references
+                .iter()
+                .filter(|listed| *listed == data)
+                .count();
+            if *owner == identifier && listed != 0 && listed != *count as usize {
+                return Err(Error::InvalidSource);
+            }
+        }
+    }
+    let data_count = facts.data_owner_records.len();
     let mut data_owners = Vec::new();
     data_owners
         .try_reserve_exact(data_count)
         .map_err(|_| Error::Allocation { amount: data_count })?;
-    data_owners.extend(
-        node_info
-            .data_references
-            .iter()
-            .map(|id| DataReferenceOwnerRemoval::new(node_selector, *id, node_identifier, 1)),
-    );
-    data_owners.extend(
-        slide_info
-            .data_references
-            .iter()
-            .map(|id| DataReferenceOwnerRemoval::new(slide_selector, *id, slide_identifier, 1)),
-    );
+    data_owners.extend(facts.data_owner_records.iter().map(|(owner, data, count)| {
+        let selector = if *owner == node_identifier {
+            node_selector
+        } else {
+            slide_selector
+        };
+        DataReferenceOwnerRemoval::new(selector, *data, *owner, *count)
+    }));
     let node_uuid = facts.node_uuid.ok_or(Error::InvalidSource)?;
     let slide_uuid = facts.slide_uuid.ok_or(Error::InvalidSource)?;
     let uuid_removals = [
