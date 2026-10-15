@@ -600,6 +600,15 @@ Cut from `99cc3138eb`. It targets what Phase G (0289) found still open for the D
 - **D1 (record 0248), iWork placement: remove the iWork-free gate.** `litchi-ops` may depend on the iWork crates, so the single `File` enum gets `Pages`, `Keynote` and `Numbers` variants directly. There is no facade-level wrapper and no separate adapter crate. The provisional option (a) is withdrawn.
 - **D2 (record 0248), iWork ownership: the iWork owner agent is paused.** The coordinator's agents may now modify the iWork crates, including the ADR 0034 W1 iWork renames and the `IWORK_API_REQUESTS.md` leaf APIs.
 
+## Incident (2026-10-15): coordinator session lost
+The coordinator's Claude process stalled and exited while seven agents (wave R7 plus `iwork-found`, 0296) were building.
+- Evidence: no API error in the transcript and no reboot; no orphaned build processes. `/proc/pressure/memory` showed sustained full stalls, the host has 123 GB and no swap, and each agent ran cargo with the default 32 jobs. The kernel log is not readable, so an OOM kill is likely but unconfirmed.
+- Mitigation:
+  - every agent and coordinator build now runs with `CARGO_BUILD_JOBS=6–8` and `RUST_TEST_THREADS=8`, one cargo-heavy command at a time;
+  - at most four agents run concurrently;
+  - the coordinator watches `MemAvailable` (alert below 16 GB) and free disk.
+- Resumed: `iwork-found` (0296), `checklist-fixes` (0290), `perf-path` (0291), `producer-structure` (0293). Held: `odf-verbs` (0292), `acceptance2` (0294), `m4-ext` (0295).
+
 Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-pptx-w4` 9474e2b6ce, `uo/m2-l-xlsb-w1` 876588a23c, `uo/m1-r4-perf` 012fd509ff.
 
 - M0a S10 (`docs/unified-ops/s10-measurement.md` §9). M0a landed on the strength of two explanations. If either is rejected, the chosen alternative becomes a harness follow-up; M0a is not reverted.
