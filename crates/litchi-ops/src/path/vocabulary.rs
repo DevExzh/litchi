@@ -435,7 +435,6 @@ pub(crate) static WORD: Vocabulary = Vocabulary {
         ("comments", "comments"),
         ("contentcontrol", "sdt"),
         ("customxml", "customXml"),
-        ("diagram", "smartart"),
         ("embed", "ole"),
         ("endnote", "endnote"),
         ("endnotes", "endnotes"),

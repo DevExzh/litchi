@@ -90,7 +90,7 @@ The format is the extension of the document each call names.
 | set | cell | `warned` | `bold` | 64 | not in the registry; OfficeCLI documents it | `word/revisions.sh:166`, `word/revisions.sh:167` |
 | set | cell | `warned` | `color` | 64 | not in the registry; OfficeCLI documents it | `word/tables.sh:34`, `word/tables.sh:35` |
 | set | cell | `warned` | `align` | 57 | not in the registry; OfficeCLI documents it | `word/tables.sh:94`, `word/tables.sh:101` |
-| add | diagram | `unsupported_capability` | - | 19 | element not in the registry | `word/diagram.sh:64`, `word/diagram.sh:100` |
+| add | smartart | `unsupported_capability` | - | 19 | registry lists add; refused for this target (operation gap) | `word/diagram.sh:64`, `word/diagram.sh:100` |
 | set | cell | `warned` | `vmerge` | 18 | registry: `vmerge` is not set-able; OfficeCLI documents it | `word/tables.sh:42`, `word/tables.sh:49` |
 | set | document | `unsupported_element` | - | 13 | registry: no set on document | `word/document-formatting.sh:25`, `word/document-formatting.sh:28` |
 | add | textbox | `unsupported_element` | - | 11 | registry gap R4x | `word/textbox.sh:39`, `word/textbox.sh:184` |
@@ -106,12 +106,12 @@ The format is the extension of the document each call names.
 | add | abstractNum | `unsupported_capability` | - | 4 | registry gap L-DOCX-R6 (R4x) | `word/numbering.sh:46`, `word/numbering.sh:160` |
 | add | table | `warned` | `border.all` | 4 | not in the registry; OfficeCLI documents it | `word/tables.sh:179`, `word/tables.sh:247` |
 | set | cell | `warned` | `fill` | 4 | not in the registry; OfficeCLI documents it | `word/tables.sh:198`, `word/tables.sh:199` |
-| add | diagram | `unsupported_element` | - | 3 | element not in the registry | `word/diagram.sh:57`, `word/diagram.sh:78` |
 | add | paragraph | `warned` | `em` | 3 | not in the registry; not in OfficeCLI's help schema | `word/run-formatting.sh:135`, `word/run-formatting.sh:136` |
 | add | paragraph | `warned` | `shading.fill` | 3 | not in the registry; OfficeCLI documents it | `word/paragraph-formatting.sh:55`, `word/paragraph-formatting.sh:56` |
 | add | picture | `warned` | `anchor` | 3 | not in the registry; OfficeCLI documents it | `word/pictures.sh:106`, `word/pictures.sh:121` |
 | add | picture | `warned` | `wrap` | 3 | not in the registry; OfficeCLI documents it | `word/pictures.sh:106`, `word/pictures.sh:121` |
 | add | section | `unsupported_element` | - | 3 | registry: no add on section | `word/sections.sh:60`, `word/sections.sh:87` |
+| add | smartart | `unsupported_element` | - | 3 | registry lists add; refused for this target (operation gap) | `word/diagram.sh:57`, `word/diagram.sh:78` |
 | add | style | `unsupported_capability` | - | 3 | registry gap L-DOCX-R6 (R4x) | `word/fields.sh:37`, `word/fields.sh:40` |
 | set | level | `unsupported_capability` | - | 3 | registry gap L-DOCX-R6 (R4x) | `word/numbering.sh:257`, `word/numbering.sh:302` |
 | add | chart | `warned` | `axisNumFmt` | 2 | not in the registry; OfficeCLI documents it | `word/charts.sh:50`, `word/charts.sh:215` |

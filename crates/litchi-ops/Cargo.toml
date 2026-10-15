@@ -201,3 +201,8 @@ required-features = ["docx", "xlsx", "eval"]
 [[example]]
 name              = "iwork_bench"
 required-features = ["pages", "keynote", "numbers"]
+
+# Paired leaf-vs-unified find, merge and import on more formats (record 0295).
+[[example]]
+name              = "m4_formats_bench"
+required-features = ["odt", "doc", "ods"]

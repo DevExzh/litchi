@@ -1294,7 +1294,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
             element(
                 K::SmartArt,
                 "smartart",
-                &["diagram", "smartart"],
+                &["smartart"],
                 &[K::Document],
                 &[],
                 &["/smartart[N]", "/body/smartart[N]"],

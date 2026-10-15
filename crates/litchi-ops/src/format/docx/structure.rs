@@ -381,7 +381,7 @@ fn new_kind(name: &str) -> Result<NewKind> {
         Ok(NewKind::Picture)
     } else if name.eq_ignore_ascii_case("chart") {
         Ok(NewKind::Chart)
-    } else if name.eq_ignore_ascii_case("smartart") || name.eq_ignore_ascii_case("diagram") {
+    } else if name.eq_ignore_ascii_case("smartart") {
         Ok(NewKind::SmartArt)
     } else {
         Err(Error::new(

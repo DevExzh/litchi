@@ -3501,9 +3501,6 @@
       "format": "docx",
       "element": "smartart",
       "parent": "document",
-      "elementAliases": [
-        "diagram"
-      ],
       "operations": {
         "add": true,
         "set": false,

@@ -285,7 +285,10 @@ fn ordinary_reports_hide_native_selection_fields() {
                 );
                 assert_eq!(
                     property.get(),
-                    matches!(property.name(), "layout" | "layoutId" | "nodeCount" | "text"),
+                    matches!(
+                        property.name(),
+                        "layout" | "layoutId" | "nodeCount" | "text"
+                    ),
                     "smartart {}",
                     property.name()
                 );
