@@ -18,18 +18,18 @@ refused (typed), `refused` every candidate set was refused (typed),
 | odb | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 1 |
 | odc | 2 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 |
 | odf | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 |
-| odg | 9 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 9 | 0 | 0 | 0 | 0 |
+| odg | 9 | 0 | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 9 | 0 | 0 | 0 | 0 |
 | odm | 3 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 0 | 0 |
 | odp | 15 | 0 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 13 | 0 | 2 | 0 | 0 |
 | ods | 13 | 0 | 13 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 0 | 10 | 0 |
-| odt | 23 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 20 | 0 | 0 | 3 | 0 |
+| odt | 23 | 0 | 47 | 0 | 0 | 0 | 0 | 0 | 0 | 20 | 0 | 0 | 3 | 0 |
 | ppt | 27 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 27 |
 | pptx | 80 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 50 | 26 |
 | rtf | 162 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 14 | 49 | 0 | 1 | 61 | 37 |
 | xls | 119 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 59 | 3 | 0 | 0 | 57 | 0 |
 | xlsb | 18 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 18 | 0 | 0 | 0 | 0 |
 | xlsx | 179 | 0 | 0 | 0 | 2 | 0 | 0 | 1 | 0 | 173 | 0 | 1 | 5 | 0 |
-| **all** | 771 | 0 | 21 | 0 | 7 | 0 | 0 | 14 | 109 | 342 | 0 | 4 | 195 | 121 |
+| **all** | 771 | 0 | 71 | 0 | 7 | 0 | 0 | 14 | 109 | 342 | 0 | 4 | 195 | 121 |
 
 ## Office-extension files the unified layer does not open
 
@@ -37,10 +37,9 @@ refused (typed), `refused` every candidate set was refused (typed),
 |---|---|
 | doc | corrupt_file ×5, unsupported_format ×5 |
 | docx | corrupt_file ×3 |
-| fodg | unsupported_capability ×5 |
+| fodg | corrupt_file ×2 |
 | fodp | corrupt_file ×3 |
 | fods | corrupt_file ×2 |
-| fodt | unsupported_capability ×46 |
 | odt | corrupt_file ×1 |
 | rtf | corrupt_file ×14, unsupported_format ×1 |
 | xls | corrupt_file ×2, unsupported_format ×2 |
@@ -56,12 +55,45 @@ refused (typed), `refused` every candidate set was refused (typed),
 - `libreoffice-core/sd/qa/unit/data/draw-object-link.fodp` (odp): refused edit: unsupported_capability: flat OpenDocument presentations (.fodp) are read-only in the unified API; save-only exact
 - `libreoffice-core/sd/qa/unit/data/odp/Math.fodp` (odp): refused edit: unsupported_capability: flat OpenDocument presentations (.fodp) are read-only in the unified API; save-only exact
 - `libreoffice-core/sd/qa/unit/tiledrendering/data/slide-background-link.fodp` (odp): refused edit: unsupported_capability: flat OpenDocument presentations (.fodp) are read-only in the unified API; save-only exact
+- `libreoffice-core/sw/qa/core/doc/data/tdf171549.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
 - `libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx` (docx): refused edit: unsupported_capability: unsafe DOCX edit 'edit' rejected: source-backed document transactions do not support markup-compatibility b...
+- `libreoffice-core/sw/qa/core/text/data/footnote-connect.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `libreoffice-core/sw/qa/extras/layout/data/drop_asian_word.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `libreoffice-core/sw/qa/extras/layout/data/field_hide_section.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `libreoffice-core/sw/qa/extras/layout/data/tdf112256-diacritic-index-mark.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `libreoffice-core/sw/qa/extras/layout/data/toc-inline-heading-order.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `libreoffice-core/sw/qa/extras/layout/data/user-field-type-language.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `libreoffice-core/sw/qa/extras/odfexport/data/CrossRefHeadingBookmark.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `libreoffice-core/sw/qa/extras/odfimport/data/draw-image-embedded.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `libreoffice-core/sw/qa/extras/odfimport/data/draw-image-link.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `libreoffice-core/sw/qa/extras/odfimport/data/draw-object-link.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `libreoffice-core/sw/qa/extras/ooxmlexport/data/toxmarkhyperlink.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `libreoffice-core/sw/qa/extras/pagelinespacing/data/frameWithColumns.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `libreoffice-core/sw/qa/extras/pagelinespacing/data/pageColumns.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
 - `libreoffice-core/sw/qa/extras/rtfexport/data/tdf107480.rtf` (rtf): exact ; revert one-way: /body/p[1] text: the set back is refused: unsupported_capability: unsupported RTF edit source: candidate body text did not survive RTF va...
+- `libreoffice-core/sw/qa/extras/uiwriter/data/IndexElementsInHiddenSections.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `libreoffice-core/sw/qa/extras/uiwriter/data/tdf91801.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `libreoffice-core/sw/qa/extras/uiwriter/data/text-with-formula.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `libreoffice-core/sw/qa/uibase/shells/data/protectedLinkCopy.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `libreoffice-core/sw/qa/uitest/data/redline-autocorrect.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `libreoffice-core/sw/qa/uitest/data/section-columns-separator.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `libreoffice-core/sw/qa/uitest/data/tdf145178.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
 - `libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk-header.docx` (docx): refused edit: corrupt_file: invalid DOCX format: body-final section properties are not the final body child; save-only exact
+- `libreoffice-core/vcl/qa/cppunit/pdfexport/data/PDF_export_with_formcontrol.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `libreoffice-core/vcl/qa/cppunit/pdfexport/data/formcontrol.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `libreoffice-core/vcl/qa/cppunit/pdfexport/data/image-hyperlink-alttext.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `libreoffice-core/vcl/qa/cppunit/pdfexport/data/tdf159817.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `libreoffice-core/writerperfect/qa/unit/data/writer/epubexport/footnote.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `libreoffice-core/xmloff/qa/unit/data/differentListStylesInOneList.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `libreoffice-core/xmloff/qa/unit/data/floattable-wrap-all-pages2.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `libreoffice-core/xmloff/qa/unit/data/scale-width-redline.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `libreoffice-core/xmloff/qa/unit/data/tdf161327_LatheEndAngle.fodg` (odg): refused edit: unsupported_capability: flat OpenDocument drawings (.fodg) open read-only through the unified layer; save-only exact
 - `libreoffice-core/xmloff/qa/unit/data/tdf162686_3D_metal_type_ODF.fods` (ods): refused edit: unsupported_capability: flat ODS (.fods) opens read-only through the unified layer; save-only exact
+- `odf/drawing/fill-image-inline.fodg` (odg): refused edit: unsupported_capability: flat OpenDocument drawings (.fodg) open read-only through the unified layer; save-only exact
 - `odf/drawing/fill-image-linked.fodp` (odp): refused edit: unsupported_capability: flat OpenDocument presentations (.fodp) are read-only in the unified API; save-only exact
 - `odf/drawing/marker-flat.fods` (ods): refused edit: unsupported_capability: flat ODS (.fods) opens read-only through the unified layer; save-only exact
+- `odf/drawing/opacity-angles.fodg` (odg): refused edit: unsupported_capability: flat OpenDocument drawings (.fodg) open read-only through the unified layer; save-only exact
+- `odf/drawing/opacity-extension-stops.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
 - `odf/native-resave/libreoffice-resaved/tdf169979-litchi.odp` (odp): exact ; revert one-way: /slide[1] name: the set back is refused: unsupported_capability: Unsupported feature: the ODP page name is referenced by links or custom ...
 - `odf/native-resave/litchi-changed/tdf169979-litchi.odp` (odp): exact ; revert one-way: /slide[1] name: the set back is refused: unsupported_capability: Unsupported feature: the ODP page name is referenced by links or custom ...
 - `odf/ods/conditional-formats.fods` (ods): refused edit: unsupported_capability: flat ODS (.fods) opens read-only through the unified layer; save-only exact
@@ -69,6 +101,23 @@ refused (typed), `refused` every candidate set was refused (typed),
 - `odf/ods/rich-text-hyperlinks.fods` (ods): refused edit: unsupported_capability: flat ODS (.fods) opens read-only through the unified layer; save-only exact
 - `odf/ods/sheet-shapes.fods` (ods): refused edit: unsupported_capability: flat ODS (.fods) opens read-only through the unified layer; save-only exact
 - `odf/ods/sparklines.fods` (ods): refused edit: unsupported_capability: flat ODS (.fods) opens read-only through the unified layer; save-only exact
+- `odf/odt/drawing-style-resources.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `odf/odt/font-face-declarations-flat.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `odf/odt/form-controls.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `odf/odt/libreoffice-linked-object-compact.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `odf/odt/libreoffice-page-columns-compact.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `odf/odt/libreoffice-user-field-compact.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `odf/odt/nested-frame-paragraphs.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `odf/odt/note-drawing.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `odf/odt/note-hyperlink-host.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `odf/odt/note-nested.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `odf/odt/note-ordinary-numbering.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `odf/odt/note-tracked-changes.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `odf/odt/outline-ten-level-extension.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `odf/odt/ruby-hyperlink.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `odf/odt/title-field-invalidate.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
+- `odfdo/tests/samples/images.fodt` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
 - `odfdo/tests/samples/test_flat_lo.fods` (ods): refused edit: unsupported_capability: flat ODS (.fods) opens read-only through the unified layer; save-only exact
+- `odfpy/xml2odf/definitionlists.xml` (odt): refused edit: unsupported_capability: flat ODT (.fodt) opens read-only through the unified layer; save-only exact
 - `poi/test-data/document/test.doc` (doc): refused edit: corrupt_file: the file is malformed; save-only exact
 - `poi/test-data/spreadsheet/49609.xlsx` (xlsx): exact ; revert one-way: /sheet[1] name: the set back is refused: unsupported_capability: OPC package error: owned OPC source preservation is unavailable: source ...

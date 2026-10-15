@@ -52,6 +52,20 @@ impl FlatDrawing {
         &self.0.pages
     }
 
+    /// A packaged copy of the drawing for the packaged reader: the flat
+    /// root's children split into package parts with their bytes kept
+    /// ([`litchi_odf_common::flat::Parts`]). The flat bytes stay this
+    /// drawing's publication; the copy is a read projection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the parts cannot be split or the packaged
+    /// reader refuses them.
+    pub fn to_package(&self) -> std::result::Result<crate::Package, litchi_odf_common::Error> {
+        let parts = litchi_odf_common::flat::Parts::split(self.as_bytes())?;
+        crate::Package::from_bytes(&parts.to_bytes()?)
+    }
+
     /// Returns the original flat XML bytes exactly.
     #[must_use]
     pub fn as_bytes(&self) -> &[u8] {

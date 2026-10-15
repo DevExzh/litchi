@@ -418,6 +418,7 @@ pub(crate) fn set_groups(
     groups: &[Group<'_, '_, '_>],
     limits: &SemanticLimits,
 ) -> Result<Commit> {
+    file.admit_edit()?;
     match file.owner() {
         #[cfg(feature = "odg")]
         Owner::Odg(package) => super::odg::set(file, package, groups, limits),

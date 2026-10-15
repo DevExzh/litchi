@@ -931,11 +931,11 @@ pub(crate) static WRITE_GAPS: [GapSpec; 12] = [
         "the leaf preserves signed and encrypted packages only as exact no-ops; changed writes are refused",
     ),
     operation_gap(
-        "get",
+        "set",
         "document",
         "flat-odf-input",
-        "M6 flat ODF owner",
-        "single-XML .fodt input is detected but refused; the leaf flat snapshot has no body index or package owner the adapter can publish through",
+        "0292 flat ODT writes",
+        "single-XML .fodt input reads through the leaf's packaged projection of its parts and republishes its flat bytes; writes are refused",
     ),
     operation_gap(
         "create",

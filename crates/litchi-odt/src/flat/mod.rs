@@ -218,6 +218,21 @@ impl Document {
         })
     }
 
+    /// A packaged copy of the document for the packaged readers: the flat
+    /// root's children split into `content.xml`, `styles.xml`, `meta.xml`
+    /// and `settings.xml` with their bytes kept
+    /// ([`litchi_odf_common::flat::Parts`]). The flat bytes stay this
+    /// document's publication; the copy is a read projection.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the parts cannot be split or the packaged
+    /// reader refuses them.
+    pub fn to_package(&self) -> std::result::Result<crate::Package, litchi_odf_common::Error> {
+        let parts = litchi_odf_common::flat::Parts::split(self.inner.xml().as_bytes())?;
+        crate::Package::from_bytes(&parts.to_bytes()?)
+    }
+
     /// Returns the validated flat XML without reconstructing it.
     #[must_use]
     pub fn xml(&self) -> &str {

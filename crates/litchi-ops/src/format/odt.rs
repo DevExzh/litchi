@@ -54,6 +54,10 @@ struct OdtState {
     /// ordinal lookup past [`DIRECT_SCAN`] children.
     kinds: OnceLock<KindIndex>,
     origin: Option<Arc<Path>>,
+    /// The flat single-XML document (`.fodt`) this handle reads, whose
+    /// bytes it publishes; the package is its read projection (record
+    /// 0292).
+    flat: Option<litchi_odt::flat::Document>,
 }
 
 /// Ordinal lookups below this many same-kind children scan the parent;
@@ -145,7 +149,56 @@ impl Odt {
             tree: OnceLock::new(),
             kinds: OnceLock::new(),
             origin,
+            flat: None,
         })))
+    }
+
+    /// Opens a flat single-XML text document (`.fodt`) detection
+    /// recognized. Reads go through the leaf's packaged projection of the
+    /// flat parts; publication writes the flat bytes (record 0292).
+    pub(crate) fn from_flat(bytes: Vec<u8>, options: &OpenOptions) -> Result<Self> {
+        let mut limits = litchi_odt::flat::Limits::default();
+        if let Some(maximum) = options.max_input_bytes {
+            let maximum = usize::try_from(maximum).unwrap_or(usize::MAX);
+            if maximum < bytes.len() {
+                return Err(core_error(litchi_core::Error::ResourceLimit(
+                    litchi_core::ResourceLimit {
+                        resource: litchi_core::Resource::InputBytes,
+                        observed: u64::try_from(bytes.len()).unwrap_or(u64::MAX),
+                        limit: u64::try_from(maximum).unwrap_or(u64::MAX),
+                        scope: Arc::from("flat ODT input"),
+                    },
+                )));
+            }
+            limits = limits
+                .with_max_document_bytes(
+                    maximum.clamp(1, litchi_odt::flat::Limits::HARD_MAX_DOCUMENT_BYTES),
+                )
+                .map_err(core_error)?;
+        }
+        let flat = litchi_odt::flat::Document::from_bytes_with_limits(bytes, limits)
+            .map_err(core_error)?;
+        let package = flat.to_package().map_err(odf_error)?;
+        let document = package.document().map_err(core_error)?;
+        Ok(Self(Arc::new(OdtState {
+            owner: OdtOwner::Eager(document),
+            format: FileFormat::Odt,
+            package: OnceLock::from(package),
+            tree: OnceLock::new(),
+            kinds: OnceLock::new(),
+            origin: None,
+            flat: Some(flat),
+        })))
+    }
+
+    /// The flat document this handle reads, when it reads one.
+    pub(crate) fn flat(&self) -> Option<&litchi_odt::flat::Document> {
+        self.0.flat.as_ref()
+    }
+
+    /// Whether the handle reads a flat single-XML document.
+    pub(crate) fn is_flat(&self) -> bool {
+        self.0.flat.is_some()
     }
 
     /// Opens the source-pinned candidate the document path probe returned
@@ -173,6 +226,7 @@ impl Odt {
             tree: OnceLock::new(),
             kinds: OnceLock::new(),
             origin: None,
+            flat: None,
         }))
     }
 
@@ -352,6 +406,11 @@ impl Odt {
 
     /// The immutable leaf package edits start from.
     pub(crate) fn package(&self) -> Result<&litchi_odt::Package> {
+        // A flat document's package is a read projection: package edits
+        // and publication never start from it.
+        if self.is_flat() {
+            return Err(write::flat_refusal());
+        }
         if let Some(package) = self.0.package.get() {
             return Ok(package);
         }
@@ -376,6 +435,9 @@ impl Odt {
 
     /// Whether two handles retain the same immutable package bytes.
     pub(crate) fn same_snapshot(&self, other: &Self) -> bool {
+        if let (Some(left), Some(right)) = (self.flat(), other.flat()) {
+            return Arc::ptr_eq(&self.0, &other.0) || left.as_bytes() == right.as_bytes();
+        }
         Arc::ptr_eq(&self.0, &other.0)
             || match (self.0.package.get(), other.0.package.get()) {
                 (Some(left), Some(right)) => left.as_bytes() == right.as_bytes(),
@@ -384,7 +446,12 @@ impl Odt {
     }
 
     /// Publish the document's package bytes into `sink`.
-    pub(crate) fn write_to(&self, sink: impl std::io::Write) -> Result<()> {
+    pub(crate) fn write_to(&self, mut sink: impl std::io::Write) -> Result<()> {
+        if let Some(flat) = self.flat() {
+            return sink
+                .write_all(flat.as_bytes())
+                .map_err(|error| core_error(litchi_core::Error::from(error)));
+        }
         self.package()?.write_to(sink).map_err(odf_error)
     }
 
@@ -392,8 +459,10 @@ impl Odt {
     /// temporary file renamed over the destination, or published only when
     /// the destination is still absent under [`crate::Overwrite::Refuse`].
     pub(crate) fn save_to(&self, path: &Path, options: &crate::SaveOptions) -> Result<u64> {
-        let package = self.package()?;
-        let bytes = package.as_bytes();
+        let bytes = match self.flat() {
+            Some(flat) => flat.as_bytes(),
+            None => self.package()?.as_bytes(),
+        };
         let overwrite = match options.overwrite {
             crate::Overwrite::Replace => litchi_core::atomic::Overwrite::Replace,
             crate::Overwrite::Refuse => litchi_core::atomic::Overwrite::Refuse,
@@ -423,12 +492,18 @@ impl Odt {
     /// Admit a leaf edit before a unified transaction starts: the source is
     /// current and the package is available.
     pub(crate) fn admit_edit(&self) -> Result<()> {
+        if self.is_flat() {
+            return Err(write::flat_refusal());
+        }
         self.check_source()?;
         self.package().map(drop)
     }
 
     /// Whether two handles publish the same package bytes.
     pub(crate) fn same_content(&self, other: &Self) -> Result<bool> {
+        if self.is_flat() || other.is_flat() {
+            return Ok(self.same_snapshot(other));
+        }
         Ok(self.same_snapshot(other) || self.package()?.as_bytes() == other.package()?.as_bytes())
     }
 

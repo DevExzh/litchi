@@ -452,11 +452,17 @@ pub(crate) fn digests(root: &Path) -> BTreeMap<String, String> {
         ("fods", FileFormat::Ods, ODS),
         #[cfg(feature = "odt")]
         ("odt", FileFormat::Odt, ODT),
+        // Flat text documents read through the ODT adapter (record 0292).
+        #[cfg(feature = "odt")]
+        ("fodt", FileFormat::Odt, ODT),
         // ODM master documents run the ODT selectors (record 0282).
         #[cfg(feature = "odm")]
         ("odm", FileFormat::Odm, ODT),
         #[cfg(feature = "odg")]
         ("odg", FileFormat::Odg, ODG),
+        // Flat drawings read through the object-tree adapter (record 0292).
+        #[cfg(feature = "odg")]
+        ("fodg", FileFormat::Odg, ODG),
         #[cfg(feature = "odc")]
         ("odc", FileFormat::Odc, ODC),
         #[cfg(feature = "odb")]

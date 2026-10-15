@@ -1572,7 +1572,7 @@ impl<W: Write> PackageWriter<W> {
         Ok(())
     }
 
-    fn write_exact_source_file(
+    pub(crate) fn write_exact_source_file(
         &mut self,
         path: &str,
         content: &[u8],

@@ -96,6 +96,9 @@ struct State {
     /// Built at open; after a write, on the first read (record 0288).
     tree: std::sync::OnceLock<Tree>,
     origin: Option<Arc<Path>>,
+    /// The flat single-XML bytes (`.fodg`) a flat handle publishes; its
+    /// owner is the leaf's packaged read projection (record 0292).
+    flat: Option<Box<[u8]>>,
 }
 
 const fn assert_handle<T: Send + Sync + Clone>() {}
@@ -230,7 +233,71 @@ impl OdfTree {
             owner,
             tree: std::sync::OnceLock::from(tree),
             origin,
+            flat: None,
         })))
+    }
+
+    /// Open a flat single-XML drawing (`.fodg`) detection recognized: the
+    /// leaf reads the flat parts as a package projection; publication
+    /// writes the flat bytes unchanged (record 0292).
+    #[cfg(feature = "odg")]
+    pub(crate) fn from_flat(bytes: Vec<u8>, options: &OpenOptions) -> Result<Self> {
+        let format = FileFormat::Odg;
+        if let Some(maximum) = options.max_input_bytes
+            && u64::try_from(bytes.len()).unwrap_or(u64::MAX) > maximum
+        {
+            return Err(core_error(
+                litchi_core::Error::ResourceLimit(litchi_core::ResourceLimit {
+                    resource: litchi_core::Resource::InputBytes,
+                    observed: u64::try_from(bytes.len()).unwrap_or(u64::MAX),
+                    limit: maximum,
+                    scope: Arc::from("flat ODG input"),
+                }),
+                format,
+            ));
+        }
+        let parts = litchi_odf_common::flat::Parts::split(&bytes)
+            .map_err(|error| core_error(error, format))?;
+        let package = parts
+            .to_bytes()
+            .map_err(|error| core_error(error, format))
+            .and_then(|zip| {
+                litchi_odg::Package::from_bytes(&zip).map_err(|error| odf_error(error, format))
+            })?;
+        let owner = Owner::Odg(package);
+        let tree = owner.tree()?;
+        Ok(Self(Arc::new(State {
+            owner,
+            tree: std::sync::OnceLock::from(tree),
+            origin: None,
+            flat: Some(bytes.into_boxed_slice()),
+        })))
+    }
+
+    /// Whether the handle reads a flat single-XML document.
+    pub(crate) fn is_flat(&self) -> bool {
+        self.0.flat.is_some()
+    }
+
+    /// The refusal of a write to a flat single-XML document.
+    fn refuse_flat(&self) -> Result<()> {
+        if self.is_flat() {
+            return Err(Error::new(
+                crate::Code::UnsupportedCapability,
+                "flat OpenDocument drawings (.fodg) open read-only through the unified layer",
+            )
+            .with_format(self.format())
+            .with_suggestion("follow-up: 0292 flat ODG writes; save a packaged .odg to edit"));
+        }
+        Ok(())
+    }
+
+    /// The bytes this handle publishes: the flat document, or the package.
+    fn published(&self) -> &[u8] {
+        self.0
+            .flat
+            .as_deref()
+            .unwrap_or_else(|| self.0.owner.as_bytes())
     }
 
     /// Adopt a package a leaf commit published and verified. The object
@@ -247,6 +314,7 @@ impl OdfTree {
             owner,
             tree: std::sync::OnceLock::new(),
             origin,
+            flat: None,
         })))
     }
 
@@ -365,7 +433,7 @@ impl OdfTree {
 
     /// Whether two handles retain the same package bytes.
     pub(crate) fn same_snapshot(&self, other: &Self) -> bool {
-        Arc::ptr_eq(&self.0, &other.0) || self.0.owner.as_bytes() == other.0.owner.as_bytes()
+        Arc::ptr_eq(&self.0, &other.0) || self.published() == other.published()
     }
 
     /// Whether two handles publish the same package bytes.
@@ -385,19 +453,20 @@ impl OdfTree {
 
     /// Admit a leaf edit before a unified transaction starts.
     pub(crate) fn admit_edit(&self) -> Result<()> {
+        self.refuse_flat()?;
         self.check_source()
     }
 
     /// Publish the package bytes into `sink`.
     pub(crate) fn write_to(&self, mut sink: impl std::io::Write) -> Result<()> {
-        sink.write_all(self.0.owner.as_bytes()).map_err(|error| {
+        sink.write_all(self.published()).map_err(|error| {
             Error::from(litchi_core::Error::from(error)).with_format(self.format())
         })
     }
 
     /// Atomically save the package to `path`.
     pub(crate) fn save_to(&self, path: &Path, options: &crate::SaveOptions) -> Result<u64> {
-        let bytes = self.0.owner.as_bytes();
+        let bytes = self.published();
         let overwrite = match options.overwrite {
             crate::Overwrite::Replace => litchi_core::atomic::Overwrite::Replace,
             crate::Overwrite::Refuse => litchi_core::atomic::Overwrite::Refuse,
@@ -443,6 +512,7 @@ impl OdfTree {
         props: impl crate::IntoProps<'v>,
         limits: &crate::transaction::SemanticLimits,
     ) -> Result<write::Commit> {
+        self.refuse_flat()?;
         write::set(self, target, props, limits).map_err(|error| self.tag(error))
     }
 
@@ -462,6 +532,7 @@ impl OdfTree {
         node: crate::NewNode<'n>,
         limits: &crate::transaction::SemanticLimits,
     ) -> Result<(write::Commit, crate::path::Path<'static>)> {
+        self.refuse_flat()?;
         write::add(self, parent, node, limits).map_err(|error| self.tag(error))
     }
 
@@ -476,6 +547,7 @@ impl OdfTree {
         target: crate::TargetArg<'p>,
         limits: &crate::transaction::SemanticLimits,
     ) -> Result<write::Commit> {
+        self.refuse_flat()?;
         write::remove(self, target, limits).map_err(|error| self.tag(error))
     }
 
@@ -499,6 +571,7 @@ impl OdfTree {
         placement: crate::Placement<'q>,
         limits: &crate::transaction::SemanticLimits,
     ) -> Result<write::Commit> {
+        self.refuse_flat()?;
         write::move_to(self, path, placement, limits).map_err(|error| self.tag(error))
     }
 
@@ -518,6 +591,7 @@ impl OdfTree {
         right: crate::path::PathArg<'q>,
         limits: &crate::transaction::SemanticLimits,
     ) -> Result<write::Commit> {
+        self.refuse_flat()?;
         write::swap(self, left, right, limits).map_err(|error| self.tag(error))
     }
 
