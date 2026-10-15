@@ -14,7 +14,10 @@ use litchi_iwa_archive::package::{Catalog, EntryEdit};
 use litchi_iwa_common::table::merge::Region;
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::tswp;
-use litchi_pages::{BodyTableMergesError, BodyTableSelector, MergeReader, Package};
+use litchi_pages::{
+    BodyTableSelector, MergeReader, Package,
+    table::merge::transaction::Error as BodyTableMergesError,
+};
 use prost::Message as _;
 
 const NATIVE: &[u8] = include_bytes!(concat!(
@@ -59,10 +62,10 @@ fn append_irrelevant_body_run(source: &[u8], length: usize) -> TestResult<Vec<u8
             else {
                 continue;
             };
-            if !storage
+            if storage
                 .table_attachment
                 .as_ref()
-                .is_some_and(|table| !table.entries.is_empty())
+                .is_none_or(|table| table.entries.is_empty())
             {
                 continue;
             }
@@ -146,7 +149,7 @@ fn reader_accepts_an_inclusive_input_limit_and_rejects_one_below() -> TestResult
     assert!(matches!(
         MergeReader::from_bytes_with_limits(NATIVE, below),
         Err(BodyTableMergesError::LimitExceeded {
-            kind: litchi_pages::BodyTableMergesLimitKind::InputBytes,
+            kind: litchi_pages::table::merge::transaction::LimitKind::InputBytes,
             observed,
             maximum,
         }) if observed == input_bytes && maximum == input_bytes - 1
@@ -307,7 +310,7 @@ fn shared_catalog_reader_rejects_one_below_component_payload_budget() -> TestRes
     assert!(matches!(
         reader.body_table_merges(0usize),
         Err(BodyTableMergesError::LimitExceeded {
-            kind: litchi_pages::BodyTableMergesLimitKind::TotalPayloadBytes,
+            kind: litchi_pages::table::merge::transaction::LimitKind::TotalPayloadBytes,
             observed,
             maximum,
         }) if observed == total && maximum == total - 1

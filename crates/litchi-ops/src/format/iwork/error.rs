@@ -20,7 +20,7 @@ pub enum LeafError {
     Pages(litchi_pages::PackageError),
     /// A Pages section-text transaction failed.
     #[cfg(feature = "pages")]
-    PagesText(litchi_pages::SectionTextError),
+    PagesText(litchi_pages::section::text::Error),
     /// Writing the Pages package to a sink failed.
     #[cfg(feature = "pages")]
     PagesWrite(litchi_pages::WriteError),
@@ -193,8 +193,8 @@ fn pages_code(error: &litchi_pages::PackageError) -> Code {
 }
 
 #[cfg(feature = "pages")]
-fn pages_text_code(error: &litchi_pages::SectionTextError) -> Code {
-    use litchi_pages::SectionTextError as E;
+fn pages_text_code(error: &litchi_pages::section::text::Error) -> Code {
+    use litchi_pages::section::text::Error as E;
     match error {
         E::NameNotFound | E::PositionNotFound { .. } => Code::PathNotFound,
         E::AmbiguousSelector { .. } | E::BodySectionCount { .. } => Code::InvalidPath,

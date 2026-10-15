@@ -20,7 +20,9 @@ use litchi_iwa_common::{
 };
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::{image_adjustments_codec, tsd, tswp};
-use litchi_pages::{BodyImageAdjustmentsError, ImageSelector, Package, PackageError};
+use litchi_pages::{
+    ImageSelector, Package, PackageError, image::adjustments::Error as BodyImageAdjustmentsError,
+};
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;

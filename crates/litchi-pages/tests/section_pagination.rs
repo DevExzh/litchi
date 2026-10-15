@@ -1,11 +1,14 @@
 use std::io;
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::{WireLimits, decode_varint_from_bytes, encode_varint_into, wire::WireView};
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tp, tsp, tswp};
 use litchi_pages::{
-    Limits, Package, Position, SectionPaginationError, SectionPaginationLimitKind, SectionSelector,
+    Package, Position, SectionSelector,
+    section::pagination::transaction::Error as SectionPaginationError,
+    section::pagination::transaction::LimitKind as SectionPaginationLimitKind,
     section::{PageNumber, PageNumbering, Pagination, Start},
 };
 use prost::Message as _;
@@ -690,7 +693,10 @@ fn changed_pagination_respects_retained_output_limit() -> TestResult<()> {
 
     let maximum = u64::try_from(target_length - 1)?;
     let limits = Limits::new(maximum, 8, 1_024 * 1_024, 1_024 * 1_024, 1_024 * 1_024)?;
-    let package = Package::from_bytes_with_limits(&bytes, limits)?;
+    let package = Package::from_bytes_with_options(
+        &bytes,
+        litchi_pages::OpenOptions::new().__archive_limits(limits),
+    )?;
     let mut limited_edit = package.edit_section_pagination(SectionSelector::index(0))?;
     limited_edit.set_pagination(target)?;
     assert!(matches!(

@@ -1,10 +1,13 @@
 use std::io;
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_common::wire::WireView;
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tp, tsa, tsp};
-use litchi_pages::{BodyDrawableOrderError, DrawableLayerMove, Limits, Package, Position};
+use litchi_pages::{
+    DrawableLayerMove, Package, Position, drawable::order::Error as BodyDrawableOrderError,
+};
 use prost::Message as _;
 
 const DOCUMENT_MEMBER: &str = "Index/Document.iwa";

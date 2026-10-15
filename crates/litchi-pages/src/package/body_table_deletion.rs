@@ -25,7 +25,7 @@ use std::num::NonZeroU64;
 use std::sync::Arc;
 
 use litchi_iwa_archive::package::{EntryEdit, ExactArtifacts};
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::{Package, PackageError, body_table_catalog, table_lock};
 use crate::selector::BodyTableSelector;
@@ -35,7 +35,7 @@ const PREVIEW_ENTRY_NAMES: [&str; 3] = ["preview.jpg", "preview-micro.jpg", "pre
 /// Finite resources charged by one complete body-table deletion transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum BodyTableDeletionLimitKind {
+pub enum LimitKind {
     /// Complete source package bytes.
     InputBytes,
     /// Complete candidate package bytes.
@@ -75,7 +75,7 @@ pub enum BodyTableDeletionLimitKind {
     TransactionWork,
 }
 
-impl fmt::Display for BodyTableDeletionLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -101,9 +101,9 @@ impl fmt::Display for BodyTableDeletionLimitKind {
 }
 
 /// Failure from resolving, preparing, or publishing one body-table deletion.
-#[derive(Debug, Error, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, ThisError, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum BodyTableDeletionError {
+pub enum Error {
     /// No rooted body table matched the selector.
     #[error("the Pages body has no table matching the requested selector")]
     TableNotFound,
@@ -129,7 +129,7 @@ pub enum BodyTableDeletionError {
     )]
     LimitExceeded {
         /// Resource category that exceeded its ceiling.
-        kind: BodyTableDeletionLimitKind,
+        kind: LimitKind,
         /// Observed or requested amount.
         observed: u64,
         /// Configured maximum.
@@ -190,7 +190,7 @@ impl DeletionObjectIndex {
 #[derive(Clone)]
 pub(super) struct DeletionRequest {
     pub(super) target: table_lock::BodyTableTarget,
-    pub(super) removed_table: body_table_catalog::BodyTableSnapshot,
+    pub(super) removed_table: body_table_catalog::Snapshot,
 }
 
 impl fmt::Debug for DeletionRequest {
@@ -281,7 +281,7 @@ pub(super) struct RemovalPlan {
 pub(super) struct GraphPlan {
     pub(super) request: DeletionRequest,
     pub(super) index: DeletionObjectIndex,
-    pub(super) source_tables: Vec<body_table_catalog::BodyTableSnapshot>,
+    pub(super) source_tables: Vec<body_table_catalog::Snapshot>,
     pub(super) removals: RemovalPlan,
 }
 
@@ -323,12 +323,12 @@ pub(super) struct ArchivePlan {
 
 /// Exact-source reversible body-table deletion patch.
 #[derive(Clone, PartialEq, Eq)]
-pub struct BodyTableDeletionPatch {
+pub struct Patch {
     artifacts: ExactArtifacts,
     proof: table_lock::BodyTableTarget,
-    removed_table: body_table_catalog::BodyTableSnapshot,
-    source_tables: Arc<[body_table_catalog::BodyTableSnapshot]>,
-    target_tables: Arc<[body_table_catalog::BodyTableSnapshot]>,
+    removed_table: body_table_catalog::Snapshot,
+    source_tables: Arc<[body_table_catalog::Snapshot]>,
+    target_tables: Arc<[body_table_catalog::Snapshot]>,
     source_preview_count: usize,
     target_preview_count: usize,
     touched_components: usize,
@@ -337,10 +337,10 @@ pub struct BodyTableDeletionPatch {
     removes_table: bool,
 }
 
-impl fmt::Debug for BodyTableDeletionPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("BodyTableDeletionPatch")
+            .debug_struct("Patch")
             .field("removed_table", &self.removed_table)
             .field("source_table_count", &self.source_tables.len())
             .field("target_table_count", &self.target_tables.len())
@@ -348,10 +348,10 @@ impl fmt::Debug for BodyTableDeletionPatch {
     }
 }
 
-impl BodyTableDeletionPatch {
+impl Patch {
     /// Return the semantic table snapshot removed by this patch.
     #[must_use]
-    pub const fn removed_table(&self) -> &body_table_catalog::BodyTableSnapshot {
+    pub const fn removed_table(&self) -> &body_table_catalog::Snapshot {
         &self.removed_table
     }
 
@@ -394,7 +394,7 @@ impl BodyTableDeletionPatch {
 
 /// Compact evidence from one published body-table deletion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct BodyTableDeletionDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     removed_objects: usize,
@@ -403,7 +403,7 @@ pub struct BodyTableDeletionDiagnostics {
     full_reparse_performed: bool,
 }
 
-impl BodyTableDeletionDiagnostics {
+impl Diagnostics {
     fn published(plan: &ArchivePlan, deleted_previews: usize) -> Self {
         Self {
             changed: true,
@@ -455,13 +455,13 @@ impl BodyTableDeletionDiagnostics {
 /// Fully reopened immutable result of one body-table deletion transaction.
 #[must_use = "a body-table deletion commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct BodyTableDeletionCommit {
+pub struct Commit {
     package: Package,
-    patch: BodyTableDeletionPatch,
-    diagnostics: BodyTableDeletionDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl BodyTableDeletionCommit {
+impl Commit {
     /// Borrow the validated package snapshot.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -476,13 +476,13 @@ impl BodyTableDeletionCommit {
 
     /// Borrow the exact reversible patch.
     #[must_use]
-    pub const fn patch(&self) -> &BodyTableDeletionPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Borrow compact publication diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> &BodyTableDeletionDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 
@@ -491,7 +491,7 @@ impl BodyTableDeletionCommit {
     /// For an inverse patch this is the table being restored; the snapshot
     /// remains the original deletion's semantic identity in both directions.
     #[must_use]
-    pub fn removed_table(&self) -> &body_table_catalog::BodyTableSnapshot {
+    pub fn removed_table(&self) -> &body_table_catalog::Snapshot {
         self.patch.removed_table()
     }
 }
@@ -501,7 +501,7 @@ impl Package {
     pub fn remove_body_table<'table>(
         &self,
         selector: impl Into<BodyTableSelector<'table>>,
-    ) -> Result<BodyTableDeletionCommit, BodyTableDeletionError> {
+    ) -> Result<Commit, Error> {
         let source = &self.state.source;
         let mut budget = table_lock::WireBudget::new(source.limits()).map_err(map_lock_error)?;
         budget
@@ -512,10 +512,10 @@ impl Package {
         let selector = selector.into();
         let target = select_target(targets, selector, &mut budget)?;
         if !source.source_is_exact() {
-            return Err(BodyTableDeletionError::UnsupportedSource);
+            return Err(Error::UnsupportedSource);
         }
-        let removed_table = body_table_catalog::BodyTableSnapshot::from_target(target.clone())
-            .map_err(map_catalog_error)?;
+        let removed_table =
+            body_table_catalog::Snapshot::from_target(target.clone()).map_err(map_catalog_error)?;
         let request = DeletionRequest {
             target,
             removed_table,
@@ -524,10 +524,7 @@ impl Package {
     }
 
     /// Apply a deletion patch only to its exact immutable source package.
-    pub fn apply_body_table_deletion(
-        &self,
-        patch: &BodyTableDeletionPatch,
-    ) -> Result<BodyTableDeletionCommit, BodyTableDeletionError> {
+    pub fn apply_body_table_deletion(&self, patch: &Patch) -> Result<Commit, Error> {
         let source = &self.state.source;
         let mut budget = table_lock::WireBudget::new(source.limits()).map_err(map_lock_error)?;
         let source_bytes = source.source_bytes();
@@ -537,10 +534,10 @@ impl Package {
             .map_err(map_lock_error)?;
         let source_owner = source.shared_source();
         if !patch.artifacts.authorizes_source(&source_owner) {
-            return Err(BodyTableDeletionError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if !source.source_is_exact() {
-            return Err(BodyTableDeletionError::UnsupportedSource);
+            return Err(Error::UnsupportedSource);
         }
         if patch.removes_table {
             let current = self
@@ -550,25 +547,24 @@ impl Package {
                 )
                 .map_err(map_lock_error)?;
             if current != patch.proof
-                || body_table_catalog::BodyTableSnapshot::from_target(current)
-                    .map_err(map_catalog_error)?
+                || body_table_catalog::Snapshot::from_target(current).map_err(map_catalog_error)?
                     != patch.removed_table
             {
-                return Err(BodyTableDeletionError::PatchConflict);
+                return Err(Error::PatchConflict);
             }
         } else {
             let current = catalog_with_budget(self, &mut budget)?;
             if !catalog_matches_snapshots(&current, &patch.source_tables) {
-                return Err(BodyTableDeletionError::PatchConflict);
+                return Err(Error::PatchConflict);
             }
         }
         let target = patch.artifacts.target();
         let candidate = reopen_candidate(self, target, &mut budget)?;
         verify_candidate(&candidate, patch, &mut budget)?;
-        Ok(BodyTableDeletionCommit {
+        Ok(Commit {
             package: candidate,
             patch: patch.clone(),
-            diagnostics: BodyTableDeletionDiagnostics {
+            diagnostics: Diagnostics {
                 changed: true,
                 touched_components: patch.touched_components,
                 removed_objects: patch.removed_objects,
@@ -592,7 +588,7 @@ fn publish_deletion(
     source: &Package,
     request: DeletionRequest,
     budget: &mut table_lock::WireBudget,
-) -> Result<BodyTableDeletionCommit, BodyTableDeletionError> {
+) -> Result<Commit, Error> {
     let graph = graph::prepare(source, request, budget)?;
     let mut formula = formula::prepare(source, &graph, budget)?;
     graph::complete_removals(source, &graph, &mut formula, budget)?;
@@ -602,18 +598,18 @@ fn publish_deletion(
     append_preview_deletions(source, &mut archive.deleted_entries, budget)?;
 
     let mut edits = Vec::new();
-    edits.try_reserve_exact(archive.edits.len()).map_err(|_| {
-        BodyTableDeletionError::Allocation {
+    edits
+        .try_reserve_exact(archive.edits.len())
+        .map_err(|_| Error::Allocation {
             amount: archive.edits.len(),
-        }
-    })?;
+        })?;
     for edit in &archive.edits {
         edits.push(EntryEdit::new(edit.name.as_ref(), &edit.data));
     }
     let mut deleted_names = Vec::new();
     deleted_names
         .try_reserve_exact(archive.deleted_entries.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: archive.deleted_entries.len(),
         })?;
     for entry in &archive.deleted_entries {
@@ -638,7 +634,7 @@ fn publish_deletion(
         .map_err(map_archive_error)?;
     let target: Arc<[u8]> = target_bytes.into();
     let source_table_count = graph.source_tables.len();
-    let source_tables: Arc<[body_table_catalog::BodyTableSnapshot]> = graph.source_tables.into();
+    let source_tables: Arc<[body_table_catalog::Snapshot]> = graph.source_tables.into();
     let candidate = reopen_candidate(source, Arc::clone(&target), budget)?;
     verify_removed_object_references(&candidate, &archive.removed_object_ids, budget)?;
     let target_tables = catalog_with_budget(&candidate, budget)?;
@@ -650,18 +646,17 @@ fn publish_deletion(
             graph.request.removed_table.index(),
         )
     {
-        return Err(BodyTableDeletionError::Verification);
+        return Err(Error::Verification);
     }
     let target_preview_count = preview_count(&candidate, budget)?;
     if target_preview_count != 0 {
-        return Err(BodyTableDeletionError::Verification);
+        return Err(Error::Verification);
     }
     verify_locality(source, &candidate, &archive, budget)?;
-    let target_tables: Arc<[body_table_catalog::BodyTableSnapshot]> =
-        target_tables.into_values().into();
+    let target_tables: Arc<[body_table_catalog::Snapshot]> = target_tables.into_values().into();
     let source_bytes = source.state.source.shared_source();
     let artifacts = ExactArtifacts::new(source_bytes, target);
-    let patch = BodyTableDeletionPatch {
+    let patch = Patch {
         artifacts,
         proof: graph.request.target,
         removed_table: graph.request.removed_table,
@@ -674,10 +669,10 @@ fn publish_deletion(
         removed_components: archive.removed_components,
         removes_table: true,
     };
-    Ok(BodyTableDeletionCommit {
+    Ok(Commit {
         package: candidate,
         patch,
-        diagnostics: BodyTableDeletionDiagnostics::published(&archive, source_preview_count),
+        diagnostics: Diagnostics::published(&archive, source_preview_count),
     })
 }
 
@@ -685,7 +680,7 @@ fn reopen_candidate(
     source: &Package,
     bytes: Arc<[u8]>,
     budget: &mut table_lock::WireBudget,
-) -> Result<Package, BodyTableDeletionError> {
+) -> Result<Package, Error> {
     budget
         .charge_payload_work(bytes.len())
         .map_err(map_lock_error)?;
@@ -703,9 +698,9 @@ fn reopen_candidate(
 
 fn verify_candidate(
     candidate: &Package,
-    patch: &BodyTableDeletionPatch,
+    patch: &Patch,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     let target_tables = catalog_with_budget(candidate, budget)?;
     if !catalog_matches_snapshots(&target_tables, &patch.target_tables)
         || (patch.removes_table
@@ -721,10 +716,10 @@ fn verify_candidate(
                 patch.removed_table.index(),
             ))
     {
-        return Err(BodyTableDeletionError::Verification);
+        return Err(Error::Verification);
     }
     if preview_count(candidate, budget)? != patch.target_preview_count {
-        return Err(BodyTableDeletionError::Verification);
+        return Err(Error::Verification);
     }
     Ok(())
 }
@@ -737,7 +732,7 @@ fn verify_removed_object_references(
     candidate: &Package,
     removed_ids: &[NonZeroU64],
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     if removed_ids.is_empty() {
         return Ok(());
     }
@@ -751,7 +746,7 @@ fn verify_removed_object_references(
         budget.charge_payload_work(1).map_err(map_lock_error)?;
         object_count = object_count
             .checked_add(component.archive().objects.len())
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         for object in &component.archive().objects {
             budget
                 .charge_payload_work(
@@ -759,48 +754,48 @@ fn verify_removed_object_references(
                         .messages
                         .len()
                         .checked_add(1)
-                        .ok_or(BodyTableDeletionError::InvalidSource)?,
+                        .ok_or(Error::InvalidSource)?,
                 )
                 .map_err(map_lock_error)?;
             message_count = message_count
                 .checked_add(object.messages.len())
-                .ok_or(BodyTableDeletionError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             for info in &object.archive_info.message_infos {
                 budget.charge_payload_work(1).map_err(map_lock_error)?;
                 field_count = field_count
                     .checked_add(info.field_infos.len())
-                    .ok_or(BodyTableDeletionError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
                 object_reference_count = object_reference_count
                     .checked_add(info.object_references.len())
-                    .ok_or(BodyTableDeletionError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
                 reference_count = reference_count
                     .checked_add(info.object_references.len())
                     .and_then(|value| value.checked_add(info.data_references.len()))
-                    .ok_or(BodyTableDeletionError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
                 budget
                     .charge_payload_work(
                         info.object_references
                             .len()
                             .checked_add(info.data_references.len())
-                            .ok_or(BodyTableDeletionError::InvalidSource)?,
+                            .ok_or(Error::InvalidSource)?,
                     )
                     .map_err(map_lock_error)?;
                 for field in &info.field_infos {
                     budget.charge_payload_work(1).map_err(map_lock_error)?;
                     object_reference_count = object_reference_count
                         .checked_add(field.object_references.len())
-                        .ok_or(BodyTableDeletionError::InvalidSource)?;
+                        .ok_or(Error::InvalidSource)?;
                     reference_count = reference_count
                         .checked_add(field.object_references.len())
                         .and_then(|value| value.checked_add(field.data_references.len()))
-                        .ok_or(BodyTableDeletionError::InvalidSource)?;
+                        .ok_or(Error::InvalidSource)?;
                     budget
                         .charge_payload_work(
                             field
                                 .object_references
                                 .len()
                                 .checked_add(field.data_references.len())
-                                .ok_or(BodyTableDeletionError::InvalidSource)?,
+                                .ok_or(Error::InvalidSource)?,
                         )
                         .map_err(map_lock_error)?;
                 }
@@ -819,21 +814,21 @@ fn verify_removed_object_references(
     while remaining > 0 {
         binary_search_steps = binary_search_steps
             .checked_add(1)
-            .ok_or(BodyTableDeletionError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         remaining >>= 1;
     }
     let searches = object_count
         .checked_add(object_reference_count)
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget
         .charge_payload_work(
             searches
                 .checked_mul(
                     binary_search_steps
                         .checked_add(1)
-                        .ok_or(BodyTableDeletionError::InvalidSource)?,
+                        .ok_or(Error::InvalidSource)?,
                 )
-                .ok_or(BodyTableDeletionError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )
         .map_err(map_lock_error)?;
 
@@ -845,7 +840,7 @@ fn verify_removed_object_references(
                 .and_then(NonZeroU64::new)
                 .is_some_and(|identifier| removed_ids.binary_search(&identifier).is_ok())
             {
-                return Err(BodyTableDeletionError::Verification);
+                return Err(Error::Verification);
             }
             for info in &object.archive_info.message_infos {
                 if info
@@ -854,7 +849,7 @@ fn verify_removed_object_references(
                     .filter_map(|identifier| NonZeroU64::new(*identifier))
                     .any(|identifier| removed_ids.binary_search(&identifier).is_ok())
                 {
-                    return Err(BodyTableDeletionError::Verification);
+                    return Err(Error::Verification);
                 }
                 for field in &info.field_infos {
                     if field
@@ -863,7 +858,7 @@ fn verify_removed_object_references(
                         .filter_map(|identifier| NonZeroU64::new(*identifier))
                         .any(|identifier| removed_ids.binary_search(&identifier).is_ok())
                     {
-                        return Err(BodyTableDeletionError::Verification);
+                        return Err(Error::Verification);
                     }
                 }
             }
@@ -875,13 +870,13 @@ fn verify_removed_object_references(
 fn catalog_with_budget(
     package: &Package,
     budget: &mut table_lock::WireBudget,
-) -> Result<body_table_catalog::BodyTableCatalog, BodyTableDeletionError> {
+) -> Result<body_table_catalog::Catalog, Error> {
     budget
         .charge_source_catalog(&package.state.source)
         .map_err(map_lock_error)?;
     let targets =
         table_lock::body_table_catalog_with_budget(package, budget).map_err(map_lock_error)?;
-    body_table_catalog::BodyTableCatalog::from_targets(targets, budget).map_err(map_catalog_error)
+    body_table_catalog::Catalog::from_targets(targets, budget).map_err(map_catalog_error)
 }
 
 fn verify_locality(
@@ -889,11 +884,11 @@ fn verify_locality(
     candidate: &Package,
     plan: &ArchivePlan,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     let before = source.state.source.package();
     let after = candidate.state.source.package();
     if before.len().saturating_sub(plan.deleted_entries.len()) != after.len() {
-        return Err(BodyTableDeletionError::Verification);
+        return Err(Error::Verification);
     }
     let locality_comparisons = before
         .len()
@@ -901,10 +896,10 @@ fn verify_locality(
             plan.deleted_entries
                 .len()
                 .checked_add(plan.edits.len())
-                .ok_or(BodyTableDeletionError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )
         .and_then(|value| value.checked_add(after.len()))
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget
         .charge_payload_work(locality_comparisons)
         .map_err(map_lock_error)?;
@@ -923,19 +918,16 @@ fn verify_locality(
             .iter()
             .any(|edit| edit.name.as_ref() == before_entry.name());
         if before_entry.name() != after_entry.name() {
-            return Err(BodyTableDeletionError::Verification);
+            return Err(Error::Verification);
         }
         if !edited && before_entry.data() != after_entry.data() {
-            return Err(BodyTableDeletionError::Verification);
+            return Err(Error::Verification);
         }
     }
     Ok(())
 }
 
-fn preview_count(
-    package: &Package,
-    budget: &mut table_lock::WireBudget,
-) -> Result<usize, BodyTableDeletionError> {
+fn preview_count(package: &Package, budget: &mut table_lock::WireBudget) -> Result<usize, Error> {
     budget
         .charge_payload_work(
             package
@@ -944,7 +936,7 @@ fn preview_count(
                 .package()
                 .len()
                 .checked_mul(PREVIEW_ENTRY_NAMES.len())
-                .ok_or(BodyTableDeletionError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )
         .map_err(map_lock_error)?;
     Ok(PREVIEW_ENTRY_NAMES
@@ -964,7 +956,7 @@ fn select_target(
     targets: Vec<table_lock::BodyTableTarget>,
     selector: BodyTableSelector<'_>,
     budget: &mut table_lock::WireBudget,
-) -> Result<table_lock::BodyTableTarget, BodyTableDeletionError> {
+) -> Result<table_lock::BodyTableTarget, Error> {
     match selector {
         BodyTableSelector::Position(position) => {
             budget
@@ -973,7 +965,7 @@ fn select_target(
             targets
                 .into_iter()
                 .nth(position.get())
-                .ok_or(BodyTableDeletionError::TableNotFound)
+                .ok_or(Error::TableNotFound)
         },
         BodyTableSelector::Name(name) => {
             let mut selected = None;
@@ -982,7 +974,7 @@ fn select_target(
                     .table_name
                     .len()
                     .checked_add(name.len())
-                    .ok_or(BodyTableDeletionError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
                 budget
                     .charge_payload_work(comparison_work)
                     .map_err(map_lock_error)?;
@@ -990,18 +982,18 @@ fn select_target(
                     continue;
                 }
                 if selected.is_some() {
-                    return Err(BodyTableDeletionError::AmbiguousTableName);
+                    return Err(Error::AmbiguousTableName);
                 }
                 selected = Some(target);
             }
-            selected.ok_or(BodyTableDeletionError::TableNotFound)
+            selected.ok_or(Error::TableNotFound)
         },
     }
 }
 
 fn catalog_matches_snapshots(
-    catalog: &body_table_catalog::BodyTableCatalog,
-    expected: &[body_table_catalog::BodyTableSnapshot],
+    catalog: &body_table_catalog::Catalog,
+    expected: &[body_table_catalog::Snapshot],
 ) -> bool {
     catalog.len() == expected.len()
         && catalog
@@ -1011,16 +1003,16 @@ fn catalog_matches_snapshots(
 }
 
 fn catalog_matches_deleted_source(
-    after: &body_table_catalog::BodyTableCatalog,
-    before: &[body_table_catalog::BodyTableSnapshot],
+    after: &body_table_catalog::Catalog,
+    before: &[body_table_catalog::Snapshot],
     removed_index: usize,
 ) -> bool {
     snapshots_match_deleted_source(after.as_slice(), before, removed_index)
 }
 
 fn snapshots_match_deleted_source(
-    after: &[body_table_catalog::BodyTableSnapshot],
-    before: &[body_table_catalog::BodyTableSnapshot],
+    after: &[body_table_catalog::Snapshot],
+    before: &[body_table_catalog::Snapshot],
     removed_index: usize,
 ) -> bool {
     if before.len() != after.len().saturating_add(1) || removed_index >= before.len() {
@@ -1036,8 +1028,8 @@ fn snapshots_match_deleted_source(
 }
 
 fn same_table_snapshot(
-    left: &body_table_catalog::BodyTableSnapshot,
-    right: &body_table_catalog::BodyTableSnapshot,
+    left: &body_table_catalog::Snapshot,
+    right: &body_table_catalog::Snapshot,
 ) -> bool {
     left.name() == right.name() && left.rows() == right.rows() && left.columns() == right.columns()
 }
@@ -1046,20 +1038,20 @@ fn append_preview_deletions(
     source: &Package,
     deleted_entries: &mut Vec<Box<str>>,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableDeletionError> {
+) -> Result<(), Error> {
     let package_len = source.state.source.package().len();
     let deleted_len = deleted_entries.len();
     let comparisons = package_len
         .checked_add(deleted_len)
         .and_then(|value| value.checked_mul(PREVIEW_ENTRY_NAMES.len()))
-        .ok_or(BodyTableDeletionError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget
         .charge_payload_items(PREVIEW_ENTRY_NAMES.len())
         .and_then(|_| budget.charge_payload_work(comparisons))
         .map_err(map_lock_error)?;
     deleted_entries
         .try_reserve(PREVIEW_ENTRY_NAMES.len())
-        .map_err(|_| BodyTableDeletionError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: PREVIEW_ENTRY_NAMES.len(),
         })?;
     for name in PREVIEW_ENTRY_NAMES {
@@ -1077,164 +1069,132 @@ fn append_preview_deletions(
     Ok(())
 }
 
-fn map_catalog_error(error: body_table_catalog::BodyTableCatalogError) -> BodyTableDeletionError {
+fn map_catalog_error(error: body_table_catalog::Error) -> Error {
     match error {
-        body_table_catalog::BodyTableCatalogError::AmbiguousTableName => {
-            BodyTableDeletionError::AmbiguousTableName
-        },
-        body_table_catalog::BodyTableCatalogError::InvalidSource => {
-            BodyTableDeletionError::InvalidSource
-        },
-        body_table_catalog::BodyTableCatalogError::LimitExceeded {
+        body_table_catalog::Error::AmbiguousTableName => Error::AmbiguousTableName,
+        body_table_catalog::Error::InvalidSource => Error::InvalidSource,
+        body_table_catalog::Error::LimitExceeded {
             kind,
             observed,
             maximum,
-        } => BodyTableDeletionError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: map_catalog_limit(kind),
             observed,
             maximum,
         },
-        body_table_catalog::BodyTableCatalogError::Allocation { amount } => {
-            BodyTableDeletionError::Allocation { amount }
-        },
-        body_table_catalog::BodyTableCatalogError::InvalidName(_) => {
-            BodyTableDeletionError::InvalidSource
-        },
+        body_table_catalog::Error::Allocation { amount } => Error::Allocation { amount },
+        body_table_catalog::Error::InvalidName(_) => Error::InvalidSource,
     }
 }
 
-fn map_lock_error(error: table_lock::BodyTableLockError) -> BodyTableDeletionError {
+fn map_lock_error(error: table_lock::Error) -> Error {
     match error {
-        table_lock::BodyTableLockError::TableNotFound => BodyTableDeletionError::TableNotFound,
-        table_lock::BodyTableLockError::AmbiguousTableName => {
-            BodyTableDeletionError::AmbiguousTableName
-        },
-        table_lock::BodyTableLockError::AmbiguousSelector => {
-            BodyTableDeletionError::AmbiguousSelector
-        },
-        table_lock::BodyTableLockError::UnsupportedSource => {
-            BodyTableDeletionError::UnsupportedSource
-        },
-        table_lock::BodyTableLockError::InvalidSource => BodyTableDeletionError::InvalidSource,
-        table_lock::BodyTableLockError::LimitExceeded {
+        table_lock::Error::TableNotFound => Error::TableNotFound,
+        table_lock::Error::AmbiguousTableName => Error::AmbiguousTableName,
+        table_lock::Error::AmbiguousSelector => Error::AmbiguousSelector,
+        table_lock::Error::UnsupportedSource => Error::UnsupportedSource,
+        table_lock::Error::InvalidSource => Error::InvalidSource,
+        table_lock::Error::LimitExceeded {
             kind,
             observed,
             maximum,
-        } => BodyTableDeletionError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: map_lock_limit(kind),
             observed,
             maximum,
         },
-        table_lock::BodyTableLockError::Allocation { amount } => {
-            BodyTableDeletionError::Allocation { amount }
-        },
-        table_lock::BodyTableLockError::Verification => BodyTableDeletionError::Verification,
-        table_lock::BodyTableLockError::PatchConflict => BodyTableDeletionError::PatchConflict,
+        table_lock::Error::Allocation { amount } => Error::Allocation { amount },
+        table_lock::Error::Verification => Error::Verification,
+        table_lock::Error::PatchConflict => Error::PatchConflict,
     }
 }
 
-const fn map_lock_limit(kind: table_lock::BodyTableLockLimitKind) -> BodyTableDeletionLimitKind {
-    use table_lock::BodyTableLockLimitKind as Lock;
+const fn map_lock_limit(kind: table_lock::LimitKind) -> LimitKind {
+    use table_lock::LimitKind as Lock;
     match kind {
-        Lock::InputBytes => BodyTableDeletionLimitKind::InputBytes,
-        Lock::OutputBytes => BodyTableDeletionLimitKind::OutputBytes,
-        Lock::Entries => BodyTableDeletionLimitKind::Entries,
-        Lock::EntryBytes => BodyTableDeletionLimitKind::EntryBytes,
-        Lock::TotalEntryBytes => BodyTableDeletionLimitKind::TotalEntryBytes,
-        Lock::PackageBytes => BodyTableDeletionLimitKind::PackageBytes,
-        Lock::PayloadBytes => BodyTableDeletionLimitKind::PayloadBytes,
-        Lock::TotalPayloadBytes => BodyTableDeletionLimitKind::TotalPayloadBytes,
-        Lock::PayloadObjects => BodyTableDeletionLimitKind::PayloadObjects,
-        Lock::PayloadMessages => BodyTableDeletionLimitKind::PayloadMessages,
-        Lock::PayloadItems => BodyTableDeletionLimitKind::PayloadItems,
-        Lock::PayloadReferences => BodyTableDeletionLimitKind::PayloadReferences,
-        Lock::WireBytes => BodyTableDeletionLimitKind::WireBytes,
-        Lock::WireFields => BodyTableDeletionLimitKind::WireFields,
-        Lock::WireNesting => BodyTableDeletionLimitKind::WireNesting,
-        Lock::WireWork => BodyTableDeletionLimitKind::WireWork,
+        Lock::InputBytes => LimitKind::InputBytes,
+        Lock::OutputBytes => LimitKind::OutputBytes,
+        Lock::Entries => LimitKind::Entries,
+        Lock::EntryBytes => LimitKind::EntryBytes,
+        Lock::TotalEntryBytes => LimitKind::TotalEntryBytes,
+        Lock::PackageBytes => LimitKind::PackageBytes,
+        Lock::PayloadBytes => LimitKind::PayloadBytes,
+        Lock::TotalPayloadBytes => LimitKind::TotalPayloadBytes,
+        Lock::PayloadObjects => LimitKind::PayloadObjects,
+        Lock::PayloadMessages => LimitKind::PayloadMessages,
+        Lock::PayloadItems => LimitKind::PayloadItems,
+        Lock::PayloadReferences => LimitKind::PayloadReferences,
+        Lock::WireBytes => LimitKind::WireBytes,
+        Lock::WireFields => LimitKind::WireFields,
+        Lock::WireNesting => LimitKind::WireNesting,
+        Lock::WireWork => LimitKind::WireWork,
     }
 }
 
-const fn map_catalog_limit(
-    kind: body_table_catalog::BodyTableCatalogLimitKind,
-) -> BodyTableDeletionLimitKind {
-    use body_table_catalog::BodyTableCatalogLimitKind as Catalog;
+const fn map_catalog_limit(kind: body_table_catalog::LimitKind) -> LimitKind {
+    use body_table_catalog::LimitKind as Catalog;
     match kind {
-        Catalog::InputBytes => BodyTableDeletionLimitKind::InputBytes,
-        Catalog::OutputBytes => BodyTableDeletionLimitKind::OutputBytes,
-        Catalog::Entries => BodyTableDeletionLimitKind::Entries,
-        Catalog::EntryBytes => BodyTableDeletionLimitKind::EntryBytes,
-        Catalog::TotalEntryBytes => BodyTableDeletionLimitKind::TotalEntryBytes,
-        Catalog::PackageBytes => BodyTableDeletionLimitKind::PackageBytes,
-        Catalog::PayloadBytes => BodyTableDeletionLimitKind::PayloadBytes,
-        Catalog::TotalPayloadBytes => BodyTableDeletionLimitKind::TotalPayloadBytes,
-        Catalog::PayloadObjects => BodyTableDeletionLimitKind::PayloadObjects,
-        Catalog::PayloadMessages => BodyTableDeletionLimitKind::PayloadMessages,
-        Catalog::PayloadItems => BodyTableDeletionLimitKind::PayloadItems,
-        Catalog::PayloadReferences => BodyTableDeletionLimitKind::PayloadReferences,
-        Catalog::WireBytes => BodyTableDeletionLimitKind::WireBytes,
-        Catalog::WireFields => BodyTableDeletionLimitKind::WireFields,
-        Catalog::WireNesting => BodyTableDeletionLimitKind::WireNesting,
-        Catalog::WireWork => BodyTableDeletionLimitKind::WireWork,
+        Catalog::InputBytes => LimitKind::InputBytes,
+        Catalog::OutputBytes => LimitKind::OutputBytes,
+        Catalog::Entries => LimitKind::Entries,
+        Catalog::EntryBytes => LimitKind::EntryBytes,
+        Catalog::TotalEntryBytes => LimitKind::TotalEntryBytes,
+        Catalog::PackageBytes => LimitKind::PackageBytes,
+        Catalog::PayloadBytes => LimitKind::PayloadBytes,
+        Catalog::TotalPayloadBytes => LimitKind::TotalPayloadBytes,
+        Catalog::PayloadObjects => LimitKind::PayloadObjects,
+        Catalog::PayloadMessages => LimitKind::PayloadMessages,
+        Catalog::PayloadItems => LimitKind::PayloadItems,
+        Catalog::PayloadReferences => LimitKind::PayloadReferences,
+        Catalog::WireBytes => LimitKind::WireBytes,
+        Catalog::WireFields => LimitKind::WireFields,
+        Catalog::WireNesting => LimitKind::WireNesting,
+        Catalog::WireWork => LimitKind::WireWork,
     }
 }
 
-fn map_archive_error(error: litchi_iwa_archive::Error) -> BodyTableDeletionError {
+fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     match error {
         litchi_iwa_archive::Error::Limit {
             kind,
             observed,
             maximum,
-        } => BodyTableDeletionError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: match kind {
-                litchi_iwa_archive::LimitKind::InputBytes => BodyTableDeletionLimitKind::InputBytes,
-                litchi_iwa_archive::LimitKind::OutputBytes => {
-                    BodyTableDeletionLimitKind::OutputBytes
-                },
-                litchi_iwa_archive::LimitKind::Entries => BodyTableDeletionLimitKind::Entries,
+                litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
+                litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_archive::LimitKind::Entries => LimitKind::Entries,
                 litchi_iwa_archive::LimitKind::CompressedEntryBytes
-                | litchi_iwa_archive::LimitKind::EntryBytes => {
-                    BodyTableDeletionLimitKind::EntryBytes
-                },
-                litchi_iwa_archive::LimitKind::TotalBytes => {
-                    BodyTableDeletionLimitKind::TotalEntryBytes
-                },
-                litchi_iwa_archive::LimitKind::IwaStreamBytes => {
-                    BodyTableDeletionLimitKind::PayloadBytes
-                },
-                litchi_iwa_archive::LimitKind::IwaTotalBytes => {
-                    BodyTableDeletionLimitKind::TotalPayloadBytes
-                },
+                | litchi_iwa_archive::LimitKind::EntryBytes => LimitKind::EntryBytes,
+                litchi_iwa_archive::LimitKind::TotalBytes => LimitKind::TotalEntryBytes,
+                litchi_iwa_archive::LimitKind::IwaStreamBytes => LimitKind::PayloadBytes,
+                litchi_iwa_archive::LimitKind::IwaTotalBytes => LimitKind::TotalPayloadBytes,
                 litchi_iwa_archive::LimitKind::MemberNameBytes
-                | litchi_iwa_archive::LimitKind::MetadataBytes => {
-                    BodyTableDeletionLimitKind::PackageBytes
-                },
+                | litchi_iwa_archive::LimitKind::MetadataBytes => LimitKind::PackageBytes,
             },
             observed,
             maximum,
         },
-        litchi_iwa_archive::Error::Allocation { amount, .. } => {
-            BodyTableDeletionError::Allocation { amount }
-        },
-        _ => BodyTableDeletionError::InvalidSource,
+        litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_package_error(error: PackageError) -> BodyTableDeletionError {
+fn map_package_error(error: PackageError) -> Error {
     match error {
         PackageError::Archive(error) => map_archive_error(error),
-        PackageError::Allocation { amount } => BodyTableDeletionError::Allocation { amount },
-        PackageError::ObjectLimit { observed, limit } => BodyTableDeletionError::LimitExceeded {
-            kind: BodyTableDeletionLimitKind::PayloadObjects,
+        PackageError::Allocation { amount } => Error::Allocation { amount },
+        PackageError::ObjectLimit { observed, limit } => Error::LimitExceeded {
+            kind: LimitKind::PayloadObjects,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
-        PackageError::PayloadLimit { observed, limit } => BodyTableDeletionError::LimitExceeded {
-            kind: BodyTableDeletionLimitKind::PayloadBytes,
+        PackageError::PayloadLimit { observed, limit } => Error::LimitExceeded {
+            kind: LimitKind::PayloadBytes,
             observed: usize_to_u64(observed),
             maximum: usize_to_u64(limit),
         },
-        _ => BodyTableDeletionError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 

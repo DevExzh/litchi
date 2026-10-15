@@ -30,8 +30,8 @@ Rules of reading:
 | Read-only semantic projection, spreadsheets | `Workbook` | `Spreadsheet` | 🔴 numbers `Document`→`Workbook` (W1) · ✅ xlsx `Workbook` owned projection via `Package::workbook()` (0250) · ✅ ods `Spreadsheet`→`Workbook` owned projection via `Package::workbook()` (0268) · ✅ XLS (0197) |
 | Read-only semantic projection, decks | `Presentation` | — | 🔴 keynote `Document`→`Presentation` (W1) · ✅ pptx view / odp `Presentation` owned projection via `Package::presentation()` (0268) · ✅ PPT shared owned projection (0211) |
 | Projection accessor | `Package::{document, workbook, presentation}()` | — | owned projections primary; borrowed `*_ref()` views secondary |
-| Option-bearing fresh authoring | per-format `Builder` in a focused module | `WorkbookWriter` (xlsb), `Writer` (doc), `*DocumentBuilder` prefixes (litchi-iwa) | ✅ XLSB (0175), XLS (0200), PPT (0213) and RTF (0225) `Builder::build()` return `Package`; ✅ ODT/ODS/ODP `Builder::build()` return `Package` (0268); ✅ OTH/ODM/ODG/ODC/ODI/ODB/ODF-formula `Builder::build()` return `Package` (0282); 🔴 remaining W2–W4 builders |
-| iWork document identity (explicit, required) | `Identity` with `Identity::generate()` / fixed bytes | implicit random identity inside builders | 🔴 W1; `build()` without identity is a typed error |
+| Option-bearing fresh authoring | per-format `Builder` in a focused module | `WorkbookWriter` (xlsb), `Writer` (doc), `*DocumentBuilder` prefixes (litchi-iwa) | ✅ XLSB (0175), XLS (0200), PPT (0213) and RTF (0225) `Builder::build()` return `Package`; ✅ ODT/ODS/ODP `Builder::build()` return `Package` (0268); ✅ OTH/ODM/ODG/ODC/ODI/ODB/ODF-formula `Builder::build()` return `Package` (0282); ✅ pages `builder::Builder::build() -> Package` (0299); 🔴 remaining W2–W4 builders |
+| iWork document identity (explicit, required) | `Identity` with `Identity::generate()` / fixed bytes | implicit random identity inside builders | ✅ pages `builder::Identity::{generate, from_bytes}`; `Builder::build()` without one is `PackageError::MissingIdentity`; fixed identities give byte-identical builds (0299) · 🔴 keynote/numbers (W1) |
 
 ## 2. Transaction vocabulary (iWork canonical form)
 
@@ -76,6 +76,21 @@ transaction is the bare `Package::edit()`.
 Deferred (own tracks, not this glossary): `History`/undo-redo, patch
 composition (`join`, `three_way`), durable patch formats beyond pptx/xlsx.
 
+Pages W1 (record 0299): every focused family lives in its module with the
+six canonical names — `section::{text, name, settings, background,
+paragraphs}`, `section::pagination::transaction`,
+`page_layout::transaction`, `header_footer::text`, `footnote::text`,
+`footnote::body::transaction`, `chart::{arrangement, data}`,
+`drawable::order`, `image::adjustments`, `metadata`, `document_settings`,
+`table::{title, lock}` and `table::{appearance, dimension, headers,
+hidden_axes, merge, name, sort}::transaction`; the crate-root prefixed names
+(`SectionTextCommit`, `BodyTableNameEdit`, …) and the root aliases
+(`BodyTableHeaderSettings`, `BodyTableLockState`, `BodyTableName`,
+`BodyTableNameValueError`) are deleted and banned by the `pages` glossary
+profile. `Package::{document, document_ref}` replace `semantic_document`;
+`Document` keeps no ingress verbs (`open`, `from_bytes`, …), and
+`Package::open` reads package directories.
+
 RTF primary `edit::Commit` now exposes `package`, `patch`, `diagnostics`,
 `into_package` and `(Package, Patch)` `into_parts` (0224). Primary replay is
 `Package::apply`; `Patch::is_noop` and diagnostics use exact artifact equality.
@@ -100,10 +115,10 @@ and redaction vocabulary remain pending.
 |---|---|---|---|
 | Open from path | `open(path)` | — | ✅ everywhere |
 | Open from bytes (copy allowed) | `from_bytes(&[u8])` | `from_bytes(Vec<u8>)` signatures (xlsx/odt/odp), `from_slice` (xlsx), `from_vec` (pptx, removed 0252) | ✅ DOCX owning/lazy Package (0038/0040); ✅ XLSX `Package` (0250; copies into the owned source archive); ✅ PPTX (0252); ✅ XLSB `Package` (0261; copies into the owned source archive; `from_slice*` deleted) · ✅ ODT/ODS/ODP `Package::from_bytes(&[u8])` (0268) · ✅ OTH/ODM/ODG/ODC/ODI/ODB/ODF-formula `Package::from_bytes(&[u8])` (0282); 🔴 flat `Flat*` owners |
-| Open from shared bytes (zero-copy) | `from_shared_bytes(Arc<[u8]>)` | — | ✅ numbers; offered only where zero-copy is real |
+| Open from shared bytes (zero-copy) | `from_shared_bytes(Arc<[u8]>)` | — | ✅ numbers; ✅ pages `Package::from_shared_bytes{,_with_options}` (0299); offered only where zero-copy is real |
 | Open from reader | `from_reader(R)` | — | ✅ docx/xlsx; ✅ XLSB `Package`/`SourceBackedWorkbook` (0261); extended per wave |
-| Configured open | `open_with_options(path, OpenOptions)`, `from_bytes_with_options(bytes, OpenOptions)` | `open_with_limits`, `open_with` (doc), `open_with_options` under other type names | envelope decided in §5 · ✅ DOCX (0038) · ✅ XLSX `OpenOptions` (source limits, leniency, encryption limits; 0250) · ✅ PPTX owning `Package` and positional-source presentation owners (0252) · ✅ XLSB `OpenOptions` (source, external-link and cache limits, leniency, drawing decoding, execution context) on `Package`, the `Workbook` projection constructors and `SourceBackedWorkbook` (0261) · ✅ DOC raw owner and part editors, `open_with_limits*` banned crate-wide (0258) · ✅ PPT `text_edit::SourceSnapshot::open_with_options` and `slide_order::Snapshot::from_bytes_with_options` only (0260) · ✅ ODT/ODS/ODP `open_with_options`/`from_bytes_with_options`/`from_reader_with_options` with the `litchi_odf_common::OpenOptions` envelope (source + semantic limits, 0268) · ✅ the other seven ODF `Package` owners `open_with_options`/`from_bytes_with_options`/`from_reader_with_options` (0282); 🔴 PPT `raw::Reader` limits-only ingress and scoped-family `*_with_limits` (W4 residue) |
-| Minimal fresh artifact | `Package::new()` | `Workbook::create()` duplicate (xlsx) | ✅ docx; ✅ canonical PPTX constructor (0127); ✅ XLSB (0175); ✅ XLS (0199); ✅ RTF (0225); ✅ XLSX (0250) · all formats gain it |
+| Configured open | `open_with_options(path, OpenOptions)`, `from_bytes_with_options(bytes, OpenOptions)` | `open_with_limits`, `open_with` (doc), `open_with_options` under other type names | envelope decided in §5 · ✅ DOCX (0038) · ✅ XLSX `OpenOptions` (source limits, leniency, encryption limits; 0250) · ✅ PPTX owning `Package` and positional-source presentation owners (0252) · ✅ XLSB `OpenOptions` (source, external-link and cache limits, leniency, drawing decoding, execution context) on `Package`, the `Workbook` projection constructors and `SourceBackedWorkbook` (0261) · ✅ DOC raw owner and part editors, `open_with_limits*` banned crate-wide (0258) · ✅ PPT `text_edit::SourceSnapshot::open_with_options` and `slide_order::Snapshot::from_bytes_with_options` only (0260) · ✅ ODT/ODS/ODP `open_with_options`/`from_bytes_with_options`/`from_reader_with_options` with the `litchi_odf_common::OpenOptions` envelope (source + semantic limits, 0268) · ✅ the other seven ODF `Package` owners `open_with_options`/`from_bytes_with_options`/`from_reader_with_options` (0282) · ✅ pages `Package::{open_with_options, from_bytes_with_options, from_shared_bytes_with_options}`; `open_with_limits`/`from_bytes_with_limits` banned (0299); 🔴 PPT `raw::Reader` limits-only ingress and scoped-family `*_with_limits` (W4 residue) |
+| Minimal fresh artifact | `Package::new()` | `Workbook::create()` duplicate (xlsx) | ✅ docx; ✅ canonical PPTX constructor (0127); ✅ XLSB (0175); ✅ XLS (0199); ✅ RTF (0225); ✅ XLSX (0250); ✅ pages (deterministic built-in template, 0299) · all formats gain it |
 | Save to path | `save(path)` — **always atomic** (sibling temp + rename) | non-atomic `Builder::save` (odt/odp) | ✅ OOXML, including lazy DOCX (0041), and RTF (0226) · ✅ ODF: every ODT/ODS/ODP/ODC/formula/generic whole-package save publishes through `litchi_core::atomic` with failed-save CRUD evidence (0268); `Package::{save, save_with_durability}` on all seven remaining ODF owners (0282) |
 | Save with explicit durability | `save_with_durability(path, Durability)` | — | ✅ OOXML and RTF (0226); extended everywhere |
 | Bytes output | `to_bytes()` | `Builder::build() -> Vec<u8>` as output (ODF) | ✅ owning DOCX (0044); lazy managed DOCX bytes pending. `build()` returns `Package`; output lives on `Package` |
@@ -117,11 +132,11 @@ and redaction vocabulary remain pending.
 
 | Concept | Canonical | Banned | Notes / status |
 |---|---|---|---|
-| Physical ingress limits | `SourceLimits` | `ReadLimits` (OPC re-exports in docx/pptx/xlsx/xlsb), `SourcePackageLimits` (odt), `package::Limits` (doc), `RecordLimits` (ppt), `DocumentSourceLimits` (iWork) | ✅ OPC `SourceLimits`/`SourceLimitsBuilder` and OOXML `SourceLimits` re-exports, record 0035 · ✅ DOC (0192); ✅ XLS eager/retained policies (0196–0198); ✅ PPT (0210); ✅ ODF `litchi_odf_common::SourceLimits` (`SourcePackageLimits` deleted, 0268); 🔴 iWork |
-| Semantic limits | `SemanticLimits` | `DocumentLimits` (numbers), `DocumentSemanticLimits` (keynote) | ✅ pages; ✅ RTF primary operation count and replacement bytes (0227–0228); ✅ XLSB nested `data_model`, `calculation_chain`, `volatile_dependencies` and `xml_maps` `ReadLimits` and their `Limits` aliases renamed `SemanticLimits` (0261) · ✅ ODT/ODS/ODP `SemanticLimits` (content/styles bytes, units; 0268) · 🔴 remaining dimensions and W1 |
-| Open configuration envelope | `OpenOptions` (per format, extensible fields) | `PackageOpenOptions` (doc — merges), `ReadOptions` (numbers), `iwork::Options` (facade) | ✅ DOCX ingress envelope (0038–0040); ✅ XLSB (0261, `OpenPolicy` refusals for owner-specific policies); owning lazy-policy support and W1–W4 pending |
-| Construction idiom | consuming builder, fallible `max_<dimension>` setters, fallible `build()` | positional `new(...)` constructors (iWork) | ✅ OPC, DOC (0192), XLS (0196) and PPT (0210) · 🔴 other W1 |
-| Build-time invalid limit | `Error::InvalidLimit { kind, value, maximum }` | standalone `*LimitsError` types (doc, iWork) | ✅ OPC `InvalidLimit` with contextual maximum (0036); DOC (0192), XLS (0196), PPT (0210); other owners pending |
+| Physical ingress limits | `SourceLimits` | `ReadLimits` (OPC re-exports in docx/pptx/xlsx/xlsb), `SourcePackageLimits` (odt), `package::Limits` (doc), `RecordLimits` (ppt), `DocumentSourceLimits` (iWork) | ✅ OPC `SourceLimits`/`SourceLimitsBuilder` and OOXML `SourceLimits` re-exports, record 0035 · ✅ DOC (0192); ✅ XLS eager/retained policies (0196–0198); ✅ PPT (0210); ✅ ODF `litchi_odf_common::SourceLimits` (`SourcePackageLimits` deleted, 0268); ✅ pages `SourceLimits` (input bytes, members, entry/aggregate/component bytes; `DocumentSourceLimits` and the `Limits` re-export deleted, 0299); 🔴 keynote/numbers |
+| Semantic limits | `SemanticLimits` | `DocumentLimits` (numbers), `DocumentSemanticLimits` (keynote) | ✅ pages; ✅ RTF primary operation count and replacement bytes (0227–0228); ✅ XLSB nested `data_model`, `calculation_chain`, `volatile_dependencies` and `xml_maps` `ReadLimits` and their `Limits` aliases renamed `SemanticLimits` (0261) · ✅ ODT/ODS/ODP `SemanticLimits` (content/styles bytes, units; 0268) · ✅ pages builder form, `SemanticLimitsError` deleted (0299) · 🔴 remaining dimensions and W1 |
+| Open configuration envelope | `OpenOptions` (per format, extensible fields) | `PackageOpenOptions` (doc — merges), `ReadOptions` (numbers), `iwork::Options` (facade) | ✅ DOCX ingress envelope (0038–0040); ✅ XLSB (0261, `OpenPolicy` refusals for owner-specific policies); ✅ pages `OpenOptions` (`DocumentReadOptions` deleted, 0299); owning lazy-policy support and W1–W4 pending |
+| Construction idiom | consuming builder, fallible `max_<dimension>` setters, fallible `build()` | positional `new(...)` constructors (iWork) | ✅ OPC, DOC (0192), XLS (0196) and PPT (0210) · ✅ pages `SourceLimits::builder()`/`SemanticLimits::builder()` (0299) · 🔴 keynote/numbers W1 |
+| Build-time invalid limit | `Error::InvalidLimit { kind, value, maximum }` | standalone `*LimitsError` types (doc, iWork) | ✅ OPC `InvalidLimit` with contextual maximum (0036); DOC (0192), XLS (0196), PPT (0210); pages `PackageError::InvalidLimit` (0299); other owners pending |
 | Ingress limit exceeded | `Error::Limit { kind, observed, maximum }` | `OpcError::ReadLimit`, facade `ResourceLimit` mapping drift | ✅ OPC (0036), DOC (0192), XLS (0196), PPT (0210) kind/observed/maximum; ✅ XLSB cell-values transaction bounds (`PackageError::Limit`, 0261); broader taxonomy pending |
 | Limit kind enums | `SourceLimitKind` / `SemanticLimitKind` | `ReadResource`, per-crate one-off kinds | ✅ OPC/OOXML (0036), DOC (0192), XLS (0196), PPT (0210) `SourceLimitKind`; ✅ XLSB `cell_values::LimitKind` (0261); other semantic kinds pending |
 | Dimension naming | nouns (`input_bytes`, `members`, `entry_bytes`, `aggregate_bytes`, `depth`, `events`, …); setters `max_<noun>` | a second name for an existing dimension | ✅ OPC common nouns (0037); shared defaults remain 512 MiB input and XML depth 256; other families pending |
@@ -235,7 +250,7 @@ semantic-limit migrations.
 
 | Concept | Canonical variant | Banned |
 |---|---|---|
-| Recognized but wrong family | `UnexpectedFormat { detected: FileFormat }` | `NotPages` / `NotKeynote` / `NotNumbers`, string messages (`"Not an ODT file: …"`) |
+| Recognized but wrong family | `UnexpectedFormat { detected: FileFormat }` | `NotPages` / `NotKeynote` / `NotNumbers`, string messages (`"Not an ODT file: …"`) (✅ pages `PackageError::UnexpectedFormat`, unrecognized input `PackageError::NotOfficeFile`; `NotPages` banned, 0299) |
 | Unrecognized input | `NotOfficeFile` | — |
 | Source file changed after open | `SourceChanged { expected, observed }` | — |
 | Patch base mismatch | `PatchConflict { .. }` | `StaleSource` (merges; the two concepts stay distinct; ✅ PPTX 0252, 🔴 docx) |
@@ -267,13 +282,13 @@ semantic-limit migrations.
 | Custom properties | `custom_props()` / `edit_custom_props()` | — | ✅ name (docx/pptx/xlsx); OOXML custom properties are also staged through `metadata::Edit::set_custom_props` (0253) |
 | Application properties (OOXML-only) | `app_props()` | — | ✅ `litchi_ooxml_common::properties::app` (splice writer), pptx/xlsx/xlsb `Package::app_props()` (0253) |
 | Fresh-authoring metadata | `Builder::set_metadata(Metadata)` | `Builder::set_property` (doc/xls/ppt) | ✅ ODF · ✅ doc/xls/ppt (0254); not an opened-document mutation · OOXML creation commits a metadata `Edit` on the fresh package (0253) |
-| iWork metadata write | typed unsupported until native gates pass | — | no capability is claimed ahead of evidence |
+| iWork metadata write | typed unsupported until native gates pass | — | ✅ pages `Package::{metadata, edit_metadata, apply_metadata}` with `metadata::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}`: title/author/keywords/description in `Metadata/Properties.plist`, read back and verified; the Pages app does not display these keys, so no native acceptance is claimed (0299) · 🔴 keynote/numbers |
 
 ## 7. Selectors and coordinates
 
 | Concept | Canonical | Banned | Notes / status |
 |---|---|---|---|
-| Catalog selector | `Selector<'a> = Name(Cow<'a, str>) \| Position(Position)` | the `Id` variant (raw IDs live in raw modules); `Index(usize)` (numbers); `At`/`Index` selector forms (pages footnotes) | ✅ core/pages/keynote shape · ✅ XLS `cell_values`/`sheet_visibility` `Position(Position)` (0259) · 🔴 numbers (W1) |
+| Catalog selector | `Selector<'a> = Name(Cow<'a, str>) \| Position(Position)` | the `Id` variant (raw IDs live in raw modules); `Index(usize)` (numbers); `At`/`Index` selector forms (pages footnotes) | ✅ core/pages/keynote shape · ✅ XLS `cell_values`/`sheet_visibility` `Position(Position)` (0259) · ✅ pages `ImageSelector`/`BodyChartSelector` `Position(Position)`, footnote `Selector::{Anchor, Position}` (0299) · 🔴 numbers (W1) |
 | Positional selection word | `Position` — checked, zero-based value type | `Index` as a selector variant; raw `usize` in public signatures (facade `slide(usize)`, `paragraph(usize)`) | 🔴 facade fold into M0a |
 | Selector-taking methods | `impl Into<Selector>` parameter, `Result<Option<_>>` return; missing → `Ok(None)`, ambiguous/invalid → typed error, never panics, no `Index` trait | method-level splits that bypass the selector channel | pptx `scene::get/at` converge (W2) |
 | Grid coordinates (not selectors) | `At` / `Area` with A1 parsing at the edge | treating coordinates as catalog selectors | ✅ xlsx; rule recorded |

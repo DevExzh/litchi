@@ -27,7 +27,7 @@ use litchi_iwa_protos::numbers_table_cell_dependency_codec as dependency_codec;
 use litchi_iwa_protos::numbers_table_physical_sort_codec as uid_codec;
 use litchi_iwa_protos::pages_hidden_state_codec as codec;
 use litchi_iwa_protos::table_appearance_codec as style_codec;
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::{Package, PackageError, page_layout, table_lock};
 use crate::selector::BodyTableSelector;
@@ -104,21 +104,21 @@ impl GraphProfile {
 /// A content-free location associated with one hidden-axis operation.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum BodyTableHiddenAxesPath {
+pub enum Path {
     /// The complete Pages package.
     Package,
     /// One rooted table at a checked body position.
     Table { table: usize },
 }
 
-impl fmt::Debug for BodyTableHiddenAxesPath {
+impl fmt::Debug for Path {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         // A table position is useful to the private adapter, but public
         // diagnostics are intentionally content-free.  In particular, do not
         // expose the selector, native proof, or any package member here.
         formatter.write_str(match self {
-            Self::Package => "BodyTableHiddenAxesPath::Package",
-            Self::Table { .. } => "BodyTableHiddenAxesPath::Table",
+            Self::Package => "Path::Package",
+            Self::Table { .. } => "Path::Table",
         })
     }
 }
@@ -126,7 +126,7 @@ impl fmt::Debug for BodyTableHiddenAxesPath {
 /// Finite resources governed by one hidden-axis transaction.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum BodyTableHiddenAxesLimitKind {
+pub enum LimitKind {
     InputBytes,
     OutputBytes,
     Entries,
@@ -147,7 +147,7 @@ pub enum BodyTableHiddenAxesLimitKind {
     TransactionWork,
 }
 
-impl fmt::Display for BodyTableHiddenAxesLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             Self::InputBytes => "input bytes",
@@ -173,9 +173,9 @@ impl fmt::Display for BodyTableHiddenAxesLimitKind {
 }
 
 /// A redacted failure from a body-table hidden-axis read or transaction.
-#[derive(Error, Clone, Copy, PartialEq, Eq)]
+#[derive(ThisError, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
-pub enum BodyTableHiddenAxesError {
+pub enum Error {
     #[error("the Pages body has no table matching the requested selector")]
     TableNotFound,
     #[error("more than one Pages body table has the requested name")]
@@ -194,7 +194,7 @@ pub enum BodyTableHiddenAxesError {
         "Pages body-table hidden axes {kind} limit exceeded: observed {observed}, maximum {maximum}"
     )]
     LimitExceeded {
-        kind: BodyTableHiddenAxesLimitKind,
+        kind: LimitKind,
         observed: u64,
         maximum: u64,
     },
@@ -206,7 +206,7 @@ pub enum BodyTableHiddenAxesError {
     PatchConflict,
 }
 
-impl fmt::Debug for BodyTableHiddenAxesError {
+impl fmt::Debug for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::LimitExceeded {
@@ -218,48 +218,40 @@ impl fmt::Debug for BodyTableHiddenAxesError {
                 // no source fingerprint, payload, UUID, or native identity is
                 // ever included in this public representation.
                 formatter
-                    .debug_struct("BodyTableHiddenAxesError::LimitExceeded")
+                    .debug_struct("Error::LimitExceeded")
                     .field("kind", kind)
                     .field("observed", observed)
                     .field("maximum", maximum)
                     .finish_non_exhaustive()
             },
             Self::Allocation { amount } => formatter
-                .debug_struct("BodyTableHiddenAxesError::Allocation")
+                .debug_struct("Error::Allocation")
                 .field("allocation_units", amount)
                 .finish_non_exhaustive(),
-            Self::TableNotFound => formatter.write_str("BodyTableHiddenAxesError::TableNotFound"),
-            Self::AmbiguousTableName => {
-                formatter.write_str("BodyTableHiddenAxesError::AmbiguousTableName")
-            },
-            Self::AmbiguousSelector => {
-                formatter.write_str("BodyTableHiddenAxesError::AmbiguousSelector")
-            },
-            Self::UnsupportedSource => {
-                formatter.write_str("BodyTableHiddenAxesError::UnsupportedSource")
-            },
-            Self::InvalidSource => formatter.write_str("BodyTableHiddenAxesError::InvalidSource"),
-            Self::TableLocked => formatter.write_str("BodyTableHiddenAxesError::TableLocked"),
-            Self::UnsupportedDependency => {
-                formatter.write_str("BodyTableHiddenAxesError::UnsupportedDependency")
-            },
-            Self::Verification => formatter.write_str("BodyTableHiddenAxesError::Verification"),
-            Self::PatchConflict => formatter.write_str("BodyTableHiddenAxesError::PatchConflict"),
+            Self::TableNotFound => formatter.write_str("Error::TableNotFound"),
+            Self::AmbiguousTableName => formatter.write_str("Error::AmbiguousTableName"),
+            Self::AmbiguousSelector => formatter.write_str("Error::AmbiguousSelector"),
+            Self::UnsupportedSource => formatter.write_str("Error::UnsupportedSource"),
+            Self::InvalidSource => formatter.write_str("Error::InvalidSource"),
+            Self::TableLocked => formatter.write_str("Error::TableLocked"),
+            Self::UnsupportedDependency => formatter.write_str("Error::UnsupportedDependency"),
+            Self::Verification => formatter.write_str("Error::Verification"),
+            Self::PatchConflict => formatter.write_str("Error::PatchConflict"),
         }
     }
 }
 
 /// Selector-first immutable hidden-axis edit.
-pub struct BodyTableHiddenAxesEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
     target: table_lock::BodyTableTarget,
     before: HiddenAxes,
     axes: HiddenAxes,
 }
 
-impl fmt::Debug for BodyTableHiddenAxesEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("BodyTableHiddenAxesEdit")
+        f.debug_struct("Edit")
             // Hidden row/column positions are semantic content.  Public
             // diagnostics may report only bounded counts and state changes;
             // the source, proof, and selected package member stay private.
@@ -270,10 +262,10 @@ impl fmt::Debug for BodyTableHiddenAxesEdit<'_> {
     }
 }
 
-impl BodyTableHiddenAxesEdit<'_> {
+impl Edit<'_> {
     #[must_use]
-    pub const fn path(&self) -> BodyTableHiddenAxesPath {
-        BodyTableHiddenAxesPath::Table {
+    pub const fn path(&self) -> Path {
+        Path::Table {
             table: self.target.table_position,
         }
     }
@@ -309,14 +301,14 @@ impl BodyTableHiddenAxesEdit<'_> {
         self.clear()
     }
 
-    pub fn commit(self) -> Result<BodyTableHiddenAxesCommit, BodyTableHiddenAxesError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         commit_edit(self)
     }
 }
 
 /// Exact-source reversible hidden-axis patch.
 #[derive(Clone, PartialEq, Eq)]
-pub struct BodyTableHiddenAxesPatch {
+pub struct Patch {
     source: Arc<[u8]>,
     target: Arc<[u8]>,
     source_fingerprint: u64,
@@ -330,9 +322,9 @@ pub struct BodyTableHiddenAxesPatch {
     added_object_ids: Arc<[u64]>,
 }
 
-impl fmt::Debug for BodyTableHiddenAxesPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("BodyTableHiddenAxesPatch")
+        f.debug_struct("Patch")
             .field("before_count", &self.before.as_slice().len())
             .field("after_count", &self.after.as_slice().len())
             .field("changed", &(self.before != self.after))
@@ -342,10 +334,10 @@ impl fmt::Debug for BodyTableHiddenAxesPatch {
     }
 }
 
-impl BodyTableHiddenAxesPatch {
+impl Patch {
     #[must_use]
-    pub const fn path(&self) -> BodyTableHiddenAxesPath {
-        BodyTableHiddenAxesPath::Table {
+    pub const fn path(&self) -> Path {
+        Path::Table {
             table: self.proof.table_position,
         }
     }
@@ -399,17 +391,17 @@ impl BodyTableHiddenAxesPatch {
 
 /// Content-free publication diagnostics.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct BodyTableHiddenAxesDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     deleted_previews: usize,
     full_reparse_performed: bool,
 }
 
-impl fmt::Debug for BodyTableHiddenAxesDiagnostics {
+impl fmt::Debug for Diagnostics {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("BodyTableHiddenAxesDiagnostics")
+            .debug_struct("Diagnostics")
             .field("changed", &self.changed)
             .field("touched_components", &self.touched_components)
             .field("deleted_previews", &self.deleted_previews)
@@ -418,7 +410,7 @@ impl fmt::Debug for BodyTableHiddenAxesDiagnostics {
     }
 }
 
-impl BodyTableHiddenAxesDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -460,19 +452,19 @@ impl BodyTableHiddenAxesDiagnostics {
 
 /// Fully reopened immutable result of one hidden-axis transaction.
 #[must_use = "a body-table hidden-axis commit contains the validated package snapshot"]
-pub struct BodyTableHiddenAxesCommit {
+pub struct Commit {
     package: Package,
-    patch: BodyTableHiddenAxesPatch,
-    diagnostics: BodyTableHiddenAxesDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl fmt::Debug for BodyTableHiddenAxesCommit {
+impl fmt::Debug for Commit {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         // Formatting `package` or `patch` recursively would make this type's
         // redaction depend on every nested implementation.  Keep the public
         // commit representation to the already-safe diagnostics summary.
         formatter
-            .debug_struct("BodyTableHiddenAxesCommit")
+            .debug_struct("Commit")
             .field("changed", &self.diagnostics.changed)
             .field("touched_components", &self.diagnostics.touched_components)
             .field("deleted_previews", &self.diagnostics.deleted_previews)
@@ -484,7 +476,7 @@ impl fmt::Debug for BodyTableHiddenAxesCommit {
     }
 }
 
-impl BodyTableHiddenAxesCommit {
+impl Commit {
     #[must_use]
     pub const fn package(&self) -> &Package {
         &self.package
@@ -496,12 +488,12 @@ impl BodyTableHiddenAxesCommit {
     }
 
     #[must_use]
-    pub const fn patch(&self) -> &BodyTableHiddenAxesPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     #[must_use]
-    pub const fn diagnostics(&self) -> &BodyTableHiddenAxesDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
@@ -570,13 +562,13 @@ impl UidIndex {
     fn new(
         physical: &[codec::UuidSnapshot],
         budget: &mut table_lock::WireBudget,
-    ) -> Result<Self, BodyTableHiddenAxesError> {
+    ) -> Result<Self, Error> {
         let mut entries = Vec::new();
-        entries.try_reserve_exact(physical.len()).map_err(|_| {
-            BodyTableHiddenAxesError::Allocation {
+        entries
+            .try_reserve_exact(physical.len())
+            .map_err(|_| Error::Allocation {
                 amount: physical.len(),
-            }
-        })?;
+            })?;
         for (index, uid) in physical.iter().copied().enumerate() {
             validate_uuid(uid)?;
             entries.push((uid, index));
@@ -584,7 +576,7 @@ impl UidIndex {
         entries.sort_unstable_by_key(|(uid, _)| (uid.lower(), uid.upper()));
         for pair in entries.windows(2) {
             if pair[0].0 == pair[1].0 {
-                return Err(BodyTableHiddenAxesError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
         let levels = if entries.len() <= 1 {
@@ -593,14 +585,17 @@ impl UidIndex {
             (usize::BITS - (entries.len() - 1).leading_zeros()) as usize
         };
         budget
-            .charge_payload_work(entries.len().checked_mul(levels).ok_or(
-                BodyTableHiddenAxesError::LimitExceeded {
-                    kind: BodyTableHiddenAxesLimitKind::TransactionWork,
-                    observed: u64::MAX,
-                    maximum:
-                        u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
-                },
-            )?)
+            .charge_payload_work(
+                entries
+                    .len()
+                    .checked_mul(levels)
+                    .ok_or(Error::LimitExceeded {
+                        kind: LimitKind::TransactionWork,
+                        observed: u64::MAX,
+                        maximum: u64::try_from(budget.wire_limits().max_rewrite_work())
+                            .unwrap_or(u64::MAX),
+                    })?,
+            )
             .map_err(map_lock_error)?;
         Ok(Self { entries })
     }
@@ -620,7 +615,7 @@ impl Package {
     pub fn body_table_hidden_axes<'table>(
         &self,
         selector: impl Into<BodyTableSelector<'table>>,
-    ) -> Result<HiddenAxes, BodyTableHiddenAxesError> {
+    ) -> Result<HiddenAxes, Error> {
         let mut budget = transaction_budget(self)?;
         let graph = resolve_graph(self, selector.into(), &mut budget)?;
         Ok(graph.before)
@@ -630,10 +625,10 @@ impl Package {
     pub fn edit_body_table_hidden_axes<'table>(
         &self,
         selector: impl Into<BodyTableSelector<'table>>,
-    ) -> Result<BodyTableHiddenAxesEdit<'_>, BodyTableHiddenAxesError> {
+    ) -> Result<Edit<'_>, Error> {
         let mut budget = transaction_budget(self)?;
         let graph = resolve_graph(self, selector.into(), &mut budget)?;
-        Ok(BodyTableHiddenAxesEdit {
+        Ok(Edit {
             source: self,
             target: graph.target,
             before: graph.before.clone(),
@@ -642,16 +637,13 @@ impl Package {
     }
 
     /// Apply a patch only when both its exact source and semantic proof match.
-    pub fn apply_body_table_hidden_axes(
-        &self,
-        patch: &BodyTableHiddenAxesPatch,
-    ) -> Result<BodyTableHiddenAxesCommit, BodyTableHiddenAxesError> {
+    pub fn apply_body_table_hidden_axes(&self, patch: &Patch) -> Result<Commit, Error> {
         let mut budget = transaction_budget(self)?;
         let source = self.state.source.source_bytes();
         if page_layout::fingerprint(source) != patch.source_fingerprint
             || source != patch.source.as_ref()
         {
-            return Err(BodyTableHiddenAxesError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let graph = resolve_graph(
             self,
@@ -661,25 +653,25 @@ impl Package {
         if graph.target.model_identifier != patch.proof.model_identifier
             || graph.before != patch.before
         {
-            return Err(BodyTableHiddenAxesError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if patch.is_noop() {
-            return Ok(BodyTableHiddenAxesCommit {
-                package: self.snapshot(),
+            return Ok(Commit {
+                package: self.clone(),
                 patch: patch.clone(),
-                diagnostics: BodyTableHiddenAxesDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         if graph.target.explicit_locked == Some(true) {
-            return Err(BodyTableHiddenAxesError::TableLocked);
+            return Err(Error::TableLocked);
         }
         if graph.profile.is_native() && graph.model.owner.is_none() {
-            return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+            return Err(Error::UnsupportedDependency);
         }
         if !self.state.source.source_is_exact()
             || page_layout::fingerprint(patch.target.as_ref()) != patch.target_fingerprint
         {
-            return Err(BodyTableHiddenAxesError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let candidate = reopen(self, Arc::clone(&patch.target), &mut budget)?;
         let verified = resolve_graph(
@@ -690,7 +682,7 @@ impl Package {
         if verified.target.model_identifier != patch.proof.model_identifier
             || verified.before != patch.after
         {
-            return Err(BodyTableHiddenAxesError::Verification);
+            return Err(Error::Verification);
         }
         verify_locality(
             self,
@@ -700,10 +692,10 @@ impl Package {
             patch.added_object_ids.as_ref(),
             &mut budget,
         )?;
-        Ok(BodyTableHiddenAxesCommit {
+        Ok(Commit {
             package: candidate,
             patch: patch.clone(),
-            diagnostics: BodyTableHiddenAxesDiagnostics::published(
+            diagnostics: Diagnostics::published(
                 patch.source_previews.saturating_sub(patch.target_previews),
                 patch.touched_components,
             ),
@@ -711,9 +703,7 @@ impl Package {
     }
 }
 
-fn commit_edit(
-    edit: BodyTableHiddenAxesEdit<'_>,
-) -> Result<BodyTableHiddenAxesCommit, BodyTableHiddenAxesError> {
+fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
     let source = edit.source;
     let mut budget = transaction_budget(source)?;
     let source_bytes = source.state.source.shared_source();
@@ -730,11 +720,11 @@ fn commit_edit(
         if graph.target.model_identifier != edit.target.model_identifier
             || graph.before != edit.before
         {
-            return Err(BodyTableHiddenAxesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
-        return Ok(BodyTableHiddenAxesCommit {
-            package: source.snapshot(),
-            patch: BodyTableHiddenAxesPatch {
+        return Ok(Commit {
+            package: source.clone(),
+            patch: Patch {
                 source: Arc::clone(&source_bytes),
                 target: source_bytes,
                 source_fingerprint,
@@ -747,14 +737,14 @@ fn commit_edit(
                 touched_components: 0,
                 added_object_ids: Arc::from(Vec::<u64>::new()),
             },
-            diagnostics: BodyTableHiddenAxesDiagnostics::unchanged(),
+            diagnostics: Diagnostics::unchanged(),
         });
     }
     if !source.state.source.source_is_exact() {
-        return Err(BodyTableHiddenAxesError::UnsupportedSource);
+        return Err(Error::UnsupportedSource);
     }
     if edit.target.explicit_locked == Some(true) {
-        return Err(BodyTableHiddenAxesError::TableLocked);
+        return Err(Error::TableLocked);
     }
     let graph = resolve_graph(
         source,
@@ -762,15 +752,15 @@ fn commit_edit(
         &mut budget,
     )?;
     if graph.before != edit.before {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if graph.profile.is_native() && graph.model.owner.is_none() {
         // Native kind-1 formula ownership is qualified for existing-owner
         // edits only. Native helper-owner creation remains unsupported.
-        return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+        return Err(Error::UnsupportedDependency);
     }
     if graph.model.pivot || graph.info.pivot {
-        return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+        return Err(Error::UnsupportedDependency);
     }
     validate_axis_bounds(&graph, &edit.axes)?;
     let (candidate, touched_components, added_object_ids) =
@@ -783,10 +773,10 @@ fn commit_edit(
     if verified.target.model_identifier != edit.target.model_identifier
         || verified.before != edit.axes
     {
-        return Err(BodyTableHiddenAxesError::Verification);
+        return Err(Error::Verification);
     }
     if preview_count(&candidate) != 0 {
-        return Err(BodyTableHiddenAxesError::Verification);
+        return Err(Error::Verification);
     }
     verify_locality(
         source,
@@ -799,9 +789,9 @@ fn commit_edit(
     let target = candidate.state.source.shared_source();
     let target_fingerprint = page_layout::fingerprint(target.as_ref());
     let target_previews = preview_count(&candidate);
-    Ok(BodyTableHiddenAxesCommit {
+    Ok(Commit {
         package: candidate,
-        patch: BodyTableHiddenAxesPatch {
+        patch: Patch {
             source: source_bytes,
             target,
             source_fingerprint,
@@ -814,16 +804,14 @@ fn commit_edit(
             touched_components,
             added_object_ids,
         },
-        diagnostics: BodyTableHiddenAxesDiagnostics::published(
+        diagnostics: Diagnostics::published(
             source_previews.saturating_sub(target_previews),
             touched_components,
         ),
     })
 }
 
-fn transaction_budget(
-    package: &Package,
-) -> Result<table_lock::WireBudget, BodyTableHiddenAxesError> {
+fn transaction_budget(package: &Package) -> Result<table_lock::WireBudget, Error> {
     let mut budget =
         table_lock::WireBudget::new(package.state.source.limits()).map_err(map_lock_error)?;
     budget
@@ -836,7 +824,7 @@ fn resolve_graph(
     package: &Package,
     selector: BodyTableSelector<'_>,
     budget: &mut table_lock::WireBudget,
-) -> Result<Graph, BodyTableHiddenAxesError> {
+) -> Result<Graph, Error> {
     let target = package
         .resolve_body_table_with_budget(selector, budget)
         .map_err(map_lock_error)?;
@@ -844,7 +832,7 @@ fn resolve_graph(
     if !TABLE_MODEL_MESSAGE_TYPES.contains(&target.model_message_type)
         || !TABLE_INFO_MESSAGE_TYPES.contains(&target.message_type)
     {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let profile = classify_graph_profile(package, &target)?;
     let model_raw = message_at(
@@ -945,7 +933,7 @@ fn resolve_graph(
         } else if profile.is_native() {
             // The native existing-owner profile carries both dependency roots.  An
             // absent root cannot be interpreted as an ownerless empty table.
-            return Err(BodyTableHiddenAxesError::InvalidSource);
+            return Err(Error::InvalidSource);
         } else {
             reject_reference_path_metadata(
                 package,
@@ -957,12 +945,12 @@ fn resolve_graph(
             )?;
         }
     }
-    let map = model.map.ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+    let map = model.map.ok_or(Error::InvalidSource)?;
     if info.map.is_some_and(|info_map| info_map != map) {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if info.model != target.model_identifier {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     validate_reference_metadata_for_profile(
         package,
@@ -989,7 +977,7 @@ fn resolve_graph(
         validate_uuid(hidden_uuid)?;
     }
     if profile.is_native() && model.owner.is_none() {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let (rows, columns, objects) = if model.owner.is_none() {
         // An ownerless table still proves its mandatory UID map, but does not
@@ -1005,10 +993,10 @@ fn resolve_graph(
     };
     validate_cross_axis_uuid_identity(&rows, &columns, budget)?;
     if model.owner.is_none() && info.hidden_uuid.is_some() {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if model.owner.is_none() && (model.formula_columns.is_some() || model.formula_rows.is_some()) {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     validate_model_counts(&model, info.hidden_uuid, budget)?;
     if model.owner.is_none() {
@@ -1027,7 +1015,7 @@ fn resolve_graph(
             before: HiddenAxes::empty(),
         });
     }
-    let objects = objects.ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+    let objects = objects.ok_or(Error::InvalidSource)?;
     let row_indices = UidIndex::new(&rows, budget)?;
     let column_indices = UidIndex::new(&columns, budget)?;
     let model_location = object_location(&objects, target.model_identifier)?;
@@ -1035,13 +1023,13 @@ fn resolve_graph(
         || model_location.object_index != target.model_object_index
         || model_location.identifier == target.drawable_identifier.get()
     {
-        return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+        return Err(Error::UnsupportedDependency);
     }
     let drawable_location = object_location(&objects, target.drawable_identifier)?;
     if drawable_location.component_index != target.component_index
         || drawable_location.object_index != target.object_index
     {
-        return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+        return Err(Error::UnsupportedDependency);
     }
     let formula_owner_messages = formula_owner_messages(package, &objects, budget)?;
     let formula_owner_uid = formula_owner_for(
@@ -1053,24 +1041,24 @@ fn resolve_graph(
         budget,
     )?;
     if model.owner.is_some() && formula_owner_uid.is_none() {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if model.owner.is_some() && (model.formula_columns.is_none() || model.formula_rows.is_none()) {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if let Some(owner) = model.owner.as_ref() {
-        let formula_uid = formula_owner_uid.ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+        let formula_uid = formula_owner_uid.ok_or(Error::InvalidSource)?;
         validate_uuid(formula_uid)?;
         let expected_owner_uid = codec::UuidSnapshot::new(
             formula_uid
                 .lower()
                 .checked_add(4)
-                .ok_or(BodyTableHiddenAxesError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
             formula_uid.upper(),
         );
         validate_uuid(expected_owner_uid)?;
         if owner.owner_uid() != expected_owner_uid || info.hidden_uuid != Some(owner.owner_uid()) {
-            return Err(BodyTableHiddenAxesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     if profile.is_native() {
@@ -1110,22 +1098,22 @@ fn message_at(
     identifier: NonZeroU64,
     type_: u32,
     versions: &[u32],
-) -> Result<RawMessage, BodyTableHiddenAxesError> {
+) -> Result<RawMessage, Error> {
     let object = package
         .state
         .source
         .components()
         .get_index(component_index)
         .and_then(|c| c.archive().objects.get(object_index))
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if object.archive_info.identifier != Some(identifier.get()) {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let message = object
         .messages
         .get(message_index)
         .filter(|m| m.type_ == type_)
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     validate_message_metadata_with_versions(object, message_index, type_, versions)?;
     Ok(message.clone())
 }
@@ -1133,31 +1121,31 @@ fn message_at(
 fn classify_graph_profile(
     package: &Package,
     target: &table_lock::BodyTableTarget,
-) -> Result<GraphProfile, BodyTableHiddenAxesError> {
+) -> Result<GraphProfile, Error> {
     let info_object = package
         .state
         .source
         .components()
         .get_index(target.component_index)
         .and_then(|component| component.archive().objects.get(target.object_index))
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let info = info_object
         .archive_info
         .message_infos
         .get(target.info_message_index)
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let model_object = package
         .state
         .source
         .components()
         .get_index(target.model_component_index)
         .and_then(|component| component.archive().objects.get(target.model_object_index))
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let model = model_object
         .archive_info
         .message_infos
         .get(target.model_message_index)
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
 
     if target.message_type == 6_000
         && target.model_message_type == 6_001
@@ -1175,7 +1163,7 @@ fn classify_graph_profile(
         return Ok(GraphProfile::Indexed);
     }
 
-    Err(BodyTableHiddenAxesError::InvalidSource)
+    Err(Error::InvalidSource)
 }
 
 fn message_info_at(
@@ -1183,7 +1171,7 @@ fn message_info_at(
     component_index: usize,
     object_index: usize,
     message_index: usize,
-) -> Result<&MessageInfo, BodyTableHiddenAxesError> {
+) -> Result<&MessageInfo, Error> {
     package
         .state
         .source
@@ -1191,7 +1179,7 @@ fn message_info_at(
         .get_index(component_index)
         .and_then(|component| component.archive().objects.get(object_index))
         .and_then(|object| object.archive_info.message_infos.get(message_index))
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)
+        .ok_or(Error::InvalidSource)
 }
 
 /// Identify the source-built current route that keeps selected references in
@@ -1205,7 +1193,7 @@ fn aggregate_only_metadata(
     model: &ModelValues,
     info: &InfoValues,
     budget: &mut table_lock::WireBudget,
-) -> Result<bool, BodyTableHiddenAxesError> {
+) -> Result<bool, Error> {
     // The selected-edge probes below each scan the retained field list. Charge
     // the maximum number of bounded passes before inspecting it.
     charge_metadata_scan(model_info, 3, budget)?;
@@ -1220,12 +1208,12 @@ fn aggregate_only_metadata(
             _ => return Ok(false),
         };
         let Some(expected) = expected else {
-            return Err(BodyTableHiddenAxesError::InvalidSource);
+            return Err(Error::InvalidSource);
         };
         if field.object_references.as_slice() != [expected.get()]
             || !field.data_references.is_empty()
         {
-            return Err(BodyTableHiddenAxesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     let mut omitted = false;
@@ -1252,11 +1240,11 @@ fn aggregate_field_is_omitted(
     info: &MessageInfo,
     identifier: u64,
     path: &[u32],
-) -> Result<bool, BodyTableHiddenAxesError> {
+) -> Result<bool, Error> {
     let mut occurrences = 0usize;
     for field in &info.field_infos {
         if field.data_references.contains(&identifier) {
-            return Err(BodyTableHiddenAxesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let field_occurrences = field
             .object_references
@@ -1264,14 +1252,14 @@ fn aggregate_field_is_omitted(
             .filter(|candidate| **candidate == identifier)
             .count();
         if field_occurrences > 1 || (field_occurrences == 1 && field.path.as_slice() != path) {
-            return Err(BodyTableHiddenAxesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         occurrences = occurrences
             .checked_add(field_occurrences)
-            .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     if occurrences > 1 {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(occurrences == 0)
 }
@@ -1287,7 +1275,7 @@ fn validate_message_metadata(
     object: &ArchiveObject,
     message_index: usize,
     expected_type: u32,
-) -> Result<&MessageInfo, BodyTableHiddenAxesError> {
+) -> Result<&MessageInfo, Error> {
     validate_message_metadata_with_versions(
         object,
         message_index,
@@ -1301,23 +1289,23 @@ fn validate_message_metadata_with_versions<'object>(
     message_index: usize,
     expected_type: u32,
     versions: &[u32],
-) -> Result<&'object MessageInfo, BodyTableHiddenAxesError> {
+) -> Result<&'object MessageInfo, Error> {
     let message = object
         .messages
         .get(message_index)
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let info = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if message.type_ != expected_type
         || info.type_ != message.type_
         || info.versions.as_slice() != versions
         || usize::try_from(info.length).ok() != Some(message.data.len())
         || object.header_length == 0
     {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     page_layout::validate_selected_metadata(object, message_index)
         .map_err(map_page_layout_error)?;
@@ -1331,12 +1319,12 @@ fn validate_no_reference_metadata(
     message_index: usize,
     expected_type: u32,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableHiddenAxesError> {
+) -> Result<(), Error> {
     if object.messages.len() != 1
         || object.archive_info.message_infos.len() != 1
         || message_index != 0
     {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let info = validate_message_metadata(object, message_index, expected_type)?;
     charge_metadata_scan(info, 1, budget)?;
@@ -1347,7 +1335,7 @@ fn validate_no_reference_metadata(
             .iter()
             .any(|field| !field.object_references.is_empty() || !field.data_references.is_empty())
     {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -1361,24 +1349,24 @@ fn validate_formula_owner_metadata(
     message_index: usize,
     drawable_identifier: u64,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableHiddenAxesError> {
+) -> Result<(), Error> {
     if object.messages.len() != 1
         || object.archive_info.message_infos.len() != 1
         || message_index != 0
     {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let info = validate_message_metadata(object, message_index, FORMULA_OWNER_MESSAGE_TYPE)?;
     charge_metadata_scan(info, 2, budget)?;
     if info.object_references.as_slice() != [drawable_identifier]
         || !info.data_references.is_empty()
     {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut field_occurrences = 0usize;
     for field in &info.field_infos {
         if !field.data_references.is_empty() {
-            return Err(BodyTableHiddenAxesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if field.object_references.is_empty() {
             continue;
@@ -1386,14 +1374,14 @@ fn validate_formula_owner_metadata(
         if field.object_references.as_slice() != [drawable_identifier]
             || field.path.as_slice() != FORMULA_OWNER_REFERENCE_PATH
         {
-            return Err(BodyTableHiddenAxesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field_occurrences = field_occurrences
             .checked_add(1)
-            .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     if !info.field_infos.is_empty() && field_occurrences != 1 {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -1411,12 +1399,12 @@ fn validate_aggregate_formula_owner_metadata(
     message_index: usize,
     drawable_identifier: u64,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableHiddenAxesError> {
+) -> Result<(), Error> {
     if object.messages.len() != 1
         || object.archive_info.message_infos.len() != 1
         || message_index != 0
     {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let info = validate_message_metadata(object, message_index, FORMULA_OWNER_MESSAGE_TYPE)?;
     charge_metadata_scan(info, 2, budget)?;
@@ -1438,15 +1426,15 @@ fn validate_aggregate_formula_owner_component(
     package: &Package,
     component_index: usize,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableHiddenAxesError> {
+) -> Result<(), Error> {
     let component = package
         .state
         .source
         .components()
         .get_index(component_index)
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if component.name() != CALCULATION_ENGINE_ENTRY_NAME {
-        return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+        return Err(Error::UnsupportedDependency);
     }
     let mut canonical_components = 0usize;
     for candidate in package.state.source.components().iter() {
@@ -1454,11 +1442,11 @@ fn validate_aggregate_formula_owner_component(
         if candidate.name() == CALCULATION_ENGINE_ENTRY_NAME {
             canonical_components = canonical_components
                 .checked_add(1)
-                .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
         }
     }
     if canonical_components != 1 {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let entry = package
         .state
@@ -1466,9 +1454,9 @@ fn validate_aggregate_formula_owner_component(
         .package()
         .iter()
         .find(|entry| entry.name() == CALCULATION_ENGINE_ENTRY_NAME)
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(BodyTableHiddenAxesError::UnsupportedSource);
+        return Err(Error::UnsupportedSource);
     }
     Ok(())
 }
@@ -1506,7 +1494,7 @@ impl dependency_codec::DependencyVisitor for FormulaOwnerIncomingVisitor {
 fn dependency_codec_options(
     budget: &table_lock::WireBudget,
     source_len: usize,
-) -> Result<dependency_codec::DecodeOptions, BodyTableHiddenAxesError> {
+) -> Result<dependency_codec::DecodeOptions, Error> {
     let options = codec_options(budget, source_len, source_len)?;
     Ok(dependency_codec::DecodeOptions::new(
         options.max_input_bytes(),
@@ -1521,7 +1509,7 @@ fn dependency_codec_options(
 fn charge_dependency_report(
     budget: &mut table_lock::WireBudget,
     report: dependency_codec::DecodeReport,
-) -> Result<(), BodyTableHiddenAxesError> {
+) -> Result<(), Error> {
     budget
         .charge_codec_report(
             report.fields(),
@@ -1535,7 +1523,7 @@ fn charge_dependency_report(
             report
                 .reference_bytes()
                 .checked_add(report.text_bytes())
-                .ok_or(BodyTableHiddenAxesError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )
         .map_err(map_lock_error)
 }
@@ -1549,14 +1537,14 @@ fn validate_aggregate_formula_owner_provenance(
     formula_owner_identifier: u64,
     owner: &codec::FormulaOwnerDependenciesSnapshot,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableHiddenAxesError> {
+) -> Result<(), Error> {
     let component = package
         .state
         .source
         .components()
         .iter()
         .find(|component| component.name() == CALCULATION_ENGINE_ENTRY_NAME)
-        .ok_or(BodyTableHiddenAxesError::UnsupportedDependency)?;
+        .ok_or(Error::UnsupportedDependency)?;
     let mut qualified_engines = 0usize;
     for object in &component.archive().objects {
         for (message_index, message) in object.messages.iter().enumerate() {
@@ -1568,7 +1556,7 @@ fn validate_aggregate_formula_owner_provenance(
                 || message_index != 0
                 || object.archive_info.identifier == Some(formula_owner_identifier)
             {
-                return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+                return Err(Error::UnsupportedDependency);
             }
             let info = validate_message_metadata(object, message_index, 4_000)?;
             charge_metadata_scan(info, 1, budget)?;
@@ -1576,7 +1564,7 @@ fn validate_aggregate_formula_owner_provenance(
                 || !info.data_references.is_empty()
                 || !info.field_infos.is_empty()
             {
-                return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+                return Err(Error::UnsupportedDependency);
             }
             budget
                 .charge_payload_work(message.data.len())
@@ -1620,13 +1608,13 @@ fn validate_aggregate_formula_owner_provenance(
             )?;
             qualified_engines = qualified_engines
                 .checked_add(1)
-                .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
         }
     }
     if qualified_engines == 1 {
         Ok(())
     } else {
-        Err(BodyTableHiddenAxesError::UnsupportedDependency)
+        Err(Error::UnsupportedDependency)
     }
 }
 
@@ -1636,7 +1624,7 @@ fn validate_aggregate_formula_owner_provenance(
 fn validate_aggregate_tracker_shape(
     source: &[u8],
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableHiddenAxesError> {
+) -> Result<(), Error> {
     let limits = RawWireLimits::new(
         budget.wire_limits().max_input_bytes(),
         budget.remaining_wire_fields().max(1),
@@ -1657,7 +1645,7 @@ fn validate_aggregate_tracker_shape(
             3 => (0, 2),
             5 => (1, 0),
             6 => (2, 2),
-            _ => return Err(BodyTableHiddenAxesError::UnsupportedDependency),
+            _ => return Err(Error::UnsupportedDependency),
         };
         if seen[index]
             || field.wire_type() != wire
@@ -1665,14 +1653,14 @@ fn validate_aggregate_tracker_shape(
             || (wire == 2 && !field.length_is_canonical())
             || (wire == 0 && !field.value_is_canonical())
         {
-            return Err(BodyTableHiddenAxesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         seen[index] = true;
     }
     if seen.into_iter().all(|present| present) {
         Ok(())
     } else {
-        Err(BodyTableHiddenAxesError::InvalidSource)
+        Err(Error::InvalidSource)
     }
 }
 
@@ -1680,13 +1668,12 @@ fn charge_raw_wire_scan(
     budget: &mut table_lock::WireBudget,
     fields: &RawWireFields<'_>,
     max_depth: usize,
-) -> Result<(), BodyTableHiddenAxesError> {
-    let max_depth =
-        u32::try_from(max_depth).map_err(|_| BodyTableHiddenAxesError::LimitExceeded {
-            kind: BodyTableHiddenAxesLimitKind::WireNesting,
-            observed: u64::try_from(max_depth).unwrap_or(u64::MAX),
-            maximum: u64::try_from(budget.wire_limits().max_nesting()).unwrap_or(u64::MAX),
-        })?;
+) -> Result<(), Error> {
+    let max_depth = u32::try_from(max_depth).map_err(|_| Error::LimitExceeded {
+        kind: LimitKind::WireNesting,
+        observed: u64::try_from(max_depth).unwrap_or(u64::MAX),
+        maximum: u64::try_from(budget.wire_limits().max_nesting()).unwrap_or(u64::MAX),
+    })?;
     budget
         .charge_codec_report(fields.fields(), 0, max_depth, 0)
         .map_err(map_lock_error)
@@ -1697,7 +1684,7 @@ fn validate_owner_id_map(
     expected_internal_id: u32,
     expected_uid: codec::UuidSnapshot,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableHiddenAxesError> {
+) -> Result<(), Error> {
     let limits = RawWireLimits::new(
         budget.wire_limits().max_input_bytes(),
         budget.remaining_wire_fields().max(1),
@@ -1718,7 +1705,7 @@ fn validate_owner_id_map(
             field
                 .depth()
                 .checked_add(field.group_depth())
-                .ok_or(BodyTableHiddenAxesError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         );
         match field.number() {
             1 => {
@@ -1726,11 +1713,9 @@ fn validate_owner_id_map(
                     || !field.key_is_canonical()
                     || !field.length_is_canonical()
                 {
-                    return Err(BodyTableHiddenAxesError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
-                entries = entries
-                    .checked_add(1)
-                    .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+                entries = entries.checked_add(1).ok_or(Error::InvalidSource)?;
                 matched |= validate_owner_id_map_entry(
                     field.payload(),
                     expected_internal_id,
@@ -1743,18 +1728,18 @@ fn validate_owner_id_map(
                     || !field.key_is_canonical()
                     || !field.value_is_canonical()
                 {
-                    return Err(BodyTableHiddenAxesError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 unregistered = true;
             },
-            _ => return Err(BodyTableHiddenAxesError::InvalidSource),
+            _ => return Err(Error::InvalidSource),
         }
     }
     charge_raw_wire_scan(budget, &fields, max_depth)?;
     if entries == 1 && matched && !unregistered {
         Ok(())
     } else {
-        Err(BodyTableHiddenAxesError::UnsupportedDependency)
+        Err(Error::UnsupportedDependency)
     }
 }
 
@@ -1763,7 +1748,7 @@ fn validate_owner_id_map_entry(
     expected_internal_id: u32,
     expected_uid: codec::UuidSnapshot,
     budget: &mut table_lock::WireBudget,
-) -> Result<bool, BodyTableHiddenAxesError> {
+) -> Result<bool, Error> {
     let limits = RawWireLimits::new(
         budget.wire_limits().max_input_bytes(),
         budget.remaining_wire_fields().max(1),
@@ -1783,7 +1768,7 @@ fn validate_owner_id_map_entry(
             field
                 .depth()
                 .checked_add(field.group_depth())
-                .ok_or(BodyTableHiddenAxesError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         );
         match field.number() {
             1 => {
@@ -1792,7 +1777,7 @@ fn validate_owner_id_map_entry(
                     || !field.key_is_canonical()
                     || !field.value_is_canonical()
                 {
-                    return Err(BodyTableHiddenAxesError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 internal_id = Some(raw_u32(field.payload())?);
             },
@@ -1802,11 +1787,11 @@ fn validate_owner_id_map_entry(
                     || !field.key_is_canonical()
                     || !field.length_is_canonical()
                 {
-                    return Err(BodyTableHiddenAxesError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 uid = Some(parse_cfuuid_words(field.payload(), budget)?);
             },
-            _ => return Err(BodyTableHiddenAxesError::InvalidSource),
+            _ => return Err(Error::InvalidSource),
         }
     }
     charge_raw_wire_scan(budget, &fields, max_depth)?;
@@ -1816,7 +1801,7 @@ fn validate_owner_id_map_entry(
 fn parse_cfuuid_words(
     source: &[u8],
     budget: &mut table_lock::WireBudget,
-) -> Result<codec::UuidSnapshot, BodyTableHiddenAxesError> {
+) -> Result<codec::UuidSnapshot, Error> {
     let limits = RawWireLimits::new(
         budget.wire_limits().max_input_bytes(),
         budget.remaining_wire_fields().max(1),
@@ -1835,28 +1820,27 @@ fn parse_cfuuid_words(
             field
                 .depth()
                 .checked_add(field.group_depth())
-                .ok_or(BodyTableHiddenAxesError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         );
         let number = field.number();
         if number == 1 {
-            return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+            return Err(Error::UnsupportedDependency);
         }
         if !(2..=5).contains(&number) {
-            return Err(BodyTableHiddenAxesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if field.wire_type() != 0 || !field.key_is_canonical() || !field.value_is_canonical() {
-            return Err(BodyTableHiddenAxesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
-        let index =
-            usize::try_from(number - 2).map_err(|_| BodyTableHiddenAxesError::InvalidSource)?;
+        let index = usize::try_from(number - 2).map_err(|_| Error::InvalidSource)?;
         let word = raw_u32(field.payload())?;
         if words[index].replace(word).is_some() {
-            return Err(BodyTableHiddenAxesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     charge_raw_wire_scan(budget, &fields, max_depth)?;
     let [Some(w0), Some(w1), Some(w2), Some(w3)] = words else {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     };
     Ok(codec::UuidSnapshot::new(
         u64::from(w0) | (u64::from(w1) << 32),
@@ -1864,13 +1848,12 @@ fn parse_cfuuid_words(
     ))
 }
 
-fn raw_u32(source: &[u8]) -> Result<u32, BodyTableHiddenAxesError> {
-    let (value, length) =
-        decode_varint_from_bytes(source).map_err(|_| BodyTableHiddenAxesError::InvalidSource)?;
+fn raw_u32(source: &[u8]) -> Result<u32, Error> {
+    let (value, length) = decode_varint_from_bytes(source).map_err(|_| Error::InvalidSource)?;
     if length != source.len() || encoded_len(value) != length {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
-    u32::try_from(value).map_err(|_| BodyTableHiddenAxesError::InvalidSource)
+    u32::try_from(value).map_err(|_| Error::InvalidSource)
 }
 
 /// Confirm that every physically present dependency envelope in the
@@ -1881,7 +1864,7 @@ fn raw_u32(source: &[u8]) -> Result<u32, BodyTableHiddenAxesError> {
 fn validate_empty_formula_owner_dependencies(
     source: &[u8],
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableHiddenAxesError> {
+) -> Result<(), Error> {
     let limits = RawWireLimits::new(
         budget.wire_limits().max_input_bytes(),
         budget.remaining_wire_fields().max(1),
@@ -1900,17 +1883,16 @@ fn validate_empty_formula_owner_dependencies(
             field
                 .depth()
                 .checked_add(field.group_depth())
-                .ok_or(BodyTableHiddenAxesError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         );
         if matches!(field.number(), 4..=10 | 13..=16) {
-            let number = usize::try_from(field.number())
-                .map_err(|_| BodyTableHiddenAxesError::InvalidSource)?;
+            let number = usize::try_from(field.number()).map_err(|_| Error::InvalidSource)?;
             if dependency_fields[number]
                 || !field.key_is_canonical()
                 || !field.length_is_canonical()
                 || field.wire_type() != 2
             {
-                return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+                return Err(Error::UnsupportedDependency);
             }
             dependency_fields[number] = true;
             match field.number() {
@@ -1921,12 +1903,12 @@ fn validate_empty_formula_owner_dependencies(
                 )?,
                 9 => validate_empty_dependency_children(field.payload(), &[1], budget)?,
                 _ if !field.payload().is_empty() => {
-                    return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+                    return Err(Error::UnsupportedDependency);
                 },
                 _ => {},
             }
         } else if !matches!(field.number(), 1 | 2 | 3 | 11 | 12) {
-            return Err(BodyTableHiddenAxesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     charge_raw_wire_scan(budget, &fields, max_depth)?;
@@ -1934,7 +1916,7 @@ fn validate_empty_formula_owner_dependencies(
         .into_iter()
         .any(|number| !dependency_fields[number as usize])
     {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -1943,7 +1925,7 @@ fn validate_empty_dependency_children(
     source: &[u8],
     expected_fields: &[u32],
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableHiddenAxesError> {
+) -> Result<(), Error> {
     let limits = RawWireLimits::new(
         budget.wire_limits().max_input_bytes(),
         budget.remaining_wire_fields().max(1),
@@ -1962,13 +1944,13 @@ fn validate_empty_dependency_children(
             field
                 .depth()
                 .checked_add(field.group_depth())
-                .ok_or(BodyTableHiddenAxesError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         );
         let Some(index) = expected_fields
             .iter()
             .position(|number| *number == field.number())
         else {
-            return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+            return Err(Error::UnsupportedDependency);
         };
         if seen[index]
             || field.wire_type() != 2
@@ -1976,7 +1958,7 @@ fn validate_empty_dependency_children(
             || !field.length_is_canonical()
             || !field.payload().is_empty()
         {
-            return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+            return Err(Error::UnsupportedDependency);
         }
         seen[index] = true;
     }
@@ -1986,7 +1968,7 @@ fn validate_empty_dependency_children(
         .enumerate()
         .any(|(index, _)| !seen[index])
     {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -2002,12 +1984,12 @@ fn validate_native_formula_owner_metadata(
     drawable_identifier: u64,
     versions: &[u32],
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableHiddenAxesError> {
+) -> Result<(), Error> {
     if object.messages.len() != 1
         || object.archive_info.message_infos.len() != 1
         || message_index != 0
     {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let info = validate_message_metadata_with_versions(
         object,
@@ -2017,14 +1999,14 @@ fn validate_native_formula_owner_metadata(
     )?;
     charge_metadata_scan(info, 2, budget)?;
     if !info.data_references.is_empty() {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if info
         .object_references
         .iter()
         .any(|identifier| *identifier != drawable_identifier)
     {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let aggregate_occurrences = info
         .object_references
@@ -2032,19 +2014,19 @@ fn validate_native_formula_owner_metadata(
         .filter(|identifier| **identifier == drawable_identifier)
         .count();
     if aggregate_occurrences > 1 {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut field_occurrences = 0usize;
     for field in &info.field_infos {
         if !field.data_references.is_empty() {
-            return Err(BodyTableHiddenAxesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if field
             .object_references
             .iter()
             .any(|identifier| *identifier != drawable_identifier)
         {
-            return Err(BodyTableHiddenAxesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let occurrences = field
             .object_references
@@ -2053,22 +2035,22 @@ fn validate_native_formula_owner_metadata(
             .count();
         if occurrences != 0 {
             if occurrences != 1 || field.path.as_slice() != FORMULA_OWNER_REFERENCE_PATH {
-                return Err(BodyTableHiddenAxesError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             field_occurrences = field_occurrences
                 .checked_add(1)
-                .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
         }
         if field.path.as_slice() == FORMULA_OWNER_REFERENCE_PATH
             && !field.object_references.is_empty()
             && (field.object_references.as_slice() != [drawable_identifier]
                 || !field.data_references.is_empty())
         {
-            return Err(BodyTableHiddenAxesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     if field_occurrences > 1 || field_occurrences > aggregate_occurrences {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -2080,12 +2062,12 @@ fn validate_native_formula_owner_metadata(
 fn validate_aggregate_only_reference_edge(
     inventory: &ReferenceInventory,
     identifier: u64,
-) -> Result<(), BodyTableHiddenAxesError> {
+) -> Result<(), Error> {
     if ReferenceInventory::occurrences(&inventory.object_references, identifier) != 1
         || ReferenceInventory::occurrences(&inventory.data_references, identifier) != 0
         || ReferenceInventory::occurrences(&inventory.field_references, identifier) != 0
     {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -2100,7 +2082,7 @@ fn validate_aggregate_only_reference_edge(
 fn validate_native_filter_metadata(
     info: &MessageInfo,
     filter_identifiers: &[NonZeroU64],
-) -> Result<(), BodyTableHiddenAxesError> {
+) -> Result<(), Error> {
     for identifier in filter_identifiers {
         let identifier = identifier.get();
         if info
@@ -2111,7 +2093,7 @@ fn validate_native_filter_metadata(
             != 1
             || info.data_references.contains(&identifier)
         {
-            return Err(BodyTableHiddenAxesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     let mut owner_field_count = 0usize;
@@ -2119,38 +2101,38 @@ fn validate_native_filter_metadata(
     for field in &info.field_infos {
         let at_hidden_states_owner = field.path.as_slice() == [70];
         if at_hidden_states_owner && !field.data_references.is_empty() {
-            return Err(BodyTableHiddenAxesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if field
             .data_references
             .iter()
             .any(|reference| filter_identifiers.iter().any(|id| id.get() == *reference))
         {
-            return Err(BodyTableHiddenAxesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if at_hidden_states_owner {
             owner_field_count = owner_field_count
                 .checked_add(1)
-                .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             owner_field_reference_count = owner_field_reference_count
                 .checked_add(field.object_references.len())
-                .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
         }
         for reference in &field.object_references {
             let is_filter = filter_identifiers
                 .iter()
                 .any(|identifier| identifier.get() == *reference);
             if is_filter != at_hidden_states_owner {
-                return Err(BodyTableHiddenAxesError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
     }
     if owner_field_count > 1 {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if owner_field_count == 1 {
         if owner_field_reference_count != filter_identifiers.len() {
-            return Err(BodyTableHiddenAxesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         for identifier in filter_identifiers {
             let occurrences = info
@@ -2161,7 +2143,7 @@ fn validate_native_filter_metadata(
                 .filter(|candidate| **candidate == identifier.get())
                 .count();
             if occurrences != 1 {
-                return Err(BodyTableHiddenAxesError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
     }
@@ -2176,19 +2158,19 @@ fn validate_reference_metadata(
     identifier: NonZeroU64,
     path: &[u32],
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableHiddenAxesError> {
+) -> Result<(), Error> {
     let object = package
         .state
         .source
         .components()
         .get_index(component_index)
         .and_then(|component| component.archive().objects.get(object_index))
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let info = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     charge_metadata_scan(info, 2, budget)?;
     budget
         .charge_payload_work(path.len().saturating_add(1))
@@ -2205,7 +2187,7 @@ fn validate_reference_metadata(
             .iter()
             .any(|field| field.data_references.contains(&identifier.get()))
     {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -2226,7 +2208,7 @@ fn validate_reference_metadata_for_profile(
     versions: &[u32],
     profile: GraphProfile,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableHiddenAxesError> {
+) -> Result<(), Error> {
     if matches!(profile, GraphProfile::Indexed) {
         return validate_reference_metadata(
             package,
@@ -2244,12 +2226,12 @@ fn validate_reference_metadata_for_profile(
         .components()
         .get_index(component_index)
         .and_then(|component| component.archive().objects.get(object_index))
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let info = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     charge_metadata_scan(info, 2, budget)?;
     budget
         .charge_payload_work(path.len().saturating_add(1))
@@ -2260,7 +2242,7 @@ fn validate_reference_metadata_for_profile(
         object
             .messages
             .get(message_index)
-            .ok_or(BodyTableHiddenAxesError::InvalidSource)?
+            .ok_or(Error::InvalidSource)?
             .type_,
         versions,
     )?;
@@ -2272,12 +2254,12 @@ fn validate_reference_metadata_for_profile(
         .filter(|candidate| **candidate == identifier)
         .count();
     if aggregate_occurrences != 1 || info.data_references.contains(&identifier) {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut field_occurrences = 0usize;
     for field in &info.field_infos {
         if field.data_references.contains(&identifier) {
-            return Err(BodyTableHiddenAxesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let occurrences = field
             .object_references
@@ -2285,26 +2267,26 @@ fn validate_reference_metadata_for_profile(
             .filter(|candidate| **candidate == identifier)
             .count();
         if field.path.as_slice() == path && !field.data_references.is_empty() {
-            return Err(BodyTableHiddenAxesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if occurrences != 0 {
             if occurrences != 1 || field.path.as_slice() != path {
-                return Err(BodyTableHiddenAxesError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             field_occurrences = field_occurrences
                 .checked_add(1)
-                .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
         }
         if field.path.as_slice() == path && !field.object_references.is_empty() {
             if field.object_references.as_slice() != [identifier]
                 || !field.data_references.is_empty()
             {
-                return Err(BodyTableHiddenAxesError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
     }
     if field_occurrences > 1 || field_occurrences > aggregate_occurrences {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -2316,21 +2298,21 @@ fn reject_reference_identifier_metadata(
     message_index: usize,
     identifier: NonZeroU64,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableHiddenAxesError> {
+) -> Result<(), Error> {
     let object = package
         .state
         .source
         .components()
         .get_index(component_index)
         .and_then(|component| component.archive().objects.get(object_index))
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let info = validate_message_metadata(
         object,
         message_index,
         object
             .messages
             .get(message_index)
-            .ok_or(BodyTableHiddenAxesError::InvalidSource)?
+            .ok_or(Error::InvalidSource)?
             .type_,
     )?;
     charge_metadata_scan(info, 1, budget)?;
@@ -2341,7 +2323,7 @@ fn reject_reference_identifier_metadata(
                 || field.data_references.contains(&identifier.get())
         })
     {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -2353,21 +2335,21 @@ fn reject_reference_path_metadata(
     message_index: usize,
     path: &[u32],
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableHiddenAxesError> {
+) -> Result<(), Error> {
     let object = package
         .state
         .source
         .components()
         .get_index(component_index)
         .and_then(|component| component.archive().objects.get(object_index))
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let info = validate_message_metadata(
         object,
         message_index,
         object
             .messages
             .get(message_index)
-            .ok_or(BodyTableHiddenAxesError::InvalidSource)?
+            .ok_or(Error::InvalidSource)?
             .type_,
     )?;
     charge_metadata_scan(info, 1, budget)?;
@@ -2375,16 +2357,14 @@ fn reject_reference_path_metadata(
         field.path.as_slice() == path
             && (!field.object_references.is_empty() || !field.data_references.is_empty())
     }) {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
 
-fn validate_reference_shape(
-    reference: codec::ReferenceSnapshot,
-) -> Result<(), BodyTableHiddenAxesError> {
+fn validate_reference_shape(reference: codec::ReferenceSnapshot) -> Result<(), Error> {
     if reference.deprecated_type().is_some() || reference.deprecated_is_external().is_some() {
-        return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+        return Err(Error::UnsupportedDependency);
     }
     Ok(())
 }
@@ -2393,20 +2373,20 @@ fn strict_varint(
     source: &[u8],
     number: u32,
     budget: &mut table_lock::WireBudget,
-) -> Result<Option<u64>, BodyTableHiddenAxesError> {
+) -> Result<Option<u64>, Error> {
     let view = budget.parse(source, 1).map_err(map_lock_error)?;
     let mut found = None;
     for field in view.fields().filter(|field| field.number() == number) {
         field
             .validate_canonical_framing()
-            .map_err(|_| BodyTableHiddenAxesError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?;
         if field.wire_type() != 0 || found.is_some() {
-            return Err(BodyTableHiddenAxesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
-        let (value, length) = decode_varint_from_bytes(field.payload())
-            .map_err(|_| BodyTableHiddenAxesError::InvalidSource)?;
+        let (value, length) =
+            decode_varint_from_bytes(field.payload()).map_err(|_| Error::InvalidSource)?;
         if length != field.payload().len() || encoded_len(value) != length {
-            return Err(BodyTableHiddenAxesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         found = Some(value);
     }
@@ -2417,18 +2397,18 @@ fn strict_bool(
     source: &[u8],
     number: u32,
     budget: &mut table_lock::WireBudget,
-) -> Result<Option<bool>, BodyTableHiddenAxesError> {
+) -> Result<Option<bool>, Error> {
     match strict_varint(source, number, budget)? {
         None => Ok(None),
         Some(0) => Ok(Some(false)),
         Some(1) => Ok(Some(true)),
-        Some(_) => Err(BodyTableHiddenAxesError::InvalidSource),
+        Some(_) => Err(Error::InvalidSource),
     }
 }
 
-fn validate_uuid(uuid: codec::UuidSnapshot) -> Result<(), BodyTableHiddenAxesError> {
+fn validate_uuid(uuid: codec::UuidSnapshot) -> Result<(), Error> {
     if uuid.lower() == 0 && uuid.upper() == 0 {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -2438,15 +2418,15 @@ fn strict_has_field(
     number: u32,
     wire: u8,
     budget: &mut table_lock::WireBudget,
-) -> Result<bool, BodyTableHiddenAxesError> {
+) -> Result<bool, Error> {
     let view = budget.parse(source, 1).map_err(map_lock_error)?;
     let mut found = false;
     for field in view.fields().filter(|field| field.number() == number) {
         field
             .validate_canonical_framing()
-            .map_err(|_| BodyTableHiddenAxesError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?;
         if field.wire_type() != wire || found {
-            return Err(BodyTableHiddenAxesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         found = true;
     }
@@ -2459,7 +2439,7 @@ fn strict_has_field(
 fn reject_filter_rule_fields(
     source: &[u8],
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableHiddenAxesError> {
+) -> Result<(), Error> {
     let view = budget.parse(source, 1).map_err(map_lock_error)?;
     for field in view.fields() {
         if !matches!(field.number(), 3 | 6 | 7) {
@@ -2467,20 +2447,17 @@ fn reject_filter_rule_fields(
         }
         field
             .validate_canonical_framing()
-            .map_err(|_| BodyTableHiddenAxesError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?;
         let expected_wire = if field.number() == 6 { 0 } else { 2 };
         if field.wire_type() != expected_wire {
-            return Err(BodyTableHiddenAxesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
-        return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+        return Err(Error::UnsupportedDependency);
     }
     Ok(())
 }
 
-fn decode_model(
-    source: &[u8],
-    budget: &mut table_lock::WireBudget,
-) -> Result<ModelValues, BodyTableHiddenAxesError> {
+fn decode_model(source: &[u8], budget: &mut table_lock::WireBudget) -> Result<ModelValues, Error> {
     let options = codec_options(budget, source.len(), source.len())?;
     let (snapshot, report) =
         codec::decode_table_model_with_report(source, options).map_err(map_codec_error)?;
@@ -2514,10 +2491,7 @@ fn decode_model(
     })
 }
 
-fn decode_info(
-    source: &[u8],
-    budget: &mut table_lock::WireBudget,
-) -> Result<InfoValues, BodyTableHiddenAxesError> {
+fn decode_info(source: &[u8], budget: &mut table_lock::WireBudget) -> Result<InfoValues, Error> {
     let options = codec_options(budget, source.len(), source.len())?;
     let (snapshot, report) =
         codec::decode_table_info_with_report(source, options).map_err(map_codec_error)?;
@@ -2539,7 +2513,7 @@ fn codec_options(
     budget: &table_lock::WireBudget,
     source_len: usize,
     required_output: usize,
-) -> Result<codec::DecodeOptions, BodyTableHiddenAxesError> {
+) -> Result<codec::DecodeOptions, Error> {
     let limits = budget.wire_limits();
     let fields = budget.remaining_wire_fields();
     let work = budget.remaining_wire_work();
@@ -2557,29 +2531,29 @@ fn codec_options(
     let states = source_len.min(16_384);
     let recursion = u32::try_from(limits.max_nesting()).unwrap_or(u32::MAX);
     if source_len > limits.max_input_bytes() {
-        return Err(BodyTableHiddenAxesError::LimitExceeded {
-            kind: BodyTableHiddenAxesLimitKind::WireBytes,
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::WireBytes,
             observed: u64::try_from(source_len).unwrap_or(u64::MAX),
             maximum: u64::try_from(limits.max_input_bytes()).unwrap_or(u64::MAX),
         });
     }
     if required_output > limits.max_output_bytes() {
-        return Err(BodyTableHiddenAxesError::LimitExceeded {
-            kind: BodyTableHiddenAxesLimitKind::WireOutputBytes,
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::WireOutputBytes,
             observed: u64::try_from(required_output).unwrap_or(u64::MAX),
             maximum: u64::try_from(limits.max_output_bytes()).unwrap_or(u64::MAX),
         });
     }
     if source_len > output || source_len > retained || source_len > scratch {
-        return Err(BodyTableHiddenAxesError::LimitExceeded {
-            kind: BodyTableHiddenAxesLimitKind::WireOutputBytes,
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::WireOutputBytes,
             observed: u64::try_from(source_len).unwrap_or(u64::MAX),
             maximum: u64::try_from(output).unwrap_or(u64::MAX),
         });
     }
     if source_len != 0 && (fields == 0 || work == 0 || recursion == 0 || states == 0) {
-        return Err(BodyTableHiddenAxesError::LimitExceeded {
-            kind: BodyTableHiddenAxesLimitKind::WireWork,
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::WireWork,
             observed: 1,
             maximum: u64::try_from(work).unwrap_or(u64::MAX),
         });
@@ -2595,21 +2569,21 @@ fn codec_options(
 fn style_codec_options(
     budget: &table_lock::WireBudget,
     source_len: usize,
-) -> Result<style_codec::DecodeOptions, BodyTableHiddenAxesError> {
+) -> Result<style_codec::DecodeOptions, Error> {
     let limits = budget.wire_limits();
     let fields = budget.remaining_wire_fields();
     let work = budget.remaining_wire_work();
     let recursion = u32::try_from(limits.max_nesting()).unwrap_or(u32::MAX);
     if source_len > limits.max_input_bytes() {
-        return Err(BodyTableHiddenAxesError::LimitExceeded {
-            kind: BodyTableHiddenAxesLimitKind::WireBytes,
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::WireBytes,
             observed: u64::try_from(source_len).unwrap_or(u64::MAX),
             maximum: u64::try_from(limits.max_input_bytes()).unwrap_or(u64::MAX),
         });
     }
     if source_len != 0 && (fields == 0 || work == 0 || recursion == 0) {
-        return Err(BodyTableHiddenAxesError::LimitExceeded {
-            kind: BodyTableHiddenAxesLimitKind::WireWork,
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::WireWork,
             observed: 1,
             maximum: u64::try_from(work).unwrap_or(u64::MAX),
         });
@@ -2630,13 +2604,13 @@ fn style_codec_options(
 fn charge_style_codec(
     budget: &mut table_lock::WireBudget,
     report: style_codec::DecodeReport,
-) -> Result<(), BodyTableHiddenAxesError> {
+) -> Result<(), Error> {
     let retained_work = report
         .allocations()
         .checked_add(report.retained_bytes())
         .and_then(|value| value.checked_add(report.scratch_bytes()))
-        .ok_or(BodyTableHiddenAxesError::LimitExceeded {
-            kind: BodyTableHiddenAxesLimitKind::TransactionWork,
+        .ok_or(Error::LimitExceeded {
+            kind: LimitKind::TransactionWork,
             observed: u64::MAX,
             maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
         })?;
@@ -2651,14 +2625,14 @@ fn charge_style_codec(
 fn charge_codec(
     budget: &mut table_lock::WireBudget,
     report: codec::DecodeReport,
-) -> Result<(), BodyTableHiddenAxesError> {
+) -> Result<(), Error> {
     let retained_work = report
         .states()
         .checked_add(report.allocations())
         .and_then(|value| value.checked_add(report.retained_bytes()))
         .and_then(|value| value.checked_add(report.scratch_bytes()))
-        .ok_or(BodyTableHiddenAxesError::LimitExceeded {
-            kind: BodyTableHiddenAxesLimitKind::TransactionWork,
+        .ok_or(Error::LimitExceeded {
+            kind: LimitKind::TransactionWork,
             observed: u64::MAX,
             maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
         })?;
@@ -2701,10 +2675,7 @@ struct ReferenceInventory {
 }
 
 impl ReferenceInventory {
-    fn new(
-        info: &MessageInfo,
-        budget: &mut table_lock::WireBudget,
-    ) -> Result<Self, BodyTableHiddenAxesError> {
+    fn new(info: &MessageInfo, budget: &mut table_lock::WireBudget) -> Result<Self, Error> {
         let field_reference_count = info
             .field_infos
             .iter()
@@ -2713,8 +2684,8 @@ impl ReferenceInventory {
                     .checked_add(field.object_references.len())
                     .and_then(|value| value.checked_add(field.data_references.len()))
             })
-            .ok_or(BodyTableHiddenAxesError::LimitExceeded {
-                kind: BodyTableHiddenAxesLimitKind::PayloadReferences,
+            .ok_or(Error::LimitExceeded {
+                kind: LimitKind::PayloadReferences,
                 observed: u64::MAX,
                 maximum: u64::try_from(budget.maximum_payload_references()).unwrap_or(u64::MAX),
             })?;
@@ -2723,8 +2694,8 @@ impl ReferenceInventory {
             .len()
             .checked_add(info.data_references.len())
             .and_then(|count| count.checked_add(field_reference_count))
-            .ok_or(BodyTableHiddenAxesError::LimitExceeded {
-                kind: BodyTableHiddenAxesLimitKind::PayloadReferences,
+            .ok_or(Error::LimitExceeded {
+                kind: LimitKind::PayloadReferences,
                 observed: u64::MAX,
                 maximum: u64::try_from(budget.maximum_payload_references()).unwrap_or(u64::MAX),
             })?;
@@ -2743,8 +2714,8 @@ impl ReferenceInventory {
         .try_fold(0usize, |total, count| {
             total
                 .checked_add(reference_inventory_sort_work(count)?)
-                .ok_or(BodyTableHiddenAxesError::LimitExceeded {
-                    kind: BodyTableHiddenAxesLimitKind::TransactionWork,
+                .ok_or(Error::LimitExceeded {
+                    kind: LimitKind::TransactionWork,
                     observed: u64::MAX,
                     maximum: u64::try_from(budget.wire_limits().max_rewrite_work())
                         .unwrap_or(u64::MAX),
@@ -2753,8 +2724,8 @@ impl ReferenceInventory {
         let work = metadata_scan_work(info)?
             .checked_mul(2)
             .and_then(|scan| scan.checked_add(sorting_work))
-            .ok_or(BodyTableHiddenAxesError::LimitExceeded {
-                kind: BodyTableHiddenAxesLimitKind::TransactionWork,
+            .ok_or(Error::LimitExceeded {
+                kind: LimitKind::TransactionWork,
                 observed: u64::MAX,
                 maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
             })?;
@@ -2762,21 +2733,21 @@ impl ReferenceInventory {
         let mut object_references = Vec::new();
         object_references
             .try_reserve_exact(info.object_references.len())
-            .map_err(|_| BodyTableHiddenAxesError::Allocation {
+            .map_err(|_| Error::Allocation {
                 amount: info.object_references.len(),
             })?;
         object_references.extend_from_slice(&info.object_references);
         let mut data_references = Vec::new();
         data_references
             .try_reserve_exact(info.data_references.len())
-            .map_err(|_| BodyTableHiddenAxesError::Allocation {
+            .map_err(|_| Error::Allocation {
                 amount: info.data_references.len(),
             })?;
         data_references.extend_from_slice(&info.data_references);
         let mut field_references = Vec::new();
         field_references
             .try_reserve_exact(field_reference_count)
-            .map_err(|_| BodyTableHiddenAxesError::Allocation {
+            .map_err(|_| Error::Allocation {
                 amount: field_reference_count,
             })?;
         for field in &info.field_infos {
@@ -2800,7 +2771,7 @@ impl ReferenceInventory {
     }
 }
 
-fn reference_inventory_sort_work(count: usize) -> Result<usize, BodyTableHiddenAxesError> {
+fn reference_inventory_sort_work(count: usize) -> Result<usize, Error> {
     let levels = if count <= 1 {
         0
     } else {
@@ -2809,14 +2780,14 @@ fn reference_inventory_sort_work(count: usize) -> Result<usize, BodyTableHiddenA
     count
         .checked_mul(levels)
         .and_then(|value| value.checked_add(count))
-        .ok_or(BodyTableHiddenAxesError::LimitExceeded {
-            kind: BodyTableHiddenAxesLimitKind::TransactionWork,
+        .ok_or(Error::LimitExceeded {
+            kind: LimitKind::TransactionWork,
             observed: u64::MAX,
             maximum: u64::MAX,
         })
 }
 
-fn metadata_scan_work(info: &MessageInfo) -> Result<usize, BodyTableHiddenAxesError> {
+fn metadata_scan_work(info: &MessageInfo) -> Result<usize, Error> {
     let mut work = info
         .versions
         .len()
@@ -2825,16 +2796,16 @@ fn metadata_scan_work(info: &MessageInfo) -> Result<usize, BodyTableHiddenAxesEr
         .and_then(|value| value.checked_add(info.data_references.len()))
         .and_then(|value| value.checked_add(info.diff_merge_version.len()))
         .and_then(|value| value.checked_add(info.diff_read_version.len()))
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if let Some(path) = info.diff_field_path.as_ref() {
         work = work
             .checked_add(path.as_slice().len())
-            .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     for path in &info.fields_to_remove {
         work = work
             .checked_add(path.as_slice().len())
-            .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     for field in &info.field_infos {
         work = work
@@ -2850,7 +2821,7 @@ fn metadata_scan_work(info: &MessageInfo) -> Result<usize, BodyTableHiddenAxesEr
                         .map_or(0, String::len),
                 )
             })
-            .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     Ok(work)
 }
@@ -2859,21 +2830,21 @@ fn charge_metadata_scan(
     info: &MessageInfo,
     passes: usize,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableHiddenAxesError> {
-    let work = metadata_scan_work(info)?.checked_mul(passes).ok_or(
-        BodyTableHiddenAxesError::LimitExceeded {
-            kind: BodyTableHiddenAxesLimitKind::TransactionWork,
+) -> Result<(), Error> {
+    let work = metadata_scan_work(info)?
+        .checked_mul(passes)
+        .ok_or(Error::LimitExceeded {
+            kind: LimitKind::TransactionWork,
             observed: u64::MAX,
             maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
-        },
-    )?;
+        })?;
     budget.charge_payload_work(work).map_err(map_lock_error)
 }
 
 fn global_objects(
     package: &Package,
     budget: &mut table_lock::WireBudget,
-) -> Result<Vec<ObjectLocation>, BodyTableHiddenAxesError> {
+) -> Result<Vec<ObjectLocation>, Error> {
     let object_count = package
         .state
         .source
@@ -2882,8 +2853,8 @@ fn global_objects(
         .try_fold(0usize, |count, component| {
             count.checked_add(component.archive().objects.len())
         })
-        .ok_or(BodyTableHiddenAxesError::LimitExceeded {
-            kind: BodyTableHiddenAxesLimitKind::PayloadObjects,
+        .ok_or(Error::LimitExceeded {
+            kind: LimitKind::PayloadObjects,
             observed: u64::MAX,
             maximum: u64::MAX,
         })?;
@@ -2893,17 +2864,14 @@ fn global_objects(
     let mut objects = Vec::new();
     objects
         .try_reserve_exact(object_count)
-        .map_err(|_| BodyTableHiddenAxesError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: object_count,
         })?;
     for (component_index, component) in package.state.source.components().iter().enumerate() {
         for (object_index, object) in component.archive().objects.iter().enumerate() {
-            let id = object
-                .archive_info
-                .identifier
-                .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+            let id = object.archive_info.identifier.ok_or(Error::InvalidSource)?;
             if id == 0 {
-                return Err(BodyTableHiddenAxesError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
             objects.push(ObjectLocation {
                 identifier: id,
@@ -2917,7 +2885,7 @@ fn global_objects(
         .windows(2)
         .any(|pair| pair[0].identifier == pair[1].identifier)
     {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let levels = if objects.len() <= 1 {
         0
@@ -2925,13 +2893,17 @@ fn global_objects(
         (usize::BITS - (objects.len() - 1).leading_zeros()) as usize
     };
     budget
-        .charge_payload_work(objects.len().checked_mul(levels).ok_or(
-            BodyTableHiddenAxesError::LimitExceeded {
-                kind: BodyTableHiddenAxesLimitKind::TransactionWork,
-                observed: u64::MAX,
-                maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
-            },
-        )?)
+        .charge_payload_work(
+            objects
+                .len()
+                .checked_mul(levels)
+                .ok_or(Error::LimitExceeded {
+                    kind: LimitKind::TransactionWork,
+                    observed: u64::MAX,
+                    maximum: u64::try_from(budget.wire_limits().max_rewrite_work())
+                        .unwrap_or(u64::MAX),
+                })?,
+        )
         .map_err(map_lock_error)?;
     Ok(objects)
 }
@@ -2939,7 +2911,7 @@ fn global_objects(
 fn metadata_route(
     source: &Package,
     budget: &mut table_lock::WireBudget,
-) -> Result<Option<MetadataRoute>, BodyTableHiddenAxesError> {
+) -> Result<Option<MetadataRoute>, Error> {
     if let Some(entry) = source
         .state
         .source
@@ -2948,7 +2920,7 @@ fn metadata_route(
         .find(|entry| entry.name() == METADATA_ENTRY_NAME)
     {
         if entry.is_opaque() {
-            return Err(BodyTableHiddenAxesError::UnsupportedSource);
+            return Err(Error::UnsupportedSource);
         }
     }
 
@@ -2958,7 +2930,7 @@ fn metadata_route(
         budget.charge_payload_work(1).map_err(map_lock_error)?;
         if component.name() == METADATA_ENTRY_NAME {
             if component_index.replace(index).is_some() {
-                return Err(BodyTableHiddenAxesError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
         for (object_index, object) in component.archive().objects.iter().enumerate() {
@@ -2970,7 +2942,7 @@ fn metadata_route(
                     continue;
                 }
                 if component.name() != METADATA_ENTRY_NAME || route.is_some() {
-                    return Err(BodyTableHiddenAxesError::InvalidSource);
+                    return Err(Error::InvalidSource);
                 }
                 validate_metadata_message(object, message_index)?;
                 route = Some(MetadataRoute {
@@ -2989,10 +2961,10 @@ fn metadata_route(
         return Ok(None);
     }
     if route.is_none() {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if route.is_some_and(|route| Some(route.component_index) != component_index) {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(route)
 }
@@ -3000,22 +2972,22 @@ fn metadata_route(
 fn validate_metadata_message(
     object: &ArchiveObject,
     message_index: usize,
-) -> Result<&MessageInfo, BodyTableHiddenAxesError> {
+) -> Result<&MessageInfo, Error> {
     let message = object
         .messages
         .get(message_index)
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let info = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if message.type_ != METADATA_MESSAGE_TYPE
         || info.type_ != METADATA_MESSAGE_TYPE
         || usize::try_from(info.length).ok() != Some(message.data.len())
         || object.header_length == 0
     {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     page_layout::validate_selected_metadata(object, message_index)
         .map_err(map_page_layout_error)?;
@@ -3030,7 +3002,7 @@ fn formula_owner_messages(
     package: &Package,
     objects: &[ObjectLocation],
     budget: &mut table_lock::WireBudget,
-) -> Result<Vec<MessageLocation>, BodyTableHiddenAxesError> {
+) -> Result<Vec<MessageLocation>, Error> {
     let mut formula_messages = 0usize;
     for location in objects {
         let object = package
@@ -3039,7 +3011,7 @@ fn formula_owner_messages(
             .components()
             .get_index(location.component_index)
             .and_then(|component| component.archive().objects.get(location.object_index))
-            .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         for message in &object.messages {
             // The first pass counts and the second pass materializes the
             // location list. Charge both traversals before reserving the
@@ -3047,22 +3019,22 @@ fn formula_owner_messages(
             // without consuming the shared transaction budget.
             budget.charge_payload_work(2).map_err(map_lock_error)?;
             if message.type_ == FORMULA_OWNER_MESSAGE_TYPE {
-                formula_messages = formula_messages.checked_add(1).ok_or(
-                    BodyTableHiddenAxesError::LimitExceeded {
-                        kind: BodyTableHiddenAxesLimitKind::PayloadMessages,
+                formula_messages = formula_messages
+                    .checked_add(1)
+                    .ok_or(Error::LimitExceeded {
+                        kind: LimitKind::PayloadMessages,
                         observed: u64::MAX,
                         maximum: u64::MAX,
-                    },
-                )?;
+                    })?;
             }
         }
     }
     let mut locations = Vec::new();
-    locations.try_reserve_exact(formula_messages).map_err(|_| {
-        BodyTableHiddenAxesError::Allocation {
+    locations
+        .try_reserve_exact(formula_messages)
+        .map_err(|_| Error::Allocation {
             amount: formula_messages,
-        }
-    })?;
+        })?;
     for location in objects {
         let object = package
             .state
@@ -3070,7 +3042,7 @@ fn formula_owner_messages(
             .components()
             .get_index(location.component_index)
             .and_then(|component| component.archive().objects.get(location.object_index))
-            .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         for (message_index, message) in object.messages.iter().enumerate() {
             if message.type_ == FORMULA_OWNER_MESSAGE_TYPE {
                 locations.push(MessageLocation {
@@ -3086,19 +3058,19 @@ fn formula_owner_messages(
 fn object_location(
     objects: &[ObjectLocation],
     identifier: NonZeroU64,
-) -> Result<ObjectLocation, BodyTableHiddenAxesError> {
+) -> Result<ObjectLocation, Error> {
     objects
         .binary_search_by_key(&identifier.get(), |entry| entry.identifier)
         .ok()
         .map(|index| objects[index])
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)
+        .ok_or(Error::InvalidSource)
 }
 
 fn unique_object_location(
     package: &Package,
     identifier: NonZeroU64,
     budget: &mut table_lock::WireBudget,
-) -> Result<ObjectLocation, BodyTableHiddenAxesError> {
+) -> Result<ObjectLocation, Error> {
     let mut result = None;
     for (component_index, component) in package.state.source.components().iter().enumerate() {
         for (object_index, object) in component.archive().objects.iter().enumerate() {
@@ -3112,11 +3084,11 @@ fn unique_object_location(
                     })
                     .is_some()
             {
-                return Err(BodyTableHiddenAxesError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
     }
-    result.ok_or(BodyTableHiddenAxesError::InvalidSource)
+    result.ok_or(Error::InvalidSource)
 }
 
 fn decode_uid_map(
@@ -3125,7 +3097,7 @@ fn decode_uid_map(
     map_id: NonZeroU64,
     model: &ModelValues,
     budget: &mut table_lock::WireBudget,
-) -> Result<(Vec<codec::UuidSnapshot>, Vec<codec::UuidSnapshot>), BodyTableHiddenAxesError> {
+) -> Result<(Vec<codec::UuidSnapshot>, Vec<codec::UuidSnapshot>), Error> {
     let location = object_location(objects, map_id)?;
     decode_uid_map_at(package, location, model, budget)
 }
@@ -3135,13 +3107,13 @@ fn decode_uid_map_at(
     location: ObjectLocation,
     model: &ModelValues,
     budget: &mut table_lock::WireBudget,
-) -> Result<(Vec<codec::UuidSnapshot>, Vec<codec::UuidSnapshot>), BodyTableHiddenAxesError> {
+) -> Result<(Vec<codec::UuidSnapshot>, Vec<codec::UuidSnapshot>), Error> {
     let object = &package
         .state
         .source
         .components()
         .get_index(location.component_index)
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?
+        .ok_or(Error::InvalidSource)?
         .archive()
         .objects[location.object_index];
     budget
@@ -3151,16 +3123,16 @@ fn decode_uid_map_at(
     for (message_index, message) in object.messages.iter().enumerate() {
         if message.type_ == UID_MAP_MESSAGE_TYPE || message.type_ == LEGACY_UID_MAP_MESSAGE_TYPE {
             if selected.replace((message_index, message)).is_some() {
-                return Err(BodyTableHiddenAxesError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
     }
-    let (message_index, message) = selected.ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+    let (message_index, message) = selected.ok_or(Error::InvalidSource)?;
     let message_info = object
         .archive_info
         .message_infos
         .get(message_index)
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     // 6267 is the native Pages route.  A legacy 6200 route is accepted only
     // when its archive metadata explicitly identifies the same qualified
     // message; synthetic message IDs and unqualified legacy payloads are not
@@ -3171,7 +3143,7 @@ fn decode_uid_map_at(
     page_layout::validate_selected_metadata(object, message_index)
         .map_err(map_page_layout_error)?;
     codec::validate_column_row_uid_map_message_type(message.type_, allow_legacy)
-        .map_err(|_| BodyTableHiddenAxesError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
     validate_no_reference_metadata(object, message_index, message.type_, budget)?;
     budget
         .charge_payload_work(message.data.len())
@@ -3188,21 +3160,21 @@ fn decode_uid_map_at(
                 .checked_mul(3)
                 .and_then(|value| rows.checked_mul(3).and_then(|rows| value.checked_add(rows)))
         })
-        .ok_or(BodyTableHiddenAxesError::LimitExceeded {
-            kind: BodyTableHiddenAxesLimitKind::PayloadItems,
+        .ok_or(Error::LimitExceeded {
+            kind: LimitKind::PayloadItems,
             observed: u64::MAX,
             maximum: u64::try_from(budget.maximum_payload_references()).unwrap_or(u64::MAX),
         })?;
     if message.data.len() > limits.max_input_bytes() {
-        return Err(BodyTableHiddenAxesError::LimitExceeded {
-            kind: BodyTableHiddenAxesLimitKind::WireBytes,
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::WireBytes,
             observed: u64::try_from(message.data.len()).unwrap_or(u64::MAX),
             maximum: u64::try_from(limits.max_input_bytes()).unwrap_or(u64::MAX),
         });
     }
     if element_count > fields || recursion == 0 {
-        return Err(BodyTableHiddenAxesError::LimitExceeded {
-            kind: BodyTableHiddenAxesLimitKind::WireFields,
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::WireFields,
             observed: u64::try_from(element_count).unwrap_or(u64::MAX),
             maximum: u64::try_from(fields).unwrap_or(u64::MAX),
         });
@@ -3219,8 +3191,8 @@ fn decode_uid_map_at(
     );
     let (map, report) = uid_codec::decode_column_row_uid_map(
         message.data.as_slice(),
-        usize::try_from(model.columns).map_err(|_| BodyTableHiddenAxesError::InvalidSource)?,
-        usize::try_from(model.rows).map_err(|_| BodyTableHiddenAxesError::InvalidSource)?,
+        usize::try_from(model.columns).map_err(|_| Error::InvalidSource)?,
+        usize::try_from(model.rows).map_err(|_| Error::InvalidSource)?,
         uid_options,
     )
     .map_err(map_uid_codec_error)?;
@@ -3233,8 +3205,8 @@ fn decode_uid_map_at(
                 .records()
                 .checked_add(report.elements())
                 .and_then(|value| value.checked_add(element_count))
-                .ok_or(BodyTableHiddenAxesError::LimitExceeded {
-                    kind: BodyTableHiddenAxesLimitKind::TransactionWork,
+                .ok_or(Error::LimitExceeded {
+                    kind: LimitKind::TransactionWork,
                     observed: u64::MAX,
                     maximum: u64::try_from(budget.wire_limits().max_rewrite_work())
                         .unwrap_or(u64::MAX),
@@ -3261,22 +3233,18 @@ fn physical_uids(
     uid_for_index: &[u32],
     expected: u32,
     budget: &mut table_lock::WireBudget,
-) -> Result<Vec<codec::UuidSnapshot>, BodyTableHiddenAxesError> {
-    let expected =
-        usize::try_from(expected).map_err(|_| BodyTableHiddenAxesError::InvalidSource)?;
+) -> Result<Vec<codec::UuidSnapshot>, Error> {
+    let expected = usize::try_from(expected).map_err(|_| Error::InvalidSource)?;
     if sorted.len() != expected || uid_for_index.len() != expected {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut physical = Vec::new();
     physical
         .try_reserve_exact(expected)
-        .map_err(|_| BodyTableHiddenAxesError::Allocation { amount: expected })?;
+        .map_err(|_| Error::Allocation { amount: expected })?;
     for stable_index in uid_for_index.iter().copied() {
-        let stable_index =
-            usize::try_from(stable_index).map_err(|_| BodyTableHiddenAxesError::InvalidSource)?;
-        let uid = sorted
-            .get(stable_index)
-            .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+        let stable_index = usize::try_from(stable_index).map_err(|_| Error::InvalidSource)?;
+        let uid = sorted.get(stable_index).ok_or(Error::InvalidSource)?;
         let uid = codec::UuidSnapshot::new(uid.lower(), uid.upper());
         validate_uuid(uid)?;
         physical.push(uid);
@@ -3291,11 +3259,11 @@ fn validate_cross_axis_uuid_identity(
     rows: &[codec::UuidSnapshot],
     columns: &[codec::UuidSnapshot],
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableHiddenAxesError> {
+) -> Result<(), Error> {
     let mut sorted_rows = Vec::new();
     sorted_rows
         .try_reserve_exact(rows.len())
-        .map_err(|_| BodyTableHiddenAxesError::Allocation { amount: rows.len() })?;
+        .map_err(|_| Error::Allocation { amount: rows.len() })?;
     sorted_rows.extend_from_slice(rows);
     sorted_rows.sort_unstable_by_key(|uid| (uid.lower(), uid.upper()));
     let row_levels = if sorted_rows.len() <= 1 {
@@ -3312,8 +3280,8 @@ fn validate_cross_axis_uuid_identity(
         .len()
         .checked_mul(row_levels)
         .and_then(|value| value.checked_add(columns.len().checked_mul(column_levels)?))
-        .ok_or(BodyTableHiddenAxesError::LimitExceeded {
-            kind: BodyTableHiddenAxesLimitKind::TransactionWork,
+        .ok_or(Error::LimitExceeded {
+            kind: LimitKind::TransactionWork,
             observed: u64::MAX,
             maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
         })?;
@@ -3325,61 +3293,51 @@ fn validate_cross_axis_uuid_identity(
             })
             .is_ok()
     }) {
-        return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+        return Err(Error::UnsupportedDependency);
     }
     Ok(())
 }
 
-fn map_uid_codec_error(error: uid_codec::DecodeError) -> BodyTableHiddenAxesError {
+fn map_uid_codec_error(error: uid_codec::DecodeError) -> Error {
     match error.resource_limit() {
-        Some(uid_codec::DecodeLimit::Bytes { observed, maximum }) => {
-            BodyTableHiddenAxesError::LimitExceeded {
-                kind: BodyTableHiddenAxesLimitKind::WireBytes,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        Some(uid_codec::DecodeLimit::Bytes { observed, maximum }) => Error::LimitExceeded {
+            kind: LimitKind::WireBytes,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        Some(uid_codec::DecodeLimit::Fields { observed, maximum }) => {
-            BodyTableHiddenAxesError::LimitExceeded {
-                kind: BodyTableHiddenAxesLimitKind::WireFields,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        Some(uid_codec::DecodeLimit::Fields { observed, maximum }) => Error::LimitExceeded {
+            kind: LimitKind::WireFields,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        Some(uid_codec::DecodeLimit::Work { observed, maximum }) => {
-            BodyTableHiddenAxesError::LimitExceeded {
-                kind: BodyTableHiddenAxesLimitKind::WireWork,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        Some(uid_codec::DecodeLimit::Work { observed, maximum }) => Error::LimitExceeded {
+            kind: LimitKind::WireWork,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        Some(uid_codec::DecodeLimit::Nesting { observed, maximum }) => {
-            BodyTableHiddenAxesError::LimitExceeded {
-                kind: BodyTableHiddenAxesLimitKind::WireNesting,
-                observed: u64::from(observed),
-                maximum: u64::from(maximum),
-            }
+        Some(uid_codec::DecodeLimit::Nesting { observed, maximum }) => Error::LimitExceeded {
+            kind: LimitKind::WireNesting,
+            observed: u64::from(observed),
+            maximum: u64::from(maximum),
         },
         Some(uid_codec::DecodeLimit::Allocation { requested }) => {
-            BodyTableHiddenAxesError::Allocation { amount: requested }
+            Error::Allocation { amount: requested }
         },
         Some(uid_codec::DecodeLimit::OutputBytes { observed, maximum })
         | Some(uid_codec::DecodeLimit::ScratchBytes { observed, maximum }) => {
-            BodyTableHiddenAxesError::LimitExceeded {
-                kind: BodyTableHiddenAxesLimitKind::PayloadBytes,
+            Error::LimitExceeded {
+                kind: LimitKind::PayloadBytes,
                 observed: observed as u64,
                 maximum: maximum as u64,
             }
         },
         Some(uid_codec::DecodeLimit::Records { observed, maximum })
-        | Some(uid_codec::DecodeLimit::Elements { observed, maximum }) => {
-            BodyTableHiddenAxesError::LimitExceeded {
-                kind: BodyTableHiddenAxesLimitKind::PayloadItems,
-                observed: observed as u64,
-                maximum: maximum as u64,
-            }
+        | Some(uid_codec::DecodeLimit::Elements { observed, maximum }) => Error::LimitExceeded {
+            kind: LimitKind::PayloadItems,
+            observed: observed as u64,
+            maximum: maximum as u64,
         },
-        None | Some(_) => BodyTableHiddenAxesError::InvalidSource,
+        None | Some(_) => Error::InvalidSource,
     }
 }
 
@@ -3390,7 +3348,7 @@ fn formula_owner_for(
     model: ObjectLocation,
     profile: GraphProfile,
     budget: &mut table_lock::WireBudget,
-) -> Result<Option<codec::UuidSnapshot>, BodyTableHiddenAxesError> {
+) -> Result<Option<codec::UuidSnapshot>, Error> {
     if profile.is_native() || profile.is_aggregate_only() {
         return native_formula_owner_for(
             package,
@@ -3416,15 +3374,15 @@ fn formula_owner_for(
                     .objects
                     .get(location.object.object_index)
             })
-            .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if object.archive_info.identifier != Some(location.object.identifier) {
-            return Err(BodyTableHiddenAxesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let message = object
             .messages
             .get(location.message_index)
             .filter(|message| message.type_ == FORMULA_OWNER_MESSAGE_TYPE)
-            .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         // The type-4008 payload is a dependency root, not an arbitrary
         // generated message.  Qualify its paired header before decoding so a
         // redirected/merged helper cannot be mistaken for the selected
@@ -3441,7 +3399,7 @@ fn formula_owner_for(
             || owner.owner_kind().is_some()
             || owner.base_owner_uid().is_some()
         {
-            return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+            return Err(Error::UnsupportedDependency);
         }
         if let Some(reference) = owner.formula_owner() {
             validate_reference_shape(reference)?;
@@ -3458,7 +3416,7 @@ fn formula_owner_for(
                 || location.object.identifier == drawable.identifier
                 || location.object.identifier == model.identifier
             {
-                return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+                return Err(Error::UnsupportedDependency);
             }
             validate_formula_owner_metadata(
                 object,
@@ -3467,7 +3425,7 @@ fn formula_owner_for(
                 budget,
             )?;
             if result.replace(owner.formula_owner_uid()).is_some() {
-                return Err(BodyTableHiddenAxesError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
     }
@@ -3486,7 +3444,7 @@ fn native_formula_owner_for(
     versions: &[u32],
     profile: GraphProfile,
     budget: &mut table_lock::WireBudget,
-) -> Result<Option<codec::UuidSnapshot>, BodyTableHiddenAxesError> {
+) -> Result<Option<codec::UuidSnapshot>, Error> {
     let mut result = None;
     for location in formula_messages {
         budget.charge_payload_work(1).map_err(map_lock_error)?;
@@ -3501,15 +3459,15 @@ fn native_formula_owner_for(
                     .objects
                     .get(location.object.object_index)
             })
-            .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if object.archive_info.identifier != Some(location.object.identifier) {
-            return Err(BodyTableHiddenAxesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let message = object
             .messages
             .get(location.message_index)
             .filter(|message| message.type_ == FORMULA_OWNER_MESSAGE_TYPE)
-            .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         validate_message_metadata_with_versions(
             object,
             location.message_index,
@@ -3534,7 +3492,7 @@ fn native_formula_owner_for(
             || !owner.has_dependencies()
             || owner.base_owner_uid().is_some()
         {
-            return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+            return Err(Error::UnsupportedDependency);
         }
         // A forged aggregate edge is not sufficient provenance.  The
         // selected 4008 cannot be embedded in either selected object.  The
@@ -3547,7 +3505,7 @@ fn native_formula_owner_for(
             || location.object.identifier == drawable.identifier
             || location.object.identifier == model.identifier
         {
-            return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+            return Err(Error::UnsupportedDependency);
         }
         if profile.is_aggregate_only() {
             validate_aggregate_formula_owner_component(
@@ -3578,7 +3536,7 @@ fn native_formula_owner_for(
             )?;
         }
         if result.replace(owner.formula_owner_uid()).is_some() {
-            return Err(BodyTableHiddenAxesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     let result = result.map(|uid| codec::UuidSnapshot::new(uid.lower(), uid.upper()));
@@ -3598,7 +3556,7 @@ fn validate_dependencies(
     column_indices: &UidIndex,
     profile: GraphProfile,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableHiddenAxesError> {
+) -> Result<(), Error> {
     let Some(owner) = model.owner.as_ref() else {
         return Ok(());
     };
@@ -3606,14 +3564,14 @@ fn validate_dependencies(
     if row_indices.index_of(owner.owner_uid()).is_some()
         || column_indices.index_of(owner.owner_uid()).is_some()
     {
-        return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+        return Err(Error::UnsupportedDependency);
     }
-    let active_uuid = active_uuid.ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+    let active_uuid = active_uuid.ok_or(Error::InvalidSource)?;
     validate_uuid(active_uuid)?;
     let mut state_uids = Vec::new();
     state_uids
         .try_reserve_exact(owner.hidden_states().len())
-        .map_err(|_| BodyTableHiddenAxesError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: owner.hidden_states().len(),
         })?;
     for state in owner.hidden_states() {
@@ -3622,7 +3580,7 @@ fn validate_dependencies(
     }
     state_uids.sort_unstable_by_key(|uid| (uid.lower(), uid.upper()));
     if state_uids.windows(2).any(|pair| pair[0] == pair[1]) {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let levels = if state_uids.len() <= 1 {
         0
@@ -3630,19 +3588,23 @@ fn validate_dependencies(
         (usize::BITS - (state_uids.len() - 1).leading_zeros()) as usize
     };
     budget
-        .charge_payload_work(state_uids.len().checked_mul(levels).ok_or(
-            BodyTableHiddenAxesError::LimitExceeded {
-                kind: BodyTableHiddenAxesLimitKind::TransactionWork,
-                observed: u64::MAX,
-                maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
-            },
-        )?)
+        .charge_payload_work(
+            state_uids
+                .len()
+                .checked_mul(levels)
+                .ok_or(Error::LimitExceeded {
+                    kind: LimitKind::TransactionWork,
+                    observed: u64::MAX,
+                    maximum: u64::try_from(budget.wire_limits().max_rewrite_work())
+                        .unwrap_or(u64::MAX),
+                })?,
+        )
         .map_err(map_lock_error)?;
     let active = owner
         .hidden_states()
         .iter()
         .find(|state| state.hidden_states_uid() == active_uuid)
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if owner
         .hidden_states()
         .iter()
@@ -3650,12 +3612,12 @@ fn validate_dependencies(
         .count()
         != 1
     {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if active.column_hidden_state_extent().direction() != codec::AxisDirection::Column
         || active.row_hidden_state_extent().direction() != codec::AxisDirection::Row
     {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if active
         .column_hidden_state_extent()
@@ -3666,7 +3628,7 @@ fn validate_dependencies(
             .needs_to_update_filter_set_for_import()
             == Some(true)
     {
-        return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+        return Err(Error::UnsupportedDependency);
     }
     for state in owner.hidden_states() {
         validate_uuid(state.hidden_states_uid())?;
@@ -3677,14 +3639,14 @@ fn validate_dependencies(
                 .hidden_states_uid()
                 .lower()
                 .checked_add(7)
-                .ok_or(BodyTableHiddenAxesError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
             state.hidden_states_uid().upper(),
         );
         validate_uuid(expected_column_uid)?;
         if state.row_hidden_state_extent().hidden_state_extent_uid() != state.hidden_states_uid()
             || state.column_hidden_state_extent().hidden_state_extent_uid() != expected_column_uid
         {
-            return Err(BodyTableHiddenAxesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         if row_indices
             .index_of(state.row_hidden_state_extent().hidden_state_extent_uid())
@@ -3699,7 +3661,7 @@ fn validate_dependencies(
                 .index_of(state.column_hidden_state_extent().hidden_state_extent_uid())
                 .is_some()
         {
-            return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+            return Err(Error::UnsupportedDependency);
         }
     }
     let expected_column_extent_uid = codec::UuidSnapshot::new(
@@ -3707,7 +3669,7 @@ fn validate_dependencies(
             .owner_uid()
             .lower()
             .checked_add(7)
-            .ok_or(BodyTableHiddenAxesError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
         owner.owner_uid().upper(),
     );
     if active.hidden_states_uid() != owner.owner_uid()
@@ -3717,7 +3679,7 @@ fn validate_dependencies(
             .hidden_state_extent_uid()
             != expected_column_extent_uid
     {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if active
         .column_hidden_state_extent()
@@ -3725,17 +3687,13 @@ fn validate_dependencies(
         .zip(active.row_hidden_state_extent().filter_set())
         .is_some_and(|(column, row)| column.identifier() == row.identifier())
     {
-        return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+        return Err(Error::UnsupportedDependency);
     }
     validate_extent_filters(package, target, owner, objects, model, profile, budget)?;
-    let col_ref = model
-        .formula_columns
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
-    let row_ref = model
-        .formula_rows
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+    let col_ref = model.formula_columns.ok_or(Error::InvalidSource)?;
+    let row_ref = model.formula_rows.ok_or(Error::InvalidSource)?;
     if col_ref == row_ref {
-        return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+        return Err(Error::UnsupportedDependency);
     }
     validate_formula_object(
         package,
@@ -3761,7 +3719,7 @@ fn validate_extent_shape(
     physical: &UidIndex,
     row: bool,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableHiddenAxesError> {
+) -> Result<(), Error> {
     let extent = if row {
         state.row_hidden_state_extent()
     } else {
@@ -3773,13 +3731,13 @@ fn validate_extent_shape(
         codec::AxisDirection::Column
     };
     if extent.direction() != expected {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     validate_uuid(extent.hidden_state_extent_uid())?;
     let mut identities = Vec::new();
     identities
         .try_reserve_exact(extent.base_hidden_states().len())
-        .map_err(|_| BodyTableHiddenAxesError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: extent.base_hidden_states().len(),
         })?;
     for hidden_state in extent.base_hidden_states() {
@@ -3789,13 +3747,13 @@ fn validate_extent_shape(
             .index_of(hidden_state.row_or_column_uid())
             .is_none()
         {
-            return Err(BodyTableHiddenAxesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         identities.push(hidden_state.row_or_column_uid());
     }
     identities.sort_unstable_by_key(|uid| (uid.lower(), uid.upper()));
     if identities.windows(2).any(|pair| pair[0] == pair[1]) {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let levels = if identities.len() <= 1 {
         0
@@ -3803,13 +3761,17 @@ fn validate_extent_shape(
         (usize::BITS - (identities.len() - 1).leading_zeros()) as usize
     };
     budget
-        .charge_payload_work(identities.len().checked_mul(levels).ok_or(
-            BodyTableHiddenAxesError::LimitExceeded {
-                kind: BodyTableHiddenAxesLimitKind::TransactionWork,
-                observed: u64::MAX,
-                maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
-            },
-        )?)
+        .charge_payload_work(
+            identities
+                .len()
+                .checked_mul(levels)
+                .ok_or(Error::LimitExceeded {
+                    kind: LimitKind::TransactionWork,
+                    observed: u64::MAX,
+                    maximum: u64::try_from(budget.wire_limits().max_rewrite_work())
+                        .unwrap_or(u64::MAX),
+                })?,
+        )
         .map_err(map_lock_error)?;
     Ok(())
 }
@@ -3822,7 +3784,7 @@ fn validate_extent_filters(
     model: &ModelValues,
     profile: GraphProfile,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableHiddenAxesError> {
+) -> Result<(), Error> {
     let model_location = object_location(objects, target.model_identifier)?;
     let model_object = package
         .state
@@ -3830,7 +3792,7 @@ fn validate_extent_filters(
         .components()
         .get_index(model_location.component_index)
         .and_then(|component| component.archive().objects.get(model_location.object_index))
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let model_info = validate_message_metadata_with_versions(
         model_object,
         target.model_message_index,
@@ -3839,16 +3801,19 @@ fn validate_extent_filters(
     )?;
     let model_references = ReferenceInventory::new(model_info, budget)?;
     let mut filter_identifiers = Vec::new();
-    let filter_capacity = owner.hidden_states().len().checked_mul(2).ok_or(
-        BodyTableHiddenAxesError::LimitExceeded {
-            kind: BodyTableHiddenAxesLimitKind::PayloadItems,
-            observed: u64::MAX,
-            maximum: u64::try_from(budget.maximum_payload_references()).unwrap_or(u64::MAX),
-        },
-    )?;
+    let filter_capacity =
+        owner
+            .hidden_states()
+            .len()
+            .checked_mul(2)
+            .ok_or(Error::LimitExceeded {
+                kind: LimitKind::PayloadItems,
+                observed: u64::MAX,
+                maximum: u64::try_from(budget.maximum_payload_references()).unwrap_or(u64::MAX),
+            })?;
     filter_identifiers
         .try_reserve_exact(filter_capacity)
-        .map_err(|_| BodyTableHiddenAxesError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: filter_capacity,
         })?;
     for state in owner.hidden_states() {
@@ -3857,7 +3822,7 @@ fn validate_extent_filters(
             state.row_hidden_state_extent(),
         ] {
             if extent.needs_to_update_filter_set_for_import() == Some(true) {
-                return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+                return Err(Error::UnsupportedDependency);
             }
             if let Some(reference) = extent.filter_set() {
                 validate_reference_shape(reference)?;
@@ -3867,7 +3832,7 @@ fn validate_extent_filters(
     }
     filter_identifiers.sort_unstable_by_key(|identifier| identifier.get());
     if filter_identifiers.windows(2).any(|pair| pair[0] == pair[1]) {
-        return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+        return Err(Error::UnsupportedDependency);
     }
     let levels = if filter_identifiers.len() <= 1 {
         0
@@ -3876,8 +3841,8 @@ fn validate_extent_filters(
     };
     budget
         .charge_payload_work(filter_identifiers.len().checked_mul(levels).ok_or(
-            BodyTableHiddenAxesError::LimitExceeded {
-                kind: BodyTableHiddenAxesLimitKind::TransactionWork,
+            Error::LimitExceeded {
+                kind: LimitKind::TransactionWork,
                 observed: u64::MAX,
                 maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
             },
@@ -3900,7 +3865,7 @@ fn validate_extent_filters(
             .source
             .components()
             .get_index(location.component_index)
-            .ok_or(BodyTableHiddenAxesError::InvalidSource)?
+            .ok_or(Error::InvalidSource)?
             .archive()
             .objects[location.object_index];
         let messages = object
@@ -3910,15 +3875,15 @@ fn validate_extent_filters(
         let mut selected = None;
         for message in messages {
             if selected.replace(message).is_some() {
-                return Err(BodyTableHiddenAxesError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
-        let message = selected.ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+        let message = selected.ok_or(Error::InvalidSource)?;
         let message_index = object
             .messages
             .iter()
             .position(|candidate| std::ptr::eq(candidate, message))
-            .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         validate_no_reference_metadata(object, message_index, FILTER_SET_MESSAGE_TYPE, budget)?;
         reject_filter_rule_fields(message.data.as_slice(), budget)?;
         let (filter, report) = codec::decode_filter_set_with_report(
@@ -3932,12 +3897,12 @@ fn validate_extent_filters(
                 .filter_type()
                 .is_some_and(|value| !matches!(value, 0 | 1))
         {
-            return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+            return Err(Error::UnsupportedDependency);
         }
         let mut offsets = Vec::new();
         offsets
             .try_reserve_exact(filter.filter_offsets().len())
-            .map_err(|_| BodyTableHiddenAxesError::Allocation {
+            .map_err(|_| Error::Allocation {
                 amount: filter.filter_offsets().len(),
             })?;
         offsets.extend_from_slice(filter.filter_offsets());
@@ -3945,7 +3910,7 @@ fn validate_extent_filters(
         if offsets.windows(2).any(|pair| pair[0] == pair[1])
             || offsets.iter().any(|offset| *offset >= model.rows)
         {
-            return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+            return Err(Error::UnsupportedDependency);
         }
         budget
             .charge_payload_work(offsets.len())
@@ -3960,30 +3925,30 @@ fn validate_formula_object(
     identifier: NonZeroU64,
     expected_uid: codec::UuidSnapshot,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableHiddenAxesError> {
+) -> Result<(), Error> {
     let location = object_location(objects, identifier)?;
     let object = &package
         .state
         .source
         .components()
         .get_index(location.component_index)
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?
+        .ok_or(Error::InvalidSource)?
         .archive()
         .objects[location.object_index];
     let mut selected = None;
     for message in &object.messages {
         if message.type_ == HIDDEN_STATE_FORMULA_OWNER_MESSAGE_TYPE {
             if selected.replace(message).is_some() {
-                return Err(BodyTableHiddenAxesError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
     }
-    let message = selected.ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+    let message = selected.ok_or(Error::InvalidSource)?;
     let message_index = object
         .messages
         .iter()
         .position(|candidate| std::ptr::eq(candidate, message))
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     validate_no_reference_metadata(
         object,
         message_index,
@@ -4001,16 +3966,12 @@ fn validate_formula_object(
             .owner_id()
             .is_none_or(|owner| owner.uuid_bytes().is_some())
     {
-        return Err(BodyTableHiddenAxesError::UnsupportedDependency);
+        return Err(Error::UnsupportedDependency);
     }
-    let owner = decoded
-        .owner_id()
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
-    let uuid = owner
-        .words_uuid()
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+    let owner = decoded.owner_id().ok_or(Error::InvalidSource)?;
+    let uuid = owner.words_uuid().ok_or(Error::InvalidSource)?;
     if uuid != expected_uid {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -4021,18 +3982,16 @@ fn hidden_axes(
     row_indices: &UidIndex,
     column_indices: &UidIndex,
     budget: &mut table_lock::WireBudget,
-) -> Result<HiddenAxes, BodyTableHiddenAxesError> {
+) -> Result<HiddenAxes, Error> {
     let Some(owner) = model.owner.as_ref() else {
         return Ok(HiddenAxes::empty());
     };
-    let active_uuid = info
-        .hidden_uuid
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+    let active_uuid = info.hidden_uuid.ok_or(Error::InvalidSource)?;
     let active = owner
         .hidden_states()
         .iter()
         .find(|state| state.hidden_states_uid() == active_uuid)
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if owner
         .hidden_states()
         .iter()
@@ -4040,7 +3999,7 @@ fn hidden_axes(
         .count()
         != 1
     {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let axis_capacity = active
         .row_hidden_state_extent()
@@ -4054,7 +4013,7 @@ fn hidden_axes(
         );
     let mut axes = Vec::new();
     axes.try_reserve_exact(axis_capacity)
-        .map_err(|_| BodyTableHiddenAxesError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: axis_capacity,
         })?;
     read_extent(
@@ -4074,7 +4033,7 @@ fn hidden_axes(
     budget
         .charge_payload_work(axes.as_slice().len())
         .map_err(map_lock_error)?;
-    HiddenAxes::new(axes).map_err(|_| BodyTableHiddenAxesError::InvalidSource)
+    HiddenAxes::new(axes).map_err(|_| Error::InvalidSource)
 }
 
 fn read_extent(
@@ -4083,20 +4042,20 @@ fn read_extent(
     row: bool,
     output: &mut Vec<AxisIndex>,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableHiddenAxesError> {
+) -> Result<(), Error> {
     let expected = if row {
         codec::AxisDirection::Row
     } else {
         codec::AxisDirection::Column
     };
     if extent.direction() != expected {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     for state in extent.base_hidden_states() {
         budget.charge_payload_work(1).map_err(map_lock_error)?;
         let index = physical
             .index_of(state.row_or_column_uid())
-            .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if state.user_hidden() == Some(true) {
             output.push(if row {
                 AxisIndex::row(index)
@@ -4108,14 +4067,8 @@ fn read_extent(
     Ok(())
 }
 
-fn validate_native_existing_owner(
-    model: &ModelValues,
-    info: &InfoValues,
-) -> Result<(), BodyTableHiddenAxesError> {
-    let owner = model
-        .owner
-        .as_ref()
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+fn validate_native_existing_owner(model: &ModelValues, info: &InfoValues) -> Result<(), Error> {
+    let owner = model.owner.as_ref().ok_or(Error::InvalidSource)?;
     if owner.hidden_states().len() != 1
         || info.hidden_uuid != Some(owner.owner_uid())
         || model.formula_columns.is_none()
@@ -4123,14 +4076,11 @@ fn validate_native_existing_owner(
         || model.pivot
         || info.pivot
     {
-        return Err(BodyTableHiddenAxesError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
-    let state = owner
-        .hidden_states()
-        .first()
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+    let state = owner.hidden_states().first().ok_or(Error::InvalidSource)?;
     if state.hidden_states_uid() != owner.owner_uid() {
-        Err(BodyTableHiddenAxesError::InvalidSource)
+        Err(Error::InvalidSource)
     } else {
         // The qualified native envelope has exactly one state. The shared
         // dependency proof validates its extents, UUIDs, directions, filters,
@@ -4139,16 +4089,18 @@ fn validate_native_existing_owner(
     }
 }
 
-fn validate_axis_bounds(graph: &Graph, axes: &HiddenAxes) -> Result<(), BodyTableHiddenAxesError> {
+fn validate_axis_bounds(graph: &Graph, axes: &HiddenAxes) -> Result<(), Error> {
     for axis in axes.iter() {
         let limit = match axis {
-            AxisIndex::Row(_) => usize::try_from(graph.model.rows)
-                .map_err(|_| BodyTableHiddenAxesError::InvalidSource)?,
-            AxisIndex::Column(_) => usize::try_from(graph.model.columns)
-                .map_err(|_| BodyTableHiddenAxesError::InvalidSource)?,
+            AxisIndex::Row(_) => {
+                usize::try_from(graph.model.rows).map_err(|_| Error::InvalidSource)?
+            },
+            AxisIndex::Column(_) => {
+                usize::try_from(graph.model.columns).map_err(|_| Error::InvalidSource)?
+            },
         };
         if axis.index() >= limit {
-            return Err(BodyTableHiddenAxesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(())
@@ -4158,7 +4110,7 @@ fn validate_model_counts(
     model: &ModelValues,
     active_uuid: Option<codec::UuidSnapshot>,
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableHiddenAxesError> {
+) -> Result<(), Error> {
     let Some(owner) = model.owner.as_ref() else {
         for value in [
             model.hidden_rows,
@@ -4171,17 +4123,17 @@ fn validate_model_counts(
         .flatten()
         {
             if value != 0 {
-                return Err(BodyTableHiddenAxesError::InvalidSource);
+                return Err(Error::InvalidSource);
             }
         }
         return Ok(());
     };
-    let active_uuid = active_uuid.ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+    let active_uuid = active_uuid.ok_or(Error::InvalidSource)?;
     let active = owner
         .hidden_states()
         .iter()
         .find(|state| state.hidden_states_uid() == active_uuid)
-        .ok_or(BodyTableHiddenAxesError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let count_work = active
         .row_hidden_state_extent()
         .base_hidden_states()
@@ -4193,8 +4145,8 @@ fn validate_model_counts(
                 .len(),
         )
         .and_then(|count| count.checked_mul(5))
-        .ok_or(BodyTableHiddenAxesError::LimitExceeded {
-            kind: BodyTableHiddenAxesLimitKind::TransactionWork,
+        .ok_or(Error::LimitExceeded {
+            kind: LimitKind::TransactionWork,
             observed: u64::MAX,
             maximum: u64::try_from(budget.wire_limits().max_rewrite_work()).unwrap_or(u64::MAX),
         })?;
@@ -4249,7 +4201,7 @@ fn validate_model_counts(
         if let Some(stored) = stored
             && usize::try_from(stored).ok() != Some(expected)
         {
-            return Err(BodyTableHiddenAxesError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(())
@@ -4273,7 +4225,7 @@ fn reopen(
     source: &Package,
     target: Arc<[u8]>,
     budget: &mut table_lock::WireBudget,
-) -> Result<Package, BodyTableHiddenAxesError> {
+) -> Result<Package, Error> {
     budget
         .charge_input_source(target.as_ref())
         .map_err(map_lock_error)?;
@@ -4294,14 +4246,14 @@ fn verify_locality(
     touched_components: usize,
     added_object_ids: &[u64],
     budget: &mut table_lock::WireBudget,
-) -> Result<(), BodyTableHiddenAxesError> {
+) -> Result<(), Error> {
     if !(1..=2).contains(&touched_components)
         || (touched_components == 2 && added_object_ids.is_empty())
         || source.state.source.components().len() != candidate.state.source.components().len()
         || target.model_identifier == target.drawable_identifier
         || (!added_object_ids.is_empty() && added_object_ids.len() != OWNER_CREATION_OBJECTS)
     {
-        return Err(BodyTableHiddenAxesError::Verification);
+        return Err(Error::Verification);
     }
     let archive_limits = source
         .state
@@ -4322,18 +4274,18 @@ fn verify_locality(
     let creation_in_source =
         !added_object_ids.is_empty() && source_has_added && !candidate_has_added;
     if !added_object_ids.is_empty() && creation_in_candidate == creation_in_source {
-        return Err(BodyTableHiddenAxesError::Verification);
+        return Err(Error::Verification);
     }
     let body_name = source
         .state
         .source
         .components()
         .get_index(target.model_component_index)
-        .ok_or(BodyTableHiddenAxesError::Verification)?
+        .ok_or(Error::Verification)?
         .name();
     let metadata_changed = touched_components == 2;
     let source_metadata_route = if metadata_changed {
-        metadata_route(source, budget)?.ok_or(BodyTableHiddenAxesError::Verification)?
+        metadata_route(source, budget)?.ok_or(Error::Verification)?
     } else {
         MetadataRoute {
             component_index: usize::MAX,
@@ -4343,12 +4295,12 @@ fn verify_locality(
     };
     if metadata_changed {
         let candidate_metadata_route =
-            metadata_route(candidate, budget)?.ok_or(BodyTableHiddenAxesError::Verification)?;
+            metadata_route(candidate, budget)?.ok_or(Error::Verification)?;
         if candidate_metadata_route.component_index != source_metadata_route.component_index
             || candidate_metadata_route.object_index != source_metadata_route.object_index
             || candidate_metadata_route.message_index != source_metadata_route.message_index
         {
-            return Err(BodyTableHiddenAxesError::Verification);
+            return Err(Error::Verification);
         }
     }
 
@@ -4374,7 +4326,7 @@ fn verify_locality(
                     .and_then(|value| {
                         value.checked_add(before_entry.metadata().central().extra().len())
                     })
-                    .ok_or(BodyTableHiddenAxesError::Verification)?,
+                    .ok_or(Error::Verification)?,
             )
             .map_err(map_lock_error)?;
         if page_layout::PREVIEW_ENTRY_NAMES
@@ -4383,28 +4335,26 @@ fn verify_locality(
         {
             continue;
         }
-        let after_entry = candidate_entries
-            .next()
-            .ok_or(BodyTableHiddenAxesError::Verification)?;
+        let after_entry = candidate_entries.next().ok_or(Error::Verification)?;
         if before_entry.name() != after_entry.name()
             || before_entry.raw_name() != after_entry.raw_name()
         {
-            return Err(BodyTableHiddenAxesError::Verification);
+            return Err(Error::Verification);
         }
         let selected_entry = before_entry.name() == body_name
             || (metadata_changed && before_entry.name() == METADATA_ENTRY_NAME);
         if selected_entry {
             if after_entry.is_opaque() || !same_entry_static_metadata(before_entry, after_entry) {
-                return Err(BodyTableHiddenAxesError::Verification);
+                return Err(Error::Verification);
             }
         } else if before_entry.data() != after_entry.data()
             || before_entry.metadata() != after_entry.metadata()
         {
-            return Err(BodyTableHiddenAxesError::Verification);
+            return Err(Error::Verification);
         }
     }
     if candidate_entries.next().is_some() {
-        return Err(BodyTableHiddenAxesError::Verification);
+        return Err(Error::Verification);
     }
 
     for (component_index, (before, after)) in source
@@ -4416,7 +4366,7 @@ fn verify_locality(
         .enumerate()
     {
         if before.name() != after.name() {
-            return Err(BodyTableHiddenAxesError::Verification);
+            return Err(Error::Verification);
         }
         let expected_count = if component_index == target.model_component_index {
             if creation_in_candidate {
@@ -4437,9 +4387,9 @@ fn verify_locality(
         } else {
             Some(before.archive().objects.len())
         }
-        .ok_or(BodyTableHiddenAxesError::Verification)?;
+        .ok_or(Error::Verification)?;
         if after.archive().objects.len() != expected_count {
-            return Err(BodyTableHiddenAxesError::Verification);
+            return Err(Error::Verification);
         }
     }
 
@@ -4453,14 +4403,14 @@ fn verify_locality(
                     || candidate_location
                         .is_none_or(|location| location.component_index != helper_component)
                 {
-                    return Err(BodyTableHiddenAxesError::Verification);
+                    return Err(Error::Verification);
                 }
             } else if creation_in_source {
                 if candidate_location.is_some()
                     || source_location
                         .is_none_or(|location| location.component_index != helper_component)
                 {
-                    return Err(BodyTableHiddenAxesError::Verification);
+                    return Err(Error::Verification);
                 }
             }
         }
@@ -4480,7 +4430,7 @@ fn verify_locality(
                     .get(source_metadata_route.object_index)
             })
             .and_then(|object| object.archive_info.identifier)
-            .ok_or(BodyTableHiddenAxesError::Verification)?
+            .ok_or(Error::Verification)?
     } else {
         0
     };
@@ -4493,32 +4443,32 @@ fn verify_locality(
             continue;
         }
         let after_location = find_object_location(&candidate_objects, before_location.identifier)
-            .ok_or(BodyTableHiddenAxesError::Verification)?;
+            .ok_or(Error::Verification)?;
         let before_component = source
             .state
             .source
             .components()
             .get_index(before_location.component_index)
-            .ok_or(BodyTableHiddenAxesError::Verification)?;
+            .ok_or(Error::Verification)?;
         let after_component = candidate
             .state
             .source
             .components()
             .get_index(after_location.component_index)
-            .ok_or(BodyTableHiddenAxesError::Verification)?;
+            .ok_or(Error::Verification)?;
         if before_component.name() != after_component.name() {
-            return Err(BodyTableHiddenAxesError::Verification);
+            return Err(Error::Verification);
         }
         let before_object = before_component
             .archive()
             .objects
             .get(before_location.object_index)
-            .ok_or(BodyTableHiddenAxesError::Verification)?;
+            .ok_or(Error::Verification)?;
         let after_object = after_component
             .archive()
             .objects
             .get(after_location.object_index)
-            .ok_or(BodyTableHiddenAxesError::Verification)?;
+            .ok_or(Error::Verification)?;
         let id = before_location.identifier;
         let selected = before_location.component_index == target.model_component_index
             && (id == target.model_identifier.get() || id == target.drawable_identifier.get());
@@ -4555,7 +4505,7 @@ fn verify_locality(
                 )?
             };
             if !equivalent {
-                return Err(BodyTableHiddenAxesError::Verification);
+                return Err(Error::Verification);
             }
         } else if selected_metadata {
             changed = changed.saturating_add(1);
@@ -4566,10 +4516,10 @@ fn verify_locality(
                 archive_limits,
                 budget,
             )? {
-                return Err(BodyTableHiddenAxesError::Verification);
+                return Err(Error::Verification);
             }
         } else if !before_object.same_content_ignoring_offsets(after_object) {
-            return Err(BodyTableHiddenAxesError::Verification);
+            return Err(Error::Verification);
         }
         budget
             .charge_payload_work(
@@ -4578,13 +4528,13 @@ fn verify_locality(
                     .len()
                     .checked_add(before_object.archive_info.message_infos.len())
                     .and_then(|value| value.checked_add(1))
-                    .ok_or(BodyTableHiddenAxesError::Verification)?,
+                    .ok_or(Error::Verification)?,
             )
             .map_err(map_lock_error)?;
     }
     let expected_changed = 2usize.saturating_add(usize::from(metadata_changed));
     if changed != expected_changed {
-        return Err(BodyTableHiddenAxesError::Verification);
+        return Err(Error::Verification);
     }
     Ok(())
 }
@@ -4603,7 +4553,7 @@ fn same_creation_model_object(
     added_object_ids: &[u64],
     archive_limits: litchi_iwa_core::ArchiveLimits,
     budget: &mut table_lock::WireBudget,
-) -> Result<bool, BodyTableHiddenAxesError> {
+) -> Result<bool, Error> {
     if added_object_ids.len() != OWNER_CREATION_OBJECTS
         || original.archive_info.identifier != creation.archive_info.identifier
         || original.archive_info.should_merge != creation.archive_info.should_merge
@@ -4646,7 +4596,7 @@ fn same_creation_model_object(
             work.checked_add(message.data.len())
                 .and_then(|value| value.checked_add(1))
         })
-        .ok_or(BodyTableHiddenAxesError::Verification)?;
+        .ok_or(Error::Verification)?;
     budget
         .charge_payload_work(scan_work)
         .map_err(map_lock_error)?;
@@ -4654,12 +4604,12 @@ fn same_creation_model_object(
         .archive_info
         .message_infos
         .get(selected_message)
-        .ok_or(BodyTableHiddenAxesError::Verification)?;
+        .ok_or(Error::Verification)?;
     let creation_info = creation
         .archive_info
         .message_infos
         .get(selected_message)
-        .ok_or(BodyTableHiddenAxesError::Verification)?;
+        .ok_or(Error::Verification)?;
     let column_references = [added_object_ids[0]];
     let row_references = [added_object_ids[1]];
     let fields = [
@@ -4705,7 +4655,7 @@ fn same_object_except_message(
     selected_message: usize,
     archive_limits: litchi_iwa_core::ArchiveLimits,
     budget: &mut table_lock::WireBudget,
-) -> Result<bool, BodyTableHiddenAxesError> {
+) -> Result<bool, Error> {
     if before.archive_info.identifier != after.archive_info.identifier
         || before.archive_info.should_merge != after.archive_info.should_merge
         || before.messages.len() != after.messages.len()
@@ -4722,13 +4672,13 @@ fn same_object_except_message(
     });
     let expected_after_data_length = before.data_length.checked_sub(
         u64::try_from(before.messages[selected_message].data.len())
-            .map_err(|_| BodyTableHiddenAxesError::Verification)?,
+            .map_err(|_| Error::Verification)?,
     );
     let expected_after_data_length = expected_after_data_length
         .and_then(|length| {
             length.checked_add(u64::try_from(after.messages[selected_message].data.len()).ok()?)
         })
-        .ok_or(BodyTableHiddenAxesError::Verification)?;
+        .ok_or(Error::Verification)?;
     if before_payload_length.and_then(|length| u64::try_from(length).ok())
         != Some(before.data_length)
         || after_payload_length.and_then(|length| u64::try_from(length).ok())
@@ -4772,13 +4722,13 @@ fn same_object_except_message(
         .try_fold(0usize, |length, message| {
             length.checked_add(message.data.len())
         })
-        .ok_or(BodyTableHiddenAxesError::Verification)?;
+        .ok_or(Error::Verification)?;
     let before_selected_bytes = before.messages[selected_message].data.len();
     budget
         .charge_payload_work(
             after_payload_bytes
                 .checked_add(before_selected_bytes)
-                .ok_or(BodyTableHiddenAxesError::Verification)?,
+                .ok_or(Error::Verification)?,
         )
         .map_err(map_lock_error)?;
     let mut restored = after.clone();
@@ -4812,358 +4762,274 @@ fn same_message_info_except_length(before: &MessageInfo, after: &MessageInfo) ->
         && before.diff_read_version == after.diff_read_version
 }
 
-fn map_codec_error(error: codec::DecodeError) -> BodyTableHiddenAxesError {
+fn map_codec_error(error: codec::DecodeError) -> Error {
     if let Some(amount) = error.allocation_amount() {
-        return BodyTableHiddenAxesError::Allocation { amount };
+        return Error::Allocation { amount };
     }
     if let Some(limit) = error.resource_limit() {
         let (kind, observed, maximum) = match limit {
             codec::DecodeLimit::InputBytes { observed, maximum } => {
-                (BodyTableHiddenAxesLimitKind::WireBytes, observed, maximum)
+                (LimitKind::WireBytes, observed, maximum)
             },
-            codec::DecodeLimit::OutputBytes { observed, maximum } => (
-                BodyTableHiddenAxesLimitKind::WireOutputBytes,
-                observed,
-                maximum,
-            ),
+            codec::DecodeLimit::OutputBytes { observed, maximum } => {
+                (LimitKind::WireOutputBytes, observed, maximum)
+            },
             codec::DecodeLimit::Fields { observed, maximum } => {
-                (BodyTableHiddenAxesLimitKind::WireFields, observed, maximum)
+                (LimitKind::WireFields, observed, maximum)
             },
             codec::DecodeLimit::WorkBytes { observed, maximum } => {
-                (BodyTableHiddenAxesLimitKind::WireWork, observed, maximum)
+                (LimitKind::WireWork, observed, maximum)
             },
-            codec::DecodeLimit::Nesting { observed, maximum } => (
-                BodyTableHiddenAxesLimitKind::WireNesting,
-                observed as usize,
-                maximum as usize,
-            ),
-            codec::DecodeLimit::States { observed, maximum } => (
-                BodyTableHiddenAxesLimitKind::PayloadItems,
-                observed,
-                maximum,
-            ),
-            codec::DecodeLimit::Allocations { observed, maximum } => (
-                BodyTableHiddenAxesLimitKind::PayloadItems,
-                observed,
-                maximum,
-            ),
-            codec::DecodeLimit::RetainedBytes { observed, maximum } => (
-                BodyTableHiddenAxesLimitKind::PayloadBytes,
-                observed,
-                maximum,
-            ),
-            codec::DecodeLimit::ScratchBytes { observed, maximum } => (
-                BodyTableHiddenAxesLimitKind::PayloadBytes,
-                observed,
-                maximum,
-            ),
-            _ => return BodyTableHiddenAxesError::InvalidSource,
+            codec::DecodeLimit::Nesting { observed, maximum } => {
+                (LimitKind::WireNesting, observed as usize, maximum as usize)
+            },
+            codec::DecodeLimit::States { observed, maximum } => {
+                (LimitKind::PayloadItems, observed, maximum)
+            },
+            codec::DecodeLimit::Allocations { observed, maximum } => {
+                (LimitKind::PayloadItems, observed, maximum)
+            },
+            codec::DecodeLimit::RetainedBytes { observed, maximum } => {
+                (LimitKind::PayloadBytes, observed, maximum)
+            },
+            codec::DecodeLimit::ScratchBytes { observed, maximum } => {
+                (LimitKind::PayloadBytes, observed, maximum)
+            },
+            _ => return Error::InvalidSource,
         };
-        return BodyTableHiddenAxesError::LimitExceeded {
+        return Error::LimitExceeded {
             kind,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
-    BodyTableHiddenAxesError::InvalidSource
+    Error::InvalidSource
 }
 
-fn map_style_codec_error(error: style_codec::DecodeError) -> BodyTableHiddenAxesError {
+fn map_style_codec_error(error: style_codec::DecodeError) -> Error {
     if let Some(amount) = error.allocation_requested() {
-        return BodyTableHiddenAxesError::Allocation { amount };
+        return Error::Allocation { amount };
     }
     let Some(limit) = error.resource_limit() else {
-        return BodyTableHiddenAxesError::InvalidSource;
+        return Error::InvalidSource;
     };
     let (kind, observed, maximum) = match limit {
         style_codec::DecodeLimit::InputBytes { observed, maximum } => {
-            (BodyTableHiddenAxesLimitKind::WireBytes, observed, maximum)
+            (LimitKind::WireBytes, observed, maximum)
         },
-        style_codec::DecodeLimit::OutputBytes { observed, maximum } => (
-            BodyTableHiddenAxesLimitKind::WireOutputBytes,
-            observed,
-            maximum,
-        ),
+        style_codec::DecodeLimit::OutputBytes { observed, maximum } => {
+            (LimitKind::WireOutputBytes, observed, maximum)
+        },
         style_codec::DecodeLimit::Fields { observed, maximum } => {
-            (BodyTableHiddenAxesLimitKind::WireFields, observed, maximum)
+            (LimitKind::WireFields, observed, maximum)
         },
         style_codec::DecodeLimit::WorkBytes { observed, maximum } => {
-            (BodyTableHiddenAxesLimitKind::WireWork, observed, maximum)
+            (LimitKind::WireWork, observed, maximum)
         },
-        style_codec::DecodeLimit::Nesting { observed, maximum } => (
-            BodyTableHiddenAxesLimitKind::WireNesting,
-            observed as usize,
-            maximum as usize,
-        ),
+        style_codec::DecodeLimit::Nesting { observed, maximum } => {
+            (LimitKind::WireNesting, observed as usize, maximum as usize)
+        },
         style_codec::DecodeLimit::Styles { observed, maximum }
-        | style_codec::DecodeLimit::Allocations { observed, maximum } => (
-            BodyTableHiddenAxesLimitKind::PayloadItems,
-            observed,
-            maximum,
-        ),
+        | style_codec::DecodeLimit::Allocations { observed, maximum } => {
+            (LimitKind::PayloadItems, observed, maximum)
+        },
         style_codec::DecodeLimit::RetainedBytes { observed, maximum }
-        | style_codec::DecodeLimit::ScratchBytes { observed, maximum } => (
-            BodyTableHiddenAxesLimitKind::PayloadBytes,
-            observed,
-            maximum,
-        ),
-        _ => return BodyTableHiddenAxesError::InvalidSource,
+        | style_codec::DecodeLimit::ScratchBytes { observed, maximum } => {
+            (LimitKind::PayloadBytes, observed, maximum)
+        },
+        _ => return Error::InvalidSource,
     };
-    BodyTableHiddenAxesError::LimitExceeded {
+    Error::LimitExceeded {
         kind,
         observed: observed as u64,
         maximum: maximum as u64,
     }
 }
 
-fn map_dependency_codec_error(error: dependency_codec::DecodeError) -> BodyTableHiddenAxesError {
+fn map_dependency_codec_error(error: dependency_codec::DecodeError) -> Error {
     if let Some(requested) = error.allocation_requested() {
-        return BodyTableHiddenAxesError::Allocation { amount: requested };
+        return Error::Allocation { amount: requested };
     }
     let Some(limit) = error.resource_limit() else {
-        return BodyTableHiddenAxesError::InvalidSource;
+        return Error::InvalidSource;
     };
     let (kind, observed, maximum) = match limit {
         dependency_codec::DecodeLimit::Bytes { observed, maximum } => {
-            (BodyTableHiddenAxesLimitKind::WireBytes, observed, maximum)
+            (LimitKind::WireBytes, observed, maximum)
         },
-        dependency_codec::DecodeLimit::References { observed, maximum } => (
-            BodyTableHiddenAxesLimitKind::PayloadReferences,
-            observed,
-            maximum,
-        ),
-        dependency_codec::DecodeLimit::Text { observed, maximum } => (
-            BodyTableHiddenAxesLimitKind::PayloadBytes,
-            observed,
-            maximum,
-        ),
+        dependency_codec::DecodeLimit::References { observed, maximum } => {
+            (LimitKind::PayloadReferences, observed, maximum)
+        },
+        dependency_codec::DecodeLimit::Text { observed, maximum } => {
+            (LimitKind::PayloadBytes, observed, maximum)
+        },
         dependency_codec::DecodeLimit::Fields { observed, maximum } => {
-            (BodyTableHiddenAxesLimitKind::WireFields, observed, maximum)
+            (LimitKind::WireFields, observed, maximum)
         },
         dependency_codec::DecodeLimit::Work { observed, maximum } => {
-            (BodyTableHiddenAxesLimitKind::WireWork, observed, maximum)
+            (LimitKind::WireWork, observed, maximum)
         },
-        dependency_codec::DecodeLimit::Nesting { observed, maximum } => (
-            BodyTableHiddenAxesLimitKind::WireNesting,
-            observed as usize,
-            maximum as usize,
-        ),
-        dependency_codec::DecodeLimit::Retained { observed, maximum } => (
-            BodyTableHiddenAxesLimitKind::PayloadBytes,
-            observed,
-            maximum,
-        ),
-        _ => return BodyTableHiddenAxesError::InvalidSource,
+        dependency_codec::DecodeLimit::Nesting { observed, maximum } => {
+            (LimitKind::WireNesting, observed as usize, maximum as usize)
+        },
+        dependency_codec::DecodeLimit::Retained { observed, maximum } => {
+            (LimitKind::PayloadBytes, observed, maximum)
+        },
+        _ => return Error::InvalidSource,
     };
-    BodyTableHiddenAxesError::LimitExceeded {
+    Error::LimitExceeded {
         kind,
         observed: observed as u64,
         maximum: maximum as u64,
     }
 }
 
-fn map_lock_error(error: table_lock::BodyTableLockError) -> BodyTableHiddenAxesError {
+fn map_lock_error(error: table_lock::Error) -> Error {
     match error {
-        table_lock::BodyTableLockError::TableNotFound => BodyTableHiddenAxesError::TableNotFound,
-        table_lock::BodyTableLockError::AmbiguousTableName => {
-            BodyTableHiddenAxesError::AmbiguousTableName
-        },
-        table_lock::BodyTableLockError::AmbiguousSelector => {
-            BodyTableHiddenAxesError::AmbiguousSelector
-        },
-        table_lock::BodyTableLockError::UnsupportedSource => {
-            BodyTableHiddenAxesError::UnsupportedSource
-        },
-        table_lock::BodyTableLockError::InvalidSource => BodyTableHiddenAxesError::InvalidSource,
-        table_lock::BodyTableLockError::LimitExceeded {
+        table_lock::Error::TableNotFound => Error::TableNotFound,
+        table_lock::Error::AmbiguousTableName => Error::AmbiguousTableName,
+        table_lock::Error::AmbiguousSelector => Error::AmbiguousSelector,
+        table_lock::Error::UnsupportedSource => Error::UnsupportedSource,
+        table_lock::Error::InvalidSource => Error::InvalidSource,
+        table_lock::Error::LimitExceeded {
             kind,
             observed,
             maximum,
-        } => BodyTableHiddenAxesError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: map_lock_limit(kind),
             observed,
             maximum,
         },
-        table_lock::BodyTableLockError::Allocation { amount } => {
-            BodyTableHiddenAxesError::Allocation { amount }
-        },
-        table_lock::BodyTableLockError::Verification => BodyTableHiddenAxesError::Verification,
-        table_lock::BodyTableLockError::PatchConflict => BodyTableHiddenAxesError::PatchConflict,
+        table_lock::Error::Allocation { amount } => Error::Allocation { amount },
+        table_lock::Error::Verification => Error::Verification,
+        table_lock::Error::PatchConflict => Error::PatchConflict,
     }
 }
 
-fn map_lock_limit(kind: table_lock::BodyTableLockLimitKind) -> BodyTableHiddenAxesLimitKind {
+fn map_lock_limit(kind: table_lock::LimitKind) -> LimitKind {
     match kind {
-        table_lock::BodyTableLockLimitKind::InputBytes => BodyTableHiddenAxesLimitKind::InputBytes,
-        table_lock::BodyTableLockLimitKind::OutputBytes => {
-            BodyTableHiddenAxesLimitKind::OutputBytes
-        },
-        table_lock::BodyTableLockLimitKind::Entries => BodyTableHiddenAxesLimitKind::Entries,
-        table_lock::BodyTableLockLimitKind::EntryBytes => BodyTableHiddenAxesLimitKind::EntryBytes,
-        table_lock::BodyTableLockLimitKind::TotalEntryBytes => {
-            BodyTableHiddenAxesLimitKind::TotalEntryBytes
-        },
-        table_lock::BodyTableLockLimitKind::PackageBytes => {
-            BodyTableHiddenAxesLimitKind::PackageBytes
-        },
-        table_lock::BodyTableLockLimitKind::PayloadBytes => {
-            BodyTableHiddenAxesLimitKind::PayloadBytes
-        },
-        table_lock::BodyTableLockLimitKind::TotalPayloadBytes => {
-            BodyTableHiddenAxesLimitKind::TotalPayloadBytes
-        },
-        table_lock::BodyTableLockLimitKind::PayloadObjects => {
-            BodyTableHiddenAxesLimitKind::PayloadObjects
-        },
-        table_lock::BodyTableLockLimitKind::PayloadMessages => {
-            BodyTableHiddenAxesLimitKind::PayloadMessages
-        },
-        table_lock::BodyTableLockLimitKind::PayloadItems => {
-            BodyTableHiddenAxesLimitKind::PayloadItems
-        },
-        table_lock::BodyTableLockLimitKind::PayloadReferences => {
-            BodyTableHiddenAxesLimitKind::PayloadReferences
-        },
-        table_lock::BodyTableLockLimitKind::WireBytes => BodyTableHiddenAxesLimitKind::WireBytes,
-        table_lock::BodyTableLockLimitKind::WireFields => BodyTableHiddenAxesLimitKind::WireFields,
-        table_lock::BodyTableLockLimitKind::WireNesting => {
-            BodyTableHiddenAxesLimitKind::WireNesting
-        },
-        table_lock::BodyTableLockLimitKind::WireWork => BodyTableHiddenAxesLimitKind::WireWork,
+        table_lock::LimitKind::InputBytes => LimitKind::InputBytes,
+        table_lock::LimitKind::OutputBytes => LimitKind::OutputBytes,
+        table_lock::LimitKind::Entries => LimitKind::Entries,
+        table_lock::LimitKind::EntryBytes => LimitKind::EntryBytes,
+        table_lock::LimitKind::TotalEntryBytes => LimitKind::TotalEntryBytes,
+        table_lock::LimitKind::PackageBytes => LimitKind::PackageBytes,
+        table_lock::LimitKind::PayloadBytes => LimitKind::PayloadBytes,
+        table_lock::LimitKind::TotalPayloadBytes => LimitKind::TotalPayloadBytes,
+        table_lock::LimitKind::PayloadObjects => LimitKind::PayloadObjects,
+        table_lock::LimitKind::PayloadMessages => LimitKind::PayloadMessages,
+        table_lock::LimitKind::PayloadItems => LimitKind::PayloadItems,
+        table_lock::LimitKind::PayloadReferences => LimitKind::PayloadReferences,
+        table_lock::LimitKind::WireBytes => LimitKind::WireBytes,
+        table_lock::LimitKind::WireFields => LimitKind::WireFields,
+        table_lock::LimitKind::WireNesting => LimitKind::WireNesting,
+        table_lock::LimitKind::WireWork => LimitKind::WireWork,
     }
 }
 
-fn map_page_layout_error(error: page_layout::PageLayoutError) -> BodyTableHiddenAxesError {
+fn map_page_layout_error(error: page_layout::Error) -> Error {
     match error {
-        page_layout::PageLayoutError::Allocation { amount } => {
-            BodyTableHiddenAxesError::Allocation { amount }
-        },
-        page_layout::PageLayoutError::LimitExceeded {
+        page_layout::Error::Allocation { amount } => Error::Allocation { amount },
+        page_layout::Error::LimitExceeded {
             observed, maximum, ..
-        } => BodyTableHiddenAxesError::LimitExceeded {
-            kind: BodyTableHiddenAxesLimitKind::PayloadBytes,
+        } => Error::LimitExceeded {
+            kind: LimitKind::PayloadBytes,
             observed,
             maximum,
         },
-        page_layout::PageLayoutError::UnsupportedSource => {
-            BodyTableHiddenAxesError::UnsupportedSource
-        },
-        _ => BodyTableHiddenAxesError::InvalidSource,
+        page_layout::Error::UnsupportedSource => Error::UnsupportedSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_archive_error(error: litchi_iwa_archive::Error) -> BodyTableHiddenAxesError {
+fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
     match error {
-        litchi_iwa_archive::Error::Allocation { amount, .. } => {
-            BodyTableHiddenAxesError::Allocation { amount }
-        },
+        litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
         litchi_iwa_archive::Error::Limit {
             kind,
             observed,
             maximum,
-        } => BodyTableHiddenAxesError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: match kind {
-                litchi_iwa_archive::LimitKind::InputBytes => {
-                    BodyTableHiddenAxesLimitKind::InputBytes
-                },
-                litchi_iwa_archive::LimitKind::OutputBytes => {
-                    BodyTableHiddenAxesLimitKind::OutputBytes
-                },
-                litchi_iwa_archive::LimitKind::Entries => BodyTableHiddenAxesLimitKind::Entries,
+                litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
+                litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_archive::LimitKind::Entries => LimitKind::Entries,
                 litchi_iwa_archive::LimitKind::MemberNameBytes
-                | litchi_iwa_archive::LimitKind::MetadataBytes => {
-                    BodyTableHiddenAxesLimitKind::PackageBytes
-                },
+                | litchi_iwa_archive::LimitKind::MetadataBytes => LimitKind::PackageBytes,
                 litchi_iwa_archive::LimitKind::CompressedEntryBytes
-                | litchi_iwa_archive::LimitKind::EntryBytes => {
-                    BodyTableHiddenAxesLimitKind::EntryBytes
-                },
-                litchi_iwa_archive::LimitKind::TotalBytes => {
-                    BodyTableHiddenAxesLimitKind::TotalEntryBytes
-                },
-                litchi_iwa_archive::LimitKind::IwaStreamBytes => {
-                    BodyTableHiddenAxesLimitKind::PayloadBytes
-                },
-                litchi_iwa_archive::LimitKind::IwaTotalBytes => {
-                    BodyTableHiddenAxesLimitKind::TotalPayloadBytes
-                },
+                | litchi_iwa_archive::LimitKind::EntryBytes => LimitKind::EntryBytes,
+                litchi_iwa_archive::LimitKind::TotalBytes => LimitKind::TotalEntryBytes,
+                litchi_iwa_archive::LimitKind::IwaStreamBytes => LimitKind::PayloadBytes,
+                litchi_iwa_archive::LimitKind::IwaTotalBytes => LimitKind::TotalPayloadBytes,
             },
             observed,
             maximum,
         },
-        _ => BodyTableHiddenAxesError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_core_error(error: litchi_iwa_core::Error) -> BodyTableHiddenAxesError {
+fn map_core_error(error: litchi_iwa_core::Error) -> Error {
     match error {
         litchi_iwa_core::Error::Allocation { requested, .. } => {
-            BodyTableHiddenAxesError::Allocation { amount: requested }
+            Error::Allocation { amount: requested }
         },
         litchi_iwa_core::Error::Limit {
             kind,
             observed,
             maximum,
-        } => BodyTableHiddenAxesError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: match kind {
-                litchi_iwa_core::LimitKind::Objects => BodyTableHiddenAxesLimitKind::PayloadObjects,
+                litchi_iwa_core::LimitKind::Objects => LimitKind::PayloadObjects,
                 litchi_iwa_core::LimitKind::Messages
-                | litchi_iwa_core::LimitKind::MessagesPerObject => {
-                    BodyTableHiddenAxesLimitKind::PayloadMessages
-                },
-                litchi_iwa_core::LimitKind::HeaderFields => {
-                    BodyTableHiddenAxesLimitKind::WireFields
-                },
-                litchi_iwa_core::LimitKind::HeaderNesting => {
-                    BodyTableHiddenAxesLimitKind::WireNesting
-                },
-                _ => BodyTableHiddenAxesLimitKind::PayloadBytes,
+                | litchi_iwa_core::LimitKind::MessagesPerObject => LimitKind::PayloadMessages,
+                litchi_iwa_core::LimitKind::HeaderFields => LimitKind::WireFields,
+                litchi_iwa_core::LimitKind::HeaderNesting => LimitKind::WireNesting,
+                _ => LimitKind::PayloadBytes,
             },
             observed: observed as u64,
             maximum: maximum as u64,
         },
-        _ => BodyTableHiddenAxesError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_wire_error(error: litchi_iwa_common::Error) -> BodyTableHiddenAxesError {
+fn map_wire_error(error: litchi_iwa_common::Error) -> Error {
     match error {
         litchi_iwa_common::Error::LimitExceeded {
             kind,
             observed,
             limit,
-        } => BodyTableHiddenAxesError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: match kind {
-                litchi_iwa_common::LimitKind::InputBytes => BodyTableHiddenAxesLimitKind::WireBytes,
-                litchi_iwa_common::LimitKind::Fields => BodyTableHiddenAxesLimitKind::WireFields,
-                litchi_iwa_common::LimitKind::Nesting => BodyTableHiddenAxesLimitKind::WireNesting,
-                _ => BodyTableHiddenAxesLimitKind::WireWork,
+                litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
+                litchi_iwa_common::LimitKind::Fields => LimitKind::WireFields,
+                litchi_iwa_common::LimitKind::Nesting => LimitKind::WireNesting,
+                _ => LimitKind::WireWork,
             },
             observed: observed as u64,
             maximum: limit as u64,
         },
-        litchi_iwa_common::Error::Allocation { amount, .. } => {
-            BodyTableHiddenAxesError::Allocation { amount }
-        },
-        _ => BodyTableHiddenAxesError::InvalidSource,
+        litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_package_error(error: PackageError) -> BodyTableHiddenAxesError {
+fn map_package_error(error: PackageError) -> Error {
     match error {
         PackageError::Archive(error) => map_archive_error(error),
-        PackageError::Allocation { amount } => BodyTableHiddenAxesError::Allocation { amount },
-        PackageError::ObjectLimit { observed, limit } => BodyTableHiddenAxesError::LimitExceeded {
-            kind: BodyTableHiddenAxesLimitKind::PayloadObjects,
+        PackageError::Allocation { amount } => Error::Allocation { amount },
+        PackageError::ObjectLimit { observed, limit } => Error::LimitExceeded {
+            kind: LimitKind::PayloadObjects,
             observed: observed as u64,
             maximum: limit as u64,
         },
-        PackageError::PayloadLimit { observed, limit } => BodyTableHiddenAxesError::LimitExceeded {
-            kind: BodyTableHiddenAxesLimitKind::PayloadBytes,
+        PackageError::PayloadLimit { observed, limit } => Error::LimitExceeded {
+            kind: LimitKind::PayloadBytes,
             observed: observed as u64,
             maximum: limit as u64,
         },
-        _ => BodyTableHiddenAxesError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
@@ -5207,8 +5073,8 @@ mod reference_inventory_tests {
 
         assert!(matches!(
             ReferenceInventory::new(&info, &mut budget(3)),
-            Err(BodyTableHiddenAxesError::LimitExceeded {
-                kind: BodyTableHiddenAxesLimitKind::PayloadReferences,
+            Err(Error::LimitExceeded {
+                kind: LimitKind::PayloadReferences,
                 observed: 4,
                 maximum: 3,
             })
@@ -5237,8 +5103,8 @@ mod reference_inventory_tests {
             .expect("leave one fewer work unit");
         assert!(matches!(
             ReferenceInventory::new(&info, &mut exhausted),
-            Err(BodyTableHiddenAxesError::LimitExceeded {
-                kind: BodyTableHiddenAxesLimitKind::WireWork,
+            Err(Error::LimitExceeded {
+                kind: LimitKind::WireWork,
                 ..
             })
         ));

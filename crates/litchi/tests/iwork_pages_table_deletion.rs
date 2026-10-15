@@ -1,7 +1,7 @@
 //! Public Pages table deletion parity and exact-source transactions.
 #![cfg(feature = "pages")]
 
-use litchi::pages::{BodyTableDeletionError, BodyTableSelector, Package};
+use litchi::pages::{BodyTableSelector, Package, table::deletion::Error as BodyTableDeletionError};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 

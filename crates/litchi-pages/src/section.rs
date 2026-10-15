@@ -1,8 +1,22 @@
 /// Exact-source transactions for the fill stored directly on one section.
 pub mod background;
+/// Exact-source transactions for one section's name.
+pub mod name {
+    pub use crate::package::section_name::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
+}
+/// Paragraph-level transactions over one section's body text.
+pub mod paragraphs {
+    pub use crate::package::section_paragraphs::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch,
+    };
+}
 pub mod pagination;
 /// Exact-source transactions for the settings stored on one section.
 pub mod settings;
+/// Exact-source transactions for one section's body text.
+pub mod text {
+    pub use crate::package::section_text::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};
+}
 
 use std::{fmt, sync::Arc};
 

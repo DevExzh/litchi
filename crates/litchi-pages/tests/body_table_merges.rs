@@ -7,11 +7,14 @@
 
 use std::error::Error as StdError;
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
 use litchi_iwa_common::table::merge::Region;
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tsce, tst};
-use litchi_pages::{BodyTableMergesError, BodyTableSelector, Limits, Package};
+use litchi_pages::{
+    BodyTableSelector, Package, table::merge::transaction::Error as BodyTableMergesError,
+};
 use prost::Message as _;
 
 const NATIVE: &[u8] = include_bytes!(concat!(
@@ -217,7 +220,7 @@ fn merge_transaction_rewrites_one_component_and_inverse_restores_exact_source() 
     let replacement = Region::new(0, 0, 1, 2)?;
 
     let mut edit = package.edit_body_table_merges(BodyTableSelector::name("Table 1"))?;
-    assert_eq!(edit.unmerge(existing)?, true);
+    assert!(edit.unmerge(existing)?);
     assert_eq!(edit.merge(replacement)?.regions(), &[replacement]);
     let commit = edit.commit()?;
 
@@ -300,7 +303,10 @@ fn merge_transaction_limit_failure_is_atomic() -> TestResult {
     for fields in 1..=4_096 {
         let archive_limits = litchi_iwa_core::Limits::default().with_header_fields(fields)?;
         let limits = Limits::default().with_archive_limits(archive_limits)?;
-        let Ok(package) = Package::from_bytes_with_limits(NATIVE, limits) else {
+        let Ok(package) = Package::from_bytes_with_options(
+            NATIVE,
+            litchi_pages::OpenOptions::new().__archive_limits(limits),
+        ) else {
             continue;
         };
         let before = exact_bytes(&package)?;
@@ -329,7 +335,7 @@ fn merge_transaction_noop_and_missing_unmerge_are_byte_exact() -> TestResult {
     let missing = Region::new(0, 0, 1, 2)?;
 
     let mut edit = package.edit_body_table_merges(BodyTableSelector::index(0))?;
-    assert_eq!(edit.unmerge(missing)?, false);
+    assert!(!edit.unmerge(missing)?);
     let commit = edit.commit()?;
     assert!(commit.patch().is_noop());
     assert!(!commit.diagnostics().changed());

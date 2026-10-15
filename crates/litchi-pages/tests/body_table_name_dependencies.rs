@@ -14,7 +14,9 @@ use litchi_iwa_archive::{
 use litchi_iwa_common::wire::append_length_delimited_field;
 use litchi_iwa_core::{Archive, FieldInfo, FieldPath, SnappyStream};
 use litchi_iwa_protos::{tp, tsce, tsp};
-use litchi_pages::{BodyTableNameError, BodyTableSelector, Package};
+use litchi_pages::{
+    BodyTableSelector, Package, table::name::transaction::Error as BodyTableNameError,
+};
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn StdError>>;

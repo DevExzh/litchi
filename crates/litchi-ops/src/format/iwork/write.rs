@@ -34,7 +34,7 @@ use crate::value::{Scalar, ValueType};
 )]
 pub(crate) enum LeafPatch {
     #[cfg(feature = "pages")]
-    PagesText(litchi_pages::SectionTextPatch),
+    PagesText(litchi_pages::section::text::Patch),
     #[cfg(feature = "keynote")]
     KeynoteText(litchi_keynote::SlideTextPatch),
     #[cfg(feature = "keynote")]

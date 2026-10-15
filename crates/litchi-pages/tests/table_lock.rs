@@ -1,5 +1,6 @@
 use std::error::Error as StdError;
 
+use litchi_iwa_archive::Limits;
 use litchi_iwa_archive::package::{Catalog, EntryEdit};
 use litchi_iwa_common::{decode_varint_from_bytes, wire::WireView};
 use litchi_iwa_core::{
@@ -8,7 +9,8 @@ use litchi_iwa_core::{
 use litchi_iwa_protos::{tp, tsa, tsd, tsp, tst, tswp};
 use litchi_pages::table::lock::State;
 use litchi_pages::{
-    BodyTableLockError, BodyTableLockLimitKind, BodyTableSelector, Limits, Package,
+    BodyTableSelector, Package, table::lock::Error as BodyTableLockError,
+    table::lock::LimitKind as BodyTableLockLimitKind,
 };
 use prost::Message as _;
 
@@ -266,7 +268,10 @@ fn cumulative_table_info_wire_budget_has_a_bounded_boundary() -> TestResult<()> 
     for fields in 1..=4_096 {
         let archive_limits = ArchiveLimits::default().with_header_fields(fields)?;
         let limits = Limits::default().with_archive_limits(archive_limits)?;
-        let Ok(package) = Package::from_bytes_with_limits(&source, limits) else {
+        let Ok(package) = Package::from_bytes_with_options(
+            &source,
+            litchi_pages::OpenOptions::new().__archive_limits(limits),
+        ) else {
             continue;
         };
         match package.body_table_lock(BodyTableSelector::index(0)) {
@@ -299,7 +304,10 @@ fn cumulative_table_info_wire_budget_scales_with_unique_tables() -> TestResult<(
         let archive_limits = ArchiveLimits::default().with_header_fields(fields)?;
         let limits = Limits::default().with_archive_limits(archive_limits)?;
         if one_success.is_none()
-            && let Ok(one) = Package::from_bytes_with_limits(&one_source, limits)
+            && let Ok(one) = Package::from_bytes_with_options(
+                &one_source,
+                litchi_pages::OpenOptions::new().__archive_limits(limits),
+            )
             && matches!(
                 one.body_table_lock(BodyTableSelector::index(0)),
                 Ok(State::Unlocked) | Ok(State::Locked)
@@ -308,7 +316,10 @@ fn cumulative_table_info_wire_budget_scales_with_unique_tables() -> TestResult<(
             one_success = Some(fields);
         }
         if two_success.is_none()
-            && let Ok(two) = Package::from_bytes_with_limits(&two_source, limits)
+            && let Ok(two) = Package::from_bytes_with_options(
+                &two_source,
+                litchi_pages::OpenOptions::new().__archive_limits(limits),
+            )
             && matches!(
                 two.body_table_lock(BodyTableSelector::index(0)),
                 Ok(State::Unlocked) | Ok(State::Locked)
