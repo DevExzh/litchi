@@ -68,7 +68,9 @@ fn keynote_reader_helpers_keep_semantic_values_and_typed_routing() {
 #[cfg(feature = "numbers")]
 #[test]
 fn numbers_reader_helpers_keep_semantic_values_and_typed_routing() {
-    use litchi::numbers::semantic::{self, DocumentReadError, SheetSelector, TableSelector};
+    use litchi::numbers::semantic::{
+        self, ReadError as DocumentReadError, SheetSelector, TableSelector,
+    };
 
     let bytes = include_bytes!("../../../test-data/iwork/numbers/basic.numbers");
     let document = semantic::from_bytes(bytes).expect("Numbers fixture must decode");
@@ -91,7 +93,9 @@ fn numbers_reader_helpers_keep_semantic_values_and_typed_routing() {
     let pages = include_bytes!("../../../test-data/iwork/pages/basic.pages");
     assert_eq!(
         semantic::from_bytes(pages).expect_err("Pages must not route as Numbers"),
-        DocumentReadError::NotNumbers
+        DocumentReadError::UnexpectedFormat {
+            detected: litchi::FileFormat::Pages,
+        }
     );
 
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))

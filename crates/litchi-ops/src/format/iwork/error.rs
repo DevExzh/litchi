@@ -65,16 +65,21 @@ pub enum LeafError {
     KeynoteWrite(litchi_keynote::WriteError),
     /// The Numbers package could not be read.
     #[cfg(feature = "numbers")]
-    Numbers(litchi_numbers::PackageError),
+    Numbers(litchi_numbers::Error),
     /// The Numbers workbook text could not be rendered.
     #[cfg(feature = "numbers")]
-    NumbersText(litchi_numbers::DocumentReadError),
+    NumbersText(litchi_numbers::workbook::ReadError),
     /// A Numbers table-cell transaction failed.
     #[cfg(feature = "numbers")]
     NumbersCells(litchi_numbers::table::cells::Error),
     /// Writing the Numbers package to a sink failed.
     #[cfg(feature = "numbers")]
     NumbersWrite(litchi_numbers::WriteError),
+    /// A Numbers transaction other than the cell transaction failed: sheet
+    /// and table names, sheet order, table relocation, merges, comments,
+    /// display formats, formula text, or a fresh workbook build.
+    #[cfg(feature = "numbers")]
+    NumbersEdit(super::numbers::EditError),
 }
 
 impl fmt::Display for LeafError {
@@ -121,6 +126,8 @@ impl fmt::Display for LeafError {
             Self::NumbersCells(error) => error.fmt(formatter),
             #[cfg(feature = "numbers")]
             Self::NumbersWrite(error) => error.fmt(formatter),
+            #[cfg(feature = "numbers")]
+            Self::NumbersEdit(error) => error.fmt(formatter),
         }
     }
 }
@@ -169,6 +176,8 @@ impl std::error::Error for LeafError {
             Self::NumbersCells(error) => Some(error),
             #[cfg(feature = "numbers")]
             Self::NumbersWrite(error) => Some(error),
+            #[cfg(feature = "numbers")]
+            Self::NumbersEdit(error) => error.source_error(),
         }
     }
 }
@@ -218,7 +227,7 @@ impl LeafError {
             Self::Numbers(error) => numbers_code(error),
             #[cfg(feature = "numbers")]
             Self::NumbersText(error) => match error {
-                litchi_numbers::DocumentReadError::Limit { .. } => Code::LimitExceeded,
+                litchi_numbers::workbook::ReadError::Limit { .. } => Code::LimitExceeded,
                 _ => Code::InternalError,
             },
             #[cfg(feature = "numbers")]
@@ -229,6 +238,8 @@ impl LeafError {
             Self::KeynoteWrite(_) => Code::IoError,
             #[cfg(feature = "numbers")]
             Self::NumbersWrite(_) => Code::IoError,
+            #[cfg(feature = "numbers")]
+            Self::NumbersEdit(error) => error.code(),
         }
     }
 }
@@ -430,8 +441,8 @@ fn keynote_deletion_code(error: &litchi_keynote::slide::delete::Error) -> Code {
 }
 
 #[cfg(feature = "numbers")]
-fn numbers_code(error: &litchi_numbers::PackageError) -> Code {
-    use litchi_numbers::PackageError as E;
+fn numbers_code(error: &litchi_numbers::Error) -> Code {
+    use litchi_numbers::Error as E;
     match error {
         E::Io(_) => Code::IoError,
         E::Detection(error) => detection_code(error),

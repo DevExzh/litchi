@@ -9,8 +9,7 @@ use litchi_iwa_common::{
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tn, tsce, tsd, tsp, tst};
 use litchi_numbers::{
-    MAX_MATERIALIZED_CELLS, Package, PackageReadOptions, PackageSemanticLimits, SheetSelector,
-    TableSelector, cell::Value, names,
+    MAX_MATERIALIZED_CELLS, Package, SheetSelector, TableSelector, cell::Value, names,
 };
 use prost::Message as _;
 
@@ -333,12 +332,17 @@ fn bytes(package: &Package) -> TestResult<Vec<u8>> {
 }
 
 fn sheet_name(package: &Package, position: usize) -> &str {
-    package.document().sheets().get(position).unwrap().name()
+    package
+        .workbook_ref()
+        .sheets()
+        .get(position)
+        .unwrap()
+        .name()
 }
 
 fn table_name(package: &Package, sheet: usize, table: usize) -> &str {
     package
-        .document()
+        .workbook_ref()
         .sheets()
         .get(sheet)
         .unwrap()
@@ -841,11 +845,14 @@ fn names_selectors_are_case_sensitive_and_failed_selection_preserves_source() ->
 fn staged_name_bytes_accept_exact_limit_reject_one_over_and_bound_multiple_operations() -> TestResult
 {
     let maximum = 256;
-    let semantic =
-        PackageSemanticLimits::default().with_projection_limits(MAX_MATERIALIZED_CELLS, maximum)?;
+    let semantic = litchi_numbers::SemanticLimits::DEFAULT
+        .to_builder()
+        .max_materialized_cells(MAX_MATERIALIZED_CELLS)
+        .and_then(|b| b.max_output_text_bytes(maximum))
+        .and_then(|b| b.build())?;
     let package = Package::from_bytes_with_options(
         &package_bytes(false, false, 0)?,
-        PackageReadOptions::new(Limits::default(), semantic),
+        litchi_numbers::OpenOptions::new().semantic_limits(semantic),
     )?;
 
     let exact = package
@@ -1124,10 +1131,14 @@ fn names_work_limit_rejects_before_reassembly_and_publication() -> TestResult {
     // 2,597 is the pre-selector-charge total for this fixed fixture; the
     // two selected component groups each add one decompressed metadata
     // payload bound to the caller-owned work total.
-    let semantic = PackageSemanticLimits::default().with_formula_render_limits(2_597, 1)?;
+    let semantic = litchi_numbers::SemanticLimits::DEFAULT
+        .to_builder()
+        .max_formula_render_work(2_597)
+        .and_then(|b| b.max_formula_render_depth(1))
+        .and_then(|b| b.build())?;
     let package = Package::from_bytes_with_options(
         &source,
-        PackageReadOptions::new(Limits::default(), semantic),
+        litchi_numbers::OpenOptions::new().semantic_limits(semantic),
     )?;
     let before = bytes(&package)?;
     let error = package
@@ -1440,7 +1451,7 @@ fn native_fixture_combined_rename_reopens_and_inverse_restores_exact_bytes() -> 
     assert_eq!(sheet_name(commit.package(), 0), "Líneas 你好 🧪");
     assert_eq!(table_name(commit.package(), 0, 0), "表 Café №42");
     assert!(matches!(
-        commit.package().document().sheets()[0].tables().next().unwrap().get_a1("B2")?,
+        commit.package().workbook_ref().sheets()[0].tables().next().unwrap().get_a1("B2")?,
         Some(Value::Text(value)) if value == "Litchi native Numbers fixture"
     ));
     assert_eq!(
@@ -1459,7 +1470,7 @@ fn native_fixture_combined_rename_reopens_and_inverse_restores_exact_bytes() -> 
 fn empty_sheet_name_changes_and_empty_batches_have_exact_noop_diagnostics() -> TestResult {
     let source = empty_first_sheet(&package_bytes(false, false, 1)?)?;
     let package = Package::from_bytes(&source)?;
-    assert_eq!(package.document().sheets()[0].table_count(), 0);
+    assert_eq!(package.workbook_ref().sheets()[0].table_count(), 0);
     let changed = package
         .edit_names()
         .rename_sheet("Alpha", "Empty")?

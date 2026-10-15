@@ -16,9 +16,7 @@ use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, 
 use litchi_iwa_protos::{tn, tsce, tsd, tsk, tsp, tst};
 use litchi_numbers::CellPosition;
 use litchi_numbers::cell::data_format::pop_up_menu::{InitialSelection, PopUpMenu};
-use litchi_numbers::{
-    Package, PackageReadOptions, PackageSemanticLimits, SheetSelector, TableSelector,
-};
+use litchi_numbers::{Package, SheetSelector, TableSelector};
 use litchi_numbers_wire::{BncCell, CellDataFormatKind};
 use prost::Message as _;
 
@@ -1741,17 +1739,23 @@ fn popup_missing_metadata_and_tight_ingress_fail_before_publication() -> TestRes
     );
     assert_eq!(package.exact_bytes(), before);
 
-    let tight = Limits::new(
-        u64::try_from(source.len().saturating_sub(1))?,
-        Limits::MAX_ENTRIES,
-        Limits::MAX_ENTRY_BYTES,
-        Limits::MAX_TOTAL_BYTES,
-        Limits::MAX_IWA_STREAM_BYTES,
-    )?;
+    let tight = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(source.len().saturating_sub(1))?)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
     assert!(
         Package::from_bytes_with_options(
             &source,
-            PackageReadOptions::new(tight, PackageSemanticLimits::default()),
+            litchi_numbers::OpenOptions::new()
+                .source_limits(tight)
+                .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
         )
         .is_err()
     );
@@ -1849,17 +1853,23 @@ fn popup_public_physical_and_semantic_limits_fail_before_publication() -> TestRe
 
     // Physical input/stream ceilings reject the source before a Package can
     // expose an editable snapshot.
-    let source_limits = Limits::new(
-        u64::try_from(source.len().saturating_sub(1))?,
-        Limits::MAX_ENTRIES,
-        Limits::MAX_ENTRY_BYTES,
-        Limits::MAX_TOTAL_BYTES,
-        Limits::MAX_IWA_STREAM_BYTES,
-    )?;
+    let source_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(source.len().saturating_sub(1))?)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
     assert!(
         Package::from_bytes_with_options(
             &source,
-            PackageReadOptions::new(source_limits, PackageSemanticLimits::default()),
+            litchi_numbers::OpenOptions::new()
+                .source_limits(source_limits)
+                .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
         )
         .is_err()
     );
@@ -1877,16 +1887,20 @@ fn popup_public_physical_and_semantic_limits_fail_before_publication() -> TestRe
         .commit()?;
     let target_bytes = target.package().exact_bytes();
     assert!(target_bytes.len() > source.len());
-    let exact_output_limits = Limits::new(
-        u64::try_from(target_bytes.len())?,
-        Limits::MAX_ENTRIES,
-        Limits::MAX_ENTRY_BYTES,
-        Limits::MAX_TOTAL_BYTES,
-        4 * 1024,
-    )?;
+    let exact_output_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(target_bytes.len())?)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| b.max_component_bytes(4 * 1024))
+        .and_then(|b| b.build())?;
     let exact_package = Package::from_bytes_with_options(
         &source,
-        PackageReadOptions::new(exact_output_limits, PackageSemanticLimits::default()),
+        litchi_numbers::OpenOptions::new()
+            .source_limits(exact_output_limits)
+            .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
     )?;
     let exact_commit = exact_package
         .edit_table_cell_pop_up_menu_format(
@@ -1898,16 +1912,20 @@ fn popup_public_physical_and_semantic_limits_fail_before_publication() -> TestRe
         .commit()?;
     assert_eq!(exact_commit.package().exact_bytes(), target_bytes);
 
-    let limited_output_limits = Limits::new(
-        u64::try_from(target_bytes.len().saturating_sub(1))?,
-        Limits::MAX_ENTRIES,
-        Limits::MAX_ENTRY_BYTES,
-        Limits::MAX_TOTAL_BYTES,
-        4 * 1024,
-    )?;
+    let limited_output_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(target_bytes.len().saturating_sub(1))?)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| b.max_component_bytes(4 * 1024))
+        .and_then(|b| b.build())?;
     let output_limited = Package::from_bytes_with_options(
         &source,
-        PackageReadOptions::new(limited_output_limits, PackageSemanticLimits::default()),
+        litchi_numbers::OpenOptions::new()
+            .source_limits(limited_output_limits)
+            .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
     )?;
     let before = output_limited.exact_bytes();
     let output_edit = output_limited.edit_table_cell_pop_up_menu_format(
@@ -1921,16 +1939,20 @@ fn popup_public_physical_and_semantic_limits_fail_before_publication() -> TestRe
     // A deliberately small native stream ceiling is independently typed by
     // the public archive options.  If ingress accepts it as an opaque source,
     // the changed transaction must still leave its exact snapshot untouched.
-    let stream_limits = Limits::new(
-        u64::try_from(source.len())?,
-        Limits::MAX_ENTRIES,
-        Limits::MAX_ENTRY_BYTES,
-        Limits::MAX_TOTAL_BYTES,
-        1,
-    )?;
+    let stream_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(source.len())?)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| b.max_component_bytes(1))
+        .and_then(|b| b.build())?;
     if let Ok(package) = Package::from_bytes_with_options(
         &source,
-        PackageReadOptions::new(stream_limits, PackageSemanticLimits::default()),
+        litchi_numbers::OpenOptions::new()
+            .source_limits(stream_limits)
+            .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
     ) {
         let before = package.exact_bytes();
         let edit = package.edit_table_cell_pop_up_menu_format(
@@ -1945,12 +1967,17 @@ fn popup_public_physical_and_semantic_limits_fail_before_publication() -> TestRe
     }
 
     // Public semantic object/reference ceilings are ingress-level controls;
-    // there are no public codec fields/work knobs on PackageReadOptions.
-    let semantic = PackageSemanticLimits::new(1, 1, 1, 1)?;
+    // there are no public codec fields/work knobs on litchi_numbers::OpenOptions.
+    let semantic = litchi_numbers::SemanticLimits::builder()
+        .max_objects(1)
+        .and_then(|b| b.max_sheets(1))
+        .and_then(|b| b.max_tables(1))
+        .and_then(|b| b.max_references(1))
+        .and_then(|b| b.build())?;
     assert!(
         Package::from_bytes_with_options(
             &source,
-            PackageReadOptions::new(Limits::default(), semantic),
+            litchi_numbers::OpenOptions::new().semantic_limits(semantic),
         )
         .is_err()
     );

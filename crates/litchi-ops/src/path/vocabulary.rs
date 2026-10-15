@@ -953,9 +953,15 @@ const _: () = assert!(well_formed(&MATH) && names_are_aliases(&MATH));
 pub(crate) static NUMBERS: Vocabulary = Vocabulary {
     family: Family::Workbook,
     root: "workbook",
-    aliases: &[("cell", "cell"), ("sheet", "sheet"), ("table", "table")],
+    aliases: &[
+        ("cell", "cell"),
+        ("mergecell", "mergeCell"),
+        ("sheet", "sheet"),
+        ("table", "table"),
+    ],
     elements: &[
         ElementRule::new("cell"),
+        ElementRule::new("mergeCell"),
         ElementRule::new("sheet").named(Named::First {
             child: "table",
             case: Caseless,
@@ -969,7 +975,7 @@ pub(crate) static NUMBERS: Vocabulary = Vocabulary {
             case: Caseless,
         }),
     ],
-    roots: "/<sheet name>, /sheet[N], /sheet[N]/table[N] (cells as /Sheet 1/Table 1/A1)",
+    roots: "/<sheet name>, /sheet[N], /sheet[N]/table[N] (cells as /Sheet 1/Table 1/A1; merged ranges as /sheet[N]/table[N]/mergeCell[N])",
     index: AliasIndex::EMPTY,
 }
 .indexed();

@@ -289,7 +289,7 @@ fn focused_cell_comment_from_path(
     row: usize,
     column: usize,
     path: FocusedCommentReadPath,
-) -> crate::Result<Option<litchi_numbers::TableCellComment>> {
+) -> crate::Result<Option<litchi_numbers::cell::comment::Comment>> {
     let (sheet, table) = selectors::focused_table_location(editor, table_id)?;
     let position = CellPosition::try_from_usize(row, column).map_err(|error| {
         Error::InvalidFormat(format!("invalid Numbers comment coordinate: {error}"))
@@ -318,7 +318,7 @@ fn focused_cell_comment(
     table_id: u64,
     row: usize,
     column: usize,
-) -> crate::Result<Option<litchi_numbers::TableCellComment>> {
+) -> crate::Result<Option<litchi_numbers::cell::comment::Comment>> {
     focused_cell_comment_from_path(editor, table_id, row, column, FocusedCommentReadPath::Exact)
 }
 
@@ -327,7 +327,7 @@ fn focused_compatibility_cell_comment(
     table_id: u64,
     row: usize,
     column: usize,
-) -> crate::Result<Option<litchi_numbers::TableCellComment>> {
+) -> crate::Result<Option<litchi_numbers::cell::comment::Comment>> {
     focused_cell_comment_from_path(
         editor,
         table_id,
@@ -343,7 +343,7 @@ fn focused_cell_comment_replies_from_path(
     row: usize,
     column: usize,
     path: FocusedCommentReadPath,
-) -> crate::Result<Box<[litchi_numbers::TableCellCommentReply]>> {
+) -> crate::Result<Box<[litchi_numbers::cell::comment::CommentReply]>> {
     let (sheet, table) = selectors::focused_table_location(editor, table_id)?;
     let position = CellPosition::try_from_usize(row, column).map_err(|error| {
         Error::InvalidFormat(format!("invalid Numbers comment coordinate: {error}"))
@@ -372,7 +372,7 @@ fn focused_compatibility_cell_comment_replies(
     table_id: u64,
     row: usize,
     column: usize,
-) -> crate::Result<Box<[litchi_numbers::TableCellCommentReply]>> {
+) -> crate::Result<Box<[litchi_numbers::cell::comment::CommentReply]>> {
     focused_cell_comment_replies_from_path(
         editor,
         table_id,

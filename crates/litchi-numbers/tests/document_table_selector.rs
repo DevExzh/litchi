@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use litchi_numbers::{Document, SheetSelector, TableSelector, cell::Value};
+use litchi_numbers::{SheetSelector, TableSelector, Workbook, cell::Value};
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
@@ -12,7 +12,7 @@ fn fixture_path() -> PathBuf {
 
 #[test]
 fn document_table_selects_fixture_by_names_and_positions() -> TestResult {
-    let document = Document::open(fixture_path())?;
+    let document = Workbook::open(fixture_path())?;
 
     let by_name = document
         .table(

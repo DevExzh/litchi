@@ -7,10 +7,10 @@ use litchi_iwa_protos::tsce::ast_node_array_archive::{AstNodeArchive, AstNodeTyp
 use litchi_iwa_protos::{tn, tsce, tsp, tst, tswp};
 use litchi_numbers::cell::Value;
 use litchi_numbers::{
-    DEFAULT_MAX_TEXT_BYTES, Dimensions, Document, DocumentLimits, DocumentReadError,
-    DocumentReadLimitKind, DocumentReadOptions, DocumentSourceLimits, DocumentStats,
-    MAX_MATERIALIZED_CELLS, MAX_SHEETS, MAX_TABLES, Package, PackageError, Position, SheetBuilder,
-    TableBuilder,
+    Dimensions, Error as PackageError, MAX_MATERIALIZED_CELLS, MAX_SHEETS, MAX_TABLES,
+    MAX_TEXT_BYTES, Package, Position, SheetBuilder, TableBuilder, Workbook,
+    workbook::ReadError as DocumentReadError, workbook::ReadLimitKind as DocumentReadLimitKind,
+    workbook::Stats as DocumentStats,
 };
 use litchi_numbers_wire::BncCell;
 use prost::Message as _;
@@ -78,21 +78,26 @@ fn copy_directory_fixture(target: &Path) -> TestResult {
     Ok(())
 }
 
-fn source_limits(max_input_bytes: u64) -> TestResult<DocumentSourceLimits> {
-    let defaults = DocumentSourceLimits::default();
-    Ok(DocumentSourceLimits::new(
-        max_input_bytes,
-        defaults.max_entries(),
-        defaults.max_entry_bytes(),
-        defaults.max_aggregate_bytes(),
-        defaults.max_component_bytes(),
-    )?)
+fn source_limits(max_input_bytes: u64) -> TestResult<litchi_numbers::SourceLimits> {
+    let defaults = litchi_numbers::SourceLimits::DEFAULT;
+    Ok(litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(max_input_bytes)
+        .and_then(|b| b.max_members(defaults.max_members()))
+        .and_then(|b| b.max_entry_bytes(defaults.max_entry_bytes()))
+        .and_then(|b| b.max_aggregate_bytes(defaults.max_aggregate_bytes()))
+        .and_then(|b| b.max_component_bytes(defaults.max_component_bytes()))
+        .and_then(|b| b.build())?)
 }
 
-fn options(source: DocumentSourceLimits, semantic: DocumentLimits) -> DocumentReadOptions {
-    let options = DocumentReadOptions::new(source, semantic);
-    assert_eq!(options.source(), source);
-    assert_eq!(options.semantic(), semantic);
+fn options(
+    source: litchi_numbers::SourceLimits,
+    semantic: litchi_numbers::SemanticLimits,
+) -> litchi_numbers::OpenOptions {
+    let options = litchi_numbers::OpenOptions::new()
+        .source_limits(source)
+        .semantic_limits(semantic);
+    assert_eq!(options.source_limits_value(), source);
+    assert_eq!(options.semantic_limits_value(), semantic);
     options
 }
 
@@ -159,7 +164,7 @@ fn duplicate_member_zip(first: &[u8], second: &[u8]) -> TestResult<Vec<u8>> {
 }
 
 fn assert_read_limit(
-    result: Result<Document, DocumentReadError>,
+    result: Result<Workbook, DocumentReadError>,
     kind: DocumentReadLimitKind,
     observed: u64,
     maximum: u64,
@@ -360,7 +365,7 @@ fn synthetic_formula_source() -> TestResult<Vec<u8>> {
     )?)
 }
 
-fn assert_native_semantics(document: &Document) -> TestResult {
+fn assert_native_semantics(document: &Workbook) -> TestResult {
     document.validate()?;
     assert_eq!(document.sheet_count(), 1);
     let sheet = document
@@ -397,7 +402,7 @@ fn assert_native_semantics(document: &Document) -> TestResult {
 }
 
 fn assert_native_metadata(
-    document: &Document,
+    document: &Workbook,
     expected_identifier: &str,
     expected_revision: &str,
 ) -> TestResult {
@@ -415,7 +420,7 @@ fn assert_native_metadata(
     Ok(())
 }
 
-fn semantic_document() -> TestResult<Document> {
+fn semantic_document() -> TestResult<Workbook> {
     let mut table = TableBuilder::new("Types", Dimensions::new(3, 3));
     for (position, value) in [
         (Position::new(0, 0), Value::Text("alpha".to_owned())),
@@ -435,24 +440,24 @@ fn semantic_document() -> TestResult<Document> {
     let table = table.finish()?;
     let mut sheet = SheetBuilder::new("Summary", 0);
     assert!(sheet.push_table(table).is_ok());
-    Ok(Document::from_sheets(vec![sheet.finish()])?)
+    Ok(Workbook::from_sheets(vec![sheet.finish()])?)
 }
 
 #[test]
 fn archive_free_document_has_path_byte_directory_and_package_parity() -> TestResult {
-    assert_send_sync::<Document>();
+    assert_send_sync::<Workbook>();
     assert_send_sync::<DocumentStats>();
-    assert_send_sync::<DocumentReadOptions>();
+    assert_send_sync::<litchi_numbers::OpenOptions>();
 
     let path = fixture("numbers/basic.numbers");
     let package = Package::open(&path)?;
-    let zipped = Document::open(&path)?;
-    let directory = Document::open(fixture("directory/numbers/basic.numbers"))?;
+    let zipped = Workbook::open(&path)?;
+    let directory = Workbook::open(fixture("directory/numbers/basic.numbers"))?;
     let bytes = std::fs::read(path)?;
-    let borrowed = Document::from_bytes(&bytes)?;
+    let borrowed = Workbook::from_bytes(&bytes)?;
     let shared_source: Arc<[u8]> = Arc::from(bytes);
     let weak_source = Arc::downgrade(&shared_source);
-    let shared = Document::from_shared_bytes(shared_source)?;
+    let shared = Workbook::from_shared_bytes(shared_source)?;
     assert!(weak_source.upgrade().is_none());
 
     for document in [&zipped, &directory, &borrowed, &shared] {
@@ -482,7 +487,7 @@ fn archive_free_document_has_path_byte_directory_and_package_parity() -> TestRes
         zipped.metadata().map(|value| value.identifier.as_deref())
     );
 
-    let semantic = package.document();
+    let semantic = package.workbook_ref();
     assert_eq!(semantic.sheets(), zipped.sheets());
     assert_eq!(semantic.plain_text()?, EXPECTED_TEXT);
     assert_eq!(semantic.text_len(), EXPECTED_TEXT.len());
@@ -512,8 +517,8 @@ fn foreign_iwork_families_are_typed_before_publication() {
         fixture("directory/keynote/basic.key"),
     ] {
         assert!(matches!(
-            Document::open(path),
-            Err(DocumentReadError::NotNumbers)
+            Workbook::open(path),
+            Err(DocumentReadError::UnexpectedFormat { .. })
         ));
     }
 }
@@ -533,13 +538,19 @@ fn frozen_directory_survives_source_deletion_and_source_limits_are_inclusive() -
     .try_fold(0_u64, |total, path| {
         Ok::<_, std::io::Error>(total.saturating_add(std::fs::metadata(path)?.len()))
     })?;
-    let document = Document::open_with_options(
+    let document = Workbook::open_with_options(
         &source,
-        options(source_limits(exact_input)?, DocumentLimits::default()),
+        options(
+            source_limits(exact_input)?,
+            litchi_numbers::SemanticLimits::DEFAULT,
+        ),
     )?;
-    let error = Document::open_with_options(
+    let error = Workbook::open_with_options(
         &source,
-        options(source_limits(exact_input - 1)?, DocumentLimits::default()),
+        options(
+            source_limits(exact_input - 1)?,
+            litchi_numbers::SemanticLimits::DEFAULT,
+        ),
     )
     .expect_err("source maximum-minus-one must refuse");
     assert!(matches!(
@@ -566,19 +577,22 @@ fn zip_input_limit_is_exact_across_path_borrowed_and_shared_sources() -> TestRes
     let path = fixture("numbers/basic.numbers");
     let bytes = std::fs::read(&path)?;
     let exact = u64::try_from(bytes.len())?;
-    let options_for = |maximum| -> TestResult<DocumentReadOptions> {
-        Ok(options(source_limits(maximum)?, DocumentLimits::default()))
+    let options_for = |maximum| -> TestResult<litchi_numbers::OpenOptions> {
+        Ok(options(
+            source_limits(maximum)?,
+            litchi_numbers::SemanticLimits::DEFAULT,
+        ))
     };
 
-    Document::open_with_options(&path, options_for(exact)?)?.validate()?;
-    Document::from_bytes_with_options(&bytes, options_for(exact)?)?.validate()?;
-    Document::from_shared_bytes_with_options(Arc::from(bytes.clone()), options_for(exact)?)?
+    Workbook::open_with_options(&path, options_for(exact)?)?.validate()?;
+    Workbook::from_bytes_with_options(&bytes, options_for(exact)?)?.validate()?;
+    Workbook::from_shared_bytes_with_options(Arc::from(bytes.clone()), options_for(exact)?)?
         .validate()?;
 
     for result in [
-        Document::open_with_options(&path, options_for(exact - 1)?),
-        Document::from_bytes_with_options(&bytes, options_for(exact - 1)?),
-        Document::from_shared_bytes_with_options(Arc::from(bytes.clone()), options_for(exact - 1)?),
+        Workbook::open_with_options(&path, options_for(exact - 1)?),
+        Workbook::from_bytes_with_options(&bytes, options_for(exact - 1)?),
+        Workbook::from_shared_bytes_with_options(Arc::from(bytes.clone()), options_for(exact - 1)?),
     ] {
         assert_read_limit(result, DocumentReadLimitKind::InputBytes, exact, exact - 1);
     }
@@ -604,8 +618,8 @@ fn rooted_formula_source_is_materialized_once_in_semantic_text() -> TestResult {
     let bytes = synthetic_formula_source()?;
     Package::from_bytes(&bytes)?;
     for document in [
-        Document::from_bytes(&bytes)?,
-        Document::from_shared_bytes(Arc::from(bytes.clone()))?,
+        Workbook::from_bytes(&bytes)?,
+        Workbook::from_shared_bytes(Arc::from(bytes.clone()))?,
     ] {
         document.validate()?;
         let table = document
@@ -645,7 +659,7 @@ fn missing_rooted_sheet_refuses_without_partial_publication() -> TestResult {
         ArchiveLimits::default(),
     )?;
     assert!(matches!(
-        Document::from_bytes(&bytes),
+        Workbook::from_bytes(&bytes),
         Err(DocumentReadError::InvalidFormat)
     ));
     Ok(())
@@ -655,55 +669,64 @@ fn missing_rooted_sheet_refuses_without_partial_publication() -> TestResult {
 #[test]
 fn focused_path_ingress_fails_closed_on_windows() {
     assert!(matches!(
-        Document::open(fixture("numbers/basic.numbers")),
+        Workbook::open(fixture("numbers/basic.numbers")),
         Err(DocumentReadError::InvalidSource)
     ));
 }
 
 #[test]
-fn semantic_limits_are_exact_and_zero_is_never_widened() -> TestResult {
+fn semantic_limits_are_exact_and_zero_is_refused_at_build() -> TestResult {
     let bytes = std::fs::read(fixture("numbers/basic.numbers"))?;
     let read = |limits| {
-        Document::from_bytes_with_options(&bytes, options(DocumentSourceLimits::default(), limits))
+        Workbook::from_bytes_with_options(
+            &bytes,
+            options(litchi_numbers::SourceLimits::DEFAULT, limits),
+        )
     };
 
-    let exact = DocumentLimits::new(1, 1, 2, EXPECTED_TEXT.len())?;
+    let exact = litchi_numbers::SemanticLimits::builder()
+        .max_sheets(1)
+        .and_then(|b| b.max_tables(1))
+        .and_then(|b| b.max_materialized_cells(2))
+        .and_then(|b| b.max_output_text_bytes(EXPECTED_TEXT.len()))
+        .and_then(|b| b.build())?;
     assert_eq!(read(exact)?.plain_text()?, EXPECTED_TEXT);
-    for (limits, kind, observed) in [
-        (
-            DocumentLimits::new(0, 1, 2, EXPECTED_TEXT.len())?,
-            DocumentReadLimitKind::Sheets,
-            1,
-        ),
-        (
-            DocumentLimits::new(1, 0, 2, EXPECTED_TEXT.len())?,
-            DocumentReadLimitKind::Tables,
-            1,
-        ),
-        (
-            DocumentLimits::new(1, 1, 0, EXPECTED_TEXT.len())?,
-            DocumentReadLimitKind::Cells,
-            2,
-        ),
-        (
-            DocumentLimits::new(1, 1, 2, 0)?,
-            DocumentReadLimitKind::TextBytes,
-            "Sheet 1".len(),
-        ),
-    ] {
-        let error = read(limits).expect_err("zero semantic ceiling must refuse the native source");
-        assert!(matches!(
-            error,
-            DocumentReadError::Limit {
-                kind: actual_kind,
-                observed: actual_observed,
-                maximum: 0,
-            } if actual_kind == kind && actual_observed == observed as u64
-        ));
-    }
+    // A zero ceiling is not a valid profile: the builder refuses it
+    // instead of silently admitting or widening it.
+    assert!(
+        litchi_numbers::SemanticLimits::builder()
+            .max_sheets(0)
+            .is_err()
+    );
+    assert!(
+        litchi_numbers::SemanticLimits::builder()
+            .max_tables(0)
+            .is_err()
+    );
+    let cells = read(
+        litchi_numbers::SemanticLimits::builder()
+            .max_materialized_cells(1)
+            .and_then(|b| b.build())?,
+    )
+    .expect_err("one materialized cell must refuse the two-cell source");
+    assert!(matches!(
+        cells,
+        DocumentReadError::Limit {
+            kind: DocumentReadLimitKind::Cells,
+            observed: 2,
+            maximum: 1,
+        }
+    ));
 
-    let text_error = read(DocumentLimits::new(1, 1, 2, EXPECTED_TEXT.len() - 1)?)
-        .expect_err("rendered text maximum-minus-one must refuse");
+    let text_error = read(
+        litchi_numbers::SemanticLimits::builder()
+            .max_sheets(1)
+            .and_then(|b| b.max_tables(1))
+            .and_then(|b| b.max_materialized_cells(2))
+            .and_then(|b| b.max_output_text_bytes(EXPECTED_TEXT.len() - 1))
+            .and_then(|b| b.build())?,
+    )
+    .expect_err("rendered text maximum-minus-one must refuse");
     assert!(matches!(
         text_error,
         DocumentReadError::Limit {
@@ -718,17 +741,62 @@ fn semantic_limits_are_exact_and_zero_is_never_widened() -> TestResult {
 
 #[test]
 fn checked_limit_constructors_reject_only_invalid_profiles() {
-    assert!(DocumentLimits::new(0, 0, 0, 0).is_ok());
-    assert!(DocumentLimits::new(MAX_SHEETS + 1, 0, 0, 0).is_err());
-    assert!(DocumentLimits::new(0, MAX_TABLES + 1, 0, 0).is_err());
-    assert!(DocumentLimits::new(0, 0, MAX_MATERIALIZED_CELLS + 1, 0).is_err());
-    assert!(DocumentLimits::new(0, 0, 0, DEFAULT_MAX_TEXT_BYTES + 1).is_err());
+    assert!(
+        litchi_numbers::SemanticLimits::builder()
+            .max_sheets(1)
+            .and_then(|b| b.max_tables(1))
+            .and_then(|b| b.max_materialized_cells(1))
+            .and_then(|b| b.max_output_text_bytes(1))
+            .and_then(|b| b.build())
+            .is_ok()
+    );
+    assert!(
+        litchi_numbers::SemanticLimits::builder()
+            .max_sheets(0)
+            .is_err()
+    );
+    assert!(
+        litchi_numbers::SemanticLimits::builder()
+            .max_sheets(MAX_SHEETS + 1)
+            .and_then(|b| b.max_tables(0))
+            .and_then(|b| b.max_materialized_cells(0))
+            .and_then(|b| b.max_output_text_bytes(0))
+            .and_then(|b| b.build())
+            .is_err()
+    );
+    assert!(
+        litchi_numbers::SemanticLimits::builder()
+            .max_sheets(0)
+            .and_then(|b| b.max_tables(MAX_TABLES + 1))
+            .and_then(|b| b.max_materialized_cells(0))
+            .and_then(|b| b.max_output_text_bytes(0))
+            .and_then(|b| b.build())
+            .is_err()
+    );
+    assert!(
+        litchi_numbers::SemanticLimits::builder()
+            .max_sheets(0)
+            .and_then(|b| b.max_tables(0))
+            .and_then(|b| b.max_materialized_cells(MAX_MATERIALIZED_CELLS + 1))
+            .and_then(|b| b.max_output_text_bytes(0))
+            .and_then(|b| b.build())
+            .is_err()
+    );
+    assert!(
+        litchi_numbers::SemanticLimits::builder()
+            .max_sheets(0)
+            .and_then(|b| b.max_tables(0))
+            .and_then(|b| b.max_materialized_cells(0))
+            .and_then(|b| b.max_output_text_bytes(MAX_TEXT_BYTES + 1))
+            .and_then(|b| b.build())
+            .is_err()
+    );
 
-    let defaults = DocumentSourceLimits::default();
+    let defaults = litchi_numbers::SourceLimits::DEFAULT;
     for values in [
         (
             0,
-            defaults.max_entries(),
+            defaults.max_members(),
             defaults.max_entry_bytes(),
             defaults.max_aggregate_bytes(),
             defaults.max_component_bytes(),
@@ -742,28 +810,35 @@ fn checked_limit_constructors_reject_only_invalid_profiles() {
         ),
         (
             defaults.max_input_bytes(),
-            defaults.max_entries(),
+            defaults.max_members(),
             0,
             defaults.max_aggregate_bytes(),
             defaults.max_component_bytes(),
         ),
         (
             defaults.max_input_bytes(),
-            defaults.max_entries(),
+            defaults.max_members(),
             defaults.max_entry_bytes(),
             0,
             defaults.max_component_bytes(),
         ),
         (
             defaults.max_input_bytes(),
-            defaults.max_entries(),
+            defaults.max_members(),
             defaults.max_entry_bytes(),
             defaults.max_aggregate_bytes(),
             0,
         ),
     ] {
         assert!(
-            DocumentSourceLimits::new(values.0, values.1, values.2, values.3, values.4).is_err()
+            litchi_numbers::SourceLimits::builder()
+                .max_input_bytes(values.0)
+                .and_then(|b| b.max_members(values.1))
+                .and_then(|b| b.max_entry_bytes(values.2))
+                .and_then(|b| b.max_aggregate_bytes(values.3))
+                .and_then(|b| b.max_component_bytes(values.4))
+                .and_then(|b| b.build())
+                .is_err()
         );
     }
 }
@@ -783,7 +858,7 @@ fn canonical_metadata_authorities_ignore_malformed_near_names() -> TestResult {
     ];
     entries.extend(catalog.iter().map(|entry| (entry.name(), entry.data())));
     let candidate = litchi_iwa_archive::package::to_bytes(entries, ArchiveLimits::default())?;
-    let document = Document::from_bytes(&candidate)?;
+    let document = Workbook::from_bytes(&candidate)?;
     assert_native_metadata(&document, ZIP_IDENTIFIER, ZIP_REVISION)?;
     assert_native_semantics(&document)?;
     Ok(())
@@ -795,9 +870,9 @@ fn metadata_event_depth_and_scalar_limits_are_exact() -> TestResult {
         let body = "<key>opaque</key><string>x</string>".repeat(count);
         xml_plist(&format!("<dict>{body}</dict>"))
     };
-    Document::from_bytes(&native_with_metadata(Some(&pairs(511)), None, None)?)?.validate()?;
+    Workbook::from_bytes(&native_with_metadata(Some(&pairs(511)), None, None)?)?.validate()?;
     assert_read_limit(
-        Document::from_bytes(&native_with_metadata(Some(&pairs(512)), None, None)?),
+        Workbook::from_bytes(&native_with_metadata(Some(&pairs(512)), None, None)?),
         DocumentReadLimitKind::PayloadFields,
         1_025,
         1_024,
@@ -810,9 +885,9 @@ fn metadata_event_depth_and_scalar_limits_are_exact() -> TestResult {
             "</array>".repeat(count)
         ))
     };
-    Document::from_bytes(&native_with_metadata(Some(&nested(15)), None, None)?)?.validate()?;
+    Workbook::from_bytes(&native_with_metadata(Some(&nested(15)), None, None)?)?.validate()?;
     assert_read_limit(
-        Document::from_bytes(&native_with_metadata(Some(&nested(16)), None, None)?),
+        Workbook::from_bytes(&native_with_metadata(Some(&nested(16)), None, None)?),
         DocumentReadLimitKind::PayloadNesting,
         17,
         16,
@@ -825,13 +900,13 @@ fn metadata_event_depth_and_scalar_limits_are_exact() -> TestResult {
         ))
     };
     let selected =
-        Document::from_bytes(&native_with_metadata(Some(&scalar(16 * 1024)), None, None)?)?;
+        Workbook::from_bytes(&native_with_metadata(Some(&scalar(16 * 1024)), None, None)?)?;
     assert_eq!(
         selected.metadata().and_then(|value| value.title.as_deref()),
         Some("x".repeat(16 * 1024).as_str())
     );
     assert_read_limit(
-        Document::from_bytes(&native_with_metadata(
+        Workbook::from_bytes(&native_with_metadata(
             Some(&scalar(16 * 1024 + 1)),
             None,
             None,
@@ -852,7 +927,7 @@ fn metadata_history_and_retained_limits_are_exact() -> TestResult {
         ))
     };
     let exact_history = history(128);
-    let document = Document::from_bytes(&native_with_metadata(None, Some(&exact_history), None)?)?;
+    let document = Workbook::from_bytes(&native_with_metadata(None, Some(&exact_history), None)?)?;
     assert_eq!(
         document
             .metadata()
@@ -860,7 +935,7 @@ fn metadata_history_and_retained_limits_are_exact() -> TestResult {
         Some("v")
     );
     assert_read_limit(
-        Document::from_bytes(&native_with_metadata(None, Some(&history(129)), None)?),
+        Workbook::from_bytes(&native_with_metadata(None, Some(&history(129)), None)?),
         DocumentReadLimitKind::PayloadFields,
         129,
         128,
@@ -872,7 +947,7 @@ fn metadata_history_and_retained_limits_are_exact() -> TestResult {
          <key>Author</key><string>{value}</string>\
          <key>Keywords</key><string>{value}</string></dict>"
     ));
-    let exact = Document::from_bytes(&native_with_metadata(
+    let exact = Workbook::from_bytes(&native_with_metadata(
         Some(&properties),
         None,
         Some(value.as_bytes()),
@@ -885,7 +960,7 @@ fn metadata_history_and_retained_limits_are_exact() -> TestResult {
     );
     let one_more = xml_plist("<array><string>v</string></array>");
     assert_read_limit(
-        Document::from_bytes(&native_with_metadata(
+        Workbook::from_bytes(&native_with_metadata(
             Some(&properties),
             Some(&one_more),
             Some(value.as_bytes()),
@@ -911,7 +986,7 @@ fn metadata_duplicate_keys_refuse_and_history_version_takes_precedence() -> Test
             (None, Some(data.as_slice()))
         };
         assert!(matches!(
-            Document::from_bytes(&native_with_metadata(properties, history, None)?),
+            Workbook::from_bytes(&native_with_metadata(properties, history, None)?),
             Err(DocumentReadError::InvalidFormat)
         ));
     }
@@ -921,7 +996,7 @@ fn metadata_duplicate_keys_refuse_and_history_version_takes_precedence() -> Test
         "<array><dict><key>Build</key><string>build</string>\
          <key>Version</key><string>version</string></dict></array>",
     );
-    let document = Document::from_bytes(&native_with_metadata(
+    let document = Workbook::from_bytes(&native_with_metadata(
         Some(&properties),
         Some(&history),
         None,
@@ -963,24 +1038,24 @@ fn canonical_metadata_hard_limit_is_exact_before_publication() -> TestResult {
         let path = temp.path().join("metadata-limit.numbers");
         std::fs::write(&path, &candidate)?;
         if should_pass {
-            Document::open(&path)?.validate()?;
-            Document::from_bytes(&candidate)?.validate()?;
-            Document::from_shared_bytes(Arc::from(candidate))?.validate()?;
+            Workbook::open(&path)?.validate()?;
+            Workbook::from_bytes(&candidate)?.validate()?;
+            Workbook::from_shared_bytes(Arc::from(candidate))?.validate()?;
         } else {
             assert_read_limit(
-                Document::open(&path),
+                Workbook::open(&path),
                 DocumentReadLimitKind::PayloadBytes,
                 length as u64,
                 MAX_SIDECAR_BYTES as u64,
             );
             assert_read_limit(
-                Document::from_bytes(&candidate),
+                Workbook::from_bytes(&candidate),
                 DocumentReadLimitKind::PayloadBytes,
                 length as u64,
                 MAX_SIDECAR_BYTES as u64,
             );
             assert_read_limit(
-                Document::from_shared_bytes(Arc::from(candidate)),
+                Workbook::from_shared_bytes(Arc::from(candidate)),
                 DocumentReadLimitKind::PayloadBytes,
                 length as u64,
                 MAX_SIDECAR_BYTES as u64,
@@ -994,18 +1069,18 @@ fn canonical_metadata_hard_limit_is_exact_before_publication() -> TestResult {
 fn public_read_errors_redact_paths_members_and_control_characters() -> TestResult {
     let temp = tempfile::tempdir()?;
     let path_sentinel = "private-numbers-path-998244353";
-    let path_error = Document::open(temp.path().join(path_sentinel))
+    let path_error = Workbook::open(temp.path().join(path_sentinel))
         .expect_err("missing sentinel path must fail");
     assert_content_free(&path_error, &[path_sentinel, "998244353"]);
 
     let member_sentinel = "private-member-sentinel-776655443";
     let duplicate = duplicate_member_zip(member_sentinel.as_bytes(), b"duplicate")?;
     let member_error =
-        Document::from_bytes(&duplicate).expect_err("duplicate malformed member must fail");
+        Workbook::from_bytes(&duplicate).expect_err("duplicate malformed member must fail");
     assert_content_free(&member_error, &[member_sentinel, "776655443"]);
 
     let control_sentinel = "private-control\r\n\u{1b}[31m-112233445";
-    let control_error = Document::from_bytes(control_sentinel.as_bytes())
+    let control_error = Workbook::from_bytes(control_sentinel.as_bytes())
         .expect_err("unrecognized control-character input must fail");
     assert_content_free(
         &control_error,

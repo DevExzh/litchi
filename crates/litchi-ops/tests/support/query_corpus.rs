@@ -325,6 +325,10 @@ pub(crate) const NUMBERS: &[&str] = &[
     "cell:contains(a)",
     "table > cell",
     "sheet[name~=Sheet]",
+    // Record 0297: merged ranges.
+    "mergeCell",
+    "table[mergeCount>0]",
+    "cell[mergeAnchor=true]",
 ];
 
 /// FNV-1a over two 64-bit lanes with different offsets.

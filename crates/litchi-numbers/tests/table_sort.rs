@@ -19,7 +19,7 @@ use litchi_iwa_common::wire::{
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tsp, tst};
 use litchi_numbers::{
-    Package, PackageLimits, PackageReadOptions, PackageSemanticLimits,
+    Package,
     table::{
         lock::State as LockState,
         sort::transaction::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path},
@@ -651,31 +651,37 @@ fn unknown_overlong_scalar_and_balanced_group_bytes_survive_set_and_clear() -> T
 fn public_limits_reject_input_and_reference_ingress_before_publication() -> TestResult {
     let fixture = std::fs::read(fixture_path())?;
     let source = without_sort(&fixture)?;
-    let too_small_input = PackageLimits::new(
-        source.len().saturating_sub(1) as u64,
-        PackageLimits::MAX_ENTRIES,
-        PackageLimits::MAX_ENTRY_BYTES,
-        PackageLimits::MAX_TOTAL_BYTES,
-        PackageLimits::MAX_IWA_STREAM_BYTES,
-    )?;
+    let too_small_input = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(source.len().saturating_sub(1) as u64)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
     assert!(
         Package::from_bytes_with_options(
             &source,
-            PackageReadOptions::new(too_small_input, PackageSemanticLimits::default()),
+            litchi_numbers::OpenOptions::new()
+                .source_limits(too_small_input)
+                .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
         )
         .is_err()
     );
 
-    let too_few_references = PackageSemanticLimits::new(
-        PackageSemanticLimits::MAX_OBJECTS,
-        PackageSemanticLimits::MAX_SHEETS,
-        PackageSemanticLimits::MAX_TABLES,
-        1,
-    )?;
+    let too_few_references = litchi_numbers::SemanticLimits::builder()
+        .max_objects(litchi_numbers::SemanticLimits::MAXIMUM.max_objects())
+        .and_then(|b| b.max_sheets(litchi_numbers::SemanticLimits::MAXIMUM.max_sheets()))
+        .and_then(|b| b.max_tables(litchi_numbers::SemanticLimits::MAXIMUM.max_tables()))
+        .and_then(|b| b.max_references(1))
+        .and_then(|b| b.build())?;
     assert!(
         Package::from_bytes_with_options(
             &source,
-            PackageReadOptions::new(PackageLimits::default(), too_few_references),
+            litchi_numbers::OpenOptions::new().semantic_limits(too_few_references),
         )
         .is_err()
     );

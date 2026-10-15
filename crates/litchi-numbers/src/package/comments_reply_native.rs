@@ -18,6 +18,7 @@ use std::{
     mem::size_of,
 };
 
+use crate::cell::comment::transaction::Path as CommentReplyPath;
 use litchi_iwa_common::wire::{
     append_length_delimited_field, append_varint_field, patch_length_delimited_field,
     patch_varint_field,
@@ -33,7 +34,6 @@ use litchi_iwa_protos::{
 use litchi_numbers_wire::BncCell;
 
 use super::{
-    comments::CommentReplyPath,
     table_cell_pop_up_menu::{Path as BudgetPath, TransactionBudget},
     table_cell_pop_up_menu_native as popup_native,
 };

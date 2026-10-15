@@ -3,8 +3,8 @@
 use std::{fs, io::Read, path::PathBuf};
 
 use litchi_numbers::{
-    CellPosition, Package, SheetSelector, TableCellComment, TableSelector, cell::Value,
-    table::cells::Storage,
+    CellPosition, Package, SheetSelector, TableSelector, cell::Value,
+    cell::comment::Comment as TableCellComment, table::cells::Storage,
 };
 
 const SOURCE: &[u8] = include_bytes!("fixtures/comment-edit-root.numbers");

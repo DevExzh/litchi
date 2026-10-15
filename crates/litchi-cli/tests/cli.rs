@@ -390,7 +390,7 @@ fn exit_statuses_follow_the_code_families() {
     let text = dir.path().join("plain.txt");
     std::fs::write(&text, "hello").expect("write");
     expect(5, ["get", arg(&text)]);
-    expect(5, ["create", arg(&dir.path().join("x.numbers"))]);
+    expect(5, ["create", arg(&dir.path().join("x.key"))]);
     // 6: I/O.
     expect(6, ["get", arg(&dir.path().join("missing.docx"))]);
     expect(6, ["create", arg(&copy)]);
@@ -463,6 +463,8 @@ fn create_writes_every_creatable_format_and_refuses_overwrite() {
     for format in [
         "docx", "xlsx", "pptx", "xlsb", "doc", "xls", "ppt", "rtf", "ods", "odt", "odp", "oth",
         "odm", "odg", "odc", "odi", "odb", "odf",
+        // Record 0297: Numbers builds a blank workbook.
+        "numbers",
     ] {
         let path = scratch(dir.path(), &format!("blank.{format}"), None);
         let file = litchi_ops::open(&path).expect("reopen in process");
@@ -1003,8 +1005,32 @@ fn iwork_writes_save_in_place() {
     let query = expect(0, ["query", arg(&numbers), "cell", "--json"]).json();
     assert!(query.to_string().contains("CLI cell"), "{query}");
 
-    // Pages creates its minimal document (record 0299); Numbers creation is
-    // a typed gap until its leaf can build a package.
+    // Record 0297: a created workbook takes renames, values and merges.
+    let blank = scratch(dir.path(), "blank.numbers", None);
+    let file = arg(&blank);
+    expect(0, ["set", file, "/sheet[1]", "--prop", "name=Budget"]);
+    expect(
+        0,
+        ["set", file, "/sheet[1]/table[1]/A1", "--prop", "value=2"],
+    );
+    expect(
+        0,
+        [
+            "add",
+            file,
+            "/sheet[1]/table[1]",
+            "--type",
+            "mergeCell",
+            "--prop",
+            "ref=A2:B3",
+        ],
+    );
+    let sheet = expect(0, ["get", file, "/sheet[1]", "--json"]).json();
+    assert!(sheet.to_string().contains("Budget"), "{sheet}");
+    let merges = expect(0, ["query", file, "mergeCell", "--json"]).json();
+    assert!(merges.to_string().contains("A2:B3"), "{merges}");
+
+    // Pages creates its minimal document (record 0299).
     let blank = dir.path().join("blank.pages");
     expect(0, ["create", arg(&blank)]);
     expect(
@@ -1018,12 +1044,6 @@ fn iwork_writes_save_in_place() {
         ],
     );
     assert_eq!(text_of(&blank, "/body/p[1]"), "Created by the CLI");
-    let run = expect(5, ["create", arg(&dir.path().join("blank.numbers"))]);
-    assert!(
-        run.stderr.contains("unsupported_capability"),
-        "{}",
-        run.stderr
-    );
 }
 
 const ITEMS: &str = r#"[

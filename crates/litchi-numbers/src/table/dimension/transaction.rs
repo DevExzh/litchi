@@ -74,7 +74,7 @@ impl fmt::Display for LimitKind {
 /// A content-redacted row or column size transaction failure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum TransactionError {
+pub enum Error {
     /// No rooted sheet matched the selector.
     #[error("the Numbers workbook has no sheet matching the requested selector")]
     SheetNotFound,
@@ -187,7 +187,7 @@ impl Edit<'_> {
     /// # Errors
     ///
     /// Returns a typed selector, source, lock, resource, or verification error.
-    pub fn commit(self) -> Result<Commit, TransactionError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         crate::package::table_dimension::commit(self)
     }
 }

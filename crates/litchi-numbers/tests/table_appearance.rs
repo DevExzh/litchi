@@ -12,10 +12,7 @@ use litchi_iwa_archive::{Limits, package::Catalog};
 use litchi_iwa_common::wire::{WireView, append_length_delimited_field, append_varint_field};
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, FieldType, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tn, tsd, tsp, tss, tst};
-use litchi_numbers::{
-    Appearance, Banding, GridlineVisibility, Gridlines, Package, PackageLimits, PackageReadOptions,
-    PackageSemanticLimits, RowSizing,
-};
+use litchi_numbers::{Appearance, Banding, GridlineVisibility, Gridlines, Package, RowSizing};
 use prost::Message as _;
 
 use litchi_numbers::table::appearance::transaction::{Error, Path};
@@ -1663,17 +1660,23 @@ fn old_style_metadata_ownership_and_aliases_fail_closed() -> TestResult {
 #[test]
 fn tight_ingress_limit_rejects_before_package_publication() -> TestResult {
     let source = synthetic_package()?;
-    let archive_limits = PackageLimits::new(
-        u64::try_from(source.len().saturating_sub(1))?,
-        PackageLimits::MAX_ENTRIES,
-        PackageLimits::MAX_ENTRY_BYTES,
-        PackageLimits::MAX_TOTAL_BYTES,
-        PackageLimits::MAX_IWA_STREAM_BYTES,
-    )?;
+    let archive_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(source.len().saturating_sub(1))?)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
     assert!(
         Package::from_bytes_with_options(
             &source,
-            PackageReadOptions::new(archive_limits, PackageSemanticLimits::default()),
+            litchi_numbers::OpenOptions::new()
+                .source_limits(archive_limits)
+                .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
         )
         .is_err()
     );
@@ -1684,16 +1687,20 @@ fn tight_ingress_limit_rejects_before_package_publication() -> TestResult {
 fn tight_candidate_output_limit_rejects_before_publication() -> TestResult {
     let source = synthetic_package()?;
     let source_limit = u64::try_from(source.len())?;
-    let archive_limits = PackageLimits::new(
-        source_limit,
-        PackageLimits::MAX_ENTRIES,
-        PackageLimits::MAX_ENTRY_BYTES,
-        source_limit,
-        PackageLimits::MAX_IWA_STREAM_BYTES,
-    )?;
+    let archive_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(source_limit)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| b.max_aggregate_bytes(source_limit))
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
     let package = Package::from_bytes_with_options(
         &source,
-        PackageReadOptions::new(archive_limits, PackageSemanticLimits::default()),
+        litchi_numbers::OpenOptions::new()
+            .source_limits(archive_limits)
+            .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
     )?;
     let before = package.exact_bytes();
     assert!(

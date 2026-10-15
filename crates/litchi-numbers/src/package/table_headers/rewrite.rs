@@ -227,7 +227,7 @@ pub(super) fn rewrite(
         )
         .map_err(map_archive_error)?;
     drop(compressed);
-    let candidate = Package::from_shared_bytes_with_options(output.into(), source.state.options)
+    let candidate = Package::from_shared_profile(output.into(), source.state.options)
         .map_err(map_candidate_read_error)?;
     let selected = resolve_target(&candidate, target.sheet_position, target.table_position)?;
     if selected.settings != after {

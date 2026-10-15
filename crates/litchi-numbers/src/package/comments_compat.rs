@@ -24,11 +24,11 @@ use litchi_iwa_core::{LimitKind as CoreLimitKind, RawMessage};
 use litchi_iwa_protos::table_info_codec;
 
 use super::super::{
-    Components, Document, DocumentLimits, Error as PackageError, Index, Package, ReadOptions,
-    SemanticLimitKind, State, table_headers, validate_numbers_application,
+    Components, Error as PackageError, Index, Package, Profile, SemanticLimitKind, State,
+    table_headers, validate_numbers_application,
 };
 use super::{Comment, CommentReply, Error, Path, Target};
-use crate::{SheetSelector, TableSelector, table::CellPosition};
+use crate::{OpenOptions, SheetSelector, TableSelector, table::CellPosition};
 
 const SHEET_MESSAGE_TYPE: u32 = 2;
 const FORM_BASED_SHEET_MESSAGE_TYPE: u32 = 3;
@@ -50,7 +50,7 @@ impl Package {
     ) -> Result<Option<Comment>> {
         Self::__table_cell_comment_from_bytes_for_compatibility_with_options(
             bytes,
-            ReadOptions::default(),
+            OpenOptions::new(),
             sheet,
             table,
             position,
@@ -62,11 +62,12 @@ impl Package {
     #[doc(hidden)]
     pub fn __table_cell_comment_from_bytes_for_compatibility_with_options<'sheet, 'table>(
         bytes: &[u8],
-        options: ReadOptions,
+        options: OpenOptions,
         sheet: impl Into<SheetSelector<'sheet>>,
         table: impl Into<TableSelector<'table>>,
         position: CellPosition,
     ) -> Result<Option<Comment>> {
+        let options = Profile::from_options(options).map_err(map_package_error)?;
         let source = compatibility_package(bytes, options)?;
         let located = resolve_compatibility_comment(&source, sheet.into(), table.into(), position)?;
         Ok(located.comment)
@@ -82,7 +83,7 @@ impl Package {
     ) -> Result<Box<[CommentReply]>> {
         Self::__table_cell_comment_replies_from_bytes_for_compatibility_with_options(
             bytes,
-            ReadOptions::default(),
+            OpenOptions::new(),
             sheet,
             table,
             position,
@@ -97,11 +98,12 @@ impl Package {
         'table,
     >(
         bytes: &[u8],
-        options: ReadOptions,
+        options: OpenOptions,
         sheet: impl Into<SheetSelector<'sheet>>,
         table: impl Into<TableSelector<'table>>,
         position: CellPosition,
     ) -> Result<Box<[CommentReply]>> {
+        let options = Profile::from_options(options).map_err(map_package_error)?;
         let source = compatibility_package(bytes, options)?;
         let located = resolve_compatibility_comment(&source, sheet.into(), table.into(), position)?;
         source.read_comment_replies_compatibility(located)
@@ -114,7 +116,7 @@ impl Package {
 /// does not materialize any sheet, table, row, or cell projection.  The empty
 /// document is an implementation detail that lets the existing native
 /// comment decoder share the package-owned source and bounds.
-fn compatibility_package(bytes: &[u8], options: ReadOptions) -> Result<Package> {
+fn compatibility_package(bytes: &[u8], options: Profile) -> Result<Package> {
     let components = Components::from_bytes(bytes, options.archive()).map_err(map_package_error)?;
     validate_numbers_application(&components, options.archive()).map_err(map_package_error)?;
     let index = Index::from_components(&components, options.semantic().max_objects())
@@ -123,8 +125,9 @@ fn compatibility_package(bytes: &[u8], options: ReadOptions) -> Result<Package> 
         .physical()
         .ok_or(Error::UnsupportedSource)?
         .__source_owner();
-    let document = Document::from_sheets_with_limits(Vec::new(), DocumentLimits::default())
-        .map_err(|_| invalid_source())?;
+    let document =
+        crate::Workbook::from_sheets_with_limits(Vec::new(), crate::SemanticLimits::DEFAULT)
+            .map_err(|_| invalid_source())?;
     Ok(Package {
         state: Arc::new(State {
             source,
@@ -174,11 +177,13 @@ fn resolve_sheet_position(source: &Package, selector: SheetSelector<'_>) -> Resu
     let root = Package::root_sheet_order(&source.state.components, source.state.options.semantic())
         .map_err(map_package_error)?;
     match selector {
-        SheetSelector::Index(index) => root
-            .sheet_references()
-            .get(index)
-            .map(|_| index)
-            .ok_or(Error::SheetNotFound),
+        SheetSelector::Position(index) => {
+            let index = index.get();
+            root.sheet_references()
+                .get(index)
+                .map(|_| index)
+                .ok_or(Error::SheetNotFound)
+        },
         SheetSelector::Name(name) => {
             let mut found = None;
             for (index, reference) in root.sheet_references().iter().enumerate() {
@@ -199,7 +204,8 @@ fn resolve_table_position(
     table_count: usize,
 ) -> Result<usize> {
     match selector {
-        TableSelector::Index(index) => {
+        TableSelector::Position(index) => {
+            let index = index.get();
             if index >= table_count {
                 return Err(Error::TableNotFound);
             }
@@ -657,7 +663,7 @@ const fn map_semantic_limit_kind(kind: SemanticLimitKind) -> super::LimitKind {
     match kind {
         SemanticLimitKind::OutputTextBytes
         | SemanticLimitKind::TextBytes
-        | SemanticLimitKind::FormulaWireBytes => super::LimitKind::TextBytes,
+        | SemanticLimitKind::FormulaCategoryBytes => super::LimitKind::TextBytes,
         SemanticLimitKind::References
         | SemanticLimitKind::Objects
         | SemanticLimitKind::Sheets

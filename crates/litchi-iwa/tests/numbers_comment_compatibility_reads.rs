@@ -8,11 +8,7 @@
 
 use std::{env, fs, io, path::Path};
 
-use litchi_iwa_archive::Limits as ArchiveLimits;
-use litchi_numbers::{
-    CellPosition, Package, PackageReadOptions, PackageSemanticLimits, SheetSelector,
-    TableCellCommentError, TableCellCommentLimitKind, TableCellCommentPath, TableSelector,
-};
+use litchi_numbers::{CellPosition, Package, SheetSelector, TableSelector};
 
 #[path = "../../litchi-numbers/tests/support/numbers_comment_fixture.rs"]
 mod fixture;
@@ -22,6 +18,9 @@ use fixture::{
     source_built_comment_fixture_with_metadata_payload,
     source_built_comment_fixture_with_table_style, source_built_comment_fixture_without_metadata,
 };
+use litchi_numbers::cell::comment::Error as TableCellCommentError;
+use litchi_numbers::cell::comment::LimitKind as TableCellCommentLimitKind;
+use litchi_numbers::cell::comment::Path as TableCellCommentPath;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
@@ -34,7 +33,7 @@ fn compatibility_root(
     sheet: impl Into<SheetSelector<'static>>,
     table: impl Into<TableSelector<'static>>,
     position: CellPosition,
-) -> Result<Option<litchi_numbers::TableCellComment>, TableCellCommentError> {
+) -> Result<Option<litchi_numbers::cell::comment::Comment>, TableCellCommentError> {
     Package::__table_cell_comment_from_bytes_for_compatibility(source, sheet, table, position)
 }
 
@@ -43,7 +42,7 @@ fn compatibility_replies(
     sheet: impl Into<SheetSelector<'static>>,
     table: impl Into<TableSelector<'static>>,
     position: CellPosition,
-) -> Result<Box<[litchi_numbers::TableCellCommentReply]>, TableCellCommentError> {
+) -> Result<Box<[litchi_numbers::cell::comment::CommentReply]>, TableCellCommentError> {
     Package::__table_cell_comment_replies_from_bytes_for_compatibility(
         source, sheet, table, position,
     )
@@ -200,13 +199,13 @@ fn legacy_comment_compatibility_selectors_and_bounds_are_typed() -> TestResult {
 
     // A caller-selected one-table ceiling still admits the inclusive table
     // zero position, while a later position remains a typed miss.
-    let one_table = PackageSemanticLimits::new(
-        PackageSemanticLimits::MAX_OBJECTS,
-        PackageSemanticLimits::MAX_SHEETS,
-        1,
-        PackageSemanticLimits::MAX_REFERENCES,
-    )?;
-    let options = PackageReadOptions::new(ArchiveLimits::default(), one_table);
+    let one_table = litchi_numbers::SemanticLimits::builder()
+        .max_objects(litchi_numbers::SemanticLimits::MAXIMUM.max_objects())
+        .and_then(|b| b.max_sheets(litchi_numbers::SemanticLimits::MAXIMUM.max_sheets()))
+        .and_then(|b| b.max_tables(1))
+        .and_then(|b| b.max_references(litchi_numbers::SemanticLimits::MAXIMUM.max_references()))
+        .and_then(|b| b.build())?;
+    let options = litchi_numbers::OpenOptions::new().semantic_limits(one_table);
     assert!(
         Package::__table_cell_comment_from_bytes_for_compatibility_with_options(
             &source,
@@ -287,13 +286,13 @@ fn duplicate_table_names_are_rejected_after_full_scan_and_limits_are_not_truncat
         Err(TableCellCommentError::InvalidSource { .. })
     ));
 
-    let one_table = PackageSemanticLimits::new(
-        PackageSemanticLimits::MAX_OBJECTS,
-        PackageSemanticLimits::MAX_SHEETS,
-        1,
-        PackageSemanticLimits::MAX_REFERENCES,
-    )?;
-    let options = PackageReadOptions::new(ArchiveLimits::default(), one_table);
+    let one_table = litchi_numbers::SemanticLimits::builder()
+        .max_objects(litchi_numbers::SemanticLimits::MAXIMUM.max_objects())
+        .and_then(|b| b.max_sheets(litchi_numbers::SemanticLimits::MAXIMUM.max_sheets()))
+        .and_then(|b| b.max_tables(1))
+        .and_then(|b| b.max_references(litchi_numbers::SemanticLimits::MAXIMUM.max_references()))
+        .and_then(|b| b.build())?;
+    let options = litchi_numbers::OpenOptions::new().semantic_limits(one_table);
     for table in [TableSelector::index(0), TableSelector::name(LEGACY_TABLE)] {
         assert!(matches!(
             Package::__table_cell_comment_from_bytes_for_compatibility_with_options(
@@ -428,19 +427,14 @@ fn assert_legacy_semantics_without_metadata(source: &[u8]) -> TestResult {
     Ok(())
 }
 
-fn options_with_archive_input_limit(input_limit: usize) -> TestResult<PackageReadOptions> {
+fn options_with_archive_input_limit(input_limit: usize) -> TestResult<litchi_numbers::OpenOptions> {
     let input_limit = u64::try_from(input_limit)?;
-    let archive = ArchiveLimits::new(
-        input_limit,
-        ArchiveLimits::MAX_ENTRIES,
-        ArchiveLimits::MAX_ENTRY_BYTES,
-        ArchiveLimits::MAX_TOTAL_BYTES,
-        ArchiveLimits::MAX_IWA_STREAM_BYTES,
-    )?;
-    Ok(PackageReadOptions::new(
-        archive,
-        PackageSemanticLimits::default(),
-    ))
+    let archive = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(input_limit)?
+        .build()?;
+    Ok(litchi_numbers::OpenOptions::new()
+        .source_limits(archive)
+        .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT))
 }
 
 #[test]
@@ -479,13 +473,13 @@ fn legacy_comment_compatibility_honors_archive_object_reference_and_text_limits(
         .is_some()
     );
 
-    let objects_limited = PackageSemanticLimits::new(
-        1,
-        PackageSemanticLimits::MAX_SHEETS,
-        PackageSemanticLimits::MAX_TABLES,
-        PackageSemanticLimits::MAX_REFERENCES,
-    )?;
-    let object_options = PackageReadOptions::new(ArchiveLimits::default(), objects_limited);
+    let objects_limited = litchi_numbers::SemanticLimits::builder()
+        .max_objects(1)
+        .and_then(|b| b.max_sheets(litchi_numbers::SemanticLimits::MAXIMUM.max_sheets()))
+        .and_then(|b| b.max_tables(litchi_numbers::SemanticLimits::MAXIMUM.max_tables()))
+        .and_then(|b| b.max_references(litchi_numbers::SemanticLimits::MAXIMUM.max_references()))
+        .and_then(|b| b.build())?;
+    let object_options = litchi_numbers::OpenOptions::new().semantic_limits(objects_limited);
     let object_result = Package::__table_cell_comment_from_bytes_for_compatibility_with_options(
         &source,
         object_options,
@@ -503,13 +497,13 @@ fn legacy_comment_compatibility_honors_archive_object_reference_and_text_limits(
         })
     ));
 
-    let references_limited = PackageSemanticLimits::new(
-        PackageSemanticLimits::MAX_OBJECTS,
-        PackageSemanticLimits::MAX_SHEETS,
-        PackageSemanticLimits::MAX_TABLES,
-        1,
-    )?;
-    let reference_options = PackageReadOptions::new(ArchiveLimits::default(), references_limited);
+    let references_limited = litchi_numbers::SemanticLimits::builder()
+        .max_objects(litchi_numbers::SemanticLimits::MAXIMUM.max_objects())
+        .and_then(|b| b.max_sheets(litchi_numbers::SemanticLimits::MAXIMUM.max_sheets()))
+        .and_then(|b| b.max_tables(litchi_numbers::SemanticLimits::MAXIMUM.max_tables()))
+        .and_then(|b| b.max_references(1))
+        .and_then(|b| b.build())?;
+    let reference_options = litchi_numbers::OpenOptions::new().semantic_limits(references_limited);
     let reference_result =
         Package::__table_cell_comment_replies_from_bytes_for_compatibility_with_options(
             &source,
@@ -533,8 +527,12 @@ fn legacy_comment_compatibility_honors_archive_object_reference_and_text_limits(
         })
     ));
 
-    let text_limited = PackageSemanticLimits::default().with_projection_limits(1, 4)?;
-    let text_options = PackageReadOptions::new(ArchiveLimits::default(), text_limited);
+    let text_limited = litchi_numbers::SemanticLimits::DEFAULT
+        .to_builder()
+        .max_materialized_cells(1)
+        .and_then(|b| b.max_output_text_bytes(4))
+        .and_then(|b| b.build())?;
+    let text_options = litchi_numbers::OpenOptions::new().semantic_limits(text_limited);
     let text_result = Package::__table_cell_comment_from_bytes_for_compatibility_with_options(
         &source,
         text_options,
@@ -608,13 +606,13 @@ fn native_one_table_ceiling_admits_comment_and_empty_replies() -> TestResult {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/iwork/numbers/comment-reader-native-created.numbers"
     ));
-    let semantic = PackageSemanticLimits::new(
-        PackageSemanticLimits::MAX_OBJECTS,
-        PackageSemanticLimits::MAX_SHEETS,
-        1,
-        PackageSemanticLimits::MAX_REFERENCES,
-    )?;
-    let options = PackageReadOptions::new(ArchiveLimits::default(), semantic);
+    let semantic = litchi_numbers::SemanticLimits::builder()
+        .max_objects(litchi_numbers::SemanticLimits::MAXIMUM.max_objects())
+        .and_then(|b| b.max_sheets(litchi_numbers::SemanticLimits::MAXIMUM.max_sheets()))
+        .and_then(|b| b.max_tables(1))
+        .and_then(|b| b.max_references(litchi_numbers::SemanticLimits::MAXIMUM.max_references()))
+        .and_then(|b| b.build())?;
+    let options = litchi_numbers::OpenOptions::new().semantic_limits(semantic);
     let position = CellPosition::new(1, 1);
 
     // The strict package path and the compatibility selector-first path must

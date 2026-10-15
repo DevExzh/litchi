@@ -53,11 +53,8 @@ mod comments_create;
 #[path = "comments_read.rs"]
 mod comments_read;
 #[path = "comments_reply.rs"]
-mod comments_reply;
-pub use comments_reply::{
-    CommentReplyCommit, CommentReplyDiagnostics, CommentReplyEdit, CommentReplyError,
-    CommentReplyIndex, CommentReplyLimitKind, CommentReplyPatch, CommentReplyPath,
-};
+pub(crate) mod comments_reply;
+pub use comments_reply::CommentReplyIndex;
 
 const TILE_MESSAGE_TYPE: u32 = 6_002;
 const TABLE_DATA_LIST_MESSAGE_TYPES: [u32; 2] = [6_005, 6_201];
@@ -216,11 +213,7 @@ impl Comment {
     /// copied with a fallible reservation, so oversized or allocation-failed
     /// values are rejected without publishing a partial comment value.
     pub fn try_new(text: impl AsRef<str>) -> Result<Self, Error> {
-        Self::try_from_text(
-            text.as_ref(),
-            super::SemanticLimits::MAX_OUTPUT_TEXT_BYTES,
-            Path::Package,
-        )
+        Self::try_from_text(text.as_ref(), crate::MAX_TEXT_BYTES, Path::Package)
     }
 
     /// Borrow the comment text.
@@ -1427,7 +1420,10 @@ fn resolve_comment<'sheet, 'table>(
         });
     }
     let table_position = match table.into() {
-        TableSelector::Index(index) => selected_sheet.tables().nth(index).map(|_| index),
+        TableSelector::Position(index) => {
+            let index = index.get();
+            selected_sheet.tables().nth(index).map(|_| index)
+        },
         TableSelector::Name(name) => {
             let mut matches = selected_sheet
                 .tables()
@@ -2600,9 +2596,8 @@ fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
             .map_err(|_| Error::InvalidSource {
                 path: edit.target.path,
             })?;
-        let package =
-            Package::from_shared_bytes_with_options(output.into(), edit.source.state.options)
-                .map_err(|_| Error::Verification)?;
+        let package = Package::from_shared_profile(output.into(), edit.source.state.options)
+            .map_err(|_| Error::Verification)?;
         let position = cell_position_for_path(edit.target.path)?;
         if package
             .table_cell_comment(
@@ -2773,7 +2768,7 @@ fn rewrite_existing(
         .map_err(|_| Error::InvalidSource {
             path: located.target.path,
         })?;
-    let package = Package::from_shared_bytes_with_options(output.into(), source.state.options)
+    let package = Package::from_shared_profile(output.into(), source.state.options)
         .map_err(|_| Error::Verification)?;
     Ok((package, Arc::clone(cell), touched, deleted.len()))
 }

@@ -15,7 +15,7 @@
 //!
 //! `TableDataExtractor`, `Components`, and `Index` are implementation details
 //! of [`crate::Package`]. Applications should parse a native package through
-//! [`crate::Package`] and consume its archive-free [`crate::Document`] result;
+//! [`crate::Package`] and consume its archive-free [`crate::Workbook`] result;
 //! this decoder is intentionally not part of the public API.
 
 use super::Components;
@@ -26,7 +26,7 @@ use super::{
     table_info_decode_options,
 };
 use super::{Index, Resolved};
-use crate::DEFAULT_MAX_TEXT_BYTES;
+use crate::MAX_TEXT_BYTES;
 use crate::cell::FiniteF64;
 use crate::cell::Value as CellValue;
 use litchi_iwa_common::comment::{AuthorId, Comment, StorageId, Uuid};
@@ -80,7 +80,7 @@ const MAX_ADDRESSABLE_CELLS: usize = 1 << 24;
 const MAX_TABLE_MATERIALIZED_CELLS: usize = 1 << 20;
 const MAX_FORMULA_CATEGORY_DEPTH: usize = 64;
 const MAX_FORMULA_WORK: usize = crate::MAX_REFERENCES;
-const MAX_FORMULA_WIRE_BYTES: usize = DEFAULT_MAX_TEXT_BYTES;
+const MAX_FORMULA_WIRE_BYTES: usize = MAX_TEXT_BYTES;
 const MAX_PAYLOAD_WORK: usize = WireLimits::MAX_REWRITE_WORK;
 
 /// Formula bytes retained by the table sidecar.
@@ -169,7 +169,7 @@ fn map_formula_envelope_wire_error(error: litchi_iwa_common::Error) -> Error {
             observed,
             limit,
         } => Error::SemanticLimit {
-            kind: SemanticLimitKind::FormulaWireBytes,
+            kind: SemanticLimitKind::FormulaCategoryBytes,
             observed,
             maximum: limit,
             path: SemanticPath::StructuredTables,
@@ -322,7 +322,7 @@ fn map_table_cell_decode_limit_with_offsets(
     use numbers_table_cell_storage_codec::DecodeLimit;
     let (kind, observed, maximum) = match limit {
         DecodeLimit::Bytes { observed, maximum } => {
-            (SemanticLimitKind::FormulaWireBytes, observed, maximum)
+            (SemanticLimitKind::FormulaCategoryBytes, observed, maximum)
         },
         DecodeLimit::References { observed, maximum } => (
             SemanticLimitKind::References,
@@ -382,7 +382,7 @@ fn map_comment_storage_codec_error(
     use comment_storage_codec::DecodeLimit;
     let (kind, observed, maximum) = match limit {
         DecodeLimit::Bytes { observed, maximum } => {
-            (SemanticLimitKind::FormulaWireBytes, observed, maximum)
+            (SemanticLimitKind::FormulaCategoryBytes, observed, maximum)
         },
         DecodeLimit::References { observed, maximum } => (
             SemanticLimitKind::References,
@@ -558,7 +558,7 @@ impl ProjectionBudget {
     }
 
     const fn remaining_staging_text_bytes(&self) -> usize {
-        DEFAULT_MAX_TEXT_BYTES.saturating_sub(self.staging_text_bytes)
+        MAX_TEXT_BYTES.saturating_sub(self.staging_text_bytes)
     }
 
     const fn remaining_formula_wire_bytes(&self) -> usize {
@@ -569,7 +569,7 @@ impl ProjectionBudget {
         self.staging_text_bytes = projection_charge(
             self.staging_text_bytes,
             amount,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
             SemanticLimitKind::TextBytes,
         )?;
         Ok(())
@@ -580,7 +580,7 @@ impl ProjectionBudget {
             self.formula_wire_bytes,
             amount,
             MAX_FORMULA_WIRE_BYTES,
-            SemanticLimitKind::FormulaWireBytes,
+            SemanticLimitKind::FormulaCategoryBytes,
         )?;
         Ok(())
     }
@@ -4008,7 +4008,7 @@ fn map_rich_text_rewrite_error(error: litchi_iwa_text_wire::RewriteError) -> Err
             } else if resource.contains("work") {
                 SemanticLimitKind::FormulaWork
             } else {
-                SemanticLimitKind::FormulaWireBytes
+                SemanticLimitKind::FormulaCategoryBytes
             },
             observed,
             maximum: limit,
@@ -4122,14 +4122,14 @@ impl FormulaReferenceBudget {
         self.charge_work(bytes)?;
         self.wire_bytes = self.wire_bytes.checked_add(bytes).ok_or_else(|| {
             formula_semantic_limit(
-                SemanticLimitKind::FormulaWireBytes,
+                SemanticLimitKind::FormulaCategoryBytes,
                 usize::MAX,
                 self.maximum_wire_bytes,
             )
         })?;
         if self.wire_bytes > self.maximum_wire_bytes {
             return Err(formula_semantic_limit(
-                SemanticLimitKind::FormulaWireBytes,
+                SemanticLimitKind::FormulaCategoryBytes,
                 self.wire_bytes,
                 self.maximum_wire_bytes,
             ));
@@ -5348,7 +5348,7 @@ fn map_formula_render_decode_error(error: numbers_formula_codec::DecodeError) ->
     use numbers_formula_codec::DecodeLimit;
     match error.resource_limit() {
         Some(DecodeLimit::Bytes { observed, maximum }) => Error::SemanticLimit {
-            kind: SemanticLimitKind::FormulaWireBytes,
+            kind: SemanticLimitKind::FormulaCategoryBytes,
             observed,
             maximum,
             path: SemanticPath::StructuredTables,
@@ -6546,11 +6546,9 @@ mod tests {
     use crate::cell::Value as CellValue;
     use crate::cell::wire::{BncCell, decimal128_le};
     use crate::package::{
-        Components, Index, ReadOptions, SemanticPath, compatibility_tables_from_bytes_with_options,
+        Components, Index, SemanticPath, compatibility_tables_from_bytes_with_options,
     };
-    use crate::{
-        DEFAULT_MAX_TEXT_BYTES, Package, PackageSemanticLimits as SemanticLimits, SemanticLimitKind,
-    };
+    use crate::{MAX_TEXT_BYTES, OpenOptions, Package, SemanticLimitKind, SemanticLimits};
     use litchi_iwa_archive::Limits;
     use litchi_iwa_common::comment::{Comment, StorageId};
     use litchi_iwa_common::wire::{append_length_delimited_field, append_varint_field};
@@ -7015,7 +7013,7 @@ mod tests {
     ) -> super::Result<T> {
         let bytes = compatibility_package(objects)?;
         let components = Components::from_bytes(&bytes, Limits::default())?;
-        let index = Index::from_components(&components, SemanticLimits::MAX_OBJECTS)?;
+        let index = Index::from_components(&components, crate::MAX_OBJECTS)?;
         let extractor = TableDataExtractor::new(&components, &index, SemanticLimits::default());
         if document_projection {
             visit(&extractor.without_comments())
@@ -7232,8 +7230,7 @@ mod tests {
         ])
         .expect("compatibility package");
         let components = Components::from_bytes(&bytes, Limits::default()).expect("components");
-        let index =
-            Index::from_components(&components, SemanticLimits::MAX_OBJECTS).expect("object index");
+        let index = Index::from_components(&components, crate::MAX_OBJECTS).expect("object index");
         let extractor = TableDataExtractor::new(&components, &index, SemanticLimits::default());
 
         let tables = extractor
@@ -7302,8 +7299,7 @@ mod tests {
         ])
         .expect("compatibility package");
         let components = Components::from_bytes(&bytes, Limits::default()).expect("components");
-        let index =
-            Index::from_components(&components, SemanticLimits::MAX_OBJECTS).expect("object index");
+        let index = Index::from_components(&components, crate::MAX_OBJECTS).expect("object index");
         let extractor = TableDataExtractor::new(&components, &index, SemanticLimits::default());
         let before = *extractor.projection_budget.borrow();
 
@@ -7352,8 +7348,7 @@ mod tests {
         ])
         .expect("compatibility package");
         let components = Components::from_bytes(&bytes, Limits::default()).expect("components");
-        let index =
-            Index::from_components(&components, SemanticLimits::MAX_OBJECTS).expect("object index");
+        let index = Index::from_components(&components, crate::MAX_OBJECTS).expect("object index");
         let extractor = TableDataExtractor::new(&components, &index, SemanticLimits::default());
 
         let error = extractor
@@ -7582,11 +7577,14 @@ mod tests {
             )?,
         ])?;
         let semantic = SemanticLimits::default()
-            .with_projection_limits(SemanticLimits::MAX_MATERIALIZED_CELLS, 1)
+            .to_builder()
+            .max_materialized_cells(SemanticLimits::MAXIMUM.max_materialized_cells())
+            .and_then(|b| b.max_output_text_bytes(1))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let result = compatibility_tables_from_bytes_with_options(
             &bytes,
-            ReadOptions::new(Limits::default(), semantic),
+            OpenOptions::new().semantic_limits(semantic),
         );
         let error = result
             .err()
@@ -7818,7 +7816,10 @@ mod tests {
         let mut table = Table::with_dimensions("comments", 1, 2)?;
         let mut cell_budget = CellBudget::new();
         let limits = SemanticLimits::default()
-            .with_projection_limits(3, 8)
+            .to_builder()
+            .max_materialized_cells(3)
+            .and_then(|b| b.max_output_text_bytes(8))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let mut projection_budget = ProjectionBudget::new(limits);
 
@@ -7924,7 +7925,10 @@ mod tests {
         let mut table = Table::with_dimensions("comments", 1, 2)?;
         let mut cell_budget = CellBudget::new();
         let limits = SemanticLimits::default()
-            .with_projection_limits(16, 5)
+            .to_builder()
+            .max_materialized_cells(16)
+            .and_then(|b| b.max_output_text_bytes(5))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let mut projection_budget = ProjectionBudget::new(limits);
         let error = TableDataExtractor::parse_tile_row(
@@ -8088,7 +8092,10 @@ mod tests {
             2,
         );
         let limits = SemanticLimits::default()
-            .with_projection_limits(1, SemanticLimits::MAX_OUTPUT_TEXT_BYTES)
+            .to_builder()
+            .max_materialized_cells(1)
+            .and_then(|b| b.max_output_text_bytes(SemanticLimits::MAXIMUM.max_output_text_bytes()))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let (decode_result, table, mut budget, semantic_error, materialized_cells) =
             run_tile_visitor(&source, 1, limits)?;
@@ -8311,9 +8318,15 @@ mod tests {
         ]);
 
         let exact_limits = SemanticLimits::default()
-            .with_formula_render_limits(3, 64)
+            .to_builder()
+            .max_formula_render_work(3)
+            .and_then(|b| b.max_formula_render_depth(64))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?
-            .with_projection_limits(crate::MAX_MATERIALIZED_CELLS, 6)
+            .to_builder()
+            .max_materialized_cells(crate::MAX_MATERIALIZED_CELLS)
+            .and_then(|b| b.max_output_text_bytes(6))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let mut exact = ProjectionBudget::new(exact_limits);
         assert_eq!(
@@ -8322,7 +8335,10 @@ mod tests {
         );
 
         let tight_work = SemanticLimits::default()
-            .with_formula_render_limits(2, 64)
+            .to_builder()
+            .max_formula_render_work(2)
+            .and_then(|b| b.max_formula_render_depth(64))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let mut work_budget = ProjectionBudget::new(tight_work);
         assert!(matches!(
@@ -8336,7 +8352,10 @@ mod tests {
         ));
 
         let tight_text = SemanticLimits::default()
-            .with_projection_limits(crate::MAX_MATERIALIZED_CELLS, 5)
+            .to_builder()
+            .max_materialized_cells(crate::MAX_MATERIALIZED_CELLS)
+            .and_then(|b| b.max_output_text_bytes(5))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let mut text_budget = ProjectionBudget::new(tight_text);
         assert!(matches!(
@@ -8364,7 +8383,10 @@ mod tests {
             ..Default::default()
         };
         let depth_limits = SemanticLimits::default()
-            .with_formula_render_limits(4, 3)
+            .to_builder()
+            .max_formula_render_work(4)
+            .and_then(|b| b.max_formula_render_depth(3))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let mut depth_budget = ProjectionBudget::new(depth_limits);
         assert!(matches!(
@@ -8382,7 +8404,10 @@ mod tests {
     #[test]
     fn projection_budget_is_package_aggregate() -> super::Result<()> {
         let limits = SemanticLimits::default()
-            .with_projection_limits(3, 5)
+            .to_builder()
+            .max_materialized_cells(3)
+            .and_then(|b| b.max_output_text_bytes(5))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let mut budget = ProjectionBudget::new(limits);
         budget.charge_materialized_cells(2)?;
@@ -8414,13 +8439,13 @@ mod tests {
     fn rooted_table_call_graph_enforces_one_cumulative_reference_budget() -> super::Result<()> {
         fn extract(max_references: usize) -> super::Result<usize> {
             let package = Package::open(native_fixture())?;
-            let limits = SemanticLimits::new(
-                SemanticLimits::MAX_OBJECTS,
-                SemanticLimits::MAX_SHEETS,
-                SemanticLimits::MAX_TABLES,
-                max_references,
-            )
-            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+            let limits = SemanticLimits::builder()
+                .max_objects(crate::MAX_OBJECTS)
+                .and_then(|b| b.max_sheets(SemanticLimits::MAXIMUM.max_sheets()))
+                .and_then(|b| b.max_tables(SemanticLimits::MAXIMUM.max_tables()))
+                .and_then(|b| b.max_references(max_references))
+                .and_then(|b| b.build())
+                .map_err(|error| Error::InvalidFormat(error.to_string()))?;
             let extractor =
                 TableDataExtractor::new(&package.state.components, &package.state.index, limits)
                     .without_comments();
@@ -8447,7 +8472,7 @@ mod tests {
             Ok(extractor.projection_budget.borrow().references)
         }
 
-        let exact = extract(SemanticLimits::MAX_REFERENCES)?;
+        let exact = extract(SemanticLimits::MAXIMUM.max_references())?;
         assert!(
             exact > 3,
             "table/list/rich/tile projection must charge references"
@@ -8547,11 +8572,11 @@ mod tests {
                 |extractor| {
                     let mut budget = ProjectionBudget::new(SemanticLimits::default());
                     budget.references = budget.max_references;
-                    budget.staging_text_bytes = DEFAULT_MAX_TEXT_BYTES;
+                    budget.staging_text_bytes = MAX_TEXT_BYTES;
                     let table = load_string_list_with_budget(extractor, 90, &mut budget)?;
                     assert!(table.is_empty());
                     assert_eq!(budget.references, budget.max_references);
-                    assert_eq!(budget.staging_text_bytes, DEFAULT_MAX_TEXT_BYTES);
+                    assert_eq!(budget.staging_text_bytes, MAX_TEXT_BYTES);
                     assert!(budget.payload_work > 0);
                     Ok(())
                 },
@@ -8701,7 +8726,7 @@ mod tests {
             crate::MAX_REFERENCES,
             source_len * 4,
             source_len,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
         );
         exact.charge_table_info_payload(source_len)?;
         assert_eq!(exact.wire_bytes, source_len);
@@ -8711,7 +8736,7 @@ mod tests {
             crate::MAX_REFERENCES,
             source_len * 4 - 1,
             source_len,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
         );
         assert!(matches!(
             one_short.charge_table_info_payload(source_len),
@@ -8809,7 +8834,7 @@ mod tests {
         )?;
         let bytes = compatibility_package(vec![model_one, model_two])?;
         let components = Components::from_bytes(&bytes, Limits::default())?;
-        let index = Index::from_components(&components, SemanticLimits::MAX_OBJECTS)?;
+        let index = Index::from_components(&components, crate::MAX_OBJECTS)?;
         let table_info = |model_id| RawMessage {
             type_: 6_000,
             data: tst::TableInfoArchive {
@@ -8828,7 +8853,7 @@ mod tests {
                 crate::MAX_REFERENCES,
                 MAX_FORMULA_WORK,
                 MAX_FORMULA_WIRE_BYTES,
-                DEFAULT_MAX_TEXT_BYTES,
+                MAX_TEXT_BYTES,
             );
             assert!(matches!(
                 formula_table_name(&components, &index, &messages, &mut budget),
@@ -8846,7 +8871,7 @@ mod tests {
             crate::MAX_REFERENCES,
             MAX_FORMULA_WORK,
             MAX_FORMULA_WIRE_BYTES,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
         );
         let name = formula_table_name(
             &components,
@@ -8859,7 +8884,7 @@ mod tests {
             crate::MAX_REFERENCES,
             MAX_FORMULA_WORK,
             MAX_FORMULA_WIRE_BYTES,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
         );
         let name = formula_table_name(&components, &index, &[valid, malformed], &mut budget)?;
         assert_eq!(name.as_deref(), Some("one"));
@@ -8876,7 +8901,7 @@ mod tests {
             crate::MAX_REFERENCES,
             MAX_FORMULA_WORK,
             MAX_FORMULA_WIRE_BYTES,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
         );
         failed_map.charge_wire_bytes(5)?;
         failed_map.charge_text(11)?;
@@ -9353,7 +9378,10 @@ mod tests {
         let source = input.encode_to_vec();
 
         let exact_limits = SemanticLimits::default()
-            .with_formula_render_limits(2, 2)
+            .to_builder()
+            .max_formula_render_work(2)
+            .and_then(|b| b.max_formula_render_depth(2))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let mut exact_budget = ProjectionBudget::new(exact_limits);
         let exact_raw = FormulaArchiveBytes::from_wire(&source, &mut exact_budget)?;
@@ -9369,7 +9397,10 @@ mod tests {
         assert_eq!(actual, "=1");
 
         let tight_limits = SemanticLimits::default()
-            .with_formula_render_limits(2, 1)
+            .to_builder()
+            .max_formula_render_work(2)
+            .and_then(|b| b.max_formula_render_depth(1))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let mut tight_budget = ProjectionBudget::new(tight_limits);
         let tight_raw = FormulaArchiveBytes::from_wire(&source, &mut tight_budget)?;
@@ -9465,7 +9496,10 @@ mod tests {
         assert_eq!(probe.scalar_visitor_node_count, 2);
 
         let exact_limits = SemanticLimits::default()
-            .with_formula_render_limits(2, 64)
+            .to_builder()
+            .max_formula_render_work(2)
+            .and_then(|b| b.max_formula_render_depth(64))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let mut exact_budget = ProjectionBudget::new(exact_limits);
         let exact_raw = FormulaArchiveBytes::from_wire(&source, &mut exact_budget)?;
@@ -9484,7 +9518,10 @@ mod tests {
         assert_eq!(exact_budget.formula_render_work, 2);
 
         let tight_limits = SemanticLimits::default()
-            .with_formula_render_limits(1, 64)
+            .to_builder()
+            .max_formula_render_work(1)
+            .and_then(|b| b.max_formula_render_depth(64))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let mut tight_budget = ProjectionBudget::new(tight_limits);
         let tight_raw = FormulaArchiveBytes::from_wire(&source, &mut tight_budget)?;
@@ -9542,7 +9579,10 @@ mod tests {
         assert_eq!(probe.lazy_traversal_entry_count, 3);
 
         let exact_limits = SemanticLimits::default()
-            .with_formula_render_limits(4, 64)
+            .to_builder()
+            .max_formula_render_work(4)
+            .and_then(|b| b.max_formula_render_depth(64))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let mut exact_budget = ProjectionBudget::new(exact_limits);
         let exact_raw = FormulaArchiveBytes::from_wire(&source, &mut exact_budget)?;
@@ -9559,7 +9599,7 @@ mod tests {
                 MAX_PAYLOAD_WORK,
                 render_depth,
                 exact_raw.scalar_visitor_node_count,
-                DEFAULT_MAX_TEXT_BYTES,
+                MAX_TEXT_BYTES,
             )
             .with_opaque_unknown_fields(true)
             .with_render_recursion_limit(render_depth),
@@ -9832,7 +9872,10 @@ mod tests {
         let input = formula(vec![number_node(1.0), number_node(2.0)]);
         let source = input.encode_to_vec();
         let limits = SemanticLimits::default()
-            .with_formula_render_limits(1, 64)
+            .to_builder()
+            .max_formula_render_work(1)
+            .and_then(|b| b.max_formula_render_depth(64))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let mut budget = ProjectionBudget::new(limits);
         let raw = FormulaArchiveBytes::from_wire(&source, &mut budget)?;
@@ -10227,7 +10270,7 @@ mod tests {
         assert!(matches!(
             error,
             Error::SemanticLimit {
-                kind: SemanticLimitKind::FormulaWireBytes,
+                kind: SemanticLimitKind::FormulaCategoryBytes,
                 observed,
                 maximum,
                 ..
@@ -10300,7 +10343,7 @@ mod tests {
             )?,
         ])?;
         let components = Components::from_bytes(&bytes, Limits::default())?;
-        let index = Index::from_components(&components, SemanticLimits::MAX_OBJECTS)?;
+        let index = Index::from_components(&components, crate::MAX_OBJECTS)?;
         let extractor = TableDataExtractor::new(&components, &index, SemanticLimits::default());
         let model = tst::TableModelArchive {
             table_name: "wire".to_owned(),
@@ -10328,7 +10371,7 @@ mod tests {
         assert!(matches!(
             error,
             Error::SemanticLimit {
-                kind: SemanticLimitKind::FormulaWireBytes,
+                kind: SemanticLimitKind::FormulaCategoryBytes,
                 observed: 2,
                 maximum: 0,
                 path: SemanticPath::StructuredTables,
@@ -10496,7 +10539,7 @@ mod tests {
             )?,
         ])?;
         let components = Components::from_bytes(&bytes, Limits::default())?;
-        let index = Index::from_components(&components, SemanticLimits::MAX_OBJECTS)?;
+        let index = Index::from_components(&components, crate::MAX_OBJECTS)?;
         let extractor = TableDataExtractor::new(&components, &index, SemanticLimits::default())
             .without_comments();
 
@@ -10543,9 +10586,15 @@ mod tests {
     #[test]
     fn rejected_attempt_rolls_back_retained_values_but_not_formula_work() -> super::Result<()> {
         let limits = SemanticLimits::default()
-            .with_projection_limits(3, 5)
+            .to_builder()
+            .max_materialized_cells(3)
+            .and_then(|b| b.max_output_text_bytes(5))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?
-            .with_formula_render_limits(2, 1)
+            .to_builder()
+            .max_formula_render_work(2)
+            .and_then(|b| b.max_formula_render_depth(1))
+            .and_then(|b| b.build())
             .map_err(|error| Error::InvalidFormat(error.to_string()))?;
         let mut published = ProjectionBudget::new(limits);
         published.charge_materialized_cells(1)?;
@@ -10589,7 +10638,7 @@ mod tests {
             crate::MAX_REFERENCES,
             MAX_FORMULA_WORK,
             MAX_FORMULA_WIRE_BYTES,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
         );
         let depth_result =
             collect_formula_category_payload(&deep_wire, &mut depth_names, &mut depth_budget);
@@ -10624,7 +10673,7 @@ mod tests {
             1,
             MAX_FORMULA_WORK,
             MAX_FORMULA_WIRE_BYTES,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
         );
         assert!(matches!(
             collect_formula_category_payload(
@@ -10649,7 +10698,7 @@ mod tests {
             1,
             MAX_FORMULA_WORK,
             MAX_FORMULA_WIRE_BYTES,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
         );
         collect_formula_category_payload(
             &empty_fanout.encode_to_vec(),
@@ -10667,7 +10716,7 @@ mod tests {
             crate::MAX_REFERENCES,
             MAX_FORMULA_WORK,
             MAX_FORMULA_WIRE_BYTES,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
         );
         full_work_budget.work_items = MAX_FORMULA_WORK - 1;
         assert!(matches!(
@@ -10694,7 +10743,7 @@ mod tests {
             crate::MAX_REFERENCES,
             MAX_FORMULA_WORK,
             MAX_FORMULA_WIRE_BYTES,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
         );
         nested_work_budget.work_items = MAX_FORMULA_WORK - 5;
         assert!(matches!(
@@ -10723,7 +10772,7 @@ mod tests {
             crate::MAX_REFERENCES,
             MAX_FORMULA_WORK,
             MAX_FORMULA_WIRE_BYTES,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
         );
         collect_formula_category_payload(
             &malformed_projection,
@@ -10756,7 +10805,7 @@ mod tests {
             1,
             MAX_FORMULA_WORK,
             MAX_FORMULA_WIRE_BYTES,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
         );
         collect_formula_category_payload(
             &duplicate.encode_to_vec(),
@@ -10794,7 +10843,7 @@ mod tests {
             crate::MAX_REFERENCES,
             1,
             MAX_FORMULA_WIRE_BYTES,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
         );
         collect_formula_category_payload(&[], &mut names, &mut exact_budget)
             .expect("the exact formula-work boundary must be admitted");
@@ -10830,7 +10879,7 @@ mod tests {
             crate::MAX_REFERENCES,
             4,
             MAX_FORMULA_WIRE_BYTES,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
         );
         let error = collect_formula_category_payload(&one_group, &mut names, &mut rejected_budget)
             .expect_err("the category preflight must cross its exact work boundary");
@@ -10868,7 +10917,7 @@ mod tests {
             crate::MAX_REFERENCES,
             MAX_FORMULA_WORK,
             MAX_FORMULA_WIRE_BYTES,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
         );
         let expected_nodes = preflight_formula_category_payload(&exact_source, &mut exact_budget)
             .expect("the exact category-depth boundary must be admitted");
@@ -10885,7 +10934,7 @@ mod tests {
             crate::MAX_REFERENCES,
             MAX_FORMULA_WORK,
             MAX_FORMULA_WIRE_BYTES,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
         );
         let error =
             collect_formula_category_payload(&over_source, &mut over_names, &mut over_budget)
@@ -10916,14 +10965,14 @@ mod tests {
             crate::MAX_REFERENCES,
             MAX_FORMULA_WORK,
             MAX_FORMULA_WIRE_BYTES,
-            DEFAULT_MAX_TEXT_BYTES,
+            MAX_TEXT_BYTES,
         );
         budget.wire_bytes = MAX_FORMULA_WIRE_BYTES;
 
         assert!(matches!(
             collect_formula_category_payload(&[0x08], &mut names, &mut budget),
             Err(Error::SemanticLimit {
-                kind: SemanticLimitKind::FormulaWireBytes,
+                kind: SemanticLimitKind::FormulaCategoryBytes,
                 observed,
                 maximum: MAX_FORMULA_WIRE_BYTES,
                 path: SemanticPath::StructuredTables,
@@ -11032,9 +11081,9 @@ mod tests {
         assert!(!expected.is_empty());
 
         let mut text_budget = ProjectionBudget::new(SemanticLimits::default());
-        text_budget.staging_text_bytes = DEFAULT_MAX_TEXT_BYTES - text;
+        text_budget.staging_text_bytes = MAX_TEXT_BYTES - text;
         assert_eq!(render(&mut text_budget)?, expected);
-        assert_eq!(text_budget.staging_text_bytes, DEFAULT_MAX_TEXT_BYTES);
+        assert_eq!(text_budget.staging_text_bytes, MAX_TEXT_BYTES);
         let text_before_refusal = text_budget;
         let text_error = render(&mut text_budget).expect_err("text residual must fail");
         assert!(matches!(

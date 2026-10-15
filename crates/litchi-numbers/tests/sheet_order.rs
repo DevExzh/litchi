@@ -47,3 +47,35 @@ fn native_single_sheet_noop_and_typed_staging_errors_are_exact() -> TestResult<(
     assert_send_sync::<LimitKind>();
     Ok(())
 }
+
+/// Record 0297: a package without previews (here, stripped by an earlier
+/// changed move) still reorders, and the inverse restores it exactly.
+#[test]
+fn a_package_without_previews_still_reorders() -> Result<(), Box<dyn std::error::Error>> {
+    let source = std::fs::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../test-data/iwork/numbers/table-relocation-native.numbers"
+    ))?;
+    let package = Package::from_bytes(&source)?;
+    let first = package
+        .edit_sheet_order()
+        .move_sheet(litchi_numbers::SheetSelector::index(1), 0)?
+        .commit()?;
+    let stripped = first.package();
+    assert_eq!(stripped.sheets()[0].name(), "Sheet 2");
+    let second = stripped
+        .edit_sheet_order()
+        .move_sheet(litchi_numbers::SheetSelector::index(1), 0)?
+        .commit()?;
+    assert_eq!(second.package().sheets()[0].name(), "Sheet 1");
+    assert_eq!(second.diagnostics().deleted_previews(), 0);
+    let restored = second
+        .package()
+        .apply_sheet_order(&second.patch().inverse())?;
+    let mut expected = Vec::new();
+    stripped.write_to(&mut expected)?;
+    let mut actual = Vec::new();
+    restored.package().write_to(&mut actual)?;
+    assert_eq!(actual, expected);
+    Ok(())
+}

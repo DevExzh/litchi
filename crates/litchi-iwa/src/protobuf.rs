@@ -523,7 +523,7 @@ fn table_data_list_codec_decode_options(
             .clamp(1, WireLimits::MAX_REWRITE_WORK),
         TABLE_DATA_LIST_CODEC_RECURSION_LIMIT,
         data.len().clamp(1, litchi_numbers::MAX_REFERENCES),
-        data.len().clamp(1, litchi_numbers::DEFAULT_MAX_TEXT_BYTES),
+        data.len().clamp(1, litchi_numbers::MAX_TEXT_BYTES),
     )
 }
 

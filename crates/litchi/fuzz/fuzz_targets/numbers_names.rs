@@ -6,7 +6,7 @@ use std::sync::OnceLock;
 
 use libfuzzer_sys::fuzz_target;
 use litchi::numbers::{
-    Package, PackageLimits, PackageReadOptions, PackageSemanticLimits, SheetSelector,
+    Package, SheetSelector,
     TableSelector,
     sheet::order::{Commit as SheetOrderCommit, Error as SheetOrderError},
     table::title::{Error as TitleError, Path as TitlePath, Settings as TitleSettings},
@@ -48,27 +48,21 @@ fuzz_target!(|data: &[u8]| {
     exercise_input_limit();
 });
 
-fn fuzz_options() -> PackageReadOptions {
-    static OPTIONS: OnceLock<PackageReadOptions> = OnceLock::new();
+fn fuzz_options() -> litchi::numbers::OpenOptions {
+    static OPTIONS: OnceLock<litchi::numbers::OpenOptions> = OnceLock::new();
     *OPTIONS.get_or_init(|| {
-        let archive = PackageLimits::new(
-            MAX_INPUT_BYTES,
-            MAX_ENTRIES,
-            MAX_ENTRY_BYTES,
-            MAX_EXPANDED_BYTES,
-            MAX_IWA_STREAM_BYTES,
-        )
+        let archive = litchi::numbers::SourceLimits::builder().max_input_bytes(MAX_INPUT_BYTES).and_then(|b| b.max_members(MAX_ENTRIES)).and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES)).and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES)).and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES)).and_then(|b| b.build())
         .unwrap_or_else(|error| unreachable!("valid Numbers fuzz archive limits: {error}"));
         let semantic =
-            PackageSemanticLimits::new(MAX_OBJECTS, MAX_SHEETS, MAX_TABLES, MAX_REFERENCES)
+            litchi::numbers::SemanticLimits::builder().max_objects(MAX_OBJECTS).and_then(|b| b.max_sheets(MAX_SHEETS)).and_then(|b| b.max_tables(MAX_TABLES)).and_then(|b| b.max_references(MAX_REFERENCES)).and_then(|b| b.build())
                 .unwrap_or_else(|error| unreachable!("valid Numbers fuzz semantic limits: {error}"))
-                .with_projection_limits(MAX_MATERIALIZED_CELLS, MAX_TEXT_BYTES)
+                .to_builder().max_materialized_cells(MAX_MATERIALIZED_CELLS).and_then(|b| b.max_output_text_bytes(MAX_TEXT_BYTES)).and_then(|b| b.build())
                 .unwrap_or_else(|error| {
                     unreachable!("valid Numbers fuzz projection limits: {error}")
                 })
-                .with_formula_render_limits(MAX_FORMULA_WORK, MAX_FORMULA_DEPTH)
+                .to_builder().max_formula_render_work(MAX_FORMULA_WORK).and_then(|b| b.max_formula_render_depth(MAX_FORMULA_DEPTH)).and_then(|b| b.build())
                 .unwrap_or_else(|error| unreachable!("valid Numbers fuzz formula limits: {error}"));
-        PackageReadOptions::new(archive, semantic)
+        litchi::numbers::OpenOptions::new().source_limits(archive).semantic_limits(semantic)
     })
 }
 
@@ -78,7 +72,7 @@ fn native_package() -> &'static Package {
         let package = Package::from_bytes_with_options(NATIVE_NUMBERS, fuzz_options())
             .unwrap_or_else(|error| panic!("native Numbers names fuzz seed must open: {error}"));
         let sheet = package
-            .document()
+            .workbook_ref()
             .sheets()
             .first()
             .unwrap_or_else(|| panic!("native Numbers names fuzz seed must have a sheet"));
@@ -99,7 +93,7 @@ fn exercise_package(package: &Package, data: &[u8]) {
     exercise_sheet_order(package, data);
     exercise_table_title(package, data);
 
-    let Some(sheet) = package.document().sheets().first() else {
+    let Some(sheet) = package.workbook_ref().sheets().first() else {
         return;
     };
     let Some(table) = sheet.tables().next() else {
@@ -216,7 +210,7 @@ fn exercise_table_title(package: &Package, data: &[u8]) {
         SheetSelector::index(usize::from(read_u16(data, 3))),
         TableSelector::index(usize::from(read_u16(data, 5))),
     ));
-    if let Some(sheet) = package.document().sheets().first() {
+    if let Some(sheet) = package.workbook_ref().sheets().first() {
         if let Some(table) = sheet.tables().next() {
             observe_result(package.table_title_settings(
                 SheetSelector::name(sheet.name()),
@@ -390,7 +384,7 @@ fn observe_title_settings(settings: TitleSettings) {
 fn exercise_title_selector_errors(package: &Package) {
     assert!(matches!(
         package.table_title_settings(
-            SheetSelector::index(package.document().sheets().len()),
+            SheetSelector::index(package.workbook_ref().sheets().len()),
             TableSelector::index(0),
         ),
         Err(TitleError::SheetNotFound)
@@ -410,7 +404,7 @@ fn exercise_title_selector_errors(package: &Package) {
 }
 
 fn exercise_sheet_order(package: &Package, data: &[u8]) {
-    let sheets = package.document().sheets();
+    let sheets = package.workbook_ref().sheets();
     let sheet_count = sheets.len();
     let Some(_) = sheets.first() else {
         return;
@@ -530,7 +524,7 @@ fn moved_sheet_order(before: &[String], source: usize, destination: usize) -> Ve
 
 fn assert_sheet_order(package: &Package, expected: &[String]) {
     let actual: Vec<&str> = package
-        .document()
+        .workbook_ref()
         .sheets()
         .iter()
         .map(|sheet| sheet.name())
@@ -553,7 +547,7 @@ fn assert_names(
     table_after: &str,
 ) {
     let sheet = package
-        .document()
+        .workbook_ref()
         .sheets()
         .first()
         .unwrap_or_else(|| panic!("names transaction must retain its first sheet"));

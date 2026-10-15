@@ -6,11 +6,14 @@ use litchi_iwa_archive::{Limits, package::Catalog, package::EntryEdit};
 use litchi_iwa_common::{decode_varint_from_bytes, encode_varint_into, wire::WireView};
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tn, tsd, tsp, tst};
+use litchi_numbers::table::lock::Commit as TableLockCommit;
+use litchi_numbers::table::lock::Diagnostics as TableLockDiagnostics;
+use litchi_numbers::table::lock::Edit as TableLockEdit;
+use litchi_numbers::table::lock::Error as TableLockError;
+use litchi_numbers::table::lock::LimitKind as TableLockLimitKind;
+use litchi_numbers::table::lock::Patch as TableLockPatch;
 use litchi_numbers::table::lock::State as LockState;
-use litchi_numbers::{
-    Package, SheetSelector, TableLockCommit, TableLockDiagnostics, TableLockEdit, TableLockError,
-    TableLockLimitKind, TableLockPatch, TableSelector,
-};
+use litchi_numbers::{Package, SheetSelector, TableSelector};
 use prost::Message as _;
 
 const DOCUMENT_MEMBER: &str = "Index/Document.iwa";
@@ -1157,8 +1160,17 @@ fn output_limit_is_typed_and_failure_atomic() -> TestResult {
     let bytes = growth_fixture
         .ok_or_else(|| io::Error::other("could not construct a growing lock-edit fixture"))?;
     let input_bytes = u64::try_from(bytes.len())?;
-    let limits = Limits::new(input_bytes, 32, 1024 * 1024, 1024 * 1024, 1024 * 1024)?;
-    let package = Package::from_bytes_with_limits(&bytes, limits)?;
+    let limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(input_bytes)
+        .and_then(|b| b.max_members(32))
+        .and_then(|b| b.max_entry_bytes(1024 * 1024))
+        .and_then(|b| b.max_aggregate_bytes(1024 * 1024))
+        .and_then(|b| b.max_component_bytes(1024 * 1024))
+        .and_then(|b| b.build())?;
+    let package = Package::from_bytes_with_options(
+        &bytes,
+        litchi_numbers::OpenOptions::new().source_limits(limits),
+    )?;
     let mut edit = package.edit_table_lock(FIRST_SHEET_NAME, ABSENT_TABLE_NAME)?;
     edit.lock();
     match edit.commit() {

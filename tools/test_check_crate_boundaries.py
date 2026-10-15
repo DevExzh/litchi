@@ -163,7 +163,7 @@ def add_iwa_numbers_cell_comment_reader_retirement_evidence(root: Path) -> None:
         "#[doc(hidden)]\n"
         "pub fn __table_cell_comment_from_bytes_for_compatibility_with_options<'sheet, 'table>(\n"
         "    bytes: &[u8],\n"
-        "    options: ReadOptions,\n"
+        "    options: OpenOptions,\n"
         "    sheet: impl Into<SheetSelector<'sheet>>,\n"
         "    table: impl Into<TableSelector<'table>>,\n"
         "    position: CellPosition,\n"
@@ -187,7 +187,7 @@ def add_iwa_numbers_cell_comment_reader_retirement_evidence(root: Path) -> None:
         "    'table,\n"
         ">(\n"
         "    bytes: &[u8],\n"
-        "    options: ReadOptions,\n"
+        "    options: OpenOptions,\n"
         "    sheet: impl Into<SheetSelector<'sheet>>,\n"
         "    table: impl Into<TableSelector<'table>>,\n"
         "    position: CellPosition,\n"
@@ -1572,9 +1572,17 @@ def add_numbers_table_cell_comment_reply_scaffold(
     lib.parent.mkdir(parents=True, exist_ok=True)
     lib.write_text(
         lib_source
-        or "pub use package::{ comments::{CommentReply as TableCellCommentReply} };\n",
+        or "pub mod cell;\n",
         encoding="utf-8",
     )
+    # ADR 0034 W1 (record 0297): the value is published by `cell::comment`.
+    comment = root / boundaries.NUMBERS_SOURCE_ROOT / "cell" / "comment.rs"
+    comment.parent.mkdir(parents=True, exist_ok=True)
+    if not comment.exists():
+        comment.write_text(
+            "pub use crate::package::comments::CommentReply;\n",
+            encoding="utf-8",
+        )
 
 
 def add_numbers_table_cell_comment_reply_metadata_scaffold(root: Path) -> None:
@@ -1820,7 +1828,7 @@ def add_numbers_cell_comment_reader_compat_mutation_scaffold(
         f"{method_attributes}"
         "pub fn __table_cell_comment_from_bytes_for_compatibility_with_options<'sheet, 'table>(\n"
         "    bytes: &[u8],\n"
-        "    options: ReadOptions,\n"
+        "    options: OpenOptions,\n"
         "    sheet: impl Into<SheetSelector<'sheet>>,\n"
         "    table: impl Into<TableSelector<'table>>,\n"
         "    position: CellPosition,\n"
@@ -1838,7 +1846,7 @@ def add_numbers_cell_comment_reader_compat_mutation_scaffold(
         "    'table,\n"
         ">(\n"
         "    bytes: &[u8],\n"
-        "    options: ReadOptions,\n"
+        "    options: OpenOptions,\n"
         "    sheet: impl Into<SheetSelector<'sheet>>,\n"
         "    table: impl Into<TableSelector<'table>>,\n"
         "    position: CellPosition,\n"
@@ -5197,8 +5205,8 @@ def add_focused_chart_arrangement_owner_scaffolds(root: Path) -> None:
         "    pub fn sheet_chart_arrangements<'sheet>(&self, sheet_selector: impl Into<SheetSelector<'sheet>>) -> Result<Box<[ChartArrangement]>, Error> {\n"
         "        discover_sheet_charts(self, resolve_sheet_position(self, sheet_selector.into()))\n"
         "    }\n"
-        "    pub fn edit_sheet_chart_arrangement<'sheet>(&self, sheet_selector: impl Into<SheetSelector<'sheet>>, chart_selector: impl Into<ChartSelector>) -> Result<ChartArrangementEdit, Error> {\n"
-        "        ChartArrangementEdit::new(self, sheet_selector.into(), chart_selector.into())\n"
+        "    pub fn edit_sheet_chart_arrangement<'sheet>(&self, sheet_selector: impl Into<SheetSelector<'sheet>>, chart_selector: impl Into<ChartSelector>) -> Result<Edit, Error> {\n"
+        "        Edit::new(self, sheet_selector.into(), chart_selector.into())\n"
         "    }\n"
         "    pub fn apply_sheet_chart_arrangement(&self, patch: &ChartArrangementPatch) -> Result<ChartArrangementCommit, Error> {\n"
         "        let selected = select_chart_with_budget(self, SheetSelector::position(patch.position()), ChartSelector::position(patch.position()));\n"
@@ -5219,15 +5227,16 @@ def add_focused_chart_arrangement_owner_scaffolds(root: Path) -> None:
     numbers_package = root / boundaries.NUMBERS_PACKAGE_SOURCE
     numbers_package.parent.mkdir(parents=True, exist_ok=True)
     numbers_package.write_text(
-        "mod chart_arrangement;\n"
-        "pub use chart_arrangement::{SheetChartArrangementCommit, SheetChartArrangementDiagnostics, SheetChartArrangementEdit, SheetChartArrangementError, SheetChartArrangementLimitKind, SheetChartArrangementPatch};\n",
+        "mod chart_arrangement;\n",
         encoding="utf-8",
     )
-    numbers_public = root / (boundaries.NUMBERS_SOURCE_ROOT / "lib.rs")
+    numbers_public = root / (boundaries.NUMBERS_SOURCE_ROOT / "sheet" / "chart.rs")
     numbers_public.parent.mkdir(parents=True, exist_ok=True)
     numbers_public.write_text(
-        "pub use litchi_iwa_common::chart::arrangement::ChartArrangement;\n"
-        "pub use package::{SheetChartArrangementCommit, SheetChartArrangementDiagnostics, SheetChartArrangementEdit, SheetChartArrangementError, SheetChartArrangementLimitKind, SheetChartArrangementPatch};\n",
+        "pub mod arrangement {\n"
+        "    pub use crate::ChartArrangement;\n"
+        "    pub use crate::package::families::chart_arrangement::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};\n"
+        "}\n",
         encoding="utf-8",
     )
 
@@ -10001,10 +10010,9 @@ class BoundaryPolicyTests(unittest.TestCase):
                 1,
             )
             source = source.replace(
-                "        pub use litchi_numbers::{\n            Document, DocumentError as Error,",
+                "        pub use litchi_numbers::workbook::{Error, ReadError, ReadLimitKind, Result, Stats};",
                 "        pub use litchi_numbers::*;\n"
-                "        pub use litchi_numbers::{\n"
-                "            Document, DocumentError as Error,",
+                "        pub use litchi_numbers::workbook::{Error, ReadError, ReadLimitKind, Result, Stats};",
                 1,
             )
             facade.write_text(source, encoding="utf-8")
@@ -37261,7 +37269,7 @@ fn rewrite_movie_title_operation(
                 "#[cfg(feature = \"internal-iwork-source\")]\n"
                 "#[doc(hidden)]\n"
                 "pub fn __from_shared_source_with_options(\n"
-                "    source: Arc<[u8]>, options: ReadOptions\n"
+                "    source: Arc<[u8]>, options: OpenOptions\n"
                 ") -> Result<Self, Error> { let _ = (source, options); todo!() }\n",
                 encoding="utf-8",
             )
@@ -37306,7 +37314,7 @@ fn rewrite_movie_title_operation(
                 "#[cfg(feature = \"internal-iwork-source\")]\n"
                 "#[doc(hidden)]\n"
                 "pub fn __from_shared_source_with_options(\n"
-                "    source: Arc<[u8]>, options: ReadOptions\n"
+                "    source: Arc<[u8]>, options: OpenOptions\n"
                 ") -> Result<Self, Error> { let _ = (source, options); todo!() }\n",
                 encoding="utf-8",
             )
@@ -37843,7 +37851,7 @@ fn rewrite_movie_title_operation(
                 "Diagnostics",
                 "Path",
                 "LimitKind",
-                "TransactionError",
+                "Error",
             ),
         )
         self.assertEqual(
@@ -38044,7 +38052,7 @@ fn rewrite_movie_title_operation(
             lib = root / boundaries.NUMBERS_TABLE_DIMENSION_EXPORT_SOURCES[0]
             lib.write_text(
                 lib.read_text(encoding="utf-8")
-                + "pub use table::dimension::transaction::{Edit, TransactionError};\n",
+                + "pub use table::dimension::transaction::{Edit, Error};\n",
                 encoding="utf-8",
             )
 
@@ -38055,7 +38063,7 @@ fn rewrite_movie_title_operation(
             for fragment in (
                 "retains flat alias DimensionSizeEdit",
                 "transaction alias outside table::dimension::transaction Edit",
-                "transaction alias outside table::dimension::transaction TransactionError",
+                "transaction alias outside table::dimension::transaction Error",
                 "exposes raw identifier object_id",
                 "exposes raw identifier NativeObjectIdentifier",
                 "exposes native object native_object",
@@ -42357,13 +42365,13 @@ fn rewrite_movie_title_operation(
             boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_TYPES,
             (
                 "CommentReplyIndex",
-                "CommentReplyEdit",
-                "CommentReplyPatch",
-                "CommentReplyCommit",
-                "CommentReplyDiagnostics",
-                "CommentReplyError",
-                "CommentReplyLimitKind",
-                "CommentReplyPath",
+                "Edit",
+                "Patch",
+                "Commit",
+                "Diagnostics",
+                "Error",
+                "LimitKind",
+                "Path",
             ),
         )
         self.assertEqual(
@@ -42670,7 +42678,7 @@ fn rewrite_movie_title_operation(
                         any(f" {token}" in item for item in violations),
                         violations,
                     )
-            owner.write_text(complete + "pub type ReplyEdit = CommentReplyEdit;\n", encoding="utf-8")
+            owner.write_text(complete + "pub type ReplyEdit = Edit;\n", encoding="utf-8")
             violations = boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(root)
             self.assertTrue(any("flat alias ReplyEdit" in item for item in violations), violations)
 
@@ -42683,7 +42691,6 @@ fn rewrite_movie_title_operation(
             )
             violations = boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(root)
             self.assertTrue(any("comment transaction glob" in item for item in violations), violations)
-            self.assertTrue(any("not type aliases" in item for item in violations), violations)
 
             semantic = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_SEMANTIC_SOURCE
             semantic_complete = semantic.read_text(encoding="utf-8")
@@ -49072,7 +49079,7 @@ fn rewrite_movie_title_operation(
             ('#[cfg(feature = "internal-iwork-source")]', "feature-gated"),
             ('#[doc(hidden)]', "doc(hidden)"),
             ('Arc<ComponentCatalog>', "Arc<ComponentCatalog>"),
-            ('options: ReadOptions', "ReadOptions"),
+            ('options: crate::OpenOptions', "OpenOptions"),
         ):
             with self.subTest(removed=removed), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
@@ -50824,7 +50831,14 @@ fn rewrite_movie_title_operation(
     ) -> None:
         relatives = [
             spec[key]
-            for key in ("owner_path", "transaction_path", "package_path", "library_path")
+            for key in (
+                "owner_path",
+                "transaction_path",
+                "package_path",
+                "library_path",
+                "focused_module",
+            )
+            if key in spec
         ]
         if spec.get("transaction_family_owner") is not None:
             # ADR 0034 W1: the public ``table::merge::transaction`` chain.

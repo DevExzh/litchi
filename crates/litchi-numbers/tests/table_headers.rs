@@ -5,8 +5,7 @@ use std::{io, sync::Arc};
 use litchi_iwa_archive::package::Catalog;
 use litchi_iwa_core::{FieldInfo, FieldPath};
 use litchi_numbers::{
-    Package, PackageLimits, PackageReadOptions, PackageSemanticLimits, SheetSelector,
-    TableSelector,
+    Package, SheetSelector, TableSelector,
     table::{
         headers::{
             Count, Settings,
@@ -457,16 +456,21 @@ fn inverse_apply_preflights_the_retained_target_work_before_reopen() -> TestResu
     let maximum = observed
         .checked_sub(1)
         .ok_or_else(|| io::Error::other("transaction work must be non-zero"))?;
-    let archive_limits = PackageLimits::new(
-        PackageLimits::MAX_INPUT_BYTES,
-        PackageLimits::MAX_ENTRIES,
-        PackageLimits::MAX_ENTRY_BYTES,
-        u64::try_from(maximum)?,
-        PackageLimits::MAX_IWA_STREAM_BYTES,
-    )?;
+    let aggregate = u64::try_from(maximum)?;
+    let archive_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_input_bytes())
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| b.max_aggregate_bytes(aggregate))
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
     let restricted = Package::from_bytes_with_options(
         &candidate,
-        PackageReadOptions::new(archive_limits, PackageSemanticLimits::default()),
+        litchi_numbers::OpenOptions::new()
+            .source_limits(archive_limits)
+            .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
     )?;
     let unchanged = restricted.exact_bytes();
     let error = restricted

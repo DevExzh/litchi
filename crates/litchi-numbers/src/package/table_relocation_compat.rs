@@ -14,10 +14,7 @@ use super::table_relocation::{
     rewrite_bytes_for_compatibility, root_preview_deletions, verify_locality,
     verify_physical_source_state, verify_physical_target_state,
 };
-use super::{
-    Components, Document, DocumentLimits, Package, ReadOptions, SemanticLimits, State,
-    table_headers,
-};
+use super::{Components, Package, Profile, SemanticLimits, State, table_headers};
 use crate::selector::{SheetSelector, TableSelector};
 use crate::table::lock::State as LockState;
 
@@ -103,7 +100,7 @@ impl Package {
 }
 
 fn physical_package(bytes: &[u8]) -> Result<Package> {
-    let options = ReadOptions::default();
+    let options = Profile::default();
     let components = Components::from_bytes(bytes, options.archive())
         .map_err(|_error| invalid_source(Path::Package))?;
     super::validate_numbers_application(&components, options.archive())
@@ -114,7 +111,7 @@ fn physical_package(bytes: &[u8]) -> Result<Package> {
         .physical()
         .ok_or(Error::UnsupportedSource)?
         .__source_owner();
-    let document = Document::from_sheets_with_limits(Vec::new(), DocumentLimits::default())
+    let document = crate::Workbook::from_sheets_with_limits(Vec::new(), SemanticLimits::DEFAULT)
         .map_err(|_error| invalid_source(Path::Package))?;
     Ok(Package {
         state: Arc::new(State {
@@ -131,11 +128,13 @@ fn resolve_sheet_position(source: &Package, selector: SheetSelector<'_>) -> Resu
     let root = Package::root_sheet_order(&source.state.components, SemanticLimits::default())
         .map_err(|_error| invalid_source(Path::Package))?;
     match selector {
-        SheetSelector::Index(index) => root
-            .sheet_references()
-            .get(index)
-            .map(|_reference| index)
-            .ok_or(Error::SheetNotFound),
+        SheetSelector::Position(index) => {
+            let index = index.get();
+            root.sheet_references()
+                .get(index)
+                .map(|_reference| index)
+                .ok_or(Error::SheetNotFound)
+        },
         SheetSelector::Name(name) => {
             let mut found = None;
             for index in 0..root.sheet_references().len() {
@@ -184,7 +183,8 @@ fn resolve_table_position(
         destination_sheet: sheet_position,
     };
     match selector {
-        TableSelector::Index(index) => {
+        TableSelector::Position(index) => {
+            let index = index.get();
             table_headers::resolve::resolve_target_physical(source, sheet_position, index)
                 .map_err(|error| map_header_error(error, path))?;
             Ok(index)
