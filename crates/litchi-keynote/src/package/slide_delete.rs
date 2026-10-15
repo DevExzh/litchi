@@ -169,6 +169,10 @@ struct MetadataFacts<'a> {
     component_external_record: Option<(u64, Option<bool>)>,
     invalid: bool,
     ambiguous: bool,
+    /// Weak, unversioned references to the node from other components (a
+    /// view state's slide selection): `(source component, source locator,
+    /// target component)`. They do not own the node and are dropped with it.
+    weak_node_references: Vec<(u64, String, u64)>,
     node_identifier: u64,
     slide_identifier: u64,
     node_locator: &'a str,
@@ -223,6 +227,15 @@ impl PackageMetadataVisitor for MetadataFacts<'_> {
         if reference.object_identifier() == Some(self.node_identifier) {
             if reference.is_versioned() {
                 self.invalid = true;
+            } else if reference.is_weak() == Some(true)
+                && reference.source().is_current()
+                && reference.source().effective_locator() != self.node_locator
+            {
+                self.weak_node_references.push((
+                    reference.source().identifier(),
+                    reference.source().effective_locator().to_owned(),
+                    reference.target_component_identifier(),
+                ));
             } else {
                 self.ambiguous = true;
             }
@@ -321,6 +334,7 @@ fn select_metadata<'a>(
         component_external_record: None,
         invalid: false,
         ambiguous: false,
+        weak_node_references: Vec::new(),
         node_identifier,
         slide_identifier,
         node_locator: normalized_locator(node_component),
@@ -400,10 +414,41 @@ fn select_metadata<'a>(
     // with no object-specific external reference for its slide object. Remove
     // an exact object-specific record when present; a component-level record
     // (`object_identifier == None`) is not object ownership and is preserved.
-    let external_removal = facts.external_record.map(|(_, weakness)| {
+    if facts
+        .weak_node_references
+        .iter()
+        .any(|(_, _, target)| *target != node_component_id)
+    {
+        return Err(Error::InvalidSource);
+    }
+    let mut external_removals = Vec::new();
+    external_removals
+        .try_reserve_exact(facts.weak_node_references.len() + 1)
+        .map_err(|_| Error::Allocation {
+            amount: facts.weak_node_references.len() + 1,
+        })?;
+    external_removals.extend(facts.external_record.map(|(_, weakness)| {
         ExternalReferenceRemoval::new(node_selector, slide_selector, slide_identifier, weakness)
-    });
-    let external_removals = external_removal.as_slice();
+    }));
+    // A view state's slide selection references the selected node weakly
+    // from its own component. Weak references do not own their target, so
+    // the registry record is removed with the node; the selection payload is
+    // left as a dangling weak reference (not verified against Keynote; see
+    // record 0298).
+    external_removals.extend(
+        facts
+            .weak_node_references
+            .iter()
+            .map(|(source, locator, _)| {
+                ExternalReferenceRemoval::new(
+                    ComponentSelector::new(*source, locator),
+                    node_selector,
+                    node_identifier,
+                    Some(true),
+                )
+            }),
+    );
+    let external_removals = external_removals.as_slice();
     let removal = remove_package_metadata(
         payload,
         RemovalBatch::new(

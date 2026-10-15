@@ -24,6 +24,7 @@ pub(crate) mod slide_chart_legend;
 pub(crate) mod slide_chart_metadata;
 pub(crate) mod slide_chart_title;
 pub(crate) mod slide_chart_value_axis;
+pub(crate) mod slide_creation;
 pub(crate) mod slide_delete;
 pub(crate) mod slide_drawable_comments;
 pub(crate) mod slide_media_lifecycle;
@@ -57,6 +58,7 @@ pub(crate) mod soundtrack_items;
 pub(crate) mod soundtrack_order;
 pub(crate) mod soundtrack_physical;
 pub(crate) mod soundtrack_settings;
+mod structure;
 
 use std::fmt;
 use std::fs::{Metadata, OpenOptions as FsOpenOptions};

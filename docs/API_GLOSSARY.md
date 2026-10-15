@@ -2303,3 +2303,16 @@ ADR 0034 W1 for `litchi-keynote`, part 2 (focused transaction families):
   `slide::media::lifecycle` and `slide::{audio, movie}::creation` (package
   operations return the commit directly), `chart::metadata` and
   `slide::table::cells` (shared error vocabularies, not transactions).
+
+ADR 0034 W1 for `litchi-keynote`, part 3 (slide creation):
+
+| Canonical name | Notes | Status |
+| --- | --- | --- |
+| `litchi_keynote::slide::creation::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` | Registered family (40th) in `keynote-minimal` / `keynote-full` | ✅ 0298 |
+| `Package::edit_slide_creation() -> creation::Edit<'_>` | Several operations per edit, applied in order in one workspace, one commit | ✅ 0298 |
+| `Edit::duplicate_slide(impl Into<SlideSelector>, Position)` | Selector resolved against the base snapshot; destination = final position when the operation runs (`0..=count`) | ✅ 0298 |
+| `Edit::add_slide(impl Into<LayoutSelector>, Position)` | `LayoutSelector::{Name, Position}`; `&str`, `Position`, `usize`, `&Layout` convert | ✅ 0298 |
+| `Package::{slide_layouts, default_slide_layout}` | `creation::Layout { name(), position() }`; no native identifiers | ✅ 0298 |
+| `Package::apply_slide_creation(&Patch)` | Exact source check, reopen; `Patch::{is_noop, inverse, source_slide_count, target_slide_count, created_slides}` | ✅ 0298 |
+| `Commit::{package, into_package, patch, diagnostics, into_parts}` | `Diagnostics::{changed, created_slides, touched_components, full_reparse_performed}` | ✅ 0298 |
+| `creation::Error::UnsupportedContent { reason: Unsupported }` | Typed refusals: `ExternalContent`, `UnmodelledContent`, `RegistryShape`, `LayoutState`, `LayoutMedia`, `NotesTemplate`, `SharedComponent` | ✅ 0298 |

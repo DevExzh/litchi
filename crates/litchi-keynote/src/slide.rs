@@ -2,6 +2,7 @@
 
 pub mod audio;
 pub mod comment;
+pub mod creation;
 pub mod delete;
 pub mod image;
 pub mod media;

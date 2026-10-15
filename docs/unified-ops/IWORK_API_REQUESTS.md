@@ -64,7 +64,15 @@ Each request is described by intent. The signatures are suggestions; the owners 
 
 **Keynote**
 
-8. **Slide add and duplicate** from a master or layout.
+8. **Slide add and duplicate** from a master or layout. *Landed in 0298:*
+   `litchi_keynote::slide::creation` — `Package::edit_slide_creation()` with
+   `Edit::{duplicate_slide(SlideSelector, Position), add_slide(LayoutSelector,
+   Position)}` (several operations per edit, one commit),
+   `Package::{slide_layouts, default_slide_layout, apply_slide_creation}`,
+   exact-source `Patch::{is_noop, inverse}`; typed
+   `Error::UnsupportedContent` for slides whose content lives in other
+   components (tables, charts, comments). The unified adapter is the
+   coordinator's follow-up.
 9. **Shape and text-box CRUD:** add, remove, and change geometry.
 10. **Text formatting** on slide text spans.
 
@@ -138,7 +146,8 @@ makes `File::Pages`, `File::Keynote` and `File::Numbers` hold the leaf
 - 3: typed encrypted state (no `Locked` for iWork yet).
 - 4–6: Numbers sheet, table, row and column lifecycle.
 - 7, 10, 13: text styling (Numbers cells, Keynote spans, Pages spans).
-- 8, 9: Keynote slide add/duplicate and shape CRUD.
+- 9: Keynote shape CRUD (8, slide add/duplicate, landed in the leaf in
+  0298; the unified arm is pending).
 - 11, 12: Pages section add/remove and paragraph insert/remove/move.
 - 14: Pages metadata set.
 - **New 15 — public prepared-source ingress.** The unified layer uses the

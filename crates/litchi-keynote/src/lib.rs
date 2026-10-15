@@ -108,7 +108,9 @@
 //! objects but does not garbage-collect media: data payloads remain preserved
 //! even when their former owner was on the deleted slide. Only the supported
 //! flat native ownership topology is admitted; a surviving child backlink or
-//! other inbound owner is refused as ambiguous ownership.
+//! other inbound owner is refused as ambiguous ownership. A view state's
+//! weak selection reference to the deleted slide node is not ownership: its
+//! registry record is removed with the node.
 //!
 //! ```no_run
 //! use litchi_keynote::{Package, SlideSelector};
@@ -123,6 +125,36 @@
 //!     .package()
 //!     .apply_slide_deletion(&commit.patch().inverse())?;
 //! assert_eq!(restored.package().show()?.slides().len(), package.show()?.slides().len());
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! # Duplicate slides and add slides from layouts
+//!
+//! [`Package::edit_slide_creation`] stages any number of
+//! [`slide::creation::Edit::duplicate_slide`] and
+//! [`slide::creation::Edit::add_slide`] operations and commits them as one
+//! verified package. Selectors resolve against the base snapshot;
+//! destinations are final positions in the slide list as it is when each
+//! operation runs. A duplicate copies the slide's own component (its
+//! drawables, text and notes); a fresh slide materializes a theme layout
+//! ([`Package::slide_layouts`]) with empty title, body and notes. Slides
+//! whose content lives in other components (tables, charts, comments) are
+//! refused with a typed [`slide::creation::Error::UnsupportedContent`].
+//!
+//! ```no_run
+//! use litchi_keynote::{Package, Position, SlideSelector};
+//!
+//! let package = Package::open("input.key")?;
+//! let mut edit = package.edit_slide_creation();
+//! edit.duplicate_slide(SlideSelector::index(0), Position::new(1))?
+//!     .add_slide("Title & Bullets", Position::new(2))?;
+//! let commit = edit.commit()?;
+//! assert_eq!(commit.package().slides()?.len(), package.slides()?.len() + 2);
+//!
+//! let restored = commit
+//!     .package()
+//!     .apply_slide_creation(&commit.patch().inverse())?;
+//! assert_eq!(restored.package().slides()?.len(), package.slides()?.len());
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!

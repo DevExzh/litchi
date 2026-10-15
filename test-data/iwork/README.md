@@ -1510,3 +1510,11 @@ The focused `slide_drawable_comments` integration test consumes this artifact
 for source-order inventory, root comment CRUD, replies, copy-on-write, exact
 inverse, and malformed-graph refusal. This is a native source-oracle receipt;
 no focused candidate or native reply-authoring acceptance is claimed here.
+
+## Litchi-built multi-slide Keynote fixture (record 0298)
+
+[`keynote/multi-slide.key`](keynote/multi-slide.key) (463,067 bytes, SHA-256
+`9f33d0ff0110fcb173fac2fe666eedcf830f5620fe1d7130159d35ac36aca616`) is a
+five-slide deck built from `keynote/basic.key` with the public
+slide-creation, slide-text, notes and skip transactions; provenance, steps
+and content are in [`keynote/multi-slide.md`](keynote/multi-slide.md).
