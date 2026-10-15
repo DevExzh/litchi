@@ -12,14 +12,14 @@ use litchi_iwa_common::wire::{
 };
 use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
 use litchi_iwa_protos::{numbers_names_codec, tsp, tst};
+use litchi_numbers::table::dimension::transaction::Error as TransactionError;
 use litchi_numbers::{
-    Package, PackageLimits, PackageReadOptions, PackageSemanticLimits, SheetSelector,
-    TableSelector,
+    Package, SheetSelector, TableSelector,
     cell::Value,
     table::{
         dimension::{
             Dimension, Points, Size,
-            transaction::{Commit, Diagnostics, Edit, LimitKind, Patch, Path, TransactionError},
+            transaction::{Commit, Diagnostics, Edit, LimitKind, Patch, Path},
         },
         lock::State as LockState,
     },
@@ -54,7 +54,7 @@ fn points(value: f32) -> TestResult<Size> {
 
 fn assert_native_invariants(package: &Package) -> TestResult {
     let table = package
-        .document()
+        .workbook_ref()
         .sheet(0)?
         .and_then(|sheet| sheet.tables().next())
         .ok_or_else(|| std::io::Error::other("native table is missing"))?;
@@ -331,15 +331,15 @@ fn transaction_work_precharge(source: &[u8], target: &[u8]) -> TestResult<usize>
 }
 
 fn package_with_reference_limit(source: &[u8], maximum: usize) -> TestResult<Package> {
-    let semantic = PackageSemanticLimits::new(
-        PackageSemanticLimits::MAX_OBJECTS,
-        PackageSemanticLimits::MAX_SHEETS,
-        PackageSemanticLimits::MAX_TABLES,
-        maximum,
-    )?;
+    let semantic = litchi_numbers::SemanticLimits::builder()
+        .max_objects(litchi_numbers::SemanticLimits::MAXIMUM.max_objects())
+        .and_then(|b| b.max_sheets(litchi_numbers::SemanticLimits::MAXIMUM.max_sheets()))
+        .and_then(|b| b.max_tables(litchi_numbers::SemanticLimits::MAXIMUM.max_tables()))
+        .and_then(|b| b.max_references(maximum))
+        .and_then(|b| b.build())?;
     Ok(Package::from_bytes_with_options(
         source,
-        PackageReadOptions::new(PackageLimits::default(), semantic),
+        litchi_numbers::OpenOptions::new().semantic_limits(semantic),
     )?)
 }
 
@@ -348,7 +348,7 @@ fn minimum_reference_limit(
     succeeds: impl Fn(&Package) -> bool,
 ) -> TestResult<usize> {
     let mut lower = 1usize;
-    let mut upper = PackageSemanticLimits::MAX_REFERENCES;
+    let mut upper = litchi_numbers::SemanticLimits::MAXIMUM.max_references();
     while lower < upper {
         let middle = lower + (upper - lower) / 2;
         let success =
@@ -1186,13 +1186,7 @@ fn row_bucket_local_index_intervals_are_authoritative() -> TestResult {
 #[test]
 fn inverse_transaction_work_limit_is_inclusive_and_max_minus_one_is_atomic() -> TestResult {
     assert!(
-        PackageLimits::new(
-            PackageLimits::MAX_INPUT_BYTES,
-            PackageLimits::MAX_ENTRIES,
-            PackageLimits::MAX_ENTRY_BYTES,
-            0,
-            PackageLimits::MAX_IWA_STREAM_BYTES,
-        )
+        litchi_numbers::SourceLimits::builder().max_input_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_input_bytes()).and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members())).and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes())).and_then(|b| b.max_aggregate_bytes(0)).and_then(|b| b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())).and_then(|b| b.build())
         .is_err()
     );
     let package = Package::open(fixture_path())?;
@@ -1206,16 +1200,23 @@ fn inverse_transaction_work_limit_is_inclusive_and_max_minus_one_is_atomic() -> 
     let observed = transaction_work_precharge(&candidate, &source)?;
 
     let package_with_limit = |maximum: usize| -> TestResult<Package> {
-        let limits = PackageLimits::new(
-            PackageLimits::MAX_INPUT_BYTES,
-            PackageLimits::MAX_ENTRIES,
-            PackageLimits::MAX_ENTRY_BYTES,
-            u64::try_from(maximum)?,
-            PackageLimits::MAX_IWA_STREAM_BYTES,
-        )?;
+        let aggregate = u64::try_from(maximum)?;
+        let limits = litchi_numbers::SourceLimits::builder()
+            .max_input_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_input_bytes())
+            .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+            .and_then(|b| {
+                b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes())
+            })
+            .and_then(|b| b.max_aggregate_bytes(aggregate))
+            .and_then(|b| {
+                b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+            })
+            .and_then(|b| b.build())?;
         Ok(Package::from_bytes_with_options(
             &candidate,
-            PackageReadOptions::new(limits, PackageSemanticLimits::default()),
+            litchi_numbers::OpenOptions::new()
+                .source_limits(limits)
+                .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
         )?)
     };
 
@@ -1251,13 +1252,13 @@ fn inverse_transaction_work_limit_is_inclusive_and_max_minus_one_is_atomic() -> 
 fn cumulative_public_read_and_changed_commit_limits_are_inclusive() -> TestResult {
     let source = std::fs::read(fixture_path())?;
     assert!(
-        PackageSemanticLimits::new(
-            PackageSemanticLimits::MAX_OBJECTS,
-            PackageSemanticLimits::MAX_SHEETS,
-            PackageSemanticLimits::MAX_TABLES,
-            0,
-        )
-        .is_err()
+        litchi_numbers::SemanticLimits::builder()
+            .max_objects(litchi_numbers::SemanticLimits::MAXIMUM.max_objects())
+            .and_then(|b| b.max_sheets(litchi_numbers::SemanticLimits::MAXIMUM.max_sheets()))
+            .and_then(|b| b.max_tables(litchi_numbers::SemanticLimits::MAXIMUM.max_tables()))
+            .and_then(|b| b.max_references(0))
+            .and_then(|b| b.build())
+            .is_err()
     );
 
     let read_exact = minimum_reference_limit(&source, |package| {

@@ -8,7 +8,7 @@ const MAX_FIELDS: usize = litchi_iwa_common::WireLimits::MAX_FIELDS;
 const MAX_INPUT_BYTES: usize = litchi_iwa_common::WireLimits::MAX_INPUT_BYTES;
 const MAX_WORK: usize = litchi_iwa_common::WireLimits::MAX_REWRITE_WORK;
 const MAX_REFERENCES: usize = litchi_numbers::MAX_REFERENCES;
-const MAX_TEXT_BYTES: usize = litchi_numbers::DEFAULT_MAX_TEXT_BYTES;
+const MAX_TEXT_BYTES: usize = litchi_numbers::MAX_TEXT_BYTES;
 const RECURSION_LIMIT: u32 = 64;
 
 /// Result of probing one type-gated table-model candidate.

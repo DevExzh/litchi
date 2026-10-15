@@ -18,7 +18,7 @@ use std::{
 
 use libfuzzer_sys::fuzz_target;
 use litchi::numbers::{
-    CellPosition, Package, PackageError, PackageLimits, PackageReadOptions, PackageSemanticLimits,
+    CellPosition, Package, Error as PackageError,
     SheetSelector, TableSelector,
     cell::data_format::{DateTime, date_time::MAX_PATTERN_BYTES, date_time::transaction::Error},
 };
@@ -70,25 +70,19 @@ fuzz_target!(|data: &[u8]| {
     exercise_output_limit();
 });
 
-fn options() -> PackageReadOptions {
-    static OPTIONS: OnceLock<PackageReadOptions> = OnceLock::new();
+fn options() -> litchi::numbers::OpenOptions {
+    static OPTIONS: OnceLock<litchi::numbers::OpenOptions> = OnceLock::new();
     *OPTIONS.get_or_init(|| {
-        let archive = PackageLimits::new(
-            MAX_INPUT_BYTES,
-            MAX_ENTRIES,
-            MAX_ENTRY_BYTES,
-            MAX_EXPANDED_BYTES,
-            MAX_IWA_STREAM_BYTES,
-        )
+        let archive = litchi::numbers::SourceLimits::builder().max_input_bytes(MAX_INPUT_BYTES).and_then(|b| b.max_members(MAX_ENTRIES)).and_then(|b| b.max_entry_bytes(MAX_ENTRY_BYTES)).and_then(|b| b.max_aggregate_bytes(MAX_EXPANDED_BYTES)).and_then(|b| b.max_component_bytes(MAX_IWA_STREAM_BYTES)).and_then(|b| b.build())
         .unwrap_or_else(|error| unreachable!("valid Date & Time archive limits: {error}"));
         let semantic =
-            PackageSemanticLimits::new(MAX_OBJECTS, MAX_SHEETS, MAX_TABLES, MAX_REFERENCES)
+            litchi::numbers::SemanticLimits::builder().max_objects(MAX_OBJECTS).and_then(|b| b.max_sheets(MAX_SHEETS)).and_then(|b| b.max_tables(MAX_TABLES)).and_then(|b| b.max_references(MAX_REFERENCES)).and_then(|b| b.build())
                 .unwrap_or_else(|error| unreachable!("valid Date & Time semantic limits: {error}"))
-                .with_projection_limits(MAX_MATERIALIZED_CELLS, MAX_TEXT_BYTES)
+                .to_builder().max_materialized_cells(MAX_MATERIALIZED_CELLS).and_then(|b| b.max_output_text_bytes(MAX_TEXT_BYTES)).and_then(|b| b.build())
                 .unwrap_or_else(|error| {
                     unreachable!("valid Date & Time projection limits: {error}")
                 });
-        PackageReadOptions::new(archive, semantic)
+        litchi::numbers::OpenOptions::new().source_limits(archive).semantic_limits(semantic)
     })
 }
 
@@ -186,7 +180,7 @@ fn exercise_selector_reads(package: &Package, data: &[u8], position: CellPositio
     ));
     observe_result(package.table_cell_date_time_format(0usize, 0usize, position));
 
-    if let Some(sheet) = package.document().sheets().first()
+    if let Some(sheet) = package.workbook_ref().sheets().first()
         && let Some(table) = sheet.tables().next()
     {
         let by_name = package.table_cell_date_time_format(
@@ -201,7 +195,7 @@ fn exercise_selector_reads(package: &Package, data: &[u8], position: CellPositio
 
 fn exercise_selector_errors(package: &Package, position: CellPosition) {
     let source_bytes = package_bytes(package);
-    let sheet_count = package.document().sheets().len();
+    let sheet_count = package.workbook_ref().sheets().len();
     if let Err(error) = package.table_cell_date_time_format(
         SheetSelector::index(sheet_count),
         TableSelector::index(0),
@@ -519,9 +513,9 @@ fn exercise_input_limit() {
 fn exercise_semantic_limit() {
     static ONCE: OnceLock<()> = OnceLock::new();
     ONCE.get_or_init(|| {
-        let semantic = PackageSemanticLimits::new(1, 1, 1, 1)
+        let semantic = litchi::numbers::SemanticLimits::builder().max_objects(1).and_then(|b| b.max_sheets(1)).and_then(|b| b.max_tables(1)).and_then(|b| b.max_references(1)).and_then(|b| b.build())
             .unwrap_or_else(|error| panic!("one-entry Date & Time limits must validate: {error}"));
-        let constrained = PackageReadOptions::new(options().archive(), semantic);
+        let constrained = litchi::numbers::OpenOptions::new().source_limits(options().source_limits_value()).semantic_limits(semantic);
         let source = fixture::synthetic_package_for(
             fixture::FormatFamily::DateTime,
             fixture::FormatSharing::Shared,
@@ -544,17 +538,11 @@ fn exercise_output_limit() {
             fixture::FormatSharing::Shared,
         )
         .unwrap_or_else(|error| panic!("Date & Time output-limit source: {error}"));
-        let limits = PackageLimits::new(
-            u64::try_from(source.len()).unwrap_or(u64::MAX),
-            PackageLimits::MAX_ENTRIES,
-            PackageLimits::MAX_ENTRY_BYTES,
-            PackageLimits::MAX_TOTAL_BYTES,
-            PackageLimits::MAX_IWA_STREAM_BYTES,
-        )
+        let limits = litchi::numbers::SourceLimits::builder().max_input_bytes(u64::try_from(source.len()).unwrap_or(u64::MAX)).and_then(|b| b.max_members(litchi::numbers::SourceLimits::MAXIMUM.max_members())).and_then(|b| b.max_entry_bytes(litchi::numbers::SourceLimits::MAXIMUM.max_entry_bytes())).and_then(|b| b.max_aggregate_bytes(litchi::numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())).and_then(|b| b.max_component_bytes(litchi::numbers::SourceLimits::MAXIMUM.max_component_bytes())).and_then(|b| b.build())
         .unwrap_or_else(|error| panic!("Date & Time output limits must validate: {error}"));
         let package = Package::from_bytes_with_options(
             &source,
-            PackageReadOptions::new(limits, PackageSemanticLimits::default()),
+            litchi::numbers::OpenOptions::new().source_limits(limits).semantic_limits(litchi::numbers::SemanticLimits::DEFAULT),
         )
         .unwrap_or_else(|error| panic!("Date & Time exact-limit source must open: {error}"));
         let before = package_bytes(&package);

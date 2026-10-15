@@ -19,10 +19,7 @@ use litchi_iwa_archive::{Limits, package::Catalog};
 use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tsp, tst};
 use litchi_numbers::cell::comment::CommentReplyIndex;
-use litchi_numbers::{
-    CellPosition, Package, PackageLimits, PackageReadOptions, PackageSemanticLimits, SheetSelector,
-    TableSelector,
-};
+use litchi_numbers::{CellPosition, Package, SheetSelector, TableSelector};
 use prost::Message as _;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -749,22 +746,25 @@ fn unknown_scalar_and_group_are_retained_or_rejected_without_source_mutation() -
 fn semantic_and_physical_limits_reject_without_mutating_the_source() -> TestResult {
     let source = fixture(FixtureMode::DuplicateText, None)?;
     let original = source.clone();
-    let semantic = PackageSemanticLimits::new(
-        PackageSemanticLimits::MAX_OBJECTS,
-        1,
-        PackageSemanticLimits::MAX_TABLES,
-        1,
-    )?;
-    let options = PackageReadOptions::new(PackageLimits::default(), semantic);
+    let semantic = litchi_numbers::SemanticLimits::builder()
+        .max_objects(litchi_numbers::SemanticLimits::MAXIMUM.max_objects())
+        .and_then(|b| b.max_sheets(1))
+        .and_then(|b| b.max_tables(litchi_numbers::SemanticLimits::MAXIMUM.max_tables()))
+        .and_then(|b| b.max_references(1))
+        .and_then(|b| b.build())?;
+    let options = litchi_numbers::OpenOptions::new().semantic_limits(semantic);
     assert!(Package::from_bytes_with_options(&source, options).is_err());
     assert_eq!(source, original);
 
-    let default_semantic = PackageSemanticLimits::default();
-    let capped_semantic =
-        default_semantic.with_projection_limits(default_semantic.max_materialized_cells(), 1024)?;
+    let default_semantic = litchi_numbers::SemanticLimits::DEFAULT;
+    let capped_semantic = default_semantic
+        .to_builder()
+        .max_materialized_cells(default_semantic.max_materialized_cells())
+        .and_then(|b| b.max_output_text_bytes(1024))
+        .and_then(|b| b.build())?;
     let package = Package::from_bytes_with_options(
         &source,
-        PackageReadOptions::new(PackageLimits::default(), capped_semantic),
+        litchi_numbers::OpenOptions::new().semantic_limits(capped_semantic),
     )?;
     let before = exact_bytes(&package)?;
     let result = package

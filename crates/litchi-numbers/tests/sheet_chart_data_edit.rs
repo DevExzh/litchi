@@ -6,7 +6,8 @@ use litchi_iwa_archive::{
     Limits,
     package::{Catalog, EntryInsertion},
 };
-use litchi_numbers::{ChartData, ChartDataError, ChartSelector, Package, SheetSelector};
+use litchi_numbers::sheet::chart::data::Error as ChartDataError;
+use litchi_numbers::{ChartData, ChartSelector, Package, SheetSelector};
 
 #[path = "support/chart_arrangement_fixture.rs"]
 mod fixture;

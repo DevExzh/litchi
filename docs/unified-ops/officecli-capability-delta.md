@@ -32,7 +32,7 @@ differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `73fafb3ba518137725602d97210ce5837886dff848671f143278fd3cb55063e3` |
 | golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `232e6d10bfb92c6f50d0b80e9206938030ffc468f48ef078c2e4d8a091b8c89a` |
 | golden | `crates/litchi-ops/tests/golden/registry/keynote.json` | `01497f55fe71995f16ec5ffd0c7b8516c91fa4c524b92a7affe10b10c774fcf4` |
-| golden | `crates/litchi-ops/tests/golden/registry/numbers.json` | `1544a8f5d70e284733fb87b113978f631755dd01d968652b707246be59f1fc43` |
+| golden | `crates/litchi-ops/tests/golden/registry/numbers.json` | `1096eea95f8aaf22bbd6e1a512f3beb39a19b62efc3cf3d1eb53d319a57d3712` |
 | golden | `crates/litchi-ops/tests/golden/registry/odb.json` | `6db2565f0802f112be6d3db035e0444e2e132d7c24546c7ff18ec004de4fada7` |
 | golden | `crates/litchi-ops/tests/golden/registry/odc.json` | `b3d7d096e06b8dd2300d8d27d56449e1cbba6976e302308f6cc47db1090bd8ee` |
 | golden | `crates/litchi-ops/tests/golden/registry/odf.json` | `7f3d45bc3a6a7be93cb0cf50617df4c59fe2c13236ce331e3142f38229005a41` |
@@ -90,7 +90,7 @@ Elements:
 | pptx | 25 | 8 | 0 | 0 | 0 | 1 | 9 |
 | ppt | 15 | 18 | 0 | 0 | 0 | 1 | 8 |
 | keynote | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
-| numbers | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
+| numbers | 0 | 0 | 0 | 0 | 0 | 0 | 5 |
 | odb | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
 | odc | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
 | odf | 0 | 0 | 0 | 0 | 0 | 0 | 2 |
@@ -7878,6 +7878,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 |  | sheet | litchi-only |  |
 |  | table | litchi-only |  |
 |  | cell | litchi-only |  |
+|  | mergeCell | litchi-only |  |
 
 ### Properties
 
@@ -7890,10 +7891,12 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 
 | Verb | Element | Context | Reason | Follow-up |
 |---|---|---|---|---|
-| `set` | `cell` | `a formula` | the leaf's formula authoring is not wired; `value` writes text, numbers and booleans | 0299 Numbers formula writes |
-| `add` | `sheet` | `a new sheet` | the Numbers leaf has no sheet lifecycle transaction | IWORK_API_REQUESTS.md request 4 |
-| `add` | `table` | `a new table` | the Numbers leaf has no table lifecycle transaction | IWORK_API_REQUESTS.md request 5 |
-| `create` | `workbook` | `a workbook from scratch` | the Numbers leaf has no from-scratch package builder | IWORK_API_REQUESTS.md request 1 |
+| `set` | `cell` | `cross-table formula references` | formula text is parsed with local A1 references and the authorable function subset; references to other tables need source-bound table handles | record 0297 follow-ups (IWORK_API_REQUESTS.md) |
+| `add` | `sheet` | `a new sheet` | the Numbers leaf has no sheet creation transaction | IWORK_API_REQUESTS.md request 4 |
+| `remove` | `sheet` | `a sheet and its graph` | the Numbers leaf has no sheet deletion transaction | IWORK_API_REQUESTS.md request 4 |
+| `add` | `table` | `a new table` | the Numbers leaf has no table creation transaction | IWORK_API_REQUESTS.md request 5 |
+| `remove` | `table` | `a table and its storage` | the Numbers leaf has no table deletion transaction | IWORK_API_REQUESTS.md request 5 |
+| `move` | `table` | `a position within its sheet` | the leaf relocates a table into another sheet (appended there); it has no transaction that reorders tables within one sheet | record 0297 follow-ups (IWORK_API_REQUESTS.md) |
 
 ## odb
 

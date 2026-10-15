@@ -18,9 +18,7 @@ use litchi_numbers::cell::data_format::control::{
     CellControl, DisplayFormat, Range, Slider, Stepper,
 };
 use litchi_numbers::cell::data_format::{Checkbox, Number, PopUpMenu, StarRating};
-use litchi_numbers::{
-    Package, PackageReadOptions, PackageSemanticLimits, SheetSelector, TableSelector,
-};
+use litchi_numbers::{Package, SheetSelector, TableSelector};
 use litchi_numbers_wire::{BncCell, CellDataFormatKind};
 use prost::Message as _;
 
@@ -2920,25 +2918,36 @@ fn selector_conflict_position_and_public_limits_are_typed_and_atomic() -> TestRe
             .is_err()
     );
 
-    let tight = Limits::new(
-        u64::try_from(source.len().saturating_sub(1))?,
-        Limits::MAX_ENTRIES,
-        Limits::MAX_ENTRY_BYTES,
-        Limits::MAX_TOTAL_BYTES,
-        Limits::MAX_IWA_STREAM_BYTES,
-    )?;
+    let tight = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(source.len().saturating_sub(1))?)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
     assert!(
         Package::from_bytes_with_options(
             &source,
-            PackageReadOptions::new(tight, PackageSemanticLimits::default()),
+            litchi_numbers::OpenOptions::new()
+                .source_limits(tight)
+                .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
         )
         .is_err()
     );
-    let semantic = PackageSemanticLimits::new(1, 1, 1, 1)?;
+    let semantic = litchi_numbers::SemanticLimits::builder()
+        .max_objects(1)
+        .and_then(|b| b.max_sheets(1))
+        .and_then(|b| b.max_tables(1))
+        .and_then(|b| b.max_references(1))
+        .and_then(|b| b.build())?;
     assert!(
         Package::from_bytes_with_options(
             &source,
-            PackageReadOptions::new(Limits::default(), semantic),
+            litchi_numbers::OpenOptions::new().semantic_limits(semantic),
         )
         .is_err()
     );
@@ -3307,17 +3316,23 @@ fn split_scalar_refcounts_locks_and_limits_remain_atomic() -> TestResult {
     );
     assert_eq!(package.exact_bytes(), before);
 
-    let tight = Limits::new(
-        u64::try_from(source.len().saturating_sub(1))?,
-        Limits::MAX_ENTRIES,
-        Limits::MAX_ENTRY_BYTES,
-        Limits::MAX_TOTAL_BYTES,
-        Limits::MAX_IWA_STREAM_BYTES,
-    )?;
+    let tight = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(source.len().saturating_sub(1))?)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
     assert!(
         Package::from_bytes_with_options(
             &source,
-            PackageReadOptions::new(tight, PackageSemanticLimits::default()),
+            litchi_numbers::OpenOptions::new()
+                .source_limits(tight)
+                .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
         )
         .is_err()
     );
@@ -3538,16 +3553,20 @@ fn split_popup_candidate_serialization_limits_are_inclusive_and_atomic() -> Test
         "split candidate IWA stream must grow beyond the source for a stream ceiling test"
     );
 
-    let exact_output_limits = Limits::new(
-        u64::try_from(target.len())?,
-        Limits::MAX_ENTRIES,
-        Limits::MAX_ENTRY_BYTES,
-        Limits::MAX_TOTAL_BYTES,
-        target_stream,
-    )?;
+    let exact_output_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(target.len())?)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| b.max_component_bytes(target_stream))
+        .and_then(|b| b.build())?;
     let exact = Package::from_bytes_with_options(
         &source,
-        PackageReadOptions::new(exact_output_limits, PackageSemanticLimits::default()),
+        litchi_numbers::OpenOptions::new()
+            .source_limits(exact_output_limits)
+            .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
     )?;
     let exact_commit = exact
         .edit_table_cell_control_format(
@@ -3559,16 +3578,20 @@ fn split_popup_candidate_serialization_limits_are_inclusive_and_atomic() -> Test
         .commit()?;
     assert_eq!(exact_commit.package().exact_bytes(), target);
 
-    let output_minus_one_limits = Limits::new(
-        u64::try_from(target.len().saturating_sub(1))?,
-        Limits::MAX_ENTRIES,
-        Limits::MAX_ENTRY_BYTES,
-        Limits::MAX_TOTAL_BYTES,
-        target_stream,
-    )?;
+    let output_minus_one_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(target.len().saturating_sub(1))?)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| b.max_component_bytes(target_stream))
+        .and_then(|b| b.build())?;
     let output_limited = Package::from_bytes_with_options(
         &source,
-        PackageReadOptions::new(output_minus_one_limits, PackageSemanticLimits::default()),
+        litchi_numbers::OpenOptions::new()
+            .source_limits(output_minus_one_limits)
+            .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
     )?;
     let output_before = output_limited.exact_bytes();
     assert!(
@@ -3585,16 +3608,20 @@ fn split_popup_candidate_serialization_limits_are_inclusive_and_atomic() -> Test
     );
     assert_eq!(output_limited.exact_bytes(), output_before);
 
-    let stream_minus_one_limits = Limits::new(
-        u64::try_from(target.len())?,
-        Limits::MAX_ENTRIES,
-        Limits::MAX_ENTRY_BYTES,
-        Limits::MAX_TOTAL_BYTES,
-        target_stream.saturating_sub(1),
-    )?;
+    let stream_minus_one_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(target.len())?)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| b.max_component_bytes(target_stream.saturating_sub(1)))
+        .and_then(|b| b.build())?;
     let stream_limited = Package::from_bytes_with_options(
         &source,
-        PackageReadOptions::new(stream_minus_one_limits, PackageSemanticLimits::default()),
+        litchi_numbers::OpenOptions::new()
+            .source_limits(stream_minus_one_limits)
+            .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
     )?;
     let stream_before = stream_limited.exact_bytes();
     assert!(
@@ -3993,24 +4020,37 @@ fn split_popup_ownership_aliases_undercounts_inbound_and_limits_fail_closed() ->
     );
     assert_eq!(package.exact_bytes(), before);
 
-    let tight = Limits::new(
-        u64::try_from(source.len().saturating_sub(1))?,
-        Limits::MAX_ENTRIES,
-        Limits::MAX_ENTRY_BYTES,
-        Limits::MAX_TOTAL_BYTES,
-        Limits::MAX_IWA_STREAM_BYTES,
-    )?;
+    let tight = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(source.len().saturating_sub(1))?)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
     assert!(
         Package::from_bytes_with_options(
             &source,
-            PackageReadOptions::new(tight, PackageSemanticLimits::default()),
+            litchi_numbers::OpenOptions::new()
+                .source_limits(tight)
+                .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
         )
         .is_err()
     );
     assert!(
         Package::from_bytes_with_options(
             &source,
-            PackageReadOptions::new(Limits::default(), PackageSemanticLimits::new(1, 1, 1, 1)?,),
+            litchi_numbers::OpenOptions::new().semantic_limits(
+                litchi_numbers::SemanticLimits::builder()
+                    .max_objects(1)
+                    .and_then(|b| b.max_sheets(1))
+                    .and_then(|b| b.max_tables(1))
+                    .and_then(|b| b.max_references(1))
+                    .and_then(|b| b.build())?,
+            ),
         )
         .is_err()
     );

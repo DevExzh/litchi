@@ -71,7 +71,7 @@ pub(crate) mod write;
 #[cfg(feature = "keynote")]
 pub(crate) mod keynote;
 #[cfg(feature = "numbers")]
-pub(crate) mod numbers;
+pub mod numbers;
 #[cfg(feature = "pages")]
 pub(crate) mod pages;
 
@@ -152,7 +152,7 @@ impl Owner {
             #[cfg(feature = "keynote")]
             Self::Keynote(package) => keynote::build(package),
             #[cfg(feature = "numbers")]
-            Self::Numbers(package) => Ok(numbers::build(package)),
+            Self::Numbers(package) => numbers::build(package),
         }
     }
 
@@ -226,7 +226,7 @@ impl Iwork {
             litchi_iwa_detect::Format::Numbers => Owner::Numbers(
                 litchi_numbers::Package::__from_prepared_source(
                     prepared,
-                    litchi_numbers::PackageSemanticLimits::default(),
+                    litchi_numbers::SemanticLimits::DEFAULT,
                 )
                 .map_err(|error| leaf_error(LeafError::Numbers(error), FileFormat::Numbers))?,
             ),
@@ -402,7 +402,7 @@ impl Iwork {
             Owner::Keynote(package) => package.text().map_err(LeafError::Keynote),
             #[cfg(feature = "numbers")]
             Owner::Numbers(package) => package
-                .document()
+                .workbook_ref()
                 .plain_text()
                 .map_err(LeafError::NumbersText),
         }
@@ -424,7 +424,11 @@ impl Iwork {
                 .map_err(|error| leaf_error(LeafError::Keynote(error), FileFormat::Keynote)),
             #[cfg(feature = "numbers")]
             Owner::Numbers(package) => Ok(Some(
-                package.document().metadata().cloned().unwrap_or_default(),
+                package
+                    .workbook_ref()
+                    .metadata()
+                    .cloned()
+                    .unwrap_or_default(),
             )),
         }
     }
@@ -486,10 +490,16 @@ impl Iwork {
         Ok(written)
     }
 
-    /// A fresh package of `format`. Pages documents come from the leaf's
-    /// deterministic `Package::new()` (record 0299); Keynote and Numbers
-    /// have no from-scratch builder yet (`IWORK_API_REQUESTS.md` request 1).
+    /// A fresh package of `format`: the Pages (record 0299) and Numbers
+    /// (record 0297) leaves' deterministic `Package::new()`; Keynote has no
+    /// from-scratch builder yet (`IWORK_API_REQUESTS.md` request 1).
     pub(crate) fn create(format: FileFormat, options: &crate::CreateOptions) -> Result<Self> {
+        #[cfg(feature = "numbers")]
+        if format == FileFormat::Numbers {
+            return numbers::create(options)
+                .map(|package| Self::from_owner(Owner::Numbers(package), None))
+                .map_err(|error| error.with_format(format));
+        }
         let _ = options;
         #[cfg(feature = "pages")]
         if format == FileFormat::Pages {
@@ -499,7 +509,7 @@ impl Iwork {
         }
         Err(Error::new(
             crate::Code::UnsupportedCapability,
-            "creating a Keynote or Numbers document from scratch needs a leaf `Package::new()`, which those owners do not have yet",
+            "creating a Keynote document from scratch needs a leaf `Package::new()`, which that owner does not have yet",
         )
         .with_format(format)
         .with_suggestion("open an existing package and edit it"))

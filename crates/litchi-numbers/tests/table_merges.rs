@@ -14,10 +14,8 @@ use litchi_iwa_archive::{
 use litchi_iwa_common::table::merge::Region;
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tn, tsce, tst};
-use litchi_numbers::{
-    MergeReader, Package, PackageLimits, PackageReadOptions, PackageSemanticLimits, SheetSelector,
-    TableMergesError, TableSelector,
-};
+use litchi_numbers::table::merge::transaction::Error as TableMergesError;
+use litchi_numbers::{MergeReader, Package, SheetSelector, TableSelector};
 use prost::Message as _;
 
 const NATIVE_SOURCE: &[u8] = include_bytes!(concat!(
@@ -977,9 +975,14 @@ fn metadata_reader_accepts_malformed_unneeded_cell_storage() -> TestResult {
 
 #[test]
 fn metadata_reader_honors_tight_projection_profile_without_materializing_cells() -> TestResult {
-    let semantic = PackageSemanticLimits::default()
-        .with_projection_limits(1, PackageSemanticLimits::MAX_OUTPUT_TEXT_BYTES)?;
-    let options = PackageReadOptions::new(PackageLimits::default(), semantic);
+    let semantic = litchi_numbers::SemanticLimits::DEFAULT
+        .to_builder()
+        .max_materialized_cells(1)
+        .and_then(|b| {
+            b.max_output_text_bytes(litchi_numbers::SemanticLimits::MAXIMUM.max_output_text_bytes())
+        })
+        .and_then(|b| b.build())?;
+    let options = litchi_numbers::OpenOptions::new().semantic_limits(semantic);
 
     assert!(
         Package::from_bytes_with_options(NATIVE_SOURCE, options).is_err(),
@@ -995,13 +998,13 @@ fn metadata_reader_honors_tight_projection_profile_without_materializing_cells()
 
 #[test]
 fn metadata_reader_applies_sheet_and_table_limits_during_selection() -> TestResult {
-    let semantic = PackageSemanticLimits::new(
-        PackageSemanticLimits::MAX_OBJECTS,
-        1,
-        1,
-        PackageSemanticLimits::MAX_REFERENCES,
-    )?;
-    let options = PackageReadOptions::new(PackageLimits::default(), semantic);
+    let semantic = litchi_numbers::SemanticLimits::builder()
+        .max_objects(litchi_numbers::SemanticLimits::MAXIMUM.max_objects())
+        .and_then(|b| b.max_sheets(1))
+        .and_then(|b| b.max_tables(1))
+        .and_then(|b| b.max_references(litchi_numbers::SemanticLimits::MAXIMUM.max_references()))
+        .and_then(|b| b.build())?;
+    let options = litchi_numbers::OpenOptions::new().semantic_limits(semantic);
     let native = MergeReader::from_bytes_with_options(NATIVE_SOURCE, options)?;
     assert_eq!(
         native.table_merges(0usize, 0usize)?,
@@ -1014,7 +1017,7 @@ fn metadata_reader_applies_sheet_and_table_limits_during_selection() -> TestResu
     assert!(matches!(
         reader.table_merges(0usize, 1usize),
         Err(TableMergesError::LimitExceeded {
-            kind: litchi_numbers::TableMergesLimitKind::Tables,
+            kind: litchi_numbers::table::merge::transaction::LimitKind::Tables,
             ..
         })
     ));
@@ -1092,10 +1095,12 @@ fn metadata_reader_keeps_form_based_and_selected_topology_strict() -> TestResult
 
 #[test]
 fn missing_name_queries_charge_fields_without_charging_opaque_bytes_as_fields() -> TestResult {
-    let physical = PackageLimits::default().with_archive_limits(
-        litchi_iwa_core::ArchiveLimits::default().with_header_fields(2_048)?,
-    )?;
-    let options = PackageReadOptions::new(physical, PackageSemanticLimits::default());
+    let physical = litchi_numbers::SourceLimits::builder()
+        .max_header_fields(2_048)?
+        .build()?;
+    let options = litchi_numbers::OpenOptions::new()
+        .source_limits(physical)
+        .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT);
 
     for many_fields in [false, true] {
         let padding = if many_fields {
@@ -1134,7 +1139,7 @@ fn missing_name_queries_charge_fields_without_charging_opaque_bytes_as_fields() 
             assert!(matches!(
                 result,
                 Err(TableMergesError::LimitExceeded {
-                    kind: litchi_numbers::TableMergesLimitKind::WireFields,
+                    kind: litchi_numbers::table::merge::transaction::LimitKind::WireFields,
                     ..
                 })
             ));

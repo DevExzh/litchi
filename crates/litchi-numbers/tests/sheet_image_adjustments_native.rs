@@ -12,9 +12,10 @@ use litchi_iwa_common::wire::WireView;
 use litchi_iwa_core::{Archive, SnappyStream};
 use litchi_iwa_protos::tsd;
 use litchi_numbers::cell::Value;
+use litchi_numbers::shape::image::adjustments::Error as SheetImageAdjustmentsError;
 use litchi_numbers::{
-    ImageAdjustment, ImageAdjustments, ImageEnhancement, Package, SheetImageAdjustmentsError,
-    SheetSelector, shape::image::ImageSelector,
+    ImageAdjustment, ImageAdjustments, ImageEnhancement, Package, SheetSelector,
+    shape::image::ImageSelector,
 };
 use prost::Message as _;
 

@@ -220,7 +220,7 @@ pub(super) fn rewrite(
             .saturating_add(output.len().saturating_mul(2))
             .saturating_add(128),
     )?;
-    let candidate = Package::from_shared_bytes_with_options(output.into(), source.state.options)
+    let candidate = Package::from_shared_profile(output.into(), source.state.options)
         .map_err(map_candidate_read_error)?;
     let selected = resolve_title_at_positions_with_budget(
         &candidate,

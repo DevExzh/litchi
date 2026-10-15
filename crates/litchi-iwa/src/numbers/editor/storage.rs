@@ -12,7 +12,7 @@ const TABLE_CELL_STORAGE_CODEC_RECURSION_LIMIT: u32 = 64;
 const TABLE_CELL_STORAGE_MAX_FIELDS: usize = litchi_iwa_common::WireLimits::MAX_FIELDS;
 const TABLE_CELL_STORAGE_MAX_WORK: usize = litchi_iwa_common::WireLimits::MAX_REWRITE_WORK;
 const TABLE_CELL_STORAGE_MAX_REFERENCES: usize = litchi_numbers::MAX_REFERENCES;
-const TABLE_CELL_STORAGE_MAX_TEXT_BYTES: usize = litchi_numbers::DEFAULT_MAX_TEXT_BYTES;
+const TABLE_CELL_STORAGE_MAX_TEXT_BYTES: usize = litchi_numbers::MAX_TEXT_BYTES;
 
 pub(super) fn table_info_model_identifier(message: &RawMessage, drawable_id: u64) -> Result<u64> {
     table_info_projection::model_reference_for_type_with_recursion_limit(
@@ -51,9 +51,7 @@ fn table_cell_storage_decode_options(source: &[u8]) -> table_cell_storage_codec:
             .clamp(1, litchi_iwa_common::WireLimits::MAX_REWRITE_WORK),
         TABLE_CELL_STORAGE_CODEC_RECURSION_LIMIT,
         source.len().clamp(1, litchi_numbers::MAX_REFERENCES),
-        source
-            .len()
-            .clamp(1, litchi_numbers::DEFAULT_MAX_TEXT_BYTES),
+        source.len().clamp(1, litchi_numbers::MAX_TEXT_BYTES),
     )
 }
 

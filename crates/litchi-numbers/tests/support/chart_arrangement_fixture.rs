@@ -216,42 +216,34 @@ fn style_payload(type_: u32) -> Vec<u8> {
     match type_ {
         CHART_STYLE_MESSAGE_TYPE => tsch::ChartStyleArchive {
             super_: Some(style_base()),
-            ..tsch::ChartStyleArchive::default()
         }
         .encode_to_vec(),
         CHART_NON_STYLE_MESSAGE_TYPE => tsch::ChartNonStyleArchive {
             super_: Some(style_base()),
-            ..tsch::ChartNonStyleArchive::default()
         }
         .encode_to_vec(),
         LEGEND_STYLE_MESSAGE_TYPE => tsch::LegendStyleArchive {
             super_: Some(style_base()),
-            ..tsch::LegendStyleArchive::default()
         }
         .encode_to_vec(),
         LEGEND_NON_STYLE_MESSAGE_TYPE => tsch::LegendNonStyleArchive {
             super_: Some(style_base()),
-            ..tsch::LegendNonStyleArchive::default()
         }
         .encode_to_vec(),
         AXIS_STYLE_MESSAGE_TYPE => tsch::ChartAxisStyleArchive {
             super_: Some(style_base()),
-            ..tsch::ChartAxisStyleArchive::default()
         }
         .encode_to_vec(),
         AXIS_NON_STYLE_MESSAGE_TYPE => tsch::ChartAxisNonStyleArchive {
             super_: Some(style_base()),
-            ..tsch::ChartAxisNonStyleArchive::default()
         }
         .encode_to_vec(),
         SERIES_STYLE_MESSAGE_TYPE => tsch::ChartSeriesStyleArchive {
             super_: Some(style_base()),
-            ..tsch::ChartSeriesStyleArchive::default()
         }
         .encode_to_vec(),
         SERIES_NON_STYLE_MESSAGE_TYPE => tsch::ChartSeriesNonStyleArchive {
             super_: Some(style_base()),
-            ..tsch::ChartSeriesNonStyleArchive::default()
         }
         .encode_to_vec(),
         _ => Vec::new(),

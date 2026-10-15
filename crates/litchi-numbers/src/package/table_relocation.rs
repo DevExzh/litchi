@@ -562,11 +562,6 @@ impl Package {
             ),
         })
     }
-
-    /// Compatibility spelling for callers that name the operation as a move.
-    pub fn apply_table_move(&self, patch: &Patch) -> Result<Commit, Error> {
-        self.apply_table_relocation(patch)
-    }
 }
 
 fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
@@ -619,11 +614,14 @@ fn resolve_table_position(
     path: Path,
 ) -> Result<usize, Error> {
     match selector {
-        TableSelector::Index(index) => sheet
-            .tables()
-            .nth(index)
-            .map(|_table| index)
-            .ok_or(Error::TableNotFound),
+        TableSelector::Position(index) => {
+            let index = index.get();
+            sheet
+                .tables()
+                .nth(index)
+                .map(|_table| index)
+                .ok_or(Error::TableNotFound)
+        },
         TableSelector::Name(name) => {
             let mut matches = sheet
                 .tables()

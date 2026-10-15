@@ -1104,6 +1104,10 @@ impl Capabilities {
         if self.format == Some(FileFormat::Odp) && cfg!(feature = "odp") {
             return Support::Supported;
         }
+        // Record 0297: the Numbers leaf builds a minimal workbook.
+        if self.format == Some(FileFormat::Numbers) && self.adapter().is_some() {
+            return Support::Supported;
+        }
         // Pages creates its minimal document (record 0299).
         if self.format == Some(FileFormat::Pages) && self.adapter().is_some() {
             return Support::Supported;

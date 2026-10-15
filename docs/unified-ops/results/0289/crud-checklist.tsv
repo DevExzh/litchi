@@ -4939,55 +4939,68 @@ keynote	notes	edit	n/a	edit not offered for this element	-
 keynote	notes	batch	n/a	batch not offered for this element	-
 keynote	notes	create	gap	IWORK_API_REQUESTS.md request 1	refused unsupported_capability
 keynote	notes	save	supported		ok format
-numbers	workbook	get	supported		ok 2 instances, first `iwork/numbers/basic.numbers` /
-numbers	workbook	find	supported		ok 2 instances, first `iwork/numbers/basic.numbers` /
+numbers	workbook	get	supported		ok 6 instances, first `iwork/numbers/basic.numbers` /
+numbers	workbook	find	supported		ok 6 instances, first `iwork/numbers/basic.numbers` /
 numbers	workbook	query	n/a	query not offered for this element	-
-numbers	workbook	view	supported		ok 2 instances, first `iwork/numbers/basic.numbers` /
+numbers	workbook	view	supported		ok 6 instances, first `iwork/numbers/basic.numbers` /
 numbers	workbook	set	n/a	set not offered for this element	-
-numbers	workbook	add	gap	IWORK_API_REQUESTS.md	-
-numbers	workbook	remove	gap	IWORK_API_REQUESTS.md	-
-numbers	workbook	move	gap	IWORK_API_REQUESTS.md	unreached
+numbers	workbook	add	n/a	add not offered for this element	-
+numbers	workbook	remove	n/a	remove not offered for this element	-
+numbers	workbook	move	format-verb		unreached
 numbers	workbook	swap	gap	IWORK_API_REQUESTS.md	unreached
 numbers	workbook	edit	n/a	edit not offered for this element	-
 numbers	workbook	batch	n/a	batch not offered for this element	-
-numbers	workbook	create	gap	IWORK_API_REQUESTS.md request 1	refused unsupported_capability
+numbers	workbook	create	supported		ok format
 numbers	workbook	save	supported		ok format
-numbers	sheet	get	supported		ok 2 instances, first `iwork/numbers/basic.numbers` /sheet[1]
-numbers	sheet	find	supported		ok 2 instances, first `iwork/numbers/basic.numbers` /sheet[1]
-numbers	sheet	query	supported		ok matches in iwork/numbers/basic.numbers
-numbers	sheet	view	supported		ok 2 instances, first `iwork/numbers/basic.numbers` /sheet[1]
-numbers	sheet	set	n/a	set not offered for this element	-
-numbers	sheet	add	gap	IWORK_API_REQUESTS.md	-
-numbers	sheet	remove	gap	IWORK_API_REQUESTS.md	-
-numbers	sheet	move	gap	IWORK_API_REQUESTS.md	unreached
-numbers	sheet	swap	gap	IWORK_API_REQUESTS.md	unreached
-numbers	sheet	edit	n/a	edit not offered for this element	-
-numbers	sheet	batch	n/a	batch not offered for this element	-
-numbers	sheet	create	gap	IWORK_API_REQUESTS.md request 1	refused unsupported_capability
+numbers	sheet	get	supported		ok 7 instances, first `iwork/numbers/basic.numbers` /sheet[1]
+numbers	sheet	find	supported		ok 7 instances, first `iwork/numbers/basic.numbers` /sheet[1]
+numbers	sheet	query	supported		ok matches in create()
+numbers	sheet	view	supported		ok 7 instances, first `iwork/numbers/basic.numbers` /sheet[1]
+numbers	sheet	set	supported		ok `create() + add mergeCell` /sheet[1] name=Litchi
+numbers	sheet	add	n/a	add not offered for this element	-
+numbers	sheet	remove	n/a	remove not offered for this element	-
+numbers	sheet	move	format-verb		ok `iwork/numbers/table-relocation-native.numbers` /sheet[1] /sheet[2]
+numbers	sheet	swap	gap	IWORK_API_REQUESTS.md	refused unsupported_capability
+numbers	sheet	edit	supported		ok tx.set
+numbers	sheet	batch	supported		ok set item
+numbers	sheet	create	supported		ok format
 numbers	sheet	save	supported		ok format
-numbers	table	get	supported		ok 2 instances, first `iwork/numbers/basic.numbers` /sheet[1]/table[1]
-numbers	table	find	supported		ok 2 instances, first `iwork/numbers/basic.numbers` /sheet[1]/table[1]
-numbers	table	query	supported		ok matches in iwork/numbers/basic.numbers
-numbers	table	view	supported		ok 2 instances, first `iwork/numbers/basic.numbers` /sheet[1]/table[1]
-numbers	table	set	n/a	set not offered for this element	-
-numbers	table	add	gap	IWORK_API_REQUESTS.md	-
-numbers	table	remove	gap	IWORK_API_REQUESTS.md	-
-numbers	table	move	gap	IWORK_API_REQUESTS.md	unreached
+numbers	table	get	supported		ok 7 instances, first `iwork/numbers/basic.numbers` /sheet[1]/table[1]
+numbers	table	find	supported		ok 7 instances, first `iwork/numbers/basic.numbers` /sheet[1]/table[1]
+numbers	table	query	supported		ok matches in create()
+numbers	table	view	supported		ok 7 instances, first `iwork/numbers/basic.numbers` /sheet[1]/table[1]
+numbers	table	set	supported		ok `create() + add mergeCell` /sheet[1]/table[1] name=Litchi
+numbers	table	add	n/a	add not offered for this element	-
+numbers	table	remove	n/a	remove not offered for this element	-
+numbers	table	move	format-verb		unreached
 numbers	table	swap	gap	IWORK_API_REQUESTS.md	unreached
-numbers	table	edit	n/a	edit not offered for this element	-
-numbers	table	batch	n/a	batch not offered for this element	-
-numbers	table	create	gap	IWORK_API_REQUESTS.md request 1	refused unsupported_capability
+numbers	table	edit	supported		ok tx.set
+numbers	table	batch	supported		ok set item
+numbers	table	create	supported		ok format
 numbers	table	save	supported		ok format
 numbers	cell	get	supported		ok 8 instances, first `iwork/numbers/basic.numbers` /sheet[1]/table[1]/B2
 numbers	cell	find	supported		ok 8 instances, first `iwork/numbers/basic.numbers` /sheet[1]/table[1]/B2
 numbers	cell	query	supported		ok matches in iwork/numbers/basic.numbers
 numbers	cell	view	supported		ok 8 instances, first `iwork/numbers/basic.numbers` /sheet[1]/table[1]/B2
 numbers	cell	set	supported		ok `iwork/numbers/basic.numbers` /sheet[1]/table[1]/B2 value=Litchi
-numbers	cell	add	gap	IWORK_API_REQUESTS.md	-
-numbers	cell	remove	gap	IWORK_API_REQUESTS.md	-
-numbers	cell	move	gap	IWORK_API_REQUESTS.md	refused unsupported_capability
+numbers	cell	add	n/a	add not offered for this element	-
+numbers	cell	remove	supported		ok `iwork/numbers/basic.numbers` /sheet[1]/table[1]/B2
+numbers	cell	move	format-verb		refused unsupported_capability
 numbers	cell	swap	gap	IWORK_API_REQUESTS.md	refused unsupported_capability
 numbers	cell	edit	supported		ok tx.set
 numbers	cell	batch	supported		ok set item
-numbers	cell	create	gap	IWORK_API_REQUESTS.md request 1	refused unsupported_capability
+numbers	cell	create	supported		ok format
 numbers	cell	save	supported		ok format
+numbers	mergeCell	get	supported		ok 2 instances, first `iwork/numbers/table-merges-native.numbers` /sheet[1]/table[1]/mergeCell[1]
+numbers	mergeCell	find	supported		ok 2 instances, first `iwork/numbers/table-merges-native.numbers` /sheet[1]/table[1]/mergeCell[1]
+numbers	mergeCell	query	supported		ok matches in iwork/numbers/table-merges-native.numbers
+numbers	mergeCell	view	supported		ok 2 instances, first `iwork/numbers/table-merges-native.numbers` /sheet[1]/table[1]/mergeCell[1]
+numbers	mergeCell	set	n/a	set not offered for this element	-
+numbers	mergeCell	add	supported		ok /sheet[1]/table[1]/mergeCell[1] on `create()` under /sheet[1]/table[1] [ref]
+numbers	mergeCell	remove	supported		ok `create() + add mergeCell` /sheet[1]/table[1]/mergeCell[1]
+numbers	mergeCell	move	format-verb		unreached
+numbers	mergeCell	swap	gap	IWORK_API_REQUESTS.md	unreached
+numbers	mergeCell	edit	n/a	edit not offered for this element	-
+numbers	mergeCell	batch	n/a	batch not offered for this element	-
+numbers	mergeCell	create	supported		ok format
+numbers	mergeCell	save	supported		ok format

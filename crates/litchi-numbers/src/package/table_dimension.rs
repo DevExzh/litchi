@@ -5,8 +5,9 @@ use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
 use litchi_iwa_protos::numbers_table_cell_storage_codec as codec;
 
 use super::{Package, table_headers};
+use crate::table::dimension::transaction::Error as TransactionError;
 use crate::table::dimension::transaction::{
-    Commit, Diagnostics, Edit, Evidence, LimitKind, Patch, Path, TransactionError,
+    Commit, Diagnostics, Edit, Evidence, LimitKind, Patch, Path,
 };
 use crate::{
     selector::{SheetSelector, TableSelector},
@@ -452,7 +453,10 @@ fn resolve<'sheet, 'table>(
         })?
         .ok_or(TransactionError::SheetNotFound)?;
     let table_position = match table.into() {
-        TableSelector::Index(index) => selected_sheet.tables().nth(index).map(|_| index),
+        TableSelector::Position(index) => {
+            let index = index.get();
+            selected_sheet.tables().nth(index).map(|_| index)
+        },
         TableSelector::Name(name) => {
             let mut matches = selected_sheet
                 .tables()
@@ -1378,7 +1382,7 @@ fn map_codec_error_with_offsets(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{PackageLimits, PackageReadOptions, PackageSemanticLimits};
+    use crate::{OpenOptions, SourceLimits};
 
     fn fixture() -> std::path::PathBuf {
         std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -1389,16 +1393,13 @@ mod tests {
         source: &[u8],
         maximum: usize,
     ) -> Result<Package, Box<dyn std::error::Error>> {
-        let limits = PackageLimits::new(
-            PackageLimits::MAX_INPUT_BYTES,
-            PackageLimits::MAX_ENTRIES,
-            PackageLimits::MAX_ENTRY_BYTES,
-            u64::try_from(maximum)?,
-            PackageLimits::MAX_IWA_STREAM_BYTES,
-        )?;
+        let limits = SourceLimits::builder()
+            .max_input_bytes(SourceLimits::MAXIMUM.max_input_bytes())?
+            .max_aggregate_bytes(u64::try_from(maximum)?)?
+            .build()?;
         Ok(Package::from_bytes_with_options(
             source,
-            PackageReadOptions::new(limits, PackageSemanticLimits::default()),
+            OpenOptions::new().source_limits(limits),
         )?)
     }
 
@@ -1407,7 +1408,7 @@ mod tests {
     -> Result<(), Box<dyn std::error::Error>> {
         let source = std::fs::read(fixture())?;
         let mut lower = source.len();
-        let mut upper = usize::try_from(PackageLimits::MAX_TOTAL_BYTES)?;
+        let mut upper = usize::try_from(SourceLimits::MAXIMUM.max_aggregate_bytes())?;
         while lower < upper {
             let middle = lower + (upper - lower) / 2;
             let succeeds = with_work_limit(&source, middle).is_ok_and(|package| {

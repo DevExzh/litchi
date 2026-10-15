@@ -43,9 +43,7 @@ fn comment_storage_decode_options(source: &[u8]) -> comment_storage_codec::Decod
             .clamp(1, litchi_iwa_common::WireLimits::MAX_REWRITE_WORK),
         COMMENT_STORAGE_CODEC_RECURSION_LIMIT,
         source.len().clamp(1, litchi_numbers::MAX_REFERENCES),
-        source
-            .len()
-            .clamp(1, litchi_numbers::DEFAULT_MAX_TEXT_BYTES),
+        source.len().clamp(1, litchi_numbers::MAX_TEXT_BYTES),
     )
 }
 

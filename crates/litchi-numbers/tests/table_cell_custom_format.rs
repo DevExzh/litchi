@@ -23,10 +23,7 @@ use litchi_numbers::cell::data_format::{
         transaction::{Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path},
     },
 };
-use litchi_numbers::{
-    CellPosition, Package, PackageLimits, PackageReadOptions, PackageSemanticLimits, SheetSelector,
-    TableSelector,
-};
+use litchi_numbers::{CellPosition, Package, SheetSelector, TableSelector};
 use litchi_numbers_wire::{BncCell, StoredValue};
 use prost::Message as _;
 
@@ -889,16 +886,22 @@ fn custom_patch_rejects_stale_and_foreign_sources_atomically() -> TestResult {
 #[test]
 fn custom_input_operation_budgets_and_allocation_refuse_before_publication() -> TestResult {
     let source = source(fixture::CustomFamily::Number)?;
-    let exact_limits = PackageLimits::new(
-        u64::try_from(source.len())?,
-        PackageLimits::MAX_ENTRIES,
-        PackageLimits::MAX_ENTRY_BYTES,
-        PackageLimits::MAX_TOTAL_BYTES,
-        PackageLimits::MAX_IWA_STREAM_BYTES,
-    )?;
+    let exact_limits = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(source.len())?)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
     let exact = Package::from_bytes_with_options(
         &source,
-        PackageReadOptions::new(exact_limits, PackageSemanticLimits::default()),
+        litchi_numbers::OpenOptions::new()
+            .source_limits(exact_limits)
+            .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
     )?;
     assert!(
         exact
@@ -906,25 +909,36 @@ fn custom_input_operation_budgets_and_allocation_refuse_before_publication() -> 
             .is_some()
     );
 
-    let tight = PackageLimits::new(
-        u64::try_from(source.len().saturating_sub(1))?,
-        PackageLimits::MAX_ENTRIES,
-        PackageLimits::MAX_ENTRY_BYTES,
-        PackageLimits::MAX_TOTAL_BYTES,
-        PackageLimits::MAX_IWA_STREAM_BYTES,
-    )?;
+    let tight = litchi_numbers::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(source.len().saturating_sub(1))?)
+        .and_then(|b| b.max_members(litchi_numbers::SourceLimits::MAXIMUM.max_members()))
+        .and_then(|b| b.max_entry_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_entry_bytes()))
+        .and_then(|b| {
+            b.max_aggregate_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_aggregate_bytes())
+        })
+        .and_then(|b| {
+            b.max_component_bytes(litchi_numbers::SourceLimits::MAXIMUM.max_component_bytes())
+        })
+        .and_then(|b| b.build())?;
     assert!(
         Package::from_bytes_with_options(
             &source,
-            PackageReadOptions::new(tight, PackageSemanticLimits::default()),
+            litchi_numbers::OpenOptions::new()
+                .source_limits(tight)
+                .semantic_limits(litchi_numbers::SemanticLimits::DEFAULT),
         )
         .is_err()
     );
-    let semantic = PackageSemanticLimits::new(1, 1, 1, 1)?;
+    let semantic = litchi_numbers::SemanticLimits::builder()
+        .max_objects(1)
+        .and_then(|b| b.max_sheets(1))
+        .and_then(|b| b.max_tables(1))
+        .and_then(|b| b.max_references(1))
+        .and_then(|b| b.build())?;
     assert!(
         Package::from_bytes_with_options(
             &source,
-            PackageReadOptions::new(PackageLimits::default(), semantic),
+            litchi_numbers::OpenOptions::new().semantic_limits(semantic),
         )
         .is_err()
     );
@@ -983,15 +997,15 @@ fn custom_registry_many_entries_are_rejected_at_the_reference_budget() -> TestRe
     const MAX_REFERENCES: usize = 1_024;
     let source = source(fixture::CustomFamily::Number)?;
     let hostile = rewrite_custom_registry_with_entries(&source, MAX_REFERENCES)?;
-    let semantic = PackageSemanticLimits::new(
-        PackageSemanticLimits::MAX_OBJECTS,
-        PackageSemanticLimits::MAX_SHEETS,
-        PackageSemanticLimits::MAX_TABLES,
-        MAX_REFERENCES,
-    )?;
+    let semantic = litchi_numbers::SemanticLimits::builder()
+        .max_objects(litchi_numbers::SemanticLimits::MAXIMUM.max_objects())
+        .and_then(|b| b.max_sheets(litchi_numbers::SemanticLimits::MAXIMUM.max_sheets()))
+        .and_then(|b| b.max_tables(litchi_numbers::SemanticLimits::MAXIMUM.max_tables()))
+        .and_then(|b| b.max_references(MAX_REFERENCES))
+        .and_then(|b| b.build())?;
     let package = Package::from_bytes_with_options(
         &hostile,
-        PackageReadOptions::new(PackageLimits::default(), semantic),
+        litchi_numbers::OpenOptions::new().semantic_limits(semantic),
     )?;
     let before = package.exact_bytes();
     let result = package.table_cell_custom_format(0usize, 0usize, selected_position());

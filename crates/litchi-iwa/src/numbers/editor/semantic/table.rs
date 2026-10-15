@@ -7,14 +7,15 @@ use crate::numbers::editor::selectors;
 use crate::text::{Alignment, Indents, LineSpacing, Spacing};
 use litchi_iwa_common::shape::stroke::Stroke;
 use litchi_iwa_common::table::cell::{BorderSide, Borders, layout::Layout};
+use litchi_numbers::Package as FocusedNumbersPackage;
 use litchi_numbers::cell::comment::{
     CommentReplyIndex, transaction::Error as FocusedCommentReplyError,
 };
 use litchi_numbers::table::merge::Region;
-use litchi_numbers::{Package as FocusedNumbersPackage, TableCellCommentError};
 
 use crate::numbers::bnc::{BncCellView, CachedScalar, NumericCellType, StoredValue};
 use litchi_numbers::cell::CellControl;
+use litchi_numbers::cell::comment::Error as TableCellCommentError;
 
 type FocusedControlError = litchi_numbers::cell::data_format::control::transaction::Error;
 
@@ -140,10 +141,8 @@ fn parse_focused_merge_source(editor: &NumbersEditor) -> Result<FocusedNumbersPa
         .shared_component_catalog(|error| Error::InvalidFormat(error.to_string()))?;
     FocusedNumbersPackage::__from_shared_source_with_options(
         source,
-        litchi_numbers::PackageReadOptions::new(
-            limits,
-            litchi_numbers::PackageSemanticLimits::default(),
-        ),
+        litchi_numbers::OpenOptions::new()
+            .source_limits(litchi_numbers::SourceLimits::__from_archive(limits)),
     )
     .map_err(|error| Error::InvalidFormat(format!("focused Numbers merge source failed: {error}")))
 }
@@ -922,10 +921,10 @@ fn focused_comment_reply_source(
     // Re-materialize the checked positional selectors at this boundary so
     // the legacy native ID is resolved exactly once before entering the
     // selector-first package owner.
-    let sheet = litchi_numbers::SheetSelector::index(sheet.as_index().ok_or_else(|| {
+    let sheet = litchi_numbers::SheetSelector::position(sheet.as_position().ok_or_else(|| {
         Error::InvalidFormat("focused Numbers comment-reply sheet was not positional".to_owned())
     })?);
-    let table = litchi_numbers::TableSelector::index(table.as_index().ok_or_else(|| {
+    let table = litchi_numbers::TableSelector::position(table.as_position().ok_or_else(|| {
         Error::InvalidFormat("focused Numbers comment-reply table was not positional".to_owned())
     })?);
     let position =

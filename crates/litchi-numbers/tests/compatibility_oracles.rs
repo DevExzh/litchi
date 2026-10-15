@@ -3,9 +3,8 @@ use std::error::Error as StdError;
 use litchi_iwa_core::{Archive, ArchiveObject, RawMessage, SnappyStream};
 use litchi_iwa_protos::{tn, tsp, tst};
 use litchi_numbers::{
-    MAX_OBJECTS, MAX_REFERENCES, MAX_SHEETS, Package, PackageError, PackageLimits,
-    PackageReadOptions, PackageSemanticLimits, PackageSemanticPath, SemanticLimitKind, cell::Value,
-    compatibility_tables_from_bytes,
+    Error as PackageError, MAX_OBJECTS, MAX_REFERENCES, MAX_SHEETS, Package, SemanticLimitKind,
+    SemanticPath as PackageSemanticPath, cell::Value, compatibility_tables_from_bytes,
 };
 use prost::Message as _;
 
@@ -138,7 +137,7 @@ fn package_bytes(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
     let iwa = SnappyStream::compress(&Archive { objects }.to_bytes()?)?;
     Ok(litchi_iwa_archive::package::to_bytes(
         [("Index/Document.iwa", iwa.as_slice())],
-        PackageLimits::default(),
+        litchi_iwa_archive::Limits::default(),
     )?)
 }
 
@@ -316,10 +315,14 @@ fn canonical_models_precede_legacy_models_and_duplicate_payloads_are_emitted_onc
 #[test]
 fn global_table_limit_is_inclusive_and_reports_the_first_exceeded_table() -> TestResult {
     let bytes = checked_oracle_fixture()?;
-    let options = |max_tables| -> TestResult<PackageReadOptions> {
-        Ok(PackageReadOptions::new(
-            PackageLimits::default(),
-            PackageSemanticLimits::new(MAX_OBJECTS, MAX_SHEETS, max_tables, MAX_REFERENCES)?,
+    let options = |max_tables| -> TestResult<litchi_numbers::OpenOptions> {
+        Ok(litchi_numbers::OpenOptions::new().semantic_limits(
+            litchi_numbers::SemanticLimits::builder()
+                .max_objects(MAX_OBJECTS)
+                .and_then(|b| b.max_sheets(MAX_SHEETS))
+                .and_then(|b| b.max_tables(max_tables))
+                .and_then(|b| b.max_references(MAX_REFERENCES))
+                .and_then(|b| b.build())?,
         ))
     };
 

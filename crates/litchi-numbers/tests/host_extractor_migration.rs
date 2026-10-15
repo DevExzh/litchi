@@ -9,7 +9,7 @@
 use std::{error::Error, fs, path::PathBuf};
 
 use litchi_numbers::{
-    Package, PackageError, PackageLimits, PackageReadOptions, PackageSemanticLimits,
+    Error as PackageError, Package,
     cell::Value,
     table::{CellPosition, Dimensions},
 };
@@ -28,7 +28,7 @@ fn exact_bytes(package: &Package) -> Result<Vec<u8>, Box<dyn Error>> {
 
 fn table_dimensions(package: &Package) -> Result<Dimensions, Box<dyn Error>> {
     Ok(package
-        .document()
+        .workbook_ref()
         .table("Sheet 1", "shared-model")?
         .ok_or_else(|| std::io::Error::other("native fixture has no shared-model table"))?
         .dimensions())
@@ -121,11 +121,18 @@ fn native_formula_projection_reports_selected_render_budget_without_mutating_sou
 -> Result<(), Box<dyn Error>> {
     let source = fs::read(fixture("formula-budget-native.numbers"))?;
     let original = source.clone();
-    let semantic = PackageSemanticLimits::default()
-        .with_formula_render_limits(1, PackageSemanticLimits::MAX_FORMULA_RENDER_DEPTH)?;
+    let semantic = litchi_numbers::SemanticLimits::DEFAULT
+        .to_builder()
+        .max_formula_render_work(1)
+        .and_then(|b| {
+            b.max_formula_render_depth(
+                litchi_numbers::SemanticLimits::MAXIMUM.max_formula_render_depth(),
+            )
+        })
+        .and_then(|b| b.build())?;
     let result = Package::from_bytes_with_options(
         &source,
-        PackageReadOptions::new(PackageLimits::default(), semantic),
+        litchi_numbers::OpenOptions::new().semantic_limits(semantic),
     );
     let error = result.expect_err("native formulas must exceed a one-node render budget");
     // Formula conversion currently adds the cell context through the public

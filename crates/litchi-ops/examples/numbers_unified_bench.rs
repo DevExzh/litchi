@@ -1,0 +1,460 @@
+//! Paired leaf and unified Numbers timings (record 0297).
+//!
+//! Scenarios, each on the same input bytes for both legs:
+//!
+//! - `open_get`: open from bytes and read one cell (leaf
+//!   `Package::from_bytes` + the projection's typed cell; unified
+//!   `open_bytes` + `get`);
+//! - `set`: one cell value (leaf `edit_table_cells` + one change + commit;
+//!   unified `File::set`);
+//! - `batch_N`: N distinct cell values (leaf: one `edit_table_cells` with N
+//!   changes; unified: one atomic `File::batch` of N `set` items, coalesced
+//!   into one leaf commit);
+//! - `rename_sheet`: leaf `edit_names` + `rename_sheet`; unified `set` of the
+//!   sheet `name`;
+//! - `merge_add`: leaf `edit_table_merges` + `merge`; unified `add` of a
+//!   `mergeCell`;
+//! - `sheet_move`: leaf `edit_sheet_order` + `move_sheet`; unified
+//!   `move_to(.., Placement::Start)` (on the two-sheet fixture).
+//!
+//! Legs run in ABBA order per sample after a warm-up; outputs of every
+//! write scenario are compared byte for byte before timing (the merge by
+//! its regions: a leaf merge draws fresh object identifiers). Path and
+//! payload building and verification are untimed; neither leg serializes
+//! inside the clock.
+//!
+//! ```text
+//! cargo build --release -p litchi-ops --features numbers --example numbers_unified_bench
+//! taskset -c 7 target/release/examples/numbers_unified_bench > numbers.json
+//! ```
+//!
+//! `LITCHI_NUMBERS_BENCH_SAMPLES` sets the ABBA rounds (default 5; each
+//! round times each leg twice). `LITCHI_NUMBERS_BENCH_ONLY`, a
+//! comma-separated list of scenario names, runs only those scenarios.
+
+#[cfg(feature = "numbers")]
+mod enabled {
+    use std::hint::black_box;
+    use std::time::Instant;
+
+    use litchi_numbers::formula::Expression;
+    use litchi_numbers::table::CellPosition;
+    use litchi_numbers::table::cells::{Change, Input};
+    use litchi_numbers::table::merge::Region;
+    use litchi_numbers::{Package, SheetSelector, TableSelector};
+    use litchi_ops::{BatchItem, BatchMode, File, NewNode, Placement, Props, props};
+    use serde::Serialize;
+
+    #[derive(Serialize)]
+    struct Report {
+        schema: &'static str,
+        rounds: usize,
+        order: &'static str,
+        fixtures: Vec<Fixture>,
+        scenarios: Vec<Scenario>,
+    }
+
+    #[derive(Serialize)]
+    struct Fixture {
+        name: &'static str,
+        bytes: usize,
+    }
+
+    #[derive(Serialize)]
+    struct Scenario {
+        name: String,
+        fixture: &'static str,
+        outputs_identical: Option<bool>,
+        leaf_ns: Vec<u128>,
+        unified_ns: Vec<u128>,
+        leaf_median_ns: u128,
+        unified_median_ns: u128,
+        ratio: f64,
+    }
+
+    /// One 101 x 11 table: the corpus has no table of 1000 cells
+    /// (`test-data/iwork/synthetic/numbers/README.md`).
+    const GRID: &str = "../synthetic/numbers/bench-grid.numbers";
+    /// A Numbers-authored package with two sheets, for the sheet move.
+    const SHEETS: &str = "table-relocation-native.numbers";
+    /// The formula scenario's package (the synthetic grid has no formula
+    /// owner).
+    const FORMULAS: &str = "basic.numbers";
+    const BATCH: usize = 1000;
+
+    fn fixture(name: &str) -> Vec<u8> {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/iwork/numbers")
+            .join(name);
+        std::fs::read(&path).unwrap_or_else(|error| panic!("{}: {error}", path.display()))
+    }
+
+    fn leaf_bytes(package: &Package) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        package.write_to(&mut bytes).expect("leaf bytes");
+        bytes
+    }
+
+    fn median(values: &[u128]) -> u128 {
+        let mut sorted = values.to_vec();
+        sorted.sort_unstable();
+        sorted[sorted.len() / 2]
+    }
+
+    fn time<T>(operation: impl FnOnce() -> T) -> u128 {
+        let start = Instant::now();
+        black_box(operation());
+        start.elapsed().as_nanos()
+    }
+
+    fn selected(scenario: &str) -> bool {
+        std::env::var("LITCHI_NUMBERS_BENCH_ONLY").map_or(true, |only| {
+            only.split(',').any(|wanted| wanted == scenario)
+        })
+    }
+
+    /// Run `leaf` and `unified` in ABBA order `rounds` times.
+    fn abba(
+        name: impl Into<String>,
+        fixture: &'static str,
+        rounds: usize,
+        outputs_identical: Option<bool>,
+        mut leaf: impl FnMut() -> u128,
+        mut unified: impl FnMut() -> u128,
+    ) -> Option<Scenario> {
+        let name = name.into();
+        if !selected(&name) {
+            return None;
+        }
+        leaf();
+        unified();
+        let (mut leaf_ns, mut unified_ns) = (Vec::new(), Vec::new());
+        for _ in 0..rounds {
+            leaf_ns.push(leaf());
+            unified_ns.push(unified());
+            unified_ns.push(unified());
+            leaf_ns.push(leaf());
+        }
+        let (leaf_median_ns, unified_median_ns) = (median(&leaf_ns), median(&unified_ns));
+        Some(Scenario {
+            name,
+            fixture,
+            outputs_identical,
+            ratio: unified_median_ns as f64 / leaf_median_ns as f64,
+            leaf_ns,
+            unified_ns,
+            leaf_median_ns,
+            unified_median_ns,
+        })
+    }
+
+    fn table() -> (SheetSelector<'static>, TableSelector<'static>) {
+        (SheetSelector::index(0), TableSelector::index(0))
+    }
+
+    /// The `BATCH` cells the batch scenario writes: rows 2.. of columns B..K.
+    fn batch_cells() -> Vec<(CellPosition, String, f64)> {
+        (0..BATCH)
+            .map(|index| {
+                let row = (index / 10 + 1) as u32;
+                let column = (index % 10 + 1) as u32;
+                let position = CellPosition::new(row, column);
+                let a1 = format!("{}{}", char::from(b'A' + column as u8), row + 1);
+                (position, a1, index as f64)
+            })
+            .collect()
+    }
+
+    #[inline(never)]
+    fn leaf_batch(package: &Package, cells: &[(CellPosition, String, f64)]) -> Package {
+        let (sheet, table) = table();
+        let changes = cells.iter().map(|(position, _, value)| {
+            Change::set(*position, Input::number(*value).expect("finite"))
+        });
+        package
+            .edit_table_cells(sheet, table)
+            .expect("edit")
+            .extend(changes)
+            .expect("stage")
+            .commit()
+            .expect("commit")
+            .into_package()
+    }
+
+    /// Kept out of line so a profiler can select it
+    /// (`--toggle-collect=*unified_batch*`).
+    #[inline(never)]
+    fn unified_batch(file: &File, items: &[BatchItem<'static>]) -> File {
+        file.batch(items.to_vec(), BatchMode::Atomic)
+            .expect("batch")
+            .file
+    }
+
+    /// Print each corpus table's dimensions (`LITCHI_NUMBERS_BENCH_SURVEY`).
+    fn survey() {
+        let directory =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/iwork/numbers");
+        let mut names: Vec<_> = std::fs::read_dir(&directory)
+            .expect("corpus")
+            .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+            .filter(|path| path.extension().is_some_and(|ext| ext == "numbers"))
+            .collect();
+        names.sort();
+        for path in names {
+            let Ok(package) = Package::open(&path) else {
+                continue;
+            };
+            let workbook = package.workbook_ref();
+            for (sheet_index, sheet) in workbook.sheets().iter().enumerate() {
+                for (table_index, table) in sheet.tables().enumerate() {
+                    eprintln!(
+                        "{} {sheet_index}/{table_index} {}x{}",
+                        path.display(),
+                        table.row_count(),
+                        table.column_count()
+                    );
+                }
+            }
+        }
+    }
+
+    pub(crate) fn main() {
+        if std::env::var_os("LITCHI_NUMBERS_BENCH_SURVEY").is_some() {
+            survey();
+            return;
+        }
+        let rounds = std::env::var("LITCHI_NUMBERS_BENCH_SAMPLES")
+            .ok()
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(5);
+        let grid = fixture(GRID);
+        let sheets = fixture(SHEETS);
+        let leaf = Package::from_bytes(&grid).expect("leaf open");
+        let file = litchi_ops::open_bytes(grid.clone()).expect("unified open");
+        let mut scenarios = Vec::new();
+
+        scenarios.extend(abba(
+            "open_get",
+            GRID,
+            rounds,
+            None,
+            || {
+                time(|| {
+                    let package = Package::from_bytes(&grid).expect("open");
+                    let workbook = package.workbook_ref();
+                    let table = workbook.sheets()[0].tables().next().expect("table");
+                    table.get_a1("A3").expect("cell").cloned()
+                })
+            },
+            || {
+                time(|| {
+                    let file = litchi_ops::open_bytes(grid.clone()).expect("open");
+                    let node = file.get("/sheet[1]/table[1]/A3").expect("get");
+                    node.view()
+                        .text()
+                        .map(|text| text.map(|text| text.into_owned()))
+                })
+            },
+        ));
+
+        // One cell value.
+        let leaf_set = |package: &Package| {
+            let (sheet, table) = table();
+            package
+                .edit_table_cells(sheet, table)
+                .expect("edit")
+                .extend([Change::set(
+                    CellPosition::new(2, 1),
+                    Input::number(42.0).expect("finite"),
+                )])
+                .expect("stage")
+                .commit()
+                .expect("commit")
+                .into_package()
+        };
+        let unified_set = |file: &File| {
+            file.set("/sheet[1]/table[1]/B3", props! { "value" => 42 })
+                .expect("set")
+        };
+        let same = leaf_bytes(&leaf_set(&leaf)) == unified_set(&file).to_bytes().expect("bytes");
+        scenarios.extend(abba(
+            "set",
+            GRID,
+            rounds,
+            Some(same),
+            || time(|| leaf_set(&leaf)),
+            || time(|| unified_set(&file)),
+        ));
+
+        // `BATCH` cell values.
+        let cells = batch_cells();
+        let items: Vec<BatchItem<'static>> = cells
+            .iter()
+            .map(|(_, a1, value)| {
+                let mut item = BatchItem::new("set");
+                item.path = Some(format!("/sheet[1]/table[1]/{a1}").into());
+                item.props = Some(Props::new().with("value", *value));
+                item
+            })
+            .collect();
+        let same = leaf_bytes(&leaf_batch(&leaf, &cells))
+            == unified_batch(&file, &items).to_bytes().expect("bytes");
+        scenarios.extend(abba(
+            format!("batch_{BATCH}"),
+            GRID,
+            rounds,
+            Some(same),
+            || time(|| leaf_batch(&leaf, &cells)),
+            || time(|| unified_batch(&file, &items)),
+        ));
+
+        let formulas = fixture(FORMULAS);
+        let basic = Package::from_bytes(&formulas).expect("leaf open");
+        let basic_file = litchi_ops::open_bytes(formulas.clone()).expect("unified open");
+        // One formula.
+        let leaf_formula = |package: &Package| {
+            let (sheet, table) = table();
+            let expression = Expression::parse("B3*2").expect("parse");
+            package
+                .edit_table_cells(sheet, table)
+                .expect("edit")
+                .extend([Change::set_formula(CellPosition::new(2, 3), expression)])
+                .expect("stage")
+                .commit()
+                .expect("commit")
+                .into_package()
+        };
+        let unified_formula = |file: &File| {
+            file.set("/sheet[1]/table[1]/D3", props! { "formula" => "B3*2" })
+                .expect("formula")
+        };
+        let same = leaf_bytes(&leaf_formula(&basic))
+            == unified_formula(&basic_file).to_bytes().expect("bytes");
+        scenarios.extend(abba(
+            "formula",
+            FORMULAS,
+            rounds,
+            Some(same),
+            || time(|| leaf_formula(&basic)),
+            || time(|| unified_formula(&basic_file)),
+        ));
+
+        // Sheet rename.
+        let leaf_rename = |package: &Package| {
+            package
+                .edit_names()
+                .rename_sheet(SheetSelector::index(0), "Renamed")
+                .expect("rename")
+                .commit()
+                .expect("commit")
+                .into_package()
+        };
+        let unified_rename = |file: &File| {
+            file.set("/sheet[1]", props! { "name" => "Renamed" })
+                .expect("rename")
+        };
+        let same =
+            leaf_bytes(&leaf_rename(&leaf)) == unified_rename(&file).to_bytes().expect("bytes");
+        scenarios.extend(abba(
+            "rename_sheet",
+            GRID,
+            rounds,
+            Some(same),
+            || time(|| leaf_rename(&leaf)),
+            || time(|| unified_rename(&file)),
+        ));
+
+        // Merge add.
+        let region = Region::new(40, 2, 2, 2).expect("region");
+        let leaf_merge = |package: &Package| {
+            let (sheet, table) = table();
+            let mut edit = package.edit_table_merges(sheet, table).expect("merges");
+            edit.merge(region).expect("merge");
+            edit.commit().expect("commit").into_package()
+        };
+        let unified_merge = |file: &File| {
+            file.add(
+                "/sheet[1]/table[1]",
+                NewNode::new("mergeCell").prop("ref", "C41:D42"),
+            )
+            .expect("merge")
+            .into_file()
+        };
+        // A merge draws fresh object identifiers, so two leaf merges already
+        // differ byte for byte; compare the merged regions instead.
+        let regions = |bytes: Vec<u8>| {
+            let (sheet, table) = table();
+            Package::from_bytes(&bytes)
+                .expect("reopen")
+                .table_merges(sheet, table)
+                .expect("merges")
+                .to_vec()
+        };
+        let same = regions(leaf_bytes(&leaf_merge(&leaf)))
+            == regions(unified_merge(&file).to_bytes().expect("bytes"));
+        scenarios.extend(abba(
+            "merge_add",
+            GRID,
+            rounds,
+            Some(same),
+            || time(|| leaf_merge(&leaf)),
+            || time(|| unified_merge(&file)),
+        ));
+
+        // Sheet move.
+        let native = Package::from_bytes(&sheets).expect("leaf open");
+        let native_file = litchi_ops::open_bytes(sheets.clone()).expect("unified open");
+        let leaf_move = |package: &Package| {
+            package
+                .edit_sheet_order()
+                .move_sheet(SheetSelector::index(1), 0)
+                .expect("move")
+                .commit()
+                .expect("commit")
+                .into_package()
+        };
+        let unified_move = |file: &File| file.move_to("/sheet[2]", Placement::Start).expect("move");
+        let same = leaf_bytes(&leaf_move(&native))
+            == unified_move(&native_file).to_bytes().expect("bytes");
+        scenarios.extend(abba(
+            "sheet_move",
+            SHEETS,
+            rounds,
+            Some(same),
+            || time(|| leaf_move(&native)),
+            || time(|| unified_move(&native_file)),
+        ));
+
+        let report = Report {
+            schema: "litchi.numbers-unified-bench.v1",
+            rounds,
+            order: "ABBA",
+            fixtures: vec![
+                Fixture {
+                    name: GRID,
+                    bytes: grid.len(),
+                },
+                Fixture {
+                    name: SHEETS,
+                    bytes: sheets.len(),
+                },
+                Fixture {
+                    name: FORMULAS,
+                    bytes: formulas.len(),
+                },
+            ],
+            scenarios,
+        };
+        println!("{}", serde_json::to_string(&report).expect("json"));
+    }
+}
+
+#[cfg(feature = "numbers")]
+fn main() {
+    enabled::main();
+}
+
+#[cfg(not(feature = "numbers"))]
+fn main() {
+    eprintln!("numbers_unified_bench needs the `numbers` feature");
+}

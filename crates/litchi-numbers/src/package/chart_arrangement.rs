@@ -36,7 +36,7 @@ use litchi_iwa_protos::chart_arrangement_codec::{
 };
 use litchi_iwa_protos::numbers_sheet_order_codec;
 use litchi_iwa_protos::{chart_data_codec, chart_metadata_codec};
-use thiserror::Error;
+use thiserror::Error as ThisError;
 
 use super::{Error as PackageError, Package};
 use crate::{ChartSelector, SheetSelector};
@@ -72,7 +72,7 @@ const ROOT_PREVIEW_NAMES: [&str; 3] = ["preview.jpg", "preview-micro.jpg", "prev
 /// operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum ChartArrangementLimitKind {
+pub enum LimitKind {
     /// Source or candidate wire bytes.
     WireBytes,
     /// Parsed wire fields.
@@ -93,7 +93,7 @@ pub enum ChartArrangementLimitKind {
     References,
 }
 
-impl fmt::Display for ChartArrangementLimitKind {
+impl fmt::Display for LimitKind {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str(match self {
             Self::WireBytes => "wire bytes",
@@ -110,9 +110,9 @@ impl fmt::Display for ChartArrangementLimitKind {
 }
 
 /// Failure raised by a selector-first Numbers chart-arrangement operation.
-#[derive(Debug, Clone, PartialEq, Eq, Error)]
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
 #[non_exhaustive]
-pub enum ChartArrangementError {
+pub enum Error {
     /// The package does not retain an exact physical source suitable for an
     /// edit.
     #[error("this Numbers source does not support physical chart-arrangement edits")]
@@ -144,7 +144,7 @@ pub enum ChartArrangementError {
     )]
     LimitExceeded {
         /// Resource that exceeded its ceiling.
-        kind: ChartArrangementLimitKind,
+        kind: LimitKind,
         /// Observed or requested amount.
         observed: u64,
         /// Configured maximum.
@@ -163,16 +163,16 @@ pub enum ChartArrangementError {
 
 /// One mutable chart Arrange-panel value staged against an immutable Numbers
 /// package snapshot.
-pub struct ChartArrangementEdit<'a> {
+pub struct Edit<'a> {
     source: &'a Package,
     selection: ChartSelection,
     after: ChartArrangement,
 }
 
-impl fmt::Debug for ChartArrangementEdit<'_> {
+impl fmt::Debug for Edit<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("ChartArrangementEdit")
+            .debug_struct("Edit")
             .field("sheet_position", &self.selection.sheet_position)
             .field("chart_position", &self.selection.chart_position)
             .field("before", &self.selection.before)
@@ -181,12 +181,12 @@ impl fmt::Debug for ChartArrangementEdit<'_> {
     }
 }
 
-impl<'a> ChartArrangementEdit<'a> {
+impl<'a> Edit<'a> {
     fn new<'sheet>(
         source: &'a Package,
         sheet_selector: impl Into<SheetSelector<'sheet>>,
         chart_selector: impl Into<ChartSelector>,
-    ) -> Result<Self, ChartArrangementError> {
+    ) -> Result<Self, Error> {
         let mut budget = ChartBudget::for_package(source)?;
         let selection = select_chart_with_budget(
             source,
@@ -249,14 +249,14 @@ impl<'a> ChartArrangementEdit<'a> {
     }
 
     /// Validate and atomically publish the staged immutable candidate.
-    pub fn commit(self) -> Result<ChartArrangementCommit, ChartArrangementError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         commit_edit(self.source, &self.selection, self.after)
     }
 }
 
 /// Exact-source checked reversible semantic chart-arrangement patch.
 #[derive(Clone, PartialEq, Eq)]
-pub struct ChartArrangementPatch {
+pub struct Patch {
     artifacts: OwnedExactArtifacts,
     selection: ChartSelection,
     before: ChartArrangement,
@@ -265,10 +265,10 @@ pub struct ChartArrangementPatch {
     target_payload: Option<Arc<[u8]>>,
 }
 
-impl fmt::Debug for ChartArrangementPatch {
+impl fmt::Debug for Patch {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("ChartArrangementPatch")
+            .debug_struct("Patch")
             .field("sheet_position", &self.selection.sheet_position)
             .field("chart_position", &self.selection.chart_position)
             .field("before", &self.before)
@@ -277,7 +277,7 @@ impl fmt::Debug for ChartArrangementPatch {
     }
 }
 
-impl ChartArrangementPatch {
+impl Patch {
     /// Return the selected sheet source position.
     #[must_use]
     pub const fn sheet_position(&self) -> Position {
@@ -336,13 +336,13 @@ impl ChartArrangementPatch {
 
 /// Compact evidence describing one chart-arrangement publication.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ChartArrangementDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     touched_components: usize,
     full_reparse_performed: bool,
 }
 
-impl ChartArrangementDiagnostics {
+impl Diagnostics {
     const fn unchanged() -> Self {
         Self {
             changed: false,
@@ -381,13 +381,13 @@ impl ChartArrangementDiagnostics {
 /// Fully verified result of one immutable chart-arrangement transaction.
 #[must_use = "a Numbers chart-arrangement commit contains the validated package snapshot"]
 #[derive(Debug)]
-pub struct ChartArrangementCommit {
+pub struct Commit {
     package: Package,
-    patch: ChartArrangementPatch,
-    diagnostics: ChartArrangementDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl ChartArrangementCommit {
+impl Commit {
     /// Borrow the fully reopened package snapshot.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -402,29 +402,16 @@ impl ChartArrangementCommit {
 
     /// Borrow the reversible exact-source patch.
     #[must_use]
-    pub const fn patch(&self) -> &ChartArrangementPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Borrow compact publication diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> &ChartArrangementDiagnostics {
+    pub const fn diagnostics(&self) -> &Diagnostics {
         &self.diagnostics
     }
 }
-
-/// Compatibility aliases for callers that use the format-qualified names.
-pub type SheetChartArrangementEdit<'a> = ChartArrangementEdit<'a>;
-/// Compatibility alias for the format-qualified patch name.
-pub type SheetChartArrangementPatch = ChartArrangementPatch;
-/// Compatibility alias for the format-qualified commit name.
-pub type SheetChartArrangementCommit = ChartArrangementCommit;
-/// Compatibility alias for the format-qualified diagnostics name.
-pub type SheetChartArrangementDiagnostics = ChartArrangementDiagnostics;
-/// Compatibility alias for the format-qualified error name.
-pub type SheetChartArrangementError = ChartArrangementError;
-/// Compatibility alias for the format-qualified limit vocabulary.
-pub type SheetChartArrangementLimitKind = ChartArrangementLimitKind;
 
 #[derive(Clone, PartialEq, Eq)]
 pub(super) struct ChartSelection {
@@ -472,11 +459,11 @@ pub(super) struct ChartBudget {
 }
 
 impl ChartBudget {
-    pub(super) fn for_package(package: &Package) -> Result<Self, ChartArrangementError> {
+    pub(super) fn for_package(package: &Package) -> Result<Self, Error> {
         let archive = package.state.options.archive();
         let core = archive
             .effective_archive_limits()
-            .map_err(|_| ChartArrangementError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?;
         let source = core
             .max_message_bytes()
             .min(core.max_archive_bytes())
@@ -501,13 +488,13 @@ impl ChartBudget {
                         .clamp(1, WireLimits::MAX_REWRITE_WORK),
                 )
             })
-            .map_err(|_| ChartArrangementError::InvalidSource)?;
+            .map_err(|_| Error::InvalidSource)?;
         let semantic = package.state.options.semantic();
         let max_allocations = semantic
             .max_objects()
             .checked_add(semantic.max_references())
             .and_then(|amount| amount.checked_add(MAX_TRANSACTION_ALLOCATIONS))
-            .ok_or(ChartArrangementError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let aggregate = source.saturating_mul(8).max(source);
         Ok(Self {
             max_input: aggregate,
@@ -535,13 +522,11 @@ impl ChartBudget {
         current: &mut usize,
         amount: usize,
         maximum: usize,
-        kind: ChartArrangementLimitKind,
-    ) -> Result<(), ChartArrangementError> {
-        let observed = current
-            .checked_add(amount)
-            .ok_or(ChartArrangementError::InvalidSource)?;
+        kind: LimitKind,
+    ) -> Result<(), Error> {
+        let observed = current.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > maximum {
-            return Err(ChartArrangementError::LimitExceeded {
+            return Err(Error::LimitExceeded {
                 kind,
                 observed: observed as u64,
                 maximum: maximum as u64,
@@ -555,13 +540,11 @@ impl ChartBudget {
         current: usize,
         amount: usize,
         maximum: usize,
-        kind: ChartArrangementLimitKind,
-    ) -> Result<(), ChartArrangementError> {
-        let observed = current
-            .checked_add(amount)
-            .ok_or(ChartArrangementError::InvalidSource)?;
+        kind: LimitKind,
+    ) -> Result<(), Error> {
+        let observed = current.checked_add(amount).ok_or(Error::InvalidSource)?;
         if observed > maximum {
-            return Err(ChartArrangementError::LimitExceeded {
+            return Err(Error::LimitExceeded {
                 kind,
                 observed: observed as u64,
                 maximum: maximum as u64,
@@ -570,90 +553,80 @@ impl ChartBudget {
         Ok(())
     }
 
-    pub(super) fn source(&mut self, amount: usize) -> Result<(), ChartArrangementError> {
+    pub(super) fn source(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.input,
             amount,
             self.max_input,
-            ChartArrangementLimitKind::WireBytes,
+            LimitKind::WireBytes,
         )
     }
 
-    pub(super) fn output(&mut self, amount: usize) -> Result<(), ChartArrangementError> {
+    pub(super) fn output(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.output,
             amount,
             self.max_output,
-            ChartArrangementLimitKind::OutputBytes,
+            LimitKind::OutputBytes,
         )
     }
 
-    fn fields(&mut self, amount: usize) -> Result<(), ChartArrangementError> {
+    fn fields(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.fields,
             amount,
             self.max_fields,
-            ChartArrangementLimitKind::WireFields,
+            LimitKind::WireFields,
         )
     }
 
-    pub(super) fn work(&mut self, amount: usize) -> Result<(), ChartArrangementError> {
-        Self::add(
-            &mut self.work,
-            amount,
-            self.max_work,
-            ChartArrangementLimitKind::WireWork,
-        )
+    pub(super) fn work(&mut self, amount: usize) -> Result<(), Error> {
+        Self::add(&mut self.work, amount, self.max_work, LimitKind::WireWork)
     }
 
-    pub(super) fn references(&mut self, amount: usize) -> Result<(), ChartArrangementError> {
+    pub(super) fn references(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.references,
             amount,
             self.max_references,
-            ChartArrangementLimitKind::References,
+            LimitKind::References,
         )
     }
 
-    pub(super) fn allocations(&mut self, amount: usize) -> Result<(), ChartArrangementError> {
+    pub(super) fn allocations(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.allocations,
             amount,
             self.max_allocations,
-            ChartArrangementLimitKind::Allocations,
+            LimitKind::Allocations,
         )
     }
 
-    pub(super) fn retained(&mut self, amount: usize) -> Result<(), ChartArrangementError> {
+    pub(super) fn retained(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.retained,
             amount,
             self.max_retained,
-            ChartArrangementLimitKind::RetainedBytes,
+            LimitKind::RetainedBytes,
         )
     }
 
-    pub(super) fn scratch(&mut self, amount: usize) -> Result<(), ChartArrangementError> {
+    pub(super) fn scratch(&mut self, amount: usize) -> Result<(), Error> {
         Self::add(
             &mut self.scratch,
             amount,
             self.max_scratch,
-            ChartArrangementLimitKind::ScratchBytes,
+            LimitKind::ScratchBytes,
         )
     }
 
-    fn scan(
-        &mut self,
-        payload: &[u8],
-        fields: usize,
-        depth: usize,
-    ) -> Result<(), ChartArrangementError> {
+    fn scan(&mut self, payload: &[u8], fields: usize, depth: usize) -> Result<(), Error> {
         self.source(payload.len())?;
         self.fields(fields)?;
         self.work(payload.len())?;
         if depth > self.max_nesting {
-            return Err(ChartArrangementError::LimitExceeded {
-                kind: ChartArrangementLimitKind::WireNesting,
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::WireNesting,
                 observed: depth as u64,
                 maximum: self.max_nesting as u64,
             });
@@ -662,28 +635,28 @@ impl ChartBudget {
         Ok(())
     }
 
-    fn preflight_scan(&self, report: WirePreflight) -> Result<(), ChartArrangementError> {
+    fn preflight_scan(&self, report: WirePreflight) -> Result<(), Error> {
         Self::preflight(
             self.input,
             report.scanned_bytes(),
             self.max_input,
-            ChartArrangementLimitKind::WireBytes,
+            LimitKind::WireBytes,
         )?;
         Self::preflight(
             self.fields,
             report.fields(),
             self.max_fields,
-            ChartArrangementLimitKind::WireFields,
+            LimitKind::WireFields,
         )?;
         Self::preflight(
             self.work,
             report.scanned_bytes(),
             self.max_work,
-            ChartArrangementLimitKind::WireWork,
+            LimitKind::WireWork,
         )?;
         if report.max_depth() > self.max_nesting {
-            return Err(ChartArrangementError::LimitExceeded {
-                kind: ChartArrangementLimitKind::WireNesting,
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::WireNesting,
                 observed: report.max_depth() as u64,
                 maximum: self.max_nesting as u64,
             });
@@ -691,10 +664,7 @@ impl ChartBudget {
         Ok(())
     }
 
-    fn charge_preflight_scan(
-        &mut self,
-        report: WirePreflight,
-    ) -> Result<(), ChartArrangementError> {
+    fn charge_preflight_scan(&mut self, report: WirePreflight) -> Result<(), Error> {
         self.source(report.scanned_bytes())?;
         self.fields(report.fields())?;
         self.work(report.scanned_bytes())?;
@@ -702,66 +672,56 @@ impl ChartBudget {
         Ok(())
     }
 
-    pub(super) fn preflight_allocations(&self, amount: usize) -> Result<(), ChartArrangementError> {
+    pub(super) fn preflight_allocations(&self, amount: usize) -> Result<(), Error> {
         Self::preflight(
             self.allocations,
             amount,
             self.max_allocations,
-            ChartArrangementLimitKind::Allocations,
+            LimitKind::Allocations,
         )
     }
 
-    pub(super) fn preflight_retained(&self, amount: usize) -> Result<(), ChartArrangementError> {
+    pub(super) fn preflight_retained(&self, amount: usize) -> Result<(), Error> {
         Self::preflight(
             self.retained,
             amount,
             self.max_retained,
-            ChartArrangementLimitKind::RetainedBytes,
+            LimitKind::RetainedBytes,
         )
     }
 
-    pub(super) fn preflight_scratch(&self, amount: usize) -> Result<(), ChartArrangementError> {
+    pub(super) fn preflight_scratch(&self, amount: usize) -> Result<(), Error> {
         Self::preflight(
             self.scratch,
             amount,
             self.max_scratch,
-            ChartArrangementLimitKind::ScratchBytes,
+            LimitKind::ScratchBytes,
         )
     }
 
-    pub(super) fn preflight_output(&self, amount: usize) -> Result<(), ChartArrangementError> {
-        Self::preflight(
-            self.output,
-            amount,
-            self.max_output,
-            ChartArrangementLimitKind::OutputBytes,
-        )
+    pub(super) fn preflight_output(&self, amount: usize) -> Result<(), Error> {
+        Self::preflight(self.output, amount, self.max_output, LimitKind::OutputBytes)
     }
 
-    pub(super) fn preflight_work(&self, amount: usize) -> Result<(), ChartArrangementError> {
-        Self::preflight(
-            self.work,
-            amount,
-            self.max_work,
-            ChartArrangementLimitKind::WireWork,
-        )
+    pub(super) fn preflight_work(&self, amount: usize) -> Result<(), Error> {
+        Self::preflight(self.work, amount, self.max_work, LimitKind::WireWork)
     }
 
-    pub(super) fn residual_wire_limits(&self) -> Result<WireLimits, ChartArrangementError> {
+    pub(super) fn residual_wire_limits(&self) -> Result<WireLimits, Error> {
         let input = self
             .max_input
             .checked_sub(self.input)
-            .ok_or(ChartArrangementError::InvalidSource)?
+            .ok_or(Error::InvalidSource)?
             .clamp(1, WireLimits::MAX_INPUT_BYTES);
         let fields = self
             .max_fields
             .checked_sub(self.fields)
-            .ok_or(ChartArrangementError::InvalidSource)?
+            .ok_or(Error::InvalidSource)?
             .clamp(1, WireLimits::MAX_FIELDS);
         let work = self
             .max_work
             .checked_sub(self.work)
-            .ok_or(ChartArrangementError::InvalidSource)?
+            .ok_or(Error::InvalidSource)?
             .clamp(1, WireLimits::MAX_REWRITE_WORK);
         let nesting = self
             .max_nesting
@@ -773,10 +733,10 @@ impl ChartBudget {
             .and_then(|limits| limits.with_fields(fields))
             .and_then(|limits| limits.with_rewrite_work(work))
             .and_then(|limits| limits.with_nesting(nesting))
-            .map_err(|_| ChartArrangementError::InvalidSource)
+            .map_err(|_| Error::InvalidSource)
     }
 
-    fn codec_options(&self, source: &[u8]) -> Result<DecodeOptions, ChartArrangementError> {
+    fn codec_options(&self, source: &[u8]) -> Result<DecodeOptions, Error> {
         let limits = self.residual_wire_limits()?;
         let depth = u32::try_from(limits.max_nesting().min(MAX_CODEC_NESTING as usize))
             .unwrap_or(MAX_CODEC_NESTING);
@@ -814,7 +774,7 @@ impl ChartBudget {
     /// reset the package-wide wire ceilings when it enters its codec.
     pub(super) fn metadata_codec_options(
         &self,
-    ) -> Result<chart_metadata_codec::DecodeOptions, ChartArrangementError> {
+    ) -> Result<chart_metadata_codec::DecodeOptions, Error> {
         let limits = self.residual_wire_limits()?;
         let depth = u32::try_from(limits.max_nesting().min(MAX_CODEC_NESTING as usize))
             .unwrap_or(MAX_CODEC_NESTING);
@@ -843,19 +803,19 @@ impl ChartBudget {
     pub(super) fn metadata_codec_report(
         &mut self,
         report: chart_metadata_codec::DecodeReport,
-    ) -> Result<(), ChartArrangementError> {
+    ) -> Result<(), Error> {
         self.source(report.source_bytes())?;
         self.fields(report.fields())?;
         self.work(
             report
                 .work_bytes()
                 .checked_add(report.failure_work_bytes())
-                .ok_or(ChartArrangementError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         let depth = usize::try_from(report.max_depth()).unwrap_or(usize::MAX);
         if depth > self.max_nesting {
-            return Err(ChartArrangementError::LimitExceeded {
-                kind: ChartArrangementLimitKind::WireNesting,
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::WireNesting,
                 observed: depth as u64,
                 maximum: self.max_nesting as u64,
             });
@@ -872,9 +832,7 @@ impl ChartBudget {
     /// wire and text axes.  Keep that ceiling derived from the same finite
     /// field budget so a large package limit cannot turn into an unbounded
     /// rectangular allocation at the package boundary.
-    pub(super) fn data_codec_options(
-        &self,
-    ) -> Result<chart_data_codec::DecodeOptions, ChartArrangementError> {
+    pub(super) fn data_codec_options(&self) -> Result<chart_data_codec::DecodeOptions, Error> {
         let limits = self.residual_wire_limits()?;
         let depth = u32::try_from(limits.max_nesting().min(MAX_CODEC_NESTING as usize))
             .unwrap_or(MAX_CODEC_NESTING);
@@ -899,7 +857,7 @@ impl ChartBudget {
     pub(super) fn data_codec_report(
         &mut self,
         report: chart_data_codec::DecodeReport,
-    ) -> Result<(), ChartArrangementError> {
+    ) -> Result<(), Error> {
         self.source(report.source_bytes())?;
         self.fields(report.fields())?;
         self.work(report.work_bytes())?;
@@ -909,8 +867,8 @@ impl ChartBudget {
         self.work(report.cell_count())?;
         let depth = usize::try_from(report.max_depth()).unwrap_or(usize::MAX);
         if depth > self.max_nesting {
-            return Err(ChartArrangementError::LimitExceeded {
-                kind: ChartArrangementLimitKind::WireNesting,
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::WireNesting,
                 observed: depth as u64,
                 maximum: self.max_nesting as u64,
             });
@@ -923,10 +881,7 @@ impl ChartBudget {
 
     /// Charge the bounded wire work needed to walk the lazy chart-data views
     /// before any fallible semantic allocation starts.
-    pub(super) fn data_materialization_work(
-        &mut self,
-        amount: usize,
-    ) -> Result<(), ChartArrangementError> {
+    pub(super) fn data_materialization_work(&mut self, amount: usize) -> Result<(), Error> {
         self.work(amount)
     }
 
@@ -935,8 +890,7 @@ impl ChartBudget {
     pub(super) fn title_codec_options(
         &self,
         source: &[u8],
-    ) -> Result<litchi_iwa_protos::keynote_chart_title_codec::DecodeOptions, ChartArrangementError>
-    {
+    ) -> Result<litchi_iwa_protos::keynote_chart_title_codec::DecodeOptions, Error> {
         let limits = self.residual_wire_limits()?;
         let depth = u32::try_from(limits.max_nesting().min(MAX_CODEC_NESTING as usize))
             .unwrap_or(MAX_CODEC_NESTING);
@@ -963,14 +917,14 @@ impl ChartBudget {
     pub(super) fn title_codec_report(
         &mut self,
         report: litchi_iwa_protos::keynote_chart_title_codec::DecodeReport,
-    ) -> Result<(), ChartArrangementError> {
+    ) -> Result<(), Error> {
         self.source(report.source_bytes())?;
         self.fields(report.fields())?;
         self.work(report.work_bytes())?;
         let depth = usize::try_from(report.max_depth()).unwrap_or(usize::MAX);
         if depth > self.max_nesting {
-            return Err(ChartArrangementError::LimitExceeded {
-                kind: ChartArrangementLimitKind::WireNesting,
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::WireNesting,
                 observed: depth as u64,
                 maximum: self.max_nesting as u64,
             });
@@ -984,10 +938,7 @@ impl ChartBudget {
     /// outer wire-view ledger; this reservation covers the title codec's
     /// strict scan and Buffa attempt without allowing an error path to bypass
     /// the aggregate budget.
-    pub(super) fn title_codec_failure(
-        &mut self,
-        source: &[u8],
-    ) -> Result<(), ChartArrangementError> {
+    pub(super) fn title_codec_failure(&mut self, source: &[u8]) -> Result<(), Error> {
         let fields = source.len().saturating_mul(2).max(1);
         let work = source.len().saturating_mul(4).max(1);
         self.source(source.len())?;
@@ -995,10 +946,7 @@ impl ChartBudget {
         self.work(work)
     }
 
-    pub(super) fn codec_report(
-        &mut self,
-        report: DecodeReport,
-    ) -> Result<(), ChartArrangementError> {
+    pub(super) fn codec_report(&mut self, report: DecodeReport) -> Result<(), Error> {
         self.source(report.source_bytes())?;
         self.fields(report.fields())?;
         self.work(report.work_bytes())?;
@@ -1011,14 +959,14 @@ impl ChartBudget {
     pub(super) fn codec_requirements(
         &mut self,
         requirements: RewriteExecutionRequirements,
-    ) -> Result<(), ChartArrangementError> {
+    ) -> Result<(), Error> {
         self.output(requirements.output_bytes)?;
         self.fields(requirements.fields)?;
         self.work(requirements.work_bytes)?;
         let depth = usize::try_from(requirements.max_depth).unwrap_or(usize::MAX);
         if depth > self.max_nesting {
-            return Err(ChartArrangementError::LimitExceeded {
-                kind: ChartArrangementLimitKind::WireNesting,
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::WireNesting,
                 observed: depth as u64,
                 maximum: self.max_nesting as u64,
             });
@@ -1036,14 +984,14 @@ impl ChartBudget {
     pub(super) fn data_codec_requirements(
         &mut self,
         requirements: chart_data_codec::RewriteExecutionRequirements,
-    ) -> Result<(), ChartArrangementError> {
+    ) -> Result<(), Error> {
         self.output(requirements.output_bytes)?;
         self.fields(requirements.fields)?;
         self.work(requirements.work_bytes)?;
         let depth = usize::try_from(requirements.max_depth).unwrap_or(usize::MAX);
         if depth > self.max_nesting {
-            return Err(ChartArrangementError::LimitExceeded {
-                kind: ChartArrangementLimitKind::WireNesting,
+            return Err(Error::LimitExceeded {
+                kind: LimitKind::WireNesting,
                 observed: depth as u64,
                 maximum: self.max_nesting as u64,
             });
@@ -1057,7 +1005,7 @@ impl ChartBudget {
     pub(super) fn reassembly(
         &mut self,
         requirements: litchi_iwa_archive::package::ReassemblyExecutionRequirements,
-    ) -> Result<(), ChartArrangementError> {
+    ) -> Result<(), Error> {
         self.output(requirements.output_bytes())?;
         self.work(requirements.output_bytes())?;
         self.allocations(requirements.allocations())?;
@@ -1065,7 +1013,7 @@ impl ChartBudget {
         self.scratch(requirements.scratch_bytes())
     }
 
-    pub(super) fn candidate_reopen(&mut self, bytes: usize) -> Result<(), ChartArrangementError> {
+    pub(super) fn candidate_reopen(&mut self, bytes: usize) -> Result<(), Error> {
         self.source(bytes)?;
         self.work(bytes)?;
         self.allocations(1)?;
@@ -1079,7 +1027,7 @@ impl Package {
         &self,
         sheet_selector: impl Into<SheetSelector<'sheet>>,
         chart_selector: impl Into<ChartSelector>,
-    ) -> Result<ChartArrangement, ChartArrangementError> {
+    ) -> Result<ChartArrangement, Error> {
         let mut budget = ChartBudget::for_package(self)?;
         Ok(select_chart_with_budget(
             self,
@@ -1096,7 +1044,7 @@ impl Package {
     pub fn sheet_chart_arrangements<'sheet>(
         &self,
         sheet_selector: impl Into<SheetSelector<'sheet>>,
-    ) -> Result<Box<[ChartArrangement]>, ChartArrangementError> {
+    ) -> Result<Box<[ChartArrangement]>, Error> {
         let mut budget = ChartBudget::for_package(self)?;
         let charts = discover_sheet_charts(
             self,
@@ -1105,17 +1053,17 @@ impl Package {
             &mut budget,
         )?;
         let mut arrangements = Vec::new();
-        arrangements.try_reserve_exact(charts.len()).map_err(|_| {
-            ChartArrangementError::Allocation {
+        arrangements
+            .try_reserve_exact(charts.len())
+            .map_err(|_| Error::Allocation {
                 amount: charts.len(),
-            }
-        })?;
+            })?;
         budget.allocations(1)?;
         budget.retained(
             charts
                 .len()
                 .checked_mul(size_of::<ChartArrangement>())
-                .ok_or(ChartArrangementError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )?;
         for chart in charts {
             arrangements.push(chart.before);
@@ -1129,19 +1077,16 @@ impl Package {
         &self,
         sheet_selector: impl Into<SheetSelector<'sheet>>,
         chart_selector: impl Into<ChartSelector>,
-    ) -> Result<ChartArrangementEdit<'_>, ChartArrangementError> {
-        ChartArrangementEdit::new(self, sheet_selector, chart_selector)
+    ) -> Result<Edit<'_>, Error> {
+        Edit::new(self, sheet_selector, chart_selector)
     }
 
     /// Apply an exact-source checked chart-arrangement patch.
-    pub fn apply_sheet_chart_arrangement(
-        &self,
-        patch: &ChartArrangementPatch,
-    ) -> Result<ChartArrangementCommit, ChartArrangementError> {
+    pub fn apply_sheet_chart_arrangement(&self, patch: &Patch) -> Result<Commit, Error> {
         let catalog = physical_catalog(self)?;
         let source_owner = catalog.__source_owner();
         if !patch.artifacts.authorizes_owner(&source_owner) {
-            return Err(ChartArrangementError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let mut budget = ChartBudget::for_package(self)?;
         budget.source(self.source_bytes().len())?;
@@ -1153,22 +1098,22 @@ impl Package {
             &mut budget,
         )?;
         if !same_selection(&current, &patch.selection) || current.before != patch.before {
-            return Err(ChartArrangementError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if patch.is_noop() {
-            return Ok(ChartArrangementCommit {
+            return Ok(Commit {
                 package: self.snapshot(),
                 patch: patch.clone(),
-                diagnostics: ChartArrangementDiagnostics::unchanged(),
+                diagnostics: Diagnostics::unchanged(),
             });
         }
         if !catalog.source_is_exact() {
-            return Err(ChartArrangementError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let target_owner = patch.artifacts.target_owner();
         budget.candidate_reopen(target_owner.len())?;
         let candidate = Package::from_source_owner_with_options(target_owner, self.state.options)
-            .map_err(|_| ChartArrangementError::Verification)?;
+            .map_err(|_| Error::Verification)?;
         let selected = select_chart_with_budget(
             &candidate,
             SheetSelector::position(patch.selection.sheet_position),
@@ -1177,7 +1122,7 @@ impl Package {
             &mut budget,
         )?;
         if !same_selection(&selected, &patch.selection) || selected.before != patch.after {
-            return Err(ChartArrangementError::Verification);
+            return Err(Error::Verification);
         }
         verify_locality(
             self,
@@ -1186,10 +1131,10 @@ impl Package {
             patch.target_payload.as_deref(),
             &mut budget,
         )?;
-        Ok(ChartArrangementCommit {
+        Ok(Commit {
             package: candidate,
             patch: patch.clone(),
-            diagnostics: ChartArrangementDiagnostics::published(),
+            diagnostics: Diagnostics::published(),
         })
     }
 }
@@ -1197,28 +1142,29 @@ impl Package {
 fn resolve_sheet_position(
     package: &Package,
     selector: SheetSelector<'_>,
-) -> Result<Position, ChartArrangementError> {
+) -> Result<Position, Error> {
     match selector {
         SheetSelector::Name(name) => {
             if name.is_empty() {
-                return Err(ChartArrangementError::EmptySheetName);
+                return Err(Error::EmptySheetName);
             }
             let mut matches = package
-                .document()
+                .workbook_ref()
                 .sheets()
                 .iter()
                 .filter(|sheet| sheet.name() == name);
             let Some(sheet) = matches.next() else {
-                return Err(ChartArrangementError::SheetNameNotFound);
+                return Err(Error::SheetNameNotFound);
             };
             if matches.next().is_some() {
-                return Err(ChartArrangementError::AmbiguousSelector);
+                return Err(Error::AmbiguousSelector);
             }
             Ok(Position::new(sheet.index()))
         },
-        SheetSelector::Index(index) => {
-            if package.document().sheets().get(index).is_none() {
-                return Err(ChartArrangementError::SheetPositionNotFound {
+        SheetSelector::Position(index) => {
+            let index = index.get();
+            if package.workbook_ref().sheets().get(index).is_none() {
+                return Err(Error::SheetPositionNotFound {
                     position: Position::new(index),
                 });
             }
@@ -1233,20 +1179,21 @@ pub(super) fn select_chart_with_budget(
     chart_selector: ChartSelector,
     require_editable: bool,
     budget: &mut ChartBudget,
-) -> Result<ChartSelection, ChartArrangementError> {
+) -> Result<ChartSelection, Error> {
     let sheet_position = resolve_sheet_position(package, sheet_selector)?;
     let charts = discover_sheet_charts(package, sheet_position, require_editable, budget)?;
-    charts.into_iter().nth(chart_selector.as_index()).ok_or(
-        ChartArrangementError::ChartPositionNotFound {
+    charts
+        .into_iter()
+        .nth(chart_selector.as_position().get())
+        .ok_or(Error::ChartPositionNotFound {
             position: chart_selector.as_position(),
-        },
-    )
+        })
 }
 
 fn root_document_with_budget(
     package: &Package,
     budget: &mut ChartBudget,
-) -> Result<numbers_sheet_order_codec::DocumentSheetOrderSnapshot, ChartArrangementError> {
+) -> Result<numbers_sheet_order_codec::DocumentSheetOrderSnapshot, Error> {
     let payload =
         Package::root_document_payload(&package.state.components).map_err(map_package_error)?;
     let fields = payload
@@ -1268,27 +1215,22 @@ fn root_document_with_budget(
         .checked_add(
             references
                 .checked_mul(size_of::<numbers_sheet_order_codec::ReferenceSnapshot>())
-                .ok_or(ChartArrangementError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )
-        .ok_or(ChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     ChartBudget::preflight(
         budget.input,
         payload.len(),
         budget.max_input,
-        ChartArrangementLimitKind::WireBytes,
+        LimitKind::WireBytes,
     )?;
     ChartBudget::preflight(
         budget.fields,
         fields,
         budget.max_fields,
-        ChartArrangementLimitKind::WireFields,
+        LimitKind::WireFields,
     )?;
-    ChartBudget::preflight(
-        budget.work,
-        work,
-        budget.max_work,
-        ChartArrangementLimitKind::WireWork,
-    )?;
+    ChartBudget::preflight(budget.work, work, budget.max_work, LimitKind::WireWork)?;
     budget.preflight_allocations(1)?;
     budget.preflight_retained(retained)?;
     let document = Package::root_document(&package.state.components).map_err(map_package_error)?;
@@ -1305,7 +1247,7 @@ fn discover_sheet_charts(
     sheet_position: Position,
     _require_editable: bool,
     budget: &mut ChartBudget,
-) -> Result<Vec<ChartSelection>, ChartArrangementError> {
+) -> Result<Vec<ChartSelection>, Error> {
     let document = root_document_with_budget(package, budget)?;
     let sheet_references = document.sheet_references();
     let sheet_reference_count = sheet_references.len();
@@ -1313,24 +1255,25 @@ fn discover_sheet_charts(
         budget.references,
         sheet_reference_count,
         budget.max_references,
-        ChartArrangementLimitKind::References,
+        LimitKind::References,
     )?;
     ChartBudget::preflight(
         budget.work,
         sheet_reference_count,
         budget.max_work,
-        ChartArrangementLimitKind::WireWork,
+        LimitKind::WireWork,
     )?;
     budget.references(sheet_reference_count)?;
     budget.work(sheet_reference_count)?;
-    let sheet_reference = sheet_references.get(sheet_position.get()).ok_or(
-        ChartArrangementError::SheetPositionNotFound {
-            position: sheet_position,
-        },
-    )?;
+    let sheet_reference =
+        sheet_references
+            .get(sheet_position.get())
+            .ok_or(Error::SheetPositionNotFound {
+                position: sheet_position,
+            })?;
     let sheet_identifier = sheet_reference.identifier();
     if sheet_identifier == 0 || sheet_reference.deprecated_is_external() == Some(true) {
-        return Err(ChartArrangementError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if sheet_references
         .iter()
@@ -1338,32 +1281,32 @@ fn discover_sheet_charts(
         .count()
         != 1
     {
-        return Err(ChartArrangementError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let resolved_sheet = package
         .state
         .index
         .resolve_ref_id(&package.state.components, sheet_identifier)
         .map_err(map_package_error)?
-        .ok_or(ChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let sheet_object = object_from_resolved(package, resolved_sheet)?;
     if sheet_object.archive_info.identifier != Some(sheet_identifier) {
-        return Err(ChartArrangementError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     validate_message_metadata(sheet_object)?;
     let has_sheet = unique_typed_message(sheet_object, SHEET_MESSAGE_TYPE)?.is_some();
     let has_form_sheet =
         unique_typed_message(sheet_object, FORM_BASED_SHEET_MESSAGE_TYPE)?.is_some();
     if has_sheet == has_form_sheet {
-        return Err(ChartArrangementError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let sheet_message_type = if has_sheet {
         SHEET_MESSAGE_TYPE
     } else {
         FORM_BASED_SHEET_MESSAGE_TYPE
     };
-    let (_, sheet_message) = unique_typed_message(sheet_object, sheet_message_type)?
-        .ok_or(ChartArrangementError::InvalidSource)?;
+    let (_, sheet_message) =
+        unique_typed_message(sheet_object, sheet_message_type)?.ok_or(Error::InvalidSource)?;
     let drawable_identifiers =
         sheet_drawable_identifiers(sheet_message_type, sheet_message.data.as_slice(), budget)?;
     let chart_capacity = drawable_identifiers.len();
@@ -1371,19 +1314,19 @@ fn discover_sheet_charts(
     budget.preflight_retained(
         chart_capacity
             .checked_mul(size_of::<ChartSelection>())
-            .ok_or(ChartArrangementError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     let mut charts = Vec::new();
     charts
         .try_reserve_exact(chart_capacity)
-        .map_err(|_| ChartArrangementError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: chart_capacity,
         })?;
     budget.allocations(1)?;
     budget.retained(
         chart_capacity
             .checked_mul(size_of::<ChartSelection>())
-            .ok_or(ChartArrangementError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
 
     // A repeated sheet drawable reference would make semantic chart
@@ -1394,25 +1337,25 @@ fn discover_sheet_charts(
     budget.preflight_retained(
         chart_capacity
             .checked_mul(size_of::<u64>())
-            .ok_or(ChartArrangementError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     let mut seen_drawables = Vec::new();
     seen_drawables
         .try_reserve_exact(chart_capacity)
-        .map_err(|_| ChartArrangementError::Allocation {
+        .map_err(|_| Error::Allocation {
             amount: chart_capacity,
         })?;
     budget.allocations(1)?;
     budget.retained(
         chart_capacity
             .checked_mul(size_of::<u64>())
-            .ok_or(ChartArrangementError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
 
     for drawable_identifier in drawable_identifiers {
         budget.work(seen_drawables.len())?;
         if seen_drawables.contains(&drawable_identifier) {
-            return Err(ChartArrangementError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         seen_drawables.push(drawable_identifier);
         budget.references(1)?;
@@ -1421,10 +1364,10 @@ fn discover_sheet_charts(
             .index
             .resolve_ref_id(&package.state.components, drawable_identifier)
             .map_err(map_package_error)?
-            .ok_or(ChartArrangementError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let object = object_from_resolved(package, resolved)?;
         if object.archive_info.identifier != Some(drawable_identifier) {
-            return Err(ChartArrangementError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let Some((message_index, message)) = unique_typed_message(object, CHART_MESSAGE_TYPE)?
         else {
@@ -1434,11 +1377,11 @@ fn discover_sheet_charts(
             .archive_info
             .message_infos
             .get(message_index)
-            .ok_or(ChartArrangementError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         validate_chart_message_metadata(object, info, sheet_identifier)?;
         let parent = chart_parent_identifier(message.data.as_slice(), budget)?;
         if parent != sheet_identifier {
-            return Err(ChartArrangementError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         let before = decode_arrangement(message.data.as_slice(), budget)?;
         let component = package
@@ -1446,7 +1389,7 @@ fn discover_sheet_charts(
             .components
             .catalog()
             .get_index(resolved.component_index)
-            .ok_or(ChartArrangementError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         let component_name: Arc<str> = Arc::from(component.name());
         budget.retained(component.name().len())?;
         budget.allocations(1)?;
@@ -1470,7 +1413,7 @@ fn sheet_drawable_identifiers(
     message_type: u32,
     source: &[u8],
     budget: &mut ChartBudget,
-) -> Result<Vec<u64>, ChartArrangementError> {
+) -> Result<Vec<u64>, Error> {
     let maximum = budget.max_references.saturating_sub(budget.references);
     let mut count = 0usize;
     let preflight =
@@ -1520,14 +1463,14 @@ fn sheet_drawable_identifiers(
     budget.preflight_scan(preflight)?;
     let identifier_bound = count
         .checked_mul(size_of::<u64>())
-        .ok_or(ChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.preflight_allocations(3)?;
     budget.preflight_retained(
         source
             .len()
             .checked_add(identifier_bound)
             .and_then(|amount| amount.checked_add(source.len()))
-            .ok_or(ChartArrangementError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     budget.charge_preflight_scan(preflight)?;
     // `names::preflight_sheet_payload` performs its own bounded tree walk
@@ -1537,10 +1480,10 @@ fn sheet_drawable_identifiers(
     // names projection's shallower pass.
     budget.preflight_scan(preflight)?;
     let (_name, identifiers) = super::names::preflight_sheet_payload(message_type, source, maximum)
-        .map_err(|_| ChartArrangementError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
     budget.charge_preflight_scan(preflight)?;
     if identifiers.len() != count {
-        return Err(ChartArrangementError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     budget.allocations(3)?;
     budget.retained(
@@ -1550,9 +1493,9 @@ fn sheet_drawable_identifiers(
                 identifiers
                     .len()
                     .checked_mul(size_of::<u64>())
-                    .ok_or(ChartArrangementError::InvalidSource)?,
+                    .ok_or(Error::InvalidSource)?,
             )
-            .ok_or(ChartArrangementError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
     )?;
     budget.references(identifiers.len())?;
     budget.work(identifiers.len())?;
@@ -1562,37 +1505,35 @@ fn sheet_drawable_identifiers(
 pub(super) fn object_from_resolved<'a>(
     package: &'a Package,
     resolved: crate::package::index::Resolved<'a>,
-) -> Result<&'a ArchiveObject, ChartArrangementError> {
+) -> Result<&'a ArchiveObject, Error> {
     package
         .state
         .components
         .catalog()
         .get_index(resolved.component_index)
         .and_then(|component| component.archive().objects.get(resolved.object_index))
-        .ok_or(ChartArrangementError::InvalidSource)
+        .ok_or(Error::InvalidSource)
 }
 
 pub(super) fn unique_typed_message(
     object: &ArchiveObject,
     message_type: u32,
-) -> Result<Option<(usize, &RawMessage)>, ChartArrangementError> {
+) -> Result<Option<(usize, &RawMessage)>, Error> {
     let mut selected = None;
     for (index, message) in object.messages.iter().enumerate() {
         if message.type_ != message_type {
             continue;
         }
         if selected.replace((index, message)).is_some() {
-            return Err(ChartArrangementError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(selected)
 }
 
-pub(super) fn validate_message_metadata(
-    object: &ArchiveObject,
-) -> Result<(), ChartArrangementError> {
+pub(super) fn validate_message_metadata(object: &ArchiveObject) -> Result<(), Error> {
     if object.messages.len() != object.archive_info.message_infos.len() {
-        return Err(ChartArrangementError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     for (message, info) in object
         .messages
@@ -1602,7 +1543,7 @@ pub(super) fn validate_message_metadata(
         if message.type_ != info.type_
             || usize::try_from(info.length).ok() != Some(message.data.len())
         {
-            return Err(ChartArrangementError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
     }
     Ok(())
@@ -1612,7 +1553,7 @@ fn validate_chart_message_metadata(
     object: &ArchiveObject,
     info: &litchi_iwa_core::MessageInfo,
     sheet_identifier: u64,
-) -> Result<(), ChartArrangementError> {
+) -> Result<(), Error> {
     if info.base_message_index.is_some()
         || !info.diff_merge_version.is_empty()
         || info.diff_field_path.is_some()
@@ -1620,10 +1561,10 @@ fn validate_chart_message_metadata(
         || !info.diff_read_version.is_empty()
         || object.archive_info.should_merge == Some(true)
     {
-        return Err(ChartArrangementError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if !chart_parent_metadata_is_owned(info, sheet_identifier) {
-        return Err(ChartArrangementError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(())
 }
@@ -1663,10 +1604,7 @@ fn chart_parent_metadata_is_owned(info: &litchi_iwa_core::MessageInfo, identifie
     matches!((aggregate, field_occurrence), (0, 0) | (1, 0 | 1))
 }
 
-fn chart_parent_identifier(
-    payload: &[u8],
-    budget: &mut ChartBudget,
-) -> Result<u64, ChartArrangementError> {
+fn chart_parent_identifier(payload: &[u8], budget: &mut ChartBudget) -> Result<u64, Error> {
     let root = parse_wire_view_with_budget(payload, 1, budget)?;
     let mut super_payload = None;
     for field in root.fields() {
@@ -1674,14 +1612,14 @@ fn chart_parent_identifier(
             continue;
         }
         if super_payload.is_some() || field.wire_type() != 2 {
-            return Err(ChartArrangementError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field
             .validate_canonical_framing()
             .map_err(map_common_error)?;
         super_payload = Some(field.payload());
     }
-    let super_payload = super_payload.ok_or(ChartArrangementError::InvalidSource)?;
+    let super_payload = super_payload.ok_or(Error::InvalidSource)?;
     let drawable = parse_wire_view_with_budget(super_payload, 2, budget)?;
     let mut parent_payload = None;
     for field in drawable.fields() {
@@ -1689,14 +1627,14 @@ fn chart_parent_identifier(
             continue;
         }
         if parent_payload.is_some() || field.wire_type() != 2 {
-            return Err(ChartArrangementError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field
             .validate_canonical_framing()
             .map_err(map_common_error)?;
         parent_payload = Some(field.payload());
     }
-    let parent_payload = parent_payload.ok_or(ChartArrangementError::InvalidSource)?;
+    let parent_payload = parent_payload.ok_or(Error::InvalidSource)?;
     let reference = parse_wire_view_with_budget(parent_payload, 3, budget)?;
     let mut identifier = None;
     for field in reference.fields() {
@@ -1704,27 +1642,27 @@ fn chart_parent_identifier(
             continue;
         }
         if identifier.is_some() || field.wire_type() != 0 {
-            return Err(ChartArrangementError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         field.validate_canonical_key().map_err(map_common_error)?;
-        let (value, consumed) = decode_varint_from_bytes(field.payload())
-            .map_err(|_| ChartArrangementError::InvalidSource)?;
+        let (value, consumed) =
+            decode_varint_from_bytes(field.payload()).map_err(|_| Error::InvalidSource)?;
         if consumed != field.payload().len()
             || litchi_iwa_common::varint::encoded_len(value) != consumed
             || value == 0
         {
-            return Err(ChartArrangementError::InvalidSource);
+            return Err(Error::InvalidSource);
         }
         identifier = Some(value);
     }
-    identifier.ok_or(ChartArrangementError::InvalidSource)
+    identifier.ok_or(Error::InvalidSource)
 }
 
 pub(super) fn parse_wire_view_with_budget<'source>(
     payload: &'source [u8],
     depth: usize,
     budget: &mut ChartBudget,
-) -> Result<WireView<'source>, ChartArrangementError> {
+) -> Result<WireView<'source>, Error> {
     // Count only top-level fields before constructing `WireView`; its private
     // span vector grows with fields, rather than with the size of an opaque
     // length-delimited payload. The preflight itself is allocation-free but
@@ -1739,7 +1677,7 @@ pub(super) fn parse_wire_view_with_budget<'source>(
         .fields()
         .checked_mul(4)
         .and_then(|capacity| capacity.checked_mul(WIRE_VIEW_SPAN_BYTES_PER_FIELD))
-        .ok_or(ChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     // The span parser reserves incrementally; bound growth events and the
     // cumulative capacities, including its initial four-slot allocation.
     let span_allocations = preflight.fields();
@@ -1754,16 +1692,13 @@ pub(super) fn parse_wire_view_with_budget<'source>(
     Ok(view)
 }
 
-fn decode_arrangement(
-    payload: &[u8],
-    budget: &mut ChartBudget,
-) -> Result<ChartArrangement, ChartArrangementError> {
+fn decode_arrangement(payload: &[u8], budget: &mut ChartBudget) -> Result<ChartArrangement, Error> {
     let options = budget.codec_options(payload)?;
     let (snapshot, report) =
         codec::decode_chart_arrangement_with_report(payload, options).map_err(map_codec_error)?;
     budget.codec_report(report)?;
     if !snapshot.has_drawable() {
-        return Err(ChartArrangementError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(ChartArrangement::new(
         snapshot.is_locked(),
@@ -1786,7 +1721,7 @@ fn commit_edit(
     source: &Package,
     selection: &ChartSelection,
     after: ChartArrangement,
-) -> Result<ChartArrangementCommit, ChartArrangementError> {
+) -> Result<Commit, Error> {
     let catalog = physical_catalog(source)?;
     let source_owner = catalog.__source_owner();
     let mut budget = ChartBudget::for_package(source)?;
@@ -1799,12 +1734,12 @@ fn commit_edit(
         &mut budget,
     )?;
     if !same_selection(&current, selection) || current.before != selection.before {
-        return Err(ChartArrangementError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     if selection.before == after {
-        return Ok(ChartArrangementCommit {
+        return Ok(Commit {
             package: source.snapshot(),
-            patch: ChartArrangementPatch {
+            patch: Patch {
                 artifacts: OwnedExactArtifacts::new(source_owner.clone(), source_owner),
                 selection: selection.clone(),
                 before: selection.before,
@@ -1812,11 +1747,11 @@ fn commit_edit(
                 source_payload: None,
                 target_payload: None,
             },
-            diagnostics: ChartArrangementDiagnostics::unchanged(),
+            diagnostics: Diagnostics::unchanged(),
         });
     }
     if !catalog.source_is_exact() {
-        return Err(ChartArrangementError::UnsupportedSource);
+        return Err(Error::UnsupportedSource);
     }
     let candidate = rewrite_chart(source, selection, after, &mut budget)?;
     let target_catalog = physical_catalog(&candidate)?;
@@ -1829,7 +1764,7 @@ fn commit_edit(
         &mut budget,
     )?;
     if !same_selection(&selected, selection) || selected.before != after {
-        return Err(ChartArrangementError::Verification);
+        return Err(Error::Verification);
     }
     let source_payload = selected_chart_payload(source, selection)?;
     let target_payload = selected_chart_payload(&candidate, selection)?;
@@ -1842,9 +1777,9 @@ fn commit_edit(
     )?;
     let (source_payload, target_payload) =
         retain_payload_pair(source_payload, target_payload, &mut budget)?;
-    Ok(ChartArrangementCommit {
+    Ok(Commit {
         package: candidate,
-        patch: ChartArrangementPatch {
+        patch: Patch {
             artifacts: OwnedExactArtifacts::new(source_owner, target_owner),
             selection: selection.clone(),
             before: selection.before,
@@ -1852,7 +1787,7 @@ fn commit_edit(
             source_payload: Some(source_payload),
             target_payload: Some(target_payload),
         },
-        diagnostics: ChartArrangementDiagnostics::published(),
+        diagnostics: Diagnostics::published(),
     })
 }
 
@@ -1870,7 +1805,7 @@ pub(super) fn rewrite_selected_chart_payload(
     selection: &ChartSelection,
     rewritten: Vec<u8>,
     budget: &mut ChartBudget,
-) -> Result<Package, ChartArrangementError> {
+) -> Result<Package, Error> {
     rewrite_selected_chart_payload_with_previews(source, selection, rewritten, false, budget)
 }
 
@@ -1885,10 +1820,10 @@ pub(super) fn rewrite_selected_chart_payload_with_previews(
     rewritten: Vec<u8>,
     delete_previews: bool,
     budget: &mut ChartBudget,
-) -> Result<Package, ChartArrangementError> {
+) -> Result<Package, Error> {
     let catalog = physical_catalog(source)?;
     if is_root_preview_name(selection.component_name.as_ref()) {
-        return Err(ChartArrangementError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let mut deleted_previews = [""; ROOT_PREVIEW_NAMES.len()];
     let deleted_preview_count = if delete_previews {
@@ -1900,13 +1835,13 @@ pub(super) fn rewrite_selected_chart_payload_with_previews(
         .package()
         .iter()
         .find(|entry| entry.name() == selection.component_name.as_ref())
-        .ok_or(ChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if entry.is_opaque() {
-        return Err(ChartArrangementError::UnsupportedSource);
+        return Err(Error::UnsupportedSource);
     }
     let component = package_component(source, selection.component_index)?;
     if component.name() != selection.component_name.as_ref() {
-        return Err(ChartArrangementError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let source_archive = component.archive();
     let archive_limits = source
@@ -1914,25 +1849,25 @@ pub(super) fn rewrite_selected_chart_payload_with_previews(
         .options
         .archive()
         .effective_archive_limits()
-        .map_err(|_| ChartArrangementError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
     let snappy_limits = source
         .state
         .options
         .archive()
         .snappy_limits()
-        .map_err(|_| ChartArrangementError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
     let object = source_archive
         .objects
         .get(selection.object_index)
-        .ok_or(ChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if object.archive_info.identifier != Some(selection.chart_identifier) {
-        return Err(ChartArrangementError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     validate_message_metadata(object)?;
-    let (message_index, message) = unique_typed_message(object, CHART_MESSAGE_TYPE)?
-        .ok_or(ChartArrangementError::InvalidSource)?;
+    let (message_index, message) =
+        unique_typed_message(object, CHART_MESSAGE_TYPE)?.ok_or(Error::InvalidSource)?;
     if message_index != selection.message_index {
-        return Err(ChartArrangementError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     validate_chart_message_metadata(
         object,
@@ -1940,21 +1875,21 @@ pub(super) fn rewrite_selected_chart_payload_with_previews(
             .archive_info
             .message_infos
             .get(message_index)
-            .ok_or(ChartArrangementError::InvalidSource)?,
+            .ok_or(Error::InvalidSource)?,
         selection.sheet_identifier,
     )?;
     let original = message.data.as_slice();
     let source_encoded_len = source_archive
         .encoded_len_with_limits(archive_limits)
-        .map_err(|_| ChartArrangementError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
     let encoded_bound =
         rewritten_archive_bound(source_encoded_len, original.len(), rewritten.len())?;
-    let compressed_bound = SnappyStream::maximum_compressed_len(encoded_bound)
-        .map_err(|_| ChartArrangementError::InvalidSource)?;
+    let compressed_bound =
+        SnappyStream::maximum_compressed_len(encoded_bound).map_err(|_| Error::InvalidSource)?;
     let (snappy_allocations, snappy_scratch) = snappy_compression_requirements(encoded_bound)?;
     if compressed_bound > snappy_limits.max_compressed_stream() {
-        return Err(ChartArrangementError::LimitExceeded {
-            kind: ChartArrangementLimitKind::OutputBytes,
+        return Err(Error::LimitExceeded {
+            kind: LimitKind::OutputBytes,
             observed: compressed_bound as u64,
             maximum: snappy_limits.max_compressed_stream() as u64,
         });
@@ -1976,11 +1911,11 @@ pub(super) fn rewrite_selected_chart_payload_with_previews(
         // temporary compressed buffer per write chunk.
         .and_then(|amount| amount.checked_add(1))
         .and_then(|amount| amount.checked_add(snappy_allocations))
-        .ok_or(ChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let total_work = clone_work
         .checked_add(header_work)
         .and_then(|amount| amount.checked_add(serialization_work))
-        .ok_or(ChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.preflight_allocations(total_allocations)?;
     budget.preflight_work(total_work)?;
     let temporary_retained = clone_retained
@@ -1989,7 +1924,7 @@ pub(super) fn rewrite_selected_chart_payload_with_previews(
         .and_then(|amount| amount.checked_add(encoded_bound))
         .and_then(|amount| amount.checked_add(compressed_bound))
         .and_then(|amount| amount.checked_add(snappy_scratch))
-        .ok_or(ChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.preflight_retained(temporary_retained)?;
     budget.preflight_scratch(snappy_scratch)?;
     budget.allocations(total_allocations)?;
@@ -2002,7 +1937,7 @@ pub(super) fn rewrite_selected_chart_payload_with_previews(
     archive
         .objects
         .get_mut(selection.object_index)
-        .ok_or(ChartArrangementError::InvalidSource)?
+        .ok_or(Error::InvalidSource)?
         .replace_message_preserving_header_with_limits(
             selection.message_index,
             RawMessage {
@@ -2011,14 +1946,13 @@ pub(super) fn rewrite_selected_chart_payload_with_previews(
             },
             archive_limits,
         )
-        .map_err(|_| ChartArrangementError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
     let bytes = archive
         .to_bytes_with_limits(archive_limits)
-        .map_err(|_| ChartArrangementError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
     budget.output(bytes.len())?;
     budget.retained(bytes.len())?;
-    let compressed =
-        SnappyStream::compress(&bytes).map_err(|_| ChartArrangementError::InvalidSource)?;
+    let compressed = SnappyStream::compress(&bytes).map_err(|_| Error::InvalidSource)?;
     budget.retained(compressed.len())?;
     let edits = [EntryEdit::new(
         selection.component_name.as_ref(),
@@ -2030,15 +1964,15 @@ pub(super) fn rewrite_selected_chart_payload_with_previews(
             &deleted_previews[..deleted_preview_count],
             source.state.options.archive(),
         )
-        .map_err(|_| ChartArrangementError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
     let reassembly_requirements = prepared_reassembly.execution_requirements();
     budget.reassembly(reassembly_requirements)?;
     budget.candidate_reopen(reassembly_requirements.output_bytes())?;
     let output = prepared_reassembly
         .execute(reassembly_requirements.exact_limits())
-        .map_err(|_| ChartArrangementError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
     Package::from_owned_bytes_with_options(output, source.state.options)
-        .map_err(|_| ChartArrangementError::Verification)
+        .map_err(|_| Error::Verification)
 }
 
 fn is_root_preview_name(name: &str) -> bool {
@@ -2048,7 +1982,7 @@ fn is_root_preview_name(name: &str) -> bool {
 fn collect_root_preview_deletions(
     catalog: &SourceCatalog,
     output: &mut [&'static str; ROOT_PREVIEW_NAMES.len()],
-) -> Result<usize, ChartArrangementError> {
+) -> Result<usize, Error> {
     let mut count = 0;
     for name in ROOT_PREVIEW_NAMES {
         let matches = catalog
@@ -2062,7 +1996,7 @@ fn collect_root_preview_deletions(
                 output[count] = name;
                 count += 1;
             },
-            _ => return Err(ChartArrangementError::InvalidSource),
+            _ => return Err(Error::InvalidSource),
         }
     }
     Ok(count)
@@ -2073,11 +2007,11 @@ fn rewrite_chart(
     selection: &ChartSelection,
     after: ChartArrangement,
     budget: &mut ChartBudget,
-) -> Result<Package, ChartArrangementError> {
+) -> Result<Package, Error> {
     let original = selected_chart_payload(source, selection)?;
     let before = decode_arrangement(original, budget)?;
     if before != selection.before {
-        return Err(ChartArrangementError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     let options = budget.codec_options(original)?;
     let prepared = codec::prepare_chart_arrangement_rewrite(
@@ -2095,7 +2029,7 @@ fn rewrite_chart(
         .into_output();
     let verified = decode_arrangement(&rewritten, budget)?;
     if verified != after {
-        return Err(ChartArrangementError::Verification);
+        return Err(Error::Verification);
     }
     rewrite_selected_chart_payload(source, selection, rewritten, budget)
 }
@@ -2106,11 +2040,11 @@ pub(super) fn verify_locality(
     selection: &ChartSelection,
     expected_payload: Option<&[u8]>,
     budget: &mut ChartBudget,
-) -> Result<(), ChartArrangementError> {
+) -> Result<(), Error> {
     let source_catalog = physical_catalog(source)?;
     let candidate_catalog = physical_catalog(candidate)?;
     if is_root_preview_name(selection.component_name.as_ref()) {
-        return Err(ChartArrangementError::Verification);
+        return Err(Error::Verification);
     }
     let selected_component = selection.component_name.as_ref();
     let mut entry_work = 0usize;
@@ -2122,7 +2056,7 @@ pub(super) fn verify_locality(
         let entry_work_value = zip_entry_work(entry, entry.name() != selected_component)?;
         entry_work = entry_work
             .checked_add(entry_work_value)
-            .ok_or(ChartArrangementError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     budget.preflight_work(entry_work)?;
     budget.work(entry_work)?;
@@ -2130,34 +2064,34 @@ pub(super) fn verify_locality(
     let source_archive = package_component(source, selection.component_index)?.archive();
     let candidate_archive = package_component(candidate, selection.component_index)?.archive();
     if source_archive.objects.len() != candidate_archive.objects.len() {
-        return Err(ChartArrangementError::Verification);
+        return Err(Error::Verification);
     }
     let archive_limits = source
         .state
         .options
         .archive()
         .effective_archive_limits()
-        .map_err(|_| ChartArrangementError::InvalidSource)?;
+        .map_err(|_| Error::InvalidSource)?;
     let mut object_work = 0usize;
     let mut selected_clone = None;
     for (object_index, source_object) in source_archive.objects.iter().enumerate() {
         let candidate_object = candidate_archive
             .objects
             .get(object_index)
-            .ok_or(ChartArrangementError::Verification)?;
+            .ok_or(Error::Verification)?;
         let source_object_work = archive_object_work(source_object)?;
         let candidate_object_work = archive_object_work(candidate_object)?;
         object_work = object_work
             .checked_add(source_object_work)
             .and_then(|amount| amount.checked_add(candidate_object_work))
-            .ok_or(ChartArrangementError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if object_index == selection.object_index {
             let candidate_message = candidate_object
                 .messages
                 .get(selection.message_index)
-                .ok_or(ChartArrangementError::Verification)?;
+                .ok_or(Error::Verification)?;
             if candidate_message.type_ != CHART_MESSAGE_TYPE {
-                return Err(ChartArrangementError::Verification);
+                return Err(Error::Verification);
             }
             let requirements = archive_object_clone_requirements(
                 source_object,
@@ -2166,12 +2100,12 @@ pub(super) fn verify_locality(
             )?;
             object_work = object_work
                 .checked_add(requirements.2)
-                .ok_or(ChartArrangementError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             selected_clone = Some(requirements);
         }
     }
     if selected_clone.is_none() {
-        return Err(ChartArrangementError::Verification);
+        return Err(Error::Verification);
     }
     budget.preflight_work(object_work)?;
     if let Some((allocations, retained, _work)) = selected_clone {
@@ -2185,24 +2119,24 @@ pub(super) fn verify_locality(
         let candidate_object = candidate_archive
             .objects
             .get(object_index)
-            .ok_or(ChartArrangementError::Verification)?;
+            .ok_or(Error::Verification)?;
         if object_index != selection.object_index {
             if !source_object.same_content_ignoring_offsets(candidate_object) {
-                return Err(ChartArrangementError::Verification);
+                return Err(Error::Verification);
             }
             continue;
         }
         let candidate_message = candidate_object
             .messages
             .get(selection.message_index)
-            .ok_or(ChartArrangementError::Verification)?;
+            .ok_or(Error::Verification)?;
         if candidate_message.type_ != CHART_MESSAGE_TYPE {
-            return Err(ChartArrangementError::Verification);
+            return Err(Error::Verification);
         }
         if let Some(expected_payload) = expected_payload
             && candidate_message.data.as_slice() != expected_payload
         {
-            return Err(ChartArrangementError::Verification);
+            return Err(Error::Verification);
         }
         let mut expected = source_object.clone();
         expected
@@ -2214,11 +2148,11 @@ pub(super) fn verify_locality(
                 },
                 archive_limits,
             )
-            .map_err(|_| ChartArrangementError::Verification)?;
+            .map_err(|_| Error::Verification)?;
         expected.header_length = candidate_object.header_length;
         expected.data_length = candidate_object.data_length;
         if !expected.same_content_ignoring_offsets(candidate_object) {
-            return Err(ChartArrangementError::Verification);
+            return Err(Error::Verification);
         }
     }
     Ok(())
@@ -2228,7 +2162,7 @@ fn verify_package_entries(
     source_catalog: &SourceCatalog,
     candidate_catalog: &SourceCatalog,
     selected_component: &str,
-) -> Result<(), ChartArrangementError> {
+) -> Result<(), Error> {
     let source_previews = root_preview_entries(source_catalog)?;
     let candidate_previews = root_preview_entries(candidate_catalog)?;
     for (source_entry, candidate_entry) in source_previews.into_iter().zip(candidate_previews) {
@@ -2238,7 +2172,7 @@ fn verify_package_entries(
             && (!same_entry_fixed_metadata(source_entry, candidate_entry)
                 || !same_unselected_entry_records(source_entry, candidate_entry))
         {
-            return Err(ChartArrangementError::Verification);
+            return Err(Error::Verification);
         }
     }
 
@@ -2256,19 +2190,19 @@ fn verify_package_entries(
                 if source_entry.name() != candidate_entry.name()
                     || !same_entry_fixed_metadata(source_entry, candidate_entry)
                 {
-                    return Err(ChartArrangementError::Verification);
+                    return Err(Error::Verification);
                 }
                 if source_entry.name() == selected_component {
                     if !same_selected_entry_records(source_entry, candidate_entry) {
-                        return Err(ChartArrangementError::Verification);
+                        return Err(Error::Verification);
                     }
                 } else if !same_unselected_entry_records(source_entry, candidate_entry) {
-                    return Err(ChartArrangementError::Verification);
+                    return Err(Error::Verification);
                 }
             },
             (None, None) => break,
             (Some(_), None) | (None, Some(_)) => {
-                return Err(ChartArrangementError::Verification);
+                return Err(Error::Verification);
             },
         }
     }
@@ -2277,7 +2211,7 @@ fn verify_package_entries(
 
 fn root_preview_entries(
     catalog: &SourceCatalog,
-) -> Result<[Option<&Entry>; ROOT_PREVIEW_NAMES.len()], ChartArrangementError> {
+) -> Result<[Option<&Entry>; ROOT_PREVIEW_NAMES.len()], Error> {
     let mut previews = [None; ROOT_PREVIEW_NAMES.len()];
     for entry in catalog.package().iter() {
         let Some(index) = ROOT_PREVIEW_NAMES
@@ -2287,7 +2221,7 @@ fn root_preview_entries(
             continue;
         };
         if previews[index].is_some() {
-            return Err(ChartArrangementError::Verification);
+            return Err(Error::Verification);
         }
         previews[index] = Some(entry);
     }
@@ -2297,12 +2231,12 @@ fn root_preview_entries(
 pub(super) fn root_preview_count(
     catalog: &SourceCatalog,
     budget: &mut ChartBudget,
-) -> Result<usize, ChartArrangementError> {
+) -> Result<usize, Error> {
     let scan_work = catalog
         .package()
         .len()
         .checked_mul(ROOT_PREVIEW_NAMES.len())
-        .ok_or(ChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.preflight_work(scan_work)?;
     budget.work(scan_work)?;
     let mut previews = [false; ROOT_PREVIEW_NAMES.len()];
@@ -2314,14 +2248,14 @@ pub(super) fn root_preview_count(
             continue;
         };
         if previews[index] {
-            return Err(ChartArrangementError::Verification);
+            return Err(Error::Verification);
         }
         previews[index] = true;
     }
     Ok(previews.into_iter().filter(|present| *present).count())
 }
 
-fn zip_entry_work(entry: &Entry, include_data: bool) -> Result<usize, ChartArrangementError> {
+fn zip_entry_work(entry: &Entry, include_data: bool) -> Result<usize, Error> {
     let metadata = entry.metadata();
     let mut work = entry
         .name()
@@ -2329,18 +2263,18 @@ fn zip_entry_work(entry: &Entry, include_data: bool) -> Result<usize, ChartArran
         .checked_add(entry.raw_name().len())
         .and_then(|amount| amount.checked_add(entry.raw_record().local_record().len()))
         .and_then(|amount| amount.checked_add(entry.raw_record().central_directory_record().len()))
-        .ok_or(ChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if include_data {
         work = work
             .checked_add(entry.data().len())
-            .ok_or(ChartArrangementError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     for header in [metadata.local(), metadata.central()] {
         work = work
             .checked_add(header.name().len())
             .and_then(|amount| amount.checked_add(header.extra().len()))
             .and_then(|amount| amount.checked_add(header.comment().len()))
-            .ok_or(ChartArrangementError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     Ok(work)
 }
@@ -2384,33 +2318,6 @@ fn same_selected_central_record(left: &[u8], right: &[u8]) -> bool {
         && left[28..] == right[28..]
 }
 
-#[cfg(test)]
-mod tests {
-    use super::same_selected_central_record;
-
-    #[test]
-    fn selected_central_record_mask_preserves_timestamp_and_allows_sizes() {
-        let source: Vec<u8> = (0..46).map(|value| value as u8).collect();
-
-        let mut timestamp = source.clone();
-        timestamp[14] ^= 1;
-        assert!(!same_selected_central_record(&source, &timestamp));
-
-        let mut crc = source.clone();
-        crc[16] ^= 1;
-        assert!(same_selected_central_record(&source, &crc));
-
-        let mut high_size = source.clone();
-        high_size[26] ^= 1;
-        high_size[27] ^= 1;
-        assert!(same_selected_central_record(&source, &high_size));
-
-        let mut filename_length = source.clone();
-        filename_length[28] ^= 1;
-        assert!(!same_selected_central_record(&source, &filename_length));
-    }
-}
-
 fn same_unselected_entry_records(left: &Entry, right: &Entry) -> bool {
     if left.data() != right.data()
         || left.metadata() != right.metadata()
@@ -2432,31 +2339,31 @@ fn same_unselected_entry_records(left: &Entry, right: &Entry) -> bool {
 pub(super) fn package_component(
     package: &Package,
     component_index: usize,
-) -> Result<&litchi_iwa_archive::Component, ChartArrangementError> {
+) -> Result<&litchi_iwa_archive::Component, Error> {
     package
         .state
         .components
         .catalog()
         .get_index(component_index)
-        .ok_or(ChartArrangementError::InvalidSource)
+        .ok_or(Error::InvalidSource)
 }
 
 pub(super) fn selected_chart_payload<'source>(
     package: &'source Package,
     selection: &ChartSelection,
-) -> Result<&'source [u8], ChartArrangementError> {
+) -> Result<&'source [u8], Error> {
     let object = package_component(package, selection.component_index)?
         .archive()
         .objects
         .get(selection.object_index)
-        .ok_or(ChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     if object.archive_info.identifier != Some(selection.chart_identifier) {
-        return Err(ChartArrangementError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
-    let (message_index, message) = unique_typed_message(object, CHART_MESSAGE_TYPE)?
-        .ok_or(ChartArrangementError::InvalidSource)?;
+    let (message_index, message) =
+        unique_typed_message(object, CHART_MESSAGE_TYPE)?.ok_or(Error::InvalidSource)?;
     if message_index != selection.message_index {
-        return Err(ChartArrangementError::InvalidSource);
+        return Err(Error::InvalidSource);
     }
     Ok(message.data.as_slice())
 }
@@ -2465,12 +2372,12 @@ pub(super) fn retain_payload_pair(
     source: &[u8],
     target: &[u8],
     budget: &mut ChartBudget,
-) -> Result<(Arc<[u8]>, Arc<[u8]>), ChartArrangementError> {
+) -> Result<(Arc<[u8]>, Arc<[u8]>), Error> {
     let allocations = usize::from(!source.is_empty()) + usize::from(!target.is_empty());
     let retained = source
         .len()
         .checked_add(target.len())
-        .ok_or(ChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     budget.preflight_allocations(allocations)?;
     budget.preflight_retained(retained)?;
     let source = Arc::<[u8]>::from(source);
@@ -2480,24 +2387,24 @@ pub(super) fn retain_payload_pair(
     Ok((source, target))
 }
 
-pub(super) fn physical_catalog(package: &Package) -> Result<&SourceCatalog, ChartArrangementError> {
+pub(super) fn physical_catalog(package: &Package) -> Result<&SourceCatalog, Error> {
     package
         .state
         .components
         .physical()
-        .ok_or(ChartArrangementError::UnsupportedSource)
+        .ok_or(Error::UnsupportedSource)
 }
 
 fn rewritten_archive_bound(
     source_encoded_len: usize,
     original_len: usize,
     replacement_len: usize,
-) -> Result<usize, ChartArrangementError> {
+) -> Result<usize, Error> {
     source_encoded_len
         .checked_sub(original_len)
         .and_then(|value| value.checked_add(replacement_len))
         .and_then(|value| value.checked_add(64))
-        .ok_or(ChartArrangementError::InvalidSource)
+        .ok_or(Error::InvalidSource)
 }
 
 /// Bound the allocations and transient workspace used by the final IWA
@@ -2505,78 +2412,72 @@ fn rewritten_archive_bound(
 /// obtains one temporary compressed vector for each independently encoded
 /// chunk. The neutral stream API exposes the chunk size and output bound, so
 /// account for both before invoking the allocation-bearing compressor.
-fn snappy_compression_requirements(
-    input_len: usize,
-) -> Result<(usize, usize), ChartArrangementError> {
+fn snappy_compression_requirements(input_len: usize) -> Result<(usize, usize), Error> {
     let frame_count = if input_len == 0 {
         0
     } else {
         input_len
             .checked_add(SnappyStream::WRITE_CHUNK_SIZE - 1)
             .and_then(|length| length.checked_div(SnappyStream::WRITE_CHUNK_SIZE))
-            .ok_or(ChartArrangementError::InvalidSource)?
+            .ok_or(Error::InvalidSource)?
     };
     let chunk_output = if input_len == 0 {
         0
     } else {
         SnappyStream::maximum_compressed_len(input_len.min(SnappyStream::WRITE_CHUNK_SIZE))
-            .map_err(|_| ChartArrangementError::InvalidSource)?
+            .map_err(|_| Error::InvalidSource)?
             .checked_sub(4)
-            .ok_or(ChartArrangementError::InvalidSource)?
+            .ok_or(Error::InvalidSource)?
     };
     let encoder_workspace = usize::from(input_len != 0)
         .checked_mul(SNAPPY_ENCODER_WORKSPACE_BYTES)
-        .ok_or(ChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let allocations = frame_count
         .checked_add(1)
         .and_then(|amount| amount.checked_add(usize::from(input_len != 0)))
-        .ok_or(ChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let scratch = chunk_output
         .checked_add(encoder_workspace)
-        .ok_or(ChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     Ok((allocations, scratch))
 }
 
 fn archive_header_rewrite_requirements(
     object: &ArchiveObject,
-) -> Result<(usize, usize, usize), ChartArrangementError> {
-    let header =
-        usize::try_from(object.header_length).map_err(|_| ChartArrangementError::InvalidSource)?;
+) -> Result<(usize, usize, usize), Error> {
+    let header = usize::try_from(object.header_length).map_err(|_| Error::InvalidSource)?;
     let retained = header
         .checked_add(64)
         .and_then(|value| value.checked_mul(3))
-        .ok_or(ChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     Ok((3, retained, archive_object_work(object)?))
 }
 
-fn archive_serialization_requirements(
-    archive: &Archive,
-) -> Result<(usize, usize, usize), ChartArrangementError> {
+fn archive_serialization_requirements(archive: &Archive) -> Result<(usize, usize, usize), Error> {
     let mut retained = 0usize;
     let mut work = 0usize;
     for object in &archive.objects {
-        let header = usize::try_from(object.header_length)
-            .map_err(|_| ChartArrangementError::InvalidSource)?;
+        let header = usize::try_from(object.header_length).map_err(|_| Error::InvalidSource)?;
         retained = retained
             .checked_add(header)
             .and_then(|amount| amount.checked_add(64))
-            .ok_or(ChartArrangementError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         work = work
             .checked_add(archive_object_work(object)?)
-            .ok_or(ChartArrangementError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     let allocations = archive
         .objects
         .len()
         .checked_add(2)
-        .ok_or(ChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     Ok((allocations, retained, work))
 }
 
 fn archive_clone_requirements(
     archive: &Archive,
     encoded_len: usize,
-) -> Result<(usize, usize, usize), ChartArrangementError> {
+) -> Result<(usize, usize, usize), Error> {
     let mut allocations = 0usize;
     let mut retained = encoded_len;
     let mut work = 0usize;
@@ -2584,7 +2485,7 @@ fn archive_clone_requirements(
     for object in &archive.objects {
         work = work
             .checked_add(archive_object_work(object)?)
-            .ok_or(ChartArrangementError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         add_clone_vec::<RawMessage>(object.messages.len(), &mut allocations, &mut retained)?;
         add_clone_vec::<litchi_iwa_core::MessageInfo>(
             object.archive_info.message_infos.len(),
@@ -2592,17 +2493,15 @@ fn archive_clone_requirements(
             &mut retained,
         )?;
         if object.header_length != 0 {
-            allocations = allocations
-                .checked_add(2)
-                .ok_or(ChartArrangementError::InvalidSource)?;
+            allocations = allocations.checked_add(2).ok_or(Error::InvalidSource)?;
             retained = retained
                 .checked_add(
                     usize::try_from(object.header_length)
-                        .map_err(|_| ChartArrangementError::InvalidSource)?
+                        .map_err(|_| Error::InvalidSource)?
                         .checked_mul(2)
-                        .ok_or(ChartArrangementError::InvalidSource)?,
+                        .ok_or(Error::InvalidSource)?,
                 )
-                .ok_or(ChartArrangementError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
         }
         for message in &object.messages {
             add_clone_bytes(message.data.len(), &mut allocations, &mut retained)?;
@@ -2671,17 +2570,17 @@ fn archive_clone_requirements(
 /// exhaust the focused transaction ledger before the first checked
 /// allocation. This helper charges every nested vector and scalar byte
 /// inspected by those operations.
-fn archive_object_work(object: &ArchiveObject) -> Result<usize, ChartArrangementError> {
+fn archive_object_work(object: &ArchiveObject) -> Result<usize, Error> {
     let mut work = size_of::<ArchiveObject>();
     work = work
         .checked_add(object.messages.len())
         .and_then(|amount| amount.checked_add(object.archive_info.message_infos.len()))
-        .ok_or(ChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     for message in &object.messages {
         work = work
             .checked_add(message.data.len())
             .and_then(|amount| amount.checked_add(size_of::<RawMessage>()))
-            .ok_or(ChartArrangementError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     for info in &object.archive_info.message_infos {
         work = work
@@ -2693,16 +2592,16 @@ fn archive_object_work(object: &ArchiveObject) -> Result<usize, ChartArrangement
             .and_then(|amount| amount.checked_add(info.diff_merge_version.len()))
             .and_then(|amount| amount.checked_add(info.fields_to_remove.len()))
             .and_then(|amount| amount.checked_add(info.diff_read_version.len()))
-            .ok_or(ChartArrangementError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
         if let Some(path) = info.diff_field_path.as_ref() {
             work = work
                 .checked_add(path.path.len())
-                .ok_or(ChartArrangementError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
         }
         for path in &info.fields_to_remove {
             work = work
                 .checked_add(path.path.len())
-                .ok_or(ChartArrangementError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
         }
         for field in &info.field_infos {
             work = work
@@ -2711,11 +2610,11 @@ fn archive_object_work(object: &ArchiveObject) -> Result<usize, ChartArrangement
                 .and_then(|amount| amount.checked_add(field.object_references.len()))
                 .and_then(|amount| amount.checked_add(field.data_references.len()))
                 .and_then(|amount| amount.checked_add(field.known_field_version.len()))
-                .ok_or(ChartArrangementError::InvalidSource)?;
+                .ok_or(Error::InvalidSource)?;
             if let Some(identifier) = field.known_field_feature_identifier.as_ref() {
                 work = work
                     .checked_add(identifier.len())
-                    .ok_or(ChartArrangementError::InvalidSource)?;
+                    .ok_or(Error::InvalidSource)?;
             }
         }
     }
@@ -2730,7 +2629,7 @@ fn archive_object_clone_requirements(
     source: &ArchiveObject,
     candidate: &ArchiveObject,
     replacement_len: usize,
-) -> Result<(usize, usize, usize), ChartArrangementError> {
+) -> Result<(usize, usize, usize), Error> {
     let mut allocations = 0usize;
     let mut retained = size_of::<ArchiveObject>();
     add_clone_vec::<RawMessage>(source.messages.len(), &mut allocations, &mut retained)?;
@@ -2795,37 +2694,32 @@ fn archive_object_clone_requirements(
         }
     }
     if source.header_length != 0 {
-        allocations = allocations
-            .checked_add(2)
-            .ok_or(ChartArrangementError::InvalidSource)?;
+        allocations = allocations.checked_add(2).ok_or(Error::InvalidSource)?;
         retained = retained
             .checked_add(
                 usize::try_from(source.header_length)
-                    .map_err(|_| ChartArrangementError::InvalidSource)?
+                    .map_err(|_| Error::InvalidSource)?
                     .checked_mul(2)
-                    .ok_or(ChartArrangementError::InvalidSource)?,
+                    .ok_or(Error::InvalidSource)?,
             )
-            .ok_or(ChartArrangementError::InvalidSource)?;
+            .ok_or(Error::InvalidSource)?;
     }
     add_clone_bytes(replacement_len, &mut allocations, &mut retained)?;
-    let source_header =
-        usize::try_from(source.header_length).map_err(|_| ChartArrangementError::InvalidSource)?;
-    let candidate_header = usize::try_from(candidate.header_length)
-        .map_err(|_| ChartArrangementError::InvalidSource)?;
+    let source_header = usize::try_from(source.header_length).map_err(|_| Error::InvalidSource)?;
+    let candidate_header =
+        usize::try_from(candidate.header_length).map_err(|_| Error::InvalidSource)?;
     let header_scratch = source_header
         .checked_add(candidate_header)
         .and_then(|bytes| bytes.checked_mul(3))
-        .ok_or(ChartArrangementError::InvalidSource)?;
-    allocations = allocations
-        .checked_add(3)
-        .ok_or(ChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
+    allocations = allocations.checked_add(3).ok_or(Error::InvalidSource)?;
     retained = retained
         .checked_add(header_scratch)
-        .ok_or(ChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     let work = archive_object_work(source)?
         .checked_add(replacement_len)
         .and_then(|amount| amount.checked_add(header_scratch))
-        .ok_or(ChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     Ok((allocations, retained, work))
 }
 
@@ -2833,20 +2727,18 @@ fn add_clone_vec<T>(
     length: usize,
     allocations: &mut usize,
     retained: &mut usize,
-) -> Result<(), ChartArrangementError> {
+) -> Result<(), Error> {
     if length == 0 {
         return Ok(());
     }
-    *allocations = allocations
-        .checked_add(1)
-        .ok_or(ChartArrangementError::InvalidSource)?;
+    *allocations = allocations.checked_add(1).ok_or(Error::InvalidSource)?;
     *retained = retained
         .checked_add(
             length
                 .checked_mul(size_of::<T>())
-                .ok_or(ChartArrangementError::InvalidSource)?,
+                .ok_or(Error::InvalidSource)?,
         )
-        .ok_or(ChartArrangementError::InvalidSource)?;
+        .ok_or(Error::InvalidSource)?;
     Ok(())
 }
 
@@ -2854,87 +2746,79 @@ fn add_clone_bytes(
     length: usize,
     allocations: &mut usize,
     retained: &mut usize,
-) -> Result<(), ChartArrangementError> {
+) -> Result<(), Error> {
     add_clone_vec::<u8>(length, allocations, retained)
 }
 
-fn map_common_error(error: CommonError) -> ChartArrangementError {
+fn map_common_error(error: CommonError) -> Error {
     match error {
         CommonError::LimitExceeded {
             kind,
             observed,
             limit,
-        } => ChartArrangementError::LimitExceeded {
+        } => Error::LimitExceeded {
             kind: match kind {
-                CommonLimitKind::InputBytes => ChartArrangementLimitKind::WireBytes,
-                CommonLimitKind::Fields => ChartArrangementLimitKind::WireFields,
-                CommonLimitKind::OutputBytes => ChartArrangementLimitKind::OutputBytes,
-                CommonLimitKind::Nesting => ChartArrangementLimitKind::WireNesting,
-                CommonLimitKind::RewriteWork => ChartArrangementLimitKind::WireWork,
-                _ => ChartArrangementLimitKind::WireWork,
+                CommonLimitKind::InputBytes => LimitKind::WireBytes,
+                CommonLimitKind::Fields => LimitKind::WireFields,
+                CommonLimitKind::OutputBytes => LimitKind::OutputBytes,
+                CommonLimitKind::Nesting => LimitKind::WireNesting,
+                CommonLimitKind::RewriteWork => LimitKind::WireWork,
+                _ => LimitKind::WireWork,
             },
             observed: observed as u64,
             maximum: limit as u64,
         },
-        CommonError::Allocation { amount, .. } => ChartArrangementError::Allocation { amount },
-        _ => ChartArrangementError::InvalidSource,
+        CommonError::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
     }
 }
 
-pub(super) fn map_package_error(error: PackageError) -> ChartArrangementError {
+pub(super) fn map_package_error(error: PackageError) -> Error {
     match error {
         PackageError::Common(error) => map_common_error(error),
-        _ => ChartArrangementError::InvalidSource,
+        _ => Error::InvalidSource,
     }
 }
 
-fn map_codec_error(error: codec::DecodeError) -> ChartArrangementError {
+fn map_codec_error(error: codec::DecodeError) -> Error {
     if let Some(limit) = error.resource_limit() {
         let (kind, observed, maximum) = match limit {
-            DecodeLimit::Bytes { observed, maximum } => {
-                (ChartArrangementLimitKind::WireBytes, observed, maximum)
-            },
-            DecodeLimit::Fields { observed, maximum } => {
-                (ChartArrangementLimitKind::WireFields, observed, maximum)
-            },
-            DecodeLimit::Work { observed, maximum } => {
-                (ChartArrangementLimitKind::WireWork, observed, maximum)
-            },
+            DecodeLimit::Bytes { observed, maximum } => (LimitKind::WireBytes, observed, maximum),
+            DecodeLimit::Fields { observed, maximum } => (LimitKind::WireFields, observed, maximum),
+            DecodeLimit::Work { observed, maximum } => (LimitKind::WireWork, observed, maximum),
             DecodeLimit::Output { observed, maximum } => {
-                (ChartArrangementLimitKind::OutputBytes, observed, maximum)
+                (LimitKind::OutputBytes, observed, maximum)
             },
-            DecodeLimit::Nesting { observed, maximum } => (
-                ChartArrangementLimitKind::WireNesting,
-                observed as usize,
-                maximum as usize,
-            ),
+            DecodeLimit::Nesting { observed, maximum } => {
+                (LimitKind::WireNesting, observed as usize, maximum as usize)
+            },
             DecodeLimit::Allocations { observed, maximum } => {
-                (ChartArrangementLimitKind::Allocations, observed, maximum)
+                (LimitKind::Allocations, observed, maximum)
             },
             DecodeLimit::Retained { observed, maximum } => {
-                (ChartArrangementLimitKind::RetainedBytes, observed, maximum)
+                (LimitKind::RetainedBytes, observed, maximum)
             },
             DecodeLimit::Scratch { observed, maximum } => {
-                (ChartArrangementLimitKind::ScratchBytes, observed, maximum)
+                (LimitKind::ScratchBytes, observed, maximum)
             },
-            _ => return ChartArrangementError::InvalidSource,
+            _ => return Error::InvalidSource,
         };
-        return ChartArrangementError::LimitExceeded {
+        return Error::LimitExceeded {
             kind,
             observed: observed as u64,
             maximum: maximum as u64,
         };
     }
     if let Some(amount) = error.allocation_amount() {
-        return ChartArrangementError::Allocation { amount };
+        return Error::Allocation { amount };
     }
-    ChartArrangementError::InvalidSource
+    Error::InvalidSource
 }
 
 fn physical_component_archive(
     package: &Package,
     component_index: usize,
-) -> Result<&Archive, ChartArrangementError> {
+) -> Result<&Archive, Error> {
     Ok(package_component(package, component_index)?.archive())
 }
 
@@ -2944,9 +2828,33 @@ fn physical_component_archive(
     dead_code,
     reason = "Retained for the host migration's graph diagnostics."
 )]
-fn _component_archive(
-    package: &Package,
-    component_index: usize,
-) -> Result<&Archive, ChartArrangementError> {
+fn _component_archive(package: &Package, component_index: usize) -> Result<&Archive, Error> {
     physical_component_archive(package, component_index)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::same_selected_central_record;
+
+    #[test]
+    fn selected_central_record_mask_preserves_timestamp_and_allows_sizes() {
+        let source: Vec<u8> = (0..46).map(|value| value as u8).collect();
+
+        let mut timestamp = source.clone();
+        timestamp[14] ^= 1;
+        assert!(!same_selected_central_record(&source, &timestamp));
+
+        let mut crc = source.clone();
+        crc[16] ^= 1;
+        assert!(same_selected_central_record(&source, &crc));
+
+        let mut high_size = source.clone();
+        high_size[26] ^= 1;
+        high_size[27] ^= 1;
+        assert!(same_selected_central_record(&source, &high_size));
+
+        let mut filename_length = source.clone();
+        filename_length[28] ^= 1;
+        assert!(!same_selected_central_record(&source, &filename_length));
+    }
 }

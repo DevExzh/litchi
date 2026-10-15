@@ -233,18 +233,14 @@ fn keynote_limits(limits: SnapshotLimits) -> Result<litchi_keynote::SemanticLimi
     .map_err(|_error| Error::invariant(Some(Format::Keynote), Stage::Validation))
 }
 
-fn numbers_limits(limits: SnapshotLimits) -> Result<litchi_numbers::PackageSemanticLimits> {
-    let defaults = litchi_numbers::PackageSemanticLimits::default();
-    litchi_numbers::PackageSemanticLimits::new(
-        defaults.max_objects(),
-        defaults.max_sheets(),
-        limits.max_tables(),
-        defaults.max_references(),
-    )
-    .and_then(|profile| {
-        profile.with_projection_limits(defaults.max_materialized_cells(), limits.max_text_bytes())
-    })
-    .map_err(|_error| Error::invariant(Some(Format::Numbers), Stage::Validation))
+fn numbers_limits(limits: SnapshotLimits) -> Result<litchi_numbers::SemanticLimits> {
+    let defaults = litchi_numbers::SemanticLimits::DEFAULT;
+    defaults
+        .to_builder()
+        .max_tables(limits.max_tables())
+        .and_then(|builder| builder.max_output_text_bytes(limits.max_text_bytes()))
+        .and_then(litchi_numbers::SemanticLimitsBuilder::build)
+        .map_err(|_error| Error::invariant(Some(Format::Numbers), Stage::Validation))
 }
 
 fn map_detection(error: litchi_iwa_detect::Error) -> Error {
@@ -414,12 +410,12 @@ fn keynote_payload_resource(kind: litchi_keynote::PayloadLimitKind) -> Resource 
     }
 }
 
-fn map_numbers(error: litchi_numbers::PackageError) -> Error {
+fn map_numbers(error: litchi_numbers::Error) -> Error {
     if let Some(resource_error) = error.resource_error() {
         return map_numbers_resource_error(resource_error);
     }
     match error {
-        litchi_numbers::PackageError::Io(_error) => Error::new(
+        litchi_numbers::Error::Io(_error) => Error::new(
             ErrorKind::Io,
             Stage::Input,
             Some(Format::Numbers),
@@ -427,14 +423,14 @@ fn map_numbers(error: litchi_numbers::PackageError) -> Error {
             None,
             None,
         ),
-        litchi_numbers::PackageError::InputTooLarge { observed, maximum } => Error::limit(
+        litchi_numbers::Error::InputTooLarge { observed, maximum } => Error::limit(
             Some(Format::Numbers),
             Stage::Input,
             Resource::InputBytes,
             observed,
             maximum,
         ),
-        litchi_numbers::PackageError::SemanticLimit {
+        litchi_numbers::Error::SemanticLimit {
             kind,
             observed,
             maximum,
@@ -450,9 +446,9 @@ fn map_numbers(error: litchi_numbers::PackageError) -> Error {
     }
 }
 
-fn map_numbers_resource_error(error: litchi_numbers::PackageResourceError) -> Error {
+fn map_numbers_resource_error(error: litchi_numbers::ResourceError) -> Error {
     match error {
-        litchi_numbers::PackageResourceError::LimitExceeded {
+        litchi_numbers::ResourceError::LimitExceeded {
             kind,
             observed,
             maximum,
@@ -463,24 +459,24 @@ fn map_numbers_resource_error(error: litchi_numbers::PackageResourceError) -> Er
             usize_u64(observed),
             usize_u64(maximum),
         ),
-        litchi_numbers::PackageResourceError::Allocation { amount } => {
+        litchi_numbers::ResourceError::Allocation { amount } => {
             Error::allocation(Some(Format::Numbers), Stage::Semantic, usize_u64(amount))
         },
         _ => Error::invalid_data(Some(Format::Numbers), Stage::Semantic),
     }
 }
 
-fn numbers_payload_resource(kind: litchi_numbers::PackagePayloadLimitKind) -> Resource {
+fn numbers_payload_resource(kind: litchi_numbers::PayloadLimitKind) -> Resource {
     match kind {
-        litchi_numbers::PackagePayloadLimitKind::InputBytes => Resource::PayloadBytes,
-        litchi_numbers::PackagePayloadLimitKind::Fields => Resource::Fields,
-        litchi_numbers::PackagePayloadLimitKind::OutputBytes => Resource::OutputBytes,
-        litchi_numbers::PackagePayloadLimitKind::Nesting => Resource::NestingDepth,
-        litchi_numbers::PackagePayloadLimitKind::RewriteWork => Resource::SemanticWork,
-        litchi_numbers::PackagePayloadLimitKind::TableRows
-        | litchi_numbers::PackagePayloadLimitKind::TableColumns
-        | litchi_numbers::PackagePayloadLimitKind::TableCells
-        | litchi_numbers::PackagePayloadLimitKind::MaterializedCells => Resource::Cells,
+        litchi_numbers::PayloadLimitKind::InputBytes => Resource::PayloadBytes,
+        litchi_numbers::PayloadLimitKind::Fields => Resource::Fields,
+        litchi_numbers::PayloadLimitKind::OutputBytes => Resource::OutputBytes,
+        litchi_numbers::PayloadLimitKind::Nesting => Resource::NestingDepth,
+        litchi_numbers::PayloadLimitKind::RewriteWork => Resource::SemanticWork,
+        litchi_numbers::PayloadLimitKind::TableRows
+        | litchi_numbers::PayloadLimitKind::TableColumns
+        | litchi_numbers::PayloadLimitKind::TableCells
+        | litchi_numbers::PayloadLimitKind::MaterializedCells => Resource::Cells,
         _ => Resource::SemanticWork,
     }
 }
@@ -496,7 +492,7 @@ fn numbers_resource(kind: litchi_numbers::SemanticLimitKind) -> Resource {
         | litchi_numbers::SemanticLimitKind::TextBytes => Resource::TextBytes,
         litchi_numbers::SemanticLimitKind::FormulaRenderDepth
         | litchi_numbers::SemanticLimitKind::FormulaDepth => Resource::NestingDepth,
-        litchi_numbers::SemanticLimitKind::FormulaWireBytes => Resource::PayloadBytes,
+        litchi_numbers::SemanticLimitKind::FormulaCategoryBytes => Resource::PayloadBytes,
         litchi_numbers::SemanticLimitKind::FormulaRenderWork
         | litchi_numbers::SemanticLimitKind::FormulaWork => Resource::SemanticWork,
         _ => Resource::SemanticWork,
@@ -807,7 +803,7 @@ mod tests {
                 Resource::NestingDepth,
             ),
             (
-                litchi_numbers::SemanticLimitKind::FormulaWireBytes,
+                litchi_numbers::SemanticLimitKind::FormulaCategoryBytes,
                 Resource::PayloadBytes,
             ),
             (
@@ -824,11 +820,11 @@ mod tests {
             ),
         ];
         for (kind, resource) in resources {
-            let error = map_numbers(litchi_numbers::PackageError::SemanticLimit {
+            let error = map_numbers(litchi_numbers::Error::SemanticLimit {
                 kind,
                 observed: 9,
                 maximum: 8,
-                path: litchi_numbers::PackageSemanticPath::Package,
+                path: litchi_numbers::SemanticPath::Package,
             });
             assert_limit_shape(error, Format::Numbers, Stage::Semantic, resource);
         }
@@ -836,7 +832,9 @@ mod tests {
 
     #[test]
     fn numbers_payload_limits_map_every_known_resource_exactly() {
-        use litchi_numbers::{PackagePayloadLimitKind as LimitKind, PackageResourceError};
+        use litchi_numbers::{
+            PayloadLimitKind as LimitKind, ResourceError as PackageResourceError,
+        };
 
         let resources = [
             (LimitKind::InputBytes, Resource::PayloadBytes),
@@ -861,9 +859,8 @@ mod tests {
 
     #[test]
     fn numbers_allocation_preserves_amount_without_internal_resource_text() {
-        let error = map_numbers_resource_error(litchi_numbers::PackageResourceError::Allocation {
-            amount: 17,
-        });
+        let error =
+            map_numbers_resource_error(litchi_numbers::ResourceError::Allocation { amount: 17 });
         assert_eq!(error.kind(), ErrorKind::Allocation);
         assert_eq!(error.stage(), Stage::Semantic);
         assert_eq!(error.format(), Some(Format::Numbers));
@@ -907,9 +904,7 @@ mod tests {
         const PRIVATE: &str = "private-path/member/authored-value";
         let invalid = [
             map_keynote(litchi_keynote::ReadError::InvalidFormat(PRIVATE.to_owned())),
-            map_numbers(litchi_numbers::PackageError::InvalidFormat(
-                PRIVATE.to_owned(),
-            )),
+            map_numbers(litchi_numbers::Error::InvalidFormat(PRIVATE.to_owned())),
             map_pages(litchi_pages::PackageError::InvalidFormat(
                 PRIVATE.to_owned(),
             )),

@@ -17,6 +17,8 @@
 /// three).
 /// Public diagnostics and errors are content-free and do not expose retained
 /// implementation identifiers.
+/// Sheet-chart transaction families.
+pub mod chart;
 pub mod order;
 
 use std::collections::HashSet;
@@ -180,7 +182,10 @@ impl Sheet {
                 }
                 Ok(Some(table))
             },
-            TableSelector::Index(index) => Ok(self.tables.get(index)),
+            TableSelector::Position(index) => {
+                let index = index.get();
+                Ok(self.tables.get(index))
+            },
         }
     }
 
@@ -220,7 +225,7 @@ impl Sheet {
     /// This selector currently cannot fail for a valid position; the
     /// `Result` keeps the selector boundary explicit for future validation.
     pub fn at(&self, index: usize) -> Result<Option<&Table>> {
-        self.select(TableSelector::Index(index))
+        self.select(TableSelector::index(index))
     }
 
     /// Returns whether the sheet has no tables.
