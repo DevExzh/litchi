@@ -25,6 +25,25 @@ use std::collections::{HashMap, HashSet};
 use std::io::{Read, Seek};
 use std::sync::Arc;
 
+/// Consumes an embedded substream whose BOF was just read, through its
+/// matching EOF (nested substreams included).
+fn skip_embedded_substream(records: &mut Records<'_>) -> Result<()> {
+    let mut depth = 1_usize;
+    for record in records.by_ref() {
+        match record?.kind().get() {
+            0x0809 => depth += 1,
+            0x000A => {
+                depth -= 1;
+                if depth == 0 {
+                    return Ok(());
+                }
+            },
+            _ => {},
+        }
+    }
+    Err(Error::Eof("embedded substream has no EOF record"))
+}
+
 #[derive(Clone, Copy)]
 struct FormulaLink {
     row: u16,
@@ -390,6 +409,16 @@ impl<R: Read + Seek> Reader<R> {
 
         while let Some(record_result) = records_iter.next() {
             let record = record_result?;
+            if record.kind().get() == 0x0809 {
+                // The worksheet's own BOF was consumed by the caller, so a
+                // BOF here opens an embedded substream (an embedded chart
+                // after its drawing object: MS-XLS 2.1.7.20.6 OBJECTS). Its
+                // records belong to that substream, whose own owner (the chart
+                // inventory) reads them; the worksheet collectors must not see
+                // its HEADER, WINDOW2 or EOF.
+                skip_embedded_substream(records_iter)?;
+                continue;
+            }
             let record_position = region.base_position + record.offset() as u64;
             sheet_layout_collector.feed_record(record.kind().get(), record.payload())?;
             comment_collector.feed_record(record.kind().get(), record.payload())?;
