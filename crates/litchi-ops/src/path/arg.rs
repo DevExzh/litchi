@@ -218,6 +218,15 @@ impl<'p> PathArg<'p> {
     pub(crate) fn origin(&self) -> Origin<'p> {
         self.origin
     }
+
+    /// The same path, borrowed: no step is copied (record 0291).
+    pub(crate) fn reborrow(&self) -> PathArg<'_> {
+        PathArg {
+            held: Held::Borrowed(self.path()),
+            origin: self.origin,
+            raw: self.raw,
+        }
+    }
 }
 
 impl<'p> From<Path<'p>> for PathArg<'p> {

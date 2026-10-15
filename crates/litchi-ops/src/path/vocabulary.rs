@@ -11,7 +11,8 @@
 //! from an unknown name.
 //!
 //! Every table is a `static` sorted array, checked at compile time. Lookups
-//! binary-search with an inline ASCII case-insensitive comparison; they never
+//! scan the few aliases that share a name's first letter, through an index
+//! computed at compile time ([`AliasIndex`], record 0291); they never
 //! allocate.
 //!
 //! # Sources
@@ -227,21 +228,125 @@ pub(crate) struct Vocabulary {
     pub(crate) elements: &'static [ElementRule],
     /// The family's top-level path forms, for `unsupported_path` suggestions.
     pub(crate) roots: &'static str,
+    /// Lookup tables over `aliases` and `elements`, computed at compile
+    /// time by [`Vocabulary::indexed`] (record 0291).
+    pub(crate) index: AliasIndex,
+}
+
+/// The most aliases one vocabulary may have: the size of
+/// [`AliasIndex::rules`].
+const MAX_ALIASES: usize = 128;
+
+/// Compile-time lookup tables of a [`Vocabulary`] (record 0291). A path step
+/// is classified on every `get`, `find` and `set`; a binary search over the
+/// alias table with a case-folding comparison cost about 400 instructions
+/// per step, and the element rule another 300. The tables below make both a
+/// short scan of the aliases that share the step's first letter.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct AliasIndex {
+    /// For each ASCII byte `b`, aliases `starts[b]..starts[b + 1]` begin
+    /// with `b` (aliases are lowercase and sorted).
+    starts: [u8; 129],
+    /// For each alias, the position of its canonical name's rule in
+    /// `elements`.
+    rules: [u8; MAX_ALIASES],
+    /// The position of the root's rule in `elements`.
+    root: u8,
+}
+
+impl AliasIndex {
+    /// The placeholder a vocabulary literal starts from; replaced by
+    /// [`Vocabulary::indexed`].
+    pub(crate) const EMPTY: Self = Self {
+        starts: [0; 129],
+        rules: [0; MAX_ALIASES],
+        root: 0,
+    };
 }
 
 impl Vocabulary {
+    /// The vocabulary with its [`AliasIndex`] computed. Fails compilation
+    /// when an alias does not start with an ASCII byte, a vocabulary has
+    /// more than [`MAX_ALIASES`] aliases or 256 elements, or an alias or the
+    /// root names no element.
+    pub(crate) const fn indexed(self) -> Self {
+        let aliases = self.aliases;
+        assert!(aliases.len() <= MAX_ALIASES && self.elements.len() <= 256);
+        let mut index = AliasIndex::EMPTY;
+        let mut at = 0;
+        while at < aliases.len() {
+            let alias = aliases[at].0.as_bytes();
+            assert!(!alias.is_empty() && alias[0].is_ascii());
+            // Every later byte value starts at or after this alias.
+            let mut byte = alias[0] as usize + 1;
+            while byte < index.starts.len() {
+                index.starts[byte] = (at + 1) as u8;
+                byte += 1;
+            }
+            let rule = element_position(self.elements, aliases[at].1);
+            assert!(rule < self.elements.len());
+            index.rules[at] = rule as u8;
+            at += 1;
+        }
+        let root = element_position(self.elements, self.root);
+        assert!(root < self.elements.len());
+        index.root = root as u8;
+        Self { index, ..self }
+    }
+
+    /// The position in `aliases` of the alias `name` (ASCII
+    /// case-insensitive). Allocation-free.
+    fn alias(&self, name: &str) -> Option<usize> {
+        let bytes = name.as_bytes();
+        let first = usize::from(bytes.first()?.to_ascii_lowercase());
+        if first >= 128 {
+            return None;
+        }
+        let start = usize::from(self.index.starts[first]);
+        let end = usize::from(self.index.starts[first + 1]);
+        let candidates = self.aliases.get(start..end)?;
+        candidates
+            .iter()
+            .position(|(alias, _)| {
+                alias.len() == bytes.len() && alias.as_bytes().eq_ignore_ascii_case(bytes)
+            })
+            .map(|at| start + at)
+    }
+
     /// The canonical name `name` stands for, matched ASCII
     /// case-insensitively. Allocation-free.
     pub(crate) fn canonical(&self, name: &str) -> Option<&'static str> {
-        // Aliases are lowercase, so folding both sides orders them as stored.
-        self.aliases
-            .binary_search_by(|(alias, _)| cmp_ascii_ci(alias.as_bytes(), name.as_bytes()))
-            .ok()
-            .map(|index| self.aliases[index].1)
+        self.alias(name).map(|index| self.aliases[index].1)
+    }
+
+    /// The canonical name `name` stands for and that name's rule, matched
+    /// ASCII case-insensitively: one lookup for both. Allocation-free.
+    pub(crate) fn canonical_rule(
+        &self,
+        name: &str,
+    ) -> Option<(&'static str, &'static ElementRule)> {
+        self.alias(name).map(|index| {
+            (
+                self.aliases[index].1,
+                &self.elements[usize::from(self.index.rules[index])],
+            )
+        })
     }
 
     /// The rule of a canonical element name (ASCII case-insensitive).
     pub(crate) fn rule(&self, canonical: &str) -> Option<&'static ElementRule> {
+        if self.root.eq_ignore_ascii_case(canonical) {
+            return Some(&self.elements[usize::from(self.index.root)]);
+        }
+        // Every element but the root is its own alias, so the alias table
+        // finds its rule; another alias of the same element is not a
+        // canonical name and falls through to the search, which misses.
+        if let Some(alias) = self.alias(canonical) {
+            let rule = &self.elements[usize::from(self.index.rules[alias])];
+            if rule.name.eq_ignore_ascii_case(canonical) {
+                return Some(rule);
+            }
+        }
         self.index(canonical).map(|index| &self.elements[index])
     }
 
@@ -369,6 +474,19 @@ const fn has_element(vocabulary: &Vocabulary, name: &str) -> bool {
         index += 1;
     }
     false
+}
+
+/// The position of the element named `name` in `elements`, or
+/// `elements.len()` when there is none.
+const fn element_position(elements: &[ElementRule], name: &str) -> usize {
+    let mut index = 0;
+    while index < elements.len() {
+        if equal(elements[index].name, name) {
+            return index;
+        }
+        index += 1;
+    }
+    elements.len()
 }
 
 const fn equal(left: &str, right: &str) -> bool {
@@ -561,7 +679,9 @@ pub(crate) static WORD: Vocabulary = Vocabulary {
     ],
     roots: "/body, /header[N], /footer[N], /footnote[N], /endnote[N], \
             /comments/comment[N], /styles/<style id>, /numbering or /section[N]",
-};
+    index: AliasIndex::EMPTY,
+}
+.indexed();
 
 /// OpenDocument text: the Word family names plus the elements ODF has as
 /// their own concepts (`h` headings, `list`/`listItem`, `frame`, the
@@ -719,7 +839,9 @@ pub(crate) static ODT: Vocabulary = Vocabulary {
         ElementRule::new("watermark"),
     ],
     roots: "/body, /styles/<style name> or /metadata",
-};
+    index: AliasIndex::EMPTY,
+}
+.indexed();
 
 #[cfg(feature = "odt")]
 const _: () = assert!(well_formed(&ODT) && names_are_aliases(&ODT) && ODT.elements.len() <= 128);
@@ -737,7 +859,9 @@ pub(crate) static DRAWING: Vocabulary = Vocabulary {
         ElementRule::new("shape").bare(Bare::Name(Exact)),
     ],
     roots: "/page[N], /page[N]/shape[N] or /page[N]/layer[N]",
-};
+    index: AliasIndex::EMPTY,
+}
+.indexed();
 
 #[cfg(feature = "odg")]
 const _: () = assert!(well_formed(&DRAWING) && names_are_aliases(&DRAWING));
@@ -755,7 +879,9 @@ pub(crate) static CHART: Vocabulary = Vocabulary {
         ElementRule::new("series"),
     ],
     roots: "/axis[N], /series[N] or /legend",
-};
+    index: AliasIndex::EMPTY,
+}
+.indexed();
 
 #[cfg(feature = "odc")]
 const _: () = assert!(well_formed(&CHART) && names_are_aliases(&CHART));
@@ -776,7 +902,9 @@ pub(crate) static IMAGE: Vocabulary = Vocabulary {
         ElementRule::new("metadata"),
     ],
     roots: "/frame[N] or /metadata",
-};
+    index: AliasIndex::EMPTY,
+}
+.indexed();
 
 #[cfg(feature = "odi")]
 const _: () = assert!(well_formed(&IMAGE) && names_are_aliases(&IMAGE));
@@ -794,7 +922,9 @@ pub(crate) static DATABASE: Vocabulary = Vocabulary {
         ElementRule::new("table").bare(Bare::Name(Exact)),
     ],
     roots: "/table[N], /table[N]/column[N] or /query[N]",
-};
+    index: AliasIndex::EMPTY,
+}
+.indexed();
 
 #[cfg(feature = "odb")]
 const _: () = assert!(well_formed(&DATABASE) && names_are_aliases(&DATABASE));
@@ -807,7 +937,9 @@ pub(crate) static MATH: Vocabulary = Vocabulary {
     aliases: &[("element", "element"), ("node", "element")],
     elements: &[ElementRule::new("element"), ElementRule::new("math")],
     roots: "/element[N] (nested: /element[N]/element[M])",
-};
+    index: AliasIndex::EMPTY,
+}
+.indexed();
 
 #[cfg(feature = "odf-formula")]
 const _: () = assert!(well_formed(&MATH) && names_are_aliases(&MATH));
@@ -822,7 +954,9 @@ pub(crate) static DOC: Vocabulary = Vocabulary {
     aliases: WORD.aliases,
     elements: &word_elements_without_paragraph_identity(),
     roots: WORD.roots,
-};
+    index: AliasIndex::EMPTY,
+}
+.indexed();
 
 /// RTF uses the same Word family aliases and the same absence of OOXML
 /// paragraph identities as legacy DOC. Keeping a distinct static lets the
@@ -834,7 +968,9 @@ pub(crate) static RTF: Vocabulary = Vocabulary {
     aliases: WORD.aliases,
     elements: &word_elements_without_paragraph_identity(),
     roots: WORD.roots,
-};
+    index: AliasIndex::EMPTY,
+}
+.indexed();
 
 #[cfg(any(feature = "doc", feature = "rtf"))]
 const fn word_elements_without_paragraph_identity() -> [ElementRule; WORD.elements.len()] {
@@ -972,7 +1108,9 @@ pub(crate) static PRESENTATION: Vocabulary = Vocabulary {
         ElementRule::new("zoom"),
     ],
     roots: "/slide[N], /slidemaster[N], /slidelayout[N], /notesMaster or /theme",
-};
+    index: AliasIndex::EMPTY,
+}
+.indexed();
 
 /// The identities of a presentation shape-tree element: the `cNvPr` id, and
 /// its name compared as OfficeCLI's `MatchesShapeName` does (case-insensitive;
@@ -1061,4 +1199,105 @@ pub(crate) static WORKBOOK: Vocabulary = Vocabulary {
         }),
     ],
     roots: "/<sheet name>, /sheet[N] or /namedrange[NAME] (cells as /Sheet1/A1 or Sheet1!A1)",
-};
+    index: AliasIndex::EMPTY,
+}
+.indexed();
+
+#[cfg(test)]
+mod index_tests {
+    use super::{ElementRule, Vocabulary, cmp_ascii_ci};
+
+    /// Every vocabulary this build has.
+    fn all() -> Vec<&'static Vocabulary> {
+        [
+            &super::WORD,
+            &super::PRESENTATION,
+            &super::WORKBOOK,
+            #[cfg(feature = "odt")]
+            &super::ODT,
+            #[cfg(feature = "odg")]
+            &super::DRAWING,
+            #[cfg(feature = "odc")]
+            &super::CHART,
+            #[cfg(feature = "odi")]
+            &super::IMAGE,
+            #[cfg(feature = "odb")]
+            &super::DATABASE,
+            #[cfg(feature = "odf-formula")]
+            &super::MATH,
+            #[cfg(feature = "doc")]
+            &super::DOC,
+            #[cfg(feature = "rtf")]
+            &super::RTF,
+        ]
+        .to_vec()
+    }
+
+    /// The binary searches the index replaced (record 0291).
+    fn searched_canonical(vocabulary: &Vocabulary, name: &str) -> Option<&'static str> {
+        vocabulary
+            .aliases
+            .binary_search_by(|(alias, _)| cmp_ascii_ci(alias.as_bytes(), name.as_bytes()))
+            .ok()
+            .map(|index| vocabulary.aliases[index].1)
+    }
+
+    fn searched_rule(vocabulary: &Vocabulary, name: &str) -> Option<&'static ElementRule> {
+        vocabulary
+            .elements
+            .binary_search_by(|rule| cmp_ascii_ci(rule.name.as_bytes(), name.as_bytes()))
+            .ok()
+            .map(|index| &vocabulary.elements[index])
+    }
+
+    #[test]
+    fn indexed_lookups_match_the_sorted_table_searches() {
+        let mut names: Vec<String> = ["", "x", "zz", "P1", "é", "body/", "3", "3D", "rr", "pp"]
+            .into_iter()
+            .map(str::to_owned)
+            .collect();
+        for vocabulary in all() {
+            for (alias, canonical) in vocabulary.aliases {
+                names.extend([
+                    (*alias).to_owned(),
+                    alias.to_ascii_uppercase(),
+                    (*canonical).to_owned(),
+                    canonical.to_ascii_uppercase(),
+                    format!("{alias}s"),
+                    alias[..alias.len() - 1].to_owned(),
+                ]);
+            }
+            for rule in vocabulary.elements {
+                names.extend([rule.name.to_owned(), rule.name.to_ascii_lowercase()]);
+            }
+            names.push(vocabulary.root.to_ascii_uppercase());
+        }
+        for vocabulary in all() {
+            for name in &names {
+                assert_eq!(
+                    vocabulary.canonical(name),
+                    searched_canonical(vocabulary, name),
+                    "{name}"
+                );
+                assert_eq!(
+                    vocabulary.rule(name).map(std::ptr::from_ref),
+                    searched_rule(vocabulary, name).map(std::ptr::from_ref),
+                    "{name}"
+                );
+                let pair = vocabulary.canonical_rule(name);
+                assert_eq!(
+                    pair.map(|(canonical, _)| canonical),
+                    vocabulary.canonical(name)
+                );
+                assert_eq!(
+                    pair.map(|(_, rule)| std::ptr::from_ref(rule)),
+                    vocabulary
+                        .canonical(name)
+                        .and_then(|canonical| searched_rule(vocabulary, canonical))
+                        .map(std::ptr::from_ref),
+                    "{name}"
+                );
+            }
+        }
+    }
+}

@@ -239,10 +239,16 @@ fn mixed_union_scope() -> Error {
 /// The path grammar deliberately accepts broad step names, so a plain path
 /// parse would otherwise misclassify unions, combinators and pseudo-classes
 /// as one structural step.
+///
+/// `(`, `)` and whitespace outside brackets are query syntax only after the
+/// last top-level `/` (outside brackets and parentheses). One pass keeps
+/// whether such a byte follows the latest top-level slash seen so far
+/// (record 0291; it used to find the last slash in a separate pass first).
 fn has_query_syntax(text: &str) -> bool {
     let mut brackets = 0_usize;
+    let mut parens = 0_usize;
     let mut quote: Option<u8> = None;
-    let last_slash = last_top_level_slash_index(text);
+    let mut tail = false;
     let mut bytes = text.bytes().enumerate();
     while let Some((index, byte)) = bytes.next() {
         if let Some(open) = quote {
@@ -259,21 +265,22 @@ fn has_query_syntax(text: &str) -> bool {
             b']' => brackets = brackets.saturating_sub(1),
             b',' | b'>' | b'*' if brackets == 0 => return true,
             b':' if brackets == 0 && is_query_pseudo(text, index) => return true,
-            b'(' | b')' if brackets == 0 => {
-                if last_slash.is_none_or(|slash| index > slash) {
-                    return true;
+            b'(' | b')' => {
+                if byte == b'(' {
+                    parens += 1;
+                } else {
+                    parens = parens.saturating_sub(1);
+                }
+                if brackets == 0 {
+                    tail = true;
                 }
             },
-            byte if brackets == 0
-                && byte.is_ascii_whitespace()
-                && last_slash.is_none_or(|slash| index > slash) =>
-            {
-                return true;
-            },
+            b'/' if brackets == 0 && parens == 0 => tail = false,
+            byte if brackets == 0 && byte.is_ascii_whitespace() => tail = true,
             _ => {},
         }
     }
-    false
+    tail
 }
 
 fn is_query_pseudo(text: &str, colon: usize) -> bool {
@@ -450,6 +457,28 @@ impl<'p> IntoTarget<'p> for TargetArg<'p> {
     }
 }
 
+/// A target parsed once runs again without parsing, classifying or
+/// copying it: the path or selector is borrowed (record 0291).
+///
+/// ```
+/// use litchi_ops::{IntoTarget, TargetArg};
+///
+/// let target = TargetArg::parse("/body/p[1]")?;
+/// for _ in 0..2 {
+///     let again = (&target).into_target()?;
+///     assert_eq!(again.path().map(ToString::to_string), Some("/body/p[1]".to_owned()));
+/// }
+/// # Ok::<(), litchi_ops::Error>(())
+/// ```
+impl<'a, 'p: 'a> IntoTarget<'a> for &'a TargetArg<'p> {
+    fn into_target(self) -> Result<TargetArg<'a>> {
+        Ok(TargetArg(match &self.0 {
+            Held::Path(path) => Held::Path(path.reborrow()),
+            Held::Query(query) => Held::Query(query.into_query()?),
+        }))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use litchi_core::selector::{Path, Query, limits};
@@ -577,6 +606,88 @@ mod tests {
         assert!(!error.suggestion().unwrap_or_default().contains(secret));
         assert!(!error.to_string().contains(secret));
         assert!(!format!("{error:?}").contains(secret));
+    }
+
+    /// The two-pass classifier `has_query_syntax` replaced (record 0291).
+    fn two_pass_query_syntax(text: &str) -> bool {
+        let mut brackets = 0_usize;
+        let mut quote: Option<u8> = None;
+        let last_slash = super::last_top_level_slash_index(text);
+        let mut bytes = text.bytes().enumerate();
+        while let Some((index, byte)) = bytes.next() {
+            if let Some(open) = quote {
+                if byte == b'\\' {
+                    bytes.next();
+                } else if byte == open {
+                    quote = None;
+                }
+                continue;
+            }
+            match byte {
+                b'"' | b'\'' => quote = Some(byte),
+                b'[' => brackets += 1,
+                b']' => brackets = brackets.saturating_sub(1),
+                b',' | b'>' | b'*' if brackets == 0 => return true,
+                b':' if brackets == 0 && super::is_query_pseudo(text, index) => return true,
+                b'(' | b')' if brackets == 0 => {
+                    if last_slash.is_none_or(|slash| index > slash) {
+                        return true;
+                    }
+                },
+                byte if brackets == 0
+                    && byte.is_ascii_whitespace()
+                    && last_slash.is_none_or(|slash| index > slash) =>
+                {
+                    return true;
+                },
+                _ => {},
+            }
+        }
+        false
+    }
+
+    #[test]
+    fn one_pass_query_syntax_matches_the_two_pass_classifier() {
+        // Every string of up to five bytes over the bytes the classifier
+        // treats specially, plus a letter.
+        let alphabet = b"/[]()'\\\" ,>*:pa";
+        let mut text = Vec::new();
+        let mut checked = 0;
+        for len in 0..=5_u32 {
+            for mut code in 0..alphabet.len().pow(len) {
+                text.clear();
+                for _ in 0..len {
+                    text.push(alphabet[code % alphabet.len()]);
+                    code /= alphabet.len();
+                }
+                let text = std::str::from_utf8(&text).expect("ASCII");
+                assert_eq!(
+                    super::has_query_syntax(text),
+                    two_pass_query_syntax(text),
+                    "{text:?}"
+                );
+                checked += 1;
+            }
+        }
+        assert!(checked > 800_000);
+        for text in [
+            "/body/p[1]",
+            "/body/p:contains(x)",
+            "/Sheet1/row[1] > cell",
+            "/a(b)/c",
+            "/a/(b)",
+            "/a(b/c)",
+            "/a/b c",
+            "/a b/c",
+            "Sheet1!A1",
+            "/body/p[@paraId='1 2']/r",
+        ] {
+            assert_eq!(
+                super::has_query_syntax(text),
+                two_pass_query_syntax(text),
+                "{text}"
+            );
+        }
     }
 
     #[test]
