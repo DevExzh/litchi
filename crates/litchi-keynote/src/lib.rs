@@ -478,8 +478,10 @@ mod time;
 
 pub mod background;
 pub mod build;
+pub mod builder;
 pub mod chart;
 pub mod edit;
+pub mod identity;
 pub mod limits;
 pub mod presentation;
 pub mod show;
@@ -489,10 +491,12 @@ pub mod transition;
 
 pub use background::{Angle, Background, Gradient, Kind, Stop};
 pub use build::{AnimationType, Build};
+pub use builder::Builder;
 pub use chart::{
     Axis, ChartArrangement, ChartCatalog, ChartDescriptor, ChartSelector, ChartSelectorError,
 };
 pub use error::{Error, Result};
+pub use identity::Identity;
 pub use limits::{
     LimitKind, OpenOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsBuilder,
     SourceLimitKind, SourceLimits, SourceLimitsBuilder,

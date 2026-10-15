@@ -102,6 +102,10 @@ name = "remove_slide"
 path = "examples/remove_slide.rs"
 
 [[example]]
+name = "keynote_new_presentation"
+path = "examples/new_presentation.rs"
+
+[[example]]
 name = "keynote_save_package"
 path = "examples/save_package.rs"
 

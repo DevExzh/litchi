@@ -8,6 +8,7 @@
 mod catalog_table_appearance;
 mod chart_axis_support;
 pub(crate) mod edit;
+mod identity;
 pub(crate) mod image_adjustments;
 mod rendering_invalidation;
 mod save;

@@ -160,7 +160,13 @@ makes `File::Pages`, `File::Keynote` and `File::Numbers` hold the leaf
 **Still open, as `capabilities()` gaps** (requests above unless noted):
 
 - 1: `Package::new()` for all three formats; `create(Format::{Pages,
-  Keynote, Numbers})` returns `unsupported_capability`.
+  Keynote, Numbers})` returns `unsupported_capability`. Keynote landed in
+  the leaf in 0298: `Package::new()` (deterministic, fixed
+  `Identity::BLANK`), `litchi_keynote::Builder` (`builder` module; title,
+  subtitle, notes, slide size; `build()` without an `Identity` is
+  `builder::Error::MissingIdentity`) and `litchi_keynote::Identity`
+  (`generate()`, `from_bytes`). The unified `create(Format::Keynote)` arm is
+  pending; Pages and Numbers remain open.
 - 3: typed encrypted state (no `Locked` for iWork yet).
 - 4–6: Numbers sheet, table, row and column lifecycle.
 - 7, 10, 13: text styling (Numbers cells, Keynote spans, Pages spans).
