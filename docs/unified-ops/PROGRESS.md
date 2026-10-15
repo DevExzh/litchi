@@ -609,6 +609,18 @@ The coordinator's Claude process stalled and exited while seven agents (wave R7 
   - the coordinator watches `MemAvailable` (alert below 16 GB) and free disk.
 - Resumed: `iwork-found` (0296), `checklist-fixes` (0290), `perf-path` (0291), `producer-structure` (0293). Held: `odf-verbs` (0292), `acceptance2` (0294), `m4-ext` (0295).
 
+## M6 — iWork (2026-10-15)
+- Merged `iwork-found` (0296, owner decisions D1/D2):
+  - the iWork-free gate is removed; the `pages`, `keynote` and `numbers` features carry their leaf edges (ADR 0024 amendment), and `litchi-ops`/`litchi-cli` leave the non-iWork bulk lane (48 → 46);
+  - `File::{Pages, Keynote, Numbers}` through the iWork object-tree adapter, and `litchi::open` routes iWork through `File`;
+  - writes: Pages paragraph/section text; Keynote title/body text and slide hidden/remove/move; Numbers cell values;
+  - all 126 iWork corpus no-op saves are byte-identical; open/get/set are within 1.1% of the leaf.
+  - Open:
+    - `litchi::iwork::Document` is kept (package directories, tables and text roles not modelled);
+    - `create`/structural verbs are typed gaps (`IWORK_API_REQUESTS.md`, requests 15–17);
+    - Keynote slide remove has no multi-slide fixture (known failure F8);
+    - `litchi-numbers` test-target lints predate this change.
+
 Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-pptx-w4` 9474e2b6ce, `uo/m2-l-xlsb-w1` 876588a23c, `uo/m1-r4-perf` 012fd509ff.
 
 - M0a S10 (`docs/unified-ops/s10-measurement.md` §9). M0a landed on the strength of two explanations. If either is rejected, the chosen alternative becomes a harness follow-up; M0a is not reverted.
