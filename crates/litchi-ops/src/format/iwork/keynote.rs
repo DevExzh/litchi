@@ -105,6 +105,15 @@ pub(crate) const PLACEHOLDER_PROPS: &[PropSpec] = &[
     writable("height", EXTENT),
     writable("rotation", ValueType::Number),
     PropSpec::new("zorder", ValueType::Int),
+    {
+        let mut spec = PropSpec::new("hidden", ValueType::Bool);
+        spec.access = crate::node::spec::Access {
+            get: false,
+            set: true,
+            add: false,
+        };
+        spec
+    },
 ];
 
 const NOTES_PROPS: &[PropSpec] = &[writable("text", ValueType::Text)];
@@ -112,12 +121,12 @@ const NOTES_PROPS: &[PropSpec] = &[writable("text", ValueType::Text)];
 const PARAGRAPH_PROPS: &[PropSpec] = &[addable("text", ValueType::Text)];
 
 const RUN_PROPS: &[PropSpec] = &[
-    PropSpec::new("bold", ValueType::Bool),
-    PropSpec::new("italic", ValueType::Bool),
-    PropSpec::new("underline", ValueType::Bool),
-    PropSpec::new("size", FONT_SIZE),
-    PropSpec::new("color", COLOR),
-    PropSpec::new("font.latin", ValueType::Text),
+    writable("bold", ValueType::Bool),
+    writable("italic", ValueType::Bool),
+    writable("underline", ValueType::Bool),
+    writable("size", FONT_SIZE),
+    writable("color", COLOR),
+    writable("font.latin", ValueType::Text),
 ];
 
 const SHAPE_PROPS: &[PropSpec] = &[
@@ -170,8 +179,17 @@ const TABLE_PROPS: &[PropSpec] = &[
 const ROW_PROPS: &[PropSpec] = &[];
 
 const CELL_PROPS: &[PropSpec] = &[
-    PropSpec::new("text", ValueType::Text),
+    writable("text", ValueType::Text),
     PropSpec::new("type", ValueType::Text),
+    {
+        let mut spec = PropSpec::new("value", ValueType::Scalar);
+        spec.access = crate::node::spec::Access {
+            get: false,
+            set: true,
+            add: false,
+        };
+        spec
+    },
 ];
 
 static GAPS: [GapSpec; 0] = [];
@@ -196,13 +214,13 @@ const fn operation_gap(
     }
 }
 
-static OPERATION_GAPS: [GapSpec; 10] = [
+static OPERATION_GAPS: [GapSpec; 9] = [
     operation_gap(
         "set",
         "run",
-        "character formatting",
-        "IWORK_API_REQUESTS.md request 10 (Keynote character-style writes)",
-        "the leaf reads character runs and refuses character-style writes (slide::drawable Unsupported::TextStyling)",
+        "placeholder and notes runs",
+        "record 0309 follow-ups",
+        "character properties are written on runs of text boxes and shapes; placeholder and notes text keeps its layout's styles",
     ),
     operation_gap(
         "add",
@@ -214,9 +232,9 @@ static OPERATION_GAPS: [GapSpec; 10] = [
     operation_gap(
         "set",
         "tc",
-        "table cell values",
-        "record 0298 follow-up: wire the Keynote slide-table cell transactions",
-        "the unified layer reads slide-table cells; their leaf write families are not wired yet",
+        "cells in a formula graph",
+        "record 0309 follow-ups",
+        "slide-table cells take text, numbers, booleans and clears; a formula cell, or one a formula or chart reads, is refused so no calculation cache goes stale",
     ),
     operation_gap(
         "add",
@@ -233,18 +251,11 @@ static OPERATION_GAPS: [GapSpec; 10] = [
         "the leaf's drawable removal refuses tables, charts and groups",
     ),
     operation_gap(
-        "remove",
-        "video",
-        "a movie or audio clip",
-        "record 0298 follow-up: wire slide::media lifecycle removal",
-        "movies and audio are removed through the leaf's media lifecycle family, not wired yet",
-    ),
-    operation_gap(
         "add",
         "video",
         "a new movie or audio clip",
-        "record 0298 follow-up: wire slide::movie and slide::audio creation",
-        "the leaf's movie and audio creation families are not wired yet",
+        "record 0309 follow-up: wire slide::movie and slide::audio creation",
+        "the leaf's movie and audio creation families need the clip's poster, duration and placement, which `add` does not take yet",
     ),
     operation_gap(
         "set",
@@ -256,16 +267,16 @@ static OPERATION_GAPS: [GapSpec; 10] = [
     operation_gap(
         "remove",
         "placeholder",
-        "a title or body placeholder",
-        "record 0298 follow-up: Keynote placeholder visibility through the unified layer",
-        "placeholders are hidden, not removed; set the text to empty instead",
+        "slide-number and object placeholders",
+        "record 0309 follow-ups",
+        "`remove` hides a title or body placeholder on its slide (and `hidden` = false shows it again); slide-number and object placeholders have no unified element",
     ),
     operation_gap(
         "add",
         "placeholder",
         "a new placeholder",
-        "record 0298 follow-up: Keynote placeholder visibility through the unified layer",
-        "a slide's placeholders come from its layout; add a slide from a layout instead",
+        "record 0309 follow-ups",
+        "a slide's placeholders come from its layout; show a hidden one with `hidden` = false, or add a slide from a layout",
     ),
 ];
 
@@ -471,6 +482,8 @@ pub(crate) enum Patch {
     ),
     Drawables(litchi_keynote::slide::drawable::Patch),
     Creation(litchi_keynote::slide::creation::Patch),
+    Media(litchi_keynote::slide::media::lifecycle::Patch),
+    Placeholder(litchi_keynote::slide::placeholder::Patch),
 }
 
 impl Patch {
@@ -484,6 +497,8 @@ impl Patch {
             Self::Deletion(_) => false,
             Self::Drawables(patch) => patch.is_noop(),
             Self::Creation(patch) => patch.is_noop(),
+            Self::Media(patch) => patch.is_noop(),
+            Self::Placeholder(patch) => patch.is_noop(),
         }
     }
 }
@@ -495,11 +510,22 @@ pub(crate) static WRITES: super::Writes = super::Writes {
         "placeholder",
         "notes",
         "paragraph",
+        "run",
         "shape",
         "picture",
+        "tc",
     ],
     addable: &["slide", "paragraph", "shape", "picture"],
-    removable: &["slide", "paragraph", "shape", "picture", "connector"],
+    removable: &[
+        "slide",
+        "paragraph",
+        "shape",
+        "picture",
+        "connector",
+        "video",
+        "audio",
+        "placeholder",
+    ],
     movable: &[
         "slide",
         "paragraph",
@@ -663,140 +689,241 @@ fn runs(tree: &mut TreeBuilder<Kind>, deferred: &Deferred, runs: &[TextRun]) {
     }
 }
 
-/// Build the tree of `package` without character runs: reading them decodes
-/// every drawable's character-style table, so they join the tree the first
-/// time a read reaches a paragraph's children ([`build_full`]).
-pub(crate) fn build(package: &Package) -> Result<super::Tree> {
-    build_with(package, false)
-}
-
-/// Build the complete tree of `package`, character runs included. Every
-/// item of [`build`]'s tree keeps its index: the runs are pushed last.
-pub(crate) fn build_full(package: &Package) -> Result<super::Tree> {
-    build_with(package, true)
-}
-
-fn build_with(package: &Package, with_runs: bool) -> Result<super::Tree> {
+/// Build the eager tree of `package`: the presentation, whose slides are a
+/// lazily materialized part ([`Slides`]); each slide's children are a
+/// lazily built part ([`build_slide`]), built the first time a read
+/// reaches them (record 0305).
+pub(crate) fn build(package: &Package) -> Result<(super::Tree, Box<[super::Part]>)> {
     let read = |error| leaf_refusal(LeafError::Keynote(error), FileFormat::Keynote);
     let slides = package.slides().map_err(read)?;
-    // A theme or slide record the layout reader refuses leaves `layout`
-    // unset; it never hides the slides.
-    let layouts = package.slide_layout_list().ok();
     let mut tree = TreeBuilder::new(SPEC.elements, Keynote::SINGLETONS);
-    tree.root().prop("slideCount", count(slides.len())).done();
-    let mut deferred = Vec::new();
-    for (index, slide) in slides.iter().enumerate() {
+    tree.root()
+        .prop("slideCount", count(slides.len()))
+        .part(Slides::PART)
+        .done();
+    let mut parts = Vec::with_capacity(slides.len() + 1);
+    parts.push(super::Part::Slides(Slides::new(slides.len())));
+    for index in 0..slides.len() {
+        parts.push(super::Part::Slide(super::part::Whole::new(
+            index,
+            Box::new([slide_step(index)]),
+        )));
+    }
+    Ok((tree.build(), parts.into_boxed_slice()))
+}
+
+/// The canonical step of slide `index`.
+fn slide_step(index: usize) -> crate::node::PathStep<'static> {
+    crate::node::PathStep::at(
+        crate::path::navigate::ElementKind::name(Kind::Slide),
+        litchi_core::Position::new(index),
+    )
+}
+
+/// The slides of a presentation, each item materialized the first time a
+/// read reaches it (record 0305): a slide's `layout` reads the theme's
+/// layout catalog, decoded once, on the first slide item.
+pub(crate) struct Slides {
+    items: Box<[std::sync::OnceLock<Box<super::tree::Item>>]>,
+    /// The layout each slide was made from; `None` when the layout reader
+    /// refuses the theme or a slide record (`layout` is then unset; it
+    /// never hides the slides).
+    layouts: std::sync::OnceLock<Option<Box<[Option<litchi_keynote::slide::creation::Layout>]>>>,
+}
+
+impl Slides {
+    /// The kind ordinal of every item.
+    pub(crate) const KIND: u8 = Kind::Slide as u8;
+    /// The slides' part: the first.
+    const PART: u32 = 1;
+
+    fn new(count: usize) -> Self {
+        Self {
+            items: (0..count).map(|_| std::sync::OnceLock::new()).collect(),
+            layouts: std::sync::OnceLock::new(),
+        }
+    }
+
+    /// The part holding the children of slide `slot`: the parts after the
+    /// slides' own.
+    pub(crate) const fn child_part(slot: u32) -> u32 {
+        slot.saturating_add(Self::PART + 1)
+    }
+
+    pub(crate) fn len(&self) -> u32 {
+        u32::try_from(self.items.len()).unwrap_or(u32::MAX)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn state(&self) -> String {
+        let built = self
+            .items
+            .iter()
+            .filter(|item| item.get().is_some())
+            .count();
+        let layouts = if self.layouts.get().is_some() {
+            "+layouts"
+        } else {
+            ""
+        };
+        format!("slides {built}/{}{layouts}", self.items.len())
+    }
+
+    /// The item of slide `slot`, materialized on the first call.
+    pub(crate) fn item<'f>(&'f self, file: &'f super::Iwork, slot: u32) -> &'f super::tree::Item {
+        self.items[slot as usize].get_or_init(|| Box::new(self.slide(file, slot as usize)))
+    }
+
+    fn slide(&self, file: &super::Iwork, index: usize) -> super::tree::Item {
+        let spec = &SPEC.elements[Kind::Slide as usize];
+        let ordinal = u32::try_from(index).unwrap_or(u32::MAX);
+        let mut item = super::tree::Item::detached(spec, Box::new([slide_step(index)]), ordinal);
+        let Some(package) = file.keynote() else {
+            return item;
+        };
+        let layouts = self
+            .layouts
+            .get_or_init(|| package.slide_layout_list().ok());
         let layout = layouts
             .as_ref()
             .and_then(|layouts| layouts.get(index))
             .and_then(Option::as_ref)
             .and_then(|layout| layout.name());
-        let item = tree
-            .push(ROOT, Kind::Slide)
-            .prop("name", text(slide.name()))
-            .prop("title", text(slide.title()))
-            .prop("hidden", Some(slide.is_skipped().into()))
-            .prop("layout", text(layout))
-            .label(slide.name())
-            .leaf([index, 0, 0, 0])
-            .done();
-        let selector = SlideSelector::index(index);
-        // A slide the drawable inventory refuses keeps its placeholders and
-        // notes; it lists no drawables.
-        let drawables = package.slide_drawable_list(selector).ok();
-        let drawables = drawables.as_deref().unwrap_or_default();
-        // The placeholders the leaf's slide-text transaction addresses; a
-        // slide without one has no such child.
-        let roles = [
-            (TITLE, Role::Title, "title", DrawableKind::TitlePlaceholder),
-            (BODY, Role::Body, "body", DrawableKind::BodyPlaceholder),
-        ];
-        for (slot, role, name, kind) in roles {
-            let Ok(Some(value)) = package.slide_text(selector, role) else {
-                continue;
-            };
-            let position = drawables
-                .iter()
-                .position(|drawable| drawable.kind() == kind);
-            let drawable = position.and_then(|position| drawables.get(position));
-            let placeholder = frame(
-                tree.push(item, Kind::Placeholder)
-                    .prop("type", text(Some(name)))
-                    .prop("text", text(Some(&value))),
-                drawable,
-            )
-            .label(Some(name))
-            .text(value.clone())
-            .leaf([index, slot, 0, position.unwrap_or(NONE)])
-            .done();
-            let lines = paragraphs(&mut tree, placeholder, &value, [index, slot, NONE]);
-            if let Some(position) = position {
-                deferred.push(Deferred {
-                    paragraphs: lines,
-                    slide: index,
-                    drawable: position,
-                });
-            }
+        // The handle's package is immutable: its slides decoded when the
+        // eager tree was built.
+        let slide = package.slides().ok().and_then(|slides| slides.get(index));
+        let draft = item.draft::<Kind>();
+        match slide {
+            Some(slide) => draft
+                .prop("name", text(slide.name()))
+                .prop("title", text(slide.title()))
+                .prop("hidden", Some(slide.is_skipped().into()))
+                .prop("layout", text(layout))
+                .label(slide.name()),
+            None => draft,
         }
-        if let Some(notes) = slide.notes() {
-            let item = tree
-                .push(item, Kind::Notes)
-                .prop("text", text(Some(notes)))
-                .text(notes)
-                .leaf([index, NOTES, 0, NONE])
-                .done();
-            paragraphs(&mut tree, item, notes, [index, NOTES, NONE]);
-        }
-        let mut tables = drawables
+        .leaf([index, 0, 0, 0])
+        .part(Self::child_part(ordinal))
+        .done();
+        item
+    }
+}
+
+/// Build the children of slide `index` (at `path`): its placeholders,
+/// notes and drawables with their paragraphs, and with `with_runs` the
+/// character runs of every text, pushed last ([`TreeBuilder::defer`]):
+/// reading them decodes every drawable's character-style table, so they
+/// join the part the first time a read reaches a paragraph's children.
+/// Every item of the part without runs keeps its index.
+pub(crate) fn build_slide(
+    package: &Package,
+    index: usize,
+    path: &[crate::node::PathStep<'static>],
+    with_runs: bool,
+) -> super::Tree {
+    let mut tree = TreeBuilder::under(SPEC.elements, Keynote::SINGLETONS, Kind::Slide, path);
+    let Some(slide) = package.slides().ok().and_then(|slides| slides.get(index)) else {
+        return tree.build();
+    };
+    let item = ROOT;
+    let mut deferred = Vec::new();
+    let selector = SlideSelector::index(index);
+    // A slide the drawable inventory refuses keeps its placeholders and
+    // notes; it lists no drawables.
+    let drawables = package.slide_drawable_list(selector).ok();
+    let drawables = drawables.as_deref().unwrap_or_default();
+    // The placeholders the leaf's slide-text transaction addresses; a
+    // slide without one has no such child.
+    let roles = [
+        (TITLE, Role::Title, "title", DrawableKind::TitlePlaceholder),
+        (BODY, Role::Body, "body", DrawableKind::BodyPlaceholder),
+    ];
+    for (slot, role, name, kind) in roles {
+        let Ok(Some(value)) = package.slide_text(selector, role) else {
+            continue;
+        };
+        let position = drawables
             .iter()
-            .enumerate()
-            .filter(|(_, drawable)| drawable.kind() == DrawableKind::Table)
-            .map(|(position, drawable)| (drawable.z_position(), position))
-            .collect::<Vec<_>>();
-        // A table selector addresses the slide's tables in z-order.
-        tables.sort_unstable();
-        for (position, drawable) in drawables.iter().enumerate() {
-            let Some(kind) = element_of(drawable.kind()) else {
-                continue;
-            };
-            let draft = tree
-                .push(item, kind)
-                .prop("name", text(drawable.name()))
-                .label(drawable.name())
-                .leaf([index, DRAWABLE, 0, position]);
-            let draft = match kind {
-                Kind::Shape => {
-                    let value = drawable.text().unwrap_or_default();
-                    draft.prop("text", text(Some(value))).text(value)
-                },
-                _ => draft,
-            };
-            let drawable_item = frame(draft, Some(drawable)).done();
-            match kind {
-                Kind::Shape => {
-                    let value = drawable.text().unwrap_or_default();
-                    let lines =
-                        paragraphs(&mut tree, drawable_item, value, [index, DRAWABLE, position]);
-                    if drawable.text().is_some() {
-                        deferred.push(Deferred {
-                            paragraphs: lines,
-                            slide: index,
-                            drawable: position,
-                        });
-                    }
-                },
-                Kind::Table => {
-                    let ordinal = tables
-                        .iter()
-                        .position(|(_, table)| *table == position)
-                        .unwrap_or(0);
-                    table(&mut tree, package, drawable_item, index, ordinal, position);
-                },
-                _ => {},
-            }
+            .position(|drawable| drawable.kind() == kind);
+        let drawable = position.and_then(|position| drawables.get(position));
+        let placeholder = frame(
+            tree.push(item, Kind::Placeholder)
+                .prop("type", text(Some(name)))
+                .prop("text", text(Some(&value))),
+            drawable,
+        )
+        .label(Some(name))
+        .text(value.clone())
+        .leaf([index, slot, 0, position.unwrap_or(NONE)])
+        .done();
+        let lines = paragraphs(&mut tree, placeholder, &value, [index, slot, NONE]);
+        if let Some(position) = position {
+            deferred.push(Deferred {
+                paragraphs: lines,
+                slide: index,
+                drawable: position,
+            });
+        }
+    }
+    if let Some(notes) = slide.notes() {
+        let item = tree
+            .push(item, Kind::Notes)
+            .prop("text", text(Some(notes)))
+            .text(notes)
+            .leaf([index, NOTES, 0, NONE])
+            .done();
+        paragraphs(&mut tree, item, notes, [index, NOTES, NONE]);
+    }
+    let mut tables = drawables
+        .iter()
+        .enumerate()
+        .filter(|(_, drawable)| drawable.kind() == DrawableKind::Table)
+        .map(|(position, drawable)| (drawable.z_position(), position))
+        .collect::<Vec<_>>();
+    // A table selector addresses the slide's tables in z-order.
+    tables.sort_unstable();
+    for (position, drawable) in drawables.iter().enumerate() {
+        let Some(kind) = element_of(drawable.kind()) else {
+            continue;
+        };
+        let draft = tree
+            .push(item, kind)
+            .prop("name", text(drawable.name()))
+            .label(drawable.name())
+            .leaf([index, DRAWABLE, 0, position]);
+        let draft = match kind {
+            Kind::Shape => {
+                let value = drawable.text().unwrap_or_default();
+                draft.prop("text", text(Some(value))).text(value)
+            },
+            _ => draft,
+        };
+        let drawable_item = frame(draft, Some(drawable)).done();
+        match kind {
+            Kind::Shape => {
+                let value = drawable.text().unwrap_or_default();
+                let lines =
+                    paragraphs(&mut tree, drawable_item, value, [index, DRAWABLE, position]);
+                if drawable.text().is_some() {
+                    deferred.push(Deferred {
+                        paragraphs: lines,
+                        slide: index,
+                        drawable: position,
+                    });
+                }
+            },
+            Kind::Table => {
+                let ordinal = tables
+                    .iter()
+                    .position(|(_, table)| *table == position)
+                    .unwrap_or(0);
+                table(&mut tree, package, drawable_item, index, ordinal, position);
+            },
+            _ => {},
         }
     }
     if with_runs {
+        tree.defer();
         for text in &deferred {
             let Ok(read) = package.slide_drawable_text_runs(
                 SlideSelector::index(text.slide),
@@ -807,7 +934,7 @@ fn build_with(package: &Package, with_runs: bool) -> Result<super::Tree> {
             runs(&mut tree, text, &read);
         }
     }
-    Ok(tree.build())
+    tree.build()
 }
 
 /// Read one table's name, size and cells. A table the leaf's cell reader

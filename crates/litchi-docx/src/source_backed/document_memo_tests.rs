@@ -188,3 +188,64 @@ fn body_indexes_follow_effective_revisions_and_keep_old_values() {
         "after"
     );
 }
+
+/// One source revision's unmanaged transaction snapshot is scanned once and
+/// shared by every edit and commit started from it (record 0305), and an
+/// edit from the memo publishes what an edit from a fresh scan publishes.
+#[test]
+fn unmanaged_edits_share_one_transaction_snapshot() {
+    let bytes = docx(word_document(
+        "",
+        "<w:p><w:r><w:t>alpha</w:t></w:r></w:p><w:p><w:r><w:t>beta</w:t></w:r></w:p>",
+    ));
+    let package = Package::from_read_at(Arc::new(OwnedSource::new(bytes.clone()))).unwrap();
+    let first = package.edit().unwrap();
+    let held = package.main_snapshot.lock().unwrap().clone();
+    let held = held.expect("the first edit memoizes its snapshot");
+    let raw = held.xml_bytes().to_vec();
+    let lineage = package.physical_package().unwrap().source_lineage();
+    let version = package
+        .physical_package()
+        .unwrap()
+        .source_version()
+        .unwrap();
+    let partname = PackURI::new("/word/document.xml").unwrap();
+    assert!(
+        package
+            .memoized_main_snapshot(&raw, &lineage, version, &partname)
+            .is_some(),
+        "the memo answers for the same revision and bytes"
+    );
+    let mut other = raw.clone();
+    other[0] = b' ';
+    assert!(
+        package
+            .memoized_main_snapshot(&other, &lineage, version, &partname)
+            .is_none(),
+        "other bytes are never served from the memo"
+    );
+    let second = package.edit().unwrap();
+    assert_eq!(first.source().xml_bytes(), second.source().xml_bytes());
+    let mut edit = second;
+    edit.replace_paragraph_text(Position::new(1), "gamma")
+        .unwrap();
+    let mut memoized = Vec::new();
+    edit.commit()
+        .unwrap()
+        .into_package()
+        .write_to(&mut memoized)
+        .unwrap();
+
+    let fresh = Package::from_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
+    let mut edit = fresh.edit().unwrap();
+    edit.replace_paragraph_text(Position::new(1), "gamma")
+        .unwrap();
+    let mut expected = Vec::new();
+    edit.commit()
+        .unwrap()
+        .into_package()
+        .write_to(&mut expected)
+        .unwrap();
+    assert_eq!(memoized, expected);
+    drop(first);
+}

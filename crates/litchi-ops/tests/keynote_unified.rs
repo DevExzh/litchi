@@ -390,8 +390,9 @@ fn removes_slides_paragraphs_and_drawables() {
         .remove("/slide[1]/placeholder[title]/p[1]")
         .unwrap_err();
     assert_eq!(error.code(), Code::InvalidArgument);
-    let error = file.remove("/slide[1]/placeholder[title]").unwrap_err();
-    assert_eq!(error.code(), Code::UnsupportedCapability);
+    // A title placeholder is hidden on its slide (record 0309).
+    file.remove("/slide[1]/placeholder[title]")
+        .expect("hide the title placeholder");
     let tables = read("slide-table-read-native.key");
     let error = tables.remove("/slide[1]/table[1]").unwrap_err();
     assert_eq!(error.code(), Code::UnsupportedCapability);
@@ -506,9 +507,10 @@ fn unsupported_writes_are_typed_refusals() {
         .set("/slide[3]/placeholder[body]", props! { "x" => "1in" })
         .unwrap_err();
     assert_eq!(error.code(), Code::UnsupportedCapability);
+    // A formula cell refuses a value (no recalculation).
     let tables = read("slide-table-read-native.key");
     let error = tables
-        .set("/slide[1]/table[1]/tr[1]/tc[1]", props! { "text" => "x" })
+        .set("/slide[1]/table[1]/tr[2]/tc[4]", props! { "text" => "x" })
         .unwrap_err();
     assert_eq!(error.code(), Code::UnsupportedCapability);
     let error = file.add("/slide[1]", NewNode::new("table")).unwrap_err();
@@ -651,9 +653,153 @@ fn a_failing_item_leaves_the_file_untouched() {
     let mut first = BatchItem::new("set");
     first.path = Some(format!("{BODY}/p[1]").into());
     first.props = Some(litchi_ops::Props::new().with("text", "batch"));
-    let mut second = BatchItem::new("remove");
-    second.path = Some("/slide[1]/placeholder[title]".into());
+    let mut second = BatchItem::new("set");
+    second.path = Some("/slide[1]/shape[1]".into());
+    second.props = Some(litchi_ops::Props::new().with("zorder", 2_i64));
     let error = file.batch([first, second], BatchMode::Atomic).unwrap_err();
     assert_eq!(error.code(), Code::UnsupportedCapability);
     assert_eq!(file.to_bytes().unwrap(), bytes);
+}
+
+#[test]
+fn runs_of_shapes_take_character_properties() {
+    let file = read("multi-slide.key");
+    let added = file
+        .add(
+            "/slide[1]",
+            NewNode::new("shape").prop("text", "Styled words here"),
+        )
+        .expect("add a text box");
+    let shape = added.path.to_string();
+    let styled = added
+        .file
+        .set(
+            &format!("{shape}/p[1]/run[1]"),
+            props! { "bold" => true, "color" => "C80000", "size" => "24pt", "font.latin" => "Helvetica" },
+        )
+        .expect("style the run");
+    let reopened = reopen(&styled);
+    let run = format!("{shape}/p[1]/run[1]");
+    assert_eq!(prop(&reopened, &run, "bold").as_deref(), Some("true"));
+    assert_eq!(
+        prop(&reopened, &run, "font.latin").as_deref(),
+        Some("Helvetica")
+    );
+    assert!(prop(&reopened, &run, "color").is_some());
+    assert_eq!(
+        text(&reopened, &shape).as_deref(),
+        Some("Styled words here")
+    );
+    // A second write builds on the first.
+    let italic = reopened
+        .set(&run, props! { "italic" => true })
+        .expect("italic");
+    let reopened = reopen(&italic);
+    assert_eq!(prop(&reopened, &run, "bold").as_deref(), Some("true"));
+    assert_eq!(prop(&reopened, &run, "italic").as_deref(), Some("true"));
+    // Undo restores the bytes.
+    let commit = added
+        .file
+        .edit(|tx| tx.set(&run, props! { "underline" => true }))
+        .expect("underline");
+    let restored = commit.patch.inverse().apply(&commit.file).expect("inverse");
+    assert_eq!(restored.to_bytes().unwrap(), added.file.to_bytes().unwrap());
+    // A text change, then a run style on the new text, in one edit.
+    let both = added
+        .file
+        .edit(|tx| {
+            tx.set(&shape, props! { "text" => "changed" })?;
+            tx.set(&run, props! { "bold" => true })?;
+            Ok(())
+        })
+        .expect("text then style");
+    let reopened = reopen(&both.file);
+    assert_eq!(text(&reopened, &shape).as_deref(), Some("changed"));
+    assert_eq!(prop(&reopened, &run, "bold").as_deref(), Some("true"));
+}
+
+#[test]
+fn slide_table_cells_take_values() {
+    let file = read("table-discovery.key");
+    let cell = file
+        .query("tc")
+        .expect("query")
+        .next()
+        .expect("a cell")
+        .expect("node")
+        .path()
+        .to_string();
+    let written = file
+        .edit(|tx| tx.set(&cell, props! { "text" => "Updated" }))
+        .expect("write a cell");
+    let reopened = reopen(&written.file);
+    assert_eq!(text(&reopened, &cell).as_deref(), Some("Updated"));
+    let restored = written
+        .patch
+        .inverse()
+        .apply(&written.file)
+        .expect("inverse");
+    assert_eq!(restored.to_bytes().unwrap(), file.to_bytes().unwrap());
+    let numeric = reopened
+        .set(&cell, props! { "value" => 3 })
+        .expect("a number");
+    assert_eq!(
+        prop(&reopen(&numeric), &cell, "type").as_deref(),
+        Some("number")
+    );
+}
+
+#[test]
+fn movies_and_audio_are_removed() {
+    for name in [
+        "media-lifecycle-audio-remove-native.key",
+        "slide-movie-creation-focused-native.key",
+    ] {
+        let file = read(name);
+        let before = count(&file, "video") + count(&file, "audio");
+        assert!(before > 0, "{name} has media");
+        let path = file
+            .query("video, audio")
+            .or_else(|_| file.query("audio"))
+            .expect("query")
+            .next()
+            .expect("media")
+            .expect("node")
+            .path()
+            .to_string();
+        let commit = file.edit(|tx| tx.remove(&path)).expect("remove media");
+        let reopened = reopen(&commit.file);
+        assert_eq!(
+            count(&reopened, "video") + count(&reopened, "audio"),
+            before - 1,
+            "{name}"
+        );
+        let restored = commit.patch.inverse().apply(&commit.file).expect("inverse");
+        assert_eq!(restored.to_bytes().unwrap(), file.to_bytes().unwrap());
+    }
+}
+
+#[test]
+fn placeholders_are_hidden_and_shown() {
+    use litchi_keynote::slide::placeholder::{Kind, State};
+    let file = read("multi-slide.key");
+    let leaf = |file: &File| {
+        litchi_keynote::Package::from_bytes(&file.to_bytes().expect("bytes")).expect("leaf")
+    };
+    let removed = file.remove(BODY).expect("hide the body placeholder");
+    assert_eq!(
+        leaf(&removed)
+            .slide_placeholder_visibility(litchi_keynote::SlideSelector::index(1), Kind::Body)
+            .expect("read"),
+        Some(State::Hidden)
+    );
+    let shown = removed
+        .set(BODY, props! { "hidden" => false })
+        .expect("show it again");
+    assert_eq!(
+        leaf(&shown)
+            .slide_placeholder_visibility(litchi_keynote::SlideSelector::index(1), Kind::Body)
+            .expect("read"),
+        Some(State::Visible)
+    );
 }

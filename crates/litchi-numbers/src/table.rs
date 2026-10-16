@@ -32,7 +32,8 @@ pub mod relocation;
 pub mod sort;
 /// Compact, presence-preserving table title semantics.
 pub mod title;
-/// Section-relative table topology edits.
+/// Section-relative table row and column insertion and removal, started by
+/// [`crate::Package::edit_table_topology`].
 pub mod topology;
 
 use crate::cell::Value;

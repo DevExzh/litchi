@@ -14,7 +14,9 @@ use std::sync::Arc;
 use litchi_core::selector::Path;
 use litchi_core::{FileFormat, Position};
 use litchi_keynote::slide::creation::LayoutSelector;
-use litchi_keynote::slide::drawable::{Created, Geometry, Preset};
+use litchi_keynote::slide::drawable::{
+    Created, Geometry, Preset, Style, TableCellValue, TextSpan as DrawableSpan,
+};
 use litchi_keynote::slide::placeholder::Kind as Role;
 use litchi_keynote::{DrawableSelector, Package, SlideSelector, TextPosition, TextSpan};
 
@@ -76,20 +78,21 @@ impl Text {
 
     /// The item holding this text in `file`'s tree.
     fn item(self, file: &Iwork) -> Option<&super::super::tree::Item> {
-        let tree = file.tree();
-        let slide = *tree.item(super::ROOT).children().get(self.slide)?;
-        tree.item(slide)
-            .children()
-            .iter()
-            .map(|child| tree.item(*child))
-            .find(|item| {
-                let leaf = item.leaf().map(|value| value as usize);
-                match (item.type_name(), self.container) {
-                    ("placeholder", TITLE | BODY) | ("notes", NOTES) => leaf[1] == self.container,
-                    ("shape", DRAWABLE) => leaf[3] == self.drawable,
-                    _ => false,
-                }
-            })
+        self.at(file).map(|at| file.item(at))
+    }
+
+    /// The place of the item holding this text in `file`'s tree.
+    fn at(self, file: &Iwork) -> Option<super::super::At> {
+        let slide = file.kids(super::super::At::ROOT).get(self.slide)?;
+        file.kids(slide).iter().find(|&child| {
+            let item = file.item(child);
+            let leaf = item.leaf().map(|value| value as usize);
+            match (item.type_name(), self.container) {
+                ("placeholder", TITLE | BODY) | ("notes", NOTES) => leaf[1] == self.container,
+                ("shape", DRAWABLE) => leaf[3] == self.drawable,
+                _ => false,
+            }
+        })
     }
 }
 
@@ -132,6 +135,13 @@ pub(super) struct Pending {
     adds: Vec<(Add, usize)>,
     /// Slide visibility: slide → (hidden, item).
     hidden: BTreeMap<usize, (bool, usize)>,
+    /// Character styles: (slide, drawable, first char, end char) → (style,
+    /// item) (record 0309).
+    styles: BTreeMap<(usize, usize, usize, usize), (Style, usize)>,
+    /// Table cells: (slide, drawable, row, column) → (value, item).
+    cells: BTreeMap<(usize, usize, u32, u32), (TableCellValue, usize)>,
+    /// Placeholder visibility: (slide, TITLE or BODY) → (hidden, item).
+    visibility: BTreeMap<(usize, usize), (bool, usize)>,
 }
 
 /// What publishing a pending set made.
@@ -141,16 +151,80 @@ pub(super) struct Published {
     pub(super) created: Vec<Created>,
 }
 
-/// A refusal of `key` on a run: character styles are read-only.
+/// A refusal of `key` on a run: only character properties are written.
 fn run_refusal(key: &str) -> Error {
     refusal(
         Code::UnsupportedCapability,
-        "Keynote character runs are read-only: the leaf refuses character-style writes",
+        "a Keynote run writes its character properties (bold, italic, underline, size, color, font.latin)",
     )
     .with_property(key.to_owned())
-    .with_suggestion(
-        "set the paragraph's or the shape's text instead (follow-up: IWORK_API_REQUESTS.md request 10)",
-    )
+    .with_suggestion("set the paragraph's or the shape's text to change the characters")
+}
+
+/// Fold one run property into `style`.
+fn run_style(style: &mut Style, key: &str, value: &PropValue<'_>) -> Result<()> {
+    let cleared = || {
+        refusal(
+            Code::InvalidValue,
+            "a run's character property cannot be cleared",
+        )
+        .with_property(key.to_owned())
+    };
+    match key {
+        "bold" => style.bold = Some(super::super::write::boolean(value, "bold")?),
+        "italic" => style.italic = Some(super::super::write::boolean(value, "italic")?),
+        "underline" => {
+            style.underline = Some(super::super::write::boolean(value, "underline")?);
+        },
+        "size" => {
+            let points = value
+                .with_coerced(super::FONT_SIZE, |scalar| {
+                    Ok(scalar.and_then(|scalar| match scalar {
+                        Scalar::Length(length) => Some(length.points()),
+                        Scalar::Number(value) => Some(value),
+                        #[allow(clippy::cast_precision_loss, reason = "point sizes are small")]
+                        Scalar::Int(value) => Some(value as f64),
+                        _ => None,
+                    }))
+                })
+                .map_err(|error| error.with_property("size"))?
+                .ok_or_else(cleared)?;
+            #[allow(
+                clippy::cast_possible_truncation,
+                reason = "Keynote stores font sizes as 32-bit floats"
+            )]
+            let points = points as f32;
+            if !points.is_finite() || points <= 0.0 {
+                return Err(refusal(Code::InvalidValue, "a font size must be positive")
+                    .with_property("size".to_owned()));
+            }
+            style.font_size = Some(points);
+        },
+        "color" => {
+            let color = value
+                .with_coerced(super::COLOR, |scalar| {
+                    Ok(scalar.and_then(|scalar| match scalar {
+                        Scalar::Color(color) if color.transforms().is_empty() => {
+                            match color.base() {
+                                crate::value::Base::Rgb(rgba) => {
+                                    Some([rgba.red(), rgba.green(), rgba.blue()])
+                                },
+                                _ => None,
+                            }
+                        },
+                        _ => None,
+                    }))
+                })
+                .map_err(|error| error.with_property("color"))?
+                .ok_or_else(cleared)?;
+            style.color = Some(color);
+        },
+        _ => {
+            let name = super::super::write::text(value, "font.latin")?.ok_or_else(cleared)?;
+            style.font_name = Some(name);
+        },
+    }
+    Ok(())
 }
 
 /// The value of a length key in points; `null` is refused.
@@ -268,6 +342,9 @@ impl Pending {
             && self.removals.is_empty()
             && self.adds.is_empty()
             && self.hidden.is_empty()
+            && self.styles.is_empty()
+            && self.cells.is_empty()
+            && self.visibility.is_empty()
     }
 
     /// The new drawables staged on `slide` so far.
@@ -291,6 +368,145 @@ impl Pending {
     /// Stage a whole text.
     pub(super) fn stage_text(&mut self, text: Text, value: String, index: usize) {
         self.texts.insert(text, (value, index));
+    }
+
+    /// Stage one character property of a run of a text box or shape: the
+    /// run's characters in its drawable's text (record 0309).
+    fn stage_run_style(
+        &mut self,
+        file: &Iwork,
+        node: &Node<'_>,
+        key: &str,
+        value: &PropValue<'_>,
+        index: usize,
+    ) -> Result<()> {
+        let [slide, container, line, drawable] = node.item().leaf().map(|value| value as usize);
+        if container != DRAWABLE {
+            return Err(refusal(
+                Code::UnsupportedCapability,
+                "character properties are written on runs of text boxes and shapes; placeholder and notes runs keep their layout's styles",
+            )
+            .with_property(key.to_owned()));
+        }
+        let text = Text {
+            slide,
+            container: DRAWABLE,
+            drawable,
+        };
+        if self.texts.contains_key(&text) {
+            return Err(refusal(
+                Code::InvalidArgument,
+                "set a shape's text and its runs' character properties in separate writes",
+            )
+            .with_property(key.to_owned()));
+        }
+        // A placeholder's runs have no shape item: their text keeps its
+        // layout's styles.
+        let shape = text.at(file).ok_or_else(|| {
+            refusal(
+                Code::UnsupportedCapability,
+                "character properties are written on runs of text boxes and shapes; placeholder and notes runs keep their layout's styles",
+            )
+            .with_property(key.to_owned())
+        })?;
+        let of_kind = |parent, kind: &str| -> Vec<super::super::At> {
+            file.kids(parent)
+                .iter()
+                .filter(|&child| file.item(child).type_name() == kind)
+                .collect()
+        };
+        let paragraphs = of_kind(shape, "paragraph");
+        let mut start = 0;
+        for &paragraph in paragraphs.iter().take(line) {
+            start += file
+                .item(paragraph)
+                .text()
+                .unwrap_or_default()
+                .chars()
+                .count()
+                + 1;
+        }
+        let paragraph = *paragraphs
+            .get(line)
+            .ok_or_else(|| refusal(Code::PathNotFound, "the run's paragraph is missing"))?;
+        let runs: Vec<_> = of_kind(paragraph, "run")
+            .into_iter()
+            .map(|run| (run, file.item(run)))
+            .collect();
+        let ordinal = runs
+            .iter()
+            .position(|(run, _)| *run == node.at())
+            .ok_or_else(|| refusal(Code::InternalError, "the run is not in its paragraph"))?;
+        let runs: Vec<_> = runs.into_iter().map(|(_, run)| run).collect();
+        for run in runs.iter().take(ordinal) {
+            start += run.text().unwrap_or_default().chars().count();
+        }
+        let length = node.item().text().unwrap_or_default().chars().count();
+        if length == 0 {
+            return Err(refusal(
+                Code::InvalidArgument,
+                "the run holds no characters",
+            ));
+        }
+        let entry = self
+            .styles
+            .entry((slide, drawable, start, start + length))
+            .or_insert_with(|| (Style::new(), index));
+        run_style(&mut entry.0, key, value)?;
+        Ok(())
+    }
+
+    /// Stage one slide-table cell value (record 0309).
+    fn stage_cell(
+        &mut self,
+        file: &Iwork,
+        node: &Node<'_>,
+        key: &str,
+        value: &PropValue<'_>,
+        index: usize,
+    ) -> Result<()> {
+        use super::super::write::CellScalar;
+        let [slide, _, row, drawable] = node.item().leaf().map(|value| value as usize);
+        let slide_at = file
+            .kids(super::super::At::ROOT)
+            .get(slide)
+            .ok_or_else(|| refusal(Code::PathNotFound, "the cell's slide is missing"))?;
+        let table = file
+            .kids(slide_at)
+            .iter()
+            .find(|&child| {
+                let item = file.item(child);
+                item.type_name() == "table" && item.leaf()[3] as usize == drawable
+            })
+            .ok_or_else(|| refusal(Code::PathNotFound, "the cell's table is missing"))?;
+        let row_at = file
+            .kids(table)
+            .iter()
+            .filter(|&child| file.item(child).type_name() == "tr")
+            .nth(row)
+            .ok_or_else(|| refusal(Code::PathNotFound, "the cell's row is missing"))?;
+        let column = file
+            .kids(row_at)
+            .iter()
+            .filter(|&child| file.item(child).type_name() == "tc")
+            .position(|child| child == node.at())
+            .ok_or_else(|| refusal(Code::InternalError, "the cell is not in its row"))?;
+        let cell = match super::super::write::cell_scalar(key, value)? {
+            CellScalar::Text(text) => TableCellValue::Text(text),
+            CellScalar::Number(number) => TableCellValue::Number(number),
+            CellScalar::Boolean(flag) => TableCellValue::Boolean(flag),
+            CellScalar::Empty => TableCellValue::Empty,
+        };
+        self.cells.insert(
+            (
+                slide,
+                drawable,
+                u32::try_from(row).unwrap_or(u32::MAX),
+                u32::try_from(column).unwrap_or(u32::MAX),
+            ),
+            (cell, index),
+        );
+        Ok(())
     }
 
     /// Stage one `key = value` assignment on `node`.
@@ -353,7 +569,19 @@ impl Pending {
                 }
                 self.frames.insert((slide, drawable), (geometry, index));
             },
+            ("run", "bold" | "italic" | "underline" | "size" | "color" | "font.latin") => {
+                self.stage_run_style(file, node, key, value, index)?;
+            },
             ("run", _) => return Err(run_refusal(key)),
+            ("tc", "text" | "value") => self.stage_cell(file, node, key, value, index)?,
+            ("placeholder", "hidden") => {
+                let [_, slot, _, _] = node.item().leaf().map(|value| value as usize);
+                if slot != TITLE && slot != BODY {
+                    return Err(key_refusal(node, key));
+                }
+                let hidden = super::super::write::boolean(value, "hidden")?;
+                self.visibility.insert((slide, slot), (hidden, index));
+            },
             (
                 "slide" | "placeholder" | "notes" | "paragraph" | "shape" | "picture" | "connector"
                 | "video" | "audio" | "table" | "tc" | "chart" | "group",
@@ -392,6 +620,8 @@ impl Pending {
             || !self.frames.is_empty()
             || !self.removals.is_empty()
             || !self.adds.is_empty()
+            || !self.styles.is_empty()
+            || !self.cells.is_empty()
         {
             let first = drawable_texts
                 .iter()
@@ -399,6 +629,8 @@ impl Pending {
                 .chain(self.frames.values().map(|(_, index)| *index))
                 .chain(self.removals.values().copied())
                 .chain(self.adds.iter().map(|(_, index)| *index))
+                .chain(self.styles.values().map(|(_, index)| *index))
+                .chain(self.cells.values().map(|(_, index)| *index))
                 .min();
             let at = |index: usize| {
                 move |error| (failure(LeafError::KeynoteDrawables(error)), Some(index))
@@ -418,6 +650,25 @@ impl Pending {
                         SlideSelector::index(text.slide),
                         DrawableSelector::index(text.drawable),
                         value,
+                    )
+                    .map_err(at(*index))?;
+                }
+                for ((slide, drawable, start, end), (style, index)) in &self.styles {
+                    edit.set_text_style(
+                        SlideSelector::index(*slide),
+                        DrawableSelector::index(*drawable),
+                        DrawableSpan::new(*start, *end),
+                        style.clone(),
+                    )
+                    .map_err(at(*index))?;
+                }
+                for ((slide, drawable, row, column), (value, index)) in &self.cells {
+                    edit.set_table_cell(
+                        SlideSelector::index(*slide),
+                        DrawableSelector::index(*drawable),
+                        *row,
+                        *column,
+                        value.clone(),
                     )
                     .map_err(at(*index))?;
                 }
@@ -505,6 +756,22 @@ impl Pending {
                 _ => {},
             }
         }
+        for ((slide, slot), (hidden, index)) in std::mem::take(&mut self.visibility) {
+            let error = |error| (failure(LeafError::KeynotePlaceholder(error)), Some(index));
+            let kind = if slot == TITLE {
+                litchi_keynote::slide::placeholder::Kind::Title
+            } else {
+                litchi_keynote::slide::placeholder::Kind::Body
+            };
+            let edit = chain
+                .package
+                .edit_slide_placeholder_visibility(SlideSelector::index(slide), kind)
+                .map_err(error)?;
+            let edit = if hidden { edit.hide() } else { edit.show() };
+            let commit = edit.commit().map_err(error)?;
+            let patch = commit.patch().clone();
+            push(chain, commit.into_package(), Patch::Placeholder(patch));
+        }
         for (slide, (hidden, index)) in std::mem::take(&mut self.hidden) {
             let error = |error| (failure(LeafError::KeynoteEdit(error)), Some(index));
             let commit = {
@@ -518,6 +785,8 @@ impl Pending {
         }
         self.frames.clear();
         self.removals.clear();
+        self.styles.clear();
+        self.cells.clear();
         self.adds.clear();
         Ok(published)
     }
@@ -870,7 +1139,7 @@ pub(crate) fn add(
                 Some(from) => SlideSource::Duplicate(slide_position(file, &from)?),
                 None => SlideSource::Layout(layout),
             };
-            let count = file.tree().item(super::ROOT).children().len();
+            let count = file.kids(super::super::At::ROOT).len();
             let destination = insertion(count, node.placement(), |anchor| slide_at(file, anchor))?;
             let mut chain = Chain::new(package.clone());
             create_slides(&mut chain, &[(source, destination, 0)]).map_err(|(error, _)| error)?;
@@ -898,12 +1167,9 @@ pub(crate) fn add(
             let element = request.element;
             // A new drawable joins the end of its slide's drawables: its
             // ordinal among the slide's elements of its kind is their count.
-            let tree = file.tree();
-            let ordinal = tree
-                .item(parent_node.index())
-                .children()
-                .iter()
-                .filter(|child| tree.item(**child).type_name() == element)
+            let ordinal = parent_node
+                .child_nodes()
+                .filter(|child| child.item().type_name() == element)
                 .count();
             let mut pending = Pending::default();
             pending.stage_add(request.add, 0);
@@ -980,7 +1246,6 @@ fn removal_gap(node: &Node<'_>) -> Error {
         format!("removing a Keynote `{kind}` is not supported yet"),
     )
     .with_suggestion(match kind {
-        "video" | "audio" => "follow-up: wire slide::media lifecycle removal (record 0298)",
         "table" | "chart" | "group" => {
             "the leaf's drawable removal refuses tables, charts and groups (record 0298 follow-up)"
         },
@@ -1002,17 +1267,27 @@ pub(crate) fn remove(
     let mut slides = Vec::new();
     let mut lines: BTreeMap<Text, Vec<usize>> = BTreeMap::new();
     let mut pending = Pending::default();
+    let mut media: Vec<(usize, usize)> = Vec::new();
     for node in &nodes {
         let [slide, _, line, drawable] = node.item().leaf().map(|value| value as usize);
         match node.item().type_name() {
             "slide" => slides.push(slide),
+            "video" | "audio" => media.push((slide, drawable)),
             "paragraph" => {
                 let text = Text::of(node)
                     .ok_or_else(|| refusal(Code::InternalError, "the text is missing"))?;
                 lines.entry(text).or_default().push(line);
             },
             "shape" | "picture" | "connector" => pending.stage_removal(slide, drawable, 0),
-            "placeholder" | "notes" | "video" | "audio" | "table" | "chart" | "group" => {
+            "placeholder" => {
+                // A layout placeholder is hidden on its slide, not deleted.
+                let [_, slot, _, _] = node.item().leaf().map(|value| value as usize);
+                if slot != TITLE && slot != BODY {
+                    return Err(removal_gap(node));
+                }
+                pending.visibility.insert((slide, slot), (true, 0));
+            },
+            "notes" | "table" | "chart" | "group" => {
                 return Err(removal_gap(node));
             },
             _ => return Err(element_refusal("remove", node)),
@@ -1041,6 +1316,37 @@ pub(crate) fn remove(
     let mut chain = Chain::new(package.clone());
     if !pending.is_empty() {
         pending.flush(&mut chain).map_err(|(error, _)| error)?;
+    }
+    // Movies and audio, each slide's from its last, so the earlier source
+    // positions hold (record 0309).
+    media.sort_unstable();
+    media.dedup();
+    media.retain(|(slide, _)| !slides.contains(slide));
+    for (slide, drawable) in media.iter().rev() {
+        let list = chain
+            .package
+            .slide_drawable_list(SlideSelector::index(*slide))
+            .map_err(|error| failure(LeafError::KeynoteDrawables(error)))?;
+        let ordinal = list
+            .iter()
+            .take(*drawable)
+            .filter(|item| {
+                matches!(
+                    item.kind(),
+                    litchi_keynote::slide::drawable::Kind::Movie
+                        | litchi_keynote::slide::drawable::Kind::Audio
+                )
+            })
+            .count();
+        let commit = chain
+            .package
+            .remove_slide_media(
+                SlideSelector::index(*slide),
+                litchi_keynote::MovieSelector::index(ordinal),
+            )
+            .map_err(|error| failure(LeafError::KeynoteMedia(error)))?;
+        let patch = commit.patch().clone();
+        push(&mut chain, commit.into_package(), Patch::Media(patch));
     }
     slides.sort_unstable();
     slides.dedup();
@@ -1144,7 +1450,7 @@ pub(crate) fn move_to(
     let mut chain = Chain::new(package.clone());
     let [slide, _, line, drawable] = node.item().leaf().map(|value| value as usize);
     if kind == "slide" {
-        let slides = file.tree().item(super::ROOT).children().len();
+        let slides = file.kids(super::super::At::ROOT).len();
         let to = destination(slide, slides, placement, |anchor| slide_at(file, anchor))?;
         move_slide(&mut chain, slide, to)?;
     } else if kind == "paragraph" {

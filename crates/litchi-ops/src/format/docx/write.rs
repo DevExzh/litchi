@@ -146,6 +146,69 @@ impl Docx {
         self.owner().finish(result)
     }
 
+    /// [`Self::set`] for single-operation `File::set`, which keeps only the
+    /// committed handle: the leaf's patch is dropped where the commit
+    /// returns instead of travelling up the call chain, and a direct body
+    /// paragraph's text skips the generic resolver (record 0305).
+    pub(crate) fn set_file(&self, target: &TargetArg<'_>, props: Props<'_>) -> Result<Self> {
+        let result = match self.direct_paragraph(target, &props) {
+            Some(position) => self.set_paragraph_text(position, &props),
+            None => self.set_inner(target, props, false),
+        };
+        self.owner().finish(result)
+    }
+
+    /// The transaction position of the paragraph a `text`-only set on an
+    /// eager owner names by the direct path `/body/p[N]` (exactly the step
+    /// names `body` and `p`, no predicate on `body`, one positional index),
+    /// read from the body index the resolver reads: the `N`-th paragraph
+    /// block of the body. `None` sends anything else, a missing paragraph
+    /// and any read failure to the general route, which reports it.
+    fn direct_paragraph(&self, target: &TargetArg<'_>, props: &Props<'_>) -> Option<Position> {
+        if !matches!(self.owner(), super::DocxOwner::Eager(_)) {
+            return None;
+        }
+        let mut keys = props.iter();
+        let (Some((key, _)), None) = (keys.next(), keys.next()) else {
+            return None;
+        };
+        if key.as_str() != "text" {
+            return None;
+        }
+        let path = target.path()?.path();
+        let [body, paragraph] = path.steps() else {
+            return None;
+        };
+        if !path.is_absolute()
+            || body.name() != "body"
+            || !body.predicates().is_empty()
+            || paragraph.name() != "p"
+        {
+            return None;
+        }
+        let index = paragraph.index()?.get();
+        let blocks = super::nav::load_body(self).ok()?;
+        let block = blocks.nth(litchi_docx::BlockKind::Paragraph, Position::new(index))?;
+        block.transaction_position().ok()
+    }
+
+    /// The general route's work for one direct body paragraph and one
+    /// `text` value: the editor first (the same security refusals), the
+    /// same property admission, then the paragraph text replacement.
+    fn set_paragraph_text(&self, position: Position, props: &Props<'_>) -> Result<Self> {
+        let editor = self.edit()?;
+        let assignments = admit_assignments(TargetKind::Paragraph, props)?;
+        let target = Target {
+            selection: Selection::Body(WriteSelection::Paragraph(position)),
+            kind: TargetKind::Paragraph,
+        };
+        let mut editor = WorkEdit::from(editor)?;
+        for assignment in &assignments {
+            editor.apply_with_policy(&target, assignment, false)?;
+        }
+        editor.commit_file(self)
+    }
+
     pub(crate) fn set_command<'p, 'v>(
         &self,
         target: &TargetArg<'p>,
@@ -154,12 +217,12 @@ impl Docx {
         self.owner().finish(self.set_inner(target, props, true))
     }
 
-    fn set_inner<'p, 'v>(
+    fn set_inner<'p, 'v, O: Publish>(
         &self,
         target: &TargetArg<'p>,
         props: impl IntoProps<'v>,
         command_text: bool,
-    ) -> Result<Commit> {
+    ) -> Result<O> {
         // Build the editor first.  Besides refusing signed/read-only handles,
         // this makes an empty property list honor the same security policy as
         // a non-empty write.
@@ -167,7 +230,7 @@ impl Docx {
         let nodes = self.resolve_targets(target)?;
         let props = Props::from_props(props)?;
         let editor = match self.try_set_chart(editor, &nodes, &props)? {
-            Ok(commit) => return Ok(commit),
+            Ok(commit) => return Ok(O::from_commit(commit)),
             Err(editor) => editor,
         };
         let controls = command_text && crate::batch::has_text_controls(&props);
@@ -190,7 +253,7 @@ impl Docx {
         };
 
         if props.is_empty() {
-            return WorkEdit::from(editor)?.commit(self);
+            return O::publish(WorkEdit::from(editor)?, self);
         }
         let mut assignments = admit_assignments(targets[0].kind, &props)?;
         let request = list_request(&mut assignments)?;
@@ -216,14 +279,14 @@ impl Docx {
         let mut editor = WorkEdit::from(editor)?;
         let Some(request) = request else {
             if editor.bulk_paragraph_text(&targets, &assignments)? {
-                return editor.commit(self);
+                return O::publish(editor, self);
             }
             for target in &targets {
                 for assignment in &assignments {
                     editor.apply_with_policy(target, assignment, command_text)?;
                 }
             }
-            return editor.commit(self);
+            return O::publish(editor, self);
         };
         // `listStyle`: plan each paragraph's list (staging new definitions),
         // then write its numbering after the other properties.
@@ -251,7 +314,7 @@ impl Docx {
             }
             editor.set_numbering(target, planned, explicit_level)?;
         }
-        editor.commit(self)
+        O::publish(editor, self)
     }
 
     /// An editor over the owning package: package-graph changes
@@ -305,6 +368,36 @@ impl Docx {
             .with_format(FileFormat::Docx));
         }
         Ok(nodes)
+    }
+}
+
+/// What a `set` publishes: the complete [`Commit`] (transactions keep its
+/// patch and diagnostics), or only the committed handle (record 0305).
+pub(super) trait Publish: Sized {
+    /// Commit `edit` over `source`.
+    fn publish(edit: WorkEdit, source: &Docx) -> Result<Self>;
+
+    /// A commit another route already made.
+    fn from_commit(commit: Commit) -> Self;
+}
+
+impl Publish for Commit {
+    fn publish(edit: WorkEdit, source: &Docx) -> Result<Self> {
+        edit.commit(source)
+    }
+
+    fn from_commit(commit: Commit) -> Self {
+        commit
+    }
+}
+
+impl Publish for Docx {
+    fn publish(edit: WorkEdit, source: &Docx) -> Result<Self> {
+        edit.commit_file(source)
+    }
+
+    fn from_commit(commit: Commit) -> Self {
+        commit.into_file()
     }
 }
 
@@ -860,6 +953,20 @@ impl WorkEdit {
         both!(self, |edit| edit
             .move_element_at(path, container, anchor)
             .map_err(Error::from))
+    }
+
+    /// Commit and adopt the published package, dropping the patch.
+    pub(super) fn commit_file(self, source: &Docx) -> Result<Docx> {
+        match self {
+            Self::Eager(edit) => {
+                let package = edit.commit().map_err(Error::from)?.into_package();
+                Ok(source.adopt_eager_package(package))
+            },
+            Self::Source(edit) => {
+                let package = edit.commit().map_err(Error::from)?.into_package();
+                Ok(source.adopt_source_package(package))
+            },
+        }
     }
 
     pub(super) fn commit(self, source: &Docx) -> Result<Commit> {

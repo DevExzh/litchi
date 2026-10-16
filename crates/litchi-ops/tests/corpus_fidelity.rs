@@ -426,8 +426,8 @@ fn texts(file: &File, paths: &[&str]) -> Vec<Option<String>> {
 /// back. The reverted file must read back with the same node texts; whether
 /// its bytes equal the input is reported.
 fn structure(file: &File, input: &[u8]) -> (&'static str, String) {
-    type Forward = fn(&File) -> litchi_ops::Result<File>;
-    type Inverse = fn(&File) -> litchi_ops::Result<File>;
+    type Forward<'a> = Box<dyn Fn(&File) -> litchi_ops::Result<File> + 'a>;
+    type Inverse<'a> = Box<dyn Fn(&File) -> litchi_ops::Result<File> + 'a>;
     let count = |parent: &str, kind: &str| {
         file.get(parent).map_or(0, |node| {
             node.children()
@@ -436,7 +436,8 @@ fn structure(file: &File, input: &[u8]) -> (&'static str, String) {
                 .count()
         })
     };
-    let (label, checked, forward, inverse): (&str, &[&str], Forward, Inverse) = match file.format()
+    let (label, checked, forward, inverse): (&str, &[&str], Forward<'_>, Inverse<'_>) = match file
+        .format()
     {
         Some(FileFormat::Xls) => {
             if count("/", "sheet") == 0 {
@@ -445,11 +446,11 @@ fn structure(file: &File, input: &[u8]) -> (&'static str, String) {
             (
                 "row add+remove",
                 &["/sheet[1]/row[1]"],
-                |file| {
+                Box::new(|file: &File| {
                     file.add("/sheet[1]", NewNode::new("row").at(Placement::Start))
                         .map(|added| added.file)
-                },
-                |file| file.remove("/sheet[1]/row[1]"),
+                }),
+                Box::new(|file: &File| file.remove("/sheet[1]/row[1]")),
             )
         },
         Some(FileFormat::Pptx) => {
@@ -459,8 +460,8 @@ fn structure(file: &File, input: &[u8]) -> (&'static str, String) {
             (
                 "slide move+back",
                 &["/slide[1]", "/slide[2]"],
-                |file| file.move_to("/slide[1]", Placement::after("/slide[2]")?),
-                |file| file.move_to("/slide[2]", Placement::Start),
+                Box::new(|file: &File| file.move_to("/slide[1]", Placement::after("/slide[2]")?)),
+                Box::new(|file: &File| file.move_to("/slide[2]", Placement::Start)),
             )
         },
         Some(FileFormat::Rtf) => {
@@ -470,8 +471,10 @@ fn structure(file: &File, input: &[u8]) -> (&'static str, String) {
             (
                 "paragraph move+back",
                 &["/body/p[1]", "/body/p[2]"],
-                |file| file.move_to("/body/p[1]", Placement::after("/body/p[2]")?),
-                |file| file.move_to("/body/p[2]", Placement::before("/body/p[1]")?),
+                Box::new(|file: &File| file.move_to("/body/p[1]", Placement::after("/body/p[2]")?)),
+                Box::new(|file: &File| {
+                    file.move_to("/body/p[2]", Placement::before("/body/p[1]")?)
+                }),
             )
         },
         // Record 0299: a Pages paragraph added at the start of the body and
@@ -479,7 +482,7 @@ fn structure(file: &File, input: &[u8]) -> (&'static str, String) {
         Some(FileFormat::Pages) => (
             "paragraph add+remove",
             &["/body/p[1]"],
-            |file| {
+            Box::new(|file: &File| {
                 file.add(
                     "/body",
                     NewNode::new("p")
@@ -487,8 +490,8 @@ fn structure(file: &File, input: &[u8]) -> (&'static str, String) {
                         .at(Placement::Start),
                 )
                 .map(|added| added.file)
-            },
-            |file| file.remove("/body/p[1]"),
+            }),
+            Box::new(|file: &File| file.remove("/body/p[1]")),
         ),
         // Record 0298: the first Keynote slide duplicated after itself and a
         // slide added from the theme's default layout at the end, then both
@@ -496,7 +499,7 @@ fn structure(file: &File, input: &[u8]) -> (&'static str, String) {
         Some(FileFormat::Keynote) => (
             "slide duplicate+add+remove",
             &["/slide[1]/placeholder[1]", "/slide[1]/shape[1]"],
-            |file| {
+            Box::new(|file: &File| {
                 let copied = file
                     .add(
                         "/",
@@ -508,25 +511,47 @@ fn structure(file: &File, input: &[u8]) -> (&'static str, String) {
                 copied
                     .add("/", NewNode::new("slide"))
                     .map(|added| added.file)
-            },
-            |file| {
+            }),
+            Box::new(|file: &File| {
                 let last = file.query("slide")?.count();
                 file.remove(format!("/slide[{last}]").as_str())?
                     .remove("/slide[2]")
-            },
+            }),
         ),
         // Record 0301: a Numbers table added first in the first sheet and
         // removed again, through the leaf table-lifecycle and table-order
-        // transactions.
-        Some(FileFormat::Numbers) => (
-            "table add+remove",
-            &["/sheet[1]/table[1]/A1", "/sheet[1]/table[1]/B2"],
-            |file| {
-                file.add("/sheet[1]", NewNode::new("table").at(Placement::Start))
-                    .map(|added| added.file)
-            },
-            |file| file.remove("/sheet[1]/table[1]"),
-        ),
+        // transactions. Record 0309: a row inserted at the start of the
+        // original table and removed again, through the leaf topology
+        // transaction (skipped where that table refuses it, typed).
+        Some(FileFormat::Numbers) => {
+            let rows = |file: &File, path: &str| current(file, path, "rowCount");
+            let before = rows(file, "/sheet[1]/table[1]");
+            (
+                "table add+remove, row add+remove",
+                &["/sheet[1]/table[1]/A1", "/sheet[1]/table[1]/B2"],
+                Box::new(|file: &File| {
+                    let added = file
+                        .add("/sheet[1]", NewNode::new("table").at(Placement::Start))?
+                        .file;
+                    match added.add(
+                        "/sheet[1]/table[2]",
+                        NewNode::new("row").at(Placement::Start),
+                    ) {
+                        Ok(row) => Ok(row.file),
+                        Err(error) if !untyped(&error.to_string()) => Ok(added),
+                        Err(error) => Err(error),
+                    }
+                }),
+                Box::new(move |file: &File| {
+                    let file = if rows(file, "/sheet[1]/table[2]") != before {
+                        file.remove("/sheet[1]/table[2]/row[1]")?
+                    } else {
+                        file.clone()
+                    };
+                    file.remove("/sheet[1]/table[1]")
+                }),
+            )
+        },
         _ => return ("-", String::new()),
     };
     let original = catch_unwind(AssertUnwindSafe(|| texts(file, checked))).unwrap_or_default();

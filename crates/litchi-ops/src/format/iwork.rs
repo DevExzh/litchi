@@ -5,8 +5,10 @@
 //! built from the leaf's read-only projection on the first read: the body,
 //! its paragraphs and the sections of a Pages document; the slides, their
 //! title and body placeholders and notes of a Keynote presentation; the
-//! sheets, tables and stored cells of a Numbers workbook. Paths, queries and
-//! node views run over that tree through one generic adapter (`Nav`),
+//! sheets, tables and stored cells of a Numbers workbook. Keynote slides and
+//! their children and Numbers table cells are lazily built parts of the
+//! tree, built as reads reach them (record 0305). Paths, queries and node
+//! views run over that tree through one generic adapter (`Nav`),
 //! parameterized by a per-format `Flavor`, in the shape of the ODF
 //! object-tree adapter (record 0282). Writes stage the leaf's own focused
 //! transactions (section text, slide text, slide skip/order/deletion, table
@@ -64,6 +66,7 @@ pub(crate) mod children;
 mod error;
 mod nav;
 mod node;
+mod part;
 mod tree;
 pub(crate) mod views;
 pub(crate) mod write;
@@ -78,7 +81,8 @@ pub(crate) mod pages;
 pub use error::LeafError;
 pub(crate) use nav::{Flavor, Nav};
 pub use node::Node;
-pub(crate) use tree::{Tree, TreeBuilder};
+pub(crate) use part::{Kids, Part};
+pub(crate) use tree::{At, Tree, TreeBuilder};
 
 use std::fmt;
 use std::path::Path;
@@ -99,10 +103,11 @@ struct State {
     /// Built on the first read: the open route decodes only what the leaf
     /// open decodes.
     tree: OnceLock<Built>,
-    /// The complete tree, for a format whose tree builds some children on
-    /// demand (Pages section headers and footers, record 0299): built the
-    /// first time a read reaches them. Every item of `tree` keeps its index
-    /// here, so nodes taken from either tree stay valid.
+    /// The complete Pages tree, whose section headers and footers are built
+    /// the first time a read reaches them (record 0299). Every item of
+    /// `tree` keeps its index here, so nodes taken from either tree stay
+    /// valid.
+    #[cfg(feature = "pages")]
     full: OnceLock<Built>,
     /// The global index of each Pages section's first paragraph, then the
     /// paragraph count: what a coalesced `/body/p[N]` set needs, without
@@ -113,10 +118,29 @@ struct State {
 }
 
 /// The object tree, or the error building it raised (a lazily decoded
-/// Keynote slide can fail) beside a root-only tree.
+/// Keynote slide can fail) beside a root-only tree; and its lazily built
+/// parts, the `k`-th at [`At`] part `k` (record 0305).
 struct Built {
     tree: Tree,
     error: Option<Error>,
+    parts: Box<[Part]>,
+}
+
+impl Built {
+    fn new(built: Result<(Tree, Box<[Part]>)>) -> Self {
+        match built {
+            Ok((tree, parts)) => Self {
+                tree,
+                error: None,
+                parts,
+            },
+            Err(error) => Self {
+                tree: Tree::root_only(),
+                error: Some(error),
+                parts: Box::new([]),
+            },
+        }
+    }
 }
 
 const fn assert_handle<T: Send + Sync + Clone>() {}
@@ -149,11 +173,12 @@ impl Owner {
         }
     }
 
-    /// Build the object tree of this owner.
-    fn tree(&self) -> Result<Tree> {
+    /// Build the eager object tree of this owner and its lazily built
+    /// parts.
+    fn tree(&self) -> Result<(Tree, Box<[Part]>)> {
         match self {
             #[cfg(feature = "pages")]
-            Self::Pages(package) => Ok(pages::build(package)),
+            Self::Pages(package) => Ok((pages::build(package), Box::new([]))),
             #[cfg(feature = "keynote")]
             Self::Keynote(package) => keynote::build(package),
             #[cfg(feature = "numbers")]
@@ -297,6 +322,7 @@ impl Iwork {
         Self(Arc::new(State {
             owner,
             tree: OnceLock::new(),
+            #[cfg(feature = "pages")]
             full: OnceLock::new(),
             #[cfg(feature = "pages")]
             paragraph_starts: OnceLock::new(),
@@ -372,39 +398,11 @@ impl Iwork {
     }
 
     fn built(&self) -> &Built {
+        #[cfg(feature = "pages")]
         if let Some(full) = self.0.full.get() {
             return full;
         }
-        self.0.tree.get_or_init(|| match self.0.owner.tree() {
-            Ok(tree) => Built { tree, error: None },
-            Err(error) => Built {
-                tree: Tree::root_only(),
-                error: Some(error),
-            },
-        })
-    }
-
-    /// Complete the tree before the children of `parent` are read, when the
-    /// format builds them on demand (Pages section headers and footers).
-    pub(crate) fn expand(&self, parent: u32) {
-        #[cfg(feature = "pages")]
-        if self.0.full.get().is_none()
-            && matches!(self.0.owner, Owner::Pages(_))
-            && self.tree().item(parent).type_name() == "section"
-        {
-            self.expand_all();
-        }
-        // Keynote character runs join the tree under their paragraphs
-        // (record 0298).
-        #[cfg(feature = "keynote")]
-        if self.0.full.get().is_none()
-            && matches!(self.0.owner, Owner::Keynote(_))
-            && self.tree().item(parent).type_name() == "paragraph"
-        {
-            self.expand_all();
-        }
-        #[cfg(not(any(feature = "pages", feature = "keynote")))]
-        let _ = parent;
+        self.0.tree.get_or_init(|| Built::new(self.0.owner.tree()))
     }
 
     /// Complete the tree (views and whole-tree reads).
@@ -412,28 +410,15 @@ impl Iwork {
         match &self.0.owner {
             #[cfg(feature = "pages")]
             Owner::Pages(package) => {
-                self.0.full.get_or_init(|| Built {
-                    tree: pages::build_full(package),
-                    error: None,
-                });
-            },
-            #[cfg(feature = "keynote")]
-            Owner::Keynote(package) => {
                 self.0
                     .full
-                    .get_or_init(|| match keynote::build_full(package) {
-                        Ok(tree) => Built { tree, error: None },
-                        Err(error) => Built {
-                            tree: Tree::root_only(),
-                            error: Some(error),
-                        },
-                    });
+                    .get_or_init(|| Built::new(Ok((pages::build_full(package), Box::new([])))));
             },
             #[allow(
                 unreachable_patterns,
-                reason = "only the Pages and Keynote trees build children on demand"
+                reason = "the Keynote and Numbers trees build parts on demand"
             )]
-            _ => {},
+            _ => self.expand_parts(),
         }
     }
 
@@ -451,8 +436,9 @@ impl Iwork {
         }
     }
 
-    /// The object tree; root-only when building it failed (every read
-    /// entry point checks [`Self::checked_tree`] first).
+    /// The eager object tree; root-only when building it failed (every
+    /// read entry point checks [`Self::checked_tree`] first). Items of the
+    /// lazily built parts are read through [`Self::item`].
     pub(crate) fn tree(&self) -> &Tree {
         &self.built().tree
     }

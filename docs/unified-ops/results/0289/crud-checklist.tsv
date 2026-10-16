@@ -1884,10 +1884,10 @@ xls	sheet	edit	supported		ok tx.set
 xls	sheet	batch	supported		ok set item
 xls	sheet	create	supported		ok format
 xls	sheet	save	supported		ok format
-xls	cell	get	supported		ok 8 instances, first `ole/xls/WithExtendedStyles.xls` /sheet[1]/A1
-xls	cell	find	supported		ok 8 instances, first `ole/xls/WithExtendedStyles.xls` /sheet[1]/A1
-xls	cell	query	supported		ok matches in ole/xls/WithExtendedStyles.xls
-xls	cell	view	supported		ok 8 instances, first `ole/xls/WithExtendedStyles.xls` /sheet[1]/A1
+xls	cell	get	supported		ok 8 instances, first `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls` /sheet[1]/A1
+xls	cell	find	supported		ok 8 instances, first `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls` /sheet[1]/A1
+xls	cell	query	supported		ok matches in libreoffice-core/sc/qa/unit/data/xls/external-ref.xls
+xls	cell	view	supported		ok 8 instances, first `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls` /sheet[1]/A1
 xls	cell	set	supported		ok `create() + add sheet` /sheet[1]/A1 {"formula":"7"}
 xls	cell	add	n/a	add not offered for this element	-
 xls	cell	remove	supported		ok `create() + add sheet` /sheet[1]/A1
@@ -1897,10 +1897,10 @@ xls	cell	edit	supported		ok tx.set
 xls	cell	batch	supported		ok set item
 xls	cell	create	supported		ok format
 xls	cell	save	supported		ok format
-xls	range	get	supported		ok 6 instances, first `ole/xls/WithExtendedStyles.xls` /sheet[1]/A1:B2
-xls	range	find	supported		ok 6 instances, first `ole/xls/WithExtendedStyles.xls` /sheet[1]/A1:B2
+xls	range	get	supported		ok 8 instances, first `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls` /sheet[1]/A1:B2
+xls	range	find	supported		ok 8 instances, first `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls` /sheet[1]/A1:B2
 xls	range	query	n/a	query not offered for this element	-
-xls	range	view	supported		ok 6 instances, first `ole/xls/WithExtendedStyles.xls` /sheet[1]/A1:B2
+xls	range	view	supported		ok 8 instances, first `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls` /sheet[1]/A1:B2
 xls	range	set	n/a	set not offered for this element	-
 xls	range	add	n/a	add not offered for this element	-
 xls	range	remove	n/a	remove not offered for this element	-
@@ -1910,10 +1910,10 @@ xls	range	edit	n/a	edit not offered for this element	-
 xls	range	batch	n/a	batch not offered for this element	-
 xls	range	create	supported		ok format
 xls	range	save	supported		ok format
-xls	row	get	supported		ok 8 instances, first `ole/xls/WithExtendedStyles.xls` /sheet[1]/row[1]
-xls	row	find	supported		ok 8 instances, first `ole/xls/WithExtendedStyles.xls` /sheet[1]/row[1]
-xls	row	query	supported		ok matches in ole/xls/WithExtendedStyles.xls
-xls	row	view	supported		ok 8 instances, first `ole/xls/WithExtendedStyles.xls` /sheet[1]/row[1]
+xls	row	get	supported		ok 8 instances, first `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls` /sheet[1]/row[1]
+xls	row	find	supported		ok 8 instances, first `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls` /sheet[1]/row[1]
+xls	row	query	supported		ok matches in libreoffice-core/sc/qa/unit/data/xls/external-ref.xls
+xls	row	view	supported		ok 8 instances, first `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls` /sheet[1]/row[1]
 xls	row	set	supported		ok `create() + add sheet` /sheet[1]/row[1] {"height":"12pt"}
 xls	row	add	supported		ok /sheet[1]/row[1] on `create()` under /sheet[1] {} at start
 xls	row	remove	supported		ok `create() + add row` /sheet[1]/row[1]
@@ -1923,10 +1923,10 @@ xls	row	edit	supported		ok tx.set
 xls	row	batch	supported		ok set item
 xls	row	create	supported		ok format
 xls	row	save	supported		ok format
-xls	column	get	supported		ok 8 instances, first `ole/xls/WithExtendedStyles.xls` /sheet[1]/col[A]
-xls	column	find	supported		ok 8 instances, first `ole/xls/WithExtendedStyles.xls` /sheet[1]/col[A]
-xls	column	query	supported		ok matches in ole/xls/WithExtendedStyles.xls
-xls	column	view	supported		ok 8 instances, first `ole/xls/WithExtendedStyles.xls` /sheet[1]/col[A]
+xls	column	get	supported		ok 8 instances, first `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls` /sheet[1]/col[A]
+xls	column	find	supported		ok 8 instances, first `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls` /sheet[1]/col[A]
+xls	column	query	supported		ok matches in libreoffice-core/sc/qa/unit/data/xls/external-ref.xls
+xls	column	view	supported		ok 8 instances, first `libreoffice-core/sc/qa/unit/data/xls/external-ref.xls` /sheet[1]/col[A]
 xls	column	set	supported		ok `create() + add sheet` /sheet[1]/col[A] {"width":"1.5"}
 xls	column	add	supported		ok /sheet[1]/col[A] on `create()` under /sheet[1] {} at start
 xls	column	remove	supported		ok `create() + add column` /sheet[1]/col[A]
@@ -3760,7 +3760,7 @@ odp	paragraph	get	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slid
 odp	paragraph	find	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]/tc[1]/paragraph[1]
 odp	paragraph	query	supported		ok matches in odf/odp/tdf105502.odp
 odp	paragraph	view	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]/tc[1]/paragraph[1]
-odp	paragraph	set	supported		ok `create() + add slide + add shape` /slide[1]/shape[1]/paragraph[1] {"text":"Litchi"}
+odp	paragraph	set	supported		ok `create() + add slide + add shape` /slide[1]/shape[1]/paragraph[1] {"bold":"true"}
 odp	paragraph	add	supported		ok /slide[1]/shape[1]/paragraph[2] on `create() + add slide + add shape` under /slide[1]/shape[1] {}
 odp	paragraph	remove	supported		ok `create() + add slide + add shape` /slide[1]/shape[1]/paragraph[1]
 odp	paragraph	move	format-verb		refused unsupported_capability
@@ -3773,7 +3773,7 @@ odp	run	get	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/t
 odp	run	find	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]/tc[1]/paragraph[1]/run[1]
 odp	run	query	supported		ok matches in odf/odp/tdf105502.odp
 odp	run	view	supported		ok 8 instances, first `odf/odp/tdf105502.odp` /slide[1]/table[1]/tr[1]/tc[1]/paragraph[1]/run[1]
-odp	run	set	supported		ok `create() + add slide + add shape` /slide[1]/shape[1]/paragraph[1]/run[1] {"text":"Litchi"}
+odp	run	set	supported		ok `create() + add slide + add shape` /slide[1]/shape[1]/paragraph[1]/run[1] {"bold":"true"}
 odp	run	add	n/a	add not offered for this element	-
 odp	run	remove	supported		ok `create() + add slide + add shape` /slide[1]/shape[1]/paragraph[1]/run[1]
 odp	run	move	format-verb		unreached
@@ -4744,10 +4744,10 @@ odf	element	edit	supported		ok tx.set
 odf	element	batch	supported		ok set item
 odf	element	create	supported		ok format
 odf	element	save	supported		ok format
-pages	document	get	supported		ok 6 instances, first `iwork/pages/body-sections-unicode.pages` /
-pages	document	find	supported		ok 6 instances, first `iwork/pages/body-sections-unicode.pages` /
+pages	document	get	supported		ok 7 instances, first `iwork/pages/body-sections-unicode.pages` /
+pages	document	find	supported		ok 7 instances, first `iwork/pages/body-sections-unicode.pages` /
 pages	document	query	n/a	query not offered for this element	-
-pages	document	view	supported		ok 6 instances, first `iwork/pages/body-sections-unicode.pages` /
+pages	document	view	supported		ok 7 instances, first `iwork/pages/body-sections-unicode.pages` /
 pages	document	set	n/a	set not offered for this element	-
 pages	document	add	n/a	add not offered for this element	-
 pages	document	remove	n/a	remove not offered for this element	-
@@ -4757,10 +4757,10 @@ pages	document	edit	n/a	edit not offered for this element	-
 pages	document	batch	n/a	batch not offered for this element	-
 pages	document	create	supported		ok format
 pages	document	save	supported		ok format
-pages	body	get	supported		ok 6 instances, first `iwork/pages/body-sections-unicode.pages` /body
-pages	body	find	supported		ok 6 instances, first `iwork/pages/body-sections-unicode.pages` /body
+pages	body	get	supported		ok 7 instances, first `iwork/pages/body-sections-unicode.pages` /body
+pages	body	find	supported		ok 7 instances, first `iwork/pages/body-sections-unicode.pages` /body
 pages	body	query	supported		ok matches in create()
-pages	body	view	supported		ok 6 instances, first `iwork/pages/body-sections-unicode.pages` /body
+pages	body	view	supported		ok 7 instances, first `iwork/pages/body-sections-unicode.pages` /body
 pages	body	set	n/a	set not offered for this element	-
 pages	body	add	n/a	add not offered for this element	-
 pages	body	remove	n/a	remove not offered for this element	-
@@ -4783,10 +4783,10 @@ pages	paragraph	edit	supported		ok tx.set
 pages	paragraph	batch	supported		ok set item
 pages	paragraph	create	supported		ok format
 pages	paragraph	save	supported		ok format
-pages	section	get	supported		ok 7 instances, first `iwork/pages/body-sections-unicode.pages` /section[1]
-pages	section	find	supported		ok 7 instances, first `iwork/pages/body-sections-unicode.pages` /section[1]
+pages	section	get	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /section[1]
+pages	section	find	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /section[1]
 pages	section	query	supported		ok matches in create()
-pages	section	view	supported		ok 7 instances, first `iwork/pages/body-sections-unicode.pages` /section[1]
+pages	section	view	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /section[1]
 pages	section	set	supported		ok `create() + add paragraph` /section[1] {"name":"Litchi"}
 pages	section	add	n/a	add not offered for this element	-
 pages	section	remove	n/a	remove not offered for this element	-
@@ -4796,10 +4796,10 @@ pages	section	edit	supported		ok tx.set
 pages	section	batch	supported		ok set item
 pages	section	create	supported		ok format
 pages	section	save	supported		ok format
-pages	table	get	supported		ok 2 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]
-pages	table	find	supported		ok 2 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]
+pages	table	get	supported		ok 3 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]
+pages	table	find	supported		ok 3 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]
 pages	table	query	supported		ok matches in iwork/pages/body-table-read-native.pages
-pages	table	view	supported		ok 2 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]
+pages	table	view	supported		ok 3 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]
 pages	table	set	n/a	set not offered for this element	-
 pages	table	add	n/a	add not offered for this element	-
 pages	table	remove	supported		ok `iwork/pages/body-table-read-native.pages` /body/tbl[1]
@@ -4809,10 +4809,10 @@ pages	table	edit	n/a	edit not offered for this element	-
 pages	table	batch	n/a	batch not offered for this element	-
 pages	table	create	supported		ok format
 pages	table	save	supported		ok format
-pages	row	get	supported		ok 6 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]/tr[1]
-pages	row	find	supported		ok 6 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]/tr[1]
+pages	row	get	supported		ok 8 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]/tr[1]
+pages	row	find	supported		ok 8 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]/tr[1]
 pages	row	query	supported		ok matches in iwork/pages/body-table-read-native.pages
-pages	row	view	supported		ok 6 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]/tr[1]
+pages	row	view	supported		ok 8 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]/tr[1]
 pages	row	set	n/a	set not offered for this element	-
 pages	row	add	n/a	add not offered for this element	-
 pages	row	remove	n/a	remove not offered for this element	-
@@ -4822,17 +4822,17 @@ pages	row	edit	n/a	edit not offered for this element	-
 pages	row	batch	n/a	batch not offered for this element	-
 pages	row	create	supported		ok format
 pages	row	save	supported		ok format
-pages	cell	get	supported		ok 6 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]/tr[1]/tc[1]
-pages	cell	find	supported		ok 6 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]/tr[1]/tc[1]
+pages	cell	get	supported		ok 8 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]/tr[1]/tc[1]
+pages	cell	find	supported		ok 8 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]/tr[1]/tc[1]
 pages	cell	query	supported		ok matches in iwork/pages/body-table-read-native.pages
-pages	cell	view	supported		ok 6 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]/tr[1]/tc[1]
-pages	cell	set	n/a	set not offered for this element	-
+pages	cell	view	supported		ok 8 instances, first `iwork/pages/body-table-read-native.pages` /body/tbl[1]/tr[1]/tc[1]
+pages	cell	set	supported		ok `iwork/pages/body-table-name-focused.pages` /body/tbl[1]/tr[1]/tc[1] {"text":"Litchi"}
 pages	cell	add	n/a	add not offered for this element	-
 pages	cell	remove	n/a	remove not offered for this element	-
 pages	cell	move	format-verb		refused invalid_argument
 pages	cell	swap	format-verb		refused invalid_argument
-pages	cell	edit	n/a	edit not offered for this element	-
-pages	cell	batch	n/a	batch not offered for this element	-
+pages	cell	edit	supported		ok tx.set
+pages	cell	batch	supported		ok set item
 pages	cell	create	supported		ok format
 pages	cell	save	supported		ok format
 pages	header	get	supported		ok 8 instances, first `iwork/pages/body-sections-unicode.pages` /section[1]/header[1]
@@ -4861,10 +4861,10 @@ pages	footer	edit	supported		ok tx.set
 pages	footer	batch	supported		ok set item
 pages	footer	create	supported		ok format
 pages	footer	save	supported		ok format
-pages	footnotes	get	supported		ok 6 instances, first `iwork/pages/body-sections-unicode.pages` /footnotes
-pages	footnotes	find	supported		ok 6 instances, first `iwork/pages/body-sections-unicode.pages` /footnotes
+pages	footnotes	get	supported		ok 7 instances, first `iwork/pages/body-sections-unicode.pages` /footnotes
+pages	footnotes	find	supported		ok 7 instances, first `iwork/pages/body-sections-unicode.pages` /footnotes
 pages	footnotes	query	supported		ok matches in create()
-pages	footnotes	view	supported		ok 6 instances, first `iwork/pages/body-sections-unicode.pages` /footnotes
+pages	footnotes	view	supported		ok 7 instances, first `iwork/pages/body-sections-unicode.pages` /footnotes
 pages	footnotes	set	n/a	set not offered for this element	-
 pages	footnotes	add	n/a	add not offered for this element	-
 pages	footnotes	remove	n/a	remove not offered for this element	-
@@ -4919,7 +4919,7 @@ keynote	placeholder	query	supported		ok matches in create()
 keynote	placeholder	view	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/placeholder[1]
 keynote	placeholder	set	supported		ok `iwork/keynote/multi-slide.key + add slide` /slide[1]/placeholder[1] {"text":"Litchi"}
 keynote	placeholder	add	n/a	add not offered for this element	-
-keynote	placeholder	remove	n/a	remove not offered for this element	-
+keynote	placeholder	remove	supported		ok `iwork/keynote/multi-slide.key + add slide` /slide[1]/placeholder[1]
 keynote	placeholder	move	format-verb		ok `iwork/keynote/multi-slide.key + add slide` /slide[1]/placeholder[1] /slide[1]/placeholder[2]
 keynote	placeholder	swap	format-verb		ok `iwork/keynote/multi-slide.key + add slide` /slide[1]/placeholder[1] /slide[1]/placeholder[2]
 keynote	placeholder	edit	supported		ok tx.set
@@ -4943,11 +4943,11 @@ keynote	paragraph	get	supported		ok 8 instances, first `iwork/keynote/multi-slid
 keynote	paragraph	find	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/placeholder[1]/paragraph[1]
 keynote	paragraph	query	supported		ok matches in create()
 keynote	paragraph	view	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/placeholder[1]/paragraph[1]
-keynote	paragraph	set	supported		ok `iwork/keynote/multi-slide.key + add slide` /slide[1]/placeholder[1]/paragraph[1] {"text":"Litchi"}
+keynote	paragraph	set	supported		ok `iwork/keynote/multi-slide.key + add slide` /slide[1]/notes/paragraph[1] {"text":"Litchi"}
 keynote	paragraph	add	supported		ok /slide[1]/placeholder[1]/paragraph[2] on `iwork/keynote/multi-slide.key + add slide` under /slide[1]/placeholder[1] {}
-keynote	paragraph	remove	supported		ok `iwork/keynote/multi-slide.key + add slide + add paragraph` /slide[1]/placeholder[1]/paragraph[1]
-keynote	paragraph	move	format-verb		ok `iwork/keynote/multi-slide.key + add slide + add paragraph` /slide[1]/placeholder[1]/paragraph[1] /slide[1]/placeholder[1]/paragraph[2]
-keynote	paragraph	swap	format-verb		ok `iwork/keynote/multi-slide.key + add slide + add paragraph` /slide[1]/placeholder[1]/paragraph[1] /slide[1]/placeholder[1]/paragraph[2]
+keynote	paragraph	remove	supported		ok `seed` /slide[1]/shape[1]/paragraph[1]
+keynote	paragraph	move	format-verb		ok `seed` /slide[1]/shape[1]/paragraph[1] /slide[1]/shape[1]/paragraph[2]
+keynote	paragraph	swap	format-verb		ok `seed` /slide[1]/shape[1]/paragraph[1] /slide[1]/shape[1]/paragraph[2]
 keynote	paragraph	edit	supported		ok tx.set
 keynote	paragraph	batch	supported		ok set item
 keynote	paragraph	create	supported		ok format
@@ -4956,18 +4956,18 @@ keynote	run	get	supported		ok 8 instances, first `iwork/keynote/multi-slide.key`
 keynote	run	find	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/placeholder[1]/paragraph[1]/run[1]
 keynote	run	query	supported		ok matches in create()
 keynote	run	view	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/placeholder[1]/paragraph[1]/run[1]
-keynote	run	set	n/a	set not offered for this element	-
+keynote	run	set	supported		ok `iwork/keynote/multi-slide.key + add slide` /slide[1]/shape[1]/paragraph[1]/run[1] {"bold":"true"}
 keynote	run	add	n/a	add not offered for this element	-
 keynote	run	remove	n/a	remove not offered for this element	-
 keynote	run	move	format-verb		unreached
 keynote	run	swap	format-verb		unreached
-keynote	run	edit	n/a	edit not offered for this element	-
-keynote	run	batch	n/a	batch not offered for this element	-
+keynote	run	edit	supported		ok tx.set
+keynote	run	batch	supported		ok set item
 keynote	run	create	supported		ok format
 keynote	run	save	supported		ok format
 keynote	shape	get	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/shape[1]
 keynote	shape	find	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/shape[1]
-keynote	shape	query	supported		ok matches in iwork/keynote/multi-slide.key
+keynote	shape	query	supported		ok matches in seed
 keynote	shape	view	supported		ok 8 instances, first `iwork/keynote/multi-slide.key` /slide[1]/shape[1]
 keynote	shape	set	supported		ok `iwork/keynote/multi-slide.key + add slide` /slide[1]/shape[1] {"text":"Litchi"}
 keynote	shape	add	supported		ok /slide[1]/shape[2] on `iwork/keynote/multi-slide.key + add slide` under /slide[1] {}
@@ -5010,7 +5010,7 @@ keynote	video	query	supported		ok matches in iwork/keynote/media-lifecycle-audio
 keynote	video	view	supported		ok 2 instances, first `iwork/keynote/media-lifecycle-audio-remove-native.key` /slide[1]/video[1]
 keynote	video	set	n/a	set not offered for this element	-
 keynote	video	add	n/a	add not offered for this element	-
-keynote	video	remove	n/a	remove not offered for this element	-
+keynote	video	remove	supported		ok `iwork/keynote/media-lifecycle-audio-remove-native.key` /slide[1]/video[1]
 keynote	video	move	format-verb		ok `iwork/keynote/media-lifecycle-audio-remove-native.key` /slide[1]/video[1] /slide[1]/video[2]
 keynote	video	swap	format-verb		ok `iwork/keynote/media-lifecycle-audio-remove-native.key` /slide[1]/video[1] /slide[1]/video[2]
 keynote	video	edit	n/a	edit not offered for this element	-
@@ -5023,7 +5023,7 @@ keynote	audio	query	supported		ok matches in iwork/keynote/media-lifecycle-remov
 keynote	audio	view	supported		ok 2 instances, first `iwork/keynote/media-lifecycle-remove-native.key` /slide[1]/audio[1]
 keynote	audio	set	n/a	set not offered for this element	-
 keynote	audio	add	n/a	add not offered for this element	-
-keynote	audio	remove	n/a	remove not offered for this element	-
+keynote	audio	remove	supported		ok `iwork/keynote/media-lifecycle-remove-native.key` /slide[1]/audio[1]
 keynote	audio	move	format-verb		ok `iwork/keynote/media-lifecycle-remove-native.key` /slide[1]/audio[1] /slide[1]/audio[2]
 keynote	audio	swap	format-verb		ok `iwork/keynote/media-lifecycle-remove-native.key` /slide[1]/audio[1] /slide[1]/audio[2]
 keynote	audio	edit	n/a	edit not offered for this element	-
@@ -5060,13 +5060,13 @@ keynote	tc	get	supported		ok 6 instances, first `iwork/keynote/slide-table-read-
 keynote	tc	find	supported		ok 6 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]/tc[1]
 keynote	tc	query	supported		ok matches in iwork/keynote/slide-table-read-native.key
 keynote	tc	view	supported		ok 6 instances, first `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]/tc[1]
-keynote	tc	set	n/a	set not offered for this element	-
+keynote	tc	set	supported		ok `iwork/keynote/slide-table-read-native.key` /slide[1]/table[1]/tr[1]/tc[1] {"text":"Litchi"}
 keynote	tc	add	n/a	add not offered for this element	-
 keynote	tc	remove	n/a	remove not offered for this element	-
 keynote	tc	move	format-verb		refused unsupported_capability
 keynote	tc	swap	format-verb		refused invalid_argument
-keynote	tc	edit	n/a	edit not offered for this element	-
-keynote	tc	batch	n/a	batch not offered for this element	-
+keynote	tc	edit	supported		ok tx.set
+keynote	tc	batch	supported		ok set item
 keynote	tc	create	supported		ok format
 keynote	tc	save	supported		ok format
 keynote	chart	get	supported		ok 1 instances, first `iwork/keynote/chart-grid-authored-native.key` /slide[1]/chart[1]
@@ -5160,3 +5160,29 @@ numbers	mergeCell	edit	n/a	edit not offered for this element	-
 numbers	mergeCell	batch	n/a	batch not offered for this element	-
 numbers	mergeCell	create	supported		ok format
 numbers	mergeCell	save	supported		ok format
+numbers	row	get	supported		ok 8 instances, first `iwork/numbers/basic.numbers` /sheet[1]/table[1]/row[1]
+numbers	row	find	supported		ok 8 instances, first `iwork/numbers/basic.numbers` /sheet[1]/table[1]/row[1]
+numbers	row	query	supported		ok matches in create()
+numbers	row	view	supported		ok 8 instances, first `iwork/numbers/basic.numbers` /sheet[1]/table[1]/row[1]
+numbers	row	set	n/a	set not offered for this element	-
+numbers	row	add	supported		ok /sheet[1]/table[1]/row[11] on `create() + add sheet` under /sheet[1]/table[1] {}
+numbers	row	remove	supported		ok `create() + add sheet` /sheet[1]/table[1]/row[1]
+numbers	row	move	format-verb		refused unsupported_capability
+numbers	row	swap	gap	IWORK_API_REQUESTS.md	refused unsupported_capability
+numbers	row	edit	n/a	edit not offered for this element	-
+numbers	row	batch	n/a	batch not offered for this element	-
+numbers	row	create	supported		ok format
+numbers	row	save	supported		ok format
+numbers	col	get	supported		ok 8 instances, first `iwork/numbers/basic.numbers` /sheet[1]/table[1]/col[1]
+numbers	col	find	supported		ok 8 instances, first `iwork/numbers/basic.numbers` /sheet[1]/table[1]/col[1]
+numbers	col	query	supported		ok matches in create()
+numbers	col	view	supported		ok 8 instances, first `iwork/numbers/basic.numbers` /sheet[1]/table[1]/col[1]
+numbers	col	set	n/a	set not offered for this element	-
+numbers	col	add	supported		ok /sheet[1]/table[1]/col[6] on `create() + add sheet` under /sheet[1]/table[1] {}
+numbers	col	remove	supported		ok `create() + add sheet` /sheet[1]/table[1]/col[1]
+numbers	col	move	format-verb		refused unsupported_capability
+numbers	col	swap	gap	IWORK_API_REQUESTS.md	refused unsupported_capability
+numbers	col	edit	n/a	edit not offered for this element	-
+numbers	col	batch	n/a	batch not offered for this element	-
+numbers	col	create	supported		ok format
+numbers	col	save	supported		ok format

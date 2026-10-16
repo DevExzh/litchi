@@ -609,6 +609,32 @@ The coordinator's Claude process stalled and exited while seven agents (wave R7 
   - the coordinator watches `MemAvailable` (alert below 16 GB) and free disk.
 - Resumed: `iwork-found` (0296), `checklist-fixes` (0290), `perf-path` (0291), `producer-structure` (0293). Held: `odf-verbs` (0292), `acceptance2` (0294), `m4-ext` (0295).
 
+## Incident (2026-10-16): coordinator session lost to an OOM kill
+The session exited at 07:46 while four agents (0305, 0308, 0309, 0310) were running.
+- Cause, now confirmed: the user journal shows a kernel OOM kill in the session's tmux scope (memory peak 106.8 GB). That scope has `OOMPolicy=stop`, so systemd stopped the whole scope, coordinator included. The policy cannot be changed at runtime.
+- Mitigation: a coordinator-side cargo shim (`.coord/bin/cargo`) runs every cargo command in its own `systemd-run --user --scope` with `OOMPolicy=continue` and `MemoryMax=26G`. An OOM now kills only that command. Every agent env, the gate and the rebless scripts put the shim first on `PATH`, and the agent rules require the same scoping for valgrind and perf.
+- Resumed all four agents.
+
+- Merged `office-gaps` (0308):
+  - XLS producer row/column shifts byte-exact 176/165 → 227/227 of 305 sheets. The ClientAnchor "moves with cells" flags were inverted in the shift code and are fixed. Reserved Formula bits are ignored, so 4 worksheets load again (89 XLS query digests re-blessed).
+  - RTF producer splice: paragraph insertion (add+remove 7 → 121), group split, replayed inherited formatting, table rows, removal with anchored content (60 → 110 of 147).
+  - ODP G-ODP-1 run/paragraph character formatting through new automatic styles.
+  - DOC `FloatingPictures.doc` gives a typed smart-tag refusal instead of `corrupt_file`; refused ODG text sets report `unsupported_capability`.
+  - Open (to 0311): DOC unified is 1.56× the leaf (it predates 0308); ODP scan +3–7% wall time with −0.14% instructions.
+  - Open (follow-ups): the public `AnchorBehavior` names are still inverted; XLS CF12, conditional-format/validation formulas with cell references, Array/Table records; RTF section breaks; ODP shape/cell/notes formatting.
+- Merged `perf-lazy` (0305):
+  - Keynote/Numbers trees are built lazily: Keynote open+get 1.10 → 1.03, Numbers 1.21 → 1.06–1.09 (within the +20 µs allowance).
+  - DOCX single set 1.09 → 1.055 (`Docx::set_file`, direct `/body/p[N]` text route).
+  - DOCX 1,000-paragraph set 2.5× → 1.56× and add 2.1× → 1.46× through a source-backed snapshot memo (the eager owner is at 1.00×).
+  - RTF `&Query` route: a plan-cache hit costs ~0.05 µs, so no change.
+  - Open (to 0311): litchi-opc audits the replacement part a second time after the commit's own audit.
+- Merged `iwork-elements` (0309):
+  - Numbers rows and columns (`table::topology`, request 6) through unified `add`/`remove` of `row[N]`/`col[N]`; 28 corpus tables round trip. Tables with formulas, merges, filters or pivots are refused, typed.
+  - Character styling on one shared wire module: Keynote runs (request 10), Pages paragraph `font.*` (request 13), Numbers cell `font.*` (request 7).
+  - Pages and Keynote table cells write `text`/`value`; Keynote media removal and placeholder hide/show; formulas on created Numbers workbooks (request 18).
+  - Performance: Numbers within 1%; Keynote run/placeholder/media and Pages paragraph within 3%.
+  - Open (to 0312): Keynote `table_cell` 1.99× and Pages 1.065× (+103 µs), both from the first-read tree build; requests 11 and 19; table creation; formula-coordinate shift for row/column edits.
+
 - Merged `checklist-fixes` (0290):
   - Phase G checklist failures F1 (bare `placeholder` query), F2 (negative `c:axId` read leniently), F4 (PPT `hidden` inserts the slide info atom), F6 (OTH/ODM `meta.xml` created on demand) and F7 (RTF picture remove on mismatched payloads) are fixed;
   - `File::metadata()` reports `dc:language` for every ODF format (six Markdown golden rows updated);

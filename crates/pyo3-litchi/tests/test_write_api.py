@@ -187,8 +187,12 @@ class CreateTests(WriteAssertions):
         self.assertEqual(paragraph, "/slide[2]/placeholder[2]/paragraph[4]")
         edited = added.set(body + "/p[1]", {"text": "Changed"})
         self.assertEqual(edited.get(body + "/p[1]", 0)["text"], "Changed")
-        error = raised(lambda: deck.remove("/slide[1]/placeholder[title]"))
-        self.assertIsInstance(error, L.UnsupportedError)
+        # Record 0309: removing a title placeholder hides it (`hidden` is
+        # set-only); setting `hidden` to false shows it again.
+        hidden = deck.remove("/slide[1]/placeholder[title]")
+        self.assertNotEqual(hidden.to_bytes(), deck.to_bytes())
+        shown = L.open_bytes(hidden.to_bytes()).set("/slide[1]/placeholder[title]", {"hidden": False})
+        self.assertEqual(shown.get("/slide[1]/placeholder[title]", 0)["text"], "Litchi multi-slide fixture")
         created = L.create("keynote")
         grown, _ = created.add("/", "slide")
         self.assertEqual(len(grown.query("slide")), len(created.query("slide")) + 1)
@@ -206,6 +210,38 @@ class CreateTests(WriteAssertions):
         self.assertEqual(L.open_bytes(written.to_bytes()).get("/sheet[1]/table[1]/B2", 0)["format"]["value"], 5)
         removed = with_table.remove("/sheet[1]")
         self.assertEqual(L.open_bytes(removed.to_bytes()).get("/", 0)["format"]["sheetCount"], 1)
+
+    def test_iwork_element_writes_round_trip(self):
+        # Record 0309: Numbers rows and columns, character properties and
+        # table cells across the iWork formats.
+        workbook = L.create("numbers").set("/sheet[1]/table[1]/B2", {"value": 5})
+        rows = workbook.get("/sheet[1]/table[1]", 0)["format"]["rowCount"]
+        grown, row = workbook.add("/sheet[1]/table[1]", "row", {}, index=1)
+        self.assertEqual(row, "/sheet[1]/table[1]/row[2]")
+        reopened = L.open_bytes(grown.to_bytes())
+        self.assertEqual(reopened.get("/sheet[1]/table[1]", 0)["format"]["rowCount"], rows + 1)
+        self.assertEqual(reopened.get("/sheet[1]/table[1]/B3", 0)["format"]["value"], 5)
+        shrunk = L.open_bytes(reopened.remove(row).to_bytes())
+        self.assertEqual(shrunk.get("/sheet[1]/table[1]/B2", 0)["format"]["value"], 5)
+        widened, column = workbook.add("/sheet[1]/table[1]", "col", {}, index=0)
+        self.assertEqual(column, "/sheet[1]/table[1]/col[1]")
+        self.assertEqual(L.open_bytes(widened.to_bytes()).get("/sheet[1]/table[1]/C2", 0)["format"]["value"], 5)
+        bold = workbook.set("/sheet[1]/table[1]/B2", {"font.bold": True, "font.size": "18pt"})
+        self.assertEqual(L.open_bytes(bold.to_bytes()).get("/sheet[1]/table[1]/B2", 0)["format"]["value"], 5)
+        pages = L.open(fixture("iwork/pages/basic.pages"))
+        styled = pages.set("/body/p[1]", {"font.italic": True})
+        self.assertEqual(L.open_bytes(styled.to_bytes()).get("/body/p[1]", 0)["text"], pages.get("/body/p[1]", 0)["text"])
+        tables = L.open(fixture("iwork/pages/body-table-catalog-native.pages"))
+        written = tables.set("/body/tbl[1]/tr[1]/tc[1]", {"text": "From Python"})
+        self.assertEqual(L.open_bytes(written.to_bytes()).get("/body/tbl[1]/tr[1]/tc[1]", 0)["text"], "From Python")
+        deck = L.open(fixture("iwork/keynote/multi-slide.key"))
+        boxed, box = deck.add("/slide[1]", "textbox", {"text": "Styled"})
+        run = box + "/p[1]/run[1]"
+        styled = L.open_bytes(boxed.set(run, {"bold": True, "color": "C80000"}).to_bytes())
+        self.assertTrue(styled.get(run, 0)["format"]["bold"])
+        cells = L.open(fixture("iwork/keynote/table-discovery.key"))
+        cell = cells.query("tc")[0]["path"]
+        self.assertEqual(L.open_bytes(cells.set(cell, {"text": "Cell"}).to_bytes()).get(cell, 0)["text"], "Cell")
 
     def test_a_created_file_has_no_path(self):
         error = raised(lambda: L.create("docx").save())

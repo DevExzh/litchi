@@ -400,7 +400,7 @@ fn is_character_format_control(name: &[u8]) -> bool {
 }
 
 /// Render replacement text as RTF transport bytes.
-fn encode_text(text: &str, paragraphs: bool, output: &mut Vec<u8>) -> Result<(), Error> {
+pub(super) fn encode_text(text: &str, paragraphs: bool, output: &mut Vec<u8>) -> Result<(), Error> {
     output
         .try_reserve(text.len().saturating_add(8))
         .map_err(|_error| allocation_error("destination replacement", text.len()))?;

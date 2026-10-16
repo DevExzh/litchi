@@ -4,9 +4,11 @@
 //! shared data-list ownership.  Its job is the small and safety-critical part
 //! of a table edit: rewrite the BNC rows which are already attached to one
 //! tile.  The caller owns string/rich-text/formula reference accounting and
-//! sparse attachment.  An absent row in a populated existing tile is reported
-//! as [`TileError::NeedSparse`].  A canonical modern tile with no row records
-//! is materialised in place, retaining its top-level unknown fields exactly.
+//! sparse attachment.  An absent row of a modern tile is materialised in row
+//! order (record 0309: rows inserted by a table-topology edit sit between
+//! stored rows); a legacy tile reports it as [`TileError::NeedSparse`].  A
+//! canonical modern tile with no row records is materialised in place,
+//! retaining its top-level unknown fields exactly.
 
 use std::mem::size_of;
 
@@ -478,6 +480,9 @@ enum PreparedRowSource<'source> {
 
 struct PreparedRow<'source> {
     field_index: Option<usize>,
+    /// For a materialized (new) row, the field index of the first source
+    /// row that follows it; `None` appends it after every source row.
+    insert_before: Option<usize>,
     row: u32,
     source: PreparedRowSource<'source>,
     slots: Vec<PreparedSlot<'source>>,
@@ -913,15 +918,14 @@ pub(crate) fn preclassify_tile(
             return Err(TileError::InvalidSource);
         }
         previous_row = Some(row_index);
-        if positions
+        // Positions in rows the tile does not store are missing cells; the
+        // rewrite materializes such a row in row order.
+        while let Some(position) = positions
             .get(position_start)
-            .is_some_and(|position| position.row < row_index)
+            .filter(|position| position.row < row_index)
         {
-            let position = positions[position_start];
-            return Err(TileError::NeedSparse {
-                row: position.row,
-                column: position.column,
-            });
+            cells.push(missing_cell(*position));
+            position_start += 1;
         }
         let position_end = positions[position_start..]
             .iter()
@@ -938,11 +942,8 @@ pub(crate) fn preclassify_tile(
         }
         position_start = position_end;
     }
-    if let Some(position) = positions.get(position_start) {
-        return Err(TileError::NeedSparse {
-            row: position.row,
-            column: position.column,
-        });
+    for position in &positions[position_start..] {
+        cells.push(missing_cell(*position));
     }
     if cells.len() != positions.len() {
         return Err(TileError::InvalidSource);
@@ -1306,6 +1307,24 @@ fn scan_formula_cell(
     Ok(())
 }
 
+/// The classification of a position in a row the tile does not store.
+const fn missing_cell(position: TileReadPosition) -> PreclassifiedCell {
+    PreclassifiedCell {
+        row: position.row,
+        column: position.column,
+        before: CellValue::Missing,
+        before_references: CellReferences {
+            string: None,
+            rich_text: None,
+            formula: None,
+            formula_error: None,
+            comment: None,
+        },
+        formula_cache: None,
+        present: false,
+    }
+}
+
 fn preclassify_empty_modern_tile(
     positions: &[TileReadPosition],
     counters: &mut Counters,
@@ -1327,14 +1346,7 @@ fn preclassify_empty_modern_tile(
         .ok_or(TileError::InvalidSource)?;
     counters.record_scratch_allocation(retained_capacity)?;
     for position in positions {
-        cells.push(PreclassifiedCell {
-            row: position.row,
-            column: position.column,
-            before: CellValue::Missing,
-            before_references: CellReferences::default(),
-            formula_cache: None,
-            present: false,
-        });
+        cells.push(missing_cell(*position));
     }
     counters.release_scratch(retained_capacity)?;
     counters.retain(retained_capacity, cells.len())?;
@@ -1702,12 +1714,12 @@ fn prepare_tile_internal<'source>(
                     column: change.column,
                 });
             },
-            Err(_) => Some(prepare_canonical_row(
-                row_index,
-                request.columns,
-                row_changes,
-                &mut counters,
-            )?),
+            Err(position) => {
+                let mut row =
+                    prepare_canonical_row(row_index, request.columns, row_changes, &mut counters)?;
+                row.insert_before = raw_rows.get(position).map(|raw| raw.field_index);
+                Some(row)
+            },
         };
         let cell_count = plan.as_ref().map_or(0, |row| row.cell_count);
         final_rows.push(RowCellCount {
@@ -1930,7 +1942,6 @@ fn classify_prepared_mode(
     modern: bool,
     counters: &mut Counters,
 ) -> Result<PreparedTileMode> {
-    let last_source = raw_rows.last().map(|row| row.row.tile_row_index());
     let mut missing_materialized = false;
     for group in changes.chunk_by(|left, right| left.row == right.row) {
         counters.charge(u64_from_usize(binary_search_work(raw_rows.len()))?)?;
@@ -1950,12 +1961,6 @@ fn classify_prepared_mode(
             continue;
         }
         if !modern {
-            return Err(TileError::NeedSparse {
-                row: group[0].row,
-                column: group[0].column,
-            });
-        }
-        if last_source.is_some_and(|last| group[0].row <= last) {
             return Err(TileError::NeedSparse {
                 row: group[0].row,
                 column: group[0].column,
@@ -2026,11 +2031,15 @@ fn find_prepared_row_by_field<'row, 'source>(
     rows: &'row [PreparedRow<'source>],
     field_index: usize,
 ) -> Option<&'row PreparedRow<'source>> {
-    let borrowed = rows.partition_point(|row| row.field_index.is_some());
-    rows[..borrowed]
-        .binary_search_by_key(&field_index, |row| row.field_index.unwrap_or(usize::MAX))
-        .ok()
-        .and_then(|index| rows.get(index))
+    // Rows are in ascending row order: each source row sorts by its field
+    // index, and each materialized row sorts immediately before the source
+    // row it precedes (or after every source row).
+    rows.binary_search_by_key(&(field_index, true), |row| match row.field_index {
+        Some(index) => (index, true),
+        None => (row.insert_before.unwrap_or(usize::MAX), false),
+    })
+    .ok()
+    .and_then(|index| rows.get(index))
 }
 
 fn tile_execution_requirements(
@@ -2497,6 +2506,7 @@ fn prepare_borrowed_row<'source>(
     counters.retain(prepared_bytes, prepared.len())?;
     Ok(PreparedRow {
         field_index: Some(field_index),
+        insert_before: None,
         row: row.tile_row_index(),
         source: PreparedRowSource::Borrowed { raw },
         slots: prepared,
@@ -2581,6 +2591,7 @@ fn prepare_canonical_row<'source>(
     counters.retain(prepared_bytes, slots.len())?;
     Ok(PreparedRow {
         field_index: None,
+        insert_before: None,
         row,
         source: PreparedRowSource::Canonical { row },
         slots,
@@ -2808,6 +2819,18 @@ fn write_prepared_tile(plan: &PreparedTileRewrite<'_>, counters: &mut Counters) 
     let mut output = exact_scratch_vec::<u8>(plan.output_len, plan.output_len, counters)?;
     let view = WireView::parse(plan.source).map_err(|_| TileError::InvalidSource)?;
     for (field_index, field) in view.fields().enumerate() {
+        // Materialized rows keep the tile's ascending row order: each goes
+        // right before the first source row that follows it.
+        for row in plan
+            .rows
+            .iter()
+            .filter(|row| row.field_index.is_none() && row.insert_before == Some(field_index))
+        {
+            let payload = row.output.as_deref().ok_or(TileError::InvalidSource)?;
+            output.push(0x2a);
+            encode_varint(&mut output, u64_from_usize(payload.len())?);
+            output.extend_from_slice(payload);
+        }
         if let Some(row) = find_prepared_row_by_field(&plan.rows, field_index) {
             let payload = row.output.as_deref().ok_or(TileError::InvalidSource)?;
             output.extend_from_slice(field.key());
@@ -2828,7 +2851,11 @@ fn write_prepared_tile(plan: &PreparedTileRewrite<'_>, counters: &mut Counters) 
             _ => output.extend_from_slice(field.raw()),
         }
     }
-    for row in plan.rows.iter().filter(|row| row.field_index.is_none()) {
+    for row in plan
+        .rows
+        .iter()
+        .filter(|row| row.field_index.is_none() && row.insert_before.is_none())
+    {
         let payload = row.output.as_deref().ok_or(TileError::InvalidSource)?;
         output.push(0x2a);
         encode_varint(&mut output, u64_from_usize(payload.len())?);
@@ -4053,25 +4080,37 @@ mod tests {
                     && maximum == (positions.len() - 1) as u64
         ));
 
+        // A row the populated tile does not store is a missing cell, and a
+        // write materializes it before the stored row that follows it.
         let populated = populated_template();
         let missing_position = [TileReadPosition { row: 0, column: 0 }];
-        assert!(matches!(
-            preclassify_tile(&populated, 2, &missing_position, limits()),
-            Err(TileError::NeedSparse { row: 0, column: 0 })
-        ));
-        assert!(matches!(
-            rewrite_tile(TileRewriteRequest {
-                source: &populated,
-                columns: 2,
-                changes: &[TileChange {
-                    row: 0,
-                    column: 0,
-                    change: BncChange::Set(ScalarInput::Boolean(true)),
-                }],
-                limits: limits(),
-            }),
-            Err(TileError::NeedSparse { row: 0, column: 0 })
-        ));
+        let missing = preclassify_tile(&populated, 2, &missing_position, limits())
+            .expect("a missing row classifies");
+        assert_eq!(missing.cells.len(), 1);
+        assert_eq!(missing.cells[0].before, CellValue::Missing);
+        assert!(!missing.cells[0].present);
+        let inserted = rewrite_tile(TileRewriteRequest {
+            source: &populated,
+            columns: 2,
+            changes: &[TileChange {
+                row: 0,
+                column: 0,
+                change: BncChange::Set(ScalarInput::Boolean(true)),
+            }],
+            limits: limits(),
+        })
+        .expect("a missing row before a stored row materializes");
+        let payload = inserted.payload.as_deref().expect("replacement payload");
+        let (tile, rows) = decode_rows(payload);
+        assert_eq!(tile.num_rows(), 2);
+        assert_eq!(
+            rows.values
+                .iter()
+                .map(|(row, cells, ..)| (*row, *cells))
+                .collect::<Vec<_>>(),
+            [(0, 1), (4, 0)]
+        );
+        assert_eq!(unknown_99(payload), unknown_99(&populated));
 
         let outcome = rewrite_tile(TileRewriteRequest {
             source: &source,

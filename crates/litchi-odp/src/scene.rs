@@ -41,6 +41,7 @@
 mod change;
 mod markup;
 mod scan;
+mod styles;
 #[cfg(test)]
 mod tests;
 
@@ -50,6 +51,7 @@ use litchi_core::Result;
 
 use change::Fragment;
 pub use change::{Attribute, Change, NewPage, NewTextBox, ObjectRef, Scope, StoryRef};
+pub use styles::{AutomaticStyle, AutomaticStyles, TextProperties, TextPropertyEdit};
 
 /// Apply `changes` to the `content.xml` of `source` as checked splices.
 ///
@@ -98,6 +100,11 @@ pub struct Scene {
     /// before the end tag of `office:presentation`.
     pub(crate) body_end: Option<usize>,
     pub(crate) len: usize,
+    /// The content of `office:automatic-styles`, indexed on demand by
+    /// [`Scene::automatic_styles`].
+    pub(crate) styles_range: Option<Range<usize>>,
+    /// Where new automatic styles go.
+    pub(crate) styles_insertion: styles::StylesInsertion,
 }
 
 /// The prefixes the document root binds to the ODF namespaces markup is
@@ -108,6 +115,9 @@ pub(crate) struct Prefixes {
     pub(crate) text: Option<String>,
     pub(crate) svg: Option<String>,
     pub(crate) presentation: Option<String>,
+    pub(crate) style: Option<String>,
+    pub(crate) fo: Option<String>,
+    pub(crate) office: Option<String>,
 }
 
 impl Scene {
@@ -146,6 +156,24 @@ impl Scene {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.len == 0
+    }
+
+    /// Index the automatic styles of `xml`, the text this scene indexes
+    /// (`office:automatic-styles`: each `style:style`, its family, parent
+    /// and `style:text-properties`). The scan only records where they are,
+    /// so reading a presentation does not pay for them.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`litchi_core::Error::InvalidFormat`] when `xml` is not the
+    /// text this scene indexes or its styles are malformed.
+    pub fn automatic_styles(&self, xml: &str) -> Result<AutomaticStyles> {
+        if xml.len() != self.len {
+            return Err(litchi_core::Error::InvalidFormat(
+                "the ODP scene does not index this content".to_string(),
+            ));
+        }
+        styles::parse(xml, self.styles_range.clone(), &self.prefixes)
     }
 
     /// Resolve an object reference against this scene.

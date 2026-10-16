@@ -32,7 +32,7 @@ impl Docx {
                 match self.owner() {
                     DocxOwner::Source(package) => publish_source(package, path, options),
                     DocxOwner::Eager(package) => {
-                        let mut package = package.as_ref().clone();
+                        let mut package = package.clone();
                         publish_owned(&mut package, path, options, None, || Ok(()))
                     },
                 }
@@ -49,9 +49,7 @@ impl Docx {
             } else {
                 match self.owner() {
                     DocxOwner::Source(package) => package.write_to(sink).map_err(Into::into),
-                    DocxOwner::Eager(package) => {
-                        package.as_ref().clone().write_to(sink).map_err(Into::into)
-                    },
+                    DocxOwner::Eager(package) => package.clone().write_to(sink).map_err(Into::into),
                 }
             }
         })();

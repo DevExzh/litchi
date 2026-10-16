@@ -30,6 +30,12 @@ pub enum LeafError {
     /// A Pages section-name transaction failed.
     #[cfg(feature = "pages")]
     PagesName(litchi_pages::section::name::Error),
+    /// A Pages character-style transaction failed (record 0309).
+    #[cfg(feature = "pages")]
+    PagesTextStyle(litchi_pages::section::text_style::Error),
+    /// A Pages body-table value transaction failed (record 0309).
+    #[cfg(feature = "pages")]
+    PagesTableValues(litchi_pages::table::values::Error),
     /// A Pages header or footer text transaction failed.
     #[cfg(feature = "pages")]
     PagesHeaderFooter(litchi_pages::header_footer::text::Error),
@@ -72,6 +78,12 @@ pub enum LeafError {
     /// A Keynote slide-drawable transaction failed.
     #[cfg(feature = "keynote")]
     KeynoteDrawables(litchi_keynote::slide::drawable::Error),
+    /// A Keynote movie or audio removal failed (record 0309).
+    #[cfg(feature = "keynote")]
+    KeynoteMedia(litchi_keynote::slide::media::lifecycle::Error),
+    /// A Keynote placeholder visibility change failed (record 0309).
+    #[cfg(feature = "keynote")]
+    KeynotePlaceholder(litchi_keynote::slide::placeholder::Error),
     /// A Keynote slide-creation transaction failed.
     #[cfg(feature = "keynote")]
     KeynoteCreation(litchi_keynote::slide::creation::Error),
@@ -115,6 +127,10 @@ impl fmt::Display for LeafError {
             #[cfg(feature = "pages")]
             Self::PagesName(error) => error.fmt(formatter),
             #[cfg(feature = "pages")]
+            Self::PagesTextStyle(error) => error.fmt(formatter),
+            #[cfg(feature = "pages")]
+            Self::PagesTableValues(error) => error.fmt(formatter),
+            #[cfg(feature = "pages")]
             Self::PagesHeaderFooter(error) => error.fmt(formatter),
             #[cfg(feature = "pages")]
             Self::PagesFootnote(error) => error.fmt(formatter),
@@ -142,6 +158,10 @@ impl fmt::Display for LeafError {
             Self::KeynoteNotes(error) => error.fmt(formatter),
             #[cfg(feature = "keynote")]
             Self::KeynoteDrawables(error) => error.fmt(formatter),
+            #[cfg(feature = "keynote")]
+            Self::KeynoteMedia(error) => error.fmt(formatter),
+            #[cfg(feature = "keynote")]
+            Self::KeynotePlaceholder(error) => error.fmt(formatter),
             #[cfg(feature = "keynote")]
             Self::KeynoteCreation(error) => error.fmt(formatter),
             #[cfg(feature = "keynote")]
@@ -177,6 +197,10 @@ impl std::error::Error for LeafError {
             #[cfg(feature = "pages")]
             Self::PagesName(error) => Some(error),
             #[cfg(feature = "pages")]
+            Self::PagesTextStyle(error) => Some(error),
+            #[cfg(feature = "pages")]
+            Self::PagesTableValues(error) => Some(error),
+            #[cfg(feature = "pages")]
             Self::PagesHeaderFooter(error) => Some(error),
             #[cfg(feature = "pages")]
             Self::PagesFootnote(error) => Some(error),
@@ -204,6 +228,10 @@ impl std::error::Error for LeafError {
             Self::KeynoteNotes(error) => Some(error),
             #[cfg(feature = "keynote")]
             Self::KeynoteDrawables(error) => Some(error),
+            #[cfg(feature = "keynote")]
+            Self::KeynoteMedia(error) => Some(error),
+            #[cfg(feature = "keynote")]
+            Self::KeynotePlaceholder(error) => Some(error),
             #[cfg(feature = "keynote")]
             Self::KeynoteCreation(error) => Some(error),
             #[cfg(feature = "keynote")]
@@ -246,6 +274,10 @@ impl LeafError {
             #[cfg(feature = "pages")]
             Self::PagesName(error) => pages_name_code(error),
             #[cfg(feature = "pages")]
+            Self::PagesTextStyle(error) => pages_text_style_code(error),
+            #[cfg(feature = "pages")]
+            Self::PagesTableValues(error) => pages_table_values_code(error),
+            #[cfg(feature = "pages")]
             Self::PagesHeaderFooter(error) => pages_region_code(error),
             #[cfg(feature = "pages")]
             Self::PagesFootnote(error) => pages_footnote_code(error),
@@ -275,6 +307,10 @@ impl LeafError {
             Self::KeynoteNotes(error) => keynote_notes_code(error),
             #[cfg(feature = "keynote")]
             Self::KeynoteDrawables(error) => keynote_drawables_code(error),
+            #[cfg(feature = "keynote")]
+            Self::KeynoteMedia(error) => keynote_media_code(error),
+            #[cfg(feature = "keynote")]
+            Self::KeynotePlaceholder(error) => keynote_placeholder_code(error),
             #[cfg(feature = "keynote")]
             Self::KeynoteCreation(error) => keynote_creation_code(error),
             #[cfg(feature = "numbers")]
@@ -395,6 +431,62 @@ fn pages_name_code(error: &litchi_pages::section::name::Error) -> Code {
         E::PatchConflict | E::InvalidSource => Code::InvalidInput,
         E::Allocation { .. } | E::Verification => Code::InternalError,
         _ => Code::InvalidValue,
+    }
+}
+
+#[cfg(feature = "pages")]
+fn pages_text_style_code(error: &litchi_pages::section::text_style::Error) -> Code {
+    use litchi_pages::section::text_style::Error as E;
+    match error {
+        E::SectionNotFound => Code::PathNotFound,
+        E::InvalidSpan | E::EmptyStyle => Code::InvalidArgument,
+        E::UnsupportedDependency | E::UnsupportedSource => Code::UnsupportedCapability,
+        E::LimitExceeded { .. } => Code::LimitExceeded,
+        E::PatchConflict | E::InvalidSource => Code::InvalidInput,
+        _ => Code::InternalError,
+    }
+}
+
+#[cfg(feature = "keynote")]
+fn keynote_placeholder_code(error: &litchi_keynote::slide::placeholder::Error) -> Code {
+    use litchi_keynote::slide::placeholder::Error as E;
+    match error {
+        E::SlideNameNotFound | E::SlidePositionNotFound { .. } | E::PlaceholderNotFound { .. } => {
+            Code::PathNotFound
+        },
+        E::UnsupportedSource => Code::UnsupportedCapability,
+        E::LimitExceeded { .. } => Code::LimitExceeded,
+        E::InvalidSource | E::AmbiguousSelector => Code::InvalidInput,
+        _ => Code::InternalError,
+    }
+}
+
+#[cfg(feature = "keynote")]
+fn keynote_media_code(error: &litchi_keynote::slide::media::lifecycle::Error) -> Code {
+    use litchi_keynote::slide::media::lifecycle::Error as E;
+    match error {
+        E::SlideNameNotFound
+        | E::SlidePositionNotFound { .. }
+        | E::MoviePositionNotFound { .. } => Code::PathNotFound,
+        E::UnsupportedSource | E::UnsupportedComment | E::AudioPoster | E::KindMismatch { .. } => {
+            Code::UnsupportedCapability
+        },
+        E::LimitExceeded { .. } => Code::LimitExceeded,
+        E::InvalidSource | E::PatchConflict | E::Read => Code::InvalidInput,
+        _ => Code::InternalError,
+    }
+}
+
+#[cfg(feature = "pages")]
+fn pages_table_values_code(error: &litchi_pages::table::values::Error) -> Code {
+    use litchi_pages::table::values::Error as E;
+    match error {
+        E::TableNotFound => Code::PathNotFound,
+        E::InvalidCell => Code::InvalidValue,
+        E::Formulas | E::UnsupportedStorage | E::UnsupportedSource => Code::UnsupportedCapability,
+        E::LimitExceeded { .. } => Code::LimitExceeded,
+        E::PatchConflict | E::InvalidSource => Code::InvalidInput,
+        _ => Code::InternalError,
     }
 }
 

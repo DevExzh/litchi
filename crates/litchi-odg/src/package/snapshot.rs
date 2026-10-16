@@ -2006,7 +2006,9 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns an error for an invalid selector, unsupported source span, or limit violation.
+    /// Returns [`Error::Unsupported`] for a shape whose text is not one
+    /// plain span (several paragraphs, spans, links or fields), and
+    /// [`Error::InvalidFormat`] for an invalid selector or a limit violation.
     pub fn set_shape_text(
         &mut self,
         page: usize,
@@ -2031,7 +2033,9 @@ impl Edit {
             .and_then(|shapes| shapes.get(shape))
             .ok_or_else(|| Error::InvalidFormat("ODG shape source span is missing".to_string()))?;
         if !matches!(spans.as_slice(), [Some(_)]) {
-            return invalid("ODG shape text is not one losslessly replaceable XML span");
+            return Err(Error::Unsupported(
+                "ODG shape text is not one losslessly replaceable XML span".to_string(),
+            ));
         }
         if selected.text() == after {
             return Ok(());

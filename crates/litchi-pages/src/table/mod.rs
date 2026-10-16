@@ -8,6 +8,12 @@ pub mod catalog {
 pub mod cells {
     pub use crate::package::table_cells::{Error, LimitKind};
 }
+/// Cell values of one body table (record 0309).
+pub mod values {
+    pub use crate::package::body_table_values::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Value,
+    };
+}
 /// Exact-source deletion of one rooted body table.
 pub mod deletion {
     pub use crate::package::body_table_deletion::{Commit, Diagnostics, Error, LimitKind, Patch};

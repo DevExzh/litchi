@@ -33,9 +33,9 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | oth | 22 | 205 | 205 | 0 | 0 | 0 | 37 | 28 | 2 |
 | odm | 22 | 205 | 205 | 0 | 0 | 0 | 37 | 28 | 2 |
 | odf | 2 | 19 | 19 | 0 | 0 | 0 | 3 | 2 | 0 |
-| pages | 11 | 85 | 85 | 0 | 0 | 0 | 36 | 2 | 14 |
-| keynote | 16 | 122 | 113 | 0 | 9 | 0 | 54 | 14 | 4 |
-| numbers | 5 | 45 | 45 | 0 | 0 | 5 | 10 | 2 | 1 |
+| pages | 11 | 88 | 88 | 0 | 0 | 0 | 33 | 2 | 14 |
+| keynote | 16 | 131 | 122 | 0 | 9 | 0 | 45 | 14 | 4 |
+| numbers | 7 | 61 | 61 | 0 | 0 | 7 | 16 | 2 | 3 |
 
 ## docx
 
@@ -548,7 +548,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## pages
 
-- fixtures: `create()`, `iwork/pages/body-sections-unicode.pages`, `iwork/pages/basic.pages`, `iwork/pages/body-table-read-native.pages`, `create() + add paragraph`, `create() + add paragraph + add footnote`
+- fixtures: `create()`, `iwork/pages/body-sections-unicode.pages`, `iwork/pages/basic.pages`, `iwork/pages/body-table-read-native.pages`, `iwork/pages/body-table-name-focused.pages`, `create() + add paragraph`, `create() + add paragraph + add footnote`
 - document views on `iwork/pages/body-sections-unicode.pages`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
@@ -559,7 +559,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | section | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
 | table | ok | ok | ok | ok | n/a | n/a | ok | refused | refused | n/a | n/a | ok | ok |
 | row | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
-| cell | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| cell | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
 | header | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
 | footer | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
 | footnotes | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
@@ -567,31 +567,31 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## keynote
 
-- fixtures: `create()`, `iwork/keynote/multi-slide.key`, `iwork/keynote/basic.key`, `iwork/keynote/slide-table-read-native.key`, `iwork/keynote/chart-grid-authored-native.key`, `iwork/keynote/image-adjustments-native.key`, `iwork/keynote/media-lifecycle-audio-remove-native.key`, `iwork/keynote/media-lifecycle-remove-native.key`, `iwork/keynote/multi-slide.key + add slide`, `iwork/keynote/multi-slide.key + add slide + add paragraph`, `iwork/keynote/multi-slide.key + add slide + add shape`, `iwork/keynote/multi-slide.key + add picture`
-- document views on `iwork/keynote/multi-slide.key`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
+- fixtures: `create()`, `seed`, `iwork/keynote/multi-slide.key`, `iwork/keynote/basic.key`, `iwork/keynote/slide-table-read-native.key`, `iwork/keynote/chart-grid-authored-native.key`, `iwork/keynote/image-adjustments-native.key`, `iwork/keynote/media-lifecycle-audio-remove-native.key`, `iwork/keynote/media-lifecycle-remove-native.key`, `iwork/keynote/multi-slide.key + add slide`, `iwork/keynote/multi-slide.key + add slide + add paragraph`, `iwork/keynote/multi-slide.key + add slide + add shape`, `iwork/keynote/multi-slide.key + add picture`
+- document views on `seed`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | presentation | ok | ok | n/a | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | slide | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
-| placeholder | ok | ok | ok | ok | ok | n/a | n/a | ok | ok | ok | ok | ok | ok |
+| placeholder | ok | ok | ok | ok | ok | n/a | ok | ok | ok | ok | ok | ok | ok |
 | notes | ok | ok | ok | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
 | paragraph | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
-| run | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
+| run | ok | ok | ok | ok | ok | n/a | n/a | no pair | no pair | ok | ok | ok | ok |
 | shape | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | picture | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok | ok |
 | connector | unreached | unreached | unreached | unreached | n/a | n/a | unreached | no pair | no pair | n/a | n/a | ok | ok |
-| video | ok | ok | ok | ok | n/a | n/a | n/a | ok | ok | n/a | n/a | ok | ok |
-| audio | ok | ok | ok | ok | n/a | n/a | n/a | ok | ok | n/a | n/a | ok | ok |
+| video | ok | ok | ok | ok | n/a | n/a | ok | ok | ok | n/a | n/a | ok | ok |
+| audio | ok | ok | ok | ok | n/a | n/a | ok | ok | ok | n/a | n/a | ok | ok |
 | table | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | tr | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
-| tc | ok | ok | ok | ok | n/a | n/a | n/a | refused | refused | n/a | n/a | ok | ok |
+| tc | ok | ok | ok | ok | ok | n/a | n/a | refused | refused | ok | ok | ok | ok |
 | chart | ok | ok | ok | ok | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 | group | unreached | unreached | unreached | unreached | n/a | n/a | n/a | no pair | no pair | n/a | n/a | ok | ok |
 
 ## numbers
 
-- fixtures: `create()`, `iwork/numbers/basic.numbers`, `iwork/numbers/cell-value-native.numbers`, `iwork/numbers/table-merges-native.numbers`, `iwork/numbers/table-relocation-native.numbers`, `create() + add sheet`, `create() + add sheet + add table`, `create() + add mergeCell`
+- fixtures: `create()`, `iwork/numbers/basic.numbers`, `iwork/numbers/cell-value-native.numbers`, `iwork/numbers/table-merges-native.numbers`, `iwork/numbers/table-relocation-native.numbers`, `create() + add sheet`, `create() + add sheet + add table`, `create() + add mergeCell`, `create() + add sheet + add row`, `create() + add sheet + add col`
 - document views on `iwork/numbers/basic.numbers`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
@@ -601,4 +601,6 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | table | ok | ok | ok | ok | ok | ok | ok | ok | gap | ok | ok | ok | ok |
 | cell | ok | ok | ok | ok | ok | n/a | ok | refused | gap | ok | ok | ok | ok |
 | mergeCell | ok | ok | ok | ok | n/a | ok | ok | no pair | gap | n/a | n/a | ok | ok |
+| row | ok | ok | ok | ok | n/a | ok | ok | refused | gap | n/a | n/a | ok | ok |
+| col | ok | ok | ok | ok | n/a | ok | ok | refused | gap | n/a | n/a | ok | ok |
 

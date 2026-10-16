@@ -740,10 +740,10 @@ impl Package {
 }
 
 #[derive(Debug)]
-struct NativeBodySnapshot {
-    identifier: NonZeroU64,
+pub(super) struct NativeBodySnapshot {
+    pub(super) identifier: NonZeroU64,
     references: Vec<NativeSectionReference>,
-    utf16_len: usize,
+    pub(super) utf16_len: usize,
 }
 
 const ROOT_COMPONENT_NAME: &str = "Index/Document.iwa";
@@ -954,7 +954,7 @@ fn section_text_at(package: &Package, position: Position) -> Result<&str, Error>
     section.body_text().ok_or(Error::InvalidSource)
 }
 
-fn native_body(package: &Package) -> Result<NativeBodySnapshot, Error> {
+pub(super) fn native_body(package: &Package) -> Result<NativeBodySnapshot, Error> {
     let components = package.state.source.components();
     let limits = package.state.source.limits();
     let root = root_references_with_limits(components, limits).map_err(map_package_error)?;
@@ -988,7 +988,7 @@ pub(crate) fn section_start(package: &Package, position: Position) -> Result<usi
     Ok(native_section_range(package, &body, position)?.start)
 }
 
-fn native_section_range(
+pub(super) fn native_section_range(
     package: &Package,
     body: &NativeBodySnapshot,
     position: Position,

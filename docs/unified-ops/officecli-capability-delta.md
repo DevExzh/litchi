@@ -31,19 +31,19 @@ differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `1797c362ea6d2c866d70d7801e1bc625acfb1758440bbfcb0fcd19884ac4d07d` |
 | golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `3f9933fcc82cdb5c6974246e4eff44efd2985093eaa5302abc7b1a3c6a387faa` |
 | golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `232e6d10bfb92c6f50d0b80e9206938030ffc468f48ef078c2e4d8a091b8c89a` |
-| golden | `crates/litchi-ops/tests/golden/registry/keynote.json` | `ef314e1e8b8607d17dc63ddee4e32ed7eb67e056f4d34f6d52ebe5f3750a4a7b` |
-| golden | `crates/litchi-ops/tests/golden/registry/numbers.json` | `598fe1e05cf36c559b8a3744c20a8c08d5a58583ca2b9cd8a46df80e3ceb83e0` |
+| golden | `crates/litchi-ops/tests/golden/registry/keynote.json` | `a8e6bfdedfcc65539479cb710e28b8818dbdda31ab68fb831106ca0576c823d6` |
+| golden | `crates/litchi-ops/tests/golden/registry/numbers.json` | `a709d8d0d7f5b8d90b14ba3162013f4afc0a0c914a238ba6cec825295bcd4d37` |
 | golden | `crates/litchi-ops/tests/golden/registry/odb.json` | `6db2565f0802f112be6d3db035e0444e2e132d7c24546c7ff18ec004de4fada7` |
 | golden | `crates/litchi-ops/tests/golden/registry/odc.json` | `b3d7d096e06b8dd2300d8d27d56449e1cbba6976e302308f6cc47db1090bd8ee` |
 | golden | `crates/litchi-ops/tests/golden/registry/odf.json` | `7f3d45bc3a6a7be93cb0cf50617df4c59fe2c13236ce331e3142f38229005a41` |
 | golden | `crates/litchi-ops/tests/golden/registry/odg.json` | `a6a2731d888a494e6e9b2cdcb95c7dc3e2d6434b0872a612b4acc8d8a14f93cf` |
 | golden | `crates/litchi-ops/tests/golden/registry/odi.json` | `ae58459a816d8f5e9589778be23054de447115fe445e805eda0bb7ac6fee9445` |
 | golden | `crates/litchi-ops/tests/golden/registry/odm.json` | `ff30dfda02183baa2952667b60f97fc880ae89102392884fb022c2e1bb416eae` |
-| golden | `crates/litchi-ops/tests/golden/registry/odp.json` | `6a14cabd33f6f0f65d9397307fddea6917e0b5380d4921266cf0000ca3648929` |
+| golden | `crates/litchi-ops/tests/golden/registry/odp.json` | `634b4300cceeab83f03358d88d8777bf451bb8d21c145a5c6bff93aa41fe14ef` |
 | golden | `crates/litchi-ops/tests/golden/registry/ods.json` | `3a7d89d93de8cdb1b8e225b37b78f6cc2adae9cf187b384071cdafd1c846d69c` |
 | golden | `crates/litchi-ops/tests/golden/registry/odt.json` | `adbc9fc35ffae00c3089b29ffbe50bf327f8a0f7ec11080651ed8ddda00f87ba` |
 | golden | `crates/litchi-ops/tests/golden/registry/oth.json` | `d7ed0734b44bf5cec561cea44b5e7629e2c19e96ce1834aecacf776daf95b990` |
-| golden | `crates/litchi-ops/tests/golden/registry/pages.json` | `bcf0552c30e2bee4516ff579ccd174bf3c2e59941ed19d277637aece2deda8e9` |
+| golden | `crates/litchi-ops/tests/golden/registry/pages.json` | `f6be53b953eb7ca538731f5d32fedf58dc3804812313739f38392172139284ab` |
 | officecli | `schemas/help` (152 files, OfficeCLI commit `dced0d74`) | `0bcd8cae45fabc0c5e45ff99d1994465fb213ac1b8db3f7eadd87339fb40ced4` |
 
 ## Statuses
@@ -90,7 +90,7 @@ Elements:
 | pptx | 25 | 8 | 0 | 0 | 0 | 1 | 9 |
 | ppt | 15 | 18 | 0 | 0 | 0 | 1 | 8 |
 | keynote | 0 | 0 | 0 | 0 | 0 | 0 | 16 |
-| numbers | 0 | 0 | 0 | 0 | 0 | 0 | 5 |
+| numbers | 0 | 0 | 0 | 0 | 0 | 0 | 7 |
 | odb | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
 | odc | 0 | 0 | 0 | 0 | 0 | 0 | 4 |
 | odf | 0 | 0 | 0 | 0 | 0 | 0 | 2 |
@@ -123,7 +123,7 @@ Property reads:
 | odg | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | odi | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | odm | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| odp | 70 | 3 | 80 | 0 | 123 | 0 | 411 | 65 |
+| odp | 80 | 2 | 80 | 0 | 122 | 0 | 403 | 67 |
 | ods | 25 | 11 | 501 | 0 | 26 | 1 | 127 | 6 |
 | odt | 63 | 0 | 199 | 0 | 168 | 1 | 530 | 45 |
 | oth | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -149,7 +149,7 @@ Property writes:
 | odg | 0 | 0 | 0 | 0 | 0 | 0 |
 | odi | 0 | 0 | 0 | 0 | 0 | 0 |
 | odm | 0 | 0 | 0 | 0 | 0 | 0 |
-| odp | 3 | 37 | 521 | 0 | 17 | 174 |
+| odp | 3 | 47 | 511 | 0 | 19 | 174 |
 | ods | 6 | 5 | 533 | 0 | 6 | 147 |
 | odt | 12 | 32 | 752 | 0 | 31 | 179 |
 | oth | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -7876,16 +7876,15 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 
 | Verb | Element | Context | Reason | Follow-up |
 |---|---|---|---|---|
-| `set` | `run` | `character formatting` | the leaf reads character runs and refuses character-style writes (slide::drawable Unsupported::TextStyling) | IWORK_API_REQUESTS.md request 10 (Keynote character-style writes) |
+| `set` | `run` | `placeholder and notes runs` | character properties are written on runs of text boxes and shapes; placeholder and notes text keeps its layout's styles | record 0309 follow-ups |
 | `add` | `run` | `a new character run` | a run is a styled span of a paragraph; add a paragraph or set its text | IWORK_API_REQUESTS.md request 10 (Keynote character-style writes) |
-| `set` | `tc` | `table cell values` | the unified layer reads slide-table cells; their leaf write families are not wired yet | record 0298 follow-up: wire the Keynote slide-table cell transactions |
+| `set` | `tc` | `cells in a formula graph` | slide-table cells take text, numbers, booleans and clears; a formula cell, or one a formula or chart reads, is refused so no calculation cache goes stale | record 0309 follow-ups |
 | `add` | `table` | `a new slide table` | the Keynote leaf has no slide-table creation transaction | record 0298 follow-up: Keynote slide-table creation |
 | `remove` | `table` | `a slide table, chart or group` | the leaf's drawable removal refuses tables, charts and groups | record 0298 follow-up: structural removal of tables, charts and groups |
-| `remove` | `video` | `a movie or audio clip` | movies and audio are removed through the leaf's media lifecycle family, not wired yet | record 0298 follow-up: wire slide::media lifecycle removal |
-| `add` | `video` | `a new movie or audio clip` | the leaf's movie and audio creation families are not wired yet | record 0298 follow-up: wire slide::movie and slide::audio creation |
+| `add` | `video` | `a new movie or audio clip` | the leaf's movie and audio creation families need the clip's poster, duration and placement, which `add` does not take yet | record 0309 follow-up: wire slide::movie and slide::audio creation |
 | `set` | `video` | `the frame of a movie, audio clip, line, table, chart or group` | the leaf's drawable geometry refuses tables, charts, groups, lines and movies | record 0298 follow-up: wire slide::movie::geometry; the drawable family refuses the others |
-| `remove` | `placeholder` | `a title or body placeholder` | placeholders are hidden, not removed; set the text to empty instead | record 0298 follow-up: Keynote placeholder visibility through the unified layer |
-| `add` | `placeholder` | `a new placeholder` | a slide's placeholders come from its layout; add a slide from a layout instead | record 0298 follow-up: Keynote placeholder visibility through the unified layer |
+| `remove` | `placeholder` | `slide-number and object placeholders` | `remove` hides a title or body placeholder on its slide (and `hidden` = false shows it again); slide-number and object placeholders have no unified element | record 0309 follow-ups |
+| `add` | `placeholder` | `a new placeholder` | a slide's placeholders come from its layout; show a hidden one with `hidden` = false, or add a slide from a layout | record 0309 follow-ups |
 
 ## numbers
 
@@ -7898,6 +7897,8 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 |  | table | litchi-only |  |
 |  | cell | litchi-only |  |
 |  | mergeCell | litchi-only |  |
+|  | row | litchi-only |  |
+|  | col | litchi-only |  |
 
 ### Properties
 
@@ -7912,6 +7913,8 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 |---|---|---|---|---|
 | `set` | `cell` | `cross-table formula references` | formula text is parsed with local A1 references and the authorable function subset; references to other tables need source-bound table handles | record 0297 follow-ups (IWORK_API_REQUESTS.md) |
 | `add` | `table` | `a workbook without a table` | a new table copies the structure (styles, sizes, storage layout) of the workbook's first table; a workbook with no table has no template yet | record 0301 follow-ups (IWORK_API_REQUESTS.md request 5) |
+| `add` | `row` | `tables with formulas or merges` | rows and columns are inserted and removed when no formula coordinate moves: a table holding formulas, one a formula or chart elsewhere reads, merged cells, filters, categories, pivots and (for columns) sort rules are refused, as are removing a hidden, bordered or commented row or column | record 0309 follow-ups (IWORK_API_REQUESTS.md request 6) |
+| `set` | `row` | `height and visibility` | rows and columns are structural only here: their sizes and hidden states are not wired to the leaf's dimension transaction | record 0309 follow-ups |
 
 ## odb
 
@@ -8444,10 +8447,10 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | paragraph | `marginLeft` | length | asg |  | missing | gap |  |
 | paragraph | `marginRight` | length | asg |  | missing | gap |  |
 | paragraph | `lineRule` | enum | --- |  | write-only | — |  |
-| paragraph | `bold` | bool | asg |  | missing | gap |  |
-| paragraph | `italic` | bool | asg |  | missing | gap |  |
-| paragraph | `color` | color | asg |  | missing | gap |  |
-| paragraph | `size` | length | asg |  | missing | gap |  |
+| paragraph | `bold` | bool | asg | -sg | supported | partial |  |
+| paragraph | `italic` | bool | asg | -sg | supported | partial |  |
+| paragraph | `color` | color | asg | -sg | supported | partial |  |
+| paragraph | `size` | length | asg | -sg | supported | partial |  |
 | paragraph | `lang` | string | asg |  | missing | gap |  |
 | paragraph | `list` | string | asg |  | missing | gap |  |
 | paragraph | `tabs` | string | asg |  | missing | gap |  |
@@ -8455,6 +8458,8 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | paragraph | `lineSpacing` | string | asg |  | missing | gap |  |
 | paragraph | `text` | string | asg | -s- | write-only | partial |  |
 | paragraph | `style` | string |  | --g | litchi-only | — |  |
+| paragraph | `underline` | bool |  | -sg | litchi-only | litchi-only |  |
+| paragraph | `font` | string |  | -sg | litchi-only | litchi-only |  |
 | picture | `id` | number | a-g |  | missing | gap |  |
 | picture | `mediaType` | string | --g |  | missing | — |  |
 | picture | `x` | length | asg | -sg | supported | partial |  |
@@ -8566,7 +8571,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | presentation | `theme.formatScheme` | string | --g |  | missing | — |  |
 | presentation | `theme.name` | string | --g |  | missing | — |  |
 | presentation | `slideCount` | int |  | --g | litchi-only | — |  |
-| run | `font` | string | as- |  | write-only | gap |  |
+| run | `font` | string | as- | -sg | supported | partial |  |
 | run | `baseline` | string | asg |  | missing | gap |  |
 | run | `highlight` | color | asg |  | missing | gap |  |
 | run | `kern` | int | asg |  | missing | gap |  |
@@ -8582,11 +8587,11 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | run | `effective.bold` | bool | --g |  | missing | — |  |
 | run | `effective.color` | color | --g |  | missing | — |  |
 | run | `effective.size` | font-size | --g |  | missing | — |  |
-| run | `underline` | enum | asg |  | missing | gap |  |
-| run | `bold` | bool | asg |  | gap | gap | M6 ODP text styles |
-| run | `color` | color | asg |  | missing | gap |  |
-| run | `italic` | bool | asg |  | missing | gap |  |
-| run | `size` | font-size | asg |  | missing | gap |  |
+| run | `underline` | enum | asg | -sg | supported | partial |  |
+| run | `bold` | bool | asg | -sg | supported | partial |  |
+| run | `color` | color | asg | -sg | supported | partial |  |
+| run | `italic` | bool | asg | -sg | supported | partial |  |
+| run | `size` | font-size | asg | -sg | supported | partial |  |
 | run | `text` | string | asg | -s- | write-only | partial |  |
 | run | `style` | string |  | --g | litchi-only | — |  |
 | run | `link` | string |  | --g | litchi-only | — |  |
@@ -8912,7 +8917,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | Verb | Element | Context | Reason | Follow-up |
 |---|---|---|---|---|
 | `set` | `run` | `field-run` | page-number, date and other field runs are computed by the producer and refuse text | M6 ODP field editing |
-| `set` | `shape` | `character-format` | text sets write plain paragraphs in the first paragraph's style; bold, size, colour and other character formatting live in automatic styles the adapter does not author | M6 ODP text styles |
+| `set` | `shape` | `character-format` | bold, italic, underline, size, colour and font are set on paragraphs and runs (derived automatic styles); a shape, table cell or notes story takes no character formatting, and its text sets write plain paragraphs in the first paragraph's style | 0308 ODP shape and cell character formatting |
 | `set` | `shape` | `non-paragraph-story` | a whole-story text set refuses a text box that holds drawing objects or other non-paragraph children; set paragraphs or runs instead | M6 ODP rich text boxes |
 | `add` | `shape` | `positioned-insert` | new text boxes are appended at the end of the slide's objects; move them afterwards | M6 ODP z-order insertion |
 | `add` | `shape` | `picture-table-chart` | only text boxes are added; pictures, tables, charts and media need package resources the scene splice does not author | M6 ODP media and table creation |
@@ -10867,7 +10872,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | `get` | `metadata` | `path-read` | `set("/metadata", ..)` writes the document properties through the leaf metadata family; the path is set-only, and reads go through File::metadata() | record 0299 Pages metadata node |
 | `add` | `section` | `a new section` | the Pages leaf has no section lifecycle transaction (a section break plus a new native section object) | IWORK_API_REQUESTS.md request 11 |
 | `remove` | `section` | `a section` | the Pages leaf has no section lifecycle transaction | IWORK_API_REQUESTS.md request 11 |
-| `set` | `tc` | `a body-table cell` | the Pages leaf reads body-table cells but has no cell-write transaction (the Numbers cell writer is not shared with Pages) | record 0299 follow-up: Pages body-table cell writes |
+| `set` | `tc` | `cells in a formula graph` | body-table cells take text, numbers, booleans and clears through table::values; a formula cell, or one a formula or chart reads, is refused so no calculation cache goes stale | record 0309 follow-ups |
 | `add` | `tbl` | `a new body table` | the Pages leaf deletes body tables but has no table-creation transaction | record 0299 follow-up: Pages body-table creation |
 | `remove` | `p` | `a paragraph that anchors a chart, image or footnote` | a paragraph whose anchors are all body tables is removed with its tables (record 0301); removing one that anchors a chart, image or footnote, or moving any anchored paragraph, would delete or move an object the leaf has no transaction for here | record 0301 follow-up: delete those anchored objects with their paragraph |
 | `create` | `document` | `a document with a fresh identity` | `create` returns the deterministic minimal Pages document (`Package::new`); a fresh document identity is an explicit leaf builder input | litchi_pages::builder::Builder with Identity::generate |

@@ -4,7 +4,8 @@
 //! one direct path `set` per target inside an edit closure (coalesced into one
 //! native publication) and, where the selector grammar reaches the story,
 //! one query fan-out `set` (also with the selector compiled once into a
-//! `Plan`, record 0287). Picture removal compares the native exact-source
+//! `Plan`, record 0287; and with the query passed by reference, record 0305,
+//! so neither leg clones an owned `Query` per call). Picture removal compares the native exact-source
 //! remover with one unified query `remove`. Sources, paths, properties and
 //! native operations are prepared outside timing; staging and commit are
 //! timed. Every sample's output is checked byte-for-byte against the native
@@ -302,6 +303,21 @@ impl Prepared {
             .map(|commit| commit.file)
     }
 
+    /// The fan-out with the query passed by reference: the plan cache
+    /// compiles it once, and no owned `Query` is cloned per call (record
+    /// 0305).
+    fn unified_fanout_ref(&self, query: &Query<'static>) -> litchi_ops::Result<File> {
+        self.unified
+            .edit_with_limits(&self.limits, |edit| {
+                if self.family == Family::PictureRemoval {
+                    edit.remove(query)
+                } else {
+                    edit.set(query, Props::new().with("text", "shared"))
+                }
+            })
+            .map(|commit| commit.file)
+    }
+
     fn unified_fanout(&self, query: &Query<'static>) -> litchi_ops::Result<File> {
         self.unified
             .edit_with_limits(&self.limits, |edit| {
@@ -344,14 +360,16 @@ fn run_case(case: &Prepared) -> Result<serde_json::Value, Box<dyn std::error::Er
     let mut fanout = Vec::with_capacity(18);
     let mut direct = Vec::with_capacity(18);
     let mut fanout_plan = Vec::with_capacity(18);
-    // Two warm-up rounds, then nine A-B-C-D-E-F-F-E-D-C-B-A rounds: 18
+    let mut fanout_ref = Vec::with_capacity(18);
+    // Two warm-up rounds, then nine A-B-C-D-E-F-G-G-F-E-D-C-B-A rounds: 18
     // samples per route. C/D (native and unified fan-out with one shared
-    // value) and F (the same fan-out with a precompiled plan, record 0287)
-    // run only where the query walker reaches the story; E (one direct
+    // value), F (the same fan-out with a precompiled plan, record 0287) and
+    // G (the fan-out with the query by reference, record 0305) run only
+    // where the query walker reaches the story; E (one direct
     // `File::set`/`remove`) only for a single target.
     for round in 0..11 {
-        for route in [0u8, 1, 2, 3, 4, 5, 5, 4, 3, 2, 1, 0] {
-            if matches!(route, 2 | 3 | 5) && fanout_query.is_none() {
+        for route in [0u8, 1, 2, 3, 4, 5, 6, 6, 5, 4, 3, 2, 1, 0] {
+            if matches!(route, 2 | 3 | 5 | 6) && fanout_query.is_none() {
                 continue;
             }
             if route == 4 && case.count != 1 {
@@ -385,6 +403,12 @@ fn run_case(case: &Prepared) -> Result<serde_json::Value, Box<dyn std::error::Er
                     )),
                     fanout_oracle,
                 ),
+                6 => (
+                    Output::Unified(black_box(
+                        case.unified_fanout_ref(fanout_query.ok_or("query")?)?,
+                    )),
+                    fanout_oracle,
+                ),
                 _ => (
                     Output::Unified(black_box(
                         case.unified_fanout(fanout_query.ok_or("query")?)?,
@@ -405,7 +429,8 @@ fn run_case(case: &Prepared) -> Result<serde_json::Value, Box<dyn std::error::Er
                     2 => native_shared.push(elapsed),
                     3 => fanout.push(elapsed),
                     4 => direct.push(elapsed),
-                    _ => fanout_plan.push(elapsed),
+                    5 => fanout_plan.push(elapsed),
+                    _ => fanout_ref.push(elapsed),
                 }
             }
         }
@@ -418,6 +443,7 @@ fn run_case(case: &Prepared) -> Result<serde_json::Value, Box<dyn std::error::Er
     let shared_median = (!native_shared.is_empty()).then(|| median(&native_shared));
     let direct_median = (!direct.is_empty()).then(|| median(&direct));
     let fanout_plan_median = (!fanout_plan.is_empty()).then(|| median(&fanout_plan));
+    let fanout_ref_median = (!fanout_ref.is_empty()).then(|| median(&fanout_ref));
     Ok(json!({
         "family": case.family.name(),
         "count": case.count,
@@ -438,6 +464,10 @@ fn run_case(case: &Prepared) -> Result<serde_json::Value, Box<dyn std::error::Er
         "unified_fanout_plan_ns": fanout_plan,
         "unified_fanout_plan_median_ns": fanout_plan_median,
         "fanout_plan_ratio": fanout_plan_median.zip(shared_median).map(|(fanout, native)| fanout / native),
+        "unified_fanout_ref_ns": fanout_ref,
+        "unified_fanout_ref_median_ns": fanout_ref_median,
+        "fanout_ref_ratio": fanout_ref_median.zip(shared_median).map(|(fanout, native)| fanout / native),
+        "fanout_ref_over_plan": fanout_ref_median.zip(fanout_plan_median).map(|(by_ref, plan)| by_ref / plan),
         "exact_bytes_and_source_immutability": true
     }))
 }
@@ -457,7 +487,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             "schema": "rtf_destination_benchmark.v1",
             "rounds": 9,
             "warmup_rounds": 2,
-            "order": "ABCDEFFEDCBA",
+            "order": "ABCDEFGGFEDCBA",
             "timing": "warmed immutable owners; paths, properties and native operations prepared outside timing; staging and commit timed; serialization and validation excluded",
             "cases": cases
         }))?

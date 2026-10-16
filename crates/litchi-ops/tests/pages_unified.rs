@@ -450,3 +450,71 @@ fn a_batch_mixing_structure_and_sets_keeps_its_order() {
         .expect("edit");
     assert_eq!(paragraphs(&reopen(&commit.file)), ["A", "2026-08-07", "C"]);
 }
+
+#[test]
+fn paragraph_fonts_are_written() {
+    let file = read("pages/basic.pages");
+    let styled = file
+        .set(
+            "/body/p[1]",
+            props! { "font.bold" => true, "font.size" => "20pt", "font.color" => "0000FF" },
+        )
+        .expect("style a paragraph");
+    let bytes = styled.to_bytes().expect("publish");
+    let package = litchi_pages::Package::from_bytes(&bytes).expect("leaf");
+    let runs = package.section_text_runs(0).expect("runs");
+    assert_eq!(runs[0].style().bold, Some(true));
+    assert_eq!(runs[0].style().size, Some(20.0));
+    assert_eq!(runs[0].style().color, Some([0, 0, 255]));
+    assert_eq!(
+        text(&reopen(&styled), "/body/p[1]"),
+        text(&file, "/body/p[1]")
+    );
+    let commit = file
+        .edit(|tx| tx.set("/body/p[1]", props! { "font.italic" => true }))
+        .expect("italic");
+    let restored = commit.patch.inverse().apply(&commit.file).expect("inverse");
+    assert_eq!(restored.to_bytes().unwrap(), file.to_bytes().unwrap());
+    let error = file
+        .set("/body/p[1]", props! { "font.size" => "-3pt" })
+        .unwrap_err();
+    assert_eq!(error.code(), Code::InvalidValue);
+}
+
+#[test]
+fn body_table_cells_take_values() {
+    let file = read("pages/body-table-catalog-native.pages");
+    let written = file
+        .edit(|tx| {
+            tx.set("/body/tbl[1]/tr[1]/tc[1]", props! { "text" => "Header" })?;
+            tx.set("/body/tbl[1]/tr[2]/tc[2]", props! { "value" => 12.5 })?;
+            Ok(())
+        })
+        .expect("cell values");
+    let reopened = reopen(&written.file);
+    assert_eq!(
+        text(&reopened, "/body/tbl[1]/tr[1]/tc[1]").as_deref(),
+        Some("Header")
+    );
+    assert_eq!(
+        prop(&reopened, "/body/tbl[1]/tr[2]/tc[2]", "type").as_deref(),
+        Some("number")
+    );
+    let restored = written
+        .patch
+        .inverse()
+        .apply(&written.file)
+        .expect("inverse");
+    assert_eq!(restored.to_bytes().unwrap(), file.to_bytes().unwrap());
+    let cleared = written
+        .file
+        .set(
+            "/body/tbl[1]/tr[1]/tc[1]",
+            props! { "value" => litchi_ops::PropValue::Null },
+        )
+        .expect("clear");
+    assert_eq!(
+        prop(&reopen(&cleared), "/body/tbl[1]/tr[1]/tc[1]", "type").as_deref(),
+        Some("empty")
+    );
+}

@@ -486,8 +486,14 @@ enum PropValues<'a> {
         number: usize,
     },
     Object(&'a Object),
-    Paragraph(&'a litchi_odp::scene::Paragraph),
-    Run(&'a litchi_odp::scene::Run),
+    Paragraph(
+        &'a litchi_odp::scene::Paragraph,
+        &'a litchi_odp::scene::AutomaticStyles,
+    ),
+    Run(
+        &'a litchi_odp::scene::Run,
+        &'a litchi_odp::scene::AutomaticStyles,
+    ),
     Cell(&'a litchi_odp::scene::Cell),
     Notes(Option<String>),
     Comment(&'a litchi_odp::annotation::Info),
@@ -514,12 +520,19 @@ impl<'a> Props<'a> {
             Item::Paragraph(story, index) => scene
                 .story(story)
                 .and_then(|story| story.paragraphs().get(*index))
-                .map_or(PropValues::None, PropValues::Paragraph),
+                .map_or(Ok::<_, crate::Error>(PropValues::None), |paragraph| {
+                    Ok(PropValues::Paragraph(
+                        paragraph,
+                        node.file.automatic_styles()?,
+                    ))
+                })?,
             Item::Run(story, paragraph, index) => scene
                 .story(story)
                 .and_then(|story| story.paragraphs().get(*paragraph))
                 .and_then(|paragraph| paragraph.runs().get(*index))
-                .map_or(PropValues::None, PropValues::Run),
+                .map_or(Ok::<_, crate::Error>(PropValues::None), |run| {
+                    Ok(PropValues::Run(run, node.file.automatic_styles()?))
+                })?,
             Item::Cell(object, row, cell) => scene
                 .object(object)
                 .and_then(Object::table)
@@ -580,15 +593,15 @@ impl<'a> Props<'a> {
                 _ => None,
             },
             PropValues::Object(object) => object_value(object, key),
-            PropValues::Paragraph(paragraph) => match key {
+            PropValues::Paragraph(paragraph, styles) => match key {
                 "style" => text(paragraph.style_name()),
                 "level" => Some(Value::Int(i64::from(paragraph.level()))),
-                _ => None,
+                key => character(styles.paragraph_text_properties(paragraph)?, key),
             },
-            PropValues::Run(run) => match key {
+            PropValues::Run(run, styles) => match key {
                 "style" => text(run.style_name()),
                 "link" => text(run.href()),
-                _ => None,
+                key => character(styles.run_text_properties(run)?, key),
             },
             PropValues::Cell(cell) => match key {
                 "colSpan" => Some(Value::Int(i64::from(cell.column_span()))),
@@ -683,5 +696,41 @@ fn count(value: usize) -> Value<'static> {
 impl fmt::Debug for Props<'_> {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter.write_str("Props { .. }")
+    }
+}
+
+/// A character property (record 0308) a paragraph or span's automatic
+/// style sets locally.
+fn character<'a>(
+    properties: &'a litchi_odp::scene::TextProperties,
+    key: &str,
+) -> Option<Value<'a>> {
+    match key {
+        "bold" => properties.bold().map(Value::Bool),
+        "italic" => properties.italic().map(Value::Bool),
+        "underline" => properties.underline().map(Value::Bool),
+        "size" => {
+            let raw = properties.size()?;
+            Length::parse_in(raw, crate::value::LengthContext::FontSize)
+                .or_else(|_| Length::parse(raw))
+                .ok()
+                .map(Value::Length)
+        },
+        "color" => {
+            let hex = properties.color()?.strip_prefix('#')?;
+            if hex.len() != 6 {
+                return None;
+            }
+            let channel = |offset: usize| u8::from_str_radix(hex.get(offset..offset + 2)?, 16).ok();
+            Some(Value::Color(crate::value::Color::rgb(
+                channel(0)?,
+                channel(2)?,
+                channel(4)?,
+            )))
+        },
+        "font" => properties
+            .font()
+            .map(|font| Value::Text(Cow::Borrowed(font))),
+        _ => None,
     }
 }

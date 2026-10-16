@@ -581,6 +581,29 @@ pub enum Refusal {
     /// The package is encrypted or obfuscated; the body editor never
     /// rewrites protected streams.
     Encrypted,
+    /// A bookmark, smart tag, comment range, field, note or proofing range
+    /// recorded in the CP-indexed FIB table `fib_index` has a boundary
+    /// strictly inside the replaced text; replacing the text would collapse
+    /// that boundary.
+    RangeBoundary { fib_index: usize },
+}
+
+/// What the CP-indexed FIB table `index` positions, for refusal messages
+/// ([MS-DOC] 2.5.6–2.5.10, `FibRgFcLcb97` through `FibRgFcLcb2007`).
+fn cp_table_content(index: usize) -> &'static str {
+    match index {
+        2 | 46 => "note reference",
+        4 | 42 | 43 => "comment",
+        6 => "section",
+        16 => "field",
+        22 | 23 | 142 | 143 | 124 | 125 => "bookmark",
+        40 => "drawing anchor",
+        115 | 117 | 132 => "smart tag",
+        121 | 122 => "format consistency mark",
+        138 | 139 => "content control",
+        55 | 90 | 89 | 93 => "proofing",
+        _ => "CP range",
+    }
 }
 
 impl std::fmt::Display for Refusal {
@@ -692,6 +715,11 @@ impl std::fmt::Display for Refusal {
             Self::Encrypted => {
                 formatter.write_str("encrypted or obfuscated DOC packages cannot be edited")
             },
+            Self::RangeBoundary { fib_index } => write!(
+                formatter,
+                "the replaced text holds a {} boundary (CP-indexed FIB table {fib_index}); replacing it would collapse that range",
+                cp_table_content(*fib_index)
+            ),
         }
     }
 }
@@ -2037,6 +2065,12 @@ impl Edit {
         // accept an empty no-op).
         if span.text == replacement {
             return Ok(());
+        }
+        if let Some(fib_index) = self
+            .editor
+            .interior_range_boundary(span.start_cp, span.end_cp)
+        {
+            return Err(Error::Refused(Refusal::RangeBoundary { fib_index }));
         }
         let actual = replacement.encode_utf16().count();
         self.ensure_replacement_capacity(actual)?;

@@ -4,9 +4,9 @@ use std::borrow::Cow;
 
 use litchi_core::FileFormat;
 
-use super::Iwork;
 use super::children::Children;
 use super::tree::Item;
+use super::{At, Iwork};
 use crate::error::Result;
 use crate::node::{
     Children as ViewChildren, Format, NodePath, Preview, Project, Source, Value, ViewOptions,
@@ -17,20 +17,35 @@ use crate::node::{
 #[derive(Clone, Copy)]
 pub struct Node<'f> {
     file: &'f Iwork,
-    index: u32,
+    at: At,
 }
 
 impl<'f> Node<'f> {
-    pub(crate) const fn new(file: &'f Iwork, index: u32) -> Self {
-        Self { file, index }
+    pub(crate) const fn new(file: &'f Iwork, at: At) -> Self {
+        Self { file, at }
     }
 
-    pub(crate) const fn index(&self) -> u32 {
-        self.index
+    /// Where the node's item lives.
+    pub(crate) const fn at(&self) -> At {
+        self.at
     }
 
     pub(crate) fn item(&self) -> &'f Item {
-        self.file.tree().item(self.index)
+        self.file.item(self.at)
+    }
+
+    /// The kind ordinal, without materializing a lazily built item.
+    pub(crate) fn kind_ordinal(&self) -> u8 {
+        self.file.kind_at(self.at)
+    }
+
+    /// The node's children, every kind.
+    #[cfg(feature = "keynote")]
+    pub(crate) fn child_nodes(&self) -> impl Iterator<Item = Node<'f>> + 'f {
+        let file = self.file;
+        file.kids(self.at)
+            .iter()
+            .map(move |child| Node::new(file, child))
     }
 
     /// The OfficeCLI type name.
@@ -102,9 +117,8 @@ impl<'f> Project<'f> for Node<'f> {
     }
 
     fn child_count(&self, _: &ViewOptions) -> Result<Option<u32>> {
-        self.file.expand(self.index);
         Ok(Some(
-            u32::try_from(self.item().children().len()).unwrap_or(u32::MAX),
+            u32::try_from(self.file.kids(self.at).len()).unwrap_or(u32::MAX),
         ))
     }
 
@@ -114,7 +128,7 @@ impl<'f> Project<'f> for Node<'f> {
     }
 
     fn children(&self, _: &ViewOptions) -> ViewChildren<'_, 'f> {
-        ViewChildren::iwork(Children::filtered(self.file, self.index, u128::MAX))
+        ViewChildren::iwork(Children::filtered(self.file, self.at, u128::MAX))
     }
 }
 

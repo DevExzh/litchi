@@ -432,10 +432,12 @@ fn unsupported_operations_are_typed_refusals() -> TestResult {
             slide,
             DrawableSelector::index(0),
             TextSpan::new(0, 4),
-            Style::new().with_bold(true)
+            Style::new()
         ),
         Err(Error::Unsupported {
             reason: Unsupported::TextStyling
+        } | Error::Unsupported {
+            reason: Unsupported::Kind { .. }
         })
     ));
     assert!(matches!(
@@ -690,6 +692,257 @@ fn set_text_on_a_new_shape_and_on_every_corpus_text_box() -> TestResult {
             "{}",
             path.display()
         );
+    }
+    Ok(())
+}
+
+/// Character styling (record 0309): a span of a text box gets a variation
+/// of its run style, reads back, survives a reopen and inverts exactly.
+#[test]
+fn text_spans_take_character_styles() -> TestResult {
+    let package = open("basic.key")?;
+    let source = bytes(&package)?;
+    let slide = SlideSelector::index(0);
+    let mut edit = package.edit_slide_drawables();
+    edit.add_text_box(
+        slide,
+        Geometry::new(10.0, 10.0, 300.0, 60.0),
+        "Hello styled world",
+    )?;
+    let added = edit.commit()?.into_package();
+    let drawable = DrawableSelector::index(list(&added, 0)?.len() - 1);
+    let before_text = bytes(&added)?;
+
+    let mut edit = added.edit_slide_drawables();
+    edit.set_text_style(
+        slide,
+        drawable,
+        TextSpan::new(6, 12),
+        Style::new().with_bold(true).with_color([200, 10, 20]),
+    )?;
+    edit.set_text_style(
+        slide,
+        drawable,
+        TextSpan::new(9, 18),
+        Style::new().with_italic(true).with_font_size(30.0),
+    )?;
+    let commit = edit.commit()?;
+    let styled = commit.package();
+    let reopened = Package::from_bytes(&bytes(styled)?)?;
+    for package in [styled, &reopened] {
+        let runs = package.slide_drawable_text_runs(slide, drawable)?;
+        let texts: Vec<&str> = runs.iter().map(|run| run.text()).collect();
+        assert_eq!(texts, ["Hello ", "sty", "led", " world"]);
+        assert_eq!(*runs[0].style(), Style::new());
+        assert_eq!(runs[1].style().bold, Some(true));
+        assert_eq!(runs[1].style().color, Some([200, 10, 20]));
+        // The overlapping span is a variation of the bold one.
+        assert_eq!(runs[2].style().bold, Some(true));
+        assert_eq!(runs[2].style().italic, Some(true));
+        assert_eq!(runs[2].style().font_size, Some(30.0));
+        assert_eq!(runs[3].style().italic, Some(true));
+        assert_eq!(
+            list(package, 0)?.last().and_then(Drawable::text),
+            Some("Hello styled world")
+        );
+    }
+    let restored = styled.apply_slide_drawables(&commit.patch().inverse())?;
+    assert_eq!(bytes(restored.package())?, before_text);
+    let _ = source;
+
+    // Text edits keep the styled runs where their characters went.
+    let mut edit = styled.edit_slide_drawables();
+    edit.set_text(slide, drawable, "Hi styled world")?;
+    let retexted = edit.commit()?.into_package();
+    let runs = retexted.slide_drawable_text_runs(slide, drawable)?;
+    assert_eq!(runs[1].text(), "sty");
+    assert_eq!(runs[1].style().bold, Some(true));
+    Ok(())
+}
+
+/// Every corpus deck takes a styled span in a new text box, or refuses
+/// typed; the inverse restores the bytes.
+#[test]
+fn corpus_text_boxes_take_character_styles() -> TestResult {
+    let mut paths: Vec<PathBuf> = std::fs::read_dir(keynote_dir())?
+        .map(|entry| entry.map(|entry| entry.path()))
+        .collect::<Result<_, _>>()?;
+    paths.retain(|path| path.extension().is_some_and(|extension| extension == "key"));
+    paths.sort();
+    let mut styled = 0_usize;
+    let mut refused = Vec::new();
+    for path in paths {
+        let Ok(package) = Package::open(&path) else {
+            continue;
+        };
+        if package.slides().map_or(true, <[_]>::is_empty) {
+            continue;
+        }
+        let slide = SlideSelector::index(0);
+        let mut edit = package.edit_slide_drawables();
+        if edit
+            .add_text_box(slide, Geometry::new(10.0, 10.0, 200.0, 40.0), "Styled text")
+            .is_err()
+        {
+            continue;
+        }
+        let Ok(added) = edit.commit() else { continue };
+        let added = added.into_package();
+        let before = bytes(&added)?;
+        let drawable = DrawableSelector::index(list(&added, 0)?.len() - 1);
+        let mut edit = added.edit_slide_drawables();
+        edit.set_text_style(
+            slide,
+            drawable,
+            TextSpan::new(0, 6),
+            Style::new().with_bold(true),
+        )?;
+        match edit.commit() {
+            Ok(commit) => {
+                let runs = commit.package().slide_drawable_text_runs(slide, drawable)?;
+                assert_eq!(runs[0].style().bold, Some(true), "{}", path.display());
+                let restored = commit
+                    .package()
+                    .apply_slide_drawables(&commit.patch().inverse())?;
+                assert_eq!(bytes(restored.package())?, before, "{}", path.display());
+                styled += 1;
+            },
+            Err(error @ Error::Unsupported { .. }) => refused.push((path, error)),
+            Err(error) => panic!("{}: {error:?}", path.display()),
+        }
+    }
+    eprintln!("styled {styled}; refused {refused:?}");
+    assert!(styled >= 10, "only {styled} styled");
+    Ok(())
+}
+
+/// Slide-table cell writes (record 0309): text, numbers, booleans and
+/// clears read back through the table reader and invert exactly.
+#[test]
+fn slide_table_cells_take_values() -> TestResult {
+    use litchi_iwa_common::table::cell::value::Value;
+    use litchi_iwa_common::table::coordinate::CellPosition;
+    use litchi_keynote::slide::drawable::TableCellValue;
+    for name in [
+        "slide-table-read-native.key",
+        "slide-table-merges-native.key",
+        "table-discovery.key",
+    ] {
+        let package = open(name)?;
+        let source = bytes(&package)?;
+        let slides = package.slides()?.len();
+        let mut done = false;
+        for slide_index in 0..slides {
+            let slide = SlideSelector::index(slide_index);
+            let drawables = list(&package, slide_index)?;
+            let Some(table_drawable) = drawables
+                .iter()
+                .position(|drawable| drawable.kind() == Kind::Table)
+            else {
+                continue;
+            };
+            let read = package.slide_table_cells(slide, 0_usize)?;
+            let dimensions = read.table().dimensions();
+            let (rows, columns) = (dimensions.rows(), dimensions.columns());
+            let mut edit = package.edit_slide_drawables();
+            let drawable = DrawableSelector::index(table_drawable);
+            edit.set_table_cell(
+                slide,
+                drawable,
+                rows - 1,
+                columns - 1,
+                TableCellValue::Text("written".into()),
+            )?
+            .set_table_cell(
+                slide,
+                drawable,
+                0,
+                columns - 1,
+                TableCellValue::Number(42.5),
+            )?;
+            let commit = match edit.commit() {
+                Ok(commit) => commit,
+                Err(
+                    error @ Error::Unsupported {
+                        reason: Unsupported::TableFormulas | Unsupported::TableStorage,
+                    },
+                ) => {
+                    eprintln!("{name}: refused {error:?}");
+                    break;
+                },
+                Err(error) => panic!("{name}: {error:?}"),
+            };
+            let edited = commit.package();
+            let reopened = Package::from_bytes(&bytes(edited)?)?;
+            for candidate in [edited, &reopened] {
+                let read = candidate.slide_table_cells(slide, 0_usize)?;
+                let table = read.table();
+                assert_eq!(
+                    table.get(CellPosition::new(rows - 1, columns - 1)),
+                    Some(&Value::Text("written".into())),
+                    "{name}"
+                );
+                assert!(matches!(
+                    table.get(CellPosition::new(0, columns - 1)),
+                    Some(Value::Number(number)) if number.get() == 42.5
+                ));
+            }
+            let restored = edited.apply_slide_drawables(&commit.patch().inverse())?;
+            assert_eq!(bytes(restored.package())?, source);
+            // Clearing the written cell removes its value.
+            let mut edit = edited.edit_slide_drawables();
+            edit.set_table_cell(
+                slide,
+                drawable,
+                rows - 1,
+                columns - 1,
+                TableCellValue::Empty,
+            )?;
+            let cleared = edit.commit()?.into_package();
+            let read = cleared.slide_table_cells(slide, 0_usize)?;
+            assert!(!matches!(
+                read.table().get(CellPosition::new(rows - 1, columns - 1)),
+                Some(Value::Text(_))
+            ));
+            done = true;
+            break;
+        }
+        eprintln!("{name}: written {done}");
+    }
+    Ok(())
+}
+
+/// A formula cell, and a cell a formula reads, refuse a value write.
+#[test]
+fn formula_cells_and_their_precedents_refuse_value_writes() -> TestResult {
+    use litchi_keynote::slide::drawable::TableCellValue;
+    let package = open("slide-table-read-native.key")?;
+    let slide_index = (0..package.slides()?.len())
+        .find(|index| {
+            list(&package, *index)
+                .is_ok_and(|drawables| drawables.iter().any(|item| item.kind() == Kind::Table))
+        })
+        .expect("a slide with a table");
+    let slide = SlideSelector::index(slide_index);
+    let table = list(&package, slide_index)?
+        .iter()
+        .position(|item| item.kind() == Kind::Table)
+        .expect("table");
+    for (row, column) in [(1, 3), (1, 1)] {
+        let mut edit = package.edit_slide_drawables();
+        edit.set_table_cell(
+            slide,
+            DrawableSelector::index(table),
+            row,
+            column,
+            TableCellValue::Number(1.0),
+        )?;
+        assert!(matches!(
+            edit.commit(),
+            Err(Error::Unsupported {
+                reason: Unsupported::TableFormulas
+            })
+        ));
     }
     Ok(())
 }

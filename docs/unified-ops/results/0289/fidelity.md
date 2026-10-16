@@ -34,11 +34,11 @@ was refused (typed), `none` nothing to move.
 | pages | 33 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 29 | 3 | 0 | 0 | 0 | 0 | 29 | 3 | 0 | 0 | 0 | 0 |
 | ppt | 29 | 0 | 0 | 0 | 0 | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 0 | 29 | 0 | 0 | 0 | 0 | 0 | 0 |
 | pptx | 81 | 0 | 0 | 0 | 2 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 52 | 24 | 11 | 0 | 0 | 0 | 1 | 69 |
-| rtf | 162 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 14 | 49 | 0 | 1 | 61 | 37 | 15 | 10 | 0 | 0 | 49 | 88 |
-| xls | 119 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 100 | 3 | 0 | 0 | 16 | 0 | 58 | 2 | 0 | 0 | 59 | 0 |
+| rtf | 162 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 14 | 49 | 0 | 1 | 61 | 37 | 16 | 39 | 0 | 1 | 18 | 88 |
+| xls | 119 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 103 | 3 | 0 | 0 | 13 | 0 | 80 | 2 | 0 | 0 | 37 | 0 |
 | xlsb | 19 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 18 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | xlsx | 179 | 0 | 0 | 0 | 2 | 0 | 0 | 1 | 0 | 173 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| **all** | 985 | 0 | 0 | 0 | 7 | 0 | 0 | 14 | 223 | 455 | 0 | 4 | 173 | 127 | 113 | 67 | 0 | 1 | 152 | 157 |
+| **all** | 985 | 0 | 0 | 0 | 7 | 0 | 0 | 14 | 226 | 455 | 0 | 4 | 170 | 127 | 136 | 96 | 0 | 2 | 99 | 157 |
 
 ## Office-extension files the unified layer does not open
 
@@ -55,8 +55,9 @@ was refused (typed), `none` nothing to move.
 
 ## Every no-op that is not exact, and every revert that is not exact
 
-- `iwork/numbers/formula-envelope-native.numbers` (numbers): exact ; structure one-way: table add+remove: the inverse is refused: unsupported_capability: source representation does not support table lifecycle changes
+- `iwork/numbers/formula-envelope-native.numbers` (numbers): exact ; structure one-way: table add+remove, row add+remove: the inverse is refused: unsupported_capability: source representation does not support table lifecycle ...
 - `libreoffice-core/sw/qa/extras/rtfexport/data/tdf107480.rtf` (rtf): exact ; revert one-way: /body/p[1] text: the set back is refused: unsupported_capability: unsupported RTF edit source: candidate body text did not survive RTF va...
+- `libreoffice-core/sw/qa/extras/rtfexport/data/tdf158830.rtf` (rtf): exact ; structure one-way: paragraph move+back: the inverse is refused: unsupported_capability: unsupported RTF edit source: the spliced paragraph segments do not r...
 - `odf/native-resave/libreoffice-resaved/tdf169979-litchi.odp` (odp): exact ; revert one-way: /slide[1] name: the set back is refused: unsupported_capability: Unsupported feature: the ODP page name is referenced by links or custom ...
 - `odf/native-resave/litchi-changed/tdf169979-litchi.odp` (odp): exact ; revert one-way: /slide[1] name: the set back is refused: unsupported_capability: Unsupported feature: the ODP page name is referenced by links or custom ...
 - `poi/test-data/spreadsheet/49609.xlsx` (xlsx): exact ; revert one-way: /sheet[1] name: the set back is refused: unsupported_capability: OPC package error: owned OPC source preservation is unavailable: source ...
