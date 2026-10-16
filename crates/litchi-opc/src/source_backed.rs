@@ -217,6 +217,9 @@ struct TopologyPartAddition {
     partname: PackURI,
     content_type: ContentType,
     payload: TopologyPartPayload,
+    /// The payload restores bytes another producer wrote, so XML is held to
+    /// the source policy instead of the authored compact contract.
+    restored: bool,
 }
 
 #[derive(Debug)]
@@ -2271,6 +2274,7 @@ impl SourceTopologyPlan {
             partname,
             content_type,
             payload: TopologyPartPayload::SourceXml(Arc::new(source_xml)),
+            restored: false,
         });
         Ok(())
     }
@@ -2307,7 +2311,34 @@ impl SourceTopologyPlan {
             partname,
             content_type,
             payload: TopologyPartPayload::Precompressed(Box::new(payload)),
+            restored: false,
         });
+        Ok(())
+    }
+
+    /// Add a Part that restores the exact bytes of a Part a producer wrote,
+    /// such as one a durable inverse brings back after a removal.
+    ///
+    /// The bytes were not authored by this library, so an XML payload is
+    /// audited with the source policy that source-backed replacements use:
+    /// it must be well-formed, bounded XML with one document element, but
+    /// the producer's indentation and spacing are kept as written. Every
+    /// other check is the one [`Self::try_add_part_shared`] applies.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same typed URI, content-type, duplicate-name, operation
+    /// bound, and allocation errors as [`Self::try_add_part`].
+    pub fn try_add_restored_part_shared(
+        &mut self,
+        partname: PackURI,
+        content_type: impl Into<String>,
+        payload: Arc<Vec<u8>>,
+    ) -> Result<()> {
+        self.try_add_part_with_payload(partname, content_type, || payload)?;
+        if let Some(addition) = self.additions.last_mut() {
+            addition.restored = true;
+        }
         Ok(())
     }
 
@@ -2332,6 +2363,7 @@ impl SourceTopologyPlan {
             partname,
             content_type,
             payload: TopologyPartPayload::Decoded(payload()),
+            restored: false,
         });
         Ok(())
     }
@@ -11102,7 +11134,11 @@ impl SourceBackedPackage {
                         addition.partname.as_str(),
                         addition.content_type.as_str(),
                     ) {
-                        validate_overlay_xml(addition.partname.as_str(), payload)?;
+                        if addition.restored {
+                            validate_restored_xml(addition.partname.as_str(), payload)?;
+                        } else {
+                            validate_overlay_xml(addition.partname.as_str(), payload)?;
+                        }
                     }
                     soapberry_zip::RegeneratedEntry::new_shared(
                         addition.partname.membername(),
@@ -14979,6 +15015,17 @@ fn strict_content_type_mapping_key(
     qualified.push(':');
     qualified.push_str(&key);
     Ok(qualified)
+}
+
+/// Audit restored producer bytes with the source policy (see
+/// [`SourceTopologyPlan::try_add_restored_part_shared`]).
+fn validate_restored_xml(part: &str, bytes: &[u8]) -> Result<()> {
+    xml_minifier::audit::verify_source(bytes, xml_minifier::audit::Limits::default())
+        .map(|_report| ())
+        .map_err(|source| OpcError::XmlPublication {
+            part: part.to_string(),
+            source,
+        })
 }
 
 fn validate_overlay_xml(part: &str, bytes: &[u8]) -> Result<()> {
