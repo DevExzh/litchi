@@ -2186,8 +2186,9 @@ fn patch_workbook_dependencies(workbook: &mut [u8], tab: usize, shift: AxisShift
     // 3-D reference, which needs an XTI of this workbook covering its tab;
     // the shifted worksheet's own records are certified with it
     // (`certify_coordinate_shift`). Record 0308.
-    let target = worksheet_range(workbook, tab)?;
-    let target_name = bound_sheets(workbook)?
+    let bounds = bound_sheets_in(workbook, &records)?;
+    let target = worksheet_range_in(&bounds, workbook.len(), tab)?;
+    let target_name = bounds
         .get(tab)
         .map(|bound| {
             record_payload(workbook, &bound.record, "BoundSheet").and_then(decode_bound_name)
@@ -2406,8 +2407,11 @@ fn patch_dv(payload: &mut [u8], shift: AxisShift) -> Result<()> {
 }
 
 /// The byte range of the worksheet substream at workbook tab `tab`.
-fn worksheet_range(workbook: &[u8], tab: usize) -> Result<std::ops::Range<usize>> {
-    let bounds = bound_sheets(workbook)?;
+fn worksheet_range_in(
+    bounds: &[BoundSheet],
+    length: usize,
+    tab: usize,
+) -> Result<std::ops::Range<usize>> {
     let Some(bound) = bounds.get(tab) else {
         // A stream without the tab's BoundSheet holds none of its records.
         return Ok(0..0);
@@ -2421,7 +2425,7 @@ fn worksheet_range(workbook: &[u8], tab: usize) -> Result<std::ops::Range<usize>
             (position > start).then_some(position)
         })
         .min()
-        .unwrap_or(workbook.len());
+        .unwrap_or(length);
     Ok(start..end)
 }
 
@@ -2629,16 +2633,19 @@ fn rebuild_sheet(
     let source_dimensions = worksheet
         .get(records[dimensions].start + 4..records[dimensions].end)
         .unwrap_or_default();
-    let source_exact = stored_dimensions(source_dimensions, &[])
-        == Some(dimensions_from_row_table(
-            worksheet
-                .get(row_table_start..row_table_end)
-                .unwrap_or_default(),
-        )?);
-    let stored = if source_exact {
-        None
-    } else {
-        stored_dimensions(source_dimensions, operations)
+    // The source's exactness matters only when the shifted extents differ
+    // from the regenerated ones, so the source row table is read only then.
+    let stored = match stored_dimensions(source_dimensions, operations) {
+        Some(stored) if stored != computed => {
+            let source_exact = stored_dimensions(source_dimensions, &[])
+                == Some(dimensions_from_row_table(
+                    worksheet
+                        .get(row_table_start..row_table_end)
+                        .unwrap_or_default(),
+                )?);
+            (!source_exact).then_some(stored)
+        },
+        _ => None,
     };
     let (first_used_row, last_used_row, first_used_col, last_used_col) = match stored {
         Some(stored)
@@ -5484,9 +5491,13 @@ fn adjusted_offset(offset: usize, start: usize, end: usize, delta: i64) -> Resul
 }
 
 fn bound_sheets(workbook: &[u8]) -> Result<Vec<BoundSheet>> {
-    let records = raw_records(workbook)?;
+    bound_sheets_in(workbook, &raw_records(workbook)?)
+}
+
+/// The BoundSheet records among `records`, the records of `workbook`.
+fn bound_sheets_in(workbook: &[u8], records: &[RawRecord]) -> Result<Vec<BoundSheet>> {
     let mut bounds = Vec::new();
-    for record in records {
+    for record in records.iter().cloned() {
         if record.kind == 0x000a {
             break;
         }
