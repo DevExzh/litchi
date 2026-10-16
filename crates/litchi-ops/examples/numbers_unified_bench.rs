@@ -22,7 +22,7 @@
 //!   `table_remove` (the grid's table) and `table_move` (leaf
 //!   `edit_table_order`; unified in-sheet `move_to`), on the grid fixture.
 //! - record 0309: `row_insert` and `col_insert` (leaf `edit_table_topology`
-//!   + `insert_row`/`insert_column` before physical row 51 / column 6;
+//!   with `insert_row`/`insert_column` before physical row 51 / column 6;
 //!   unified `add(table, row|col)` at that position), `row_remove` and
 //!   `col_remove` (the same row or column), and `cell_font` (leaf
 //!   `edit_table_cell_text_style` + bold on A3; unified `set` of
