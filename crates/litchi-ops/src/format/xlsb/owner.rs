@@ -385,7 +385,14 @@ impl fmt::Debug for SheetHandle {
 impl XlsbOwner {
     /// Bracket a read with source and execution freshness fences.  A source
     /// change after the operation wins over the operation's own result.
+    /// Inside a resolver or query step for this owner's handle, whose bracket
+    /// already checks after the whole step, `read` runs alone (record 0262,
+    /// as `nav::finish` and `XlsxOwner::finish` do; record 0310: node property
+    /// and text reads paid two extra checks per visited cell).
     pub(crate) fn finish<T>(&self, read: impl FnOnce() -> Result<T>) -> Result<T> {
+        if crate::path::fence::is_active(std::ptr::from_ref(self).addr()) {
+            return read();
+        }
         self.ensure_current()?;
         let result = read();
         self.ensure_current()?;

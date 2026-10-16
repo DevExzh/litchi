@@ -238,7 +238,9 @@ fn resolve_layout_targets(
 ) -> Result<Option<(Axis, Vec<LayoutTarget>)>> {
     let mut nodes = Vec::new();
     if let Some(path) = target.path() {
-        nodes.push(crate::path::resolve::get(&Nav::new(file), path)?);
+        // Only each node's kind, number and sheet are read below, so a path
+        // resolves its coordinates without the worksheet grid (record 0310).
+        nodes.push(crate::path::resolve::get(&Nav::coordinates(file), path)?);
     } else if let Some(query) = target.query() {
         let walk = crate::query::run(Nav::new(file), query)?;
         if !walk.plan().diagnostics().is_empty() {

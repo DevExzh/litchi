@@ -85,12 +85,18 @@ impl SourceWorkbook {
     }
 
     /// The facade's `ensure_source_current`.
+    ///
+    /// The checks and errors of the leaf's
+    /// `SourceBackedWorkbook::source_version` (execution context, source
+    /// version, execution context), with one source observation: the leaf
+    /// reads the version twice with nothing in between, which on a file
+    /// source is a second `fstat` per check (record 0310).
     pub(super) fn ensure_current(&self) -> Result<()> {
-        self.workbook
-            .source_backed_package()
-            .check_execution()
-            .map_err(|error| Error::from(xlsb::package::PackageError::from(error)))?;
-        self.workbook.source_version()?;
+        let package = self.workbook.source_backed_package();
+        let fence = |error| Error::from(xlsb::package::PackageError::from(error));
+        package.check_execution().map_err(fence)?;
+        package.source_version().map_err(fence)?;
+        package.check_execution().map_err(fence)?;
         Ok(())
     }
 

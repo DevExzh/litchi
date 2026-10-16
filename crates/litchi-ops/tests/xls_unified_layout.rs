@@ -212,3 +212,40 @@ fn invalid_layout_values_are_typed_and_atomic() {
     }
     assert_eq!(owner.to_bytes().unwrap(), bytes);
 }
+
+/// Record 0310: a layout write to a row or column named by its number
+/// resolves the coordinates without materializing the worksheet grid. The
+/// published bytes are still exactly the native edit's on both owner
+/// routes, and `last()` selectors, which do read the grid, still resolve.
+#[test]
+fn layout_path_writes_publish_the_native_edit_bytes() {
+    let bytes = fixture();
+    let native = |edit: &dyn Fn(&mut litchi_xls::Edit)| {
+        let package = litchi_xls::Package::from_bytes(&bytes).unwrap();
+        let mut native = package.edit().unwrap();
+        edit(&mut native);
+        native.commit().unwrap().into_package().to_bytes().unwrap()
+    };
+    let row = native(&|edit| edit.set_row_height("Data", 0, 480).unwrap());
+    let column = native(&|edit| edit.set_column_width("Data", 2, 3200).unwrap());
+    for eager in [false, true] {
+        let owner = open_owner(&bytes, eager);
+        let written = owner
+            .set("/Data/row[1]", props! { "height" => "24pt" })
+            .unwrap();
+        assert_eq!(written.to_bytes().unwrap(), row, "eager={eager}");
+        let written = owner
+            .set("/Data/col[C]", props! { "width" => 12.5 })
+            .unwrap();
+        assert_eq!(written.to_bytes().unwrap(), column, "eager={eager}");
+        let last = owner
+            .set("/Data/row[last()]", props! { "height" => "24pt" })
+            .unwrap();
+        assert_eq!(
+            property(&last, "/Data/row[3]", "height").as_deref(),
+            Some("24pt"),
+            "eager={eager}"
+        );
+        assert_eq!(owner.to_bytes().unwrap(), bytes);
+    }
+}

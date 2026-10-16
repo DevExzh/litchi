@@ -306,6 +306,16 @@ pub(super) struct Grid {
 }
 
 impl Grid {
+    /// The grid of a node resolved by [`super::Nav::coordinates`]: no cells
+    /// are read. Only the write resolvers that use only a node's coordinates
+    /// make such nodes, and they do not escape them.
+    pub(super) fn coordinates_only() -> Self {
+        Self {
+            cells: Arc::from(Vec::new()),
+            extent: None,
+        }
+    }
+
     fn from_package(package: &Package, position: usize) -> Result<Self> {
         let mut cells: Vec<((u32, u32), CellData)> = Vec::new();
         if let Some(source) = package.source_workbook() {
