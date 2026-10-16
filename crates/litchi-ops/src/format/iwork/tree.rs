@@ -12,8 +12,26 @@ use crate::node::spec::{ElementSpec, PropSpec};
 use crate::node::{PathStep, Value};
 use crate::path::navigate::ElementKind;
 
-/// The index of the root item.
+/// The index of the root item (of a part, its anchor: the item standing in
+/// for the eager item whose children the part holds).
 pub(crate) const ROOT: u32 = 0;
+
+/// Where an item lives: its part (0 for the tree built on the first read,
+/// `k` for the `k`-th lazily built part) and its index there.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct At {
+    pub(crate) part: u32,
+    pub(crate) index: u32,
+}
+
+impl At {
+    /// The root of the tree.
+    pub(crate) const ROOT: Self = Self::new(0, ROOT);
+
+    pub(crate) const fn new(part: u32, index: u32) -> Self {
+        Self { part, index }
+    }
+}
 
 /// One element of the tree.
 #[derive(Debug)]
@@ -39,9 +57,45 @@ pub(crate) struct Item {
     leaf: [u32; 4],
     /// The item's position among its parent's children of its kind.
     ordinal: u32,
+    /// The lazily built part holding the item's children (record 0305), or
+    /// 0 when they are in its own part.
+    part: u32,
 }
 
 impl Item {
+    /// An item of `spec` at `path` outside any builder: a lazily
+    /// materialized element (a Keynote slide, a Numbers cell, record 0305).
+    #[cfg(any(feature = "keynote", feature = "numbers"))]
+    pub(crate) fn detached<K: ElementKind>(
+        spec: &'static ElementSpec<K>,
+        path: Box<[PathStep<'static>]>,
+        ordinal: u32,
+    ) -> Self {
+        Self {
+            kind: spec.kind.ordinal(),
+            type_name: spec.name,
+            props: spec.props,
+            values: vec![None; spec.props.len()].into_boxed_slice(),
+            text: None,
+            label: None,
+            children: Vec::new(),
+            path,
+            leaf: [0; 4],
+            ordinal,
+            part: 0,
+        }
+    }
+
+    /// Set the item's properties, text and leaf positions.
+    #[cfg(any(feature = "keynote", feature = "numbers"))]
+    pub(crate) fn draft<K>(&mut self) -> Draft<'_, K> {
+        Draft {
+            item: self,
+            index: 0,
+            kind: std::marker::PhantomData,
+        }
+    }
+
     pub(crate) const fn kind(&self) -> u8 {
         self.kind
     }
@@ -82,6 +136,12 @@ impl Item {
         self.ordinal
     }
 
+    /// The lazily built part holding the item's children; 0 when they are
+    /// in its own part.
+    pub(crate) const fn part(&self) -> u32 {
+        self.part
+    }
+
     /// The value of the property `key`, if set.
     pub(crate) fn value(&self, key: &str) -> Option<&Value<'static>> {
         let index = self.props.iter().position(|prop| prop.name == key)?;
@@ -89,10 +149,19 @@ impl Item {
     }
 }
 
-/// The items of one package, the root first.
+/// The items of one package, the root first; or of one lazily built part,
+/// its anchor first.
 #[derive(Debug)]
 pub(crate) struct Tree {
     items: Vec<Item>,
+    /// The first item pushed after [`TreeBuilder::defer`]: a part's
+    /// deferred items (Keynote character runs), which the document-order
+    /// views list after every part's other items.
+    #[cfg_attr(
+        not(feature = "keynote"),
+        allow(dead_code, reason = "only Keynote parts defer items")
+    )]
+    deferred: u32,
 }
 
 impl Tree {
@@ -111,7 +180,9 @@ impl Tree {
                 path: Box::new([]),
                 leaf: [0; 4],
                 ordinal: 0,
+                part: 0,
             }],
+            deferred: 1,
         }
     }
 
@@ -126,6 +197,12 @@ impl Tree {
     pub(crate) fn item(&self, index: u32) -> &Item {
         &self.items[index as usize]
     }
+
+    /// The index of the first deferred item ([`TreeBuilder::defer`]).
+    #[cfg(feature = "keynote")]
+    pub(crate) const fn deferred(&self) -> u32 {
+        self.deferred
+    }
 }
 
 /// Builds a [`Tree`] in document order.
@@ -137,44 +214,78 @@ pub(crate) struct TreeBuilder<K: 'static> {
     /// step is its ordinal among them (counting would make building
     /// quadratic in a large parent's child count).
     ordinals: std::collections::HashMap<(u32, u8), usize>,
+    /// Where the deferred items start, once [`Self::defer`] was called.
+    deferred: Option<u32>,
 }
 
 /// One item under construction, returned by [`TreeBuilder::push`].
 pub(crate) struct Draft<'b, K: 'static> {
-    builder: &'b mut TreeBuilder<K>,
+    item: &'b mut Item,
     index: u32,
+    kind: std::marker::PhantomData<fn() -> K>,
 }
 
 impl<K: ElementKind> TreeBuilder<K> {
     /// A tree whose root has the spec table's root kind.
     pub(crate) fn new(elements: &'static [ElementSpec<K>], singletons: &'static [K]) -> Self {
-        let root = &elements[usize::from(K::ROOT.ordinal())];
+        Self::under(elements, singletons, K::ROOT, &[])
+    }
+
+    /// A lazily built part holding the children of an item of `kind` at
+    /// `path`: its anchor (index [`ROOT`]) stands in for that item, so the
+    /// children pushed under it take their paths and ordinals from it.
+    pub(crate) fn under(
+        elements: &'static [ElementSpec<K>],
+        singletons: &'static [K],
+        kind: K,
+        path: &[PathStep<'static>],
+    ) -> Self {
+        let spec = &elements[usize::from(kind.ordinal())];
         let item = Item {
-            kind: K::ROOT.ordinal(),
-            type_name: root.name,
-            props: root.props,
-            values: vec![None; root.props.len()].into_boxed_slice(),
+            kind: kind.ordinal(),
+            type_name: spec.name,
+            props: spec.props,
+            values: vec![None; spec.props.len()].into_boxed_slice(),
             text: None,
             label: None,
             children: Vec::new(),
-            path: Box::new([]),
+            path: path.into(),
             leaf: [0; 4],
             ordinal: 0,
+            part: 0,
         };
         Self {
             items: vec![item],
             elements,
             singletons,
             ordinals: std::collections::HashMap::new(),
+            deferred: None,
         }
     }
 
     /// The root item, for its properties.
     pub(crate) fn root(&mut self) -> Draft<'_, K> {
+        self.draft_at(ROOT)
+    }
+
+    fn draft_at(&mut self, index: u32) -> Draft<'_, K> {
         Draft {
-            builder: self,
-            index: ROOT,
+            item: &mut self.items[index as usize],
+            index,
+            kind: std::marker::PhantomData,
         }
+    }
+
+    /// Mark the items pushed from now on as deferred ([`Tree::deferred`]).
+    #[cfg(feature = "keynote")]
+    pub(crate) fn defer(&mut self) {
+        self.deferred = Some(u32::try_from(self.items.len()).unwrap_or(u32::MAX));
+    }
+
+    /// The canonical path of an item already built.
+    #[cfg(feature = "numbers")]
+    pub(crate) fn path_of(&self, index: u32) -> Box<[PathStep<'static>]> {
+        self.items[index as usize].path.clone()
     }
 
     /// The text of an item already built.
@@ -189,10 +300,7 @@ impl<K: ElementKind> TreeBuilder<K> {
     /// An item already built, for more properties.
     #[cfg(any(feature = "pages", feature = "keynote"))]
     pub(crate) fn draft(&mut self, index: u32) -> Draft<'_, K> {
-        Draft {
-            builder: self,
-            index,
-        }
+        self.draft_at(index)
     }
 
     /// Append an item of `kind` under `parent`. A cell's path step is its
@@ -234,25 +342,27 @@ impl<K: ElementKind> TreeBuilder<K> {
             path: path.into_boxed_slice(),
             leaf: [0; 4],
             ordinal: 0,
+            part: 0,
         });
         self.items[parent as usize].children.push(index);
         let ordinal = self.ordinals.entry((parent, kind.ordinal())).or_insert(0);
         self.items[index as usize].ordinal = u32::try_from(*ordinal).unwrap_or(u32::MAX);
         *ordinal += 1;
-        Draft {
-            builder: self,
-            index,
-        }
+        self.draft_at(index)
     }
 
     pub(crate) fn build(self) -> Tree {
-        Tree { items: self.items }
+        let length = u32::try_from(self.items.len()).unwrap_or(u32::MAX);
+        Tree {
+            items: self.items,
+            deferred: self.deferred.unwrap_or(length),
+        }
     }
 }
 
 impl<K> Draft<'_, K> {
     fn item(&mut self) -> &mut Item {
-        &mut self.builder.items[self.index as usize]
+        &mut *self.item
     }
 
     /// Set the property `key` when `value` is present.
@@ -283,6 +393,13 @@ impl<K> Draft<'_, K> {
     /// Set the name a bare `[NAME]` step matches.
     pub(crate) fn label(mut self, label: Option<&str>) -> Self {
         self.item().label = label.map(str::to_owned);
+        self
+    }
+
+    /// Hold the item's children in lazily built part `part`.
+    #[cfg(any(feature = "keynote", feature = "numbers"))]
+    pub(crate) fn part(mut self, part: u32) -> Self {
+        self.item().part = part;
         self
     }
 
