@@ -634,6 +634,12 @@ The session exited at 07:46 while four agents (0305, 0308, 0309, 0310) were runn
   - Pages and Keynote table cells write `text`/`value`; Keynote media removal and placeholder hide/show; formulas on created Numbers workbooks (request 18).
   - Performance: Numbers within 1%; Keynote run/placeholder/media and Pages paragraph within 3%.
   - Open (to 0312): Keynote `table_cell` 1.99× and Pages 1.065× (+103 µs), both from the first-read tree build; requests 11 and 19; table creation; formula-coordinate shift for row/column edits.
+- Merged `perf-opc` (0311):
+  - litchi-opc audited the same DOCX part bytes twice per publish and discarded the commit's own proof. New `PreparedTopology::apply_verified_xml_bytes` takes the audit-minted `xml_minifier::audit::VerifiedSource` (private fields, unforgeable); a passing original audit is remembered per part and revision.
+  - 1,000-paragraph DOCX on the default owner: set 1.57× → 0.54× the leaf, add 1.47× → 0.40–0.47×; second set on a committed handle 1,907 → 417 µs.
+  - DOC: `litchi_doc::Package::edit` re-parsed the whole file per edit and now keeps its body snapshot. Unified is 1.03–1.04× the `Package::edit` leaf it wraps, and 1.12–1.27× the bare body-text leaf (the commit's `Document` validation).
+  - The ODP scan (0308) and ODT plain set (0290) wall-time gaps are binary code layout: isolated benches show equal or faster times with fewer instructions. No code change.
+  - Open: DOCX add vs the eager owner 1.05–1.22× (needs a deferred overlay audit or an `xml-minifier` insertion proof).
 
 - Merged `checklist-fixes` (0290):
   - Phase G checklist failures F1 (bare `placeholder` query), F2 (negative `c:axId` read leniently), F4 (PPT `hidden` inserts the slide info atom), F6 (OTH/ODM `meta.xml` created on demand) and F7 (RTF picture remove on mismatched payloads) are fixed;
