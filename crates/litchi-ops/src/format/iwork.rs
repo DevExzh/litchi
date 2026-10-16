@@ -503,6 +503,29 @@ impl Iwork {
     /// Atomically save the package to `path`: the leaf's exact bytes,
     /// staged in a sibling temporary file.
     pub(crate) fn save_to(&self, path: &Path, options: &crate::SaveOptions) -> Result<u64> {
+        // A Pages package saved over a package directory (its origin when it
+        // was opened from one) is written back as a directory (record 0301).
+        #[cfg(feature = "pages")]
+        if let Owner::Pages(package) = &self.0.owner
+            && std::fs::symlink_metadata(path).is_ok_and(|metadata| metadata.is_dir())
+        {
+            if options.overwrite == crate::Overwrite::Refuse {
+                return Err(Error::new(
+                    crate::Code::FileExists,
+                    "the destination package directory exists",
+                ));
+            }
+            package
+                .save_directory(path)
+                .map_err(|error| leaf_error(LeafError::PagesSave(error), FileFormat::Pages))?;
+            let mut sink = std::io::sink();
+            let mut written = 0_u64;
+            self.0.owner.write_to(&mut Counter {
+                inner: &mut sink,
+                written: &mut written,
+            })?;
+            return Ok(written);
+        }
         let overwrite = match options.overwrite {
             crate::Overwrite::Replace => litchi_core::atomic::Overwrite::Replace,
             crate::Overwrite::Refuse => litchi_core::atomic::Overwrite::Refuse,
@@ -555,13 +578,17 @@ impl Iwork {
 
     /// Open an app-authored Pages package directory: the leaf captures the
     /// bundle once and converts it to its single-file form (record 0299).
-    /// The handle has no origin, so `save()` needs a path (`save_as`), and
-    /// the saved file is the single-file package.
+    /// The directory is the handle's origin, so `save()` writes the bundle
+    /// back in place (record 0301); `save_as` to a file path writes the
+    /// single-file package.
     #[cfg(feature = "pages")]
     pub(crate) fn open_pages_directory(path: &Path) -> Result<Self> {
         let package = litchi_pages::Package::open(path)
             .map_err(|error| leaf_error(LeafError::Pages(error), FileFormat::Pages))?;
-        Ok(Self::from_owner(Owner::Pages(package), None))
+        Ok(Self::from_owner(
+            Owner::Pages(package),
+            Some(Arc::from(path)),
+        ))
     }
 
     /// Tag an error with this handle's format.

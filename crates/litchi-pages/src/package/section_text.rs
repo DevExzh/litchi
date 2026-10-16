@@ -982,6 +982,12 @@ fn native_body(package: &Package) -> Result<NativeBodySnapshot, Error> {
     })
 }
 
+/// The UTF-16 body offset where section `position` starts.
+pub(crate) fn section_start(package: &Package, position: Position) -> Result<usize, Error> {
+    let body = native_body(package)?;
+    Ok(native_section_range(package, &body, position)?.start)
+}
+
 fn native_section_range(
     package: &Package,
     body: &NativeBodySnapshot,

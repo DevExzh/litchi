@@ -2,7 +2,7 @@ file	format	noop	detail	revert	revert_detail	structure	structure_detail
 Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestDataStorage/O14ISOStrict/Word/sectPr-Previous Section Properties-rsidSelect-004B4C75.docx	docx	exact		none		-	
 Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/svg.docx	docx	exact		none		-	
 iwork/directory/keynote/basic.key/Index.zip	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 123322 -> 123308 bytes, first difference at 14	value-exact	slide duplicate+add+remove: 123322 -> 126565 bytes, first difference at 89854
-iwork/directory/numbers/basic.numbers/Index.zip	numbers	exact		value-exact	/sheet[1] name: 78105 -> 78111 bytes, first difference at 58425	-	
+iwork/directory/numbers/basic.numbers/Index.zip	numbers	exact		value-exact	/sheet[1] name: 78105 -> 78111 bytes, first difference at 58425	value-exact	table add+remove: 78105 -> 78139 bytes, first difference at 58425
 iwork/directory/pages/basic.pages/Index.zip	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
 iwork/keynote/basic.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 500058 -> 455848 bytes, first difference at 328815	value-exact	slide duplicate+add+remove: 500058 -> 459101 bytes, first difference at 418690
 iwork/keynote/chart-arrangement-retirement-resaved.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 510176 -> 459802 bytes, first difference at 331046	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
@@ -59,43 +59,43 @@ iwork/keynote/slide-movie-geometry-vertical-focused-native.key	keynote	exact		va
 iwork/keynote/slide-table-merges-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 534674 -> 472171 bytes, first difference at 335338	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
 iwork/keynote/slide-table-read-native.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 540001 -> 473709 bytes, first difference at 336363	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
 iwork/keynote/table-discovery.key	keynote	exact		value-exact	/slide[1]/placeholder[1] text: 535255 -> 471103 bytes, first difference at 334847	refused	slide duplicate+add+remove: unsupported_capability: the Keynote slide cannot be created: it contains content stored in other package comp...
-iwork/numbers/audio-playback-native-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 146555 -> 89610 bytes, first difference at 68395	-	
-iwork/numbers/audio-playback-native.numbers	numbers	exact		value-exact	/sheet[1] name: 146459 -> 89692 bytes, first difference at 68478	-	
-iwork/numbers/basic.numbers	numbers	exact		value-exact	/sheet[1] name: 136357 -> 79384 bytes, first difference at 58396	-	
-iwork/numbers/cell-value-native.numbers	numbers	exact		value-exact	/sheet[1] name: 125316 -> 80319 bytes, first difference at 59187	-	
-iwork/numbers/chart-arrangement-native.numbers	numbers	exact		value-exact	/sheet[1] name: 128644 -> 81454 bytes, first difference at 59934	-	
-iwork/numbers/chart-arrangement-retirement-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 128604 -> 81414 bytes, first difference at 59895	-	
-iwork/numbers/chart-data-edited-native.numbers	numbers	exact		value-exact	/sheet[1] name: 62570 -> 20881 bytes, first difference at 14	-	
-iwork/numbers/chart-data-native.numbers	numbers	exact		value-exact	/sheet[1] name: 127968 -> 81540 bytes, first difference at 60045	-	
-iwork/numbers/chart-grid-authored-native.numbers	numbers	exact		value-exact	/sheet[1] name: 60618 -> 20852 bytes, first difference at 14	-	
-iwork/numbers/chart-grid-replaced-native.numbers	numbers	exact		value-exact	/sheet[1] name: 61042 -> 20885 bytes, first difference at 14	-	
-iwork/numbers/comment-compat-native-multiroot.numbers	numbers	exact		value-exact	/sheet[1] name: 138691 -> 79668 bytes, first difference at 58655	-	
-iwork/numbers/comment-metadata-native-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 28973 -> 19136 bytes, first difference at 14	-	
-iwork/numbers/comment-reader-native-created.numbers	numbers	exact		value-exact	/sheet[1] name: 136175 -> 79461 bytes, first difference at 58476	-	
-iwork/numbers/custom-datetime-native-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 137684 -> 79475 bytes, first difference at 58512	-	
-iwork/numbers/custom-datetime-native.numbers	numbers	exact		value-exact	/sheet[1] name: 136983 -> 79430 bytes, first difference at 58472	-	
-iwork/numbers/custom-number-native-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 136808 -> 79485 bytes, first difference at 58490	-	
-iwork/numbers/custom-number-native.numbers	numbers	exact		value-exact	/sheet[1] name: 136401 -> 79482 bytes, first difference at 58498	-	
-iwork/numbers/custom-retirement-cleared.numbers	numbers	exact		value-exact	/sheet[1] name: 136435 -> 79343 bytes, first difference at 58344	-	
-iwork/numbers/custom-retirement-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 137073 -> 79499 bytes, first difference at 58516	-	
-iwork/numbers/custom-text-native-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 137237 -> 79479 bytes, first difference at 58498	-	
-iwork/numbers/custom-text-native-unicode.numbers	numbers	exact		value-exact	/sheet[1] name: 136917 -> 79459 bytes, first difference at 58499	-	
-iwork/numbers/custom-text-native.numbers	numbers	exact		value-exact	/sheet[1] name: 137384 -> 79452 bytes, first difference at 58493	-	
-iwork/numbers/duration-native-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 136757 -> 79349 bytes, first difference at 58373	-	
-iwork/numbers/duration-native.numbers	numbers	exact		value-exact	/sheet[1] name: 136485 -> 78948 bytes, first difference at 57994	-	
-iwork/numbers/formula-arena-native.numbers	numbers	exact		value-exact	/sheet[1] name: 102550 -> 79037 bytes, first difference at 57990	-	
-iwork/numbers/formula-budget-native.numbers	numbers	exact		value-exact	/sheet[1] name: 101345 -> 78961 bytes, first difference at 57898	-	
-iwork/numbers/formula-envelope-native.numbers	numbers	exact		value-exact	/sheet[1] name: 104582 -> 79576 bytes, first difference at 58384	-	
-iwork/numbers/formula-events-native.numbers	numbers	exact		value-exact	/sheet[1] name: 104679 -> 79442 bytes, first difference at 58303	-	
-iwork/numbers/image-adjustments-direct-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 407242 -> 296247 bytes, first difference at 274590	-	
-iwork/numbers/image-adjustments-native-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 408848 -> 296236 bytes, first difference at 274579	-	
-iwork/numbers/image-adjustments-native.numbers	numbers	exact		value-exact	/sheet[1] name: 406626 -> 295945 bytes, first difference at 274287	-	
-iwork/numbers/image-adjustments-retirement-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 407012 -> 296017 bytes, first difference at 274381	-	
-iwork/numbers/shared-model-native.numbers	numbers	exact		value-exact	/sheet[1] name: 105105 -> 78707 bytes, first difference at 57685	-	
-iwork/numbers/table-data-list-native.numbers	numbers	exact		value-exact	/sheet[1] name: 134196 -> 80787 bytes, first difference at 59718	-	
-iwork/numbers/table-merges-native.numbers	numbers	exact		value-exact	/sheet[1] name: 136130 -> 81278 bytes, first difference at 60132	-	
-iwork/numbers/table-relocation-native-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 427012 -> 305386 bytes, first difference at 280493	-	
-iwork/numbers/table-relocation-native.numbers	numbers	exact		value-exact	/sheet[1] name: 415992 -> 305312 bytes, first difference at 280396	-	
+iwork/numbers/audio-playback-native-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 146555 -> 89610 bytes, first difference at 68395	value-exact	table add+remove: 146555 -> 89633 bytes, first difference at 10088
+iwork/numbers/audio-playback-native.numbers	numbers	exact		value-exact	/sheet[1] name: 146459 -> 89692 bytes, first difference at 68478	value-exact	table add+remove: 146459 -> 89721 bytes, first difference at 10088
+iwork/numbers/basic.numbers	numbers	exact		value-exact	/sheet[1] name: 136357 -> 79384 bytes, first difference at 58396	value-exact	table add+remove: 136357 -> 79401 bytes, first difference at 58396
+iwork/numbers/cell-value-native.numbers	numbers	exact		value-exact	/sheet[1] name: 125316 -> 80319 bytes, first difference at 59187	value-exact	table add+remove: 125316 -> 80315 bytes, first difference at 8282
+iwork/numbers/chart-arrangement-native.numbers	numbers	exact		value-exact	/sheet[1] name: 128644 -> 81454 bytes, first difference at 59934	value-exact	table add+remove: 128644 -> 81455 bytes, first difference at 14
+iwork/numbers/chart-arrangement-retirement-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 128604 -> 81414 bytes, first difference at 59895	value-exact	table add+remove: 128604 -> 81428 bytes, first difference at 14
+iwork/numbers/chart-data-edited-native.numbers	numbers	exact		value-exact	/sheet[1] name: 62570 -> 20881 bytes, first difference at 14	value-exact	table add+remove: 62570 -> 20898 bytes, first difference at 15
+iwork/numbers/chart-data-native.numbers	numbers	exact		value-exact	/sheet[1] name: 127968 -> 81540 bytes, first difference at 60045	value-exact	table add+remove: 127968 -> 81562 bytes, first difference at 14
+iwork/numbers/chart-grid-authored-native.numbers	numbers	exact		value-exact	/sheet[1] name: 60618 -> 20852 bytes, first difference at 14	value-exact	table add+remove: 60618 -> 20868 bytes, first difference at 14
+iwork/numbers/chart-grid-replaced-native.numbers	numbers	exact		value-exact	/sheet[1] name: 61042 -> 20885 bytes, first difference at 14	value-exact	table add+remove: 61042 -> 20905 bytes, first difference at 14
+iwork/numbers/comment-compat-native-multiroot.numbers	numbers	exact		value-exact	/sheet[1] name: 138691 -> 79668 bytes, first difference at 58655	value-exact	table add+remove: 138691 -> 79691 bytes, first difference at 12585
+iwork/numbers/comment-metadata-native-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 28973 -> 19136 bytes, first difference at 14	value-exact	table add+remove: 28973 -> 19138 bytes, first difference at 14
+iwork/numbers/comment-reader-native-created.numbers	numbers	exact		value-exact	/sheet[1] name: 136175 -> 79461 bytes, first difference at 58476	value-exact	table add+remove: 136175 -> 79499 bytes, first difference at 58476
+iwork/numbers/custom-datetime-native-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 137684 -> 79475 bytes, first difference at 58512	value-exact	table add+remove: 137684 -> 79480 bytes, first difference at 12451
+iwork/numbers/custom-datetime-native.numbers	numbers	exact		value-exact	/sheet[1] name: 136983 -> 79430 bytes, first difference at 58472	value-exact	table add+remove: 136983 -> 79457 bytes, first difference at 12417
+iwork/numbers/custom-number-native-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 136808 -> 79485 bytes, first difference at 58490	value-exact	table add+remove: 136808 -> 79490 bytes, first difference at 12432
+iwork/numbers/custom-number-native.numbers	numbers	exact		value-exact	/sheet[1] name: 136401 -> 79482 bytes, first difference at 58498	value-exact	table add+remove: 136401 -> 79499 bytes, first difference at 12444
+iwork/numbers/custom-retirement-cleared.numbers	numbers	exact		value-exact	/sheet[1] name: 136435 -> 79343 bytes, first difference at 58344	value-exact	table add+remove: 136435 -> 79361 bytes, first difference at 12333
+iwork/numbers/custom-retirement-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 137073 -> 79499 bytes, first difference at 58516	value-exact	table add+remove: 137073 -> 79513 bytes, first difference at 12451
+iwork/numbers/custom-text-native-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 137237 -> 79479 bytes, first difference at 58498	value-exact	table add+remove: 137237 -> 79492 bytes, first difference at 12437
+iwork/numbers/custom-text-native-unicode.numbers	numbers	exact		value-exact	/sheet[1] name: 136917 -> 79459 bytes, first difference at 58499	value-exact	table add+remove: 136917 -> 79493 bytes, first difference at 12443
+iwork/numbers/custom-text-native.numbers	numbers	exact		value-exact	/sheet[1] name: 137384 -> 79452 bytes, first difference at 58493	value-exact	table add+remove: 137384 -> 79481 bytes, first difference at 12437
+iwork/numbers/duration-native-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 136757 -> 79349 bytes, first difference at 58373	value-exact	table add+remove: 136757 -> 79369 bytes, first difference at 12330
+iwork/numbers/duration-native.numbers	numbers	exact		value-exact	/sheet[1] name: 136485 -> 78948 bytes, first difference at 57994	value-exact	table add+remove: 136485 -> 78978 bytes, first difference at 11961
+iwork/numbers/formula-arena-native.numbers	numbers	exact		value-exact	/sheet[1] name: 102550 -> 79037 bytes, first difference at 57990	value-exact	table add+remove: 102550 -> 79033 bytes, first difference at 8272
+iwork/numbers/formula-budget-native.numbers	numbers	exact		value-exact	/sheet[1] name: 101345 -> 78961 bytes, first difference at 57898	value-exact	table add+remove: 101345 -> 78959 bytes, first difference at 8282
+iwork/numbers/formula-envelope-native.numbers	numbers	exact		value-exact	/sheet[1] name: 104582 -> 79576 bytes, first difference at 58384	one-way	table add+remove: the inverse is refused: unsupported_capability: source representation does not support table lifecycle changes
+iwork/numbers/formula-events-native.numbers	numbers	exact		value-exact	/sheet[1] name: 104679 -> 79442 bytes, first difference at 58303	value-exact	table add+remove: 104679 -> 79444 bytes, first difference at 8283
+iwork/numbers/image-adjustments-direct-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 407242 -> 296247 bytes, first difference at 274590	value-exact	table add+remove: 407242 -> 296263 bytes, first difference at 215881
+iwork/numbers/image-adjustments-native-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 408848 -> 296236 bytes, first difference at 274579	value-exact	table add+remove: 408848 -> 296252 bytes, first difference at 215881
+iwork/numbers/image-adjustments-native.numbers	numbers	exact		value-exact	/sheet[1] name: 406626 -> 295945 bytes, first difference at 274287	value-exact	table add+remove: 406626 -> 295976 bytes, first difference at 215881
+iwork/numbers/image-adjustments-retirement-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 407012 -> 296017 bytes, first difference at 274381	value-exact	table add+remove: 407012 -> 296030 bytes, first difference at 215881
+iwork/numbers/shared-model-native.numbers	numbers	exact		value-exact	/sheet[1] name: 105105 -> 78707 bytes, first difference at 57685	value-exact	table add+remove: 105105 -> 78725 bytes, first difference at 7914
+iwork/numbers/table-data-list-native.numbers	numbers	exact		value-exact	/sheet[1] name: 134196 -> 80787 bytes, first difference at 59718	value-exact	table add+remove: 134196 -> 80783 bytes, first difference at 13309
+iwork/numbers/table-merges-native.numbers	numbers	exact		value-exact	/sheet[1] name: 136130 -> 81278 bytes, first difference at 60132	value-exact	table add+remove: 136130 -> 81276 bytes, first difference at 13643
+iwork/numbers/table-relocation-native-resaved.numbers	numbers	exact		value-exact	/sheet[1] name: 427012 -> 305386 bytes, first difference at 280493	value-exact	table add+remove: 427012 -> 305389 bytes, first difference at 280493
+iwork/numbers/table-relocation-native.numbers	numbers	exact		value-exact	/sheet[1] name: 415992 -> 305312 bytes, first difference at 280396	value-exact	table add+remove: 415992 -> 305332 bytes, first difference at 215882
 iwork/pages/audio-playback-native-resaved.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
 iwork/pages/audio-playback-native.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
 iwork/pages/basic.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
@@ -127,8 +127,8 @@ iwork/pages/source-built-hidden-axes-before.pages	pages	exact		byte-exact	/secti
 iwork/pages/source-built-hidden-axes-legacy.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
 iwork/pages/source-built-table-stylesheet-before.pages	pages	exact		byte-exact	/section[1] name	byte-exact	paragraph add+remove
 iwork/pages/source-built-table-stylesheet-native-saved.pages	pages	exact		value-exact	/section[1] name: 37712 -> 37713 bytes, first difference at 14	value-exact	paragraph add+remove: 37712 -> 37713 bytes, first difference at 14
-iwork/synthetic/numbers/bench-grid.numbers	numbers	exact		value-exact	/sheet[1] name: 11482 -> 11482 bytes, first difference at 8540	-	
-iwork/synthetic/numbers/custom-focused.numbers	numbers	exact		value-exact	/sheet[1] name: 2246 -> 1841 bytes, first difference at 1003	-	
+iwork/synthetic/numbers/bench-grid.numbers	numbers	exact		value-exact	/sheet[1] name: 11482 -> 11482 bytes, first difference at 8540	value-exact	table add+remove: 11482 -> 11482 bytes, first difference at 8540
+iwork/synthetic/numbers/custom-focused.numbers	numbers	exact		value-exact	/sheet[1] name: 2246 -> 1841 bytes, first difference at 1003	refused	table add+remove: invalid_input: rooted table-lifecycle source is invalid
 libreoffice-core/chart2/qa/extras/data/odp/tdf121189.odp	odp	exact		value-exact	/slide[1] name: 16945 -> 16948 bytes, first difference at 9192	-	
 libreoffice-core/chart2/qa/extras/data/xls/chart.xls	xls	exact		byte-exact	/sheet[1] name	refused	row add+remove: unsupported_capability: Unsafe edit refused: worksheet has no INDEX record
 libreoffice-core/chart2/qa/extras/data/xlsx/boxWhisker.xlsx	xlsx	exact		value-exact	/sheet[1] name: 13397 -> 13382 bytes, first difference at 1771	-	

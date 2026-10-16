@@ -111,3 +111,44 @@ fn package_directories_open_as_single_file_packages() -> TestResult {
     assert_eq!(Package::open(&path)?.text()?, single.text()?);
     Ok(())
 }
+
+fn package_bytes(package: &Package) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+    let mut bytes = Vec::new();
+    package.write_to(&mut bytes)?;
+    Ok(bytes)
+}
+
+#[test]
+fn packages_save_back_as_directories_byte_exactly() -> TestResult {
+    let temp = tempfile::tempdir()?;
+    // A directory-backed package saves back as a directory that opens to the
+    // same single-file bytes.
+    let directory = Package::open(fixture("directory/pages/basic.pages"))?;
+    let path = temp.path().join("bundle.pages");
+    directory.save_directory(&path)?;
+    assert!(path.join("Index.zip").is_file());
+    assert!(!path.join("Index").exists());
+    let reopened = Package::open(&path)?;
+    assert_eq!(package_bytes(&reopened)?, package_bytes(&directory)?);
+    // Saving over the existing directory replaces it.
+    let edited = Package::new()?;
+    edited.save_directory(&path)?;
+    assert_eq!(Package::open(&path)?.text()?, edited.text()?);
+    assert_eq!(
+        std::fs::read_dir(temp.path())?.count(),
+        1,
+        "no staging or retired directory is left behind"
+    );
+    // A single-file package converts too, and a file destination is refused.
+    let single = Package::open(fixture("pages/basic.pages"))?;
+    let other = temp.path().join("single.pages");
+    single.save_directory(&other)?;
+    assert_eq!(Package::open(&other)?.text()?, single.text()?);
+    let file = temp.path().join("file.pages");
+    single.save(&file)?;
+    assert!(matches!(
+        single.save_directory(&file),
+        Err(litchi_pages::SaveError::Publication(_))
+    ));
+    Ok(())
+}

@@ -176,11 +176,11 @@ static OPERATION_GAPS: [GapSpec; 6] = [
         subject: Subject::Operation {
             verb: "remove",
             element: "p",
-            context: "a paragraph that anchors an object",
+            context: "a paragraph that anchors a chart, image or footnote",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "remove the anchored object (`tbl`) itself",
-        reason: "removing or moving the paragraph would delete or move the inline table, chart, image or footnote it anchors",
+        follow_up: "record 0301 follow-up: delete those anchored objects with their paragraph",
+        reason: "a paragraph whose anchors are all body tables is removed with its tables (record 0301); removing one that anchors a chart, image or footnote, or moving any anchored paragraph, would delete or move an object the leaf has no transaction for here",
     },
     GapSpec {
         subject: Subject::Operation {
@@ -1133,6 +1133,34 @@ pub(crate) fn remove(
         }
     }
     bound(LimitKind::Operations, nodes.len(), limits.max_operations())?;
+    // A paragraph whose every anchor is a body table goes with its tables
+    // (record 0301); one that anchors anything else stays refused by the
+    // leaf paragraph transaction.
+    for (section, targets) in &lines {
+        let mut anchored = None;
+        for line in targets {
+            let raw = raw_paragraph(package, *section, *line)?;
+            let anchors = raw
+                .chars()
+                .filter(|character| matches!(character, '\u{fffc}' | '\u{000e}'))
+                .count();
+            if anchors == 0 {
+                continue;
+            }
+            let per_paragraph = match &anchored {
+                Some(per_paragraph) => per_paragraph,
+                None => anchored.insert(
+                    package
+                        .section_paragraph_tables(*section)
+                        .map_err(|error| failure(LeafError::PagesParagraphs(error)))?,
+                ),
+            };
+            let owned = per_paragraph.get(*line).map_or(&[][..], Vec::as_slice);
+            if owned.len() == anchors {
+                tables.extend(owned.iter().map(|position| position.get()));
+            }
+        }
+    }
     tables.sort_unstable();
     tables.dedup();
     let mut chain = Chain::new(package.clone());

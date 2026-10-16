@@ -32,7 +32,7 @@ differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `73fafb3ba518137725602d97210ce5837886dff848671f143278fd3cb55063e3` |
 | golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `232e6d10bfb92c6f50d0b80e9206938030ffc468f48ef078c2e4d8a091b8c89a` |
 | golden | `crates/litchi-ops/tests/golden/registry/keynote.json` | `ef314e1e8b8607d17dc63ddee4e32ed7eb67e056f4d34f6d52ebe5f3750a4a7b` |
-| golden | `crates/litchi-ops/tests/golden/registry/numbers.json` | `1096eea95f8aaf22bbd6e1a512f3beb39a19b62efc3cf3d1eb53d319a57d3712` |
+| golden | `crates/litchi-ops/tests/golden/registry/numbers.json` | `598fe1e05cf36c559b8a3744c20a8c08d5a58583ca2b9cd8a46df80e3ceb83e0` |
 | golden | `crates/litchi-ops/tests/golden/registry/odb.json` | `6db2565f0802f112be6d3db035e0444e2e132d7c24546c7ff18ec004de4fada7` |
 | golden | `crates/litchi-ops/tests/golden/registry/odc.json` | `b3d7d096e06b8dd2300d8d27d56449e1cbba6976e302308f6cc47db1090bd8ee` |
 | golden | `crates/litchi-ops/tests/golden/registry/odf.json` | `7f3d45bc3a6a7be93cb0cf50617df4c59fe2c13236ce331e3142f38229005a41` |
@@ -43,7 +43,7 @@ differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/registry/ods.json` | `3a7d89d93de8cdb1b8e225b37b78f6cc2adae9cf187b384071cdafd1c846d69c` |
 | golden | `crates/litchi-ops/tests/golden/registry/odt.json` | `adbc9fc35ffae00c3089b29ffbe50bf327f8a0f7ec11080651ed8ddda00f87ba` |
 | golden | `crates/litchi-ops/tests/golden/registry/oth.json` | `d7ed0734b44bf5cec561cea44b5e7629e2c19e96ce1834aecacf776daf95b990` |
-| golden | `crates/litchi-ops/tests/golden/registry/pages.json` | `0198494f9b01534e0e0c947ca0f100cc9bd63ab8e52b4f37c28ada745b8b8734` |
+| golden | `crates/litchi-ops/tests/golden/registry/pages.json` | `bcf0552c30e2bee4516ff579ccd174bf3c2e59941ed19d277637aece2deda8e9` |
 | officecli | `schemas/help` (152 files, OfficeCLI commit `dced0d74`) | `0bcd8cae45fabc0c5e45ff99d1994465fb213ac1b8db3f7eadd87339fb40ced4` |
 
 ## Statuses
@@ -7911,11 +7911,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | Verb | Element | Context | Reason | Follow-up |
 |---|---|---|---|---|
 | `set` | `cell` | `cross-table formula references` | formula text is parsed with local A1 references and the authorable function subset; references to other tables need source-bound table handles | record 0297 follow-ups (IWORK_API_REQUESTS.md) |
-| `add` | `sheet` | `a new sheet` | the Numbers leaf has no sheet creation transaction | IWORK_API_REQUESTS.md request 4 |
-| `remove` | `sheet` | `a sheet and its graph` | the Numbers leaf has no sheet deletion transaction | IWORK_API_REQUESTS.md request 4 |
-| `add` | `table` | `a new table` | the Numbers leaf has no table creation transaction | IWORK_API_REQUESTS.md request 5 |
-| `remove` | `table` | `a table and its storage` | the Numbers leaf has no table deletion transaction | IWORK_API_REQUESTS.md request 5 |
-| `move` | `table` | `a position within its sheet` | the leaf relocates a table into another sheet (appended there); it has no transaction that reorders tables within one sheet | record 0297 follow-ups (IWORK_API_REQUESTS.md) |
+| `add` | `table` | `a workbook without a table` | a new table copies the structure (styles, sizes, storage layout) of the workbook's first table; a workbook with no table has no template yet | record 0301 follow-ups (IWORK_API_REQUESTS.md request 5) |
 
 ## odb
 
@@ -10873,5 +10869,5 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | `remove` | `section` | `a section` | the Pages leaf has no section lifecycle transaction | IWORK_API_REQUESTS.md request 11 |
 | `set` | `tc` | `a body-table cell` | the Pages leaf reads body-table cells but has no cell-write transaction (the Numbers cell writer is not shared with Pages) | record 0299 follow-up: Pages body-table cell writes |
 | `add` | `tbl` | `a new body table` | the Pages leaf deletes body tables but has no table-creation transaction | record 0299 follow-up: Pages body-table creation |
-| `remove` | `p` | `a paragraph that anchors an object` | removing or moving the paragraph would delete or move the inline table, chart, image or footnote it anchors | remove the anchored object (`tbl`) itself |
+| `remove` | `p` | `a paragraph that anchors a chart, image or footnote` | a paragraph whose anchors are all body tables is removed with its tables (record 0301); removing one that anchors a chart, image or footnote, or moving any anchored paragraph, would delete or move an object the leaf has no transaction for here | record 0301 follow-up: delete those anchored objects with their paragraph |
 | `create` | `document` | `a document with a fresh identity` | `create` returns the deterministic minimal Pages document (`Package::new`); a fresh document identity is an explicit leaf builder input | litchi_pages::builder::Builder with Identity::generate |
