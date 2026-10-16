@@ -1030,6 +1030,33 @@ fn iwork_writes_save_in_place() {
     let merges = expect(0, ["query", file, "mergeCell", "--json"]).json();
     assert!(merges.to_string().contains("A2:B3"), "{merges}");
 
+    // Record 0301: sheets and tables are added and removed.
+    expect(
+        0,
+        ["add", file, "/", "--type", "sheet", "--prop", "name=Extra"],
+    );
+    expect(
+        0,
+        [
+            "add",
+            file,
+            "/sheet[2]",
+            "--type",
+            "table",
+            "--prop",
+            "name=Data",
+            "--prop",
+            "rowCount=3",
+            "--prop",
+            "columnCount=2",
+        ],
+    );
+    let table = expect(0, ["get", file, "/sheet[2]/table[1]", "--json"]).json();
+    assert!(table.to_string().contains("Data"), "{table}");
+    expect(0, ["remove", file, "/sheet[2]"]);
+    let sheets = expect(0, ["query", file, "sheet", "--json"]).json();
+    assert!(!sheets.to_string().contains("Extra"), "{sheets}");
+
     // Pages creates its minimal document (record 0299).
     let blank = dir.path().join("blank.pages");
     expect(0, ["create", arg(&blank)]);

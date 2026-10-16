@@ -16,8 +16,11 @@
 //! | `remove` | `cell` (clears) / `mergeCell` | `edit_table_cells` / `edit_table_merges` |
 //! | `move` | `sheet` | `edit_sheet_order` |
 //! | `move` | `table` into another sheet | `edit_table_relocation` |
+//! | `move` | `table` within its sheet | `edit_table_order` |
+//! | `add`/`remove` | `sheet` | `edit_sheet_lifecycle` (+ `edit_sheet_order` for a position) |
+//! | `add`/`remove` | `table` | `edit_table_lifecycle` (+ `edit_table_order` for a position) |
 //!
-//! Sheet, table, row and column lifecycle stays a typed gap (requests 4–6).
+//! Row and column insertion and deletion stay a typed gap (request 6).
 
 pub(crate) mod coalesce;
 
@@ -78,15 +81,29 @@ const fn set_only(name: &'static str, ty: ValueType) -> PropSpec {
 
 const WORKBOOK_PROPS: &[PropSpec] = &[PropSpec::new("sheetCount", ValueType::Int)];
 
+/// A property `set` writes and `add` accepts.
+const fn addable_writable(name: &'static str, ty: ValueType) -> PropSpec {
+    let mut spec = writable(name, ty);
+    spec.access.add = true;
+    spec
+}
+
+/// A property the tree reads and `add` accepts.
+const fn addable_read(name: &'static str, ty: ValueType) -> PropSpec {
+    let mut spec = PropSpec::new(name, ty);
+    spec.access.add = true;
+    spec
+}
+
 pub(crate) const SHEET_PROPS: &[PropSpec] = &[
-    writable("name", ValueType::Text),
+    addable_writable("name", ValueType::Text),
     PropSpec::new("tableCount", ValueType::Int),
 ];
 
 pub(crate) const TABLE_PROPS: &[PropSpec] = &[
-    writable("name", ValueType::Text),
-    PropSpec::new("rowCount", ValueType::Int),
-    PropSpec::new("columnCount", ValueType::Int),
+    addable_writable("name", ValueType::Text),
+    addable_read("rowCount", ValueType::Int),
+    addable_read("columnCount", ValueType::Int),
     PropSpec::new("mergeCount", ValueType::Int),
 ];
 
@@ -144,58 +161,16 @@ static GAPS: [GapSpec; 4] = [
     },
 ];
 
-static OPERATION_GAPS: [GapSpec; 5] = [
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "add",
-            element: "sheet",
-            context: "a new sheet",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "IWORK_API_REQUESTS.md request 4",
-        reason: "the Numbers leaf has no sheet creation transaction",
+static OPERATION_GAPS: [GapSpec; 1] = [GapSpec {
+    subject: Subject::Operation {
+        verb: "add",
+        element: "table",
+        context: "a workbook without a table",
     },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "remove",
-            element: "sheet",
-            context: "a sheet and its graph",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "IWORK_API_REQUESTS.md request 4",
-        reason: "the Numbers leaf has no sheet deletion transaction",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "add",
-            element: "table",
-            context: "a new table",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "IWORK_API_REQUESTS.md request 5",
-        reason: "the Numbers leaf has no table creation transaction",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "remove",
-            element: "table",
-            context: "a table and its storage",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "IWORK_API_REQUESTS.md request 5",
-        reason: "the Numbers leaf has no table deletion transaction",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "move",
-            element: "table",
-            context: "a position within its sheet",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: FOLLOW_UP,
-        reason: "the leaf relocates a table into another sheet (appended there); it has no transaction that reorders tables within one sheet",
-    },
-];
+    code: Code::UnsupportedCapability,
+    follow_up: "record 0301 follow-ups (IWORK_API_REQUESTS.md request 5)",
+    reason: "a new table copies the structure (styles, sizes, storage layout) of the workbook's first table; a workbook with no table has no template yet",
+}];
 
 /// The Numbers spec table.
 pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
@@ -265,8 +240,8 @@ impl Flavor for Numbers {
 /// The elements each write verb accepts.
 pub(crate) static WRITES: super::Writes = super::Writes {
     settable: &["cell", "sheet", "table"],
-    addable: &["mergeCell"],
-    removable: &["cell", "mergeCell"],
+    addable: &["mergeCell", "sheet", "table"],
+    removable: &["cell", "mergeCell", "sheet", "table"],
     movable: &["sheet", "table"],
     gaps: &OPERATION_GAPS,
 };
@@ -292,6 +267,12 @@ pub enum EditError {
     Formula(litchi_numbers::formula::Error),
     /// A fresh workbook.
     Create(litchi_numbers::create::Error),
+    /// A sheet addition or removal.
+    SheetLifecycle(litchi_numbers::sheet::lifecycle::Error),
+    /// A table addition or removal.
+    TableLifecycle(litchi_numbers::table::lifecycle::Error),
+    /// A table move within its sheet.
+    TableOrder(litchi_numbers::table::order::Error),
 }
 
 impl fmt::Display for EditError {
@@ -305,6 +286,9 @@ impl fmt::Display for EditError {
             Self::PercentageFormat(error) => error.fmt(formatter),
             Self::Formula(error) => error.fmt(formatter),
             Self::Create(error) => error.fmt(formatter),
+            Self::SheetLifecycle(error) => error.fmt(formatter),
+            Self::TableLifecycle(error) => error.fmt(formatter),
+            Self::TableOrder(error) => error.fmt(formatter),
         }
     }
 }
@@ -320,6 +304,9 @@ impl EditError {
             Self::PercentageFormat(error) => error,
             Self::Formula(error) => error,
             Self::Create(error) => error,
+            Self::SheetLifecycle(error) => error,
+            Self::TableLifecycle(error) => error,
+            Self::TableOrder(error) => error,
         })
     }
 
@@ -396,6 +383,44 @@ impl EditError {
                 | litchi_numbers::create::Error::IdentityNotDistinct => Code::InvalidArgument,
                 _ => Code::InternalError,
             },
+            Self::SheetLifecycle(error) => {
+                use litchi_numbers::sheet::lifecycle::Error as E;
+                match error {
+                    E::SheetNotFound => Code::PathNotFound,
+                    E::InvalidName { .. } => Code::InvalidValue,
+                    E::LastSheet => Code::InvalidArgument,
+                    E::SheetNotEmpty | E::UnsupportedDependency | E::UnsupportedSource => {
+                        Code::UnsupportedCapability
+                    },
+                    E::LimitExceeded { .. } => Code::LimitExceeded,
+                    E::InvalidSource | E::PatchConflict => Code::InvalidInput,
+                    _ => Code::InternalError,
+                }
+            },
+            Self::TableLifecycle(error) => {
+                use litchi_numbers::table::lifecycle::Error as E;
+                match error {
+                    E::SheetNotFound | E::TableNotFound => Code::PathNotFound,
+                    E::InvalidName { .. } | E::InvalidSize { .. } => Code::InvalidValue,
+                    E::NoTemplate | E::UnsupportedDependency | E::UnsupportedSource => {
+                        Code::UnsupportedCapability
+                    },
+                    E::LimitExceeded { .. } => Code::LimitExceeded,
+                    E::InvalidSource | E::PatchConflict => Code::InvalidInput,
+                    _ => Code::InternalError,
+                }
+            },
+            Self::TableOrder(error) => {
+                use litchi_numbers::table::order::Error as E;
+                match error {
+                    E::SheetNotFound | E::TableNotFound => Code::PathNotFound,
+                    E::DestinationOutOfRange { .. } => Code::OutOfRange,
+                    E::UnsupportedDependency | E::UnsupportedSource => Code::UnsupportedCapability,
+                    E::LimitExceeded { .. } => Code::LimitExceeded,
+                    E::InvalidSource | E::PatchConflict => Code::InvalidInput,
+                    _ => Code::InternalError,
+                }
+            },
         }
     }
 }
@@ -414,6 +439,12 @@ pub(crate) enum Patch {
     NumberFormat(litchi_numbers::cell::data_format::number::transaction::Patch),
     /// A percentage display format.
     PercentageFormat(litchi_numbers::cell::data_format::percentage::transaction::Patch),
+    /// A sheet addition or removal.
+    SheetLifecycle(litchi_numbers::sheet::lifecycle::Patch),
+    /// A table addition or removal.
+    TableLifecycle(litchi_numbers::table::lifecycle::Patch),
+    /// A table move within its sheet.
+    TableOrder(litchi_numbers::table::order::Patch),
 }
 
 impl Patch {
@@ -425,6 +456,9 @@ impl Patch {
             Self::Merges(patch) => patch.is_noop(),
             Self::NumberFormat(patch) => patch.is_noop(),
             Self::PercentageFormat(patch) => patch.is_noop(),
+            Self::SheetLifecycle(patch) => patch.is_noop(),
+            Self::TableLifecycle(patch) => patch.is_noop(),
+            Self::TableOrder(patch) => patch.is_noop(),
         }
     }
 }
@@ -1002,6 +1036,12 @@ pub(crate) fn add(
     limits: &SemanticLimits,
 ) -> Result<(Commit, Path<'static>)> {
     let kind = node.kind();
+    if kind.eq_ignore_ascii_case("sheet") {
+        return add_sheet(file, package, parent, node, limits);
+    }
+    if kind.eq_ignore_ascii_case("table") {
+        return add_table(file, package, parent, node, limits);
+    }
     if !(kind.eq_ignore_ascii_case("mergeCell")
         || kind.eq_ignore_ascii_case("merge")
         || kind.eq_ignore_ascii_case("mergedRange"))
@@ -1071,6 +1111,216 @@ pub(crate) fn add(
     Ok((commit, path))
 }
 
+/// The first `<prefix> N` (N from 1) that `taken` does not hold.
+fn fresh_name(prefix: &str, taken: &[&str]) -> String {
+    (1..)
+        .map(|index| format!("{prefix} {index}"))
+        .find(|name| !taken.contains(&name.as_str()))
+        .unwrap_or_else(|| prefix.to_owned())
+}
+
+/// A non-negative count property of a new table.
+fn count_prop(value: &PropValue<'_>, key: &str) -> Result<u32> {
+    value
+        .with_coerced(ValueType::Int, |scalar| match scalar {
+            Some(Scalar::Int(value)) => u32::try_from(value)
+                .map_err(|_| refusal(Code::InvalidValue, "a table size must be a positive count")),
+            _ => Err(refusal(Code::InvalidValue, "a table size must be a count")),
+        })
+        .map_err(|error| error.with_property(key.to_owned()))
+}
+
+/// The zero-based final position `placement` names among `count` siblings
+/// once the new one is appended, or `None` to keep it last.
+fn add_position(
+    count: usize,
+    placement: Option<&crate::Placement<'_>>,
+    anchor: impl Fn(&PathArg<'_>) -> Result<usize>,
+) -> Result<Option<usize>> {
+    use crate::Placement;
+    let Some(placement) = placement else {
+        return Ok(None);
+    };
+    let last = count;
+    let to = match placement {
+        Placement::End | Placement::Into(_, None) => last,
+        Placement::Start => 0,
+        Placement::Position(position) | Placement::Into(_, Some(position)) => position.get(),
+        Placement::Before(path) => anchor(path)?,
+        Placement::After(path) => anchor(path)? + 1,
+    };
+    if to > last {
+        return Err(refusal(
+            Code::OutOfRange,
+            "the insertion position is outside the parent's children",
+        ));
+    }
+    Ok((to != last).then_some(to))
+}
+
+/// Add an empty sheet (`name`, default `Sheet N`), appended or placed.
+fn add_sheet(
+    file: &Iwork,
+    package: &Package,
+    parent: &PathArg<'_>,
+    node: &NewNode<'_>,
+    limits: &SemanticLimits,
+) -> Result<(Commit, Path<'static>)> {
+    let root = node_at::<Numbers>(file, parent)?;
+    if root.item().type_name() != "workbook" {
+        return Err(refusal(
+            Code::InvalidArgument,
+            "a Numbers sheet is added under the workbook (`/`)",
+        ));
+    }
+    let mut name = None;
+    for (key, value) in node.props().iter() {
+        if key.as_str().eq_ignore_ascii_case("name") {
+            name = super::write::text(value, "name")?;
+        } else {
+            return Err(super::write::unwritable("sheet", key.as_str()));
+        }
+    }
+    let taken: Vec<&str> = package.sheets().iter().map(|sheet| sheet.name()).collect();
+    let name = name.unwrap_or_else(|| fresh_name("Sheet", &taken));
+    let count = package.sheets().len();
+    let position = add_position(count, node.placement(), |anchor| {
+        let anchor = node_at::<Numbers>(file, anchor)?;
+        if anchor.item().type_name() == "sheet" {
+            Ok(anchor.item().leaf()[0] as usize)
+        } else {
+            Err(refusal(
+                Code::InvalidArgument,
+                "a sheet is placed before or after another sheet",
+            ))
+        }
+    })?;
+    bound(LimitKind::Operations, 1, limits.max_operations())?;
+    let error = |error| edit_error(EditError::SheetLifecycle(error));
+    let commit = package
+        .edit_sheet_lifecycle()
+        .add(&name)
+        .map_err(error)?
+        .commit()
+        .map_err(error)?;
+    let mut chain = Chain::new(package.clone());
+    let (next, patch) = commit.into_parts();
+    push(&mut chain, next, Patch::SheetLifecycle(patch));
+    let index = position.unwrap_or(count);
+    if let Some(to) = position {
+        let error = |error| edit_error(EditError::Order(error));
+        let commit = chain
+            .package
+            .edit_sheet_order()
+            .move_sheet(SheetSelector::index(count), to)
+            .map_err(error)?
+            .commit()
+            .map_err(error)?;
+        let patch = commit.patch().clone();
+        push(&mut chain, commit.into_package(), Patch::Order(patch));
+    }
+    let commit = finish(
+        file,
+        chain.changed,
+        Owner::Numbers(chain.package),
+        chain.patches,
+        1,
+        limits,
+    )?;
+    let path = Path::from_steps([Step::new("sheet").with(Predicate::Index(Position::new(index)))]);
+    Ok((commit, path))
+}
+
+/// Add an empty table (`name`, `rowCount`, `columnCount`; defaults
+/// `Table N`, 10 × 5) to a sheet, appended or placed among its tables.
+fn add_table(
+    file: &Iwork,
+    package: &Package,
+    parent: &PathArg<'_>,
+    node: &NewNode<'_>,
+    limits: &SemanticLimits,
+) -> Result<(Commit, Path<'static>)> {
+    let sheet_node = node_at::<Numbers>(file, parent)?;
+    if sheet_node.item().type_name() != "sheet" {
+        return Err(refusal(
+            Code::InvalidArgument,
+            "a Numbers table is added under a sheet (`/sheet[N]`)",
+        ));
+    }
+    let sheet = sheet_node.item().leaf()[0] as usize;
+    let (mut name, mut rows, mut columns) = (None, 10_u32, 5_u32);
+    for (key, value) in node.props().iter() {
+        let key = key.as_str();
+        if key.eq_ignore_ascii_case("name") {
+            name = super::write::text(value, "name")?;
+        } else if key.eq_ignore_ascii_case("rowCount") || key.eq_ignore_ascii_case("rows") {
+            rows = count_prop(value, "rowCount")?;
+        } else if key.eq_ignore_ascii_case("columnCount") || key.eq_ignore_ascii_case("columns") {
+            columns = count_prop(value, "columnCount")?;
+        } else {
+            return Err(super::write::unwritable("table", key));
+        }
+    }
+    let leaf_sheet = package
+        .sheets()
+        .get(sheet)
+        .ok_or_else(|| refusal(Code::PathNotFound, "the sheet is no longer in the workbook"))?;
+    let taken: Vec<&str> = leaf_sheet.tables().map(|table| table.name()).collect();
+    let name = name.unwrap_or_else(|| fresh_name("Table", &taken));
+    let count = leaf_sheet.table_count();
+    let position = add_position(count, node.placement(), |anchor| {
+        let anchor = node_at::<Numbers>(file, anchor)?;
+        let [anchor_sheet, anchor_table, _, _] = anchor.item().leaf().map(|value| value as usize);
+        if anchor.item().type_name() == "table" && anchor_sheet == sheet {
+            Ok(anchor_table)
+        } else {
+            Err(refusal(
+                Code::InvalidArgument,
+                "a table is placed before or after another table of its sheet",
+            ))
+        }
+    })?;
+    bound(LimitKind::Operations, 1, limits.max_operations())?;
+    let error = |error| edit_error(EditError::TableLifecycle(error));
+    let commit = package
+        .edit_table_lifecycle(SheetSelector::index(sheet))
+        .map_err(error)?
+        .add(&name, rows, columns)
+        .map_err(error)?
+        .commit()
+        .map_err(error)?;
+    let mut chain = Chain::new(package.clone());
+    let (next, patch) = commit.into_parts();
+    push(&mut chain, next, Patch::TableLifecycle(patch));
+    let index = position.unwrap_or(count);
+    if let Some(to) = position {
+        let error = |error| edit_error(EditError::TableOrder(error));
+        let commit = chain
+            .package
+            .edit_table_order(SheetSelector::index(sheet))
+            .map_err(error)?
+            .move_table(TableSelector::index(count), to)
+            .map_err(error)?
+            .commit()
+            .map_err(error)?;
+        let (next, patch) = commit.into_parts();
+        push(&mut chain, next, Patch::TableOrder(patch));
+    }
+    let commit = finish(
+        file,
+        chain.changed,
+        Owner::Numbers(chain.package),
+        chain.patches,
+        1,
+        limits,
+    )?;
+    let path = Path::from_steps([
+        Step::new("sheet").with(Predicate::Index(Position::new(sheet))),
+        Step::new("table").with(Predicate::Index(Position::new(index))),
+    ]);
+    Ok((commit, path))
+}
+
 fn parse_region(range: &str) -> Result<Region> {
     let invalid = || {
         refusal(
@@ -1094,17 +1344,13 @@ fn parse_region(range: &str) -> Result<Region> {
 
 /// The typed refusal of an `add` the leaf cannot perform.
 fn add_gap(kind: &str) -> crate::Error {
-    let message = if kind.eq_ignore_ascii_case("sheet") {
-        "adding a Numbers sheet needs a leaf sheet-creation transaction (IWORK_API_REQUESTS.md request 4)"
-    } else if kind.eq_ignore_ascii_case("table") {
-        "adding a Numbers table needs a leaf table-creation transaction (IWORK_API_REQUESTS.md request 5)"
-    } else if ["row", "col", "column"]
+    let message = if ["row", "col", "column"]
         .iter()
         .any(|name| kind.eq_ignore_ascii_case(name))
     {
         "inserting Numbers rows or columns needs a leaf topology transaction (IWORK_API_REQUESTS.md request 6)"
     } else {
-        "a Numbers workbook adds merged ranges (`mergeCell`) only"
+        "a Numbers workbook adds sheets, tables and merged ranges (`mergeCell`)"
     };
     refusal(Code::UnsupportedCapability, message)
 }
@@ -1132,6 +1378,8 @@ pub(crate) fn remove(
     };
     let mut cells: BTreeMap<(usize, usize), Vec<Change>> = BTreeMap::new();
     let mut merges: BTreeMap<(usize, usize), Vec<Region>> = BTreeMap::new();
+    let mut tables: Vec<(usize, usize)> = Vec::new();
+    let mut sheets: Vec<usize> = Vec::new();
     let mut operations = 0_usize;
     for node in &nodes {
         operations += 1;
@@ -1155,18 +1403,8 @@ pub(crate) fn remove(
                     .or_default()
                     .push(parse_region(&range)?);
             },
-            "sheet" => {
-                return Err(refusal(
-                    Code::UnsupportedCapability,
-                    "removing a Numbers sheet needs a leaf sheet-deletion transaction (IWORK_API_REQUESTS.md request 4)",
-                ));
-            },
-            "table" => {
-                return Err(refusal(
-                    Code::UnsupportedCapability,
-                    "removing a Numbers table needs a leaf table-deletion transaction (IWORK_API_REQUESTS.md request 5)",
-                ));
-            },
+            "sheet" => sheets.push(sheet),
+            "table" => tables.push((sheet, table)),
             _ => return Err(element_refusal("remove", node)),
         }
     }
@@ -1185,6 +1423,38 @@ pub(crate) fn remove(
         push(&mut chain, commit.into_package(), Patch::Merges(patch));
     }
     commit_cells(&mut chain, cells)?;
+    // Whole tables, then whole sheets, each from the last so the earlier
+    // positions hold. A table of a removed sheet goes with the sheet.
+    sheets.sort_unstable();
+    sheets.dedup();
+    tables.retain(|(sheet, _)| !sheets.contains(sheet));
+    tables.sort_unstable();
+    tables.dedup();
+    for (sheet, table) in tables.iter().rev() {
+        let error = |error| edit_error(EditError::TableLifecycle(error));
+        let commit = chain
+            .package
+            .edit_table_lifecycle(SheetSelector::index(*sheet))
+            .map_err(error)?
+            .remove(TableSelector::index(*table))
+            .map_err(error)?
+            .commit()
+            .map_err(error)?;
+        let (next, patch) = commit.into_parts();
+        push(&mut chain, next, Patch::TableLifecycle(patch));
+    }
+    for sheet in sheets.iter().rev() {
+        let error = |error| edit_error(EditError::SheetLifecycle(error));
+        let commit = chain
+            .package
+            .edit_sheet_lifecycle()
+            .remove(SheetSelector::index(*sheet))
+            .map_err(error)?
+            .commit()
+            .map_err(error)?;
+        let (next, patch) = commit.into_parts();
+        push(&mut chain, next, Patch::SheetLifecycle(patch));
+    }
     finish(
         file,
         chain.changed,
@@ -1240,10 +1510,44 @@ pub(crate) fn move_to(
         },
         "table" => {
             let crate::Placement::Into(destination_path, position) = placement else {
-                return Err(refusal(
-                    Code::UnsupportedCapability,
-                    "a Numbers table moves into another sheet (`Placement::Into`), where it is appended; the leaf does not reorder tables within a sheet",
-                ));
+                // Within its sheet.
+                let [sheet, table, _, _] = node.item().leaf().map(|value| value as usize);
+                let count = package
+                    .sheets()
+                    .get(sheet)
+                    .map_or(0, |sheet| sheet.table_count());
+                let to = destination(table, count, placement, |anchor| {
+                    let anchor = node_at::<Numbers>(file, anchor)?;
+                    let [anchor_sheet, anchor_table, _, _] =
+                        anchor.item().leaf().map(|value| value as usize);
+                    if anchor.item().type_name() == "table" && anchor_sheet == sheet {
+                        Ok(anchor_table)
+                    } else {
+                        Err(refusal(
+                            Code::InvalidArgument,
+                            "a table moves before or after another table of its sheet; use `Placement::Into` for another sheet",
+                        ))
+                    }
+                })?;
+                let error = |error| edit_error(EditError::TableOrder(error));
+                let commit = package
+                    .edit_table_order(SheetSelector::index(sheet))
+                    .map_err(error)?
+                    .move_table(TableSelector::index(table), to)
+                    .map_err(error)?
+                    .commit()
+                    .map_err(error)?;
+                let (next, patch) = commit.into_parts();
+                push(&mut chain, next, Patch::TableOrder(patch));
+                bound(LimitKind::Operations, 1, limits.max_operations())?;
+                return finish(
+                    file,
+                    chain.changed,
+                    Owner::Numbers(chain.package),
+                    chain.patches,
+                    1,
+                    limits,
+                );
             };
             let destination = node_at::<Numbers>(file, destination_path)?;
             if destination.item().type_name() != "sheet" {

@@ -42,6 +42,9 @@ pub enum LeafError {
     /// A Pages document-properties transaction failed.
     #[cfg(feature = "pages")]
     PagesMetadata(litchi_pages::metadata::Error),
+    /// Saving a Pages package directory failed (record 0301).
+    #[cfg(feature = "pages")]
+    PagesSave(litchi_pages::SaveError),
     /// A Pages body-table deletion failed.
     #[cfg(feature = "pages")]
     PagesTableDeletion(litchi_pages::table::deletion::Error),
@@ -105,6 +108,8 @@ impl fmt::Display for LeafError {
             #[cfg(feature = "pages")]
             Self::PagesMetadata(error) => error.fmt(formatter),
             #[cfg(feature = "pages")]
+            Self::PagesSave(error) => error.fmt(formatter),
+            #[cfg(feature = "pages")]
             Self::PagesTableDeletion(error) => error.fmt(formatter),
             #[cfg(feature = "keynote")]
             Self::Keynote(error) => error.fmt(formatter),
@@ -154,6 +159,8 @@ impl std::error::Error for LeafError {
             Self::PagesFootnotes(error) => Some(error),
             #[cfg(feature = "pages")]
             Self::PagesMetadata(error) => Some(error),
+            #[cfg(feature = "pages")]
+            Self::PagesSave(error) => Some(error),
             #[cfg(feature = "pages")]
             Self::PagesTableDeletion(error) => Some(error),
             #[cfg(feature = "keynote")]
@@ -211,6 +218,12 @@ impl LeafError {
             Self::PagesFootnotes(error) => pages_footnotes_code(error),
             #[cfg(feature = "pages")]
             Self::PagesMetadata(error) => pages_metadata_code(error),
+            #[cfg(feature = "pages")]
+            Self::PagesSave(error) => match error.write_error() {
+                Some(_) => Code::IoError,
+                None if matches!(error, litchi_pages::SaveError::Bundle(_)) => Code::InvalidInput,
+                None => Code::IoError,
+            },
             #[cfg(feature = "pages")]
             Self::PagesTableDeletion(error) => pages_deletion_code(error),
             #[cfg(feature = "keynote")]

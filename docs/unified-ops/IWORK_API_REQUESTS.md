@@ -233,3 +233,52 @@ cell-write transaction; the Numbers writer is not shared), directory
 save-back to the bundle form, and `litchi::iwork::Document` removal
 (blocked on the Keynote and Numbers directory and table gaps, records
 0297–0298).
+
+## 2026-10-16 iWork structure (record 0301)
+
+Record 0301 adds structural leaf transactions and wires them into
+`File::Numbers` and `File::Pages`. Status:
+
+- **4 (Numbers): done.** `sheet::lifecycle` (`Package::{edit_sheet_lifecycle,
+  apply_sheet_lifecycle}`): add an empty sheet (the first sheet's settings
+  without its private objects, a sidebar node) and remove a sheet with its
+  tables. A sheet that holds charts, media or shapes is refused
+  (`SheetNotEmpty`).
+- **5 (Numbers): done**, with one gap. `table::lifecycle`: add an empty
+  table (the workbook's first table's structure, emptied storage, a fresh
+  UUID, a CalculationEngine owner with the native range contexts, a
+  sidebar node) and remove a table with its private graph and formula
+  owners (the TSCE phase ported from the Pages body-table deletion). Open:
+  a workbook without any table (`NoTemplate`), and a removal on a formula
+  graph the ported phase does not rewrite (a range tile with several
+  from-to ranges) is refused, typed.
+- **In-sheet table order: done.** `table::order` (`Package::edit_table_order`).
+- **Multi-table cell writes** (found while testing): the table-cell writer
+  refused every multi-table workbook (another table's undeclared native
+  owner back-reference, and inert foreign owners without geometry). Both
+  are accepted now; a workbook with formulas in another table still refuses
+  a write (`UnsupportedDependency { FormulaCache }`): the cache planner
+  needs every formula-bearing table's geometry.
+- **6: open.** Row and column insert/delete: the host closure is 9–12k
+  lines (formula dependency shifting, tiles, UID maps, stroke layers,
+  merges, headers); not ported.
+- **7, 19, cross-table formulas: open** (unchanged).
+- **18: open, narrowed.** The blank's table owner lacks the native
+  total/body range contexts (the cache planner refuses empty ones); with
+  them added, formula authoring on the blank then fails one reference short
+  in the formula-metadata planner's exact execution budget
+  (`LimitExceeded { References, observed 9, maximum 8 }`). The asset was
+  not changed.
+- **16 (Pages): done.** `Package::save_directory` writes the bundle form
+  (`Index.zip` with the `Index/` records unchanged, every other member a
+  file) through a sibling staging directory; reopening gives the same
+  single-file bytes. A `File::Pages` opened from a directory keeps it as
+  its origin, so `save()` writes the directory back.
+- **Pages anchored paragraphs: partly done.** `Package::section_paragraph_tables`
+  maps each paragraph to the body tables it anchors; unified `remove` of a
+  paragraph whose every anchor is a body table removes the tables first.
+  Paragraphs anchoring charts, images or footnotes, and moving any anchored
+  paragraph, stay refused.
+- **11, 13, Pages table cells/creation: open.** Section add/remove (the host
+  clones the section's page-master graph and inserts a U+0004 break through
+  its text editor), text runs, and a Pages cell writer were not ported.

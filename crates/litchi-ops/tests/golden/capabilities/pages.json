@@ -673,10 +673,10 @@
       "subject": "operation",
       "verb": "remove",
       "element": "p",
-      "context": "a paragraph that anchors an object",
+      "context": "a paragraph that anchors a chart, image or footnote",
       "code": "unsupported_capability",
-      "followUp": "remove the anchored object (`tbl`) itself",
-      "reason": "removing or moving the paragraph would delete or move the inline table, chart, image or footnote it anchors"
+      "followUp": "record 0301 follow-up: delete those anchored objects with their paragraph",
+      "reason": "a paragraph whose anchors are all body tables is removed with its tables (record 0301); removing one that anchors a chart, image or footnote, or moving any anchored paragraph, would delete or move an object the leaf has no transaction for here"
     },
     {
       "subject": "operation",

@@ -35,7 +35,7 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 | odf | 2 | 19 | 19 | 0 | 0 | 0 | 3 | 2 | 0 |
 | pages | 11 | 85 | 85 | 0 | 0 | 0 | 36 | 2 | 14 |
 | keynote | 4 | 26 | 21 | 1 | 4 | 12 | 10 | 0 | 1 |
-| numbers | 5 | 41 | 41 | 0 | 0 | 5 | 14 | 1 | 1 |
+| numbers | 5 | 45 | 45 | 0 | 0 | 5 | 10 | 2 | 1 |
 
 ## docx
 
@@ -579,14 +579,14 @@ Claimed cells count the per-element `get`/`find`/`query`/`view`/`set`/
 
 ## numbers
 
-- fixtures: `create()`, `iwork/numbers/basic.numbers`, `iwork/numbers/cell-value-native.numbers`, `iwork/numbers/table-merges-native.numbers`, `iwork/numbers/table-relocation-native.numbers`, `create() + add mergeCell`
+- fixtures: `create()`, `iwork/numbers/basic.numbers`, `iwork/numbers/cell-value-native.numbers`, `iwork/numbers/table-merges-native.numbers`, `iwork/numbers/table-relocation-native.numbers`, `create() + add sheet`, `create() + add sheet + add table`, `create() + add mergeCell`
 - document views on `iwork/numbers/basic.numbers`: text ok, annotated ok, outline ok, stats ok, issues gap (unsupported_capability), forms gap (unsupported_capability), html gap (unsupported_capability), svg gap (unsupported_capability), screenshot gap (unsupported_capability), pdf gap (unsupported_capability)
 
 | element | get | find | query | view | set | add | remove | move | swap | edit | batch | create | save |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | workbook | ok | ok | n/a | ok | n/a | n/a | n/a | no pair | gap | n/a | n/a | ok | ok |
-| sheet | ok | ok | ok | ok | ok | n/a | n/a | ok | gap | ok | ok | ok | ok |
-| table | ok | ok | ok | ok | ok | n/a | n/a | no pair | gap | ok | ok | ok | ok |
+| sheet | ok | ok | ok | ok | ok | ok | ok | ok | gap | ok | ok | ok | ok |
+| table | ok | ok | ok | ok | ok | ok | ok | ok | gap | ok | ok | ok | ok |
 | cell | ok | ok | ok | ok | ok | n/a | ok | refused | gap | ok | ok | ok | ok |
 | mergeCell | ok | ok | ok | ok | n/a | ok | ok | no pair | gap | n/a | n/a | ok | ok |
 

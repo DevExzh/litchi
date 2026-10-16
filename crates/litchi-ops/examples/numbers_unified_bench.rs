@@ -1,4 +1,4 @@
-//! Paired leaf and unified Numbers timings (record 0297).
+//! Paired leaf and unified Numbers timings (records 0297 and 0301).
 //!
 //! Scenarios, each on the same input bytes for both legs:
 //!
@@ -16,6 +16,11 @@
 //!   `mergeCell`;
 //! - `sheet_move`: leaf `edit_sheet_order` + `move_sheet`; unified
 //!   `move_to(.., Placement::Start)` (on the two-sheet fixture).
+//! - record 0301: `sheet_add` (leaf `edit_sheet_lifecycle().add`; unified
+//!   `add("/", sheet)`), `sheet_remove` (an empty sheet), `table_add` (leaf
+//!   `edit_table_lifecycle(..).add`; unified `add("/sheet[1]", table)`),
+//!   `table_remove` (the grid's table) and `table_move` (leaf
+//!   `edit_table_order`; unified in-sheet `move_to`), on the grid fixture.
 //!
 //! Legs run in ABBA order per sample after a warm-up; outputs of every
 //! write scenario are compared byte for byte before timing (the merge by
@@ -423,6 +428,127 @@ mod enabled {
             Some(same),
             || time(|| leaf_move(&native)),
             || time(|| unified_move(&native_file)),
+        ));
+
+        // Record 0301: structural operations on the grid.
+        let leaf_sheet_add = |package: &Package| {
+            package
+                .edit_sheet_lifecycle()
+                .add("Added")
+                .expect("add")
+                .commit()
+                .expect("commit")
+                .into_package()
+        };
+        let unified_sheet_add = |file: &File| {
+            file.add("/", NewNode::new("sheet").prop("name", "Added"))
+                .expect("add sheet")
+                .into_file()
+        };
+        let same = leaf_bytes(&leaf_sheet_add(&leaf))
+            == unified_sheet_add(&file).to_bytes().expect("bytes");
+        scenarios.extend(abba(
+            "sheet_add",
+            GRID,
+            rounds,
+            Some(same),
+            || time(|| leaf_sheet_add(&leaf)),
+            || time(|| unified_sheet_add(&file)),
+        ));
+        let two = leaf_sheet_add(&leaf);
+        let two_file = litchi_ops::open_bytes(leaf_bytes(&two)).expect("open two");
+        let leaf_sheet_remove = |package: &Package| {
+            package
+                .edit_sheet_lifecycle()
+                .remove(1_usize)
+                .expect("remove")
+                .commit()
+                .expect("commit")
+                .into_package()
+        };
+        let unified_sheet_remove = |file: &File| file.remove("/sheet[2]").expect("remove sheet");
+        let same = leaf_bytes(&leaf_sheet_remove(&two))
+            == unified_sheet_remove(&two_file).to_bytes().expect("bytes");
+        scenarios.extend(abba(
+            "sheet_remove",
+            GRID,
+            rounds,
+            Some(same),
+            || time(|| leaf_sheet_remove(&two)),
+            || time(|| unified_sheet_remove(&two_file)),
+        ));
+        let leaf_table_add = |package: &Package| {
+            package
+                .edit_table_lifecycle(0_usize)
+                .expect("edit")
+                .add("Added", 10, 5)
+                .expect("add")
+                .commit()
+                .expect("commit")
+                .into_package()
+        };
+        let unified_table_add = |file: &File| {
+            file.add("/sheet[1]", NewNode::new("table").prop("name", "Added"))
+                .expect("add table")
+                .into_file()
+        };
+        let same = leaf_bytes(&leaf_table_add(&leaf))
+            == unified_table_add(&file).to_bytes().expect("bytes");
+        scenarios.extend(abba(
+            "table_add",
+            GRID,
+            rounds,
+            Some(same),
+            || time(|| leaf_table_add(&leaf)),
+            || time(|| unified_table_add(&file)),
+        ));
+        let leaf_table_remove = |package: &Package| {
+            package
+                .edit_table_lifecycle(0_usize)
+                .expect("edit")
+                .remove(0_usize)
+                .expect("remove")
+                .commit()
+                .expect("commit")
+                .into_package()
+        };
+        let unified_table_remove =
+            |file: &File| file.remove("/sheet[1]/table[1]").expect("remove table");
+        let same = leaf_bytes(&leaf_table_remove(&leaf))
+            == unified_table_remove(&file).to_bytes().expect("bytes");
+        scenarios.extend(abba(
+            "table_remove",
+            GRID,
+            rounds,
+            Some(same),
+            || time(|| leaf_table_remove(&leaf)),
+            || time(|| unified_table_remove(&file)),
+        ));
+        let tables = leaf_table_add(&leaf);
+        let tables_file = litchi_ops::open_bytes(leaf_bytes(&tables)).expect("open tables");
+        let leaf_table_move = |package: &Package| {
+            package
+                .edit_table_order(0_usize)
+                .expect("edit")
+                .move_table(1_usize, 0)
+                .expect("move")
+                .commit()
+                .expect("commit")
+                .into_package()
+        };
+        let unified_table_move = |file: &File| {
+            file.move_to("/sheet[1]/table[2]", Placement::Start)
+                .expect("move table")
+        };
+        let same = leaf_bytes(&leaf_table_move(&tables))
+            == unified_table_move(&tables_file).to_bytes().expect("bytes");
+        scenarios.extend(abba(
+            "table_move",
+            GRID,
+            rounds,
+            Some(same),
+            || time(|| leaf_table_move(&tables)),
+            || time(|| unified_table_move(&tables_file)),
         ));
 
         let report = Report {
