@@ -10219,6 +10219,7 @@
         "litchi_pages::metadata",
         "litchi_pages::document_settings",
         "litchi_pages::section::text",
+        "litchi_pages::section::text_style",
         "litchi_pages::section::name",
         "litchi_pages::section::settings",
         "litchi_pages::section::background",

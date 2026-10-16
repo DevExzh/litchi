@@ -2431,7 +2431,7 @@ ADR 0034 W1 for `litchi-keynote`, part 4 (slide drawables):
 | `Package::edit_slide_drawables() -> drawable::Edit<'_>` | Several operations per edit, one workspace, one commit; selectors resolve against the base snapshot | ✅ 0298 |
 | `Edit::{set_geometry, remove, move_to}(slide, drawable, …)` | `move_to` takes the back-to-front z-order `Position`; owned order (and so selectors) unchanged | ✅ 0298 |
 | `Edit::{add_text_box(slide, Geometry, &str), add_shape(slide, Preset, Geometry, &str), add_image(slide, &[u8], &str, Geometry)}` | `drawable::Preset::{Rectangle, RoundedRectangle { radius }, Ellipse}`; `ImageFormat::{Png, Jpeg, Gif}` sniffed; `Commit::created() -> &[Created { slide(), drawable() }]` | ✅ 0298 |
-| `Edit::set_text_style(slide, drawable, TextSpan, Style)` | Validates, then typed `Error::Unsupported { reason: Unsupported::TextStyling }`; `Package::slide_drawable_text_runs` reads `TextRun { span, text, style }` | 🔴 write refused (0298) |
+| `Edit::set_text_style(slide, drawable, TextSpan, Style)` | Each run in the span gets a `TSWP.CharacterStyleArchive` variation of its style in the storage's stylesheet; `Unsupported::TextStyling` only for a style that sets nothing; `Package::slide_drawable_text_runs` reads `TextRun { span, text, style }` with the parent chain resolved | ✅ 0309 (refused in 0298) |
 | `Package::apply_slide_drawables(&Patch)` | Exact source check, reopen; `Patch::{is_noop, inverse, operations}` | ✅ 0298 |
 
 ## Numbers structure (record 0301)
@@ -2460,6 +2460,13 @@ Both profiles now register 30 families.
 | `Package::apply_table_topology(&Patch)` | Exact source check; `Patch::{is_noop, inverse}` | ✅ 0309 |
 | `topology::Error::Unsupported { reason: Unsupported }` | `Formulas`, `ReferencedByOtherOwners`, `Merges`, `Filters`, `Categories`, `Pivot`, `SortRules`, `HiddenAxis`, `Borders`, `Comments`, `StorageLayout` | ✅ 0309 |
 | `litchi_numbers_wire::{ListKind, BncCell::list_keys}` | The table data lists a BNC cell's keys index | ✅ 0309 |
+
+## iWork character styling (record 0309)
+
+| Canonical name | Notes | Status |
+| --- | --- | --- |
+| `litchi_iwa_text_wire::{CharacterProperties, CharStyleRun, CharStyleError, char_style_runs, styles_in_span, restyle_span, character_style_variation, character_style_properties, character_style_parent, stylesheet_with_style}` | Shared TSWP `table_char_style` runs and the character-style variation records a span restyle writes | ✅ 0309 |
+| `litchi_pages::section::text_style::{Edit, Patch, Commit, Diagnostics, Error, LimitKind, Run, CharacterProperties}` | Registered family in `pages`; `Package::{edit_section_text_style, apply_section_text_style, section_text_runs}`; `Edit::set(TextSpan, CharacterProperties)` (UTF-16, several per edit) | ✅ 0309 |
 
 ## iWork facade retirement and iWork open options (record 0306)
 

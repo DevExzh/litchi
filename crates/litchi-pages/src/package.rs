@@ -37,6 +37,7 @@ pub(crate) mod section_pagination;
 pub(crate) mod section_paragraphs;
 pub(crate) mod section_settings;
 pub(crate) mod section_text;
+pub(crate) mod section_text_style;
 mod section_transaction;
 pub(crate) mod sidecars;
 pub(crate) mod table_cells;
