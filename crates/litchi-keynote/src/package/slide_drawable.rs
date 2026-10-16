@@ -1004,6 +1004,33 @@ impl<'a> Edit<'a> {
         Ok(self)
     }
 
+    /// Whether a sequence of text sets of one text box or shape, each a
+    /// splice within `hull` (UTF-16 code units of the drawable's text in
+    /// the source package, both ends inclusive), publishes exactly what one
+    /// splice from the text before them to the text after them publishes
+    /// (record 0314). `false` asks the caller to commit the sets one at a
+    /// time. Whether a later set follows an emptied text is the caller's to
+    /// check.
+    ///
+    /// # Errors
+    ///
+    /// Typed selector errors, and [`Error::Unsupported`] for drawables other
+    /// than text boxes and shapes.
+    pub fn text_admits_combined_splice<'s>(
+        &mut self,
+        slide: impl Into<SlideSelector<'s>>,
+        drawable: impl Into<DrawableSelector>,
+        hull: std::ops::Range<usize>,
+    ) -> Result<bool, Error> {
+        let (_, item) = self.drawable(slide.into(), drawable.into())?;
+        let (Kind::TextBox | Kind::Shape, Some(storage)) = (item.kind, item.storage) else {
+            return Err(Error::Unsupported {
+                reason: Unsupported::Kind { kind: item.kind },
+            });
+        };
+        stage::storage_admits_combined_splice(self.source, storage, hull)
+    }
+
     /// Stage new plain text for one text box or shape.
     ///
     /// The commit rewrites only the changed span of the drawable's own text

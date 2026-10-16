@@ -3852,6 +3852,65 @@ mod tests {
             .unwrap_or_default()
     }
 
+    /// A storage "ab\ncd\nef" whose paragraph-style table (field 5) holds
+    /// entries at `starts`, and a language table (field 19) at zero.
+    fn paragraphs_storage(starts: &[u32]) -> Vec<u8> {
+        let mut source = raw_length_delimited(3, b"ab\ncd\nef");
+        let entries: Vec<(u32, Option<u64>)> = starts
+            .iter()
+            .map(|&start| (start, Some(40 + u64::from(start))))
+            .collect();
+        source.extend_from_slice(&raw_length_delimited(
+            5,
+            &object_table(&entries).encode_to_vec(),
+        ));
+        source.extend_from_slice(&raw_length_delimited(
+            19,
+            &string_table(&[0]).encode_to_vec(),
+        ));
+        source
+    }
+
+    /// Record 0314: the boundaries admit a combined splice exactly where
+    /// one splice publishes what the splices publish one at a time.
+    #[test]
+    fn boundaries_admit_combined_splices_that_equal_their_sequence() {
+        let limits = RewriteLimits::default();
+        // Two paragraph sets: "ab" -> "AB" (0..2), then "cd" -> "CD" (3..5).
+        let sequence = |source: &[u8]| {
+            let first = rewrite(source, 0..2, "AB");
+            rewrite(first.bytes(), 3..5, "CD").into_bytes()
+        };
+        let combined = |source: &[u8]| rewrite(source, 0..5, "AB\nCD").into_bytes();
+
+        let shared = paragraphs_storage(&[0]);
+        let boundaries = storage_boundaries_with_limits(&shared, limits).expect("boundaries");
+        assert!(boundaries.admits_combined_splice(0..5));
+        assert_eq!(combined(&shared), sequence(&shared));
+
+        let per_paragraph = paragraphs_storage(&[0, 3, 6]);
+        let boundaries =
+            storage_boundaries_with_limits(&per_paragraph, limits).expect("boundaries");
+        assert!(!boundaries.admits_combined_splice(0..5));
+        assert_ne!(combined(&per_paragraph), sequence(&per_paragraph));
+        // One paragraph's own region: its start entry is kept either way.
+        assert!(boundaries.admits_combined_splice(3..5));
+        assert!(boundaries.admits_combined_splice(0..2));
+
+        // Several fragments and overlapping ranges are refused.
+        let mut fragments = raw_length_delimited(3, b"ab");
+        fragments.extend_from_slice(&raw_length_delimited(3, b"\ncd"));
+        let boundaries = storage_boundaries_with_limits(&fragments, limits).expect("boundaries");
+        assert!(!boundaries.admits_combined_splice(0..1));
+        let mut ranged = raw_length_delimited(3, b"abcd");
+        ranged.extend_from_slice(&raw_length_delimited(
+            25,
+            &overlapping_table(70).encode_to_vec(),
+        ));
+        let boundaries = storage_boundaries_with_limits(&ranged, limits).expect("boundaries");
+        assert!(!boundaries.admits_combined_splice(0..2));
+    }
+
     #[test]
     fn exact_semantic_no_op_keeps_fragments_tables_and_unknowns() {
         let mut source = raw_length_delimited(3, b"A");
@@ -4948,4 +5007,122 @@ mod tests {
             Err(RewriteError::InvalidFormat(message)) if message.contains("wire type")
         ));
     }
+}
+
+/// Where a validated storage's attribute tables place their entries, in
+/// UTF-16 code units of its text: what decides whether several splices of
+/// the text can be published as one (record 0314).
+///
+/// One storage rewrite takes one splice. A caller that wants to publish a
+/// sequence of edits of one text (each paragraph of a batch, say) as one
+/// splice from the first text to the last must publish exactly what the
+/// edits publish one at a time. That holds when no attribute entry lies
+/// where the two differ: every table entry the splices could drop, merge or
+/// move differently. [`Self::admits_combined_splice`] answers it for the
+/// hull of the edits.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StorageBoundaries {
+    /// Entries of index tables a splice starting at their index keeps.
+    retained: Vec<u32>,
+    /// Entries of index tables a splice starting at their index drops, or
+    /// that a splice may normalize or remove with their table.
+    dropped: Vec<u32>,
+    /// Overlapping ranges, as `start..end`.
+    ranges: Vec<(u32, u32)>,
+    fragments: usize,
+}
+
+impl StorageBoundaries {
+    /// Whether every sequence of splices whose spans lie within `hull` (UTF-16
+    /// code units of the text, both ends inclusive) publishes exactly what one
+    /// splice from the sequence's first text to its last publishes.
+    ///
+    /// The answer is conservative: `false` means the caller publishes the
+    /// splices one at a time. It is `true` when the text is held in at most
+    /// one fragment, no index-table entry lies in `(hull.start, hull.end]`,
+    /// no entry a splice drops lies at `hull.start`, and no overlapping range
+    /// meets the hull. Whether an intermediate text is empty is the caller's
+    /// to check (an emptied text loses its field, which a later splice adds
+    /// back last).
+    #[must_use]
+    pub fn admits_combined_splice(&self, hull: Range<usize>) -> bool {
+        if self.fragments > 1 || hull.start > hull.end {
+            return false;
+        }
+        let inside = |index: u32| {
+            usize::try_from(index).is_ok_and(|index| index > hull.start && index <= hull.end)
+        };
+        let at_or_inside = |index: u32| {
+            usize::try_from(index).is_ok_and(|index| index >= hull.start && index <= hull.end)
+        };
+        !self.retained.iter().copied().any(inside)
+            && !self.dropped.iter().copied().any(at_or_inside)
+            && !self.ranges.iter().any(|&(start, end)| {
+                usize::try_from(start).is_ok_and(|start| start <= hull.end)
+                    && usize::try_from(end).is_ok_and(|end| end >= hull.start)
+            })
+    }
+}
+
+/// Read the attribute boundaries of one `TSWP.StorageArchive` payload: one
+/// bounded scan of its root fields and table entries.
+///
+/// The scan only reads; it does not validate the storage the way a rewrite
+/// does (a caller publishes through a rewrite, which validates the complete
+/// tree). A malformed entry is an error.
+///
+/// # Errors
+///
+/// A typed bounded wire error for a malformed field, entry or range, or an
+/// exceeded limit.
+pub fn storage_boundaries_with_limits(
+    source: &[u8],
+    limits: RewriteLimits,
+) -> RewriteResult<StorageBoundaries> {
+    let mut boundaries = StorageBoundaries {
+        retained: Vec::new(),
+        dropped: Vec::new(),
+        ranges: Vec::new(),
+        fragments: 0,
+    };
+    let mut fields = RawFields::new(source, limits)?;
+    while let Some(field) = fields.next()? {
+        let number = field.number();
+        if number == ROOT_TEXT_FIELD {
+            boundaries.fragments = checked_add(boundaries.fragments, 1, "text fragments")?;
+            continue;
+        }
+        if !is_table_field(number) {
+            continue;
+        }
+        let policy = TablePolicy::for_field(number)
+            .ok_or_else(|| invalid("recognized table has no rewrite policy"))?;
+        let table = field.canonical_payload(2, "TSWP storage table")?;
+        let mut entries = RawFields::new(table, limits)?;
+        while let Some(entry) = entries.next()? {
+            if entry.number() != TABLE_ENTRY_FIELD {
+                continue;
+            }
+            let payload = entry.canonical_payload(2, "TSWP table entry")?;
+            match policy.entry_kind() {
+                None => {
+                    let inspected = inspect_overlapping_entry(payload, limits)?;
+                    let end = inspected
+                        .start
+                        .checked_add(inspected.length)
+                        .ok_or_else(|| arithmetic("overlapping range end"))?;
+                    boundaries.ranges.push((inspected.start, end));
+                },
+                Some(kind) => {
+                    let index = inspect_index_entry(payload, kind, limits)?.index;
+                    if policy.retain_start() {
+                        boundaries.retained.push(index);
+                    } else {
+                        boundaries.dropped.push(index);
+                    }
+                },
+            }
+        }
+    }
+    Ok(boundaries)
 }

@@ -13,6 +13,9 @@
 //!   identity). Leaf: one `edit_section_paragraphs` edit with N `set`s and
 //!   one commit; unified: `File::edit` with N `tx.set("/body/p[i]", text)`
 //!   calls, which coalesce into one leaf paragraph transaction.
+//! - record 0314: `batch_1000_parsed` and `batch_10000_parsed`, the same
+//!   batches with every path parsed once outside the clock (the unified leg
+//!   passes `&TargetArg`).
 //! - record 0309: `paragraph_font` (bold on the first paragraph of
 //!   `basic.pages`; leaf `edit_section_text_style` + `set` of its span;
 //!   unified `set` of `font.bold`) and `table_cell` (a text value in the
@@ -363,6 +366,56 @@ fn main() {
                             .edit(|tx| {
                                 for (path, text) in paths.iter().zip(texts.iter()) {
                                     tx.set(path.as_str(), props! { "text" => text.as_str() })?;
+                                }
+                                Ok(())
+                            })
+                            .unwrap();
+                        assert_eq!(commit.diagnostics.commits(), 1);
+                        black_box(commit);
+                    },
+                )
+            }),
+        });
+    }
+    // Record 0314: the same batches with each path parsed once, outside the
+    // clock (`TargetArg::parse`; `&TargetArg` reruns without parsing).
+    for count in [1_000_usize, 10_000] {
+        let targets: Vec<litchi_ops::TargetArg<'static>> = (1..=count)
+            .map(|index| {
+                let text: &'static str = Box::leak(format!("/body/p[{index}]").into_boxed_str());
+                litchi_ops::TargetArg::parse(text).unwrap()
+            })
+            .collect();
+        let texts: Vec<String> = (0..count).map(|index| format!("Edited {index}")).collect();
+        let (targets, texts) = (std::rc::Rc::new(targets), std::rc::Rc::new(texts));
+        let (leaf_texts, unified_texts) = (texts.clone(), texts.clone());
+        scenarios.push(Scenario {
+            name: format!("batch_{count}_parsed"),
+            iterations: (iterations / 4).max(3),
+            leaf: Box::new(move |n| {
+                let texts = leaf_texts.clone();
+                leg(
+                    n,
+                    || Package::from_bytes(large_ref).unwrap(),
+                    |package| {
+                        paragraph_edit(&package, |edit| {
+                            for (index, text) in texts.iter().enumerate() {
+                                edit.set(Position::new(index), text).unwrap();
+                            }
+                        });
+                    },
+                )
+            }),
+            unified: Box::new(move |n| {
+                let (targets, texts) = (targets.clone(), unified_texts.clone());
+                leg(
+                    n,
+                    || litchi_ops::open_bytes(large_ref.clone()).unwrap(),
+                    |file| {
+                        let commit = file
+                            .edit(|tx| {
+                                for (target, text) in targets.iter().zip(texts.iter()) {
+                                    tx.set(target, props! { "text" => text.as_str() })?;
                                 }
                                 Ok(())
                             })

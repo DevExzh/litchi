@@ -10,6 +10,9 @@
 //! - `batch_N`: N distinct cell values (leaf: one `edit_table_cells` with N
 //!   changes; unified: one atomic `File::batch` of N `set` items, coalesced
 //!   into one leaf commit);
+//! - record 0314: `batch_N_owned` (the batch items copied outside the
+//!   clock) and `batch_N_parsed` (one `File::edit` of the same assignments,
+//!   each path parsed once outside the clock);
 //! - `rename_sheet`: leaf `edit_names` + `rename_sheet`; unified `set` of the
 //!   sheet `name`;
 //! - `merge_add`: leaf `edit_table_merges` + `merge`; unified `add` of a
@@ -321,6 +324,46 @@ mod enabled {
             Some(same),
             || time(|| leaf_batch(&leaf, &cells)),
             || time(|| unified_batch(&file, &items)),
+        ));
+        // Record 0314: the batch with its items copied outside the clock
+        // (`File::batch` takes them by value), and the same assignments in
+        // one `File::edit` with each path parsed once outside the clock.
+        scenarios.extend(abba(
+            format!("batch_{BATCH}_owned"),
+            GRID,
+            rounds,
+            Some(same),
+            || time(|| leaf_batch(&leaf, &cells)),
+            || {
+                let (file, owned) = (&file, items.to_vec());
+                time(move || file.batch(owned, BatchMode::Atomic).expect("batch").file)
+            },
+        ));
+        let targets: Vec<litchi_ops::TargetArg<'_>> = items
+            .iter()
+            .map(|item| {
+                litchi_ops::TargetArg::parse(item.path.as_deref().expect("path")).expect("target")
+            })
+            .collect();
+        let unified_parsed = |file: &File| {
+            file.edit(|tx| {
+                for (target, (_, _, value)) in targets.iter().zip(&cells) {
+                    tx.set(target, props! { "value" => *value })?;
+                }
+                Ok(())
+            })
+            .expect("edit")
+            .file
+        };
+        let same_parsed = leaf_bytes(&leaf_batch(&leaf, &cells))
+            == unified_parsed(&file).to_bytes().expect("bytes");
+        scenarios.extend(abba(
+            format!("batch_{BATCH}_parsed"),
+            GRID,
+            rounds,
+            Some(same_parsed),
+            || time(|| leaf_batch(&leaf, &cells)),
+            || time(|| unified_parsed(&file)),
         ));
 
         let formulas = fixture(FORMULAS);

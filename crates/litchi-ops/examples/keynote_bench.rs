@@ -17,6 +17,8 @@
 //!   slide-text commit. The leaf leg hand-writes the same leaf work: one
 //!   `edit_slide_text` replacing the changed span with the final body text
 //!   and one `edit_slide_drawables` with the final frame;
+//! - record 0314: `batch_1000_parsed`, the same batch with every path
+//!   parsed once outside the clock (the unified leg passes `&TargetArg`);
 //! - `duplicate`, `add_slide`, `add_textbox`, `remove_slide`: one
 //!   structural operation (leaf: `edit_slide_creation` with
 //!   `duplicate_slide` / `add_slide` from the default layout,
@@ -174,6 +176,17 @@ fn main() {
         .map(|(_, _, value)| value.trim_end_matches("pt").parse::<f32>().unwrap())
         .unwrap();
     let final_body = &final_body;
+    let parsed: Vec<(litchi_ops::TargetArg<'_>, &str, String)> = batch
+        .iter()
+        .map(|(path, key, value)| {
+            (
+                litchi_ops::TargetArg::parse(path.as_str()).unwrap(),
+                *key,
+                value.clone(),
+            )
+        })
+        .collect();
+    let parsed = &parsed;
     let frame = package()
         .slide_drawable_list(SlideSelector::index(0))
         .unwrap()[0]
@@ -445,6 +458,49 @@ fn main() {
                         .edit(|tx| {
                             for (path, key, value) in batch {
                                 tx.set(path.as_str(), props! { *key => value.as_str() })?;
+                            }
+                            Ok(())
+                        })
+                        .unwrap();
+                    assert_eq!(commit.diagnostics.commits(), 1);
+                    black_box(commit);
+                })
+            }),
+        },
+        // Record 0314: the same batch with each path parsed once, outside
+        // the clock (`&TargetArg` reruns without parsing).
+        Scenario {
+            name: "batch_1000_parsed",
+            leaf: Box::new(move |n| {
+                leg(n, package, |package| {
+                    let commit = {
+                        let mut edit = package
+                            .edit_slide_text(SlideSelector::index(1), Role::Body)
+                            .unwrap();
+                        let (span, replacement) = span(edit.text(), final_body);
+                        edit.replace(span, replacement).unwrap();
+                        edit.commit().unwrap()
+                    };
+                    let package = commit.into_package();
+                    let mut edit = package.edit_slide_drawables();
+                    edit.set_geometry(
+                        SlideSelector::index(0),
+                        DrawableSelector::index(0),
+                        Geometry {
+                            x: final_x,
+                            ..frame
+                        },
+                    )
+                    .unwrap();
+                    drop(black_box(edit.commit().unwrap()));
+                })
+            }),
+            unified: Box::new(move |n| {
+                leg(n, file, |file| {
+                    let commit = file
+                        .edit(|tx| {
+                            for ((target, key, value), _) in parsed.iter().zip(batch) {
+                                tx.set(target, props! { *key => value.as_str() })?;
                             }
                             Ok(())
                         })

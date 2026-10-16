@@ -477,3 +477,43 @@ removal and stale thumbnail records; a readable placeholder `hidden`.
   (`validate_comment_message_metadata`). Not changed in this record.
 - **Still open:** Keynote and Pages table creation; Numbers topology on
   tables with formulas (the formula-coordinate shift is not ported).
+
+## 2026-10-16 batch equivalence and the open element gaps (record 0314)
+
+- **New leaf APIs (record 0314).** `litchi_iwa_text_wire::{StorageBoundaries,
+  storage_boundaries_with_limits}` read where a text storage's attribute
+  tables place their entries; `StorageBoundaries::admits_combined_splice`
+  answers whether a sequence of splices inside a region publishes what one
+  combined splice publishes. Keynote exposes it per text:
+  `slide_text::Edit::admits_combined_splice`,
+  `slide_notes::Edit::admits_combined_splice`,
+  `slide_drawable::Edit::text_admits_combined_splice`.
+- **Pages paragraph edits: fixed data loss.**
+  `section::paragraphs::Edit::commit` published several staged sets as one
+  splice from the first text to the last, which dropped the paragraph-style
+  entries of the paragraphs between the changed ones. It now publishes what
+  the operations publish one at a time: text sets share one splice only
+  where the boundaries prove it equal; structural operations and other
+  runs commit one transaction each.
+- **19 (Numbers comments): still open, diagnosed further.** The 31 refusals
+  are the package-wide census at `creation_graph` (more than one comment
+  list); the 6 others are the strict field-info rule of
+  `validate_comment_message_metadata` in mutation mode, applied to every
+  list in the workbook. Native packages keep each `TST.TableDataList` in
+  its own `Index/Tables/DataList-<id>.iwa`, the table model in
+  `Index/CalculationEngine.iwa`, tiles in `Index/Tables/Tile*.iwa`, and the
+  comment storages in `Index/Tables/DataList.iwa`
+  (`comment-reader-native-created.numbers`: list 905275 in its own member,
+  storage 905277 beside list 904482). Creation in that layout needs a new
+  data-list member with its registry entry and a cross-member reference
+  from the model; the strict same-member writer cannot express it.
+  Follow-up: a per-table census, a two-member writer (list member + tile
+  member) for tables that already own a list, then the new-member path.
+- **Numbers topology on tables with formulas: still open.** The retired
+  host editor's shift (`litchi-iwa/src/numbers/editor/formula_dependency_shift{,/ast,/wire}.rs`,
+  about 4,000 lines over Prost archives: dependency records, range
+  precedents, formula ASTs, incoming references from other owners) is the
+  reference; `litchi-numbers` works on exact wire replacements without
+  Prost, so the port is a rewrite. `Unsupported::{Formulas,
+  ReferencedByOtherOwners}` stay.
+- **Keynote and Pages table creation: not started.**
