@@ -19,7 +19,7 @@ was refused (typed), `none` nothing to move.
 | format | exact | differs | refused | error | signed-exact | signed-differs | signed-error | locked | revert byte-exact | revert value-exact | revert mismatch | revert one-way | revert refused | revert none | structure byte-exact | structure value-exact | structure mismatch | structure one-way | structure refused | structure none |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | doc | 44 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 0 | 37 | 0 | 0 | 4 | 3 | 0 | 0 | 0 | 0 | 0 | 0 |
-| docx | 69 | 0 | 1 | 0 | 3 | 0 | 0 | 3 | 36 | 0 | 0 | 0 | 5 | 28 | 0 | 0 | 0 | 0 | 0 | 0 |
+| docx | 74 | 0 | 0 | 0 | 3 | 0 | 0 | 3 | 39 | 0 | 0 | 0 | 6 | 29 | 0 | 0 | 0 | 0 | 0 | 0 |
 | keynote | 56 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 55 | 0 | 0 | 0 | 0 | 0 | 14 | 0 | 0 | 42 | 0 |
 | numbers | 40 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 40 | 0 | 0 | 0 | 0 | 0 | 38 | 0 | 1 | 1 | 0 |
 | odb | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 5 | 0 | 0 | 0 | 1 | 0 | 0 | 0 | 0 | 0 | 0 |
@@ -38,7 +38,7 @@ was refused (typed), `none` nothing to move.
 | xls | 119 | 0 | 0 | 0 | 0 | 0 | 0 | 3 | 100 | 3 | 0 | 0 | 16 | 0 | 58 | 2 | 0 | 0 | 59 | 0 |
 | xlsb | 19 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 1 | 18 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | xlsx | 179 | 0 | 0 | 0 | 2 | 0 | 0 | 1 | 0 | 173 | 0 | 1 | 5 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
-| **all** | 977 | 0 | 1 | 0 | 7 | 0 | 0 | 14 | 213 | 466 | 0 | 4 | 168 | 126 | 111 | 67 | 0 | 1 | 154 | 157 |
+| **all** | 982 | 0 | 0 | 0 | 7 | 0 | 0 | 14 | 216 | 466 | 0 | 4 | 169 | 127 | 111 | 67 | 0 | 1 | 154 | 157 |
 
 ## Office-extension files the unified layer does not open
 
@@ -56,7 +56,6 @@ was refused (typed), `none` nothing to move.
 ## Every no-op that is not exact, and every revert that is not exact
 
 - `iwork/numbers/formula-envelope-native.numbers` (numbers): exact ; structure one-way: table add+remove: the inverse is refused: unsupported_capability: source representation does not support table lifecycle changes
-- `libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx` (docx): refused edit: unsupported_capability: unsafe DOCX edit 'edit' rejected: source-backed document transactions do not support markup-compatibility b...
 - `libreoffice-core/sw/qa/extras/rtfexport/data/tdf107480.rtf` (rtf): exact ; revert one-way: /body/p[1] text: the set back is refused: unsupported_capability: unsupported RTF edit source: candidate body text did not survive RTF va...
 - `odf/native-resave/libreoffice-resaved/tdf169979-litchi.odp` (odp): exact ; revert one-way: /slide[1] name: the set back is refused: unsupported_capability: Unsupported feature: the ODP page name is referenced by links or custom ...
 - `odf/native-resave/litchi-changed/tdf169979-litchi.odp` (odp): exact ; revert one-way: /slide[1] name: the set back is refused: unsupported_capability: Unsupported feature: the ODP page name is referenced by links or custom ...

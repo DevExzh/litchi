@@ -235,12 +235,13 @@ libreoffice-core/sw/qa/core/data/rtf/pass/tdf116851.rtf	rtf	exact		value-exact	/
 libreoffice-core/sw/qa/core/doc/data/bookmark-delete-redline.doc	doc	exact		refused	/body/p[1] text: unsupported_capability: the format cannot perform the requested operation	-	
 libreoffice-core/sw/qa/core/doc/data/tdf171549.fodt	odt	exact		byte-exact	/body/tbl[1] name	-	
 libreoffice-core/sw/qa/core/header_footer/data/first-header-footer.odt	odt	exact		refused	/body/p[1] style: invalid_value: the ODT style does not exist	-	
-libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx	docx	refused	edit: unsupported_capability: unsafe DOCX edit 'edit' rejected: source-backed document transactions do not support markup-compatibility b...	-		-	
+libreoffice-core/sw/qa/core/objectpositioning/data/do-not-capture-draw-objs-on-page-draw-wrap-none.docx	docx	exact		byte-exact	/body/p[1]/r[1] lang.latin	-	
 libreoffice-core/sw/qa/core/text/data/A011-charheight.rtf	rtf	exact		none		refused	paragraph move+back: unsupported_capability: unsupported RTF edit source: a paragraph ends inside a group that continues with more content
 libreoffice-core/sw/qa/core/text/data/footnote-connect.fodt	odt	exact		byte-exact	/body/p[1] text	-	
 libreoffice-core/sw/qa/extras/layout/data/A020-min.rtf	rtf	exact		none		none	
 libreoffice-core/sw/qa/extras/layout/data/drop_asian_word.fodt	odt	exact		byte-exact	/body/p[1] text	-	
 libreoffice-core/sw/qa/extras/layout/data/field_hide_section.fodt	odt	exact		value-exact	/body/p[1] text: 15388 -> 15263 bytes, first difference at 13238	-	
+libreoffice-core/sw/qa/extras/layout/data/inline-textbox-position.docx	docx	exact		byte-exact	/body/p[1] style	-	
 libreoffice-core/sw/qa/extras/layout/data/tdf112256-diacritic-index-mark.fodt	odt	exact		value-exact	/body/p[1] text: 1996 -> 1826 bytes, first difference at 1761	-	
 libreoffice-core/sw/qa/extras/layout/data/tdf124423.odt	odt	exact		value-exact	/metadata author: 4863 -> 4467 bytes, first difference at 4	-	
 libreoffice-core/sw/qa/extras/layout/data/toc-inline-heading-order.fodt	odt	exact		byte-exact	/body/h[1] text	-	
@@ -266,12 +267,14 @@ libreoffice-core/sw/qa/extras/ooxmlexport/data/multi-page-toc.docx	docx	exact		b
 libreoffice-core/sw/qa/extras/ooxmlexport/data/n830205.docx	docx	exact		refused	/body/p[1] style: unsupported_capability: unsafe DOCX edit 'changed document publication' rejected: document or write protection, or trac...	-	
 libreoffice-core/sw/qa/extras/ooxmlexport/data/ooo39250-1-min.rtf	rtf	exact		refused	/body/p[3] text: unsupported_capability: unsupported RTF edit source: the body contains tables or positioned structure	byte-exact	paragraph move+back
 libreoffice-core/sw/qa/extras/ooxmlexport/data/strict.docx	docx	exact		byte-exact	/body/p[1]/r[2] lang.latin	-	
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf103389.docx	docx	exact		none		-	
 libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf124384.docx	docx	exact		refused	/body/sdt[1]/p[1] style: unsupported_capability: OPC error: source-backed OPC Part overlay is unavailable: topology publication refuses n...	-	
 libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf141173_missingFrames.rtf	rtf	exact		refused	/body/p[2] text: unsupported_capability: unsupported RTF edit source: the body contains tables or positioned structure	refused	paragraph move+back: unsupported_capability: unsupported RTF edit source: a paragraph inherits character formatting from its neighbours a...
 libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf154703_framePr2.rtf	rtf	exact		byte-exact	/header[2] text	refused	paragraph move+back: unsupported_capability: unsupported RTF edit source: a paragraph inherits character formatting from its neighbours a...
 libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf157011_ins_del_empty_cols.docx	docx	exact		refused	/body/p[1] lineSpacing: invalid_value: lineSpacing must contain a finite number	-	
 libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf164835_nonDummyLineHeight.docx	docx	exact		none		-	
 libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf89731.docx	docx	exact		byte-exact	/body/p[1] style	-	
+libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf90153.docx	docx	exact		byte-exact	/body/p[1] style	-	
 libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx	docx	exact		byte-exact	/body/sdt[1]/p[1] style	-	
 libreoffice-core/sw/qa/extras/ooxmlexport/data/testTOCFlag_u.docx	docx	exact		byte-exact	/body/p[1] style	-	
 libreoffice-core/sw/qa/extras/ooxmlexport/data/testTrackChangesInsertedTableCell.docx	docx	exact		none		-	
@@ -387,6 +390,7 @@ libreoffice-core/sw/qa/writerfilter/dmapper/data/alt-chunk.docx	docx	exact		none
 libreoffice-core/sw/qa/writerfilter/dmapper/data/floattable-vertical-frame-offset.rtf	rtf	exact		byte-exact	/body/tbl[1]/tr[1]/tc[1] text	refused	paragraph move+back: unsupported_capability: unsupported RTF edit source: producer paragraph splicing refuses bodies with tables or secti...
 libreoffice-core/sw/qa/writerfilter/dmapper/data/layout-in-cell-2.docx	docx	exact		byte-exact	/body/tbl[1]/tr[1]/tc[1]/p[2]/r[1] lang.ea	-	
 libreoffice-core/sw/qa/writerfilter/dmapper/data/redline-range-comment.docx	docx	exact		none		-	
+libreoffice-core/sw/qa/writerfilter/dmapper/data/redlined-shape-sdt.docx	docx	exact		refused	/body/p[2] style: unsupported_capability: unsafe DOCX edit 'changed document publication' rejected: document or write protection, or trac...	-	
 libreoffice-core/sw/qa/writerfilter/filters-test/data/pass/TCI-TN65GP-DDRHDLL-partial.rtf	rtf	exact		none		none	
 libreoffice-core/sw/qa/writerfilter/rtftok/data/endnote-at-section-end.rtf	rtf	exact		value-exact	/endnote[1] text: 253 -> 252 bytes, first difference at 197	none	
 libreoffice-core/sw/qa/writerfilter/rtftok/data/floating-table.rtf	rtf	exact		byte-exact	/body/tbl[1]/tr[1]/tc[1] text	refused	paragraph move+back: unsupported_capability: unsupported RTF edit source: producer paragraph splicing refuses bodies with tables or secti...

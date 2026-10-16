@@ -21,8 +21,8 @@ differs from the hash recorded below.
 
 | Input | File | SHA-256 |
 |---|---|---|
-| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `6e78cda6a9782ff91cbd9e647c43478016f0b0b69ab91435c80c612daa2a5e72` |
-| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `55f0808295e05bf834eabb36af5711d1811c453bcd90cd2c4620bc029777abf9` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `f20932a0760b8d4cffafe14e505399f6ed468ebecf69af15eba2bb3b371fae2e` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `f6a7361ed49a24501a09b237591b593e9ca8b6c9223b87c7a34801d414c08334` |
 | golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `50f8da9165f985c1e7c72a12aeb12e57c77ea6c93b68da89b56d2f85986d4e08` |
 | golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `7f0bb0d83ab8d8ab1f6951aebfb8d1b26516d7c5a1bb201e346bac315faa7d69` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `728daa474cf4f13235a7d82ad19802d4a051195be4bdc6b73dc462cabea8b957` |
@@ -1304,11 +1304,11 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 
 | Verb | Element | Context | Reason | Follow-up |
 |---|---|---|---|---|
-| `set` | `paragraph` | `wrapped-or-unproven-selection` | paragraphs in cells and content controls are edited through proven element paths (record 0251a); paragraphs in w:customXml wrappers, wrapped rows or cells, or markup-compatibility-selected content have no proven raw position | L-DOCX-W3 |
+| `set` | `paragraph` | `wrapped-or-unproven-selection` | paragraphs in cells and content controls are edited through proven element paths (record 0251a); paragraphs in w:customXml wrappers, wrapped rows or cells, or markup-compatibility content selected outside runs have no proven raw position; alternate content inside runs keeps every position (record 0307) | L-DOCX-W3 |
 | `set` | `run` | `wrapped-or-unproven-selection` | direct runs and direct runs of hyperlinks are edited (record 0251a); runs in tracked changes, smart tags, custom XML or other wrappers, and paragraphs with comment-reference runs, have no proven raw ordinal | L-DOCX-W2 |
 | `set` | `paragraph/run` | `mixed-paragraph-run-fanout` | one DOCX mutation admits one target kind, so a paragraph/run union is refused before staging rather than applying a descendant ordinal to the wrong leaf | M2 (homogeneous mutation fanout) |
 | `set` | `paragraph/run` | `managed-transaction` | the formatting transaction has not proven edit admission and publication for execution-context-managed DOCX owners; the read projection remains available | L-DOCX-W5 |
-| `set` | `paragraph/run` | `complex-leaf-content` | fields, markup-compatibility branches and other nested or unmodeled run content lack a proven raw ownership and address mapping for leaf edits | L-DOCX-W2 / record 0011 |
+| `set` | `paragraph/run` | `complex-leaf-content` | fields and other nested or unmodeled run content lack a proven raw ownership and address mapping for leaf edits; markup-compatibility alternate content in a run is one opaque object, so a text set over one whose branches hold text (a text box) is refused | L-DOCX-W2 / record 0011 / record 0307 (text-box stories) |
 | `add` | `paragraph/run` | `managed-transaction` | structural insertion uses the unmanaged DOCX transaction path; execution-context-managed owners refuse the leaf splice until managed admission is proven | L-DOCX-W5 |
 | `add` | `paragraph` | `wrapped-or-unproven-parent` | paragraphs are added under the body, cells and block content controls (record 0251a); parents whose raw position is not proven are refused | L-DOCX-W3 |
 | `add` | `run` | `wrapped-or-unproven-parent` | runs are added beside the direct runs of any proven paragraph (record 0251a); insertion inside a hyperlink and under wrapped paragraphs is refused | L-DOCX-W2 |
